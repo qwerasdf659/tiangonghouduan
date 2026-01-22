@@ -5,14 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>用户材料余额查询 - 管理后台</title>
 
-  <!-- Bootstrap 5 - UI框架 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
-  <!-- Bootstrap Icons - 图标库 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-
-  <!-- 公共样式表 - 统一主题和响应式设计 -->
   <link href="/admin/css/common.css" rel="stylesheet">
+  
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
 
   <style>
     .balance-card {
@@ -22,8 +21,12 @@
       font-size: 1.5rem;
     }
   </style>
+  <!-- Alpine.js -->
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
 </head>
 <body class="bg-light">
+  <div x-data="materialBalancesPage()" x-init="init()" x-cloak>
   <!-- 顶部导航 -->
   <nav class="navbar navbar-dark bg-primary">
     <div class="container-fluid">
@@ -31,8 +34,8 @@
         <i class="bi bi-arrow-left me-2"></i>管理后台 - 用户材料余额查询
       </a>
       <div>
-        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+          <span class="text-light me-3" x-text="'欢迎，' + (adminInfo.nickname || adminInfo.username || '管理员')"></span>
+          <button class="btn btn-outline-light btn-sm" @click="logout">退出登录</button>
       </div>
     </div>
   </nav>
@@ -44,14 +47,14 @@
         <h5 class="mb-3">
           <i class="bi bi-search"></i> 查询用户材料余额
         </h5>
-        <form id="searchForm" class="row g-3">
+          <form @submit.prevent="handleSearch" class="row g-3">
           <div class="col-md-4">
             <label class="form-label">用户ID</label>
-            <input type="number" class="form-control" id="searchUserId" placeholder="输入用户ID">
+              <input type="number" class="form-control" x-model="searchUserId" placeholder="输入用户ID">
           </div>
           <div class="col-md-4">
             <label class="form-label">手机号</label>
-            <input type="text" class="form-control" id="searchMobile" placeholder="输入手机号">
+              <input type="text" class="form-control" x-model="searchMobile" placeholder="输入手机号">
           </div>
           <div class="col-md-4 d-flex align-items-end">
             <button type="submit" class="btn btn-primary w-100">
@@ -63,19 +66,23 @@
     </div>
 
     <!-- 用户信息区域 -->
-    <div id="userInfoSection" style="display: none;">
+      <div x-show="currentUser" x-cloak>
       <div class="card mb-3">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center">
             <div>
               <h5 class="mb-1">
-                <i class="bi bi-person-circle"></i> <span id="userNickname">-</span>
+                  <i class="bi bi-person-circle"></i> 
+                  <span x-text="currentUser?.nickname || '未设置'"></span>
               </h5>
               <p class="mb-0 text-muted">
-                <small>用户ID: <code id="userId">-</code> | 手机号: <span id="userMobile">-</span></small>
+                  <small>
+                    用户ID: <code x-text="currentUser?.user_id || '-'"></code> | 
+                    手机号: <span x-text="maskPhone(currentUser?.mobile) || '-'"></span>
+                  </small>
               </p>
             </div>
-            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#adjustBalanceModal">
+              <button class="btn btn-success" @click="openAdjustModal">
               <i class="bi bi-wallet2"></i> 调整余额
             </button>
           </div>
@@ -99,13 +106,35 @@
                   <th>活动ID</th>
                 </tr>
               </thead>
-              <tbody id="balancesTableBody">
-                <tr>
+                <tbody>
+                  <!-- 加载状态 -->
+                  <tr x-show="loading">
+                    <td colspan="5" class="text-center py-5">
+                      <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">加载中...</span>
+                      </div>
+                      <p class="mt-2 text-muted">正在加载数据...</p>
+                    </td>
+                  </tr>
+                  
+                  <!-- 空数据状态 -->
+                  <tr x-show="!loading && balances.length === 0">
                   <td colspan="5" class="text-center py-5">
                     <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
-                    <p class="mt-2 text-muted">请先搜索用户</p>
+                      <p class="mt-2 text-muted">该用户暂无材料余额</p>
                   </td>
                 </tr>
+                  
+                  <!-- 余额列表 -->
+                  <template x-for="balance in balances" :key="balance.asset_code">
+                    <tr>
+                      <td><code x-text="balance.asset_code"></code></td>
+                      <td><h5 class="mb-0 text-success" x-text="balance.available_amount"></h5></td>
+                      <td><span class="text-warning" x-text="balance.frozen_amount"></span></td>
+                      <td><span class="text-primary fw-bold" x-text="balance.total"></span></td>
+                      <td><span class="text-muted" x-text="balance.campaign_id || '-'"></span></td>
+                    </tr>
+                  </template>
               </tbody>
             </table>
           </div>
@@ -114,14 +143,14 @@
     </div>
 
     <!-- 空状态提示 -->
-    <div id="emptyState" class="text-center py-5">
+      <div x-show="!currentUser" class="text-center py-5">
       <i class="bi bi-search text-muted" style="font-size: 4rem;"></i>
       <p class="mt-3 text-muted">请输入用户ID或手机号进行查询</p>
     </div>
   </div>
 
   <!-- 调整余额模态框 -->
-  <div class="modal fade" id="adjustBalanceModal" tabindex="-1">
+    <div class="modal fade" x-ref="adjustModal" tabindex="-1">
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
@@ -130,65 +159,52 @@
           </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
+          <form @submit.prevent="submitAdjust">
         <div class="modal-body">
-          <form id="adjustBalanceForm">
             <div class="mb-3">
               <label class="form-label">资产类型 <span class="text-danger">*</span></label>
-              <select class="form-select" id="adjustAssetCode" required>
+                <select class="form-select" x-model="adjustForm.asset_code" required>
                 <option value="">请选择</option>
+                  <template x-for="asset in enabledAssetTypes" :key="asset.asset_code">
+                    <option :value="asset.asset_code" x-text="asset.display_name + ' (' + asset.asset_code + ')'"></option>
+                  </template>
               </select>
             </div>
             <div class="mb-3">
               <label class="form-label">调整类型 <span class="text-danger">*</span></label>
-              <select class="form-select" id="adjustType" required>
+                <select class="form-select" x-model="adjustForm.adjust_type" required>
                 <option value="increase">增加</option>
                 <option value="decrease">减少</option>
               </select>
             </div>
             <div class="mb-3">
               <label class="form-label">调整数量 <span class="text-danger">*</span></label>
-              <input type="number" class="form-control" id="adjustAmount" required min="1" placeholder="输入调整数量">
+                <input type="number" class="form-control" x-model="adjustForm.amount" required min="1" placeholder="输入调整数量">
             </div>
             <div class="mb-3">
               <label class="form-label">调整原因 <span class="text-danger">*</span></label>
-              <textarea class="form-control" id="adjustReason" required rows="3" placeholder="请说明调整原因"></textarea>
+                <textarea class="form-control" x-model="adjustForm.reason" required rows="3" placeholder="请说明调整原因"></textarea>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+              <button type="submit" class="btn btn-primary" :disabled="submitting">
+                <span x-show="submitting" class="spinner-border spinner-border-sm me-1"></span>
+                <i class="bi bi-check-lg" x-show="!submitting"></i> 确认调整
+              </button>
             </div>
           </form>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="button" class="btn btn-primary" id="submitAdjustBtn">
-            <i class="bi bi-check-lg"></i> 确认调整
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Toast 提示组件 -->
-  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
-    <div id="successToast" class="toast align-items-center text-white bg-success border-0" role="alert">
-      <div class="d-flex">
-        <div class="toast-body" id="successToastBody"></div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-      </div>
-    </div>
-    <div id="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert">
-      <div class="d-flex">
-        <div class="toast-body" id="errorToastBody"></div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
       </div>
     </div>
   </div>
 
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-  <!-- 引入公共模块 -->
+  <!-- 通用工具库 -->
   <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/api-config.js"></script>
-
-  <!-- 引入页面专属逻辑 -->
-  <script src="/admin/js/pages/material-balances.js?v=1.0.0"></script>
+  <script src="/admin/js/pages/material-balances.js"></script>
+  <!-- Alpine.js -->
 </body>
 </html>

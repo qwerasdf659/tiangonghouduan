@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数据仪表盘 - 管理后台</title>
+  
+  <!-- ✅ Bootstrap 5 - UI框架 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- ✅ Bootstrap Icons - 图标库 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  
+  <!-- ✅ 公共样式表 - 统一主题和响应式设计 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+  
+  <style>
+    .chart-container {
+      position: relative;
+      height: 280px;
+    }
+  </style>
+</head>
+<body class="bg-light" x-data="dashboardPage()" x-init="init()">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <span class="navbar-brand">📊 管理后台 - 数据仪表盘</span>
+      <div>
+        <span class="text-light me-3" x-text="'欢迎，' + (userInfo?.nickname || '管理员')"></span>
+        <button class="btn btn-outline-light btn-sm" @click="logout">退出登录</button>
+      </div>
+    </div>
+  </nav>
+  
+  <div class="container mt-4">
+    <h4 class="mb-3">今日数据概览</h4>
+    
+    <!-- 统计卡片 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">总用户数</h6>
+            <h2 class="text-primary" x-text="formatNumber(stats.totalUsers)">-</h2>
+            <small class="text-success">今日新增: <span x-text="stats.todayNewUsers">-</span></small>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">今日抽奖</h6>
+            <h2 class="text-success" x-text="formatNumber(stats.todayDraws)">-</h2>
+            <small class="text-info">中奖: <span x-text="formatNumber(stats.todayWins)">-</span></small>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">中奖率</h6>
+            <h2 class="text-warning" x-text="stats.winRate + '%'">-</h2>
+            <small class="text-secondary">消耗积分: <span x-text="formatNumber(stats.pointsConsumed)">-</span></small>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">客服会话</h6>
+            <h2 class="text-danger" x-text="formatNumber(stats.sessions)">-</h2>
+            <small class="text-muted">消息数: <span x-text="formatNumber(stats.messages)">-</span></small>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- ECharts 数据趋势图表 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-8">
+        <div class="card">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h6 class="mb-0"><i class="bi bi-graph-up"></i> 7日抽奖趋势</h6>
+            <small class="text-muted">每分钟自动刷新</small>
+          </div>
+          <div class="card-body">
+            <div id="lotteryTrendChart" class="chart-container" x-ref="trendChart"></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card">
+          <div class="card-header bg-white">
+            <h6 class="mb-0"><i class="bi bi-pie-chart"></i> 今日数据分布</h6>
+          </div>
+          <div class="card-body">
+            <div id="todayDistributionChart" class="chart-container" x-ref="distributionChart"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 快速导航 -->
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title">
+              <i class="bi bi-lightning-fill"></i> 快速操作
+            </h5>
+            
+            <!-- P0 - 核心业务功能 -->
+            <div class="mb-3">
+              <h6 class="text-muted mb-2">
+                <span class="badge bg-danger me-2">P0</span>核心业务功能
+              </h6>
+              <div class="row g-2">
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/consumption.html" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-clipboard-check"></i> 消费记录审核
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/presets.html" class="btn btn-outline-warning w-100">
+                    <i class="bi bi-stars"></i> 抽奖预设管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/campaigns.html" class="btn btn-outline-danger w-100">
+                    <i class="bi bi-gift"></i> 抽奖活动管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/lottery-strategy.html" class="btn btn-outline-success w-100">
+                    <i class="bi bi-sliders"></i> 策略引擎配置
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/debt-management.html" class="btn btn-outline-info w-100">
+                    <i class="bi bi-cash-stack"></i> 欠账管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/stores.html" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-shop"></i> 门店管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/store-staff.html" class="btn btn-outline-dark w-100">
+                    <i class="bi bi-person-badge"></i> 员工管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/risk-alerts.html" class="btn btn-danger w-100">
+                    <i class="bi bi-exclamation-triangle"></i> 风控告警
+                  </a>
+                </div>
+              </div>
+            </div>
+            
+            <!-- P1 - 统一管理中心 (新架构) -->
+            <div class="mb-3">
+              <h6 class="text-muted mb-2">
+                <span class="badge bg-primary me-2">P1</span>统一管理中心 <span class="badge bg-success">组件化架构</span>
+              </h6>
+              <div class="row g-2">
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/pages/asset-management.html" class="btn btn-primary w-100">
+                    <i class="bi bi-gem"></i> 资产管理中心
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/pages/market-management.html" class="btn btn-success w-100">
+                    <i class="bi bi-shop-window"></i> 市场交易管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/pages/user-management.html" class="btn btn-info w-100">
+                    <i class="bi bi-people-fill"></i> 用户权限管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/pages/system-config.html" class="btn btn-warning w-100">
+                    <i class="bi bi-gear-wide-connected"></i> 系统配置管理
+                  </a>
+                </div>
+              </div>
+            </div>
+            
+            <!-- P1.5 - 核心功能 -->
+            <div class="mb-3">
+              <h6 class="text-muted mb-2">
+                <span class="badge bg-secondary me-2">P1.5</span>核心功能
+              </h6>
+              <div class="row g-2">
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/users.html" class="btn btn-outline-info w-100">
+                    <i class="bi bi-people"></i> 用户管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/prizes.html" class="btn btn-outline-success w-100">
+                    <i class="bi bi-gift"></i> 奖品池配置
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/customer-service.html" class="btn btn-outline-danger w-100">
+                    <i class="bi bi-chat-dots"></i> 客服工作台
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/activity-conditions.html" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-list-check"></i> 活动条件管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/roles.html" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-shield-check"></i> 角色管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/item-templates.html" class="btn btn-outline-warning w-100">
+                    <i class="bi bi-box"></i> 物品模板
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/dict-management.html" class="btn btn-outline-dark w-100">
+                    <i class="bi bi-book"></i> 字典管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/tier-matrix.html" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-grid-3x3"></i> BxPx矩阵配置
+                  </a>
+                </div>
+              </div>
+            </div>
+            
+            <!-- P2 - 高级功能 -->
+            <div class="mb-3">
+              <h6 class="text-muted mb-2">
+                <span class="badge bg-success me-2">P2</span>高级功能
+              </h6>
+              <div class="row g-2">
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/statistics.html" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-bar-chart-fill"></i> 数据统计报表
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/charts.html" class="btn btn-outline-success w-100">
+                    <i class="bi bi-graph-up"></i> 图表可视化
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/settings.html" class="btn btn-outline-danger w-100">
+                    <i class="bi bi-gear-fill"></i> 系统设置
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/lottery-metrics.html" class="btn btn-outline-info w-100">
+                    <i class="bi bi-speedometer2"></i> 抽奖监控
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/redemption-orders.html" class="btn btn-outline-warning w-100">
+                    <i class="bi bi-qr-code"></i> 核销码管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/pricing-config.html" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-currency-dollar"></i> 活动定价
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/sessions.html" class="btn btn-outline-dark w-100">
+                    <i class="bi bi-key"></i> 会话管理
+                  </a>
+                </div>
+              </div>
+            </div>
+            
+            <!-- P3 - 系统管理 -->
+            <div class="mb-3">
+              <h6 class="text-muted mb-2">
+                <span class="badge bg-info me-2">P3</span>系统管理
+              </h6>
+              <div class="row g-2">
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/feedbacks.html" class="btn btn-outline-info w-100">
+                    <i class="bi bi-chat-square-text"></i> 反馈管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/audit-logs.html" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-journal-text"></i> 审计日志
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/config-tools.html" class="btn btn-outline-dark w-100">
+                    <i class="bi bi-tools"></i> 配置工具
+                  </a>
+                </div>
+              </div>
+            </div>
+            
+            <!-- P3.5 - 运营管理 -->
+            <div class="mb-3">
+              <h6 class="text-muted mb-2">
+                <span class="badge bg-secondary me-2">P3.5</span>运营管理
+              </h6>
+              <div class="row g-2">
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/analytics.html" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-graph-up"></i> 运营分析
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/lottery-quota.html" class="btn btn-outline-success w-100">
+                    <i class="bi bi-ticket-perforated"></i> 抽奖配额管理
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/campaign-budget.html" class="btn btn-outline-warning w-100">
+                    <i class="bi bi-wallet2"></i> 活动预算配置
+                  </a>
+                </div>
+              </div>
+            </div>
+            
+            <!-- P3.6 - 资产相关功能 -->
+            <div class="mb-3">
+              <h6 class="text-muted mb-2">
+                <span class="badge bg-dark me-2">P3.6</span>资产相关功能
+              </h6>
+              <div class="row g-2">
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/asset-adjustment.html" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-plus-slash-minus"></i> 资产调整
+                  </a>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/orphan-frozen.html" class="btn btn-outline-danger w-100">
+                    <i class="bi bi-snow"></i> 孤儿冻结清理
+                  </a>
+                </div>
+              </div>
+            </div>
+            
+            <!-- P4 - 其他交易功能 (已整合到市场交易管理) -->
+            <div>
+              <h6 class="text-muted mb-2">
+                <span class="badge bg-warning me-2">P4</span>独立交易功能
+              </h6>
+              <div class="row g-2">
+                <div class="col-md-3 col-sm-6">
+                  <a href="/admin/trade-orders.html" class="btn btn-outline-warning w-100">
+                    <i class="bi bi-arrow-left-right"></i> C2C交易订单
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ ECharts - 图表库（本地引用，符合规范要求） -->
+  <script src="/admin/js/lib/echarts.min.js"></script>
+  
+  <!-- ✅ 引入通用工具库 -->
+  <script src="/admin/js/api-config.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  
+  <!-- ✅ 页面专属逻辑（必须在 Alpine 之前加载） -->
+  <script src="/admin/js/pages/dashboard.js"></script>
+  
+  <!-- ✅ Alpine.js -->
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+</body>
+</html>

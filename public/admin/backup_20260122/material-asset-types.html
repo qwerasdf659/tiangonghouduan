@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>材料资产类型管理 - 管理后台</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+
+  <style>
+    .asset-badge {
+      font-size: 0.875rem;
+      padding: 0.25rem 0.75rem;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <div x-data="materialAssetTypesPage()" x-init="init()">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>💎 管理后台 - 材料资产类型管理
+      </a>
+      <div>
+          <span class="text-light me-3" x-text="'欢迎，' + (userInfo.nickname || userInfo.username || '管理员')"></span>
+          <button class="btn btn-outline-light btn-sm" @click="logout">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 操作区域 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="mb-0">
+              <i class="bi bi-gem"></i> 材料资产类型管理
+            </h5>
+            <small class="text-muted">配置系统中的材料类型（碎片/水晶）</small>
+          </div>
+            <button class="btn btn-primary" @click="openAddModal">
+            <i class="bi bi-plus-lg"></i> 添加资产类型
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 统计信息 -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">资产类型总数</h6>
+              <h3 class="text-primary" x-text="stats.total"></h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">已启用</h6>
+              <h3 class="text-success" x-text="stats.enabled"></h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">已禁用</h6>
+              <h3 class="text-warning" x-text="stats.disabled"></h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">材料组数量</h6>
+              <h3 class="text-info" x-text="stats.groups"></h3>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据表格 -->
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>资产代码</th>
+                <th>显示名称</th>
+                <th>材料组</th>
+                <th>形态</th>
+                <th>层级</th>
+                <th>可见价值</th>
+                <th>预算价值</th>
+                <th>排序</th>
+                <th>状态</th>
+                <th style="width: 200px;">操作</th>
+              </tr>
+            </thead>
+              <tbody>
+                <!-- 加载状态 -->
+                <tr x-show="loading">
+                <td colspan="10" class="text-center py-5">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                  </div>
+                  <p class="mt-2 text-muted">正在加载数据...</p>
+                </td>
+              </tr>
+                
+                <!-- 空数据状态 -->
+                <tr x-show="!loading && assetTypes.length === 0">
+                  <td colspan="10" class="text-center py-5">
+                    <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                    <p class="mt-2 text-muted">暂无资产类型，点击右上角添加</p>
+                  </td>
+                </tr>
+                
+                <!-- 资产类型列表 -->
+                <template x-for="asset in assetTypes" :key="asset.asset_code">
+                  <tr>
+                    <td><code x-text="asset.asset_code"></code></td>
+                    <td><strong x-text="asset.display_name"></strong></td>
+                    <td><span class="badge bg-info" x-text="asset.group_code"></span></td>
+                    <td>
+                      <span class="badge" :class="getFormColor(asset.form)" x-text="getFormLabel(asset.form)"></span>
+                    </td>
+                    <td><span class="badge bg-secondary" x-text="'Tier ' + asset.tier"></span></td>
+                    <td class="text-primary fw-bold" x-text="asset.visible_value_points"></td>
+                    <td class="text-success fw-bold" x-text="asset.budget_value_points"></td>
+                    <td x-text="asset.sort_order"></td>
+                    <td>
+                      <span class="badge" :class="asset.is_enabled ? 'bg-success' : 'bg-secondary'" 
+                            x-text="asset.is_enabled ? '已启用' : '已禁用'"></span>
+                    </td>
+                    <td>
+                      <button class="btn btn-sm btn-primary me-1" @click="openEditModal(asset.asset_code)">
+                        <i class="bi bi-pencil"></i> 编辑
+                      </button>
+                      <button class="btn btn-sm" 
+                              :class="asset.is_enabled ? 'btn-warning' : 'btn-success'"
+                              @click="toggleStatus(asset.asset_code, asset.is_enabled)">
+                        <i class="bi" :class="asset.is_enabled ? 'bi-pause-circle' : 'bi-play-circle'"></i>
+                        <span x-text="asset.is_enabled ? '禁用' : '启用'"></span>
+                      </button>
+                    </td>
+                  </tr>
+                </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加资产类型模态框 -->
+    <div class="modal fade" x-ref="addModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-plus-circle"></i> 添加资产类型
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+          <form @submit.prevent="submitAdd">
+        <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">资产代码 <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control" x-model="addForm.asset_code" required placeholder="如: red_shard">
+                <small class="text-muted">唯一标识，建议使用小写字母和下划线</small>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">显示名称 <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control" x-model="addForm.display_name" required placeholder="如: 碎红水晶">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">材料组 <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control" x-model="addForm.group_code" required placeholder="如: red">
+                <small class="text-muted">用于分组，如: red, orange, purple</small>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">形态 <span class="text-danger">*</span></label>
+                  <select class="form-select" x-model="addForm.form" required>
+                  <option value="">请选择</option>
+                  <option value="shard">碎片（shard）</option>
+                  <option value="crystal">水晶（crystal）</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">层级 <span class="text-danger">*</span></label>
+                  <input type="number" class="form-control" x-model="addForm.tier" required min="1" placeholder="如: 1">
+                <small class="text-muted">层级越高价值越大，红=1，橙=2</small>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">可见价值（积分） <span class="text-danger">*</span></label>
+                  <input type="number" class="form-control" x-model="addForm.visible_value_points" required min="0" placeholder="如: 10">
+                <small class="text-muted">用于用户展示和说明</small>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">预算价值（积分） <span class="text-danger">*</span></label>
+                  <input type="number" class="form-control" x-model="addForm.budget_value_points" required min="0" placeholder="如: 10">
+                <small class="text-muted">用于系统成本控制</small>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">排序权重</label>
+                  <input type="number" class="form-control" x-model="addForm.sort_order" value="0">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">启用状态</label>
+                  <select class="form-select" x-model="addForm.is_enabled">
+                  <option value="1">启用</option>
+                  <option value="0">禁用</option>
+                </select>
+              </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+              <button type="submit" class="btn btn-primary" :disabled="submitting">
+                <span x-show="submitting" class="spinner-border spinner-border-sm me-1"></span>
+                <i class="bi bi-check-lg" x-show="!submitting"></i> 确认添加
+          </button>
+        </div>
+          </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 编辑资产类型模态框 -->
+    <div class="modal fade" x-ref="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-pencil"></i> 编辑资产类型
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+          <form @submit.prevent="submitEdit">
+        <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-md-12">
+                <label class="form-label">资产代码</label>
+                  <input type="text" class="form-control" x-model="editForm.asset_code" disabled>
+                <small class="text-muted">资产代码不可修改</small>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">显示名称 <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control" x-model="editForm.display_name" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">材料组</label>
+                  <input type="text" class="form-control" x-model="editForm.group_code" disabled>
+                <small class="text-muted">材料组不可修改</small>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">形态</label>
+                  <input type="text" class="form-control" x-model="editForm.form" disabled>
+                <small class="text-muted">形态不可修改</small>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">层级</label>
+                  <input type="number" class="form-control" x-model="editForm.tier" disabled>
+                <small class="text-muted">层级不可修改</small>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">排序权重</label>
+                  <input type="number" class="form-control" x-model="editForm.sort_order">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">可见价值（积分） <span class="text-danger">*</span></label>
+                  <input type="number" class="form-control" x-model="editForm.visible_value_points" required min="0">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">预算价值（积分） <span class="text-danger">*</span></label>
+                  <input type="number" class="form-control" x-model="editForm.budget_value_points" required min="0">
+              </div>
+              <div class="col-md-12">
+                <label class="form-label">启用状态</label>
+                  <select class="form-select" x-model="editForm.is_enabled">
+                  <option value="1">启用</option>
+                  <option value="0">禁用</option>
+                </select>
+              </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+              <button type="submit" class="btn btn-primary" :disabled="submitting">
+                <span x-show="submitting" class="spinner-border spinner-border-sm me-1"></span>
+                <i class="bi bi-check-lg" x-show="!submitting"></i> 保存更新
+          </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  <script src="/admin/js/common/toast.js"></script>
+  <script src="/admin/js/pages/material-asset-types.js"></script>
+</body>
+</html>

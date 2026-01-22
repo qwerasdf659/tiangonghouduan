@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>孤儿冻结清理 - 管理后台</title>
+
+  <!-- Bootstrap 5 - UI框架 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Bootstrap Icons - 图标库 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- 公共样式表 - 统一主题和响应式设计 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+
+  <style>
+    .orphan-card {
+      border-left: 4px solid #dc3545;
+    }
+    .frozen-card {
+      border-left: 4px solid #17a2b8;
+    }
+    .user-card {
+      border-left: 4px solid #ffc107;
+    }
+    .value-card {
+      border-left: 4px solid #28a745;
+    }
+    .table th {
+      white-space: nowrap;
+    }
+    .badge-asset {
+      font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>管理后台 - 孤儿冻结清理
+      </a>
+      <div>
+        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 功能说明 -->
+    <div class="alert alert-info mb-4">
+      <i class="bi bi-info-circle me-2"></i>
+      <strong>孤儿冻结说明：</strong>
+      当用户账户的冻结金额（frozen_amount）大于其活跃挂牌的冻结总额时，多出的部分称为"孤儿冻结"。
+      清理操作会将孤儿冻结金额解冻到用户的可用余额。
+    </div>
+
+    <!-- 统计概览 - 适配后端stats API字段 -->
+    <!-- 后端字段: total_orphan_count, total_orphan_amount, affected_user_count -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card orphan-card">
+          <div class="card-body text-center">
+            <i class="bi bi-exclamation-triangle text-danger" style="font-size: 2rem;"></i>
+            <h4 class="mt-2 text-danger" id="orphanCount">0</h4>
+            <small class="text-muted">孤儿冻结数</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card frozen-card">
+          <div class="card-body text-center">
+            <i class="bi bi-snow2 text-info" style="font-size: 2rem;"></i>
+            <h4 class="mt-2 text-info" id="frozenCount">0</h4>
+            <small class="text-muted">孤儿冻结总额</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card user-card">
+          <div class="card-body text-center">
+            <i class="bi bi-people text-warning" style="font-size: 2rem;"></i>
+            <h4 class="mt-2 text-warning" id="expiredCount">0</h4>
+            <small class="text-muted">影响用户数</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card value-card">
+          <div class="card-body text-center">
+            <i class="bi bi-cash-coin text-success" style="font-size: 2rem;"></i>
+            <h4 class="mt-2 text-success" id="totalValue">¥0.00</h4>
+            <small class="text-muted">涉及金额</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 操作区域 - 简化筛选器，只保留后端支持的 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">资产类型 (asset_code)</label>
+            <select class="form-select" id="assetTypeFilter">
+              <option value="">全部资产</option>
+              <option value="points">积分 (points)</option>
+              <option value="diamond">钻石 (diamond)</option>
+              <option value="gold_coin">金币 (gold_coin)</option>
+              <option value="silver_coin">银币 (silver_coin)</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-primary w-100" id="refreshBtn">
+              <i class="bi bi-arrow-repeat"></i> 刷新
+            </button>
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-warning w-100" id="scanBtn">
+              <i class="bi bi-search"></i> 扫描孤儿
+            </button>
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-danger w-100" id="batchCleanBtn" disabled>
+              <i class="bi bi-trash"></i> 批量清理
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据列表 -->
+    <div class="card">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-list-ul"></i> 孤儿冻结数据列表</h5>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="selectAll">
+          <label class="form-check-label" for="selectAll">全选</label>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th width="40"><input type="checkbox" class="form-check-input" id="headerCheckbox"></th>
+                <th>#</th>
+                <th>类型</th>
+                <th>资产类型</th>
+                <th>孤儿冻结额</th>
+                <th>用户</th>
+                <th>描述</th>
+                <th>创建时间</th>
+                <th>过期时间</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="dataTableBody">
+              <tr>
+                <td colspan="11" class="text-center py-5 text-muted">
+                  <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                  <p class="mt-2">点击"刷新"或"扫描孤儿"开始检查</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card-footer bg-white">
+        <nav id="paginationNav"></nav>
+      </div>
+    </div>
+
+    <!-- 后端字段说明 -->
+    <div class="card mt-4">
+      <div class="card-header bg-light">
+        <i class="bi bi-code-square"></i> 后端API字段说明
+      </div>
+      <div class="card-body">
+        <h6>检测API (GET /api/v4/console/orphan-frozen/detect)</h6>
+        <ul class="small text-muted mb-3">
+          <li><code>total</code> - 孤儿冻结记录数</li>
+          <li><code>total_amount</code> - 孤儿冻结总金额</li>
+          <li><code>orphan_list[]</code> - 孤儿冻结列表</li>
+        </ul>
+        
+        <h6>孤儿冻结项字段 (orphan_list item)</h6>
+        <ul class="small text-muted mb-3">
+          <li><code>user_id</code> - 用户ID</li>
+          <li><code>account_id</code> - 账户ID</li>
+          <li><code>asset_code</code> - 资产代码</li>
+          <li><code>frozen_amount</code> - 账户总冻结金额</li>
+          <li><code>listed_amount</code> - 活跃挂牌冻结金额</li>
+          <li><code>orphan_amount</code> - 孤儿冻结金额 (frozen_amount - listed_amount)</li>
+          <li><code>available_amount</code> - 可用余额</li>
+          <li><code>description</code> - 描述信息</li>
+        </ul>
+
+        <h6>统计API (GET /api/v4/console/orphan-frozen/stats)</h6>
+        <ul class="small text-muted mb-0">
+          <li><code>total_orphan_count</code> - 孤儿冻结总数</li>
+          <li><code>total_orphan_amount</code> - 孤儿冻结总金额</li>
+          <li><code>affected_user_count</code> - 影响用户数</li>
+          <li><code>by_asset[]</code> - 按资产类型分组统计</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 清理确认模态框 -->
+  <div class="modal fade" id="cleanConfirmModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle"></i> 确认清理孤儿冻结</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-warning">
+            <i class="bi bi-info-circle-fill"></i> 
+            清理操作会将孤儿冻结金额解冻到用户的可用余额，此操作会记录审计日志。
+          </div>
+          <p>您即将清理以下孤儿冻结数据：</p>
+          <ul id="cleanSummaryList">
+            <!-- 动态生成 -->
+          </ul>
+          <div class="mb-3">
+            <label class="form-label">清理原因 <span class="text-danger">*</span></label>
+            <textarea class="form-control" id="cleanReason" rows="2" required placeholder="请输入清理原因（必填）"></textarea>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="confirmClean" required>
+            <label class="form-check-label" for="confirmClean">
+              我已了解清理操作的影响，确认执行
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-danger" id="confirmCleanBtn" disabled>确认清理</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- 引入通用工具库 -->
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+
+  <!-- 页面脚本 -->
+  <script src="/admin/js/common/toast.js"></script>
+  <script src="/admin/js/pages/orphan-frozen.js"></script>
+</body>
+</html>

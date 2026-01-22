@@ -1,582 +1,474 @@
 /**
- * 通用资产调整页面
- * @description 管理用户的各类资产（积分、钻石、材料等）
- * @created 2026-01-09
- * @version 1.0.0
+ * 通用资产调整页面 - Alpine.js 组件
+ * asset-adjustment.js
  */
 
-// ============================================================
-// 全局变量
-// ============================================================
-let currentUserId = null
-let currentPage = 1
-const pageSize = 20
-let assetTypes = []
-let campaigns = [] // 活动列表（用于BUDGET_POINTS选择）
-
-// ============================================================
-// 页面初始化
-// ============================================================
-document.addEventListener('DOMContentLoaded', function () {
-  // 显示用户信息
-  const userInfo = getCurrentUser()
-  if (userInfo && userInfo.nickname) {
-    document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`
-  }
-
-  // 事件监听器
-  document.getElementById('logoutBtn').addEventListener('click', logout)
-  document.getElementById('searchForm').addEventListener('submit', handleSearch)
-  document.getElementById('submitAdjustBtn').addEventListener('click', submitAdjustAsset)
-  document.getElementById('assetTypeFilter').addEventListener('change', loadAdjustmentRecords)
-  // 资产类型选择变化时，显示/隐藏活动选择框
-  document.getElementById('assetType').addEventListener('change', onAssetTypeChange)
-
-  // Token和权限验证
-  if (!getToken() || !checkAdminPermission()) {
-    return
-  }
+function assetAdjustmentPage() {
+  return {
+    // 用户信息
+    userInfo: {},
+    
+    // 加载状态
+    loading: false,
+    searching: false,
+    loadingRecords: false,
+    submitting: false,
+    
+    // 搜索条件
+    searchUserId: '',
+    searchMobile: '',
+    
+    // 当前用户数据
+    currentUser: null,
+    balances: [],
+    
+    // 资产类型和活动列表
+    assetTypes: [],
+    campaigns: [],
+    
+    // 交易记录
+    transactions: [],
+    filterAssetCode: '',
+    
+    // 分页
+    currentPage: 1,
+    pageSize: 20,
+    pagination: null,
+    
+    // 调整表单
+    adjustForm: {
+      assetCode: '',
+      adjustType: 'increase',
+      amount: '',
+      reason: '',
+      campaignId: ''
+    },
+    
+    // 弹窗实例
+    adjustModal: null,
+    
+    /**
+     * 初始化
+     */
+    async init() {
+      console.log('🚀 初始化资产调整页面...');
+      
+      // 初始化弹窗
+      this.$nextTick(() => {
+        this.adjustModal = new bootstrap.Modal(this.$refs.adjustModal);
+      });
+      
+      // 加载用户信息
+      this.loadUserInfo();
 
   // 加载资产类型
-  loadAssetTypes()
-
-  // 加载活动列表（用于预算积分调整）
-  loadCampaigns()
-})
-
-// ============================================================
-// 资产类型管理
-// ============================================================
+      await this.loadAssetTypes();
+      
+      // 加载活动列表
+      await this.loadCampaigns();
+    },
+    
+    /**
+     * 加载用户信息
+     */
+    loadUserInfo() {
+      try {
+        const stored = localStorage.getItem('userInfo');
+        if (stored) {
+          this.userInfo = JSON.parse(stored);
+        }
+      } catch (e) {
+        console.error('加载用户信息失败:', e);
+      }
+    },
+    
+    /**
+     * 退出登录
+     */
+    logout() {
+      if (confirm('确定要退出登录吗？')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('userInfo');
+        window.location.href = '/admin/login.html';
+      }
+    },
 
 /**
  * 加载资产类型
- * @returns {Promise<void>}
  */
-async function loadAssetTypes() {
+    async loadAssetTypes() {
   try {
-    const response = await apiRequest(API_ENDPOINTS.ASSET_ADJUSTMENT.ASSET_TYPES)
-    if (response && response.success) {
-      assetTypes = response.data.asset_types || response.data || []
-
-      const select = document.getElementById('assetType')
-      const filterSelect = document.getElementById('assetTypeFilter')
-
-      // 清空现有选项（保留默认）
-      select.innerHTML = '<option value="">请选择资产类型</option>'
-      filterSelect.innerHTML = '<option value="">全部资产</option>'
-
-      assetTypes.forEach(type => {
-        const option = document.createElement('option')
-        option.value = type.asset_code
-        option.textContent = type.name || type.asset_code
-        select.appendChild(option.cloneNode(true))
-        filterSelect.appendChild(option)
-      })
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/console/asset-adjustment/asset-types`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            this.assetTypes = result.data?.asset_types || result.data || [];
+            console.log(`📊 加载资产类型: ${this.assetTypes.length} 个`);
+          }
     }
   } catch (error) {
-    console.error('加载资产类型失败:', error)
+        console.error('加载资产类型失败:', error);
   }
-}
+    },
 
 /**
  * 加载活动列表
- * @description 用于预算积分调整时选择活动
- * @returns {Promise<void>}
  */
-async function loadCampaigns() {
+    async loadCampaigns() {
   try {
-    // 使用活动预算批量状态接口获取活动列表
-    const response = await apiRequest(`${API_ENDPOINTS.CAMPAIGN_BUDGET.BATCH_STATUS}?limit=50`)
-    if (response && response.success) {
-      campaigns = response.data.campaigns || []
-
-      const select = document.getElementById('campaignId')
-      select.innerHTML = '<option value="">请选择活动</option>'
-
-      campaigns.forEach(campaign => {
-        const option = document.createElement('option')
-        option.value = campaign.campaign_id
-        option.textContent = `${campaign.campaign_name || campaign.name || '活动' + campaign.campaign_id} (ID: ${campaign.campaign_id})`
-        select.appendChild(option)
-      })
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/admin/campaign-budget/batch-status?limit=50`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            this.campaigns = result.data?.campaigns || [];
+            console.log(`📊 加载活动列表: ${this.campaigns.length} 个`);
+          }
     }
   } catch (error) {
-    console.error('加载活动列表失败:', error)
+        console.error('加载活动列表失败:', error);
   }
-}
+    },
 
 /**
- * 资产类型切换事件处理
- * @description 当选择预算积分时显示活动选择框
- */
-function onAssetTypeChange() {
-  const assetType = document.getElementById('assetType').value
-  const campaignGroup = document.getElementById('campaignIdGroup')
-  const campaignSelect = document.getElementById('campaignId')
-
-  if (assetType === 'BUDGET_POINTS') {
-    campaignGroup.style.display = 'block'
-    campaignSelect.setAttribute('required', 'required')
+     * 搜索用户
+     */
+    async handleSearch() {
+      if (!this.searchUserId && !this.searchMobile) {
+        this.showError('请输入用户ID或手机号');
+        return;
+      }
+      
+      this.searching = true;
+      
+      try {
+        let targetUserId = this.searchUserId;
+        
+        // 如果只有手机号，先查询用户ID
+        if (!targetUserId && this.searchMobile) {
+          const token = localStorage.getItem('token');
+          const userResponse = await fetch(`${API_BASE_URL}/admin/users?search=${this.searchMobile}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          
+          if (userResponse.ok) {
+            const userResult = await userResponse.json();
+            if (userResult.success && userResult.data?.users?.length > 0) {
+              targetUserId = userResult.data.users[0].user_id;
   } else {
-    campaignGroup.style.display = 'none'
-    campaignSelect.removeAttribute('required')
-    campaignSelect.value = ''
+              this.showError('未找到该手机号对应的用户');
+              return;
   }
 }
-
-// ============================================================
-// 用户搜索和资产加载
-// ============================================================
-
-/**
- * 处理搜索
- * @param {Event} e - 表单提交事件
- * @returns {Promise<void>}
- */
-async function handleSearch(e) {
-  e.preventDefault()
-
-  const userId = document.getElementById('searchUserId').value.trim()
-  const mobile = document.getElementById('searchMobile').value.trim()
-
-  if (!userId && !mobile) {
-    showErrorToast('请输入用户ID或手机号')
-    return
-  }
-
-  let targetUserId = userId
-
-  // 如果提供了手机号，先通过手机号查询用户ID
-  if (mobile && !userId) {
-    try {
-      const userResponse = await apiRequest(
-        `${API_ENDPOINTS.USER.LIST}?search=${mobile}`
-      )
-      if (userResponse && userResponse.success && userResponse.data) {
-        const users = userResponse.data.users || userResponse.data
-        if (users.length > 0) {
-          targetUserId = users[0].user_id
-        } else {
-          showErrorToast('未找到该手机号对应的用户')
-          return
         }
-      } else {
-        showErrorToast('查询用户失败')
-        return
+        
+        if (!targetUserId) {
+          this.showError('请输入有效的用户ID或手机号');
+          return;
+        }
+        
+        // 加载用户资产
+        await this.loadUserAssets(targetUserId);
+      } catch (error) {
+        console.error('搜索用户失败:', error);
+        this.showError('搜索失败: ' + error.message);
+      } finally {
+        this.searching = false;
+      }
+    },
+    
+    /**
+     * 加载用户资产
+     */
+    async loadUserAssets(userId) {
+      this.loading = true;
+      
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/console/asset-adjustment/user/${userId}/balances`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error('加载用户资产失败');
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          this.currentUser = result.data.user;
+          this.balances = result.data.balances || [];
+          
+          console.log(`✅ 加载用户资产完成: ${this.balances.length} 种`);
+          
+          // 加载调整记录
+          this.currentPage = 1;
+          await this.loadAdjustmentRecords();
+        } else {
+          this.showError(result.message || '查询失败');
       }
     } catch (error) {
-      showErrorToast('查询用户失败：' + error.message)
-      return
-    }
-  }
-
-  // 加载用户资产信息
-  await loadUserAssets(targetUserId)
-}
+        console.error('加载用户资产失败:', error);
+        this.showError(error.message);
+      } finally {
+        this.loading = false;
+      }
+    },
 
 /**
- * 加载用户资产信息
- * @param {number|string} userId - 用户ID
- * @returns {Promise<void>}
- */
-async function loadUserAssets(userId) {
-  currentUserId = userId
-  currentPage = 1
-  showLoading(true)
-
-  try {
-    const response = await apiRequest(API.buildURL(API_ENDPOINTS.ASSET_ADJUSTMENT.USER_BALANCES, { user_id: userId }))
-
-    if (response && response.success) {
-      const { user, balances } = response.data
-
-      // 显示用户信息
-      document.getElementById('userId').textContent = user.user_id
-      document.getElementById('userNickname').textContent = user.nickname || '未设置'
-      document.getElementById('userMobile').textContent = maskPhone(user.mobile) || '-'
-
-      // 渲染资产卡片
-      renderAssetCards(balances)
-
-      // 显示用户资产区域
-      document.getElementById('userAssetsSection').style.display = 'block'
-      document.getElementById('emptyState').style.display = 'none'
-
-      // 加载调整记录
-      loadAdjustmentRecords()
-    } else {
-      showErrorToast(response?.message || '查询失败')
+     * 计算聚合后的余额（相同asset_code合并）
+     */
+    get aggregatedBalances() {
+      const balanceMap = new Map();
+      
+      this.balances.forEach(balance => {
+        const key = balance.asset_code;
+        if (balanceMap.has(key)) {
+          const existing = balanceMap.get(key);
+          existing.available_amount = (existing.available_amount || 0) + (balance.available_amount || 0);
+          existing.frozen_amount = (existing.frozen_amount || 0) + (balance.frozen_amount || 0);
+          existing.total = (existing.total || 0) + (balance.total || 0);
+        } else {
+          balanceMap.set(key, { ...balance });
+        }
+      });
+      
+      return Array.from(balanceMap.values());
+    },
+    
+    /**
+     * 加载调整记录
+     */
+    async loadAdjustmentRecords() {
+      if (!this.currentUser) return;
+      
+      this.loadingRecords = true;
+      
+      try {
+        const token = localStorage.getItem('token');
+        const params = new URLSearchParams({
+          user_id: this.currentUser.user_id,
+          page: this.currentPage,
+          page_size: this.pageSize
+        });
+        
+        if (this.filterAssetCode) {
+          params.append('asset_code', this.filterAssetCode);
+        }
+        
+        const response = await fetch(`${API_BASE_URL}/console/assets/transactions?${params}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            this.transactions = result.data?.transactions || [];
+            this.pagination = result.data?.pagination || null;
+          }
     }
   } catch (error) {
-    console.error('加载用户资产失败:', error)
-    showErrorToast(error.message)
+        console.error('加载调整记录失败:', error);
   } finally {
-    showLoading(false)
+        this.loadingRecords = false;
   }
-}
-
-// ============================================================
-// 渲染函数
-// ============================================================
+    },
 
 /**
- * 渲染资产卡片
- * @param {Array} balances - 资产余额列表（后端字段：asset_code, available_amount, frozen_amount, total, campaign_id）
- * 
- * 以后端数据库为准，直接使用后端返回的字段名：
- * - available_amount: 可用余额
- * - frozen_amount: 冻结余额
- * - total: 总余额
- * - asset_code: 资产代码
- * - campaign_id: 活动ID（BUDGET_POINTS专用）
- */
-function renderAssetCards(balances) {
-  const container = document.getElementById('assetCardsContainer')
-
-  if (!balances || balances.length === 0) {
-    container.innerHTML = `
-      <div class="col-12">
-        <div class="alert alert-info">该用户暂无资产记录</div>
-      </div>
-    `
-    return
-  }
-
-  // 聚合同类资产（BUDGET_POINTS可能有多条记录，合并显示总额）
-  const aggregatedBalances = aggregateBalances(balances)
-
-  container.innerHTML = aggregatedBalances
-    .map(balance => {
-      const iconClass = getAssetIcon(balance.asset_code)
-      const cardClass = balance.asset_code.toLowerCase()
-      // 优先显示 total，其次 available_amount
-      const displayBalance = balance.total ?? balance.available_amount ?? 0
-      // 获取资产显示名称
-      const displayName = getAssetDisplayName(balance.asset_code)
-
-      return `
-      <div class="col-md-3">
-        <div class="card asset-card ${cardClass}">
-          <div class="card-body text-center">
-            <i class="bi ${iconClass}" style="font-size: 2rem;"></i>
-            <h4 class="mt-2 mb-0">${formatNumber(displayBalance)}</h4>
-            <small class="text-muted">${displayName}</small>
-          </div>
-        </div>
-      </div>
-    `
-    })
-    .join('')
-}
-
-/**
- * 聚合同类资产余额
- * @description 将相同asset_code的余额合并（如BUDGET_POINTS不同campaign_id的余额）
- * @param {Array} balances - 原始余额列表
- * @returns {Array} 聚合后的余额列表
- */
-function aggregateBalances(balances) {
-  const balanceMap = new Map()
-
-  balances.forEach(balance => {
-    const key = balance.asset_code
-    if (balanceMap.has(key)) {
-      const existing = balanceMap.get(key)
-      existing.available_amount = (existing.available_amount || 0) + (balance.available_amount || 0)
-      existing.frozen_amount = (existing.frozen_amount || 0) + (balance.frozen_amount || 0)
-      existing.total = (existing.total || 0) + (balance.total || 0)
-      // 标记为聚合数据
-      existing._aggregated = true
-      existing._campaign_count = (existing._campaign_count || 1) + 1
+     * 计算可见页码
+     */
+    get visiblePages() {
+      if (!this.pagination) return [];
+      
+      const pages = [];
+      const total = this.pagination.total_pages;
+      const current = this.currentPage;
+      
+      for (let i = 1; i <= total; i++) {
+        if (i === 1 || i === total || (i >= current - 2 && i <= current + 2)) {
+          pages.push(i);
+        } else if (i === current - 3 || i === current + 3) {
+          pages.push('...');
+        }
+      }
+      
+      return pages;
+    },
+    
+    /**
+     * 跳转页面
+     */
+    goToPage(page) {
+      if (page < 1 || page > this.pagination?.total_pages) return;
+      this.currentPage = page;
+      this.loadAdjustmentRecords();
+    },
+    
+    /**
+     * 打开调整弹窗
+     */
+    openAdjustModal() {
+      this.adjustForm = {
+        assetCode: '',
+        adjustType: 'increase',
+        amount: '',
+        reason: '',
+        campaignId: ''
+      };
+      this.adjustModal.show();
+    },
+    
+    /**
+     * 提交调整
+     */
+    async submitAdjust() {
+      if (!this.adjustForm.assetCode || !this.adjustForm.amount || !this.adjustForm.reason) {
+        this.showError('请填写完整的调整信息');
+        return;
+      }
+      
+      if (this.adjustForm.assetCode === 'BUDGET_POINTS' && !this.adjustForm.campaignId) {
+        this.showError('调整预算积分必须选择活动');
+        return;
+      }
+      
+      this.submitting = true;
+      
+      try {
+        const token = localStorage.getItem('token');
+        const amount = this.adjustForm.adjustType === 'decrease' 
+          ? -Math.abs(this.adjustForm.amount) 
+          : Math.abs(this.adjustForm.amount);
+        
+        const data = {
+          user_id: this.currentUser.user_id,
+          asset_code: this.adjustForm.assetCode,
+          amount: amount,
+          reason: this.adjustForm.reason,
+          idempotency_key: `asset_adjust_${this.currentUser.user_id}_${this.adjustForm.assetCode}_${Date.now()}`
+        };
+        
+        if (this.adjustForm.assetCode === 'BUDGET_POINTS') {
+          data.campaign_id = parseInt(this.adjustForm.campaignId);
+        }
+        
+        const response = await fetch(`${API_BASE_URL}/console/asset-adjustment/adjust`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          this.showSuccess('资产调整成功');
+          this.adjustModal.hide();
+          
+          // 重新加载用户资产
+          await this.loadUserAssets(this.currentUser.user_id);
     } else {
-      balanceMap.set(key, { ...balance, _campaign_count: 1 })
-    }
-  })
-
-  return Array.from(balanceMap.values())
-}
+          this.showError(result.message || '调整失败');
+        }
+      } catch (error) {
+        console.error('资产调整失败:', error);
+        this.showError(error.message);
+      } finally {
+        this.submitting = false;
+      }
+    },
+    
+    /**
+     * 获取资产图标
+     */
+    getAssetIcon(assetCode) {
+      const icons = {
+        POINTS: 'bi-star-fill text-warning',
+        DIAMOND: 'bi-gem text-info',
+        BUDGET_POINTS: 'bi-wallet2 text-success',
+        GOLD: 'bi-coin text-warning',
+        SILVER: 'bi-circle-fill text-secondary'
+      };
+      return icons[assetCode] || 'bi-box text-primary';
+    },
 
 /**
  * 获取资产显示名称
- * @param {string} assetCode - 资产代码
- * @returns {string} 显示名称
  */
-function getAssetDisplayName(assetCode) {
-  // 从已加载的资产类型中查找
-  const assetType = assetTypes.find(t => t.asset_code === assetCode)
+    getAssetDisplayName(assetCode) {
+      const assetType = this.assetTypes.find(t => t.asset_code === assetCode);
   if (assetType) {
-    return assetType.display_name || assetType.name || assetCode
+        return assetType.display_name || assetType.name || assetCode;
   }
   
-  // 内置资产类型映射
   const builtInNames = {
     POINTS: '积分',
     DIAMOND: '钻石',
     BUDGET_POINTS: '预算积分'
-  }
-  return builtInNames[assetCode] || assetCode
-}
+      };
+      return builtInNames[assetCode] || assetCode;
+    },
 
 /**
- * 格式化数字（添加千分位）
- * @param {number} num - 数字
- * @returns {string} 格式化后的字符串
- */
-function formatNumber(num) {
-  if (num === null || num === undefined) return '0'
-  return Number(num).toLocaleString('zh-CN')
-}
+     * 手机号脱敏
+     */
+    maskPhone(phone) {
+      if (!phone) return '-';
+      return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+    },
+    
+    /**
+     * 格式化数字
+     */
+    formatNumber(num) {
+      if (num === null || num === undefined) return '0';
+      return Number(num).toLocaleString('zh-CN');
+    },
 
 /**
- * 获取资产图标
- * @param {string} assetCode - 资产代码
- * @returns {string} Bootstrap图标类名
- */
-function getAssetIcon(assetCode) {
-  const icons = {
-    POINTS: 'bi-star-fill text-warning',
-    DIAMOND: 'bi-gem text-info',
-    GOLD: 'bi-coin text-warning',
-    SILVER: 'bi-circle-fill text-secondary'
-  }
-  return icons[assetCode] || 'bi-box text-primary'
-}
-
-// ============================================================
-// 调整记录管理
-// ============================================================
-
-/**
- * 加载调整记录
- * @returns {Promise<void>}
- */
-async function loadAdjustmentRecords() {
-  if (!currentUserId) return
-
-  const tbody = document.getElementById('adjustmentTableBody')
-  tbody.innerHTML = `
-    <tr>
-      <td colspan="7" class="text-center py-5">
-        <div class="spinner-border text-primary" role="status">
-          <span class="visually-hidden">加载中...</span>
-        </div>
-      </td>
-    </tr>
-  `
-
-  try {
-    const assetType = document.getElementById('assetTypeFilter').value
-    const params = new URLSearchParams({
-      user_id: currentUserId,
-      page: currentPage,
-      page_size: pageSize
-    })
-
-    if (assetType) {
-      params.append('asset_code', assetType)
-    }
-
-    const response = await apiRequest(`${API_ENDPOINTS.ASSETS.TRANSACTIONS}?${params.toString()}`)
-
-    if (response && response.success) {
-      const { transactions, pagination } = response.data
-      renderAdjustmentTable(transactions)
-      if (pagination) {
-        renderPagination(pagination)
+     * 格式化日期时间
+     */
+    formatDateTime(dateStr) {
+      if (!dateStr) return '-';
+      try {
+        const date = new Date(dateStr);
+        return date.toLocaleString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch {
+        return dateStr;
       }
-    } else {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="7" class="text-center py-5 text-muted">
-            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-            <p class="mt-2">暂无调整记录</p>
-          </td>
-        </tr>
-      `
+    },
+
+/**
+     * 显示成功消息
+ */
+    showSuccess(message) {
+      this.$toast.success(message);
+    },
+
+    /**
+     * 显示错误消息
+     */
+    showError(message) {
+      this.$toast.error(message);
     }
-  } catch (error) {
-    console.error('加载调整记录失败:', error)
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="7" class="text-center py-5 text-danger">
-          <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
-          <p class="mt-2">加载失败：${error.message}</p>
-        </td>
-      </tr>
-    `
-  }
+  };
 }
 
-/**
- * 渲染调整记录表格
- * @param {Array} transactions - 交易记录列表
- */
-function renderAdjustmentTable(transactions) {
-  const tbody = document.getElementById('adjustmentTableBody')
-
-  if (!transactions || transactions.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="7" class="text-center py-5 text-muted">
-          <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-          <p class="mt-2">暂无调整记录</p>
-        </td>
-      </tr>
-    `
-    return
-  }
-
-  tbody.innerHTML = transactions
-    .map(tx => {
-      const amountClass = tx.amount >= 0 ? 'text-success' : 'text-danger'
-      const amountPrefix = tx.amount >= 0 ? '+' : ''
-
-      return `
-      <tr>
-        <td>${formatDate(tx.created_at)}</td>
-        <td>${tx.asset_name || tx.asset_code}</td>
-        <td>${tx.tx_type || '-'}</td>
-        <td class="${amountClass}">${amountPrefix}${tx.amount}</td>
-        <td>${tx.balance_after || '-'}</td>
-        <td>${tx.reason || tx.description || '-'}</td>
-        <td>${tx.operator_name || '-'}</td>
-      </tr>
-    `
-    })
-    .join('')
-}
-
-// ============================================================
-// 分页功能
-// ============================================================
-
-/**
- * 渲染分页
- * @param {Object} pagination - 分页信息
- */
-function renderPagination(pagination) {
-  const nav = document.getElementById('paginationNav')
-  if (!pagination || pagination.total_pages <= 1) {
-    nav.innerHTML = ''
-    return
-  }
-
-  let html = '<ul class="pagination pagination-sm justify-content-center mb-0">'
-
-  html += `
-    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-      <a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;">上一页</a>
-    </li>
-  `
-
-  for (let i = 1; i <= pagination.total_pages; i++) {
-    if (i === 1 || i === pagination.total_pages || (i >= currentPage - 2 && i <= currentPage + 2)) {
-      html += `
-        <li class="page-item ${i === currentPage ? 'active' : ''}">
-          <a class="page-link" href="#" onclick="goToPage(${i}); return false;">${i}</a>
-        </li>
-      `
-    } else if (i === currentPage - 3 || i === currentPage + 3) {
-      html += '<li class="page-item disabled"><span class="page-link">...</span></li>'
-    }
-  }
-
-  html += `
-    <li class="page-item ${currentPage === pagination.total_pages ? 'disabled' : ''}">
-      <a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">下一页</a>
-    </li>
-  `
-
-  html += '</ul>'
-  nav.innerHTML = html
-}
-
-/**
- * 跳转到指定页
- * @param {number} page - 页码
- */
-function goToPage(page) {
-  currentPage = page
-  loadAdjustmentRecords()
-}
-
-// ============================================================
-// 资产调整操作
-// ============================================================
-
-/**
- * 提交资产调整
- * @returns {Promise<void>}
- */
-async function submitAdjustAsset() {
-  const form = document.getElementById('adjustAssetForm')
-  if (!form.checkValidity()) {
-    form.reportValidity()
-    return
-  }
-
-  const assetCode = document.getElementById('assetType').value
-  const adjustType = document.getElementById('adjustType').value
-  const amount = parseInt(document.getElementById('adjustAmount').value)
-
-  // 构建请求数据
-  const data = {
-    user_id: currentUserId,
-    asset_code: assetCode,
-    // 后端使用amount字段，正数=增加，负数=扣减
-    amount: adjustType === 'decrease' ? -Math.abs(amount) : Math.abs(amount),
-    reason: document.getElementById('adjustReason').value.trim(),
-    idempotency_key: `asset_adjust_${currentUserId}_${assetCode}_${Date.now()}`
-  }
-
-  // 预算积分必须提供campaign_id
-  if (assetCode === 'BUDGET_POINTS') {
-    const campaignId = document.getElementById('campaignId').value
-    if (!campaignId) {
-      showErrorToast('调整预算积分必须选择活动')
-      return
-    }
-    data.campaign_id = parseInt(campaignId)
-  }
-
-  try {
-    const submitBtn = document.getElementById('submitAdjustBtn')
-    submitBtn.disabled = true
-    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>提交中...'
-
-    const response = await apiRequest(API_ENDPOINTS.ASSET_ADJUSTMENT.ADJUST, {
-      method: 'POST',
-      body: JSON.stringify(data)
-    })
-
-    if (response && response.success) {
-      showSuccessToast('资产调整成功')
-      bootstrap.Modal.getInstance(document.getElementById('adjustAssetModal')).hide()
-      form.reset()
-      // 重置活动选择框显示状态
-      document.getElementById('campaignIdGroup').style.display = 'none'
-      loadUserAssets(currentUserId)
-    } else {
-      showErrorToast(response?.message || '调整失败')
-    }
-  } catch (error) {
-    console.error('资产调整失败:', error)
-    showErrorToast(error.message)
-  } finally {
-    const submitBtn = document.getElementById('submitAdjustBtn')
-    submitBtn.disabled = false
-    submitBtn.innerHTML = '确认调整'
-  }
-}
-
-// ============================================================
-// 工具函数
-// ============================================================
-
-/**
- * 显示/隐藏加载状态
- * @param {boolean} show - 是否显示
- */
-function showLoading(show) {
-  document.getElementById('loadingOverlay').classList.toggle('show', show)
-}
+// Alpine.js 组件注册
+document.addEventListener('alpine:init', () => {
+  Alpine.data('assetAdjustmentPage', assetAdjustmentPage)
+  console.log('✅ [AssetAdjustmentPage] Alpine 组件已注册')
+})

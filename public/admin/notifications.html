@@ -1,276 +1,279 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>系统通知中心 - 管理后台</title>
 
-    <!-- ✅ CSP策略 - 允许加载本地脚本和WebSocket连接 -->
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'self'; 
-                 script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; 
-                 style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; 
-                 font-src 'self' https://cdn.jsdelivr.net; 
-                 connect-src 'self' ws: wss: http://localhost:* https://localhost:*; 
-                 img-src 'self' data: https:;"
-    />
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
 
-    <title>系统通知中心 - 管理后台</title>
+  <style>
+    .notification-item {
+      transition: background 0.2s;
+      cursor: pointer;
+      border-left: 4px solid transparent;
+    }
+    .notification-item:hover {
+      background: #f8f9fa;
+    }
+    .notification-item.unread {
+      background: #e7f3ff;
+      border-left-color: #0d6efd;
+    }
+  </style>
 
-    <!-- ✅ Bootstrap 5 - UI框架 -->
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
 
-    <!-- ✅ Bootstrap Icons - 图标库 -->
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"
-      rel="stylesheet"
-    />
-
-    <!-- ✅ 公共样式表 - 统一主题和响应式设计 -->
-    <link href="/admin/css/common.css" rel="stylesheet" />
-
-    <!-- ✅ 页面特有样式 -->
-    <style>
-      .notification-item {
-        transition: background 0.2s;
-        cursor: pointer;
-        border-left: 4px solid transparent;
-      }
-      .notification-item:hover {
-        background: #f8f9fa;
-      }
-      .notification-item.unread {
-        background: #e7f3ff;
-        border-left-color: #0d6efd;
-      }
-      .notification-badge {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background: #dc3545;
-        color: white;
-        border-radius: 50%;
-        width: 24px;
-        height: 24px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.75rem;
-        font-weight: bold;
-      }
-    </style>
-  </head>
-  <body class="bg-light">
-    <!-- 顶部导航 -->
-    <nav class="navbar navbar-dark bg-primary">
-      <div class="container-fluid">
-        <a href="/admin/dashboard.html" class="navbar-brand">
-          <i class="bi bi-arrow-left me-2"></i>🔔 管理后台 - 系统通知中心
-        </a>
-        <div>
-          <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-          <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
-        </div>
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+<body class="bg-light" x-data="notificationsPage()" x-cloak>
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>🔔 管理后台 - 系统通知中心
+      </a>
+      <div>
+        <span class="text-light me-3" x-text="'欢迎，' + (userInfo?.nickname || '管理员')"></span>
+        <button class="btn btn-outline-light btn-sm" @click="logout()">退出登录</button>
       </div>
-    </nav>
+    </div>
+  </nav>
 
-    <div class="container-fluid mt-4">
-      <!-- 操作栏 -->
-      <div class="card mb-3">
-        <div class="card-body">
-          <div class="row g-3 align-items-end">
-            <div class="col-md-3">
-              <label class="form-label">通知类型</label>
-              <select class="form-select" id="typeFilter">
-                <option value="all">全部类型</option>
-                <option value="system">系统通知</option>
-                <option value="user">用户动态</option>
-                <option value="order">订单消息</option>
-                <option value="alert">警告提醒</option>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">状态筛选</label>
-              <select class="form-select" id="statusFilter">
-                <option value="all">全部状态</option>
-                <option value="unread">未读</option>
-                <option value="read">已读</option>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <button class="btn btn-primary w-100" id="loadNotificationsBtn">
-                <i class="bi bi-search"></i> 筛选
+  <div class="container-fluid mt-4">
+    <!-- 操作栏 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">通知类型</label>
+            <select class="form-select" x-model="filters.type">
+              <option value="all">全部类型</option>
+              <option value="system">系统通知</option>
+              <option value="user">用户动态</option>
+              <option value="order">订单消息</option>
+              <option value="alert">警告提醒</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">状态筛选</label>
+            <select class="form-select" x-model="filters.status">
+              <option value="all">全部状态</option>
+              <option value="unread">未读</option>
+              <option value="read">已读</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-primary w-100" @click="loadNotifications()">
+              <i class="bi bi-search"></i> 筛选
+            </button>
+          </div>
+          <div class="col-md-3">
+            <div class="btn-group w-100">
+              <button class="btn btn-outline-success" @click="markAllAsRead()">
+                <i class="bi bi-check-all"></i> 全部已读
+              </button>
+              <button class="btn btn-outline-danger" @click="clearAll()">
+                <i class="bi bi-trash"></i> 清空
               </button>
             </div>
-            <div class="col-md-3">
-              <div class="btn-group w-100">
-                <button class="btn btn-outline-success" id="markAllAsReadBtn">
-                  <i class="bi bi-check-all"></i> 全部已读
-                </button>
-                <button class="btn btn-outline-danger" id="clearAllBtn">
-                  <i class="bi bi-trash"></i> 清空
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 统计信息 -->
-      <div class="row g-3 mb-3">
-        <div class="col-md-3">
-          <div class="card">
-            <div class="card-body text-center position-relative">
-              <h6 class="text-muted">总通知数</h6>
-              <h3 id="totalNotifications">-</h3>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-3">
-          <div class="card">
-            <div class="card-body text-center position-relative">
-              <h6 class="text-muted">未读通知</h6>
-              <h3 class="text-danger" id="unreadNotifications">-</h3>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-3">
-          <div class="card">
-            <div class="card-body text-center">
-              <h6 class="text-muted">今日通知</h6>
-              <h3 class="text-primary" id="todayNotifications">-</h3>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-3">
-          <div class="card">
-            <div class="card-body text-center">
-              <h6 class="text-muted">本周通知</h6>
-              <h3 class="text-success" id="weekNotifications">-</h3>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 通知列表 -->
-      <div class="card">
-        <div class="card-header bg-white">
-          <div class="d-flex justify-content-between align-items-center">
-            <h6 class="mb-0"><i class="bi bi-bell-fill"></i> 通知列表</h6>
-            <button
-              class="btn btn-sm btn-primary"
-              data-bs-toggle="modal"
-              data-bs-target="#sendNotificationModal"
-            >
-              <i class="bi bi-plus-lg"></i> 发送通知
-            </button>
-          </div>
-        </div>
-        <div class="card-body p-0">
-          <div id="notificationsList">
-            <div class="text-center py-5">
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">加载中...</span>
-              </div>
-              <p class="mt-2 text-muted">正在加载通知...</p>
-            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 通知详情模态框 -->
-    <div class="modal fade" id="notificationDetailModal" tabindex="-1">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="notificationDetailTitle">通知详情</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <!-- 统计信息 -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">总通知数</h6>
+            <h3 x-text="stats.total ?? '-'"></h3>
           </div>
-          <div class="modal-body" id="notificationDetailBody">
-            <!-- 详情将动态加载 -->
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">未读通知</h6>
+            <h3 class="text-danger" x-text="stats.unread ?? '-'"></h3>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">今日通知</h6>
+            <h3 class="text-primary" x-text="stats.today ?? '-'"></h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">本周通知</h6>
+            <h3 class="text-success" x-text="stats.week ?? '-'"></h3>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 发送通知模态框 -->
-    <div class="modal fade" id="sendNotificationModal" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title"><i class="bi bi-send"></i> 发送系统通知</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <!-- 通知列表 -->
+    <div class="card">
+      <div class="card-header bg-white">
+        <div class="d-flex justify-content-between align-items-center">
+          <h6 class="mb-0"><i class="bi bi-bell-fill"></i> 通知列表</h6>
+          <button class="btn btn-sm btn-primary" @click="openSendModal()">
+            <i class="bi bi-plus-lg"></i> 发送通知
+          </button>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <!-- 加载中 -->
+        <div x-show="loading" class="text-center py-5">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">加载中...</span>
           </div>
-          <div class="modal-body">
-            <form id="sendNotificationForm">
-              <div class="mb-3">
-                <label class="form-label">通知类型 <span class="text-danger">*</span></label>
-                <select class="form-select" id="notificationType" required>
-                  <option value="">请选择</option>
-                  <option value="system">系统通知</option>
-                  <option value="user">用户动态</option>
-                  <option value="order">订单消息</option>
-                  <option value="alert">警告提醒</option>
-                </select>
+          <p class="mt-2 text-muted">正在加载通知...</p>
+        </div>
+
+        <!-- 空状态 -->
+        <div x-show="!loading && notifications.length === 0" class="text-center py-5">
+          <i class="bi bi-bell-slash text-muted" style="font-size: 3rem;"></i>
+          <p class="mt-2 text-muted">暂无通知</p>
+        </div>
+
+        <!-- 通知列表 -->
+        <template x-for="notif in notifications" :key="notif.notification_id || notif.id">
+          <div class="notification-item p-3 border-bottom" 
+               :class="{ 'unread': !notif.is_read }"
+               @click="viewNotification(notif)">
+            <div class="d-flex">
+              <div class="flex-shrink-0 me-3" x-html="getNotificationIcon(notif.type)"></div>
+              <div class="flex-grow-1">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                  <h6 class="mb-0" :class="notif.is_read ? 'text-muted' : 'fw-bold'" x-text="notif.title"></h6>
+                  <small class="text-muted" x-text="formatRelativeTime(notif.created_at)"></small>
+                </div>
+                <p class="text-muted small mb-1" x-text="(notif.content || '').substring(0, 100) + (notif.content?.length > 100 ? '...' : '')"></p>
+                <div class="d-flex align-items-center">
+                  <span class="badge me-2" :class="getTypeBadgeClass(notif.type)" x-text="getTypeText(notif.type)"></span>
+                  <span x-show="!notif.is_read" class="badge bg-danger">未读</span>
+                </div>
               </div>
-              <div class="mb-3">
-                <label class="form-label">通知标题 <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="notificationTitle" required />
-              </div>
-              <div class="mb-3">
-                <label class="form-label">通知内容 <span class="text-danger">*</span></label>
-                <textarea
-                  class="form-control"
-                  id="notificationContent"
-                  rows="4"
-                  required
-                ></textarea>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">发送对象</label>
-                <select class="form-select" id="notificationTarget">
-                  <option value="all">全部管理员</option>
-                  <option value="online">在线管理员</option>
-                  <option value="self">仅自己</option>
-                </select>
-              </div>
-            </form>
+            </div>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-            <button type="button" class="btn btn-primary" id="sendNotificationBtn">
-              <i class="bi bi-send"></i> 发送
-            </button>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- 通知详情模态框 -->
+  <div class="modal fade" id="notificationDetailModal" tabindex="-1" x-ref="detailModal">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" x-text="currentNotification?.title || '通知详情'"></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <div class="d-flex align-items-center mb-2">
+              <span x-html="getNotificationIcon(currentNotification?.type)"></span>
+              <span class="badge ms-2" :class="getTypeBadgeClass(currentNotification?.type)" x-text="getTypeText(currentNotification?.type)"></span>
+            </div>
           </div>
+          <div class="mb-3">
+            <h6 class="text-muted">通知时间</h6>
+            <p x-text="formatDate(currentNotification?.created_at)"></p>
+          </div>
+          <div class="mb-3">
+            <h6 class="text-muted">通知内容</h6>
+            <p class="text-break" x-text="currentNotification?.content"></p>
+          </div>
+          <div class="mb-3" x-show="currentNotification?.link">
+            <h6 class="text-muted">相关链接</h6>
+            <a :href="currentNotification?.link" class="btn btn-sm btn-outline-primary" target="_blank">
+              <i class="bi bi-box-arrow-up-right"></i> 查看详情
+            </a>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- 加载遮罩层 -->
-    <div class="loading-overlay" id="loadingOverlay">
-      <div class="spinner-border text-light" style="width: 3rem; height: 3rem" role="status">
-        <span class="visually-hidden">处理中...</span>
+  <!-- 发送通知模态框 -->
+  <div class="modal fade" id="sendNotificationModal" tabindex="-1" x-ref="sendModal">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-send"></i> 发送系统通知</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">通知类型 <span class="text-danger">*</span></label>
+            <select class="form-select" x-model="sendForm.type" required>
+              <option value="">请选择</option>
+              <option value="system">系统通知</option>
+              <option value="user">用户动态</option>
+              <option value="order">订单消息</option>
+              <option value="alert">警告提醒</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">通知标题 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" x-model="sendForm.title" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">通知内容 <span class="text-danger">*</span></label>
+            <textarea class="form-control" x-model="sendForm.content" rows="4" required></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">发送对象</label>
+            <select class="form-select" x-model="sendForm.target">
+              <option value="all">全部管理员</option>
+              <option value="online">在线管理员</option>
+              <option value="self">仅自己</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" @click="sendNotification()" :disabled="sending">
+            <span x-show="sending" class="spinner-border spinner-border-sm me-1"></span>
+            <i x-show="!sending" class="bi bi-send"></i> 发送
+          </button>
+        </div>
       </div>
     </div>
+  </div>
 
-    <!-- ✅ Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" x-show="globalLoading" x-cloak>
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
 
-    <!-- ✅ Socket.IO客户端库 - 本地版本（安全，不依赖外部CDN） -->
-    <script src="/admin/js/vendor/socket.io.min.js"></script>
-
-    <!-- ✅ 引入通用工具库 -->
-    <script src="/admin/js/admin-common.js?v=20260121"></script>
-    <script src="/admin/js/api-config.js?v=20260121"></script>
-
-    <!-- ✅ 页面逻辑 -->
-    <script src="/admin/js/pages/notifications.js?v=20260121"></script>
-  </body>
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/vendor/socket.io.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  
+  
+  <!-- Alpine.js 页面逻辑 -->
+  <script src="/admin/js/pages/notifications.js"></script>
+  
+</body>
 </html>

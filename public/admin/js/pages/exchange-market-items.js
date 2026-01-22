@@ -1,607 +1,460 @@
 /**
- * 兑换市场商品管理页面
- * @description 管理用户可兑换的官方商品
- * @author Admin
- * @created 2026-01-09
- * @updated 2026-01-09 适配后端V4.5.0材料资产支付字段
- *
- * 后端字段对照（以后端为准）：
- * - item_id: 商品ID
- * - name: 商品名称
- * - description: 商品描述
- * - cost_asset_code: 支付资产类型（如 red_shard）
- * - cost_amount: 消耗数量
- * - cost_price: 成本价
- * - stock: 库存
- * - sold_count: 已售数量
- * - sort_order: 排序号
- * - status: 状态（active/inactive）
+ * 兑换市场商品管理页面 - Alpine.js 组件
+ * exchange-market-items.js
  */
 
-// ============================================
-// 全局变量
-// ============================================
-
-let currentPage = 1
-const pageSize = 20
-let currentFilters = {
+function exchangeMarketItemsPage() {
+  return {
+    // 用户信息
+    userInfo: {},
+    
+    // 加载状态
+    loading: false,
+    globalLoading: false,
+    submitting: false,
+    
+    // 数据
+    items: [],
+    assetTypes: [],
+    
+    // 统计
+    stats: {
+      total: 0,
+      active: 0,
+      lowStock: 0,
+      totalSold: 0
+    },
+    
+    // 筛选
+    filters: {
   status: '',
   cost_asset_code: '',
   sort_by: 'sort_order'
-}
-let assetTypes = [] // 缓存材料资产类型列表
-
-// ============================================
-// 页面初始化
-// ============================================
-
-document.addEventListener('DOMContentLoaded', function () {
-  checkAuth()
-  loadAssetTypes() // 加载材料资产类型
-  loadItems()
-  bindEvents()
-})
+    },
+    
+    // 分页
+    currentPage: 1,
+    pageSize: 20,
+    pagination: null,
+    
+    // 添加表单
+    addForm: {
+      item_name: '',
+      item_description: '',
+      cost_asset_code: '',
+      cost_amount: 1,
+      cost_price: 0,
+      stock: 0,
+      sort_order: 100,
+      status: 'active'
+    },
+    
+    // 编辑表单
+    editForm: {
+      item_id: null,
+      item_name: '',
+      item_description: '',
+      cost_asset_code: '',
+      cost_amount: 1,
+      cost_price: 0,
+      stock: 0,
+      sort_order: 100,
+      status: 'active'
+    },
+    
+    // 弹窗实例
+    addModal: null,
+    editModal: null,
 
 /**
- * 检查认证
- */
-function checkAuth() {
-  if (!getToken()) {
-    window.location.href = '/admin/login.html'
-    return
-  }
-
-  // 显示用户信息
-  const userInfo = getCurrentUser()
-  if (userInfo && userInfo.nickname) {
-    document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`
-  }
-}
-
-/**
- * 绑定事件
- */
-function bindEvents() {
-  document.getElementById('logoutBtn').addEventListener('click', logout)
-  document.getElementById('searchBtn').addEventListener('click', handleSearch)
-  document.getElementById('submitAddItemBtn').addEventListener('click', handleAddItem)
-  document.getElementById('submitEditItemBtn').addEventListener('click', handleEditItem)
-
-  // 🔧 2026-01-09 CSP修复：使用事件委托替代内联onclick
-  document.getElementById('itemsTableBody').addEventListener('click', function (e) {
-    const target = e.target.closest('button')
-    if (!target) return
-
-    const itemId = target.dataset.itemId
-    if (!itemId) return
-
-    if (target.classList.contains('btn-edit-item')) {
-      editItem(parseInt(itemId))
-    } else if (target.classList.contains('btn-delete-item')) {
-      deleteItem(parseInt(itemId))
+     * 初始化
+     */
+    async init() {
+      console.log('🚀 初始化兑换市场商品管理页面...');
+      
+      // 初始化弹窗
+      this.$nextTick(() => {
+        this.addModal = new bootstrap.Modal(this.$refs.addModal);
+        this.editModal = new bootstrap.Modal(this.$refs.editModal);
+      });
+      
+      // 加载用户信息
+      this.loadUserInfo();
+      
+      // 加载资产类型
+      await this.loadAssetTypes();
+      
+      // 加载商品列表
+      await this.loadItems();
+    },
+    
+    /**
+     * 加载用户信息
+     */
+    loadUserInfo() {
+      try {
+        const stored = localStorage.getItem('userInfo');
+        if (stored) {
+          this.userInfo = JSON.parse(stored);
+        }
+      } catch (e) {
+        console.error('加载用户信息失败:', e);
     }
-  })
-
-  // 🔧 2026-01-09 CSP修复：分页事件委托
-  document.getElementById('pagination').addEventListener('click', function (e) {
-    e.preventDefault()
-    const target = e.target.closest('a[data-page]')
-    if (!target) return
-
-    const page = parseInt(target.dataset.page)
-    if (!isNaN(page)) {
-      changePage(page)
+    },
+    
+    /**
+     * 退出登录
+     */
+    logout() {
+      if (confirm('确定要退出登录吗？')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('userInfo');
+        window.location.href = '/admin/login.html';
     }
-  })
-}
-
-// ============================================
-// 材料资产类型加载
-// ============================================
+    },
 
 /**
- * 加载材料资产类型列表
+     * 加载资产类型
  */
-async function loadAssetTypes() {
+    async loadAssetTypes() {
   try {
-    const token = getToken()
-    const response = await fetch(`${API_ENDPOINTS.MATERIAL.ASSET_TYPES}?is_enabled=true`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-
-    const data = await response.json()
-
-    if (data.success && data.data && data.data.asset_types) {
-      assetTypes = data.data.asset_types
-      populateAssetTypeSelects()
-    } else {
-      console.warn('加载材料资产类型失败', data.message)
-      // 使用默认选项
-      assetTypes = [
-        { asset_code: 'red_shard', display_name: '碎红水晶' },
-        { asset_code: 'red_crystal', display_name: '完整红水晶' }
-      ]
-      populateAssetTypeSelects()
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/admin/material/asset-types?is_enabled=true`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data?.asset_types) {
+            this.assetTypes = result.data.asset_types;
+          }
     }
   } catch (error) {
-    console.error('加载材料资产类型失败', error)
-    // 使用默认选项
-    assetTypes = [
+        console.error('加载资产类型失败:', error);
+        // 使用默认值
+        this.assetTypes = [
       { asset_code: 'red_shard', display_name: '碎红水晶' },
       { asset_code: 'red_crystal', display_name: '完整红水晶' }
-    ]
-    populateAssetTypeSelects()
+        ];
   }
-}
+    },
 
 /**
- * 填充资产类型选择器
- */
-function populateAssetTypeSelects() {
-  const selects = ['addAssetCodeSelect', 'editAssetCodeSelect', 'assetCodeFilter']
-
-  selects.forEach(selectId => {
-    const select = document.getElementById(selectId)
-    if (!select) return
-
-    // 保留第一个选项（默认提示）
-    const firstOption = select.options[0]
-    select.innerHTML = ''
-    select.appendChild(firstOption)
-
-    // 添加资产类型选项
-    assetTypes.forEach(asset => {
-      const option = document.createElement('option')
-      option.value = asset.asset_code
-      option.textContent = `${asset.display_name} (${asset.asset_code})`
-      select.appendChild(option)
-    })
-  })
-}
+     * 获取资产显示名称
+     */
+    getAssetDisplayName(assetCode) {
+      if (!assetCode) return '未设置';
+      const asset = this.assetTypes.find(a => a.asset_code === assetCode);
+      return asset ? asset.display_name : assetCode;
+    },
 
 /**
- * 获取资产类型显示名称
- */
-function getAssetDisplayName(assetCode) {
-  const asset = assetTypes.find(a => a.asset_code === assetCode)
-  return asset ? asset.display_name : assetCode
-}
-
-// ============================================
-// 商品列表
-// ============================================
+     * 获取库存样式类
+     */
+    getStockClass(stock) {
+      if (stock === 0) return 'stock-warning';
+      if (stock <= 10) return 'stock-low';
+      return 'stock-ok';
+    },
 
 /**
- * 处理搜索
+     * 搜索
  */
-function handleSearch() {
-  currentFilters = {
-    status: document.getElementById('statusFilter').value,
-    cost_asset_code: document.getElementById('assetCodeFilter').value,
-    sort_by: document.getElementById('sortByFilter').value
-  }
-  currentPage = 1
-  loadItems()
-}
+    handleSearch() {
+      this.currentPage = 1;
+      this.loadItems();
+    },
 
 /**
  * 加载商品列表
  */
-async function loadItems() {
+    async loadItems() {
+      this.loading = true;
+      
   try {
-    showLoading(true)
-    const token = getToken()
-
+        const token = localStorage.getItem('token');
     const params = new URLSearchParams({
-      page: currentPage,
-      page_size: pageSize,
-      sort_by: currentFilters.sort_by || 'sort_order',
+          page: this.currentPage,
+          page_size: this.pageSize,
+          sort_by: this.filters.sort_by || 'sort_order',
       sort_order: 'ASC'
-    })
+        });
 
-    if (currentFilters.status) params.append('status', currentFilters.status)
-    if (currentFilters.cost_asset_code)
-      params.append('cost_asset_code', currentFilters.cost_asset_code)
+        if (this.filters.status) params.append('status', this.filters.status);
+        if (this.filters.cost_asset_code) params.append('cost_asset_code', this.filters.cost_asset_code);
+        
+        const response = await fetch(`${API_BASE_URL}/admin/marketplace/exchange-items?${params}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error('加载商品列表失败');
 
-    // 使用管理端接口（以后端为准）
-    const response = await fetch(`${API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEMS}?${params}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+        const result = await response.json();
 
-    const data = await response.json()
-
-    if (data.success) {
-      renderItems(data.data.items)
-      renderPagination(data.data.pagination)
-      updateStats(data.data.items)
+        if (result.success) {
+          this.items = result.data?.items || [];
+          this.pagination = result.data?.pagination || null;
+          this.updateStats();
+          console.log(`✅ 加载商品: ${this.items.length} 个`);
     } else {
-      showError(data.message || '加载失败')
+          this.showError(result.message || '加载失败');
     }
   } catch (error) {
-    console.error('加载商品列表失败', error)
-    showError('加载失败，请稍后重试')
+        console.error('加载商品列表失败:', error);
+        this.showError('加载失败，请稍后重试');
   } finally {
-    showLoading(false)
-  }
-}
+        this.loading = false;
+      }
+    },
 
 /**
- * 渲染商品列表
- *
- * DataSanitizer 返回的字段（以后端为准）：
- * - id: 商品ID（DataSanitizer 将 item_id 映射为 id）
- * - name: 商品名称
- * - description: 商品描述
- * - cost_asset_code: 支付资产类型
- * - cost_amount: 消耗数量
- * - stock: 库存
- * - status: 状态
- * - sort_order: 排序号
- * - cost_price: 成本价（管理员可见）
- * - sold_count: 已售数量（管理员可见）
+     * 更新统计
  */
-function renderItems(items) {
-  const tbody = document.getElementById('itemsTableBody')
-
-  if (!items || items.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">暂无数据</td></tr>'
-    return
-  }
-
-  tbody.innerHTML = items
-    .map(item => {
-      // 兼容处理：优先使用 id，兼容 item_id
-      const itemId = item.id || item.item_id
-      const stockClass =
-        item.stock === 0 ? 'stock-warning' : item.stock <= 10 ? 'stock-low' : 'stock-ok'
-      const statusBadge =
-        item.status === 'active'
-          ? '<span class="badge bg-success">上架</span>'
-          : '<span class="badge bg-secondary">下架</span>'
-
-      // 显示支付资产信息
-      const assetDisplay = item.cost_asset_code
-        ? `<span class="badge bg-info">${getAssetDisplayName(item.cost_asset_code)}</span>`
-        : '<span class="badge bg-secondary">未设置</span>'
-
-      // 已售数量：DataSanitizer返回 sold_count（管理员可见）
-      const soldCount = item.sold_count || 0
-
-      return `
-      <tr>
-        <td>${itemId}</td>
-        <td>
-          <div><strong>${escapeHtml(item.name)}</strong></div>
-          <small class="text-muted">${escapeHtml(item.description || '')}</small>
-        </td>
-        <td>${assetDisplay}</td>
-        <td><span class="badge bg-warning text-dark">${item.cost_amount || 0}</span></td>
-        <td><span class="${stockClass}">${item.stock}</span></td>
-        <td>${soldCount}</td>
-        <td>${statusBadge}</td>
-        <td>${item.sort_order}</td>
-        <td>
-          <button class="btn btn-sm btn-outline-primary btn-edit-item" data-item-id="${itemId}">
-            <i class="bi bi-pencil"></i> 编辑
-          </button>
-          <button class="btn btn-sm btn-outline-danger btn-delete-item" data-item-id="${itemId}">
-            <i class="bi bi-trash"></i> 删除
-          </button>
-        </td>
-      </tr>
-    `
-    })
-    .join('')
-}
-
-/**
- * 更新统计数据
- * 字段说明：sold_count 是管理员可见的已售数量
- */
-function updateStats(items) {
-  const stats = {
-    total: items.length,
-    active: items.filter(i => i.status === 'active').length,
-    lowStock: items.filter(i => i.stock <= 10 && i.stock > 0).length,
-    // 使用 sold_count 统计已售数量
-    totalSold: items.reduce((sum, i) => sum + (i.sold_count || 0), 0)
-  }
-
-  document.getElementById('totalItems').textContent = stats.total
-  document.getElementById('activeItems').textContent = stats.active
-  document.getElementById('lowStockItems').textContent = stats.lowStock
-  document.getElementById('totalExchanges').textContent = stats.totalSold
-}
-
-/**
- * 渲染分页
- * 🔧 2026-01-09 CSP修复：使用 data-page 替代 onclick
- */
-function renderPagination(pagination) {
-  const paginationEl = document.getElementById('pagination')
-  if (!pagination || pagination.total_pages <= 1) {
-    paginationEl.innerHTML = ''
-    return
-  }
-
-  let html = ''
-  for (let i = 1; i <= pagination.total_pages; i++) {
-    html += `
-      <li class="page-item ${i === currentPage ? 'active' : ''}">
-        <a class="page-link" href="#" data-page="${i}">${i}</a>
-      </li>
-    `
-  }
-  paginationEl.innerHTML = html
-}
+    updateStats() {
+      this.stats = {
+        total: this.items.length,
+        active: this.items.filter(i => i.status === 'active').length,
+        lowStock: this.items.filter(i => i.stock <= 10 && i.stock > 0).length,
+        totalSold: this.items.reduce((sum, i) => sum + (i.sold_count || 0), 0)
+      };
+    },
+    
+    /**
+     * 计算可见页码
+     */
+    get visiblePages() {
+      if (!this.pagination) return [];
+      
+      const pages = [];
+      const total = this.pagination.total_pages;
+      const current = this.currentPage;
+      
+      for (let i = 1; i <= total; i++) {
+        if (i === 1 || i === total || (i >= current - 2 && i <= current + 2)) {
+          pages.push(i);
+        } else if (i === current - 3 || i === current + 3) {
+          pages.push('...');
+        }
+      }
+      
+      return pages;
+    },
 
 /**
  * 切换页码
  */
-function changePage(page) {
-  currentPage = page
-  loadItems()
-}
-
-// ============================================
-// 商品操作
-// ============================================
+    changePage(page) {
+      if (page < 1 || page > this.pagination?.total_pages) return;
+      this.currentPage = page;
+      this.loadItems();
+    },
+    
+    /**
+     * 打开添加弹窗
+     */
+    openAddModal() {
+      this.addForm = {
+        item_name: '',
+        item_description: '',
+        cost_asset_code: '',
+        cost_amount: 1,
+        cost_price: 0,
+        stock: 0,
+        sort_order: 100,
+        status: 'active'
+      };
+      this.addModal.show();
+    },
 
 /**
  * 添加商品
- * 发送后端期望的字段：item_name, item_description, cost_asset_code, cost_amount, cost_price, stock, sort_order, status
  */
-async function handleAddItem() {
-  try {
-    const form = document.getElementById('addItemForm')
-    if (!form.checkValidity()) {
-      form.reportValidity()
-      return
+    async handleAddItem() {
+      if (!this.addForm.item_name || !this.addForm.cost_asset_code) {
+        this.showError('请填写必填字段');
+        return;
+      }
+      
+      if (this.addForm.cost_amount <= 0) {
+        this.showError('材料消耗数量必须大于0');
+        return;
     }
 
-    showLoading(true)
-    const formData = new FormData(form)
-
-    // 构建后端期望的请求体（使用后端字段名）
-    const requestData = {
-      item_name: formData.get('item_name'),
-      item_description: formData.get('item_description') || '',
-      cost_asset_code: formData.get('cost_asset_code'),
-      cost_amount: parseInt(formData.get('cost_amount')) || 0,
-      cost_price: parseFloat(formData.get('cost_price')) || 0,
-      stock: parseInt(formData.get('stock')) || 0,
-      sort_order: parseInt(formData.get('sort_order')) || 100,
-      status: formData.get('status') || 'active'
-    }
-
-    // 验证必填字段
-    if (!requestData.cost_asset_code) {
-      showError('请选择支付资产类型')
-      return
-    }
-    if (requestData.cost_amount <= 0) {
-      showError('材料消耗数量必须大于0')
-      return
-    }
-
-    const token = getToken()
-    const response = await fetch(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEMS, {
+      this.submitting = true;
+      
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/admin/marketplace/exchange-items`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify(requestData)
-    })
+          body: JSON.stringify(this.addForm)
+        });
 
-    const result = await response.json()
+        const result = await response.json();
 
     if (result.success) {
-      showSuccess('添加成功')
-      bootstrap.Modal.getInstance(document.getElementById('addItemModal')).hide()
-      form.reset()
-      loadItems()
+          this.showSuccess('添加成功');
+          this.addModal.hide();
+          this.loadItems();
     } else {
-      showError(result.message || '添加失败')
+          this.showError(result.message || '添加失败');
     }
   } catch (error) {
-    console.error('添加商品失败', error)
-    showError('添加失败，请稍后重试')
+        console.error('添加商品失败:', error);
+        this.showError('添加失败，请稍后重试');
   } finally {
-    showLoading(false)
+        this.submitting = false;
   }
-}
+    },
 
 /**
- * 编辑商品 - 加载商品详情
- *
- * DataSanitizer 返回的字段：
- * - id: 商品ID（DataSanitizer 将 item_id 映射为 id）
- * - name, description, cost_asset_code, cost_amount, stock, status, sort_order
- * - cost_price: 成本价（管理员可见）
+     * 编辑商品
  */
-async function editItem(itemId) {
-  try {
-    showLoading(true)
-    const token = getToken()
+    async editItem(itemId) {
+      this.globalLoading = true;
+      
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/admin/marketplace/exchange-items/${itemId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error('获取商品信息失败');
 
-    // 使用管理端接口获取商品详情（以后端为准）
-    // 注意：管理端接口返回的是原始字段 item_id, name 等
-    const response = await fetch(API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEM_DETAIL, { item_id: itemId }), {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+        const result = await response.json();
 
-    const data = await response.json()
-
-    if (data.success) {
-      const item = data.data.item
-
-      // 填充表单（兼容 id 和 item_id）
-      document.getElementById('editItemId').value = item.id || item.item_id
-      document.getElementById('editItemName').value = item.name || ''
-      document.getElementById('editItemDescription').value = item.description || ''
-      document.getElementById('editAssetCodeSelect').value = item.cost_asset_code || ''
-      document.getElementById('editCostAmount').value = item.cost_amount || 0
-      document.getElementById('editCostPrice').value = item.cost_price || 0
-      document.getElementById('editStock').value = item.stock || 0
-      document.getElementById('editSortOrder').value = item.sort_order || 100
-      document.getElementById('editStatus').value = item.status || 'active'
-
-      // display_points 是可选展示字段，后端可能没有
-      const displayPointsEl = document.getElementById('editDisplayPoints')
-      if (displayPointsEl) {
-        displayPointsEl.value = item.display_points || 0
-      }
-
-      new bootstrap.Modal(document.getElementById('editItemModal')).show()
+        if (result.success) {
+          const item = result.data?.item;
+          this.editForm = {
+            item_id: item.id || item.item_id,
+            item_name: item.name || '',
+            item_description: item.description || '',
+            cost_asset_code: item.cost_asset_code || '',
+            cost_amount: item.cost_amount || 0,
+            cost_price: item.cost_price || 0,
+            stock: item.stock || 0,
+            sort_order: item.sort_order || 100,
+            status: item.status || 'active'
+          };
+          this.editModal.show();
     } else {
-      showError(data.message || '获取商品信息失败')
+          this.showError(result.message || '获取商品信息失败');
     }
   } catch (error) {
-    console.error('加载商品信息失败', error)
-    showError('加载失败，请稍后重试')
+        console.error('加载商品信息失败:', error);
+        this.showError('加载失败，请稍后重试');
   } finally {
-    showLoading(false)
+        this.globalLoading = false;
   }
-}
+    },
 
 /**
  * 提交编辑
- * 发送后端期望的字段：item_name, item_description, cost_asset_code, cost_amount, cost_price, stock, sort_order, status
  */
-async function handleEditItem() {
-  try {
-    const form = document.getElementById('editItemForm')
-    if (!form.checkValidity()) {
-      form.reportValidity()
-      return
+    async handleEditItem() {
+      if (!this.editForm.item_name || !this.editForm.cost_asset_code) {
+        this.showError('请填写必填字段');
+        return;
+      }
+      
+      if (this.editForm.cost_amount <= 0) {
+        this.showError('材料消耗数量必须大于0');
+        return;
     }
 
-    showLoading(true)
-    const formData = new FormData(form)
-    const itemId = formData.get('item_id')
-
-    // 构建后端期望的请求体（使用后端字段名）
-    const requestData = {
-      item_name: formData.get('item_name'),
-      item_description: formData.get('item_description') || '',
-      cost_asset_code: formData.get('cost_asset_code'),
-      cost_amount: parseInt(formData.get('cost_amount')) || 0,
-      cost_price: parseFloat(formData.get('cost_price')) || 0,
-      stock: parseInt(formData.get('stock')) || 0,
-      sort_order: parseInt(formData.get('sort_order')) || 100,
-      status: formData.get('status') || 'active'
-    }
-
-    // 验证必填字段
-    if (!requestData.cost_asset_code) {
-      showError('请选择支付资产类型')
-      return
-    }
-    if (requestData.cost_amount <= 0) {
-      showError('材料消耗数量必须大于0')
-      return
-    }
-
-    const token = getToken()
-    const response = await fetch(API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEM_DETAIL, { item_id: itemId }), {
+      this.submitting = true;
+      
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/admin/marketplace/exchange-items/${this.editForm.item_id}`, {
       method: 'PUT',
       headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestData)
-    })
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            item_name: this.editForm.item_name,
+            item_description: this.editForm.item_description,
+            cost_asset_code: this.editForm.cost_asset_code,
+            cost_amount: this.editForm.cost_amount,
+            cost_price: this.editForm.cost_price,
+            stock: this.editForm.stock,
+            sort_order: this.editForm.sort_order,
+            status: this.editForm.status
+          })
+        });
 
-    const result = await response.json()
+        const result = await response.json();
 
     if (result.success) {
-      showSuccess('更新成功')
-      bootstrap.Modal.getInstance(document.getElementById('editItemModal')).hide()
-      loadItems()
+          this.showSuccess('更新成功');
+          this.editModal.hide();
+          this.loadItems();
     } else {
-      showError(result.message || '更新失败')
+          this.showError(result.message || '更新失败');
     }
   } catch (error) {
-    console.error('更新商品失败', error)
-    showError('更新失败，请稍后重试')
+        console.error('更新商品失败:', error);
+        this.showError('更新失败，请稍后重试');
   } finally {
-    showLoading(false)
+        this.submitting = false;
   }
-}
+    },
 
 /**
  * 删除商品
  */
-async function deleteItem(itemId) {
+    async deleteItem(itemId) {
   if (!confirm('确定要删除这个商品吗？此操作不可恢复！')) {
-    return
+        return;
   }
 
-  try {
-    showLoading(true)
-    const token = getToken()
-
-    const response = await fetch(API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEM_DETAIL, { item_id: itemId }), {
+      this.globalLoading = true;
+      
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/admin/marketplace/exchange-items/${itemId}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
-    })
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
 
-    const data = await response.json()
+        const result = await response.json();
 
-    if (data.success) {
-      showSuccess('删除成功')
-      loadItems()
+        if (result.success) {
+          this.showSuccess('删除成功');
+          this.loadItems();
     } else {
-      showError(data.message || '删除失败')
+          this.showError(result.message || '删除失败');
     }
   } catch (error) {
-    console.error('删除商品失败', error)
-    showError('删除失败，请稍后重试')
+        console.error('删除商品失败:', error);
+        this.showError('删除失败，请稍后重试');
   } finally {
-    showLoading(false)
+        this.globalLoading = false;
   }
-}
-
-// ============================================
-// 工具函数
-// ============================================
-
-/**
- * HTML转义
- */
-function escapeHtml(text) {
-  if (!text) return ''
-  const div = document.createElement('div')
-  div.textContent = text
-  return div.innerHTML
-}
-
-/**
- * 显示加载状态
- */
-function showLoading(show) {
-  document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none'
-}
+    },
 
 /**
  * 显示成功消息
  */
-function showSuccess(message) {
-  if (typeof showSuccessToast === 'function') {
-    showSuccessToast(message)
-  } else {
-    alert(message)
-  }
+    showSuccess(message) {
+      this.$toast.success(message);
+    },
+
+    /**
+     * 显示错误消息
+     */
+    showError(message) {
+      this.$toast.error(message);
+    }
+  };
 }
 
-/**
- * 显示错误消息
- */
-function showError(message) {
-  if (typeof showErrorToast === 'function') {
-    showErrorToast(message)
-  } else {
-    alert(message)
-  }
-}
+// Alpine.js 组件注册
+document.addEventListener('alpine:init', () => {
+  Alpine.data('exchangeMarketItemsPage', exchangeMarketItemsPage)
+  console.log('✅ [ExchangeMarketItemsPage] Alpine 组件已注册')
+})

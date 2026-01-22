@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>奖品池配置 - 管理后台</title>
+  
+  <!-- ✅ Bootstrap 5 - UI框架 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- ✅ Bootstrap Icons - 图标库 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  
+  <!-- ✅ 公共样式表 - 统一主题和响应式设计 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+  
+  <!-- ✅ 页面特有样式 -->
+  <style>
+    .stock-badge {
+      font-size: 0.875rem;
+      padding: 0.25rem 0.75rem;
+    }
+  </style>
+</head>
+<body class="bg-light" x-data="prizesPage()">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>🎁 管理后台 - 奖品池配置
+      </a>
+      <div>
+        <span class="text-light me-3" x-text="'欢迎，' + (userInfo?.nickname || '管理员')">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" @click="logout">退出登录</button>
+      </div>
+    </div>
+  </nav>
+  
+  <div class="container-fluid mt-4">
+    <!-- 操作区域 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="mb-0">
+              <i class="bi bi-gift-fill"></i> 奖品池管理
+            </h5>
+            <small class="text-muted">管理抽奖系统中的所有奖品</small>
+          </div>
+          <button class="btn btn-primary" @click="openAddModal">
+            <i class="bi bi-plus-lg"></i> 添加奖品
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 统计信息 -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">奖品总数</h6>
+            <h3 class="text-primary" x-text="formatNumber(statistics.totalPrizes)">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">库存充足</h6>
+            <h3 class="text-success" x-text="formatNumber(statistics.inStockPrizes)">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">库存不足</h6>
+            <h3 class="text-warning" x-text="formatNumber(statistics.lowStockPrizes)">-</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">已领取</h6>
+            <h3 class="text-info" x-text="formatNumber(statistics.claimedPrizes)">-</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 数据表格 -->
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 80px;">ID</th>
+                <th>奖品信息</th>
+                <th>类型</th>
+                <th>价值</th>
+                <th>库存</th>
+                <th>已领取</th>
+                <th>状态</th>
+                <th style="width: 250px;">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- 加载中状态 -->
+              <template x-if="loading && prizes.length === 0">
+                <tr>
+                  <td colspan="8" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">加载中...</span>
+                    </div>
+                    <p class="mt-2 text-muted">正在加载数据...</p>
+                  </td>
+                </tr>
+              </template>
+              
+              <!-- 空数据状态 -->
+              <template x-if="!loading && prizes.length === 0">
+                <tr>
+                  <td colspan="8" class="text-center py-5">
+                    <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                    <p class="mt-2 text-muted">暂无奖品，点击右上角添加奖品</p>
+                  </td>
+                </tr>
+              </template>
+              
+              <!-- 数据列表 -->
+              <template x-for="prize in prizes" :key="prize.prize_id || prize.id">
+                <tr>
+                  <td x-text="prize.prize_id || prize.id"></td>
+                  <td>
+                    <div class="d-flex align-items-center">
+                      <img :src="prize.image_url || defaultPrizeImage" 
+                           class="prize-image me-3" 
+                           :alt="prize.prize_name"
+                           @error="$event.target.src = defaultPrizeImage">
+                      <div>
+                        <div class="fw-bold" x-text="prize.prize_name"></div>
+                        <small class="text-muted" x-text="prize.prize_description || '暂无描述'"></small>
+                      </div>
+                    </div>
+                  </td>
+                  <td x-html="getPrizeTypeLabel(prize.prize_type)"></td>
+                  <td class="fw-bold text-primary" x-text="'¥' + (prize.prize_value || 0).toFixed(2)"></td>
+                  <td x-html="renderStockBadge(prize.remaining_quantity, prize.stock_quantity)"></td>
+                  <td class="text-info" x-text="formatNumber(prize.total_win_count || 0)"></td>
+                  <td x-html="renderPrizeStatus(prize)"></td>
+                  <td>
+                    <div class="btn-group btn-group-sm">
+                      <button class="btn btn-outline-primary" @click="editPrize(prize.prize_id || prize.id)">
+                        <i class="bi bi-pencil"></i> 编辑
+                      </button>
+                      <button class="btn btn-outline-success" @click="addStock(prize.prize_id || prize.id)">
+                        <i class="bi bi-plus-circle"></i> 补货
+                      </button>
+                      <button class="btn btn-outline-danger" @click="deletePrize(prize.prize_id || prize.id)">
+                        <i class="bi bi-trash"></i> 删除
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 添加奖品模态框 -->
+  <div class="modal fade" id="addPrizeModal" tabindex="-1" x-ref="addPrizeModal">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-plus-circle"></i> 添加奖品
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form x-ref="addPrizeForm">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">奖品名称 <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" x-model="addForm.name" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">奖品类型 <span class="text-danger">*</span></label>
+                <select class="form-select" x-model="addForm.type" required>
+                  <option value="">请选择</option>
+                  <option value="physical">实物奖品</option>
+                  <option value="virtual">虚拟奖品</option>
+                  <option value="points">积分奖励</option>
+                  <option value="coupon">优惠券</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">奖品价值(元) <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" x-model="addForm.value" step="0.01" min="0" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">初始库存 <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" x-model="addForm.quantity" min="0" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label">奖品描述</label>
+                <textarea class="form-control" x-model="addForm.description" rows="3"></textarea>
+              </div>
+              <div class="col-12">
+                <label class="form-label">奖品图片</label>
+                <input type="file" class="form-control" x-ref="addImageInput" accept="image/*" @change="previewAddImage">
+                <small class="text-muted">支持 JPG、PNG 格式，建议尺寸 400x400</small>
+                <div class="mt-2" x-show="addForm.imagePreview">
+                  <img :src="addForm.imagePreview" class="upload-preview" alt="预览">
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" @click="submitAddPrize">
+            <i class="bi bi-check-lg"></i> 添加
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 编辑奖品模态框 -->
+  <div class="modal fade" id="editPrizeModal" tabindex="-1" x-ref="editPrizeModal">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-pencil-square"></i> 编辑奖品
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form x-ref="editPrizeForm">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">奖品名称 <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" x-model="editForm.name" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">奖品类型 <span class="text-danger">*</span></label>
+                <select class="form-select" x-model="editForm.type" required>
+                  <option value="physical">实物奖品</option>
+                  <option value="virtual">虚拟奖品</option>
+                  <option value="points">积分奖励</option>
+                  <option value="coupon">优惠券</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">奖品价值(元) <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" x-model="editForm.value" step="0.01" min="0" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">当前库存 <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" x-model="editForm.quantity" min="0" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label">奖品描述</label>
+                <textarea class="form-control" x-model="editForm.description" rows="3"></textarea>
+              </div>
+              <div class="col-12">
+                <label class="form-label">奖品图片</label>
+                <input type="file" class="form-control" x-ref="editImageInput" accept="image/*" @change="previewEditImage">
+                <small class="text-muted">留空则不更新图片</small>
+                <div class="mt-2" x-show="editForm.imagePreview">
+                  <img :src="editForm.imagePreview" class="upload-preview" alt="当前图片">
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" @click="submitEditPrize">
+            <i class="bi bi-check-lg"></i> 保存
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" :class="{ 'show': globalLoading }">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <!-- ✅ Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- ✅ 资源配置 - 统一静态资源管理 -->
+  <script src="/admin/js/resource-config.js"></script>
+  
+  <!-- ✅ 引入通用工具库 -->
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  
+  <!-- ✅ Alpine.js 初始化 -->
+  <script src="/admin/js/alpine/init.js"></script>
+  
+  <!-- ✅ 页面专属逻辑 (Alpine.js 组件) -->
+  <script src="/admin/js/pages/prizes.js"></script>
+  
+  <!-- ✅ Alpine.js -->
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+</body>
+</html>

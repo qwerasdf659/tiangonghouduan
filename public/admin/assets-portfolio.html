@@ -14,6 +14,7 @@
   <!-- 公共样式表 - 统一主题和响应式设计 -->
   <link href="/admin/css/common.css" rel="stylesheet">
 
+
   <style>
     .asset-overview-card {
       border-left: 4px solid #0d6efd;
@@ -29,141 +30,203 @@
       font-size: 1.8rem;
       font-weight: bold;
     }
+    [x-cloak] { display: none !important; }
   </style>
+  <!-- Alpine.js -->
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
 </head>
 <body class="bg-light">
-  <!-- 顶部导航 -->
-  <nav class="navbar navbar-dark bg-primary">
-    <div class="container-fluid">
-      <a href="/admin/dashboard.html" class="navbar-brand">
-        <i class="bi bi-arrow-left me-2"></i>管理后台 - 运营资产中心
-      </a>
-      <div>
-        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
-      </div>
-    </div>
-  </nav>
-
-  <div class="container-fluid mt-4">
-    <!-- 资产概览 -->
-    <div class="row g-3 mb-4" id="assetOverviewContainer">
-      <!-- 动态生成 -->
-    </div>
-
-    <!-- 快速操作 -->
-    <div class="card mb-3">
-      <div class="card-body">
-        <h5 class="mb-3"><i class="bi bi-lightning"></i> 快速操作</h5>
-        <div class="row g-2">
-          <div class="col-md-2">
-            <a href="/admin/asset-adjustment.html" class="btn btn-outline-primary w-100">
-              <i class="bi bi-sliders"></i> 资产调整
-            </a>
-          </div>
-          <div class="col-md-2">
-            <a href="/admin/diamond-accounts.html" class="btn btn-outline-info w-100">
-              <i class="bi bi-gem"></i> 钻石管理
-            </a>
-          </div>
-          <div class="col-md-2">
-            <a href="/admin/material-balances.html" class="btn btn-outline-success w-100">
-              <i class="bi bi-box-seam"></i> 材料管理
-            </a>
-          </div>
-          <div class="col-md-2">
-            <a href="/admin/material-transactions.html" class="btn btn-outline-warning w-100">
-              <i class="bi bi-clock-history"></i> 资产流水
-            </a>
-          </div>
-          <div class="col-md-2">
-            <a href="/admin/orphan-frozen.html" class="btn btn-outline-danger w-100">
-              <i class="bi bi-snow2"></i> 冻结清理
-            </a>
-          </div>
-          <div class="col-md-2">
-            <button class="btn btn-primary w-100" id="refreshBtn">
-              <i class="bi bi-arrow-repeat"></i> 刷新数据
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 资产类型详情 -->
-    <div class="card mb-3">
-      <div class="card-header bg-white">
-        <h5 class="mb-0"><i class="bi bi-grid"></i> 资产类型详情</h5>
-      </div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-hover mb-0">
-            <thead class="table-light">
-              <tr>
-                <th>资产代码</th>
-                <th>资产名称</th>
-                <th>总发行量</th>
-                <th>流通量</th>
-                <th>冻结量</th>
-                <th>销毁量</th>
-                <th>持有用户数</th>
-                <th>状态</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody id="assetTypeTableBody">
-              <tr>
-                <td colspan="9" class="text-center py-5 text-muted">
-                  <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-                  <p class="mt-2">加载中...</p>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- 最近资产变动 -->
-    <div class="card">
-      <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-activity"></i> 最近资产变动</h5>
-        <a href="/admin/material-transactions.html" class="btn btn-sm btn-outline-primary">
-          查看全部 <i class="bi bi-arrow-right"></i>
+  <!-- Alpine.js 应用 -->
+  <div x-data="assetsPortfolioPage()" x-init="init()" x-cloak>
+    <!-- 顶部导航 -->
+    <nav class="navbar navbar-dark bg-primary">
+      <div class="container-fluid">
+        <a href="/admin/dashboard.html" class="navbar-brand">
+          <i class="bi bi-arrow-left me-2"></i>管理后台 - 运营资产中心
         </a>
+        <div>
+          <span class="text-light me-3" x-text="'欢迎，' + (userInfo.nickname || userInfo.username || '管理员')">欢迎，管理员</span>
+          <button class="btn btn-outline-light btn-sm" @click="handleLogout()">退出登录</button>
+        </div>
       </div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-hover mb-0">
-            <thead class="table-light">
-              <tr>
-                <th>时间</th>
-                <th>用户</th>
-                <th>资产类型</th>
-                <th>变动类型</th>
-                <th>数量</th>
-                <th>余额</th>
-                <th>操作人</th>
-              </tr>
-            </thead>
-            <tbody id="recentTransactionsBody">
-              <tr>
-                <td colspan="7" class="text-center py-5 text-muted">
-                  <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-                  <p class="mt-2">加载中...</p>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+    </nav>
+
+    <div class="container-fluid mt-4">
+      <!-- 资产概览 -->
+      <div class="row g-3 mb-4">
+        <template x-for="asset in assetOverview" :key="asset.asset_code">
+          <div class="col-md-3">
+            <div class="card asset-overview-card">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <h6 class="text-muted mb-1" x-text="asset.name"></h6>
+                    <div class="asset-value" :class="'text-' + asset.color" x-text="formatNumber(asset.total_circulation || 0)"></div>
+                    <small class="text-muted">
+                      持有用户: <span x-text="asset.holder_count || 0"></span>
+                    </small>
+                  </div>
+                  <div>
+                    <i class="bi asset-icon" :class="[asset.icon, 'text-' + asset.color]"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- 快速操作 -->
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="mb-3"><i class="bi bi-lightning"></i> 快速操作</h5>
+          <div class="row g-2">
+            <div class="col-md-2">
+              <a href="/admin/asset-adjustment.html" class="btn btn-outline-primary w-100">
+                <i class="bi bi-sliders"></i> 资产调整
+              </a>
+            </div>
+            <div class="col-md-2">
+              <a href="/admin/diamond-accounts.html" class="btn btn-outline-info w-100">
+                <i class="bi bi-gem"></i> 钻石管理
+              </a>
+            </div>
+            <div class="col-md-2">
+              <a href="/admin/material-balances.html" class="btn btn-outline-success w-100">
+                <i class="bi bi-box-seam"></i> 材料管理
+              </a>
+            </div>
+            <div class="col-md-2">
+              <a href="/admin/material-transactions.html" class="btn btn-outline-warning w-100">
+                <i class="bi bi-clock-history"></i> 资产流水
+              </a>
+            </div>
+            <div class="col-md-2">
+              <a href="/admin/orphan-frozen.html" class="btn btn-outline-danger w-100">
+                <i class="bi bi-snow2"></i> 冻结清理
+              </a>
+            </div>
+            <div class="col-md-2">
+              <button class="btn btn-primary w-100" @click="loadAllData()" :disabled="loading">
+                <span x-show="loading" class="spinner-border spinner-border-sm me-1"></span>
+                <i class="bi bi-arrow-repeat" x-show="!loading"></i> 刷新数据
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 资产类型详情 -->
+      <div class="card mb-3">
+        <div class="card-header bg-white">
+          <h5 class="mb-0"><i class="bi bi-grid"></i> 资产类型详情</h5>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>资产代码</th>
+                  <th>资产名称</th>
+                  <th>总发行量</th>
+                  <th>流通量</th>
+                  <th>冻结量</th>
+                  <th>销毁量</th>
+                  <th>持有用户数</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- 加载中 -->
+                <tr x-show="loading">
+                  <td colspan="9" class="text-center py-5 text-muted">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">加载中...</span>
+                    </div>
+                    <p class="mt-2">加载中...</p>
+                  </td>
+                </tr>
+                <!-- 空数据 -->
+                <tr x-show="!loading && assetTypes.length === 0">
+                  <td colspan="9" class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                    <p class="mt-2">暂无资产类型数据</p>
+                  </td>
+                </tr>
+                <!-- 数据列表 -->
+                <template x-for="type in assetTypes" :key="type.asset_code">
+                  <tr>
+                    <td><code x-text="type.asset_code"></code></td>
+                    <td x-text="type.name || type.asset_code"></td>
+                    <td x-text="formatNumber(type.total_issued || 0)"></td>
+                    <td x-text="formatNumber(type.circulation || 0)"></td>
+                    <td x-text="formatNumber(type.frozen || 0)"></td>
+                    <td x-text="formatNumber(type.destroyed || 0)"></td>
+                    <td x-text="type.holder_count || 0"></td>
+                    <td>
+                      <span class="badge" :class="type.is_active !== false ? 'bg-success' : 'bg-secondary'" x-text="type.is_active !== false ? '启用' : '禁用'"></span>
+                    </td>
+                    <td>
+                      <a :href="'/admin/material-transactions.html?asset_code=' + type.asset_code" 
+                         class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-clock-history"></i> 流水
+                      </a>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 最近资产变动 -->
+      <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="bi bi-activity"></i> 最近资产变动</h5>
+          <a href="/admin/material-transactions.html" class="btn btn-sm btn-outline-primary">
+            查看全部 <i class="bi bi-arrow-right"></i>
+          </a>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>时间</th>
+                  <th>用户</th>
+                  <th>资产类型</th>
+                  <th>变动类型</th>
+                  <th>数量</th>
+                  <th>余额</th>
+                  <th>操作人</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- 提示信息 -->
+                <tr x-show="!loading">
+                  <td colspan="7" class="text-center py-5 text-muted">
+                    <i class="bi bi-info-circle" style="font-size: 2rem;"></i>
+                    <p class="mt-2">资产流水需按用户查询</p>
+                    <a href="/admin/asset-adjustment.html" class="btn btn-sm btn-primary mt-2">
+                      <i class="bi bi-search"></i> 前往资产调整页面查询
+                    </a>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- 加载遮罩层 -->
-  <div class="loading-overlay" id="loadingOverlay">
-    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
-      <span class="visually-hidden">处理中...</span>
+    <!-- 加载遮罩层 -->
+    <div class="loading-overlay" :class="{ show: loading }" x-cloak>
+      <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+        <span class="visually-hidden">处理中...</span>
+      </div>
     </div>
   </div>
 
@@ -173,10 +236,10 @@
   <!-- 引入公共模块 -->
   <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/api-config.js"></script>
-  <script src="/admin/js/common/toast.js"></script>
 
   <!-- 引入页面专属逻辑 -->
-  <script src="/admin/js/pages/assets-portfolio.js?v=1.0.0"></script>
+  <script src="/admin/js/pages/assets-portfolio.js?v=2.0.0"></script>
+  
+  <!-- Alpine.js -->
 </body>
 </html>
-

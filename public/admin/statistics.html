@@ -4,24 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>数据统计报表 - 管理后台</title>
-  
-  <!-- ✅ Bootstrap 5 - UI框架 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  
-  <!-- ✅ Bootstrap Icons - 图标库 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-  
-  <!-- ✅ 公共样式表 - 统一主题和响应式设计 -->
   <link href="/admin/css/common.css" rel="stylesheet">
-  
-  <!-- ✅ 页面特有样式 -->
   <style>
-    .trend-up {
-      color: #28a745;
-    }
-    .trend-down {
-      color: #dc3545;
-    }
+    .trend-up { color: #28a745; }
+    .trend-down { color: #dc3545; }
     .export-btn {
       position: fixed;
       bottom: 20px;
@@ -33,8 +21,16 @@
       height: 280px;
     }
   </style>
+
+  <!-- Alpine.js -->
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
 </head>
-<body class="bg-light">
+<body class="bg-light" x-data="statisticsPage()" x-cloak>
   <!-- 顶部导航 -->
   <nav class="navbar navbar-dark bg-primary">
     <div class="container-fluid">
@@ -42,8 +38,8 @@
         <i class="bi bi-arrow-left me-2"></i>📊 管理后台 - 数据统计报表
       </a>
       <div>
-        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+        <span class="text-light me-3" x-text="'欢迎，' + (userInfo.nickname || '管理员')">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" @click="logout">退出登录</button>
       </div>
     </div>
   </nav>
@@ -55,25 +51,26 @@
         <div class="row g-3 align-items-end">
           <div class="col-md-3">
             <label class="form-label">统计周期</label>
-            <select class="form-select" id="periodSelect">
+            <select class="form-select" x-model="filters.period" @change="onPeriodChange">
               <option value="today">今日</option>
               <option value="yesterday">昨日</option>
-              <option value="week" selected>本周</option>
+              <option value="week">本周</option>
               <option value="month">本月</option>
               <option value="custom">自定义</option>
             </select>
           </div>
-          <div class="col-md-3" id="customDateStart" style="display: none;">
+          <div class="col-md-3" x-show="filters.period === 'custom'" x-transition>
             <label class="form-label">开始日期</label>
-            <input type="date" class="form-control" id="startDate">
+            <input type="date" class="form-control" x-model="filters.startDate">
           </div>
-          <div class="col-md-3" id="customDateEnd" style="display: none;">
+          <div class="col-md-3" x-show="filters.period === 'custom'" x-transition>
             <label class="form-label">结束日期</label>
-            <input type="date" class="form-control" id="endDate">
+            <input type="date" class="form-control" x-model="filters.endDate">
           </div>
           <div class="col-md-3">
-            <button class="btn btn-primary w-100" id="loadStatisticsBtn">
-              <i class="bi bi-search"></i> 查询
+            <button class="btn btn-primary w-100" @click="loadStatistics" :disabled="loading">
+              <span x-show="!loading"><i class="bi bi-search"></i> 查询</span>
+              <span x-show="loading"><span class="spinner-border spinner-border-sm"></span> 加载中...</span>
             </button>
           </div>
         </div>
@@ -92,15 +89,16 @@
             <div class="d-flex justify-content-between align-items-start mb-2">
               <div>
                 <h6 class="text-muted mb-0">总用户数</h6>
-                <h2 class="mt-2 mb-0" id="totalUsers">-</h2>
+                <h2 class="mt-2 mb-0" x-text="formatNumber(stats.totalUsers)">-</h2>
               </div>
               <div class="text-primary" style="font-size: 2rem;">
                 <i class="bi bi-people-fill"></i>
               </div>
             </div>
             <div class="d-flex align-items-center">
-              <span class="trend-up me-2" id="userTrend">
-                <i class="bi bi-arrow-up"></i> +0%
+              <span :class="stats.userTrend >= 0 ? 'trend-up me-2' : 'trend-down me-2'">
+                <i :class="stats.userTrend >= 0 ? 'bi bi-arrow-up' : 'bi bi-arrow-down'"></i>
+                <span x-text="(stats.userTrend >= 0 ? '+' : '') + stats.userTrend.toFixed(1) + '%'"></span>
               </span>
               <small class="text-muted">较上期</small>
             </div>
@@ -114,15 +112,16 @@
             <div class="d-flex justify-content-between align-items-start mb-2">
               <div>
                 <h6 class="text-muted mb-0">总抽奖次数</h6>
-                <h2 class="mt-2 mb-0" id="totalDraws">-</h2>
+                <h2 class="mt-2 mb-0" x-text="formatNumber(stats.totalDraws)">-</h2>
               </div>
               <div class="text-success" style="font-size: 2rem;">
                 <i class="bi bi-gift-fill"></i>
               </div>
             </div>
             <div class="d-flex align-items-center">
-              <span class="trend-up me-2" id="drawTrend">
-                <i class="bi bi-arrow-up"></i> +0%
+              <span :class="stats.drawTrend >= 0 ? 'trend-up me-2' : 'trend-down me-2'">
+                <i :class="stats.drawTrend >= 0 ? 'bi bi-arrow-up' : 'bi bi-arrow-down'"></i>
+                <span x-text="(stats.drawTrend >= 0 ? '+' : '') + stats.drawTrend.toFixed(1) + '%'"></span>
               </span>
               <small class="text-muted">较上期</small>
             </div>
@@ -136,15 +135,16 @@
             <div class="d-flex justify-content-between align-items-start mb-2">
               <div>
                 <h6 class="text-muted mb-0">高档奖励率</h6>
-                <h2 class="mt-2 mb-0" id="winRate">-</h2>
+                <h2 class="mt-2 mb-0" x-text="stats.winRate.toFixed(2) + '%'">-</h2>
               </div>
               <div class="text-warning" style="font-size: 2rem;">
                 <i class="bi bi-trophy-fill"></i>
               </div>
             </div>
             <div class="d-flex align-items-center">
-              <span class="trend-up me-2" id="winRateTrend">
-                <i class="bi bi-arrow-up"></i> +0%
+              <span :class="stats.winRateTrend >= 0 ? 'trend-up me-2' : 'trend-down me-2'">
+                <i :class="stats.winRateTrend >= 0 ? 'bi bi-arrow-up' : 'bi bi-arrow-down'"></i>
+                <span x-text="(stats.winRateTrend >= 0 ? '+' : '') + stats.winRateTrend.toFixed(1) + '%'"></span>
               </span>
               <small class="text-muted">较上期</small>
             </div>
@@ -158,15 +158,16 @@
             <div class="d-flex justify-content-between align-items-start mb-2">
               <div>
                 <h6 class="text-muted mb-0">总消费金额</h6>
-                <h2 class="mt-2 mb-0" id="totalRevenue">-</h2>
+                <h2 class="mt-2 mb-0" x-text="'¥' + stats.totalRevenue.toFixed(2)">-</h2>
               </div>
               <div class="text-danger" style="font-size: 2rem;">
                 <i class="bi bi-currency-dollar"></i>
               </div>
             </div>
             <div class="d-flex align-items-center">
-              <span class="trend-up me-2" id="revenueTrend">
-                <i class="bi bi-arrow-up"></i> +0%
+              <span :class="stats.revenueTrend >= 0 ? 'trend-up me-2' : 'trend-down me-2'">
+                <i :class="stats.revenueTrend >= 0 ? 'bi bi-arrow-up' : 'bi bi-arrow-down'"></i>
+                <span x-text="(stats.revenueTrend >= 0 ? '+' : '') + stats.revenueTrend.toFixed(1) + '%'"></span>
               </span>
               <small class="text-muted">较上期</small>
             </div>
@@ -183,7 +184,7 @@
             <h6 class="mb-0"><i class="bi bi-graph-up"></i> 数据趋势分析</h6>
           </div>
           <div class="card-body">
-            <div id="trendChart" class="chart-container"></div>
+            <div x-ref="trendChart" class="chart-container"></div>
           </div>
         </div>
       </div>
@@ -193,7 +194,7 @@
             <h6 class="mb-0"><i class="bi bi-pie-chart"></i> 用户类型分布</h6>
           </div>
           <div class="card-body">
-            <div id="userTypeChart" class="chart-container"></div>
+            <div x-ref="userTypeChart" class="chart-container"></div>
           </div>
         </div>
       </div>
@@ -211,19 +212,19 @@
               <tbody>
                 <tr>
                   <td>新增用户</td>
-                  <td class="text-end fw-bold" id="newUsers">-</td>
+                  <td class="text-end fw-bold" x-text="formatNumber(userStats.newUsers)">-</td>
                 </tr>
                 <tr>
                   <td>活跃用户</td>
-                  <td class="text-end fw-bold" id="activeUsers">-</td>
+                  <td class="text-end fw-bold" x-text="formatNumber(userStats.activeUsers)">-</td>
                 </tr>
                 <tr>
                   <td>管理员用户</td>
-                  <td class="text-end fw-bold" id="vipUsers">-</td>
+                  <td class="text-end fw-bold" x-text="formatNumber(userStats.adminUsers)">-</td>
                 </tr>
                 <tr>
                   <td>普通用户</td>
-                  <td class="text-end fw-bold text-muted" id="bannedUsers">-</td>
+                  <td class="text-end fw-bold text-muted" x-text="formatNumber(userStats.regularUsers)">-</td>
                 </tr>
               </tbody>
             </table>
@@ -241,19 +242,19 @@
               <tbody>
                 <tr>
                   <td>抽奖总次数</td>
-                  <td class="text-end fw-bold" id="lotteryDraws">-</td>
+                  <td class="text-end fw-bold" x-text="formatNumber(lotteryStats.totalDraws)">-</td>
                 </tr>
                 <tr>
                   <td>高档奖励次数</td>
-                  <td class="text-end fw-bold text-success" id="lotteryWins">-</td>
+                  <td class="text-end fw-bold text-success" x-text="formatNumber(lotteryStats.highTierWins)">-</td>
                 </tr>
                 <tr>
                   <td>普通奖励次数</td>
-                  <td class="text-end fw-bold text-muted" id="lotteryLosses">-</td>
+                  <td class="text-end fw-bold text-muted" x-text="formatNumber(lotteryStats.regularWins)">-</td>
                 </tr>
                 <tr>
                   <td>高档奖励率</td>
-                  <td class="text-end fw-bold text-warning" id="avgWinRate">-</td>
+                  <td class="text-end fw-bold text-warning" x-text="lotteryStats.winRate.toFixed(2) + '%'">-</td>
                 </tr>
               </tbody>
             </table>
@@ -274,19 +275,19 @@
               <tbody>
                 <tr>
                   <td>总消费金额</td>
-                  <td class="text-end fw-bold text-primary" id="consumptionTotal">-</td>
+                  <td class="text-end fw-bold text-primary" x-text="'¥' + consumptionStats.total.toFixed(2)">-</td>
                 </tr>
                 <tr>
                   <td>审核通过</td>
-                  <td class="text-end fw-bold text-success" id="consumptionApproved">-</td>
+                  <td class="text-end fw-bold text-success" x-text="'¥' + consumptionStats.approved.toFixed(2)">-</td>
                 </tr>
                 <tr>
                   <td>待审核</td>
-                  <td class="text-end fw-bold text-warning" id="consumptionPending">-</td>
+                  <td class="text-end fw-bold text-warning" x-text="'¥' + consumptionStats.pending.toFixed(2)">-</td>
                 </tr>
                 <tr>
                   <td>已拒绝</td>
-                  <td class="text-end fw-bold text-danger" id="consumptionRejected">-</td>
+                  <td class="text-end fw-bold text-danger" x-text="'¥' + consumptionStats.rejected.toFixed(2)">-</td>
                 </tr>
               </tbody>
             </table>
@@ -304,19 +305,19 @@
               <tbody>
                 <tr>
                   <td>总发放积分</td>
-                  <td class="text-end fw-bold text-primary" id="pointsIssued">-</td>
+                  <td class="text-end fw-bold text-primary" x-text="formatNumber(pointsStats.issued)">-</td>
                 </tr>
                 <tr>
                   <td>总消耗积分</td>
-                  <td class="text-end fw-bold text-danger" id="pointsConsumed">-</td>
+                  <td class="text-end fw-bold text-danger" x-text="formatNumber(pointsStats.consumed)">-</td>
                 </tr>
                 <tr>
                   <td>当前总积分</td>
-                  <td class="text-end fw-bold text-success" id="pointsCurrent">-</td>
+                  <td class="text-end fw-bold text-success" x-text="formatNumber(pointsStats.current)">-</td>
                 </tr>
                 <tr>
                   <td>平均每用户积分</td>
-                  <td class="text-end fw-bold text-info" id="pointsAverage">-</td>
+                  <td class="text-end fw-bold text-info" x-text="formatNumber(pointsStats.average)">-</td>
                 </tr>
               </tbody>
             </table>
@@ -345,7 +346,8 @@
                     <th>总价值</th>
                   </tr>
                 </thead>
-                <tbody id="prizeStatsTable">
+                <tbody>
+                  <template x-if="loading">
                   <tr>
                     <td colspan="6" class="text-center py-4">
                       <div class="spinner-border text-primary" role="status">
@@ -353,6 +355,35 @@
                       </div>
                     </td>
                   </tr>
+                  </template>
+                  <template x-if="!loading && prizeStats.length === 0">
+                    <tr>
+                      <td colspan="6" class="text-center py-4">
+                        <i class="bi bi-inbox text-muted" style="font-size: 2rem;"></i>
+                        <p class="mt-2 text-muted">暂无奖品数据</p>
+                      </td>
+                    </tr>
+                  </template>
+                  <template x-for="prize in prizeStats" :key="prize.prize_name">
+                    <tr>
+                      <td x-text="prize.prize_name || '未知奖品'"></td>
+                      <td><span class="badge bg-primary">抽奖</span></td>
+                      <td x-text="formatNumber(prize.count)"></td>
+                      <td x-text="formatNumber(prize.count)"></td>
+                      <td>
+                        <div class="d-flex align-items-center">
+                          <div class="progress flex-fill me-2" style="height: 20px;">
+                            <div class="progress-bar" 
+                                 :class="getProgressColor(prize.percentage)"
+                                 :style="'width: ' + Math.min(prize.percentage, 100) + '%'" 
+                                 role="progressbar"
+                                 x-text="prize.percentage.toFixed(1) + '%'"></div>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="text-muted">-</td>
+                    </tr>
+                  </template>
                 </tbody>
               </table>
             </div>
@@ -372,25 +403,25 @@
             <div class="row">
               <div class="col-md-3">
                 <div class="text-center p-3">
-                  <h4 class="text-primary mb-1" id="totalSessions">-</h4>
+                  <h4 class="text-primary mb-1" x-text="formatNumber(activeHoursStats.totalActivity)">-</h4>
                   <small class="text-muted">总活跃次数</small>
                 </div>
               </div>
               <div class="col-md-3">
                 <div class="text-center p-3">
-                  <h4 class="text-success mb-1" id="closedSessions">-</h4>
+                  <h4 class="text-success mb-1" x-text="formatNumber(activeHoursStats.activeHourCount)">-</h4>
                   <small class="text-muted">活跃时段数</small>
                 </div>
               </div>
               <div class="col-md-3">
                 <div class="text-center p-3">
-                  <h4 class="text-warning mb-1" id="avgResponseTime">-</h4>
+                  <h4 class="text-warning mb-1" x-text="activeHoursStats.peakHour">-</h4>
                   <small class="text-muted">最活跃时段</small>
                 </div>
               </div>
               <div class="col-md-3">
                 <div class="text-center p-3">
-                  <h4 class="text-info mb-1" id="customerSatisfaction">-</h4>
+                  <h4 class="text-info mb-1" x-text="activeHoursStats.coverageRate">-</h4>
                   <small class="text-muted">活跃覆盖率</small>
                 </div>
               </div>
@@ -404,34 +435,29 @@
   <!-- 浮动导出按钮 -->
   <div class="export-btn">
     <div class="btn-group-vertical">
-      <button class="btn btn-success" id="exportExcelBtn" title="导出Excel">
+      <button class="btn btn-success" @click="exportToExcel" title="导出Excel" :disabled="exporting">
         <i class="bi bi-file-earmark-excel"></i> 导出Excel
       </button>
-      <button class="btn btn-danger" id="exportPdfBtn" title="导出PDF">
+      <button class="btn btn-danger" @click="exportToPDF" title="导出PDF" :disabled="exporting">
         <i class="bi bi-file-earmark-pdf"></i> 导出PDF
       </button>
     </div>
   </div>
   
   <!-- 加载遮罩层 -->
-  <div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-overlay" :class="{ 'show': loading }">
     <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
       <span class="visually-hidden">处理中...</span>
     </div>
   </div>
 
-  <!-- ✅ Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  
-  <!-- ✅ ECharts - 图表库（本地引用，符合规范要求） -->
   <script src="/admin/js/lib/echarts.min.js"></script>
-  
-  <!-- ✅ 引入通用工具库 -->
   <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/api-config.js"></script>
-  
-  <!-- ✅ 页面逻辑 -->
   <script src="/admin/js/pages/statistics.js"></script>
+  
+  <!-- Alpine.js -->
+  <!-- Alpine.js -->
 </body>
 </html>
-

@@ -41,9 +41,13 @@
       50% { opacity: 0.5; }
       100% { opacity: 1; }
     }
+    [x-cloak] { display: none !important; }
   </style>
+
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
 </head>
-<body class="bg-light">
+<body class="bg-light" x-data="lotteryMetricsPage()" x-cloak>
   <nav class="navbar navbar-dark bg-primary">
     <div class="container-fluid">
       <a href="/admin/dashboard.html" class="navbar-brand">
@@ -51,9 +55,9 @@
       </a>
       <div class="d-flex align-items-center">
         <span class="live-indicator me-2"></span>
-        <span class="text-light me-3" id="lastUpdate">实时更新</span>
-        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+        <span class="text-light me-3" x-text="lastUpdate">实时更新</span>
+        <span class="text-light me-3" x-text="'欢迎，' + welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" @click="handleLogout">退出登录</button>
       </div>
     </div>
   </nav>
@@ -65,13 +69,16 @@
         <div class="row align-items-center">
           <div class="col-md-3">
             <label class="form-label">选择活动</label>
-            <select class="form-select" id="campaignFilter">
+            <select class="form-select" x-model="campaignId" @change="loadMetrics()">
               <option value="">全部活动</option>
+              <template x-for="campaign in campaigns" :key="campaign.campaign_id">
+                <option :value="campaign.campaign_id" x-text="campaign.name || campaign.campaign_name"></option>
+              </template>
             </select>
           </div>
           <div class="col-md-3">
             <label class="form-label">时间范围</label>
-            <select class="form-select" id="timeRange">
+            <select class="form-select" x-model="timeRange" @change="onTimeRangeChange()">
               <option value="today">今日</option>
               <option value="yesterday">昨日</option>
               <option value="week">本周</option>
@@ -79,16 +86,16 @@
               <option value="custom">自定义</option>
             </select>
           </div>
-          <div class="col-md-4" id="customDateRange" style="display: none;">
+          <div class="col-md-4" x-show="showCustomDateRange" x-cloak>
             <label class="form-label">自定义时间</label>
             <div class="input-group">
-              <input type="date" class="form-control" id="startDate">
+              <input type="date" class="form-control" x-model="startDate">
               <span class="input-group-text">至</span>
-              <input type="date" class="form-control" id="endDate">
+              <input type="date" class="form-control" x-model="endDate">
             </div>
           </div>
           <div class="col-md-2 d-flex align-items-end">
-            <button class="btn btn-primary" onclick="loadMetrics()">
+            <button class="btn btn-primary" @click="loadMetrics()">
               <i class="bi bi-arrow-clockwise"></i> 刷新数据
             </button>
           </div>
@@ -104,8 +111,8 @@
             <div class="d-flex justify-content-between">
               <div>
                 <h6 class="text-muted">抽奖次数</h6>
-                <div class="metric-value text-primary" id="totalDraws">-</div>
-                <div class="metric-trend" id="drawsTrend">-</div>
+                <div class="metric-value text-primary" x-text="metrics.totalDraws">-</div>
+                <div class="metric-trend" x-html="getTrendHtml(metrics.drawsTrend)">-</div>
               </div>
               <i class="bi bi-dice-5 text-primary" style="font-size: 2.5rem;"></i>
             </div>
@@ -118,8 +125,8 @@
             <div class="d-flex justify-content-between">
               <div>
                 <h6 class="text-muted">中奖次数</h6>
-                <div class="metric-value text-success" id="totalWins">-</div>
-                <div class="metric-trend" id="winsTrend">-</div>
+                <div class="metric-value text-success" x-text="metrics.totalWins">-</div>
+                <div class="metric-trend" x-html="getTrendHtml(metrics.winsTrend)">-</div>
               </div>
               <i class="bi bi-trophy text-success" style="font-size: 2.5rem;"></i>
             </div>
@@ -132,8 +139,8 @@
             <div class="d-flex justify-content-between">
               <div>
                 <h6 class="text-muted">中奖率</h6>
-                <div class="metric-value text-warning" id="winRate">-</div>
-                <div class="metric-trend" id="rateTrend">-</div>
+                <div class="metric-value text-warning" x-text="metrics.winRate">-</div>
+                <div class="metric-trend" x-html="getTrendHtml(metrics.rateTrend)">-</div>
               </div>
               <i class="bi bi-percent text-warning" style="font-size: 2.5rem;"></i>
             </div>
@@ -146,8 +153,8 @@
             <div class="d-flex justify-content-between">
               <div>
                 <h6 class="text-muted">奖品价值</h6>
-                <div class="metric-value text-info" id="totalValue">-</div>
-                <div class="metric-trend" id="valueTrend">-</div>
+                <div class="metric-value text-info" x-text="metrics.totalValue">-</div>
+                <div class="metric-trend" x-html="getTrendHtml(metrics.valueTrend)">-</div>
               </div>
               <i class="bi bi-currency-yen text-info" style="font-size: 2.5rem;"></i>
             </div>
@@ -198,8 +205,22 @@
                   <th>结果</th>
                 </tr>
               </thead>
-              <tbody id="realtimeList">
-                <!-- 动态生成 -->
+              <tbody>
+                <template x-if="realtimeRecords.length === 0">
+                  <tr>
+                    <td colspan="4" class="text-center text-muted">暂无数据</td>
+                  </tr>
+                </template>
+                <template x-for="record in realtimeRecords" :key="record.id || Math.random()">
+                  <tr>
+                    <td><small class="text-muted" x-text="getRecordTime(record)"></small></td>
+                    <td x-text="getRecordUser(record)"></td>
+                    <td x-text="getRecordCampaign(record)"></td>
+                    <td>
+                      <span class="badge" :class="record.is_win ? 'bg-success' : 'bg-secondary'" x-text="getRecordResult(record)"></span>
+                    </td>
+                  </tr>
+                </template>
               </tbody>
             </table>
           </div>
@@ -222,8 +243,29 @@
                   <th>消耗率</th>
                 </tr>
               </thead>
-              <tbody id="prizeStatsList">
-                <!-- 动态生成 -->
+              <tbody>
+                <template x-if="prizeStats.length === 0">
+                  <tr>
+                    <td colspan="4" class="text-center text-muted">暂无数据</td>
+                  </tr>
+                </template>
+                <template x-for="prize in prizeStats" :key="prize.prize_id || Math.random()">
+                  <tr>
+                    <td x-text="getPrizeName(prize)"></td>
+                    <td><span class="badge bg-success" x-text="getPrizeIssued(prize)"></span></td>
+                    <td><span class="badge bg-info" x-text="getPrizeStock(prize)"></span></td>
+                    <td>
+                      <div class="progress" style="height: 20px;">
+                        <div 
+                          class="progress-bar" 
+                          :class="getProgressBarClass(getPrizeRate(prize))" 
+                          :style="'width: ' + getPrizeRate(prize) + '%'"
+                          x-text="getPrizeRate(prize).toFixed(1) + '%'"
+                        ></div>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
               </tbody>
             </table>
           </div>
@@ -232,7 +274,7 @@
     </div>
   </div>
 
-  <div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-overlay" :class="{ 'show': loadingOverlay }">
     <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
       <span class="visually-hidden">加载中...</span>
     </div>
@@ -242,309 +284,10 @@
   <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/api-config.js"></script>
   <script src="/admin/js/lib/echarts.min.js"></script>
-  <script>
-    let trendChart = null;
-    let prizeDistChart = null;
-    let refreshTimer = null;
-
-    document.addEventListener('DOMContentLoaded', function() {
-      const userInfo = getCurrentUser();
-      if (userInfo && userInfo.nickname) {
-        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
-      }
-      document.getElementById('logoutBtn').addEventListener('click', logout);
-
-      document.getElementById('timeRange').addEventListener('change', function() {
-        document.getElementById('customDateRange').style.display = this.value === 'custom' ? 'block' : 'none';
-      });
-
-      initCharts();
-      loadCampaigns();
-      loadMetrics();
-
-      // 自动刷新（每30秒）
-      refreshTimer = setInterval(() => {
-        loadMetrics();
-        updateLastTime();
-      }, 30000);
-    });
-
-    function initCharts() {
-      trendChart = echarts.init(document.getElementById('trendChart'));
-      prizeDistChart = echarts.init(document.getElementById('prizeDistChart'));
-
-      window.addEventListener('resize', () => {
-        trendChart.resize();
-        prizeDistChart.resize();
-      });
-    }
-
-    async function loadCampaigns() {
-      try {
-        const response = await apiRequest(API_ENDPOINTS.CAMPAIGN.LIST);
-        if (response && response.success) {
-          const campaigns = response.data.campaigns || response.data || [];
-          const select = document.getElementById('campaignFilter');
-          select.innerHTML = '<option value="">全部活动</option>' +
-            campaigns.map(c => `<option value="${c.campaign_id}">${escapeHtml(c.name || c.campaign_name)}</option>`).join('');
-        }
-      } catch (error) {
-        console.error('加载活动失败:', error);
-      }
-    }
-
-    async function loadMetrics() {
-      showLoading();
-      try {
-        const campaignId = document.getElementById('campaignFilter').value;
-        const timeRange = document.getElementById('timeRange').value;
-
-        const params = new URLSearchParams();
-        if (campaignId) params.append('campaign_id', campaignId);
-        params.append('time_range', timeRange);
-
-        if (timeRange === 'custom') {
-          params.append('start_date', document.getElementById('startDate').value);
-          params.append('end_date', document.getElementById('endDate').value);
-        }
-
-        const url = API_ENDPOINTS.LOTTERY_MONITORING.STATS + '?' + params.toString();
-        const response = await apiRequest(url);
-
-        if (response && response.success) {
-          const data = response.data;
-          updateMetricCards(data.summary || data);
-          updateTrendChart(data.trend || []);
-          updatePrizeDistChart(data.prize_distribution || []);
-          updateRealtimeList(data.recent_draws || []);
-          updatePrizeStats(data.prize_stats || []);
-        } else {
-          // 使用模拟数据
-          updateWithMockData();
-        }
-      } catch (error) {
-        console.error('加载监控数据失败:', error);
-        updateWithMockData();
-      } finally {
-        hideLoading();
-        updateLastTime();
-      }
-    }
-
-    function updateWithMockData() {
-      updateMetricCards({
-        total_draws: 1234,
-        total_wins: 456,
-        win_rate: 36.9,
-        total_value: 12580,
-        draws_trend: 12.5,
-        wins_trend: 8.2,
-        rate_trend: -2.1,
-        value_trend: 15.6
-      });
-
-      updateTrendChart([
-        { time: '00:00', draws: 45, wins: 15 },
-        { time: '04:00', draws: 23, wins: 8 },
-        { time: '08:00', draws: 89, wins: 32 },
-        { time: '12:00', draws: 156, wins: 58 },
-        { time: '16:00', draws: 234, wins: 89 },
-        { time: '20:00', draws: 312, wins: 118 },
-        { time: '24:00', draws: 375, wins: 136 }
-      ]);
-
-      updatePrizeDistChart([
-        { name: '一等奖', value: 5 },
-        { name: '二等奖', value: 25 },
-        { name: '三等奖', value: 80 },
-        { name: '参与奖', value: 346 },
-        { name: '谢谢参与', value: 778 }
-      ]);
-
-      updateRealtimeList([
-        { time: '刚刚', user: '用户***1234', campaign: '新春抽奖', result: '二等奖', is_win: true },
-        { time: '1分钟前', user: '用户***5678', campaign: '新春抽奖', result: '谢谢参与', is_win: false },
-        { time: '2分钟前', user: '用户***9012', campaign: '会员福利', result: '三等奖', is_win: true }
-      ]);
-
-      updatePrizeStats([
-        { name: '一等奖-iPhone', issued: 5, stock: 95, rate: 5 },
-        { name: '二等奖-耳机', issued: 25, stock: 175, rate: 12.5 },
-        { name: '三等奖-优惠券', issued: 80, stock: 420, rate: 16 }
-      ]);
-    }
-
-    function updateMetricCards(data) {
-      document.getElementById('totalDraws').textContent = formatNumber(data.total_draws || 0);
-      document.getElementById('totalWins').textContent = formatNumber(data.total_wins || 0);
-      // 后端返回字符串格式，直接使用或转换为数字
-      const winRate = parseFloat(data.win_rate) || 0;
-      document.getElementById('winRate').textContent = winRate.toFixed(1) + '%';
-      document.getElementById('totalValue').textContent = '¥' + formatNumber(data.total_value || 0);
-
-      updateTrend('drawsTrend', data.draws_trend);
-      updateTrend('winsTrend', data.wins_trend);
-      updateTrend('rateTrend', data.rate_trend);
-      updateTrend('valueTrend', data.value_trend);
-    }
-
-    function updateTrend(elementId, value) {
-      const element = document.getElementById(elementId);
-      if (value === undefined || value === null) {
-        element.textContent = '-';
-        return;
-      }
-      // 后端返回字符串格式，转换为数字
-      const numValue = parseFloat(value) || 0;
-      const isUp = numValue >= 0;
-      element.innerHTML = `
-        <span class="${isUp ? 'trend-up' : 'trend-down'}">
-          <i class="bi bi-arrow-${isUp ? 'up' : 'down'}"></i>
-          ${Math.abs(numValue).toFixed(1)}%
-        </span>
-        <span class="text-muted">较昨日</span>
-      `;
-    }
-
-    function updateTrendChart(data) {
-      const option = {
-        tooltip: { trigger: 'axis' },
-        legend: { data: ['抽奖次数', '中奖次数'], bottom: 0 },
-        grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
-        xAxis: {
-          type: 'category',
-          data: data.map(d => d.time || d.hour || d.date)
-        },
-        yAxis: { type: 'value' },
-        series: [
-          {
-            name: '抽奖次数',
-            type: 'line',
-            smooth: true,
-            data: data.map(d => d.draws || d.draw_count || 0),
-            areaStyle: { opacity: 0.3 },
-            itemStyle: { color: '#0d6efd' }
-          },
-          {
-            name: '中奖次数',
-            type: 'line',
-            smooth: true,
-            data: data.map(d => d.wins || d.win_count || 0),
-            areaStyle: { opacity: 0.3 },
-            itemStyle: { color: '#198754' }
-          }
-        ]
-      };
-      trendChart.setOption(option);
-    }
-
-    function updatePrizeDistChart(data) {
-      const option = {
-        tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-        legend: { orient: 'vertical', left: 'left', top: 'center' },
-        series: [{
-          type: 'pie',
-          radius: ['40%', '70%'],
-          center: ['60%', '50%'],
-          avoidLabelOverlap: false,
-          itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
-          label: { show: false },
-          emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
-          data: data.map(d => ({
-            name: d.name || d.prize_name,
-            value: d.value || d.count
-          }))
-        }]
-      };
-      prizeDistChart.setOption(option);
-    }
-
-    function updateRealtimeList(records) {
-      const tbody = document.getElementById('realtimeList');
-      
-      if (!records || records.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无数据</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = records.map(r => `
-        <tr>
-          <td><small class="text-muted">${r.time || formatTime(r.created_at)}</small></td>
-          <td>${escapeHtml(r.user || r.user_name || '-')}</td>
-          <td>${escapeHtml(r.campaign || r.campaign_name || '-')}</td>
-          <td>
-            <span class="badge ${r.is_win ? 'bg-success' : 'bg-secondary'}">
-              ${escapeHtml(r.result || r.prize_name || '谢谢参与')}
-            </span>
-          </td>
-        </tr>
-      `).join('');
-    }
-
-    function updatePrizeStats(stats) {
-      const tbody = document.getElementById('prizeStatsList');
-      
-      if (!stats || stats.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无数据</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = stats.map(s => `
-        <tr>
-          <td>${escapeHtml(s.name || s.prize_name)}</td>
-          <td><span class="badge bg-success">${s.issued || s.issued_count || 0}</span></td>
-          <td><span class="badge bg-info">${s.stock || s.remaining || 0}</span></td>
-          <td>
-            <div class="progress" style="height: 20px;">
-              <div class="progress-bar ${getProgressBarClass(s.rate || 0)}" 
-                   style="width: ${s.rate || 0}%">
-                ${(s.rate || 0).toFixed(1)}%
-              </div>
-            </div>
-          </td>
-        </tr>
-      `).join('');
-    }
-
-    function getProgressBarClass(rate) {
-      if (rate >= 80) return 'bg-danger';
-      if (rate >= 50) return 'bg-warning';
-      return 'bg-success';
-    }
-
-    function updateLastTime() {
-      document.getElementById('lastUpdate').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN');
-    }
-
-    function formatNumber(num) {
-      return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    }
-
-    function formatTime(dateStr) {
-      if (!dateStr) return '-';
-      const date = new Date(dateStr);
-      const now = new Date();
-      const diff = now - date;
-      if (diff < 60000) return '刚刚';
-      if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
-      return date.toLocaleTimeString('zh-CN');
-    }
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
-    }
-
-    function showLoading() {
-      document.getElementById('loadingOverlay').classList.add('show');
-    }
-
-    function hideLoading() {
-      document.getElementById('loadingOverlay').classList.remove('show');
-    }
-  </script>
+  
+  
+  <!-- ✅ 页面逻辑 -->
+  <script src="/admin/js/pages/lottery-metrics.js"></script>
+  
 </body>
 </html>
-

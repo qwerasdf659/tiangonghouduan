@@ -3,7 +3,6 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
     <!-- ✅ CSP策略 - 允许加载本地脚本和Sealos对象存储图片 -->
     <meta
       http-equiv="Content-Security-Policy"
@@ -14,24 +13,19 @@
                  connect-src 'self' ws: wss: http://localhost:* https://localhost:*; 
                  img-src 'self' data: https: blob:;"
     />
-
     <title>弹窗Banner管理 - 管理后台</title>
-
     <!-- ✅ Bootstrap 5 - UI框架 -->
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
       rel="stylesheet"
     />
-
     <!-- ✅ Bootstrap Icons - 图标库 -->
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"
       rel="stylesheet"
     />
-
     <!-- ✅ 公共样式表 - 统一主题和响应式设计 -->
     <link href="/admin/css/common.css" rel="stylesheet" />
-
     <!-- ✅ 页面特有样式 -->
     <style>
       .banner-card {
@@ -110,344 +104,484 @@
       .stats-card.home {
         border-left-color: #fd7e14;
       }
+      [x-cloak] { display: none !important; }
     </style>
+  <!-- Alpine.js -->
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
   </head>
   <body class="bg-light">
-    <!-- 顶部导航 -->
-    <nav class="navbar navbar-dark bg-primary">
-      <div class="container-fluid">
-        <a href="/admin/dashboard.html" class="navbar-brand">
-          <i class="bi bi-arrow-left me-2"></i>🖼️ 管理后台 - 弹窗Banner管理
-        </a>
-        <div>
-          <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-          <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+    <div x-data="popupBannersPage()" x-init="init()" x-cloak>
+      <!-- 顶部导航 -->
+      <nav class="navbar navbar-dark bg-primary">
+        <div class="container-fluid">
+          <a href="/admin/dashboard.html" class="navbar-brand">
+            <i class="bi bi-arrow-left me-2"></i>🖼️ 管理后台 - 弹窗Banner管理
+          </a>
+          <div>
+            <span class="text-light me-3" x-text="'欢迎，' + (userInfo.nickname || '管理员')"></span>
+            <button class="btn btn-outline-light btn-sm" @click="logout">退出登录</button>
+          </div>
         </div>
-      </div>
-    </nav>
-
-    <div class="container-fluid mt-4">
-      <!-- 统计信息 -->
-      <div class="row g-3 mb-4">
-        <div class="col-md-3">
-          <div class="card stats-card total">
-            <div class="card-body">
-              <div class="d-flex justify-content-between">
-                <div>
-                  <h6 class="text-muted mb-1">总弹窗数</h6>
-                  <h3 class="mb-0" id="statTotal">-</h3>
+      </nav>
+      <div class="container-fluid mt-4">
+        <!-- 统计信息 -->
+        <div class="row g-3 mb-4">
+          <div class="col-md-3">
+            <div class="card stats-card total">
+              <div class="card-body">
+                <div class="d-flex justify-content-between">
+                  <div>
+                    <h6 class="text-muted mb-1">总弹窗数</h6>
+                    <h3 class="mb-0" x-text="stats.total"></h3>
+                  </div>
+                  <div class="text-primary">
+                    <i class="bi bi-images" style="font-size: 2rem;"></i>
+                  </div>
                 </div>
-                <div class="text-primary">
-                  <i class="bi bi-images" style="font-size: 2rem;"></i>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card stats-card active">
+              <div class="card-body">
+                <div class="d-flex justify-content-between">
+                  <div>
+                    <h6 class="text-muted mb-1">已启用</h6>
+                    <h3 class="mb-0 text-success" x-text="stats.active"></h3>
+                  </div>
+                  <div class="text-success">
+                    <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card stats-card inactive">
+              <div class="card-body">
+                <div class="d-flex justify-content-between">
+                  <div>
+                    <h6 class="text-muted mb-1">已禁用</h6>
+                    <h3 class="mb-0 text-secondary" x-text="stats.inactive"></h3>
+                  </div>
+                  <div class="text-secondary">
+                    <i class="bi bi-pause-circle" style="font-size: 2rem;"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card stats-card home">
+              <div class="card-body">
+                <div class="d-flex justify-content-between">
+                  <div>
+                    <h6 class="text-muted mb-1">首页弹窗</h6>
+                    <h3 class="mb-0 text-warning" x-text="stats.home"></h3>
+                  </div>
+                  <div class="text-warning">
+                    <i class="bi bi-house" style="font-size: 2rem;"></i>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-        <div class="col-md-3">
-          <div class="card stats-card active">
-            <div class="card-body">
-              <div class="d-flex justify-content-between">
-                <div>
-                  <h6 class="text-muted mb-1">已启用</h6>
-                  <h3 class="mb-0 text-success" id="statActive">-</h3>
-                </div>
-                <div class="text-success">
-                  <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
-                </div>
+        <!-- 操作栏 -->
+        <div class="card mb-3">
+          <div class="card-body">
+            <div class="row g-3 align-items-end">
+              <div class="col-md-2">
+                <label class="form-label">显示位置</label>
+                <select class="form-select" x-model="filters.position" @change="currentPage = 1; loadBanners()">
+                  <option value="">全部位置</option>
+                  <option value="home">首页</option>
+                  <option value="profile">个人中心</option>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">状态筛选</label>
+                <select class="form-select" x-model="filters.status" @change="currentPage = 1; loadBanners()">
+                  <option value="">全部状态</option>
+                  <option value="true">已启用</option>
+                  <option value="false">已禁用</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">搜索关键词</label>
+                <input type="text" class="form-control" x-model="filters.keyword" @keypress.enter="currentPage = 1; loadBanners()" placeholder="标题关键词..." />
+              </div>
+              <div class="col-md-2">
+                <button class="btn btn-primary w-100" @click="currentPage = 1; loadBanners()">
+                  <i class="bi bi-search"></i> 搜索
+                </button>
+              </div>
+              <div class="col-md-3">
+                <button class="btn btn-success w-100" @click="openAddModal">
+                  <i class="bi bi-plus-lg"></i> 新建弹窗
+                </button>
               </div>
             </div>
           </div>
         </div>
-        <div class="col-md-3">
-          <div class="card stats-card inactive">
-            <div class="card-body">
-              <div class="d-flex justify-content-between">
-                <div>
-                  <h6 class="text-muted mb-1">已禁用</h6>
-                  <h3 class="mb-0 text-secondary" id="statInactive">-</h3>
-                </div>
-                <div class="text-secondary">
-                  <i class="bi bi-pause-circle" style="font-size: 2rem;"></i>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-3">
-          <div class="card stats-card home">
-            <div class="card-body">
-              <div class="d-flex justify-content-between">
-                <div>
-                  <h6 class="text-muted mb-1">首页弹窗</h6>
-                  <h3 class="mb-0 text-warning" id="statHome">-</h3>
-                </div>
-                <div class="text-warning">
-                  <i class="bi bi-house" style="font-size: 2rem;"></i>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 操作栏 -->
-      <div class="card mb-3">
-        <div class="card-body">
-          <div class="row g-3 align-items-end">
-            <div class="col-md-2">
-              <label class="form-label">显示位置</label>
-              <select class="form-select" id="filterPosition">
-                <option value="">全部位置</option>
-                <option value="home">首页</option>
-                <option value="profile">个人中心</option>
-              </select>
-            </div>
-            <div class="col-md-2">
-              <label class="form-label">状态筛选</label>
-              <select class="form-select" id="filterStatus">
-                <option value="">全部状态</option>
-                <option value="true">已启用</option>
-                <option value="false">已禁用</option>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">搜索关键词</label>
-              <input type="text" class="form-control" id="filterKeyword" placeholder="标题关键词..." />
-            </div>
-            <div class="col-md-2">
-              <button class="btn btn-primary w-100" id="searchBtn">
-                <i class="bi bi-search"></i> 搜索
+        <!-- 弹窗列表 -->
+        <div class="card">
+          <div class="card-header bg-white">
+            <div class="d-flex justify-content-between align-items-center">
+              <h6 class="mb-0"><i class="bi bi-grid-3x3-gap"></i> 弹窗列表</h6>
+              <button class="btn btn-sm btn-outline-secondary" @click="loadStatistics(); loadBanners()">
+                <i class="bi bi-arrow-clockwise"></i> 刷新
               </button>
             </div>
-            <div class="col-md-3">
-              <button class="btn btn-success w-100" data-bs-toggle="modal" data-bs-target="#bannerModal" id="addBannerBtn">
-                <i class="bi bi-plus-lg"></i> 新建弹窗
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <!-- 加载中 -->
+              <template x-if="loading && banners.length === 0">
+                <div class="text-center py-5 col-12">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                  </div>
+                  <p class="mt-2 text-muted">正在加载弹窗列表...</p>
+                </div>
+              </template>
+              <!-- 空状态 -->
+              <template x-if="!loading && banners.length === 0">
+                <div class="text-center py-5 col-12">
+                  <i class="bi bi-images text-muted" style="font-size: 4rem;"></i>
+                  <p class="mt-3 text-muted">暂无弹窗数据</p>
+                  <button class="btn btn-primary" @click="openAddModal">
+                    <i class="bi bi-plus-lg"></i> 新建弹窗
+                  </button>
+                </div>
+              </template>
+              <!-- 弹窗卡片列表 -->
+              <template x-for="banner in banners" :key="banner.banner_id">
+                <div class="col-md-4 col-lg-3">
+                  <div class="card banner-card h-100 position-relative">
+                    <div class="position-relative">
+                      <img :src="banner.image_url" class="banner-preview card-img-top" 
+                           :alt="banner.title" @error="$event.target.src='/admin/images/placeholder.png'" />
+                      <span class="banner-order-badge" x-text="banner.display_order"></span>
+                      <span class="banner-status-badge badge" :class="banner.is_active ? 'bg-success' : 'bg-secondary'" x-text="banner.is_active ? '已启用' : '已禁用'"></span>
+                    </div>
+                    <div class="card-body">
+                      <h6 class="card-title text-truncate" :title="banner.title" x-text="banner.title"></h6>
+                      <div class="small text-muted">
+                        <p class="mb-1">
+                          <i class="bi bi-geo-alt"></i> 
+                          <span x-text="getPositionText(banner.position)"></span>
+                        </p>
+                        <p class="mb-1">
+                          <i class="bi bi-link-45deg"></i> 
+                          <span x-text="getLinkTypeText(banner.link_type)"></span>
+                        </p>
+                        <p class="mb-0">
+                          <i class="bi bi-calendar"></i> 
+                          <span x-text="formatTimeRange(banner.start_time, banner.end_time)"></span>
+                        </p>
+                      </div>
+                    </div>
+                    <div class="card-footer bg-white border-top-0">
+                      <div class="btn-group w-100" role="group">
+                        <button class="btn btn-sm btn-outline-primary" @click="viewBanner(banner.banner_id)" title="查看">
+                          <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" @click="editBanner(banner.banner_id)" title="编辑">
+                          <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm" :class="banner.is_active ? 'btn-outline-warning' : 'btn-outline-success'" 
+                                @click="toggleBanner(banner.banner_id)" 
+                                :title="banner.is_active ? '禁用' : '启用'">
+                          <i class="bi" :class="banner.is_active ? 'bi-pause' : 'bi-play'"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" @click="showDeleteConfirm(banner)" title="删除">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+          <!-- 分页 -->
+          <div class="card-footer bg-white">
+            <div class="d-flex justify-content-between align-items-center">
+              <div class="text-muted" x-text="'共 ' + pagination.total + ' 条，第 ' + currentPage + '/' + pagination.totalPages + ' 页'"></div>
+              <nav x-show="pagination.totalPages > 1">
+                <ul class="pagination pagination-sm mb-0">
+                  <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                    <a class="page-link" href="#" @click.prevent="currentPage > 1 && goToPage(currentPage - 1)">&laquo;</a>
+                  </li>
+                  <template x-for="page in getPageNumbers()" :key="page">
+                    <li class="page-item" :class="{ active: page === currentPage }">
+                      <a class="page-link" href="#" @click.prevent="goToPage(page)" x-text="page"></a>
+                    </li>
+                  </template>
+                  <li class="page-item" :class="{ disabled: currentPage === pagination.totalPages }">
+                    <a class="page-link" href="#" @click.prevent="currentPage < pagination.totalPages && goToPage(currentPage + 1)">&raquo;</a>
+                  </li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 新建/编辑弹窗模态框 -->
+      <div class="modal fade" x-ref="bannerModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">
+                <i :class="isEditMode ? 'bi bi-pencil' : 'bi bi-plus-circle'"></i>
+                <span x-text="isEditMode ? '编辑弹窗' : '新建弹窗'"></span>
+              </h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <form @submit.prevent="saveBanner">
+                <div class="row">
+                  <div class="col-md-6">
+                    <!-- 基本信息 -->
+                    <h6 class="text-primary mb-3"><i class="bi bi-info-circle"></i> 基本信息</h6>
+                    <div class="mb-3">
+                      <label class="form-label">弹窗标题 <span class="text-danger">*</span></label>
+                      <input type="text" class="form-control" x-model="bannerForm.title" required 
+                             maxlength="100" placeholder="输入弹窗标题（便于后台识别）" />
+                      <div class="form-text">最多100字符</div>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label">显示位置 <span class="text-danger">*</span></label>
+                      <select class="form-select" x-model="bannerForm.position" required>
+                        <option value="home">首页</option>
+                        <option value="profile">个人中心</option>
+                      </select>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label">显示顺序</label>
+                      <input type="number" class="form-control" x-model.number="bannerForm.display_order" 
+                             min="0" max="999" />
+                      <div class="form-text">数字越小越靠前显示</div>
+                    </div>
+                    <div class="mb-3">
+                      <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" x-model="bannerForm.is_active" id="bannerActiveSwitch" />
+                        <label class="form-check-label" for="bannerActiveSwitch">启用弹窗</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <!-- 图片上传 -->
+                    <h6 class="text-primary mb-3"><i class="bi bi-image"></i> 弹窗图片</h6>
+                    <div class="mb-3">
+                      <div class="upload-zone" :class="{ 'has-image': imagePreview, 'dragover': isDragging }"
+                           @click="$refs.imageInput.click()"
+                           @dragover.prevent="isDragging = true"
+                           @dragleave.prevent="isDragging = false"
+                           @drop.prevent="handleImageDrop($event)">
+                        <template x-if="!imagePreview">
+                          <div>
+                            <i class="bi bi-cloud-arrow-up text-muted" style="font-size: 3rem;"></i>
+                            <p class="mb-1 text-muted">点击或拖拽上传图片</p>
+                            <p class="small text-muted mb-0">支持 JPG、PNG、GIF、WebP，最大 5MB</p>
+                          </div>
+                        </template>
+                        <template x-if="imagePreview">
+                          <div>
+                            <img :src="imagePreview" class="preview-image" alt="预览图片" />
+                            <p class="small text-muted mt-2 mb-0" x-text="imageFileName"></p>
+                            <button type="button" class="btn btn-sm btn-outline-danger mt-2" @click.stop="clearImage">
+                              <i class="bi bi-x-lg"></i> 移除图片
+                            </button>
+                          </div>
+                        </template>
+                      </div>
+                      <input type="file" x-ref="imageInput" accept="image/jpeg,image/png,image/gif,image/webp" 
+                             class="d-none" @change="handleImageSelect($event)" />
+                    </div>
+                  </div>
+                </div>
+                <hr />
+                <!-- 跳转设置 -->
+                <h6 class="text-primary mb-3"><i class="bi bi-link-45deg"></i> 点击跳转设置</h6>
+                <div class="row">
+                  <div class="col-md-4">
+                    <div class="mb-3">
+                      <label class="form-label">跳转类型</label>
+                      <select class="form-select" x-model="bannerForm.link_type">
+                        <option value="none">无跳转（仅展示）</option>
+                        <option value="page">小程序页面</option>
+                        <option value="miniprogram">其他小程序</option>
+                        <option value="webview">H5网页</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="col-md-8 link-type-section" x-show="bannerForm.link_type !== 'none'">
+                    <div class="mb-3">
+                      <label class="form-label">跳转链接 <span class="text-danger">*</span></label>
+                      <input type="text" class="form-control" x-model="bannerForm.link_url" 
+                             placeholder="输入跳转链接..." :required="bannerForm.link_type !== 'none'" />
+                      <div class="form-text" x-text="getLinkUrlHint()"></div>
+                    </div>
+                  </div>
+                </div>
+                <hr />
+                <!-- 时间范围 -->
+                <h6 class="text-primary mb-3"><i class="bi bi-calendar-range"></i> 展示时间范围（可选）</h6>
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      <label class="form-label">开始时间</label>
+                      <input type="datetime-local" class="form-control" x-model="bannerForm.start_time" />
+                      <div class="form-text time-range-hint">留空表示立即生效</div>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      <label class="form-label">结束时间</label>
+                      <input type="datetime-local" class="form-control" x-model="bannerForm.end_time" />
+                      <div class="form-text time-range-hint">留空表示永久有效</div>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+              <button type="button" class="btn btn-primary" @click="saveBanner" :disabled="submitting">
+                <span x-show="submitting" class="spinner-border spinner-border-sm me-1"></span>
+                <i class="bi bi-check-lg" x-show="!submitting"></i> 保存
               </button>
             </div>
           </div>
         </div>
       </div>
-
-      <!-- 弹窗列表 -->
-      <div class="card">
-        <div class="card-header bg-white">
-          <div class="d-flex justify-content-between align-items-center">
-            <h6 class="mb-0"><i class="bi bi-grid-3x3-gap"></i> 弹窗列表</h6>
-            <button class="btn btn-sm btn-outline-secondary" id="refreshBtn">
-              <i class="bi bi-arrow-clockwise"></i> 刷新
-            </button>
-          </div>
-        </div>
-        <div class="card-body">
-          <div id="bannersList" class="row g-3">
-            <div class="text-center py-5 col-12">
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">加载中...</span>
+      <!-- 查看弹窗详情模态框 -->
+      <div class="modal fade" x-ref="viewModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title"><i class="bi bi-eye"></i> 弹窗详情</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" x-show="viewBannerData">
+              <div class="row">
+                <div class="col-md-6">
+                  <img :src="viewBannerData?.image_url" class="img-fluid rounded mb-3" :alt="viewBannerData?.title" />
+                </div>
+                <div class="col-md-6">
+                  <h5 class="mb-3" x-text="viewBannerData?.title"></h5>
+                  <table class="table table-sm">
+                    <tr>
+                      <td class="text-muted">状态</td>
+                      <td>
+                        <span class="badge" :class="viewBannerData?.is_active ? 'bg-success' : 'bg-secondary'" 
+                              x-text="viewBannerData?.is_active ? '已启用' : '已禁用'"></span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="text-muted">显示位置</td>
+                      <td x-text="getPositionText(viewBannerData?.position)"></td>
+                    </tr>
+                    <tr>
+                      <td class="text-muted">显示顺序</td>
+                      <td x-text="viewBannerData?.display_order"></td>
+                    </tr>
+                    <tr>
+                      <td class="text-muted">跳转类型</td>
+                      <td x-text="getLinkTypeText(viewBannerData?.link_type)"></td>
+                    </tr>
+                    <template x-if="viewBannerData?.link_url">
+                      <tr>
+                        <td class="text-muted">跳转链接</td>
+                        <td class="text-break small" x-text="viewBannerData?.link_url"></td>
+                      </tr>
+                    </template>
+                    <tr>
+                      <td class="text-muted">展示时间</td>
+                      <td x-text="formatTimeRange(viewBannerData?.start_time, viewBannerData?.end_time)"></td>
+                    </tr>
+                    <tr>
+                      <td class="text-muted">创建时间</td>
+                      <td x-text="formatDate(viewBannerData?.created_at)"></td>
+                    </tr>
+                    <tr>
+                      <td class="text-muted">更新时间</td>
+                      <td x-text="formatDate(viewBannerData?.updated_at)"></td>
+                    </tr>
+                    <template x-if="viewBannerData?.creator">
+                      <tr>
+                        <td class="text-muted">创建者</td>
+                        <td x-text="viewBannerData?.creator?.nickname || '-'"></td>
+                      </tr>
+                    </template>
+                  </table>
+                </div>
               </div>
-              <p class="mt-2 text-muted">正在加载弹窗列表...</p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+              <button type="button" class="btn btn-primary" @click="editFromView">
+                <i class="bi bi-pencil"></i> 编辑
+              </button>
             </div>
           </div>
         </div>
-        <!-- 分页 -->
-        <div class="card-footer bg-white">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="text-muted" id="paginationInfo">共 0 条</div>
-            <nav>
-              <ul class="pagination pagination-sm mb-0" id="pagination"></ul>
-            </nav>
+      </div>
+      <!-- 删除确认模态框 -->
+      <div class="modal fade" x-ref="deleteModal" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+              <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> 确认删除</h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <p>确定要删除弹窗 <strong x-text="deleteBannerTitle"></strong> 吗？</p>
+              <p class="text-danger small mb-0">此操作不可恢复！</p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+              <button type="button" class="btn btn-danger" @click="confirmDelete" :disabled="submitting">
+                <span x-show="submitting" class="spinner-border spinner-border-sm me-1"></span>
+                <i class="bi bi-trash"></i> 确认删除
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 加载遮罩层 -->
+      <div class="loading-overlay" :class="{ show: globalLoading }">
+        <div class="spinner-border text-light" style="width: 3rem; height: 3rem" role="status">
+          <span class="visually-hidden">处理中...</span>
+        </div>
+      </div>
+      <!-- Toast 通知 -->
+      <div class="toast-container position-fixed top-0 end-0 p-3">
+        <div x-ref="successToast" class="toast align-items-center text-white bg-success border-0" role="alert">
+          <div class="d-flex">
+            <div class="toast-body" x-text="toastMessage"></div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+          </div>
+        </div>
+        <div x-ref="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert">
+          <div class="d-flex">
+            <div class="toast-body" x-text="toastMessage"></div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
           </div>
         </div>
       </div>
     </div>
-
-    <!-- 新建/编辑弹窗模态框 -->
-    <div class="modal fade" id="bannerModal" tabindex="-1" data-bs-backdrop="static">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="bannerModalTitle">
-              <i class="bi bi-plus-circle"></i> 新建弹窗
-            </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <form id="bannerForm">
-              <input type="hidden" id="bannerId" />
-              
-              <div class="row">
-                <div class="col-md-6">
-                  <!-- 基本信息 -->
-                  <h6 class="text-primary mb-3"><i class="bi bi-info-circle"></i> 基本信息</h6>
-                  
-                  <div class="mb-3">
-                    <label class="form-label">弹窗标题 <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="bannerTitle" required 
-                           maxlength="100" placeholder="输入弹窗标题（便于后台识别）" />
-                    <div class="form-text">最多100字符</div>
-                  </div>
-                  
-                  <div class="mb-3">
-                    <label class="form-label">显示位置 <span class="text-danger">*</span></label>
-                    <select class="form-select" id="bannerPosition" required>
-                      <option value="home">首页</option>
-                      <option value="profile">个人中心</option>
-                    </select>
-                  </div>
-                  
-                  <div class="mb-3">
-                    <label class="form-label">显示顺序</label>
-                    <input type="number" class="form-control" id="bannerOrder" 
-                           value="0" min="0" max="999" />
-                    <div class="form-text">数字越小越靠前显示</div>
-                  </div>
-                  
-                  <div class="mb-3">
-                    <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" id="bannerActive" checked />
-                      <label class="form-check-label" for="bannerActive">启用弹窗</label>
-                    </div>
-                  </div>
-                </div>
-                
-                <div class="col-md-6">
-                  <!-- 图片上传 -->
-                  <h6 class="text-primary mb-3"><i class="bi bi-image"></i> 弹窗图片</h6>
-                  
-                  <div class="mb-3">
-                    <div class="upload-zone" id="uploadZone">
-                      <i class="bi bi-cloud-arrow-up text-muted" style="font-size: 3rem;"></i>
-                      <p class="mb-1 text-muted">点击或拖拽上传图片</p>
-                      <p class="small text-muted mb-0">支持 JPG、PNG、GIF、WebP，最大 5MB</p>
-                    </div>
-                    <input type="file" id="imageInput" accept="image/jpeg,image/png,image/gif,image/webp" 
-                           class="d-none" />
-                  </div>
-                </div>
-              </div>
-              
-              <hr />
-              
-              <!-- 跳转设置 -->
-              <h6 class="text-primary mb-3"><i class="bi bi-link-45deg"></i> 点击跳转设置</h6>
-              
-              <div class="row">
-                <div class="col-md-4">
-                  <div class="mb-3">
-                    <label class="form-label">跳转类型</label>
-                    <select class="form-select" id="bannerLinkType">
-                      <option value="none">无跳转（仅展示）</option>
-                      <option value="page">小程序页面</option>
-                      <option value="miniprogram">其他小程序</option>
-                      <option value="webview">H5网页</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="col-md-8 link-type-section" id="linkUrlSection" style="display: none;">
-                  <div class="mb-3">
-                    <label class="form-label">跳转链接 <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="bannerLinkUrl" 
-                           placeholder="输入跳转链接..." />
-                    <div class="form-text" id="linkUrlHint">
-                      小程序页面示例：/pages/activity/index
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <hr />
-              
-              <!-- 时间范围 -->
-              <h6 class="text-primary mb-3"><i class="bi bi-calendar-range"></i> 展示时间范围（可选）</h6>
-              
-              <div class="row">
-                <div class="col-md-6">
-                  <div class="mb-3">
-                    <label class="form-label">开始时间</label>
-                    <input type="datetime-local" class="form-control" id="bannerStartTime" />
-                    <div class="form-text time-range-hint">留空表示立即生效</div>
-                  </div>
-                </div>
-                <div class="col-md-6">
-                  <div class="mb-3">
-                    <label class="form-label">结束时间</label>
-                    <input type="datetime-local" class="form-control" id="bannerEndTime" />
-                    <div class="form-text time-range-hint">留空表示永久有效</div>
-                  </div>
-                </div>
-              </div>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-            <button type="button" class="btn btn-primary" id="saveBannerBtn">
-              <i class="bi bi-check-lg"></i> 保存
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 查看弹窗详情模态框 -->
-    <div class="modal fade" id="viewModal" tabindex="-1">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title"><i class="bi bi-eye"></i> 弹窗详情</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body" id="viewModalBody">
-            <!-- 详情将动态加载 -->
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
-            <button type="button" class="btn btn-primary" id="editFromViewBtn">
-              <i class="bi bi-pencil"></i> 编辑
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 删除确认模态框 -->
-    <div class="modal fade" id="deleteModal" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header bg-danger text-white">
-            <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> 确认删除</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <p>确定要删除弹窗 <strong id="deleteTitle"></strong> 吗？</p>
-            <p class="text-danger small mb-0">此操作不可恢复！</p>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-            <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
-              <i class="bi bi-trash"></i> 确认删除
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 加载遮罩层 -->
-    <div class="loading-overlay" id="loadingOverlay">
-      <div class="spinner-border text-light" style="width: 3rem; height: 3rem" role="status">
-        <span class="visually-hidden">处理中...</span>
-      </div>
-    </div>
-
     <!-- ✅ Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
     <!-- ✅ 引入通用工具库 -->
-    <script src="/admin/js/admin-common.js?v=20260121"></script>
-    <script src="/admin/js/api-config.js?v=20260121"></script>
-
+    <script src="/admin/js/admin-common.js"></script>
+    <script src="/admin/js/api-config.js"></script>
     <!-- 页面脚本 -->
-    <script src="/admin/js/common/toast.js?v=20260121"></script>
-    <script src="/admin/js/pages/popup-banners.js?v=20260121b"></script>
-  </body>
+    <script src="/admin/js/pages/popup-banners.js"></script>
+    <!-- Alpine.js -->
+    <!-- Alpine.js -->
+</body>
 </html>
-

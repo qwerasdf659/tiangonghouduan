@@ -32,8 +32,15 @@
       height: 300px;
     }
   </style>
+
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
+  <!-- Alpine.js -->
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
 </head>
-<body class="bg-light">
+<body class="bg-light" x-data="analyticsPage()" x-cloak>
   <!-- 顶部导航 -->
   <nav class="navbar navbar-dark bg-primary">
     <div class="container-fluid">
@@ -41,8 +48,8 @@
         <i class="bi bi-arrow-left me-2"></i>管理后台 - 运营分析
       </a>
       <div>
-        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+        <span class="text-light me-3" x-text="'欢迎，' + (userInfo.nickname || '管理员')">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" @click="logout">退出登录</button>
       </div>
     </div>
   </nav>
@@ -54,28 +61,28 @@
         <div class="row g-3 align-items-end">
           <div class="col-md-3">
             <label class="form-label">时间范围</label>
-            <select class="form-select" id="timeRangeFilter">
+            <select class="form-select" x-model="filters.timeRange" @change="handleTimeRangeChange">
               <option value="7">最近7天</option>
-              <option value="30" selected>最近30天</option>
+              <option value="30">最近30天</option>
               <option value="90">最近90天</option>
               <option value="custom">自定义</option>
             </select>
           </div>
-          <div class="col-md-2" id="customDateStart" style="display: none;">
+          <div class="col-md-2" x-show="filters.timeRange === 'custom'">
             <label class="form-label">开始日期</label>
-            <input type="date" class="form-control" id="startDate">
+            <input type="date" class="form-control" x-model="filters.startDate">
           </div>
-          <div class="col-md-2" id="customDateEnd" style="display: none;">
+          <div class="col-md-2" x-show="filters.timeRange === 'custom'">
             <label class="form-label">结束日期</label>
-            <input type="date" class="form-control" id="endDate">
+            <input type="date" class="form-control" x-model="filters.endDate">
           </div>
           <div class="col-md-2">
-            <button class="btn btn-primary w-100" id="refreshBtn">
+            <button class="btn btn-primary w-100" @click="loadAllData">
               <i class="bi bi-arrow-repeat"></i> 刷新数据
             </button>
           </div>
           <div class="col-md-2">
-            <button class="btn btn-outline-success w-100" id="exportBtn">
+            <button class="btn btn-outline-success w-100" @click="exportReport">
               <i class="bi bi-download"></i> 导出报表
             </button>
           </div>
@@ -91,8 +98,8 @@
             <div class="d-flex justify-content-between align-items-center">
               <div>
                 <small class="text-muted">活跃用户</small>
-                <h3 class="mb-0" id="activeUsers">-</h3>
-                <small id="activeUsersGrowth" class="text-muted">-</small>
+                <h3 class="mb-0" x-text="formatNumber(stats.activeUsers)">-</h3>
+                <small class="text-muted" x-text="'总用户: ' + formatNumber(stats.totalUsers)">-</small>
               </div>
               <i class="bi bi-people text-primary" style="font-size: 2rem;"></i>
             </div>
@@ -105,8 +112,8 @@
             <div class="d-flex justify-content-between align-items-center">
               <div>
                 <small class="text-muted">抽奖次数</small>
-                <h3 class="mb-0" id="lotteryCount">-</h3>
-                <small id="lotteryCountGrowth" class="text-muted">-</small>
+                <h3 class="mb-0" x-text="formatNumber(stats.lotteryCount)">-</h3>
+                <small class="text-muted" x-text="'高档奖励: ' + stats.highTierDraws">-</small>
               </div>
               <i class="bi bi-gift text-success" style="font-size: 2rem;"></i>
             </div>
@@ -119,8 +126,8 @@
             <div class="d-flex justify-content-between align-items-center">
               <div>
                 <small class="text-muted">积分发放</small>
-                <h3 class="mb-0" id="pointsIssued">-</h3>
-                <small id="pointsIssuedGrowth" class="text-muted">-</small>
+                <h3 class="mb-0" x-text="formatNumber(stats.pointsIssued)">-</h3>
+                <small class="text-muted" x-text="'消耗: ' + formatNumber(stats.pointsSpent)">-</small>
               </div>
               <i class="bi bi-star text-warning" style="font-size: 2rem;"></i>
             </div>
@@ -133,8 +140,8 @@
             <div class="d-flex justify-content-between align-items-center">
               <div>
                 <small class="text-muted">兑换订单</small>
-                <h3 class="mb-0" id="exchangeOrders">-</h3>
-                <small id="exchangeOrdersGrowth" class="text-muted">-</small>
+                <h3 class="mb-0" x-text="formatNumber(stats.exchangeOrders)">-</h3>
+                <small class="text-muted" x-text="'新增: ' + stats.newItems">-</small>
               </div>
               <i class="bi bi-cart text-info" style="font-size: 2rem;"></i>
             </div>
@@ -151,7 +158,7 @@
             <h6 class="mb-0"><i class="bi bi-graph-up"></i> 用户活跃趋势</h6>
           </div>
           <div class="card-body">
-            <div id="userTrendChart" class="chart-container"></div>
+            <div x-ref="userTrendChart" class="chart-container"></div>
           </div>
         </div>
       </div>
@@ -163,7 +170,7 @@
             <h6 class="mb-0"><i class="bi bi-gift"></i> 抽奖活动趋势</h6>
           </div>
           <div class="card-body">
-            <div id="lotteryTrendChart" class="chart-container"></div>
+            <div x-ref="lotteryTrendChart" class="chart-container"></div>
           </div>
         </div>
       </div>
@@ -175,7 +182,7 @@
             <h6 class="mb-0"><i class="bi bi-star"></i> 积分流转分析</h6>
           </div>
           <div class="card-body">
-            <div id="pointsFlowChart" class="chart-container"></div>
+            <div x-ref="pointsFlowChart" class="chart-container"></div>
           </div>
         </div>
       </div>
@@ -187,7 +194,7 @@
             <h6 class="mb-0"><i class="bi bi-pie-chart"></i> 用户类型分布</h6>
           </div>
           <div class="card-body">
-            <div id="userSourceChart" class="chart-container"></div>
+            <div x-ref="userSourceChart" class="chart-container"></div>
           </div>
         </div>
       </div>
@@ -213,13 +220,38 @@
                 <th>高档率</th>
               </tr>
             </thead>
-            <tbody id="detailTableBody">
-              <tr>
-                <td colspan="8" class="text-center py-5 text-muted">
-                  <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-                  <p class="mt-2">加载中...</p>
-                </td>
-              </tr>
+            <tbody>
+              <!-- 加载中状态 -->
+              <template x-if="loading">
+                <tr>
+                  <td colspan="8" class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                    <p class="mt-2">加载中...</p>
+                  </td>
+                </tr>
+              </template>
+              <!-- 空数据状态 -->
+              <template x-if="!loading && dailyStats.length === 0">
+                <tr>
+                  <td colspan="8" class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                    <p class="mt-2">暂无数据</p>
+                  </td>
+                </tr>
+              </template>
+              <!-- 数据列表 -->
+              <template x-for="day in dailyStats" :key="day.date">
+                <tr>
+                  <td x-text="day.date"></td>
+                  <td>-</td>
+                  <td>-</td>
+                  <td x-text="day.draws || 0"></td>
+                  <td class="text-success" x-text="'+' + (day.high_tier_wins || 0)"></td>
+                  <td class="text-danger" x-text="'-' + (day.draws || 0)"></td>
+                  <td>-</td>
+                  <td x-text="(day.high_tier_rate || 0) + '%'"></td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>
@@ -228,7 +260,7 @@
   </div>
 
   <!-- 加载遮罩层 -->
-  <div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-overlay" :class="{ 'show': loading }">
     <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
       <span class="visually-hidden">处理中...</span>
     </div>
@@ -243,6 +275,9 @@
   
   <!-- 页面业务逻辑 -->
   <script src="/admin/js/pages/analytics.js"></script>
+
+  <!-- Alpine.js -->
+  
+  <!-- Alpine.js -->
 </body>
 </html>
-

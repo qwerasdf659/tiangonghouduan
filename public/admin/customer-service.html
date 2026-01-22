@@ -8,7 +8,7 @@
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; 
-                 script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; 
+                 script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; 
                  style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; 
                  font-src 'self' https://cdn.jsdelivr.net; 
                  connect-src 'self' ws: wss: http://localhost:* https://localhost:*; 
@@ -75,8 +75,8 @@
         display: flex;
         flex-direction: column;
         background: #fff;
-        overflow: hidden; /* 防止内容溢出 */
-        min-height: 0; /* 允许flex子项收缩 */
+        overflow: hidden;
+        min-height: 0;
       }
       .chat-interface {
         height: 100%;
@@ -88,14 +88,14 @@
         padding: 16px 20px;
         border-bottom: 1px solid #dee2e6;
         background: #fff;
-        flex-shrink: 0; /* 防止头部被压缩 */
+        flex-shrink: 0;
       }
       .chat-messages {
         flex: 1;
         overflow-y: auto;
         padding: 20px;
         background: #f5f5f5;
-        min-height: 0; /* 关键：允许flex子项滚动 */
+        min-height: 0;
       }
       .message-item {
         margin-bottom: 16px;
@@ -131,7 +131,7 @@
         padding: 16px 20px;
         border-top: 1px solid #dee2e6;
         background: #fff;
-        flex-shrink: 0; /* 防止放大时被压缩 */
+        flex-shrink: 0;
       }
       .quick-replies {
         display: flex;
@@ -140,8 +140,15 @@
         flex-wrap: wrap;
       }
     </style>
-  </head>
-  <body class="bg-light">
+  
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+  <body class="bg-light" x-data="customerServicePage()" x-cloak>
     <!-- 顶部导航 -->
     <nav class="navbar navbar-dark bg-primary">
       <div class="container-fluid">
@@ -149,8 +156,8 @@
           <i class="bi bi-arrow-left me-2"></i>💬 管理后台 - 客服工作台
         </a>
         <div>
-          <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-          <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+          <span class="text-light me-3" x-text="'欢迎，' + welcomeText">欢迎，管理员</span>
+          <button class="btn btn-outline-light btn-sm" @click="handleLogout">退出登录</button>
         </div>
       </div>
     </nav>
@@ -162,12 +169,18 @@
         <!-- 筛选器 -->
         <div class="p-3 border-bottom bg-white">
           <div class="input-group input-group-sm mb-2">
-            <input type="text" class="form-control" id="sessionSearch" placeholder="搜索用户..." />
-            <button class="btn btn-outline-secondary" id="sessionSearchBtn">
+            <input 
+              type="text" 
+              class="form-control" 
+              x-model="searchKeyword" 
+              placeholder="搜索用户..."
+              @keypress.enter="loadSessions()"
+            />
+            <button class="btn btn-outline-secondary" @click="loadSessions()">
               <i class="bi bi-search"></i>
             </button>
           </div>
-          <select class="form-select form-select-sm" id="sessionStatusFilter">
+          <select class="form-select form-select-sm" x-model="statusFilter" @change="loadSessions()">
             <option value="all">全部会话</option>
             <option value="waiting">待处理</option>
             <option value="active">进行中</option>
@@ -177,55 +190,97 @@
 
         <!-- 会话列表 -->
         <div class="flex-fill overflow-auto" id="sessionsList">
-          <div class="text-center py-5">
-            <div class="spinner-border text-primary" role="status">
-              <span class="visually-hidden">加载中...</span>
+          <!-- 加载状态 -->
+          <template x-if="sessionsLoading">
+            <div class="text-center py-5">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">加载中...</span>
+              </div>
+              <p class="mt-2 text-muted small">正在加载会话...</p>
             </div>
-            <p class="mt-2 text-muted small">正在加载会话...</p>
-          </div>
+          </template>
+          
+          <!-- 无数据状态 -->
+          <template x-if="!sessionsLoading && allSessions.length === 0">
+            <div class="text-center py-5">
+              <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+              <p class="mt-2 text-muted small">暂无会话</p>
+            </div>
+          </template>
+          
+          <!-- 会话列表 -->
+          <template x-for="session in allSessions" :key="session.session_id">
+            <div 
+              class="session-item" 
+              :class="{ 'active': String(session.session_id) === String(currentSessionId) }"
+              @click="openSession(session.session_id)"
+            >
+              <div class="d-flex justify-content-between align-items-start mb-1">
+                <div class="d-flex align-items-center flex-fill">
+                  <img 
+                    :src="getSessionUserAvatar(session)" 
+                    class="rounded-circle me-2 session-avatar-img" 
+                    style="width: 36px; height: 36px;"
+                    alt="头像"
+                    @error="$event.target.src = defaultAvatar"
+                  >
+                  <div class="flex-fill">
+                    <div class="fw-bold small" x-text="getSessionUserNickname(session)"></div>
+                    <div class="text-muted" style="font-size: 0.75rem;" x-text="maskPhone(getSessionUserMobile(session))"></div>
+                  </div>
+                </div>
+                <span class="unread-badge" x-show="session.unread_count > 0" x-text="session.unread_count"></span>
+              </div>
+              <div class="text-muted small text-truncate" x-text="getSessionLastMessage(session)"></div>
+              <div class="d-flex justify-content-between align-items-center mt-1">
+                <span class="badge" :class="getSessionStatusBadge(session.status)" x-text="getSessionStatusText(session.status)"></span>
+                <small class="text-muted" style="font-size: 0.7rem;" x-text="$format.relativeTime(session.updated_at)"></small>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
 
       <!-- 聊天主区域 -->
       <div class="chat-main">
         <!-- 默认空状态 -->
-        <div id="emptyState" class="h-100 d-flex align-items-center justify-content-center">
+        <div x-show="!currentSessionId" class="h-100 d-flex align-items-center justify-content-center">
           <div class="text-center text-muted">
             <i class="bi bi-chat-dots" style="font-size: 4rem"></i>
             <p class="mt-3">请从左侧选择一个会话开始聊天</p>
           </div>
         </div>
 
-        <!-- 聊天界面（隐藏） -->
+        <!-- 聊天界面 -->
         <div
-          id="chatInterface"
+          x-show="currentSessionId"
           class="chat-interface"
-          style="display: none"
+          x-cloak
         >
           <!-- 聊天头部 -->
           <div class="chat-header">
             <div class="d-flex justify-content-between align-items-center">
               <div class="d-flex align-items-center">
                 <img
-                  id="chatUserAvatar"
-                  src=""
+                  :src="currentChatUser.avatar"
                   class="rounded-circle me-3"
                   style="width: 40px; height: 40px"
                   alt="头像"
+                  @error="$event.target.src = defaultAvatar"
                 />
                 <div>
-                  <h6 class="mb-0" id="chatUserName">用户昵称</h6>
-                  <small class="text-muted" id="chatUserMobile">手机号</small>
+                  <h6 class="mb-0" x-text="currentChatUser.nickname">用户昵称</h6>
+                  <small class="text-muted" x-text="maskPhone(currentChatUser.mobile)">手机号</small>
                 </div>
               </div>
               <div>
-                <button class="btn btn-sm btn-outline-primary me-2" id="transferSessionBtn">
+                <button class="btn btn-sm btn-outline-primary me-2" @click="transferSession">
                   <i class="bi bi-arrow-left-right"></i> 转接
                 </button>
-                <button class="btn btn-sm btn-outline-success me-2" id="closeSessionBtn">
+                <button class="btn btn-sm btn-outline-success me-2" @click="closeSession">
                   <i class="bi bi-check-circle"></i> 结束会话
                 </button>
-                <button class="btn btn-sm btn-outline-info" id="viewUserInfoBtn">
+                <button class="btn btn-sm btn-outline-info" @click="viewUserInfo">
                   <i class="bi bi-person-circle"></i> 用户信息
                 </button>
               </div>
@@ -233,49 +288,40 @@
           </div>
 
           <!-- 消息区域 -->
-          <div class="chat-messages" id="chatMessages">
-            <!-- 消息将动态加载到这里 -->
+          <div class="chat-messages" x-ref="chatMessages">
+            <template x-for="msg in currentMessages" :key="msg.message_id || msg.id || Math.random()">
+              <div class="message-item" :class="msg.sender_type === 'admin' ? 'admin-message' : 'user-message'">
+                <div>
+                  <div class="message-bubble" x-text="msg.message_content || msg.content"></div>
+                  <div class="message-time" :class="msg.sender_type === 'admin' ? 'text-end' : ''" x-text="$format.date(msg.created_at)"></div>
+                </div>
+              </div>
+            </template>
           </div>
 
           <!-- 输入区域 -->
           <div class="chat-input-area">
             <!-- 快捷回复 -->
             <div class="quick-replies">
-              <button
-                class="btn btn-sm btn-outline-secondary quick-reply-btn"
-                data-reply="您好，有什么可以帮助您的吗？"
-              >
-                👋 欢迎语
-              </button>
-              <button
-                class="btn btn-sm btn-outline-secondary quick-reply-btn"
-                data-reply="请稍等，我为您查询一下"
-              >
-                ⏳ 查询中
-              </button>
-              <button
-                class="btn btn-sm btn-outline-secondary quick-reply-btn"
-                data-reply="感谢您的反馈，我们会尽快处理"
-              >
-                🙏 感谢反馈
-              </button>
-              <button
-                class="btn btn-sm btn-outline-secondary quick-reply-btn"
-                data-reply="祝您使用愉快！"
-              >
-                😊 祝福语
-              </button>
+              <template x-for="reply in quickReplies" :key="reply.text">
+                <button
+                  class="btn btn-sm btn-outline-secondary"
+                  @click="insertQuickReply(reply.content)"
+                  x-text="reply.text"
+                ></button>
+              </template>
             </div>
 
             <!-- 输入框 -->
             <div class="input-group">
               <textarea
                 class="form-control"
-                id="messageInput"
+                x-model="messageInput"
                 rows="3"
                 placeholder="输入消息...按Enter发送，Shift+Enter换行"
+                @keydown.enter.prevent="if (!$event.shiftKey) sendMessage()"
               ></textarea>
-              <button class="btn btn-primary" id="sendMessageBtn">
+              <button class="btn btn-primary" @click="sendMessage">
                 <i class="bi bi-send"></i> 发送
               </button>
             </div>
@@ -285,15 +331,35 @@
     </div>
 
     <!-- 用户信息模态框 -->
-    <div class="modal fade" id="userInfoModal" tabindex="-1">
+    <div class="modal fade" id="userInfoModal" tabindex="-1" x-ref="userInfoModal">
       <div class="modal-dialog modal-lg">
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title"><i class="bi bi-person-circle"></i> 用户详细信息</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
-          <div class="modal-body" id="userInfoBody">
-            <!-- 用户信息将动态加载 -->
+          <div class="modal-body">
+            <template x-if="userInfoData">
+              <div>
+                <div class="text-center mb-3">
+                  <img 
+                    :src="userInfoData.avatar_url || defaultAvatar" 
+                    class="rounded-circle" 
+                    style="width: 80px; height: 80px;" 
+                    @error="$event.target.src = defaultAvatar" 
+                    alt="头像"
+                  >
+                </div>
+                <div class="row g-2">
+                  <div class="col-6"><strong>用户ID：</strong><span x-text="userInfoData.user_id || userInfoData.id"></span></div>
+                  <div class="col-6"><strong>昵称：</strong><span x-text="userInfoData.nickname || '未设置'"></span></div>
+                  <div class="col-6"><strong>手机号：</strong><span x-text="userInfoData.mobile || '-'"></span></div>
+                  <div class="col-6"><strong>积分：</strong><span class="text-primary" x-text="$format.number(userInfoData.points_balance || 0)"></span></div>
+                  <div class="col-6"><strong>注册时间：</strong><span x-text="$format.date(userInfoData.created_at)"></span></div>
+                  <div class="col-6"><strong>最后活跃：</strong><span x-text="userInfoData.last_active_at ? $format.date(userInfoData.last_active_at) : '从未'"></span></div>
+                </div>
+              </div>
+            </template>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
@@ -303,7 +369,7 @@
     </div>
 
     <!-- 转接会话模态框 -->
-    <div class="modal fade" id="transferModal" tabindex="-1">
+    <div class="modal fade" id="transferModal" tabindex="-1" x-ref="transferModal">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
@@ -312,21 +378,23 @@
           </div>
           <div class="modal-body">
             <label class="form-label">选择接收客服</label>
-            <select class="form-select" id="transferTargetSelect">
+            <select class="form-select" x-model="transferTargetId">
               <option value="">请选择...</option>
-              <!-- 客服列表将动态加载 -->
+              <template x-for="admin in adminList" :key="admin.user_id">
+                <option :value="admin.user_id" x-text="admin.nickname || admin.mobile"></option>
+              </template>
             </select>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-            <button type="button" class="btn btn-primary" id="submitTransferBtn">确认转接</button>
+            <button type="button" class="btn btn-primary" @click="submitTransfer">确认转接</button>
           </div>
         </div>
       </div>
     </div>
 
     <!-- 加载遮罩层 -->
-    <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-overlay" :class="{ 'show': loadingOverlay }">
       <div class="spinner-border text-light" style="width: 3rem; height: 3rem" role="status">
         <span class="visually-hidden">处理中...</span>
       </div>
@@ -335,15 +403,16 @@
     <!-- ✅ Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- ✅ Socket.IO客户端库 -->
-    <!-- ✅ Socket.IO客户端库 - 本地版本（安全，不依赖外部CDN） -->
+    <!-- ✅ Socket.IO客户端库 - 本地版本 -->
     <script src="/admin/js/vendor/socket.io.min.js"></script>
 
     <!-- ✅ 引入通用工具库 -->
     <script src="/admin/js/admin-common.js"></script>
-  <script src="/admin/js/api-config.js"></script>
+    <script src="/admin/js/api-config.js"></script>
+
 
     <!-- ✅ 客服工作台页面逻辑 -->
     <script src="/admin/js/pages/customer-service.js"></script>
-  </body>
+
+</body>
 </html>

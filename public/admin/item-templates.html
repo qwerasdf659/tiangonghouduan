@@ -29,7 +29,12 @@
     .rarity-rare { background: #0d6efd; }
     .rarity-epic { background: #6f42c1; }
     .rarity-legendary { background: #fd7e14; }
+    [x-cloak] { display: none !important; }
   </style>
+
+  <!-- Alpine.js -->
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
 </head>
 <body class="bg-light">
   <nav class="navbar navbar-dark bg-primary">
@@ -38,13 +43,13 @@
         <i class="bi bi-arrow-left me-2"></i>📦 管理后台 - 物品模板
       </a>
       <div>
-        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+        <span class="text-light me-3" x-data x-text="$store.auth.user?.nickname ? `欢迎，${$store.auth.user.nickname}` : '欢迎，管理员'">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" onclick="logout()">退出登录</button>
       </div>
     </div>
   </nav>
 
-  <div class="container-fluid mt-4">
+  <div class="container-fluid mt-4" x-data="itemTemplatesPage()" x-cloak>
     <!-- 统计卡片 -->
     <div class="row g-3 mb-4">
       <div class="col-md-3">
@@ -52,7 +57,7 @@
           <div class="card-body text-center">
             <i class="bi bi-box-seam text-primary" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">模板总数</h6>
-            <h2 id="totalTemplates" class="text-primary mb-0">-</h2>
+            <h2 x-text="stats.total" class="text-primary mb-0">-</h2>
           </div>
         </div>
       </div>
@@ -61,7 +66,7 @@
           <div class="card-body text-center">
             <i class="bi bi-tags text-success" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">物品类型</h6>
-            <h2 id="totalTypes" class="text-success mb-0">-</h2>
+            <h2 x-text="stats.types" class="text-success mb-0">-</h2>
           </div>
         </div>
       </div>
@@ -70,7 +75,7 @@
           <div class="card-body text-center">
             <i class="bi bi-check-circle text-warning" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">已启用</h6>
-            <h2 id="activeTemplates" class="text-warning mb-0">-</h2>
+            <h2 x-text="stats.active" class="text-warning mb-0">-</h2>
           </div>
         </div>
       </div>
@@ -79,7 +84,7 @@
           <div class="card-body text-center">
             <i class="bi bi-star text-info" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">稀有度分布</h6>
-            <h2 id="rarityCount" class="text-info mb-0">-</h2>
+            <h2 x-text="stats.rarities" class="text-info mb-0">-</h2>
           </div>
         </div>
       </div>
@@ -91,7 +96,7 @@
         <div class="row g-3 align-items-center">
           <div class="col-md-2">
             <label class="form-label">物品类型</label>
-            <select class="form-select" id="typeFilter">
+            <select class="form-select" x-model="filters.type" @change="loadTemplates()">
               <option value="">全部类型</option>
               <option value="voucher">优惠券</option>
               <option value="coupon">代金券</option>
@@ -103,7 +108,7 @@
           </div>
           <div class="col-md-2">
             <label class="form-label">稀有度</label>
-            <select class="form-select" id="rarityFilter">
+            <select class="form-select" x-model="filters.rarity" @change="loadTemplates()">
               <option value="">全部稀有度</option>
               <option value="common">普通</option>
               <option value="uncommon">优良</option>
@@ -114,7 +119,7 @@
           </div>
           <div class="col-md-2">
             <label class="form-label">状态</label>
-            <select class="form-select" id="statusFilter">
+            <select class="form-select" x-model="filters.status" @change="loadTemplates()">
               <option value="">全部状态</option>
               <option value="active">启用</option>
               <option value="inactive">禁用</option>
@@ -122,13 +127,13 @@
           </div>
           <div class="col-md-3">
             <label class="form-label">搜索</label>
-            <input type="text" class="form-control" id="searchInput" placeholder="搜索模板名称...">
+            <input type="text" class="form-control" x-model.debounce.300ms="filters.search" @input="loadTemplates()" placeholder="搜索模板名称...">
           </div>
           <div class="col-md-3 d-flex align-items-end">
-            <button class="btn btn-primary me-2" onclick="loadTemplates()">
+            <button class="btn btn-primary me-2" @click="loadTemplates()">
               <i class="bi bi-search"></i> 搜索
             </button>
-            <button class="btn btn-success" onclick="openCreateModal()">
+            <button class="btn btn-success" @click="openCreateModal()">
               <i class="bi bi-plus-lg"></i> 新建模板
             </button>
           </div>
@@ -137,81 +142,113 @@
     </div>
 
     <!-- 物品模板列表 -->
-    <div class="row" id="templateList">
-      <!-- 动态生成 -->
-    </div>
-  </div>
-
-  <!-- 模板表单模态框 -->
-  <div class="modal fade" id="templateModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="templateModalTitle"><i class="bi bi-plus-circle"></i> 新建物品模板</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="row">
+      <template x-if="templates.length === 0">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-body text-center py-5 text-muted">
+              <i class="bi bi-box" style="font-size: 3rem;"></i>
+              <p class="mt-2">暂无物品模板</p>
+            </div>
+          </div>
         </div>
-        <div class="modal-body">
-          <form id="templateForm">
-            <input type="hidden" id="templateId">
-            <div class="row g-3">
-              <div class="col-md-6">
-                <label class="form-label">模板名称 <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="templateName" required>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">模板编码 <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="templateCode" required placeholder="唯一标识">
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">物品类型</label>
-                <select class="form-select" id="templateType">
-                  <option value="voucher">优惠券</option>
-                  <option value="coupon">代金券</option>
-                  <option value="points">积分</option>
-                  <option value="gift">礼品</option>
-                  <option value="virtual">虚拟物品</option>
-                  <option value="material">材料</option>
-                </select>
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">稀有度</label>
-                <select class="form-select" id="templateRarity">
-                  <option value="common">普通</option>
-                  <option value="uncommon">优良</option>
-                  <option value="rare">稀有</option>
-                  <option value="epic">史诗</option>
-                  <option value="legendary">传说</option>
-                </select>
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">状态</label>
-                <select class="form-select" id="templateStatus">
-                  <option value="active">启用</option>
-                  <option value="inactive">禁用</option>
-                </select>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">图标URL</label>
-                <input type="text" class="form-control" id="templateIcon" placeholder="https://...">
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">基础价值</label>
-                <input type="number" class="form-control" id="templateValue" min="0" step="0.01">
-              </div>
-              <div class="col-12">
-                <label class="form-label">模板描述</label>
-                <textarea class="form-control" id="templateDescription" rows="2"></textarea>
-              </div>
-              <div class="col-12">
-                <label class="form-label">扩展属性 (JSON格式)</label>
-                <textarea class="form-control font-monospace" id="templateAttributes" rows="3" placeholder='{"key": "value"}'></textarea>
+      </template>
+      <template x-for="t in templates" :key="t.item_template_id">
+        <div class="col-md-4 col-lg-3 mb-4">
+          <div class="card template-card h-100">
+            <div class="card-body text-center">
+              <div class="template-icon" x-text="getTypeIcon(t.item_type)"></div>
+              <h6 class="card-title" x-text="t.display_name"></h6>
+              <p class="text-muted small mb-2" x-text="t.template_code"></p>
+              <span class="badge text-white rarity-badge mb-2" :class="`rarity-${t.rarity_code || 'common'}`" x-text="getRarityLabel(t.rarity_code, t.rarity)"></span>
+              <p class="small text-muted mb-0" x-text="truncateText(t.description, 50)"></p>
+            </div>
+            <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+              <span class="badge" :class="t.is_enabled ? 'bg-success' : 'bg-secondary'" x-text="t.is_enabled ? '启用' : '禁用'"></span>
+              <div>
+                <button class="btn btn-sm btn-outline-primary me-1" @click="editTemplate(t.item_template_id)">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" @click="deleteTemplate(t.item_template_id)">
+                  <i class="bi bi-trash"></i>
+                </button>
               </div>
             </div>
-          </form>
+          </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="button" class="btn btn-primary" onclick="submitTemplate()">保存</button>
+      </template>
+    </div>
+
+    <!-- 模板表单模态框 -->
+    <div class="modal fade" id="templateModal" tabindex="-1" x-ref="templateModal">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" x-text="form.templateId ? '✏️ 编辑物品模板' : '➕ 新建物品模板'"></h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <form @submit.prevent="submitTemplate">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">模板名称 <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control" x-model="form.displayName" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">模板编码 <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control" x-model="form.templateCode" required placeholder="唯一标识">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">物品类型</label>
+                  <select class="form-select" x-model="form.itemType">
+                    <option value="voucher">优惠券</option>
+                    <option value="coupon">代金券</option>
+                    <option value="points">积分</option>
+                    <option value="gift">礼品</option>
+                    <option value="virtual">虚拟物品</option>
+                    <option value="material">材料</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">稀有度</label>
+                  <select class="form-select" x-model="form.rarityCode">
+                    <option value="common">普通</option>
+                    <option value="uncommon">优良</option>
+                    <option value="rare">稀有</option>
+                    <option value="epic">史诗</option>
+                    <option value="legendary">传说</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">状态</label>
+                  <select class="form-select" x-model="form.isEnabled">
+                    <option :value="true">启用</option>
+                    <option :value="false">禁用</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">图标URL</label>
+                  <input type="text" class="form-control" x-model="form.imageUrl" placeholder="https://...">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">基础价值</label>
+                  <input type="number" class="form-control" x-model.number="form.referencePricePoints" min="0" step="0.01">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">模板描述</label>
+                  <textarea class="form-control" x-model="form.description" rows="2"></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">扩展属性 (JSON格式)</label>
+                  <textarea class="form-control font-monospace" x-model="form.meta" rows="3" placeholder='{"key": "value"}'></textarea>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="submit" class="btn btn-primary" :disabled="isSubmitting">保存</button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
     </div>
@@ -226,288 +263,6 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/api-config.js"></script>
-  <script>
-    let templates = [];
-
-    document.addEventListener('DOMContentLoaded', function() {
-      const userInfo = getCurrentUser();
-      if (userInfo && userInfo.nickname) {
-        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
-      }
-      document.getElementById('logoutBtn').addEventListener('click', logout);
-      
-      loadTemplates();
-    });
-
-    async function loadTemplates() {
-      showLoading();
-      try {
-        const type = document.getElementById('typeFilter').value;
-        const rarity = document.getElementById('rarityFilter').value;
-        const status = document.getElementById('statusFilter').value;
-        const search = document.getElementById('searchInput').value;
-
-        // 构建查询参数（使用后端字段名）
-        const params = new URLSearchParams();
-        if (type) params.append('item_type', type);  // 后端使用 item_type
-        if (rarity) params.append('rarity_code', rarity);  // 后端使用 rarity_code
-        if (status) params.append('is_enabled', status === 'active' ? 'true' : 'false');  // 后端使用 is_enabled
-        if (search) params.append('keyword', search);  // 后端使用 keyword
-
-        const url = API_ENDPOINTS.ITEM_TEMPLATE.LIST + (params.toString() ? `?${params.toString()}` : '');
-        const response = await apiRequest(url);
-
-        if (response && response.success) {
-          // 后端返回格式: { list: [...], pagination: {...} }
-          templates = response.data.list || [];
-          renderTemplates(templates);
-          updateStats(response.data.pagination || {});
-        } else {
-          showError('加载失败', response?.message || '获取物品模板失败');
-        }
-      } catch (error) {
-        console.error('加载物品模板失败:', error);
-        showError('加载失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    function renderTemplates(templates) {
-      const container = document.getElementById('templateList');
-
-      if (!templates || templates.length === 0) {
-        container.innerHTML = `
-          <div class="col-12">
-            <div class="card">
-              <div class="card-body text-center py-5 text-muted">
-                <i class="bi bi-box" style="font-size: 3rem;"></i>
-                <p class="mt-2">暂无物品模板</p>
-              </div>
-            </div>
-          </div>
-        `;
-        return;
-      }
-
-      // 使用后端字段名：item_template_id, display_name, template_code, item_type, rarity_code, is_enabled
-      container.innerHTML = templates.map(t => `
-        <div class="col-md-4 col-lg-3 mb-4">
-          <div class="card template-card h-100">
-            <div class="card-body text-center">
-              <div class="template-icon">${getTypeIcon(t.item_type)}</div>
-              <h6 class="card-title">${escapeHtml(t.display_name)}</h6>
-              <p class="text-muted small mb-2">${escapeHtml(t.template_code)}</p>
-              <span class="badge text-white rarity-${t.rarity_code || 'common'} rarity-badge mb-2">
-                ${getRarityLabel(t.rarity_code, t.rarity)}
-              </span>
-              <p class="small text-muted mb-0">${escapeHtml(truncateText(t.description, 50))}</p>
-            </div>
-            <div class="card-footer bg-white d-flex justify-content-between align-items-center">
-              <span class="badge ${t.is_enabled ? 'bg-success' : 'bg-secondary'}">
-                ${t.is_enabled ? '启用' : '禁用'}
-              </span>
-              <div>
-                <button class="btn btn-sm btn-outline-primary me-1" onclick="editTemplate(${t.item_template_id})">
-                  <i class="bi bi-pencil"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteTemplate(${t.item_template_id})">
-                  <i class="bi bi-trash"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    function updateStats(pagination) {
-      // 使用后端分页数据和前端已加载的templates数组计算统计
-      document.getElementById('totalTemplates').textContent = pagination.total_count || templates.length;
-      document.getElementById('totalTypes').textContent = new Set(templates.map(t => t.item_type)).size;
-      document.getElementById('activeTemplates').textContent = templates.filter(t => t.is_enabled).length;
-      
-      // 稀有度分布统计
-      const raritySet = new Set(templates.map(t => t.rarity_code).filter(Boolean));
-      document.getElementById('rarityCount').textContent = raritySet.size || '-';
-    }
-
-    function getTypeIcon(itemType) {
-      // 使用后端 item_type 字段
-      const icons = {
-        voucher: '🎫',
-        coupon: '🎫',
-        points: '💰',
-        gift: '🎁',
-        virtual: '✨',
-        material: '📦'
-      };
-      return icons[itemType] || '📦';
-    }
-
-    function getRarityLabel(rarityCode, rarityObj) {
-      // 优先使用后端返回的 rarity 对象中的 display_name
-      if (rarityObj && rarityObj.display_name) {
-        return rarityObj.display_name;
-      }
-      // 回退到 rarity_code 映射
-      const labels = {
-        common: '普通',
-        uncommon: '优良',
-        rare: '稀有',
-        epic: '史诗',
-        legendary: '传说'
-      };
-      return labels[rarityCode] || '普通';
-    }
-
-    function truncateText(text, maxLength) {
-      if (!text) return '';
-      return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
-    }
-
-    function openCreateModal() {
-      document.getElementById('templateModalTitle').innerHTML = '<i class="bi bi-plus-circle"></i> 新建物品模板';
-      document.getElementById('templateForm').reset();
-      document.getElementById('templateId').value = '';
-      new bootstrap.Modal(document.getElementById('templateModal')).show();
-    }
-
-    async function editTemplate(templateId) {
-      showLoading();
-      try {
-        // 使用后端字段名 id
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.ITEM_TEMPLATE.DETAIL, { id: templateId }));
-        if (response && response.success) {
-          const t = response.data;
-          document.getElementById('templateModalTitle').innerHTML = '<i class="bi bi-pencil"></i> 编辑物品模板';
-          // 使用后端字段名
-          document.getElementById('templateId').value = t.item_template_id;
-          document.getElementById('templateName').value = t.display_name || '';
-          document.getElementById('templateCode').value = t.template_code || '';
-          document.getElementById('templateType').value = t.item_type || 'voucher';
-          document.getElementById('templateRarity').value = t.rarity_code || 'common';
-          document.getElementById('templateStatus').value = t.is_enabled ? 'active' : 'inactive';
-          document.getElementById('templateIcon').value = t.image_url || '';
-          document.getElementById('templateValue').value = t.reference_price_points || '';
-          document.getElementById('templateDescription').value = t.description || '';
-          document.getElementById('templateAttributes').value = t.meta ? JSON.stringify(t.meta, null, 2) : '';
-          
-          new bootstrap.Modal(document.getElementById('templateModal')).show();
-        } else {
-          showError('加载失败', response?.message || '获取模板详情失败');
-        }
-      } catch (error) {
-        console.error('加载模板详情失败:', error);
-        showError('加载失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    async function submitTemplate() {
-      const templateId = document.getElementById('templateId').value;
-      
-      let meta = null;
-      try {
-        const attrStr = document.getElementById('templateAttributes').value;
-        if (attrStr.trim()) {
-          meta = JSON.parse(attrStr);
-        }
-      } catch (e) {
-        alert('扩展属性JSON格式错误');
-        return;
-      }
-
-      // 使用后端字段名
-      const statusValue = document.getElementById('templateStatus').value;
-      const data = {
-        display_name: document.getElementById('templateName').value,
-        template_code: document.getElementById('templateCode').value,
-        item_type: document.getElementById('templateType').value,
-        rarity_code: document.getElementById('templateRarity').value,
-        is_enabled: statusValue === 'active',
-        image_url: document.getElementById('templateIcon').value || null,
-        reference_price_points: parseFloat(document.getElementById('templateValue').value) || 0,
-        description: document.getElementById('templateDescription').value || null,
-        meta: meta
-      };
-
-      if (!data.display_name || !data.template_code) {
-        alert('请填写模板名称和编码');
-        return;
-      }
-
-      showLoading();
-      try {
-        const url = templateId
-          ? API.buildURL(API_ENDPOINTS.ITEM_TEMPLATE.UPDATE, { id: templateId })
-          : API_ENDPOINTS.ITEM_TEMPLATE.CREATE;
-        const method = templateId ? 'PUT' : 'POST';
-
-        const response = await apiRequest(url, {
-          method: method,
-          body: JSON.stringify(data)
-        });
-
-        if (response && response.success) {
-          bootstrap.Modal.getInstance(document.getElementById('templateModal')).hide();
-          alert(`✅ ${templateId ? '更新' : '创建'}成功`);
-          loadTemplates();
-        } else {
-          showError('保存失败', response?.message || '操作失败');
-        }
-      } catch (error) {
-        console.error('保存模板失败:', error);
-        showError('保存失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    async function deleteTemplate(templateId) {
-      if (!confirm('确定要删除此物品模板吗？此操作不可恢复！')) return;
-
-      showLoading();
-      try {
-        // 使用后端字段名 id
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.ITEM_TEMPLATE.DELETE, { id: templateId }), {
-          method: 'DELETE'
-        });
-
-        if (response && response.success) {
-          alert('✅ 删除成功');
-          loadTemplates();
-        } else {
-          showError('删除失败', response?.message || '操作失败');
-        }
-      } catch (error) {
-        console.error('删除模板失败:', error);
-        showError('删除失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
-    }
-
-    function showLoading() {
-      document.getElementById('loadingOverlay').classList.add('show');
-    }
-
-    function hideLoading() {
-      document.getElementById('loadingOverlay').classList.remove('show');
-    }
-
-    function showError(title, message) {
-      alert(`❌ ${title}\n${message}`);
-    }
-  </script>
+  <script src="/admin/js/pages/item-templates.js"></script>
 </body>
 </html>
-

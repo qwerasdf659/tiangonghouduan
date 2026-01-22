@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>抽奖配额管理 - 管理后台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+  <style>
+    .quota-card {
+      border-left: 4px solid #6f42c1;
+    }
+    .quota-value {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #6f42c1;
+    }
+  </style>
+</head>
+<body class="bg-light" x-data="lotteryQuotaPage()">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>🎫 管理后台 - 抽奖配额管理
+      </a>
+      <div>
+        <span class="text-light me-3" x-text="'欢迎，' + (userInfo.nickname || '管理员')">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" @click="logout">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 配额概览 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card quota-card">
+          <div class="card-body text-center">
+            <i class="bi bi-gift text-primary" style="font-size: 2rem;"></i>
+            <div class="quota-value mt-2" x-text="quotaStats.totalRules">-</div>
+            <small class="text-muted">总配额</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card quota-card">
+          <div class="card-body text-center">
+            <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+            <div class="quota-value mt-2 text-success" x-text="quotaStats.usedQuota">-</div>
+            <small class="text-muted">已使用</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card quota-card">
+          <div class="card-body text-center">
+            <i class="bi bi-hourglass-split text-warning" style="font-size: 2rem;"></i>
+            <div class="quota-value mt-2 text-warning" x-text="quotaStats.remainingQuota">-</div>
+            <small class="text-muted">剩余配额</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card quota-card">
+          <div class="card-body text-center">
+            <i class="bi bi-percent text-info" style="font-size: 2rem;"></i>
+            <div class="quota-value mt-2 text-info" x-text="quotaStats.usageRate">-</div>
+            <small class="text-muted">使用率</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 操作区域 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">选择活动</label>
+            <select class="form-select" x-model="filters.campaignId" @change="refreshAll">
+              <option value="">全部活动</option>
+              <template x-for="activity in activities" :key="activity.campaign_id">
+                <option :value="activity.campaign_id" x-text="activity.name || activity.campaign_name"></option>
+              </template>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">时间周期</label>
+            <select class="form-select" x-model="filters.period" @change="loadQuotaData">
+              <option value="today">今日</option>
+              <option value="week">本周</option>
+              <option value="month">本月</option>
+              <option value="all">全部</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-primary w-100" @click="refreshAll" :disabled="loading">
+              <span x-show="!loading"><i class="bi bi-arrow-repeat"></i> 刷新数据</span>
+              <span x-show="loading"><span class="spinner-border spinner-border-sm"></span> 加载中...</span>
+            </button>
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-success w-100" data-bs-toggle="modal" data-bs-target="#adjustQuotaModal">
+              <i class="bi bi-plus-lg"></i> 创建配额规则
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 配额列表 -->
+    <div class="card">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-list-ul"></i> 配额记录</h5>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>规则ID</th>
+                <th>规则类型</th>
+                <th>作用范围</th>
+                <th>每日上限</th>
+                <th>优先级</th>
+                <th>生效时间</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- 加载状态 -->
+              <template x-if="loading">
+                <tr>
+                  <td colspan="8" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">加载中...</span>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+              
+              <!-- 空状态 -->
+              <template x-if="!loading && rules.length === 0">
+              <tr>
+                <td colspan="8" class="text-center py-5 text-muted">
+                  <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                    <p class="mt-2">暂无配额规则</p>
+                  </td>
+                </tr>
+              </template>
+              
+              <!-- 数据列表 -->
+              <template x-for="rule in rules" :key="rule.rule_id">
+                <tr>
+                  <td x-text="rule.rule_id"></td>
+                  <td>
+                    <span class="badge bg-primary" x-text="getScopeTypeText(rule.scope_type)"></span>
+                  </td>
+                  <td x-text="getScopeText(rule)"></td>
+                  <td>
+                    <strong x-text="rule.limit_value"></strong> 次/天
+                  </td>
+                  <td x-text="rule.priority ?? '-'"></td>
+                  <td>
+                    <small x-text="getEffectiveText(rule)"></small>
+                  </td>
+                  <td>
+                    <span class="badge" 
+                          :class="rule.status === 'active' ? 'bg-success' : 'bg-secondary'"
+                          x-text="rule.status === 'active' ? '有效' : '已禁用'"></span>
+                  </td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-danger" 
+                            @click="disableRule(rule.rule_id)"
+                            :disabled="rule.status === 'inactive'" 
+                            title="禁用规则">
+                      <i class="bi bi-x-circle"></i>
+                    </button>
+                </td>
+              </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card-footer bg-white">
+        <!-- 分页 -->
+        <nav x-show="pagination.totalPages > 1">
+          <ul class="pagination pagination-sm justify-content-center mb-0">
+            <li class="page-item" :class="{ 'disabled': pagination.currentPage === 1 }">
+              <a class="page-link" href="#" @click.prevent="goToPage(pagination.currentPage - 1)">上一页</a>
+            </li>
+            <template x-for="page in getPageNumbers()" :key="page">
+              <li class="page-item" :class="{ 'active': page === pagination.currentPage, 'disabled': page === '...' }">
+                <a class="page-link" href="#" @click.prevent="page !== '...' && goToPage(page)" x-text="page"></a>
+              </li>
+            </template>
+            <li class="page-item" :class="{ 'disabled': pagination.currentPage === pagination.totalPages }">
+              <a class="page-link" href="#" @click.prevent="goToPage(pagination.currentPage + 1)">下一页</a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- 调整配额模态框 -->
+  <div class="modal fade" id="adjustQuotaModal" tabindex="-1" x-ref="adjustModal">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-sliders"></i> 创建配额规则</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form @submit.prevent="submitCreateRule">
+            <div class="mb-3">
+              <label class="form-label">规则类型 <span class="text-danger">*</span></label>
+              <select class="form-select" x-model="formData.ruleType" required>
+                <option value="">请选择规则类型</option>
+                <option value="global">全局规则（适用所有活动）</option>
+                <option value="campaign">活动规则（仅适用特定活动）</option>
+              </select>
+              <small class="text-muted">全局规则优先级最低，活动规则优先级较高</small>
+            </div>
+            <div class="mb-3" x-show="formData.ruleType === 'campaign'" x-transition>
+              <label class="form-label">选择活动 <span class="text-danger">*</span></label>
+              <select class="form-select" x-model="formData.campaignId" :required="formData.ruleType === 'campaign'">
+                <option value="">请选择活动</option>
+                <template x-for="activity in activities" :key="activity.campaign_id">
+                  <option :value="activity.campaign_id" x-text="activity.name || activity.campaign_name"></option>
+                </template>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">每日抽奖次数上限 <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" x-model.number="formData.limitValue" min="1" max="100" required>
+              <small class="text-muted">用户每天最多可抽奖的次数</small>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">创建原因</label>
+              <textarea class="form-control" x-model="formData.reason" rows="2" placeholder="请输入创建原因（可选）"></textarea>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" @click="submitCreateRule" :disabled="submitting">
+            <span x-show="!submitting">创建规则</span>
+            <span x-show="submitting"><span class="spinner-border spinner-border-sm me-1"></span>创建中...</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" :class="{ 'show': loading }">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  <script src="/admin/js/pages/lottery-quota.js"></script>
+
+  <!-- Alpine.js -->
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+</body>
+</html>

@@ -1,357 +1,283 @@
 /**
- * 用户材料余额查询页面
- * @description 查询和管理用户的材料/资产余额，包括余额调整功能
- * @created 2026-01-09
- * @version 1.0.0
+ * 用户材料余额查询页面 - Alpine.js 组件
+ * material-balances.js
  */
 
-// ============================================================
-// 全局变量
-// ============================================================
-let currentUserId = null
-let assetTypes = []
-let adjustBalanceModalInstance
-let successToastInstance, errorToastInstance
-
-// ============================================================
-// 页面初始化
-// ============================================================
-document.addEventListener('DOMContentLoaded', function () {
-  // 权限检查
-  if (!checkAdminPermission()) {
-    return
-  }
-
-  // 显示用户信息
-  const user = getCurrentUser()
-  if (user) {
-    document.getElementById('welcomeText').textContent = `欢迎，${user.nickname || user.mobile}`
-  }
-
-  // 初始化模态框
-  adjustBalanceModalInstance = new bootstrap.Modal(document.getElementById('adjustBalanceModal'))
-
-  // 初始化Toast
-  successToastInstance = new bootstrap.Toast(document.getElementById('successToast'))
-  errorToastInstance = new bootstrap.Toast(document.getElementById('errorToast'))
+function materialBalancesPage() {
+  return {
+    // 用户信息
+    adminInfo: {},
+    
+    // 加载状态
+    loading: false,
+    submitting: false,
+    
+    // 搜索参数
+    searchUserId: '',
+    searchMobile: '',
+    
+    // 当前用户数据
+    currentUserId: null,
+    currentUser: null,
+    balances: [],
+    
+    // 资产类型
+    assetTypes: [],
+    
+    // 调整表单
+    adjustForm: {
+      asset_code: '',
+      adjust_type: 'increase',
+      amount: '',
+      reason: ''
+    },
+    
+    // 弹窗实例
+    adjustModal: null,
+    
+    /**
+     * 初始化
+     */
+    async init() {
+      console.log('🚀 初始化用户材料余额查询页面...');
+      
+      // 初始化弹窗
+      this.$nextTick(() => {
+        this.adjustModal = new bootstrap.Modal(this.$refs.adjustModal);
+      });
+      
+      // 加载管理员信息
+      this.loadAdminInfo();
 
   // 加载资产类型
-  loadAssetTypes()
-
-  // 退出登录
-  document.getElementById('logoutBtn').addEventListener('click', logout)
-
-  // 搜索表单提交
-  document.getElementById('searchForm').addEventListener('submit', handleSearch)
-
-  // 提交调整
-  document.getElementById('submitAdjustBtn').addEventListener('click', submitAdjustBalance)
-})
-
-// ============================================================
-// 资产类型管理
-// ============================================================
+      await this.loadAssetTypes();
+    },
+    
+    /**
+     * 加载管理员信息
+     */
+    loadAdminInfo() {
+      try {
+        const stored = localStorage.getItem('userInfo');
+        if (stored) {
+          this.adminInfo = JSON.parse(stored);
+        }
+      } catch (e) {
+        console.error('加载管理员信息失败:', e);
+      }
+    },
+    
+    /**
+     * 退出登录
+     */
+    logout() {
+      if (confirm('确定要退出登录吗？')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('userInfo');
+        window.location.href = '/admin/login.html';
+      }
+    },
 
 /**
  * 加载资产类型
- * @returns {Promise<void>}
  */
-async function loadAssetTypes() {
+    async loadAssetTypes() {
   try {
-    const response = await apiRequest(API_ENDPOINTS.ASSET_ADJUSTMENT.ASSET_TYPES)
-    if (response && response.success) {
-      // 后端返回格式: { asset_types: [...], total }
-      assetTypes = response.data?.asset_types || []
-      populateAssetSelect()
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/admin/asset-adjustment/asset-types`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error('加载资产类型失败');
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          this.assetTypes = result.data?.asset_types || [];
+          console.log(`✅ 加载资产类型: ${this.assetTypes.length} 个`);
     }
   } catch (error) {
-    console.error('加载资产类型失败:', error)
+        console.error('加载资产类型失败:', error);
   }
-}
+    },
 
 /**
- * 填充资产选择框
+     * 获取启用的资产类型
  */
-function populateAssetSelect() {
-  const select = document.getElementById('adjustAssetCode')
-  const options = assetTypes
-    .filter(a => a.is_enabled)
-    .map(a => `<option value="${a.asset_code}">${a.display_name} (${a.asset_code})</option>`)
-    .join('')
-
-  select.innerHTML = '<option value="">请选择</option>' + options
-}
-
-// ============================================================
-// 搜索功能
-// ============================================================
+    get enabledAssetTypes() {
+      return this.assetTypes.filter(a => a.is_enabled);
+    },
 
 /**
- * 处理搜索
- * @param {Event} e - 表单提交事件
- * @returns {Promise<void>}
+     * 搜索用户
  */
-async function handleSearch(e) {
-  e.preventDefault()
-
-  const userId = document.getElementById('searchUserId').value.trim()
-  const mobile = document.getElementById('searchMobile').value.trim()
-
-  if (!userId && !mobile) {
-    showErrorToast('请输入用户ID或手机号')
-    return
-  }
+    async handleSearch() {
+      if (!this.searchUserId && !this.searchMobile) {
+        this.showError('请输入用户ID或手机号');
+        return;
+      }
+      
+      let targetUserId = this.searchUserId;
 
   // 如果提供了手机号，先通过手机号查询用户ID
-  let targetUserId = userId
-  if (mobile && !userId) {
+      if (this.searchMobile && !this.searchUserId) {
     try {
-      // ✅ 对齐后端：user-management返回用户列表，取第一个匹配用户
-      const userResponse = await apiRequest(
-        `${API_ENDPOINTS.USER.LIST}?search=${mobile}`
-      )
-      if (userResponse && userResponse.success && userResponse.data) {
-        const users = userResponse.data.users || userResponse.data
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${API_BASE_URL}/admin/users?search=${this.searchMobile}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          
+          const result = await response.json();
+          
+          if (result.success && result.data) {
+            const users = result.data.users || result.data;
         if (users.length > 0) {
-          targetUserId = users[0].user_id
+              targetUserId = users[0].user_id;
         } else {
-          showErrorToast('未找到该手机号对应的用户')
-          return
+              this.showError('未找到该手机号对应的用户');
+              return;
         }
       } else {
-        showErrorToast('查询用户失败')
-        return
+            this.showError('查询用户失败');
+            return;
       }
     } catch (error) {
-      showErrorToast('查询用户失败：' + error.message)
-      return
+          this.showError('查询用户失败：' + error.message);
+          return;
     }
   }
 
   // 加载用户材料余额
-  await loadUserBalances(targetUserId)
-}
-
-// ============================================================
-// 数据加载
-// ============================================================
+      await this.loadUserBalances(targetUserId);
+    },
 
 /**
  * 加载用户材料余额
- * @param {number|string} userId - 用户ID
- * @returns {Promise<void>}
  */
-async function loadUserBalances(userId) {
-  currentUserId = userId
-
-  const tbody = document.getElementById('balancesTableBody')
-  tbody.innerHTML = `
-    <tr>
-      <td colspan="7" class="text-center py-5">
-        <div class="spinner-border text-primary" role="status">
-          <span class="visually-hidden">加载中...</span>
-        </div>
-        <p class="mt-2 text-muted">正在加载数据...</p>
-      </td>
-    </tr>
-  `
-
-  try {
-    const response = await apiRequest(API.buildURL(API_ENDPOINTS.ASSET_ADJUSTMENT.USER_BALANCES, { user_id: userId }))
-
-    if (response && response.success) {
-      const { user, balances } = response.data
-
-      // 显示用户信息
-      document.getElementById('userId').textContent = user.user_id
-      document.getElementById('userNickname').textContent = user.nickname || '未设置'
-      document.getElementById('userMobile').textContent = maskPhone(user.mobile) || '-'
-
-      // 显示用户信息区域
-      document.getElementById('userInfoSection').style.display = 'block'
-      document.getElementById('emptyState').style.display = 'none'
-
-      // 渲染余额列表
-      renderBalances(balances)
+    async loadUserBalances(userId) {
+      this.loading = true;
+      this.currentUserId = userId;
+      
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/admin/asset-adjustment/users/${userId}/balances`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error('加载用户余额失败');
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          this.currentUser = result.data?.user;
+          this.balances = result.data?.balances || [];
+          console.log(`✅ 加载用户余额: ${this.balances.length} 条记录`);
     } else {
-      showErrorToast(response?.message || '查询失败')
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="7" class="text-center py-5 text-danger">
-            <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
-            <p class="mt-2">查询失败：${response?.message || '未知错误'}</p>
-          </td>
-        </tr>
-      `
+          this.showError(result.message || '查询失败');
     }
   } catch (error) {
-    console.error('加载用户余额失败:', error)
-    showErrorToast(error.message)
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="7" class="text-center py-5 text-danger">
-          <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
-          <p class="mt-2">加载失败：${error.message}</p>
-        </td>
-      </tr>
-    `
-  }
-}
-
-// ============================================================
-// 渲染函数
-// ============================================================
+        console.error('加载用户余额失败:', error);
+        this.showError('加载失败，请稍后重试');
+      } finally {
+        this.loading = false;
+      }
+    },
 
 /**
- * 渲染余额列表
- * @param {Array} balances - 余额数据列表
- */
-function renderBalances(balances) {
-  const tbody = document.getElementById('balancesTableBody')
-
-  if (balances.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="7" class="text-center py-5">
-          <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
-          <p class="mt-2 text-muted">该用户暂无材料余额</p>
-        </td>
-      </tr>
-    `
-    return
-  }
-
-  // 后端返回字段: asset_code, available_amount, frozen_amount, total, campaign_id
-  tbody.innerHTML = balances
-    .map(
-      balance => `
-    <tr>
-      <td><code>${balance.asset_code}</code></td>
-      <td><h5 class="mb-0 text-success">${balance.available_amount}</h5></td>
-      <td><span class="text-warning">${balance.frozen_amount}</span></td>
-      <td><span class="text-primary fw-bold">${balance.total}</span></td>
-      <td><span class="text-muted">${balance.campaign_id || '-'}</span></td>
-    </tr>
-  `
-    )
-    .join('')
-}
-
-// ============================================================
-// 余额调整功能
-// ============================================================
+     * 打开调整余额弹窗
+     */
+    openAdjustModal() {
+      this.adjustForm = {
+        asset_code: '',
+        adjust_type: 'increase',
+        amount: '',
+        reason: ''
+      };
+      this.adjustModal.show();
+    },
 
 /**
- * 提交调整余额
- * 后端字段: user_id, asset_code, amount(带符号), reason, idempotency_key
- * @returns {Promise<void>}
+     * 提交余额调整
  */
-async function submitAdjustBalance() {
-  const form = document.getElementById('adjustBalanceForm')
-  if (!form.checkValidity()) {
-    form.reportValidity()
-    return
+    async submitAdjust() {
+      if (!this.adjustForm.asset_code || !this.adjustForm.amount || !this.adjustForm.reason) {
+        this.showError('请填写所有必填项');
+        return;
   }
 
-  if (!currentUserId) {
-    showErrorToast('未选择用户')
-    return
-  }
-
-  // 获取当前管理员ID
-  const currentUser = getCurrentUser()
-  const adminId = currentUser?.user_id || 0
-
-  // 获取调整参数
-  const assetCode = document.getElementById('adjustAssetCode').value
-  const adjustType = document.getElementById('adjustType').value
-  const rawAmount = parseInt(document.getElementById('adjustAmount').value)
-  const reason = document.getElementById('adjustReason').value.trim()
-
-  // 后端期望: amount 正数=增加, 负数=减少
-  const amount = adjustType === 'decrease' ? -Math.abs(rawAmount) : Math.abs(rawAmount)
-
-  // 生成幂等键: admin_adjust_{admin_id}_{user_id}_{asset_code}_{timestamp}
-  const timestamp = Date.now()
-  const idempotencyKey = `admin_adjust_${adminId}_${currentUserId}_${assetCode}_${timestamp}`
-
-  const data = {
-    user_id: currentUserId,
-    asset_code: assetCode,
-    amount: amount,
-    reason: reason,
-    idempotency_key: idempotencyKey
-  }
-
-  try {
-    const submitBtn = document.getElementById('submitAdjustBtn')
-    submitBtn.disabled = true
-    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>提交中...'
-
-    const response = await apiRequest(API_ENDPOINTS.ASSET_ADJUSTMENT.ADJUST, {
+      if (!this.currentUserId) {
+        this.showError('未选择用户');
+        return;
+      }
+      
+      this.submitting = true;
+      
+      try {
+        const token = localStorage.getItem('token');
+        const adminId = this.adminInfo?.user_id || 0;
+        const rawAmount = parseInt(this.adjustForm.amount);
+        const amount = this.adjustForm.adjust_type === 'decrease' ? -Math.abs(rawAmount) : Math.abs(rawAmount);
+        const timestamp = Date.now();
+        const idempotencyKey = `admin_adjust_${adminId}_${this.currentUserId}_${this.adjustForm.asset_code}_${timestamp}`;
+        
+        const response = await fetch(`${API_BASE_URL}/admin/asset-adjustment/adjust`, {
       method: 'POST',
-      body: JSON.stringify(data)
-    })
-
-    if (response && response.success) {
-      showSuccessToast('调整成功')
-      adjustBalanceModalInstance.hide()
-      form.reset()
-      loadUserBalances(currentUserId)
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            user_id: this.currentUserId,
+            asset_code: this.adjustForm.asset_code,
+            amount: amount,
+            reason: this.adjustForm.reason,
+            idempotency_key: idempotencyKey
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          this.showSuccess('调整成功');
+          this.adjustModal.hide();
+          this.loadUserBalances(this.currentUserId);
     } else {
-      showErrorToast(response?.message || '调整失败')
+          this.showError(result.message || '调整失败');
     }
   } catch (error) {
-    console.error('调整余额失败:', error)
-    showErrorToast(error.message)
+        console.error('调整余额失败:', error);
+        this.showError('调整失败，请稍后重试');
   } finally {
-    const submitBtn = document.getElementById('submitAdjustBtn')
-    submitBtn.disabled = false
-    submitBtn.innerHTML = '<i class="bi bi-check-lg"></i> 确认调整'
+        this.submitting = false;
   }
-}
-
-// ============================================================
-// 工具函数
-// ============================================================
-
-/**
- * 获取形态标签
- * @param {string} form - 形态类型
- * @returns {string} 中文标签
- */
-function getFormLabel(form) {
-  const labels = {
-    shard: '碎片',
-    crystal: '水晶'
-  }
-  return labels[form] || form
-}
+    },
 
 /**
  * 手机号脱敏
- * @param {string} phone - 手机号
- * @returns {string} 脱敏后的手机号
  */
-function maskPhone(phone) {
-  if (!phone || phone.length !== 11) return phone
-  return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
-}
+    maskPhone(phone) {
+      if (!phone || phone.length !== 11) return phone;
+      return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+    },
 
 /**
- * 显示成功提示
- * @param {string} message - 提示消息
- */
-function showSuccessToast(message) {
-  document.getElementById('successToastBody').textContent = message
-  successToastInstance.show()
+     * 显示成功消息
+     */
+    showSuccess(message) {
+      this.$toast.success(message);
+    },
+
+    /**
+     * 显示错误消息
+     */
+    showError(message) {
+      this.$toast.error(message);
+    }
+  };
 }
 
-/**
- * 显示错误提示
- * @param {string} message - 错误消息
- */
-function showErrorToast(message) {
-  document.getElementById('errorToastBody').textContent = message
-  errorToastInstance.show()
-}
+// Alpine.js 组件注册
+document.addEventListener('alpine:init', () => {
+  Alpine.data('materialBalancesPage', materialBalancesPage)
+  console.log('✅ [MaterialBalancesPage] Alpine 组件已注册')
+})

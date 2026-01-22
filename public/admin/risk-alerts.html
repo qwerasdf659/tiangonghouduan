@@ -7,6 +7,10 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
   <link href="/admin/css/common.css" rel="stylesheet">
+  
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+  
   <style>
     .alert-card {
       border-left: 4px solid;
@@ -47,761 +51,337 @@
       border-radius: 50%;
       background: #0d6efd;
     }
+    .alert-item { cursor: pointer; }
+    .alert-item:hover { background-color: #f8f9fa; }
+    .alert-item.selected { background-color: #e3f2fd; }
+    [x-cloak] { display: none !important; }
   </style>
 </head>
 <body class="bg-light">
-  <nav class="navbar navbar-dark bg-danger">
-    <div class="container-fluid">
-      <a href="/admin/dashboard.html" class="navbar-brand">
-        <i class="bi bi-arrow-left me-2"></i>🚨 管理后台 - 风控告警
-      </a>
-      <div>
-        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+  <!-- Alpine.js 应用 -->
+  <div x-data="riskAlertsPage()" x-init="init()" x-cloak>
+    <!-- 顶部导航 -->
+    <nav class="navbar navbar-dark bg-danger">
+      <div class="container-fluid">
+        <a href="/admin/dashboard.html" class="navbar-brand">
+          <i class="bi bi-arrow-left me-2"></i>🚨 管理后台 - 风控告警
+        </a>
+        <div>
+          <span class="text-light me-3" x-text="'欢迎，' + (userInfo.nickname || userInfo.username || '管理员')">欢迎，管理员</span>
+          <button class="btn btn-outline-light btn-sm" @click="handleLogout()">退出登录</button>
+        </div>
       </div>
-    </div>
-  </nav>
+    </nav>
 
-  <div class="container-fluid mt-4">
-    <!-- 告警统计 -->
-    <div class="row g-3 mb-4">
-      <div class="col-md-3">
-        <div class="card stat-card border-danger">
-          <div class="card-body text-center">
-            <i class="bi bi-exclamation-triangle text-danger" style="font-size: 2rem;"></i>
-            <h6 class="text-muted mt-2">严重告警</h6>
-            <h2 id="criticalCount" class="text-danger mb-0">-</h2>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card stat-card border-warning">
-          <div class="card-body text-center">
-            <i class="bi bi-exclamation-circle text-warning" style="font-size: 2rem;"></i>
-            <h6 class="text-muted mt-2">警告</h6>
-            <h2 id="warningCount" class="text-warning mb-0">-</h2>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card stat-card border-info">
-          <div class="card-body text-center">
-            <i class="bi bi-info-circle text-info" style="font-size: 2rem;"></i>
-            <h6 class="text-muted mt-2">提示</h6>
-            <h2 id="infoCount" class="text-info mb-0">-</h2>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card stat-card border-success">
-          <div class="card-body text-center">
-            <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
-            <h6 class="text-muted mt-2">已处理</h6>
-            <h2 id="resolvedCount" class="text-success mb-0">-</h2>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ECharts 告警分布图 -->
-    <div class="row g-3 mb-4">
-      <div class="col-md-6">
-        <div class="card">
-          <div class="card-header bg-white">
-            <h6 class="mb-0"><i class="bi bi-pie-chart"></i> 告警级别分布</h6>
-          </div>
-          <div class="card-body">
-            <div id="levelDistChart" style="height: 280px;"></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="card">
-          <div class="card-header bg-white">
-            <h6 class="mb-0"><i class="bi bi-bar-chart"></i> 告警类型分布</h6>
-          </div>
-          <div class="card-body">
-            <div id="typeDistChart" style="height: 280px;"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 筛选栏 -->
-    <div class="card mb-4">
-      <div class="card-body">
-        <div class="row g-3 align-items-center">
-          <div class="col-md-2">
-            <label class="form-label">告警级别</label>
-            <select class="form-select" id="levelFilter">
-              <option value="">全部级别</option>
-              <option value="critical">🔴 严重</option>
-              <option value="high">🔴 高危</option>
-              <option value="medium">🟡 中等</option>
-              <option value="low">🔵 低</option>
-            </select>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">告警类型</label>
-            <select class="form-select" id="typeFilter">
-              <option value="">全部类型</option>
-              <option value="frequency_limit">频次限制</option>
-              <option value="amount_limit">金额告警</option>
-              <option value="duplicate_user">重复用户</option>
-              <option value="suspicious_pattern">可疑模式</option>
-            </select>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">状态</label>
-            <select class="form-select" id="statusFilter">
-              <option value="">全部状态</option>
-              <option value="pending">待处理</option>
-              <option value="reviewed">已复核</option>
-              <option value="ignored">已忽略</option>
-            </select>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">时间范围</label>
-            <select class="form-select" id="timeFilter">
-              <option value="today">今日</option>
-              <option value="week">最近7天</option>
-              <option value="month">最近30天</option>
-              <option value="">全部</option>
-            </select>
-          </div>
-          <div class="col-md-3 d-flex align-items-end">
-            <button class="btn btn-primary me-2" onclick="loadAlerts()">
-              <i class="bi bi-search"></i> 搜索
-            </button>
-            <button class="btn btn-outline-danger" onclick="markAllRead()">
-              <i class="bi bi-check-all"></i> 全部已读
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 告警列表 -->
-    <div class="row">
-      <div class="col-lg-8">
-        <div class="card">
-          <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <h6 class="mb-0"><i class="bi bi-list-ul"></i> 告警列表</h6>
-            <span class="badge bg-secondary" id="alertCount">-</span>
-          </div>
-          <div class="card-body p-0" id="alertList">
-            <!-- 动态生成 -->
-          </div>
-        </div>
-      </div>
-
-      <div class="col-lg-4">
-        <!-- 告警详情 -->
-        <div class="card mb-4">
-          <div class="card-header bg-white">
-            <h6 class="mb-0"><i class="bi bi-info-circle"></i> 告警详情</h6>
-          </div>
-          <div class="card-body" id="alertDetail">
-            <div class="text-center text-muted py-4">
-              <i class="bi bi-mouse" style="font-size: 3rem;"></i>
-              <p class="mt-2">点击左侧告警查看详情</p>
+    <div class="container-fluid mt-4">
+      <!-- 告警统计 -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="card stat-card border-danger">
+            <div class="card-body text-center">
+              <i class="bi bi-exclamation-triangle text-danger" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">严重告警</h6>
+              <h2 class="text-danger mb-0" x-text="stats.critical">-</h2>
             </div>
           </div>
         </div>
-
-        <!-- 处理时间线 -->
-        <div class="card">
-          <div class="card-header bg-white">
-            <h6 class="mb-0"><i class="bi bi-clock-history"></i> 处理记录</h6>
+        <div class="col-md-3">
+          <div class="card stat-card border-warning">
+            <div class="card-body text-center">
+              <i class="bi bi-exclamation-circle text-warning" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">警告</h6>
+              <h2 class="text-warning mb-0" x-text="stats.warning">-</h2>
+            </div>
           </div>
-          <div class="card-body" id="alertTimeline">
-            <div class="text-center text-muted py-4">
-              <p>暂无处理记录</p>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card border-info">
+            <div class="card-body text-center">
+              <i class="bi bi-info-circle text-info" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">提示</h6>
+              <h2 class="text-info mb-0" x-text="stats.info">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card border-success">
+            <div class="card-body text-center">
+              <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">已处理</h6>
+              <h2 class="text-success mb-0" x-text="stats.resolved">-</h2>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- 处理告警模态框 -->
-  <div class="modal fade" id="handleAlertModal" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title"><i class="bi bi-gear"></i> 处理告警</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      <!-- ECharts 告警分布图 -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header bg-white">
+              <h6 class="mb-0"><i class="bi bi-pie-chart"></i> 告警级别分布</h6>
+            </div>
+            <div class="card-body">
+              <div x-ref="levelDistChart" style="height: 280px;"></div>
+            </div>
+          </div>
         </div>
-        <div class="modal-body">
-          <form id="handleAlertForm">
-            <input type="hidden" id="handleAlertId">
-            <div class="mb-3">
-              <label class="form-label">处理状态</label>
-              <select class="form-select" id="handleStatus">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header bg-white">
+              <h6 class="mb-0"><i class="bi bi-bar-chart"></i> 告警类型分布</h6>
+            </div>
+            <div class="card-body">
+              <div x-ref="typeDistChart" style="height: 280px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 筛选栏 -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="row g-3 align-items-center">
+            <div class="col-md-2">
+              <label class="form-label">告警级别</label>
+              <select class="form-select" x-model="filters.level">
+                <option value="">全部级别</option>
+                <option value="critical">🔴 严重</option>
+                <option value="high">🔴 高危</option>
+                <option value="medium">🟡 中等</option>
+                <option value="low">🔵 低</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">告警类型</label>
+              <select class="form-select" x-model="filters.type">
+                <option value="">全部类型</option>
+                <option value="frequency_limit">频次限制</option>
+                <option value="amount_limit">金额告警</option>
+                <option value="duplicate_user">重复用户</option>
+                <option value="suspicious_pattern">可疑模式</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">状态</label>
+              <select class="form-select" x-model="filters.status">
+                <option value="">全部状态</option>
+                <option value="pending">待处理</option>
                 <option value="reviewed">已复核</option>
                 <option value="ignored">已忽略</option>
               </select>
             </div>
-            <div class="mb-3">
-              <label class="form-label">处理说明</label>
-              <textarea class="form-control" id="handleRemark" rows="3" placeholder="请填写处理说明..."></textarea>
+            <div class="col-md-3">
+              <label class="form-label">时间范围</label>
+              <select class="form-select" x-model="filters.time">
+                <option value="today">今日</option>
+                <option value="week">最近7天</option>
+                <option value="month">最近30天</option>
+                <option value="">全部</option>
+              </select>
             </div>
-            <!-- 关联操作暂未支持，后端API不提供此功能 -->
-          </form>
+            <div class="col-md-3 d-flex align-items-end">
+              <button class="btn btn-primary me-2" @click="loadAlerts()" :disabled="loading">
+                <span x-show="loading" class="spinner-border spinner-border-sm me-1"></span>
+                <i class="bi bi-search" x-show="!loading"></i> 搜索
+              </button>
+              <button class="btn btn-outline-danger" @click="markAllRead()" :disabled="loading">
+                <i class="bi bi-check-all"></i> 全部已读
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="button" class="btn btn-primary" onclick="submitHandle()">确认处理</button>
+      </div>
+
+      <!-- 告警列表 -->
+      <div class="row">
+        <div class="col-lg-8">
+          <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <h6 class="mb-0"><i class="bi bi-list-ul"></i> 告警列表</h6>
+              <span class="badge bg-secondary" x-text="alerts.length">-</span>
+            </div>
+            <div class="card-body p-0">
+              <!-- 加载中 -->
+              <div x-show="loading" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">加载中...</span>
+                </div>
+                <p class="mt-2 text-muted">正在加载告警...</p>
+              </div>
+              
+              <!-- 无数据 -->
+              <div x-show="!loading && alerts.length === 0" class="text-center py-5 text-muted">
+                <i class="bi bi-check-circle" style="font-size: 3rem;"></i>
+                <p class="mt-2">暂无告警</p>
+              </div>
+              
+              <!-- 告警列表 -->
+              <template x-for="alert in alerts" :key="alert.alert_id">
+                <div class="alert-card p-3 border-bottom alert-item"
+                     :class="[mapSeverityToLevel(alert.severity), selectedAlert && selectedAlert.alert_id === alert.alert_id ? 'selected' : '']"
+                     @click="selectAlert(alert.alert_id)">
+                  <div class="d-flex align-items-start">
+                    <div class="alert-icon me-3" :class="mapSeverityToLevel(alert.severity)">
+                      <i class="bi" :class="'bi-' + getAlertIcon(alert.alert_type)"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                      <div class="d-flex justify-content-between align-items-start mb-1">
+                        <h6 class="mb-0" x-text="alert.rule_name || alert.alert_type_name || getAlertTitle(alert.alert_type)"></h6>
+                        <small class="text-muted" x-text="formatTime(alert.created_at)"></small>
+                      </div>
+                      <p class="text-muted mb-2 small" x-text="truncateText(alert.alert_message || '', 80)"></p>
+                      <div class="d-flex align-items-center">
+                        <span class="badge me-2" :class="getSeverityBadgeClass(alert.severity)" x-text="getSeverityLabel(alert.severity)"></span>
+                        <span class="badge" :class="getStatusBadgeClass(alert.status)" x-text="getStatusLabel(alert.status)"></span>
+                        <small class="text-muted ms-2" x-show="alert.target_user_id" x-text="'用户ID: ' + alert.target_user_id"></small>
+                        <span class="badge bg-danger ms-2" x-show="alert.is_blocked">已阻断</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
         </div>
+
+        <div class="col-lg-4">
+          <!-- 告警详情 -->
+          <div class="card mb-4">
+            <div class="card-header bg-white">
+              <h6 class="mb-0"><i class="bi bi-info-circle"></i> 告警详情</h6>
+            </div>
+            <div class="card-body">
+              <!-- 未选择 -->
+              <div x-show="!selectedAlert" class="text-center text-muted py-4">
+                <i class="bi bi-mouse" style="font-size: 3rem;"></i>
+                <p class="mt-2">点击左侧告警查看详情</p>
+              </div>
+              
+              <!-- 详情内容 -->
+              <template x-if="selectedAlert">
+                <div>
+                  <div class="mb-3">
+                    <span class="badge mb-2" :class="getSeverityBadgeClass(selectedAlert.severity)" x-text="getSeverityLabel(selectedAlert.severity)"></span>
+                    <span class="badge bg-danger mb-2 ms-1" x-show="selectedAlert.is_blocked">已阻断</span>
+                    <h5 x-text="selectedAlert.rule_name || selectedAlert.alert_type_name || getAlertTitle(selectedAlert.alert_type)"></h5>
+                  </div>
+                  <table class="table table-sm">
+                    <tr><th style="width:30%">告警类型</th><td x-text="getAlertTypeLabel(selectedAlert.alert_type)"></td></tr>
+                    <tr><th>严重程度</th><td x-text="getSeverityLabel(selectedAlert.severity)"></td></tr>
+                    <tr><th>状态</th><td><span class="badge" :class="getStatusBadgeClass(selectedAlert.status)" x-text="getStatusLabel(selectedAlert.status)"></span></td></tr>
+                    <tr><th>触发阈值</th><td x-text="selectedAlert.rule_threshold || '-'"></td></tr>
+                    <tr><th>实际值</th><td x-text="selectedAlert.actual_value || '-'"></td></tr>
+                    <tr><th>操作员ID</th><td x-text="selectedAlert.operator_id || '-'"></td></tr>
+                    <tr><th>目标用户ID</th><td x-text="selectedAlert.target_user_id || '-'"></td></tr>
+                    <tr><th>门店ID</th><td x-text="selectedAlert.store_id || '-'"></td></tr>
+                    <tr><th>触发时间</th><td x-text="formatDateTime(selectedAlert.created_at)"></td></tr>
+                    <tr x-show="selectedAlert.reviewed_at"><th>复核时间</th><td x-text="formatDateTime(selectedAlert.reviewed_at)"></td></tr>
+                  </table>
+                  <div class="mb-3">
+                    <h6>告警描述</h6>
+                    <p class="text-muted small" x-text="selectedAlert.alert_message || '无详细描述'"></p>
+                  </div>
+                  <template x-if="selectedAlert.review_notes">
+                    <div class="mb-3">
+                      <h6>复核备注</h6>
+                      <p class="text-muted small" x-text="selectedAlert.review_notes"></p>
+                    </div>
+                  </template>
+                  <div class="mb-3">
+                    <h6>操作员信息</h6>
+                    <pre class="bg-light p-2 rounded small" x-text="JSON.stringify(selectedAlert.operator_info || {}, null, 2)"></pre>
+                  </div>
+                  <template x-if="selectedAlert.status === 'pending'">
+                    <div class="d-grid gap-2">
+                      <button class="btn btn-primary" @click="openHandleModal(selectedAlert.alert_id)">
+                        <i class="bi bi-gear"></i> 处理告警
+                      </button>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- 处理时间线 -->
+          <div class="card">
+            <div class="card-header bg-white">
+              <h6 class="mb-0"><i class="bi bi-clock-history"></i> 处理记录</h6>
+            </div>
+            <div class="card-body">
+              <!-- 无记录 -->
+              <div x-show="timeline.length === 0" class="text-center text-muted py-4">
+                <p>暂无处理记录</p>
+              </div>
+              
+              <!-- 时间线 -->
+              <template x-for="item in timeline" :key="item.created_at">
+                <div class="timeline-item">
+                  <small class="text-muted" x-text="formatDateTime(item.created_at)"></small>
+                  <p class="mb-1"><strong x-text="getStatusLabel(item.status)"></strong></p>
+                  <p class="small text-muted mb-0" x-text="item.remark || '无备注'"></p>
+                  <small class="text-muted" x-text="'操作人: ' + (item.operator_name || item.operator_id || '-')"></small>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 处理告警模态框 -->
+    <div class="modal fade" x-ref="handleModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-gear"></i> 处理告警</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <form @submit.prevent="submitHandle()">
+              <div class="mb-3">
+                <label class="form-label">处理状态</label>
+                <select class="form-select" x-model="handleForm.status">
+                  <option value="reviewed">已复核</option>
+                  <option value="ignored">已忽略</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">处理说明</label>
+                <textarea class="form-control" x-model="handleForm.remark" rows="3" placeholder="请填写处理说明..."></textarea>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="button" class="btn btn-primary" @click="submitHandle()" :disabled="submitting">
+              <span x-show="submitting" class="spinner-border spinner-border-sm me-1"></span>
+              确认处理
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 全局加载遮罩 -->
+    <div class="loading-overlay" x-show="loading" x-cloak>
+      <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+        <span class="visually-hidden">加载中...</span>
       </div>
     </div>
   </div>
 
-  <div class="loading-overlay" id="loadingOverlay">
-    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
-      <span class="visually-hidden">加载中...</span>
-    </div>
-  </div>
-
+  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <!-- ✅ ECharts - 图表库（本地引用，符合规范要求） -->
+  <!-- ECharts -->
   <script src="/admin/js/lib/echarts.min.js"></script>
+  <!-- 通用工具库 -->
   <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/api-config.js"></script>
-  <script>
-    let alerts = [];
-    let selectedAlert = null;
-    
-    // ECharts 图表实例
-    let levelDistChart = null;
-    let typeDistChart = null;
-
-    document.addEventListener('DOMContentLoaded', function() {
-      const userInfo = getCurrentUser();
-      if (userInfo && userInfo.nickname) {
-        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
-      }
-      document.getElementById('logoutBtn').addEventListener('click', logout);
-      
-      // 初始化 ECharts 图表
-      initCharts();
-      
-      loadAlerts();
-      // 自动刷新
-      setInterval(loadAlerts, 60000);
-      
-      // 窗口大小改变时重绘图表
-      window.addEventListener('resize', function() {
-        if (levelDistChart) levelDistChart.resize();
-        if (typeDistChart) typeDistChart.resize();
-      });
-    });
-    
-    // 初始化 ECharts 图表
-    function initCharts() {
-      const levelContainer = document.getElementById('levelDistChart');
-      const typeContainer = document.getElementById('typeDistChart');
-      
-      if (levelContainer) {
-        levelDistChart = echarts.init(levelContainer);
-        levelDistChart.setOption(getLevelChartOption([]));
-      }
-      
-      if (typeContainer) {
-        typeDistChart = echarts.init(typeContainer);
-        typeDistChart.setOption(getTypeChartOption([]));
-      }
-    }
-    
-    // 告警级别分布图配置
-    function getLevelChartOption(data) {
-      return {
-        tooltip: { trigger: 'item', formatter: '{a} <br/>{b}: {c} ({d}%)' },
-        legend: { orient: 'vertical', left: 'left', top: 'center' },
-        series: [{
-          name: '告警级别',
-          type: 'pie',
-          radius: ['40%', '70%'],
-          avoidLabelOverlap: false,
-          itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
-          label: { show: false, position: 'center' },
-          emphasis: { label: { show: true, fontSize: 18, fontWeight: 'bold' } },
-          labelLine: { show: false },
-          data: data
-        }]
-      };
-    }
-    
-    // 告警类型分布图配置
-    function getTypeChartOption(types, counts) {
-      return {
-        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-        xAxis: { type: 'category', data: types, axisLabel: { interval: 0, rotate: 0 } },
-        yAxis: { type: 'value', name: '告警数' },
-        series: [{
-          name: '告警数量',
-          type: 'bar',
-          data: counts,
-          itemStyle: {
-            color: function(params) {
-              const colors = ['#5470c6', '#91cc75', '#fac858', '#ee6666'];
-              return colors[params.dataIndex % colors.length];
-            },
-            borderRadius: [4, 4, 0, 0]
-          },
-          label: { show: true, position: 'top' }
-        }]
-      };
-    }
-    
-    // 更新图表数据（使用后端字段：severity, alert_type）
-    function updateCharts(alertsList) {
-      // 统计告警严重程度分布（后端使用 severity: critical/high/medium/low）
-      const severityStats = { critical: 0, high: 0, medium: 0, low: 0 };
-      // 统计告警类型分布（后端使用 alert_type: frequency_limit/amount_limit/duplicate_user/suspicious_pattern）
-      const alertTypeStats = { frequency_limit: 0, amount_limit: 0, duplicate_user: 0, suspicious_pattern: 0 };
-      
-      alertsList.forEach(alert => {
-        // 统计严重程度
-        if (severityStats.hasOwnProperty(alert.severity)) {
-          severityStats[alert.severity]++;
-        }
-        // 统计告警类型
-        if (alertTypeStats.hasOwnProperty(alert.alert_type)) {
-          alertTypeStats[alert.alert_type]++;
-        }
-      });
-      
-      // 更新级别分布饼图（合并 critical+high 为严重，medium 为警告，low 为提示）
-      if (levelDistChart) {
-        const levelData = [
-          { value: severityStats.critical + severityStats.high, name: '严重', itemStyle: { color: '#dc3545' } },
-          { value: severityStats.medium, name: '警告', itemStyle: { color: '#ffc107' } },
-          { value: severityStats.low, name: '提示', itemStyle: { color: '#0dcaf0' } }
-        ].filter(item => item.value > 0);
-        
-        levelDistChart.setOption(getLevelChartOption(levelData));
-      }
-      
-      // 更新类型分布柱状图（使用后端实际的 alert_type 值）
-      if (typeDistChart) {
-        const typeLabels = ['频次限制', '金额告警', '重复用户', '可疑模式'];
-        const typeCounts = [
-          alertTypeStats.frequency_limit, 
-          alertTypeStats.amount_limit, 
-          alertTypeStats.duplicate_user, 
-          alertTypeStats.suspicious_pattern
-        ];
-        
-        typeDistChart.setOption(getTypeChartOption(typeLabels, typeCounts));
-      }
-    }
-
-    async function loadAlerts() {
-      showLoading();
-      try {
-        // 使用后端实际字段名：severity 代替 level，alert_type 代替 type
-        const severity = document.getElementById('levelFilter').value;
-        const alert_type = document.getElementById('typeFilter').value;
-        const status = document.getElementById('statusFilter').value;
-        const time = document.getElementById('timeFilter').value;
-
-        const params = new URLSearchParams();
-        if (severity) params.append('severity', severity);
-        if (alert_type) params.append('alert_type', alert_type);
-        if (status) params.append('status', status);
-        if (time) params.append('time_range', time);
-
-        const url = API_ENDPOINTS.RISK_ALERT.LIST + (params.toString() ? `?${params.toString()}` : '');
-        const response = await apiRequest(url);
-
-        if (response && response.success) {
-          // 后端返回 data.items 而不是 data.alerts
-          alerts = response.data.items || response.data.alerts || [];
-          // 确保是数组
-          if (!Array.isArray(alerts)) {
-            alerts = [];
-          }
-          renderAlerts(alerts);
-          updateStats(response.data.stats || calculateStatsFromAlerts(alerts));
-          updateCharts(alerts);  // 更新 ECharts 图表
-        } else {
-          showError('加载失败', response?.message || '获取告警列表失败');
-        }
-      } catch (error) {
-        console.error('加载告警失败:', error);
-        showError('加载失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-    
-    // 从告警列表计算统计数据（后端字段：severity）
-    function calculateStatsFromAlerts(alertsList) {
-      return {
-        critical: alertsList.filter(a => a.severity === 'critical' || a.severity === 'high').length,
-        warning: alertsList.filter(a => a.severity === 'warning' || a.severity === 'medium').length,
-        info: alertsList.filter(a => a.severity === 'info' || a.severity === 'low').length,
-        resolved: alertsList.filter(a => a.status === 'reviewed').length
-      };
-    }
-
-    function renderAlerts(alerts) {
-      const container = document.getElementById('alertList');
-      document.getElementById('alertCount').textContent = alerts.length;
-
-      if (!alerts || alerts.length === 0) {
-        container.innerHTML = `
-          <div class="text-center py-5 text-muted">
-            <i class="bi bi-check-circle" style="font-size: 3rem;"></i>
-            <p class="mt-2">暂无告警</p>
-          </div>
-        `;
-        return;
-      }
-
-      // 使用后端实际字段名：severity, alert_type, alert_message, rule_name
-      container.innerHTML = alerts.map(alert => `
-        <div class="alert-card ${mapSeverityToLevel(alert.severity)} p-3 border-bottom cursor-pointer" onclick="selectAlert(${alert.alert_id})" style="cursor: pointer;">
-          <div class="d-flex align-items-start">
-            <div class="alert-icon ${mapSeverityToLevel(alert.severity)} me-3">
-              <i class="bi bi-${getAlertIcon(alert.alert_type)}"></i>
-            </div>
-            <div class="flex-grow-1">
-              <div class="d-flex justify-content-between align-items-start mb-1">
-                <h6 class="mb-0">${escapeHtml(alert.rule_name || alert.alert_type_name || getAlertTitle(alert.alert_type))}</h6>
-                <small class="text-muted">${formatTime(alert.created_at)}</small>
-              </div>
-              <p class="text-muted mb-2 small">${escapeHtml(truncateText(alert.alert_message || '', 80))}</p>
-              <div class="d-flex align-items-center">
-                <span class="badge ${getSeverityBadgeClass(alert.severity)} me-2">${getSeverityLabel(alert.severity)}</span>
-                <span class="badge ${getStatusBadgeClass(alert.status)}">${getStatusLabel(alert.status)}</span>
-                ${alert.target_user_id ? `<small class="text-muted ms-2">用户ID: ${alert.target_user_id}</small>` : ''}
-                ${alert.is_blocked ? `<span class="badge bg-danger ms-2">已阻断</span>` : ''}
-              </div>
-            </div>
-          </div>
-        </div>
-      `).join('');
-    }
-    
-    // 将后端 severity 映射为前端 CSS class 使用的 level
-    function mapSeverityToLevel(severity) {
-      const map = { 'critical': 'critical', 'high': 'critical', 'medium': 'warning', 'warning': 'warning', 'low': 'info', 'info': 'info' };
-      return map[severity] || 'info';
-    }
-
-    function updateStats(stats) {
-      // 后端使用 severity 字段（critical/high/medium/low），统计分组
-      const criticalCount = stats.critical || stats.high || alerts.filter(a => a.severity === 'critical' || a.severity === 'high').length;
-      const warningCount = stats.warning || stats.medium || alerts.filter(a => a.severity === 'warning' || a.severity === 'medium').length;
-      const infoCount = stats.info || stats.low || alerts.filter(a => a.severity === 'info' || a.severity === 'low').length;
-      // 后端状态是 reviewed 而不是 resolved
-      const resolvedCount = stats.resolved || stats.reviewed || alerts.filter(a => a.status === 'reviewed').length;
-      
-      document.getElementById('criticalCount').textContent = criticalCount;
-      document.getElementById('warningCount').textContent = warningCount;
-      document.getElementById('infoCount').textContent = infoCount;
-      document.getElementById('resolvedCount').textContent = resolvedCount;
-    }
-
-    async function selectAlert(alertId) {
-      selectedAlert = alerts.find(a => a.alert_id === alertId);
-      if (!selectedAlert) return;
-
-      // 渲染详情（使用后端实际字段名）
-      document.getElementById('alertDetail').innerHTML = `
-        <div class="mb-3">
-          <span class="badge ${getSeverityBadgeClass(selectedAlert.severity)} mb-2">${getSeverityLabel(selectedAlert.severity)}</span>
-          ${selectedAlert.is_blocked ? '<span class="badge bg-danger mb-2 ms-1">已阻断</span>' : ''}
-          <h5>${escapeHtml(selectedAlert.rule_name || selectedAlert.alert_type_name || getAlertTitle(selectedAlert.alert_type))}</h5>
-        </div>
-        <table class="table table-sm">
-          <tr><th style="width:30%">告警类型</th><td>${getAlertTypeLabel(selectedAlert.alert_type)}</td></tr>
-          <tr><th>严重程度</th><td>${getSeverityLabel(selectedAlert.severity)}</td></tr>
-          <tr><th>状态</th><td><span class="badge ${getStatusBadgeClass(selectedAlert.status)}">${getStatusLabel(selectedAlert.status)}</span></td></tr>
-          <tr><th>触发阈值</th><td>${selectedAlert.rule_threshold || '-'}</td></tr>
-          <tr><th>实际值</th><td>${selectedAlert.actual_value || '-'}</td></tr>
-          <tr><th>操作员ID</th><td>${selectedAlert.operator_id || '-'}</td></tr>
-          <tr><th>目标用户ID</th><td>${selectedAlert.target_user_id || '-'}</td></tr>
-          <tr><th>门店ID</th><td>${selectedAlert.store_id || '-'}</td></tr>
-          <tr><th>触发时间</th><td>${formatDateTime(selectedAlert.created_at)}</td></tr>
-          ${selectedAlert.reviewed_at ? `<tr><th>复核时间</th><td>${formatDateTime(selectedAlert.reviewed_at)}</td></tr>` : ''}
-        </table>
-        <div class="mb-3">
-          <h6>告警描述</h6>
-          <p class="text-muted small">${escapeHtml(selectedAlert.alert_message || '无详细描述')}</p>
-        </div>
-        ${selectedAlert.review_notes ? `
-        <div class="mb-3">
-          <h6>复核备注</h6>
-          <p class="text-muted small">${escapeHtml(selectedAlert.review_notes)}</p>
-        </div>
-        ` : ''}
-        <div class="mb-3">
-          <h6>操作员信息</h6>
-          <pre class="bg-light p-2 rounded small">${JSON.stringify(selectedAlert.operator_info || {}, null, 2)}</pre>
-        </div>
-        ${selectedAlert.status === 'pending' ? `
-        <div class="d-grid gap-2">
-          <button class="btn btn-primary" onclick="openHandleModal(${selectedAlert.alert_id})">
-            <i class="bi bi-gear"></i> 处理告警
-          </button>
-        </div>
-        ` : ''}
-      `;
-
-      // 加载处理时间线
-      await loadAlertTimeline(alertId);
-    }
-
-    async function loadAlertTimeline(alertId) {
-      // 后端暂未实现告警历史API，使用告警详情中的复核信息代替
-      if (selectedAlert && selectedAlert.reviewed_at) {
-        renderTimeline([{
-          created_at: selectedAlert.reviewed_at,
-          status: selectedAlert.status,
-          remark: selectedAlert.review_notes,
-          operator_name: selectedAlert.reviewer_info?.nickname || '管理员'
-        }]);
-      } else {
-        renderTimeline([]);
-      }
-    }
-
-    function renderTimeline(history) {
-      const container = document.getElementById('alertTimeline');
-      
-      if (!history || history.length === 0) {
-        container.innerHTML = '<div class="text-center text-muted py-4"><p>暂无处理记录</p></div>';
-        return;
-      }
-
-      container.innerHTML = history.map(h => `
-        <div class="timeline-item">
-          <small class="text-muted">${formatDateTime(h.created_at)}</small>
-          <p class="mb-1"><strong>${getStatusLabel(h.status)}</strong></p>
-          <p class="small text-muted mb-0">${escapeHtml(h.remark || '无备注')}</p>
-          <small class="text-muted">操作人: ${h.operator_name || h.operator_id || '-'}</small>
-        </div>
-      `).join('');
-    }
-
-    function openHandleModal(alertId) {
-      document.getElementById('handleAlertId').value = alertId;
-      document.getElementById('handleAlertForm').reset();
-      new bootstrap.Modal(document.getElementById('handleAlertModal')).show();
-    }
-
-    async function submitHandle() {
-      const alertId = document.getElementById('handleAlertId').value;
-      const status = document.getElementById('handleStatus').value;
-      const reviewNotes = document.getElementById('handleRemark').value;
-
-      showLoading();
-      try {
-        // 使用后端正确的API路径：/api/v4/console/risk-alerts/:alert_id/review
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.RISK_ALERT.REVIEW, { alert_id: alertId }), {
-          method: 'POST',
-          body: JSON.stringify({
-            status: status,          // 后端期望：reviewed 或 ignored
-            review_notes: reviewNotes // 后端字段名是 review_notes 而不是 remark
-          })
-        });
-
-        if (response && response.success) {
-          bootstrap.Modal.getInstance(document.getElementById('handleAlertModal')).hide();
-          alert(`✅ 告警已${status === 'reviewed' ? '复核' : '忽略'}`);
-          loadAlerts();
-          if (selectedAlert && selectedAlert.alert_id == alertId) {
-            loadAlertTimeline(alertId);
-          }
-        } else {
-          showError('处理失败', response?.message || '操作失败');
-        }
-      } catch (error) {
-        console.error('处理告警失败:', error);
-        showError('处理失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    async function markAllRead() {
-      if (!confirm('确定要将所有告警标记为已读吗？')) return;
-
-      showLoading();
-      try {
-        const response = await apiRequest(API_ENDPOINTS.RISK_ALERT.MARK_ALL_READ, {
-          method: 'POST'
-        });
-
-        if (response && response.success) {
-          alert('✅ 已全部标记为已读');
-          loadAlerts();
-        } else {
-          showError('操作失败', response?.message || '标记失败');
-        }
-      } catch (error) {
-        console.error('标记已读失败:', error);
-        showError('操作失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    // 辅助函数（使用后端实际字段值）
-    
-    // 根据后端 alert_type 获取图标
-    function getAlertIcon(alertType) {
-      const icons = {
-        frequency_limit: 'speedometer2',
-        amount_limit: 'cash-stack',
-        duplicate_user: 'people',
-        suspicious_pattern: 'shield-exclamation',
-        // 兼容旧字段
-        fraud: 'shield-exclamation',
-        abuse: 'person-x',
-        anomaly: 'activity',
-        limit: 'speedometer2'
-      };
-      return icons[alertType] || 'exclamation-triangle';
-    }
-
-    // 根据后端 alert_type 获取标题
-    function getAlertTitle(alertType) {
-      const titles = {
-        frequency_limit: '频次限制告警',
-        amount_limit: '金额超限告警',
-        duplicate_user: '重复用户告警',
-        suspicious_pattern: '可疑模式告警',
-        // 兼容旧字段
-        fraud: '欺诈检测告警',
-        abuse: '滥用检测告警',
-        anomaly: '异常行为告警',
-        limit: '限额超标告警'
-      };
-      return titles[alertType] || '风控告警';
-    }
-
-    // 根据后端 alert_type 获取类型标签
-    function getAlertTypeLabel(alertType) {
-      const labels = {
-        frequency_limit: '⏱️ 频次限制',
-        amount_limit: '💰 金额告警',
-        duplicate_user: '👥 重复用户',
-        suspicious_pattern: '🔍 可疑模式',
-        // 兼容旧字段
-        fraud: '🛡️ 欺诈检测',
-        abuse: '👤 滥用检测',
-        anomaly: '📊 异常行为',
-        limit: '⚡ 限额告警'
-      };
-      return labels[alertType] || alertType;
-    }
-
-    // 后端 severity 字段的样式类
-    function getSeverityBadgeClass(severity) {
-      const classes = {
-        critical: 'bg-danger',
-        high: 'bg-danger',
-        medium: 'bg-warning text-dark',
-        warning: 'bg-warning text-dark',
-        low: 'bg-info',
-        info: 'bg-info'
-      };
-      return classes[severity] || 'bg-secondary';
-    }
-
-    // 后端 severity 字段的显示标签
-    function getSeverityLabel(severity) {
-      const labels = {
-        critical: '🔴 严重',
-        high: '🔴 高危',
-        medium: '🟡 中等',
-        warning: '🟡 警告',
-        low: '🔵 低',
-        info: '🔵 提示'
-      };
-      return labels[severity] || severity;
-    }
-    
-    // 兼容旧的 getLevelBadgeClass 和 getLevelLabel
-    function getLevelBadgeClass(level) {
-      return getSeverityBadgeClass(level);
-    }
-    
-    function getLevelLabel(level) {
-      return getSeverityLabel(level);
-    }
-
-    // 后端状态字段：pending/reviewed/ignored
-    function getStatusBadgeClass(status) {
-      const classes = {
-        pending: 'bg-danger',
-        reviewed: 'bg-success',
-        ignored: 'bg-secondary',
-        // 兼容旧字段
-        processing: 'bg-warning text-dark',
-        resolved: 'bg-success'
-      };
-      return classes[status] || 'bg-secondary';
-    }
-
-    function getStatusLabel(status) {
-      const labels = {
-        pending: '待处理',
-        reviewed: '已复核',
-        ignored: '已忽略',
-        // 兼容旧字段
-        processing: '处理中',
-        resolved: '已解决'
-      };
-      return labels[status] || status;
-    }
-
-    function truncateText(text, maxLength) {
-      if (!text) return '';
-      return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
-    }
-
-    function formatTime(dateStr) {
-      if (!dateStr) return '-';
-      const date = new Date(dateStr);
-      const now = new Date();
-      const diff = now - date;
-      
-      if (diff < 60000) return '刚刚';
-      if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
-      if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
-      return date.toLocaleDateString('zh-CN');
-    }
-
-    function formatDateTime(dateStr) {
-      if (!dateStr) return '-';
-      return new Date(dateStr).toLocaleString('zh-CN');
-    }
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
-    }
-
-    function showLoading() {
-      document.getElementById('loadingOverlay').classList.add('show');
-    }
-
-    function hideLoading() {
-      document.getElementById('loadingOverlay').classList.remove('show');
-    }
-
-    function showError(title, message) {
-      alert(`❌ ${title}\n${message}`);
-    }
-  </script>
+  
+  
+  <!-- 页面脚本 -->
+  <script src="/admin/js/pages/risk-alerts.js"></script>
 </body>
 </html>
-

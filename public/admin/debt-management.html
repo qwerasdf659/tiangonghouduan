@@ -21,257 +21,370 @@
     .chart-container {
       height: 300px;
     }
+    [x-cloak] { display: none !important; }
   </style>
+  <!-- Alpine.js -->
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
 </head>
 <body class="bg-light">
-  <nav class="navbar navbar-dark bg-primary">
-    <div class="container-fluid">
-      <a href="/admin/dashboard.html" class="navbar-brand">
-        <i class="bi bi-arrow-left me-2"></i>💰 管理后台 - 欠账管理
-      </a>
-      <div>
-        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+  <div x-data="debtManagementPage()" x-init="init()" x-cloak>
+    <nav class="navbar navbar-dark bg-primary">
+      <div class="container-fluid">
+        <a href="/admin/dashboard.html" class="navbar-brand">
+          <i class="bi bi-arrow-left me-2"></i>💰 管理后台 - 欠账管理
+        </a>
+        <div>
+          <span class="text-light me-3" x-text="'欢迎，' + (userInfo.nickname || '管理员')"></span>
+          <button class="btn btn-outline-light btn-sm" @click="logout">退出登录</button>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+      <!-- 仪表盘统计 -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-exclamation-triangle text-danger" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">待清偿总数</h6>
+              <h2 class="text-danger mb-0" x-text="stats.pendingCount"></h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-currency-yen text-warning" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">待清偿金额</h6>
+              <h2 class="text-warning mb-0" x-text="stats.pendingAmount.toLocaleString()"></h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">已清偿总数</h6>
+              <h2 class="text-success mb-0" x-text="stats.clearedCount"></h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-percent text-info" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">清偿率</h6>
+              <h2 class="text-info mb-0" x-text="stats.clearRate"></h2>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 图表区域 -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <i class="bi bi-pie-chart"></i> 欠账来源分布
+            </div>
+            <div class="card-body">
+              <div x-ref="sourceChart" class="chart-container"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <i class="bi bi-bar-chart"></i> 按活动汇总
+            </div>
+            <div class="card-body">
+              <div x-ref="campaignChart" class="chart-container"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 选项卡 -->
+      <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" :class="{ active: activeTab === 'pending' }" @click="activeTab = 'pending'" type="button">
+            <i class="bi bi-clock-history"></i> 待清偿列表
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" :class="{ active: activeTab === 'by-campaign' }" @click="activeTab = 'by-campaign'" type="button">
+            <i class="bi bi-trophy"></i> 按活动汇总
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" :class="{ active: activeTab === 'by-prize' }" @click="activeTab = 'by-prize'" type="button">
+            <i class="bi bi-gift"></i> 按奖品汇总
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" :class="{ active: activeTab === 'limits' }" @click="activeTab = 'limits'" type="button">
+            <i class="bi bi-shield-exclamation"></i> 上限配置
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+        <!-- 待清偿列表 -->
+        <div class="tab-pane fade" :class="{ 'show active': activeTab === 'pending' }" x-show="activeTab === 'pending'">
+          <div class="card">
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-hover">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>类型</th>
+                      <th>活动</th>
+                      <th>奖品</th>
+                      <th>欠账数量</th>
+                      <th>已清偿</th>
+                      <th>责任人</th>
+                      <th>创建时间</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-if="pendingDebts.length === 0">
+                      <tr>
+                        <td colspan="9" class="text-center text-muted">🎉 暂无待清偿欠账</td>
+                      </tr>
+                    </template>
+                    <template x-for="debt in pendingDebts" :key="debt.debt_id">
+                      <tr>
+                        <td x-text="debt.debt_id"></td>
+                        <td>
+                          <span class="badge" :class="isInventoryDebt(debt) ? 'bg-warning' : 'bg-info'" x-text="isInventoryDebt(debt) ? '库存' : '预算'"></span>
+                        </td>
+                        <td x-text="debt.campaign?.campaign_name || '-'"></td>
+                        <td x-text="isInventoryDebt(debt) ? (debt.prize?.prize_name || '-') : '-'"></td>
+                        <td class="text-danger fw-bold" x-text="getDebtQuantity(debt)"></td>
+                        <td class="text-success" x-text="getClearedQuantity(debt)"></td>
+                        <td x-text="debt.user?.nickname || '-'"></td>
+                        <td x-text="formatDateTime(debt.created_at)"></td>
+                        <td>
+                          <button class="btn btn-sm btn-success" @click="openClearModal(debt)">
+                            <i class="bi bi-check-circle"></i> 清偿
+                          </button>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 按活动汇总 -->
+        <div class="tab-pane fade" :class="{ 'show active': activeTab === 'by-campaign' }" x-show="activeTab === 'by-campaign'">
+          <div class="card">
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-hover">
+                  <thead>
+                    <tr>
+                      <th>活动ID</th>
+                      <th>活动名称</th>
+                      <th>欠账记录数</th>
+                      <th>欠账总量</th>
+                      <th>已清偿量</th>
+                      <th>清偿率</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-if="byCampaignList.length === 0">
+                      <tr>
+                        <td colspan="6" class="text-center text-muted">暂无数据</td>
+                      </tr>
+                    </template>
+                    <template x-for="c in byCampaignList" :key="c.campaign_id">
+                      <tr>
+                        <td x-text="c.campaign_id"></td>
+                        <td x-text="c.campaign_name || '-'"></td>
+                        <td x-text="getCampaignDebtCount(c)"></td>
+                        <td class="text-danger" x-text="getCampaignDebtTotal(c)"></td>
+                        <td class="text-success" x-text="getCampaignClearedTotal(c)"></td>
+                        <td>
+                          <div class="progress" style="height: 20px;">
+                            <div class="progress-bar bg-success" :style="'width: ' + getCampaignClearRate(c) + '%'" x-text="getCampaignClearRate(c) + '%'"></div>
+                          </div>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 按奖品汇总 -->
+        <div class="tab-pane fade" :class="{ 'show active': activeTab === 'by-prize' }" x-show="activeTab === 'by-prize'">
+          <div class="card">
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-hover">
+                  <thead>
+                    <tr>
+                      <th>奖品ID</th>
+                      <th>奖品名称</th>
+                      <th>欠账记录数</th>
+                      <th>欠账总量</th>
+                      <th>已清偿量</th>
+                      <th>清偿率</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-if="byPrizeList.length === 0">
+                      <tr>
+                        <td colspan="6" class="text-center text-muted">暂无数据</td>
+                      </tr>
+                    </template>
+                    <template x-for="p in byPrizeList" :key="p.prize_id">
+                      <tr>
+                        <td x-text="p.prize_id"></td>
+                        <td x-text="p.prize_name || '-'"></td>
+                        <td x-text="p.debt_count || 0"></td>
+                        <td class="text-danger" x-text="p.remaining_quantity || 0"></td>
+                        <td class="text-success" x-text="p.cleared_quantity || 0"></td>
+                        <td>
+                          <div class="progress" style="height: 20px;">
+                            <div class="progress-bar bg-success" :style="'width: ' + getPrizeClearRate(p) + '%'" x-text="getPrizeClearRate(p) + '%'"></div>
+                          </div>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 上限配置 -->
+        <div class="tab-pane fade" :class="{ 'show active': activeTab === 'limits' }" x-show="activeTab === 'limits'">
+          <div class="card">
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-hover">
+                  <thead>
+                    <tr>
+                      <th>配置ID</th>
+                      <th>级别</th>
+                      <th>关联ID</th>
+                      <th>最大欠账量</th>
+                      <th>当前欠账量</th>
+                      <th>使用率</th>
+                      <th>状态</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-if="limitsList.length === 0">
+                      <tr>
+                        <td colspan="7" class="text-center text-muted">暂无上限配置</td>
+                      </tr>
+                    </template>
+                    <template x-for="l in limitsList" :key="l.limit_id">
+                      <tr>
+                        <td x-text="l.limit_id"></td>
+                        <td>
+                          <span class="badge bg-secondary" x-text="l.limit_level_name || l.limit_level || 'global'"></span>
+                        </td>
+                        <td>
+                          <span x-text="l.reference_id || '-'"></span>
+                          <span x-show="l.campaign_name" class="text-muted" x-text="' (' + l.campaign_name + ')'"></span>
+                        </td>
+                        <td>
+                          <small class="text-muted">库存:</small> <span x-text="l.inventory_debt_limit || 0"></span><br>
+                          <small class="text-muted">预算:</small> <span x-text="l.budget_debt_limit || 0"></span>
+                        </td>
+                        <td>-</td>
+                        <td>
+                          <div class="progress" style="height: 20px;">
+                            <div class="progress-bar bg-info" style="width: 0%">-</div>
+                          </div>
+                        </td>
+                        <td>
+                          <span class="badge" :class="l.status === 'active' ? 'bg-success' : 'bg-secondary'" x-text="l.status === 'active' ? '启用' : '禁用'"></span>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-  </nav>
 
-  <div class="container-fluid mt-4">
-    <!-- 仪表盘统计 -->
-    <div class="row g-3 mb-4">
-      <div class="col-md-3">
-        <div class="card stat-card">
-          <div class="card-body text-center">
-            <i class="bi bi-exclamation-triangle text-danger" style="font-size: 2rem;"></i>
-            <h6 class="text-muted mt-2">待清偿总数</h6>
-            <h2 id="pendingCount" class="text-danger mb-0">-</h2>
+    <!-- 清偿模态框 -->
+    <div class="modal fade" x-ref="clearModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-check-circle"></i> 清偿操作</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card stat-card">
-          <div class="card-body text-center">
-            <i class="bi bi-currency-yen text-warning" style="font-size: 2rem;"></i>
-            <h6 class="text-muted mt-2">待清偿金额</h6>
-            <h2 id="pendingAmount" class="text-warning mb-0">-</h2>
+          <div class="modal-body">
+            <form @submit.prevent="submitClear">
+              <div class="mb-3">
+                <label class="form-label">欠账类型</label>
+                <input type="text" class="form-control" :value="clearForm.debtTypeLabel" readonly>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">待清偿数量</label>
+                <input type="text" class="form-control" :value="clearForm.pendingQty" readonly>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">清偿数量</label>
+                <input type="number" class="form-control" x-model.number="clearForm.amount" :max="clearForm.pendingQty" min="1" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">备注</label>
+                <textarea class="form-control" x-model="clearForm.remark" rows="2"></textarea>
+              </div>
+            </form>
           </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card stat-card">
-          <div class="card-body text-center">
-            <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
-            <h6 class="text-muted mt-2">已清偿总数</h6>
-            <h2 id="clearedCount" class="text-success mb-0">-</h2>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card stat-card">
-          <div class="card-body text-center">
-            <i class="bi bi-percent text-info" style="font-size: 2rem;"></i>
-            <h6 class="text-muted mt-2">清偿率</h6>
-            <h2 id="clearRate" class="text-info mb-0">-</h2>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="button" class="btn btn-success" @click="submitClear" :disabled="submitting">
+              <span x-show="submitting" class="spinner-border spinner-border-sm me-1"></span>
+              确认清偿
+            </button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 图表区域 -->
-    <div class="row g-3 mb-4">
-      <div class="col-md-6">
-        <div class="card">
-          <div class="card-header">
-            <i class="bi bi-pie-chart"></i> 欠账来源分布
-          </div>
-          <div class="card-body">
-            <div id="sourceChart" class="chart-container"></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="card">
-          <div class="card-header">
-            <i class="bi bi-bar-chart"></i> 按活动汇总
-          </div>
-          <div class="card-body">
-            <div id="campaignChart" class="chart-container"></div>
-          </div>
-        </div>
+    <!-- 加载遮罩 -->
+    <div class="loading-overlay" :class="{ show: loading }">
+      <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+        <span class="visually-hidden">加载中...</span>
       </div>
     </div>
 
-    <!-- 选项卡 -->
-    <ul class="nav nav-tabs mb-4" id="debtTabs" role="tablist">
-      <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button">
-          <i class="bi bi-clock-history"></i> 待清偿列表
-        </button>
-      </li>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="by-campaign-tab" data-bs-toggle="tab" data-bs-target="#by-campaign" type="button">
-          <i class="bi bi-trophy"></i> 按活动汇总
-        </button>
-      </li>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="by-prize-tab" data-bs-toggle="tab" data-bs-target="#by-prize" type="button">
-          <i class="bi bi-gift"></i> 按奖品汇总
-        </button>
-      </li>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="limits-tab" data-bs-toggle="tab" data-bs-target="#limits" type="button">
-          <i class="bi bi-shield-exclamation"></i> 上限配置
-        </button>
-      </li>
-    </ul>
-
-    <div class="tab-content" id="debtTabContent">
-      <!-- 待清偿列表 -->
-      <div class="tab-pane fade show active" id="pending" role="tabpanel">
-        <div class="card">
-          <div class="card-body">
-            <div class="table-responsive">
-              <table class="table table-hover">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>类型</th>
-                    <th>活动</th>
-                    <th>奖品</th>
-                    <th>欠账数量</th>
-                    <th>已清偿</th>
-                    <th>责任人</th>
-                    <th>创建时间</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody id="pendingList">
-                  <!-- 动态生成 -->
-                </tbody>
-              </table>
-            </div>
-          </div>
+    <!-- Toast 通知 -->
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+      <div x-ref="successToast" class="toast align-items-center text-white bg-success border-0" role="alert">
+        <div class="d-flex">
+          <div class="toast-body" x-text="toastMessage"></div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
         </div>
       </div>
-
-      <!-- 按活动汇总 -->
-      <div class="tab-pane fade" id="by-campaign" role="tabpanel">
-        <div class="card">
-          <div class="card-body">
-            <div class="table-responsive">
-              <table class="table table-hover">
-                <thead>
-                  <tr>
-                    <th>活动ID</th>
-                    <th>活动名称</th>
-                    <th>欠账记录数</th>
-                    <th>欠账总量</th>
-                    <th>已清偿量</th>
-                    <th>清偿率</th>
-                  </tr>
-                </thead>
-                <tbody id="byCampaignList">
-                  <!-- 动态生成 -->
-                </tbody>
-              </table>
-            </div>
-          </div>
+      <div x-ref="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert">
+        <div class="d-flex">
+          <div class="toast-body" x-text="toastMessage"></div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
         </div>
       </div>
-
-      <!-- 按奖品汇总 -->
-      <div class="tab-pane fade" id="by-prize" role="tabpanel">
-        <div class="card">
-          <div class="card-body">
-            <div class="table-responsive">
-              <table class="table table-hover">
-                <thead>
-                  <tr>
-                    <th>奖品ID</th>
-                    <th>奖品名称</th>
-                    <th>欠账记录数</th>
-                    <th>欠账总量</th>
-                    <th>已清偿量</th>
-                    <th>清偿率</th>
-                  </tr>
-                </thead>
-                <tbody id="byPrizeList">
-                  <!-- 动态生成 -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 上限配置 -->
-      <div class="tab-pane fade" id="limits" role="tabpanel">
-        <div class="card">
-          <div class="card-body">
-            <div class="table-responsive">
-              <table class="table table-hover">
-                <thead>
-                  <tr>
-                    <th>配置ID</th>
-                    <th>级别</th>
-                    <th>关联ID</th>
-                    <th>最大欠账量</th>
-                    <th>当前欠账量</th>
-                    <th>使用率</th>
-                    <th>状态</th>
-                  </tr>
-                </thead>
-                <tbody id="limitsList">
-                  <!-- 动态生成 -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 清偿模态框 -->
-  <div class="modal fade" id="clearModal" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title"><i class="bi bi-check-circle"></i> 清偿操作</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <form id="clearForm">
-            <input type="hidden" id="clearDebtId">
-            <div class="mb-3">
-              <label class="form-label">欠账类型</label>
-              <input type="text" class="form-control" id="clearDebtType" readonly>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">待清偿数量</label>
-              <input type="text" class="form-control" id="clearPendingQty" readonly>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">清偿数量</label>
-              <input type="number" class="form-control" id="clearQuantity" min="1" required>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">备注</label>
-              <textarea class="form-control" id="clearRemark" rows="2"></textarea>
-            </div>
-          </form>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="button" class="btn btn-success" onclick="submitClear()">确认清偿</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="loading-overlay" id="loadingOverlay">
-    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
-      <span class="visually-hidden">加载中...</span>
     </div>
   </div>
 
@@ -279,428 +392,8 @@
   <script src="/admin/js/lib/echarts.min.js"></script>
   <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/api-config.js"></script>
-  <script>
-    let dashboard = {};
-    let pendingDebts = [];
-    let sourceChart, campaignChart;
-
-    document.addEventListener('DOMContentLoaded', function() {
-      const userInfo = getCurrentUser();
-      if (userInfo && userInfo.nickname) {
-        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
-      }
-      document.getElementById('logoutBtn').addEventListener('click', logout);
-      
-      initCharts();
-      loadAllData();
-    });
-
-    function initCharts() {
-      sourceChart = echarts.init(document.getElementById('sourceChart'));
-      campaignChart = echarts.init(document.getElementById('campaignChart'));
-      window.addEventListener('resize', () => {
-        sourceChart.resize();
-        campaignChart.resize();
-      });
-    }
-
-    async function loadAllData() {
-      showLoading();
-      try {
-        await Promise.all([
-          loadDashboard(),
-          loadPendingDebts(),
-          loadByCampaign(),
-          loadByPrize(),
-          loadLimits()
-        ]);
-      } catch (error) {
-        console.error('加载数据失败:', error);
-        showError('加载失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    async function loadDashboard() {
-      const response = await apiRequest(API_ENDPOINTS.DEBT.DASHBOARD);
-      if (response && response.success) {
-        dashboard = response.data;
-        updateDashboard(dashboard);
-        updateCharts(dashboard);
-      }
-    }
-
-    async function loadPendingDebts() {
-      const response = await apiRequest(API_ENDPOINTS.DEBT.PENDING);
-      if (response && response.success) {
-        // 后端返回格式: { debt_type, items: [...], pagination: {...} }
-        pendingDebts = response.data.items || [];
-        renderPendingList(pendingDebts);
-      }
-    }
-
-    async function loadByCampaign() {
-      const response = await apiRequest(API_ENDPOINTS.DEBT.BY_CAMPAIGN);
-      if (response && response.success) {
-        // 后端返回格式: { items: [...], pagination: {...} }
-        renderByCampaignList(response.data.items || []);
-      }
-    }
-
-    async function loadByPrize() {
-      const response = await apiRequest(API_ENDPOINTS.DEBT.BY_PRIZE);
-      if (response && response.success) {
-        // 后端返回格式: { items: [...], pagination: {...} }
-        renderByPrizeList(response.data.items || []);
-      }
-    }
-
-    async function loadLimits() {
-      const response = await apiRequest(API_ENDPOINTS.DEBT.LIMITS);
-      if (response && response.success) {
-        // 后端返回格式: { items: [...], pagination: {...} }
-        renderLimitsList(response.data.items || []);
-      }
-    }
-
-    function updateDashboard(data) {
-      // 后端返回格式: { inventory_debt: {...}, budget_debt: {...}, debt_limit_config_count }
-      const invDebt = data.inventory_debt || {};
-      const budDebt = data.budget_debt || {};
-      
-      // 待清偿总数 = 库存欠账待清偿数 + 预算欠账待清偿数
-      const pendingCount = (invDebt.pending_count || 0) + (budDebt.pending_count || 0);
-      document.getElementById('pendingCount').textContent = pendingCount;
-      
-      // 待清偿金额 = 预算欠账剩余金额 (库存欠账没有金额概念)
-      const pendingAmount = budDebt.remaining_amount || 0;
-      document.getElementById('pendingAmount').textContent = pendingAmount.toLocaleString();
-      
-      // 已清偿总数 = 库存欠账已核销数 + 预算欠账已核销数
-      const clearedCount = (invDebt.written_off_count || 0) + (budDebt.written_off_count || 0);
-      document.getElementById('clearedCount').textContent = clearedCount;
-      
-      // 总数 = 库存欠账总数 + 预算欠账总数
-      const totalCount = (invDebt.total_count || 0) + (budDebt.total_count || 0);
-      const clearRate = totalCount > 0 
-        ? ((clearedCount / totalCount) * 100).toFixed(1) + '%'
-        : '0%';
-      document.getElementById('clearRate').textContent = clearRate;
-    }
-
-    function updateCharts(data) {
-      // 后端返回格式: { inventory_debt: {...}, budget_debt: { by_source: [...], ... } }
-      const invDebt = data.inventory_debt || {};
-      const budDebt = data.budget_debt || {};
-      
-      // 来源分布饼图 - 显示库存欠账数量 vs 预算欠账金额
-      const sourceData = [
-        { name: '库存欠账', value: invDebt.remaining_quantity || 0 },
-        { name: '预算欠账', value: budDebt.remaining_amount || 0 }
-      ];
-      
-      sourceChart.setOption({
-        tooltip: { trigger: 'item' },
-        legend: { bottom: '5%' },
-        series: [{
-          type: 'pie',
-          radius: ['40%', '70%'],
-          data: sourceData,
-          emphasis: {
-            itemStyle: {
-              shadowBlur: 10,
-              shadowOffsetX: 0,
-              shadowColor: 'rgba(0, 0, 0, 0.5)'
-            }
-          }
-        }]
-      });
-
-      // 活动柱状图 - 需要从by-campaign API获取数据，这里先设置空图表
-      // 实际数据由loadByCampaign加载后更新
-      campaignChart.setOption({
-        tooltip: { trigger: 'axis' },
-        xAxis: {
-          type: 'category',
-          data: [],
-          axisLabel: { rotate: 30 }
-        },
-        yAxis: { type: 'value' },
-        series: [{
-          type: 'bar',
-          data: [],
-          itemStyle: { color: '#dc3545' }
-        }]
-      });
-    }
-
-    function renderPendingList(debts) {
-      const tbody = document.getElementById('pendingList');
-      if (debts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">🎉 暂无待清偿欠账</td></tr>';
-        return;
-      }
-
-      // 后端返回格式 (库存欠账): 
-      // { debt_id, campaign_id, prize_id, debt_quantity, cleared_quantity, remaining_quantity, status, ... }
-      // 关联: campaign: { campaign_name }, prize: { prize_name, prize_type }
-      // 后端返回格式 (预算欠账):
-      // { debt_id, campaign_id, user_id, debt_amount, cleared_amount, remaining_amount, status, ... }
-      // 关联: campaign: { campaign_name }, user: { nickname, phone }
-      
-      tbody.innerHTML = debts.map(debt => {
-        // 判断是库存欠账还是预算欠账 (通过字段判断)
-        const isInventory = debt.debt_quantity !== undefined;
-        const debtType = isInventory ? 'inventory' : 'budget';
-        const quantity = isInventory ? debt.debt_quantity : debt.debt_amount;
-        const cleared = isInventory ? debt.cleared_quantity : debt.cleared_amount;
-        const remaining = isInventory ? debt.remaining_quantity : debt.remaining_amount;
-        
-        // 获取关联信息
-        const campaignName = debt.campaign?.campaign_name || '-';
-        const prizeName = isInventory ? (debt.prize?.prize_name || '-') : '-';
-        
-        return `
-          <tr>
-            <td>${debt.debt_id}</td>
-            <td><span class="badge bg-${isInventory ? 'warning' : 'info'}">${isInventory ? '库存' : '预算'}</span></td>
-            <td>${escapeHtml(campaignName)}</td>
-            <td>${escapeHtml(prizeName)}</td>
-            <td class="text-danger fw-bold">${quantity || 0}</td>
-            <td class="text-success">${cleared || 0}</td>
-            <td>${escapeHtml(debt.user?.nickname || '-')}</td>
-            <td>${formatDateTime(debt.created_at)}</td>
-            <td>
-              <button class="btn btn-sm btn-success" onclick="openClearModal(${debt.debt_id}, '${debtType}', ${remaining || 0})">
-                <i class="bi bi-check-circle"></i> 清偿
-              </button>
-            </td>
-          </tr>
-        `;
-      }).join('');
-    }
-
-    function renderByCampaignList(campaigns) {
-      const tbody = document.getElementById('byCampaignList');
-      if (campaigns.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无数据</td></tr>';
-        // 更新图表为空 - 需要完整配置
-        campaignChart.setOption({
-          tooltip: { trigger: 'axis' },
-          xAxis: {
-            type: 'category',
-            data: [],
-            axisLabel: { rotate: 30 }
-          },
-          yAxis: { type: 'value' },
-          series: [{
-            type: 'bar',
-            data: [],
-            itemStyle: { color: '#dc3545' }
-          }]
-        });
-        return;
-      }
-
-      // 后端返回格式: { campaign_id, campaign_name, inventory_debt: {...}, budget_debt: {...} }
-      tbody.innerHTML = campaigns.map(c => {
-        const invDebt = c.inventory_debt || {};
-        const budDebt = c.budget_debt || {};
-        
-        // 欠账记录数 = 库存欠账数 + 预算欠账数
-        const debtCount = (invDebt.count || 0) + (budDebt.count || 0);
-        // 欠账总量 = 库存欠账剩余量 + 预算欠账剩余额
-        const debtTotal = (invDebt.remaining_quantity || 0) + (budDebt.remaining_amount || 0);
-        // 已清偿量
-        const clearedTotal = (invDebt.cleared_quantity || 0) + (budDebt.cleared_amount || 0);
-        // 清偿率
-        const totalDebt = (invDebt.total_quantity || 0) + (budDebt.total_amount || 0);
-        const clearRate = totalDebt > 0 ? ((clearedTotal / totalDebt) * 100).toFixed(1) : 0;
-        
-        return `
-          <tr>
-            <td>${c.campaign_id}</td>
-            <td>${escapeHtml(c.campaign_name || '-')}</td>
-            <td>${debtCount}</td>
-            <td class="text-danger">${debtTotal}</td>
-            <td class="text-success">${clearedTotal}</td>
-            <td>
-              <div class="progress" style="height: 20px;">
-                <div class="progress-bar bg-success" style="width: ${clearRate}%">${clearRate}%</div>
-              </div>
-            </td>
-          </tr>
-        `;
-      }).join('');
-
-      // 更新活动柱状图 - 需要完整配置
-      campaignChart.setOption({
-        tooltip: { trigger: 'axis' },
-        xAxis: {
-          type: 'category',
-          data: campaigns.map(c => c.campaign_name || `活动${c.campaign_id}`),
-          axisLabel: { rotate: 30 }
-        },
-        yAxis: { type: 'value' },
-        series: [{
-          type: 'bar',
-          data: campaigns.map(c => {
-            const invDebt = c.inventory_debt || {};
-            const budDebt = c.budget_debt || {};
-            return (invDebt.remaining_quantity || 0) + (budDebt.remaining_amount || 0);
-          }),
-          itemStyle: { color: '#dc3545' }
-        }]
-      });
-    }
-
-    function renderByPrizeList(prizes) {
-      const tbody = document.getElementById('byPrizeList');
-      if (prizes.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无数据</td></tr>';
-        return;
-      }
-
-      // 后端返回格式: { prize_id, prize_name, debt_count, total_quantity, cleared_quantity, remaining_quantity }
-      tbody.innerHTML = prizes.map(p => {
-        const clearRate = p.total_quantity > 0 
-          ? ((p.cleared_quantity / p.total_quantity) * 100).toFixed(1) 
-          : 0;
-        return `
-          <tr>
-            <td>${p.prize_id}</td>
-            <td>${escapeHtml(p.prize_name || '-')}</td>
-            <td>${p.debt_count || 0}</td>
-            <td class="text-danger">${p.remaining_quantity || 0}</td>
-            <td class="text-success">${p.cleared_quantity || 0}</td>
-            <td>
-              <div class="progress" style="height: 20px;">
-                <div class="progress-bar bg-success" style="width: ${clearRate}%">${clearRate}%</div>
-              </div>
-            </td>
-          </tr>
-        `;
-      }).join('');
-    }
-
-    function renderLimitsList(limits) {
-      const tbody = document.getElementById('limitsList');
-      if (limits.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">暂无上限配置</td></tr>';
-        return;
-      }
-
-      // 后端返回格式: { limit_id, limit_level, limit_level_name, reference_id, 
-      //                inventory_debt_limit, budget_debt_limit, status, description }
-      tbody.innerHTML = limits.map(l => {
-        // 总上限 = 库存上限 + 预算上限
-        const maxDebt = (l.inventory_debt_limit || 0) + (l.budget_debt_limit || 0);
-        // 当前使用量需要从其他API获取，这里暂时显示上限配置
-        const usage = 0; // TODO: 需要获取当前欠账数据来计算
-        const statusClass = l.status === 'active' ? 'success' : 'secondary';
-        
-        return `
-          <tr>
-            <td>${l.limit_id}</td>
-            <td><span class="badge bg-secondary">${l.limit_level_name || l.limit_level || 'global'}</span></td>
-            <td>${l.reference_id || '-'}${l.campaign_name ? ` (${escapeHtml(l.campaign_name)})` : ''}</td>
-            <td>
-              <small class="text-muted">库存:</small> ${l.inventory_debt_limit || 0}<br>
-              <small class="text-muted">预算:</small> ${l.budget_debt_limit || 0}
-            </td>
-            <td>-</td>
-            <td>
-              <div class="progress" style="height: 20px;">
-                <div class="progress-bar bg-info" style="width: 0%">-</div>
-              </div>
-            </td>
-            <td>
-              <span class="badge bg-${statusClass}">
-                ${l.status === 'active' ? '启用' : '禁用'}
-              </span>
-            </td>
-          </tr>
-        `;
-      }).join('');
-    }
-
-    function openClearModal(debtId, debtType, pendingQty) {
-      document.getElementById('clearDebtId').value = debtId;
-      // 保存原始类型用于提交
-      document.getElementById('clearDebtType').value = debtType === 'inventory' ? '库存欠账' : '预算欠账';
-      document.getElementById('clearDebtType').dataset.type = debtType;
-      document.getElementById('clearPendingQty').value = pendingQty;
-      document.getElementById('clearQuantity').value = '';
-      document.getElementById('clearQuantity').max = pendingQty;
-      document.getElementById('clearRemark').value = '';
-      new bootstrap.Modal(document.getElementById('clearModal')).show();
-    }
-
-    async function submitClear() {
-      const debtId = document.getElementById('clearDebtId').value;
-      const debtTypeEl = document.getElementById('clearDebtType');
-      const debtType = debtTypeEl.dataset.type || (debtTypeEl.value === '库存欠账' ? 'inventory' : 'budget');
-      const amount = parseInt(document.getElementById('clearQuantity').value);
-      const remark = document.getElementById('clearRemark').value;
-
-      if (!amount || amount <= 0) {
-        alert('请输入有效的清偿数量');
-        return;
-      }
-
-      showLoading();
-      try {
-        // 后端API期望: { debt_type, debt_id, amount, remark }
-        const response = await apiRequest(API_ENDPOINTS.DEBT.CLEAR, {
-          method: 'POST',
-          body: JSON.stringify({
-            debt_type: debtType,
-            debt_id: parseInt(debtId),
-            amount: amount,
-            remark: remark
-          })
-        });
-
-        if (response && response.success) {
-          bootstrap.Modal.getInstance(document.getElementById('clearModal')).hide();
-          alert('✅ 清偿成功');
-          loadAllData();
-        } else {
-          showError('清偿失败', response?.message || '操作失败');
-        }
-      } catch (error) {
-        console.error('清偿失败:', error);
-        showError('清偿失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    function formatDateTime(dateStr) {
-      if (!dateStr) return '-';
-      return new Date(dateStr).toLocaleString('zh-CN');
-    }
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
-    }
-
-    function showLoading() {
-      document.getElementById('loadingOverlay').classList.add('show');
-    }
-
-    function hideLoading() {
-      document.getElementById('loadingOverlay').classList.remove('show');
-    }
-
-    function showError(title, message) {
-      alert(`❌ ${title}\n${message}`);
-    }
-  </script>
+  <script src="/admin/js/pages/debt-management.js"></script>
+  
+  <!-- Alpine.js -->
 </body>
 </html>
-

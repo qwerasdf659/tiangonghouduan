@@ -34,16 +34,23 @@
       height: 300px;
     }
   </style>
+
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
+  <!-- Alpine.js -->
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
 </head>
-<body class="bg-light">
+<body class="bg-light" x-data="campaignsPage()" x-cloak>
   <nav class="navbar navbar-dark bg-primary">
     <div class="container-fluid">
       <a href="/admin/dashboard.html" class="navbar-brand">
         <i class="bi bi-arrow-left me-2"></i>🎰 管理后台 - 抽奖活动管理
       </a>
       <div>
-        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+        <span class="text-light me-3" x-text="'欢迎，' + (userInfo.nickname || '管理员')">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" @click="logout">退出登录</button>
       </div>
     </div>
   </nav>
@@ -56,7 +63,7 @@
           <div class="card-body text-center">
             <i class="bi bi-trophy text-primary" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">活动总数</h6>
-            <h2 id="totalCampaigns" class="text-primary mb-0">-</h2>
+            <h2 class="text-primary mb-0" x-text="stats.totalCampaigns">-</h2>
           </div>
         </div>
       </div>
@@ -65,7 +72,7 @@
           <div class="card-body text-center">
             <i class="bi bi-play-circle text-success" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">进行中</h6>
-            <h2 id="activeCampaigns" class="text-success mb-0">-</h2>
+            <h2 class="text-success mb-0" x-text="stats.activeCampaigns">-</h2>
           </div>
         </div>
       </div>
@@ -74,7 +81,7 @@
           <div class="card-body text-center">
             <i class="bi bi-gift text-warning" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">奖品总数</h6>
-            <h2 id="totalPrizes" class="text-warning mb-0">-</h2>
+            <h2 class="text-warning mb-0" x-text="stats.totalPrizes">-</h2>
           </div>
         </div>
       </div>
@@ -83,7 +90,7 @@
           <div class="card-body text-center">
             <i class="bi bi-currency-yen text-danger" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">预算消耗</h6>
-            <h2 id="budgetUsed" class="text-danger mb-0">-</h2>
+            <h2 class="text-danger mb-0" x-text="formatNumber(stats.budgetUsed)">-</h2>
           </div>
         </div>
       </div>
@@ -95,7 +102,7 @@
         <div class="row g-3 align-items-center">
           <div class="col-md-3">
             <label class="form-label">活动状态</label>
-            <select class="form-select" id="statusFilter">
+            <select class="form-select" x-model="filters.status">
               <option value="">全部状态</option>
               <option value="active">进行中</option>
               <option value="paused">已暂停</option>
@@ -104,7 +111,7 @@
           </div>
           <div class="col-md-3">
             <label class="form-label">预算模式</label>
-            <select class="form-select" id="budgetModeFilter">
+            <select class="form-select" x-model="filters.budgetMode">
               <option value="">全部模式</option>
               <option value="user">用户预算</option>
               <option value="pool">奖池预算</option>
@@ -113,10 +120,10 @@
           </div>
           <div class="col-md-4">
             <label class="form-label">搜索</label>
-            <input type="text" class="form-control" id="searchInput" placeholder="搜索活动名称...">
+            <input type="text" class="form-control" x-model="filters.search" placeholder="搜索活动名称..." @keyup.enter="loadCampaigns">
           </div>
           <div class="col-md-2 d-flex align-items-end">
-            <button class="btn btn-primary w-100" id="searchBtn">
+            <button class="btn btn-primary w-100" @click="loadCampaigns">
               <i class="bi bi-search"></i> 搜索
             </button>
           </div>
@@ -125,12 +132,51 @@
     </div>
 
     <!-- 活动列表 -->
-    <div class="row" id="campaignList">
-      <!-- 活动卡片将通过JS动态生成 -->
+    <div class="row" x-show="campaigns.length > 0">
+      <template x-for="campaign in campaigns" :key="campaign.campaign_id">
+        <div class="col-md-6 col-lg-4 mb-4">
+          <div class="card campaign-card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h6 class="mb-0" x-text="campaign.campaign_name || '未命名活动'"></h6>
+              <span class="badge" 
+                    :class="'status-' + (campaign.status || 'ended')"
+                    x-text="getStatusText(campaign.status)"></span>
+            </div>
+            <div class="card-body">
+              <p class="text-muted small mb-2">
+                <i class="bi bi-calendar-event"></i> 
+                <span x-text="formatDate(campaign.start_time)"></span> ~ <span x-text="formatDate(campaign.end_time)"></span>
+              </p>
+              <p class="mb-2">
+                <i class="bi bi-wallet2 text-success"></i> 
+                预算模式: <strong x-text="getBudgetModeText(campaign.budget_mode)"></strong>
+              </p>
+              <div class="mb-2">
+                <small class="text-muted">预算使用进度</small>
+                <div class="progress budget-progress">
+                  <div class="progress-bar" 
+                       :class="getBudgetProgressColor(campaign)"
+                       :style="'width: ' + calculateBudgetProgress(campaign) + '%'"></div>
+                </div>
+                <small class="text-muted" x-text="calculateBudgetProgress(campaign).toFixed(1) + '%'"></small>
+              </div>
+              <p class="mb-0">
+                <i class="bi bi-gift text-warning"></i> 
+                奖品数量: <strong x-text="campaign.prizes ? campaign.prizes.length : 0"></strong>
+              </p>
+            </div>
+            <div class="card-footer bg-white">
+              <button class="btn btn-sm btn-outline-primary" @click="viewCampaignDetail(campaign.campaign_id)">
+                <i class="bi bi-eye"></i> 查看详情
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
     </div>
 
     <!-- 空状态 -->
-    <div class="card d-none" id="emptyState">
+    <div class="card" x-show="!loading && campaigns.length === 0">
       <div class="card-body text-center py-5">
         <i class="bi bi-inbox text-muted" style="font-size: 4rem;"></i>
         <h5 class="text-muted mt-3">暂无抽奖活动</h5>
@@ -140,7 +186,7 @@
   </div>
 
   <!-- 活动详情模态框 -->
-  <div class="modal fade" id="campaignDetailModal" tabindex="-1">
+  <div class="modal fade" id="campaignDetailModal" tabindex="-1" x-ref="detailModal">
     <div class="modal-dialog modal-xl">
       <div class="modal-content">
         <div class="modal-header">
@@ -155,8 +201,17 @@
                 <div class="card-header bg-primary text-white">
                   <i class="bi bi-info-square"></i> 基本信息
                 </div>
-                <div class="card-body" id="basicInfo">
-                  <!-- 动态填充 -->
+                <div class="card-body">
+                  <table class="table table-sm">
+                    <tr><th style="width:40%">活动ID</th><td x-text="selectedCampaign?.campaign_id || '-'"></td></tr>
+                    <tr><th>活动名称</th><td x-text="selectedCampaign?.campaign_name || '-'"></td></tr>
+                    <tr><th>活动代码</th><td x-text="selectedCampaign?.campaign_code || '-'"></td></tr>
+                    <tr><th>活动类型</th><td x-text="selectedCampaign?.campaign_type || '-'"></td></tr>
+                    <tr><th>活动状态</th><td><span class="badge" :class="'status-' + (selectedCampaign?.status || 'ended')" x-text="getStatusText(selectedCampaign?.status)"></span></td></tr>
+                    <tr><th>开始时间</th><td x-text="formatDateTime(selectedCampaign?.start_time)"></td></tr>
+                    <tr><th>结束时间</th><td x-text="formatDateTime(selectedCampaign?.end_time)"></td></tr>
+                    <tr><th>创建时间</th><td x-text="formatDateTime(selectedCampaign?.createdAt)"></td></tr>
+                  </table>
                 </div>
               </div>
             </div>
@@ -166,8 +221,16 @@
                 <div class="card-header bg-success text-white">
                   <i class="bi bi-wallet2"></i> 预算配置
                 </div>
-                <div class="card-body" id="budgetInfo">
-                  <!-- 动态填充 -->
+                <div class="card-body">
+                  <table class="table table-sm">
+                    <tr><th style="width:40%">预算模式</th><td x-text="getBudgetModeText(selectedCampaign?.budget_mode)"></td></tr>
+                    <tr><th>奖池总预算</th><td x-text="formatNumber(selectedCampaign?.pool_budget_total || 0)"></td></tr>
+                    <tr><th>奖池剩余预算</th><td x-text="formatNumber(selectedCampaign?.pool_budget_remaining || 0)"></td></tr>
+                    <tr><th>奖池已用预算</th><td x-text="formatNumber((selectedCampaign?.pool_budget_total || 0) - (selectedCampaign?.pool_budget_remaining || 0))"></td></tr>
+                    <tr><th>总参与人数</th><td x-text="formatNumber(selectedCampaign?.total_participants || 0)"></td></tr>
+                    <tr><th>总抽奖次数</th><td x-text="formatNumber(selectedCampaign?.total_draws || 0)"></td></tr>
+                    <tr><th>总中奖次数</th><td x-text="formatNumber(selectedCampaign?.total_prizes_awarded || 0)"></td></tr>
+                  </table>
                 </div>
               </div>
             </div>
@@ -179,7 +242,7 @@
             </div>
             <div class="card-body">
               <div class="table-responsive">
-                <table class="table table-hover" id="prizeTable">
+                <table class="table table-hover">
                   <thead>
                     <tr>
                       <th>奖品名称</th>
@@ -189,8 +252,19 @@
                       <th>已发放</th>
                     </tr>
                   </thead>
-                  <tbody id="prizeList">
-                    <!-- 动态填充 -->
+                  <tbody>
+                    <template x-if="!selectedCampaign?.prizes || selectedCampaign.prizes.length === 0">
+                      <tr><td colspan="5" class="text-center text-muted">暂无奖品</td></tr>
+                    </template>
+                    <template x-for="prize in (selectedCampaign?.prizes || [])" :key="prize.prize_id">
+                      <tr>
+                        <td x-text="prize.prize_name || '-'"></td>
+                        <td><span class="badge bg-secondary" x-text="prize.reward_tier || prize.prize_type || '-'"></span></td>
+                        <td x-text="((prize.win_probability || 0) * 100).toFixed(2) + '%'"></td>
+                        <td x-text="prize.stock_quantity || 0"></td>
+                        <td x-text="prize.total_win_count || 0"></td>
+                      </tr>
+                    </template>
                   </tbody>
                 </table>
               </div>
@@ -204,7 +278,7 @@
     </div>
   </div>
 
-  <div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-overlay" :class="{ 'show': loading }">
     <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
       <span class="visually-hidden">加载中...</span>
     </div>
@@ -214,261 +288,10 @@
   <script src="/admin/js/lib/echarts.min.js"></script>
   <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/api-config.js"></script>
-  <script>
-    let campaigns = [];
-
-    document.addEventListener('DOMContentLoaded', function() {
-      const userInfo = getCurrentUser();
-      if (userInfo && userInfo.nickname) {
-        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
-      }
-      document.getElementById('logoutBtn').addEventListener('click', logout);
-      document.getElementById('searchBtn').addEventListener('click', loadCampaigns);
-      loadCampaigns();
-    });
-
-    async function loadCampaigns() {
-      showLoading();
-      try {
-        const status = document.getElementById('statusFilter').value;
-        const budgetMode = document.getElementById('budgetModeFilter').value;
-        const search = document.getElementById('searchInput').value;
-
-        const params = {};
-        if (status) params.status = status;
-        if (budgetMode) params.budget_mode = budgetMode;
-        if (search) params.search = search;
-
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.CAMPAIGN.LIST, {}), {
-          method: 'GET',
-          queryParams: params
-        });
-
-        if (response && response.success) {
-          campaigns = response.data.campaigns || response.data || [];
-          renderCampaigns(campaigns);
-          updateStats(campaigns);
-        } else {
-          showError('加载失败', response?.message || '获取活动列表失败');
-        }
-      } catch (error) {
-        console.error('加载活动失败:', error);
-        showError('加载失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    function renderCampaigns(campaigns) {
-      const container = document.getElementById('campaignList');
-      const emptyState = document.getElementById('emptyState');
-
-      if (!campaigns || campaigns.length === 0) {
-        container.innerHTML = '';
-        emptyState.classList.remove('d-none');
-        return;
-      }
-
-      emptyState.classList.add('d-none');
-
-      container.innerHTML = campaigns.map(campaign => `
-        <div class="col-md-6 col-lg-4 mb-4">
-          <div class="card campaign-card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-              <h6 class="mb-0">${escapeHtml(campaign.campaign_name || '未命名活动')}</h6>
-              <span class="badge status-${campaign.status || 'ended'}">${getStatusText(campaign.status)}</span>
-            </div>
-            <div class="card-body">
-              <p class="text-muted small mb-2">
-                <i class="bi bi-calendar-event"></i> 
-                ${formatDate(campaign.start_time)} ~ ${formatDate(campaign.end_time)}
-              </p>
-              <p class="mb-2">
-                <i class="bi bi-wallet2 text-success"></i> 
-                预算模式: <strong>${getBudgetModeText(campaign.budget_mode)}</strong>
-              </p>
-              <div class="mb-2">
-                <small class="text-muted">预算使用进度</small>
-                <div class="progress budget-progress">
-                  <div class="progress-bar ${getBudgetProgressColor(campaign)}" 
-                       style="width: ${calculateBudgetProgress(campaign)}%"></div>
-                </div>
-                <small class="text-muted">${calculateBudgetProgress(campaign).toFixed(1)}%</small>
-              </div>
-              <p class="mb-0">
-                <i class="bi bi-gift text-warning"></i> 
-                奖品数量: <strong>${campaign.prizes ? campaign.prizes.length : 0}</strong>
-              </p>
-            </div>
-            <div class="card-footer bg-white">
-              <button class="btn btn-sm btn-outline-primary btn-view-detail" data-campaign-id="${campaign.campaign_id}">
-                <i class="bi bi-eye"></i> 查看详情
-              </button>
-            </div>
-          </div>
-        </div>
-      `).join('');
-
-      // 绑定查看详情按钮事件（避免CSP内联脚本限制）
-      container.querySelectorAll('.btn-view-detail').forEach(btn => {
-        btn.addEventListener('click', function() {
-          const campaignId = this.getAttribute('data-campaign-id');
-          viewCampaignDetail(parseInt(campaignId));
-        });
-      });
-    }
-
-    function updateStats(campaigns) {
-      document.getElementById('totalCampaigns').textContent = campaigns.length;
-      document.getElementById('activeCampaigns').textContent = 
-        campaigns.filter(c => c.status === 'active').length;
-      
-      // 使用后端字段：通过prizes关联数组计算奖品数量
-      const totalPrizes = campaigns.reduce((sum, c) => sum + (c.prizes ? c.prizes.length : 0), 0);
-      document.getElementById('totalPrizes').textContent = totalPrizes;
-      
-      // 使用后端字段：pool_budget_total - pool_budget_remaining = 已使用预算
-      const budgetUsed = campaigns.reduce((sum, c) => {
-        const total = Number(c.pool_budget_total) || 0;
-        const remaining = Number(c.pool_budget_remaining) || 0;
-        return sum + (total - remaining);
-      }, 0);
-      document.getElementById('budgetUsed').textContent = budgetUsed.toLocaleString();
-    }
-
-    async function viewCampaignDetail(campaignId) {
-      showLoading();
-      try {
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.CAMPAIGN.DETAIL, { campaign_id: campaignId }));
-
-        if (response && response.success) {
-          const campaign = response.data;
-          renderCampaignDetail(campaign);
-          new bootstrap.Modal(document.getElementById('campaignDetailModal')).show();
-        } else {
-          showError('加载失败', response?.message || '获取活动详情失败');
-        }
-      } catch (error) {
-        console.error('加载活动详情失败:', error);
-        showError('加载失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    function renderCampaignDetail(campaign) {
-      // 计算预算使用情况
-      const poolTotal = Number(campaign.pool_budget_total) || 0;
-      const poolRemaining = Number(campaign.pool_budget_remaining) || 0;
-      const poolUsed = poolTotal - poolRemaining;
-
-      // 基本信息 - 使用后端字段campaign_name
-      document.getElementById('basicInfo').innerHTML = `
-        <table class="table table-sm">
-          <tr><th style="width:40%">活动ID</th><td>${campaign.campaign_id}</td></tr>
-          <tr><th>活动名称</th><td>${escapeHtml(campaign.campaign_name || '-')}</td></tr>
-          <tr><th>活动代码</th><td>${escapeHtml(campaign.campaign_code || '-')}</td></tr>
-          <tr><th>活动类型</th><td>${campaign.campaign_type || '-'}</td></tr>
-          <tr><th>活动状态</th><td><span class="badge status-${campaign.status}">${getStatusText(campaign.status)}</span></td></tr>
-          <tr><th>开始时间</th><td>${formatDateTime(campaign.start_time)}</td></tr>
-          <tr><th>结束时间</th><td>${formatDateTime(campaign.end_time)}</td></tr>
-          <tr><th>创建时间</th><td>${formatDateTime(campaign.createdAt)}</td></tr>
-        </table>
-      `;
-
-      // 预算配置 - 使用后端字段pool_budget_total/pool_budget_remaining
-      document.getElementById('budgetInfo').innerHTML = `
-        <table class="table table-sm">
-          <tr><th style="width:40%">预算模式</th><td>${getBudgetModeText(campaign.budget_mode)}</td></tr>
-          <tr><th>奖池总预算</th><td>${poolTotal.toLocaleString()}</td></tr>
-          <tr><th>奖池剩余预算</th><td>${poolRemaining.toLocaleString()}</td></tr>
-          <tr><th>奖池已用预算</th><td>${poolUsed.toLocaleString()}</td></tr>
-          <tr><th>总参与人数</th><td>${(campaign.total_participants || 0).toLocaleString()}</td></tr>
-          <tr><th>总抽奖次数</th><td>${(campaign.total_draws || 0).toLocaleString()}</td></tr>
-          <tr><th>总中奖次数</th><td>${(campaign.total_prizes_awarded || 0).toLocaleString()}</td></tr>
-        </table>
-      `;
-
-      // 奖品列表 - 使用后端字段prize_name/win_probability/stock_quantity/total_win_count
-      const prizes = campaign.prizes || [];
-      document.getElementById('prizeList').innerHTML = prizes.length > 0 
-        ? prizes.map(prize => `
-            <tr>
-              <td>${escapeHtml(prize.prize_name || '-')}</td>
-              <td><span class="badge bg-secondary">${prize.reward_tier || prize.prize_type || '-'}</span></td>
-              <td>${((prize.win_probability || 0) * 100).toFixed(2)}%</td>
-              <td>${prize.stock_quantity || 0}</td>
-              <td>${prize.total_win_count || 0}</td>
-            </tr>
-          `).join('')
-        : '<tr><td colspan="5" class="text-center text-muted">暂无奖品</td></tr>';
-    }
-
-    function getStatusText(status) {
-      const statusMap = {
-        'active': '进行中',
-        'paused': '已暂停',
-        'ended': '已结束',
-        'pending': '待开始'
-      };
-      return statusMap[status] || '未知';
-    }
-
-    function getBudgetModeText(mode) {
-      // 使用后端数据库字段值：user/pool/none
-      const modeMap = {
-        'user': '用户预算',
-        'pool': '奖池预算',
-        'none': '无限制'
-      };
-      return modeMap[mode] || '未知';
-    }
-
-    function calculateBudgetProgress(campaign) {
-      // 使用后端字段：pool_budget_total 和 pool_budget_remaining
-      const totalBudget = Number(campaign.pool_budget_total) || 0;
-      const remainingBudget = Number(campaign.pool_budget_remaining) || 0;
-      const usedBudget = totalBudget - remainingBudget;
-      if (totalBudget === 0) return 0;
-      return Math.min(100, (usedBudget / totalBudget) * 100);
-    }
-
-    function getBudgetProgressColor(campaign) {
-      const progress = calculateBudgetProgress(campaign);
-      if (progress >= 90) return 'bg-danger';
-      if (progress >= 70) return 'bg-warning';
-      return 'bg-success';
-    }
-
-    function formatDate(dateStr) {
-      if (!dateStr) return '-';
-      return new Date(dateStr).toLocaleDateString('zh-CN');
-    }
-
-    function formatDateTime(dateStr) {
-      if (!dateStr) return '-';
-      return new Date(dateStr).toLocaleString('zh-CN');
-    }
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
-    }
-
-    function showLoading() {
-      document.getElementById('loadingOverlay').classList.add('show');
-    }
-
-    function hideLoading() {
-      document.getElementById('loadingOverlay').classList.remove('show');
-    }
-
-    function showError(title, message) {
-      alert(`❌ ${title}\n${message}`);
-    }
-  </script>
+  <script src="/admin/js/pages/campaigns.js"></script>
+  
+  <!-- Alpine.js -->
+  
+  <!-- Alpine.js -->
 </body>
 </html>
-

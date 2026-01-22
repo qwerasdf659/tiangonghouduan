@@ -30,16 +30,25 @@
       border-radius: 8px;
     }
   </style>
+
+  <!-- Alpine.js -->
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
 </head>
-<body class="bg-light">
+<body class="bg-light" x-data="rolesPage()" x-cloak>
+  <!-- 顶部导航 -->
   <nav class="navbar navbar-dark bg-primary">
     <div class="container-fluid">
       <a href="/admin/dashboard.html" class="navbar-brand">
         <i class="bi bi-arrow-left me-2"></i>🛡️ 管理后台 - 角色管理
       </a>
       <div>
-        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+        <span class="text-light me-3" x-text="userInfo ? `欢迎，${userInfo.nickname}` : '欢迎，管理员'"></span>
+        <button class="btn btn-outline-light btn-sm" @click="logout()">退出登录</button>
       </div>
     </div>
   </nav>
@@ -53,7 +62,7 @@
           <strong>角色管理说明</strong>
           <p class="mb-0 small text-muted">
             系统角色由数据库预设，此页面仅展示角色列表。如需修改用户角色，请前往 
-            <a href="/admin/user-management.html" class="text-decoration-none">用户管理</a> 页面操作。
+            <a href="/admin/users.html" class="text-decoration-none">用户管理</a> 页面操作。
           </p>
         </div>
       </div>
@@ -66,7 +75,7 @@
           <div class="card-body text-center">
             <i class="bi bi-shield-check text-primary" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">角色总数</h6>
-            <h2 id="totalRoles" class="text-primary mb-0">-</h2>
+            <h2 class="text-primary mb-0" x-text="statistics.totalRoles"></h2>
           </div>
         </div>
       </div>
@@ -75,7 +84,7 @@
           <div class="card-body text-center">
             <i class="bi bi-award text-success" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">最高权限级别</h6>
-            <h2 id="maxRoleLevel" class="text-success mb-0">-</h2>
+            <h2 class="text-success mb-0" x-text="statistics.maxRoleLevel"></h2>
           </div>
         </div>
       </div>
@@ -84,7 +93,7 @@
           <div class="card-body text-center">
             <i class="bi bi-people text-warning" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">角色类型</h6>
-            <h2 id="roleTypes" class="text-warning mb-0">-</h2>
+            <h2 class="text-warning mb-0" x-text="statistics.roleTypes"></h2>
           </div>
         </div>
       </div>
@@ -94,202 +103,93 @@
     <div class="card mb-4">
       <div class="card-body d-flex justify-content-between align-items-center">
         <div>
-          <input type="text" class="form-control" id="searchInput" placeholder="搜索角色名称..." style="width: 300px;">
+          <input 
+            type="text" 
+            class="form-control" 
+            placeholder="搜索角色名称..." 
+            style="width: 300px;"
+            x-model="searchKeyword"
+            @input="filterRoles()"
+          >
         </div>
         <div class="text-muted small">
-          <i class="bi bi-clock-history"></i> 数据加载时间：<span id="loadTime">-</span>
+          <i class="bi bi-clock-history"></i> 数据加载时间：<span x-text="loadTime"></span>
         </div>
       </div>
     </div>
 
+    <!-- 加载状态 -->
+    <template x-if="loading">
+      <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">加载中...</span>
+        </div>
+        <p class="mt-2 text-muted">正在加载角色数据...</p>
+      </div>
+    </template>
+
     <!-- 角色列表 -->
-    <div class="row" id="roleList">
-      <!-- 动态生成 -->
-    </div>
-  </div>
-
-  <div class="loading-overlay" id="loadingOverlay">
-    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
-      <span class="visually-hidden">加载中...</span>
-    </div>
-  </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="/admin/js/admin-common.js"></script>
-  <script src="/admin/js/api-config.js"></script>
-  <script>
-    let roles = [];
-
-    document.addEventListener('DOMContentLoaded', function() {
-      const userInfo = getCurrentUser();
-      if (userInfo && userInfo.nickname) {
-        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
-      }
-      document.getElementById('logoutBtn').addEventListener('click', logout);
-      document.getElementById('searchInput').addEventListener('input', filterRoles);
-      
-      loadRoles();
-    });
-
-    /**
-     * 加载角色列表
-     * API: GET /api/v4/console/user-management/roles
-     * 后端返回格式: { roles: [{ id, role_uuid, role_name, role_level, description }] }
-     */
-    async function loadRoles() {
-      showLoading();
-      const startTime = Date.now();
-      
-      try {
-        const response = await apiRequest(API_ENDPOINTS.ROLE.LIST);
-        
-        if (response && response.success) {
-          // 后端返回格式: { roles: [...] }
-          roles = response.data.roles || response.data || [];
-          renderRoles(roles);
-          updateStats(roles);
-          
-          // 显示加载时间
-          const loadTime = Date.now() - startTime;
-          document.getElementById('loadTime').textContent = `${loadTime}ms`;
-        } else {
-          showError('加载失败', response?.message || '获取角色列表失败');
-        }
-      } catch (error) {
-        console.error('加载角色失败:', error);
-        showError('加载失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    /**
-     * 渲染角色列表
-     * 使用后端返回的字段名：role_name, role_level, description
-     */
-    function renderRoles(roleList) {
-      const container = document.getElementById('roleList');
-
-      if (!roleList || roleList.length === 0) {
-        container.innerHTML = `
-          <div class="col-12">
-            <div class="card">
-              <div class="card-body text-center py-5 text-muted">
-                <i class="bi bi-shield" style="font-size: 3rem;"></i>
-                <p class="mt-2">暂无角色数据</p>
-              </div>
+    <div class="row" x-show="!loading">
+      <!-- 空状态 -->
+      <template x-if="filteredRoles.length === 0 && !loading">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-body text-center py-5 text-muted">
+              <i class="bi bi-shield" style="font-size: 3rem;"></i>
+              <p class="mt-2">暂无角色数据</p>
             </div>
           </div>
-        `;
-        return;
-      }
+        </div>
+      </template>
 
-      container.innerHTML = roleList.map(role => `
+      <!-- 角色卡片 -->
+      <template x-for="role in filteredRoles" :key="role.id">
         <div class="col-md-6 col-lg-4 mb-4">
           <div class="card role-card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
               <h6 class="mb-0">
                 <i class="bi bi-shield-check text-primary"></i>
-                ${escapeHtml(role.role_name)}
+                <span x-text="role.role_name"></span>
               </h6>
-              <span class="role-level-badge ${getRoleLevelClass(role.role_level)}">
-                级别 ${role.role_level || 0}
-              </span>
+              <span 
+                class="role-level-badge"
+                :class="getRoleLevelClass(role.role_level)"
+                x-text="'级别 ' + (role.role_level || 0)"
+              ></span>
             </div>
             <div class="card-body">
               <p class="text-muted small mb-2">
-                <i class="bi bi-fingerprint"></i> UUID：<code class="small">${escapeHtml(role.role_uuid || '-')}</code>
+                <i class="bi bi-fingerprint"></i> UUID：<code class="small" x-text="role.role_uuid || '-'"></code>
               </p>
               <p class="text-muted small mb-2">
-                <i class="bi bi-hash"></i> ID：${role.id || '-'}
+                <i class="bi bi-hash"></i> ID：<span x-text="role.id || '-'"></span>
               </p>
               <p class="text-muted small mb-0">
-                <i class="bi bi-card-text"></i> ${escapeHtml(role.description || '暂无描述')}
+                <i class="bi bi-card-text"></i> <span x-text="role.description || '暂无描述'"></span>
               </p>
             </div>
             <div class="card-footer bg-white text-muted small">
               <i class="bi bi-info-circle"></i> 
-              ${getRoleLevelDescription(role.role_level)}
+              <span x-text="getRoleLevelDescription(role.role_level)"></span>
             </div>
           </div>
         </div>
-      `).join('');
-    }
+      </template>
+    </div>
+  </div>
 
-    /**
-     * 获取角色级别的CSS类
-     */
-    function getRoleLevelClass(level) {
-      if (level >= 80) return 'role-level-high';
-      if (level >= 40) return 'role-level-medium';
-      return 'role-level-low';
-    }
+  <!-- 全局加载遮罩 -->
+  <div class="loading-overlay" x-show="globalLoading" x-cloak>
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">加载中...</span>
+    </div>
+  </div>
 
-    /**
-     * 获取角色级别描述
-     */
-    function getRoleLevelDescription(level) {
-      if (level >= 100) return '超级管理员权限';
-      if (level >= 80) return '高级管理权限';
-      if (level >= 60) return '业务管理权限';
-      if (level >= 40) return '运营操作权限';
-      if (level >= 20) return '基础操作权限';
-      return '普通用户权限';
-    }
-
-    /**
-     * 更新统计信息
-     */
-    function updateStats(roleList) {
-      // 角色总数
-      document.getElementById('totalRoles').textContent = roleList.length;
-      
-      // 最高权限级别
-      const maxLevel = roleList.length > 0 
-        ? Math.max(...roleList.map(r => r.role_level || 0))
-        : 0;
-      document.getElementById('maxRoleLevel').textContent = maxLevel;
-      
-      // 角色类型统计（按级别分类）
-      const highLevel = roleList.filter(r => (r.role_level || 0) >= 80).length;
-      const midLevel = roleList.filter(r => (r.role_level || 0) >= 40 && (r.role_level || 0) < 80).length;
-      const lowLevel = roleList.filter(r => (r.role_level || 0) < 40).length;
-      document.getElementById('roleTypes').textContent = `${highLevel}高/${midLevel}中/${lowLevel}低`;
-    }
-
-    /**
-     * 搜索过滤角色
-     */
-    function filterRoles() {
-      const search = document.getElementById('searchInput').value.toLowerCase();
-      const filtered = roles.filter(r => 
-        (r.role_name || '').toLowerCase().includes(search) ||
-        (r.description || '').toLowerCase().includes(search)
-      );
-      renderRoles(filtered);
-    }
-
-    /**
-     * HTML转义
-     */
-    function escapeHtml(str) {
-      if (!str) return '';
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
-    }
-
-    function showLoading() {
-      document.getElementById('loadingOverlay').classList.add('show');
-    }
-
-    function hideLoading() {
-      document.getElementById('loadingOverlay').classList.remove('show');
-    }
-
-    function showError(title, message) {
-      alert(`❌ ${title}\n${message}`);
-    }
-  </script>
+  <!-- ✅ JavaScript 加载顺序 -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  <script src="/admin/js/pages/roles.js"></script>
+  <!-- Alpine.js -->
 </body>
 </html>

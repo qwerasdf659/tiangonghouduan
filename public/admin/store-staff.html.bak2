@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>员工管理 - 管理后台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+  <style>
+    .staff-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 1.2rem;
+    }
+    .role-badge {
+      font-size: 0.75rem;
+    }
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>👥 管理后台 - 员工管理
+      </a>
+      <div>
+        <span class="text-light me-3" x-data x-text="$store.auth.user?.nickname ? `欢迎，${$store.auth.user.nickname}` : '欢迎，管理员'">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" onclick="logout()">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4" x-data="storeStaffPage()">
+    <!-- 统计卡片 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-people text-primary" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">员工总数</h6>
+            <h2 class="text-primary mb-0" x-text="stats.total">-</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-person-check text-success" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">在职员工</h6>
+            <h2 class="text-success mb-0" x-text="stats.active">-</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-person-badge text-warning" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">店长数量</h6>
+            <h2 class="text-warning mb-0" x-text="stats.managers">-</h2>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <i class="bi bi-shop text-info" style="font-size: 2rem;"></i>
+            <h6 class="text-muted mt-2">覆盖门店</h6>
+            <h2 class="text-info mb-0" x-text="stats.stores">-</h2>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选和操作栏 -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row g-3 align-items-center">
+          <div class="col-md-3">
+            <label class="form-label">所属门店</label>
+            <select class="form-select" x-model="filters.storeId">
+              <option value="">全部门店</option>
+              <template x-for="store in stores" :key="store.store_id">
+                <option :value="store.store_id" x-text="store.store_name"></option>
+              </template>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">员工角色</label>
+            <select class="form-select" x-model="filters.role">
+              <option value="">全部角色</option>
+              <option value="manager">店长</option>
+              <option value="staff">员工</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">状态</label>
+            <select class="form-select" x-model="filters.status">
+              <option value="">全部状态</option>
+              <option value="active">在职</option>
+              <option value="inactive">离职</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">搜索</label>
+            <input type="text" class="form-control" x-model="filters.search" placeholder="搜索员工姓名...">
+          </div>
+          <div class="col-md-2 d-flex align-items-end">
+            <button class="btn btn-primary me-2" @click="loadStaff()">
+              <i class="bi bi-search"></i> 搜索
+            </button>
+            <button class="btn btn-success" @click="openCreateModal()">
+              <i class="bi bi-plus-lg"></i> 入职
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 员工列表 -->
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>员工信息</th>
+                <th>所属门店</th>
+                <th>角色</th>
+                <th>入职时间</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-if="staffList.length === 0">
+                <tr><td colspan="6" class="text-center text-muted py-4">暂无员工数据</td></tr>
+              </template>
+              <template x-for="s in staffList" :key="s.store_staff_id || s.user_id">
+                <tr>
+                  <td>
+                    <div class="d-flex align-items-center">
+                      <div class="staff-avatar me-3" x-text="getInitials(s.user_nickname || 'U')"></div>
+                      <div>
+                        <div class="fw-bold" x-text="s.user_nickname || '-'"></div>
+                        <small class="text-muted" x-text="`ID: ${s.user_id}`"></small>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <i class="bi bi-shop text-primary"></i>
+                    <span x-text="s.store_name || '-'"></span>
+                  </td>
+                  <td>
+                    <span class="badge role-badge" :class="s.role_in_store === 'manager' ? 'bg-warning' : 'bg-info'" x-text="s.role_in_store === 'manager' ? '👑 店长' : '👤 员工'"></span>
+                  </td>
+                  <td x-text="formatDate(s.joined_at)"></td>
+                  <td>
+                    <span class="badge" :class="s.status === 'active' ? 'bg-success' : 'bg-secondary'" x-text="s.status === 'active' ? '在职' : '离职'"></span>
+                  </td>
+                  <td>
+                    <div class="btn-group btn-group-sm">
+                      <template x-if="s.status === 'active'">
+                        <button class="btn btn-outline-warning" @click="openTransferModal(s)">
+                          <i class="bi bi-arrow-left-right"></i> 调店
+                        </button>
+                      </template>
+                      <template x-if="s.status === 'active'">
+                        <button class="btn btn-outline-primary" @click="changeRole(s)">
+                          <i class="bi bi-person-gear"></i>
+                          <span x-text="s.role_in_store === 'manager' ? '降级' : '升级'"></span>
+                        </button>
+                      </template>
+                      <template x-if="s.status === 'active'">
+                        <button class="btn btn-outline-danger" @click="disableStaff(s.user_id)">
+                          <i class="bi bi-person-x"></i> 离职
+                        </button>
+                      </template>
+                      <template x-if="s.status !== 'active'">
+                        <button class="btn btn-outline-success" @click="enableStaff(s.user_id, s.store_id)">
+                          <i class="bi bi-person-check"></i> 复职
+                        </button>
+                      </template>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 入职模态框 -->
+    <div class="modal fade" id="staffModal" tabindex="-1" x-ref="staffModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-person-plus"></i> 员工入职</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <form @submit.prevent="submitStaff">
+              <div class="mb-3">
+                <label class="form-label">选择用户 <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" x-model.number="form.userId" placeholder="输入用户ID" required>
+                <small class="text-muted">请输入要入职的用户ID</small>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">分配门店 <span class="text-danger">*</span></label>
+                <select class="form-select" x-model="form.storeId" required>
+                  <option value="">请选择门店</option>
+                  <template x-for="store in stores" :key="store.store_id">
+                    <option :value="store.store_id" x-text="store.store_name"></option>
+                  </template>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">员工角色</label>
+                <select class="form-select" x-model="form.role">
+                  <option value="staff">员工</option>
+                  <option value="manager">店长</option>
+                </select>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="submit" class="btn btn-primary">确认入职</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 调店模态框 -->
+    <div class="modal fade" id="transferModal" tabindex="-1" x-ref="transferModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> 员工调店</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <form @submit.prevent="submitTransfer">
+              <div class="mb-3">
+                <label class="form-label">员工姓名</label>
+                <input type="text" class="form-control" :value="transferForm.staffName" readonly>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">当前门店</label>
+                <input type="text" class="form-control" :value="transferForm.currentStore" readonly>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">目标门店 <span class="text-danger">*</span></label>
+                <select class="form-select" x-model="transferForm.targetStoreId" required>
+                  <option value="">请选择目标门店</option>
+                  <template x-for="store in stores" :key="store.store_id">
+                    <option :value="store.store_id" x-text="store.store_name"></option>
+                  </template>
+                </select>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="submit" class="btn btn-warning">确认调店</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">加载中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  <script src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+  <script>
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('storeStaffPage', () => ({
+        staffList: [],
+        stores: [],
+        filters: {
+          storeId: '',
+          role: '',
+          status: '',
+          search: '',
+        },
+        stats: {
+          total: 0,
+          active: 0,
+          managers: 0,
+          stores: 0,
+        },
+        form: {
+          userId: '',
+          storeId: '',
+          role: 'staff',
+        },
+        transferForm: {
+          userId: '',
+          fromStoreId: '',
+          staffName: '',
+          currentStore: '',
+          targetStoreId: '',
+        },
+
+        init() {
+          this.loadStores();
+          this.loadStaff();
+        },
+
+        async loadStores() {
+          try {
+            const response = await apiRequest(API_ENDPOINTS.STORE.LIST);
+            if (response && response.success) {
+              this.stores = response.data.items || [];
+            }
+          } catch (error) {
+            console.error('加载门店失败:', error);
+          }
+        },
+
+        async loadStaff() {
+          showLoading();
+          try {
+            const params = new URLSearchParams();
+            if (this.filters.storeId) params.append('store_id', this.filters.storeId);
+            if (this.filters.role) params.append('role_in_store', this.filters.role);
+            if (this.filters.status) params.append('status', this.filters.status);
+            if (this.filters.search) params.append('search', this.filters.search);
+
+            const url = API_ENDPOINTS.STAFF.LIST + (params.toString() ? `?${params.toString()}` : '');
+            const response = await apiRequest(url);
+
+            if (response && response.success) {
+              this.staffList = response.data.staff || response.data || [];
+              this.updateStats(response.data.stats || {});
+            } else {
+              this.showError('加载失败', response?.message || '获取员工列表失败');
+            }
+          } catch (error) {
+            console.error('加载员工失败:', error);
+            this.showError('加载失败', error.message);
+          } finally {
+            hideLoading();
+          }
+        },
+
+        updateStats(apiStats) {
+          this.stats.total = apiStats.total || this.staffList.length;
+          this.stats.active = apiStats.active || this.staffList.filter(s => s.status === 'active').length;
+          this.stats.managers = apiStats.managers || this.staffList.filter(s => s.role_in_store === 'manager').length;
+          this.stats.stores = apiStats.stores || new Set(this.staffList.map(s => s.store_id)).size;
+        },
+
+        getInitials(name) {
+          return name ? name.charAt(0).toUpperCase() : 'U';
+        },
+
+        formatDate(dateValue) {
+          if (!dateValue) return '-';
+          if (typeof dateValue === 'object') {
+            if (dateValue.beijing) {
+              return dateValue.beijing.split(' ')[0];
+            }
+            if (dateValue.iso) {
+              return new Date(dateValue.iso).toLocaleDateString('zh-CN');
+            }
+          }
+          if (typeof dateValue === 'string') {
+            return new Date(dateValue).toLocaleDateString('zh-CN');
+          }
+          return '-';
+        },
+
+        openCreateModal() {
+          this.form = { userId: '', storeId: '', role: 'staff' };
+          new bootstrap.Modal(this.$refs.staffModal).show();
+        },
+
+        async submitStaff() {
+          if (!this.form.userId || !this.form.storeId) {
+            alert('请填写完整信息');
+            return;
+          }
+
+          showLoading();
+          try {
+            const response = await apiRequest(API_ENDPOINTS.STAFF.CREATE, {
+              method: 'POST',
+              body: JSON.stringify({
+                user_id: parseInt(this.form.userId),
+                store_id: parseInt(this.form.storeId),
+                role_in_store: this.form.role
+              })
+            });
+
+            if (response && response.success) {
+              bootstrap.Modal.getInstance(this.$refs.staffModal).hide();
+              alert('✅ 员工入职成功');
+              this.loadStaff();
+            } else {
+              this.showError('入职失败', response?.message || '操作失败');
+            }
+          } catch (error) {
+            console.error('员工入职失败:', error);
+            this.showError('入职失败', error.message);
+          } finally {
+            hideLoading();
+          }
+        },
+
+        openTransferModal(staff) {
+          this.transferForm = {
+            userId: staff.user_id,
+            fromStoreId: staff.store_id,
+            staffName: staff.user_nickname || '-',
+            currentStore: staff.store_name || '-',
+            targetStoreId: '',
+          };
+          new bootstrap.Modal(this.$refs.transferModal).show();
+        },
+
+        async submitTransfer() {
+          if (!this.transferForm.targetStoreId) {
+            alert('请选择目标门店');
+            return;
+          }
+
+          showLoading();
+          try {
+            const response = await apiRequest(API_ENDPOINTS.STAFF.TRANSFER, {
+              method: 'POST',
+              body: JSON.stringify({
+                user_id: parseInt(this.transferForm.userId),
+                from_store_id: parseInt(this.transferForm.fromStoreId),
+                to_store_id: parseInt(this.transferForm.targetStoreId)
+              })
+            });
+
+            if (response && response.success) {
+              bootstrap.Modal.getInstance(this.$refs.transferModal).hide();
+              alert('✅ 调店成功');
+              this.loadStaff();
+            } else {
+              this.showError('调店失败', response?.message || '操作失败');
+            }
+          } catch (error) {
+            console.error('调店失败:', error);
+            this.showError('调店失败', error.message);
+          } finally {
+            hideLoading();
+          }
+        },
+
+        async changeRole(staff) {
+          const newRole = staff.role_in_store === 'manager' ? 'staff' : 'manager';
+          const action = newRole === 'manager' ? '升级为店长' : '降级为员工';
+
+          if (!confirm(`确定要将此员工${action}吗？`)) return;
+
+          showLoading();
+          try {
+            const response = await apiRequest(API.buildURL(API_ENDPOINTS.STAFF.ROLE, { store_staff_id: staff.store_staff_id }), {
+              method: 'PUT',
+              body: JSON.stringify({ role_in_store: newRole })
+            });
+
+            if (response && response.success) {
+              alert(`✅ 已${action}`);
+              this.loadStaff();
+            } else {
+              this.showError('操作失败', response?.message || '角色变更失败');
+            }
+          } catch (error) {
+            console.error('角色变更失败:', error);
+            this.showError('操作失败', error.message);
+          } finally {
+            hideLoading();
+          }
+        },
+
+        async disableStaff(userId) {
+          if (!confirm('确定要将此员工设为离职状态吗？')) return;
+
+          showLoading();
+          try {
+            const response = await apiRequest(API.buildURL(API_ENDPOINTS.STAFF.DISABLE, { user_id: userId }), {
+              method: 'POST'
+            });
+
+            if (response && response.success) {
+              alert('✅ 员工已离职');
+              this.loadStaff();
+            } else {
+              this.showError('操作失败', response?.message || '离职处理失败');
+            }
+          } catch (error) {
+            console.error('离职处理失败:', error);
+            this.showError('操作失败', error.message);
+          } finally {
+            hideLoading();
+          }
+        },
+
+        async enableStaff(userId, storeId) {
+          if (!confirm('确定要恢复此员工的在职状态吗？')) return;
+
+          showLoading();
+          try {
+            const response = await apiRequest(API_ENDPOINTS.STAFF.ENABLE, {
+              method: 'POST',
+              body: JSON.stringify({ user_id: userId, store_id: storeId })
+            });
+
+            if (response && response.success) {
+              alert('✅ 员工已复职');
+              this.loadStaff();
+            } else {
+              this.showError('操作失败', response?.message || '复职处理失败');
+            }
+          } catch (error) {
+            console.error('复职处理失败:', error);
+            this.showError('操作失败', error.message);
+          } finally {
+            hideLoading();
+          }
+        },
+
+        showError(title, message) {
+          alert(`❌ ${title}\n${message}`);
+        }
+      }));
+    });
+  </script>
+</body>
+</html>

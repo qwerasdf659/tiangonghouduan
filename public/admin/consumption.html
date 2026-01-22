@@ -5,22 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>消费记录审核 - 管理后台</title>
 
-    <!-- ✅ Bootstrap 5 - UI框架 -->
+    <!-- Bootstrap 5 - UI框架 -->
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
       rel="stylesheet"
     />
 
-    <!-- ✅ Bootstrap Icons - 图标库 -->
+    <!-- Bootstrap Icons - 图标库 -->
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"
       rel="stylesheet"
     />
 
-    <!-- ✅ 公共样式表 - 统一主题和响应式设计 -->
+    <!-- 公共样式表 - 统一主题和响应式设计 -->
     <link href="/admin/css/common.css" rel="stylesheet" />
-  </head>
-  <body class="bg-light">
+  
+  <!-- Alpine.js -->
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+  <body class="bg-light" x-data="consumptionPage()" x-cloak>
     <!-- 顶部导航 -->
     <nav class="navbar navbar-dark bg-primary">
       <div class="container-fluid">
@@ -28,8 +36,8 @@
           <i class="bi bi-arrow-left me-2"></i>📋 管理后台 - 消费记录审核
         </a>
         <div>
-          <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-          <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+          <span class="text-light me-3" x-text="'欢迎，' + (userInfo.nickname || '管理员')">欢迎，管理员</span>
+          <button class="btn btn-outline-light btn-sm" @click="logout">退出登录</button>
         </div>
       </div>
     </nav>
@@ -41,7 +49,7 @@
           <div class="row g-3">
             <div class="col-md-3">
               <label class="form-label">状态筛选</label>
-              <select class="form-select" id="statusFilter">
+              <select class="form-select" x-model="filters.status" @change="resetAndLoad">
                 <option value="pending">待审核</option>
                 <option value="approved">已通过</option>
                 <option value="rejected">已拒绝</option>
@@ -53,20 +61,21 @@
               <input
                 type="text"
                 class="form-control"
-                id="searchInput"
+                x-model="filters.search"
                 placeholder="手机号、订单号"
+                @keyup.enter="resetAndLoad"
               />
             </div>
             <div class="col-md-6">
               <label class="form-label">&nbsp;</label>
               <div>
-                <button class="btn btn-primary" id="searchBtn">
+                <button class="btn btn-primary" @click="resetAndLoad">
                   <i class="bi bi-search"></i> 搜索
                 </button>
-                <button class="btn btn-outline-secondary" id="resetBtn">
+                <button class="btn btn-outline-secondary" @click="resetFilters">
                   <i class="bi bi-arrow-clockwise"></i> 重置
                 </button>
-                <button class="btn btn-outline-success" id="refreshBtn">
+                <button class="btn btn-outline-success" @click="loadRecords(true)">
                   <i class="bi bi-arrow-repeat"></i> 刷新
                 </button>
               </div>
@@ -81,7 +90,7 @@
           <div class="card">
             <div class="card-body text-center">
               <h6 class="text-muted">待审核</h6>
-              <h3 class="text-warning" id="pendingCount">-</h3>
+              <h3 class="text-warning" x-text="formatNumber(stats.pending)">-</h3>
             </div>
           </div>
         </div>
@@ -89,7 +98,7 @@
           <div class="card">
             <div class="card-body text-center">
               <h6 class="text-muted">今日审核</h6>
-              <h3 class="text-primary" id="todayCount">-</h3>
+              <h3 class="text-primary" x-text="formatNumber(stats.today)">-</h3>
             </div>
           </div>
         </div>
@@ -97,7 +106,7 @@
           <div class="card">
             <div class="card-body text-center">
               <h6 class="text-muted">通过</h6>
-              <h3 class="text-success" id="approvedCount">-</h3>
+              <h3 class="text-success" x-text="formatNumber(stats.approved)">-</h3>
             </div>
           </div>
         </div>
@@ -105,7 +114,7 @@
           <div class="card">
             <div class="card-body text-center">
               <h6 class="text-muted">拒绝</h6>
-              <h3 class="text-danger" id="rejectedCount">-</h3>
+              <h3 class="text-danger" x-text="formatNumber(stats.rejected)">-</h3>
             </div>
           </div>
         </div>
@@ -128,25 +137,117 @@
                   <th style="width: 200px">操作</th>
                 </tr>
               </thead>
-              <tbody id="recordsTableBody">
-                <tr>
-                  <td colspan="8" class="text-center py-5">
-                    <div class="spinner-border text-primary" role="status">
-                      <span class="visually-hidden">加载中...</span>
-                    </div>
-                    <p class="mt-2 text-muted">正在加载数据...</p>
-                  </td>
-                </tr>
+              <tbody>
+                <!-- 加载中状态 -->
+                <template x-if="loading && records.length === 0">
+                  <tr>
+                    <td colspan="8" class="text-center py-5">
+                      <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">加载中...</span>
+                      </div>
+                      <p class="mt-2 text-muted">正在加载数据...</p>
+                    </td>
+                  </tr>
+                </template>
+                <!-- 空数据状态 -->
+                <template x-if="!loading && records.length === 0">
+                  <tr>
+                    <td colspan="8" class="text-center py-5">
+                      <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                      <p class="mt-2 text-muted">暂无数据</p>
+                    </td>
+                  </tr>
+                </template>
+                <!-- 数据列表 -->
+                <template x-for="record in records" :key="record.record_id">
+                  <tr>
+                    <td x-text="record.record_id"></td>
+                    <td>
+                      <div x-text="record.user_mobile || '-'"></div>
+                      <small class="text-muted" x-text="record.user_nickname || '-'"></small>
+                    </td>
+                    <td class="fw-bold" x-text="'¥' + parseFloat(record.consumption_amount || 0).toFixed(2)"></td>
+                    <td class="text-primary" x-text="record.points_to_award || 0"></td>
+                    <td>
+                      <div x-text="formatApiDate(record.created_at)"></div>
+                      <small class="text-muted" x-text="record.age || '-'"></small>
+                    </td>
+                    <td>
+                      <span class="badge" 
+                            :class="{
+                              'bg-warning text-dark': record.status === 'pending',
+                              'bg-success': record.status === 'approved',
+                              'bg-danger': record.status === 'rejected',
+                              'bg-secondary': !['pending', 'approved', 'rejected'].includes(record.status)
+                            }">
+                        <i class="bi" :class="{
+                          'bi-clock': record.status === 'pending',
+                          'bi-check-circle': record.status === 'approved',
+                          'bi-x-circle': record.status === 'rejected'
+                        }"></i>
+                        <span x-text="getStatusText(record.status)"></span>
+                      </span>
+                    </td>
+                    <td>
+                      <small class="text-muted">商家扫码</small>
+                    </td>
+                    <td class="table-actions">
+                      <!-- 待审核状态显示操作按钮 -->
+                      <template x-if="record.status === 'pending'">
+                        <div>
+                          <button class="btn btn-sm btn-success me-1" @click="reviewRecord(record.record_id, 'approve')">
+                            <i class="bi bi-check-lg"></i> 通过
+                          </button>
+                          <button class="btn btn-sm btn-danger" @click="reviewRecord(record.record_id, 'reject')">
+                            <i class="bi bi-x-lg"></i> 拒绝
+                          </button>
+                        </div>
+                      </template>
+                      <!-- 已审核状态显示详情 -->
+                      <template x-if="record.status !== 'pending'">
+                        <div>
+                          <small class="text-muted">已审核</small>
+                          <div x-show="record.reviewer_nickname">
+                            <small class="text-muted" x-text="'审核员：' + record.reviewer_nickname"></small>
+                          </div>
+                          <div x-show="record.reviewed_at">
+                            <small class="text-muted" x-text="'审核时间：' + formatApiDate(record.reviewed_at)"></small>
+                          </div>
+                          <div x-show="record.admin_notes">
+                            <small class="text-muted" x-text="'备注：' + record.admin_notes"></small>
+                          </div>
+                        </div>
+                      </template>
+                    </td>
+                  </tr>
+                </template>
               </tbody>
             </table>
           </div>
 
           <!-- 分页 -->
           <nav aria-label="分页导航">
-            <ul class="pagination justify-content-center mb-0" id="pagination">
-              <li class="page-item disabled">
-                <span class="page-link">加载中...</span>
-              </li>
+            <ul class="pagination justify-content-center mb-0">
+              <template x-if="pagination.totalPages <= 1">
+                <li class="page-item disabled">
+                  <span class="page-link" x-text="'共 ' + pagination.total + ' 条记录'"></span>
+                </li>
+              </template>
+              <template x-if="pagination.totalPages > 1">
+                <li class="page-item" :class="{ 'disabled': pagination.currentPage === 1 }">
+                  <a class="page-link" href="#" @click.prevent="changePage(pagination.currentPage - 1)">上一页</a>
+                </li>
+              </template>
+              <template x-for="page in getPageNumbers()" :key="page">
+                <li class="page-item" :class="{ 'active': page === pagination.currentPage, 'disabled': page === '...' }">
+                  <a class="page-link" href="#" @click.prevent="page !== '...' && changePage(page)" x-text="page"></a>
+                </li>
+              </template>
+              <template x-if="pagination.totalPages > 1">
+                <li class="page-item" :class="{ 'disabled': pagination.currentPage === pagination.totalPages }">
+                  <a class="page-link" href="#" @click.prevent="changePage(pagination.currentPage + 1)">下一页</a>
+                </li>
+              </template>
             </ul>
           </nav>
         </div>
@@ -154,11 +255,11 @@
     </div>
 
     <!-- 审核备注模态框 -->
-    <div class="modal fade" id="remarkModal" tabindex="-1">
+    <div class="modal fade" id="remarkModal" tabindex="-1" x-ref="remarkModal">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title" id="remarkModalTitle">审核备注</h5>
+            <h5 class="modal-title" x-text="currentAction === 'approve' ? '审核通过 - 备注' : '审核拒绝 - 备注'">审核备注</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
@@ -166,38 +267,38 @@
               <label class="form-label">备注信息（可选）</label>
               <textarea
                 class="form-control"
-                id="remarkInput"
+                x-model="remarkInput"
                 rows="3"
-                placeholder="请输入审核备注..."
+                :placeholder="currentAction === 'approve' ? '请输入通过原因（可选）' : '请输入拒绝原因（建议填写）'"
               ></textarea>
             </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-            <button type="button" class="btn btn-primary" id="remarkSubmitBtn">确认</button>
+            <button type="button" class="btn btn-primary" @click="submitReview">确认</button>
           </div>
         </div>
       </div>
     </div>
 
     <!-- 加载遮罩层 -->
-    <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-overlay" :class="{ 'show': loading }">
       <div class="spinner-border text-light" style="width: 3rem; height: 3rem" role="status">
         <span class="visually-hidden">处理中...</span>
       </div>
     </div>
 
-    <!-- ✅ Bootstrap JS -->
+    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- ✅ 引入通用工具库 -->
+    <!-- 引入通用工具库 -->
     <script src="/admin/js/admin-common.js"></script>
-  <script src="/admin/js/api-config.js"></script>
+    <script src="/admin/js/api-config.js"></script>
 
-    <!-- ✅ Toast提示组件 -->
-    <script src="/admin/js/common/toast.js"></script>
-
-    <!-- ✅ 页面专属逻辑 -->
+    <!-- 页面专属逻辑 -->
     <script src="/admin/js/pages/consumption.js"></script>
-  </body>
+
+    <!-- Alpine.js -->
+  <!-- Alpine.js -->
+</body>
 </html>

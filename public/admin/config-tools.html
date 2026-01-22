@@ -4,62 +4,41 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>配置工具 - 管理后台</title>
-
-  <!-- Bootstrap 5 - UI框架 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
-  <!-- Bootstrap Icons - 图标库 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-
-  <!-- 公共样式表 - 统一主题和响应式设计 -->
   <link href="/admin/css/common.css" rel="stylesheet">
-
   <style>
-    .config-card {
-      transition: all 0.2s;
-    }
-    .config-card:hover {
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .config-value {
-      font-family: 'Courier New', monospace;
-      background-color: #f8f9fa;
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-    .tool-card {
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .tool-card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    }
-    .json-editor {
-      font-family: 'Courier New', monospace;
-      font-size: 13px;
-    }
+    .config-card { transition: all 0.2s; }
+    .config-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .config-value { font-family: 'Courier New', monospace; background-color: #f8f9fa; padding: 2px 6px; border-radius: 4px; }
+    .tool-card { cursor: pointer; transition: all 0.2s; }
+    .tool-card:hover { transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .json-editor { font-family: 'Courier New', monospace; font-size: 13px; }
+    [x-cloak] { display: none !important; }
   </style>
+
+  <!-- Alpine.js -->
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
 </head>
 <body class="bg-light">
-  <!-- 顶部导航 -->
   <nav class="navbar navbar-dark bg-primary">
     <div class="container-fluid">
       <a href="/admin/dashboard.html" class="navbar-brand">
         <i class="bi bi-arrow-left me-2"></i>管理后台 - 配置工具
       </a>
       <div>
-        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+        <span class="text-light me-3" x-data x-text="$store.auth.user?.nickname ? `欢迎，${$store.auth.user.nickname}` : '欢迎，管理员'">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" onclick="logout()">退出登录</button>
       </div>
     </div>
   </nav>
 
-  <div class="container-fluid mt-4">
+  <div class="container-fluid mt-4" x-data="configToolsPage()" x-cloak>
     <!-- 快捷工具 -->
     <div class="row g-3 mb-4">
       <div class="col-md-3">
-        <div class="card tool-card" id="toolCacheManagement">
+        <div class="card tool-card" @click="showCacheModal()">
           <div class="card-body text-center py-4">
             <i class="bi bi-database text-primary" style="font-size: 3rem;"></i>
             <h6 class="mt-3 mb-0">缓存管理</h6>
@@ -68,7 +47,7 @@
         </div>
       </div>
       <div class="col-md-3">
-        <div class="card tool-card" id="toolSystemConfig">
+        <div class="card tool-card" @click="loadCategorySettings('basic')">
           <div class="card-body text-center py-4">
             <i class="bi bi-gear text-success" style="font-size: 3rem;"></i>
             <h6 class="mt-3 mb-0">系统配置</h6>
@@ -77,7 +56,7 @@
         </div>
       </div>
       <div class="col-md-3">
-        <div class="card tool-card" id="toolFeatureFlags">
+        <div class="card tool-card" @click="showFeatureFlagsModal()">
           <div class="card-body text-center py-4">
             <i class="bi bi-toggles text-warning" style="font-size: 3rem;"></i>
             <h6 class="mt-3 mb-0">功能开关</h6>
@@ -86,7 +65,7 @@
         </div>
       </div>
       <div class="col-md-3">
-        <div class="card tool-card" id="toolMaintenanceMode">
+        <div class="card tool-card" @click="showMaintenanceModal()">
           <div class="card-body text-center py-4">
             <i class="bi bi-tools text-danger" style="font-size: 3rem;"></i>
             <h6 class="mt-3 mb-0">维护模式</h6>
@@ -102,16 +81,35 @@
         <div class="card">
           <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h6 class="mb-0"><i class="bi bi-list-ul"></i> 配置列表</h6>
-            <button class="btn btn-sm btn-primary" id="btnAddConfig">
+            <button class="btn btn-sm btn-primary" @click="showAddConfigModal()">
               <i class="bi bi-plus"></i> 新增
             </button>
           </div>
           <div class="card-body p-0">
-            <div class="list-group list-group-flush" id="configList">
+            <div class="list-group list-group-flush">
+              <template x-if="!configListLoaded">
               <div class="text-center py-4 text-muted">
                 <div class="spinner-border spinner-border-sm" role="status"></div>
                 <p class="mt-2 mb-0">加载中...</p>
               </div>
+              </template>
+              <template x-if="configListLoaded && Object.keys(categoryCounts).length === 0">
+                <div class="text-center py-4 text-muted">
+                  <i class="bi bi-inbox"></i>
+                  <p class="mt-2 mb-0">暂无配置项</p>
+                </div>
+              </template>
+              <template x-for="(count, category) in categoryCounts" :key="category">
+                <a href="javascript:void(0)" class="list-group-item list-group-item-action" :class="{ 'active': currentCategory === category }" @click="loadCategorySettings(category)">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                      <i class="bi me-2" :class="getCategoryDisplay(category).icon + ' text-' + getCategoryDisplay(category).color"></i>
+                      <strong x-text="getCategoryDisplay(category).name"></strong>
+                    </div>
+                    <span class="badge" :class="'bg-' + getCategoryDisplay(category).color" x-text="count + '项'"></span>
+                  </div>
+                </a>
+              </template>
             </div>
           </div>
         </div>
@@ -121,21 +119,91 @@
       <div class="col-md-8">
         <div class="card">
           <div class="card-header bg-white">
-            <h6 class="mb-0" id="detailTitle"><i class="bi bi-info-circle"></i> 配置详情</h6>
+            <h6 class="mb-0">
+              <i class="bi bi-info-circle"></i> 
+              <span x-text="detailTitle">配置详情</span>
+            </h6>
           </div>
-          <div class="card-body" id="configDetail">
+          <div class="card-body">
+            <template x-if="!currentCategory">
             <div class="text-center py-5 text-muted">
               <i class="bi bi-hand-index" style="font-size: 3rem;"></i>
               <p class="mt-3">请从左侧选择一个配置项</p>
             </div>
-          </div>
+            </template>
+            <template x-if="currentCategory && settingsLoading">
+              <div class="text-center py-4">
+                <div class="spinner-border" role="status"></div>
+                <p class="mt-2">加载中...</p>
+              </div>
+            </template>
+            <template x-if="currentCategory && !settingsLoading && categorySettings.length === 0">
+              <div class="text-center py-5 text-muted">
+                <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                <p class="mt-3">该分类下暂无配置项</p>
+              </div>
+            </template>
+            <template x-if="currentCategory && !settingsLoading && categorySettings.length > 0">
+              <div>
+                <div class="table-responsive">
+                  <table class="table table-hover">
+                    <thead class="table-light">
+                      <tr>
+                        <th style="width: 30%;">配置键</th>
+                        <th style="width: 35%;">配置值</th>
+                        <th style="width: 20%;">说明</th>
+                        <th style="width: 15%;">状态</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="setting in categorySettings" :key="setting.setting_key">
+                        <tr>
+                          <td>
+                            <strong class="text-primary" x-text="setting.display_name || setting.setting_key"></strong>
+                            <br><small class="text-muted"><code x-text="setting.setting_key"></code> · <span x-text="setting.value_type || 'string'"></span></small>
+                          </td>
+                          <td>
+                            <template x-if="setting.is_readonly">
+                              <span class="config-value" x-text="formatSettingValue(setting.parsed_value || setting.setting_value)"></span>
+                            </template>
+                            <template x-if="!setting.is_readonly && setting.value_type === 'boolean'">
+                              <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" :data-key="setting.setting_key" x-model="editableSettings[setting.setting_key]">
+                              </div>
+                            </template>
+                            <template x-if="!setting.is_readonly && (setting.value_type === 'number' || setting.value_type === 'integer')">
+                              <input type="number" class="form-control form-control-sm" :data-key="setting.setting_key" x-model.number="editableSettings[setting.setting_key]">
+                            </template>
+                            <template x-if="!setting.is_readonly && setting.value_type === 'json'">
+                              <textarea class="form-control form-control-sm json-editor" :data-key="setting.setting_key" rows="3" x-model="editableSettings[setting.setting_key]"></textarea>
+                            </template>
+                            <template x-if="!setting.is_readonly && (!setting.value_type || setting.value_type === 'string')">
+                              <input type="text" class="form-control form-control-sm" :data-key="setting.setting_key" x-model="editableSettings[setting.setting_key]">
+                            </template>
+                          </td>
+                          <td><small class="text-muted" x-text="setting.description || '-'"></small></td>
+                          <td>
+                            <span class="badge" :class="setting.is_readonly ? 'bg-secondary' : 'bg-success'" x-text="setting.is_readonly ? '只读' : '可编辑'"></span>
+                          </td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="mt-3 d-flex justify-content-end">
+                  <button type="button" class="btn btn-primary" @click="saveSettings()">
+                    <i class="bi bi-save me-1"></i>保存更改
+                  </button>
+                </div>
+              </div>
+            </template>
         </div>
       </div>
     </div>
   </div>
 
   <!-- 缓存管理模态框 -->
-  <div class="modal fade" id="cacheModal" tabindex="-1">
+    <div class="modal fade" id="cacheModal" tabindex="-1" x-ref="cacheModal">
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
@@ -149,29 +217,29 @@
                 <strong>用户缓存</strong>
                 <p class="text-muted mb-0 small">用户会话、权限信息</p>
               </div>
-              <button class="btn btn-outline-danger btn-sm btn-clear-cache" data-cache-type="user">清理</button>
+                <button class="btn btn-outline-danger btn-sm" @click="clearCache('user')">清理</button>
             </div>
             <div class="list-group-item d-flex justify-content-between align-items-center">
               <div>
                 <strong>配置缓存</strong>
                 <p class="text-muted mb-0 small">系统配置项、开关状态</p>
               </div>
-              <button class="btn btn-outline-danger btn-sm btn-clear-cache" data-cache-type="config">清理</button>
+                <button class="btn btn-outline-danger btn-sm" @click="clearCache('config')">清理</button>
             </div>
             <div class="list-group-item d-flex justify-content-between align-items-center">
               <div>
                 <strong>活动缓存</strong>
                 <p class="text-muted mb-0 small">抽奖活动、奖品信息</p>
               </div>
-              <button class="btn btn-outline-danger btn-sm btn-clear-cache" data-cache-type="activity">清理</button>
+                <button class="btn btn-outline-danger btn-sm" @click="clearCache('activity')">清理</button>
             </div>
             <div class="list-group-item d-flex justify-content-between align-items-center">
               <div>
                 <strong>全部缓存</strong>
                 <p class="text-muted mb-0 small">清理所有Redis缓存</p>
               </div>
-              <button class="btn btn-danger btn-sm btn-clear-cache" data-cache-type="all">全部清理</button>
-            </div>
+                <button class="btn btn-danger btn-sm" @click="clearCache('all')">全部清理</button>
+              </div>
           </div>
         </div>
       </div>
@@ -179,29 +247,61 @@
   </div>
 
   <!-- 功能开关模态框 -->
-  <div class="modal fade" id="featureFlagsModal" tabindex="-1">
+    <div class="modal fade" id="featureFlagsModal" tabindex="-1" x-ref="featureFlagsModal">
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title"><i class="bi bi-toggles"></i> 功能开关</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-        <div class="modal-body" id="featureFlagsContent">
+          <div class="modal-body">
+            <template x-if="featureFlagsLoading">
           <div class="text-center py-4">
             <div class="spinner-border" role="status"></div>
             <p class="mt-2">加载中...</p>
           </div>
+            </template>
+            <template x-if="!featureFlagsLoading && featureFlags.length === 0">
+              <div class="text-center py-4 text-muted">
+                <i class="bi bi-inbox"></i>
+                <p class="mt-2">暂无功能开关配置</p>
+              </div>
+            </template>
+            <template x-if="!featureFlagsLoading && featureFlags.length > 0">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>功能名称</th>
+                    <th>说明</th>
+                    <th style="width: 100px;">状态</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="flag in featureFlags" :key="flag.setting_key">
+                    <tr>
+                      <td><code x-text="flag.setting_key"></code></td>
+                      <td x-text="flag.description || '-'"></td>
+                      <td>
+                        <div class="form-check form-switch">
+                          <input class="form-check-input" type="checkbox" x-model="featureFlagValues[flag.setting_key]">
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </template>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
-          <button type="button" class="btn btn-primary" id="btnSaveFeatureFlags">保存更改</button>
-        </div>
+            <button type="button" class="btn btn-primary" @click="saveFeatureFlags()">保存更改</button>
+          </div>
       </div>
     </div>
   </div>
 
   <!-- 维护模式模态框 -->
-  <div class="modal fade" id="maintenanceModal" tabindex="-1">
+    <div class="modal fade" id="maintenanceModal" tabindex="-1" x-ref="maintenanceModal">
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
@@ -216,30 +316,29 @@
           <div class="mb-3">
             <label class="form-label">维护状态</label>
             <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" id="maintenanceSwitch" style="width: 3em; height: 1.5em;">
-              <label class="form-check-label" for="maintenanceSwitch" id="maintenanceLabel">关闭</label>
-            </div>
+                <input class="form-check-input" type="checkbox" x-model="maintenanceForm.enabled" style="width: 3em; height: 1.5em;">
+                <label class="form-check-label" x-text="maintenanceForm.enabled ? '开启' : '关闭'"></label>
+              </div>
           </div>
           <div class="mb-3">
             <label class="form-label">维护公告</label>
-            <textarea class="form-control" id="maintenanceMessage" rows="3" 
-              placeholder="请输入向用户展示的维护公告...">系统正在升级维护中，预计30分钟后恢复，给您带来不便敬请谅解。</textarea>
+              <textarea class="form-control" x-model="maintenanceForm.message" rows="3" placeholder="请输入向用户展示的维护公告..."></textarea>
           </div>
           <div class="mb-3">
             <label class="form-label">预计恢复时间</label>
-            <input type="datetime-local" class="form-control" id="maintenanceEndTime">
-          </div>
+              <input type="datetime-local" class="form-control" x-model="maintenanceForm.endTime">
+            </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="button" class="btn btn-danger" id="btnSaveMaintenanceMode">保存设置</button>
-        </div>
+            <button type="button" class="btn btn-danger" @click="saveMaintenanceMode()">保存设置</button>
+          </div>
       </div>
     </div>
   </div>
 
   <!-- 新增配置模态框 -->
-  <div class="modal fade" id="addConfigModal" tabindex="-1">
+    <div class="modal fade" id="addConfigModal" tabindex="-1" x-ref="addConfigModal">
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
@@ -247,52 +346,46 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <form id="addConfigForm">
+            <form @submit.prevent="addConfig">
             <div class="mb-3">
               <label class="form-label">配置键名 <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" id="newConfigKey" required
-                placeholder="如：system.max_lottery_times">
+                <input type="text" class="form-control" x-model="newConfig.key" required placeholder="如：system.max_lottery_times">
             </div>
             <div class="mb-3">
               <label class="form-label">配置值 <span class="text-danger">*</span></label>
-              <textarea class="form-control json-editor" id="newConfigValue" rows="4" required
-                placeholder="支持JSON格式"></textarea>
+                <textarea class="form-control json-editor" x-model="newConfig.value" rows="4" required placeholder="支持JSON格式"></textarea>
             </div>
             <div class="mb-3">
               <label class="form-label">配置说明</label>
-              <input type="text" class="form-control" id="newConfigDescription"
-                placeholder="配置项的用途说明">
+                <input type="text" class="form-control" x-model="newConfig.description" placeholder="配置项的用途说明">
             </div>
             <div class="mb-3">
               <label class="form-label">配置类型</label>
-              <select class="form-select" id="newConfigType">
+                <select class="form-select" x-model="newConfig.type">
                 <option value="string">字符串</option>
                 <option value="number">数字</option>
                 <option value="boolean">布尔值</option>
                 <option value="json">JSON对象</option>
               </select>
             </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="submit" class="btn btn-primary">添加配置</button>
+              </div>
           </form>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="button" class="btn btn-primary" id="btnAddConfigSubmit">添加配置</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 加载遮罩层 -->
   <div class="loading-overlay" id="loadingOverlay">
     <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
       <span class="visually-hidden">处理中...</span>
     </div>
   </div>
 
-  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-  <!-- 引入通用工具库 -->
   <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/api-config.js"></script>
   <script src="/admin/js/pages/config-tools.js"></script>

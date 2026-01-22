@@ -1,9 +1,7 @@
 /**
- * 商家积分审核页面逻辑
- * @file public/admin/js/pages/merchant-points.js
+ * 商家积分审核页面 - Alpine.js 版本
  * @description 审核商家提交的用户积分发放申请
- * @version 2.1.0
- * @date 2026-01-09
+ * @version 3.0.0
  *
  * 后端API端点:
  * - GET  /api/v4/console/merchant-points - 获取申请列表
@@ -11,637 +9,515 @@
  * - POST /api/v4/console/merchant-points/:audit_id/approve - 审核通过
  * - POST /api/v4/console/merchant-points/:audit_id/reject - 审核拒绝
  * - GET  /api/v4/console/merchant-points/stats/pending - 待审核统计
- *
- * 后端返回字段（以后端为准）:
- * - audit_id: 审核记录ID
- * - user_id: 申请用户ID
- * - applicant: { user_id, nickname, mobile } - 申请人信息
- * - points_amount: 申请积分数量
- * - description: 申请描述
- * - status: 审核状态 (pending/approved/rejected/cancelled)
- * - priority: 优先级
- * - auditor: { user_id, nickname, mobile } - 审核员信息
- * - audit_reason: 审核意见/拒绝原因
- * - submitted_at: 提交时间
- * - audited_at: 审核时间
- * - created_at: 创建时间
- *
- * CSP兼容：使用事件委托代替内联事件处理器
  */
 
-// ================================
-// 商家积分审核 - 前端逻辑（直接使用后端字段名）
-// ================================
+function merchantPointsPage() {
+  return {
+    // ============================================================
+    // 响应式数据
+    // ============================================================
+    userInfo: {},
+    loading: false,
+    globalLoading: false,
+    submitting: false,
 
-// 全局变量
-let currentPage = 1
-const pageSize = 20
-let selectedItems = new Set()
-let currentAuditId = null
+    // 统计数据
+    stats: {
+      pending_count: 0,
+      approved_count: 0,
+      rejected_count: 0,
+      today_points: 0
+    },
 
-/**
- * 页面初始化
- */
-document.addEventListener('DOMContentLoaded', function () {
-  // 显示用户信息
-  const userInfo = getCurrentUser()
-  if (userInfo && userInfo.nickname) {
-    document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`
-  }
+    // 申请列表
+    applications: [],
 
-  // 事件监听器
-  document.getElementById('logoutBtn').addEventListener('click', logout)
-  document.getElementById('refreshBtn').addEventListener('click', loadData)
-  document.getElementById('statusFilter').addEventListener('change', function () {
-    currentPage = 1
-    loadData()
-  })
-  document.getElementById('timeRangeFilter').addEventListener('change', function () {
-    currentPage = 1
-    loadData()
-  })
-  document.getElementById('priorityFilter').addEventListener('change', function () {
-    currentPage = 1
-    loadData()
-  })
+    // 筛选条件
+    filters: {
+      status: 'pending',
+      priority: '',
+      timeRange: ''
+    },
 
-  document.getElementById('headerCheckbox').addEventListener('change', toggleSelectAll)
-  document.getElementById('batchApproveBtn').addEventListener('click', batchApprove)
-  document.getElementById('batchRejectBtn').addEventListener('click', batchReject)
-  document.getElementById('approveBtn').addEventListener('click', function () {
-    reviewSingle('approve')
-  })
-  document.getElementById('rejectBtn').addEventListener('click', function () {
-    reviewSingle('reject')
-  })
+    // 分页
+    pagination: {
+      current_page: 1,
+      total_pages: 1,
+      total: 0
+    },
+    currentPage: 1,
+    pageSize: 20,
 
-  // 事件委托：处理表格内的点击事件（CSP兼容）
-  document.getElementById('reviewTableBody').addEventListener('click', handleTableClick)
-  document.getElementById('reviewTableBody').addEventListener('change', handleTableChange)
+    // 选择项
+    selectedItems: [],
 
-  // 事件委托：处理分页点击事件（CSP兼容）
-  document.getElementById('paginationNav').addEventListener('click', handlePaginationClick)
+    // 当前审核的申请
+    currentApp: {},
+    reviewComment: '',
 
-  // Token和权限验证
-  if (!getToken() || !checkAdminPermission()) {
-    return
-  }
+    // 模态框实例
+    reviewModalInstance: null,
 
-  // 加载数据
-  loadData()
-  // 加载待审核统计
-  loadPendingStats()
-})
+    // ============================================================
+    // 计算属性
+    // ============================================================
+    get isAllSelected() {
+      const pendingApps = this.applications.filter(app => app.status === 'pending')
+      return pendingApps.length > 0 && pendingApps.every(app => this.selectedItems.includes(app.audit_id))
+    },
 
-/**
- * 处理表格内的点击事件（事件委托）
- * @param {Event} event
- */
-function handleTableClick(event) {
-  const target = event.target.closest('button')
-  if (!target) return
+    // ============================================================
+    // 初始化
+    // ============================================================
+    init() {
+      this.userInfo = getCurrentUser() || {}
 
-  const auditId = parseInt(target.dataset.auditId)
-  if (!auditId) return
-
-  if (target.classList.contains('btn-review')) {
-    showReviewModal(auditId)
-  } else if (target.classList.contains('btn-detail')) {
-    showDetail(auditId)
-  }
-}
-
-/**
- * 处理表格内的change事件（事件委托）
- * @param {Event} event
- */
-function handleTableChange(event) {
-  const target = event.target
-  if (!target.classList.contains('row-checkbox')) return
-
-  const auditId = parseInt(target.dataset.id)
-  if (!auditId) return
-
-  toggleRowSelection(auditId)
-}
-
-/**
- * 处理分页点击事件（事件委托）
- * @param {Event} event
- */
-function handlePaginationClick(event) {
-  event.preventDefault()
-  const target = event.target.closest('a')
-  if (!target) return
-  if (target.parentElement.classList.contains('disabled')) return
-
-  const page = parseInt(target.dataset.page)
-  if (page && page > 0) {
-    goToPage(page)
-  }
-}
-
-/**
- * 加载待审核统计
- */
-async function loadPendingStats() {
-  console.log('[商家积分] 开始加载统计数据...')
-  console.log('[商家积分] API端点:', API_ENDPOINTS.MERCHANT_POINTS.STATS_PENDING)
-  try {
-    const response = await apiRequest(API_ENDPOINTS.MERCHANT_POINTS.STATS_PENDING)
-    console.log('[商家积分] 统计接口返回:', response)
-    if (response && response.success) {
-      // 更新所有统计卡片
-      document.getElementById('pendingCount').textContent = response.data.pending_count || 0
-      document.getElementById('approvedCount').textContent = response.data.approved_count || 0
-      document.getElementById('rejectedCount').textContent = response.data.rejected_count || 0
-      document.getElementById('totalPoints').textContent = response.data.today_points || 0
-      console.log('[商家积分] 统计数据更新完成:', response.data)
-    } else {
-      console.error('[商家积分] 统计接口返回失败:', response)
-    }
-  } catch (error) {
-    console.error('[商家积分] 加载统计失败:', error)
-  }
-}
-
-/**
- * 加载数据
- */
-async function loadData() {
-  showLoading(true)
-  const tbody = document.getElementById('reviewTableBody')
-  
-  console.log('[商家积分] 开始加载列表数据...')
-
-  try {
-    const status = document.getElementById('statusFilter').value
-    const timeRange = document.getElementById('timeRangeFilter').value
-    const priority = document.getElementById('priorityFilter').value
-
-    const params = new URLSearchParams({
-      page: currentPage,
-      page_size: pageSize
-    })
-
-    if (status) params.append('status', status)
-    if (timeRange) params.append('time_range', timeRange)
-    if (priority) params.append('priority', priority)
-
-    const url = API_ENDPOINTS.MERCHANT_POINTS.LIST + '?' + params.toString()
-    console.log('[商家积分] 请求URL:', url)
-    const response = await apiRequest(url)
-    console.log('[商家积分] 列表接口返回:', response)
-
-    if (response && response.success) {
-      const { rows, count, pagination } = response.data
-
-      // 渲染表格
-      renderTable(rows || [])
-
-      // 重新加载统计数据（从stats API获取准确统计）
-      loadPendingStats()
-
-      // 渲染分页
-      if (pagination) {
-        renderPagination(pagination)
+      if (!getToken() || !checkAdminPermission()) {
+        return
       }
-    } else {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="9" class="text-center py-5 text-muted">
-            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-            <p class="mt-2">暂无数据</p>
-          </td>
-        </tr>
-      `
-    }
-  } catch (error) {
-    console.error('加载数据失败:', error)
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="9" class="text-center py-5 text-danger">
-          <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
-          <p class="mt-2">加载失败：${error.message}</p>
-        </td>
-      </tr>
-    `
-  } finally {
-    showLoading(false)
-  }
-}
 
-/**
- * 从列表数据更新统计
- * @param {Array} rows - 申请列表
- */
-function updateStatisticsFromList(rows) {
-  // 使用后端字段名 status 和 points_amount
-  const pending = rows.filter(r => r.status === 'pending').length
-  const approved = rows.filter(r => r.status === 'approved').length
-  const rejected = rows.filter(r => r.status === 'rejected').length
-  const totalPoints = rows
-    .filter(r => r.status === 'approved')
-    .reduce((sum, r) => sum + (r.points_amount || 0), 0)
+      // 初始化模态框
+      this.reviewModalInstance = new bootstrap.Modal(this.$refs.reviewModal)
 
-  document.getElementById('approvedCount').textContent = approved
-  document.getElementById('rejectedCount').textContent = rejected
-  document.getElementById('totalPoints').textContent = totalPoints
-}
+      // 加载数据
+      this.loadData()
+      this.loadPendingStats()
+    },
 
-/**
- * 渲染表格
- * @param {Array} applications - 申请列表
- */
-function renderTable(applications) {
-  const tbody = document.getElementById('reviewTableBody')
+    // ============================================================
+    // 数据加载
+    // ============================================================
 
-  if (!applications || applications.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="9" class="text-center py-5 text-muted">
-          <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-          <p class="mt-2">暂无申请记录</p>
-        </td>
-      </tr>
-    `
-    return
-  }
-
-  tbody.innerHTML = applications
-    .map(app => {
-      const statusBadge =
-        {
-          pending: '<span class="badge bg-warning">待审核</span>',
-          approved: '<span class="badge bg-success">已通过</span>',
-          rejected: '<span class="badge bg-danger">已拒绝</span>',
-          cancelled: '<span class="badge bg-secondary">已取消</span>'
-        }[app.status] || '<span class="badge bg-secondary">未知</span>'
-
-      const isChecked = selectedItems.has(app.audit_id)
-      const isPending = app.status === 'pending'
-
-      // 直接使用后端字段名，不做复杂映射
-      const auditId = app.audit_id
-      const pointsAmount = app.points_amount || 0
-
-      // 申请人信息：使用 applicant 对象
-      const applicantName = app.applicant
-        ? app.applicant.nickname || app.applicant.mobile || `用户${app.applicant.user_id}`
-        : `用户${app.user_id}`
-
-      // 审核员信息：使用 auditor 对象
-      const auditorName = app.auditor
-        ? app.auditor.nickname || app.auditor.mobile || `管理员${app.auditor.user_id}`
-        : '-'
-
-      // 申请描述
-      const description = app.description || '-'
-
-      // 提交时间
-      const submittedAt = app.submitted_at || app.created_at
-
-      // 使用 data-* 属性代替内联事件（CSP兼容）
-      return `
-      <tr>
-        <td>
-          <input type="checkbox" class="form-check-input row-checkbox" 
-                 data-id="${auditId}" 
-                 ${isChecked ? 'checked' : ''}
-                 ${!isPending ? 'disabled' : ''}>
-        </td>
-        <td>${auditId}</td>
-        <td>${applicantName}</td>
-        <td class="text-warning"><strong>${pointsAmount}</strong></td>
-        <td title="${description}">${description.length > 20 ? description.substring(0, 20) + '...' : description}</td>
-        <td>${formatDate(submittedAt)}</td>
-        <td>${statusBadge}</td>
-        <td>${auditorName}</td>
-        <td>
-          ${
-            isPending
-              ? `
-            <button class="btn btn-sm btn-outline-primary btn-review" data-audit-id="${auditId}">
-              <i class="bi bi-clipboard-check"></i> 审核
-            </button>
-          `
-              : `
-            <button class="btn btn-sm btn-outline-secondary btn-detail" data-audit-id="${auditId}">
-              <i class="bi bi-eye"></i> 详情
-            </button>
-          `
+    /**
+     * 加载待审核统计
+     */
+    async loadPendingStats() {
+      try {
+        const response = await apiRequest(API_ENDPOINTS.MERCHANT_POINTS.STATS_PENDING)
+        if (response && response.success) {
+          this.stats = {
+            pending_count: response.data.pending_count || 0,
+            approved_count: response.data.approved_count || 0,
+            rejected_count: response.data.rejected_count || 0,
+            today_points: response.data.today_points || 0
           }
-        </td>
-      </tr>
-    `
-    })
-    .join('')
-
-  updateBatchButtons()
-}
-
-/**
- * 切换行选择
- * @param {number} auditId - 审核ID
- */
-function toggleRowSelection(auditId) {
-  if (selectedItems.has(auditId)) {
-    selectedItems.delete(auditId)
-  } else {
-    selectedItems.add(auditId)
-  }
-  updateBatchButtons()
-}
-
-/**
- * 切换全选
- */
-function toggleSelectAll() {
-  const isChecked = document.getElementById('headerCheckbox').checked
-  const checkboxes = document.querySelectorAll('.row-checkbox:not(:disabled)')
-
-  checkboxes.forEach(checkbox => {
-    checkbox.checked = isChecked
-    const auditId = parseInt(checkbox.dataset.id)
-    if (isChecked) {
-      selectedItems.add(auditId)
-    } else {
-      selectedItems.delete(auditId)
-    }
-  })
-
-  updateBatchButtons()
-}
-
-/**
- * 更新批量操作按钮状态
- */
-function updateBatchButtons() {
-  const hasSelection = selectedItems.size > 0
-  document.getElementById('batchApproveBtn').disabled = !hasSelection
-  document.getElementById('batchRejectBtn').disabled = !hasSelection
-}
-
-/**
- * 显示审核模态框
- * @param {number} auditId - 审核ID
- */
-async function showReviewModal(auditId) {
-  currentAuditId = auditId
-
-  try {
-    const response = await apiRequest(API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.DETAIL, { id: auditId }))
-
-    if (response && response.success) {
-      const app = response.data
-
-      // 直接使用后端字段名
-      document.getElementById('modalApplyId').textContent = app.audit_id
-
-      // 申请人信息
-      const applicantName = app.applicant
-        ? app.applicant.nickname || app.applicant.mobile || `用户${app.applicant.user_id}`
-        : `用户${app.user_id}`
-      document.getElementById('modalUser').textContent = applicantName
-
-      // 积分数量
-      document.getElementById('modalPoints').textContent = app.points_amount || 0
-
-      // 申请描述
-      document.getElementById('modalRemark').textContent = app.description || '-'
-
-      document.getElementById('reviewComment').value = ''
-
-      new bootstrap.Modal(document.getElementById('reviewModal')).show()
-    } else {
-      showErrorToast(response?.message || '获取详情失败')
-    }
-  } catch (error) {
-    console.error('获取申请详情失败:', error)
-    showErrorToast('获取详情失败')
-  }
-}
-
-/**
- * 审核单个申请
- * @param {string} action - 审核操作 (approve/reject)
- */
-async function reviewSingle(action) {
-  if (!currentAuditId) return
-
-  const comment = document.getElementById('reviewComment').value.trim()
-
-  // 如果是拒绝，检查是否填写了原因
-  if (action === 'reject' && !comment) {
-    showWarningToast('请填写拒绝原因')
-    return
-  }
-
-  showLoading(true)
-
-  try {
-    const endpoint = action === 'approve' 
-      ? API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.APPROVE, { id: currentAuditId })
-      : API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.REJECT, { id: currentAuditId })
-    const response = await apiRequest(
-      endpoint,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          reason: comment
-        })
+        }
+      } catch (error) {
+        console.error('加载统计失败:', error)
       }
-    )
+    },
 
-    if (response && response.success) {
-      showSuccessToast(action === 'approve' ? '审核通过' : '审核拒绝')
-      bootstrap.Modal.getInstance(document.getElementById('reviewModal')).hide()
-      loadData()
-      loadPendingStats()
-    } else {
-      showErrorToast(response?.message || '审核失败')
-    }
-  } catch (error) {
-    console.error('审核失败:', error)
-    showErrorToast('审核失败：' + error.message)
-  } finally {
-    showLoading(false)
-  }
-}
+    /**
+     * 加载数据列表
+     */
+    async loadData() {
+      this.loading = true
+      this.applications = []
 
-/**
- * 批量通过
- */
-async function batchApprove() {
-  if (selectedItems.size === 0) return
-
-  if (!confirm(`确定要批量通过 ${selectedItems.size} 条申请吗？`)) {
-    return
-  }
-
-  showLoading(true)
-
-  let successCount = 0
-  let failCount = 0
-
-  try {
-    for (const auditId of selectedItems) {
       try {
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.APPROVE, { id: auditId }), {
+        const params = new URLSearchParams({
+          page: this.currentPage,
+          page_size: this.pageSize
+        })
+
+        if (this.filters.status) params.append('status', this.filters.status)
+        if (this.filters.timeRange) params.append('time_range', this.filters.timeRange)
+        if (this.filters.priority) params.append('priority', this.filters.priority)
+
+        const url = API_ENDPOINTS.MERCHANT_POINTS.LIST + '?' + params.toString()
+        const response = await apiRequest(url)
+
+        if (response && response.success) {
+          const { rows, pagination } = response.data
+          this.applications = rows || []
+          this.pagination = pagination || { current_page: 1, total_pages: 1, total: 0 }
+
+          // 重新加载统计数据
+          this.loadPendingStats()
+        } else {
+          this.showErrorToast(response?.message || '加载数据失败')
+        }
+      } catch (error) {
+        console.error('加载数据失败:', error)
+        this.showErrorToast('加载失败：' + error.message)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    // ============================================================
+    // 事件处理
+    // ============================================================
+
+    /**
+     * 筛选条件变化
+     */
+    handleFilterChange() {
+      this.currentPage = 1
+      this.selectedItems = []
+      this.loadData()
+    },
+
+    /**
+     * 切换页码
+     * @param {number} page - 目标页码
+     */
+    changePage(page) {
+      if (page >= 1 && page <= this.pagination.total_pages && page !== this.currentPage) {
+        this.currentPage = page
+        this.selectedItems = []
+        this.loadData()
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
+    },
+
+    /**
+     * 获取可见页码数组
+     */
+    getPageNumbers() {
+      const totalPages = this.pagination.total_pages
+      const currentPage = this.currentPage
+      const maxVisible = 5
+
+      let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2))
+      let endPage = Math.min(totalPages, startPage + maxVisible - 1)
+
+      if (endPage - startPage < maxVisible - 1) {
+        startPage = Math.max(1, totalPages - maxVisible + 1)
+      }
+
+      const pages = []
+      for (let i = startPage; i <= endPage; i++) {
+        pages.push(i)
+      }
+      return pages
+    },
+
+    /**
+     * 切换行选择
+     * @param {number} auditId - 审核ID
+     */
+    toggleRowSelection(auditId) {
+      const index = this.selectedItems.indexOf(auditId)
+      if (index > -1) {
+        this.selectedItems.splice(index, 1)
+      } else {
+        this.selectedItems.push(auditId)
+      }
+    },
+
+    /**
+     * 切换全选
+     */
+    toggleSelectAll() {
+      const pendingApps = this.applications.filter(app => app.status === 'pending')
+
+      if (this.isAllSelected) {
+        // 取消全选
+        this.selectedItems = []
+      } else {
+        // 全选待审核项
+        this.selectedItems = pendingApps.map(app => app.audit_id)
+      }
+    },
+
+    /**
+     * 显示审核模态框
+     * @param {Object} app - 申请对象
+     */
+    showReviewModal(app) {
+      this.currentApp = app
+      this.reviewComment = ''
+      this.reviewModalInstance.show()
+    },
+
+    /**
+     * 显示详情模态框（复用审核模态框）
+     * @param {Object} app - 申请对象
+     */
+    showDetailModal(app) {
+      this.currentApp = app
+      this.reviewComment = app.audit_reason || ''
+      this.reviewModalInstance.show()
+    },
+
+    /**
+     * 审核单个申请
+     * @param {string} action - 审核操作 (approve/reject)
+     */
+    async reviewSingle(action) {
+      if (!this.currentApp.audit_id) return
+
+      // 如果是拒绝，检查是否填写了原因
+      if (action === 'reject' && !this.reviewComment.trim()) {
+        this.showWarningToast('请填写拒绝原因')
+        return
+      }
+
+      this.submitting = true
+
+      try {
+        const endpoint = action === 'approve'
+          ? API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.APPROVE, { id: this.currentApp.audit_id })
+          : API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.REJECT, { id: this.currentApp.audit_id })
+
+        const response = await apiRequest(endpoint, {
           method: 'POST',
-          body: JSON.stringify({ reason: '批量审核通过' })
+          body: JSON.stringify({
+            reason: this.reviewComment.trim()
+          })
         })
 
         if (response && response.success) {
-          successCount++
+          this.showSuccessToast(action === 'approve' ? '审核通过' : '审核拒绝')
+          this.reviewModalInstance.hide()
+          this.loadData()
+          this.loadPendingStats()
         } else {
-          failCount++
+          this.showErrorToast(response?.message || '审核失败')
         }
       } catch (error) {
-        failCount++
-        console.error(`审核 ${auditId} 失败:`, error)
+        console.error('审核失败:', error)
+        this.showErrorToast('审核失败：' + error.message)
+      } finally {
+        this.submitting = false
       }
-    }
+    },
 
-    if (successCount > 0) {
-      showSuccessToast(
-        `成功通过 ${successCount} 条申请${failCount > 0 ? `，${failCount} 条失败` : ''}`
-      )
-    } else {
-      showErrorToast('批量操作失败')
-    }
+    /**
+     * 批量通过
+     */
+    async batchApprove() {
+      if (this.selectedItems.length === 0) return
 
-    selectedItems.clear()
-    loadData()
-    loadPendingStats()
-  } catch (error) {
-    console.error('批量操作失败:', error)
-    showErrorToast('批量操作失败：' + error.message)
-  } finally {
-    showLoading(false)
-  }
-}
+      if (!confirm(`确定要批量通过 ${this.selectedItems.length} 条申请吗？`)) {
+        return
+      }
 
-/**
- * 批量拒绝
- */
-async function batchReject() {
-  if (selectedItems.size === 0) return
+      this.globalLoading = true
 
-  const reason = prompt('请输入拒绝原因（必填）：')
-  if (!reason || reason.trim() === '') {
-    showWarningToast('拒绝原因不能为空')
-    return
-  }
+      let successCount = 0
+      let failCount = 0
 
-  showLoading(true)
-
-  let successCount = 0
-  let failCount = 0
-
-  try {
-    for (const auditId of selectedItems) {
       try {
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.REJECT, { id: auditId }), {
-          method: 'POST',
-          body: JSON.stringify({ reason: reason.trim() })
-        })
+        for (const auditId of this.selectedItems) {
+          try {
+            const response = await apiRequest(
+              API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.APPROVE, { id: auditId }),
+              {
+                method: 'POST',
+                body: JSON.stringify({ reason: '批量审核通过' })
+              }
+            )
 
-        if (response && response.success) {
-          successCount++
-        } else {
-          failCount++
+            if (response && response.success) {
+              successCount++
+            } else {
+              failCount++
+            }
+          } catch (error) {
+            failCount++
+            console.error(`审核 ${auditId} 失败:`, error)
+          }
         }
+
+        if (successCount > 0) {
+          this.showSuccessToast(
+            `成功通过 ${successCount} 条申请${failCount > 0 ? `，${failCount} 条失败` : ''}`
+          )
+        } else {
+          this.showErrorToast('批量操作失败')
+        }
+
+        this.selectedItems = []
+        this.loadData()
+        this.loadPendingStats()
       } catch (error) {
-        failCount++
-        console.error(`审核 ${auditId} 失败:`, error)
+        console.error('批量操作失败:', error)
+        this.showErrorToast('批量操作失败：' + error.message)
+      } finally {
+        this.globalLoading = false
       }
+    },
+
+    /**
+     * 批量拒绝
+     */
+    async batchReject() {
+      if (this.selectedItems.length === 0) return
+
+      const reason = prompt('请输入拒绝原因（必填）：')
+      if (!reason || reason.trim() === '') {
+        this.showWarningToast('拒绝原因不能为空')
+        return
+      }
+
+      this.globalLoading = true
+
+      let successCount = 0
+      let failCount = 0
+
+      try {
+        for (const auditId of this.selectedItems) {
+          try {
+            const response = await apiRequest(
+              API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.REJECT, { id: auditId }),
+              {
+                method: 'POST',
+                body: JSON.stringify({ reason: reason.trim() })
+              }
+            )
+
+            if (response && response.success) {
+              successCount++
+            } else {
+              failCount++
+            }
+          } catch (error) {
+            failCount++
+            console.error(`审核 ${auditId} 失败:`, error)
+          }
+        }
+
+        if (successCount > 0) {
+          this.showSuccessToast(
+            `成功拒绝 ${successCount} 条申请${failCount > 0 ? `，${failCount} 条失败` : ''}`
+          )
+        } else {
+          this.showErrorToast('批量操作失败')
+        }
+
+        this.selectedItems = []
+        this.loadData()
+        this.loadPendingStats()
+      } catch (error) {
+        console.error('批量操作失败:', error)
+        this.showErrorToast('批量操作失败：' + error.message)
+      } finally {
+        this.globalLoading = false
+      }
+    },
+
+    // ============================================================
+    // 辅助函数
+    // ============================================================
+
+    /**
+     * 获取申请人名称
+     * @param {Object} app - 申请对象
+     * @returns {string} 申请人名称
+     */
+    getApplicantName(app) {
+      if (!app) return '-'
+      if (app.applicant) {
+        return app.applicant.nickname || app.applicant.mobile || `用户${app.applicant.user_id}`
+      }
+      return `用户${app.user_id || '-'}`
+    },
+
+    /**
+     * 获取审核员名称
+     * @param {Object} app - 申请对象
+     * @returns {string} 审核员名称
+     */
+    getAuditorName(app) {
+      if (!app || !app.auditor) return '-'
+      return app.auditor.nickname || app.auditor.mobile || `管理员${app.auditor.user_id}`
+    },
+
+    /**
+     * 获取状态徽章样式
+     * @param {string} status - 状态
+     * @returns {string} CSS类
+     */
+    getStatusBadgeClass(status) {
+      const classMap = {
+        pending: 'bg-warning',
+        approved: 'bg-success',
+        rejected: 'bg-danger',
+        cancelled: 'bg-secondary'
+      }
+      return classMap[status] || 'bg-secondary'
+    },
+
+    /**
+     * 获取状态文本
+     * @param {string} status - 状态
+     * @returns {string} 文本
+     */
+    getStatusText(status) {
+      const textMap = {
+        pending: '待审核',
+        approved: '已通过',
+        rejected: '已拒绝',
+        cancelled: '已取消'
+      }
+      return textMap[status] || '未知'
+    },
+
+    /**
+     * 截断文本
+     * @param {string} text - 文本
+     * @param {number} length - 最大长度
+     * @returns {string} 截断后的文本
+     */
+    truncateText(text, length) {
+      if (!text) return '-'
+      return text.length > length ? text.substring(0, length) + '...' : text
+    },
+
+    /**
+     * 格式化日期
+     * @param {string} dateStr - 日期字符串
+     * @returns {string} 格式化后的日期
+     */
+    formatDate(dateStr) {
+      if (!dateStr) return '-'
+      const date = new Date(dateStr)
+      return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    },
+
+    /**
+     * 显示成功提示
+     * @param {string} message - 提示消息
+     */
+    showSuccessToast(message) {
+      this.$toast.success(message)
+    },
+
+    /**
+     * 显示错误提示
+     * @param {string} message - 错误消息
+     */
+    showErrorToast(message) {
+      this.$toast.error(message)
+    },
+
+    /**
+     * 显示警告提示
+     * @param {string} message - 警告消息
+     */
+    showWarningToast(message) {
+      this.$toast.warning(message)
+    },
+
+    /**
+     * 退出登录
+     */
+    logout() {
+      logout()
     }
-
-    if (successCount > 0) {
-      showSuccessToast(
-        `成功拒绝 ${successCount} 条申请${failCount > 0 ? `，${failCount} 条失败` : ''}`
-      )
-    } else {
-      showErrorToast('批量操作失败')
-    }
-
-    selectedItems.clear()
-    loadData()
-    loadPendingStats()
-  } catch (error) {
-    console.error('批量操作失败:', error)
-    showErrorToast('批量操作失败：' + error.message)
-  } finally {
-    showLoading(false)
   }
 }
 
-/**
- * 显示详情
- * @param {number} auditId - 审核ID
- */
-function showDetail(auditId) {
-  showReviewModal(auditId)
-}
-
-/**
- * 渲染分页（使用 data-* 属性代替内联事件，CSP兼容）
- * @param {Object} pagination - 分页信息
- */
-function renderPagination(pagination) {
-  const nav = document.getElementById('paginationNav')
-  if (!pagination || pagination.total_pages <= 1) {
-    nav.innerHTML = ''
-    return
-  }
-
-  let html = '<ul class="pagination pagination-sm justify-content-center mb-0">'
-
-  html += `
-    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-      <a class="page-link" href="#" data-page="${currentPage - 1}">上一页</a>
-    </li>
-  `
-
-  for (let i = 1; i <= pagination.total_pages; i++) {
-    if (i === 1 || i === pagination.total_pages || (i >= currentPage - 2 && i <= currentPage + 2)) {
-      html += `
-        <li class="page-item ${i === currentPage ? 'active' : ''}">
-          <a class="page-link" href="#" data-page="${i}">${i}</a>
-        </li>
-      `
-    } else if (i === currentPage - 3 || i === currentPage + 3) {
-      html += '<li class="page-item disabled"><span class="page-link">...</span></li>'
-    }
-  }
-
-  html += `
-    <li class="page-item ${currentPage === pagination.total_pages ? 'disabled' : ''}">
-      <a class="page-link" href="#" data-page="${currentPage + 1}">下一页</a>
-    </li>
-  `
-
-  html += '</ul>'
-  nav.innerHTML = html
-}
-
-/**
- * 跳转到指定页
- * @param {number} page - 页码
- */
-function goToPage(page) {
-  currentPage = page
-  loadData()
-}
-
-/**
- * 显示/隐藏加载状态
- * @param {boolean} show - 是否显示
- */
-function showLoading(show) {
-  const overlay = document.getElementById('loadingOverlay')
-  if (overlay) {
-    overlay.classList.toggle('show', show)
-  }
-}
+// Alpine.js 组件注册
+document.addEventListener('alpine:init', () => {
+  Alpine.data('merchantPointsPage', merchantPointsPage)
+  console.log('✅ [MerchantPointsPage] Alpine 组件已注册')
+})

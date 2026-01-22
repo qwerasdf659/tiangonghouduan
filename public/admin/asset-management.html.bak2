@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="pageTitle">资产管理 - 管理后台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+  <style>
+    .sub-nav { background: #f8f9fa; border-bottom: 1px solid #dee2e6; padding: 0.5rem 0; }
+    .sub-nav .nav-link { color: #495057; padding: 0.5rem 1rem; border-radius: 0.25rem; margin: 0 0.25rem; }
+    .sub-nav .nav-link:hover { background: #e9ecef; }
+    .sub-nav .nav-link.active { background: #0d6efd; color: white; }
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>🏪 管理后台 - 资产管理
+      </a>
+      <div>
+        <span class="text-light me-3" x-data x-text="$store.auth.user?.nickname ? `欢迎，${$store.auth.user.nickname}` : '欢迎，管理员'">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" onclick="logout()">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 子模块导航 -->
+  <div class="sub-nav" x-data="assetNavigation()">
+    <div class="container-fluid">
+      <ul class="nav nav-pills">
+        <template x-for="page in subPages" :key="page.id">
+          <li class="nav-item">
+            <a class="nav-link" :class="{ 'active': currentPage === page.id }" :href="'?page=' + page.id" @click.prevent="switchPage(page.id)">
+              <i class="bi me-1" :class="page.icon"></i><span x-text="page.title"></span>
+            </a>
+          </li>
+        </template>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 主内容区域 -->
+  <div class="container-fluid mt-4" x-data="assetPageContent()" x-cloak>
+    <!-- 材料资产类型 -->
+    <div x-show="currentPage === 'material-types'" x-cloak>
+      <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="bi bi-archive"></i> 材料资产类型</h5>
+          <button class="btn btn-primary btn-sm" @click="openCreateModal('material-type')">
+            <i class="bi bi-plus"></i> 新建类型
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>资产代码</th>
+                  <th>名称</th>
+                  <th>分类</th>
+                  <th>单位</th>
+                  <th>是否可交易</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="materialTypes.length === 0">
+                  <tr><td colspan="7" class="text-center text-muted py-4">暂无数据</td></tr>
+                </template>
+                <template x-for="item in materialTypes" :key="item.asset_code">
+                  <tr>
+                    <td><code x-text="item.asset_code"></code></td>
+                    <td x-text="item.name"></td>
+                    <td x-text="item.category || '-'"></td>
+                    <td x-text="item.unit || '个'"></td>
+                    <td><span class="badge" :class="item.is_tradeable ? 'bg-success' : 'bg-secondary'" x-text="item.is_tradeable ? '是' : '否'"></span></td>
+                    <td><span class="badge" :class="item.is_enabled ? 'bg-success' : 'bg-secondary'" x-text="item.is_enabled ? '启用' : '禁用'"></span></td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-primary" @click="editItem('material-type', item)"><i class="bi bi-pencil"></i></button>
+                      <button class="btn btn-sm btn-outline-danger" @click="deleteItem('material-type', item.asset_code)"><i class="bi bi-trash"></i></button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 材料资产账户 -->
+    <div x-show="currentPage === 'material-accounts'" x-cloak>
+      <div class="card">
+        <div class="card-header bg-white">
+          <h5 class="mb-0"><i class="bi bi-wallet2"></i> 材料资产账户</h5>
+        </div>
+        <div class="card-body">
+          <!-- 筛选器 -->
+          <div class="row mb-3 g-2">
+            <div class="col-md-3">
+              <input type="text" class="form-control form-control-sm" placeholder="用户ID" x-model="materialAccountFilters.user_id">
+            </div>
+            <div class="col-md-3">
+              <select class="form-select form-select-sm" x-model="materialAccountFilters.asset_code">
+                <option value="">全部资产类型</option>
+                <template x-for="type in materialTypes" :key="type.asset_code">
+                  <option :value="type.asset_code" x-text="type.name"></option>
+                </template>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <button class="btn btn-primary btn-sm w-100" @click="loadMaterialAccounts()">
+                <i class="bi bi-search"></i> 搜索
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>用户ID</th>
+                  <th>资产类型</th>
+                  <th>余额</th>
+                  <th>冻结</th>
+                  <th>可用</th>
+                  <th>更新时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="materialAccounts.length === 0">
+                  <tr><td colspan="6" class="text-center text-muted py-4">暂无数据</td></tr>
+                </template>
+                <template x-for="account in materialAccounts" :key="account.account_id">
+                  <tr>
+                    <td x-text="account.user_id"></td>
+                    <td x-text="account.asset_name || account.asset_code"></td>
+                    <td class="text-success" x-text="account.balance"></td>
+                    <td class="text-warning" x-text="account.frozen || 0"></td>
+                    <td class="text-primary" x-text="account.available || account.balance"></td>
+                    <td x-text="$format.date(account.updated_at)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 材料资产交易 -->
+    <div x-show="currentPage === 'material-transactions'" x-cloak>
+      <div class="card">
+        <div class="card-header bg-white">
+          <h5 class="mb-0"><i class="bi bi-arrow-left-right"></i> 材料资产交易记录</h5>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>交易ID</th>
+                  <th>用户</th>
+                  <th>资产类型</th>
+                  <th>变动类型</th>
+                  <th>变动数量</th>
+                  <th>余额前</th>
+                  <th>余额后</th>
+                  <th>时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="materialTransactions.length === 0">
+                  <tr><td colspan="8" class="text-center text-muted py-4">暂无数据</td></tr>
+                </template>
+                <template x-for="tx in materialTransactions" :key="tx.transaction_id">
+                  <tr>
+                    <td><code x-text="tx.transaction_id"></code></td>
+                    <td x-text="tx.user_nickname || tx.user_id"></td>
+                    <td x-text="tx.asset_name || tx.asset_code"></td>
+                    <td><span class="badge" :class="tx.change_type === 'credit' ? 'bg-success' : 'bg-danger'" x-text="tx.change_type === 'credit' ? '增加' : '减少'"></span></td>
+                    <td :class="tx.change_type === 'credit' ? 'text-success' : 'text-danger'" x-text="(tx.change_type === 'credit' ? '+' : '-') + tx.amount"></td>
+                    <td x-text="tx.balance_before"></td>
+                    <td x-text="tx.balance_after"></td>
+                    <td x-text="$format.date(tx.created_at)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 物品实例 -->
+    <div x-show="currentPage === 'item-instances'" x-cloak>
+      <div class="card">
+        <div class="card-header bg-white">
+          <h5 class="mb-0"><i class="bi bi-collection"></i> 物品实例</h5>
+        </div>
+        <div class="card-body">
+          <!-- 筛选器 -->
+          <div class="row mb-3 g-2">
+            <div class="col-md-3">
+              <input type="text" class="form-control form-control-sm" placeholder="用户ID" x-model="itemInstanceFilters.user_id">
+            </div>
+            <div class="col-md-3">
+              <select class="form-select form-select-sm" x-model="itemInstanceFilters.status">
+                <option value="">全部状态</option>
+                <option value="active">正常</option>
+                <option value="used">已使用</option>
+                <option value="expired">已过期</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <button class="btn btn-primary btn-sm w-100" @click="loadItemInstances()">
+                <i class="bi bi-search"></i> 搜索
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>实例ID</th>
+                  <th>物品名称</th>
+                  <th>拥有者</th>
+                  <th>状态</th>
+                  <th>获取来源</th>
+                  <th>创建时间</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="itemInstances.length === 0">
+                  <tr><td colspan="7" class="text-center text-muted py-4">暂无数据</td></tr>
+                </template>
+                <template x-for="instance in itemInstances" :key="instance.instance_id">
+                  <tr>
+                    <td><code x-text="instance.instance_id"></code></td>
+                    <td x-text="instance.item_name || instance.template_id"></td>
+                    <td x-text="instance.owner_nickname || instance.owner_user_id"></td>
+                    <td><span class="badge" :class="getInstanceStatusClass(instance.status)" x-text="getInstanceStatusText(instance.status)"></span></td>
+                    <td x-text="instance.source || '-'"></td>
+                    <td x-text="$format.date(instance.created_at)"></td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-info" @click="viewInstanceDetail(instance)"><i class="bi bi-eye"></i></button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 虚拟资产账户 -->
+    <div x-show="currentPage === 'virtual-accounts'" x-cloak>
+      <div class="card">
+        <div class="card-header bg-white">
+          <h5 class="mb-0"><i class="bi bi-coin"></i> 虚拟资产账户</h5>
+        </div>
+        <div class="card-body">
+          <!-- 筛选器 -->
+          <div class="row mb-3 g-2">
+            <div class="col-md-3">
+              <input type="text" class="form-control form-control-sm" placeholder="用户ID" x-model="virtualAccountFilters.user_id">
+            </div>
+            <div class="col-md-3">
+              <select class="form-select form-select-sm" x-model="virtualAccountFilters.currency_type">
+                <option value="">全部货币</option>
+                <option value="coins">金币</option>
+                <option value="diamonds">钻石</option>
+                <option value="points">积分</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <button class="btn btn-primary btn-sm w-100" @click="loadVirtualAccounts()">
+                <i class="bi bi-search"></i> 搜索
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>用户ID</th>
+                  <th>用户昵称</th>
+                  <th>货币类型</th>
+                  <th>总余额</th>
+                  <th>可用余额</th>
+                  <th>冻结金额</th>
+                  <th>更新时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="virtualAccounts.length === 0">
+                  <tr><td colspan="7" class="text-center text-muted py-4">暂无数据</td></tr>
+                </template>
+                <template x-for="account in virtualAccounts" :key="account.account_id">
+                  <tr>
+                    <td x-text="account.user_id"></td>
+                    <td x-text="account.user_nickname || '-'"></td>
+                    <td><span class="badge bg-primary" x-text="getCurrencyName(account.currency_type)"></span></td>
+                    <td class="text-success fw-bold" x-text="account.balance"></td>
+                    <td class="text-primary" x-text="account.available || account.balance"></td>
+                    <td class="text-warning" x-text="account.frozen || 0"></td>
+                    <td x-text="$format.date(account.updated_at)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 虚拟资产交易 -->
+    <div x-show="currentPage === 'virtual-transactions'" x-cloak>
+      <div class="card">
+        <div class="card-header bg-white">
+          <h5 class="mb-0"><i class="bi bi-receipt-cutoff"></i> 虚拟资产交易记录</h5>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>交易ID</th>
+                  <th>用户</th>
+                  <th>货币类型</th>
+                  <th>交易类型</th>
+                  <th>金额</th>
+                  <th>余额变化</th>
+                  <th>备注</th>
+                  <th>时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-if="virtualTransactions.length === 0">
+                  <tr><td colspan="8" class="text-center text-muted py-4">暂无数据</td></tr>
+                </template>
+                <template x-for="tx in virtualTransactions" :key="tx.transaction_id">
+                  <tr>
+                    <td><code x-text="tx.transaction_id"></code></td>
+                    <td x-text="tx.user_nickname || tx.user_id"></td>
+                    <td><span class="badge bg-primary" x-text="getCurrencyName(tx.currency_type)"></span></td>
+                    <td x-text="tx.transaction_type || '-'"></td>
+                    <td :class="tx.amount > 0 ? 'text-success' : 'text-danger'" x-text="(tx.amount > 0 ? '+' : '') + tx.amount"></td>
+                    <td x-text="tx.balance_before + ' → ' + tx.balance_after"></td>
+                    <td class="text-muted" x-text="tx.remark || '-'"></td>
+                    <td x-text="$format.date(tx.created_at)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 资产统计 -->
+    <div x-show="currentPage === 'asset-stats'" x-cloak>
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-archive text-primary" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">材料类型数</h6>
+              <h2 x-text="assetStats.materialTypesCount" class="text-primary mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-collection text-success" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">物品实例数</h6>
+              <h2 x-text="assetStats.itemInstancesCount" class="text-success mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-coin text-warning" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">总金币流通</h6>
+              <h2 x-text="assetStats.totalCoins" class="text-warning mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body text-center">
+              <i class="bi bi-gem text-info" style="font-size: 2rem;"></i>
+              <h6 class="text-muted mt-2">总钻石流通</h6>
+              <h2 x-text="assetStats.totalDiamonds" class="text-info mb-0">-</h2>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  <script src="/admin/js/alpine/init.js"></script>
+  <script>
+    document.addEventListener('alpine:init', () => {
+      // Navigation component
+      Alpine.data('assetNavigation', () => ({
+        currentPage: 'material-types',
+        subPages: [
+          { id: 'material-types', title: '材料资产类型', icon: 'bi-archive' },
+          { id: 'material-accounts', title: '材料账户', icon: 'bi-wallet2' },
+          { id: 'material-transactions', title: '材料交易', icon: 'bi-arrow-left-right' },
+          { id: 'item-instances', title: '物品实例', icon: 'bi-collection' },
+          { id: 'virtual-accounts', title: '虚拟账户', icon: 'bi-coin' },
+          { id: 'virtual-transactions', title: '虚拟交易', icon: 'bi-receipt-cutoff' },
+          { id: 'asset-stats', title: '资产统计', icon: 'bi-graph-up' }
+        ],
+        init() {
+          const urlParams = new URLSearchParams(window.location.search);
+          this.currentPage = urlParams.get('page') || 'material-types';
+          Alpine.store('assetPage', this.currentPage);
+        },
+        switchPage(pageId) {
+          this.currentPage = pageId;
+          Alpine.store('assetPage', pageId);
+          window.history.pushState({}, '', `?page=${pageId}`);
+        }
+      }));
+
+      Alpine.store('assetPage', 'material-types');
+
+      // Page content component
+      Alpine.data('assetPageContent', () => ({
+        materialTypes: [],
+        materialAccounts: [],
+        materialTransactions: [],
+        itemInstances: [],
+        virtualAccounts: [],
+        virtualTransactions: [],
+        materialAccountFilters: { user_id: '', asset_code: '' },
+        itemInstanceFilters: { user_id: '', status: '' },
+        virtualAccountFilters: { user_id: '', currency_type: '' },
+        assetStats: { materialTypesCount: 0, itemInstancesCount: 0, totalCoins: 0, totalDiamonds: 0 },
+
+        get currentPage() {
+          return Alpine.store('assetPage');
+        },
+
+        init() {
+          this.loadAllData();
+          this.$watch('$store.assetPage', () => this.loadAllData());
+        },
+
+        async loadAllData() {
+          showLoading();
+          try {
+            await Promise.all([
+              this.loadMaterialTypes(),
+              this.loadMaterialAccounts(),
+              this.loadMaterialTransactions(),
+              this.loadItemInstances(),
+              this.loadVirtualAccounts(),
+              this.loadVirtualTransactions()
+            ]);
+            this.calculateStats();
+          } catch (error) {
+            console.error('加载数据失败:', error);
+          } finally {
+            hideLoading();
+          }
+        },
+
+        async loadMaterialTypes() {
+          try {
+            const response = await apiRequest(API_ENDPOINTS.MATERIAL?.ASSET_TYPES || '/api/v4/admin/material/asset-types');
+            if (response && response.success) {
+              this.materialTypes = response.data?.list || response.data || [];
+            }
+          } catch (error) {
+            console.error('加载材料类型失败:', error);
+            this.materialTypes = [];
+          }
+        },
+
+        async loadMaterialAccounts() {
+          try {
+            let url = API_ENDPOINTS.MATERIAL?.ACCOUNTS || '/api/v4/admin/material/accounts';
+            const params = new URLSearchParams();
+            if (this.materialAccountFilters.user_id) params.append('user_id', this.materialAccountFilters.user_id);
+            if (this.materialAccountFilters.asset_code) params.append('asset_code', this.materialAccountFilters.asset_code);
+            if (params.toString()) url += '?' + params.toString();
+            const response = await apiRequest(url);
+            if (response && response.success) {
+              this.materialAccounts = response.data?.list || response.data || [];
+            }
+          } catch (error) {
+            console.error('加载材料账户失败:', error);
+            this.materialAccounts = [];
+          }
+        },
+
+        async loadMaterialTransactions() {
+          try {
+            const response = await apiRequest(API_ENDPOINTS.MATERIAL?.TRANSACTIONS || '/api/v4/admin/material/transactions');
+            if (response && response.success) {
+              this.materialTransactions = response.data?.list || response.data || [];
+            }
+          } catch (error) {
+            console.error('加载材料交易失败:', error);
+            this.materialTransactions = [];
+          }
+        },
+
+        async loadItemInstances() {
+          try {
+            let url = API_ENDPOINTS.ITEM?.INSTANCES || '/api/v4/admin/items/instances';
+            const params = new URLSearchParams();
+            if (this.itemInstanceFilters.user_id) params.append('user_id', this.itemInstanceFilters.user_id);
+            if (this.itemInstanceFilters.status) params.append('status', this.itemInstanceFilters.status);
+            if (params.toString()) url += '?' + params.toString();
+            const response = await apiRequest(url);
+            if (response && response.success) {
+              this.itemInstances = response.data?.list || response.data || [];
+            }
+          } catch (error) {
+            console.error('加载物品实例失败:', error);
+            this.itemInstances = [];
+          }
+        },
+
+        async loadVirtualAccounts() {
+          try {
+            let url = API_ENDPOINTS.VIRTUAL?.ACCOUNTS || '/api/v4/admin/virtual/accounts';
+            const params = new URLSearchParams();
+            if (this.virtualAccountFilters.user_id) params.append('user_id', this.virtualAccountFilters.user_id);
+            if (this.virtualAccountFilters.currency_type) params.append('currency_type', this.virtualAccountFilters.currency_type);
+            if (params.toString()) url += '?' + params.toString();
+            const response = await apiRequest(url);
+            if (response && response.success) {
+              this.virtualAccounts = response.data?.list || response.data || [];
+            }
+          } catch (error) {
+            console.error('加载虚拟账户失败:', error);
+            this.virtualAccounts = [];
+          }
+        },
+
+        async loadVirtualTransactions() {
+          try {
+            const response = await apiRequest(API_ENDPOINTS.VIRTUAL?.TRANSACTIONS || '/api/v4/admin/virtual/transactions');
+            if (response && response.success) {
+              this.virtualTransactions = response.data?.list || response.data || [];
+            }
+          } catch (error) {
+            console.error('加载虚拟交易失败:', error);
+            this.virtualTransactions = [];
+          }
+        },
+
+        calculateStats() {
+          this.assetStats = {
+            materialTypesCount: this.materialTypes.length,
+            itemInstancesCount: this.itemInstances.length,
+            totalCoins: this.virtualAccounts.filter(a => a.currency_type === 'coins').reduce((sum, a) => sum + (a.balance || 0), 0),
+            totalDiamonds: this.virtualAccounts.filter(a => a.currency_type === 'diamonds').reduce((sum, a) => sum + (a.balance || 0), 0)
+          };
+        },
+
+        getInstanceStatusClass(status) {
+          const map = { active: 'bg-success', used: 'bg-secondary', expired: 'bg-danger', locked: 'bg-warning' };
+          return map[status] || 'bg-secondary';
+        },
+
+        getInstanceStatusText(status) {
+          const map = { active: '正常', used: '已使用', expired: '已过期', locked: '锁定中' };
+          return map[status] || status;
+        },
+
+        getCurrencyName(type) {
+          const map = { coins: '金币', diamonds: '钻石', points: '积分' };
+          return map[type] || type;
+        },
+
+        openCreateModal(type) {
+          alert(`创建${type}功能开发中`);
+        },
+
+        editItem(type, item) {
+          alert(`编辑${type}: ${item.asset_code || item.name}`);
+        },
+
+        deleteItem(type, id) {
+          if (confirm('确定要删除吗？')) {
+            alert(`删除${type}: ${id}`);
+          }
+        },
+
+        viewInstanceDetail(instance) {
+          alert(`物品实例详情: ${instance.instance_id}`);
+        }
+      }));
+    });
+  </script>
+  
+  <!-- Alpine.js (defer 确保最后加载) -->
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+</body>
+</html>

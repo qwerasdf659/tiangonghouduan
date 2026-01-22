@@ -1,412 +1,361 @@
 /**
- * 图片资源管理页面 - JavaScript逻辑
- * 从image-resources.html提取，遵循前端工程化最佳实践
+ * 图片资源管理页面 - Alpine.js 版本
+ *
+ * @file public/admin/js/pages/image-resources.js
+ * @description 图片列表、上传、删除、详情查看等功能
+ * @version 2.0.0 (Alpine.js 重构版)
+ * @date 2026-01-22
  */
-
-// ========== 全局变量 ==========
-let currentPage = 1
-const pageSize = 24
-let selectedFiles = []
-let currentImageId = null
-
-// ========== 页面初始化 ==========
-
-document.addEventListener('DOMContentLoaded', function () {
-  const userInfo = getCurrentUser()
-  if (userInfo && userInfo.nickname) {
-    document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`
-  }
-
-  document.getElementById('logoutBtn').addEventListener('click', logout)
-  document.getElementById('refreshBtn').addEventListener('click', loadImageData)
-  document.getElementById('imageTypeFilter').addEventListener('change', loadImageData)
-  document.getElementById('statusFilter').addEventListener('change', loadImageData)
-
-  setupUploadZone()
-  document.getElementById('submitUploadBtn').addEventListener('click', uploadImages)
-  document.getElementById('deleteImageBtn').addEventListener('click', deleteCurrentImage)
-
-  if (!getToken() || !checkAdminPermission()) {
-    return
-  }
-
-  loadImageData()
-})
-
-function setupUploadZone() {
-  const zone = document.getElementById('uploadZone')
-  const fileInput = document.getElementById('fileInput')
-
-  zone.addEventListener('click', () => fileInput.click())
-
-  zone.addEventListener('dragover', e => {
-    e.preventDefault()
-    zone.classList.add('dragover')
-  })
-
-  zone.addEventListener('dragleave', () => {
-    zone.classList.remove('dragover')
-  })
-
-  zone.addEventListener('drop', e => {
-    e.preventDefault()
-    zone.classList.remove('dragover')
-    handleFiles(e.dataTransfer.files)
-  })
-
-  fileInput.addEventListener('change', e => {
-    handleFiles(e.target.files)
-  })
-}
-
-function handleFiles(files) {
-  selectedFiles = Array.from(files).filter(file => {
-    if (!file.type.startsWith('image/')) {
-      showErrorToast(`${file.name} 不是图片文件`)
-      return false
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      showErrorToast(`${file.name} 超过5MB限制`)
-      return false
-    }
-    return true
-  })
-
-  if (selectedFiles.length > 0) {
-    renderUploadPreview()
-    document.getElementById('submitUploadBtn').disabled = false
-  }
-}
-
-function renderUploadPreview() {
-  const container = document.getElementById('uploadPreviewContainer')
-  const list = document.getElementById('uploadPreviewList')
-
-  list.innerHTML = selectedFiles
-    .map((file, index) => {
-      const url = URL.createObjectURL(file)
-      return `
-      <div class="col-md-3">
-        <div class="card">
-          <img src="${url}" class="card-img-top" style="height: 100px; object-fit: cover;">
-          <div class="card-body p-2">
-            <small class="text-truncate d-block">${file.name}</small>
-            <small class="text-muted">${formatFileSize(file.size)}</small>
-          </div>
-        </div>
-      </div>
-    `
-    })
-    .join('')
-
-  container.style.display = 'block'
-}
-
-async function uploadImages() {
-  if (selectedFiles.length === 0) return
-
-  const submitBtn = document.getElementById('submitUploadBtn')
-  submitBtn.disabled = true
-  submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>上传中...'
-
-  try {
-    const imageType = document.getElementById('uploadImageType').value
-    let successCount = 0
-
-    for (const file of selectedFiles) {
-      const formData = new FormData()
-      formData.append('image', file) // 后端字段名是 image
-      formData.append('business_type', imageType) // 后端字段名是 business_type
-
-      // 修正API路径：/api/v4/console/images/upload（移除 system 子路径）
-      const response = await fetch(API_ENDPOINTS.IMAGE.UPLOAD, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${getToken()}` },
-        body: formData
-      })
-
-      const result = await response.json()
-      if (result.success) successCount++
-    }
-
-    showSuccessToast(`成功上传 ${successCount}/${selectedFiles.length} 张图片`)
-    bootstrap.Modal.getInstance(document.getElementById('uploadModal')).hide()
-    selectedFiles = []
-    document.getElementById('uploadPreviewContainer').style.display = 'none'
-    document.getElementById('uploadPreviewList').innerHTML = ''
-    loadImageData()
-  } catch (error) {
-    console.error('上传失败:', error)
-    showErrorToast('上传失败：' + error.message)
-  } finally {
-    submitBtn.disabled = false
-    submitBtn.innerHTML = '开始上传'
-  }
-}
-
-async function loadImageData() {
-  showLoading(true)
-  const container = document.getElementById('imagesContainer')
-
-  try {
-    const imageType = document.getElementById('imageTypeFilter').value
-    const status = document.getElementById('statusFilter').value
-
-    // 修正API路径和参数名：使用后端字段名 business_type
-    const params = new URLSearchParams({ page: currentPage, page_size: pageSize })
-    if (imageType) params.append('business_type', imageType)
-    if (status) params.append('status', status)
-
-    // 修正API路径：/api/v4/console/images（移除 system 子路径）
-    const response = await apiRequest(`${API_ENDPOINTS.IMAGE.LIST}?${params.toString()}`)
-
-    // 处理未登录或token失效的情况（apiRequest返回undefined）
-    if (!response) {
-      console.warn('图片数据加载失败: 未获取到响应（可能是未登录或token失效）')
-      setImageStatisticsError('需要登录')
-      container.innerHTML = `
-        <div class="col-12 text-center py-5 text-warning">
-          <i class="bi bi-lock" style="font-size: 2rem;"></i>
-          <p class="mt-2">需要登录才能查看</p>
-        </div>
-      `
-      return
-    }
-
-    if (response.success) {
-      const { images, statistics, pagination } = response.data || {}
-
-      document.getElementById('totalImages').textContent = statistics?.total ?? 0
-      document.getElementById('totalSize').textContent = formatFileSize(statistics?.total_size ?? 0)
-      document.getElementById('weeklyUploads').textContent = statistics?.weekly_uploads ?? 0
-      document.getElementById('orphanImages').textContent = statistics?.orphan_count ?? 0
-
-      renderImages(images || [])
-      if (pagination) renderPagination(pagination)
-    } else {
-      setImageStatisticsError(response?.message || '加载失败')
-      container.innerHTML = `
-        <div class="col-12 text-center py-5 text-muted">
-          <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-          <p class="mt-2">${response?.message || '暂无图片'}</p>
-        </div>
-      `
-    }
-  } catch (error) {
-    console.error('加载图片失败:', error)
-    setImageStatisticsError('请求错误')
-    container.innerHTML = `
-      <div class="col-12 text-center py-5 text-danger">
-        <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
-        <p class="mt-2">加载失败：${error.message}</p>
-      </div>
-    `
-  } finally {
-    showLoading(false)
-  }
-}
 
 /**
- * 设置图片统计数据为错误状态
- * @param {string} message - 错误信息
+ * 图片资源管理页面 Alpine.js 组件
  */
-function setImageStatisticsError(message) {
-  const errorText = `<span class="text-danger" title="${message}">-</span>`
-  document.getElementById('totalImages').innerHTML = errorText
-  document.getElementById('totalSize').innerHTML = errorText
-  document.getElementById('weeklyUploads').innerHTML = errorText
-  document.getElementById('orphanImages').innerHTML = errorText
-}
-
-function renderImages(images) {
-  const container = document.getElementById('imagesContainer')
-
-  if (!images || images.length === 0) {
-    container.innerHTML = `
-      <div class="col-12 text-center py-5 text-muted">
-        <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-        <p class="mt-2">暂无图片</p>
-      </div>
-    `
-    return
-  }
-
-  // 适配后端字段名：original_filename（不是 file_name）
-  // 使用 data-image-id 属性替代内联 onclick，避免CSP错误
-  container.innerHTML = images
-    .map(image => {
-      const statusBadge =
-        image.status === 'orphan'
-          ? '<span class="badge bg-danger position-absolute top-0 end-0 m-1">孤儿</span>'
-          : ''
-
-      return `
-      <div class="col-md-2 col-sm-4 col-6">
-        <div class="card image-card" data-image-id="${image.image_id}" style="cursor: pointer;">
-          <div class="position-relative">
-            ${
-              image.url
-                ? `<img src="${image.url}" class="image-preview" alt="${image.original_filename || ''}">`
-                : '<div class="image-placeholder"><i class="bi bi-image text-muted" style="font-size: 2rem;"></i></div>'
-            }
-            ${statusBadge}
-          </div>
-          <div class="card-body p-2">
-            <small class="text-truncate d-block">${image.original_filename || '-'}</small>
-            <small class="text-muted">${formatFileSize(image.file_size)}</small>
-          </div>
-        </div>
-      </div>
-    `
-    })
-    .join('')
-
-  // 使用事件委托绑定点击事件，避免CSP内联脚本限制
-  container.querySelectorAll('.image-card[data-image-id]').forEach(card => {
-    card.addEventListener('click', function () {
-      const imageId = parseInt(this.dataset.imageId, 10)
-      if (imageId) {
-        showImageDetail(imageId)
+function imageResourcesPage() {
+  return {
+    // ==================== 状态数据 ====================
+    
+    /** 用户信息 */
+    userInfo: null,
+    
+    /** 图片列表 */
+    images: [],
+    
+    /** 选中的图片详情 */
+    selectedImage: null,
+    
+    /** 加载状态 */
+    loading: true,
+    
+    /** 全局加载状态 */
+    globalLoading: false,
+    
+    /** 上传中状态 */
+    uploading: false,
+    
+    /** 当前页码 */
+    currentPage: 1,
+    
+    /** 每页显示数量 */
+    pageSize: 24,
+    
+    /** 总页数 */
+    totalPages: 1,
+    
+    /** 筛选条件 */
+    filters: {
+      imageType: '',
+      status: ''
+    },
+    
+    /** 统计数据 */
+    statistics: {
+      totalImages: 0,
+      totalSize: '0 MB',
+      weeklyUploads: 0,
+      orphanImages: 0
+    },
+    
+    /** 待上传的文件列表 */
+    selectedFiles: [],
+    
+    /** 上传图片类型 */
+    uploadImageType: 'uploads',
+    
+    /** 文件预览URL缓存 */
+    filePreviewUrls: new Map(),
+    
+    // ==================== 生命周期 ====================
+    
+    /**
+     * 初始化
+     */
+    init() {
+      console.log('✅ 图片资源管理页面 Alpine.js 组件初始化')
+      
+      // 获取用户信息
+      this.userInfo = getCurrentUser()
+      
+      // 加载数据
+      this.loadImageData()
+    },
+    
+    // ==================== 数据加载方法 ====================
+    
+    /**
+     * 加载图片数据
+     */
+    async loadImageData() {
+      this.loading = true
+      
+      try {
+        const params = new URLSearchParams({
+          page: this.currentPage,
+          page_size: this.pageSize
+        })
+        
+        if (this.filters.imageType) params.append('business_type', this.filters.imageType)
+        if (this.filters.status) params.append('status', this.filters.status)
+        
+        const response = await apiRequest(`${API_ENDPOINTS.IMAGE.LIST}?${params.toString()}`)
+        
+        if (response && response.success) {
+          const { images, statistics, pagination } = response.data || {}
+          
+          this.images = images || []
+          this.totalPages = pagination?.total_pages || 1
+          
+          // 更新统计数据
+          this.statistics = {
+            totalImages: statistics?.total ?? 0,
+            totalSize: this.formatFileSize(statistics?.total_size ?? 0),
+            weeklyUploads: statistics?.weekly_uploads ?? 0,
+            orphanImages: statistics?.orphan_count ?? 0
+          }
+        } else {
+          this.showError('加载失败', response?.message || '获取图片列表失败')
+        }
+      } catch (error) {
+        console.error('加载图片失败:', error)
+        this.showError('加载失败', error.message)
+      } finally {
+        this.loading = false
       }
-    })
-  })
-
-  // 处理图片加载错误
-  container.querySelectorAll('.image-preview').forEach(img => {
-    img.addEventListener('error', function () {
-      this.parentNode.innerHTML =
-        '<div class="image-placeholder"><i class="bi bi-image text-muted" style="font-size: 2rem;"></i></div>'
-    })
-  })
-}
-
-async function showImageDetail(imageId) {
-  currentImageId = imageId
-
-  try {
-    // 修正API路径：/api/v4/console/images/:id（移除 system 子路径）
-    const response = await apiRequest(API.buildURL(API_ENDPOINTS.IMAGE.DELETE, { id: imageId }))
-
-    if (response && response.success) {
-      const image = response.data
-
-      // 适配后端字段名：public_url, original_filename, context_id
-      document.getElementById('detailImagePreview').src = image.public_url || ''
-      document.getElementById('detailFileName').textContent = image.original_filename || '-'
-      document.getElementById('detailFileType').textContent = image.mime_type || '-'
-      document.getElementById('detailFileSize').textContent = formatFileSize(image.file_size)
-      document.getElementById('detailUploadTime').textContent = formatDate(image.created_at)
-      // 根据 context_id 判断是否为孤儿图片
-      document.getElementById('detailUsageStatus').textContent =
-        image.context_id === 0 ? '孤儿图片（未绑定）' : '使用中'
-      // 显示关联信息：business_type + context_id
-      document.getElementById('detailRelatedEntity').textContent =
-        image.context_id > 0 ? `${image.business_type}:${image.context_id}` : '-'
-      document.getElementById('detailImageUrl').value = image.public_url || ''
-
-      new bootstrap.Modal(document.getElementById('imageDetailModal')).show()
+    },
+    
+    // ==================== 上传相关方法 ====================
+    
+    /**
+     * 处理文件拖放
+     */
+    handleDrop(event) {
+      this.$refs.uploadZone.classList.remove('dragover')
+      this.handleFiles(event.dataTransfer.files)
+    },
+    
+    /**
+     * 处理文件选择
+     */
+    handleFileSelect(event) {
+      this.handleFiles(event.target.files)
+    },
+    
+    /**
+     * 处理文件
+     */
+    handleFiles(files) {
+      const validFiles = Array.from(files).filter(file => {
+        if (!file.type.startsWith('image/')) {
+          this.showError('文件类型错误', `${file.name} 不是图片文件`)
+          return false
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          this.showError('文件过大', `${file.name} 超过5MB限制`)
+          return false
+        }
+        return true
+      })
+      
+      this.selectedFiles = validFiles
+    },
+    
+    /**
+     * 获取文件预览URL
+     */
+    getFilePreview(file) {
+      if (!this.filePreviewUrls.has(file)) {
+        this.filePreviewUrls.set(file, URL.createObjectURL(file))
+      }
+      return this.filePreviewUrls.get(file)
+    },
+    
+    /**
+     * 上传图片
+     */
+    async uploadImages() {
+      if (this.selectedFiles.length === 0) return
+      
+      this.uploading = true
+      
+      try {
+        let successCount = 0
+        
+        for (const file of this.selectedFiles) {
+          const formData = new FormData()
+          formData.append('image', file)
+          formData.append('business_type', this.uploadImageType)
+          
+          const response = await fetch(API_ENDPOINTS.IMAGE.UPLOAD, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${getToken()}` },
+            body: formData
+          })
+          
+          const result = await response.json()
+          if (result.success) successCount++
+        }
+        
+        alert(`✅ 成功上传 ${successCount}/${this.selectedFiles.length} 张图片`)
+        
+        // 清理
+        bootstrap.Modal.getInstance(this.$refs.uploadModal).hide()
+        this.selectedFiles = []
+        this.filePreviewUrls.clear()
+        
+        // 重新加载
+        this.loadImageData()
+      } catch (error) {
+        console.error('上传失败:', error)
+        this.showError('上传失败', error.message)
+      } finally {
+        this.uploading = false
+      }
+    },
+    
+    // ==================== 图片操作方法 ====================
+    
+    /**
+     * 显示图片详情
+     */
+    async showImageDetail(image) {
+      this.globalLoading = true
+      
+      try {
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.IMAGE.DELETE, { id: image.image_id }))
+        
+        if (response && response.success) {
+          this.selectedImage = response.data
+          new bootstrap.Modal(this.$refs.imageDetailModal).show()
+        } else {
+          this.showError('获取详情失败', response?.message || '操作失败')
+        }
+      } catch (error) {
+        console.error('获取图片详情失败:', error)
+        this.showError('获取失败', error.message)
+      } finally {
+        this.globalLoading = false
+      }
+    },
+    
+    /**
+     * 复制图片URL
+     */
+    copyImageUrl() {
+      const input = this.$refs.imageUrlInput
+      if (input) {
+        input.select()
+        document.execCommand('copy')
+        alert('✅ URL已复制')
+      }
+    },
+    
+    /**
+     * 删除图片
+     */
+    async deleteImage() {
+      if (!this.selectedImage) return
+      
+      if (!confirm('确定要删除这张图片吗？此操作不可恢复。')) return
+      
+      this.globalLoading = true
+      
+      try {
+        const response = await apiRequest(
+          API.buildURL(API_ENDPOINTS.IMAGE.DELETE, { id: this.selectedImage.image_id }),
+          { method: 'DELETE' }
+        )
+        
+        if (response && response.success) {
+          alert('✅ 删除成功')
+          bootstrap.Modal.getInstance(this.$refs.imageDetailModal).hide()
+          this.selectedImage = null
+          this.loadImageData()
+        } else {
+          this.showError('删除失败', response?.message || '操作失败')
+        }
+      } catch (error) {
+        console.error('删除失败:', error)
+        this.showError('删除失败', error.message)
+      } finally {
+        this.globalLoading = false
+      }
+    },
+    
+    /**
+     * 处理图片加载错误
+     */
+    handleImageError(event) {
+      event.target.parentNode.innerHTML = '<div class="image-placeholder"><i class="bi bi-image text-muted" style="font-size: 2rem;"></i></div>'
+    },
+    
+    // ==================== 分页方法 ====================
+    
+    /**
+     * 跳转到指定页
+     */
+    goToPage(page) {
+      if (page < 1 || page > this.totalPages) return
+      this.currentPage = page
+      this.loadImageData()
+    },
+    
+    /**
+     * 获取分页页码数组
+     */
+    getPaginationPages() {
+      const pages = []
+      const maxPages = Math.min(this.totalPages, 10)
+      
+      for (let i = 1; i <= maxPages; i++) {
+        pages.push(i)
+      }
+      
+      if (this.totalPages > 10) {
+        pages.push('...')
+      }
+      
+      return pages
+    },
+    
+    // ==================== 工具方法 ====================
+    
+    /**
+     * 格式化文件大小
+     */
+    formatFileSize(bytes) {
+      if (!bytes || bytes === 0) return '0 B'
+      const k = 1024
+      const sizes = ['B', 'KB', 'MB', 'GB']
+      const i = Math.floor(Math.log(bytes) / Math.log(k))
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+    },
+    
+    /**
+     * 格式化日期时间
+     */
+    formatDateTime(dateStr) {
+      if (!dateStr) return '-'
+      return new Date(dateStr).toLocaleString('zh-CN')
+    },
+    
+    /**
+     * 显示错误提示
+     */
+    showError(title, message) {
+      alert(`❌ ${title}\n${message}`)
+    },
+    
+    /**
+     * 退出登录
+     */
+    logout() {
+      if (typeof window.logout === 'function') {
+        window.logout()
+      }
     }
-  } catch (error) {
-    console.error('获取图片详情失败:', error)
-    showErrorToast('获取详情失败')
   }
 }
 
-function copyImageUrl() {
-  const input = document.getElementById('detailImageUrl')
-  input.select()
-  document.execCommand('copy')
-  showSuccessToast('URL已复制')
-}
-
-async function deleteCurrentImage() {
-  if (!currentImageId) return
-
-  if (!confirm('确定要删除这张图片吗？此操作不可恢复。')) {
-    return
-  }
-
-  try {
-    // 修正API路径：/api/v4/console/images/:id（移除 system 子路径）
-    const response = await apiRequest(API.buildURL(API_ENDPOINTS.IMAGE.DELETE, { id: currentImageId }), {
-      method: 'DELETE'
-    })
-
-    if (response && response.success) {
-      showSuccessToast('删除成功')
-      bootstrap.Modal.getInstance(document.getElementById('imageDetailModal')).hide()
-      loadImageData()
-    } else {
-      showErrorToast(response?.message || '删除失败')
-    }
-  } catch (error) {
-    console.error('删除失败:', error)
-    showErrorToast('删除失败：' + error.message)
-  }
-}
-
-function formatFileSize(bytes) {
-  if (!bytes || bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
-
-function renderPagination(pagination) {
-  const nav = document.getElementById('paginationNav')
-  if (!pagination || pagination.total_pages <= 1) {
-    nav.innerHTML = ''
-    return
-  }
-
-  let html = '<ul class="pagination pagination-sm justify-content-center mb-0">'
-
-  html += `
-    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-      <a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;">上一页</a>
-    </li>
-  `
-
-  for (let i = 1; i <= Math.min(pagination.total_pages, 10); i++) {
-    html += `
-      <li class="page-item ${i === currentPage ? 'active' : ''}">
-        <a class="page-link" href="#" onclick="goToPage(${i}); return false;">${i}</a>
-      </li>
-    `
-  }
-
-  html += `
-    <li class="page-item ${currentPage === pagination.total_pages ? 'disabled' : ''}">
-      <a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">下一页</a>
-    </li>
-  `
-
-  html += '</ul>'
-  nav.innerHTML = html
-}
-
-function goToPage(page) {
-  currentPage = page
-  loadImageData()
-}
-
-function showLoading(show) {
-  document.getElementById('loadingOverlay').classList.toggle('show', show)
-}
-
-function showSuccessToast(message) {
-  if (typeof ToastUtils !== 'undefined') {
-    ToastUtils.success(message)
-  } else {
-    alert(`✅ ${message}`)
-  }
-}
-
-function showErrorToast(message) {
-  if (typeof ToastUtils !== 'undefined') {
-    ToastUtils.error(message)
-  } else {
-    alert(`❌ ${message}`)
-  }
-}
+// 注册 Alpine.js 组件
+document.addEventListener('alpine:init', () => {
+  Alpine.data('imageResourcesPage', imageResourcesPage)
+})

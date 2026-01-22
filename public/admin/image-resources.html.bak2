@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>图片资源管理 - 管理后台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+  <style>
+    .image-card {
+      transition: transform 0.2s;
+      cursor: pointer;
+    }
+    .image-card:hover {
+      transform: translateY(-3px);
+    }
+    .image-preview {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      border-radius: 4px;
+    }
+    .image-placeholder {
+      width: 100%;
+      height: 150px;
+      background: #f8f9fa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+    .upload-zone {
+      border: 2px dashed #dee2e6;
+      border-radius: 8px;
+      padding: 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.3s;
+    }
+    .upload-zone:hover,
+    .upload-zone.dragover {
+      border-color: #0d6efd;
+      background: #e7f1ff;
+    }
+  </style>
+</head>
+<body class="bg-light" x-data="imageResourcesPage()">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>管理后台 - 图片资源管理
+      </a>
+      <div>
+        <span class="text-light me-3" x-text="userInfo ? `欢迎，${userInfo.nickname}` : '欢迎，管理员'"></span>
+        <button class="btn btn-outline-light btn-sm" @click="logout()">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 存储统计 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <i class="bi bi-image text-primary" style="font-size: 2rem;"></i>
+            <h4 class="mt-2" x-text="statistics.totalImages"></h4>
+            <small class="text-muted">图片总数</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <i class="bi bi-hdd text-success" style="font-size: 2rem;"></i>
+            <h4 class="mt-2" x-text="statistics.totalSize"></h4>
+            <small class="text-muted">存储占用</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <i class="bi bi-calendar-week text-warning" style="font-size: 2rem;"></i>
+            <h4 class="mt-2" x-text="statistics.weeklyUploads"></h4>
+            <small class="text-muted">本周上传</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <i class="bi bi-trash text-danger" style="font-size: 2rem;"></i>
+            <h4 class="mt-2" x-text="statistics.orphanImages"></h4>
+            <small class="text-muted">孤儿图片</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 操作区域 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">图片类型</label>
+            <select class="form-select" x-model="filters.imageType" @change="loadImageData()">
+              <option value="">全部类型</option>
+              <option value="lottery">抽奖奖品</option>
+              <option value="exchange">兑换商品</option>
+              <option value="trade">交易相关</option>
+              <option value="uploads">通用上传</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">状态</label>
+            <select class="form-select" x-model="filters.status" @change="loadImageData()">
+              <option value="">全部状态</option>
+              <option value="active">使用中</option>
+              <option value="orphan">孤儿图片</option>
+              <option value="archived">已归档</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-primary w-100" @click="loadImageData()">
+              <i class="bi bi-arrow-repeat"></i> 刷新
+            </button>
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-success w-100" data-bs-toggle="modal" data-bs-target="#uploadModal">
+              <i class="bi bi-cloud-upload"></i> 上传图片
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图片列表 -->
+    <div class="card">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-images"></i> 图片列表</h5>
+      </div>
+      <div class="card-body">
+        <!-- 加载状态 -->
+        <template x-if="loading">
+          <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">加载中...</span>
+            </div>
+            <p class="mt-2 text-muted">正在加载图片...</p>
+          </div>
+        </template>
+
+        <!-- 空状态 -->
+        <template x-if="!loading && images.length === 0">
+          <div class="text-center py-5 text-muted">
+            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+            <p class="mt-2">暂无图片</p>
+          </div>
+        </template>
+
+        <!-- 图片网格 -->
+        <div class="row g-3" x-show="!loading && images.length > 0">
+          <template x-for="image in images" :key="image.image_id">
+            <div class="col-md-2 col-sm-4 col-6">
+              <div class="card image-card" @click="showImageDetail(image)">
+                <div class="position-relative">
+                  <template x-if="image.url">
+                    <img :src="image.url" class="image-preview" :alt="image.original_filename || ''" @error="handleImageError($event)">
+                  </template>
+                  <template x-if="!image.url">
+                    <div class="image-placeholder">
+                      <i class="bi bi-image text-muted" style="font-size: 2rem;"></i>
+                    </div>
+                  </template>
+                  <span x-show="image.status === 'orphan'" class="badge bg-danger position-absolute top-0 end-0 m-1">孤儿</span>
+                </div>
+                <div class="card-body p-2">
+                  <small class="text-truncate d-block" x-text="image.original_filename || '-'"></small>
+                  <small class="text-muted" x-text="formatFileSize(image.file_size)"></small>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+      <div class="card-footer bg-white" x-show="totalPages > 1">
+        <nav>
+          <ul class="pagination pagination-sm justify-content-center mb-0">
+            <li class="page-item" :class="{ 'disabled': currentPage === 1 }">
+              <a class="page-link" href="#" @click.prevent="goToPage(currentPage - 1)">上一页</a>
+            </li>
+            <template x-for="page in getPaginationPages()" :key="page">
+              <li class="page-item" :class="{ 'active': page === currentPage, 'disabled': page === '...' }">
+                <a class="page-link" href="#" @click.prevent="page !== '...' && goToPage(page)" x-text="page"></a>
+              </li>
+            </template>
+            <li class="page-item" :class="{ 'disabled': currentPage === totalPages }">
+              <a class="page-link" href="#" @click.prevent="goToPage(currentPage + 1)">下一页</a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- 上传模态框 -->
+  <div class="modal fade" id="uploadModal" tabindex="-1" x-ref="uploadModal">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-cloud-upload"></i> 上传图片</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div 
+            class="upload-zone" 
+            x-ref="uploadZone"
+            @click="$refs.fileInput.click()"
+            @dragover.prevent="$refs.uploadZone.classList.add('dragover')"
+            @dragleave="$refs.uploadZone.classList.remove('dragover')"
+            @drop.prevent="handleDrop($event)"
+          >
+            <i class="bi bi-cloud-arrow-up" style="font-size: 3rem; color: #6c757d;"></i>
+            <p class="mt-2 mb-0">拖拽图片到此处或点击选择</p>
+            <small class="text-muted">支持 JPG, PNG, GIF, WebP 格式，单个文件最大 5MB</small>
+            <input type="file" x-ref="fileInput" accept="image/*" multiple style="display: none;" @change="handleFileSelect($event)">
+          </div>
+          
+          <div class="mt-3" x-show="selectedFiles.length > 0">
+            <h6>待上传文件</h6>
+            <div class="row g-2">
+              <template x-for="(file, index) in selectedFiles" :key="index">
+                <div class="col-md-3">
+                  <div class="card">
+                    <img :src="getFilePreview(file)" class="card-img-top" style="height: 100px; object-fit: cover;">
+                    <div class="card-body p-2">
+                      <small class="text-truncate d-block" x-text="file.name"></small>
+                      <small class="text-muted" x-text="formatFileSize(file.size)"></small>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <label class="form-label">图片类型</label>
+            <select class="form-select" x-model="uploadImageType">
+              <option value="uploads">通用上传</option>
+              <option value="lottery">抽奖奖品</option>
+              <option value="exchange">兑换商品</option>
+              <option value="trade">交易相关</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button 
+            type="button" 
+            class="btn btn-primary" 
+            :disabled="selectedFiles.length === 0 || uploading"
+            @click="uploadImages()"
+          >
+            <span x-show="uploading" class="spinner-border spinner-border-sm me-1"></span>
+            <span x-text="uploading ? '上传中...' : '开始上传'"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 图片详情模态框 -->
+  <div class="modal fade" id="imageDetailModal" tabindex="-1" x-ref="imageDetailModal">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-image"></i> 图片详情</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" x-show="selectedImage">
+          <div class="text-center mb-3">
+            <img :src="selectedImage?.public_url || selectedImage?.url" alt="预览" style="max-width: 100%; max-height: 400px;">
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <p><strong>文件名：</strong><span x-text="selectedImage?.original_filename || '-'"></span></p>
+              <p><strong>类型：</strong><span x-text="selectedImage?.mime_type || '-'"></span></p>
+              <p><strong>大小：</strong><span x-text="formatFileSize(selectedImage?.file_size)"></span></p>
+            </div>
+            <div class="col-md-6">
+              <p><strong>上传时间：</strong><span x-text="formatDateTime(selectedImage?.created_at)"></span></p>
+              <p><strong>使用状态：</strong><span x-text="selectedImage?.context_id === 0 ? '孤儿图片（未绑定）' : '使用中'"></span></p>
+              <p><strong>关联实体：</strong><span x-text="selectedImage?.context_id > 0 ? `${selectedImage.business_type}:${selectedImage.context_id}` : '-'"></span></p>
+            </div>
+          </div>
+          <div class="mt-2">
+            <p><strong>URL：</strong></p>
+            <div class="input-group">
+              <input type="text" class="form-control" :value="selectedImage?.public_url || selectedImage?.url" readonly x-ref="imageUrlInput">
+              <button class="btn btn-outline-secondary" type="button" @click="copyImageUrl()">
+                <i class="bi bi-clipboard"></i> 复制
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" @click="deleteImage()">
+            <i class="bi bi-trash"></i> 删除
+          </button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" x-show="globalLoading" x-cloak>
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <!-- ✅ JavaScript 加载顺序 -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  <script src="/admin/js/pages/image-resources.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+</body>
+</html>

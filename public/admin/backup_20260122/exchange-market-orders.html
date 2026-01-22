@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>兑换订单管理 - 管理后台</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <div x-data="exchangeOrdersPage()" x-init="init()">
+  <!-- 顶部导航 -->
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>📦 兑换市场 - 订单管理
+      </a>
+      <div>
+          <span class="text-light me-3" x-text="'欢迎，' + (userInfo.username || '管理员')"></span>
+          <button class="btn btn-outline-light btn-sm" @click="logout">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4">
+    <!-- 统计卡片 -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="text-muted">订单总数</h6>
+              <h3 class="text-primary" x-text="stats.total"></h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-warning">
+          <div class="card-body text-center">
+            <h6 class="text-muted">待处理</h6>
+              <h3 class="text-warning" x-text="stats.pending"></h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-success">
+          <div class="card-body text-center">
+            <h6 class="text-muted">已发货</h6>
+              <h3 class="text-success" x-text="stats.shipped"></h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-secondary">
+          <div class="card-body text-center">
+            <h6 class="text-muted">已取消</h6>
+              <h3 class="text-secondary" x-text="stats.cancelled"></h3>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选区域 -->
+    <div class="card mb-3">
+      <div class="card-body">
+          <form @submit.prevent="handleSearch" class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">订单状态</label>
+              <select class="form-select" x-model="filters.status">
+              <option value="">全部状态</option>
+              <option value="pending">待处理</option>
+              <option value="completed">已完成</option>
+              <option value="shipped">已发货</option>
+              <option value="cancelled">已取消</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">支付方式</label>
+              <select class="form-select" disabled>
+              <option value="">全部方式（仅支持虚拟价值）</option>
+              <option value="virtual">虚拟价值</option>
+            </select>
+            <small class="text-muted">已统一为虚拟价值支付</small>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">搜索订单号</label>
+              <input type="text" class="form-control" x-model="filters.order_no" placeholder="输入订单号">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">&nbsp;</label>
+              <button type="submit" class="btn btn-primary w-100">
+              <i class="bi bi-search"></i> 查询
+            </button>
+          </div>
+          </form>
+      </div>
+    </div>
+
+    <!-- 订单列表 -->
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>订单号</th>
+                <th>用户</th>
+                <th>商品信息</th>
+                <th>数量</th>
+                <th>支付方式</th>
+                <th>支付金额</th>
+                <th>状态</th>
+                <th>兑换时间</th>
+                <th style="width: 200px;">操作</th>
+              </tr>
+            </thead>
+              <tbody>
+                <!-- 加载状态 -->
+                <tr x-show="loading">
+                <td colspan="9" class="text-center py-5">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                  </div>
+                  <p class="mt-2 text-muted">正在加载数据...</p>
+                </td>
+              </tr>
+                
+                <!-- 空数据状态 -->
+                <tr x-show="!loading && orders.length === 0">
+                  <td colspan="9" class="text-center py-5">
+                    <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                    <p class="mt-2 text-muted">暂无订单数据</p>
+                  </td>
+                </tr>
+                
+                <!-- 订单列表 -->
+                <template x-for="order in orders" :key="order.order_no">
+                  <tr>
+                    <td>
+                      <span class="text-primary fw-bold" x-text="order.order_no"></span>
+                    </td>
+                    <td>
+                      <span class="text-muted small" x-text="'用户ID: ' + order.user_id"></span>
+                    </td>
+                    <td>
+                      <span x-text="order.item_name || '-'"></span>
+                    </td>
+                    <td x-text="order.quantity || 1"></td>
+                    <td>
+                      <span class="badge bg-info" x-text="getAssetTypeText(order.payment_asset_code)"></span>
+                    </td>
+                    <td>
+                      <span x-text="order.virtual_value_paid + ' ' + getAssetUnit(order.payment_asset_code)"></span>
+                    </td>
+                    <td>
+                      <span class="badge" :class="getStatusColor(order.status)" x-text="getStatusText(order.status)"></span>
+                    </td>
+                    <td x-text="formatDate(order.exchange_time || order.created_at)"></td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-primary me-1" @click="viewOrderDetail(order.order_no)" title="查看详情">
+                        <i class="bi bi-eye"></i>
+                      </button>
+                      <template x-if="order.status === 'pending'">
+                        <button class="btn btn-sm btn-outline-success" @click="openUpdateModal(order.order_no)" title="更新状态">
+                          <i class="bi bi-arrow-repeat"></i>
+                        </button>
+                      </template>
+                    </td>
+                  </tr>
+                </template>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 分页 -->
+          <nav aria-label="分页" class="mt-3" x-show="pagination && pagination.total_pages > 1">
+            <ul class="pagination justify-content-end">
+              <li class="page-item" :class="{ 'disabled': currentPage === 1 }">
+                <a class="page-link" href="#" @click.prevent="changePage(currentPage - 1)">上一页</a>
+              </li>
+              <template x-for="page in visiblePages" :key="page">
+                <li class="page-item" :class="{ 'active': page === currentPage, 'disabled': page === '...' }">
+                  <a class="page-link" href="#" @click.prevent="page !== '...' && changePage(page)" x-text="page"></a>
+                </li>
+              </template>
+              <li class="page-item" :class="{ 'disabled': currentPage === pagination?.total_pages }">
+                <a class="page-link" href="#" @click.prevent="changePage(currentPage + 1)">下一页</a>
+              </li>
+            </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- 订单详情模态框 -->
+    <div class="modal fade" x-ref="detailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-receipt"></i> 订单详情
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+          <div class="modal-body" x-show="selectedOrder">
+          <div class="row g-3">
+            <div class="col-12">
+              <h6 class="border-bottom pb-2">订单信息</h6>
+              <table class="table table-sm">
+                <tr>
+                  <td style="width: 120px;" class="text-muted">订单号:</td>
+                    <td x-text="selectedOrder?.order_no || '-'"></td>
+                </tr>
+                <tr>
+                  <td class="text-muted">订单状态:</td>
+                    <td>
+                      <span class="badge" :class="getStatusColor(selectedOrder?.status)" x-text="getStatusText(selectedOrder?.status)"></span>
+                    </td>
+                </tr>
+                <tr>
+                  <td class="text-muted">下单时间:</td>
+                    <td x-text="formatDate(selectedOrder?.exchange_time || selectedOrder?.created_at)"></td>
+                </tr>
+                <tr>
+                  <td class="text-muted">发货时间:</td>
+                    <td x-text="formatDate(selectedOrder?.shipped_at) || '-'"></td>
+                </tr>
+              </table>
+            </div>
+
+            <div class="col-12">
+              <h6 class="border-bottom pb-2">用户信息</h6>
+              <table class="table table-sm">
+                <tr>
+                  <td style="width: 120px;" class="text-muted">用户ID:</td>
+                    <td x-text="selectedOrder?.user_id || '-'"></td>
+                </tr>
+              </table>
+            </div>
+
+            <div class="col-12">
+              <h6 class="border-bottom pb-2">商品信息</h6>
+              <table class="table table-sm">
+                <tr>
+                  <td style="width: 120px;" class="text-muted">商品名称:</td>
+                    <td x-text="selectedOrder?.item_name || '-'"></td>
+                </tr>
+                <tr>
+                  <td class="text-muted">商品描述:</td>
+                    <td x-text="selectedOrder?.item_description || '-'"></td>
+                </tr>
+                <tr>
+                  <td class="text-muted">兑换数量:</td>
+                    <td x-text="selectedOrder?.quantity || 1"></td>
+                </tr>
+              </table>
+            </div>
+
+            <div class="col-12">
+              <h6 class="border-bottom pb-2">支付信息</h6>
+              <table class="table table-sm">
+                <tr>
+                  <td style="width: 120px;" class="text-muted">支付资产类型:</td>
+                    <td x-text="getAssetTypeText(selectedOrder?.payment_asset_code)"></td>
+                </tr>
+                  <tr>
+                  <td class="text-muted">支付数量:</td>
+                    <td x-text="(selectedOrder?.virtual_value_paid || 0) + ' ' + getAssetUnit(selectedOrder?.payment_asset_code)"></td>
+                </tr>
+              </table>
+            </div>
+
+              <div class="col-12">
+              <h6 class="border-bottom pb-2">管理信息</h6>
+              <table class="table table-sm">
+                <tr>
+                  <td style="width: 120px;" class="text-muted">成本:</td>
+                    <td x-text="selectedOrder?.cost || '-'"></td>
+                </tr>
+                <tr>
+                  <td class="text-muted">备注:</td>
+                    <td x-text="selectedOrder?.remark || '-'"></td>
+                </tr>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 更新状态模态框 -->
+    <div class="modal fade" x-ref="updateModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-arrow-repeat"></i> 更新订单状态
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+          <form @submit.prevent="handleUpdateStatus">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">新状态 <span class="text-danger">*</span></label>
+                <select class="form-select" x-model="updateForm.status" required>
+              <option value="">请选择</option>
+              <option value="completed">已完成</option>
+              <option value="shipped">已发货</option>
+              <option value="cancelled">取消订单</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">备注</label>
+                <textarea class="form-control" x-model="updateForm.remark" rows="3" placeholder="可选填写备注信息"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+              <button type="submit" class="btn btn-primary" :disabled="submitting">
+                <span x-show="submitting" class="spinner-border spinner-border-sm me-1"></span>
+                <i class="bi bi-check-lg" x-show="!submitting"></i> 确认更新
+          </button>
+        </div>
+          </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩层 -->
+    <div class="loading-overlay" x-show="globalLoading" style="display:none;">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <!-- 引入通用工具库 -->
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+
+  <!-- 引入公共Toast组件 -->
+  <script src="/admin/js/common/toast.js"></script>
+
+  <!-- 引入页面专属逻辑 -->
+  <script src="/admin/js/pages/exchange-market-orders.js"></script>
+</body>
+</html>

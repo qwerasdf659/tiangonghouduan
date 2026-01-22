@@ -34,16 +34,24 @@
       margin-bottom: 15px;
     }
   </style>
+
+  <!-- Alpine.js -->
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
 </head>
-<body class="bg-light">
+<body class="bg-light" x-data="lotteryStrategyPage()" x-cloak>
   <nav class="navbar navbar-dark bg-primary">
     <div class="container-fluid">
       <a href="/admin/dashboard.html" class="navbar-brand">
         <i class="bi bi-arrow-left me-2"></i>⚙️ 管理后台 - 策略引擎配置
       </a>
       <div>
-        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+        <span class="text-light me-3" x-text="'欢迎，' + (userInfo.nickname || '管理员')">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" @click="logout">退出登录</button>
       </div>
     </div>
   </nav>
@@ -56,7 +64,7 @@
           <div class="card-body text-center">
             <i class="bi bi-sliders text-primary" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">策略配置总数</h6>
-            <h2 id="totalStrategies" class="text-primary mb-0">-</h2>
+            <h2 class="text-primary mb-0" x-text="stats.totalStrategies">-</h2>
           </div>
         </div>
       </div>
@@ -65,7 +73,7 @@
           <div class="card-body text-center">
             <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">已生效配置</h6>
-            <h2 id="activeStrategies" class="text-success mb-0">-</h2>
+            <h2 class="text-success mb-0" x-text="stats.activeStrategies">-</h2>
           </div>
         </div>
       </div>
@@ -74,7 +82,7 @@
           <div class="card-body text-center">
             <i class="bi bi-grid-3x3 text-warning" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">矩阵配置数</h6>
-            <h2 id="matrixCount" class="text-warning mb-0">-</h2>
+            <h2 class="text-warning mb-0" x-text="stats.matrixCount">-</h2>
           </div>
         </div>
       </div>
@@ -83,7 +91,7 @@
           <div class="card-body text-center">
             <i class="bi bi-layers text-info" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">档位规则数</h6>
-            <h2 id="tierRulesCount" class="text-info mb-0">-</h2>
+            <h2 class="text-info mb-0" x-text="stats.tierRulesCount">-</h2>
           </div>
         </div>
       </div>
@@ -111,9 +119,47 @@
     <div class="tab-content" id="strategyTabContent">
       <!-- 策略参数配置 -->
       <div class="tab-pane fade show active" id="strategies" role="tabpanel">
-        <div id="strategyGroups">
-          <!-- 动态生成策略分组 -->
+        <template x-if="loading">
+          <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">加载中...</span>
+            </div>
+          </div>
+        </template>
+        
+        <template x-if="!loading && Object.keys(strategyGroups).length === 0">
+          <div class="text-center py-5 text-muted">
+            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+            <p class="mt-2">暂无策略配置</p>
+          </div>
+        </template>
+        
+        <template x-for="(configs, group) in strategyGroups" :key="group">
+          <div class="mb-4">
+            <div class="group-header">
+              <i :class="'bi ' + getGroupIcon(group) + ' me-2'"></i>
+              <span x-text="getGroupName(group) + ' (' + configs.length + '项)'"></span>
+            </div>
+            <div class="row g-3">
+              <template x-for="config in configs" :key="config.strategy_config_id">
+                <div class="col-md-6 col-lg-4">
+                  <div class="card strategy-card" :class="group">
+                    <div class="card-body">
+                      <h6 class="card-title" x-text="config.config_key"></h6>
+                      <p class="text-muted small mb-2" x-text="config.description || '暂无描述'"></p>
+                      <div class="d-flex justify-content-between align-items-center">
+                        <span class="config-value" x-text="config.config_value"></span>
+                        <button class="btn btn-sm btn-outline-primary" @click="viewStrategyDetail(config.strategy_config_id)">
+                          <i class="bi bi-eye"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
         </div>
+        </template>
       </div>
 
       <!-- BxPx矩阵配置 -->
@@ -124,7 +170,7 @@
           </div>
           <div class="card-body">
             <div class="table-responsive">
-              <table class="table table-bordered text-center" id="matrixTable">
+              <table class="table table-bordered text-center">
                 <thead class="table-dark">
                   <tr>
                     <th>Budget \ Pressure</th>
@@ -133,8 +179,28 @@
                     <th>P2 (高压力)</th>
                   </tr>
                 </thead>
-                <tbody id="matrixBody">
-                  <!-- 动态生成 -->
+                <tbody>
+                  <template x-for="bt in budgetTiers" :key="bt">
+                    <tr>
+                      <td class="table-secondary"><strong x-text="bt"></strong></td>
+                      <template x-for="pt in pressureTiers" :key="pt">
+                        <td>
+                          <template x-if="getMatrixConfig(bt, pt)">
+                            <div class="small">
+                              <div>Cap乘数: <span class="text-primary" x-text="getMatrixConfig(bt, pt).cap_multiplier"></span></div>
+                              <div>空奖权重: <span class="text-danger" x-text="getMatrixConfig(bt, pt).empty_weight_multiplier"></span></div>
+                              <template x-if="getMatrixConfig(bt, pt).description">
+                                <div class="text-muted" x-text="getMatrixConfig(bt, pt).description"></div>
+                              </template>
+                            </div>
+                          </template>
+                          <template x-if="!getMatrixConfig(bt, pt)">
+                            <span class="text-muted">-</span>
+                          </template>
+                        </td>
+                      </template>
+                    </tr>
+                  </template>
                 </tbody>
               </table>
             </div>
@@ -162,8 +228,25 @@
                     <th>状态</th>
                   </tr>
                 </thead>
-                <tbody id="tierRulesList">
-                  <!-- 动态生成 -->
+                <tbody>
+                  <template x-if="tierRules.length === 0">
+                    <tr><td colspan="7" class="text-center text-muted">暂无档位规则</td></tr>
+                  </template>
+                  <template x-for="rule in tierRules" :key="rule.tier_rule_id">
+                    <tr>
+                      <td x-text="rule.tier_rule_id"></td>
+                      <td><code x-text="rule.segment_key || '-'"></code></td>
+                      <td><span class="badge bg-info" x-text="rule.tier_name || '-'"></span></td>
+                      <td x-text="rule.tier_weight || 0"></td>
+                      <td x-text="rule.probability || '-'"></td>
+                      <td x-text="rule.campaign?.campaign_name || '-'"></td>
+                      <td>
+                        <span class="badge" 
+                              :class="rule.status === 'active' ? 'bg-success' : 'bg-secondary'"
+                              x-text="rule.status === 'active' ? '启用' : '禁用'"></span>
+                      </td>
+                    </tr>
+                  </template>
                 </tbody>
               </table>
             </div>
@@ -174,15 +257,30 @@
   </div>
 
   <!-- 策略详情模态框 -->
-  <div class="modal fade" id="strategyDetailModal" tabindex="-1">
+  <div class="modal fade" id="strategyDetailModal" tabindex="-1" x-ref="detailModal">
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title"><i class="bi bi-gear"></i> 策略配置详情</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-        <div class="modal-body" id="strategyDetailContent">
-          <!-- 动态填充 -->
+        <div class="modal-body">
+          <template x-if="selectedConfig">
+            <table class="table table-bordered">
+              <tr><th style="width:30%">配置ID</th><td x-text="selectedConfig.strategy_config_id"></td></tr>
+              <tr><th>配置键</th><td><code x-text="selectedConfig.config_key"></code></td></tr>
+              <tr><th>配置值</th><td><span class="config-value" x-text="selectedConfig.config_value"></span></td></tr>
+              <tr><th>数据类型</th><td x-text="selectedConfig.value_type || 'string'"></td></tr>
+              <tr><th>配置分组</th><td x-text="selectedConfig.config_group || '-'"></td></tr>
+              <tr><th>描述</th><td x-text="selectedConfig.description || '-'"></td></tr>
+              <tr><th>是否启用</th><td x-text="selectedConfig.is_active ? '✅ 启用' : '❌ 禁用'"></td></tr>
+              <tr><th>优先级</th><td x-text="selectedConfig.priority || 0"></td></tr>
+              <tr><th>生效开始时间</th><td x-text="selectedConfig.effective_start ? formatDateTime(selectedConfig.effective_start) : '立即生效'"></td></tr>
+              <tr><th>生效结束时间</th><td x-text="selectedConfig.effective_end ? formatDateTime(selectedConfig.effective_end) : '永不过期'"></td></tr>
+              <tr><th>创建时间</th><td x-text="formatDateTime(selectedConfig.created_at)"></td></tr>
+              <tr><th>更新时间</th><td x-text="formatDateTime(selectedConfig.updated_at)"></td></tr>
+            </table>
+          </template>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
@@ -191,7 +289,7 @@
     </div>
   </div>
 
-  <div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-overlay" :class="{ 'show': loading }">
     <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
       <span class="visually-hidden">加载中...</span>
     </div>
@@ -200,238 +298,9 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/api-config.js"></script>
-  <script>
-    let strategies = [];
-    let matrixConfigs = [];
-    let tierRules = [];
-
-    document.addEventListener('DOMContentLoaded', function() {
-      const userInfo = getCurrentUser();
-      if (userInfo && userInfo.nickname) {
-        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
-      }
-      document.getElementById('logoutBtn').addEventListener('click', logout);
-      
-      loadAllData();
-    });
-
-    async function loadAllData() {
-      showLoading();
-      try {
-        await Promise.all([
-          loadStrategies(),
-          loadMatrixConfigs(),
-          loadTierRules()
-        ]);
-        updateStats();
-      } catch (error) {
-        console.error('加载数据失败:', error);
-        showError('加载失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    async function loadStrategies() {
-      const response = await apiRequest(API_ENDPOINTS.STRATEGY.LIST);
-      if (response && response.success) {
-        // 后端返回结构: { list: [...], pagination: {...} }
-        strategies = response.data.list || [];
-        renderStrategies(strategies);
-      }
-    }
-
-    async function loadMatrixConfigs() {
-      const response = await apiRequest(API_ENDPOINTS.MATRIX.LIST);
-      if (response && response.success) {
-        // 后端返回结构: { list: [...], total_count: N }
-        matrixConfigs = response.data.list || [];
-        renderMatrixTable(matrixConfigs);
-      }
-    }
-
-    async function loadTierRules() {
-      const response = await apiRequest(API_ENDPOINTS.TIER_RULES.LIST);
-      if (response && response.success) {
-        // 后端返回结构: { list: [...], total: N }
-        tierRules = response.data.list || [];
-        renderTierRules(tierRules);
-      }
-    }
-
-    function updateStats() {
-      document.getElementById('totalStrategies').textContent = strategies.length;
-      // 后端字段: is_active, effective_end (非expires_at)
-      document.getElementById('activeStrategies').textContent = 
-        strategies.filter(s => s.is_active && (!s.effective_end || new Date(s.effective_end) > new Date())).length;
-      document.getElementById('matrixCount').textContent = matrixConfigs.length;
-      document.getElementById('tierRulesCount').textContent = tierRules.length;
-    }
-
-    function renderStrategies(strategies) {
-      const container = document.getElementById('strategyGroups');
-      
-      // 按config_group分组
-      const groups = {};
-      strategies.forEach(s => {
-        const group = s.config_group || 'other';
-        if (!groups[group]) groups[group] = [];
-        groups[group].push(s);
-      });
-
-      const groupNames = {
-        'budget_tier': '预算档位配置',
-        'pity': '保底机制配置',
-        'luck_debt': '运气债务配置',
-        'anti_empty': '防空奖配置',
-        'other': '其他配置'
-      };
-
-      const groupIcons = {
-        'budget_tier': 'bi-cash-stack',
-        'pity': 'bi-shield-check',
-        'luck_debt': 'bi-graph-down-arrow',
-        'anti_empty': 'bi-shield-exclamation',
-        'other': 'bi-gear'
-      };
-
-      container.innerHTML = Object.entries(groups).map(([group, configs]) => `
-        <div class="mb-4">
-          <div class="group-header">
-            <i class="bi ${groupIcons[group] || 'bi-gear'} me-2"></i>
-            ${groupNames[group] || group} (${configs.length}项)
-          </div>
-          <div class="row g-3">
-            ${configs.map(config => `
-              <div class="col-md-6 col-lg-4">
-                <div class="card strategy-card ${group}">
-                  <div class="card-body">
-                    <h6 class="card-title">${escapeHtml(config.config_key)}</h6>
-                    <p class="text-muted small mb-2">${escapeHtml(config.description || '暂无描述')}</p>
-                    <div class="d-flex justify-content-between align-items-center">
-                      <span class="config-value">${config.config_value}</span>
-                      <button class="btn btn-sm btn-outline-primary" onclick="viewStrategyDetail(${config.strategy_config_id})">
-                        <i class="bi bi-eye"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `).join('');
-    }
-
-    function renderMatrixTable(configs) {
-      const tbody = document.getElementById('matrixBody');
-      // 后端使用 B0-B3, P0-P2 格式
-      const budgetTiers = ['B0', 'B1', 'B2', 'B3'];
-      const pressureTiers = ['P0', 'P1', 'P2'];
-
-      // 创建映射
-      const configMap = {};
-      configs.forEach(c => {
-        configMap[`${c.budget_tier}_${c.pressure_tier}`] = c;
-      });
-
-      tbody.innerHTML = budgetTiers.map(bt => `
-        <tr>
-          <td class="table-secondary"><strong>${bt}</strong></td>
-          ${pressureTiers.map(pt => {
-            const config = configMap[`${bt}_${pt}`];
-            if (config) {
-              return `
-                <td>
-                  <div class="small">
-                    <div>Cap乘数: <span class="text-primary">${config.cap_multiplier}</span></div>
-                    <div>空奖权重: <span class="text-danger">${config.empty_weight_multiplier}</span></div>
-                    ${config.description ? `<div class="text-muted">${escapeHtml(config.description)}</div>` : ''}
-                  </div>
-                </td>
-              `;
-            }
-            return '<td class="text-muted">-</td>';
-          }).join('')}
-        </tr>
-      `).join('');
-    }
-
-    function renderTierRules(rules) {
-      const tbody = document.getElementById('tierRulesList');
-      
-      if (rules.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">暂无档位规则</td></tr>';
-        return;
-      }
-
-      // 后端字段: tier_rule_id, segment_key, tier_name, tier_weight, probability, status, campaign
-      tbody.innerHTML = rules.map(rule => `
-        <tr>
-          <td>${rule.tier_rule_id}</td>
-          <td><code>${escapeHtml(rule.segment_key || '-')}</code></td>
-          <td><span class="badge bg-info">${escapeHtml(rule.tier_name || '-')}</span></td>
-          <td>${rule.tier_weight || 0}</td>
-          <td>${rule.probability || '-'}</td>
-          <td>${rule.campaign ? escapeHtml(rule.campaign.campaign_name) : '-'}</td>
-          <td>
-            <span class="badge ${rule.status === 'active' ? 'bg-success' : 'bg-secondary'}">
-              ${rule.status === 'active' ? '启用' : '禁用'}
-            </span>
-          </td>
-        </tr>
-      `).join('');
-    }
-
-    function viewStrategyDetail(configId) {
-      // 后端字段: strategy_config_id (非config_id)
-      const config = strategies.find(s => s.strategy_config_id === configId);
-      if (!config) return;
-
-      document.getElementById('strategyDetailContent').innerHTML = `
-        <table class="table table-bordered">
-          <tr><th style="width:30%">配置ID</th><td>${config.strategy_config_id}</td></tr>
-          <tr><th>配置键</th><td><code>${escapeHtml(config.config_key)}</code></td></tr>
-          <tr><th>配置值</th><td><span class="config-value">${config.config_value}</span></td></tr>
-          <tr><th>数据类型</th><td>${config.value_type || 'string'}</td></tr>
-          <tr><th>配置分组</th><td>${config.config_group || '-'}</td></tr>
-          <tr><th>描述</th><td>${escapeHtml(config.description || '-')}</td></tr>
-          <tr><th>是否启用</th><td>${config.is_active ? '✅ 启用' : '❌ 禁用'}</td></tr>
-          <tr><th>优先级</th><td>${config.priority || 0}</td></tr>
-          <tr><th>生效开始时间</th><td>${config.effective_start ? formatDateTime(config.effective_start) : '立即生效'}</td></tr>
-          <tr><th>生效结束时间</th><td>${config.effective_end ? formatDateTime(config.effective_end) : '永不过期'}</td></tr>
-          <tr><th>创建时间</th><td>${formatDateTime(config.created_at)}</td></tr>
-          <tr><th>更新时间</th><td>${formatDateTime(config.updated_at)}</td></tr>
-        </table>
-      `;
-
-      new bootstrap.Modal(document.getElementById('strategyDetailModal')).show();
-    }
-
-    function formatDateTime(dateStr) {
-      if (!dateStr) return '-';
-      return new Date(dateStr).toLocaleString('zh-CN');
-    }
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
-    }
-
-    function showLoading() {
-      document.getElementById('loadingOverlay').classList.add('show');
-    }
-
-    function hideLoading() {
-      document.getElementById('loadingOverlay').classList.remove('show');
-    }
-
-    function showError(title, message) {
-      alert(`❌ ${title}\n${message}`);
-    }
-  </script>
+  <script src="/admin/js/pages/lottery-strategy.js"></script>
+  
+  <!-- Alpine.js -->
+  <!-- Alpine.js -->
 </body>
 </html>
-

@@ -1,354 +1,301 @@
-// public/admin/js/pages/exchange-market-orders.js
 /**
- * 兑换订单管理页面
- * @description 管理兑换市场的订单，包括查看、筛选、更新状态等功能
- * @created 2026-01-09
+ * 兑换订单管理页面 - Alpine.js 组件
+ * exchange-market-orders.js
  */
 
-// 全局变量
-let currentPage = 1
-const pageSize = 20
-let currentFilters = {
+function exchangeOrdersPage() {
+  return {
+    // 用户信息
+    userInfo: {},
+    
+    // 加载状态
+    loading: false,
+    globalLoading: false,
+    submitting: false,
+    
+    // 订单数据
+    orders: [],
+    selectedOrder: null,
+    
+    // 统计
+    stats: {
+      total: 0,
+      pending: 0,
+      shipped: 0,
+      cancelled: 0
+    },
+    
+    // 筛选
+    filters: {
   status: '',
   order_no: ''
-}
-
-// 页面加载
-document.addEventListener('DOMContentLoaded', function () {
-  // 使用 admin-common.js 中的 checkAdminPermission() 进行权限验证
-  if (!checkAdminPermission()) {
-    return
-  }
-  loadOrders()
-  bindEvents()
-})
-
-// 绑定事件
-function bindEvents() {
-  document.getElementById('logoutBtn').addEventListener('click', logout)
-  document.getElementById('searchBtn').addEventListener('click', handleSearch)
-  document.getElementById('submitUpdateStatusBtn').addEventListener('click', handleUpdateStatus)
-}
-
-// 处理搜索
-function handleSearch() {
-  currentFilters = {
-    status: document.getElementById('statusFilter').value,
-    order_no: document.getElementById('orderNoSearch').value.trim()
-  }
-  currentPage = 1
-  loadOrders()
-}
+    },
+    
+    // 分页
+    currentPage: 1,
+    pageSize: 20,
+    pagination: null,
+    
+    // 更新状态表单
+    updateForm: {
+      order_no: '',
+      status: '',
+      remark: ''
+    },
+    
+    // 弹窗实例
+    detailModal: null,
+    updateModal: null,
+    
+    /**
+     * 初始化
+     */
+    async init() {
+      console.log('🚀 初始化兑换订单管理页面...');
+      
+      // 初始化弹窗
+      this.$nextTick(() => {
+        this.detailModal = new bootstrap.Modal(this.$refs.detailModal);
+        this.updateModal = new bootstrap.Modal(this.$refs.updateModal);
+      });
+      
+      // 加载用户信息
+      this.loadUserInfo();
+      
+      // 加载订单列表
+      await this.loadOrders();
+    },
+    
+    /**
+     * 加载用户信息
+     */
+    loadUserInfo() {
+      try {
+        const stored = localStorage.getItem('userInfo');
+        if (stored) {
+          this.userInfo = JSON.parse(stored);
+        }
+      } catch (e) {
+        console.error('加载用户信息失败:', e);
+      }
+    },
+    
+    /**
+     * 退出登录
+     */
+    logout() {
+      if (confirm('确定要退出登录吗？')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('userInfo');
+        window.location.href = '/admin/login.html';
+      }
+    },
+    
+    /**
+     * 搜索
+     */
+    handleSearch() {
+      this.currentPage = 1;
+      this.loadOrders();
+    },
 
 /**
  * 加载订单列表
- * ✅ 使用管理员专用API端点获取全量订单列表
  */
-async function loadOrders() {
-  try {
-    showLoading(true)
-    const token = getToken()
-
+    async loadOrders() {
+      this.loading = true;
+      
+      try {
+        const token = localStorage.getItem('token');
     const params = new URLSearchParams({
-      page: currentPage,
-      page_size: pageSize
-    })
+          page: this.currentPage,
+          page_size: this.pageSize
+        });
 
-    if (currentFilters.status) params.append('status', currentFilters.status)
+        if (this.filters.status) params.append('status', this.filters.status);
+        if (this.filters.order_no) params.append('order_no', this.filters.order_no);
 
-    const response = await fetch(`${API_ENDPOINTS.MARKETPLACE.EXCHANGE_ORDERS}?${params}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+        const response = await fetch(`${API_BASE_URL}/admin/marketplace/exchange-orders?${params}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error('加载订单列表失败');
 
-    const data = await response.json()
+        const result = await response.json();
 
-    if (data.success) {
-      renderOrders(data.data.orders)
-      renderPagination(data.data.pagination)
-      updateStats(data.data.orders)
+        if (result.success) {
+          this.orders = result.data?.orders || [];
+          this.pagination = result.data?.pagination || null;
+          this.updateStats();
+          console.log(`✅ 加载订单: ${this.orders.length} 个`);
     } else {
-      showError(data.message || '加载失败')
+          this.showError(result.message || '加载失败');
     }
   } catch (error) {
-    console.error('加载订单列表失败', error)
-    showError('加载失败，请稍后重试')
+        console.error('加载订单列表失败:', error);
+        this.showError('加载失败，请稍后重试');
   } finally {
-    showLoading(false)
+        this.loading = false;
   }
-}
+    },
 
 /**
- * 渲染订单列表
- * ✅ 直接使用后端返回的字段：pay_asset_code, pay_amount
- */
-function renderOrders(orders) {
-  const tbody = document.getElementById('ordersTableBody')
-
-  if (!orders || orders.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">暂无数据</td></tr>'
-    return
-  }
-
-  tbody.innerHTML = orders
-    .map(order => {
-      // 优先使用后端返回的中文名称
-      const statusBadge = getStatusBadge(order.status, order.status_display)
-      // 直接使用后端字段 pay_asset_code 获取资产类型文本
-      const paymentTypeText = getAssetTypeText(order.pay_asset_code)
-      // 直接使用后端字段 pay_amount 显示支付数量
-      const paymentAmount = `<span class="badge bg-info">${order.pay_amount || 0} ${getAssetUnit(order.pay_asset_code)}</span>`
-
-      return `
-      <tr>
-        <td><code>${order.order_no}</code></td>
-        <td>ID: ${order.user_id}</td>
-        <td>
-          <div><strong>${escapeHtml(order.item_snapshot?.name || '-')}</strong></div>
-          <small class="text-muted">${escapeHtml(order.item_snapshot?.description || '')}</small>
-        </td>
-        <td>${order.quantity}</td>
-        <td>${paymentTypeText}</td>
-        <td>${paymentAmount}</td>
-        <td>${statusBadge}</td>
-        <td>${formatDate(order.exchange_time || order.created_at)}</td>
-        <td>
-          <button class="btn btn-sm btn-outline-info" onclick="viewOrderDetail('${order.order_no}')">
-            <i class="bi bi-eye"></i> 详情
-          </button>
-          ${
-            order.status === 'pending'
-              ? `
-            <button class="btn btn-sm btn-outline-primary" onclick="updateOrderStatus('${order.order_no}')">
-              <i class="bi bi-arrow-repeat"></i> 更新
-            </button>
-          `
-              : ''
-          }
-        </td>
-      </tr>
-    `
-    })
-    .join('')
-}
+     * 更新统计
+     */
+    updateStats() {
+      this.stats = {
+        total: this.orders.length,
+        pending: this.orders.filter(o => o.status === 'pending').length,
+        shipped: this.orders.filter(o => o.status === 'shipped').length,
+        cancelled: this.orders.filter(o => o.status === 'cancelled').length
+      };
+    },
+    
+    /**
+     * 计算可见页码
+     */
+    get visiblePages() {
+      if (!this.pagination) return [];
+      
+      const pages = [];
+      const total = this.pagination.total_pages;
+      const current = this.currentPage;
+      
+      for (let i = 1; i <= total; i++) {
+        if (i === 1 || i === total || (i >= current - 2 && i <= current + 2)) {
+          pages.push(i);
+        } else if (i === current - 3 || i === current + 3) {
+          pages.push('...');
+        }
+      }
+      
+      return pages;
+    },
 
 /**
- * 更新统计数据
- */
-function updateStats(orders) {
-  const stats = {
-    total: orders.length,
-    pending: orders.filter(o => o.status === 'pending').length,
-    shipped: orders.filter(o => o.status === 'shipped').length,
-    cancelled: orders.filter(o => o.status === 'cancelled').length
-  }
-
-  document.getElementById('totalOrders').textContent = stats.total
-  document.getElementById('pendingOrders').textContent = stats.pending
-  document.getElementById('shippedOrders').textContent = stats.shipped
-  document.getElementById('cancelledOrders').textContent = stats.cancelled
-}
+     * 切换页码
+     */
+    changePage(page) {
+      if (page < 1 || page > this.pagination?.total_pages) return;
+      this.currentPage = page;
+      this.loadOrders();
+    },
 
 /**
  * 查看订单详情
- * ✅ 直接使用后端返回的字段：pay_asset_code, pay_amount, total_cost, admin_remark
  */
-async function viewOrderDetail(orderNo) {
-  try {
-    showLoading(true)
-    const token = getToken()
-
-    const response = await fetch(API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ORDER_DETAIL, { order_no: orderNo }), {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-
-    const data = await response.json()
-
-    if (data.success) {
-      const order = data.data.order
-
-      document.getElementById('detailOrderNo').textContent = order.order_no
-      // 优先使用后端返回的中文名称
-      document.getElementById('detailStatus').innerHTML = getStatusBadge(order.status, order.status_display)
-      document.getElementById('detailExchangeTime').textContent = formatDate(
-        order.exchange_time || order.created_at
-      )
-      document.getElementById('detailShippedAt').textContent = order.shipped_at
-        ? formatDate(order.shipped_at)
-        : '-'
-      document.getElementById('detailUserId').textContent = order.user_id
-      document.getElementById('detailItemName').textContent = order.item_snapshot?.name || '-'
-      document.getElementById('detailItemDesc').textContent =
-        order.item_snapshot?.description || '-'
-      document.getElementById('detailQuantity').textContent = order.quantity
-      // 直接使用后端字段
-      document.getElementById('detailPaymentType').textContent = getAssetTypeText(
-        order.pay_asset_code
-      )
-      document.getElementById('detailVirtualPaid').textContent =
-        `${order.pay_amount || 0} ${getAssetUnit(order.pay_asset_code)}`
-      document.getElementById('detailCost').textContent = order.total_cost || '-'
-      document.getElementById('detailRemark').textContent = order.admin_remark || '-'
-
-      // 显示支付信息行
-      document.getElementById('detailVirtualRow').style.display = 'table-row'
-      document.getElementById('detailPointsRow').style.display = 'none'
-
-      new bootstrap.Modal(document.getElementById('orderDetailModal')).show()
+    async viewOrderDetail(orderNo) {
+      this.globalLoading = true;
+      
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/admin/marketplace/exchange-orders/${orderNo}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error('获取订单详情失败');
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          this.selectedOrder = result.data?.order;
+          this.detailModal.show();
     } else {
-      showError(data.message || '获取订单详情失败')
+          this.showError(result.message || '获取订单详情失败');
     }
   } catch (error) {
-    console.error('获取订单详情失败', error)
-    showError('获取失败，请稍后重试')
+        console.error('获取订单详情失败:', error);
+        this.showError('获取失败，请稍后重试');
   } finally {
-    showLoading(false)
+        this.globalLoading = false;
   }
-}
+    },
 
 /**
- * 打开更新状态对话框
+     * 打开更新状态弹窗
  */
-function updateOrderStatus(orderNo) {
-  document.getElementById('updateOrderNo').value = orderNo
-  document.getElementById('newStatus').value = ''
-  document.getElementById('statusRemark').value = ''
-  new bootstrap.Modal(document.getElementById('updateStatusModal')).show()
-}
+    openUpdateModal(orderNo) {
+      this.updateForm = {
+        order_no: orderNo,
+        status: '',
+        remark: ''
+      };
+      this.updateModal.show();
+    },
 
 /**
  * 提交状态更新
  */
-async function handleUpdateStatus() {
-  try {
-    const orderNo = document.getElementById('updateOrderNo').value
-    const newStatus = document.getElementById('newStatus').value
-    const remark = document.getElementById('statusRemark').value.trim()
-
-    if (!newStatus) {
-      showError('请选择新状态')
-      return
+    async handleUpdateStatus() {
+      if (!this.updateForm.status) {
+        this.showError('请选择新状态');
+        return;
     }
 
-    showLoading(true)
-    const token = getToken()
-
-    const response = await fetch(API.buildURL(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ORDER_STATUS, { order_no: orderNo }), {
+      this.submitting = true;
+      
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/admin/marketplace/exchange-orders/${this.updateForm.order_no}/status`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ status: newStatus, remark })
-    })
+          body: JSON.stringify({
+            status: this.updateForm.status,
+            remark: this.updateForm.remark
+          })
+        });
 
-    const data = await response.json()
+        const result = await response.json();
 
-    if (data.success) {
-      showSuccess('状态更新成功')
-      bootstrap.Modal.getInstance(document.getElementById('updateStatusModal')).hide()
-      loadOrders()
+        if (result.success) {
+          this.showSuccess('状态更新成功');
+          this.updateModal.hide();
+          this.loadOrders();
     } else {
-      showError(data.message || '更新失败')
+          this.showError(result.message || '更新失败');
     }
   } catch (error) {
-    console.error('更新订单状态失败', error)
-    showError('更新失败，请稍后重试')
+        console.error('更新订单状态失败:', error);
+        this.showError('更新失败，请稍后重试');
   } finally {
-    showLoading(false)
-  }
-}
+        this.submitting = false;
+      }
+    },
 
 /**
- * 渲染分页
+     * 获取资产类型文本
  */
-function renderPagination(pagination) {
-  const paginationEl = document.getElementById('pagination')
-  if (!pagination || pagination.total_pages <= 1) {
-    paginationEl.innerHTML = ''
-    return
-  }
-
-  let html = ''
-  for (let i = 1; i <= pagination.total_pages; i++) {
-    html += `
-      <li class="page-item ${i === currentPage ? 'active' : ''}">
-        <a class="page-link" href="#" onclick="changePage(${i}); return false;">${i}</a>
-      </li>
-    `
-  }
-  paginationEl.innerHTML = html
-}
-
-/**
- * 切换页码
- */
-function changePage(page) {
-  currentPage = page
-  loadOrders()
-}
-
-// ==================== 工具函数 ====================
-
-/**
- * 获取状态标签HTML
- */
-/**
- * 获取状态徽章
- * @param {string} status - 状态英文标识
- * @param {string} displayName - 后端返回的中文显示名称（优先使用）
- */
-function getStatusBadge(status, displayName) {
-  const colorMap = {
-    pending: 'bg-warning',
-    completed: 'bg-info',
-    shipped: 'bg-success',
-    cancelled: 'bg-secondary'
-  }
-  const statusKey = (status || '').toLowerCase()
-  const badgeColor = colorMap[statusKey] || 'bg-secondary'
-  // 优先使用后端返回的中文名称
-  const text = displayName || status || '未知'
-  return `<span class="badge ${badgeColor}">${text}</span>`
-}
-
-/**
- * 根据后端返回的 pay_asset_code 获取资产类型显示文本
- * ✅ 直接使用后端字段 pay_asset_code
- */
-function getAssetTypeText(assetCode) {
+    getAssetTypeText(assetCode) {
   const assetMap = {
-    // 积分类型
     points_virtual_value: '虚拟价值',
     points_lottery: '抽奖积分',
     points_consumption: '消费积分',
     coins: '金币',
-    // 材料类型（碎片等）
     red_shard: '红色碎片',
     blue_shard: '蓝色碎片',
     green_shard: '绿色碎片',
     gold_shard: '金色碎片',
     purple_shard: '紫色碎片',
     shard: '碎片',
-    // 其他材料
     crystal: '水晶',
     gem: '宝石',
     ticket: '兑换券'
-  }
-  return assetMap[assetCode] || assetCode || '未知'
-}
+      };
+      return assetMap[assetCode] || assetCode || '未知';
+    },
 
 /**
- * 根据后端返回的 pay_asset_code 获取资产单位
- * ✅ 直接使用后端字段 pay_asset_code
+     * 获取资产单位
  */
-function getAssetUnit(assetCode) {
+    getAssetUnit(assetCode) {
   const unitMap = {
-    // 积分类型
     points_virtual_value: '虚拟值',
     points_lottery: '积分',
     points_consumption: '积分',
     coins: '金币',
-    // 材料类型
     red_shard: '个',
     blue_shard: '个',
     green_shard: '个',
@@ -358,60 +305,73 @@ function getAssetUnit(assetCode) {
     crystal: '个',
     gem: '个',
     ticket: '张'
-  }
-  return unitMap[assetCode] || '个'
-}
+      };
+      return unitMap[assetCode] || '个';
+    },
+    
+    /**
+     * 获取状态颜色
+     */
+    getStatusColor(status) {
+      const colorMap = {
+        pending: 'bg-warning',
+        completed: 'bg-info',
+        shipped: 'bg-success',
+        cancelled: 'bg-secondary'
+      };
+      return colorMap[status] || 'bg-secondary';
+    },
+    
+    /**
+     * 获取状态文本
+     */
+    getStatusText(status) {
+      const textMap = {
+        pending: '待处理',
+        completed: '已完成',
+        shipped: '已发货',
+        cancelled: '已取消'
+      };
+      return textMap[status] || status || '未知';
+    },
 
 /**
  * 格式化日期
  */
-function formatDate(dateStr) {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
+    formatDate(dateStr) {
+      if (!dateStr) return '-';
+      try {
+        const date = new Date(dateStr);
   return date.toLocaleString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit'
-  })
-}
-
-/**
- * 转义HTML特殊字符
- */
-function escapeHtml(text) {
-  if (!text) return ''
-  const div = document.createElement('div')
-  div.textContent = text
-  return div.innerHTML
-}
-
-/**
- * 显示/隐藏加载遮罩
- */
-function showLoading(show) {
-  document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none'
-}
+        });
+      } catch {
+        return dateStr;
+      }
+    },
 
 /**
  * 显示成功消息
  */
-function showSuccess(message) {
-  if (typeof showSuccessToast === 'function') {
-    showSuccessToast(message)
-  } else {
-    alert(message)
-  }
+    showSuccess(message) {
+      this.$toast.success(message);
+    },
+
+    /**
+     * 显示错误消息
+     */
+    showError(message) {
+      this.$toast.error(message);
+    }
+  };
 }
 
-/**
- * 显示错误消息
- */
-function showError(message) {
-  if (typeof showErrorToast === 'function') {
-    showErrorToast(message)
-  } else {
-    alert(message)
-  }
-}
+// Alpine.js 组件注册
+document.addEventListener('alpine:init', () => {
+  Alpine.data('exchangeOrdersPage', exchangeOrdersPage)
+  console.log('✅ [ExchangeOrdersPage] Alpine 组件已注册')
+})

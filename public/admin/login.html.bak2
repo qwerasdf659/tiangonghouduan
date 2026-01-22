@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理后台登录 - 餐厅积分抽奖系统</title>
+  
+  <!-- Bootstrap 5 - UI框架 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  
+  <!-- 公共样式表 -->
+  <link href="/admin/css/common.css" rel="stylesheet">
+  
+  <style>
+    .login-container {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .login-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border: none;
+      border-radius: 1rem;
+    }
+    .login-card .card-body {
+      padding: 2.5rem;
+    }
+    .form-control:focus {
+      border-color: #667eea;
+      box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+    .btn-login {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      padding: 0.75rem;
+      font-size: 1.1rem;
+      transition: all 0.3s ease;
+    }
+    .btn-login:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+    .btn-login:disabled {
+      transform: none;
+      box-shadow: none;
+    }
+  </style>
+</head>
+<body class="login-container d-flex align-items-center">
+
+  <!-- 登录表单容器 -->
+  <div class="container" x-data="loginPage()">
+    <div class="row justify-content-center">
+      <div class="col-md-5 col-lg-4">
+        <div class="card login-card shadow-lg">
+          <div class="card-body">
+            <!-- 标题区域 -->
+            <div class="text-center mb-4">
+              <div class="mb-3">
+                <span style="font-size: 3rem;">🔐</span>
+              </div>
+              <h3 class="fw-bold text-dark mb-1">管理后台</h3>
+              <p class="text-muted mb-0">餐厅积分抽奖系统 V4.0</p>
+            </div>
+            
+            <!-- 登录表单 -->
+            <form @submit.prevent="handleLogin">
+              <!-- 手机号输入 -->
+              <div class="mb-3">
+                <label class="form-label fw-medium">
+                  <i class="bi bi-phone me-1"></i>手机号
+                </label>
+                <input 
+                  type="tel" 
+                  class="form-control form-control-lg" 
+                  x-model="phone"
+                  placeholder="请输入手机号"
+                  :disabled="loading"
+                  required
+                >
+              </div>
+              
+              <!-- 验证码输入 -->
+              <div class="mb-4">
+                <label class="form-label fw-medium">
+                  <i class="bi bi-shield-lock me-1"></i>验证码
+                </label>
+                <input 
+                  type="text" 
+                  class="form-control form-control-lg" 
+                  x-model="code"
+                  placeholder="请输入验证码"
+                  :disabled="loading"
+                  required
+                >
+                <div class="form-text">
+                  <i class="bi bi-info-circle me-1"></i>开发环境万能验证码：123456
+                </div>
+              </div>
+              
+              <!-- 登录按钮 -->
+              <button 
+                type="submit" 
+                class="btn btn-primary btn-login w-100"
+                :disabled="loading"
+              >
+                <template x-if="!loading">
+                  <span><i class="bi bi-box-arrow-in-right me-2"></i>登 录</span>
+                </template>
+                <template x-if="loading">
+                  <span>
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                    登录中...
+                  </span>
+                </template>
+              </button>
+            </form>
+            
+            <!-- 状态消息 -->
+            <div 
+              x-show="message" 
+              x-transition:enter="transition ease-out duration-300"
+              x-transition:enter-start="opacity-0 transform -translate-y-2"
+              x-transition:enter-end="opacity-100 transform translate-y-0"
+              x-transition:leave="transition ease-in duration-200"
+              x-transition:leave-start="opacity-100"
+              x-transition:leave-end="opacity-0"
+              class="mt-4"
+            >
+              <div 
+                class="alert mb-0 d-flex align-items-center"
+                :class="isError ? 'alert-danger' : 'alert-info'"
+              >
+                <i 
+                  class="me-2"
+                  :class="isError ? 'bi bi-exclamation-triangle-fill' : 'bi bi-info-circle-fill'"
+                ></i>
+                <span x-text="message"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 底部版权信息 -->
+        <div class="text-center mt-4 text-white-50">
+          <small>&copy; 2026 餐厅积分抽奖系统</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS 引入顺序 -->
+  <!-- 1. API 配置（无依赖） -->
+  <script src="/admin/js/api-config.js"></script>
+  
+  <!-- 2. 登录页面逻辑（必须在 Alpine 之前加载） -->
+  <script src="/admin/js/pages/login.js"></script>
+  
+  <!-- 3. Alpine.js（defer 必须） -->
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+</body>
+</html>

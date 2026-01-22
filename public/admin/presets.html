@@ -30,245 +30,410 @@
       max-height: 200px;
       overflow-y: auto;
     }
+    [x-cloak] { display: none !important; }
   </style>
+  <!-- Alpine.js -->
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
 </head>
 <body class="bg-light">
-  <!-- 顶部导航 -->
-  <nav class="navbar navbar-dark bg-primary">
-    <div class="container-fluid">
-      <a href="/admin/dashboard.html" class="navbar-brand">
-        <i class="bi bi-arrow-left me-2"></i>管理后台 - 抽奖干预管理
-      </a>
-      <div>
-        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
-      </div>
-    </div>
-  </nav>
-
-  <div class="container-fluid mt-4">
-    <!-- 功能说明 -->
-    <div class="alert alert-info mb-3">
-      <i class="bi bi-info-circle"></i>
-      <strong>功能说明：</strong>抽奖干预允许管理员预设特定用户的下次抽奖结果。干预规则生效一次后自动失效。
-    </div>
-
-    <!-- 操作区域 -->
-    <div class="card mb-3">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center">
-          <div>
-            <h5 class="mb-0"><i class="bi bi-bullseye"></i> 抽奖干预规则</h5>
-            <small class="text-muted">管理用户抽奖结果的预设规则</small>
-          </div>
-          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createInterventionModal">
-            <i class="bi bi-plus-lg"></i> 新增干预规则
-          </button>
+  <div x-data="presetsPage()" x-init="init()" x-cloak>
+    <!-- 顶部导航 -->
+    <nav class="navbar navbar-dark bg-primary">
+      <div class="container-fluid">
+        <a href="/admin/dashboard.html" class="navbar-brand">
+          <i class="bi bi-arrow-left me-2"></i>管理后台 - 抽奖干预管理
+        </a>
+        <div>
+          <span class="text-light me-3" x-text="'欢迎，' + (userInfo.nickname || '管理员')"></span>
+          <button class="btn btn-outline-light btn-sm" @click="logout">退出登录</button>
         </div>
       </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+      <!-- 功能说明 -->
+      <div class="alert alert-info mb-3">
+        <i class="bi bi-info-circle"></i>
+        <strong>功能说明：</strong>抽奖干预允许管理员预设特定用户的下次抽奖结果。干预规则生效一次后自动失效。
+      </div>
+
+      <!-- 操作区域 -->
+      <div class="card mb-3">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h5 class="mb-0"><i class="bi bi-bullseye"></i> 抽奖干预规则</h5>
+              <small class="text-muted">管理用户抽奖结果的预设规则</small>
+            </div>
+            <button class="btn btn-primary" @click="openCreateModal">
+              <i class="bi bi-plus-lg"></i> 新增干预规则
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 筛选区 -->
+      <div class="card mb-3">
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">状态筛选</label>
+              <select class="form-select" x-model="filters.status" @change="currentPage = 1; loadInterventions()">
+                <option value="">全部状态</option>
+                <option value="active">待触发</option>
+                <option value="used">已使用</option>
+                <option value="expired">已过期</option>
+                <option value="cancelled">已取消</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">用户搜索</label>
+              <input type="text" class="form-control" x-model="filters.userSearch" placeholder="手机号/用户ID" @keypress.enter="currentPage = 1; loadInterventions()">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">奖品类型</label>
+              <select class="form-select" x-model="filters.prizeType" @change="currentPage = 1; loadInterventions()">
+                <option value="">全部类型</option>
+                <option value="physical">实物奖品</option>
+                <option value="virtual">虚拟奖品</option>
+                <option value="points">积分</option>
+                <option value="coupon">优惠券</option>
+              </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+              <button class="btn btn-outline-primary w-100" @click="currentPage = 1; loadInterventions()">
+                <i class="bi bi-search"></i> 搜索
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 干预规则列表 -->
+      <div class="card">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>规则ID</th>
+                  <th>目标用户</th>
+                  <th>预设奖品</th>
+                  <th>奖品价值</th>
+                  <th>状态</th>
+                  <th>创建时间</th>
+                  <th>过期时间</th>
+                  <th>创建者</th>
+                  <th style="width: 120px;">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- 加载中 -->
+                <template x-if="loading && interventions.length === 0">
+                  <tr>
+                    <td colspan="9" class="text-center py-5 text-muted">
+                      <div class="spinner-border text-primary" role="status"></div>
+                      <p class="mt-2">加载中...</p>
+                    </td>
+                  </tr>
+                </template>
+                
+                <!-- 空状态 -->
+                <template x-if="!loading && interventions.length === 0">
+                  <tr>
+                    <td colspan="9" class="text-center py-5 text-muted">
+                      <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                      <p class="mt-2">暂无干预规则</p>
+                    </td>
+                  </tr>
+                </template>
+                
+                <!-- 数据列表 -->
+                <template x-for="(item, index) in interventions" :key="item.setting_id">
+                  <tr>
+                    <td>
+                      <span class="fw-semibold text-primary" x-text="formatRuleId(item, index)"></span>
+                      <br><small class="text-muted" :title="item.setting_id" x-text="(item.setting_id || '').substring(0, 12) + '...'"></small>
+                    </td>
+                    <td>
+                      <strong x-text="item.user_info?.nickname || '未知'"></strong>
+                      <br><small class="text-muted" x-text="item.user_info?.mobile || 'ID:' + item.user_id"></small>
+                    </td>
+                    <td x-text="item.prize_info?.prize_name || getSettingTypeLabel(item.setting_type)"></td>
+                    <td class="text-success fw-bold" x-text="item.prize_info ? '¥' + parseFloat(item.prize_info.prize_value || 0).toFixed(2) : '-'"></td>
+                    <td>
+                      <span class="badge" :class="getStatusBadgeClass(item.status)" x-text="item.status_display || item.status || '未知'"></span>
+                    </td>
+                    <td><small x-text="formatDate(item.created_at)"></small></td>
+                    <td><small x-text="item.expires_at ? formatDate(item.expires_at) : '永不过期'"></small></td>
+                    <td x-text="item.operator?.nickname || '系统'"></td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-primary me-1" @click="viewIntervention(item.setting_id)" title="查看">
+                        <i class="bi bi-eye"></i>
+                      </button>
+                      <button class="btn btn-sm btn-outline-danger" x-show="item.status === 'active'" @click="cancelIntervention(item.setting_id)" title="取消">
+                        <i class="bi bi-x"></i>
+                      </button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 分页 -->
+      <div class="d-flex justify-content-between align-items-center mt-3">
+        <div>
+          <span class="text-muted">共 <span x-text="pagination.total"></span> 条记录</span>
+        </div>
+        <nav x-show="pagination.totalPages > 1">
+          <ul class="pagination mb-0">
+            <li class="page-item" :class="{ disabled: currentPage <= 1 }">
+              <a class="page-link" href="#" @click.prevent="currentPage > 1 && goToPage(currentPage - 1)">上一页</a>
+            </li>
+            <template x-for="page in getPageNumbers()" :key="page">
+              <li class="page-item" :class="{ active: page === currentPage, disabled: page === '...' }">
+                <a class="page-link" href="#" @click.prevent="page !== '...' && goToPage(page)" x-text="page"></a>
+              </li>
+            </template>
+            <li class="page-item" :class="{ disabled: currentPage >= pagination.totalPages }">
+              <a class="page-link" href="#" @click.prevent="currentPage < pagination.totalPages && goToPage(currentPage + 1)">下一页</a>
+            </li>
+          </ul>
+        </nav>
+      </div>
     </div>
 
-    <!-- 筛选区 -->
-    <div class="card mb-3">
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-md-3">
-            <label class="form-label">状态筛选</label>
-            <select class="form-select" id="statusFilter">
-              <option value="">全部状态</option>
-              <option value="active">待触发</option>
-              <option value="used">已使用</option>
-              <option value="expired">已过期</option>
-              <option value="cancelled">已取消</option>
-            </select>
+    <!-- 新增干预规则模态框 -->
+    <div class="modal fade" x-ref="createModal" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 新增抽奖干预规则</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
-          <div class="col-md-3">
-            <label class="form-label">用户搜索</label>
-            <input type="text" class="form-control" id="userSearch" placeholder="手机号/用户ID">
+          <div class="modal-body">
+            <form @submit.prevent="createIntervention">
+              <!-- 用户选择 -->
+              <div class="card mb-3">
+                <div class="card-header bg-light">
+                  <h6 class="mb-0"><i class="bi bi-person"></i> 选择目标用户</h6>
+                </div>
+                <div class="card-body">
+                  <div class="row g-3">
+                    <div class="col-md-8">
+                      <label class="form-label">搜索用户（手机号/昵称）<span class="text-danger">*</span></label>
+                      <div class="input-group">
+                        <input type="text" class="form-control" x-model="userSearchKeyword" placeholder="请输入手机号或昵称搜索" @keypress.enter.prevent="searchUser">
+                        <button type="button" class="btn btn-outline-primary" @click="searchUser" :disabled="searchingUser">
+                          <span x-show="searchingUser" class="spinner-border spinner-border-sm"></span>
+                          <i class="bi bi-search" x-show="!searchingUser"></i> 搜索
+                        </button>
+                      </div>
+                    </div>
+                    <div class="col-12">
+                      <div class="user-search-result">
+                        <!-- 搜索中 -->
+                        <div x-show="searchingUser" class="text-center py-2">
+                          <div class="spinner-border spinner-border-sm"></div> 搜索中...
+                        </div>
+                        
+                        <!-- 搜索结果 -->
+                        <div class="list-group" x-show="userSearchResults.length > 0">
+                          <template x-for="user in userSearchResults" :key="user.user_id">
+                            <a href="#" class="list-group-item list-group-item-action" @click.prevent="selectUser(user)">
+                              <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                  <strong x-text="user.nickname || '未设置昵称'"></strong>
+                                  <small class="text-muted ms-2" x-text="user.mobile || ''"></small>
+                                </div>
+                                <span class="badge bg-secondary" x-text="'ID: ' + user.user_id"></span>
+                              </div>
+                            </a>
+                          </template>
+                        </div>
+                        
+                        <!-- 无结果 -->
+                        <div x-show="!searchingUser && userSearchResults.length === 0 && userSearchKeyword && userSearched" class="alert alert-warning py-2 mb-0">
+                          未找到匹配的用户
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-12">
+                      <div class="alert alert-secondary" x-show="selectedUser">
+                        <strong>已选用户：</strong>
+                        <span x-text="selectedUser ? (selectedUser.nickname || '未设置昵称') + ' (' + (selectedUser.mobile || 'ID:' + selectedUser.user_id) + ')' : ''"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 奖品配置 -->
+              <div class="card mb-3">
+                <div class="card-header bg-light">
+                  <h6 class="mb-0"><i class="bi bi-gift"></i> 预设奖品</h6>
+                </div>
+                <div class="card-body">
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label">选择奖品 <span class="text-danger">*</span></label>
+                      <select class="form-select" x-model="interventionForm.prize_id">
+                        <option value="">请选择奖品</option>
+                        <template x-for="prize in allPrizes" :key="prize.prize_id">
+                          <option :value="prize.prize_id" x-text="prize.prize_name + ' (¥' + (prize.prize_value || 0).toFixed(2) + ')'"></option>
+                        </template>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">奖品预览</label>
+                      <div class="border rounded p-2" :class="{ 'text-muted': !getSelectedPrize() }">
+                        <template x-if="getSelectedPrize()">
+                          <div>
+                            <div class="d-flex justify-content-between">
+                              <span><strong x-text="getSelectedPrize()?.prize_name"></strong></span>
+                              <span class="badge bg-primary" x-text="getPrizeTypeLabel(getSelectedPrize()?.prize_type)"></span>
+                            </div>
+                            <div class="text-success fw-bold" x-text="'¥' + parseFloat(getSelectedPrize()?.prize_value || 0).toFixed(2)"></div>
+                          </div>
+                        </template>
+                        <template x-if="!getSelectedPrize()">
+                          <span>未选择奖品</span>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 规则设置 -->
+              <div class="card">
+                <div class="card-header bg-light">
+                  <h6 class="mb-0"><i class="bi bi-gear"></i> 规则设置</h6>
+                </div>
+                <div class="card-body">
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label">过期时间</label>
+                      <input type="datetime-local" class="form-control" x-model="interventionForm.expire_time">
+                      <small class="text-muted">不设置则永不过期（直到被使用）</small>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">干预原因</label>
+                      <input type="text" class="form-control" x-model="interventionForm.reason" 
+                        placeholder="如：VIP用户首次抽奖礼遇">
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label">备注说明</label>
+                      <textarea class="form-control" x-model="interventionForm.note" rows="2" 
+                        placeholder="管理员备注..."></textarea>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </form>
           </div>
-          <div class="col-md-3">
-            <label class="form-label">奖品类型</label>
-            <select class="form-select" id="prizeTypeFilter">
-              <option value="">全部类型</option>
-              <option value="physical">实物奖品</option>
-              <option value="virtual">虚拟奖品</option>
-              <option value="points">积分</option>
-              <option value="coupon">优惠券</option>
-            </select>
-          </div>
-          <div class="col-md-3 d-flex align-items-end">
-            <button class="btn btn-outline-primary w-100" id="searchFilterBtn">
-              <i class="bi bi-search"></i> 搜索
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="button" class="btn btn-primary" @click="createIntervention" :disabled="submitting">
+              <span x-show="submitting" class="spinner-border spinner-border-sm me-1"></span>
+              <i class="bi bi-check-lg" x-show="!submitting"></i> 创建规则
             </button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 干预规则列表 -->
-    <div class="card">
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-hover mb-0">
-            <thead class="table-light">
-              <tr>
-                <th>规则ID</th>
-                <th>目标用户</th>
-                <th>预设奖品</th>
-                <th>奖品价值</th>
-                <th>状态</th>
-                <th>创建时间</th>
-                <th>过期时间</th>
-                <th>创建者</th>
-                <th style="width: 120px;">操作</th>
-              </tr>
-            </thead>
-            <tbody id="interventionTableBody">
-              <tr>
-                <td colspan="9" class="text-center py-5 text-muted">
-                  <div class="spinner-border text-primary" role="status"></div>
-                  <p class="mt-2">加载中...</p>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- 分页 -->
-    <div class="d-flex justify-content-between align-items-center mt-3">
-      <div>
-        <span class="text-muted">共 <span id="totalCount">0</span> 条记录</span>
-      </div>
-      <nav>
-        <ul class="pagination mb-0" id="pagination"></ul>
-      </nav>
-    </div>
-  </div>
-
-  <!-- 新增干预规则模态框 -->
-  <div class="modal fade" id="createInterventionModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 新增抽奖干预规则</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <form id="interventionForm">
-            <!-- 用户选择 -->
-            <div class="card mb-3">
-              <div class="card-header bg-light">
-                <h6 class="mb-0"><i class="bi bi-person"></i> 选择目标用户</h6>
-              </div>
-              <div class="card-body">
-                <div class="row g-3">
-                  <div class="col-md-8">
-                    <label class="form-label">搜索用户（手机号/昵称）<span class="text-danger">*</span></label>
-                    <div class="input-group">
-                      <input type="text" class="form-control" id="searchUserInput" placeholder="请输入手机号或昵称搜索">
-                      <button type="button" class="btn btn-outline-primary" id="searchUserBtn">
-                        <i class="bi bi-search"></i> 搜索
-                      </button>
-                    </div>
-                  </div>
-                  <div class="col-12">
-                    <div id="userSearchResult" class="user-search-result"></div>
-                  </div>
-                  <div class="col-12">
-                    <div id="selectedUser" class="alert alert-secondary" style="display: none;">
-                      <strong>已选用户：</strong>
-                      <span id="selectedUserInfo"></span>
-                      <input type="hidden" id="targetUserId">
-                    </div>
-                  </div>
-                </div>
+    <!-- 查看详情模态框 -->
+    <div class="modal fade" x-ref="viewModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-info-circle"></i> 干预规则详情</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body" x-show="viewData">
+            <div class="mb-3">
+              <label class="form-label text-muted">规则标识</label>
+              <div>
+                <span class="fw-bold text-primary" x-text="getSettingTypeLabel(viewData?.setting_type) + ' - ' + (viewData?.user?.nickname || '用户' + viewData?.user?.user_id)"></span>
+                <br><small class="text-muted" x-text="'技术ID: ' + viewData?.setting_id"></small>
               </div>
             </div>
-
-            <!-- 奖品配置 -->
-            <div class="card mb-3">
-              <div class="card-header bg-light">
-                <h6 class="mb-0"><i class="bi bi-gift"></i> 预设奖品</h6>
-              </div>
-              <div class="card-body">
-                <div class="row g-3">
-                  <div class="col-md-6">
-                    <label class="form-label">选择奖品 <span class="text-danger">*</span></label>
-                    <select class="form-select" id="prizeSelect">
-                      <option value="">请选择奖品</option>
-                    </select>
-                  </div>
-                  <div class="col-md-6">
-                    <label class="form-label">奖品预览</label>
-                    <div id="prizePreview" class="border rounded p-2 text-muted">
-                      未选择奖品
-                    </div>
-                  </div>
-                </div>
+            <div class="mb-3">
+              <label class="form-label text-muted">目标用户</label>
+              <div>
+                <strong x-text="viewData?.user?.nickname || '未知'"></strong>
+                <span x-text="' (' + (viewData?.user?.mobile || 'ID:' + viewData?.user?.user_id) + ')'"></span>
               </div>
             </div>
-
-            <!-- 规则设置 -->
-            <div class="card">
-              <div class="card-header bg-light">
-                <h6 class="mb-0"><i class="bi bi-gear"></i> 规则设置</h6>
-              </div>
-              <div class="card-body">
-                <div class="row g-3">
-                  <div class="col-md-6">
-                    <label class="form-label">过期时间</label>
-                    <input type="datetime-local" class="form-control" id="expireTime">
-                    <small class="text-muted">不设置则永不过期（直到被使用）</small>
-                  </div>
-                  <div class="col-md-6">
-                    <label class="form-label">干预原因</label>
-                    <input type="text" class="form-control" id="interventionReason" 
-                      placeholder="如：VIP用户首次抽奖礼遇">
-                  </div>
-                  <div class="col-12">
-                    <label class="form-label">备注说明</label>
-                    <textarea class="form-control" id="interventionNote" rows="2" 
-                      placeholder="管理员备注..."></textarea>
-                  </div>
-                </div>
+            <div class="mb-3">
+              <label class="form-label text-muted">设置类型</label>
+              <div x-text="getSettingTypeLabel(viewData?.setting_type)"></div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label text-muted">预设奖品</label>
+              <div><strong x-text="viewData?.prize_name || '未指定奖品'"></strong></div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label text-muted">状态</label>
+              <div>
+                <span class="badge" :class="getStatusBadgeClass(viewData?.status)" x-text="viewData?.status_display || viewData?.status || '未知'"></span>
               </div>
             </div>
-          </form>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="button" class="btn btn-primary" id="createInterventionBtn">
-            <i class="bi bi-check-lg"></i> 创建规则
-          </button>
+            <div class="mb-3">
+              <label class="form-label text-muted">干预原因</label>
+              <div x-text="viewData?.reason || '未填写'"></div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label text-muted">操作管理员</label>
+              <div x-text="viewData?.operator?.nickname || '系统'"></div>
+            </div>
+            <div class="row">
+              <div class="col-6">
+                <label class="form-label text-muted">创建时间</label>
+                <div><small x-text="formatDate(viewData?.created_at)"></small></div>
+              </div>
+              <div class="col-6">
+                <label class="form-label text-muted">过期时间</label>
+                <div><small x-text="viewData?.expires_at ? formatDate(viewData?.expires_at) : '永不过期'"></small></div>
+              </div>
+            </div>
+            <div class="mt-3 alert alert-success" x-show="viewData?.status === 'used' && viewData?.setting_data?.used_at">
+              <strong>使用时间：</strong><span x-text="formatDate(viewData?.setting_data?.used_at)"></span>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- 查看详情模态框 -->
-  <div class="modal fade" id="viewInterventionModal" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title"><i class="bi bi-info-circle"></i> 干预规则详情</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body" id="viewInterventionBody">
-          <!-- 详情内容 -->
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
-        </div>
+    <!-- 加载遮罩层 -->
+    <div class="loading-overlay" :class="{ show: globalLoading }">
+      <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+        <span class="visually-hidden">处理中...</span>
       </div>
     </div>
-  </div>
 
-  <!-- 加载遮罩层 -->
-  <div class="loading-overlay" id="loadingOverlay">
-    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
-      <span class="visually-hidden">处理中...</span>
+    <!-- Toast 通知 -->
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+      <div x-ref="successToast" class="toast align-items-center text-white bg-success border-0" role="alert">
+        <div class="d-flex">
+          <div class="toast-body" x-text="toastMessage"></div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+      </div>
+      <div x-ref="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert">
+        <div class="d-flex">
+          <div class="toast-body" x-text="toastMessage"></div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -277,9 +442,8 @@
   <!-- 引入通用工具库 -->
   <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/api-config.js"></script>
-  <!-- 引入公共Toast组件 -->
-  <script src="/admin/js/common/toast.js"></script>
-  <!-- 引入页面专属逻辑 -->
+  
+  <!-- 页面脚本 -->
   <script src="/admin/js/pages/presets.js"></script>
 </body>
 </html>

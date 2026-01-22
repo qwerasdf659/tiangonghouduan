@@ -20,15 +20,22 @@
       height: 280px;
     }
   </style>
+
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
 </head>
-<body class="bg-light">
+<body class="bg-light" x-data="dashboardPage()" x-init="init()" x-cloak>
   <!-- 顶部导航 -->
   <nav class="navbar navbar-dark bg-primary">
     <div class="container-fluid">
       <span class="navbar-brand">📊 管理后台 - 数据仪表盘</span>
       <div>
-        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+        <span class="text-light me-3" x-text="'欢迎，' + (userInfo?.nickname || '管理员')"></span>
+        <button class="btn btn-outline-light btn-sm" @click="logout">退出登录</button>
       </div>
     </div>
   </nav>
@@ -42,8 +49,8 @@
         <div class="card">
           <div class="card-body text-center">
             <h6 class="text-muted">总用户数</h6>
-            <h2 id="totalUsers" class="text-primary">-</h2>
-            <small class="text-success">今日新增: <span id="todayNewUsers">-</span></small>
+            <h2 class="text-primary" x-text="formatNumber(stats.totalUsers)">-</h2>
+            <small class="text-success">今日新增: <span x-text="stats.todayNewUsers">-</span></small>
           </div>
         </div>
       </div>
@@ -52,8 +59,8 @@
         <div class="card">
           <div class="card-body text-center">
             <h6 class="text-muted">今日抽奖</h6>
-            <h2 id="todayDraws" class="text-success">-</h2>
-            <small class="text-info">中奖: <span id="todayWins">-</span></small>
+            <h2 class="text-success" x-text="formatNumber(stats.todayDraws)">-</h2>
+            <small class="text-info">中奖: <span x-text="formatNumber(stats.todayWins)">-</span></small>
           </div>
         </div>
       </div>
@@ -62,8 +69,8 @@
         <div class="card">
           <div class="card-body text-center">
             <h6 class="text-muted">中奖率</h6>
-            <h2 id="winRate" class="text-warning">-</h2>
-            <small class="text-secondary">消耗积分: <span id="points">-</span></small>
+            <h2 class="text-warning" x-text="stats.winRate + '%'">-</h2>
+            <small class="text-secondary">消耗积分: <span x-text="formatNumber(stats.pointsConsumed)">-</span></small>
           </div>
         </div>
       </div>
@@ -72,8 +79,8 @@
         <div class="card">
           <div class="card-body text-center">
             <h6 class="text-muted">客服会话</h6>
-            <h2 id="sessions" class="text-danger">-</h2>
-            <small class="text-muted">消息数: <span id="messages">-</span></small>
+            <h2 class="text-danger" x-text="formatNumber(stats.sessions)">-</h2>
+            <small class="text-muted">消息数: <span x-text="formatNumber(stats.messages)">-</span></small>
           </div>
         </div>
       </div>
@@ -88,7 +95,7 @@
             <small class="text-muted">每分钟自动刷新</small>
           </div>
           <div class="card-body">
-            <div id="lotteryTrendChart" class="chart-container"></div>
+            <div id="lotteryTrendChart" class="chart-container" x-ref="trendChart"></div>
           </div>
         </div>
       </div>
@@ -98,7 +105,7 @@
             <h6 class="mb-0"><i class="bi bi-pie-chart"></i> 今日数据分布</h6>
           </div>
           <div class="card-body">
-            <div id="todayDistributionChart" class="chart-container"></div>
+            <div id="todayDistributionChart" class="chart-container" x-ref="distributionChart"></div>
           </div>
         </div>
       </div>
@@ -374,11 +381,11 @@
   <script src="/admin/js/lib/echarts.min.js"></script>
   
   <!-- ✅ 引入通用工具库 -->
-  <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/api-config.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
   
-  <!-- ✅ 页面专属逻辑 -->
+  
+  <!-- ✅ 页面专属逻辑（必须在 Alpine 之前加载） -->
   <script src="/admin/js/pages/dashboard.js"></script>
 </body>
 </html>
-

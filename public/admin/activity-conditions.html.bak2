@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>活动条件配置 - 管理后台</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/common.css" rel="stylesheet">
+
+  <style>
+    .condition-row {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      border: 1px solid #dee2e6;
+    }
+    .condition-preview {
+      background: #fff;
+      border: 1px solid #0d6efd;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+<body class="bg-light" x-data="activityConditionsPage()">
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a href="/admin/dashboard.html" class="navbar-brand">
+        <i class="bi bi-arrow-left me-2"></i>🎯 活动条件配置
+      </a>
+      <div>
+        <span class="text-light me-3" x-text="'欢迎，' + welcomeText">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" @click="handleLogout">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mt-4">
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5 class="mb-0">选择活动</h5>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-6">
+            <label class="form-label">活动名称</label>
+            <select class="form-select" x-model="selectedActivityCode" @change="loadActivityConditions()">
+              <option value="">-- 请选择活动 --</option>
+              <template x-for="activity in activities" :key="activity.campaign_code">
+                <option :value="activity.campaign_code" x-text="activity.campaign_name + ' (' + getStatusText(activity.status) + ')'"></option>
+              </template>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">活动状态</label>
+            <input type="text" class="form-control" x-model="activityStatus" readonly>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">参与条件配置</h5>
+        <button class="btn btn-sm btn-success" @click="addCondition()">
+          <i class="bi bi-plus-circle"></i> 添加条件
+        </button>
+      </div>
+      <div class="card-body">
+        <div id="conditionsContainer">
+          <template x-for="(condition, index) in conditions" :key="condition.id">
+            <div class="condition-row">
+              <div class="row g-2">
+                <div class="col-md-3">
+                  <label class="form-label small">条件类型</label>
+                  <select class="form-control form-control-sm" x-model="condition.type" @change="updateConditionUI(index)">
+                    <template x-for="(config, key) in CONDITION_TYPES" :key="key">
+                      <option :value="key" x-text="config.label"></option>
+                    </template>
+                  </select>
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label small">运算符</label>
+                  <select class="form-control form-control-sm" x-model="condition.operator" @change="updatePreview()">
+                    <template x-for="op in CONDITION_TYPES[condition.type].operators" :key="op">
+                      <option :value="op" x-text="op"></option>
+                    </template>
+                  </select>
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label small">条件值</label>
+                  <template x-if="CONDITION_TYPES[condition.type].valueType === 'number'">
+                    <input 
+                      type="number" 
+                      class="form-control form-control-sm" 
+                      x-model="condition.value"
+                      :placeholder="CONDITION_TYPES[condition.type].placeholder"
+                      @change="updatePreview()"
+                    >
+                  </template>
+                  <template x-if="CONDITION_TYPES[condition.type].valueType === 'select' && condition.operator !== 'in'">
+                    <select class="form-control form-control-sm" x-model="condition.value" @change="updatePreview()">
+                      <template x-for="opt in CONDITION_TYPES[condition.type].options" :key="opt">
+                        <option :value="opt" x-text="opt"></option>
+                      </template>
+                    </select>
+                  </template>
+                  <template x-if="CONDITION_TYPES[condition.type].valueType === 'select' && condition.operator === 'in'">
+                    <select class="form-control form-control-sm" x-model="condition.value" multiple @change="updatePreview()">
+                      <template x-for="opt in CONDITION_TYPES[condition.type].options" :key="opt">
+                        <option :value="opt" x-text="opt"></option>
+                      </template>
+                    </select>
+                  </template>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small">不满足时的提示语</label>
+                  <input 
+                    type="text" 
+                    class="form-control form-control-sm" 
+                    x-model="condition.message"
+                    placeholder="如：您的积分不足100分"
+                    @change="updatePreview()"
+                  >
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                  <button class="btn btn-sm btn-outline-danger w-100" @click="removeCondition(index)">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div class="condition-preview">
+          <h6><i class="bi bi-eye"></i> 条件预览</h6>
+          <div x-html="previewHtml">暂无条件配置</div>
+        </div>
+
+        <div class="mt-4 d-flex gap-2">
+          <button class="btn btn-primary" @click="saveConditions()">
+            <i class="bi bi-save"></i> 保存配置
+          </button>
+          <button class="btn btn-outline-danger" @click="clearAllConditions()">
+            <i class="bi bi-trash"></i> 清空所有条件
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩层 -->
+  <div class="loading-overlay" :class="{ 'show': loadingOverlay }">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">处理中...</span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/js/admin-common.js"></script>
+  <script src="/admin/js/api-config.js"></script>
+  
+  <!-- ✅ Alpine.js 初始化 -->
+  <script src="/admin/js/alpine/init.js"></script>
+  
+  <!-- ✅ 页面逻辑 -->
+  <script src="/admin/js/pages/activity-conditions.js"></script>
+  
+  <!-- ✅ Alpine.js 核心 -->
+  <script src="/admin/js/vendor/alpine.min.js" defer></script>
+</body>
+</html>

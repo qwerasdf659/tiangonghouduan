@@ -86,7 +86,13 @@ app.use(
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://unpkg.com'],
-        scriptSrc: ["'self'", "'unsafe-inline'", 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "'unsafe-eval'",
+          'https://unpkg.com',
+          'https://cdn.jsdelivr.net'
+        ],
         imgSrc: ["'self'", 'data:', 'https:'],
         baseUri: ["'self'"],
         fontSrc: ["'self'", 'https:', 'data:'],

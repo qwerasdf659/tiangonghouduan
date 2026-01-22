@@ -1,557 +1,459 @@
 /**
- * 客服工作台页面 - JavaScript逻辑
- * 从customer-service.html提取，遵循前端工程化最佳实践
+ * 客服工作台页面 - Alpine.js 组件
+ * 迁移自原生 JavaScript DOM 操作
  */
 
-// ========== 全局变量 ==========
-let currentSessionId = null
-let allSessions = []
-let wsConnection = null
-let messagePollingInterval = null
+function customerServicePage() {
+  return {
+    // ========== 状态数据 ==========
+    welcomeText: '管理员',
+    loadingOverlay: false,
+    sessionsLoading: true,
+    
+    // 会话相关
+    allSessions: [],
+    currentSessionId: null,
+    currentMessages: [],
+    currentChatUser: {
+      nickname: '',
+      mobile: '',
+      avatar: ''
+    },
+    
+    // 筛选
+    searchKeyword: '',
+    statusFilter: 'all',
+    
+    // 消息输入
+    messageInput: '',
+    
+    // 模态框数据
+    userInfoData: null,
+    transferTargetId: '',
+    adminList: [],
+    
+    // WebSocket
+    wsConnection: null,
+    messagePollingInterval: null,
+    
+    // 快捷回复配置
+    quickReplies: [
+      { text: '👋 欢迎语', content: '您好，有什么可以帮助您的吗？' },
+      { text: '⏳ 查询中', content: '请稍等，我为您查询一下' },
+      { text: '🙏 感谢反馈', content: '感谢您的反馈，我们会尽快处理' },
+      { text: '😊 祝福语', content: '祝您使用愉快！' }
+    ],
+    
+    // 默认头像
+    defaultAvatar: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLXBlcnNvbi1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTExIDZhMyAzIDAgMSAxLTYgMCAzIDMgMCAwIDEgNiAweiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTAgOGE4IDggMCAxIDEgMTYgMEE4IDggMCAwIDEgMCA4em04IDdhNyA3IDAgMCAwIDUuMzg3LTIuNTAzQTEzLjkzMyAxMy45MzMgMCAwIDAgOCAxMS41YTEzLjkzMyAxMy45MzMgMCAwIDAtNS4zODcgMS4wMDdBNyA3IDAgMCAwIDggMTV6Ii8+PC9zdmc+',
 
-// ========== 页面初始化 ==========
+    // ========== 初始化 ==========
+    init() {
+      // 获取用户信息
+      const userInfo = getCurrentUser()
+      if (userInfo && userInfo.nickname) {
+        this.welcomeText = userInfo.nickname
+      }
+      
+      // 加载数据
+      this.loadSessions()
+      this.loadAdminList()
+      this.initWebSocket()
+      
+      // 定期轮询刷新会话列表
+      setInterval(() => this.loadSessions(true), 30000)
+      
+      // 页面卸载时关闭WebSocket
+      window.addEventListener('beforeunload', () => {
+        if (this.wsConnection) {
+          this.wsConnection.disconnect()
+        }
+      })
+    },
 
-document.addEventListener('DOMContentLoaded', function () {
-  const userInfo = getCurrentUser()
-  if (userInfo && userInfo.nickname) {
-    document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`
-  }
+    // ========== WebSocket ==========
+    initWebSocket() {
+      try {
+        // 检查Socket.IO库是否已加载
+        if (typeof io === 'undefined') {
+          console.warn('⚠️ Socket.IO库未加载，WebSocket功能不可用，使用轮询模式')
+          this.startPolling()
+          return
+        }
 
-  loadSessions()
-  loadAdminList()
-  initWebSocket()
+        this.wsConnection = io({
+          auth: { token: getToken() },
+          transports: ['websocket', 'polling']
+        })
 
-  // 事件监听器
-  document.getElementById('logoutBtn').addEventListener('click', logout)
-  document.getElementById('sessionSearchBtn').addEventListener('click', () => loadSessions())
-  document.getElementById('sessionStatusFilter').addEventListener('change', () => loadSessions())
-  document.getElementById('sessionSearch').addEventListener('keypress', e => {
-    if (e.key === 'Enter') loadSessions()
-  })
-
-  document.getElementById('transferSessionBtn').addEventListener('click', transferSession)
-  document.getElementById('closeSessionBtn').addEventListener('click', closeSession)
-  document.getElementById('viewUserInfoBtn').addEventListener('click', viewUserInfo)
-  document.getElementById('sendMessageBtn').addEventListener('click', sendMessage)
-  document.getElementById('submitTransferBtn').addEventListener('click', submitTransfer)
-
-  document.getElementById('messageInput').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
-  })
-
-  // 事件委托：会话列表项
-  document.getElementById('sessionsList').addEventListener('click', e => {
-    const sessionItem = e.target.closest('.session-item')
-    if (sessionItem) {
-      const sessionId = sessionItem.dataset.sessionId // 保持字符串类型，与后端一致
-      if (sessionId) openSession(sessionId)
-    }
-  })
-
-  // 事件委托：快捷回复按钮
-  document.querySelector('.quick-replies').addEventListener('click', e => {
-    const quickReplyBtn = e.target.closest('.quick-reply-btn')
-    if (quickReplyBtn) {
-      insertQuickReply(quickReplyBtn.dataset.reply)
-    }
-  })
-
-  // 图片加载错误处理
-  const defaultAvatar =
-    'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLXBlcnNvbi1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTExIDZhMyAzIDAgMSAxLTYgMCAzIDMgMCAwIDEgNiAweiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTAgOGE4IDggMCAxIDEgMTYgMEE4IDggMCAwIDEgMCA4em04IDdhNyA3IDAgMCAwIDUuMzg3LTIuNTAzQTEzLjkzMyAxMy45MzMgMCAwIDAgOCAxMS41YTEzLjkzMyAxMy45MzMgMCAwIDAtNS4zODcgMS4wMDdBNyA3IDAgMCAwIDggMTV6Ii8+PC9zdmc+'
-  document.getElementById('sessionsList').addEventListener(
-    'error',
-    e => {
-      if (e.target.classList.contains('session-avatar-img')) {
-        e.target.src = defaultAvatar
-        e.target.alt = '默认头像'
+        this.wsConnection.on('connect', () => console.log('✅ WebSocket连接成功'))
+        this.wsConnection.on('message', data => this.handleWebSocketMessage(data))
+        this.wsConnection.on('new_message', data => this.handleWebSocketMessage({ type: 'new_message', ...data }))
+        this.wsConnection.on('session_update', data => this.handleWebSocketMessage({ type: 'session_update', ...data }))
+        this.wsConnection.on('error', error => console.error('WebSocket错误:', error))
+        this.wsConnection.on('disconnect', reason => console.log('WebSocket连接已断开:', reason))
+        this.wsConnection.on('connect_error', error => {
+          console.error('WebSocket连接失败:', error)
+          this.startPolling()
+        })
+      } catch (error) {
+        console.error('WebSocket初始化失败:', error)
+        this.startPolling()
       }
     },
-    true
-  )
 
-  // 定期轮询刷新会话列表
-  setInterval(() => loadSessions(true), 30000)
-})
-
-// 页面卸载时关闭WebSocket
-window.addEventListener('beforeunload', () => {
-  if (wsConnection) wsConnection.disconnect()
-})
-
-function initWebSocket() {
-  try {
-    // 检查Socket.IO库是否已加载
-    if (typeof io === 'undefined') {
-      console.warn('⚠️ Socket.IO库未加载，WebSocket功能不可用，使用轮询模式')
-      // 启用备用轮询模式
-      if (!messagePollingInterval) {
-        messagePollingInterval = setInterval(() => {
-          if (currentSessionId) {
-            loadSessionMessages(currentSessionId, true)
+    startPolling() {
+      if (!this.messagePollingInterval) {
+        this.messagePollingInterval = setInterval(() => {
+          if (this.currentSessionId) {
+            this.loadSessionMessages(this.currentSessionId, true)
           }
         }, 5000)
       }
-      return
-    }
+    },
 
-    wsConnection = io({
-      auth: { token: getToken() },
-      transports: ['websocket', 'polling']
-    })
+    handleWebSocketMessage(data) {
+      switch (data.type) {
+        case 'new_message':
+          if (String(data.session_id) === String(this.currentSessionId)) {
+            this.currentMessages.push(data.message)
+            this.$nextTick(() => this.scrollToBottom())
+          }
+          this.loadSessions(true)
+          break
+        case 'new_session':
+          this.loadSessions(true)
+          break
+        case 'session_closed':
+          if (String(data.session_id) === String(this.currentSessionId)) {
+            alert('当前会话已被关闭')
+            this.closeCurrentChat()
+          }
+          this.loadSessions(true)
+          break
+      }
+    },
 
-    wsConnection.on('connect', () => console.log('✅ WebSocket连接成功'))
-    wsConnection.on('message', data => handleWebSocketMessage(data))
-    wsConnection.on('new_message', data => handleWebSocketMessage({ type: 'new_message', ...data }))
-    wsConnection.on('session_update', data =>
-      handleWebSocketMessage({ type: 'session_update', ...data })
-    )
-    wsConnection.on('error', error => console.error('WebSocket错误:', error))
-    wsConnection.on('disconnect', reason => console.log('WebSocket连接已断开:', reason))
-    wsConnection.on('connect_error', error => console.error('WebSocket连接失败:', error))
-  } catch (error) {
-    console.error('WebSocket初始化失败:', error)
-    // 启用备用轮询模式
-    if (!messagePollingInterval) {
-      messagePollingInterval = setInterval(() => {
-        if (currentSessionId) {
-          loadSessionMessages(currentSessionId, true)
+    // ========== 会话管理 ==========
+    async loadSessions(silent = false) {
+      if (!silent) {
+        this.sessionsLoading = true
+      }
+
+      try {
+        const params = new URLSearchParams()
+        if (this.statusFilter !== 'all') params.append('status', this.statusFilter)
+        if (this.searchKeyword) params.append('search', this.searchKeyword)
+
+        const response = await apiRequest(
+          API_ENDPOINTS.CUSTOMER_SERVICE.SESSIONS + '?' + params.toString()
+        )
+
+        if (response && response.success) {
+          this.allSessions = response.data.sessions || response.data.list || []
+        } else if (!silent) {
+          this.showError('加载失败', response?.message || '获取会话列表失败')
         }
-      }, 5000)
-    }
-  }
-}
-
-// 加载会话消息（备用轮询模式使用）
-async function loadSessionMessages(sessionId, silent = false) {
-  if (!silent) showLoading()
-  try {
-    const response = await apiRequest(
-      API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.SESSION_MESSAGES, { session_id: sessionId })
-    )
-    if (response && response.success) {
-      renderMessages(response.data.messages || [])
-    }
-  } catch (error) {
-    if (!silent) console.error('加载消息失败:', error)
-  } finally {
-    if (!silent) hideLoading()
-  }
-}
-
-function handleWebSocketMessage(data) {
-  switch (data.type) {
-    case 'new_message':
-      if (String(data.session_id) === String(currentSessionId)) {
-        appendMessage(data.message)
-        scrollToBottom()
+      } catch (error) {
+        console.error('加载会话失败:', error)
+        if (!silent) this.showError('加载失败', error.message)
+      } finally {
+        if (!silent) {
+          this.sessionsLoading = false
+        }
       }
-      loadSessions(true)
-      break
-    case 'new_session':
-      loadSessions(true)
-      break
-    case 'session_closed':
-      if (String(data.session_id) === String(currentSessionId)) {
-        alert('当前会话已被关闭')
-        closeCurrentChat()
+    },
+
+    async openSession(sessionId) {
+      if (String(sessionId) === String(this.currentSessionId)) return
+      this.currentSessionId = sessionId
+      this.loadingOverlay = true
+
+      try {
+        const response = await apiRequest(
+          API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.SESSION_MESSAGES, { session_id: sessionId })
+        )
+        
+        if (response && response.success) {
+          const session = response.data.session
+          const messages = response.data.messages || []
+          
+          // 更新当前聊天用户信息
+          this.currentChatUser = {
+            nickname: session.user?.nickname || session.user_nickname || '未命名用户',
+            mobile: session.user?.mobile || session.user_mobile || '',
+            avatar: session.user?.avatar_url || session.user_avatar || this.defaultAvatar
+          }
+
+          this.currentMessages = messages
+          this.$nextTick(() => this.scrollToBottom())
+          this.markAsRead(sessionId)
+          this.loadSessions(true)
+        } else {
+          this.showError('打开失败', response?.message || '获取会话信息失败')
+        }
+      } catch (error) {
+        console.error('打开会话失败:', error)
+        this.showError('打开失败', error.message)
+      } finally {
+        this.loadingOverlay = false
       }
-      loadSessions(true)
-      break
-  }
-}
+    },
 
-async function loadSessions(silent = false) {
-  if (!silent) showLoading()
+    async loadSessionMessages(sessionId, silent = false) {
+      if (!silent) this.loadingOverlay = true
+      try {
+        const response = await apiRequest(
+          API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.SESSION_MESSAGES, { session_id: sessionId })
+        )
+        if (response && response.success) {
+          this.currentMessages = response.data.messages || []
+          this.$nextTick(() => this.scrollToBottom())
+        }
+      } catch (error) {
+        if (!silent) console.error('加载消息失败:', error)
+      } finally {
+        if (!silent) this.loadingOverlay = false
+      }
+    },
 
-  try {
-    const status = document.getElementById('sessionStatusFilter').value
-    const search = document.getElementById('sessionSearch').value.trim()
+    // ========== 消息发送 ==========
+    async sendMessage() {
+      const content = this.messageInput.trim()
+      if (!content) {
+        this.showError('发送失败', '请输入消息内容')
+        return
+      }
+      if (!this.currentSessionId) {
+        this.showError('发送失败', '请先选择一个会话')
+        return
+      }
 
-    const params = new URLSearchParams()
-    if (status !== 'all') params.append('status', status)
-    if (search) params.append('search', search)
+      try {
+        const response = await apiRequest(
+          API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.SEND_MESSAGE, { session_id: this.currentSessionId }),
+          {
+            method: 'POST',
+            body: JSON.stringify({ content: content })
+          }
+        )
 
-    const response = await apiRequest(
-      API_ENDPOINTS.CUSTOMER_SERVICE.SESSIONS + '?' + params.toString()
-    )
+        if (response && response.success) {
+          this.messageInput = ''
+          this.currentMessages.push({
+            sender_type: 'admin',
+            message_content: content,
+            created_at: new Date().toISOString()
+          })
+          this.$nextTick(() => this.scrollToBottom())
+          
+          if (this.wsConnection && this.wsConnection.connected) {
+            this.wsConnection.emit('send_message', { session_id: this.currentSessionId, content: content })
+          }
+        } else {
+          this.showError('发送失败', response?.message || '消息发送失败')
+        }
+      } catch (error) {
+        console.error('发送消息失败:', error)
+        this.showError('发送失败', error.message)
+      }
+    },
 
-    if (response && response.success) {
-      allSessions = response.data.sessions || response.data.list || []
-      renderSessions(allSessions)
-    } else if (!silent) {
-      showError('加载失败', response?.message || '获取会话列表失败')
-    }
-  } catch (error) {
-    console.error('加载会话失败:', error)
-    if (!silent) showError('加载失败', error.message)
-  } finally {
-    if (!silent) hideLoading()
-  }
-}
+    insertQuickReply(text) {
+      this.messageInput = text
+    },
 
-function renderSessions(sessions) {
-  const container = document.getElementById('sessionsList')
-  const defaultAvatar =
-    'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLXBlcnNvbi1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTExIDZhMyAzIDAgMSAxLTYgMCAzIDMgMCAwIDEgNiAweiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTAgOGE4IDggMCAxIDEgMTYgMEE4IDggMCAwIDEgMCA4em04IDdhNyA3IDAgMCAwIDUuMzg3LTIuNTAzQTEzLjkzMyAxMy45MzMgMCAwIDAgOCAxMS41YTEzLjkzMyAxMy45MzMgMCAwIDAtNS4zODcgMS4wMDdBNyA3IDAgMCAwIDggMTV6Ii8+PC9zdmc+'
+    // ========== 会话操作 ==========
+    async markAsRead(sessionId) {
+      try {
+        await apiRequest(API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.MARK_READ, { session_id: sessionId }), {
+          method: 'POST'
+        })
+      } catch (error) {
+        console.error('标记已读失败:', error)
+      }
+    },
 
-  if (sessions.length === 0) {
-    container.innerHTML = `
-      <div class="text-center py-5">
-        <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
-        <p class="mt-2 text-muted small">暂无会话</p>
-      </div>
-    `
-    return
-  }
+    transferSession() {
+      if (!this.currentSessionId) {
+        this.showError('操作失败', '请先选择一个会话')
+        return
+      }
+      new bootstrap.Modal(this.$refs.transferModal).show()
+    },
 
-  container.innerHTML = sessions
-    .map(session => {
-      // 适配后端数据结构：后端返回 session.user 对象而非扁平字段
-      const userNickname = session.user?.nickname || session.user_nickname || '未命名用户'
-      const userMobile = session.user?.mobile || session.user_mobile || ''
-      const userAvatar = session.user?.avatar_url || session.user_avatar || defaultAvatar
-      const userId = session.user?.user_id || session.user_id
+    async submitTransfer() {
+      if (!this.currentSessionId) {
+        this.showError('操作失败', '请先选择一个会话')
+        return
+      }
+
+      if (!this.transferTargetId) {
+        this.showError('转接失败', '请选择接收客服')
+        return
+      }
+
+      this.loadingOverlay = true
+      try {
+        const response = await apiRequest(
+          API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.TRANSFER, { session_id: this.currentSessionId }),
+          {
+            method: 'POST',
+            body: JSON.stringify({ target_admin_id: parseInt(this.transferTargetId) })
+          }
+        )
+
+        if (response && response.success) {
+          this.showSuccess('转接成功', '会话已转接')
+          bootstrap.Modal.getInstance(this.$refs.transferModal).hide()
+          this.closeCurrentChat()
+          this.loadSessions()
+        } else {
+          this.showError('转接失败', response?.message || '操作失败')
+        }
+      } catch (error) {
+        console.error('转接失败:', error)
+        this.showError('转接失败', error.message)
+      } finally {
+        this.loadingOverlay = false
+      }
+    },
+
+    async closeSession() {
+      if (!this.currentSessionId) {
+        this.showError('操作失败', '请先选择一个会话')
+        return
+      }
+
+      if (!confirm('确认结束当前会话？')) return
+      this.loadingOverlay = true
+
+      try {
+        const response = await apiRequest(
+          API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.CLOSE, { session_id: this.currentSessionId }),
+          { method: 'POST', body: JSON.stringify({ close_reason: '问题已解决' }) }
+        )
+        
+        if (response && response.success) {
+          this.showSuccess('操作成功', '会话已关闭')
+          this.closeCurrentChat()
+          this.loadSessions()
+        } else {
+          this.showError('操作失败', response?.message || '关闭会话失败')
+        }
+      } catch (error) {
+        console.error('关闭会话失败:', error)
+        this.showError('操作失败', error.message)
+      } finally {
+        this.loadingOverlay = false
+      }
+    },
+
+    closeCurrentChat() {
+      this.currentSessionId = null
+      this.currentMessages = []
+      this.currentChatUser = { nickname: '', mobile: '', avatar: '' }
+      this.messageInput = ''
+    },
+
+    // ========== 用户信息 ==========
+    async viewUserInfo() {
+      if (!this.currentSessionId) {
+        this.showError('操作失败', '请先选择一个会话')
+        return
+      }
+      this.loadingOverlay = true
+
+      try {
+        const session = this.allSessions.find(s => String(s.session_id) === String(this.currentSessionId))
+        if (!session) return
+
+        const userId = session.user?.user_id || session.user_id
+        if (!userId) {
+          this.showError('查看失败', '无法获取用户ID')
+          return
+        }
+
+        const response = await apiRequest(API.buildURL(API_ENDPOINTS.USER.DETAIL, { user_id: userId }))
+        if (response && response.success) {
+          this.userInfoData = response.data.user || response.data
+          new bootstrap.Modal(this.$refs.userInfoModal).show()
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error)
+        this.showError('查看失败', error.message)
+      } finally {
+        this.loadingOverlay = false
+      }
+    },
+
+    async loadAdminList() {
+      try {
+        const response = await apiRequest(API_ENDPOINTS.USER.LIST + '?role_filter=admin')
+        if (response && response.success) {
+          this.adminList = response.data.users || []
+        }
+      } catch (error) {
+        console.error('加载客服列表失败:', error)
+      }
+    },
+
+    // ========== 辅助方法 ==========
+    getSessionUserNickname(session) {
+      return session.user?.nickname || session.user_nickname || '未命名用户'
+    },
+
+    getSessionUserMobile(session) {
+      return session.user?.mobile || session.user_mobile || ''
+    },
+
+    getSessionUserAvatar(session) {
+      return session.user?.avatar_url || session.user_avatar || this.defaultAvatar
+    },
+
+    getSessionLastMessage(session) {
       const lastMessage = session.last_message?.content || session.last_message || '暂无消息'
+      return typeof lastMessage === 'string' ? lastMessage : '暂无消息'
+    },
 
-      return `
-    <div class="session-item ${String(session.session_id) === String(currentSessionId) ? 'active' : ''}" 
-         data-session-id="${session.session_id}" data-user-id="${userId}">
-      <div class="d-flex justify-content-between align-items-start mb-1">
-        <div class="d-flex align-items-center flex-fill">
-          <img src="${userAvatar}" 
-               class="rounded-circle me-2 session-avatar-img" 
-               style="width: 36px; height: 36px;"
-               alt="头像"
-               onerror="this.src='${defaultAvatar}'">
-          <div class="flex-fill">
-            <div class="fw-bold small">${userNickname}</div>
-            <div class="text-muted" style="font-size: 0.75rem;">${maskPhone(userMobile)}</div>
-          </div>
-        </div>
-        ${session.unread_count > 0 ? `<span class="unread-badge">${session.unread_count}</span>` : ''}
-      </div>
-      <div class="text-muted small text-truncate">${typeof lastMessage === 'string' ? lastMessage : '暂无消息'}</div>
-      <div class="d-flex justify-content-between align-items-center mt-1">
-        <span class="badge ${getSessionStatusBadge(session.status)}">${getSessionStatusText(session.status)}</span>
-        <small class="text-muted" style="font-size: 0.7rem;">${formatRelativeTime(session.updated_at)}</small>
-      </div>
-    </div>
-  `
-    })
-    .join('')
-}
+    getSessionStatusBadge(status) {
+      const badges = { waiting: 'bg-warning text-dark', active: 'bg-success', closed: 'bg-secondary' }
+      return badges[status] || 'bg-secondary'
+    },
 
-function getSessionStatusBadge(status) {
-  const badges = { waiting: 'bg-warning text-dark', active: 'bg-success', closed: 'bg-secondary' }
-  return badges[status] || 'bg-secondary'
-}
+    getSessionStatusText(status) {
+      const texts = { waiting: '待处理', active: '进行中', closed: '已关闭' }
+      return texts[status] || '未知'
+    },
 
-function getSessionStatusText(status) {
-  const texts = { waiting: '待处理', active: '进行中', closed: '已关闭' }
-  return texts[status] || '未知'
-}
+    maskPhone(phone) {
+      if (!phone || phone.length < 7) return phone || ''
+      return phone.replace(/(\d{3})\d{4}(\d+)/, '$1****$2')
+    },
 
-async function openSession(sessionId) {
-  if (String(sessionId) === String(currentSessionId)) return
-  currentSessionId = sessionId // 保持原始类型（字符串）
-  showLoading()
-
-  try {
-    const response = await apiRequest(
-      API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.SESSION_MESSAGES, { session_id: sessionId })
-    )
-    if (response && response.success) {
-      const session = response.data.session
-      const messages = response.data.messages || []
-      const defaultAvatar =
-        'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLXBlcnNvbi1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTExIDZhMyAzIDAgMSAxLTYgMCAzIDMgMCAwIDEgNiAweiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTAgOGE4IDggMCAxIDEgMTYgMEE4IDggMCAwIDEgMCA4em04IDdhNyA3IDAgMCAwIDUuMzg3LTIuNTAzQTEzLjkzMyAxMy45MzMgMCAwIDAgOCAxMS41YTEzLjkzMyAxMy45MzMgMCAwIDAtNS4zODcgMS4wMDdBNyA3IDAgMCAwIDggMTV6Ii8+PC9zdmc+'
-
-      // 适配后端数据结构：后端返回 session.user 对象
-      const userNickname = session.user?.nickname || session.user_nickname || '未命名用户'
-      const userMobile = session.user?.mobile || session.user_mobile || ''
-      const userAvatar = session.user?.avatar_url || session.user_avatar || defaultAvatar
-
-      const avatarElement = document.getElementById('chatUserAvatar')
-      avatarElement.src = userAvatar
-      avatarElement.onerror = function () {
-        this.src = defaultAvatar
+    scrollToBottom() {
+      const container = this.$refs.chatMessages
+      if (container) {
+        container.scrollTop = container.scrollHeight
       }
+    },
 
-      document.getElementById('chatUserName').textContent = userNickname
-      document.getElementById('chatUserMobile').textContent = maskPhone(userMobile)
+    // ========== 通用方法 ==========
+    handleLogout() {
+      logout()
+    },
 
-      renderMessages(messages)
-      document.getElementById('emptyState').style.display = 'none'
-      document.getElementById('chatInterface').style.display = 'flex'
-      markAsRead(sessionId)
-      loadSessions(true)
-    } else {
-      showError('打开失败', response?.message || '获取会话信息失败')
+    showSuccess(title, message) {
+      alert(`✅ ${title}\n${message}`)
+    },
+
+    showError(title, message) {
+      alert(`❌ ${title}\n${message}`)
     }
-  } catch (error) {
-    console.error('打开会话失败:', error)
-    showError('打开失败', error.message)
-  } finally {
-    hideLoading()
   }
 }
 
-function renderMessages(messages) {
-  const container = document.getElementById('chatMessages')
-  container.innerHTML = ''
-  messages.forEach(msg => appendMessage(msg))
-  scrollToBottom()
-}
-
-function appendMessage(message) {
-  const container = document.getElementById('chatMessages')
-  const isAdmin = message.sender_type === 'admin'
-  const messageHtml = `
-    <div class="message-item ${isAdmin ? 'admin-message' : 'user-message'}">
-      <div>
-        <div class="message-bubble">${escapeHtml(message.message_content || message.content)}</div>
-        <div class="message-time ${isAdmin ? 'text-end' : ''}">${formatDate(message.created_at)}</div>
-      </div>
-    </div>
-  `
-  container.insertAdjacentHTML('beforeend', messageHtml)
-}
-
-function scrollToBottom() {
-  const container = document.getElementById('chatMessages')
-  container.scrollTop = container.scrollHeight
-}
-
-async function sendMessage() {
-  const input = document.getElementById('messageInput')
-  const content = input.value.trim()
-  if (!content) {
-    showError('发送失败', '请输入消息内容')
-    return
-  }
-  if (!currentSessionId) {
-    showError('发送失败', '请先选择一个会话')
-    return
-  }
-
-  try {
-    const response = await apiRequest(
-      API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.SEND_MESSAGE, { session_id: currentSessionId }),
-      {
-        method: 'POST',
-        body: JSON.stringify({ content: content })
-      }
-    )
-
-    if (response && response.success) {
-      input.value = ''
-      appendMessage({
-        sender_type: 'admin',
-        message_content: content,
-        created_at: new Date().toISOString()
-      })
-      scrollToBottom()
-      if (wsConnection && wsConnection.connected) {
-        wsConnection.emit('send_message', { session_id: currentSessionId, content: content })
-      }
-    } else {
-      showError('发送失败', response?.message || '消息发送失败')
-    }
-  } catch (error) {
-    console.error('发送消息失败:', error)
-    showError('发送失败', error.message)
-  }
-}
-
-function insertQuickReply(text) {
-  document.getElementById('messageInput').value = text
-  document.getElementById('messageInput').focus()
-}
-
-async function markAsRead(sessionId) {
-  try {
-    await apiRequest(API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.MARK_READ, { session_id: sessionId }), {
-      method: 'POST'
-    })
-  } catch (error) {
-    console.error('标记已读失败:', error)
-  }
-}
-
-async function viewUserInfo() {
-  if (!currentSessionId) {
-    showError('操作失败', '请先选择一个会话')
-    return
-  }
-  showLoading()
-
-  try {
-    const session = allSessions.find(s => String(s.session_id) === String(currentSessionId))
-    if (!session) return
-
-    // 适配后端数据结构：后端返回 session.user.user_id
-    const userId = session.user?.user_id || session.user_id
-    if (!userId) {
-      showError('查看失败', '无法获取用户ID')
-      return
-    }
-
-    const response = await apiRequest(API.buildURL(API_ENDPOINTS.USER.DETAIL, { user_id: userId }))
-    if (response && response.success) {
-      const user = response.data.user || response.data
-      renderUserInfo(user)
-      new bootstrap.Modal(document.getElementById('userInfoModal')).show()
-    }
-  } catch (error) {
-    console.error('获取用户信息失败:', error)
-    showError('查看失败', error.message)
-  } finally {
-    hideLoading()
-  }
-}
-
-function renderUserInfo(user) {
-  const defaultAvatar =
-    'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLXBlcnNvbi1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTExIDZhMyAzIDAgMSAxLTYgMCAzIDMgMCAwIDEgNiAweiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTAgOGE4IDggMCAxIDEgMTYgMEE4IDggMCAwIDEgMCA4em04IDdhNyA3IDAgMCAwIDUuMzg3LTIuNTAzQTEzLjkzMyAxMy45MzMgMCAwIDAgOCAxMS41YTEzLjkzMyAxMy45MzMgMCAwIDAtNS4zODcgMS4wMDdBNyA3IDAgMCAwIDggMTV6Ii8+PC9zdmc+'
-  document.getElementById('userInfoBody').innerHTML = `
-    <div class="text-center mb-3">
-      <img src="${user.avatar_url || defaultAvatar}" class="rounded-circle" style="width: 80px; height: 80px;" onerror="this.src='${defaultAvatar}'" alt="头像">
-    </div>
-    <div class="row g-2">
-      <div class="col-6"><strong>用户ID：</strong>${user.user_id || user.id}</div>
-      <div class="col-6"><strong>昵称：</strong>${user.nickname || '未设置'}</div>
-      <div class="col-6"><strong>手机号：</strong>${user.mobile || '-'}</div>
-      <div class="col-6"><strong>积分：</strong><span class="text-primary">${formatNumber(user.points_balance || 0)}</span></div>
-      <div class="col-6"><strong>注册时间：</strong>${formatDate(user.created_at)}</div>
-      <div class="col-6"><strong>最后活跃：</strong>${user.last_active_at ? formatDate(user.last_active_at) : '从未'}</div>
-    </div>
-  `
-}
-
-async function loadAdminList() {
-  try {
-    const response = await apiRequest(API_ENDPOINTS.USER.LIST + '?role_filter=admin')
-    if (response && response.success) {
-      const admins = response.data.users || []
-      const select = document.getElementById('transferTargetSelect')
-      select.innerHTML =
-        '<option value="">请选择...</option>' +
-        admins
-          .map(
-            admin => `<option value="${admin.user_id}">${admin.nickname || admin.mobile}</option>`
-          )
-          .join('')
-    }
-  } catch (error) {
-    console.error('加载客服列表失败:', error)
-  }
-}
-
-function transferSession() {
-  if (!currentSessionId) {
-    showError('操作失败', '请先选择一个会话')
-    return
-  }
-  new bootstrap.Modal(document.getElementById('transferModal')).show()
-}
-
-async function submitTransfer() {
-  if (!currentSessionId) {
-    showError('操作失败', '请先选择一个会话')
-    return
-  }
-
-  const targetId = document.getElementById('transferTargetSelect').value
-  if (!targetId) {
-    showError('转接失败', '请选择接收客服')
-    return
-  }
-
-  showLoading()
-  try {
-    const response = await apiRequest(
-      API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.TRANSFER, { session_id: currentSessionId }),
-      {
-        method: 'POST',
-        body: JSON.stringify({ target_admin_id: parseInt(targetId) })
-      }
-    )
-
-    if (response && response.success) {
-      showSuccess('转接成功', '会话已转接')
-      bootstrap.Modal.getInstance(document.getElementById('transferModal')).hide()
-      closeCurrentChat()
-      loadSessions()
-    } else {
-      showError('转接失败', response?.message || '操作失败')
-    }
-  } catch (error) {
-    console.error('转接失败:', error)
-    showError('转接失败', error.message)
-  } finally {
-    hideLoading()
-  }
-}
-
-async function closeSession() {
-  // 检查是否有选中的会话
-  if (!currentSessionId) {
-    showError('操作失败', '请先选择一个会话')
-    return
-  }
-
-  if (!confirm('确认结束当前会话？')) return
-  showLoading()
-
-  try {
-    const response = await apiRequest(
-      API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.CLOSE, { session_id: currentSessionId }),
-      { method: 'POST', body: JSON.stringify({ close_reason: '问题已解决' }) }
-    )
-    if (response && response.success) {
-      showSuccess('操作成功', '会话已关闭')
-      closeCurrentChat()
-      loadSessions()
-    } else {
-      showError('操作失败', response?.message || '关闭会话失败')
-    }
-  } catch (error) {
-    console.error('关闭会话失败:', error)
-    showError('操作失败', error.message)
-  } finally {
-    hideLoading()
-  }
-}
-
-function closeCurrentChat() {
-  currentSessionId = null
-  document.getElementById('chatInterface').style.display = 'none'
-  document.getElementById('emptyState').style.display = 'flex'
-  document.getElementById('messageInput').value = ''
-}
-
-function escapeHtml(text) {
-  const div = document.createElement('div')
-  div.textContent = text
-  return div.innerHTML
-}
-
-function showLoading() {
-  document.getElementById('loadingOverlay').classList.add('show')
-}
-
-function hideLoading() {
-  document.getElementById('loadingOverlay').classList.remove('show')
-}
-
-function showSuccess(title, message) {
-  alert(`✅ ${title}\n${message}`)
-}
-
-function showError(title, message) {
-  alert(`❌ ${title}\n${message}`)
-}
+// 注册 Alpine.js 组件
+document.addEventListener('alpine:init', () => {
+  Alpine.data('customerServicePage', customerServicePage)
+})

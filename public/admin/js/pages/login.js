@@ -1,143 +1,161 @@
 /**
- * 登录页面 - JavaScript逻辑
- * 从login.html提取，遵循前端工程化最佳实践
- *
- * 注意：登录页面不依赖admin-common.js，因为用户尚未登录
+ * 登录页面 - Alpine.js CSP 版本
+ * 
+ * @file public/admin/js/pages/login.js
+ * @description 使用 Alpine.js CSP 版本重写的登录页面逻辑
+ * @version 2.1.0
+ * @date 2026-01-22
+ * 
+ * 注意：
+ * 1. 登录页面不依赖 admin-common.js，因为用户尚未登录
+ * 2. 使用 Alpine.data() 注册组件以兼容 CSP 策略
  */
-
-// ========== 页面初始化 ==========
-
-document.addEventListener('DOMContentLoaded', function () {
-  const loginForm = document.getElementById('loginForm')
-  if (loginForm) {
-    loginForm.addEventListener('submit', handleLogin)
-  }
-
-  // 检查是否已登录
-  checkExistingSession()
-})
 
 /**
- * 检查是否已有登录会话
+ * 登录页面 Alpine.js 组件定义
  */
-function checkExistingSession() {
-  const token = localStorage.getItem('admin_token')
-  const user = localStorage.getItem('admin_user')
+function loginPage() {
+  return {
+    // ========== 状态 ==========
+    phone: '13800138000',  // 开发环境默认值
+    code: '123456',        // 开发环境默认值
+    loading: false,
+    message: '',
+    isError: false,
 
-  if (token && user) {
-    // 已有登录信息，直接跳转到仪表盘
-    showStatus('检测到已登录状态，正在跳转...')
-    setTimeout(() => {
-      window.location.href = '/admin/dashboard.html'
-    }, 500)
-  }
-}
+    // ========== 初始化 ==========
+    init() {
+      console.log('[LoginPage] 初始化')
+      this.checkExistingSession()
+    },
 
-/**
- * 显示登录状态消息
- * @param {string} message - 消息内容
- * @param {boolean} isError - 是否为错误消息
- */
-function showStatus(message, isError = false) {
-  const statusDiv = document.getElementById('loginStatus')
-  if (statusDiv) {
-    statusDiv.innerHTML = `
-      <div class="alert alert-${isError ? 'danger' : 'info'}" role="alert">
-        ${message}
-      </div>
-    `
-  }
-}
+    // ========== 检查已有会话 ==========
+    checkExistingSession() {
+      const token = localStorage.getItem('admin_token')
+      const user = localStorage.getItem('admin_user')
 
-/**
- * 登录处理函数
- * @param {Event} e - 表单提交事件
- */
-async function handleLogin(e) {
-  e.preventDefault()
-
-  const phone = document.getElementById('phone').value.trim()
-  const code = document.getElementById('code').value.trim()
-
-  // 基础验证
-  if (!phone) {
-    showStatus('请输入手机号', true)
-    return
-  }
-
-  if (!code) {
-    showStatus('请输入验证码', true)
-    return
-  }
-
-  showStatus('正在登录...')
-
-  try {
-    // 统一使用console auth认证端点
-    const response = await fetch(API_ENDPOINTS.CONSOLE_AUTH.LOGIN, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        mobile: phone, // 使用mobile参数
-        verification_code: code
-      })
-    })
-
-    const result = await response.json()
-    console.log('登录响应:', result)
-
-    // 后端返回的是access_token，不是token
-    if (result.success && result.data && result.data.access_token) {
-      const user = result.data.user
-
-      // 权限检查（基于user.role_level或roles数组）
-      const hasAdminAccess = checkAdminAccess(user)
-
-      if (hasAdminAccess) {
-        showStatus('✅ 登录成功，正在跳转...')
-
-        // 保存Token和用户信息
-        localStorage.setItem('admin_token', result.data.access_token)
-        localStorage.setItem('admin_user', JSON.stringify(user))
-
-        // 延迟跳转，让用户看到成功消息
+      if (token && user) {
+        this.showMessage('检测到已登录状态，正在跳转...')
         setTimeout(() => {
           window.location.href = '/admin/dashboard.html'
-        }, 1000)
-      } else {
-        showStatus('❌ 此账号没有管理员权限，请联系系统管理员', true)
+        }, 500)
       }
-    } else {
-      showStatus(`❌ 登录失败: ${result.message || '未知错误'}`, true)
-    }
-  } catch (error) {
-    console.error('登录错误:', error)
-    showStatus(`❌ 网络错误: ${error.message}`, true)
-  }
-}
+    },
 
-/**
- * 检查用户是否有管理员权限
- * 🔄 2026-01-19：移除is_admin字段检查，统一使用 role_level >= 100 判断管理员
- * @param {Object} user - 用户信息对象
- * @returns {boolean} 是否有管理员权限
- */
-function checkAdminAccess(user) {
-  if (!user) return false
+    // ========== 显示消息 ==========
+    showMessage(msg, isError = false) {
+      this.message = msg
+      this.isError = isError
+    },
 
-  // 优先检查role_level字段（role_level >= 100 为管理员）
-  if (user.role_level >= 100) return true
+    // ========== 清除消息 ==========
+    clearMessage() {
+      this.message = ''
+      this.isError = false
+    },
 
-  // 兼容：检查roles数组中的role_level
-  if (user.roles && Array.isArray(user.roles)) {
-    return user.roles.some(role => {
-      // 支持对象形式的role
-      if (typeof role === 'object') {
-        return role.role_level >= 100
+    // ========== 登录处理 ==========
+    async handleLogin() {
+      // 清除之前的消息
+      this.clearMessage()
+
+      // 基础验证
+      const phone = this.phone.trim()
+      const code = this.code.trim()
+
+      if (!phone) {
+        this.showMessage('请输入手机号', true)
+        return
       }
+
+      if (!code) {
+        this.showMessage('请输入验证码', true)
+        return
+      }
+
+      // 手机号格式验证
+      if (!/^1[3-9]\d{9}$/.test(phone)) {
+        this.showMessage('请输入正确的手机号格式', true)
+        return
+      }
+
+      // 开始登录
+      this.loading = true
+      this.showMessage('正在登录...')
+
+      try {
+        const response = await fetch(API_ENDPOINTS.CONSOLE_AUTH.LOGIN, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mobile: phone,
+            verification_code: code
+          })
+        })
+
+        const result = await response.json()
+        console.log('[LoginPage] 登录响应:', result)
+
+        if (result.success && result.data?.access_token) {
+          const user = result.data.user
+
+          // 权限检查
+          if (this.checkAdminAccess(user)) {
+            this.showMessage('✅ 登录成功，正在跳转...')
+
+            // 保存 Token 和用户信息
+            localStorage.setItem('admin_token', result.data.access_token)
+            localStorage.setItem('admin_user', JSON.stringify(user))
+
+            // 延迟跳转
+            setTimeout(() => {
+              window.location.href = '/admin/dashboard.html'
+            }, 1000)
+          } else {
+            this.showMessage('❌ 此账号没有管理员权限，请联系系统管理员', true)
+          }
+        } else {
+          this.showMessage(`❌ 登录失败: ${result.message || '未知错误'}`, true)
+        }
+      } catch (error) {
+        console.error('[LoginPage] 登录错误:', error)
+        this.showMessage(`❌ 网络错误: ${error.message}`, true)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    // ========== 权限检查 ==========
+    /**
+     * 检查用户是否有管理员权限
+     * role_level >= 100 为管理员
+     */
+    checkAdminAccess(user) {
+      if (!user) return false
+
+      // 检查 role_level 字段
+      if (user.role_level >= 100) return true
+
+      // 检查 roles 数组
+      if (user.roles && Array.isArray(user.roles)) {
+        return user.roles.some(role => {
+          if (typeof role === 'object') {
+            return role.role_level >= 100
+          }
+          return false
+        })
+      }
+
       return false
-    })
+    }
   }
-
-  return false
 }
+
+// ========== Alpine.js CSP 兼容注册 ==========
+// 必须在 Alpine 初始化之前注册组件
+document.addEventListener('alpine:init', () => {
+  Alpine.data('loginPage', loginPage)
+  console.log('✅ [LoginPage] Alpine 组件已注册')
+})
+
+console.log('📦 登录页面 (Alpine.js CSP) 已加载')

@@ -4,35 +4,39 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>通用资产调整 - 管理后台</title>
-
-  <!-- Bootstrap 5 - UI框架 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
-  <!-- Bootstrap Icons - 图标库 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-
-  <!-- 公共样式表 - 统一主题和响应式设计 -->
   <link href="/admin/css/common.css" rel="stylesheet">
-
   <style>
     .asset-card {
       border-left: 4px solid #0d6efd;
+      transition: all 0.3s ease;
+    }
+    .asset-card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
     .asset-card.points { border-left-color: #ffc107; }
     .asset-card.diamond { border-left-color: #17a2b8; }
-    .asset-card.material { border-left-color: #28a745; }
+    .asset-card.budget_points { border-left-color: #28a745; }
+  </style>
+
+  <!-- Alpine.js -->
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+
+  <style>
+    [x-cloak] { display: none !important; }
   </style>
 </head>
-<body class="bg-light">
-  <!-- 顶部导航 -->
+<body class="bg-light" x-data="assetAdjustmentPage()" x-cloak>
   <nav class="navbar navbar-dark bg-primary">
     <div class="container-fluid">
       <a href="/admin/dashboard.html" class="navbar-brand">
-        <i class="bi bi-arrow-left me-2"></i>管理后台 - 通用资产调整
+        <i class="bi bi-arrow-left me-2"></i>💰 管理后台 - 通用资产调整
       </a>
       <div>
-        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+        <span class="text-light me-3" x-text="'欢迎，' + (userInfo.nickname || '管理员')">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" @click="logout">退出登录</button>
       </div>
     </div>
   </nav>
@@ -42,18 +46,19 @@
     <div class="card mb-3">
       <div class="card-body">
         <h5 class="mb-3"><i class="bi bi-search"></i> 查询用户资产</h5>
-        <form id="searchForm" class="row g-3">
+        <form @submit.prevent="handleSearch" class="row g-3">
           <div class="col-md-4">
             <label class="form-label">用户ID</label>
-            <input type="number" class="form-control" id="searchUserId" placeholder="输入用户ID">
+            <input type="number" class="form-control" x-model="searchUserId" placeholder="输入用户ID">
           </div>
           <div class="col-md-4">
             <label class="form-label">手机号</label>
-            <input type="text" class="form-control" id="searchMobile" placeholder="输入手机号">
+            <input type="text" class="form-control" x-model="searchMobile" placeholder="输入手机号">
           </div>
           <div class="col-md-4 d-flex align-items-end">
-            <button type="submit" class="btn btn-primary w-100">
-              <i class="bi bi-search"></i> 查询
+            <button type="submit" class="btn btn-primary w-100" :disabled="searching">
+              <span x-show="searching" class="spinner-border spinner-border-sm me-1"></span>
+              <i class="bi bi-search" x-show="!searching"></i> 查询
             </button>
           </div>
         </form>
@@ -61,20 +66,20 @@
     </div>
 
     <!-- 用户信息和资产区域 -->
-    <div id="userAssetsSection" style="display: none;">
+    <div x-show="currentUser" x-cloak>
       <!-- 用户信息 -->
       <div class="card mb-3">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center">
             <div>
               <h5 class="mb-1">
-                <i class="bi bi-person-circle"></i> <span id="userNickname">-</span>
+                <i class="bi bi-person-circle"></i> <span x-text="currentUser?.nickname || '未设置'"></span>
               </h5>
               <p class="mb-0 text-muted">
-                <small>用户ID: <code id="userId">-</code> | 手机号: <span id="userMobile">-</span></small>
+                <small>用户ID: <code x-text="currentUser?.user_id || '-'"></code> | 手机号: <span x-text="maskPhone(currentUser?.mobile)"></span></small>
               </p>
             </div>
-            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#adjustAssetModal">
+            <button class="btn btn-success" @click="openAdjustModal()">
               <i class="bi bi-wallet2"></i> 调整资产
             </button>
           </div>
@@ -82,8 +87,23 @@
       </div>
 
       <!-- 资产余额卡片 -->
-      <div class="row g-3 mb-3" id="assetCardsContainer">
-        <!-- 动态生成 -->
+      <div class="row g-3 mb-3">
+        <template x-if="balances.length === 0">
+          <div class="col-12">
+            <div class="alert alert-info">该用户暂无资产记录</div>
+          </div>
+        </template>
+        <template x-for="balance in aggregatedBalances" :key="balance.asset_code">
+          <div class="col-md-3">
+            <div class="card asset-card" :class="balance.asset_code.toLowerCase()">
+              <div class="card-body text-center">
+                <i :class="'bi ' + getAssetIcon(balance.asset_code)" style="font-size: 2rem;"></i>
+                <h4 class="mt-2 mb-0" x-text="formatNumber(balance.total || balance.available_amount || 0)"></h4>
+                <small class="text-muted" x-text="getAssetDisplayName(balance.asset_code)"></small>
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
 
       <!-- 资产调整记录 -->
@@ -91,8 +111,11 @@
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
           <h5 class="mb-0"><i class="bi bi-clock-history"></i> 调整记录</h5>
           <div>
-            <select class="form-select form-select-sm" id="assetTypeFilter" style="width: 150px;">
+            <select class="form-select form-select-sm" x-model="filterAssetCode" @change="loadAdjustmentRecords()" style="width: 150px;">
               <option value="">全部资产</option>
+              <template x-for="type in assetTypes" :key="type.asset_code">
+                <option :value="type.asset_code" x-text="type.name || type.asset_code"></option>
+              </template>
             </select>
           </div>
         </div>
@@ -110,25 +133,63 @@
                   <th>操作人</th>
                 </tr>
               </thead>
-              <tbody id="adjustmentTableBody">
+              <tbody>
+                <template x-if="loadingRecords">
+                  <tr>
+                    <td colspan="7" class="text-center py-5">
+                      <div class="spinner-border text-primary" role="status"></div>
+                    </td>
+                  </tr>
+                </template>
+                <template x-if="!loadingRecords && transactions.length === 0">
                 <tr>
                   <td colspan="7" class="text-center py-5 text-muted">
                     <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-                    <p class="mt-2">请先查询用户</p>
+                      <p class="mt-2">暂无调整记录</p>
                   </td>
                 </tr>
+                </template>
+                <template x-for="tx in transactions" :key="tx.transaction_id">
+                  <tr>
+                    <td x-text="formatDateTime(tx.created_at)"></td>
+                    <td x-text="tx.asset_name || tx.asset_code"></td>
+                    <td>
+                      <span class="badge" :class="tx.amount >= 0 ? 'bg-success' : 'bg-danger'"
+                            x-text="tx.amount >= 0 ? '增加' : '减少'"></span>
+                    </td>
+                    <td :class="tx.amount >= 0 ? 'text-success' : 'text-danger'"
+                        x-text="(tx.amount >= 0 ? '+' : '') + tx.amount"></td>
+                    <td x-text="tx.balance_after || '-'"></td>
+                    <td x-text="tx.reason || tx.description || '-'"></td>
+                    <td x-text="tx.operator_name || '-'"></td>
+                  </tr>
+                </template>
               </tbody>
             </table>
           </div>
         </div>
-        <div class="card-footer bg-white">
-          <nav id="paginationNav"></nav>
+        <div class="card-footer bg-white" x-show="pagination && pagination.total_pages > 1">
+          <nav>
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+              <li class="page-item" :class="{ 'disabled': currentPage === 1 }">
+                <a class="page-link" href="#" @click.prevent="goToPage(currentPage - 1)">上一页</a>
+              </li>
+              <template x-for="page in visiblePages" :key="page">
+                <li class="page-item" :class="{ 'active': page === currentPage, 'disabled': page === '...' }">
+                  <a class="page-link" href="#" @click.prevent="page !== '...' && goToPage(page)" x-text="page"></a>
+                </li>
+              </template>
+              <li class="page-item" :class="{ 'disabled': currentPage === pagination?.total_pages }">
+                <a class="page-link" href="#" @click.prevent="goToPage(currentPage + 1)">下一页</a>
+              </li>
+            </ul>
+          </nav>
         </div>
       </div>
     </div>
 
     <!-- 空状态 -->
-    <div id="emptyState" class="text-center py-5 text-muted">
+    <div x-show="!currentUser" class="text-center py-5 text-muted">
       <i class="bi bi-wallet2" style="font-size: 4rem;"></i>
       <h5 class="mt-3">通用资产调整</h5>
       <p>搜索用户后可查看并调整其所有类型的资产余额</p>
@@ -136,7 +197,7 @@
   </div>
 
   <!-- 调整资产模态框 -->
-  <div class="modal fade" id="adjustAssetModal" tabindex="-1">
+  <div class="modal fade" id="adjustAssetModal" tabindex="-1" x-ref="adjustModal">
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
@@ -144,67 +205,66 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <form id="adjustAssetForm">
+          <form @submit.prevent="submitAdjust" id="adjustForm">
             <div class="mb-3">
               <label class="form-label">资产类型 <span class="text-danger">*</span></label>
-              <select class="form-select" id="assetType" required>
+              <select class="form-select" x-model="adjustForm.assetCode" required>
                 <option value="">请选择资产类型</option>
-                <option value="POINTS">积分</option>
-                <option value="BUDGET_POINTS">预算积分</option>
-                <option value="DIAMOND">钻石</option>
+                <template x-for="type in assetTypes" :key="type.asset_code">
+                  <option :value="type.asset_code" x-text="type.name || type.asset_code"></option>
+                </template>
               </select>
             </div>
             <!-- 活动选择（仅预算积分时显示） -->
-            <div class="mb-3" id="campaignIdGroup" style="display: none;">
+            <div class="mb-3" x-show="adjustForm.assetCode === 'BUDGET_POINTS'">
               <label class="form-label">活动 <span class="text-danger">*</span></label>
-              <select class="form-select" id="campaignId">
+              <select class="form-select" x-model="adjustForm.campaignId" :required="adjustForm.assetCode === 'BUDGET_POINTS'">
                 <option value="">请选择活动</option>
+                <template x-for="campaign in campaigns" :key="campaign.campaign_id">
+                  <option :value="campaign.campaign_id" x-text="(campaign.campaign_name || campaign.name || '活动' + campaign.campaign_id) + ' (ID: ' + campaign.campaign_id + ')'"></option>
+                </template>
               </select>
               <small class="text-muted">预算积分必须指定活动来源</small>
             </div>
             <div class="mb-3">
               <label class="form-label">调整类型 <span class="text-danger">*</span></label>
-              <select class="form-select" id="adjustType" required>
+              <select class="form-select" x-model="adjustForm.adjustType" required>
                 <option value="increase">增加</option>
                 <option value="decrease">减少</option>
-                <option value="set">设置</option>
               </select>
             </div>
             <div class="mb-3">
               <label class="form-label">数量 <span class="text-danger">*</span></label>
-              <input type="number" class="form-control" id="adjustAmount" min="1" required>
+              <input type="number" class="form-control" x-model.number="adjustForm.amount" min="1" required>
             </div>
             <div class="mb-3">
               <label class="form-label">调整原因 <span class="text-danger">*</span></label>
-              <textarea class="form-control" id="adjustReason" rows="3" required placeholder="请输入调整原因"></textarea>
+              <textarea class="form-control" x-model="adjustForm.reason" rows="3" required placeholder="请输入调整原因"></textarea>
             </div>
           </form>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="button" class="btn btn-primary" id="submitAdjustBtn">确认调整</button>
+          <button type="submit" form="adjustForm" class="btn btn-primary" :disabled="submitting">
+            <span x-show="submitting" class="spinner-border spinner-border-sm me-1"></span>
+            确认调整
+          </button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 加载遮罩层 -->
-  <div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-overlay" :class="{ 'show': loading }">
     <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
       <span class="visually-hidden">处理中...</span>
     </div>
   </div>
 
-  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-  <!-- 引入公共模块 -->
   <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/api-config.js"></script>
-  <script src="/admin/js/common/toast.js"></script>
+  <script src="/admin/js/pages/asset-adjustment.js"></script>
 
-  <!-- 引入页面专属逻辑 -->
-  <script src="/admin/js/pages/asset-adjustment.js?v=1.0.0"></script>
+  <!-- Alpine.js -->
 </body>
 </html>
-

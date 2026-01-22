@@ -56,7 +56,13 @@
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
     }
+    [x-cloak] { display: none !important; }
   </style>
+
+  <!-- Alpine.js 初始化配置（必须在 alpine.min.js 之前） -->
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <!-- Alpine.js -->
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
 </head>
 <body class="bg-light">
   <!-- 顶部导航 -->

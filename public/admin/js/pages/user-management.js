@@ -1,997 +1,236 @@
 /**
- * 用户管理中心 - 整合页面 JavaScript
- * 整合了：用户列表、用户层级、商家积分审核
+ * 用户管理中心 - Alpine.js 组件
+ * 
+ * @file public/admin/js/pages/user-management.js
+ * @description 用户管理中心页面的 Alpine.js 组件定义
+ * @version 2.0.0
+ * @date 2026-01-22
+ * 
+ * 包含模块：
+ * - 用户列表管理
+ * - 角色管理
+ * - 权限管理
+ * - 用户角色分配
+ * - 用户统计
  */
 
-document.addEventListener('DOMContentLoaded', function () {
-  // 权限检查
-  checkAdminPermission()
+document.addEventListener('alpine:init', () => {
+  console.log('[UserManagement] 注册 Alpine 组件...')
 
-  // 显示欢迎信息
-  const currentUser = getCurrentUser()
-  if (currentUser) {
-    document.getElementById('welcomeText').textContent =
-      `欢迎，${currentUser.nickname || currentUser.mobile || '管理员'}`
-  }
+  // 全局 Store: 当前页面状态
+  Alpine.store('userPage', 'user-list')
 
-  // 退出按钮
-  document.getElementById('logoutBtn').addEventListener('click', logout)
+  /**
+   * 导航组件
+   */
+  Alpine.data('userNavigation', () => ({
+    currentPage: 'user-list',
+    subPages: [
+      { id: 'user-list', title: '用户列表', icon: 'bi-people' },
+      { id: 'role-list', title: '角色管理', icon: 'bi-shield' },
+      { id: 'permission-list', title: '权限管理', icon: 'bi-key' },
+      { id: 'user-roles', title: '角色分配', icon: 'bi-person-badge' },
+      { id: 'user-stats', title: '用户统计', icon: 'bi-graph-up' }
+    ],
 
-  // Tab切换处理
-  const tabs = document.querySelectorAll('#userManagementTabs button')
-  tabs.forEach(tab => {
-    tab.addEventListener('shown.bs.tab', function (e) {
-      const tabId = e.target.id
-      switch (tabId) {
-        case 'users-tab':
-          usersModule.loadData()
-          break
-        case 'hierarchy-tab':
-          hierarchyModule.loadData()
-          break
-        case 'merchant-points-tab':
-          merchantPointsModule.loadData()
-          break
+    init() {
+      const urlParams = new URLSearchParams(window.location.search)
+      this.currentPage = urlParams.get('page') || 'user-list'
+      Alpine.store('userPage', this.currentPage)
+    },
+
+    switchPage(pageId) {
+      this.currentPage = pageId
+      Alpine.store('userPage', pageId)
+      window.history.pushState({}, '', `?page=${pageId}`)
+    }
+  }))
+
+  /**
+   * 页面内容组件
+   */
+  Alpine.data('userPageContent', () => ({
+    // 数据
+    users: [],
+    roles: [],
+    permissions: [],
+    userRoles: [],
+
+    // 筛选器
+    userFilters: { user_id: '', nickname: '', status: '' },
+    userRoleFilters: { user_id: '', role_code: '' },
+
+    // 统计数据
+    userStats: { totalUsers: 0, activeUsers: 0, totalRoles: 0, totalPermissions: 0 },
+
+    // 计算属性：当前页面
+    get currentPage() {
+      return Alpine.store('userPage')
+    },
+
+    // 初始化
+    init() {
+      this.loadAllData()
+      this.$watch('$store.userPage', () => this.loadAllData())
+    },
+
+    // 加载所有数据
+    async loadAllData() {
+      showLoading()
+      try {
+        await Promise.all([
+          this.loadUsers(),
+          this.loadRoles(),
+          this.loadPermissions(),
+          this.loadUserRoles()
+        ])
+        this.calculateStats()
+      } catch (error) {
+        console.error('[UserManagement] 加载数据失败:', error)
+      } finally {
+        hideLoading()
       }
-    })
-  })
+    },
 
-  // 初始加载用户列表
-  usersModule.init()
-  hierarchyModule.init()
-  merchantPointsModule.init()
-  usersModule.loadData()
+    // 加载用户列表
+    async loadUsers() {
+      try {
+        let url = API_ENDPOINTS.USER?.LIST || '/api/v4/admin/users'
+        const params = new URLSearchParams()
+        if (this.userFilters.user_id) params.append('user_id', this.userFilters.user_id)
+        if (this.userFilters.nickname) params.append('nickname', this.userFilters.nickname)
+        if (this.userFilters.status) params.append('status', this.userFilters.status)
+        if (params.toString()) url += '?' + params.toString()
+        
+        const response = await apiRequest(url)
+        if (response && response.success) {
+          this.users = response.data?.list || response.data || []
+        }
+      } catch (error) {
+        console.error('[UserManagement] 加载用户失败:', error)
+        this.users = []
+      }
+    },
+
+    // 加载角色列表
+    async loadRoles() {
+      try {
+        const response = await apiRequest(API_ENDPOINTS.ROLE?.LIST || '/api/v4/admin/roles')
+        if (response && response.success) {
+          this.roles = response.data?.list || response.data || []
+        }
+      } catch (error) {
+        console.error('[UserManagement] 加载角色失败:', error)
+        this.roles = []
+      }
+    },
+
+    // 加载权限列表
+    async loadPermissions() {
+      try {
+        const response = await apiRequest(API_ENDPOINTS.PERMISSION?.LIST || '/api/v4/admin/permissions')
+        if (response && response.success) {
+          this.permissions = response.data?.list || response.data || []
+        }
+      } catch (error) {
+        console.error('[UserManagement] 加载权限失败:', error)
+        this.permissions = []
+      }
+    },
+
+    // 加载用户角色分配
+    async loadUserRoles() {
+      try {
+        let url = API_ENDPOINTS.USER_ROLE?.LIST || '/api/v4/admin/user-roles'
+        const params = new URLSearchParams()
+        if (this.userRoleFilters.user_id) params.append('user_id', this.userRoleFilters.user_id)
+        if (this.userRoleFilters.role_code) params.append('role_code', this.userRoleFilters.role_code)
+        if (params.toString()) url += '?' + params.toString()
+        
+        const response = await apiRequest(url)
+        if (response && response.success) {
+          this.userRoles = response.data?.list || response.data || []
+        }
+      } catch (error) {
+        console.error('[UserManagement] 加载用户角色失败:', error)
+        this.userRoles = []
+      }
+    },
+
+    // 计算统计数据
+    calculateStats() {
+      this.userStats = {
+        totalUsers: this.users.length,
+        activeUsers: this.users.filter(u => u.status === 'active').length,
+        totalRoles: this.roles.length,
+        totalPermissions: this.permissions.length
+      }
+    },
+
+    // 获取用户状态样式类
+    getUserStatusClass(status) {
+      const map = { active: 'bg-success', inactive: 'bg-secondary', banned: 'bg-danger' }
+      return map[status] || 'bg-secondary'
+    },
+
+    // 获取用户状态文本
+    getUserStatusText(status) {
+      const map = { active: '正常', inactive: '禁用', banned: '封禁' }
+      return map[status] || status
+    },
+
+    // 打开创建模态框
+    openCreateModal(type) {
+      this.$toast.info(`创建${type}功能开发中`)
+    },
+
+    // 查看用户详情
+    viewUserDetail(user) {
+      this.$toast.info(`用户详情: ${user.user_id}`)
+    },
+
+    // 编辑用户
+    editUser(user) {
+      this.$toast.info(`编辑用户: ${user.user_id}`)
+    },
+
+    // 切换用户状态
+    toggleUserStatus(user) {
+      const action = user.status === 'active' ? '禁用' : '启用'
+      if (confirm(`确定要${action}用户 ${user.nickname || user.user_id} 吗？`)) {
+        this.$toast.info(`${action}用户功能开发中`)
+      }
+    },
+
+    // 编辑角色
+    editRole(role) {
+      this.$toast.info(`编辑角色: ${role.role_name}`)
+    },
+
+    // 管理角色权限
+    manageRolePermissions(role) {
+      this.$toast.info(`管理角色权限: ${role.role_name}`)
+    },
+
+    // 编辑权限
+    editPermission(perm) {
+      this.$toast.info(`编辑权限: ${perm.permission_name}`)
+    },
+
+    // 打开分配角色模态框
+    openAssignRoleModal() {
+      this.$toast.info('分配角色功能开发中')
+    },
+
+    // 撤销用户角色
+    revokeUserRole(ur) {
+      if (confirm(`确定要撤销用户 ${ur.user_nickname || ur.user_id} 的 ${ur.role_name || ur.role_code} 角色吗？`)) {
+        this.$toast.info('撤销角色功能开发中')
+      }
+    }
+  }))
+
+  console.log('✅ [UserManagement] Alpine 组件注册完成')
 })
 
-// ==================== 用户列表模块 ====================
-const usersModule = {
-  currentPage: 1,
-  pageSize: 10,
-  users: [],
-
-  init() {
-    // 搜索按钮
-    document.getElementById('userSearchBtn').addEventListener('click', () => {
-      this.currentPage = 1
-      this.loadData()
-    })
-
-    // 重置按钮
-    document.getElementById('userResetBtn').addEventListener('click', () => {
-      document.getElementById('userTypeFilter').value = 'all'
-      document.getElementById('userStatusFilter').value = 'all'
-      document.getElementById('userSearchInput').value = ''
-      this.currentPage = 1
-      this.loadData()
-    })
-
-    // 筛选器变化
-    document.getElementById('userTypeFilter').addEventListener('change', () => {
-      this.currentPage = 1
-      this.loadData()
-    })
-    document.getElementById('userStatusFilter').addEventListener('change', () => {
-      this.currentPage = 1
-      this.loadData()
-    })
-  },
-
-  async loadData() {
-    showLoading(true)
-    try {
-      const params = new URLSearchParams()
-      params.append('page', this.currentPage)
-      params.append('page_size', this.pageSize)
-
-      const userType = document.getElementById('userTypeFilter').value
-      const status = document.getElementById('userStatusFilter').value
-      const search = document.getElementById('userSearchInput').value.trim()
-
-      if (userType && userType !== 'all') params.append('user_type', userType)
-      if (status && status !== 'all') params.append('status', status)
-      if (search) params.append('search', search)
-
-      const response = await apiRequest(
-        API_ENDPOINTS.USER.LIST + '?' + params.toString()
-      )
-
-      if (response && response.success) {
-        this.users = response.data.users || response.data.items || []
-        this.renderStats(response.data.stats || {})
-        this.renderTable(this.users)
-        this.renderPagination(response.data.pagination)
-      } else {
-        showErrorToast(response?.message || '加载用户列表失败')
-        this.renderEmptyTable()
-      }
-    } catch (error) {
-      console.error('加载用户列表失败:', error)
-      showErrorToast(error.message || '网络错误')
-      this.renderEmptyTable()
-    } finally {
-      showLoading(false)
-    }
-  },
-
-  renderStats(stats) {
-    document.getElementById('totalUsers').textContent = stats.total || this.users.length || '-'
-    document.getElementById('todayUsers').textContent = stats.today || '-'
-    document.getElementById('activeUsers').textContent = stats.active || '-'
-    document.getElementById('vipUsers').textContent = stats.vip || '-'
-  },
-
-  renderTable(users) {
-    const tbody = document.getElementById('usersTableBody')
-
-    if (!users || users.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="8" class="text-center py-5">
-            <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
-            <p class="mt-2 text-muted">暂无用户数据</p>
-          </td>
-        </tr>
-      `
-      return
-    }
-
-    tbody.innerHTML = users
-      .map(
-        user => `
-      <tr>
-        <td><code>${user.user_id}</code></td>
-        <td>
-          <div class="d-flex align-items-center">
-            <img src="${user.avatar_url || '/admin/images/default-avatar.svg'}" 
-                 class="rounded-circle me-2" width="40" height="40" 
-                 onerror="this.src='/admin/images/default-avatar.svg'">
-            <div>
-              <div class="fw-bold">${user.nickname || '未设置昵称'}</div>
-              <small class="text-muted">${user.mobile || '-'}</small>
-            </div>
-          </div>
-        </td>
-        <td>
-          ${user.role_level >= 100 ? '<span class="badge bg-danger">管理员</span>' : ''}
-          ${user.role_level >= 50 && user.role_level < 100 ? '<span class="badge bg-warning">高级用户</span>' : ''}
-          ${user.role_level < 50 ? '<span class="badge bg-secondary">普通用户</span>' : ''}
-          ${user.roles && user.roles.length > 0 ? user.roles.map(r => {
-            const roleName = typeof r === 'string' ? r : (r.role_name || '');
-            return roleName ? `<span class="badge bg-info ms-1">${roleName}</span>` : '';
-          }).join('') : ''}
-        </td>
-        <td><span class="badge bg-info">${user.history_total_points || 0}</span></td>
-        <td><small>${this.formatDate(user.created_at)}</small></td>
-        <td><small>${this.formatDate(user.last_login)}</small></td>
-        <td>
-          <span class="badge ${user.status === 'banned' ? 'bg-danger' : 'bg-success'}">
-            ${user.status === 'banned' ? '已封禁' : '正常'}
-          </span>
-        </td>
-        <td>
-          <button class="btn btn-sm btn-outline-primary" onclick="usersModule.viewDetail(${user.user_id})">
-            <i class="bi bi-eye"></i>
-          </button>
-          <button class="btn btn-sm btn-outline-secondary" onclick="usersModule.manageRoles(${user.user_id})">
-            <i class="bi bi-shield"></i>
-          </button>
-          <button class="btn btn-sm ${user.status === 'banned' ? 'btn-outline-success' : 'btn-outline-danger'}" 
-                  onclick="usersModule.toggleBan(${user.user_id}, '${user.status}')">
-            <i class="bi ${user.status === 'banned' ? 'bi-unlock' : 'bi-lock'}"></i>
-          </button>
-        </td>
-      </tr>
-    `
-      )
-      .join('')
-  },
-
-  renderEmptyTable() {
-    document.getElementById('usersTableBody').innerHTML = `
-      <tr>
-        <td colspan="8" class="text-center py-5 text-danger">
-          <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
-          <p class="mt-2">加载失败</p>
-        </td>
-      </tr>
-    `
-  },
-
-  renderPagination(pagination) {
-    const container = document.getElementById('usersPagination')
-    if (!pagination || pagination.total_pages <= 1) {
-      container.innerHTML = ''
-      return
-    }
-
-    let html = ''
-    html += `<li class="page-item ${this.currentPage === 1 ? 'disabled' : ''}">
-               <a class="page-link" href="#" onclick="usersModule.changePage(${this.currentPage - 1})">上一页</a>
-             </li>`
-
-    for (let i = 1; i <= pagination.total_pages; i++) {
-      html += `<li class="page-item ${this.currentPage === i ? 'active' : ''}">
-                 <a class="page-link" href="#" onclick="usersModule.changePage(${i})">${i}</a>
-               </li>`
-    }
-
-    html += `<li class="page-item ${this.currentPage === pagination.total_pages ? 'disabled' : ''}">
-               <a class="page-link" href="#" onclick="usersModule.changePage(${this.currentPage + 1})">下一页</a>
-             </li>`
-
-    container.innerHTML = html
-  },
-
-  changePage(page) {
-    if (page < 1) return
-    this.currentPage = page
-    this.loadData()
-  },
-
-  async viewDetail(userId) {
-    showLoading(true)
-    try {
-      // 并行加载用户基本信息、高级状态、风控配置、抽奖状态
-      const [userRes, premiumRes, riskRes, globalStateRes] = await Promise.allSettled([
-        apiRequest(API.buildURL(API_ENDPOINTS.USER.DETAIL, { user_id: userId })),
-        apiRequest(API.buildURL(API_ENDPOINTS.USER_PREMIUM.DETAIL, { user_id: userId })),
-        apiRequest(API.buildURL(API_ENDPOINTS.RISK_PROFILES.USER, { user_id: userId })),
-        apiRequest(API.buildURL(API_ENDPOINTS.LOTTERY_MONITORING.USER_GLOBAL_DETAIL, { user_id: userId }))
-      ])
-
-      if (userRes.status === 'fulfilled' && userRes.value && userRes.value.success) {
-        const user = userRes.value.data.user || userRes.value.data
-
-        // 解析高级状态
-        let premiumHtml = '<span class="badge bg-secondary">未解锁</span>'
-        if (premiumRes.status === 'fulfilled' && premiumRes.value?.success && premiumRes.value.data) {
-          const premium = premiumRes.value.data
-          if (premium.is_unlocked) {
-            const expireDate = premium.expire_time ? this.formatDate(premium.expire_time) : '永久'
-            premiumHtml = `<span class="badge bg-warning">✨ 已解锁</span> <small class="text-muted">到期：${expireDate}</small>`
-          }
-        }
-
-        // 解析风控配置
-        let riskHtml = '-'
-        if (riskRes.status === 'fulfilled' && riskRes.value?.success && riskRes.value.data) {
-          const risk = riskRes.value.data
-          riskHtml = `
-            <small>
-              日限次：<span class="badge bg-info">${risk.daily_draw_limit || '无限'}</span>
-              日限额：<span class="badge bg-info">${risk.daily_amount_limit || '无限'}</span>
-              风险等级：<span class="badge ${risk.risk_level === 'high' ? 'bg-danger' : risk.risk_level === 'medium' ? 'bg-warning' : 'bg-success'}">${risk.risk_level || '正常'}</span>
-            </small>
-          `
-        }
-
-        // 解析全局运气状态
-        let luckHtml = '-'
-        if (globalStateRes.status === 'fulfilled' && globalStateRes.value?.success && globalStateRes.value.data) {
-          const luck = globalStateRes.value.data
-          const emptyRate = luck.historical_empty_rate ? (luck.historical_empty_rate * 100).toFixed(1) + '%' : '-'
-          luckHtml = `
-            <small>
-              历史空奖率：<span class="badge bg-secondary">${emptyRate}</span>
-              运气债务：<span class="badge ${luck.luck_debt > 0 ? 'bg-warning' : 'bg-success'}">${luck.luck_debt || 0}</span>
-              总抽奖次数：<span class="badge bg-primary">${luck.total_draws || 0}</span>
-            </small>
-          `
-        }
-
-        // 渲染角色标签（兼容字符串数组或对象数组）
-        const rolesHtml =
-          user.roles && user.roles.length > 0
-            ? user.roles.map(r => {
-                // 后端可能返回字符串数组或对象数组
-                const roleName = typeof r === 'string' ? r : (r.role_name || r.name || '未知角色')
-                const roleColors = {
-                  'user': 'secondary',
-                  'vip': 'warning',
-                  'admin': 'primary',
-                  'super_admin': 'danger',
-                  'system_job': 'info'
-                }
-                const roleLabels = {
-                  'user': '普通用户',
-                  'vip': 'VIP用户',
-                  'admin': '管理员',
-                  'super_admin': '超级管理员',
-                  'system_job': '系统任务'
-                }
-                return `<span class="badge bg-${roleColors[roleName] || 'info'} me-1">${roleLabels[roleName] || roleName}</span>`
-              }).join('')
-            : '<span class="text-muted">无角色</span>'
-
-        document.getElementById('userDetailBody').innerHTML = `
-          <div class="row">
-            <div class="col-md-4 text-center">
-              <img src="${user.avatar_url || '/admin/images/default-avatar.svg'}" 
-                   class="rounded-circle mb-3" width="100" height="100"
-                   onerror="this.src='/admin/images/default-avatar.svg'">
-              <h5>${user.nickname || '未设置昵称'}</h5>
-              <p class="text-muted">${user.mobile || '-'}</p>
-              <div class="mb-2">${rolesHtml}</div>
-              <div>${premiumHtml}</div>
-            </div>
-            <div class="col-md-8">
-              <ul class="nav nav-tabs mb-3" id="userDetailTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                  <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#basicInfo" type="button">基本信息</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                  <button class="nav-link" data-bs-toggle="tab" data-bs-target="#riskInfo" type="button">风控配置</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                  <button class="nav-link" data-bs-toggle="tab" data-bs-target="#lotteryInfo" type="button">抽奖状态</button>
-                </li>
-              </ul>
-              <div class="tab-content">
-                <div class="tab-pane fade show active" id="basicInfo">
-                  <table class="table table-sm">
-                    <tr><td class="text-muted" width="120">用户ID</td><td>${user.user_id}</td></tr>
-                    <tr><td class="text-muted">OpenID</td><td><code class="small">${user.openid || '-'}</code></td></tr>
-                    <tr><td class="text-muted">历史总积分</td><td><span class="badge bg-primary">${user.history_total_points || 0}</span></td></tr>
-                    <tr><td class="text-muted">角色等级</td><td>Lv.${user.role_level || 0}</td></tr>
-                    <tr><td class="text-muted">注册时间</td><td>${this.formatDate(user.created_at)}</td></tr>
-                    <tr><td class="text-muted">最后登录</td><td>${this.formatDate(user.last_login)}</td></tr>
-                    <tr><td class="text-muted">状态</td><td>${user.status === 'banned' ? '<span class="badge bg-danger">已封禁</span>' : '<span class="badge bg-success">正常</span>'}</td></tr>
-                  </table>
-                </div>
-                <div class="tab-pane fade" id="riskInfo">
-                  <div class="card">
-                    <div class="card-header"><i class="bi bi-shield-exclamation"></i> 风控配置</div>
-                    <div class="card-body">${riskHtml}</div>
-                  </div>
-                </div>
-                <div class="tab-pane fade" id="lotteryInfo">
-                  <div class="card">
-                    <div class="card-header"><i class="bi bi-dice-5"></i> 全局运气状态</div>
-                    <div class="card-body">${luckHtml}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        `
-        new bootstrap.Modal(document.getElementById('userDetailModal')).show()
-      } else {
-        showErrorToast(userRes.value?.message || '获取用户详情失败')
-      }
-    } catch (error) {
-      showErrorToast(error.message || '网络错误')
-    } finally {
-      showLoading(false)
-    }
-  },
-
-  manageRoles(userId) {
-    showErrorToast('角色管理功能开发中...')
-  },
-
-  async toggleBan(userId, currentStatus) {
-    const action = currentStatus === 'banned' ? '解封' : '封禁'
-    if (!confirm(`确定要${action}该用户吗？`)) return
-
-    showLoading(true)
-    try {
-      const newStatus = currentStatus === 'banned' ? 'active' : 'banned'
-      const response = await apiRequest(API.buildURL(API_ENDPOINTS.USER.UPDATE_STATUS, { user_id: userId }), {
-        method: 'PUT',
-        body: JSON.stringify({ status: newStatus })
-      })
-
-      if (response && response.success) {
-        showSuccessToast(`${action}成功`)
-        this.loadData()
-      } else {
-        showErrorToast(response?.message || `${action}失败`)
-      }
-    } catch (error) {
-      showErrorToast(error.message || '网络错误')
-    } finally {
-      showLoading(false)
-    }
-  },
-
-  formatDate(dateStr) {
-    if (!dateStr) return '-'
-    const date = new Date(dateStr)
-    return date.toLocaleString('zh-CN')
-  }
-}
-
-// ==================== 用户层级模块 ====================
-const hierarchyModule = {
-  currentPage: 1,
-  pageSize: 10,
-  hierarchies: [],
-
-  init() {
-    document.getElementById('hierarchyRefreshBtn').addEventListener('click', () => this.loadData())
-    document
-      .getElementById('hierarchyCreateBtn')
-      .addEventListener('click', () => this.showCreateModal())
-    document
-      .getElementById('saveHierarchyBtn')
-      .addEventListener('click', () => this.saveHierarchy())
-
-    document.getElementById('hierarchyRoleLevelFilter').addEventListener('change', () => {
-      this.currentPage = 1
-      this.loadData()
-    })
-    document.getElementById('hierarchyStatusFilter').addEventListener('change', () => {
-      this.currentPage = 1
-      this.loadData()
-    })
-  },
-
-  async loadData() {
-    showLoading(true)
-    try {
-      const params = new URLSearchParams()
-      params.append('page', this.currentPage)
-      params.append('page_size', this.pageSize)
-
-      const roleLevel = document.getElementById('hierarchyRoleLevelFilter').value
-      const status = document.getElementById('hierarchyStatusFilter').value
-      const superiorId = document.getElementById('hierarchySuperiorFilter').value
-
-      if (roleLevel) params.append('role_level', roleLevel)
-      if (status) params.append('is_active', status)
-      if (superiorId) params.append('superior_user_id', superiorId) // 修复：使用后端字段名
-
-      console.log('📡 层级模块请求API:', API_ENDPOINTS.USER_HIERARCHY.LIST + '?' + params.toString())
-      const response = await apiRequest(API_ENDPOINTS.USER_HIERARCHY.LIST + '?' + params.toString())
-      console.log('📥 层级模块响应:', response)
-
-      if (response && response.success) {
-        // 修复：后端返回rows而不是items
-        this.hierarchies = response.data.rows || []
-        // 修复：从rows数据动态计算统计
-        const stats = {
-          total: response.data.count || 0,
-          active: this.hierarchies.filter(h => h.is_active).length,
-          inactive: this.hierarchies.filter(h => !h.is_active).length,
-          store_assigned: this.hierarchies.filter(h => h.store_id).length
-        }
-        this.renderStats(stats)
-        this.renderTable(this.hierarchies)
-        this.renderPagination(response.data.pagination)
-        document.getElementById('hierarchyListInfo').textContent =
-          `共 ${response.data.count || this.hierarchies.length} 条`
-        console.log('✅ 层级数据加载成功, 记录数:', this.hierarchies.length)
-      } else {
-        console.error('❌ 层级API返回失败:', response)
-        showErrorToast(response?.message || '加载层级数据失败')
-        this.renderEmptyTable()
-      }
-    } catch (error) {
-      console.error('❌ 加载层级数据异常:', error)
-      showErrorToast(error.message || '网络错误')
-      this.renderEmptyTable()
-    } finally {
-      showLoading(false)
-    }
-  },
-
-  renderStats(stats) {
-    document.getElementById('hierarchyTotalCount').textContent =
-      stats.total || this.hierarchies.length || 0
-    document.getElementById('hierarchyActiveCount').textContent = stats.active || 0
-    document.getElementById('hierarchyInactiveCount').textContent = stats.inactive || 0
-    document.getElementById('hierarchyStoreAssignCount').textContent = stats.store_assigned || 0
-  },
-
-  renderTable(items) {
-    const tbody = document.getElementById('hierarchyTableBody')
-
-    if (!items || items.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="8" class="text-center py-5 text-muted">
-            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-            <p class="mt-2">暂无层级数据</p>
-          </td>
-        </tr>
-      `
-      return
-    }
-
-    // 修复：使用后端返回的字段名（hierarchy_id, user_nickname, role_name, role_level, superior_user_id等）
-    tbody.innerHTML = items
-      .map(
-        item => `
-      <tr class="${item.is_active ? '' : 'inactive-row'}">
-        <td>${item.hierarchy_id}</td>
-        <td>
-          <strong>${item.user_nickname || '用户' + item.user_id}</strong>
-          <br><small class="text-muted">ID: ${item.user_id} | ${item.user_mobile || '-'}</small>
-        </td>
-        <td>
-          <span class="badge role-badge-${item.role_level || ''}">${item.role_name || '-'}</span>
-        </td>
-        <td>${item.superior_user_id ? `${item.superior_nickname || '用户' + item.superior_user_id}` : '-'}</td>
-        <td>${item.store_id ? `门店${item.store_id}` : '-'}</td>
-        <td>
-          <span class="badge ${item.is_active ? 'bg-success' : 'bg-secondary'}">
-            ${item.is_active ? '激活中' : '已停用'}
-          </span>
-        </td>
-        <td><small>${this.formatDate(item.activated_at)}</small></td>
-        <td>
-          <button class="btn btn-sm btn-outline-warning" onclick="hierarchyModule.toggleActive(${item.hierarchy_id}, ${item.is_active})">
-            <i class="bi ${item.is_active ? 'bi-pause' : 'bi-play'}"></i>
-          </button>
-        </td>
-      </tr>
-    `
-      )
-      .join('')
-  },
-
-  renderEmptyTable() {
-    document.getElementById('hierarchyTableBody').innerHTML = `
-      <tr>
-        <td colspan="8" class="text-center py-5 text-danger">
-          <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
-          <p class="mt-2">加载失败</p>
-        </td>
-      </tr>
-    `
-  },
-
-  renderPagination(pagination) {
-    const container = document.getElementById('hierarchyPagination')
-    if (!pagination || pagination.total_pages <= 1) {
-      container.innerHTML = ''
-      return
-    }
-
-    let html = ''
-    html += `<li class="page-item ${this.currentPage === 1 ? 'disabled' : ''}">
-               <a class="page-link" href="#" onclick="hierarchyModule.changePage(${this.currentPage - 1})">上一页</a>
-             </li>`
-
-    for (let i = 1; i <= pagination.total_pages; i++) {
-      html += `<li class="page-item ${this.currentPage === i ? 'active' : ''}">
-                 <a class="page-link" href="#" onclick="hierarchyModule.changePage(${i})">${i}</a>
-               </li>`
-    }
-
-    html += `<li class="page-item ${this.currentPage === pagination.total_pages ? 'disabled' : ''}">
-               <a class="page-link" href="#" onclick="hierarchyModule.changePage(${this.currentPage + 1})">下一页</a>
-             </li>`
-
-    container.innerHTML = html
-  },
-
-  changePage(page) {
-    if (page < 1) return
-    this.currentPage = page
-    this.loadData()
-  },
-
-  showCreateModal() {
-    document.getElementById('hierarchyModalTitle').textContent = '新建层级关系'
-    document.getElementById('hierarchyForm').reset()
-    new bootstrap.Modal(document.getElementById('hierarchyModal')).show()
-  },
-
-  async saveHierarchy() {
-    const userId = document.getElementById('formUserId').value
-    const roleId = document.getElementById('formRoleId').value
-    const superiorId = document.getElementById('formSuperiorId').value
-    const storeId = document.getElementById('formStoreId').value
-
-    if (!userId || !roleId) {
-      showErrorToast('请填写必要字段')
-      return
-    }
-
-    showLoading(true)
-    try {
-      // 修复：使用后端期望的字段名 superior_user_id
-      const response = await apiRequest(API_ENDPOINTS.USER_HIERARCHY.CREATE, {
-        method: 'POST',
-        body: JSON.stringify({
-          user_id: parseInt(userId),
-          role_id: parseInt(roleId),
-          superior_user_id: superiorId ? parseInt(superiorId) : null,
-          store_id: storeId ? parseInt(storeId) : null
-        })
-      })
-
-      if (response && response.success) {
-        showSuccessToast('创建成功')
-        bootstrap.Modal.getInstance(document.getElementById('hierarchyModal')).hide()
-        this.loadData()
-      } else {
-        showErrorToast(response?.message || '创建失败')
-      }
-    } catch (error) {
-      showErrorToast(error.message || '网络错误')
-    } finally {
-      showLoading(false)
-    }
-  },
-
-  async toggleActive(hierarchyId, isActive) {
-    const action = isActive ? '停用' : '激活'
-    if (!confirm(`确定要${action}该层级关系吗？`)) return
-
-    // 修复：获取hierarchy对应的user_id，因为后端API使用user_id
-    const hierarchy = this.hierarchies.find(h => h.hierarchy_id === hierarchyId)
-    if (!hierarchy) {
-      showErrorToast('找不到该层级关系')
-      return
-    }
-
-    showLoading(true)
-    try {
-      // 修复：使用正确的后端API端点（DEACTIVATE或ACTIVATE）
-      const endpoint = isActive 
-        ? API.buildURL(API_ENDPOINTS.USER_HIERARCHY.DEACTIVATE, { user_id: hierarchy.user_id })
-        : API.buildURL(API_ENDPOINTS.USER_HIERARCHY.ACTIVATE, { user_id: hierarchy.user_id })
-      
-      const body = isActive 
-        ? { reason: '管理员停用', include_subordinates: false }
-        : { include_subordinates: false }
-
-      const response = await apiRequest(endpoint, {
-        method: 'POST',
-        body: JSON.stringify(body)
-      })
-
-      if (response && response.success) {
-        showSuccessToast(`${action}成功`)
-        this.loadData()
-      } else {
-        showErrorToast(response?.message || `${action}失败`)
-      }
-    } catch (error) {
-      showErrorToast(error.message || '网络错误')
-    } finally {
-      showLoading(false)
-    }
-  },
-
-  formatDate(dateStr) {
-    if (!dateStr) return '-'
-    const date = new Date(dateStr)
-    return date.toLocaleString('zh-CN')
-  }
-}
-
-// ==================== 商家积分审核模块 ====================
-const merchantPointsModule = {
-  currentPage: 1,
-  pageSize: 10,
-  reviews: [],
-  selectedIds: [],
-
-  init() {
-    document.getElementById('merchantRefreshBtn').addEventListener('click', () => this.loadData())
-
-    document.getElementById('merchantStatusFilter').addEventListener('change', () => {
-      this.currentPage = 1
-      this.loadData()
-    })
-
-    document.getElementById('merchantSelectAll').addEventListener('change', e => {
-      this.toggleSelectAll(e.target.checked)
-    })
-
-    document
-      .getElementById('approveBtn')
-      .addEventListener('click', () => this.handleReview('approved'))
-    document
-      .getElementById('rejectBtn')
-      .addEventListener('click', () => this.handleReview('rejected'))
-
-    document
-      .getElementById('merchantBatchApproveBtn')
-      .addEventListener('click', () => this.batchReview('approved'))
-    document
-      .getElementById('merchantBatchRejectBtn')
-      .addEventListener('click', () => this.batchReview('rejected'))
-  },
-
-  async loadData() {
-    showLoading(true)
-    try {
-      const params = new URLSearchParams()
-      params.append('page', this.currentPage)
-      params.append('page_size', this.pageSize)
-
-      const status = document.getElementById('merchantStatusFilter').value
-      const priority = document.getElementById('merchantPriorityFilter').value
-      const timeRange = document.getElementById('merchantTimeRangeFilter').value
-
-      if (status) params.append('status', status)
-      if (priority) params.append('priority', priority)
-      if (timeRange) params.append('time_range', timeRange)
-
-      // 并行加载列表数据和统计数据
-      const [listResponse, statsResponse] = await Promise.all([
-        apiRequest(API_ENDPOINTS.MERCHANT_POINTS.LIST + '?' + params.toString()),
-        apiRequest(API_ENDPOINTS.MERCHANT_POINTS.STATS_PENDING)
-      ])
-
-      if (listResponse && listResponse.success) {
-        // 修复：后端返回 rows 而不是 items
-        this.reviews = listResponse.data.rows || []
-        this.renderTable(this.reviews)
-        this.renderPagination(listResponse.data.pagination)
-      } else {
-        showErrorToast(listResponse?.message || '加载审核数据失败')
-        this.renderEmptyTable()
-      }
-
-      // 渲染统计数据
-      if (statsResponse && statsResponse.success) {
-        this.renderStats(statsResponse.data)
-      }
-    } catch (error) {
-      console.error('加载审核数据失败:', error)
-      showErrorToast(error.message || '网络错误')
-      this.renderEmptyTable()
-    } finally {
-      showLoading(false)
-    }
-  },
-
-  renderStats(stats) {
-    // 修复：使用后端统计接口返回的字段名
-    document.getElementById('merchantPendingCount').textContent = stats.pending_count || 0
-    document.getElementById('merchantApprovedCount').textContent = stats.approved_count || 0
-    document.getElementById('merchantRejectedCount').textContent = stats.rejected_count || 0
-    document.getElementById('merchantTotalPoints').textContent = stats.today_points || 0
-  },
-
-  renderTable(items) {
-    const tbody = document.getElementById('merchantReviewTableBody')
-
-    if (!items || items.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="10" class="text-center py-5 text-muted">
-            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-            <p class="mt-2">暂无审核数据</p>
-          </td>
-        </tr>
-      `
-      return
-    }
-
-    // 修复：使用后端返回的字段名
-    tbody.innerHTML = items
-      .map(
-        item => `
-      <tr>
-        <td>
-          <input type="checkbox" class="form-check-input review-checkbox" 
-                 value="${item.audit_id}" ${item.status === 'pending' ? '' : 'disabled'}
-                 onchange="merchantPointsModule.updateSelection()">
-        </td>
-        <td><code>${item.audit_id}</code></td>
-        <td>
-          <strong>${item.applicant?.nickname || '用户' + item.user_id}</strong>
-          <br><small class="text-muted">ID: ${item.user_id}</small>
-        </td>
-        <td><span class="badge bg-warning text-dark fs-6">${item.points_amount}</span></td>
-        <td><small>${item.description || '-'}</small></td>
-        <td><small>${this.formatDate(item.submitted_at)}</small></td>
-        <td>
-          <span class="badge ${this.getStatusBadgeClass(item.status)}">
-            ${this.getStatusText(item.status)}
-          </span>
-        </td>
-        <td><small>${item.auditor?.nickname || '-'}</small></td>
-        <td>
-          ${
-            item.status === 'pending'
-              ? `
-            <button class="btn btn-sm btn-outline-primary" onclick="merchantPointsModule.showReviewModal('${item.audit_id}')">
-              <i class="bi bi-check-square"></i> 审核
-            </button>
-          `
-              : '-'
-          }
-        </td>
-      </tr>
-    `
-      )
-      .join('')
-  },
-
-  renderEmptyTable() {
-    document.getElementById('merchantReviewTableBody').innerHTML = `
-      <tr>
-        <td colspan="10" class="text-center py-5 text-danger">
-          <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
-          <p class="mt-2">加载失败</p>
-        </td>
-      </tr>
-    `
-  },
-
-  renderPagination(pagination) {
-    const container = document.getElementById('merchantPagination')
-    if (!pagination || pagination.total_pages <= 1) {
-      container.innerHTML = ''
-      return
-    }
-
-    let html = ''
-    html += `<li class="page-item ${this.currentPage === 1 ? 'disabled' : ''}">
-               <a class="page-link" href="#" onclick="merchantPointsModule.changePage(${this.currentPage - 1})">上一页</a>
-             </li>`
-
-    for (let i = 1; i <= pagination.total_pages; i++) {
-      html += `<li class="page-item ${this.currentPage === i ? 'active' : ''}">
-                 <a class="page-link" href="#" onclick="merchantPointsModule.changePage(${i})">${i}</a>
-               </li>`
-    }
-
-    html += `<li class="page-item ${this.currentPage === pagination.total_pages ? 'disabled' : ''}">
-               <a class="page-link" href="#" onclick="merchantPointsModule.changePage(${this.currentPage + 1})">下一页</a>
-             </li>`
-
-    container.innerHTML = html
-  },
-
-  changePage(page) {
-    if (page < 1) return
-    this.currentPage = page
-    this.loadData()
-  },
-
-  showReviewModal(auditId) {
-    // 修复：使用后端字段名 audit_id
-    const item = this.reviews.find(r => r.audit_id === auditId || r.audit_id === String(auditId))
-    if (!item) return
-
-    this.currentReviewId = auditId
-    document.getElementById('modalApplyId').textContent = item.audit_id
-    document.getElementById('modalUser').textContent =
-      item.applicant?.nickname || '用户' + item.user_id
-    document.getElementById('modalPoints').textContent = item.points_amount
-    document.getElementById('modalRemark').textContent = item.description || '-'
-    document.getElementById('reviewComment').value = ''
-
-    new bootstrap.Modal(document.getElementById('reviewModal')).show()
-  },
-
-  async handleReview(status) {
-    if (!this.currentReviewId) return
-
-    showLoading(true)
-    try {
-      const comment = document.getElementById('reviewComment').value
-      // 修复：使用正确的后端API端点（approve 或 reject）
-      const endpoint = status === 'approved' 
-        ? API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.APPROVE, { id: this.currentReviewId })
-        : API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.REJECT, { id: this.currentReviewId })
-      
-      const response = await apiRequest(endpoint, {
-        method: 'POST',
-        body: JSON.stringify({ audit_reason: comment })
-      })
-
-      if (response && response.success) {
-        showSuccessToast(`${status === 'approved' ? '审核通过' : '已拒绝'}`)
-        bootstrap.Modal.getInstance(document.getElementById('reviewModal')).hide()
-        this.loadData()
-      } else {
-        showErrorToast(response?.message || '操作失败')
-      }
-    } catch (error) {
-      showErrorToast(error.message || '网络错误')
-    } finally {
-      showLoading(false)
-    }
-  },
-
-  toggleSelectAll(checked) {
-    document.querySelectorAll('.review-checkbox:not(:disabled)').forEach(cb => {
-      cb.checked = checked
-    })
-    this.updateSelection()
-  },
-
-  updateSelection() {
-    // 修复：audit_id 可能是字符串，不要强制转为数字
-    this.selectedIds = Array.from(document.querySelectorAll('.review-checkbox:checked')).map(cb => cb.value)
-    const hasSelection = this.selectedIds.length > 0
-    document.getElementById('merchantBatchApproveBtn').disabled = !hasSelection
-    document.getElementById('merchantBatchRejectBtn').disabled = !hasSelection
-  },
-
-  async batchReview(status) {
-    if (this.selectedIds.length === 0) return
-
-    const action = status === 'approved' ? '批量通过' : '批量拒绝'
-    if (!confirm(`确定要${action} ${this.selectedIds.length} 条申请吗？`)) return
-
-    showLoading(true)
-    try {
-      // 后端没有批量接口，循环调用单个审核接口
-      let successCount = 0
-      let failCount = 0
-      
-      for (const auditId of this.selectedIds) {
-        try {
-          const endpoint = status === 'approved' 
-            ? API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.APPROVE, { id: auditId })
-            : API.buildURL(API_ENDPOINTS.MERCHANT_POINTS.REJECT, { id: auditId })
-          
-          const response = await apiRequest(endpoint, {
-            method: 'POST',
-            body: JSON.stringify({ audit_reason: action })
-          })
-          
-          if (response && response.success) {
-            successCount++
-          } else {
-            failCount++
-          }
-        } catch (e) {
-          failCount++
-        }
-      }
-
-      if (successCount > 0) {
-        showSuccessToast(`${action}完成：成功 ${successCount} 条${failCount > 0 ? `，失败 ${failCount} 条` : ''}`)
-      } else {
-        showErrorToast(`${action}失败`)
-      }
-      this.loadData()
-    } catch (error) {
-      showErrorToast(error.message || '网络错误')
-    } finally {
-      showLoading(false)
-    }
-  },
-
-  getStatusBadgeClass(status) {
-    const classes = {
-      pending: 'bg-warning text-dark',
-      approved: 'bg-success',
-      rejected: 'bg-danger'
-    }
-    return classes[status] || 'bg-secondary'
-  },
-
-  getStatusText(status) {
-    const texts = {
-      pending: '待审核',
-      approved: '已通过',
-      rejected: '已拒绝'
-    }
-    return texts[status] || status
-  },
-
-  formatDate(dateStr) {
-    if (!dateStr) return '-'
-    const date = new Date(dateStr)
-    return date.toLocaleString('zh-CN')
-  }
-}
-
-// ==================== 公共函数 ====================
-function showLoading(show) {
-  document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none'
-}
-
-function showSuccessToast(message) {
-  const toast = document.getElementById('successToast')
-  document.getElementById('successToastBody').textContent = message
-  new bootstrap.Toast(toast).show()
-}
-
-function showErrorToast(message) {
-  const toast = document.getElementById('errorToast')
-  document.getElementById('errorToastBody').textContent = message
-  new bootstrap.Toast(toast).show()
-}
+console.log('📦 [UserManagement] 页面脚本已加载')

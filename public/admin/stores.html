@@ -25,29 +25,36 @@
       color: #6c757d;
     }
   </style>
+
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
 </head>
-<body class="bg-light">
+<body class="bg-light" x-data="storesPage()" x-cloak>
   <nav class="navbar navbar-dark bg-primary">
     <div class="container-fluid">
       <a href="/admin/dashboard.html" class="navbar-brand">
         <i class="bi bi-arrow-left me-2"></i>🏪 管理后台 - 门店管理
       </a>
       <div>
-        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+        <span class="text-light me-3" x-text="'欢迎，' + (userInfo?.nickname || '管理员')">欢迎，管理员</span>
+        <button class="btn btn-outline-light btn-sm" @click="logout">退出登录</button>
       </div>
     </div>
   </nav>
 
   <div class="container-fluid mt-4">
-    <!-- 统计卡片 - 基于后端 getStoreStats 返回的字段 -->
+    <!-- 统计卡片 -->
     <div class="row g-3 mb-4">
       <div class="col-md-3">
         <div class="card stat-card">
           <div class="card-body text-center">
             <i class="bi bi-shop text-primary" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">门店总数</h6>
-            <h2 id="totalStores" class="text-primary mb-0">-</h2>
+            <h2 class="text-primary mb-0" x-text="statistics.total">-</h2>
           </div>
         </div>
       </div>
@@ -56,7 +63,7 @@
           <div class="card-body text-center">
             <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">营业中</h6>
-            <h2 id="activeStores" class="text-success mb-0">-</h2>
+            <h2 class="text-success mb-0" x-text="statistics.active">-</h2>
           </div>
         </div>
       </div>
@@ -65,7 +72,7 @@
           <div class="card-body text-center">
             <i class="bi bi-pause-circle text-secondary" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">已停业</h6>
-            <h2 id="inactiveStores" class="text-secondary mb-0">-</h2>
+            <h2 class="text-secondary mb-0" x-text="statistics.inactive">-</h2>
           </div>
         </div>
       </div>
@@ -74,7 +81,7 @@
           <div class="card-body text-center">
             <i class="bi bi-hourglass-split text-warning" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">待审核</h6>
-            <h2 id="pendingStores" class="text-warning mb-0">-</h2>
+            <h2 class="text-warning mb-0" x-text="statistics.pending">-</h2>
           </div>
         </div>
       </div>
@@ -86,7 +93,7 @@
         <div class="row g-3 align-items-center">
           <div class="col-md-3">
             <label class="form-label">门店状态</label>
-            <select class="form-select" id="statusFilter">
+            <select class="form-select" x-model="filters.status">
               <option value="">全部状态</option>
               <option value="active">营业中</option>
               <option value="inactive">已停业</option>
@@ -94,13 +101,14 @@
           </div>
           <div class="col-md-4">
             <label class="form-label">搜索</label>
-            <input type="text" class="form-control" id="searchInput" placeholder="搜索门店名称或地址...">
+            <input type="text" class="form-control" x-model="filters.search" 
+                   @keypress.enter="loadStores" placeholder="搜索门店名称或地址...">
           </div>
           <div class="col-md-3 d-flex align-items-end">
-            <button class="btn btn-primary me-2" id="searchBtn">
+            <button class="btn btn-primary me-2" @click="loadStores">
               <i class="bi bi-search"></i> 搜索
             </button>
-            <button class="btn btn-success" id="createBtn">
+            <button class="btn btn-success" @click="openCreateModal">
               <i class="bi bi-plus-lg"></i> 新增门店
             </button>
           </div>
@@ -109,104 +117,217 @@
     </div>
 
     <!-- 门店列表 -->
-    <div class="row" id="storeList">
-      <!-- 动态生成 -->
-    </div>
-
-    <!-- 空状态 -->
-    <div class="card d-none" id="emptyState">
-      <div class="card-body text-center py-5">
-        <i class="bi bi-shop text-muted" style="font-size: 4rem;"></i>
-        <h5 class="text-muted mt-3">暂无门店</h5>
-        <p class="text-muted">点击上方"新增门店"按钮添加</p>
-      </div>
+    <div class="row">
+      <!-- 加载中状态 -->
+      <template x-if="loading && stores.length === 0">
+        <div class="col-12 text-center py-5">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">加载中...</span>
+          </div>
+          <p class="mt-2 text-muted">正在加载数据...</p>
+        </div>
+      </template>
+      
+      <!-- 空状态 -->
+      <template x-if="!loading && stores.length === 0">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-body text-center py-5">
+              <i class="bi bi-shop text-muted" style="font-size: 4rem;"></i>
+              <h5 class="text-muted mt-3">暂无门店</h5>
+              <p class="text-muted">点击上方"新增门店"按钮添加</p>
+            </div>
+          </div>
+        </div>
+      </template>
+      
+      <!-- 门店卡片列表 -->
+      <template x-for="store in stores" :key="store.store_id">
+        <div class="col-md-6 col-lg-4 mb-4">
+          <div class="card store-card h-100" :class="{ 'inactive': store.status !== 'active' }">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h6 class="mb-0">
+                <i class="bi bi-shop me-2"></i>
+                <span x-text="store.store_name || '未命名门店'"></span>
+              </h6>
+              <span class="badge" :class="store.status === 'active' ? 'bg-success' : 'bg-secondary'"
+                    x-text="store.status_name || (store.status === 'active' ? '营业中' : '已停业')"></span>
+            </div>
+            <div class="card-body">
+              <p class="address-text mb-2">
+                <i class="bi bi-geo-alt"></i> 
+                <span x-text="store.full_region_name || ''"></span>
+              </p>
+              <p class="address-text mb-2" x-text="store.store_address || '-'"></p>
+              <p class="mb-2">
+                <i class="bi bi-telephone text-primary"></i> 
+                <span x-text="store.contact_mobile || '-'"></span>
+              </p>
+              <p class="mb-0">
+                <i class="bi bi-person text-info"></i> 
+                <span x-text="store.contact_name || '-'"></span>
+              </p>
+            </div>
+            <div class="card-footer bg-white">
+              <button class="btn btn-sm btn-outline-primary me-1" @click="viewStoreDetail(store.store_id)">
+                <i class="bi bi-eye"></i> 详情
+              </button>
+              <button class="btn btn-sm btn-outline-warning me-1" @click="editStore(store.store_id)">
+                <i class="bi bi-pencil"></i> 编辑
+              </button>
+              <button class="btn btn-sm" 
+                      :class="store.status === 'active' ? 'btn-outline-secondary' : 'btn-outline-success'"
+                      @click="toggleStoreStatus(store.store_id, store.status)">
+                <i class="bi" :class="store.status === 'active' ? 'bi-pause' : 'bi-play'"></i>
+                <span x-text="store.status === 'active' ? '停业' : '营业'"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
     </div>
   </div>
 
   <!-- 门店表单模态框 -->
-  <div class="modal fade" id="storeModal" tabindex="-1">
+  <div class="modal fade" id="storeModal" tabindex="-1" x-ref="storeModal">
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="storeModalTitle"><i class="bi bi-shop"></i> 新增门店</h5>
+          <h5 class="modal-title">
+            <i class="bi" :class="storeForm.id ? 'bi-pencil' : 'bi-shop'"></i>
+            <span x-text="storeForm.id ? '编辑门店' : '新增门店'"></span>
+          </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <form id="storeForm">
-            <input type="hidden" id="storeId">
+          <form x-ref="storeFormEl">
             <div class="row g-3">
               <div class="col-md-6">
                 <label class="form-label">门店名称 <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="storeName" required>
+                <input type="text" class="form-control" x-model="storeForm.store_name" required>
               </div>
               <div class="col-md-6">
                 <label class="form-label">联系电话</label>
-                <input type="text" class="form-control" id="storePhone">
+                <input type="text" class="form-control" x-model="storeForm.contact_mobile">
               </div>
               <div class="col-md-6">
                 <label class="form-label">省份 <span class="text-danger">*</span></label>
-                <select class="form-select" id="storeProvince" required>
+                <select class="form-select" x-model="storeForm.province_code" @change="loadCities" required>
                   <option value="">请选择省份</option>
+                  <template x-for="province in provinces" :key="province.region_code">
+                    <option :value="province.region_code" x-text="province.region_name"></option>
+                  </template>
                 </select>
               </div>
               <div class="col-md-6">
                 <label class="form-label">城市 <span class="text-danger">*</span></label>
-                <select class="form-select" id="storeCity" required>
+                <select class="form-select" x-model="storeForm.city_code" @change="loadDistricts" required>
                   <option value="">请先选择省份</option>
+                  <template x-for="city in cities" :key="city.region_code">
+                    <option :value="city.region_code" x-text="city.region_name"></option>
+                  </template>
                 </select>
               </div>
               <div class="col-md-6">
                 <label class="form-label">区县</label>
-                <select class="form-select" id="storeDistrict">
+                <select class="form-select" x-model="storeForm.district_code" @change="loadStreets">
                   <option value="">请先选择城市</option>
+                  <template x-for="district in districts" :key="district.region_code">
+                    <option :value="district.region_code" x-text="district.region_name"></option>
+                  </template>
                 </select>
               </div>
               <div class="col-md-6">
                 <label class="form-label">街道</label>
-                <select class="form-select" id="storeStreet">
+                <select class="form-select" x-model="storeForm.street_code">
                   <option value="">请先选择区县</option>
+                  <template x-for="street in streets" :key="street.region_code">
+                    <option :value="street.region_code" x-text="street.region_name"></option>
+                  </template>
                 </select>
               </div>
               <div class="col-12">
                 <label class="form-label">详细地址 <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="storeAddress" required>
+                <input type="text" class="form-control" x-model="storeForm.store_address" required>
               </div>
               <div class="col-md-6">
                 <label class="form-label">联系人</label>
-                <input type="text" class="form-control" id="storeHours" placeholder="联系人姓名">
+                <input type="text" class="form-control" x-model="storeForm.contact_name" placeholder="联系人姓名">
               </div>
               <div class="col-md-6">
                 <label class="form-label">门店状态</label>
-                <select class="form-select" id="storeStatus">
+                <select class="form-select" x-model="storeForm.status">
                   <option value="active">营业中</option>
                   <option value="inactive">已停业</option>
                 </select>
               </div>
               <div class="col-12">
                 <label class="form-label">备注</label>
-                <textarea class="form-control" id="storeRemark" rows="2"></textarea>
+                <textarea class="form-control" x-model="storeForm.notes" rows="2"></textarea>
               </div>
             </div>
           </form>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="button" class="btn btn-primary" id="submitStoreBtn">保存</button>
+          <button type="button" class="btn btn-primary" @click="submitStore">保存</button>
         </div>
       </div>
     </div>
   </div>
 
   <!-- 门店详情模态框 -->
-  <div class="modal fade" id="storeDetailModal" tabindex="-1">
+  <div class="modal fade" id="storeDetailModal" tabindex="-1" x-ref="storeDetailModal">
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title"><i class="bi bi-info-circle"></i> 门店详情</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-        <div class="modal-body" id="storeDetailContent">
-          <!-- 动态填充 -->
+        <div class="modal-body">
+          <template x-if="selectedStore">
+            <div>
+              <div class="row">
+                <div class="col-md-6">
+                  <table class="table table-sm">
+                    <tr><th style="width:40%">门店ID</th><td x-text="selectedStore.store_id"></td></tr>
+                    <tr><th>门店编号</th><td x-text="selectedStore.store_code || '-'"></td></tr>
+                    <tr><th>门店名称</th><td x-text="selectedStore.store_name || '-'"></td></tr>
+                    <tr><th>联系电话</th><td x-text="selectedStore.contact_mobile || '-'"></td></tr>
+                    <tr><th>联系人</th><td x-text="selectedStore.contact_name || '-'"></td></tr>
+                    <tr>
+                      <th>状态</th>
+                      <td>
+                        <span class="badge" :class="selectedStore.status === 'active' ? 'bg-success' : 'bg-secondary'"
+                              x-text="selectedStore.status_name || (selectedStore.status === 'active' ? '营业中' : '已停业')"></span>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+                <div class="col-md-6">
+                  <table class="table table-sm">
+                    <tr><th style="width:40%">省份</th><td x-text="selectedStore.province_name || '-'"></td></tr>
+                    <tr><th>城市</th><td x-text="selectedStore.city_name || '-'"></td></tr>
+                    <tr><th>区县</th><td x-text="selectedStore.district_name || '-'"></td></tr>
+                    <tr><th>街道</th><td x-text="selectedStore.street_name || '-'"></td></tr>
+                    <tr><th>详细地址</th><td x-text="selectedStore.store_address || '-'"></td></tr>
+                  </table>
+                </div>
+              </div>
+              <div class="mt-3" x-show="selectedStore.total_staff !== undefined">
+                <h6>员工统计</h6>
+                <p x-text="'在职员工: ' + (selectedStore.staff_counts?.active || 0) + ' | 停职: ' + (selectedStore.staff_counts?.inactive || 0) + ' | 待审核: ' + (selectedStore.staff_counts?.pending || 0)"></p>
+              </div>
+              <div class="mt-3">
+                <h6>备注</h6>
+                <p class="text-muted" x-text="selectedStore.notes || '无'"></p>
+              </div>
+              <div class="row text-muted small">
+                <div class="col-6">创建时间：<span x-text="formatDateTime(selectedStore.created_at)"></span></div>
+                <div class="col-6">更新时间：<span x-text="formatDateTime(selectedStore.updated_at)"></span></div>
+              </div>
+            </div>
+          </template>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
@@ -215,7 +336,7 @@
     </div>
   </div>
 
-  <div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-overlay" :class="{ 'show': globalLoading }">
     <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
       <span class="visually-hidden">加载中...</span>
     </div>
@@ -224,449 +345,9 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/api-config.js"></script>
-  <script>
-    let stores = [];
-    let provinces = [];
-
-    document.addEventListener('DOMContentLoaded', function() {
-      const userInfo = getCurrentUser();
-      if (userInfo && userInfo.nickname) {
-        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
-      }
-      document.getElementById('logoutBtn').addEventListener('click', logout);
-      
-      // 绑定按钮事件（避免内联onclick导致CSP错误）
-      document.getElementById('searchBtn').addEventListener('click', loadStores);
-      document.getElementById('createBtn').addEventListener('click', openCreateModal);
-      document.getElementById('submitStoreBtn').addEventListener('click', submitStore);
-      
-      // 绑定省市区联动事件
-      document.getElementById('storeProvince').addEventListener('change', loadCities);
-      document.getElementById('storeCity').addEventListener('change', loadDistricts);
-      document.getElementById('storeDistrict').addEventListener('change', loadStreets);
-      
-      // 使用事件委托处理动态生成的按钮点击事件
-      document.getElementById('storeList').addEventListener('click', function(e) {
-        const target = e.target.closest('button');
-        if (!target) return;
-        
-        const storeId = target.dataset.storeId;
-        const status = target.dataset.status;
-        
-        if (target.classList.contains('btn-view-detail')) {
-          viewStoreDetail(parseInt(storeId));
-        } else if (target.classList.contains('btn-edit-store')) {
-          editStore(parseInt(storeId));
-        } else if (target.classList.contains('btn-toggle-status')) {
-          toggleStoreStatus(parseInt(storeId), status);
-        }
-      });
-      
-      loadStores();
-      loadProvinces();
-    });
-
-    async function loadStores() {
-      showLoading();
-      try {
-        const status = document.getElementById('statusFilter').value;
-        const search = document.getElementById('searchInput').value;
-
-        const params = new URLSearchParams();
-        if (status) params.append('status', status);
-        if (search) params.append('keyword', search); // 后端使用keyword参数
-
-        const url = API_ENDPOINTS.STORE.LIST + (params.toString() ? `?${params.toString()}` : '');
-        const response = await apiRequest(url);
-
-        if (response && response.success) {
-          // 后端返回格式: { items: [...], total, page, page_size, total_pages }
-          stores = response.data.items || [];
-          renderStores(stores);
-          // 使用后端返回的统计数据
-          updateStats({
-            total: response.data.total || stores.length,
-            active: stores.filter(s => s.status === 'active').length
-          });
-          // 同时加载门店统计数据
-          loadStoreStats();
-        } else {
-          showError('加载失败', response?.message || '获取门店列表失败');
-        }
-      } catch (error) {
-        console.error('加载门店失败:', error);
-        showError('加载失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    async function loadStoreStats() {
-      try {
-        const response = await apiRequest(API_ENDPOINTS.STORE.STATS);
-        if (response && response.success) {
-          // 后端返回: { total, active, inactive, pending }
-          const stats = response.data;
-          document.getElementById('totalStores').textContent = stats.total ?? '-';
-          document.getElementById('activeStores').textContent = stats.active ?? '-';
-          document.getElementById('inactiveStores').textContent = stats.inactive ?? '-';
-          document.getElementById('pendingStores').textContent = stats.pending ?? '-';
-        }
-      } catch (error) {
-        console.error('加载门店统计失败:', error);
-      }
-    }
-
-    async function loadProvinces() {
-      try {
-        const response = await apiRequest(API_ENDPOINTS.REGION.PROVINCES);
-        if (response && response.success) {
-          provinces = response.data.provinces || response.data || [];
-          const select = document.getElementById('storeProvince');
-          select.innerHTML = '<option value="">请选择省份</option>' +
-            provinces.map(p => `<option value="${p.region_code}">${escapeHtml(p.region_name)}</option>`).join('');
-        }
-      } catch (error) {
-        console.error('加载省份失败:', error);
-      }
-    }
-
-    async function loadCities() {
-      const provinceCode = document.getElementById('storeProvince').value;
-      const citySelect = document.getElementById('storeCity');
-      const districtSelect = document.getElementById('storeDistrict');
-      const streetSelect = document.getElementById('storeStreet');
-
-      citySelect.innerHTML = '<option value="">请选择城市</option>';
-      districtSelect.innerHTML = '<option value="">请先选择城市</option>';
-      streetSelect.innerHTML = '<option value="">请先选择区县</option>';
-
-      if (!provinceCode) return;
-
-      try {
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.REGION.CHILDREN, { parent_code: provinceCode }));
-        if (response && response.success) {
-          const cities = response.data.children || response.data || [];
-          citySelect.innerHTML = '<option value="">请选择城市</option>' +
-            cities.map(c => `<option value="${c.region_code}">${escapeHtml(c.region_name)}</option>`).join('');
-        }
-      } catch (error) {
-        console.error('加载城市失败:', error);
-      }
-    }
-
-    async function loadDistricts() {
-      const cityCode = document.getElementById('storeCity').value;
-      const districtSelect = document.getElementById('storeDistrict');
-      const streetSelect = document.getElementById('storeStreet');
-
-      districtSelect.innerHTML = '<option value="">请选择区县</option>';
-      streetSelect.innerHTML = '<option value="">请先选择区县</option>';
-
-      if (!cityCode) return;
-
-      try {
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.REGION.CHILDREN, { parent_code: cityCode }));
-        if (response && response.success) {
-          const districts = response.data.children || response.data || [];
-          districtSelect.innerHTML = '<option value="">请选择区县</option>' +
-            districts.map(d => `<option value="${d.region_code}">${escapeHtml(d.region_name)}</option>`).join('');
-        }
-      } catch (error) {
-        console.error('加载区县失败:', error);
-      }
-    }
-
-    async function loadStreets() {
-      const districtCode = document.getElementById('storeDistrict').value;
-      const streetSelect = document.getElementById('storeStreet');
-
-      streetSelect.innerHTML = '<option value="">请选择街道</option>';
-
-      if (!districtCode) return;
-
-      try {
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.REGION.CHILDREN, { parent_code: districtCode }));
-        if (response && response.success) {
-          const streets = response.data.children || response.data || [];
-          streetSelect.innerHTML = '<option value="">请选择街道</option>' +
-            streets.map(s => `<option value="${s.region_code}">${escapeHtml(s.region_name)}</option>`).join('');
-        }
-      } catch (error) {
-        console.error('加载街道失败:', error);
-      }
-    }
-
-    function renderStores(stores) {
-      const container = document.getElementById('storeList');
-      const emptyState = document.getElementById('emptyState');
-
-      if (!stores || stores.length === 0) {
-        container.innerHTML = '';
-        emptyState.classList.remove('d-none');
-        return;
-      }
-
-      emptyState.classList.add('d-none');
-
-      // 使用后端字段名: store_name, store_address, contact_mobile, contact_name, notes
-      // 使用 data-* 属性替代内联onclick，避免CSP错误
-      container.innerHTML = stores.map(store => `
-        <div class="col-md-6 col-lg-4 mb-4">
-          <div class="card store-card h-100 ${store.status !== 'active' ? 'inactive' : ''}">
-            <div class="card-header d-flex justify-content-between align-items-center">
-              <h6 class="mb-0"><i class="bi bi-shop me-2"></i>${escapeHtml(store.store_name || '未命名门店')}</h6>
-              <span class="badge ${store.status === 'active' ? 'bg-success' : 'bg-secondary'}">
-                ${store.status_name || (store.status === 'active' ? '营业中' : '已停业')}
-              </span>
-            </div>
-            <div class="card-body">
-              <p class="address-text mb-2">
-                <i class="bi bi-geo-alt"></i> 
-                ${escapeHtml(store.full_region_name || '')}
-              </p>
-              <p class="address-text mb-2">${escapeHtml(store.store_address || '-')}</p>
-              <p class="mb-2">
-                <i class="bi bi-telephone text-primary"></i> ${escapeHtml(store.contact_mobile || '-')}
-              </p>
-              <p class="mb-0">
-                <i class="bi bi-person text-info"></i> ${escapeHtml(store.contact_name || '-')}
-              </p>
-            </div>
-            <div class="card-footer bg-white">
-              <button class="btn btn-sm btn-outline-primary me-1 btn-view-detail" data-store-id="${store.store_id}">
-                <i class="bi bi-eye"></i> 详情
-              </button>
-              <button class="btn btn-sm btn-outline-warning me-1 btn-edit-store" data-store-id="${store.store_id}">
-                <i class="bi bi-pencil"></i> 编辑
-              </button>
-              <button class="btn btn-sm btn-outline-${store.status === 'active' ? 'secondary' : 'success'} btn-toggle-status" 
-                      data-store-id="${store.store_id}" data-status="${store.status}">
-                <i class="bi bi-${store.status === 'active' ? 'pause' : 'play'}"></i> 
-                ${store.status === 'active' ? '停业' : '营业'}
-              </button>
-            </div>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    function updateStats(stats) {
-      // 适配后端返回: { total, active, inactive, pending }
-      document.getElementById('totalStores').textContent = stats.total ?? stores.length;
-      document.getElementById('activeStores').textContent = stats.active ?? stores.filter(s => s.status === 'active').length;
-      document.getElementById('inactiveStores').textContent = stats.inactive ?? stores.filter(s => s.status === 'inactive').length;
-      document.getElementById('pendingStores').textContent = stats.pending ?? stores.filter(s => s.status === 'pending').length;
-    }
-
-    function openCreateModal() {
-      document.getElementById('storeModalTitle').innerHTML = '<i class="bi bi-shop"></i> 新增门店';
-      document.getElementById('storeForm').reset();
-      document.getElementById('storeId').value = '';
-      new bootstrap.Modal(document.getElementById('storeModal')).show();
-    }
-
-    async function editStore(storeId) {
-      showLoading();
-      try {
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.STORE.DETAIL, { store_id: storeId }));
-        if (response && response.success) {
-          const store = response.data;
-          document.getElementById('storeModalTitle').innerHTML = '<i class="bi bi-pencil"></i> 编辑门店';
-          document.getElementById('storeId').value = store.store_id;
-          // 使用后端字段名: store_name, contact_mobile, store_address, notes
-          document.getElementById('storeName').value = store.store_name || '';
-          document.getElementById('storePhone').value = store.contact_mobile || '';
-          document.getElementById('storeAddress').value = store.store_address || '';
-          document.getElementById('storeHours').value = store.contact_name || ''; // 联系人姓名
-          document.getElementById('storeStatus').value = store.status || 'active';
-          document.getElementById('storeRemark').value = store.notes || '';
-          
-          // 设置地区选择（简化处理）
-          if (store.province_code) {
-            document.getElementById('storeProvince').value = store.province_code;
-            await loadCities();
-            if (store.city_code) {
-              document.getElementById('storeCity').value = store.city_code;
-              await loadDistricts();
-              if (store.district_code) {
-                document.getElementById('storeDistrict').value = store.district_code;
-                await loadStreets();
-                if (store.street_code) {
-                  document.getElementById('storeStreet').value = store.street_code;
-                }
-              }
-            }
-          }
-          
-          new bootstrap.Modal(document.getElementById('storeModal')).show();
-        } else {
-          showError('加载失败', response?.message || '获取门店详情失败');
-        }
-      } catch (error) {
-        console.error('加载门店详情失败:', error);
-        showError('加载失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    async function submitStore() {
-      const storeId = document.getElementById('storeId').value;
-      // 使用后端字段名: store_name, contact_mobile, store_address, contact_name, notes
-      const data = {
-        store_name: document.getElementById('storeName').value,
-        contact_mobile: document.getElementById('storePhone').value,
-        province_code: document.getElementById('storeProvince').value,
-        city_code: document.getElementById('storeCity').value,
-        district_code: document.getElementById('storeDistrict').value,
-        street_code: document.getElementById('storeStreet').value,
-        store_address: document.getElementById('storeAddress').value,
-        contact_name: document.getElementById('storeHours').value, // 联系人姓名
-        status: document.getElementById('storeStatus').value,
-        notes: document.getElementById('storeRemark').value
-      };
-
-      if (!data.store_name || !data.store_address) {
-        alert('请填写门店名称和详细地址');
-        return;
-      }
-
-      showLoading();
-      try {
-        const url = storeId 
-          ? API.buildURL(API_ENDPOINTS.STORE.UPDATE, { store_id: storeId })
-          : API_ENDPOINTS.STORE.CREATE;
-        const method = storeId ? 'PUT' : 'POST';
-
-        const response = await apiRequest(url, {
-          method: method,
-          body: JSON.stringify(data)
-        });
-
-        if (response && response.success) {
-          bootstrap.Modal.getInstance(document.getElementById('storeModal')).hide();
-          alert(`✅ ${storeId ? '更新' : '创建'}成功`);
-          loadStores();
-        } else {
-          showError('保存失败', response?.message || '操作失败');
-        }
-      } catch (error) {
-        console.error('保存门店失败:', error);
-        showError('保存失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    async function viewStoreDetail(storeId) {
-      showLoading();
-      try {
-        const response = await apiRequest(API.buildURL(API_ENDPOINTS.STORE.DETAIL, { store_id: storeId }));
-        if (response && response.success) {
-          const store = response.data;
-          // 使用后端字段名: store_name, store_code, contact_mobile, contact_name, store_address, notes
-          document.getElementById('storeDetailContent').innerHTML = `
-            <div class="row">
-              <div class="col-md-6">
-                <table class="table table-sm">
-                  <tr><th style="width:40%">门店ID</th><td>${store.store_id}</td></tr>
-                  <tr><th>门店编号</th><td>${escapeHtml(store.store_code || '-')}</td></tr>
-                  <tr><th>门店名称</th><td>${escapeHtml(store.store_name || '-')}</td></tr>
-                  <tr><th>联系电话</th><td>${escapeHtml(store.contact_mobile || '-')}</td></tr>
-                  <tr><th>联系人</th><td>${escapeHtml(store.contact_name || '-')}</td></tr>
-                  <tr><th>状态</th><td><span class="badge ${store.status === 'active' ? 'bg-success' : 'bg-secondary'}">${store.status_name || (store.status === 'active' ? '营业中' : '已停业')}</span></td></tr>
-                </table>
-              </div>
-              <div class="col-md-6">
-                <table class="table table-sm">
-                  <tr><th style="width:40%">省份</th><td>${escapeHtml(store.province_name || '-')}</td></tr>
-                  <tr><th>城市</th><td>${escapeHtml(store.city_name || '-')}</td></tr>
-                  <tr><th>区县</th><td>${escapeHtml(store.district_name || '-')}</td></tr>
-                  <tr><th>街道</th><td>${escapeHtml(store.street_name || '-')}</td></tr>
-                  <tr><th>详细地址</th><td>${escapeHtml(store.store_address || '-')}</td></tr>
-                </table>
-              </div>
-            </div>
-            ${store.total_staff !== undefined ? `
-            <div class="mt-3">
-              <h6>员工统计</h6>
-              <p>在职员工: ${store.staff_counts?.active || 0} | 停职: ${store.staff_counts?.inactive || 0} | 待审核: ${store.staff_counts?.pending || 0}</p>
-            </div>
-            ` : ''}
-            <div class="mt-3">
-              <h6>备注</h6>
-              <p class="text-muted">${escapeHtml(store.notes || '无')}</p>
-            </div>
-            <div class="row text-muted small">
-              <div class="col-6">创建时间：${formatDateTime(store.created_at)}</div>
-              <div class="col-6">更新时间：${formatDateTime(store.updated_at)}</div>
-            </div>
-          `;
-          new bootstrap.Modal(document.getElementById('storeDetailModal')).show();
-        } else {
-          showError('加载失败', response?.message || '获取门店详情失败');
-        }
-      } catch (error) {
-        console.error('加载门店详情失败:', error);
-        showError('加载失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    async function toggleStoreStatus(storeId, currentStatus) {
-      const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
-      const action = newStatus === 'active' ? '营业' : '停业';
-      
-      if (!confirm(`确定要将此门店设为${action}状态吗？`)) return;
-
-      showLoading();
-      try {
-        const url = newStatus === 'active'
-          ? API.buildURL(API_ENDPOINTS.STORE.ACTIVATE, { store_id: storeId })
-          : API.buildURL(API_ENDPOINTS.STORE.DEACTIVATE, { store_id: storeId });
-
-        const response = await apiRequest(url, { method: 'POST' });
-
-        if (response && response.success) {
-          alert(`✅ 门店已${action}`);
-          loadStores();
-        } else {
-          showError('操作失败', response?.message || '状态更新失败');
-        }
-      } catch (error) {
-        console.error('更新状态失败:', error);
-        showError('操作失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    function formatDateTime(dateStr) {
-      if (!dateStr) return '-';
-      return new Date(dateStr).toLocaleString('zh-CN');
-    }
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
-    }
-
-    function showLoading() {
-      document.getElementById('loadingOverlay').classList.add('show');
-    }
-
-    function hideLoading() {
-      document.getElementById('loadingOverlay').classList.remove('show');
-    }
-
-    function showError(title, message) {
-      alert(`❌ ${title}\n${message}`);
-    }
-  </script>
+  
+  
+  <!-- ✅ 页面专属逻辑 (Alpine.js 组件) -->
+  <script src="/admin/js/pages/stores.js"></script>
 </body>
 </html>
-

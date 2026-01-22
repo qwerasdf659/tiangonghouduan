@@ -29,29 +29,38 @@
       background: #d1e7dd !important;
     }
   </style>
+
+  <!-- Alpine.js -->
+  <script defer src="/admin/js/alpine/init.js"></script>
+  <script defer src="/admin/js/vendor/alpine.min.js"></script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
 </head>
-<body class="bg-light">
+<body class="bg-light" x-data="sessionsPage()" x-cloak>
+  <!-- 顶部导航 -->
   <nav class="navbar navbar-dark bg-primary">
     <div class="container-fluid">
       <a href="/admin/dashboard.html" class="navbar-brand">
         <i class="bi bi-arrow-left me-2"></i>🔐 管理后台 - 会话管理
       </a>
       <div>
-        <span class="text-light me-3" id="welcomeText">欢迎，管理员</span>
-        <button class="btn btn-outline-light btn-sm" id="logoutBtn">退出登录</button>
+        <span class="text-light me-3" x-text="userInfo ? `欢迎，${userInfo.nickname}` : '欢迎，管理员'"></span>
+        <button class="btn btn-outline-light btn-sm" @click="logout()">退出登录</button>
       </div>
     </div>
   </nav>
 
   <div class="container-fluid mt-4">
-    <!-- 统计卡片 - 适配后端提供的数据 -->
+    <!-- 统计卡片 -->
     <div class="row g-3 mb-4">
       <div class="col-md-3">
         <div class="card stat-card">
           <div class="card-body text-center">
             <i class="bi bi-people text-primary" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">在线用户</h6>
-            <h2 id="onlineUsers" class="text-primary mb-0">-</h2>
+            <h2 class="text-primary mb-0" x-text="statistics.onlineUsers"></h2>
           </div>
         </div>
       </div>
@@ -60,7 +69,7 @@
           <div class="card-body text-center">
             <i class="bi bi-link-45deg text-success" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">活跃会话</h6>
-            <h2 id="activeSessions" class="text-success mb-0">-</h2>
+            <h2 class="text-success mb-0" x-text="statistics.activeSessions"></h2>
           </div>
         </div>
       </div>
@@ -69,7 +78,7 @@
           <div class="card-body text-center">
             <i class="bi bi-person text-warning" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">用户会话</h6>
-            <h2 id="userSessions" class="text-warning mb-0">-</h2>
+            <h2 class="text-warning mb-0" x-text="statistics.userSessions"></h2>
           </div>
         </div>
       </div>
@@ -78,7 +87,7 @@
           <div class="card-body text-center">
             <i class="bi bi-shield-check text-info" style="font-size: 2rem;"></i>
             <h6 class="text-muted mt-2">管理员会话</h6>
-            <h2 id="adminSessions" class="text-info mb-0">-</h2>
+            <h2 class="text-info mb-0" x-text="statistics.adminSessions"></h2>
           </div>
         </div>
       </div>
@@ -90,7 +99,7 @@
         <div class="row g-3 align-items-center">
           <div class="col-md-2">
             <label class="form-label">状态</label>
-            <select class="form-select" id="statusFilter">
+            <select class="form-select" x-model="filters.status">
               <option value="">全部状态</option>
               <option value="active">活跃</option>
               <option value="expired">已过期/失效</option>
@@ -98,7 +107,7 @@
           </div>
           <div class="col-md-2">
             <label class="form-label">用户类型</label>
-            <select class="form-select" id="userTypeFilter">
+            <select class="form-select" x-model="filters.userType">
               <option value="">全部类型</option>
               <option value="user">普通用户</option>
               <option value="admin">管理员</option>
@@ -106,18 +115,18 @@
           </div>
           <div class="col-md-3">
             <label class="form-label">用户ID</label>
-            <input type="number" class="form-control" id="userSearch" placeholder="输入用户ID...">
+            <input type="number" class="form-control" x-model="filters.userId" placeholder="输入用户ID...">
           </div>
           <div class="col-md-3">
             <label class="form-label">排序方式</label>
-            <select class="form-select" id="sortFilter">
+            <select class="form-select" x-model="filters.sortBy">
               <option value="last_activity">最后活动时间</option>
               <option value="created_at">创建时间</option>
               <option value="expires_at">过期时间</option>
             </select>
           </div>
           <div class="col-md-2 d-flex align-items-end">
-            <button class="btn btn-primary me-2" onclick="loadSessions()">
+            <button class="btn btn-primary me-2" @click="loadSessions()">
               <i class="bi bi-search"></i> 搜索
             </button>
           </div>
@@ -129,534 +138,180 @@
     <div class="card mb-4">
       <div class="card-body d-flex justify-content-between align-items-center">
         <div>
-          <button class="btn btn-outline-danger me-2" onclick="revokeSelected()">
+          <button class="btn btn-outline-danger me-2" @click="revokeSelected()">
             <i class="bi bi-x-circle"></i> 撤销选中
           </button>
-          <button class="btn btn-outline-warning me-2" onclick="revokeExpired()">
+          <button class="btn btn-outline-warning me-2" @click="revokeExpired()">
             <i class="bi bi-clock-history"></i> 清理过期
           </button>
-          <button class="btn btn-outline-secondary" onclick="revokeAllExceptCurrent()">
+          <button class="btn btn-outline-secondary" @click="revokeAllExceptCurrent()">
             <i class="bi bi-trash"></i> 强制下线其他设备
           </button>
         </div>
-        <button class="btn btn-outline-primary" onclick="loadSessions()">
+        <button class="btn btn-outline-primary" @click="loadSessions()">
           <i class="bi bi-arrow-clockwise"></i> 刷新
         </button>
       </div>
     </div>
 
+    <!-- 加载状态 -->
+    <template x-if="loading">
+      <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">加载中...</span>
+        </div>
+        <p class="mt-2 text-muted">正在加载会话数据...</p>
+      </div>
+    </template>
+
     <!-- 会话列表 -->
-    <div class="row" id="sessionList">
-      <!-- 动态生成 -->
+    <div class="row" x-show="!loading">
+      <!-- 空状态 -->
+      <template x-if="sessions.length === 0 && !loading">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-body text-center py-5 text-muted">
+              <i class="bi bi-link-45deg" style="font-size: 3rem;"></i>
+              <p class="mt-2">暂无会话数据</p>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- 会话卡片 -->
+      <template x-for="session in sessions" :key="session.user_session_id || session.session_id">
+        <div class="col-md-6 col-lg-4 mb-4">
+          <div 
+            class="card session-card h-100"
+            :class="[getSessionStatus(session), isCurrentSession(session) ? 'current-session' : '']"
+          >
+            <div class="card-body">
+              <div class="d-flex align-items-start">
+                <div class="form-check me-3">
+                  <input 
+                    type="checkbox" 
+                    class="form-check-input session-checkbox" 
+                    :value="session.user_session_id || session.session_id"
+                    :disabled="isCurrentSession(session)"
+                    x-model="selectedSessions"
+                  >
+                </div>
+                <div class="device-icon me-3">
+                  <i class="bi" :class="session.user_type === 'admin' ? 'bi-shield-check' : 'bi-person'"></i>
+                </div>
+                <div class="flex-grow-1">
+                  <div class="d-flex justify-content-between">
+                    <h6 class="mb-1">
+                      用户 <span x-text="session.user_id"></span>
+                      <span x-show="isCurrentSession(session)" class="badge bg-primary ms-2">当前会话</span>
+                    </h6>
+                    <span 
+                      class="badge"
+                      :class="getStatusBadgeClass(getSessionStatus(session))"
+                      x-text="getStatusLabel(getSessionStatus(session))"
+                    ></span>
+                  </div>
+                  <p class="session-info text-muted mb-1">
+                    <i class="bi bi-globe"></i> <span x-text="session.login_ip || session.ip_address || '-'"></span>
+                  </p>
+                  <p class="session-info text-muted mb-1">
+                    <i class="bi bi-person-badge"></i> <span x-text="session.user_type === 'admin' ? '管理员' : '普通用户'"></span>
+                  </p>
+                  <p class="session-info text-muted mb-0">
+                    <i class="bi bi-clock"></i> 最后活动：<span x-text="formatRelativeTime(session.last_activity || session.last_active_at)"></span>
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="card-footer bg-white d-flex justify-content-between">
+              <small class="text-muted">创建：<span x-text="formatDateTime(session.created_at)"></span></small>
+              <div>
+                <button class="btn btn-sm btn-outline-primary me-1" @click="viewSessionDetail(session)">
+                  <i class="bi bi-eye"></i>
+                </button>
+                <button 
+                  x-show="!isCurrentSession(session) && getSessionStatus(session) === 'active'"
+                  class="btn btn-sm btn-outline-danger" 
+                  @click="revokeSession(session.user_session_id || session.session_id)"
+                >
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
     </div>
 
     <!-- 分页 -->
-    <nav aria-label="Page navigation" class="mt-4">
-      <ul class="pagination justify-content-center" id="pagination">
-        <!-- 动态生成 -->
+    <nav aria-label="Page navigation" class="mt-4" x-show="totalPages > 1">
+      <ul class="pagination justify-content-center">
+        <li class="page-item" :class="{ 'disabled': currentPage === 1 }">
+          <a class="page-link" href="#" @click.prevent="loadSessions(currentPage - 1)">上一页</a>
+        </li>
+        <template x-for="page in getPaginationPages()" :key="page">
+          <li class="page-item" :class="{ 'active': page === currentPage, 'disabled': page === '...' }">
+            <a class="page-link" href="#" @click.prevent="page !== '...' && loadSessions(page)" x-text="page"></a>
+          </li>
+        </template>
+        <li class="page-item" :class="{ 'disabled': currentPage === totalPages }">
+          <a class="page-link" href="#" @click.prevent="loadSessions(currentPage + 1)">下一页</a>
+        </li>
       </ul>
     </nav>
   </div>
 
   <!-- 会话详情模态框 -->
-  <div class="modal fade" id="sessionDetailModal" tabindex="-1">
+  <div class="modal fade" id="sessionDetailModal" tabindex="-1" x-ref="sessionDetailModal">
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title"><i class="bi bi-info-circle"></i> 会话详情</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-        <div class="modal-body" id="sessionDetailContent">
-          <!-- 动态填充 -->
+        <div class="modal-body" x-show="selectedSession">
+          <table class="table table-sm">
+            <tr><th style="width:35%">会话ID</th><td><code x-text="selectedSession?.user_session_id || selectedSession?.session_id"></code></td></tr>
+            <tr><th>用户ID</th><td x-text="selectedSession?.user_id"></td></tr>
+            <tr><th>用户昵称</th><td x-text="selectedSession?.user_info?.nickname || '-'"></td></tr>
+            <tr><th>用户类型</th><td x-text="selectedSession?.user_type === 'admin' ? '管理员' : '普通用户'"></td></tr>
+            <tr><th>状态</th><td><span class="badge" :class="getStatusBadgeClass(getSessionStatus(selectedSession))" x-text="getStatusLabel(getSessionStatus(selectedSession))"></span></td></tr>
+            <tr><th>IP地址</th><td x-text="selectedSession?.login_ip || selectedSession?.ip_address || '-'"></td></tr>
+            <tr><th>是否过期</th><td x-text="selectedSession?.is_expired ? '是' : '否'"></td></tr>
+            <tr><th>是否有效</th><td x-text="selectedSession?.is_valid ? '是' : '否'"></td></tr>
+            <tr><th>创建时间</th><td x-text="formatDateTime(selectedSession?.created_at)"></td></tr>
+            <tr><th>最后活动</th><td x-text="formatDateTime(selectedSession?.last_activity || selectedSession?.last_active_at)"></td></tr>
+            <tr><th>过期时间</th><td x-text="formatDateTime(selectedSession?.expires_at)"></td></tr>
+          </table>
+          <div x-show="isCurrentSession(selectedSession)" class="alert alert-info mb-0">
+            <i class="bi bi-info-circle"></i> 这是您当前的会话，无法撤销
+          </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-danger" id="revokeSessionBtn">撤销会话</button>
+          <button 
+            type="button" 
+            class="btn btn-danger"
+            x-show="selectedSession && !isCurrentSession(selectedSession) && getSessionStatus(selectedSession) === 'active'"
+            @click="revokeSessionFromModal()"
+          >撤销会话</button>
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="loading-overlay" id="loadingOverlay">
+  <!-- 全局加载遮罩 -->
+  <div class="loading-overlay" x-show="globalLoading" x-cloak>
     <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
       <span class="visually-hidden">加载中...</span>
     </div>
   </div>
 
+  <!-- ✅ JavaScript 加载顺序 -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/admin/js/admin-common.js"></script>
   <script src="/admin/js/api-config.js"></script>
-  <script>
-    let sessions = [];
-    let currentPage = 1;
-    let totalPages = 1;
-    let currentSessionId = null;
-
-    document.addEventListener('DOMContentLoaded', function() {
-      const userInfo = getCurrentUser();
-      if (userInfo && userInfo.nickname) {
-        document.getElementById('welcomeText').textContent = `欢迎，${userInfo.nickname}`;
-      }
-      document.getElementById('logoutBtn').addEventListener('click', logout);
-      
-      // 获取当前会话ID
-      const token = localStorage.getItem('admin_token');
-      if (token) {
-        try {
-          const payload = JSON.parse(atob(token.split('.')[1]));
-          currentSessionId = payload.session_id;
-        } catch (e) {}
-      }
-      
-      loadSessions();
-    });
-
-    async function loadSessions(page = 1) {
-      showLoading();
-      currentPage = page;
-      try {
-        // 构建查询参数 - 适配后端API字段名
-        const statusFilter = document.getElementById('statusFilter').value;
-        const userTypeFilter = document.getElementById('userTypeFilter').value;
-        const userId = document.getElementById('userSearch').value;
-        const sortBy = document.getElementById('sortFilter').value;
-
-        const params = new URLSearchParams();
-        params.append('page', page);
-        params.append('page_size', 20);
-        params.append('sort_by', sortBy);
-        params.append('sort_order', 'desc');
-        
-        // 后端使用 is_active 而非 status
-        if (statusFilter === 'active') {
-          params.append('is_active', 'true');
-        } else if (statusFilter === 'expired') {
-          params.append('is_active', 'false');
-        }
-        
-        // 用户类型筛选
-        if (userTypeFilter) {
-          params.append('user_type', userTypeFilter);
-        }
-        
-        if (userId) params.append('user_id', userId);
-
-        const url = API_ENDPOINTS.SESSIONS.LIST + '?' + params.toString();
-        const response = await apiRequest(url);
-
-        if (response && response.success) {
-          sessions = response.data.sessions || response.data || [];
-          totalPages = response.data.pagination?.total_pages || 1;
-          renderSessions(sessions);
-          renderPagination();
-          // 单独加载统计数据
-          loadStats();
-        } else {
-          showError('加载失败', response?.message || '获取会话列表失败');
-        }
-      } catch (error) {
-        console.error('加载会话失败:', error);
-        showError('加载失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    // 单独加载统计数据（后端提供独立的stats API）
-    async function loadStats() {
-      try {
-        const response = await apiRequest(API_ENDPOINTS.SESSIONS.STATS);
-        if (response && response.success) {
-          const stats = response.data;
-          // 获取按用户类型分组的统计数据
-          const userStats = stats.by_user_type?.user || { active_sessions: 0, unique_users: 0 };
-          const adminStats = stats.by_user_type?.admin || { active_sessions: 0, unique_users: 0 };
-          
-          // 计算在线用户数
-          const onlineUsers = (userStats.unique_users || 0) + (adminStats.unique_users || 0);
-          
-          document.getElementById('onlineUsers').textContent = onlineUsers;
-          document.getElementById('activeSessions').textContent = stats.total_active_sessions || 0;
-          // 用户会话数和管理员会话数（后端实际提供的数据）
-          document.getElementById('userSessions').textContent = userStats.active_sessions || 0;
-          document.getElementById('adminSessions').textContent = adminStats.active_sessions || 0;
-        }
-      } catch (error) {
-        console.error('加载统计数据失败:', error);
-      }
-    }
-
-    function renderSessions(sessions) {
-      const container = document.getElementById('sessionList');
-
-      if (!sessions || sessions.length === 0) {
-        container.innerHTML = `
-          <div class="col-12">
-            <div class="card">
-              <div class="card-body text-center py-5 text-muted">
-                <i class="bi bi-link-45deg" style="font-size: 3rem;"></i>
-                <p class="mt-2">暂无会话数据</p>
-              </div>
-            </div>
-          </div>
-        `;
-        return;
-      }
-
-      container.innerHTML = sessions.map(s => {
-        // 适配后端字段名：user_session_id → session_id
-        const sessionId = s.user_session_id || s.session_id;
-        const isCurrent = sessionId === currentSessionId;
-        // 将 is_active/is_expired 转换为 status 字符串
-        const status = getSessionStatus(s);
-        // 适配后端字段名：login_ip → ip_address
-        const ipAddress = s.login_ip || s.ip_address || s.ip || '-';
-        // 适配后端字段名：last_activity → last_active_at
-        const lastActive = s.last_activity || s.last_active_at || s.updated_at;
-        // user_type 用于显示设备图标（后端无device_type字段）
-        const userType = s.user_type || 'user';
-        
-        return `
-          <div class="col-md-6 col-lg-4 mb-4">
-            <div class="card session-card ${status} h-100 ${isCurrent ? 'current-session' : ''}">
-              <div class="card-body">
-                <div class="d-flex align-items-start">
-                  <div class="form-check me-3">
-                    <input type="checkbox" class="form-check-input session-checkbox" value="${sessionId}" 
-                           ${isCurrent ? 'disabled' : ''}>
-                  </div>
-                  <div class="device-icon me-3">
-                    <i class="bi bi-${userType === 'admin' ? 'shield-check' : 'person'}"></i>
-                  </div>
-                  <div class="flex-grow-1">
-                    <div class="d-flex justify-content-between">
-                      <h6 class="mb-1">
-                        用户 ${s.user_id}
-                        ${isCurrent ? '<span class="badge bg-primary ms-2">当前会话</span>' : ''}
-                      </h6>
-                      <span class="badge ${getStatusBadgeClass(status)}">${getStatusLabel(status)}</span>
-                    </div>
-                    <p class="session-info text-muted mb-1">
-                      <i class="bi bi-globe"></i> ${escapeHtml(ipAddress)}
-                    </p>
-                    <p class="session-info text-muted mb-1">
-                      <i class="bi bi-person-badge"></i> ${userType === 'admin' ? '管理员' : '普通用户'}
-                    </p>
-                    <p class="session-info text-muted mb-0">
-                      <i class="bi bi-clock"></i> 最后活动：${formatRelativeTime(lastActive)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div class="card-footer bg-white d-flex justify-content-between">
-                <small class="text-muted">创建：${formatDateTime(s.created_at)}</small>
-                <div>
-                  <button class="btn btn-sm btn-outline-primary me-1" onclick="viewSessionDetail('${sessionId}')">
-                    <i class="bi bi-eye"></i>
-                  </button>
-                  ${!isCurrent && status === 'active' ? `
-                    <button class="btn btn-sm btn-outline-danger" onclick="revokeSession('${sessionId}')">
-                      <i class="bi bi-x-lg"></i>
-                    </button>
-                  ` : ''}
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-    
-    // 将后端的 is_active/is_expired 转换为前端 status
-    function getSessionStatus(session) {
-      if (session.is_expired === true) return 'expired';
-      if (session.is_active === false) return 'revoked';
-      if (session.is_active === true) return 'active';
-      // 兼容直接返回status的情况
-      return session.status || 'active';
-    }
-
-    function renderPagination() {
-      const pagination = document.getElementById('pagination');
-      let html = '';
-
-      html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-        <a class="page-link" href="#" onclick="loadSessions(${currentPage - 1})">上一页</a>
-      </li>`;
-
-      for (let i = 1; i <= totalPages; i++) {
-        if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
-          html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
-            <a class="page-link" href="#" onclick="loadSessions(${i})">${i}</a>
-          </li>`;
-        } else if (i === currentPage - 3 || i === currentPage + 3) {
-          html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
-        }
-      }
-
-      html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
-        <a class="page-link" href="#" onclick="loadSessions(${currentPage + 1})">下一页</a>
-      </li>`;
-
-      pagination.innerHTML = html;
-    }
-
-    // updateStats 已移到 loadStats 函数中，此函数保留以兼容可能的直接调用
-    function updateStats(stats) {
-      // 如果传入了统计数据，使用它；否则保持当前显示
-      if (stats && Object.keys(stats).length > 0) {
-        const userStats = stats.by_user_type?.user || { active_sessions: 0, unique_users: 0 };
-        const adminStats = stats.by_user_type?.admin || { active_sessions: 0, unique_users: 0 };
-        const onlineUsers = (userStats.unique_users || 0) + (adminStats.unique_users || 0);
-        
-        document.getElementById('onlineUsers').textContent = onlineUsers;
-        document.getElementById('activeSessions').textContent = stats.total_active_sessions || 
-          sessions.filter(s => getSessionStatus(s) === 'active').length;
-        document.getElementById('userSessions').textContent = userStats.active_sessions || 0;
-        document.getElementById('adminSessions').textContent = adminStats.active_sessions || 0;
-      }
-    }
-
-    function getDeviceIcon(deviceType) {
-      if (!deviceType) return 'display';
-      const type = deviceType.toLowerCase();
-      if (type.includes('mobile') || type.includes('iphone') || type.includes('android')) return 'phone';
-      if (type.includes('tablet') || type.includes('ipad')) return 'tablet';
-      return 'display';
-    }
-
-    function getStatusBadgeClass(status) {
-      const classes = {
-        active: 'bg-success',
-        expired: 'bg-warning text-dark',
-        revoked: 'bg-danger'
-      };
-      return classes[status] || 'bg-secondary';
-    }
-
-    function getStatusLabel(status) {
-      const labels = {
-        active: '活跃',
-        expired: '已过期',
-        revoked: '已撤销'
-      };
-      return labels[status] || status;
-    }
-
-    async function viewSessionDetail(sessionId) {
-      // 适配后端字段名：使用 user_session_id 或 session_id 查找
-      const session = sessions.find(s => (s.user_session_id || s.session_id) == sessionId);
-      if (!session) return;
-
-      const actualSessionId = session.user_session_id || session.session_id;
-      const isCurrent = actualSessionId === currentSessionId;
-      const status = getSessionStatus(session);
-      const ipAddress = session.login_ip || session.ip_address || session.ip || '-';
-      const lastActive = session.last_activity || session.last_active_at || session.updated_at;
-      const expiresAt = session.expires_at || session.expire_at;
-      const userType = session.user_type || 'user';
-      const userInfo = session.user_info || {};
-
-      document.getElementById('sessionDetailContent').innerHTML = `
-        <table class="table table-sm">
-          <tr><th style="width:35%">会话ID</th><td><code>${escapeHtml(String(actualSessionId))}</code></td></tr>
-          <tr><th>用户ID</th><td>${session.user_id}</td></tr>
-          <tr><th>用户昵称</th><td>${escapeHtml(userInfo.nickname || '-')}</td></tr>
-          <tr><th>用户类型</th><td>${userType === 'admin' ? '管理员' : '普通用户'}</td></tr>
-          <tr><th>状态</th><td><span class="badge ${getStatusBadgeClass(status)}">${getStatusLabel(status)}</span></td></tr>
-          <tr><th>IP地址</th><td>${escapeHtml(ipAddress)}</td></tr>
-          <tr><th>是否过期</th><td>${session.is_expired ? '是' : '否'}</td></tr>
-          <tr><th>是否有效</th><td>${session.is_valid ? '是' : '否'}</td></tr>
-          <tr><th>创建时间</th><td>${formatDateTime(session.created_at)}</td></tr>
-          <tr><th>最后活动</th><td>${formatDateTime(lastActive)}</td></tr>
-          <tr><th>过期时间</th><td>${formatDateTime(expiresAt)}</td></tr>
-        </table>
-        ${isCurrent ? '<div class="alert alert-info mb-0"><i class="bi bi-info-circle"></i> 这是您当前的会话，无法撤销</div>' : ''}
-      `;
-
-      const revokeBtn = document.getElementById('revokeSessionBtn');
-      if (isCurrent || status !== 'active') {
-        revokeBtn.style.display = 'none';
-      } else {
-        revokeBtn.style.display = 'block';
-        revokeBtn.onclick = () => {
-          bootstrap.Modal.getInstance(document.getElementById('sessionDetailModal')).hide();
-          revokeSession(actualSessionId);
-        };
-      }
-
-      new bootstrap.Modal(document.getElementById('sessionDetailModal')).show();
-    }
-
-    async function revokeSession(sessionId) {
-      if (sessionId === currentSessionId) {
-        alert('无法撤销当前会话');
-        return;
-      }
-
-      if (!confirm('确定要撤销此会话吗？用户将被强制下线。')) return;
-
-      showLoading();
-      try {
-        // 后端API路径使用 :id 而非 :session_id，且使用 /deactivate
-        const url = `/api/v4/console/sessions/${sessionId}/deactivate`;
-        const response = await apiRequest(url, {
-          method: 'POST'
-        });
-
-        if (response && response.success) {
-          alert('✅ 会话已撤销');
-          loadSessions(currentPage);
-        } else {
-          showError('撤销失败', response?.message || '操作失败');
-        }
-      } catch (error) {
-        console.error('撤销会话失败:', error);
-        showError('撤销失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    async function revokeSelected() {
-      const selected = Array.from(document.querySelectorAll('.session-checkbox:checked'))
-        .map(cb => cb.value)
-        .filter(id => String(id) !== String(currentSessionId));
-
-      if (selected.length === 0) {
-        alert('请选择要撤销的会话');
-        return;
-      }
-
-      if (!confirm(`确定要撤销选中的 ${selected.length} 个会话吗？`)) return;
-
-      showLoading();
-      try {
-        // 后端没有批量撤销API，逐个撤销
-        let successCount = 0;
-        for (const sessionId of selected) {
-          try {
-            const url = `/api/v4/console/sessions/${sessionId}/deactivate`;
-            const response = await apiRequest(url, { method: 'POST' });
-            if (response && response.success) successCount++;
-          } catch (e) {
-            console.error(`撤销会话 ${sessionId} 失败:`, e);
-          }
-        }
-
-        alert(`✅ 批量撤销完成：成功 ${successCount}/${selected.length} 个`);
-        loadSessions(currentPage);
-      } catch (error) {
-        console.error('批量撤销失败:', error);
-        showError('撤销失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    async function revokeExpired() {
-      if (!confirm('确定要清理所有已过期的会话吗？')) return;
-
-      showLoading();
-      try {
-        const response = await apiRequest(API_ENDPOINTS.SESSIONS.CLEANUP, {
-          method: 'POST'
-        });
-
-        if (response && response.success) {
-          // 后端返回 deleted_count 字段
-          const count = response.data.deleted_count || response.data.count || 0;
-          alert(`✅ 已清理 ${count} 个过期会话`);
-          loadSessions(currentPage);
-        } else {
-          showError('清理失败', response?.message || '操作失败');
-        }
-      } catch (error) {
-        console.error('清理过期会话失败:', error);
-        showError('清理失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    async function revokeAllExceptCurrent() {
-      if (!confirm('确定要强制下线所有其他设备吗？')) return;
-
-      showLoading();
-      try {
-        // 后端 deactivate-user API 需要 user_type 和 user_id
-        // 获取当前用户信息
-        const userInfo = getCurrentUser();
-        if (!userInfo || !userInfo.user_id) {
-          showError('操作失败', '无法获取当前用户信息');
-          return;
-        }
-
-        const response = await apiRequest('/api/v4/console/sessions/deactivate-user', {
-          method: 'POST',
-          body: JSON.stringify({
-            user_type: userInfo.is_admin ? 'admin' : 'user',
-            user_id: userInfo.user_id,
-            reason: '用户主动下线其他设备'
-          })
-        });
-
-        if (response && response.success) {
-          const count = response.data.affected_count || response.data.count || 0;
-          alert(`✅ 已撤销 ${count} 个会话`);
-          loadSessions(currentPage);
-        } else {
-          showError('操作失败', response?.message || '撤销失败');
-        }
-      } catch (error) {
-        console.error('撤销其他会话失败:', error);
-        showError('操作失败', error.message);
-      } finally {
-        hideLoading();
-      }
-    }
-
-    function truncateText(text, maxLength) {
-      if (!text) return '';
-      return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
-    }
-
-    function formatDateTime(dateStr) {
-      if (!dateStr) return '-';
-      return new Date(dateStr).toLocaleString('zh-CN');
-    }
-
-    function formatRelativeTime(dateStr) {
-      if (!dateStr) return '-';
-      const date = new Date(dateStr);
-      const now = new Date();
-      const diff = now - date;
-
-      if (diff < 60000) return '刚刚';
-      if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
-      if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
-      return Math.floor(diff / 86400000) + '天前';
-    }
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
-    }
-
-    function showLoading() {
-      document.getElementById('loadingOverlay').classList.add('show');
-    }
-
-    function hideLoading() {
-      document.getElementById('loadingOverlay').classList.remove('show');
-    }
-
-    function showError(title, message) {
-      alert(`❌ ${title}\n${message}`);
-    }
-  </script>
+  <script src="/admin/js/pages/sessions.js"></script>
+  <!-- Alpine.js -->
 </body>
 </html>
-
