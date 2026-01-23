@@ -192,7 +192,7 @@ document.addEventListener('alpine:init', () => {
     async loadMaterialTypes() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.MATERIAL?.ASSET_TYPES || '/api/v4/admin/material/asset-types',
+          API_ENDPOINTS.MATERIAL?.ASSET_TYPES || '/api/v4/console/material/asset-types',
           {},
           { showLoading: false }
         )
@@ -255,7 +255,7 @@ document.addEventListener('alpine:init', () => {
 
       try {
         const response = await this.apiCall(
-          API_ENDPOINTS.MATERIAL?.ASSET_TYPES || '/api/v4/admin/material/asset-types',
+          API_ENDPOINTS.MATERIAL?.ASSET_TYPES || '/api/v4/console/material/asset-types',
           {
             method: 'POST',
             body: JSON.stringify({
@@ -322,7 +322,7 @@ document.addEventListener('alpine:init', () => {
       this.materialTypeSubmitting = true
 
       try {
-        const url = `${API_ENDPOINTS.MATERIAL?.ASSET_TYPES || '/api/v4/admin/material/asset-types'}/${form.asset_code}`
+        const url = `${API_ENDPOINTS.MATERIAL?.ASSET_TYPES || '/api/v4/console/material/asset-types'}/${form.asset_code}`
         const response = await this.apiCall(url, {
           method: 'PUT',
           body: JSON.stringify({
@@ -359,7 +359,7 @@ document.addEventListener('alpine:init', () => {
       await this.confirmAndExecute(
         `确定要${action}该资产类型吗？`,
         async () => {
-          const url = `${API_ENDPOINTS.MATERIAL?.ASSET_TYPES || '/api/v4/admin/material/asset-types'}/${assetCode}`
+          const url = `${API_ENDPOINTS.MATERIAL?.ASSET_TYPES || '/api/v4/console/material/asset-types'}/${assetCode}`
           const response = await this.apiCall(url, {
             method: 'PUT',
             body: JSON.stringify({ is_enabled: newStatus })
@@ -393,7 +393,7 @@ document.addEventListener('alpine:init', () => {
      */
     async loadMaterialAccounts() {
       try {
-        let url = API_ENDPOINTS.MATERIAL?.ACCOUNTS || '/api/v4/admin/material/accounts'
+        let url = API_ENDPOINTS.MATERIAL?.ACCOUNTS || '/api/v4/console/material/accounts'
         const params = new URLSearchParams()
         if (this.materialAccountFilters.user_id) params.append('user_id', this.materialAccountFilters.user_id)
         if (this.materialAccountFilters.asset_code) params.append('asset_code', this.materialAccountFilters.asset_code)
@@ -415,7 +415,7 @@ document.addEventListener('alpine:init', () => {
     async loadMaterialTransactions() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.MATERIAL?.TRANSACTIONS || '/api/v4/admin/material/transactions',
+          API_ENDPOINTS.MATERIAL?.TRANSACTIONS || '/api/v4/console/material/transactions',
           {},
           { showLoading: false }
         )
@@ -433,7 +433,7 @@ document.addEventListener('alpine:init', () => {
      */
     async loadItemInstances() {
       try {
-        let url = API_ENDPOINTS.ITEM?.INSTANCES || '/api/v4/admin/items/instances'
+        let url = API_ENDPOINTS.ITEM?.INSTANCES || '/api/v4/console/items/instances'
         const params = new URLSearchParams()
         if (this.itemInstanceFilters.user_id) params.append('user_id', this.itemInstanceFilters.user_id)
         if (this.itemInstanceFilters.status) params.append('status', this.itemInstanceFilters.status)
@@ -454,7 +454,7 @@ document.addEventListener('alpine:init', () => {
      */
     async loadVirtualAccounts() {
       try {
-        let url = API_ENDPOINTS.VIRTUAL?.ACCOUNTS || '/api/v4/admin/virtual/accounts'
+        let url = API_ENDPOINTS.VIRTUAL?.ACCOUNTS || '/api/v4/console/virtual/accounts'
         const params = new URLSearchParams()
         if (this.virtualAccountFilters.user_id) params.append('user_id', this.virtualAccountFilters.user_id)
         if (this.virtualAccountFilters.currency_type) params.append('currency_type', this.virtualAccountFilters.currency_type)
@@ -476,7 +476,7 @@ document.addEventListener('alpine:init', () => {
     async loadVirtualTransactions() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.VIRTUAL?.TRANSACTIONS || '/api/v4/admin/virtual/transactions',
+          API_ENDPOINTS.VIRTUAL?.TRANSACTIONS || '/api/v4/console/virtual/transactions',
           {},
           { showLoading: false }
         )

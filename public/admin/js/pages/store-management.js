@@ -131,7 +131,7 @@ document.addEventListener('alpine:init', () => {
         if (this.storeFilters.keyword) params.append('keyword', this.storeFilters.keyword)
 
         const response = await this.apiGet(
-          `${API_ENDPOINTS.STORE?.LIST || '/api/v4/admin/stores'}?${params}`,
+          `${API_ENDPOINTS.STORE?.LIST || '/api/v4/console/stores'}?${params}`,
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -146,7 +146,7 @@ document.addEventListener('alpine:init', () => {
     async loadStoreStats() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.STORE?.STATS || '/api/v4/admin/stores/stats',
+          API_ENDPOINTS.STORE?.STATS || '/api/v4/console/stores/stats',
           {}, { showError: false, showLoading: false }
         )
         if (response?.success) {
@@ -176,7 +176,7 @@ document.addEventListener('alpine:init', () => {
     async loadStoreRanking() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.STORE?.RANKING || '/api/v4/admin/stores/ranking',
+          API_ENDPOINTS.STORE?.RANKING || '/api/v4/console/stores/ranking',
           {}, { showLoading: false, showError: false }
         )
         if (response?.success) {
@@ -278,12 +278,12 @@ document.addEventListener('alpine:init', () => {
         let response
         if (this.editingStoreId) {
           response = await this.apiCall(
-            API.buildURL(API_ENDPOINTS.STORE?.UPDATE || '/api/v4/admin/stores/:id', { id: this.editingStoreId }),
+            API.buildURL(API_ENDPOINTS.STORE?.UPDATE || '/api/v4/console/stores/:id', { id: this.editingStoreId }),
             { method: 'PUT', data: payload }
           )
         } else {
           response = await this.apiCall(
-            API_ENDPOINTS.STORE?.CREATE || '/api/v4/admin/stores',
+            API_ENDPOINTS.STORE?.CREATE || '/api/v4/console/stores',
             { method: 'POST', data: payload }
           )
         }
@@ -495,7 +495,7 @@ document.addEventListener('alpine:init', () => {
         if (this.staffFilters.keyword) params.append('keyword', this.staffFilters.keyword)
 
         const response = await this.apiGet(
-          `${API_ENDPOINTS.STORE_STAFF?.LIST || '/api/v4/admin/store-staff'}?${params}`,
+          `${API_ENDPOINTS.STORE_STAFF?.LIST || '/api/v4/console/store-staff'}?${params}`,
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -538,7 +538,7 @@ document.addEventListener('alpine:init', () => {
         `确认删除员工「${staff.name}」？`,
         async () => {
           const response = await this.apiCall(
-            API.buildURL(API_ENDPOINTS.STORE_STAFF?.DELETE || '/api/v4/admin/store-staff/:id', { id: staff.staff_id }),
+            API.buildURL(API_ENDPOINTS.STORE_STAFF?.DELETE || '/api/v4/console/store-staff/:id', { id: staff.staff_id }),
             { method: 'DELETE' }
           )
           if (response?.success) this.loadStaff()
@@ -566,12 +566,12 @@ document.addEventListener('alpine:init', () => {
         let response
         if (this.editingStaffId) {
           response = await this.apiCall(
-            API.buildURL(API_ENDPOINTS.STORE_STAFF?.UPDATE || '/api/v4/admin/store-staff/:id', { id: this.editingStaffId }),
+            API.buildURL(API_ENDPOINTS.STORE_STAFF?.UPDATE || '/api/v4/console/store-staff/:id', { id: this.editingStaffId }),
             { method: 'PUT', body: JSON.stringify(payload) }
           )
         } else {
           response = await this.apiCall(
-            API_ENDPOINTS.STORE_STAFF?.CREATE || '/api/v4/admin/store-staff',
+            API_ENDPOINTS.STORE_STAFF?.CREATE || '/api/v4/console/store-staff',
             { method: 'POST', body: JSON.stringify(payload) }
           )
         }

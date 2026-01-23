@@ -147,7 +147,7 @@ document.addEventListener('alpine:init', () => {
         // 移除空值
         Object.keys(params).forEach(k => !params[k] && delete params[k])
         
-        const res = await request({ url: '/api/v4/admin/c2c-market/orders', method: 'GET', params })
+        const res = await request({ url: '/api/v4/console/c2c-market/orders', method: 'GET', params })
         
         if (res.success) {
           this.tradeOrders = res.data?.list || res.data || []
@@ -166,7 +166,7 @@ document.addEventListener('alpine:init', () => {
     
     async loadTradeStats() {
       try {
-        const res = await request({ url: '/api/v4/admin/c2c-market/orders/stats', method: 'GET' })
+        const res = await request({ url: '/api/v4/console/c2c-market/orders/stats', method: 'GET' })
         if (res.success && res.data) {
           this.tradeStats = {
             total: res.data.total || 0,
@@ -205,7 +205,7 @@ document.addEventListener('alpine:init', () => {
     // ==================== 上架统计方法 ====================
     async loadMarketplaceSummary() {
       try {
-        const res = await request({ url: '/api/v4/admin/c2c-market/listings/summary', method: 'GET' })
+        const res = await request({ url: '/api/v4/console/c2c-market/listings/summary', method: 'GET' })
         if (res.success && res.data) {
           this.marketplaceSummary = {
             total_users_with_listings: res.data.total_users_with_listings || 0,
@@ -229,7 +229,7 @@ document.addEventListener('alpine:init', () => {
         
         if (params.status === 'all') delete params.status
         
-        const res = await request({ url: '/api/v4/admin/c2c-market/listings/user-stats', method: 'GET', params })
+        const res = await request({ url: '/api/v4/console/c2c-market/listings/user-stats', method: 'GET', params })
         
         if (res.success) {
           this.marketplaceStats = res.data?.list || res.data || []
@@ -269,7 +269,7 @@ document.addEventListener('alpine:init', () => {
         
         Object.keys(params).forEach(k => !params[k] && delete params[k])
         
-        const res = await request({ url: '/api/v4/admin/redemption/orders', method: 'GET', params })
+        const res = await request({ url: '/api/v4/console/redemption/orders', method: 'GET', params })
         
         if (res.success) {
           this.redemptionOrders = res.data?.list || res.data || []
@@ -308,7 +308,7 @@ document.addEventListener('alpine:init', () => {
       
       try {
         const res = await request({
-          url: `/api/v4/admin/redemption/orders/${order.order_id}/approve`,
+          url: `/api/v4/console/redemption/orders/${order.order_id}/approve`,
           method: 'POST'
         })
         
@@ -330,7 +330,7 @@ document.addEventListener('alpine:init', () => {
       
       try {
         const res = await request({
-          url: `/api/v4/admin/redemption/orders/${order.order_id}/reject`,
+          url: `/api/v4/console/redemption/orders/${order.order_id}/reject`,
           method: 'POST'
         })
         

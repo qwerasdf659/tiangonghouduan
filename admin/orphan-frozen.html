@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '孤儿冻结资产', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+</head>
+<body class="bg-gray-100 min-h-screen" x-data="orphanFrozenPage()" x-init="init()" x-cloak>
+  
+  <!-- 导航栏 -->
+  <nav class="bg-gray-700 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/dashboard.html" class="hover:text-gray-300">← 返回仪表盘</a>
+        <span class="text-lg font-semibold">🔒 孤儿冻结资产</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-text="'欢迎，' + (userInfo?.nickname || '管理员')"></span>
+        <button @click="logout()" class="px-3 py-1 border border-white/50 rounded hover:bg-white/10">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6">
+    <!-- 说明区域 -->
+    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+      <div class="flex items-start">
+        <span class="text-yellow-500 mr-2">⚠️</span>
+        <div>
+          <strong>孤儿资产说明：</strong>
+          <p class="text-sm text-gray-600 mt-1">孤儿资产是指关联用户已删除或失效，但资产记录仍然存在的数据。冻结资产是指被系统或管理员锁定的资产。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white rounded-lg shadow p-4 text-center">
+        <div class="text-4xl text-gray-400 mb-2">👻</div>
+        <h4 class="text-2xl font-bold text-gray-600" x-text="stats.orphanCount">0</h4>
+        <p class="text-gray-500 text-sm">孤儿资产</p>
+      </div>
+      <div class="bg-white rounded-lg shadow p-4 text-center">
+        <div class="text-4xl text-blue-400 mb-2">❄️</div>
+        <h4 class="text-2xl font-bold text-blue-600" x-text="stats.frozenCount">0</h4>
+        <p class="text-gray-500 text-sm">冻结资产</p>
+      </div>
+      <div class="bg-white rounded-lg shadow p-4 text-center">
+        <div class="text-4xl text-orange-400 mb-2">💰</div>
+        <h4 class="text-2xl font-bold text-orange-600" x-text="formatNumber(stats.totalValue)">0</h4>
+        <p class="text-gray-500 text-sm">涉及价值</p>
+      </div>
+      <div class="bg-white rounded-lg shadow p-4 text-center">
+        <div class="text-4xl text-green-400 mb-2">✅</div>
+        <h4 class="text-2xl font-bold text-green-600" x-text="stats.processedCount">0</h4>
+        <p class="text-gray-500 text-sm">已处理</p>
+      </div>
+    </div>
+
+    <!-- 筛选栏 -->
+    <div class="bg-white rounded-lg shadow mb-6">
+      <div class="p-4">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">资产类型</label>
+            <select x-model="filters.type" class="w-full px-3 py-2 border rounded-lg">
+              <option value="">全部类型</option>
+              <option value="orphan">孤儿资产</option>
+              <option value="frozen">冻结资产</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">资产分类</label>
+            <select x-model="filters.assetType" class="w-full px-3 py-2 border rounded-lg">
+              <option value="">全部分类</option>
+              <option value="points">积分</option>
+              <option value="items">物品</option>
+              <option value="balance">余额</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+            <select x-model="filters.status" class="w-full px-3 py-2 border rounded-lg">
+              <option value="">全部状态</option>
+              <option value="pending">待处理</option>
+              <option value="processing">处理中</option>
+              <option value="processed">已处理</option>
+            </select>
+          </div>
+          <div>
+            <button @click="loadAssets()" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800">
+              🔍 搜索
+            </button>
+          </div>
+          <div>
+            <button @click="showCleanConfirmModal()" :disabled="selectedItems.length === 0" class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">
+              🧹 批量清理 (<span x-text="selectedItems.length">0</span>)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 资产列表 -->
+    <div class="bg-white rounded-lg shadow">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">资产列表</h5>
+        <button @click="scanOrphanAssets()" :disabled="scanning" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm">
+          <span x-show="!scanning">🔍 扫描孤儿资产</span>
+          <span x-show="scanning">扫描中...</span>
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 text-left">
+                <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll()" class="rounded">
+              </th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">资产ID</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">类型</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">原用户ID</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">资产详情</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">价值</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">发现时间</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <template x-if="assets.length === 0">
+              <tr><td colspan="9" class="px-4 py-8 text-center text-gray-500">暂无孤儿/冻结资产</td></tr>
+            </template>
+            <template x-for="asset in assets" :key="asset.asset_id">
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3">
+                  <input type="checkbox" :checked="isItemSelected(asset)" @change="toggleRowSelection(asset)" class="rounded">
+                </td>
+                <td class="px-4 py-3 text-sm font-mono" x-text="asset.asset_id"></td>
+                <td class="px-4 py-3">
+                  <span :class="asset.type === 'orphan' ? 'bg-gray-100 text-gray-700' : 'bg-blue-100 text-blue-700'" class="px-2 py-1 text-xs rounded" x-text="asset.type === 'orphan' ? '孤儿' : '冻结'"></span>
+                </td>
+                <td class="px-4 py-3 text-sm" x-text="asset.original_user_id || '-'"></td>
+                <td class="px-4 py-3 text-sm" x-text="asset.description"></td>
+                <td class="px-4 py-3 text-sm font-mono text-orange-600" x-text="formatNumber(asset.value)"></td>
+                <td class="px-4 py-3">
+                  <span :class="{
+                    'bg-yellow-100 text-yellow-700': asset.status === 'pending',
+                    'bg-blue-100 text-blue-700': asset.status === 'processing',
+                    'bg-green-100 text-green-700': asset.status === 'processed'
+                  }" class="px-2 py-1 text-xs rounded" x-text="getStatusText(asset.status)"></span>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(asset.discovered_at)"></td>
+                <td class="px-4 py-3">
+                  <div class="flex space-x-2">
+                    <button @click="viewAssetDetail(asset)" class="text-blue-500 hover:text-blue-700 text-sm">详情</button>
+                    <button x-show="asset.status === 'pending'" @click="processAsset(asset)" class="text-green-500 hover:text-green-700 text-sm">处理</button>
+                    <button x-show="asset.type === 'frozen' && asset.status !== 'processed'" @click="unfreezeAsset(asset)" class="text-orange-500 hover:text-orange-700 text-sm">解冻</button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- 分页 -->
+      <div class="p-4 border-t flex justify-between items-center">
+        <span class="text-sm text-gray-500" x-text="'共 ' + totalRecords + ' 条记录'"></span>
+        <div class="flex space-x-2">
+          <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
+          <span class="px-3 py-1" x-text="paginationInfo"></span>
+          <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 资产详情模态框 -->
+  <div x-show="selectedAsset" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="selectedAsset = null">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+      <div class="p-4 border-b">
+        <h5 class="font-semibold">资产详情</h5>
+      </div>
+      <div class="p-4 space-y-3">
+        <div class="flex justify-between"><span class="text-gray-500">资产ID:</span><span class="font-mono" x-text="selectedAsset?.asset_id"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">类型:</span><span x-text="selectedAsset?.type === 'orphan' ? '孤儿资产' : '冻结资产'"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">原用户ID:</span><span x-text="selectedAsset?.original_user_id || '-'"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">资产分类:</span><span x-text="selectedAsset?.asset_type"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">描述:</span><span x-text="selectedAsset?.description"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">价值:</span><span class="font-mono text-orange-600" x-text="formatNumber(selectedAsset?.value)"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">状态:</span><span x-text="getStatusText(selectedAsset?.status)"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">发现时间:</span><span x-text="formatDate(selectedAsset?.discovered_at)"></span></div>
+        <div x-show="selectedAsset?.frozen_reason">
+          <span class="text-gray-500">冻结原因:</span>
+          <p class="mt-1 p-2 bg-gray-50 rounded" x-text="selectedAsset?.frozen_reason"></p>
+        </div>
+      </div>
+      <div class="p-4 border-t flex justify-end">
+        <button @click="selectedAsset = null" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 清理确认模态框 -->
+  <div x-ref="cleanModal" 
+       x-show="isModalOpen('cleanModal')" 
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       x-cloak 
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" 
+       @click.self="hideModal('cleanModal')">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold text-red-600">⚠️ 确认清理孤儿冻结</h5>
+        <button @click="hideModal('cleanModal')" class="text-gray-400 hover:text-gray-600">✕</button>
+      </div>
+      <div class="p-4 space-y-4">
+        <div class="bg-red-50 border border-red-200 rounded p-3">
+          <p class="text-red-700 text-sm">
+            您即将清理 <span class="font-bold" x-text="selectedItems.length"></span> 条孤儿冻结数据，
+            总金额 <span class="font-bold" x-text="formatNumber(selectedTotalAmount)"></span>。
+          </p>
+          <p class="text-red-600 text-xs mt-1">此操作不可撤销，请确认已仔细核实数据！</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">清理原因（必填）</label>
+          <textarea x-model="cleanReason" rows="3" class="w-full px-3 py-2 border rounded-lg" placeholder="请输入清理原因..."></textarea>
+        </div>
+        <label class="flex items-center">
+          <input type="checkbox" x-model="confirmCleanChecked" class="mr-2 rounded">
+          <span class="text-sm text-gray-600">我确认已仔细核实数据，了解清理操作不可撤销</span>
+        </label>
+      </div>
+      <div class="p-4 border-t flex justify-end space-x-3">
+        <button @click="hideModal('cleanModal')" class="px-4 py-2 border rounded hover:bg-gray-50">取消</button>
+        <button @click="executeClean()" 
+                :disabled="cleaning || !confirmCleanChecked || !cleanReason.trim()" 
+                class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50">
+          <span x-show="!cleaning">确认清理</span>
+          <span x-show="cleaning">清理中...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <%- include('partials/footer') %>
+
+
+
+  <script type="module" src="./src/modules/system/pages/orphan-frozen.js"></script>
+</body>
+</html>

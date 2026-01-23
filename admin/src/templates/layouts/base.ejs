@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('../partials/head', { title: title, pageStyle: pageStyle || '' }) %>
+</head>
+<body class="bg-gray-100 min-h-screen" x-cloak>
+  
+  <%- include('../partials/navbar', { pageTitle: pageTitle, pageIcon: pageIcon, backUrl: backUrl || '/admin/dashboard.html' }) %>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6">
+    <%- content %>
+  </div>
+
+  <%- include('../partials/footer') %>
+
+  <!-- 页面专属逻辑 -->
+  <% if (typeof moduleScript !== 'undefined' && moduleScript) { %>
+  <script type="module" src="<%= moduleScript %>"></script>
+  <% } %>
+</body>
+</html>
+

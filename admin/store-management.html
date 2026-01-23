@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '门店管理', 
+    pageStyle: '[x-cloak] { display: none !important; } .store-card { border: 1px solid #e5e7eb; border-radius: 0.5rem; transition: transform 0.2s, box-shadow 0.2s; } .store-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); } .staff-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }' 
+  }) %>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="bg-gray-700 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/dashboard.html" class="hover:text-gray-300">← 返回仪表盘</a>
+        <span class="text-lg font-semibold">🏪 管理后台 - 门店管理</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-data x-text="$store.auth?.user?.nickname ? `欢迎，${$store.auth.user.nickname}` : '欢迎，管理员'">欢迎，管理员</span>
+        <button onclick="logout()" class="px-3 py-1 border border-white rounded hover:bg-white hover:text-gray-700 text-sm">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 子模块导航 -->
+  <div class="bg-gray-50 border-b" x-data="storeNavigation()" x-cloak>
+    <div class="container mx-auto px-4">
+      <div class="flex space-x-1 py-2">
+        <template x-for="page in subPages" :key="page.id">
+          <button 
+            @click="switchPage(page.id)"
+            :class="currentPage === page.id ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-200'"
+            class="px-4 py-2 rounded text-sm font-medium transition-colors"
+          >
+            <span x-text="page.icon + ' ' + page.title"></span>
+          </button>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主内容区域 -->
+  <div class="container mx-auto px-4 py-6" x-data="storePageContent()" x-cloak>
+    
+    <!-- ==================== 门店列表 ==================== -->
+    <div x-show="currentPage === 'stores'" x-cloak>
+      <!-- 统计卡片 -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-lg shadow p-4 text-center">
+          <div class="text-3xl mb-2">🏪</div>
+          <div class="text-gray-500 text-sm">总门店数</div>
+          <div class="text-2xl font-bold text-blue-600" x-text="storeStats.total || 0"></div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4 text-center">
+          <div class="text-3xl mb-2">✅</div>
+          <div class="text-gray-500 text-sm">营业中</div>
+          <div class="text-2xl font-bold text-green-600" x-text="storeStats.active || 0"></div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4 text-center">
+          <div class="text-3xl mb-2">👥</div>
+          <div class="text-gray-500 text-sm">总员工数</div>
+          <div class="text-2xl font-bold text-cyan-600" x-text="storeStats.totalStaff || 0"></div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4 text-center">
+          <div class="text-3xl mb-2">📈</div>
+          <div class="text-gray-500 text-sm">今日营业额</div>
+          <div class="text-2xl font-bold text-amber-600" x-text="'¥' + (storeStats.todayRevenue || 0)"></div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold text-lg">🏪 门店列表</h5>
+          <button @click="openCreateStoreModal()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+            ➕ 添加门店
+          </button>
+        </div>
+        <div class="p-4">
+          <!-- 筛选器 -->
+          <div class="flex flex-wrap gap-2 mb-4">
+            <select class="px-3 py-2 border rounded text-sm" x-model="storeFilters.status" @change="loadStores()">
+              <option value="">全部状态</option>
+              <option value="active">营业中</option>
+              <option value="inactive">休息中</option>
+              <option value="closed">已关闭</option>
+            </select>
+            <input type="text" class="px-3 py-2 border rounded text-sm w-48" placeholder="搜索门店名称..." x-model="storeFilters.keyword">
+            <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm" @click="loadStores()">
+              🔍 搜索
+            </button>
+          </div>
+
+          <!-- 门店列表（卡片样式） -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <template x-if="stores.length === 0">
+              <div class="col-span-3 text-center text-gray-500 py-12">暂无门店数据</div>
+            </template>
+            <template x-for="store in stores" :key="store.store_id">
+              <div class="store-card p-4 bg-white">
+                <div class="flex justify-between items-start mb-3">
+                  <h6 class="font-semibold" x-text="store.name"></h6>
+                  <span 
+                    :class="getStoreStatusClass(store.status)" 
+                    class="px-2 py-1 text-xs rounded"
+                    x-text="getStoreStatusText(store.status)"
+                  ></span>
+                </div>
+                <p class="text-gray-500 text-sm mb-2">📍 <span x-text="store.address || '暂无地址'"></span></p>
+                <p class="text-gray-500 text-sm mb-2">📞 <span x-text="store.phone || '暂无电话'"></span></p>
+                <div class="flex justify-between items-center text-gray-500 text-sm mb-3">
+                  <span>👥 <span x-text="store.staff_count || 0"></span> 员工</span>
+                  <span>📅 <span x-text="formatDateSafe(store.created_at)"></span></span>
+                </div>
+                <div class="flex gap-2">
+                  <button class="flex-1 px-3 py-1 border border-blue-600 text-blue-600 rounded text-sm hover:bg-blue-50" @click="editStore(store)">
+                    ✏️ 编辑
+                  </button>
+                  <button class="px-3 py-1 border border-cyan-600 text-cyan-600 rounded text-sm hover:bg-cyan-50" @click="viewStoreDetail(store)">
+                    👁️ 详情
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 员工管理 ==================== -->
+    <div x-show="currentPage === 'staff'" x-cloak>
+      <div class="bg-white rounded-lg shadow">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold text-lg">👥 员工管理</h5>
+          <button @click="openCreateStaffModal()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+            ➕ 添加员工
+          </button>
+        </div>
+        <div class="p-4">
+          <!-- 筛选器 -->
+          <div class="flex flex-wrap gap-2 mb-4">
+            <select class="px-3 py-2 border rounded text-sm" x-model="staffFilters.store_id" @change="loadStaff()">
+              <option value="">全部门店</option>
+              <template x-for="store in stores" :key="store.store_id">
+                <option :value="store.store_id" x-text="store.name"></option>
+              </template>
+            </select>
+            <select class="px-3 py-2 border rounded text-sm" x-model="staffFilters.role" @change="loadStaff()">
+              <option value="">全部角色</option>
+              <option value="manager">店长</option>
+              <option value="cashier">收银员</option>
+              <option value="waiter">服务员</option>
+              <option value="chef">厨师</option>
+            </select>
+            <input type="text" class="px-3 py-2 border rounded text-sm w-48" placeholder="搜索员工姓名..." x-model="staffFilters.keyword">
+            <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm" @click="loadStaff()">
+              🔍 搜索
+            </button>
+          </div>
+
+          <!-- 员工表格 -->
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">员工</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">所属门店</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">角色</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">手机号</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">入职日期</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-if="staffList.length === 0">
+                  <tr><td colspan="7" class="text-center text-gray-500 py-8">暂无员工数据</td></tr>
+                </template>
+                <template x-for="staff in staffList" :key="staff.staff_id">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3">
+                      <div class="flex items-center">
+                        <img :src="staff.avatar || '/admin/images/default-avatar.png'" :alt="staff.name" class="staff-avatar mr-3">
+                        <div>
+                          <div class="font-medium" x-text="staff.name"></div>
+                          <small class="text-gray-500" x-text="staff.employee_no || '-'"></small>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="px-4 py-3 text-sm" x-text="staff.store_name || '-'"></td>
+                    <td class="px-4 py-3"><span class="px-2 py-1 bg-cyan-100 text-cyan-700 text-xs rounded" x-text="getStaffRoleText(staff.role)"></span></td>
+                    <td class="px-4 py-3 text-sm" x-text="staff.phone || '-'"></td>
+                    <td class="px-4 py-3 text-sm" x-text="formatDateSafe(staff.hire_date)"></td>
+                    <td class="px-4 py-3">
+                      <span 
+                        :class="staff.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
+                        class="px-2 py-1 text-xs rounded"
+                        x-text="staff.is_active ? '在职' : '离职'"
+                      ></span>
+                    </td>
+                    <td class="px-4 py-3">
+                      <div class="flex space-x-2">
+                        <button @click="editStaff(staff)" class="text-blue-600 hover:text-blue-800 text-sm">✏️ 编辑</button>
+                        <button @click="deleteStaff(staff)" class="text-red-600 hover:text-red-800 text-sm">🗑️ 删除</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 分页 -->
+          <nav x-show="staffPagination.totalPages > 1" class="mt-4">
+            <div class="flex justify-center space-x-1">
+              <button 
+                class="px-3 py-1 border rounded text-sm" 
+                :class="page <= 1 ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'"
+                :disabled="page <= 1"
+                @click="changePage(page - 1)"
+              >上一页</button>
+              <template x-for="p in staffPagination.totalPages" :key="p">
+                <button 
+                  class="px-3 py-1 border rounded text-sm" 
+                  :class="p === page ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'"
+                  @click="changePage(p)"
+                  x-text="p"
+                ></button>
+              </template>
+              <button 
+                class="px-3 py-1 border rounded text-sm" 
+                :class="page >= staffPagination.totalPages ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'"
+                :disabled="page >= staffPagination.totalPages"
+                @click="changePage(page + 1)"
+              >下一页</button>
+            </div>
+          </nav>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 门店统计 ==================== -->
+    <div x-show="currentPage === 'store-stats'" x-cloak>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div class="bg-white rounded-lg shadow">
+          <div class="p-4 border-b">
+            <h6 class="font-semibold">📊 门店营业额排行</h6>
+          </div>
+          <div class="p-4">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-3 py-2 text-left">排名</th>
+                    <th class="px-3 py-2 text-left">门店名称</th>
+                    <th class="px-3 py-2 text-left">营业额</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(store, index) in storeRanking" :key="store.store_id">
+                    <tr>
+                      <td class="px-3 py-2">
+                        <span 
+                          :class="index < 3 ? 'bg-amber-400 text-white' : 'bg-gray-200 text-gray-700'"
+                          class="px-2 py-1 text-xs rounded"
+                          x-text="index + 1"
+                        ></span>
+                      </td>
+                      <td class="px-3 py-2" x-text="store.name"></td>
+                      <td class="px-3 py-2 text-green-600" x-text="'¥' + (store.revenue || 0).toLocaleString()"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-lg shadow">
+          <div class="p-4 border-b">
+            <h6 class="font-semibold">📈 门店状态分布</h6>
+          </div>
+          <div class="p-4 space-y-3">
+            <div class="flex justify-between items-center">
+              <span>🟢 营业中</span>
+              <span class="px-2 py-1 bg-green-100 text-green-700 text-sm rounded" x-text="storeStats.active || 0"></span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span>🟡 休息中</span>
+              <span class="px-2 py-1 bg-amber-100 text-amber-700 text-sm rounded" x-text="storeStats.inactive || 0"></span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span>⚫ 已关闭</span>
+              <span class="px-2 py-1 bg-gray-100 text-gray-700 text-sm rounded" x-text="storeStats.closed || 0"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==================== Modal 组件 ==================== -->
+  
+  <!-- 门店表单 Modal -->
+  <div 
+    x-data="storePageContent()"
+    x-show="isModalOpen('storeModal')" 
+    x-ref="storeModal"
+    class="fixed inset-0 z-50 flex items-center justify-center"
+    x-cloak
+  >
+    <div class="absolute inset-0 bg-black bg-opacity-50" @click="hideModal('storeModal')"></div>
+    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">🏪 <span x-text="isEditMode ? '编辑门店' : '添加门店'"></span></h5>
+        <button @click="hideModal('storeModal')" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      </div>
+      <form @submit.prevent="saveStore">
+        <div class="p-4 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">门店名称 <span class="text-red-500">*</span></label>
+            <input type="text" class="w-full px-3 py-2 border rounded" x-model="storeForm.name" required>
+          </div>
+
+          <!-- 省市区街道联动选择 -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">省份</label>
+              <select class="w-full px-3 py-2 border rounded" x-model="storeForm.province_code" @change="isEditMode ? loadCitiesForEdit() : loadCities()">
+                <option value="">请选择省份</option>
+                <template x-for="p in provinces" :key="p.code">
+                  <option :value="p.code" x-text="p.name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">城市</label>
+              <select class="w-full px-3 py-2 border rounded" x-model="storeForm.city_code" @change="isEditMode ? loadDistrictsForEdit() : loadDistricts()" :disabled="!storeForm.province_code">
+                <option value="">请选择城市</option>
+                <template x-for="c in cities" :key="c.code">
+                  <option :value="c.code" x-text="c.name"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">区县</label>
+              <select class="w-full px-3 py-2 border rounded" x-model="storeForm.district_code" @change="isEditMode ? loadStreetsForEdit() : loadStreets()" :disabled="!storeForm.city_code">
+                <option value="">请选择区县</option>
+                <template x-for="d in districts" :key="d.code">
+                  <option :value="d.code" x-text="d.name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">街道</label>
+              <select class="w-full px-3 py-2 border rounded" x-model="storeForm.street_code" :disabled="!storeForm.district_code">
+                <option value="">请选择街道</option>
+                <template x-for="s in streets" :key="s.code">
+                  <option :value="s.code" x-text="s.name"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">详细地址</label>
+            <input type="text" class="w-full px-3 py-2 border rounded" x-model="storeForm.address" placeholder="请输入详细地址">
+            <small class="text-gray-500">完整地址：<span x-text="getFullAddress()"></span></small>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">联系人</label>
+              <input type="text" class="w-full px-3 py-2 border rounded" x-model="storeForm.contact_name" placeholder="请输入联系人姓名">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">联系电话</label>
+              <input type="text" class="w-full px-3 py-2 border rounded" x-model="storeForm.contact_mobile" placeholder="请输入联系电话">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">门店电话</label>
+            <input type="text" class="w-full px-3 py-2 border rounded" x-model="storeForm.phone">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">门店状态</label>
+            <select class="w-full px-3 py-2 border rounded" x-model="storeForm.status">
+              <option value="active">营业中</option>
+              <option value="inactive">休息中</option>
+              <option value="closed">已关闭</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">门店描述</label>
+            <textarea class="w-full px-3 py-2 border rounded" x-model="storeForm.description" rows="3"></textarea>
+          </div>
+        </div>
+        <div class="p-4 border-t flex justify-end space-x-3">
+          <button type="button" @click="hideModal('storeModal')" class="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50">取消</button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700" :disabled="saving">
+            <span x-show="saving" class="inline-block animate-spin mr-1">⏳</span>
+            <span x-text="isEditMode ? '保存修改' : '添加门店'"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 门店详情 Modal -->
+  <div 
+    x-data="storePageContent()"
+    x-show="isModalOpen('storeDetailModal')" 
+    x-ref="storeDetailModal"
+    class="fixed inset-0 z-50 flex items-center justify-center"
+    x-cloak
+  >
+    <div class="absolute inset-0 bg-black bg-opacity-50" @click="hideModal('storeDetailModal')"></div>
+    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">🏪 门店详情</h5>
+        <button @click="hideModal('storeDetailModal')" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      </div>
+      <div class="p-4">
+        <template x-if="selectedStore">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="col-span-2">
+              <h4 class="text-xl font-bold" x-text="selectedStore.name"></h4>
+              <span 
+                :class="getStoreStatusClass(selectedStore.status)"
+                class="px-2 py-1 text-xs rounded"
+                x-text="getStoreStatusText(selectedStore.status)"
+              ></span>
+            </div>
+            <div>
+              <strong class="text-gray-600">门店ID：</strong>
+              <code class="bg-gray-100 px-2 py-1 rounded text-sm" x-text="selectedStore.store_id || selectedStore.id"></code>
+            </div>
+            <div>
+              <strong class="text-gray-600">联系电话：</strong>
+              <span x-text="selectedStore.phone || '暂无'"></span>
+            </div>
+            <div class="col-span-2">
+              <strong class="text-gray-600">门店地址：</strong>
+              <span x-text="selectedStore.address || '暂无地址'"></span>
+            </div>
+            <div>
+              <strong class="text-gray-600">员工数量：</strong>
+              <span x-text="(selectedStore.staff_count || 0) + ' 人'"></span>
+            </div>
+            <div>
+              <strong class="text-gray-600">创建时间：</strong>
+              <span x-text="formatDateSafe(selectedStore.created_at)"></span>
+            </div>
+            <div class="col-span-2" x-show="selectedStore.description">
+              <strong class="text-gray-600">门店描述：</strong>
+              <p class="text-gray-500 mt-1" x-text="selectedStore.description"></p>
+            </div>
+          </div>
+        </template>
+      </div>
+      <div class="p-4 border-t flex justify-end space-x-3">
+        <button type="button" @click="hideModal('storeDetailModal')" class="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50">关闭</button>
+        <button type="button" @click="editStore(selectedStore); hideModal('storeDetailModal')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          ✏️ 编辑
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 员工表单 Modal -->
+  <div 
+    x-data="storePageContent()"
+    x-show="isModalOpen('staffModal')" 
+    x-ref="staffModal"
+    class="fixed inset-0 z-50 flex items-center justify-center"
+    x-cloak
+  >
+    <div class="absolute inset-0 bg-black bg-opacity-50" @click="hideModal('staffModal')"></div>
+    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">👤 <span x-text="isEditMode ? '编辑员工' : '添加员工'"></span></h5>
+        <button @click="hideModal('staffModal')" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      </div>
+      <form @submit.prevent="saveStaff">
+        <div class="p-4 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">员工姓名 <span class="text-red-500">*</span></label>
+            <input type="text" class="w-full px-3 py-2 border rounded" x-model="staffForm.name" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">手机号码</label>
+            <input type="text" class="w-full px-3 py-2 border rounded" x-model="staffForm.phone">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">所属门店</label>
+            <select class="w-full px-3 py-2 border rounded" x-model="staffForm.store_id">
+              <option value="">请选择门店</option>
+              <template x-for="store in stores" :key="store.store_id">
+                <option :value="store.store_id" x-text="store.name"></option>
+              </template>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">员工角色</label>
+            <select class="w-full px-3 py-2 border rounded" x-model="staffForm.role">
+              <option value="manager">店长</option>
+              <option value="cashier">收银员</option>
+              <option value="waiter">服务员</option>
+              <option value="chef">厨师</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">入职日期</label>
+            <input type="date" class="w-full px-3 py-2 border rounded" x-model="staffForm.hire_date">
+          </div>
+        </div>
+        <div class="p-4 border-t flex justify-end space-x-3">
+          <button type="button" @click="hideModal('staffModal')" class="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50">取消</button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700" :disabled="saving">
+            <span x-show="saving" class="inline-block animate-spin mr-1">⏳</span>
+            <span x-text="isEditMode ? '保存修改' : '添加员工'"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 页面专属逻辑 -->
+  <%- include('partials/footer') %>
+
+
+  <script type="module" src="./src/modules/store/pages/store-management.js"></script>
+</body>
+</html>

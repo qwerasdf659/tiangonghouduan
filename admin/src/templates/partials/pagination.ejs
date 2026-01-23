@@ -1,0 +1,19 @@
+<%# 
+  通用分页组件模板
+  参数:
+  - paginationVar: 分页状态变量名 (可选，默认为 'pagination')
+  - prevHandler: 上一页处理函数 (可选，默认为 'prevPage()')
+  - nextHandler: 下一页处理函数 (可选，默认为 'nextPage()')
+%>
+<% var pVar = typeof paginationVar !== 'undefined' ? paginationVar : 'pagination'; %>
+<% var prevFn = typeof prevHandler !== 'undefined' ? prevHandler : 'prevPage()'; %>
+<% var nextFn = typeof nextHandler !== 'undefined' ? nextHandler : 'nextPage()'; %>
+<div class="p-4 border-t flex justify-between items-center">
+  <span class="text-sm text-gray-500">共 <span x-text="<%= pVar %>.total"></span> 条记录</span>
+  <div class="flex space-x-2">
+    <button @click="<%= prevFn %>" :disabled="<%= pVar %>.page <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
+    <span class="px-3 py-1">第 <span x-text="<%= pVar %>.page"></span> / <span x-text="<%= pVar %>.totalPages"></span> 页</span>
+    <button @click="<%= nextFn %>" :disabled="<%= pVar %>.page >= <%= pVar %>.totalPages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+  </div>
+</div>
+

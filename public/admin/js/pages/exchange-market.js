@@ -153,7 +153,7 @@ document.addEventListener('alpine:init', () => {
     // ==================== 资产类型 ====================
     async loadAssetTypes() {
       try {
-        const res = await request({ url: '/api/v4/admin/material-asset-types', method: 'GET' })
+        const res = await request({ url: '/api/v4/console/material-asset-types', method: 'GET' })
         if (res.success) {
           this.assetTypes = res.data?.list || res.data || []
         }
@@ -175,7 +175,7 @@ document.addEventListener('alpine:init', () => {
         // 移除空值
         Object.keys(params).forEach(k => !params[k] && delete params[k])
         
-        const res = await request({ url: '/api/v4/admin/exchange-market/items', method: 'GET', params })
+        const res = await request({ url: '/api/v4/console/exchange-market/items', method: 'GET', params })
         
         if (res.success) {
           this.items = res.data?.list || res.data || []
@@ -194,7 +194,7 @@ document.addEventListener('alpine:init', () => {
     
     async loadItemStats() {
       try {
-        const res = await request({ url: '/api/v4/admin/exchange-market/items/stats', method: 'GET' })
+        const res = await request({ url: '/api/v4/console/exchange-market/items/stats', method: 'GET' })
         if (res.success && res.data) {
           this.itemStats = {
             total: res.data.total || 0,
@@ -251,8 +251,8 @@ document.addEventListener('alpine:init', () => {
       try {
         this.saving = true
         const url = this.editingItemId 
-          ? `/api/v4/admin/exchange-market/items/${this.editingItemId}`
-          : '/api/v4/admin/exchange-market/items'
+          ? `/api/v4/console/exchange-market/items/${this.editingItemId}`
+          : '/api/v4/console/exchange-market/items'
         const method = this.editingItemId ? 'PUT' : 'POST'
         
         const res = await request({ url, method, data: this.itemForm })
@@ -278,7 +278,7 @@ document.addEventListener('alpine:init', () => {
       if (!confirmed) return
       
       try {
-        const res = await request({ url: `/api/v4/admin/exchange-market/items/${itemId}`, method: 'DELETE' })
+        const res = await request({ url: `/api/v4/console/exchange-market/items/${itemId}`, method: 'DELETE' })
         if (res.success) {
           this.$toast?.success('删除成功')
           this.loadItems()
@@ -304,7 +304,7 @@ document.addEventListener('alpine:init', () => {
         
         Object.keys(params).forEach(k => !params[k] && delete params[k])
         
-        const res = await request({ url: '/api/v4/admin/exchange-market/orders', method: 'GET', params })
+        const res = await request({ url: '/api/v4/console/exchange-market/orders', method: 'GET', params })
         
         if (res.success) {
           this.orders = res.data?.list || res.data || []
@@ -323,7 +323,7 @@ document.addEventListener('alpine:init', () => {
     
     async loadOrderStats() {
       try {
-        const res = await request({ url: '/api/v4/admin/exchange-market/orders/stats', method: 'GET' })
+        const res = await request({ url: '/api/v4/console/exchange-market/orders/stats', method: 'GET' })
         if (res.success && res.data) {
           this.orderStats = {
             total: res.data.total || 0,
@@ -364,7 +364,7 @@ document.addEventListener('alpine:init', () => {
       
       try {
         const res = await request({
-          url: `/api/v4/admin/exchange-market/orders/${order.order_no}/status`,
+          url: `/api/v4/console/exchange-market/orders/${order.order_no}/status`,
           method: 'PUT',
           data: { status: 'shipped' }
         })
@@ -386,7 +386,7 @@ document.addEventListener('alpine:init', () => {
     async loadExchangeStats() {
       try {
         this.loading = true
-        const res = await request({ url: '/api/v4/admin/exchange-market/statistics', method: 'GET' })
+        const res = await request({ url: '/api/v4/console/exchange-market/statistics', method: 'GET' })
         
         if (res.success && res.data) {
           this.exchangeStats = {

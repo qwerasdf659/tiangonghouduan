@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '内容管理中心', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="bg-indigo-600 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/dashboard.html" class="hover:text-indigo-200">← 返回仪表盘</a>
+        <span class="text-lg font-semibold">📄 内容管理中心</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="contentManagement()" x-init="init()">
+    
+    <!-- 子页面导航 -->
+    <div class="bg-white rounded-lg shadow mb-6">
+      <div class="flex border-b overflow-x-auto">
+        <template x-for="page in subPages" :key="page.id">
+          <button 
+            @click="switchPage(page.id)"
+            :class="currentPage === page.id ? 'border-b-2 border-indigo-500 text-indigo-600 bg-indigo-50' : 'text-gray-600 hover:bg-gray-50'"
+            class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
+            x-text="page.icon + ' ' + page.name"
+          ></button>
+        </template>
+      </div>
+    </div>
+
+    <!-- 公告管理 -->
+    <div x-show="currentPage === 'announcements'" x-cloak>
+      <div class="bg-white rounded-lg shadow">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold">公告管理</h5>
+          <button @click="openCreateAnnouncementModal()" class="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600">
+            ➕ 发布公告
+          </button>
+        </div>
+        <!-- 空状态提示 -->
+        <template x-if="announcements.length === 0">
+          <div class="p-8 text-center text-gray-500">
+            <div class="text-4xl mb-4">📢</div>
+            <p>暂无公告数据</p>
+            <p class="text-sm mt-2">点击"发布公告"按钮创建第一条公告</p>
+          </div>
+        </template>
+        <!-- 公告列表 -->
+        <div class="overflow-x-auto" x-show="announcements.length > 0">
+          <table class="w-full">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">公告ID</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">标题</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">类型</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">创建时间</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <template x-for="ann in announcements" :key="ann.announcement_id">
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-3 text-sm" x-text="ann.announcement_id"></td>
+                  <td class="px-4 py-3 text-sm" x-text="ann.title"></td>
+                  <td class="px-4 py-3">
+                    <span class="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700" x-text="ann.type || '通知'"></span>
+                  </td>
+                  <td class="px-4 py-3">
+                    <span 
+                      :class="ann.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
+                      class="px-2 py-1 text-xs rounded"
+                      x-text="ann.is_active ? '已发布' : '草稿'"
+                    ></span>
+                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(ann.created_at)"></td>
+                  <td class="px-4 py-3">
+                    <div class="flex space-x-2">
+                      <button @click="editAnnouncement(ann)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                      <button @click="deleteAnnouncement(ann)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 
+      注意：后端没有帮助文章/通知管理API (/api/v4/console/notifications 不存在)
+      此Tab已从subPages配置中移除，不再显示
+      如需此功能，需要先在后端实现对应API
+    -->
+
+    <!-- 轮播图管理 -->
+    <div x-show="currentPage === 'popup-banners'" x-cloak>
+      <div class="bg-white rounded-lg shadow">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold">轮播图管理</h5>
+          <button @click="openCreateBannerModal()" class="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600">
+            ➕ 新增轮播图
+          </button>
+        </div>
+        <!-- 空状态提示 -->
+        <template x-if="banners.length === 0">
+          <div class="p-8 text-center text-gray-500">
+            <div class="text-4xl mb-4">🎨</div>
+            <p>暂无轮播图数据</p>
+            <p class="text-sm mt-2">点击"新增轮播图"按钮添加第一个轮播图</p>
+          </div>
+        </template>
+        <!-- 轮播图列表 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4" x-show="banners.length > 0">
+          <template x-for="banner in banners" :key="banner.banner_id">
+            <div class="border rounded-lg overflow-hidden">
+              <div class="h-32 bg-gray-200 flex items-center justify-center">
+                <img :src="banner.image_url" alt="" class="w-full h-full object-cover" x-show="banner.image_url">
+                <span x-show="!banner.image_url" class="text-gray-400">无图片</span>
+              </div>
+              <div class="p-3">
+                <h6 class="font-medium" x-text="banner.title"></h6>
+                <p class="text-sm text-gray-500" x-text="'排序: ' + (banner.display_order || banner.sort_order || 0)"></p>
+                <div class="mt-2 flex space-x-2">
+                  <button @click="editBanner(banner)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                  <button @click="deleteBanner(banner)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图片资源管理 -->
+    <div x-show="currentPage === 'image-resources'" x-cloak>
+      <div class="bg-white rounded-lg shadow">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold">图片资源</h5>
+          <button @click="showModal('uploadImageModal')" class="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600">
+            ➕ 上传图片
+          </button>
+        </div>
+        <!-- 空状态提示 -->
+        <template x-if="images.length === 0">
+          <div class="p-8 text-center text-gray-500">
+            <div class="text-4xl mb-4">🖼️</div>
+            <p>暂无图片资源</p>
+            <p class="text-sm mt-2">点击"上传图片"按钮添加图片资源</p>
+          </div>
+        </template>
+        <!-- 图片列表 -->
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 p-4" x-show="images.length > 0">
+          <template x-for="image in images" :key="image.image_id || image.id">
+            <div class="border rounded-lg overflow-hidden group relative">
+              <div class="aspect-square bg-gray-100 flex items-center justify-center">
+                <img :src="image.url || image.image_url" :alt="image.filename || image.name" class="w-full h-full object-cover">
+              </div>
+              <div class="p-2">
+                <p class="text-xs text-gray-500 truncate" x-text="image.filename || image.name || '未命名'"></p>
+                <p class="text-xs text-gray-400" x-text="formatFileSize(image.size || image.file_size)"></p>
+              </div>
+              <!-- 悬停操作 -->
+              <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2">
+                <button @click="viewImage(image)" class="px-2 py-1 bg-white text-gray-700 rounded text-xs">查看</button>
+                <button @click="deleteImage(image)" class="px-2 py-1 bg-red-500 text-white rounded text-xs">删除</button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== Modal 区域 ==================== -->
+
+    <!-- 1. 公告表单 Modal -->
+    <div x-ref="announcementModal" 
+         x-show="isModalOpen('announcementModal')" 
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('announcementModal')"></div>
+      <div class="relative bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
+          <h5 class="font-semibold">📣 <span x-text="isEditMode ? '编辑公告' : '发布公告'"></span></h5>
+          <button @click="hideModal('announcementModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <form @submit.prevent="saveAnnouncement()">
+          <div class="p-6 space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">标题 <span class="text-red-500">*</span></label>
+              <input type="text" x-model="announcementForm.title" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500" required>
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">类型</label>
+                <select x-model="announcementForm.type" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+                  <option value="notice">通知</option>
+                  <option value="system">系统</option>
+                  <option value="activity">活动</option>
+                  <option value="maintenance">维护</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">优先级</label>
+                <select x-model="announcementForm.priority" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+                  <option value="low">低</option>
+                  <option value="medium">中</option>
+                  <option value="high">高</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+                <select x-model="announcementForm.status" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+                  <option value="published">发布</option>
+                  <option value="draft">草稿</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">内容 <span class="text-red-500">*</span></label>
+              <textarea x-model="announcementForm.content" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500" rows="6" required></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">过期时间（可选）</label>
+              <input type="datetime-local" x-model="announcementForm.expires_at" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+            </div>
+          </div>
+          <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2 sticky bottom-0">
+            <button type="button" @click="hideModal('announcementModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
+            <button type="submit" class="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600" :disabled="saving">
+              <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+              <span x-text="isEditMode ? '保存修改' : '发布公告'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 注意：通知相关Modal已移除，因为后端没有对应API -->
+
+    <!-- 4. 轮播图表单 Modal -->
+    <div x-ref="bannerModal" 
+         x-show="isModalOpen('bannerModal')" 
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('bannerModal')"></div>
+      <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 z-10 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
+          <h5 class="font-semibold">🖼️ <span x-text="isEditMode ? '编辑轮播图' : '添加轮播图'"></span></h5>
+          <button @click="hideModal('bannerModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <form @submit.prevent="saveBanner()">
+          <div class="p-6 space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">标题</label>
+              <input type="text" x-model="bannerForm.title" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">显示位置</label>
+                <select x-model="bannerForm.position" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+                  <option value="home">首页</option>
+                  <option value="profile">个人中心</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">排序</label>
+                <input type="number" x-model.number="bannerForm.sort_order" min="0" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">开始时间</label>
+                <input type="datetime-local" x-model="bannerForm.start_time" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">结束时间</label>
+                <input type="datetime-local" x-model="bannerForm.end_time" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">图片URL</label>
+              <input type="text" x-model="bannerForm.image_url" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500" placeholder="https://...">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">跳转链接</label>
+              <input type="text" x-model="bannerForm.link_url" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500" placeholder="https://...">
+            </div>
+            <div>
+              <label class="flex items-center cursor-pointer">
+                <input type="checkbox" x-model="bannerForm.is_active" class="w-4 h-4 mr-2 rounded border-gray-300">
+                <span class="text-sm text-gray-700">启用轮播图</span>
+              </label>
+            </div>
+          </div>
+          <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2 sticky bottom-0">
+            <button type="button" @click="hideModal('bannerModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
+            <button type="submit" class="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600" :disabled="saving">
+              <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+              <span x-text="isEditMode ? '保存修改' : '添加轮播图'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 注意：文章表单Modal已移除，因为后端没有对应API -->
+
+    <!-- 6. 图片上传 Modal -->
+    <div x-ref="uploadImageModal" 
+         x-show="isModalOpen('uploadImageModal')" 
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('uploadImageModal')"></div>
+      <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold">📤 上传图片</h5>
+          <button @click="hideModal('uploadImageModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <div class="p-6">
+          <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-400 transition-colors">
+            <span class="text-5xl mb-4 block">☁️</span>
+            <p class="mb-2">拖拽图片到此处或点击上传</p>
+            <input type="file" class="hidden" id="imageUploadInput" accept="image/*" multiple @change="handleImageUpload($event)">
+            <button type="button" onclick="document.getElementById('imageUploadInput').click()" class="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600">
+              选择图片
+            </button>
+          </div>
+          <p class="text-sm text-gray-500 mt-2 text-center">支持 JPG、PNG、GIF 格式，单张最大 5MB</p>
+        </div>
+        <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
+          <button type="button" @click="hideModal('uploadImageModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. 删除确认 Modal -->
+    <div x-ref="deleteModal" 
+         x-show="isModalOpen('deleteModal')" 
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('deleteModal')"></div>
+      <div class="relative bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 z-10">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold text-red-600">⚠️ 删除确认</h5>
+          <button @click="hideModal('deleteModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <div class="p-6 text-center">
+          <span class="text-5xl mb-4 block">🗑️</span>
+          <p class="text-gray-700">确定要删除此项吗？</p>
+          <p class="text-sm text-gray-500 mt-1">此操作不可撤销</p>
+        </div>
+        <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2">
+          <button type="button" @click="hideModal('deleteModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
+          <button type="button" @click="confirmDelete()" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600" :disabled="deleting">
+            <span x-show="deleting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+            确认删除
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 页面专属逻辑 -->
+  <%- include('partials/footer') %>
+
+
+  <script type="module" src="./src/modules/content/pages/content-management.js"></script>
+</body>
+</html>
+

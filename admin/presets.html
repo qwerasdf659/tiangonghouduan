@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '抽奖干预管理', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+</head>
+<body class="bg-gray-100 min-h-screen" x-data="presetsPage()" x-init="init()" x-cloak>
+  
+  <!-- 导航栏 -->
+  <nav class="bg-rose-600 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/dashboard.html" class="hover:text-rose-200">← 返回仪表盘</a>
+        <span class="text-lg font-semibold">🎯 抽奖干预管理</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-text="'欢迎，' + (userInfo?.nickname || '管理员')"></span>
+        <button @click="logout()" class="px-3 py-1 border border-white/50 rounded hover:bg-white/10">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6">
+    <!-- 说明区域 -->
+    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+      <div class="flex items-start">
+        <span class="text-yellow-500 mr-2">⚠️</span>
+        <div>
+          <strong>抽奖干预说明：</strong>
+          <p class="text-sm text-gray-600 mt-1">此功能用于设置用户的强制中奖或禁止中奖规则。请谨慎操作，所有干预记录将被记录。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选栏 -->
+    <div class="bg-white rounded-lg shadow mb-6">
+      <div class="p-4">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+            <select x-model="filters.status" class="w-full px-3 py-2 border rounded-lg">
+              <option value="">全部状态</option>
+              <option value="active">生效中</option>
+              <option value="expired">已过期</option>
+              <option value="used">已使用</option>
+              <option value="cancelled">已取消</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">奖品类型</label>
+            <select x-model="filters.prizeType" class="w-full px-3 py-2 border rounded-lg">
+              <option value="">全部类型</option>
+              <template x-for="prize in allPrizes" :key="prize.prize_id">
+                <option :value="prize.prize_id" x-text="prize.prize_name"></option>
+              </template>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">用户搜索</label>
+            <input type="text" x-model="filters.userSearch" placeholder="用户ID或昵称" class="w-full px-3 py-2 border rounded-lg">
+          </div>
+          <div>
+            <button @click="loadInterventions()" class="w-full px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700">
+              🔍 搜索
+            </button>
+          </div>
+          <div>
+            <button @click="openCreateModal()" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+              ➕ 新增干预规则
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 干预规则列表 -->
+    <div class="bg-white rounded-lg shadow">
+      <div class="p-4 border-b">
+        <h5 class="font-semibold">干预规则列表</h5>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">ID</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">干预类型</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">目标奖品</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">过期时间</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <template x-if="interventions.length === 0">
+              <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">暂无干预规则</td></tr>
+            </template>
+            <template x-for="item in interventions" :key="item.intervention_id">
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 text-sm" x-text="item.intervention_id"></td>
+                <td class="px-4 py-3 text-sm" x-text="item.user_nickname || item.user_id"></td>
+                <td class="px-4 py-3">
+                  <span :class="item.type === 'force_win' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'" class="px-2 py-1 text-xs rounded" x-text="item.type === 'force_win' ? '强制中奖' : '禁止中奖'"></span>
+                </td>
+                <td class="px-4 py-3 text-sm" x-text="item.prize_name || '-'"></td>
+                <td class="px-4 py-3">
+                  <span :class="{
+                    'bg-green-100 text-green-700': item.status === 'active',
+                    'bg-gray-100 text-gray-700': item.status === 'expired',
+                    'bg-blue-100 text-blue-700': item.status === 'used',
+                    'bg-red-100 text-red-700': item.status === 'cancelled'
+                  }" class="px-2 py-1 text-xs rounded" x-text="getStatusText(item.status)"></span>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(item.expire_time)"></td>
+                <td class="px-4 py-3">
+                  <div class="flex space-x-2">
+                    <button @click="viewIntervention(item)" class="text-blue-500 hover:text-blue-700 text-sm">查看</button>
+                    <button x-show="item.status === 'active'" @click="cancelIntervention(item)" class="text-red-500 hover:text-red-700 text-sm">取消</button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- 分页 -->
+      <div class="p-4 border-t flex justify-between items-center">
+        <span class="text-sm text-gray-500" x-text="'共 ' + totalRecords + ' 条记录'"></span>
+        <div class="flex space-x-2">
+          <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
+          <span class="px-3 py-1" x-text="paginationInfo"></span>
+          <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增干预规则 Modal (新架构) -->
+  <div x-ref="createModal" 
+       x-show="isModalOpen('createModal')" 
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('createModal')"></div>
+    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">🎯 新增干预规则</h5>
+        <button @click="hideModal('createModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+      </div>
+      <div class="p-6 space-y-4">
+        <!-- 用户搜索 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">选择用户 <span class="text-red-500">*</span></label>
+          <div class="flex space-x-2">
+            <input type="text" x-model="userSearchKeyword" placeholder="输入用户ID或昵称搜索" class="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+            <button @click="searchUser()" :disabled="searchingUser" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+              搜索
+            </button>
+          </div>
+          <div x-show="userSearchResults.length > 0" class="mt-2 border rounded-lg max-h-32 overflow-y-auto">
+            <template x-for="user in userSearchResults" :key="user.user_id">
+              <div @click="selectUser(user)" class="px-3 py-2 hover:bg-gray-50 cursor-pointer" :class="selectedUser?.user_id === user.user_id ? 'bg-blue-50' : ''">
+                <span x-text="user.nickname"></span>
+                <span class="text-gray-500 text-sm ml-2" x-text="'(' + user.user_id + ')'"></span>
+              </div>
+            </template>
+          </div>
+          <div x-show="selectedUser" class="mt-2 p-2 bg-blue-50 rounded flex justify-between items-center">
+            <span>已选择: <strong x-text="selectedUser?.nickname"></strong> (<span x-text="selectedUser?.user_id"></span>)</span>
+            <button @click="selectedUser = null" class="text-red-500 text-sm">取消</button>
+          </div>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">目标奖品 <span class="text-red-500">*</span></label>
+          <select x-model="interventionForm.prize_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+            <option value="">选择奖品</option>
+            <template x-for="prize in allPrizes" :key="prize.prize_id">
+              <option :value="prize.prize_id" x-text="prize.prize_name"></option>
+            </template>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">过期时间</label>
+          <input type="datetime-local" x-model="interventionForm.expire_time" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">备注说明</label>
+          <textarea x-model="interventionForm.reason" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="请输入设置原因..."></textarea>
+        </div>
+      </div>
+      <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2">
+        <button @click="hideModal('createModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
+        <button @click="createIntervention()" :disabled="submitting || !selectedUser" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">
+          <span x-show="submitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+          确认创建
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 干预规则详情 Modal (新架构) -->
+  <div x-ref="viewModal" 
+       x-show="isModalOpen('viewModal')" 
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('viewModal')"></div>
+    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">📋 干预规则详情</h5>
+        <button @click="hideModal('viewModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+      </div>
+      <div class="p-6 space-y-3" x-show="viewData">
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">规则ID:</span><span class="font-mono" x-text="viewData?.intervention_id"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">用户:</span><span x-text="viewData?.user_nickname || viewData?.user_id"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">类型:</span><span x-text="viewData?.type === 'force_win' ? '强制中奖' : '禁止中奖'"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">目标奖品:</span><span x-text="viewData?.prize_name || '-'"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">状态:</span><span x-text="getStatusText(viewData?.status)"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">创建时间:</span><span x-text="formatDate(viewData?.created_at)"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">过期时间:</span><span x-text="formatDate(viewData?.expire_time)"></span></div>
+        <div><span class="text-gray-500">备注:</span><p class="mt-1 p-2 bg-gray-50 rounded" x-text="viewData?.reason || '-'"></p></div>
+      </div>
+      <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
+        <button @click="hideModal('viewModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <%- include('partials/footer') %>
+
+
+
+  <script type="module" src="./src/modules/lottery/pages/presets.js"></script>
+</body>
+</html>

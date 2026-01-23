@@ -126,7 +126,7 @@ document.addEventListener('alpine:init', () => {
      */
     async loadAssetTypes() {
       try {
-        const response = await apiRequest(API_ENDPOINTS.MATERIAL?.ASSET_TYPES || '/api/v4/admin/material/asset-types?is_enabled=true')
+        const response = await apiRequest(API_ENDPOINTS.MATERIAL?.ASSET_TYPES || '/api/v4/console/material/asset-types?is_enabled=true')
         if (response && response.success) {
           this.assetTypes = response.data?.asset_types || response.data?.list || response.data || []
         }
@@ -142,7 +142,7 @@ document.addEventListener('alpine:init', () => {
 
     async loadExchangeItems() {
       try {
-        const response = await apiRequest(API_ENDPOINTS.EXCHANGE?.ITEMS || '/api/v4/admin/marketplace/exchange-items')
+        const response = await apiRequest(API_ENDPOINTS.EXCHANGE?.ITEMS || '/api/v4/console/marketplace/exchange-items')
         if (response && response.success) {
           this.exchangeItems = response.data?.items || response.data?.list || response.data || []
         }
@@ -154,7 +154,7 @@ document.addEventListener('alpine:init', () => {
 
     async loadExchangeOrders() {
       try {
-        const response = await apiRequest(API_ENDPOINTS.EXCHANGE?.ORDERS || '/api/v4/admin/marketplace/exchange-orders')
+        const response = await apiRequest(API_ENDPOINTS.EXCHANGE?.ORDERS || '/api/v4/console/marketplace/exchange-orders')
         if (response && response.success) {
           this.exchangeOrders = response.data?.orders || response.data?.list || response.data || []
         }
@@ -166,7 +166,7 @@ document.addEventListener('alpine:init', () => {
 
     async loadTradeOrders() {
       try {
-        const response = await apiRequest(API_ENDPOINTS.TRADE?.ORDERS || '/api/v4/admin/marketplace/trade-orders')
+        const response = await apiRequest(API_ENDPOINTS.TRADE?.ORDERS || '/api/v4/console/marketplace/trade-orders')
         if (response && response.success) {
           this.tradeOrders = response.data?.trades || response.data?.list || response.data || []
         }
@@ -261,7 +261,7 @@ document.addEventListener('alpine:init', () => {
         try {
           // 尝试获取详细信息
           const response = await apiRequest(
-            `${API_ENDPOINTS.EXCHANGE?.ITEMS || '/api/v4/admin/marketplace/exchange-items'}/${item.item_id || item.id}`
+            `${API_ENDPOINTS.EXCHANGE?.ITEMS || '/api/v4/console/marketplace/exchange-items'}/${item.item_id || item.id}`
           )
           
           if (response && response.success) {
@@ -333,7 +333,7 @@ document.addEventListener('alpine:init', () => {
       this.saving = true
 
       try {
-        const baseUrl = API_ENDPOINTS.EXCHANGE?.ITEMS || '/api/v4/admin/marketplace/exchange-items'
+        const baseUrl = API_ENDPOINTS.EXCHANGE?.ITEMS || '/api/v4/console/marketplace/exchange-items'
         const url = this.editingItem ? `${baseUrl}/${this.itemForm.item_id}` : baseUrl
         const method = this.editingItem ? 'PUT' : 'POST'
 
@@ -377,7 +377,7 @@ document.addEventListener('alpine:init', () => {
           '确定要删除这个商品吗？此操作不可恢复！',
           async () => {
             const response = await apiRequest(
-              `${API_ENDPOINTS.EXCHANGE?.ITEMS || '/api/v4/admin/marketplace/exchange-items'}/${id}`,
+              `${API_ENDPOINTS.EXCHANGE?.ITEMS || '/api/v4/console/marketplace/exchange-items'}/${id}`,
               { method: 'DELETE' }
             )
 

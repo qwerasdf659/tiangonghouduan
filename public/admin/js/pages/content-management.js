@@ -232,7 +232,7 @@ document.addEventListener('alpine:init', () => {
         if (this.announcementFilters.keyword) params.append('keyword', this.announcementFilters.keyword)
 
         const response = await this.apiGet(
-          `${API_ENDPOINTS.ANNOUNCEMENT?.LIST || '/api/v4/admin/announcements'}?${params}`,
+          `${API_ENDPOINTS.ANNOUNCEMENT?.LIST || '/api/v4/console/announcements'}?${params}`,
           {},
           { showLoading: false }
         )
@@ -296,12 +296,12 @@ document.addEventListener('alpine:init', () => {
         let response
         if (this.editingAnnouncementId) {
           response = await this.apiCall(
-            API.buildURL(API_ENDPOINTS.ANNOUNCEMENT?.UPDATE || '/api/v4/admin/announcements/:id', { id: this.editingAnnouncementId }),
+            API.buildURL(API_ENDPOINTS.ANNOUNCEMENT?.UPDATE || '/api/v4/console/announcements/:id', { id: this.editingAnnouncementId }),
             { method: 'PUT', body: JSON.stringify(payload) }
           )
         } else {
           response = await this.apiCall(
-            API_ENDPOINTS.ANNOUNCEMENT?.CREATE || '/api/v4/admin/announcements',
+            API_ENDPOINTS.ANNOUNCEMENT?.CREATE || '/api/v4/console/announcements',
             { method: 'POST', body: JSON.stringify(payload) }
           )
         }
@@ -344,7 +344,7 @@ document.addEventListener('alpine:init', () => {
         `确认删除公告「${item.title}」？`,
         async () => {
           const response = await this.apiCall(
-            API.buildURL(API_ENDPOINTS.ANNOUNCEMENT?.DELETE || '/api/v4/admin/announcements/:id', { id }),
+            API.buildURL(API_ENDPOINTS.ANNOUNCEMENT?.DELETE || '/api/v4/console/announcements/:id', { id }),
             { method: 'DELETE' }
           )
           if (response?.success) {
@@ -386,7 +386,7 @@ document.addEventListener('alpine:init', () => {
         if (this.notificationFilters.status !== 'all') params.append('status', this.notificationFilters.status)
 
         const response = await this.apiGet(
-          `${API_ENDPOINTS.NOTIFICATION?.LIST || '/api/v4/admin/notifications'}?${params}`,
+          `${API_ENDPOINTS.NOTIFICATION?.LIST || '/api/v4/console/notifications'}?${params}`,
           {},
           { showLoading: false }
         )
@@ -416,7 +416,7 @@ document.addEventListener('alpine:init', () => {
 
       try {
         const response = await this.apiGet(
-          API.buildURL(API_ENDPOINTS.NOTIFICATION?.READ || '/api/v4/admin/notifications/:id', { id })
+          API.buildURL(API_ENDPOINTS.NOTIFICATION?.READ || '/api/v4/console/notifications/:id', { id })
         )
 
         if (response?.success) {
@@ -436,7 +436,7 @@ document.addEventListener('alpine:init', () => {
         '确认将所有通知标记为已读？',
         async () => {
           const response = await this.apiCall(
-            API_ENDPOINTS.NOTIFICATION?.READ_ALL || '/api/v4/admin/notifications/read-all',
+            API_ENDPOINTS.NOTIFICATION?.READ_ALL || '/api/v4/console/notifications/read-all',
             { method: 'POST' }
           )
           if (response?.success) {
@@ -471,7 +471,7 @@ document.addEventListener('alpine:init', () => {
         }
 
         const response = await this.apiCall(
-          API_ENDPOINTS.NOTIFICATION?.SEND || '/api/v4/admin/notifications/send',
+          API_ENDPOINTS.NOTIFICATION?.SEND || '/api/v4/console/notifications/send',
           { method: 'POST', body: JSON.stringify(payload) }
         )
 
@@ -504,7 +504,7 @@ document.addEventListener('alpine:init', () => {
         if (this.bannerFilters.keyword.trim()) params.append('keyword', this.bannerFilters.keyword.trim())
 
         const response = await this.apiGet(
-          `${API_ENDPOINTS.POPUP_BANNER?.LIST || '/api/v4/admin/popup-banners'}?${params.toString()}`,
+          `${API_ENDPOINTS.POPUP_BANNER?.LIST || '/api/v4/console/popup-banners'}?${params.toString()}`,
           {},
           { showLoading: false }
         )
@@ -531,7 +531,7 @@ document.addEventListener('alpine:init', () => {
     async loadBannerStats() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.POPUP_BANNER?.STATS || '/api/v4/admin/popup-banners/stats',
+          API_ENDPOINTS.POPUP_BANNER?.STATS || '/api/v4/console/popup-banners/stats',
           {},
           { showError: false, showLoading: false }
         )
@@ -603,7 +603,7 @@ document.addEventListener('alpine:init', () => {
         `确认${newStatus ? '启用' : '禁用'}横幅「${banner.title}」？`,
         async () => {
           const response = await this.apiCall(
-            API.buildURL(API_ENDPOINTS.POPUP_BANNER?.TOGGLE || '/api/v4/admin/popup-banners/:id/toggle', { id: banner.banner_id }),
+            API.buildURL(API_ENDPOINTS.POPUP_BANNER?.TOGGLE || '/api/v4/console/popup-banners/:id/toggle', { id: banner.banner_id }),
             { method: 'PUT' }
           )
           if (response?.success) {
@@ -622,7 +622,7 @@ document.addEventListener('alpine:init', () => {
         `确认删除横幅「${banner.title}」？`,
         async () => {
           const response = await this.apiCall(
-            API.buildURL(API_ENDPOINTS.POPUP_BANNER?.DELETE || '/api/v4/admin/popup-banners/:id', { id: banner.banner_id }),
+            API.buildURL(API_ENDPOINTS.POPUP_BANNER?.DELETE || '/api/v4/console/popup-banners/:id', { id: banner.banner_id }),
             { method: 'DELETE' }
           )
           if (response?.success) {
@@ -662,12 +662,12 @@ document.addEventListener('alpine:init', () => {
         let response
         if (this.isEditMode && this.bannerForm.banner_id) {
           response = await API.request(
-            API.buildURL(API_ENDPOINTS.POPUP_BANNER?.UPDATE || '/api/v4/admin/popup-banners/:id', { id: this.bannerForm.banner_id }),
+            API.buildURL(API_ENDPOINTS.POPUP_BANNER?.UPDATE || '/api/v4/console/popup-banners/:id', { id: this.bannerForm.banner_id }),
             { method: 'PUT', body: formData }
           )
         } else {
           response = await API.request(
-            API_ENDPOINTS.POPUP_BANNER?.CREATE || '/api/v4/admin/popup-banners',
+            API_ENDPOINTS.POPUP_BANNER?.CREATE || '/api/v4/console/popup-banners',
             { method: 'POST', body: formData }
           )
         }
@@ -752,7 +752,7 @@ document.addEventListener('alpine:init', () => {
         if (this.imageFilters.keyword.trim()) params.append('keyword', this.imageFilters.keyword.trim())
 
         const response = await this.apiGet(
-          `${API_ENDPOINTS.IMAGE_RESOURCE?.LIST || '/api/v4/admin/images'}?${params.toString()}`,
+          `${API_ENDPOINTS.IMAGE_RESOURCE?.LIST || '/api/v4/console/images'}?${params.toString()}`,
           {},
           { showLoading: false }
         )
@@ -795,7 +795,7 @@ document.addEventListener('alpine:init', () => {
         `确认删除图片「${filename}」？`,
         async () => {
           const response = await this.apiCall(
-            API.buildURL(API_ENDPOINTS.IMAGE_RESOURCE?.DELETE || '/api/v4/admin/images/:id', { id }),
+            API.buildURL(API_ENDPOINTS.IMAGE_RESOURCE?.DELETE || '/api/v4/console/images/:id', { id }),
             { method: 'DELETE' }
           )
           if (response?.success) {

@@ -1,0 +1,34 @@
+<%# 
+  通用表格组件模板
+  参数:
+  - columns: 列定义数组 [{key, label, class?, render?}] (必需)
+  - dataSource: 数据源变量名 (必需)
+  - itemKey: 唯一标识字段 (必需)
+  - loading: 加载状态变量名 (可选，默认为 'loading')
+  - emptyText: 空数据提示文本 (可选，默认为 '暂无数据')
+%>
+<div class="overflow-x-auto">
+  <table class="w-full">
+    <thead class="bg-gray-50">
+      <tr>
+        <% columns.forEach(function(col) { %>
+        <th class="px-4 py-3 text-left text-sm font-medium text-gray-600 <%= col.class || '' %>"><%= col.label %></th>
+        <% }); %>
+      </tr>
+    </thead>
+    <tbody class="divide-y">
+      <template x-if="<%= typeof loading !== 'undefined' ? loading : 'loading' %>">
+        <tr><td colspan="<%= columns.length %>" class="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+      </template>
+      <template x-if="!<%= typeof loading !== 'undefined' ? loading : 'loading' %> && <%= dataSource %>.length === 0">
+        <tr><td colspan="<%= columns.length %>" class="px-4 py-8 text-center text-gray-500"><%= typeof emptyText !== 'undefined' ? emptyText : '暂无数据' %></td></tr>
+      </template>
+      <template x-for="item in <%= dataSource %>" :key="item.<%= itemKey %>">
+        <tr class="hover:bg-gray-50">
+          <%- rowContent %>
+        </tr>
+      </template>
+    </tbody>
+  </table>
+</div>
+

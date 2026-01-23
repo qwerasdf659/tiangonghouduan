@@ -144,7 +144,7 @@ document.addEventListener('alpine:init', () => {
         if (this.consumptionFilters.keyword) params.append('keyword', this.consumptionFilters.keyword)
 
         const response = await this.apiGet(
-          `${API_ENDPOINTS.CONSUMPTION?.LIST || '/api/v4/admin/consumption'}?${params}`,
+          `${API_ENDPOINTS.CONSUMPTION?.LIST || '/api/v4/console/consumption'}?${params}`,
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -159,7 +159,7 @@ document.addEventListener('alpine:init', () => {
     async loadConsumptionStats() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.CONSUMPTION?.STATS || '/api/v4/admin/consumption/stats',
+          API_ENDPOINTS.CONSUMPTION?.STATS || '/api/v4/console/consumption/stats',
           {}, { showError: false, showLoading: false }
         )
         if (response?.success) {
@@ -200,7 +200,7 @@ document.addEventListener('alpine:init', () => {
         if (this.diamondFilters.balanceRange) params.append('balance_range', this.diamondFilters.balanceRange)
 
         const response = await this.apiGet(
-          `${API_ENDPOINTS.DIAMOND_ACCOUNT?.LIST || '/api/v4/admin/diamond-accounts'}?${params}`,
+          `${API_ENDPOINTS.DIAMOND_ACCOUNT?.LIST || '/api/v4/console/diamond-accounts'}?${params}`,
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -251,7 +251,7 @@ document.addEventListener('alpine:init', () => {
           : -Math.abs(this.adjustDiamondForm.amount)
         
         const response = await this.apiCall(
-          API_ENDPOINTS.DIAMOND_ACCOUNT?.ADJUST || '/api/v4/admin/diamond-accounts/adjust',
+          API_ENDPOINTS.DIAMOND_ACCOUNT?.ADJUST || '/api/v4/console/diamond-accounts/adjust',
           {
             method: 'POST',
             data: {
@@ -283,7 +283,7 @@ document.addEventListener('alpine:init', () => {
       
       try {
         const response = await this.apiGet(
-          `${API_ENDPOINTS.DIAMOND_ACCOUNT?.HISTORY || '/api/v4/admin/diamond-accounts'}/${account.user_id}/history`,
+          `${API_ENDPOINTS.DIAMOND_ACCOUNT?.HISTORY || '/api/v4/console/diamond-accounts'}/${account.user_id}/history`,
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -308,7 +308,7 @@ document.addEventListener('alpine:init', () => {
     async loadMerchantPoints() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.MERCHANT_POINTS?.LIST || '/api/v4/admin/merchant-points',
+          API_ENDPOINTS.MERCHANT_POINTS?.LIST || '/api/v4/console/merchant-points',
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -329,7 +329,7 @@ document.addEventListener('alpine:init', () => {
       
       try {
         const response = await this.apiGet(
-          `${API_ENDPOINTS.MERCHANT_POINTS?.HISTORY || '/api/v4/admin/merchant-points'}/${merchant.merchant_id}/history`,
+          `${API_ENDPOINTS.MERCHANT_POINTS?.HISTORY || '/api/v4/console/merchant-points'}/${merchant.merchant_id}/history`,
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -347,7 +347,7 @@ document.addEventListener('alpine:init', () => {
     async loadDebtList() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.DEBT?.LIST || '/api/v4/admin/debts',
+          API_ENDPOINTS.DEBT?.LIST || '/api/v4/console/debts',
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -362,7 +362,7 @@ document.addEventListener('alpine:init', () => {
     async loadDebtStats() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.DEBT?.STATS || '/api/v4/admin/debts/stats',
+          API_ENDPOINTS.DEBT?.STATS || '/api/v4/console/debts/stats',
           {}, { showError: false, showLoading: false }
         )
         if (response?.success) {
@@ -396,7 +396,7 @@ document.addEventListener('alpine:init', () => {
         `确认处理债务 ${debt.debt_id}？`,
         async () => {
           const response = await this.apiCall(
-            API.buildURL(API_ENDPOINTS.DEBT?.PROCESS || '/api/v4/admin/debts/:id/process', { id: debt.debt_id }),
+            API.buildURL(API_ENDPOINTS.DEBT?.PROCESS || '/api/v4/console/debts/:id/process', { id: debt.debt_id }),
             { method: 'PUT' }
           )
           if (response?.success) {
@@ -423,7 +423,7 @@ document.addEventListener('alpine:init', () => {
     async loadBudgetList() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.CAMPAIGN_BUDGET?.LIST || '/api/v4/admin/campaign-budgets',
+          API_ENDPOINTS.CAMPAIGN_BUDGET?.LIST || '/api/v4/console/campaign-budgets',
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -475,8 +475,8 @@ document.addEventListener('alpine:init', () => {
       try {
         this.saving = true
         const url = this.isEditBudget 
-          ? `${API_ENDPOINTS.CAMPAIGN_BUDGET?.UPDATE || '/api/v4/admin/campaign-budgets'}/${this.budgetForm.budget_id}`
-          : API_ENDPOINTS.CAMPAIGN_BUDGET?.CREATE || '/api/v4/admin/campaign-budgets'
+          ? `${API_ENDPOINTS.CAMPAIGN_BUDGET?.UPDATE || '/api/v4/console/campaign-budgets'}/${this.budgetForm.budget_id}`
+          : API_ENDPOINTS.CAMPAIGN_BUDGET?.CREATE || '/api/v4/console/campaign-budgets'
         
         const response = await this.apiCall(url, {
           method: this.isEditBudget ? 'PUT' : 'POST',
@@ -507,7 +507,7 @@ document.addEventListener('alpine:init', () => {
         `确认删除活动"${budget.campaign_name || budget.campaign_id}"的预算配置？`,
         async () => {
           const response = await this.apiCall(
-            `${API_ENDPOINTS.CAMPAIGN_BUDGET?.DELETE || '/api/v4/admin/campaign-budgets'}/${budget.budget_id || budget.id}`,
+            `${API_ENDPOINTS.CAMPAIGN_BUDGET?.DELETE || '/api/v4/console/campaign-budgets'}/${budget.budget_id || budget.id}`,
             { method: 'DELETE' }
           )
           if (response?.success) {

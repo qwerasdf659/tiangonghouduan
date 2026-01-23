@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '用户权限管理', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="bg-blue-600 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/dashboard.html" class="hover:text-blue-200">← 返回仪表盘</a>
+        <span class="text-lg font-semibold">👥 用户权限管理</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-data="{ user: JSON.parse(localStorage.getItem('admin_user') || '{}') }" x-text="'欢迎，' + (user.nickname || '管理员')"></span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="userNavigation()" x-init="init()">
+    
+    <!-- 子页面导航 -->
+    <div class="bg-white rounded-lg shadow mb-6">
+      <div class="flex border-b overflow-x-auto">
+        <template x-for="page in subPages" :key="page.id">
+          <button 
+            @click="switchPage(page.id)"
+            :class="currentPage === page.id ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'"
+            class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
+            x-text="page.icon + ' ' + page.title"
+          ></button>
+        </template>
+      </div>
+    </div>
+
+    <!-- 页面内容区域 -->
+    <div x-data="userPageContent()" x-init="init()">
+      
+      <!-- 用户列表页 -->
+      <div x-show="currentPage === 'user-list'" x-cloak>
+        <div class="bg-white rounded-lg shadow">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">用户列表</h5>
+            <button @click="openCreateModal('user')" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+              ➕ 新增用户
+            </button>
+          </div>
+          
+          <!-- 筛选区域 -->
+          <div class="p-4 border-b bg-gray-50">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <input type="text" x-model="userFilters.phone" placeholder="手机号" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="text" x-model="userFilters.nickname" placeholder="昵称" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <select x-model="userFilters.status" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <option value="">全部状态</option>
+                <option value="active">正常</option>
+                <option value="inactive">禁用</option>
+              </select>
+              <button @click="loadUsers()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">
+                🔍 搜索
+              </button>
+            </div>
+          </div>
+          
+          <!-- 用户列表表格 -->
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">ID</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">手机号</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">昵称</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">注册时间</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-if="loading">
+                  <tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+                </template>
+                <template x-if="!loading && users.length === 0">
+                  <tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+                </template>
+                <template x-for="user in users" :key="user.user_id">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 text-sm" x-text="user.user_id"></td>
+                    <td class="px-4 py-3 text-sm" x-text="user.phone"></td>
+                    <td class="px-4 py-3 text-sm" x-text="user.nickname || '-'"></td>
+                    <td class="px-4 py-3">
+                      <span 
+                        :class="getUserStatusClass(user.status)"
+                        class="px-2 py-1 text-xs rounded text-white"
+                        x-text="getUserStatusText(user.status)"
+                      ></span>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(user.created_at)"></td>
+                    <td class="px-4 py-3">
+                      <div class="flex space-x-2">
+                        <button @click="viewUserDetail(user)" class="text-blue-500 hover:text-blue-700 text-sm">查看</button>
+                        <button @click="editUser(user)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                        <button @click="toggleUserStatus(user)" class="text-yellow-500 hover:text-yellow-700 text-sm" x-text="user.status === 'active' ? '禁用' : '启用'"></button>
+                        <button @click="manageUserRole(user)" class="text-purple-500 hover:text-purple-700 text-sm">角色</button>
+                        <button @click="openProbabilityModal(user)" class="text-orange-500 hover:text-orange-700 text-sm">概率</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          
+          <!-- 分页 -->
+          <div class="p-4 border-t flex justify-between items-center">
+            <span class="text-sm text-gray-500">共 <span x-text="pagination.total"></span> 条记录</span>
+            <div class="flex space-x-2">
+              <button @click="prevPage()" :disabled="pagination.page <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
+              <span class="px-3 py-1">第 <span x-text="pagination.page"></span> / <span x-text="pagination.totalPages"></span> 页</span>
+              <button @click="nextPage()" :disabled="pagination.page >= pagination.totalPages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 角色管理页 -->
+      <div x-show="currentPage === 'role-list'" x-cloak>
+        <div class="bg-white rounded-lg shadow">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">角色管理</h5>
+            <button @click="openCreateModal('role')" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+              ➕ 新增角色
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">角色代码</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">角色名称</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">权限等级</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">描述</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="role in roles" :key="role.role_code">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 text-sm font-mono" x-text="role.role_code"></td>
+                    <td class="px-4 py-3 text-sm" x-text="role.role_name"></td>
+                    <td class="px-4 py-3">
+                      <span class="px-2 py-1 text-xs rounded text-white" 
+                            :class="role.permission_level >= 80 ? 'bg-red-500' : (role.permission_level >= 40 ? 'bg-yellow-500' : 'bg-gray-400')"
+                            x-text="'Lv.' + role.permission_level"></span>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-500" x-text="role.description || '-'"></td>
+                    <td class="px-4 py-3">
+                      <div class="flex space-x-2">
+                        <button @click="editRole(role)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                        <button @click="manageRolePermissions(role)" class="text-purple-500 hover:text-purple-700 text-sm">权限</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 权限管理页 -->
+      <div x-show="currentPage === 'permission-list'" x-cloak>
+        <div class="bg-white rounded-lg shadow">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">权限管理</h5>
+            <button @click="openCreateModal('permission')" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+              ➕ 新增权限
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">权限代码</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">权限名称</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">描述</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="perm in permissions" :key="perm.permission_code">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 text-sm font-mono" x-text="perm.permission_code"></td>
+                    <td class="px-4 py-3 text-sm" x-text="perm.permission_name"></td>
+                    <td class="px-4 py-3 text-sm text-gray-500" x-text="perm.description || '-'"></td>
+                    <td class="px-4 py-3">
+                      <button @click="editPermission(perm)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 用户角色分配页 -->
+      <div x-show="currentPage === 'user-roles'" x-cloak>
+        <div class="bg-white rounded-lg shadow">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">用户角色分配</h5>
+            <button @click="openAssignRoleModal()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+              ➕ 分配角色
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户ID</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户昵称</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">角色</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">分配时间</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="ur in userRoles" :key="ur.id">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 text-sm" x-text="ur.user_id"></td>
+                    <td class="px-4 py-3 text-sm" x-text="ur.user?.nickname || '-'"></td>
+                    <td class="px-4 py-3 text-sm" x-text="ur.role?.role_name || ur.role_code"></td>
+                    <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(ur.created_at)"></td>
+                    <td class="px-4 py-3">
+                      <button @click="revokeUserRole(ur)" class="text-red-500 hover:text-red-700 text-sm">撤销</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 高级状态页 -->
+      <div x-show="currentPage === 'premium-status'" x-cloak>
+        <div class="bg-white rounded-lg shadow">
+          <!-- 统计卡片 -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border-b">
+            <div class="bg-blue-50 rounded-lg p-4 text-center">
+              <h6 class="text-gray-500 text-sm mb-1">总高级用户</h6>
+              <p class="text-2xl font-bold text-blue-600" x-text="premiumStats.total || 0"></p>
+            </div>
+            <div class="bg-green-50 rounded-lg p-4 text-center">
+              <h6 class="text-gray-500 text-sm mb-1">有效用户</h6>
+              <p class="text-2xl font-bold text-green-600" x-text="premiumStats.active || 0"></p>
+            </div>
+            <div class="bg-yellow-50 rounded-lg p-4 text-center">
+              <h6 class="text-gray-500 text-sm mb-1">即将过期</h6>
+              <p class="text-2xl font-bold text-yellow-600" x-text="premiumStats.expiring_soon || 0"></p>
+            </div>
+            <div class="bg-red-50 rounded-lg p-4 text-center">
+              <h6 class="text-gray-500 text-sm mb-1">已过期</h6>
+              <p class="text-2xl font-bold text-red-600" x-text="premiumStats.expired || 0"></p>
+            </div>
+          </div>
+
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">⭐ 高级用户状态</h5>
+            <button @click="loadPremiumUsers()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors">
+              🔄 刷新
+            </button>
+          </div>
+          
+          <!-- 筛选区域 -->
+          <div class="p-4 border-b bg-gray-50">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <input type="text" x-model="premiumFilters.user_id" placeholder="用户ID" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <select x-model="premiumFilters.is_valid" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <option value="">全部状态</option>
+                <option value="true">有效</option>
+                <option value="false">无效/过期</option>
+              </select>
+              <select x-model="premiumFilters.unlock_method" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <option value="">全部解锁方式</option>
+                <option value="purchase">购买解锁</option>
+                <option value="admin_grant">管理员授权</option>
+                <option value="promotion">活动赠送</option>
+                <option value="referral">推荐奖励</option>
+              </select>
+              <button @click="loadPremiumUsers()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">
+                🔍 搜索
+              </button>
+            </div>
+          </div>
+          
+          <!-- 高级状态列表表格 -->
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户ID</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">昵称</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">解锁方式</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">解锁时间</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">过期时间</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-if="loading">
+                  <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+                </template>
+                <template x-if="!loading && premiumUsers.length === 0">
+                  <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">暂无高级用户数据</td></tr>
+                </template>
+                <template x-for="user in premiumUsers" :key="user.user_id">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 text-sm" x-text="user.user_id"></td>
+                    <td class="px-4 py-3 text-sm" x-text="user.nickname || user.user?.nickname || '-'"></td>
+                    <td class="px-4 py-3">
+                      <span 
+                        :class="user.is_valid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                        class="px-2 py-1 text-xs rounded"
+                        x-text="user.is_valid ? '有效' : '无效/过期'"
+                      ></span>
+                    </td>
+                    <td class="px-4 py-3 text-sm" x-text="getUnlockMethodText(user.unlock_method)"></td>
+                    <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(user.unlocked_at || user.created_at)"></td>
+                    <td class="px-4 py-3 text-sm text-gray-500" x-text="user.expires_at ? formatDate(user.expires_at) : '永久'"></td>
+                    <td class="px-4 py-3">
+                      <button @click="viewPremiumDetail(user)" class="text-blue-500 hover:text-blue-700 text-sm">查看详情</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          
+          <!-- 分页 -->
+          <div class="p-4 border-t flex justify-between items-center">
+            <span class="text-sm text-gray-500">共 <span x-text="premiumPagination.total"></span> 条记录</span>
+            <div class="flex space-x-2">
+              <button @click="changePremiumPage(premiumPage - 1)" :disabled="premiumPage <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
+              <span class="px-3 py-1">第 <span x-text="premiumPage"></span> / <span x-text="premiumPagination.totalPages"></span> 页</span>
+              <button @click="changePremiumPage(premiumPage + 1)" :disabled="premiumPage >= premiumPagination.totalPages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 风控配置页 -->
+      <div x-show="currentPage === 'risk-profiles'" x-cloak>
+        <div class="bg-white rounded-lg shadow">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">🛡️ 风控配置管理</h5>
+            <div class="flex space-x-2">
+              <button @click="loadRiskProfiles()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors">
+                🔄 刷新
+              </button>
+            </div>
+          </div>
+          
+          <!-- 筛选区域 -->
+          <div class="p-4 border-b bg-gray-50">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <select x-model="riskFilters.config_type" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <option value="">全部配置类型</option>
+                <option value="global">全局配置</option>
+                <option value="user_level">等级配置</option>
+                <option value="individual">个人配置</option>
+              </select>
+              <select x-model="riskFilters.user_level" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <option value="">全部用户等级</option>
+                <option value="normal">普通用户</option>
+                <option value="vip">VIP用户</option>
+                <option value="premium">高级用户</option>
+              </select>
+              <select x-model="riskFilters.is_frozen" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <option value="">全部冻结状态</option>
+                <option value="true">已冻结</option>
+                <option value="false">未冻结</option>
+              </select>
+              <button @click="loadRiskProfiles()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">
+                🔍 搜索
+              </button>
+            </div>
+          </div>
+
+          <!-- 冻结用户快速查看 -->
+          <template x-if="frozenUsers.length > 0">
+            <div class="p-4 border-b bg-red-50">
+              <h6 class="text-red-700 font-medium mb-2">⚠️ 冻结用户 (<span x-text="frozenUsers.length"></span>)</h6>
+              <div class="flex flex-wrap gap-2">
+                <template x-for="fuser in frozenUsers.slice(0, 10)" :key="fuser.user_id">
+                  <span class="px-2 py-1 bg-red-200 text-red-800 rounded text-sm">
+                    <span x-text="fuser.user_id"></span>
+                    <button @click="unfreezeUser(fuser.user_id)" class="ml-1 text-red-600 hover:text-red-800">✕</button>
+                  </span>
+                </template>
+                <template x-if="frozenUsers.length > 10">
+                  <span class="text-sm text-red-600">...还有 <span x-text="frozenUsers.length - 10"></span> 人</span>
+                </template>
+              </div>
+            </div>
+          </template>
+          
+          <!-- 风控配置列表表格 -->
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户ID</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户等级</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">日积分限额</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">单笔限额</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">日抽奖限制</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">冻结状态</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-if="loading">
+                  <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+                </template>
+                <template x-if="!loading && riskProfiles.length === 0">
+                  <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">暂无风控配置数据</td></tr>
+                </template>
+                <template x-for="profile in riskProfiles" :key="profile.id || profile.user_id">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 text-sm" x-text="profile.user_id || '-'"></td>
+                    <td class="px-4 py-3 text-sm" x-text="profile.user_level || '默认'"></td>
+                    <td class="px-4 py-3 text-sm" x-text="profile.daily_points_limit || '-'"></td>
+                    <td class="px-4 py-3 text-sm" x-text="profile.single_transaction_limit || '-'"></td>
+                    <td class="px-4 py-3 text-sm" x-text="profile.daily_lottery_limit || '-'"></td>
+                    <td class="px-4 py-3">
+                      <span 
+                        :class="profile.is_frozen ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'"
+                        class="px-2 py-1 text-xs rounded"
+                        x-text="profile.is_frozen ? '已冻结' : '正常'"
+                      ></span>
+                    </td>
+                    <td class="px-4 py-3">
+                      <div class="flex space-x-2">
+                        <button @click="openEditRiskModal(profile)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                        <template x-if="profile.user_id">
+                          <button 
+                            @click="profile.is_frozen ? unfreezeUser(profile.user_id) : freezeUser(profile.user_id, '管理员操作')" 
+                            :class="profile.is_frozen ? 'text-blue-500 hover:text-blue-700' : 'text-red-500 hover:text-red-700'"
+                            class="text-sm"
+                            x-text="profile.is_frozen ? '解冻' : '冻结'"
+                          ></button>
+                        </template>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          
+          <!-- 分页 -->
+          <div class="p-4 border-t flex justify-between items-center">
+            <span class="text-sm text-gray-500">共 <span x-text="riskPagination.total"></span> 条记录</span>
+            <div class="flex space-x-2">
+              <button @click="changeRiskPage(riskPage - 1)" :disabled="riskPage <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
+              <span class="px-3 py-1">第 <span x-text="riskPage"></span> / <span x-text="riskPagination.totalPages"></span> 页</span>
+              <button @click="changeRiskPage(riskPage + 1)" :disabled="riskPage >= riskPagination.totalPages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 用户统计页 -->
+      <div x-show="currentPage === 'user-stats'" x-cloak>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div class="bg-white rounded-lg shadow p-6 text-center">
+            <h6 class="text-gray-500 mb-2">总用户数</h6>
+            <h2 class="text-3xl font-bold text-blue-600" x-text="userStats.totalUsers"></h2>
+          </div>
+          <div class="bg-white rounded-lg shadow p-6 text-center">
+            <h6 class="text-gray-500 mb-2">活跃用户</h6>
+            <h2 class="text-3xl font-bold text-green-600" x-text="userStats.activeUsers"></h2>
+          </div>
+          <div class="bg-white rounded-lg shadow p-6 text-center">
+            <h6 class="text-gray-500 mb-2">角色数量</h6>
+            <h2 class="text-3xl font-bold text-purple-600" x-text="userStats.totalRoles"></h2>
+          </div>
+          <div class="bg-white rounded-lg shadow p-6 text-center">
+            <h6 class="text-gray-500 mb-2">权限数量</h6>
+            <h2 class="text-3xl font-bold text-orange-600" x-text="userStats.totalPermissions"></h2>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== Modal 区域 ==================== -->
+
+      <!-- 1. 用户详情 Modal -->
+      <div x-ref="userDetailModal" 
+           x-show="isModalOpen('userDetailModal')" 
+           x-cloak
+           class="fixed inset-0 z-50 flex items-center justify-center"
+           style="display: none;">
+        <!-- 遮罩层 -->
+        <div class="fixed inset-0 bg-black/50" @click="hideModal('userDetailModal')"></div>
+        <!-- 内容 -->
+        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">👤 用户详情</h5>
+            <button @click="hideModal('userDetailModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          </div>
+          <div class="p-6">
+            <template x-if="selectedUser">
+              <div class="space-y-4">
+                <!-- 头像和基本信息 -->
+                <div class="flex items-center space-x-4 pb-4 border-b">
+                  <img :src="selectedUser.avatar_url || '/admin/images/default-avatar.png'" 
+                       class="w-20 h-20 rounded-full object-cover border-2 border-gray-200" 
+                       alt="头像"
+                       @error="$event.target.src='/admin/images/default-avatar.png'">
+                  <div>
+                    <h3 class="text-lg font-semibold" x-text="selectedUser.nickname || '未设置昵称'"></h3>
+                    <p class="text-gray-500">ID: <span x-text="selectedUser.user_id"></span></p>
+                  </div>
+                </div>
+                <!-- 详细信息 -->
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="text-sm text-gray-500">手机号</label>
+                    <p class="font-medium" x-text="selectedUser.phone || selectedUser.mobile || '-'"></p>
+                  </div>
+                  <div>
+                    <label class="text-sm text-gray-500">状态</label>
+                    <p>
+                      <span class="px-2 py-1 text-xs rounded text-white" 
+                            :class="getUserStatusClass(selectedUser.status)"
+                            x-text="getUserStatusText(selectedUser.status)"></span>
+                    </p>
+                  </div>
+                  <div>
+                    <label class="text-sm text-gray-500">注册时间</label>
+                    <p class="font-medium" x-text="formatDate(selectedUser.created_at)"></p>
+                  </div>
+                  <div>
+                    <label class="text-sm text-gray-500">最后登录</label>
+                    <p class="font-medium" x-text="selectedUser.last_login ? formatDate(selectedUser.last_login) : '从未登录'"></p>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+          <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
+            <button @click="hideModal('userDetailModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">关闭</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. 编辑用户 Modal -->
+      <div x-ref="editUserModal" 
+           x-show="isModalOpen('editUserModal')" 
+           x-cloak
+           class="fixed inset-0 z-50 flex items-center justify-center"
+           style="display: none;">
+        <!-- 遮罩层 -->
+        <div class="fixed inset-0 bg-black/50" @click="hideModal('editUserModal')"></div>
+        <!-- 内容 -->
+        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">✏️ 编辑用户</h5>
+            <button @click="hideModal('editUserModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          </div>
+          <form @submit.prevent="submitEditUser()">
+            <div class="p-6 space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">用户ID</label>
+                <input type="text" class="w-full px-3 py-2 border rounded bg-gray-100 cursor-not-allowed" 
+                       :value="editUserForm.user_id" disabled>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">昵称</label>
+                <input type="text" x-model="editUserForm.nickname" 
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
+                       placeholder="请输入昵称">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+                <select x-model="editUserForm.status" 
+                        class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="active">正常</option>
+                  <option value="inactive">禁用</option>
+                  <option value="banned">封禁</option>
+                </select>
+              </div>
+            </div>
+            <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2">
+              <button type="button" @click="hideModal('editUserModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
+              <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" :disabled="saving">
+                <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+                保存
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- 3. 用户角色管理 Modal -->
+      <div x-ref="userRoleModal" 
+           x-show="isModalOpen('userRoleModal')" 
+           x-cloak
+           class="fixed inset-0 z-50 flex items-center justify-center"
+           style="display: none;">
+        <!-- 遮罩层 -->
+        <div class="fixed inset-0 bg-black/50" @click="hideModal('userRoleModal')"></div>
+        <!-- 内容 -->
+        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">🛡️ 管理用户角色</h5>
+            <button @click="hideModal('userRoleModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          </div>
+          <form @submit.prevent="submitUserRole()">
+            <div class="p-6 space-y-4">
+              <p class="text-gray-600">
+                用户：<strong x-text="selectedUserForRole?.nickname || selectedUserForRole?.user_id"></strong>
+              </p>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">选择角色</label>
+                <div class="space-y-2 max-h-60 overflow-y-auto">
+                  <template x-for="role in roles" :key="role.role_code">
+                    <label class="flex items-center p-2 border rounded hover:bg-gray-50 cursor-pointer">
+                      <input type="radio" name="userRole" 
+                             :value="role.role_code" 
+                             x-model="selectedRoleCode"
+                             class="mr-3">
+                      <span class="px-2 py-0.5 text-xs rounded text-white mr-2" 
+                            :class="role.permission_level >= 80 ? 'bg-red-500' : (role.permission_level >= 40 ? 'bg-yellow-500' : 'bg-gray-400')">
+                        Lv.<span x-text="role.permission_level"></span>
+                      </span>
+                      <span x-text="role.role_name"></span>
+                      <small class="text-gray-400 ml-2" x-text="role.description || ''"></small>
+                    </label>
+                  </template>
+                </div>
+              </div>
+            </div>
+            <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2">
+              <button type="button" @click="hideModal('userRoleModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
+              <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" :disabled="saving">
+                <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+                保存
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- 4. 分配角色 Modal -->
+      <div x-ref="assignRoleModal" 
+           x-show="isModalOpen('assignRoleModal')" 
+           x-cloak
+           class="fixed inset-0 z-50 flex items-center justify-center"
+           style="display: none;">
+        <!-- 遮罩层 -->
+        <div class="fixed inset-0 bg-black/50" @click="hideModal('assignRoleModal')"></div>
+        <!-- 内容 -->
+        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">🏷️ 分配角色</h5>
+            <button @click="hideModal('assignRoleModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          </div>
+          <form @submit.prevent="submitAssignRole()">
+            <div class="p-6 space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">用户ID <span class="text-red-500">*</span></label>
+                <input type="text" x-model="assignRoleForm.user_id" 
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
+                       placeholder="请输入用户ID" required>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">选择角色 <span class="text-red-500">*</span></label>
+                <select x-model="assignRoleForm.role_code" 
+                        class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" required>
+                  <option value="">请选择角色</option>
+                  <template x-for="role in roles" :key="role.role_code">
+                    <option :value="role.role_code" x-text="role.role_name"></option>
+                  </template>
+                </select>
+              </div>
+            </div>
+            <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2">
+              <button type="button" @click="hideModal('assignRoleModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
+              <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" :disabled="saving">
+                <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+                分配
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- 5. 高级状态详情 Modal -->
+      <div x-ref="premiumDetailModal" 
+           x-show="isModalOpen('premiumDetailModal')" 
+           x-cloak
+           class="fixed inset-0 z-50 flex items-center justify-center"
+           style="display: none;">
+        <div class="fixed inset-0 bg-black/50" @click="hideModal('premiumDetailModal')"></div>
+        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 z-10">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">⭐ 高级状态详情</h5>
+            <button @click="hideModal('premiumDetailModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          </div>
+          <div class="p-6">
+            <template x-if="selectedPremiumUser">
+              <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="text-sm text-gray-500">用户ID</label>
+                    <p class="font-medium" x-text="selectedPremiumUser.user_id"></p>
+                  </div>
+                  <div>
+                    <label class="text-sm text-gray-500">昵称</label>
+                    <p class="font-medium" x-text="selectedPremiumUser.nickname || selectedPremiumUser.user?.nickname || '-'"></p>
+                  </div>
+                  <div>
+                    <label class="text-sm text-gray-500">状态</label>
+                    <p>
+                      <span 
+                        :class="selectedPremiumUser.is_valid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                        class="px-2 py-1 text-xs rounded"
+                        x-text="selectedPremiumUser.is_valid ? '有效' : '无效/过期'"
+                      ></span>
+                    </p>
+                  </div>
+                  <div>
+                    <label class="text-sm text-gray-500">解锁方式</label>
+                    <p class="font-medium" x-text="getUnlockMethodText(selectedPremiumUser.unlock_method)"></p>
+                  </div>
+                  <div>
+                    <label class="text-sm text-gray-500">解锁时间</label>
+                    <p class="font-medium" x-text="formatDate(selectedPremiumUser.unlocked_at || selectedPremiumUser.created_at)"></p>
+                  </div>
+                  <div>
+                    <label class="text-sm text-gray-500">过期时间</label>
+                    <p class="font-medium" x-text="selectedPremiumUser.expires_at ? formatDate(selectedPremiumUser.expires_at) : '永久有效'"></p>
+                  </div>
+                </div>
+                <!-- 权益信息 -->
+                <div class="pt-4 border-t">
+                  <h6 class="font-medium text-gray-700 mb-2">高级权益</h6>
+                  <div class="space-y-2 text-sm text-gray-600">
+                    <p>✓ 无广告体验</p>
+                    <p>✓ 专属客服通道</p>
+                    <p>✓ 更高中奖概率</p>
+                    <p>✓ 专属活动参与资格</p>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+          <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
+            <button @click="hideModal('premiumDetailModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">关闭</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. 风控配置编辑 Modal -->
+      <div x-ref="riskProfileModal" 
+           x-show="isModalOpen('riskProfileModal')" 
+           x-cloak
+           class="fixed inset-0 z-50 flex items-center justify-center"
+           style="display: none;">
+        <div class="fixed inset-0 bg-black/50" @click="hideModal('riskProfileModal')"></div>
+        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">🛡️ 编辑风控配置</h5>
+            <button @click="hideModal('riskProfileModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          </div>
+          <form @submit.prevent="saveRiskProfile()">
+            <div class="p-6 space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">用户ID <span class="text-red-500">*</span></label>
+                <input type="text" x-model="riskForm.user_id" 
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
+                       placeholder="请输入用户ID" required>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">日积分限额</label>
+                <input type="number" x-model.number="riskForm.daily_points_limit" 
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
+                       placeholder="如 10000">
+                <p class="text-xs text-gray-500 mt-1">用户每日可获取积分上限</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">单笔交易限额</label>
+                <input type="number" x-model.number="riskForm.single_transaction_limit" 
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
+                       placeholder="如 1000">
+                <p class="text-xs text-gray-500 mt-1">单次交易积分/金额上限</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">日抽奖次数限制</label>
+                <input type="number" x-model.number="riskForm.daily_lottery_limit" 
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
+                       placeholder="如 100">
+                <p class="text-xs text-gray-500 mt-1">用户每日可抽奖次数上限</p>
+              </div>
+            </div>
+            <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2">
+              <button type="button" @click="hideModal('riskProfileModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
+              <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" :disabled="saving">
+                <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+                保存
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- 7. 概率调整 Modal -->
+      <div x-ref="probabilityModal" 
+           x-show="isModalOpen('probabilityModal')" 
+           x-cloak
+           class="fixed inset-0 z-50 flex items-center justify-center"
+           style="display: none;">
+        <!-- 遮罩层 -->
+        <div class="fixed inset-0 bg-black/50" @click="hideModal('probabilityModal')"></div>
+        <!-- 内容 -->
+        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
+          <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
+            <h5 class="font-semibold">📊 个人概率调整</h5>
+            <button @click="hideModal('probabilityModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          </div>
+          <form @submit.prevent="saveProbabilityAdjustment()">
+            <div class="p-6 space-y-4">
+              <!-- 用户信息 -->
+              <div class="p-3 bg-blue-50 rounded-lg">
+                <p class="text-blue-800">
+                  用户：<strong x-text="probabilityModal.userNickname"></strong>
+                  (<span x-text="probabilityModal.userId"></span>)
+                </p>
+              </div>
+
+              <!-- 提示信息 -->
+              <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p class="text-yellow-800 text-sm">
+                  ⚠️ 为该用户设置专属的中奖概率调整系数，请谨慎操作
+                </p>
+              </div>
+
+              <!-- 调整模式 -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">调整模式</label>
+                <select x-model="probabilityModal.mode" 
+                        class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                        @change="updateProbabilityPreview()">
+                  <option value="global">全局倍率调整</option>
+                  <option value="specific">特定奖品调整</option>
+                </select>
+              </div>
+
+              <!-- 全局倍率模式 -->
+              <div x-show="probabilityModal.mode === 'global'" class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">概率倍率</label>
+                  <input type="number" x-model.number="probabilityModal.multiplier" 
+                         step="0.1" min="0.1" max="10"
+                         class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                         placeholder="如 2.0 表示概率翻倍">
+                  <p class="text-sm text-gray-500 mt-1">倍率范围: 0.1 - 10（1.0 为原始概率，2.0 为翻倍）</p>
+                </div>
+              </div>
+
+              <!-- 特定奖品模式 -->
+              <div x-show="probabilityModal.mode === 'specific'" class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">选择奖品</label>
+                  <select x-model="probabilityModal.targetPrizeId" 
+                          class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                          @change="updateProbabilityPreview()">
+                    <option value="">请选择奖品</option>
+                    <template x-for="prize in allPrizes" :key="prize.prize_id || prize.id">
+                      <option :value="prize.prize_id || prize.id" x-text="prize.prize_name || prize.name"></option>
+                    </template>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">自定义概率 (%)</label>
+                  <input type="number" x-model.number="probabilityModal.customProbability" 
+                         step="1" min="1" max="100"
+                         class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                         placeholder="如 50 表示 50% 概率"
+                         @input="updateProbabilityPreview()">
+                </div>
+                <!-- 预览区域 -->
+                <div class="p-3 bg-gray-50 rounded-lg">
+                  <label class="block text-sm font-medium text-gray-700 mb-2">概率预览</label>
+                  <div x-html="probabilityPreviewHtml" class="text-sm"></div>
+                </div>
+              </div>
+
+              <!-- 通用设置 -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">生效时长（分钟）</label>
+                <input type="number" x-model.number="probabilityModal.duration" 
+                       step="1" min="1" max="10080"
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                       placeholder="如 60 表示 1 小时">
+                <p class="text-sm text-gray-500 mt-1">最长 10080 分钟（7 天）</p>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">调整原因</label>
+                <textarea x-model="probabilityModal.reason" 
+                          class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
+                          rows="2"
+                          placeholder="请输入调整原因（选填）"></textarea>
+              </div>
+            </div>
+            <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2 sticky bottom-0">
+              <button type="button" @click="hideModal('probabilityModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
+              <button type="submit" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600" :disabled="saving">
+                <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+                应用调整
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 页面专属逻辑 -->
+  <%- include('partials/footer') %>
+
+
+  <script type="module" src="./src/modules/user/pages/user-management.js"></script>
+</body>
+</html>

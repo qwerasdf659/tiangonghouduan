@@ -180,7 +180,7 @@ document.addEventListener('alpine:init', () => {
      */
     async loadUsers() {
       try {
-        let url = API_ENDPOINTS.USER?.LIST || '/api/v4/admin/users'
+        let url = API_ENDPOINTS.USER?.LIST || '/api/v4/console/users'
         const params = new URLSearchParams()
         if (this.userFilters.user_id) params.append('user_id', this.userFilters.user_id)
         if (this.userFilters.nickname) params.append('nickname', this.userFilters.nickname)
@@ -203,7 +203,7 @@ document.addEventListener('alpine:init', () => {
     async loadRoles() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.ROLE?.LIST || '/api/v4/admin/roles',
+          API_ENDPOINTS.ROLE?.LIST || '/api/v4/console/roles',
           {},
           { showLoading: false }
         )
@@ -222,7 +222,7 @@ document.addEventListener('alpine:init', () => {
     async loadPermissions() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.PERMISSION?.LIST || '/api/v4/admin/permissions',
+          API_ENDPOINTS.PERMISSION?.LIST || '/api/v4/console/permissions',
           {},
           { showLoading: false }
         )
@@ -240,7 +240,7 @@ document.addEventListener('alpine:init', () => {
      */
     async loadUserRoles() {
       try {
-        let url = API_ENDPOINTS.USER_ROLE?.LIST || '/api/v4/admin/user-roles'
+        let url = API_ENDPOINTS.USER_ROLE?.LIST || '/api/v4/console/user-roles'
         const params = new URLSearchParams()
         if (this.userRoleFilters.user_id) params.append('user_id', this.userRoleFilters.user_id)
         if (this.userRoleFilters.role_code) params.append('role_code', this.userRoleFilters.role_code)
@@ -320,7 +320,7 @@ document.addEventListener('alpine:init', () => {
         // 获取用户详情
         const response = await this.apiGet(
           API_ENDPOINTS.USER?.DETAIL?.replace('{user_id}', user.user_id) || 
-          `/api/v4/admin/users/${user.user_id}`,
+          `/api/v4/console/users/${user.user_id}`,
           {},
           { showLoading: true }
         )
@@ -363,7 +363,7 @@ document.addEventListener('alpine:init', () => {
       try {
         const response = await this.apiPost(
           API_ENDPOINTS.USER?.UPDATE?.replace('{user_id}', this.editUserForm.user_id) || 
-          `/api/v4/admin/users/${this.editUserForm.user_id}`,
+          `/api/v4/console/users/${this.editUserForm.user_id}`,
           {
             nickname: this.editUserForm.nickname,
             status: this.editUserForm.status
@@ -398,7 +398,7 @@ document.addEventListener('alpine:init', () => {
         async () => {
           const response = await this.apiPost(
             API_ENDPOINTS.USER?.UPDATE_STATUS?.replace('{user_id}', user.user_id) || 
-            `/api/v4/admin/users/${user.user_id}/status`,
+            `/api/v4/console/users/${user.user_id}/status`,
             {
               status: newStatus,
               reason: `管理员手动${action}`
@@ -428,7 +428,7 @@ document.addEventListener('alpine:init', () => {
       try {
         const response = await this.apiGet(
           API_ENDPOINTS.USER?.DETAIL?.replace('{user_id}', user.user_id) || 
-          `/api/v4/admin/users/${user.user_id}`,
+          `/api/v4/console/users/${user.user_id}`,
           {},
           { showLoading: false }
         )
@@ -462,7 +462,7 @@ document.addEventListener('alpine:init', () => {
       try {
         const response = await this.apiPost(
           API_ENDPOINTS.USER?.UPDATE_ROLE?.replace('{user_id}', this.selectedUserForRole.user_id) || 
-          `/api/v4/admin/users/${this.selectedUserForRole.user_id}/role`,
+          `/api/v4/console/users/${this.selectedUserForRole.user_id}/role`,
           {
             role_code: this.selectedRoleCode,
             reason: '管理员手动更新角色'
@@ -538,7 +538,7 @@ document.addEventListener('alpine:init', () => {
 
       try {
         const response = await this.apiPost(
-          API_ENDPOINTS.USER_ROLE?.ASSIGN || '/api/v4/admin/user-roles',
+          API_ENDPOINTS.USER_ROLE?.ASSIGN || '/api/v4/console/user-roles',
           {
             user_id: parseInt(this.assignRoleForm.user_id),
             role_code: this.assignRoleForm.role_code,
@@ -570,7 +570,7 @@ document.addEventListener('alpine:init', () => {
         async () => {
           const response = await this.apiPost(
             API_ENDPOINTS.USER_ROLE?.REVOKE?.replace('{id}', ur.id) || 
-            `/api/v4/admin/user-roles/${ur.id}`,
+            `/api/v4/console/user-roles/${ur.id}`,
             { reason: '管理员手动撤销' },
             { method: 'DELETE' }
           )
@@ -616,7 +616,7 @@ document.addEventListener('alpine:init', () => {
     async loadPrizesForProbability() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.PRIZE?.LIST || '/api/v4/admin/prizes',
+          API_ENDPOINTS.PRIZE?.LIST || '/api/v4/console/prizes',
           {}, { showLoading: false, showError: false }
         )
         if (response?.success) {
@@ -744,7 +744,7 @@ document.addEventListener('alpine:init', () => {
 
       try {
         const response = await this.apiPost(
-          API_ENDPOINTS.PROBABILITY?.ADJUST || '/api/v4/admin/probability/adjust',
+          API_ENDPOINTS.PROBABILITY?.ADJUST || '/api/v4/console/probability/adjust',
           requestData
         )
 

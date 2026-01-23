@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '风控告警', 
+    pageStyle: '[x-cloak] { display: none !important; } .chart-container { height: 200px; }' 
+  }) %>
+  <!-- ECharts 已通过 main.js 统一导入，无需 CDN -->
+</head>
+<body class="bg-gray-100 min-h-screen" x-data="riskAlertsPage()" x-init="init()" x-cloak>
+  
+  <!-- 导航栏 -->
+  <nav class="bg-red-600 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/dashboard.html" class="hover:text-red-200">← 返回仪表盘</a>
+        <span class="text-lg font-semibold">🚨 风控告警</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-text="'欢迎，' + (userInfo?.nickname || '管理员')"></span>
+        <button @click="logout()" class="px-3 py-1 border border-white/50 rounded hover:bg-white/10">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6">
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white rounded-lg shadow p-4 text-center border-l-4 border-red-500">
+        <div class="text-4xl text-red-400 mb-2">🔴</div>
+        <h4 class="text-2xl font-bold text-red-600" x-text="stats.critical">0</h4>
+        <p class="text-gray-500 text-sm">严重告警</p>
+      </div>
+      <div class="bg-white rounded-lg shadow p-4 text-center border-l-4 border-yellow-500">
+        <div class="text-4xl text-yellow-400 mb-2">🟡</div>
+        <h4 class="text-2xl font-bold text-yellow-600" x-text="stats.warning">0</h4>
+        <p class="text-gray-500 text-sm">警告</p>
+      </div>
+      <div class="bg-white rounded-lg shadow p-4 text-center border-l-4 border-blue-500">
+        <div class="text-4xl text-blue-400 mb-2">🔵</div>
+        <h4 class="text-2xl font-bold text-blue-600" x-text="stats.info">0</h4>
+        <p class="text-gray-500 text-sm">提示</p>
+      </div>
+      <div class="bg-white rounded-lg shadow p-4 text-center border-l-4 border-green-500">
+        <div class="text-4xl text-green-400 mb-2">✅</div>
+        <h4 class="text-2xl font-bold text-green-600" x-text="stats.resolved">0</h4>
+        <p class="text-gray-500 text-sm">已处理</p>
+      </div>
+    </div>
+
+    <!-- 图表区域 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div class="bg-white rounded-lg shadow">
+        <div class="p-4 border-b">
+          <h5 class="font-semibold">告警级别分布</h5>
+        </div>
+        <div class="p-4">
+          <div id="levelDistChart" class="chart-container"></div>
+        </div>
+      </div>
+      <div class="bg-white rounded-lg shadow">
+        <div class="p-4 border-b">
+          <h5 class="font-semibold">告警类型分布</h5>
+        </div>
+        <div class="p-4">
+          <div id="typeDistChart" class="chart-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选栏 -->
+    <div class="bg-white rounded-lg shadow mb-6">
+      <div class="p-4">
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">告警级别</label>
+            <select x-model="filters.level" class="w-full px-3 py-2 border rounded-lg">
+              <option value="">全部级别</option>
+              <option value="critical">严重</option>
+              <option value="warning">警告</option>
+              <option value="info">提示</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">告警类型</label>
+            <select x-model="filters.type" class="w-full px-3 py-2 border rounded-lg">
+              <option value="">全部类型</option>
+              <option value="login_anomaly">登录异常</option>
+              <option value="high_frequency">高频操作</option>
+              <option value="large_transaction">大额交易</option>
+              <option value="suspicious_behavior">可疑行为</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">处理状态</label>
+            <select x-model="filters.status" class="w-full px-3 py-2 border rounded-lg">
+              <option value="">全部状态</option>
+              <option value="pending">待处理</option>
+              <option value="reviewed">已审核</option>
+              <option value="resolved">已处理</option>
+              <option value="ignored">已忽略</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">时间范围</label>
+            <select x-model="filters.time" class="w-full px-3 py-2 border rounded-lg">
+              <option value="today">今日</option>
+              <option value="week">本周</option>
+              <option value="month">本月</option>
+              <option value="all">全部</option>
+            </select>
+          </div>
+          <div>
+            <button @click="loadAlerts()" class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+              🔍 搜索
+            </button>
+          </div>
+          <div>
+            <button @click="toggleAutoRefresh()" :class="autoRefresh ? 'bg-green-600' : 'bg-gray-500'" class="w-full px-4 py-2 text-white rounded-lg hover:opacity-90">
+              <span x-text="autoRefresh ? '🔄 自动刷新中' : '⏸️ 自动刷新'"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 告警列表 -->
+    <div class="bg-white rounded-lg shadow">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">告警列表</h5>
+        <button @click="batchResolve()" :disabled="selectedAlerts.length === 0" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 text-sm">
+          批量处理选中
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 text-left">
+                <input type="checkbox" @change="toggleAllAlerts($event.target.checked)" class="rounded">
+              </th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">告警ID</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">级别</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">类型</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">关联用户</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">描述</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">时间</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <template x-if="alerts.length === 0">
+              <tr><td colspan="9" class="px-4 py-8 text-center text-gray-500">暂无告警数据</td></tr>
+            </template>
+            <template x-for="alert in alerts" :key="alert.alert_id">
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3">
+                  <input type="checkbox" :value="alert.alert_id" x-model="selectedAlerts" class="rounded">
+                </td>
+                <td class="px-4 py-3 text-sm font-mono" x-text="alert.alert_id"></td>
+                <td class="px-4 py-3">
+                  <span :class="{
+                    'bg-red-100 text-red-700': alert.level === 'critical',
+                    'bg-yellow-100 text-yellow-700': alert.level === 'warning',
+                    'bg-blue-100 text-blue-700': alert.level === 'info'
+                  }" class="px-2 py-1 text-xs rounded" x-text="getLevelText(alert.level)"></span>
+                </td>
+                <td class="px-4 py-3 text-sm" x-text="getTypeText(alert.type)"></td>
+                <td class="px-4 py-3 text-sm" x-text="alert.user_nickname || alert.user_id || '-'"></td>
+                <td class="px-4 py-3 text-sm max-w-xs truncate" x-text="alert.description"></td>
+                <td class="px-4 py-3">
+                  <span :class="{
+                    'bg-yellow-100 text-yellow-700': alert.status === 'pending',
+                    'bg-blue-100 text-blue-700': alert.status === 'reviewed',
+                    'bg-green-100 text-green-700': alert.status === 'resolved',
+                    'bg-gray-100 text-gray-700': alert.status === 'ignored'
+                  }" class="px-2 py-1 text-xs rounded" x-text="getStatusText(alert.status)"></span>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(alert.created_at)"></td>
+                <td class="px-4 py-3">
+                  <div class="flex space-x-2">
+                    <button @click="viewAlertDetail(alert)" class="text-blue-500 hover:text-blue-700 text-sm">详情</button>
+                    <button x-show="alert.status === 'pending'" @click="openHandleModal(alert)" class="text-green-500 hover:text-green-700 text-sm">处理</button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- 分页 -->
+      <div class="p-4 border-t flex justify-between items-center">
+        <span class="text-sm text-gray-500" x-text="'共 ' + totalRecords + ' 条记录'"></span>
+        <div class="flex space-x-2">
+          <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
+          <span class="px-3 py-1" x-text="paginationInfo"></span>
+          <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 处理告警 Modal (新架构) -->
+  <div x-ref="handleModal" 
+       x-show="isModalOpen('handleModal')" 
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('handleModal')"></div>
+    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">🔧 处理告警</h5>
+        <button @click="hideModal('handleModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+      </div>
+      <form @submit.prevent="submitHandle()">
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">处理结果 <span class="text-red-500">*</span></label>
+            <select x-model="handleForm.status" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500">
+              <option value="reviewed">标记为已审核</option>
+              <option value="resolved">标记为已处理</option>
+              <option value="false_positive">标记为误报</option>
+              <option value="ignored">忽略此告警</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">处理备注</label>
+            <textarea x-model="handleForm.remark" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500" placeholder="请输入处理备注..."></textarea>
+          </div>
+        </div>
+        <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2">
+          <button type="button" @click="hideModal('handleModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
+          <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50" :disabled="submitting">
+            <span x-show="submitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+            确认处理
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 告警详情模态框 -->
+  <div x-show="selectedAlert" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="selectedAlert = null">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">告警详情</h5>
+        <button @click="selectedAlert = null" class="text-gray-500 hover:text-gray-700">&times;</button>
+      </div>
+      <div class="p-4 space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div><span class="text-gray-500">告警ID:</span> <span class="font-mono" x-text="selectedAlert?.alert_id"></span></div>
+          <div><span class="text-gray-500">级别:</span> <span x-text="getLevelText(selectedAlert?.level)"></span></div>
+          <div><span class="text-gray-500">类型:</span> <span x-text="getTypeText(selectedAlert?.type)"></span></div>
+          <div><span class="text-gray-500">状态:</span> <span x-text="getStatusText(selectedAlert?.status)"></span></div>
+          <div><span class="text-gray-500">关联用户:</span> <span x-text="selectedAlert?.user_nickname || selectedAlert?.user_id || '-'"></span></div>
+          <div><span class="text-gray-500">触发时间:</span> <span x-text="formatDate(selectedAlert?.created_at)"></span></div>
+        </div>
+        <div>
+          <p class="text-gray-500 mb-2">告警描述:</p>
+          <div class="p-3 bg-gray-50 rounded" x-text="selectedAlert?.description"></div>
+        </div>
+        <div x-show="selectedAlert?.details">
+          <p class="text-gray-500 mb-2">详细信息:</p>
+          <pre class="p-3 bg-gray-50 rounded text-sm overflow-x-auto" x-text="JSON.stringify(selectedAlert?.details, null, 2)"></pre>
+        </div>
+        <div x-show="timeline.length > 0">
+          <p class="text-gray-500 mb-2">处理时间线:</p>
+          <div class="space-y-2">
+            <template x-for="item in timeline" :key="item.id">
+              <div class="flex items-start p-2 bg-gray-50 rounded">
+                <span class="text-gray-400 text-sm mr-2" x-text="formatDate(item.created_at)"></span>
+                <span x-text="item.action"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+      <div class="p-4 border-t flex justify-end">
+        <button @click="selectedAlert = null" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <%- include('partials/footer') %>
+
+
+
+  <script type="module" src="./src/modules/system/pages/risk-alerts.js"></script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<%# 
+  通用筛选栏组件模板
+  参数:
+  - filters: 筛选项数组 [{name, model, type, placeholder?, options?}] (必需)
+  - searchHandler: 搜索处理函数 (可选，默认为 'search()')
+  - gridCols: 网格列数类 (可选，默认为 'md:grid-cols-4')
+%>
+<div class="p-4 border-b bg-gray-50">
+  <div class="grid grid-cols-1 <%= typeof gridCols !== 'undefined' ? gridCols : 'md:grid-cols-4' %> gap-4">
+    <% filters.forEach(function(filter) { %>
+      <% if (filter.type === 'text' || filter.type === 'number') { %>
+    <input type="<%= filter.type %>" x-model="<%= filter.model %>" placeholder="<%= filter.placeholder || '' %>" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+      <% } else if (filter.type === 'select') { %>
+    <select x-model="<%= filter.model %>" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+      <option value=""><%= filter.placeholder || '全部' %></option>
+        <% if (filter.options) { filter.options.forEach(function(opt) { %>
+      <option value="<%= opt.value %>"><%= opt.label %></option>
+        <% }); } %>
+    </select>
+      <% } else if (filter.type === 'date') { %>
+    <input type="date" x-model="<%= filter.model %>" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+      <% } %>
+    <% }); %>
+    <button @click="<%= typeof searchHandler !== 'undefined' ? searchHandler : 'search()' %>" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">
+      🔍 搜索
+    </button>
+  </div>
+</div>
+

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '资产调账', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+</head>
+<body class="bg-gray-100 min-h-screen" x-data="assetAdjustmentPage()" x-init="init()" x-cloak>
+  
+  <!-- 导航栏 -->
+  <nav class="bg-amber-600 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/dashboard.html" class="hover:text-amber-200">← 返回仪表盘</a>
+        <span class="text-lg font-semibold">⚖️ 资产调账</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-text="'欢迎，' + (userInfo?.nickname || '管理员')"></span>
+        <button @click="logout()" class="px-3 py-1 border border-white/50 rounded hover:bg-white/10">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6">
+    <!-- 警告说明 -->
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+      <div class="flex items-start">
+        <span class="text-red-500 mr-2">⚠️</span>
+        <div>
+          <strong class="text-red-700">重要提醒：</strong>
+          <p class="text-sm text-red-600 mt-1">资产调账操作将直接影响用户资产，请务必核实信息后再操作。所有调账记录将被永久保存并可追溯。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white rounded-lg shadow p-4 text-center border-l-4 border-blue-500">
+        <div class="text-4xl text-blue-400 mb-2">📋</div>
+        <h4 class="text-2xl font-bold text-blue-600" x-text="stats.totalAdjustments">0</h4>
+        <p class="text-gray-500 text-sm">总调账次数</p>
+      </div>
+      <div class="bg-white rounded-lg shadow p-4 text-center border-l-4 border-green-500">
+        <div class="text-4xl text-green-400 mb-2">➕</div>
+        <h4 class="text-2xl font-bold text-green-600" x-text="formatNumber(stats.totalIncrease)">0</h4>
+        <p class="text-gray-500 text-sm">总增加</p>
+      </div>
+      <div class="bg-white rounded-lg shadow p-4 text-center border-l-4 border-red-500">
+        <div class="text-4xl text-red-400 mb-2">➖</div>
+        <h4 class="text-2xl font-bold text-red-600" x-text="formatNumber(stats.totalDecrease)">0</h4>
+        <p class="text-gray-500 text-sm">总减少</p>
+      </div>
+      <div class="bg-white rounded-lg shadow p-4 text-center border-l-4 border-orange-500">
+        <div class="text-4xl text-orange-400 mb-2">⏳</div>
+        <h4 class="text-2xl font-bold text-orange-600" x-text="stats.pendingApprovals">0</h4>
+        <p class="text-gray-500 text-sm">待审批</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- 调账表单 -->
+      <div class="lg:col-span-1">
+        <div class="bg-white rounded-lg shadow">
+          <div class="p-4 border-b">
+            <h5 class="font-semibold">新建调账</h5>
+          </div>
+          <div class="p-4 space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">用户ID</label>
+              <div class="flex space-x-2">
+                <input type="text" x-model="form.user_id" class="flex-1 px-3 py-2 border rounded-lg" placeholder="输入用户ID">
+                <button @click="searchUser()" class="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">查找</button>
+              </div>
+              <p x-show="form.user_info" class="mt-1 text-sm text-green-600" x-text="form.user_info"></p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">资产类型</label>
+              <select x-model="form.asset_type" class="w-full px-3 py-2 border rounded-lg">
+                <option value="">请选择</option>
+                <option value="points">积分</option>
+                <option value="balance">余额</option>
+                <option value="material">材料</option>
+              </select>
+            </div>
+            <div x-show="form.asset_type === 'material'">
+              <label class="block text-sm font-medium text-gray-700 mb-1">材料类型</label>
+              <select x-model="form.material_code" class="w-full px-3 py-2 border rounded-lg">
+                <option value="">请选择</option>
+                <template x-for="mat in materialTypes" :key="mat.code">
+                  <option :value="mat.code" x-text="mat.name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">调账方式</label>
+              <div class="flex space-x-4">
+                <label class="flex items-center">
+                  <input type="radio" x-model="form.direction" value="increase" class="mr-2"> 增加
+                </label>
+                <label class="flex items-center">
+                  <input type="radio" x-model="form.direction" value="decrease" class="mr-2"> 减少
+                </label>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">调账数量</label>
+              <input type="number" x-model.number="form.amount" min="1" class="w-full px-3 py-2 border rounded-lg" placeholder="输入调账数量">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">调账原因</label>
+              <select x-model="form.reason_type" class="w-full px-3 py-2 border rounded-lg mb-2">
+                <option value="error_correction">错误修正</option>
+                <option value="customer_service">客服补偿</option>
+                <option value="promotion">活动奖励</option>
+                <option value="refund">退款处理</option>
+                <option value="other">其他</option>
+              </select>
+              <textarea x-model="form.reason" rows="3" class="w-full px-3 py-2 border rounded-lg" placeholder="详细说明调账原因..."></textarea>
+            </div>
+            <button @click="submitAdjustment()" :disabled="submitting" class="w-full px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50">
+              <span x-show="!submitting">提交调账</span>
+              <span x-show="submitting">提交中...</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 调账记录 -->
+      <div class="lg:col-span-2">
+        <div class="bg-white rounded-lg shadow">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">调账记录</h5>
+            <div class="flex space-x-2">
+              <select x-model="filters.status" @change="loadRecords()" class="px-3 py-1 border rounded text-sm">
+                <option value="">全部状态</option>
+                <option value="pending">待审批</option>
+                <option value="approved">已通过</option>
+                <option value="rejected">已拒绝</option>
+              </select>
+              <button @click="loadRecords()" class="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600">刷新</button>
+            </div>
+          </div>
+          <div class="overflow-x-auto max-h-[600px]">
+            <table class="w-full">
+              <thead class="bg-gray-50 sticky top-0">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">调账ID</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">资产类型</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">变动</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">时间</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-if="records.length === 0">
+                  <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">暂无调账记录</td></tr>
+                </template>
+                <template x-for="record in records" :key="record.adjustment_id">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 text-sm font-mono" x-text="record.adjustment_id"></td>
+                    <td class="px-4 py-3 text-sm">
+                      <div x-text="record.user_nickname || record.user_id"></div>
+                      <div class="text-gray-400 text-xs" x-text="'ID: ' + record.user_id"></div>
+                    </td>
+                    <td class="px-4 py-3 text-sm" x-text="getAssetTypeText(record.asset_type)"></td>
+                    <td class="px-4 py-3 text-sm font-mono" :class="record.direction === 'increase' ? 'text-green-600' : 'text-red-600'">
+                      <span x-text="(record.direction === 'increase' ? '+' : '-') + formatNumber(record.amount)"></span>
+                    </td>
+                    <td class="px-4 py-3">
+                      <span :class="{
+                        'bg-yellow-100 text-yellow-700': record.status === 'pending',
+                        'bg-green-100 text-green-700': record.status === 'approved',
+                        'bg-red-100 text-red-700': record.status === 'rejected'
+                      }" class="px-2 py-1 text-xs rounded" x-text="getStatusText(record.status)"></span>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(record.created_at)"></td>
+                    <td class="px-4 py-3">
+                      <div class="flex space-x-2">
+                        <button @click="viewRecord(record)" class="text-blue-500 hover:text-blue-700 text-sm">详情</button>
+                        <template x-if="record.status === 'pending'">
+                          <button @click="approveRecord(record)" class="text-green-500 hover:text-green-700 text-sm">审批</button>
+                        </template>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          
+          <!-- 分页 -->
+          <div class="p-4 border-t flex justify-between items-center">
+            <span class="text-sm text-gray-500" x-text="'共 ' + totalRecords + ' 条记录'"></span>
+            <div class="flex space-x-2">
+              <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
+              <span class="px-3 py-1" x-text="paginationInfo"></span>
+              <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 资产调整 Modal (新架构) -->
+  <div x-ref="adjustModal" 
+       x-show="isModalOpen('adjustModal')" 
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('adjustModal')"></div>
+    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">⚖️ 资产调整</h5>
+        <button @click="hideModal('adjustModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+      </div>
+      <form @submit.prevent="submitAdjust()">
+        <div class="p-6 space-y-4">
+          <!-- 当前用户信息 -->
+          <div x-show="currentUser" class="bg-blue-50 rounded-lg p-3 text-sm">
+            <p><strong>用户:</strong> <span x-text="currentUser?.nickname || currentUser?.user_id"></span></p>
+            <p><strong>ID:</strong> <span class="font-mono" x-text="currentUser?.user_id"></span></p>
+          </div>
+          
+          <!-- 资产类型 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">资产类型 <span class="text-red-500">*</span></label>
+            <select x-model="adjustForm.assetCode" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500" required>
+              <option value="">请选择资产类型</option>
+              <template x-for="asset in assetTypes" :key="asset.asset_code">
+                <option :value="asset.asset_code" x-text="asset.display_name || asset.name"></option>
+              </template>
+            </select>
+          </div>
+          
+          <!-- 活动选择 (仅预算积分时显示) -->
+          <div x-show="adjustForm.assetCode === 'BUDGET_POINTS'">
+            <label class="block text-sm font-medium text-gray-700 mb-1">关联活动 <span class="text-red-500">*</span></label>
+            <select x-model="adjustForm.campaignId" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500">
+              <option value="">请选择活动</option>
+              <template x-for="campaign in campaigns" :key="campaign.campaign_id">
+                <option :value="campaign.campaign_id" x-text="campaign.name"></option>
+              </template>
+            </select>
+          </div>
+          
+          <!-- 调整方式 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">调整方式</label>
+            <div class="flex space-x-4">
+              <label class="flex items-center cursor-pointer">
+                <input type="radio" x-model="adjustForm.adjustType" value="increase" class="mr-2 text-green-600">
+                <span class="text-green-600 font-medium">➕ 增加</span>
+              </label>
+              <label class="flex items-center cursor-pointer">
+                <input type="radio" x-model="adjustForm.adjustType" value="decrease" class="mr-2 text-red-600">
+                <span class="text-red-600 font-medium">➖ 减少</span>
+              </label>
+            </div>
+          </div>
+          
+          <!-- 调整数量 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">调整数量 <span class="text-red-500">*</span></label>
+            <input type="number" x-model.number="adjustForm.amount" min="1" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500" placeholder="请输入调整数量" required>
+          </div>
+          
+          <!-- 调整原因 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">调整原因 <span class="text-red-500">*</span></label>
+            <textarea x-model="adjustForm.reason" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500" placeholder="请详细说明调整原因..." required></textarea>
+          </div>
+        </div>
+        <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2">
+          <button type="button" @click="hideModal('adjustModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
+          <button type="submit" class="px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50" :disabled="submitting">
+            <span x-show="submitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+            确认调整
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 详情模态框 -->
+  <div x-show="selectedRecord" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="selectedRecord = null">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+      <div class="p-4 border-b">
+        <h5 class="font-semibold">调账详情</h5>
+      </div>
+      <div class="p-4 space-y-3">
+        <div class="flex justify-between"><span class="text-gray-500">调账ID:</span><span class="font-mono" x-text="selectedRecord?.adjustment_id"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">用户:</span><span x-text="selectedRecord?.user_nickname || selectedRecord?.user_id"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">资产类型:</span><span x-text="getAssetTypeText(selectedRecord?.asset_type)"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">变动数量:</span><span class="font-mono" :class="selectedRecord?.direction === 'increase' ? 'text-green-600' : 'text-red-600'" x-text="(selectedRecord?.direction === 'increase' ? '+' : '-') + formatNumber(selectedRecord?.amount)"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">状态:</span><span x-text="getStatusText(selectedRecord?.status)"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">操作人:</span><span x-text="selectedRecord?.operator_name || selectedRecord?.operator_id"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">创建时间:</span><span x-text="formatDate(selectedRecord?.created_at)"></span></div>
+        <div>
+          <span class="text-gray-500">调账原因:</span>
+          <p class="mt-1 p-2 bg-gray-50 rounded text-sm" x-text="selectedRecord?.reason"></p>
+        </div>
+      </div>
+      <div class="p-4 border-t flex justify-end">
+        <button @click="selectedRecord = null" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <%- include('partials/footer') %>
+
+
+
+  <script type="module" src="./src/modules/asset/pages/asset-adjustment.js"></script>
+</body>
+</html>

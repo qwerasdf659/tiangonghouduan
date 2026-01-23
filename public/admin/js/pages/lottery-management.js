@@ -156,7 +156,7 @@ document.addEventListener('alpine:init', () => {
         if (this.campaignFilters.keyword) params.append('keyword', this.campaignFilters.keyword)
 
         const response = await this.apiGet(
-          `${API_ENDPOINTS.CAMPAIGN?.LIST || '/api/v4/admin/campaigns'}?${params}`,
+          `${API_ENDPOINTS.CAMPAIGN?.LIST || '/api/v4/console/campaigns'}?${params}`,
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -171,7 +171,7 @@ document.addEventListener('alpine:init', () => {
     async loadCampaignStats() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.CAMPAIGN?.STATS || '/api/v4/admin/campaigns/stats',
+          API_ENDPOINTS.CAMPAIGN?.STATS || '/api/v4/console/campaigns/stats',
           {}, { showError: false, showLoading: false }
         )
         if (response?.success) {
@@ -238,8 +238,8 @@ document.addEventListener('alpine:init', () => {
       try {
         this.saving = true
         const url = this.isEditMode
-          ? `${API_ENDPOINTS.CAMPAIGN?.UPDATE || '/api/v4/admin/campaigns'}/${this.editingCampaignId}`
-          : API_ENDPOINTS.CAMPAIGN?.CREATE || '/api/v4/admin/campaigns'
+          ? `${API_ENDPOINTS.CAMPAIGN?.UPDATE || '/api/v4/console/campaigns'}/${this.editingCampaignId}`
+          : API_ENDPOINTS.CAMPAIGN?.CREATE || '/api/v4/console/campaigns'
 
         const response = await this.apiCall(url, {
           method: this.isEditMode ? 'PUT' : 'POST',
@@ -274,7 +274,7 @@ document.addEventListener('alpine:init', () => {
         `确认删除活动「${campaign.name}」？此操作不可恢复`,
         async () => {
           const response = await this.apiCall(
-            `${API_ENDPOINTS.CAMPAIGN?.DELETE || '/api/v4/admin/campaigns'}/${campaign.campaign_id || campaign.id}`,
+            `${API_ENDPOINTS.CAMPAIGN?.DELETE || '/api/v4/console/campaigns'}/${campaign.campaign_id || campaign.id}`,
             { method: 'DELETE' }
           )
           if (response?.success) {
@@ -295,7 +295,7 @@ document.addEventListener('alpine:init', () => {
         `确认${newStatus === 'active' ? '启用' : '停用'}活动「${campaign.name}」？`,
         async () => {
           const response = await this.apiCall(
-            `${API_ENDPOINTS.CAMPAIGN?.TOGGLE || '/api/v4/admin/campaigns'}/${campaign.campaign_id || campaign.id}/status`,
+            `${API_ENDPOINTS.CAMPAIGN?.TOGGLE || '/api/v4/console/campaigns'}/${campaign.campaign_id || campaign.id}/status`,
             { method: 'PUT', data: { status: newStatus } }
           )
           if (response?.success) {
@@ -328,7 +328,7 @@ document.addEventListener('alpine:init', () => {
         if (this.prizeFilters.keyword) params.append('keyword', this.prizeFilters.keyword)
 
         const response = await this.apiGet(
-          `${API_ENDPOINTS.PRIZE?.LIST || '/api/v4/admin/prizes'}?${params}`,
+          `${API_ENDPOINTS.PRIZE?.LIST || '/api/v4/console/prizes'}?${params}`,
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -368,7 +368,7 @@ document.addEventListener('alpine:init', () => {
         `确认${newStatus ? '启用' : '禁用'}奖品「${prize.name}」？`,
         async () => {
           const response = await this.apiCall(
-            API.buildURL(API_ENDPOINTS.PRIZE?.TOGGLE || '/api/v4/admin/prizes/:id/toggle', { id: prize.prize_id }),
+            API.buildURL(API_ENDPOINTS.PRIZE?.TOGGLE || '/api/v4/console/prizes/:id/toggle', { id: prize.prize_id }),
             { method: 'PUT' }
           )
           if (response?.success) this.loadPrizes()
@@ -382,7 +382,7 @@ document.addEventListener('alpine:init', () => {
         `确认删除奖品「${prize.name}」？`,
         async () => {
           const response = await this.apiCall(
-            API.buildURL(API_ENDPOINTS.PRIZE?.DELETE || '/api/v4/admin/prizes/:id', { id: prize.prize_id }),
+            API.buildURL(API_ENDPOINTS.PRIZE?.DELETE || '/api/v4/console/prizes/:id', { id: prize.prize_id }),
             { method: 'DELETE' }
           )
           if (response?.success) this.loadPrizes()
@@ -403,8 +403,8 @@ document.addEventListener('alpine:init', () => {
       try {
         this.saving = true
         const url = this.isEditMode
-          ? `${API_ENDPOINTS.PRIZE?.UPDATE || '/api/v4/admin/prizes'}/${this.editingPrizeId}`
-          : API_ENDPOINTS.PRIZE?.CREATE || '/api/v4/admin/prizes'
+          ? `${API_ENDPOINTS.PRIZE?.UPDATE || '/api/v4/console/prizes'}/${this.editingPrizeId}`
+          : API_ENDPOINTS.PRIZE?.CREATE || '/api/v4/console/prizes'
 
         const response = await this.apiCall(url, {
           method: this.isEditMode ? 'PUT' : 'POST',
@@ -464,7 +464,7 @@ document.addEventListener('alpine:init', () => {
       try {
         this.saving = true
         const response = await this.apiCall(
-          API.buildURL(API_ENDPOINTS.PRIZE?.ADD_STOCK || '/api/v4/admin/prizes/:id/stock', { id: this.stockForm.prizeId }),
+          API.buildURL(API_ENDPOINTS.PRIZE?.ADD_STOCK || '/api/v4/console/prizes/:id/stock', { id: this.stockForm.prizeId }),
           {
             method: 'POST',
             data: { quantity: parseInt(this.stockForm.quantity) }
@@ -495,7 +495,7 @@ document.addEventListener('alpine:init', () => {
         if (this.budgetFilters.status) params.append('status', this.budgetFilters.status)
 
         const response = await this.apiGet(
-          `${API_ENDPOINTS.CAMPAIGN_BUDGET?.BATCH_STATUS || '/api/v4/admin/campaign-budgets'}?${params}`,
+          `${API_ENDPOINTS.CAMPAIGN_BUDGET?.BATCH_STATUS || '/api/v4/console/campaign-budgets'}?${params}`,
           {}, { showLoading: false }
         )
 
@@ -570,7 +570,7 @@ document.addEventListener('alpine:init', () => {
       try {
         this.saving = true
         const response = await this.apiCall(
-          API.buildURL(API_ENDPOINTS.CAMPAIGN_BUDGET?.CAMPAIGN || '/api/v4/admin/campaigns/:campaign_id/budget', { campaign_id: campaignId }),
+          API.buildURL(API_ENDPOINTS.CAMPAIGN_BUDGET?.CAMPAIGN || '/api/v4/console/campaigns/:campaign_id/budget', { campaign_id: campaignId }),
           {
             method: 'PUT',
             data: {
@@ -624,7 +624,7 @@ document.addEventListener('alpine:init', () => {
     async loadStrategies() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.LOTTERY_STRATEGY?.LIST || '/api/v4/admin/lottery/strategies',
+          API_ENDPOINTS.LOTTERY_STRATEGY?.LIST || '/api/v4/console/lottery/strategies',
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -645,7 +645,7 @@ document.addEventListener('alpine:init', () => {
     async loadTierMatrix() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.TIER_MATRIX?.LIST || '/api/v4/admin/lottery/tier-matrix',
+          API_ENDPOINTS.TIER_MATRIX?.LIST || '/api/v4/console/lottery/tier-matrix',
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -682,7 +682,7 @@ document.addEventListener('alpine:init', () => {
       try {
         this.saving = true
         const response = await this.apiCall(
-          API_ENDPOINTS.TIER_MATRIX?.UPDATE || '/api/v4/admin/lottery/tier-matrix',
+          API_ENDPOINTS.TIER_MATRIX?.UPDATE || '/api/v4/console/lottery/tier-matrix',
           {
             method: 'PUT',
             data: this.editingMatrixCell
@@ -715,7 +715,7 @@ document.addEventListener('alpine:init', () => {
     async loadQuotas() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.LOTTERY_QUOTA?.LIST || '/api/v4/admin/lottery/quotas',
+          API_ENDPOINTS.LOTTERY_QUOTA?.LIST || '/api/v4/console/lottery/quotas',
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -762,8 +762,8 @@ document.addEventListener('alpine:init', () => {
       try {
         this.saving = true
         const url = this.isEditQuota
-          ? `${API_ENDPOINTS.LOTTERY_QUOTA?.UPDATE || '/api/v4/admin/lottery/quotas'}/${this.editingQuotaId}`
-          : API_ENDPOINTS.LOTTERY_QUOTA?.CREATE || '/api/v4/admin/lottery/quotas'
+          ? `${API_ENDPOINTS.LOTTERY_QUOTA?.UPDATE || '/api/v4/console/lottery/quotas'}/${this.editingQuotaId}`
+          : API_ENDPOINTS.LOTTERY_QUOTA?.CREATE || '/api/v4/console/lottery/quotas'
 
         const response = await this.apiCall(url, {
           method: this.isEditQuota ? 'PUT' : 'POST',
@@ -790,7 +790,7 @@ document.addEventListener('alpine:init', () => {
         `确认删除此配额配置？`,
         async () => {
           const response = await this.apiCall(
-            `${API_ENDPOINTS.LOTTERY_QUOTA?.DELETE || '/api/v4/admin/lottery/quotas'}/${quota.quota_id || quota.id}`,
+            `${API_ENDPOINTS.LOTTERY_QUOTA?.DELETE || '/api/v4/console/lottery/quotas'}/${quota.quota_id || quota.id}`,
             { method: 'DELETE' }
           )
           if (response?.success) {
@@ -805,8 +805,8 @@ document.addEventListener('alpine:init', () => {
     async loadLotteryMetrics() {
       try {
         const [metricsRes, campaignMetricsRes] = await Promise.all([
-          this.apiGet(API_ENDPOINTS.LOTTERY_METRICS?.SUMMARY || '/api/v4/admin/lottery/metrics', {}, { showLoading: false, showError: false }),
-          this.apiGet(API_ENDPOINTS.LOTTERY_METRICS?.BY_CAMPAIGN || '/api/v4/admin/lottery/metrics/by-campaign', {}, { showLoading: false, showError: false })
+          this.apiGet(API_ENDPOINTS.LOTTERY_METRICS?.SUMMARY || '/api/v4/console/lottery/metrics', {}, { showLoading: false, showError: false }),
+          this.apiGet(API_ENDPOINTS.LOTTERY_METRICS?.BY_CAMPAIGN || '/api/v4/console/lottery/metrics/by-campaign', {}, { showLoading: false, showError: false })
         ])
 
         if (metricsRes?.success) {
@@ -872,7 +872,7 @@ document.addEventListener('alpine:init', () => {
     async loadStores() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.STORE?.LIST || '/api/v4/admin/stores',
+          API_ENDPOINTS.STORE?.LIST || '/api/v4/console/stores',
           {}, { showLoading: false, showError: false }
         )
         if (response?.success) {

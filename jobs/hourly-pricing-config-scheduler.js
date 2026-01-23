@@ -47,11 +47,11 @@ class HourlyPricingConfigScheduler {
    */
   static async execute() {
     const start_time = Date.now()
-    const job_id = `${this.JOB_NAME}_${BeijingTimeHelper.formatBeijingDateTime(new Date()).replace(/[:\s]/g, '-')}`
+    const job_id = `${this.JOB_NAME}_${BeijingTimeHelper.format(new Date()).replace(/[:\s]/g, '-')}`
 
     logger.info(`[${this.JOB_NAME}] 开始执行定价配置定时生效任务`, {
       job_id,
-      start_time: BeijingTimeHelper.formatBeijingDateTime(new Date())
+      start_time: BeijingTimeHelper.format(new Date())
     })
 
     try {

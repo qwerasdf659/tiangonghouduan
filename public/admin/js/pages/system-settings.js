@@ -117,7 +117,7 @@ document.addEventListener('alpine:init', () => {
     async loadSystemConfigs() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.SYSTEM_CONFIG?.LIST || '/api/v4/admin/system/configs',
+          API_ENDPOINTS.SYSTEM_CONFIG?.LIST || '/api/v4/console/system/configs',
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -138,7 +138,7 @@ document.addEventListener('alpine:init', () => {
       this.saving = true
       try {
         const response = await this.apiCall(
-          API_ENDPOINTS.SYSTEM_CONFIG?.UPDATE || '/api/v4/admin/system/configs',
+          API_ENDPOINTS.SYSTEM_CONFIG?.UPDATE || '/api/v4/console/system/configs',
           {
             method: 'PUT',
             body: JSON.stringify({ configs: this.systemConfigs })
@@ -160,7 +160,7 @@ document.addEventListener('alpine:init', () => {
     async loadDictList() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.DICT?.LIST || '/api/v4/admin/dict',
+          API_ENDPOINTS.DICT?.LIST || '/api/v4/console/dict',
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -193,7 +193,7 @@ document.addEventListener('alpine:init', () => {
         `确认删除字典「${dict.dict_name}」？`,
         async () => {
           const response = await this.apiCall(
-            API.buildURL(API_ENDPOINTS.DICT?.DELETE || '/api/v4/admin/dict/:code', { code: dict.dict_code }),
+            API.buildURL(API_ENDPOINTS.DICT?.DELETE || '/api/v4/console/dict/:code', { code: dict.dict_code }),
             { method: 'DELETE' }
           )
           if (response?.success) this.loadDictList()
@@ -219,12 +219,12 @@ document.addEventListener('alpine:init', () => {
         let response
         if (this.editingDictCode) {
           response = await this.apiCall(
-            API.buildURL(API_ENDPOINTS.DICT?.UPDATE || '/api/v4/admin/dict/:code', { code: this.editingDictCode }),
+            API.buildURL(API_ENDPOINTS.DICT?.UPDATE || '/api/v4/console/dict/:code', { code: this.editingDictCode }),
             { method: 'PUT', body: JSON.stringify(payload) }
           )
         } else {
           response = await this.apiCall(
-            API_ENDPOINTS.DICT?.CREATE || '/api/v4/admin/dict',
+            API_ENDPOINTS.DICT?.CREATE || '/api/v4/console/dict',
             { method: 'POST', body: JSON.stringify(payload) }
           )
         }
@@ -255,7 +255,7 @@ document.addEventListener('alpine:init', () => {
         if (this.auditFilters.keyword) params.append('keyword', this.auditFilters.keyword)
 
         const response = await this.apiGet(
-          `${API_ENDPOINTS.AUDIT_LOG?.LIST || '/api/v4/admin/audit-logs'}?${params}`,
+          `${API_ENDPOINTS.AUDIT_LOG?.LIST || '/api/v4/console/audit-logs'}?${params}`,
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -311,7 +311,7 @@ document.addEventListener('alpine:init', () => {
     async loadPricingConfigs() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.PRICING_CONFIG?.LIST || '/api/v4/admin/pricing-configs',
+          API_ENDPOINTS.PRICING_CONFIG?.LIST || '/api/v4/console/pricing-configs',
           {}, { showLoading: false }
         )
         if (response?.success) {
@@ -347,7 +347,7 @@ document.addEventListener('alpine:init', () => {
       this.saving = true
       try {
         const response = await this.apiCall(
-          API_ENDPOINTS.PRICING_CONFIG?.UPDATE || '/api/v4/admin/pricing-configs',
+          API_ENDPOINTS.PRICING_CONFIG?.UPDATE || '/api/v4/console/pricing-configs',
           {
             method: 'PUT',
             body: JSON.stringify({ configs: this.pricingConfigs })
@@ -370,7 +370,7 @@ document.addEventListener('alpine:init', () => {
         async () => {
           try {
             const response = await this.apiCall(
-              API.buildURL(API_ENDPOINTS.PRICING_CONFIG?.RESET || '/api/v4/admin/pricing-configs/:key/reset', { key: config.config_key }),
+              API.buildURL(API_ENDPOINTS.PRICING_CONFIG?.RESET || '/api/v4/console/pricing-configs/:key/reset', { key: config.config_key }),
               { method: 'POST' }
             )
             if (response?.success) {

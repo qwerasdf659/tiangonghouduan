@@ -12,6 +12,11 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
+    "_comment_admin": "=== 前端管理后台构建命令（需先 cd admin && npm install）===",
+    "admin:install": "cd admin && npm install",
+    "admin:dev": "cd admin && npm run dev",
+    "admin:build": "cd admin && npm run build",
+    "admin:preview": "cd admin && npm run preview",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "lint": "eslint . --ext .js",
@@ -119,7 +124,6 @@
     "cleanup:idempotency": "node scripts/maintenance/cleanup_expired_idempotency.js"
   },
   "dependencies": {
-    "alpinejs": "^3.15.4",
     "aws-sdk": "^2.1691.0",
     "axios": "^1.11.0",
     "bcrypt": "^6.0.0",
@@ -150,9 +154,6 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@tailwindcss/forms": "^0.5.11",
-    "@tailwindcss/typography": "^0.5.19",
-    "@tailwindcss/vite": "^4.1.18",
     "ajv-formats": "^3.0.1",
     "eslint": "^8.55.0",
     "eslint-config-standard": "^17.1.0",
@@ -167,9 +168,7 @@
     "nodemon": "^3.0.2",
     "prettier": "^3.1.1",
     "sequelize-cli": "^6.6.2",
-    "supertest": "^6.3.4",
-    "tailwindcss": "^4.1.18",
-    "vite": "^6.4.1"
+    "supertest": "^6.3.4"
   },
   "keywords": [
     "restaurant",

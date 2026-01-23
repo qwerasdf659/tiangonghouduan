@@ -1,0 +1,32 @@
+<%# 
+  通用 Modal 组件模板
+  参数:
+  - modalRef: x-ref 名称 (必需)
+  - title: Modal 标题 (必需)
+  - icon: 标题图标 (可选，默认为空)
+  - maxWidth: 最大宽度类 (可选，默认为 'max-w-md')
+  - showFooter: 是否显示底部按钮区域 (可选，默认为 true)
+  - scrollable: 是否可滚动 (可选，默认为 false)
+%>
+<div x-ref="<%= modalRef %>" 
+     x-show="isModalOpen('<%= modalRef %>')" 
+     x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center"
+     style="display: none;">
+  <!-- 遮罩层 -->
+  <div class="fixed inset-0 bg-black/50" @click="hideModal('<%= modalRef %>')"></div>
+  <!-- 内容 -->
+  <div class="relative bg-white rounded-lg shadow-xl w-full <%= typeof maxWidth !== 'undefined' ? maxWidth : 'max-w-md' %> mx-4 z-10 <% if (typeof scrollable !== 'undefined' && scrollable) { %>max-h-[90vh] overflow-y-auto<% } %>">
+    <div class="p-4 border-b flex justify-between items-center <% if (typeof scrollable !== 'undefined' && scrollable) { %>sticky top-0 bg-white<% } %>">
+      <h5 class="font-semibold"><%= typeof icon !== 'undefined' ? icon + ' ' : '' %><%= title %></h5>
+      <button @click="hideModal('<%= modalRef %>')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+    </div>
+    <%- body %>
+    <% if (typeof showFooter === 'undefined' || showFooter !== false) { %>
+    <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2 <% if (typeof scrollable !== 'undefined' && scrollable) { %>sticky bottom-0<% } %>">
+      <%- typeof footer !== 'undefined' ? footer : '<button type="button" @click="hideModal(\'' + modalRef + '\')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">关闭</button>' %>
+    </div>
+    <% } %>
+  </div>
+</div>
+

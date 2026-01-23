@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '客服工作台', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="bg-pink-600 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/dashboard.html" class="hover:text-pink-200">← 返回仪表盘</a>
+        <span class="text-lg font-semibold">💬 客服工作台</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="customerService()" x-init="init()">
+    
+    <div class="grid grid-cols-12 gap-4 h-[calc(100vh-140px)]">
+      <!-- 会话列表 -->
+      <div class="col-span-3 bg-white rounded-lg shadow overflow-hidden flex flex-col">
+        <div class="p-4 border-b">
+          <h5 class="font-semibold">会话列表</h5>
+        </div>
+        <div class="flex-1 overflow-y-auto">
+          <template x-for="session in sessions" :key="session.session_id">
+            <div 
+              @click="selectSession(session)"
+              :class="selectedSession?.session_id === session.session_id ? 'bg-pink-50 border-l-4 border-pink-500' : 'hover:bg-gray-50'"
+              class="p-4 border-b cursor-pointer"
+            >
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="font-medium" x-text="session.user_name || '用户' + session.user_id"></p>
+                  <p class="text-sm text-gray-500 truncate" x-text="session.last_message"></p>
+                </div>
+                <span 
+                  x-show="session.unread_count > 0"
+                  class="bg-pink-500 text-white text-xs px-2 py-1 rounded-full"
+                  x-text="session.unread_count"
+                ></span>
+              </div>
+              <p class="text-xs text-gray-400 mt-1" x-text="formatDate(session.updated_at)"></p>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 聊天区域 -->
+      <div class="col-span-6 bg-white rounded-lg shadow overflow-hidden flex flex-col">
+        <div class="p-4 border-b">
+          <h5 class="font-semibold" x-text="selectedSession ? (selectedSession.user_name || '用户' + selectedSession.user_id) : '请选择会话'"></h5>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-4" x-ref="messageContainer">
+          <template x-for="msg in messages" :key="msg.message_id">
+            <div :class="msg.sender_type === 'admin' ? 'flex justify-end' : 'flex justify-start'">
+              <div 
+                :class="msg.sender_type === 'admin' ? 'bg-pink-500 text-white' : 'bg-gray-200 text-gray-800'"
+                class="max-w-md px-4 py-2 rounded-lg"
+              >
+                <p x-text="msg.content"></p>
+                <p class="text-xs opacity-70 mt-1" x-text="formatDate(msg.created_at)"></p>
+              </div>
+            </div>
+          </template>
+        </div>
+        <div class="p-4 border-t">
+          <div class="flex space-x-2">
+            <input 
+              type="text" 
+              x-model="messageInput" 
+              @keyup.enter="sendMessage()"
+              placeholder="输入消息..."
+              class="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500"
+              :disabled="!selectedSession"
+            >
+            <button 
+              @click="sendMessage()" 
+              :disabled="!selectedSession || !messageInput.trim()"
+              class="px-6 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:opacity-50"
+            >
+              发送
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 用户信息 -->
+      <div class="col-span-3 bg-white rounded-lg shadow overflow-hidden">
+        <div class="p-4 border-b">
+          <h5 class="font-semibold">用户信息</h5>
+        </div>
+        <div class="p-4" x-show="selectedSession">
+          <div class="space-y-4">
+            <div>
+              <p class="text-sm text-gray-500">用户ID</p>
+              <p class="font-medium" x-text="selectedSession?.user_id"></p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">昵称</p>
+              <p class="font-medium" x-text="selectedSession?.user_name || '-'"></p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">手机号</p>
+              <p class="font-medium" x-text="selectedSession?.phone || '-'"></p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">会话状态</p>
+              <span 
+                :class="selectedSession?.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
+                class="px-2 py-1 text-xs rounded"
+                x-text="selectedSession?.status === 'active' ? '进行中' : '已关闭'"
+              ></span>
+            </div>
+          </div>
+          <div class="mt-6 space-y-2">
+            <button @click="closeSession()" class="w-full px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">
+              关闭会话
+            </button>
+            <button @click="viewUserProfile()" class="w-full px-4 py-2 border border-blue-500 text-blue-500 rounded hover:bg-blue-50">
+              查看用户资料
+            </button>
+          </div>
+        </div>
+        <div class="p-4 text-center text-gray-400" x-show="!selectedSession">
+          请选择一个会话
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==================== Modal 组件区域 ==================== -->
+
+  <!-- 1. 转接会话模态框 -->
+  <div x-ref="transferModal"
+       x-show="isModalOpen('transferModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('transferModal')"></div>
+    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">🔄 转接会话</h5>
+        <button @click="hideModal('transferModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+      </div>
+      <form @submit.prevent="confirmTransfer()">
+        <div class="p-6 space-y-4">
+          <p class="text-gray-600">将当前会话转接给其他客服人员</p>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">选择客服 <span class="text-red-500">*</span></label>
+            <select x-model="transferTargetId" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500" required>
+              <option value="">请选择接收客服</option>
+              <template x-for="admin in adminList" :key="admin.user_id">
+                <option :value="admin.user_id" x-text="admin.nickname || admin.username || admin.user_id"></option>
+              </template>
+            </select>
+          </div>
+        </div>
+        <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-3">
+          <button type="button" @click="hideModal('transferModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
+          <button type="submit" class="px-4 py-2 bg-pink-500 text-white rounded hover:bg-pink-600 disabled:opacity-50" :disabled="submitting || !transferTargetId">
+            确认转接
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. 用户信息模态框 -->
+  <div x-ref="userInfoModal"
+       x-show="isModalOpen('userInfoModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('userInfoModal')"></div>
+    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">👤 用户详细资料</h5>
+        <button @click="hideModal('userInfoModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+      </div>
+      <div class="p-6" x-show="userInfoData">
+        <div class="text-center mb-6">
+          <div class="w-20 h-20 bg-pink-100 rounded-full mx-auto flex items-center justify-center text-3xl">
+            <span x-text="(userInfoData?.nickname || userInfoData?.user_id || '?').charAt(0)"></span>
+          </div>
+          <h4 class="font-semibold mt-3" x-text="userInfoData?.nickname || '用户' + userInfoData?.user_id"></h4>
+        </div>
+        <div class="space-y-3">
+          <div class="flex justify-between border-b pb-2">
+            <span class="text-gray-500">用户ID</span>
+            <span class="font-mono" x-text="userInfoData?.user_id"></span>
+          </div>
+          <div class="flex justify-between border-b pb-2">
+            <span class="text-gray-500">手机号</span>
+            <span x-text="userInfoData?.phone || '-'"></span>
+          </div>
+          <div class="flex justify-between border-b pb-2">
+            <span class="text-gray-500">性别</span>
+            <span x-text="userInfoData?.gender === 1 ? '男' : userInfoData?.gender === 2 ? '女' : '未知'"></span>
+          </div>
+          <div class="flex justify-between border-b pb-2">
+            <span class="text-gray-500">注册时间</span>
+            <span x-text="formatDate(userInfoData?.created_at)"></span>
+          </div>
+          <div class="flex justify-between border-b pb-2">
+            <span class="text-gray-500">账户状态</span>
+            <span :class="userInfoData?.status === 'active' ? 'text-green-600' : 'text-red-600'" x-text="userInfoData?.status === 'active' ? '正常' : '禁用'"></span>
+          </div>
+          <div class="flex justify-between border-b pb-2">
+            <span class="text-gray-500">总抽奖次数</span>
+            <span x-text="userInfoData?.draw_count || 0"></span>
+          </div>
+          <div class="flex justify-between border-b pb-2">
+            <span class="text-gray-500">中奖次数</span>
+            <span x-text="userInfoData?.win_count || 0"></span>
+          </div>
+        </div>
+      </div>
+      <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
+        <button @click="hideModal('userInfoModal')" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页面专属逻辑 -->
+  <%- include('partials/footer') %>
+
+
+  <script type="module" src="./src/modules/content/pages/customer-service.js"></script>
+</body>
+</html>
+

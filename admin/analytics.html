@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '数据统计报表', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+  <!-- ECharts 已通过 main.js 统一导入，无需 CDN -->
+</head>
+<body class="bg-gray-100 min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="bg-purple-600 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/dashboard.html" class="hover:text-purple-200">← 返回仪表盘</a>
+        <span class="text-lg font-semibold">📊 数据统计报表</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="analyticsPage()" x-init="init()">
+    
+    <!-- 时间筛选 -->
+    <div class="bg-white rounded-lg shadow p-4 mb-6">
+      <div class="flex items-center space-x-4">
+        <span class="text-gray-600">时间范围：</span>
+        <button @click="setDateRange('today')" :class="dateRange === 'today' ? 'bg-purple-500 text-white' : 'bg-gray-100'" class="px-4 py-2 rounded">今日</button>
+        <button @click="setDateRange('week')" :class="dateRange === 'week' ? 'bg-purple-500 text-white' : 'bg-gray-100'" class="px-4 py-2 rounded">本周</button>
+        <button @click="setDateRange('month')" :class="dateRange === 'month' ? 'bg-purple-500 text-white' : 'bg-gray-100'" class="px-4 py-2 rounded">本月</button>
+        <input type="date" x-model="customStart" class="px-3 py-2 border rounded">
+        <span>至</span>
+        <input type="date" x-model="customEnd" class="px-3 py-2 border rounded">
+        <button @click="loadData()" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600">查询</button>
+      </div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+      <div class="bg-white rounded-lg shadow p-6 text-center">
+        <h6 class="text-gray-500 mb-2">总抽奖次数</h6>
+        <h2 class="text-3xl font-bold text-purple-600" x-text="stats.totalDraws"></h2>
+      </div>
+      <div class="bg-white rounded-lg shadow p-6 text-center">
+        <h6 class="text-gray-500 mb-2">总中奖次数</h6>
+        <h2 class="text-3xl font-bold text-green-600" x-text="stats.totalWins"></h2>
+      </div>
+      <div class="bg-white rounded-lg shadow p-6 text-center">
+        <h6 class="text-gray-500 mb-2">活跃用户</h6>
+        <h2 class="text-3xl font-bold text-blue-600" x-text="stats.activeUsers"></h2>
+      </div>
+      <div class="bg-white rounded-lg shadow p-6 text-center">
+        <h6 class="text-gray-500 mb-2">积分消耗</h6>
+        <h2 class="text-3xl font-bold text-yellow-600" x-text="stats.pointsConsumed"></h2>
+      </div>
+    </div>
+
+    <!-- 图表区域 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-white rounded-lg shadow p-6">
+        <h5 class="font-semibold mb-4">抽奖趋势</h5>
+        <div id="drawTrendChart" class="h-80" x-ref="drawTrendChart"></div>
+      </div>
+      <div class="bg-white rounded-lg shadow p-6">
+        <h5 class="font-semibold mb-4">奖品分布</h5>
+        <div id="prizeDistChart" class="h-80" x-ref="prizeDistChart"></div>
+      </div>
+      <div class="bg-white rounded-lg shadow p-6">
+        <h5 class="font-semibold mb-4">用户活跃度</h5>
+        <div id="userActivityChart" class="h-80" x-ref="userActivityChart"></div>
+      </div>
+      <div class="bg-white rounded-lg shadow p-6">
+        <h5 class="font-semibold mb-4">积分消耗趋势</h5>
+        <div id="pointsChart" class="h-80" x-ref="pointsChart"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 页面专属逻辑 -->
+  <%- include('partials/footer') %>
+
+
+  <script type="module" src="./src/modules/analytics/pages/analytics.js"></script>
+</body>
+</html>
+

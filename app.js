@@ -600,18 +600,19 @@ app.use('/admin', (req, res, next) => {
 })
 
 /**
- * 托管管理后台静态文件
+ * 托管管理后台静态文件（Vite 构建输出）
  *
  * 路径映射：
- * - /admin/login.html → public/admin/login.html
- * - /admin/js/admin-common.js → public/admin/js/admin-common.js
- * - /admin/css/admin-main.css → public/admin/css/admin-main.css
+ * - /admin/dashboard.html → admin/dist/dashboard.html
+ * - /admin/assets/main.js → admin/dist/assets/main.js
+ * - /admin/assets/main.css → admin/dist/assets/main.css
  *
  * ⚠️ 必须在API路由注册之前配置，避免路由冲突
+ * 📝 已从 public/admin 迁移到 admin/dist（Vite 构建输出）
  */
 app.use(
   '/admin',
-  express.static(path.join(__dirname, 'public/admin'), {
+  express.static(path.join(__dirname, 'admin/dist'), {
     index: false, // 禁用默认首页，避免冲突
     maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0, // 开发环境禁用缓存，生产环境缓存1小时
     etag: process.env.NODE_ENV === 'production', // 生产环境启用ETag缓存

@@ -1,0 +1,626 @@
+/**
+ * 资产管理 API 模块
+ *
+ * @module api/asset
+ * @description 资产、材料、钻石账户相关的 API 调用
+ *
+ * 后端路由映射：
+ * - 资产统计: /api/v4/console/assets/*
+ * - 资产调整: /api/v4/console/asset-adjustment/*（POINTS/DIAMOND/BUDGET_POINTS/材料统一入口）
+ * - 材料管理: /api/v4/console/material/*
+ * - 物品管理: /api/v4/console/item-templates/*, /api/v4/console/item-instances/*
+ *
+ * @version 2.0.0
+ * @since 2026-01-23
+ * @see routes/v4/console/assets/transactions.js - 资产流水查询
+ * @see routes/v4/console/asset-adjustment.js - 资产调整（含钻石）
+ * @see routes/v4/console/material.js - 材料转换规则管理
+ */
+
+import { request, buildURL, buildQueryString } from './base.js'
+
+// ========== API 端点 ==========
+
+export const ASSET_ENDPOINTS = {
+  // 资产统计
+  STATS: '/api/v4/console/assets/stats',
+  TRANSACTIONS: '/api/v4/console/assets/transactions',
+  PORTFOLIO: '/api/v4/console/assets/portfolio',
+
+  // 资产调整
+  ADJUSTMENT_ASSET_TYPES: '/api/v4/console/asset-adjustment/asset-types',
+  ADJUSTMENT_USER_BALANCES: '/api/v4/console/asset-adjustment/user/:user_id/balances',
+  ADJUSTMENT_ADJUST: '/api/v4/console/asset-adjustment/adjust',
+
+  // 材料资产
+  MATERIAL_ASSET_TYPES: '/api/v4/console/material/asset-types',
+  MATERIAL_ASSET_TYPE_DETAIL: '/api/v4/console/material/asset-types/:asset_code',
+  MATERIAL_CONVERSION_RULES: '/api/v4/console/material/conversion-rules',
+  MATERIAL_CONVERSION_RULE_DETAIL: '/api/v4/console/material/conversion-rules/:rule_id',
+  MATERIAL_USER_BALANCE: '/api/v4/console/material/users/:user_id/balance',
+  MATERIAL_USER_ADJUST: '/api/v4/console/material/users/:user_id/adjust',
+  MATERIAL_USERS: '/api/v4/console/material/users',
+  MATERIAL_TRANSACTIONS: '/api/v4/console/material/transactions',
+
+  // 钻石账户
+  DIAMOND_LIST: '/api/v4/console/diamond-accounts',
+  DIAMOND_DETAIL: '/api/v4/console/diamond-accounts/:user_id',
+  DIAMOND_ADJUST: '/api/v4/console/diamond-accounts/adjust',
+  DIAMOND_USER_BALANCE: '/api/v4/console/diamond/users/:user_id/balance',
+  DIAMOND_USER_ADJUST: '/api/v4/console/diamond/users/:user_id/adjust',
+  DIAMOND_USERS: '/api/v4/console/diamond/users',
+  DIAMOND_ACCOUNTS: '/api/v4/console/diamond/accounts',
+
+  // 物品模板
+  ITEM_TEMPLATES_LIST: '/api/v4/console/item-templates',
+  ITEM_TEMPLATES_DETAIL: '/api/v4/console/item-templates/:id',
+  ITEM_TEMPLATES_CREATE: '/api/v4/console/item-templates',
+  ITEM_TEMPLATES_UPDATE: '/api/v4/console/item-templates/:id',
+  ITEM_TEMPLATES_DELETE: '/api/v4/console/item-templates/:id',
+  ITEM_TEMPLATES_STATS: '/api/v4/console/item-templates/stats',
+
+  // 物品实例
+  ITEM_INSTANCES_LIST: '/api/v4/console/item-instances',
+  ITEM_INSTANCES_DETAIL: '/api/v4/console/item-instances/:instance_id',
+  ITEM_INSTANCES_USER: '/api/v4/console/item-instances/user/:user_id',
+  ITEM_INSTANCES_TRANSFER: '/api/v4/console/item-instances/:instance_id/transfer',
+  ITEM_INSTANCES_FREEZE: '/api/v4/console/item-instances/:instance_id/freeze',
+  ITEM_INSTANCES_UNFREEZE: '/api/v4/console/item-instances/:instance_id/unfreeze'
+}
+
+// ========== API 调用方法 ==========
+
+export const AssetAPI = {
+  // ===== 资产统计 =====
+
+  /**
+   * 获取资产统计
+   * @async
+   * @returns {Promise<Object>}
+   */
+  async getStats() {
+    return await request({ url: ASSET_ENDPOINTS.STATS, method: 'GET' })
+  },
+
+  /**
+   * 获取资产流水记录（管理员视角）
+   *
+   * @description 查询指定用户的资产流水记录，支持分页和多条件筛选
+   * @async
+   * @function getTransactions
+   *
+   * @param {Object} params - 查询参数
+   * @param {number} params.user_id - 用户ID（必填）
+   * @param {string} [params.asset_code] - 资产代码筛选（如 'POINTS', 'DIAMOND', 'red_shard'）
+   * @param {string} [params.business_type] - 业务类型筛选（如 'admin_adjustment', 'lottery_reward'）
+   * @param {string} [params.start_date] - 开始日期（ISO8601格式）
+   * @param {string} [params.end_date] - 结束日期（ISO8601格式）
+   * @param {number} [params.page=1] - 页码（从1开始）
+   * @param {number} [params.page_size=20] - 每页数量（最大100）
+   *
+   * @returns {Promise<Object>} 响应对象
+   * @returns {boolean} return.success - 请求是否成功
+   * @returns {Object} return.data - 响应数据
+   * @returns {Array<Object>} return.data.transactions - 流水记录数组
+   * @returns {number} return.data.transactions[].transaction_id - 交易ID
+   * @returns {string} return.data.transactions[].asset_code - 资产代码
+   * @returns {string} return.data.transactions[].asset_name - 资产显示名称
+   * @returns {string} return.data.transactions[].tx_type - 业务类型
+   * @returns {number} return.data.transactions[].amount - 变动金额（正数增加，负数扣减）
+   * @returns {number} return.data.transactions[].balance_before - 变动前余额
+   * @returns {number} return.data.transactions[].balance_after - 变动后余额
+   * @returns {string} return.data.transactions[].reason - 变动原因
+   * @returns {string} return.data.transactions[].created_at - 创建时间（ISO8601）
+   * @returns {Object} return.data.pagination - 分页信息
+   * @returns {number} return.data.pagination.page - 当前页码
+   * @returns {number} return.data.pagination.page_size - 每页数量
+   * @returns {number} return.data.pagination.total - 总记录数
+   * @returns {number} return.data.pagination.total_pages - 总页数
+   *
+   * @example
+   * // 查询用户积分流水
+   * const result = await AssetAPI.getTransactions({
+   *   user_id: 123,
+   *   asset_code: 'POINTS',
+   *   page: 1,
+   *   page_size: 20
+   * })
+   *
+   * @see GET /api/v4/console/assets/transactions
+   */
+  async getTransactions(params = {}) {
+    const url = ASSET_ENDPOINTS.TRANSACTIONS + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取用户资产总览（资产组合）
+   *
+   * @description 整合三类资产域，提供统一的资产查询入口：
+   * 1. 积分（POINTS）- 来自 account_asset_balances
+   * 2. 可叠加资产（DIAMOND、材料）- 来自 account_asset_balances
+   * 3. 不可叠加物品（优惠券、实物商品）- 来自 item_instances
+   *
+   * @async
+   * @function getPortfolio
+   *
+   * @param {Object} [params] - 查询参数
+   * @param {boolean} [params.include_items=false] - 是否包含物品详细列表
+   *
+   * @returns {Promise<Object>} 响应对象
+   * @returns {boolean} return.success - 请求是否成功
+   * @returns {Object} return.data - 资产总览数据
+   * @returns {number} return.data.user_id - 用户ID
+   * @returns {Object} return.data.points - 积分信息
+   * @returns {number} return.data.points.available - 可用积分
+   * @returns {number} return.data.points.frozen - 冻结积分
+   * @returns {number} return.data.points.total_earned - 累计获得
+   * @returns {number} return.data.points.total_consumed - 累计消耗
+   * @returns {Array<Object>} return.data.fungible_assets - 可叠加资产列表
+   * @returns {string} return.data.fungible_assets[].asset_code - 资产代码
+   * @returns {string} return.data.fungible_assets[].display_name - 显示名称
+   * @returns {number} return.data.fungible_assets[].available_amount - 可用数量
+   * @returns {number} return.data.fungible_assets[].frozen_amount - 冻结数量
+   * @returns {number} return.data.fungible_assets[].total_amount - 总数量
+   * @returns {Object} return.data.non_fungible_items - 不可叠加物品统计
+   * @returns {number} return.data.non_fungible_items.total_count - 物品总数
+   * @returns {number} return.data.non_fungible_items.available_count - 可用物品数
+   * @returns {number} return.data.non_fungible_items.locked_count - 锁定物品数
+   * @returns {Object} return.data.non_fungible_items.by_type - 按类型分组统计
+   * @returns {string} return.data.retrieved_at - 数据获取时间（ISO8601）
+   *
+   * @example
+   * // 获取当前用户资产总览
+   * const result = await AssetAPI.getPortfolio()
+   *
+   * // 获取资产总览并包含物品列表
+   * const resultWithItems = await AssetAPI.getPortfolio({ include_items: true })
+   *
+   * @see GET /api/v4/console/assets/portfolio
+   */
+  async getPortfolio(params = {}) {
+    const url = ASSET_ENDPOINTS.PORTFOLIO + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  // ===== 资产调整 =====
+
+  /**
+   * 获取资产类型列表
+   * @async
+   * @returns {Promise<Object>}
+   */
+  async getAssetTypes() {
+    return await request({ url: ASSET_ENDPOINTS.ADJUSTMENT_ASSET_TYPES, method: 'GET' })
+  },
+
+  /**
+   * 获取指定用户的所有资产余额（管理员视角）
+   *
+   * @description 查询指定用户的所有资产账户余额，用于资产调整前的余额确认
+   * @async
+   * @function getUserBalances
+   *
+   * @param {number|string} userId - 用户ID（必填）
+   *
+   * @returns {Promise<Object>} 响应对象
+   * @returns {boolean} return.success - 请求是否成功
+   * @returns {Object} return.data - 响应数据
+   * @returns {Object} return.data.user - 用户基本信息
+   * @returns {number} return.data.user.user_id - 用户ID
+   * @returns {string} return.data.user.nickname - 用户昵称
+   * @returns {string} return.data.user.mobile - 手机号
+   * @returns {string} return.data.user.status - 用户状态
+   * @returns {Array<Object>} return.data.balances - 资产余额列表
+   * @returns {string} return.data.balances[].asset_code - 资产代码（POINTS/DIAMOND/BUDGET_POINTS/材料代码）
+   * @returns {number} return.data.balances[].available_amount - 可用余额
+   * @returns {number} return.data.balances[].frozen_amount - 冻结余额
+   * @returns {number} return.data.balances[].total - 总余额（可用+冻结）
+   * @returns {number|null} return.data.balances[].campaign_id - 活动ID（仅 BUDGET_POINTS 有值）
+   *
+   * @throws {Error} 用户不存在时返回 404 错误
+   *
+   * @example
+   * // 获取用户123的所有资产余额
+   * const result = await AssetAPI.getUserBalances(123)
+   * console.log(result.data.balances)
+   *
+   * @see GET /api/v4/console/asset-adjustment/user/:user_id/balances
+   */
+  async getUserBalances(userId) {
+    const url = buildURL(ASSET_ENDPOINTS.ADJUSTMENT_USER_BALANCES, { user_id: userId })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 管理员调整用户资产（敏感操作）
+   *
+   * @description 统一资产调整入口，支持 POINTS/DIAMOND/BUDGET_POINTS/材料等所有资产类型
+   *
+   * ⚠️ 安全约束：
+   * - idempotency_key 必须由前端提供（禁止自动生成，确保幂等性）
+   * - 所有调整操作记录审计日志
+   * - BUDGET_POINTS 调整必须提供 campaign_id
+   *
+   * @async
+   * @function adjustAsset
+   *
+   * @param {Object} data - 调整参数
+   * @param {number} data.user_id - 目标用户ID（必填）
+   * @param {string} data.asset_code - 资产代码（必填，如 'POINTS', 'DIAMOND', 'BUDGET_POINTS', 'red_shard'）
+   * @param {number} data.amount - 调整数量（必填，正数=增加，负数=扣减，不能为0）
+   * @param {string} data.reason - 调整原因（必填，用于审计）
+   * @param {string} data.idempotency_key - 幂等键（必填，推荐格式：admin_adjust_{admin_id}_{user_id}_{asset_code}_{timestamp}）
+   * @param {number} [data.campaign_id] - 活动ID（BUDGET_POINTS 必填）
+   *
+   * @returns {Promise<Object>} 响应对象
+   * @returns {boolean} return.success - 请求是否成功
+   * @returns {Object} return.data - 调整结果
+   * @returns {string} return.data.message - 操作结果消息
+   * @returns {number} return.data.user_id - 用户ID
+   * @returns {string} return.data.asset_code - 资产代码
+   * @returns {number} return.data.amount - 调整数量
+   * @returns {number} return.data.balance_before - 调整前余额
+   * @returns {number} return.data.balance_after - 调整后余额
+   * @returns {number} return.data.transaction_id - 交易流水ID
+   * @returns {string} return.data.idempotency_key - 幂等键
+   * @returns {boolean} [return.data.is_duplicate] - 是否为重复请求
+   *
+   * @throws {Error} 余额不足时返回 INSUFFICIENT_BALANCE 错误
+   * @throws {Error} 缺少必填参数时返回 BAD_REQUEST 错误
+   *
+   * @example
+   * // 增加用户积分
+   * const result = await AssetAPI.adjustAsset({
+   *   user_id: 123,
+   *   asset_code: 'POINTS',
+   *   amount: 1000,
+   *   reason: '客服补偿',
+   *   idempotency_key: `admin_adjust_1_123_POINTS_${Date.now()}`
+   * })
+   *
+   * // 扣减用户钻石
+   * const result2 = await AssetAPI.adjustAsset({
+   *   user_id: 123,
+   *   asset_code: 'DIAMOND',
+   *   amount: -50,
+   *   reason: '数据修正',
+   *   idempotency_key: `admin_adjust_1_123_DIAMOND_${Date.now()}`
+   * })
+   *
+   * @see POST /api/v4/console/asset-adjustment/adjust
+   */
+  async adjustAsset(data) {
+    return await request({ url: ASSET_ENDPOINTS.ADJUSTMENT_ADJUST, method: 'POST', data })
+  },
+
+  // ===== 材料资产 =====
+
+  /**
+   * 获取材料资产类型列表
+   * @async
+   * @returns {Promise<Object>}
+   */
+  async getMaterialAssetTypes() {
+    return await request({ url: ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES, method: 'GET' })
+  },
+
+  /**
+   * 获取材料转换规则列表（管理员）
+   *
+   * @description 查询材料转换规则，支持分页和筛选。
+   *
+   * 业务规则说明：
+   * - 规则采用版本化管理，改比例必须新增规则（禁止 UPDATE 覆盖历史）
+   * - 通过 effective_at 生效时间控制规则切换
+   * - 创建规则时会进行风控校验（循环拦截 + 套利闭环检测）
+   *
+   * @async
+   * @function getConversionRules
+   *
+   * @param {Object} [params] - 查询参数
+   * @param {string} [params.from_asset_code] - 源资产代码筛选（如 'red_shard'）
+   * @param {string} [params.to_asset_code] - 目标资产代码筛选（如 'DIAMOND'）
+   * @param {boolean|string} [params.is_enabled] - 是否启用筛选（true/false）
+   * @param {number} [params.page=1] - 页码（从1开始）
+   * @param {number} [params.page_size=20] - 每页数量
+   *
+   * @returns {Promise<Object>} 响应对象
+   * @returns {boolean} return.success - 请求是否成功
+   * @returns {Object} return.data - 响应数据
+   * @returns {Array<Object>} return.data.rules - 转换规则列表
+   * @returns {number} return.data.rules[].rule_id - 规则ID
+   * @returns {string} return.data.rules[].from_asset_code - 源资产代码
+   * @returns {string} return.data.rules[].to_asset_code - 目标资产代码
+   * @returns {number} return.data.rules[].from_amount - 源资产数量
+   * @returns {number} return.data.rules[].to_amount - 目标资产数量
+   * @returns {string} return.data.rules[].effective_at - 生效时间（ISO8601）
+   * @returns {boolean} return.data.rules[].is_enabled - 是否启用
+   * @returns {number} [return.data.rules[].min_from_amount] - 最小转换数量
+   * @returns {number} [return.data.rules[].max_from_amount] - 最大转换数量
+   * @returns {number} [return.data.rules[].fee_rate] - 手续费费率（如 0.05 = 5%）
+   * @returns {string} [return.data.rules[].title] - 规则标题
+   * @returns {Object} return.data.pagination - 分页信息
+   * @returns {number} return.data.total - 总记录数
+   *
+   * @example
+   * // 查询所有启用的转换规则
+   * const result = await AssetAPI.getConversionRules({ is_enabled: true })
+   *
+   * // 查询红色碎片的转换规则
+   * const result2 = await AssetAPI.getConversionRules({
+   *   from_asset_code: 'red_shard',
+   *   page: 1,
+   *   page_size: 10
+   * })
+   *
+   * @see GET /api/v4/console/material/conversion-rules
+   */
+  async getConversionRules(params = {}) {
+    const url = ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULES + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取用户材料余额
+   * @param {number} userId - 用户 ID
+   * @async
+   * @returns {Promise<Object>}
+   */
+  async getUserMaterialBalance(userId) {
+    const url = buildURL(ASSET_ENDPOINTS.MATERIAL_USER_BALANCE, { user_id: userId })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 调整用户材料资产（敏感操作）
+   *
+   * @description 调整指定用户的材料资产余额
+   *
+   * ⚠️ 架构说明（2026-01-23）：
+   * - 后端已将材料调整统一到 /api/v4/console/asset-adjustment/adjust 端点
+   * - 推荐使用 adjustAsset() 方法，传入材料的 asset_code（如 'red_shard'）
+   * - 本方法保留用于兼容性，内部可能需要适配
+   *
+   * @async
+   * @function adjustUserMaterial
+   * @deprecated 推荐使用 adjustAsset() 统一入口
+   *
+   * @param {number|string} userId - 用户ID（必填）
+   * @param {Object} data - 调整参数
+   * @param {string} data.asset_code - 材料资产代码（必填，如 'red_shard', 'blue_crystal'）
+   * @param {number} data.amount - 调整数量（必填，正数=增加，负数=扣减）
+   * @param {string} data.reason - 调整原因（必填）
+   * @param {string} data.idempotency_key - 幂等键（必填）
+   *
+   * @returns {Promise<Object>} 响应对象
+   * @returns {boolean} return.success - 请求是否成功
+   * @returns {Object} return.data - 调整结果
+   *
+   * @example
+   * // 推荐：使用 adjustAsset 统一入口
+   * const result = await AssetAPI.adjustAsset({
+   *   user_id: 123,
+   *   asset_code: 'red_shard',
+   *   amount: 10,
+   *   reason: '活动奖励',
+   *   idempotency_key: `admin_adjust_1_123_red_shard_${Date.now()}`
+   * })
+   *
+   * @see adjustAsset - 推荐使用的统一资产调整方法
+   * @see POST /api/v4/console/asset-adjustment/adjust - 后端统一调整端点
+   */
+  async adjustUserMaterial(userId, data) {
+    const url = buildURL(ASSET_ENDPOINTS.MATERIAL_USER_ADJUST, { user_id: userId })
+    return await request({ url, method: 'POST', data })
+  },
+
+  /**
+   * 获取材料交易记录
+   * @param {Object} params - 查询参数
+   * @async
+   * @returns {Promise<Object>}
+   */
+  async getMaterialTransactions(params = {}) {
+    const url = ASSET_ENDPOINTS.MATERIAL_TRANSACTIONS + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  // ===== 钻石账户 =====
+
+  /**
+   * 获取钻石账户列表
+   * @param {Object} params - 查询参数
+   * @async
+   * @returns {Promise<Object>}
+   */
+  async getDiamondAccounts(params = {}) {
+    const url = ASSET_ENDPOINTS.DIAMOND_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取用户钻石详情
+   * @param {number} userId - 用户 ID
+   * @async
+   * @returns {Promise<Object>}
+   */
+  async getDiamondDetail(userId) {
+    const url = buildURL(ASSET_ENDPOINTS.DIAMOND_DETAIL, { user_id: userId })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 调整用户钻石余额（敏感操作）
+   *
+   * @description 调整指定用户的钻石余额
+   *
+   * ⚠️ 架构说明（2026-01-23）：
+   * - 后端已将钻石调整统一到 /api/v4/console/asset-adjustment/adjust 端点
+   * - 推荐使用 adjustAsset() 方法，传入 asset_code: 'DIAMOND'
+   * - 本方法保留用于兼容性，实际调用可能需要适配到统一端点
+   *
+   * @async
+   * @function adjustDiamond
+   * @deprecated 推荐使用 adjustAsset({ asset_code: 'DIAMOND', ... }) 统一入口
+   *
+   * @param {Object} data - 调整参数
+   * @param {number} data.user_id - 目标用户ID（必填）
+   * @param {number} data.amount - 调整数量（必填，正数=增加，负数=扣减）
+   * @param {string} data.reason - 调整原因（必填）
+   * @param {string} data.idempotency_key - 幂等键（必填）
+   *
+   * @returns {Promise<Object>} 响应对象
+   * @returns {boolean} return.success - 请求是否成功
+   * @returns {Object} return.data - 调整结果
+   * @returns {number} return.data.balance_before - 调整前余额
+   * @returns {number} return.data.balance_after - 调整后余额
+   * @returns {number} return.data.transaction_id - 交易流水ID
+   *
+   * @throws {Error} 余额不足时返回 INSUFFICIENT_BALANCE 错误
+   *
+   * @example
+   * // 推荐：使用 adjustAsset 统一入口
+   * const result = await AssetAPI.adjustAsset({
+   *   user_id: 123,
+   *   asset_code: 'DIAMOND',
+   *   amount: 100,
+   *   reason: '充值奖励',
+   *   idempotency_key: `admin_adjust_1_123_DIAMOND_${Date.now()}`
+   * })
+   *
+   * // 兼容：使用本方法
+   * const result2 = await AssetAPI.adjustDiamond({
+   *   user_id: 123,
+   *   amount: 100,
+   *   reason: '充值奖励',
+   *   idempotency_key: `admin_adjust_1_123_DIAMOND_${Date.now()}`
+   * })
+   *
+   * @see adjustAsset - 推荐使用的统一资产调整方法
+   * @see POST /api/v4/console/asset-adjustment/adjust - 后端统一调整端点
+   */
+  async adjustDiamond(data) {
+    return await request({ url: ASSET_ENDPOINTS.DIAMOND_ADJUST, method: 'POST', data })
+  },
+
+  // ===== 物品模板 =====
+
+  /**
+   * 获取物品模板列表
+   * @param {Object} params - 查询参数
+   * @async
+   * @returns {Promise<Object>}
+   */
+  async getItemTemplates(params = {}) {
+    const url = ASSET_ENDPOINTS.ITEM_TEMPLATES_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取物品模板详情
+   * @param {number} id - 模板 ID
+   * @async
+   * @returns {Promise<Object>}
+   */
+  async getItemTemplateDetail(id) {
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATES_DETAIL, { id })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 创建物品模板
+   * @param {Object} data - 模板数据
+   * @async
+   * @returns {Promise<Object>}
+   */
+  async createItemTemplate(data) {
+    return await request({ url: ASSET_ENDPOINTS.ITEM_TEMPLATES_CREATE, method: 'POST', data })
+  },
+
+  /**
+   * 更新物品模板
+   * @param {number} id - 模板 ID
+   * @param {Object} data - 模板数据
+   * @async
+   * @returns {Promise<Object>}
+   */
+  async updateItemTemplate(id, data) {
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATES_UPDATE, { id })
+    return await request({ url, method: 'PUT', data })
+  },
+
+  /**
+   * 删除物品模板
+   * @param {number} id - 模板 ID
+   * @async
+   * @returns {Promise<Object>}
+   */
+  async deleteItemTemplate(id) {
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATES_DELETE, { id })
+    return await request({ url, method: 'DELETE' })
+  },
+
+  // ===== 物品实例 =====
+
+  /**
+   * 获取物品实例列表
+   * @param {Object} params - 查询参数
+   * @async
+   * @returns {Promise<Object>}
+   */
+  async getItemInstances(params = {}) {
+    const url = ASSET_ENDPOINTS.ITEM_INSTANCES_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取用户物品实例
+   * @param {number} userId - 用户 ID
+   * @param {Object} params - 查询参数
+   * @async
+   * @returns {Promise<Object>}
+   */
+  async getUserItemInstances(userId, params = {}) {
+    const url =
+      buildURL(ASSET_ENDPOINTS.ITEM_INSTANCES_USER, { user_id: userId }) + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 转移物品
+   * @param {string} instanceId - 实例 ID
+   * @param {Object} data - 转移数据
+   * @async
+   * @returns {Promise<Object>}
+   */
+  async transferItem(instanceId, data) {
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCES_TRANSFER, { instance_id: instanceId })
+    return await request({ url, method: 'POST', data })
+  },
+
+  /**
+   * 冻结物品
+   * @param {string} instanceId - 实例 ID
+   * @param {Object} data - 冻结数据
+   * @async
+   * @returns {Promise<Object>}
+   */
+  async freezeItem(instanceId, data) {
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCES_FREEZE, { instance_id: instanceId })
+    return await request({ url, method: 'POST', data })
+  },
+
+  /**
+   * 解冻物品
+   * @param {string} instanceId - 实例 ID
+   * @async
+   * @returns {Promise<Object>}
+   */
+  async unfreezeItem(instanceId) {
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCES_UNFREEZE, { instance_id: instanceId })
+    return await request({ url, method: 'POST' })
+  }
+}
+
+export default AssetAPI
