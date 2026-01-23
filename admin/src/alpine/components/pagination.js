@@ -12,6 +12,8 @@
  * </div>
  */
 
+
+import { logger } from '../../utils/logger.js'
 /**
  * Pagination 组件数据
  * @param {Object} config - 配置选项
@@ -142,4 +144,4 @@ function pagination(config = {}) {
   }
 }
 
-console.log('📦 Pagination 组件已加载')
+logger.info('Pagination 组件已加载')

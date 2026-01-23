@@ -1,0 +1,522 @@
+/**
+ * 高级状态管理模块
+ *
+ * @file admin/src/modules/user/composables/advanced-status.js
+ * @description 高级状态、风控配置、变更历史、概率调整
+ * @version 1.0.0
+ * @date 2026-01-24
+ */
+
+import { logger } from '../../../utils/logger.js'
+import { USER_ENDPOINTS } from '../../../api/user.js'
+import { buildURL } from '../../../api/base.js'
+
+/**
+ * 高级状态管理状态
+ * @returns {Object} 状态对象
+ */
+export function useAdvancedStatusState() {
+  return {
+    // ==================== 高级状态 ====================
+    /** @type {Array} 高级状态用户列表 */
+    premiumUsers: [],
+    /** @type {Object} 高级状态筛选条件 */
+    premiumFilters: { user_id: '', is_valid: '', unlock_method: '' },
+    /** @type {number} 高级状态页码 */
+    premiumPage: 1,
+    /** @type {number} 高级状态每页数量 */
+    premiumPageSize: 20,
+    /** @type {Object} 高级状态分页 */
+    premiumPagination: { total: 0, totalPages: 1 },
+    /** @type {Object} 高级状态统计 */
+    premiumStats: { total: 0, active: 0, expired: 0, expiring_soon: 0 },
+    /** @type {Object|null} 选中的高级状态用户 */
+    selectedPremiumUser: null,
+
+    // ==================== 风控配置 ====================
+    /** @type {Array} 风控配置列表 */
+    riskProfiles: [],
+    /** @type {Object} 风控筛选条件 */
+    riskFilters: { config_type: '', user_level: '', is_frozen: '' },
+    /** @type {number} 风控页码 */
+    riskPage: 1,
+    /** @type {number} 风控每页数量 */
+    riskPageSize: 20,
+    /** @type {Object} 风控分页 */
+    riskPagination: { total: 0, totalPages: 1 },
+    /** @type {Array} 冻结用户列表 */
+    frozenUsers: [],
+    /** @type {Array} 风控等级配置 */
+    riskLevels: [],
+    /** @type {Object|null} 选中的风控配置 */
+    selectedRiskProfile: null,
+    /** @type {Object} 风控表单 */
+    riskForm: {
+      user_id: '',
+      daily_points_limit: 10000,
+      single_transaction_limit: 1000,
+      daily_lottery_limit: 100,
+      freeze_reason: ''
+    },
+
+    // ==================== 变更历史 ====================
+    /** @type {Array} 角色变更历史 */
+    roleChangeHistory: [],
+    /** @type {Object} 角色历史筛选条件 */
+    roleHistoryFilters: { user_id: '', operator_id: '', startDate: '', endDate: '' },
+    /** @type {number} 角色历史页码 */
+    roleHistoryPage: 1,
+    /** @type {number} 角色历史每页数量 */
+    roleHistoryPageSize: 20,
+    /** @type {Object} 角色历史分页 */
+    roleHistoryPagination: { total: 0, totalPages: 1 },
+    /** @type {Array} 状态变更历史 */
+    statusChangeHistory: [],
+    /** @type {Object} 状态历史筛选条件 */
+    statusHistoryFilters: { user_id: '', operator_id: '', startDate: '', endDate: '' },
+    /** @type {number} 状态历史页码 */
+    statusHistoryPage: 1,
+    /** @type {number} 状态历史每页数量 */
+    statusHistoryPageSize: 20,
+    /** @type {Object} 状态历史分页 */
+    statusHistoryPagination: { total: 0, totalPages: 1 },
+
+    // ==================== 概率调整 ====================
+    /** @type {Object} 概率调整模态框数据 */
+    probabilityModal: {
+      userId: null,
+      userNickname: '',
+      mode: 'global',
+      multiplier: 1,
+      targetPrizeId: '',
+      customProbability: 0,
+      duration: 60,
+      reason: ''
+    }
+  }
+}
+
+/**
+ * 高级状态管理方法
+ * @returns {Object} 方法对象
+ */
+export function useAdvancedStatusMethods() {
+  return {
+    // ==================== 高级状态管理 ====================
+
+    /**
+     * 加载高级状态用户列表
+     */
+    async loadPremiumUsers() {
+      try {
+        const params = new URLSearchParams()
+        params.append('page', this.premiumPage)
+        params.append('page_size', this.premiumPageSize)
+        if (this.premiumFilters.user_id) params.append('user_id', this.premiumFilters.user_id)
+        if (this.premiumFilters.is_valid) params.append('is_valid', this.premiumFilters.is_valid)
+        if (this.premiumFilters.unlock_method)
+          params.append('unlock_method', this.premiumFilters.unlock_method)
+
+        const response = await this.apiGet(
+          `${USER_ENDPOINTS.PREMIUM_LIST}?${params}`,
+          {},
+          { showLoading: false }
+        )
+
+        if (response?.success) {
+          this.premiumUsers = response.data?.list || response.data?.users || []
+          if (response.data?.pagination) {
+            this.premiumPagination.total = response.data.pagination.total || 0
+            this.premiumPagination.totalPages = response.data.pagination.total_pages || 1
+          }
+        }
+      } catch (error) {
+        logger.error('加载高级状态失败:', error)
+        this.premiumUsers = []
+      }
+    },
+
+    /**
+     * 加载高级状态统计
+     */
+    async loadPremiumStats() {
+      try {
+        const response = await this.apiGet(
+          USER_ENDPOINTS.PREMIUM_STATUS_STATS,
+          {},
+          { showLoading: false, showError: false }
+        )
+        if (response?.success && response.data) {
+          this.premiumStats = {
+            total: response.data.total ?? 0,
+            active: response.data.active ?? 0,
+            expired: response.data.expired ?? 0,
+            expiring_soon: response.data.expiring_soon ?? 0
+          }
+        }
+      } catch (error) {
+        logger.error('加载高级状态统计失败:', error)
+      }
+    },
+
+    /**
+     * 查看高级状态详情
+     * @param {Object} user - 用户对象
+     */
+    viewPremiumDetail(user) {
+      this.selectedPremiumUser = user
+      this.showModal('premiumDetailModal')
+    },
+
+    /**
+     * 延长高级状态
+     * @param {Object} user - 用户对象
+     * @param {number} days - 延长天数
+     */
+    async extendPremium(user, days = 30) {
+      await this.confirmAndExecute(
+        `确定为用户延长 ${days} 天高级状态？`,
+        async () => {
+          const response = await this.apiCall(
+            buildURL(USER_ENDPOINTS.PREMIUM_STATUS_EXTEND, { user_id: user.user_id }),
+            { method: 'POST', data: { days } }
+          )
+          if (response?.success) {
+            await this.loadPremiumUsers()
+            await this.loadPremiumStats()
+          }
+        },
+        { successMessage: '高级状态已延长' }
+      )
+    },
+
+    /**
+     * 撤销高级状态
+     * @param {Object} user - 用户对象
+     */
+    async revokePremium(user) {
+      await this.confirmAndExecute(
+        `确定撤销用户「${user.nickname || user.user_id}」的高级状态？`,
+        async () => {
+          const response = await this.apiCall(
+            buildURL(USER_ENDPOINTS.PREMIUM_STATUS_REVOKE, { user_id: user.user_id }),
+            { method: 'POST' }
+          )
+          if (response?.success) {
+            await this.loadPremiumUsers()
+            await this.loadPremiumStats()
+          }
+        },
+        { successMessage: '高级状态已撤销', confirmText: '确认撤销' }
+      )
+    },
+
+    // ==================== 风控配置管理 ====================
+
+    /**
+     * 加载风控配置列表
+     */
+    async loadRiskProfiles() {
+      try {
+        const params = new URLSearchParams()
+        params.append('page', this.riskPage)
+        params.append('page_size', this.riskPageSize)
+        if (this.riskFilters.config_type)
+          params.append('config_type', this.riskFilters.config_type)
+        if (this.riskFilters.user_level) params.append('user_level', this.riskFilters.user_level)
+        if (this.riskFilters.is_frozen) params.append('is_frozen', this.riskFilters.is_frozen)
+
+        const response = await this.apiGet(
+          `${USER_ENDPOINTS.RISK_PROFILE_LIST}?${params}`,
+          {},
+          { showLoading: false }
+        )
+
+        if (response?.success) {
+          this.riskProfiles = response.data?.profiles || response.data?.list || []
+          if (response.data?.pagination) {
+            this.riskPagination.total = response.data.pagination.total || 0
+            this.riskPagination.totalPages = response.data.pagination.total_pages || 1
+          }
+        }
+      } catch (error) {
+        logger.error('加载风控配置失败:', error)
+        this.riskProfiles = []
+      }
+    },
+
+    /**
+     * 打开风控配置模态框
+     * @param {Object|null} profile - 风控配置对象
+     */
+    openRiskModal(profile = null) {
+      if (profile) {
+        this.riskForm = {
+          user_id: profile.user_id || '',
+          daily_points_limit: profile.daily_points_limit || 10000,
+          single_transaction_limit: profile.single_transaction_limit || 1000,
+          daily_lottery_limit: profile.daily_lottery_limit || 100,
+          freeze_reason: ''
+        }
+        this.selectedRiskProfile = profile
+      } else {
+        this.riskForm = {
+          user_id: '',
+          daily_points_limit: 10000,
+          single_transaction_limit: 1000,
+          daily_lottery_limit: 100,
+          freeze_reason: ''
+        }
+        this.selectedRiskProfile = null
+      }
+      this.showModal('riskModal')
+    },
+
+    /**
+     * 提交风控配置
+     */
+    async submitRiskProfile() {
+      if (!this.riskForm.user_id) {
+        this.showError('请输入用户ID')
+        return
+      }
+
+      try {
+        this.saving = true
+        const url = this.selectedRiskProfile
+          ? buildURL(USER_ENDPOINTS.RISK_PROFILE_UPDATE, {
+              id: this.selectedRiskProfile.id
+            })
+          : USER_ENDPOINTS.RISK_PROFILE_CREATE
+
+        const response = await this.apiCall(url, {
+          method: this.selectedRiskProfile ? 'PUT' : 'POST',
+          data: this.riskForm
+        })
+
+        if (response?.success) {
+          this.showSuccess(this.selectedRiskProfile ? '风控配置已更新' : '风控配置已创建')
+          this.hideModal('riskModal')
+          await this.loadRiskProfiles()
+        }
+      } catch (error) {
+        this.showError('保存风控配置失败: ' + (error.message || '未知错误'))
+      } finally {
+        this.saving = false
+      }
+    },
+
+    /**
+     * 冻结用户
+     * @param {Object} profile - 风控配置对象
+     */
+    async freezeUser(profile) {
+      await this.confirmAndExecute(
+        `确定冻结用户「${profile.user_id}」？`,
+        async () => {
+          const response = await this.apiCall(
+            buildURL(USER_ENDPOINTS.RISK_PROFILE_FREEZE, { user_id: profile.user_id }),
+            { method: 'POST', data: { reason: this.riskForm.freeze_reason || '管理员操作' } }
+          )
+          if (response?.success) {
+            await this.loadRiskProfiles()
+          }
+        },
+        { successMessage: '用户已冻结', confirmText: '确认冻结' }
+      )
+    },
+
+    /**
+     * 解冻用户
+     * @param {Object} profile - 风控配置对象
+     */
+    async unfreezeUser(profile) {
+      await this.confirmAndExecute(
+        `确定解冻用户「${profile.user_id}」？`,
+        async () => {
+          const response = await this.apiCall(
+            buildURL(USER_ENDPOINTS.RISK_PROFILE_UNFREEZE, { user_id: profile.user_id }),
+            { method: 'POST' }
+          )
+          if (response?.success) {
+            await this.loadRiskProfiles()
+          }
+        },
+        { successMessage: '用户已解冻' }
+      )
+    },
+
+    // ==================== 变更历史 ====================
+
+    /**
+     * 加载角色变更历史
+     */
+    async loadRoleChangeHistory() {
+      try {
+        const params = new URLSearchParams()
+        params.append('page', this.roleHistoryPage)
+        params.append('page_size', this.roleHistoryPageSize)
+        if (this.roleHistoryFilters.user_id)
+          params.append('user_id', this.roleHistoryFilters.user_id)
+        if (this.roleHistoryFilters.operator_id)
+          params.append('operator_id', this.roleHistoryFilters.operator_id)
+        if (this.roleHistoryFilters.startDate)
+          params.append('start_date', this.roleHistoryFilters.startDate)
+        if (this.roleHistoryFilters.endDate)
+          params.append('end_date', this.roleHistoryFilters.endDate)
+
+        const response = await this.apiGet(
+          `${USER_ENDPOINTS.ROLE_CHANGE_HISTORY_LIST}?${params}`,
+          {},
+          { showLoading: false }
+        )
+
+        if (response?.success) {
+          this.roleChangeHistory = response.data?.history || response.data?.list || []
+          if (response.data?.pagination) {
+            this.roleHistoryPagination.total = response.data.pagination.total || 0
+            this.roleHistoryPagination.totalPages = response.data.pagination.total_pages || 1
+          }
+        }
+      } catch (error) {
+        logger.error('加载角色变更历史失败:', error)
+        this.roleChangeHistory = []
+      }
+    },
+
+    /**
+     * 加载状态变更历史
+     */
+    async loadStatusChangeHistory() {
+      try {
+        const params = new URLSearchParams()
+        params.append('page', this.statusHistoryPage)
+        params.append('page_size', this.statusHistoryPageSize)
+        if (this.statusHistoryFilters.user_id)
+          params.append('user_id', this.statusHistoryFilters.user_id)
+        if (this.statusHistoryFilters.operator_id)
+          params.append('operator_id', this.statusHistoryFilters.operator_id)
+        if (this.statusHistoryFilters.startDate)
+          params.append('start_date', this.statusHistoryFilters.startDate)
+        if (this.statusHistoryFilters.endDate)
+          params.append('end_date', this.statusHistoryFilters.endDate)
+
+        const response = await this.apiGet(
+          `${USER_ENDPOINTS.STATUS_CHANGE_HISTORY_LIST}?${params}`,
+          {},
+          { showLoading: false }
+        )
+
+        if (response?.success) {
+          this.statusChangeHistory = response.data?.history || response.data?.list || []
+          if (response.data?.pagination) {
+            this.statusHistoryPagination.total = response.data.pagination.total || 0
+            this.statusHistoryPagination.totalPages = response.data.pagination.total_pages || 1
+          }
+        }
+      } catch (error) {
+        logger.error('加载状态变更历史失败:', error)
+        this.statusChangeHistory = []
+      }
+    },
+
+    // ==================== 概率调整 ====================
+
+    /**
+     * 打开概率调整模态框
+     * @param {Object} user - 用户对象
+     */
+    openProbabilityModal(user) {
+      this.probabilityModal = {
+        userId: user.user_id || user.id,
+        userNickname: user.nickname || `用户${user.user_id}`,
+        mode: 'global',
+        multiplier: 1,
+        targetPrizeId: '',
+        customProbability: 0,
+        duration: 60,
+        reason: ''
+      }
+      this.showModal('probabilityModal')
+    },
+
+    /**
+     * 提交概率调整
+     */
+    async submitProbabilityAdjustment() {
+      if (!this.probabilityModal.userId) {
+        this.showError('用户信息无效')
+        return
+      }
+
+      try {
+        this.saving = true
+        const response = await this.apiCall(
+          buildURL(USER_ENDPOINTS.ADJUST_PROBABILITY, {
+            user_id: this.probabilityModal.userId
+          }),
+          {
+            method: 'POST',
+            data: {
+              mode: this.probabilityModal.mode,
+              multiplier: this.probabilityModal.multiplier,
+              target_prize_id: this.probabilityModal.targetPrizeId || null,
+              custom_probability: this.probabilityModal.customProbability || null,
+              duration_minutes: this.probabilityModal.duration,
+              reason: this.probabilityModal.reason
+            }
+          }
+        )
+
+        if (response?.success) {
+          this.showSuccess('概率调整已生效')
+          this.hideModal('probabilityModal')
+        }
+      } catch (error) {
+        this.showError('概率调整失败: ' + (error.message || '未知错误'))
+      } finally {
+        this.saving = false
+      }
+    },
+
+    // ==================== 辅助方法 ====================
+
+    /**
+     * 获取解锁方式文本
+     * @param {string} method - 解锁方式代码
+     * @returns {string} 解锁方式文本
+     */
+    getUnlockMethodText(method) {
+      const map = { purchase: '购买', activity: '活动', gift: '赠送', system: '系统' }
+      return map[method] || method || '-'
+    },
+
+    /**
+     * 获取风控等级文本
+     * @param {string} level - 风控等级代码
+     * @returns {string} 风控等级文本
+     */
+    getRiskLevelText(level) {
+      const map = { low: '低风险', medium: '中风险', high: '高风险', critical: '极高风险' }
+      return map[level] || level || '-'
+    },
+
+    /**
+     * 获取风控等级样式
+     * @param {string} level - 风控等级代码
+     * @returns {string} CSS类名
+     */
+    getRiskLevelClass(level) {
+      const map = {
+        low: 'bg-success',
+        medium: 'bg-warning',
+        high: 'bg-danger',
+        critical: 'bg-dark'
+      }
+      return map[level] || 'bg-secondary'
+    }
+  }
+}
+
+export default { useAdvancedStatusState, useAdvancedStatusMethods }
+

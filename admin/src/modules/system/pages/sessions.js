@@ -18,7 +18,7 @@
  * - 会话统计数据展示
  *
  * @requires createBatchOperationMixin - 批量操作混入
- * @requires API_ENDPOINTS - API端点配置
+ * @requires USER_ENDPOINTS - 用户相关API端点
  * @requires apiRequest - API请求函数
  *
  * @example
@@ -30,6 +30,10 @@
  * </div>
  */
 
+
+import { logger } from '../../../utils/logger.js'
+import { USER_ENDPOINTS } from '../../../api/user.js'
+import { buildURL } from '../../../api/base.js'
 /**
  * 会话对象类型
  * @typedef {Object} UserSession
@@ -124,7 +128,7 @@ function sessionsPage() {
      * @returns {void}
      */
     init() {
-      console.log('✅ 会话管理页面初始化 (Mixin v3.0)')
+      logger.info('会话管理页面初始化 (Mixin v3.0)')
 
       // 使用 Mixin 的认证检查
       if (!this.checkAuth()) {
@@ -138,7 +142,7 @@ function sessionsPage() {
           const payload = JSON.parse(atob(token.split('.')[1]))
           this.currentSessionId = payload.session_id
         } catch (e) {
-          console.error('解析token失败:', e)
+          logger.error('解析token失败:', e)
         }
       }
 
@@ -183,7 +187,7 @@ function sessionsPage() {
           params.append('user_id', this.filters.userId)
         }
 
-        const url = API_ENDPOINTS.SESSIONS.LIST + '?' + params.toString()
+        const url = USER_ENDPOINTS.SESSIONS_LIST + '?' + params.toString()
         const response = await apiRequest(url)
 
         if (response && response.success) {
@@ -206,7 +210,7 @@ function sessionsPage() {
      */
     async loadStats() {
       try {
-        const response = await apiRequest(API_ENDPOINTS.SESSIONS.STATS)
+        const response = await apiRequest(USER_ENDPOINTS.SESSIONS_STATS)
         if (response && response.success) {
           const stats = response.data
           const userStats = stats.by_user_type?.user || { active_sessions: 0, unique_users: 0 }
@@ -220,7 +224,7 @@ function sessionsPage() {
           }
         }
       } catch (error) {
-        console.error('加载统计数据失败:', error)
+        logger.error('加载统计数据失败:', error)
       }
     },
 
@@ -272,8 +276,8 @@ function sessionsPage() {
       this.globalLoading = true
 
       try {
-        const url = window.API.buildURL(window.API_ENDPOINTS.SESSIONS.DEACTIVATE, {
-          session_id: sessionId
+        const url = buildURL(USER_ENDPOINTS.SESSIONS_DEACTIVATE, {
+          id: sessionId
         })
         const response = await apiRequest(url, { method: 'POST' })
 
@@ -284,7 +288,7 @@ function sessionsPage() {
           this.showError(response?.message || '操作失败')
         }
       } catch (error) {
-        console.error('撤销会话失败:', error)
+        logger.error('撤销会话失败:', error)
         this.showError(error.message)
       } finally {
         this.globalLoading = false
@@ -317,20 +321,20 @@ function sessionsPage() {
         let successCount = 0
         for (const sessionId of selected) {
           try {
-            const url = window.API.buildURL(window.API_ENDPOINTS.SESSIONS.DEACTIVATE, {
-              session_id: sessionId
+            const url = buildURL(USER_ENDPOINTS.SESSIONS_DEACTIVATE, {
+              id: sessionId
             })
             const response = await apiRequest(url, { method: 'POST' })
             if (response && response.success) successCount++
           } catch (e) {
-            console.error(`撤销会话 ${sessionId} 失败:`, e)
+            logger.error(`撤销会话 ${sessionId} 失败:`, e)
           }
         }
 
         this.showSuccess(`批量撤销完成：成功 ${successCount}/${selected.length} 个`)
         this.loadData()
       } catch (error) {
-        console.error('批量撤销失败:', error)
+        logger.error('批量撤销失败:', error)
         this.showError(error.message)
       } finally {
         this.globalLoading = false
@@ -351,7 +355,7 @@ function sessionsPage() {
       this.globalLoading = true
 
       try {
-        const response = await apiRequest(API_ENDPOINTS.SESSIONS.CLEANUP, { method: 'POST' })
+        const response = await apiRequest(USER_ENDPOINTS.SESSIONS_CLEANUP, { method: 'POST' })
 
         if (response && response.success) {
           const count = response.data.deleted_count || response.data.count || 0
@@ -361,7 +365,7 @@ function sessionsPage() {
           this.showError(response?.message || '操作失败')
         }
       } catch (error) {
-        console.error('清理过期会话失败:', error)
+        logger.error('清理过期会话失败:', error)
         this.showError(error.message)
       } finally {
         this.globalLoading = false
@@ -387,7 +391,7 @@ function sessionsPage() {
       this.globalLoading = true
 
       try {
-        const response = await apiRequest(API_ENDPOINTS.SESSIONS.DEACTIVATE_USER, {
+        const response = await apiRequest(USER_ENDPOINTS.SESSIONS_DEACTIVATE_USER, {
           method: 'POST',
           body: JSON.stringify({
             user_type: this.userInfo.is_admin ? 'admin' : 'user',
@@ -404,7 +408,7 @@ function sessionsPage() {
           this.showError(response?.message || '撤销失败')
         }
       } catch (error) {
-        console.error('撤销其他会话失败:', error)
+        logger.error('撤销其他会话失败:', error)
         this.showError(error.message)
       } finally {
         this.globalLoading = false
@@ -528,5 +532,5 @@ function sessionsPage() {
  */
 document.addEventListener('alpine:init', () => {
   Alpine.data('sessionsPage', sessionsPage)
-  console.log('✅ [SessionsPage] Alpine 组件已注册 (Mixin v3.0)')
+  logger.info('[SessionsPage] Alpine 组件已注册 (Mixin v3.0)')
 })

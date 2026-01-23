@@ -20,8 +20,10 @@
  * }, '正在加载...')
  */
 
+
+import { logger } from '../../utils/logger.js'
 document.addEventListener('alpine:init', () => {
-  console.log('🔧 注册加载状态 Store...')
+  logger.info('🔧 注册加载状态 Store...')
 
   /**
    * 加载状态 Store
@@ -87,7 +89,7 @@ document.addEventListener('alpine:init', () => {
       // 同步到全局加载遮罩
       this._updateGlobalOverlay()
 
-      console.log(`[Loading] 开始: ${taskId} - ${message}`)
+      logger.info(`[Loading] 开始: ${taskId} - ${message}`)
       return taskId
     },
 
@@ -99,7 +101,7 @@ document.addEventListener('alpine:init', () => {
     stop(taskId) {
       if (this.tasks[taskId]) {
         const duration = Date.now() - this.tasks[taskId].startTime
-        console.log(`[Loading] 结束: ${taskId} (${duration}ms)`)
+        logger.info(`[Loading] 结束: ${taskId} (${duration}ms)`)
 
         delete this.tasks[taskId]
 
@@ -128,7 +130,7 @@ document.addEventListener('alpine:init', () => {
       const count = Object.keys(this.tasks).length
       this.tasks = {}
       this._updateGlobalOverlay()
-      console.log(`[Loading] 停止所有任务: ${count} 个`)
+      logger.info(`[Loading] 停止所有任务: ${count} 个`)
     },
 
     /**
@@ -177,23 +179,26 @@ document.addEventListener('alpine:init', () => {
     /**
      * 更新全局加载遮罩
      * @private
+     * ========== window.xxx 已移除（方案 A：彻底 ES Module） ==========
+     * 直接操作 DOM 元素，不再依赖 window.showLoading/hideLoading
      */
     _updateGlobalOverlay() {
       const overlay = document.getElementById('globalLoadingOverlay')
+      if (!overlay) return
 
       if (this.isLoading) {
-        if (typeof window.showLoading === 'function') {
-          window.showLoading(this.currentMessage)
+        overlay.style.display = 'flex'
+        const messageEl = overlay.querySelector('.loading-message')
+        if (messageEl && this.currentMessage) {
+          messageEl.textContent = this.currentMessage
         }
       } else {
-        if (typeof window.hideLoading === 'function') {
-          window.hideLoading()
-        }
+        overlay.style.display = 'none'
       }
     }
   })
 
-  console.log('✅ 加载状态 Store 已注册')
+  logger.info('加载状态 Store 已注册')
 })
 
-console.log('✅ 加载状态模块已加载')
+logger.info('加载状态模块已加载')

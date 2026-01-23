@@ -6,6 +6,8 @@
  * @since 2026-01-23
  */
 
+
+import { logger } from '../utils/logger.js'
 // ============================================================================
 // 类型定义 - API 通用类型
 // ============================================================================
@@ -226,7 +228,7 @@ export async function request(options) {
 
     return result
   } catch (error) {
-    console.error(`❌ API 请求失败: ${fullUrl}`, error)
+    logger.error(`❌ API 请求失败: ${fullUrl}`, error)
     throw error
   }
 }

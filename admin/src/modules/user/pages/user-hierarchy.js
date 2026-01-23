@@ -14,6 +14,10 @@
  * - 保留所有原有业务功能
  */
 
+
+import { logger } from '../../../utils/logger.js'
+import { USER_ENDPOINTS } from '../../../api/user.js'
+import { buildURL } from '../../../api/base.js'
 /**
  * @typedef {Object} HierarchyFilters
  * @property {string} roleLevel - 角色等级筛选
@@ -172,7 +176,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     init() {
-      console.log('✅ 用户层级管理页面初始化 (Mixin v3.0)')
+      logger.info('用户层级管理页面初始化 (Mixin v3.0)')
 
       // 使用 Mixin 的认证检查
       if (!this.checkAuth()) {
@@ -193,7 +197,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {Promise<void>} 无返回值
      */
     async loadRoles() {
-      const result = await this.apiGet(API_ENDPOINTS.USER_HIERARCHY.ROLES, {}, { showError: false })
+      const result = await this.apiGet(USER_ENDPOINTS.USER_HIERARCHY_ROLES, {}, { showError: false })
       if (result.success) {
         this.rolesList = result.data || []
       }
@@ -218,7 +222,7 @@ document.addEventListener('alpine:init', () => {
         if (this.filters.superiorId) params.superior_user_id = this.filters.superiorId
 
         const response = await apiRequest(
-          `${API_ENDPOINTS.USER_HIERARCHY.LIST}?${new URLSearchParams(params)}`
+          `${USER_ENDPOINTS.USER_HIERARCHY_LIST}?${new URLSearchParams(params)}`
         )
 
         if (response && response.success) {
@@ -334,7 +338,7 @@ document.addEventListener('alpine:init', () => {
       }
 
       const result = await this.apiPost(
-        API_ENDPOINTS.USER_HIERARCHY.CREATE,
+        USER_ENDPOINTS.USER_HIERARCHY_CREATE,
         {
           user_id: parseInt(this.form.userId),
           role_id: parseInt(this.form.roleId),
@@ -366,7 +370,7 @@ document.addEventListener('alpine:init', () => {
       const result = await this.withLoading(
         async () => {
           const response = await apiRequest(
-            API.buildURL(API_ENDPOINTS.USER_HIERARCHY.SUBORDINATES, { user_id: userId })
+            buildURL(USER_ENDPOINTS.USER_HIERARCHY_SUBORDINATES, { user_id: userId })
           )
           if (response.success) {
             return response.data.subordinates || []
@@ -416,7 +420,7 @@ document.addEventListener('alpine:init', () => {
       }
 
       const result = await this.apiPost(
-        API.buildURL(API_ENDPOINTS.USER_HIERARCHY.DEACTIVATE, {
+        buildURL(USER_ENDPOINTS.USER_HIERARCHY_DEACTIVATE, {
           user_id: this.deactivateForm.userId
         }),
         {
@@ -446,7 +450,7 @@ document.addEventListener('alpine:init', () => {
         '确定要激活该用户的层级权限吗？',
         async () => {
           const response = await apiRequest(
-            API.buildURL(API_ENDPOINTS.USER_HIERARCHY.ACTIVATE, { user_id: userId }),
+            buildURL(USER_ENDPOINTS.USER_HIERARCHY_ACTIVATE, { user_id: userId }),
             {
               method: 'POST',
               body: JSON.stringify({ include_subordinates: false })
@@ -560,11 +564,11 @@ document.addEventListener('alpine:init', () => {
 
         this.showSuccess('导出成功')
       } catch (error) {
-        console.error('导出失败:', error)
+        logger.error('导出失败:', error)
         this.showError('导出失败: ' + error.message)
       }
     }
   }))
 
-  console.log('✅ [UserHierarchy] Alpine 组件已注册 (Mixin v3.0)')
+  logger.info('[UserHierarchy] Alpine 组件已注册 (Mixin v3.0)')
 })

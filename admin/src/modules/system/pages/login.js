@@ -17,7 +17,7 @@
  * @note 登录页面不使用 auth-guard mixin，因为本身就是认证入口
  *       使用独立的 API 请求逻辑，不依赖 admin-common.js
  *
- * @requires API_ENDPOINTS - API端点配置
+ * @requires USER_ENDPOINTS - 用户管理API端点配置
  *
  * @example
  * // HTML中使用
@@ -28,6 +28,9 @@
  * </form>
  */
 
+
+import { logger } from '../../../utils/logger.js'
+import { USER_ENDPOINTS } from '../../../api/user.js'
 /**
  * 登录页面Alpine.js组件工厂函数
  * @function loginPage
@@ -71,7 +74,7 @@ function loginPage() {
      * x-init="init()"
      */
     init() {
-      console.log('✅ 登录页面初始化 (v3.0)')
+      logger.info('登录页面初始化 (v3.0)')
       this.checkExistingSession()
     },
 
@@ -167,7 +170,7 @@ function loginPage() {
 
       try {
         // 发送登录请求
-        const response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
+        const response = await fetch(USER_ENDPOINTS.AUTH_LOGIN, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -215,7 +218,7 @@ function loginPage() {
           window.location.href = '/admin/dashboard.html'
         }, 500)
       } catch (error) {
-        console.error('登录失败:', error)
+        logger.error('登录失败:', error)
         this.showMessage(error.message || '登录失败，请稍后重试', true)
       } finally {
         this.loading = false
@@ -279,5 +282,5 @@ function loginPage() {
  */
 document.addEventListener('alpine:init', () => {
   Alpine.data('loginPage', loginPage)
-  console.log('✅ [LoginPage] Alpine 组件已注册 (v3.0)')
+  logger.info('[LoginPage] Alpine 组件已注册 (v3.0)')
 })

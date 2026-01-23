@@ -32,6 +32,8 @@
  *
  * // <button @click="openAddForm()">新增</button>
  */
+
+import { logger } from '../../utils/logger.js'
 export function modalMixin() {
   return {
     // ========== 响应式状态 ==========
@@ -88,7 +90,7 @@ export function modalMixin() {
         this.$dispatch('modal-shown', { name: refName })
       }
 
-      console.log(`[ModalMixin] 显示 Modal: ${refName}`)
+      logger.info(`[ModalMixin] 显示 Modal: ${refName}`)
       return true
     },
 
@@ -124,7 +126,7 @@ export function modalMixin() {
         this.$dispatch('modal-hidden', { name: refName })
       }
 
-      console.log(`[ModalMixin] 隐藏 Modal: ${refName}`)
+      logger.info(`[ModalMixin] 隐藏 Modal: ${refName}`)
       return true
     },
 

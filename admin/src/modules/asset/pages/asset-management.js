@@ -9,7 +9,7 @@
  *
  * @requires Alpine.js - 响应式框架
  * @requires createPageMixin - 页面基础功能混入
- * @requires API_ENDPOINTS - API端点配置
+ * @requires ASSET_ENDPOINTS - 资产管理API端点配置
  *
  * 功能模块：
  * 1. 材料资产类型 - 资产类型CRUD、启用禁用
@@ -28,6 +28,10 @@
  * - GET /api/v4/console/virtual-accounts (虚拟账户)
  */
 
+
+import { logger } from '../../../utils/logger.js'
+import { ASSET_ENDPOINTS } from '../../../api/asset.js'
+import { buildURL } from '../../../api/base.js'
 /**
  * @typedef {Object} MaterialType
  * @property {string} asset_code - 资产代码
@@ -80,7 +84,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     init() {
-      console.log('✅ 资产管理导航初始化 (Mixin v3.0)')
+      logger.info('资产管理导航初始化 (Mixin v3.0)')
 
       // 权限检查
       if (!this.checkAuth()) return
@@ -227,7 +231,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     init() {
-      console.log('✅ 资产管理内容初始化 (Mixin v3.0)')
+      logger.info('资产管理内容初始化 (Mixin v3.0)')
 
       // 初始加载数据
       this.loadAllData()
@@ -267,7 +271,7 @@ document.addEventListener('alpine:init', () => {
     async loadMaterialTypes() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.MATERIAL.ASSET_TYPES,
+          ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES,
           {},
           { showLoading: false }
         )
@@ -277,7 +281,7 @@ document.addEventListener('alpine:init', () => {
           this.updateMaterialTypeStats()
         }
       } catch (error) {
-        console.error('加载材料类型失败:', error)
+        logger.error('加载材料类型失败:', error)
         this.materialTypes = []
       }
     },
@@ -330,7 +334,7 @@ document.addEventListener('alpine:init', () => {
       this.materialTypeSubmitting = true
 
       try {
-        const response = await this.apiCall(API_ENDPOINTS.MATERIAL.ASSET_TYPES, {
+        const response = await this.apiCall(ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES, {
           method: 'POST',
           body: JSON.stringify({
             asset_code: form.asset_code.trim(),
@@ -353,7 +357,7 @@ document.addEventListener('alpine:init', () => {
           this.showError(response?.message || '添加失败')
         }
       } catch (error) {
-        console.error('添加材料类型失败:', error)
+        logger.error('添加材料类型失败:', error)
         this.showError('添加失败，请稍后重试')
       } finally {
         this.materialTypeSubmitting = false
@@ -395,7 +399,7 @@ document.addEventListener('alpine:init', () => {
       this.materialTypeSubmitting = true
 
       try {
-        const url = `${API_ENDPOINTS.MATERIAL.ASSET_TYPES}/${form.asset_code}`
+        const url = `${ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES}/${form.asset_code}`
         const response = await this.apiCall(url, {
           method: 'PUT',
           body: JSON.stringify({
@@ -415,7 +419,7 @@ document.addEventListener('alpine:init', () => {
           this.showError(response?.message || '更新失败')
         }
       } catch (error) {
-        console.error('更新材料类型失败:', error)
+        logger.error('更新材料类型失败:', error)
         this.showError('更新失败，请稍后重试')
       } finally {
         this.materialTypeSubmitting = false
@@ -432,7 +436,7 @@ document.addEventListener('alpine:init', () => {
       await this.confirmAndExecute(
         `确定要${action}该资产类型吗？`,
         async () => {
-          const url = `${API_ENDPOINTS.MATERIAL.ASSET_TYPES}/${assetCode}`
+          const url = `${ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES}/${assetCode}`
           const response = await this.apiCall(url, {
             method: 'PUT',
             body: JSON.stringify({ is_enabled: newStatus })
@@ -467,7 +471,7 @@ document.addEventListener('alpine:init', () => {
     async loadMaterialAccounts() {
       try {
         // 使用已存在的资产组合接口
-        let url = API_ENDPOINTS.ASSETS.PORTFOLIO
+        let url = ASSET_ENDPOINTS.PORTFOLIO
         const params = new URLSearchParams()
         if (this.materialAccountFilters.user_id)
           params.append('user_id', this.materialAccountFilters.user_id)
@@ -481,7 +485,7 @@ document.addEventListener('alpine:init', () => {
           this.materialAccounts = Array.isArray(data) ? data : []
         }
       } catch (error) {
-        console.warn('材料账户接口暂不可用')
+        logger.warn('材料账户接口暂不可用')
         this.materialAccounts = []
       }
     },
@@ -502,7 +506,7 @@ document.addEventListener('alpine:init', () => {
       try {
         // 使用已存在的物品模板接口
         const response = await this.apiGet(
-          API_ENDPOINTS.ITEM_TEMPLATE.LIST,
+          ASSET_ENDPOINTS.ITEM_TEMPLATES_LIST,
           {},
           { showLoading: false }
         )
@@ -511,7 +515,7 @@ document.addEventListener('alpine:init', () => {
           this.itemInstances = Array.isArray(data) ? data : []
         }
       } catch (error) {
-        console.warn('物品实例查询失败:', error.message)
+        logger.warn('物品实例查询失败:', error.message)
         this.itemInstances = []
       }
     },
@@ -692,7 +696,7 @@ document.addEventListener('alpine:init', () => {
     saving: false,
 
     init() {
-      console.log('✅ 资产管理页面初始化 (合并组件)')
+      logger.info('资产管理页面初始化 (合并组件)')
       if (!this.checkAuth()) return
       const urlParams = new URLSearchParams(window.location.search)
       this.currentPage = urlParams.get('page') || 'material-types'
@@ -735,7 +739,7 @@ document.addEventListener('alpine:init', () => {
 
     async loadMaterialTypes() {
       try {
-        const response = await this.apiGet(API_ENDPOINTS.MATERIAL.ASSET_TYPES)
+        const response = await this.apiGet(ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES)
         if (response.success && response.data) {
           const matTypeData = response.data?.list || response.data
           this.materialTypes = Array.isArray(matTypeData) ? matTypeData : []
@@ -747,7 +751,7 @@ document.addEventListener('alpine:init', () => {
           }
         }
       } catch (error) {
-        console.error('加载材料类型失败:', error)
+        logger.error('加载材料类型失败:', error)
       }
     },
 
@@ -755,7 +759,7 @@ document.addEventListener('alpine:init', () => {
       try {
         // 使用正确的资产组合接口
         const response = await this.apiGet(
-          API_ENDPOINTS.ASSETS.PORTFOLIO,
+          ASSET_ENDPOINTS.PORTFOLIO,
           this.materialAccountFilters
         )
         if (response.success && response.data) {
@@ -763,7 +767,7 @@ document.addEventListener('alpine:init', () => {
           this.materialAccounts = Array.isArray(matAcctData) ? matAcctData : []
         }
       } catch (error) {
-        console.warn('材料账户接口暂不可用，显示空列表')
+        logger.warn('材料账户接口暂不可用，显示空列表')
         this.materialAccounts = []
       }
     },
@@ -773,10 +777,10 @@ document.addEventListener('alpine:init', () => {
         // 后端 API 要求 user_id 是必填参数，没有时显示提示
         if (!this.materialTxFilters.userId) {
           this.materialTransactions = []
-          console.log('请输入用户ID进行查询')
+          logger.info('请输入用户ID进行查询')
           return
         }
-        const response = await this.apiGet(API_ENDPOINTS.ASSETS.TRANSACTIONS, {
+        const response = await this.apiGet(ASSET_ENDPOINTS.TRANSACTIONS, {
           user_id: this.materialTxFilters.userId,
           asset_code: this.materialTxFilters.assetCode,
           type: 'material'
@@ -786,7 +790,7 @@ document.addEventListener('alpine:init', () => {
           this.materialTransactions = Array.isArray(matTxData) ? matTxData : []
         }
       } catch (error) {
-        console.warn('材料交易查询失败:', error.message)
+        logger.warn('材料交易查询失败:', error.message)
         this.materialTransactions = []
       }
     },
@@ -795,7 +799,7 @@ document.addEventListener('alpine:init', () => {
       try {
         // 使用已存在的物品模板接口
         const response = await this.apiGet(
-          API_ENDPOINTS.ITEM_TEMPLATE.LIST,
+          ASSET_ENDPOINTS.ITEM_TEMPLATES_LIST,
           this.itemInstanceFilters
         )
         if (response.success && response.data) {
@@ -803,7 +807,7 @@ document.addEventListener('alpine:init', () => {
           this.itemInstances = Array.isArray(itemInsData) ? itemInsData : []
         }
       } catch (error) {
-        console.warn('物品实例查询失败:', error.message)
+        logger.warn('物品实例查询失败:', error.message)
         this.itemInstances = []
       }
     },
@@ -813,13 +817,14 @@ document.addEventListener('alpine:init', () => {
         // 后端 API 要求 user_id 是必填参数，没有时显示提示
         if (!this.virtualAccountFilters.userId) {
           this.virtualAccounts = []
-          console.log('请输入用户ID进行查询')
+          logger.info('请输入用户ID进行查询')
           return
         }
-        // 使用已存在的 API 端点 /asset-adjustment/user/:user_id/balances
-        const response = await this.apiGet(
-          `/api/v4/console/asset-adjustment/user/${this.virtualAccountFilters.userId}/balances`
-        )
+        // 使用 ASSET_ENDPOINTS.ADJUSTMENT_USER_BALANCES 端点
+        const url = buildURL(ASSET_ENDPOINTS.ADJUSTMENT_USER_BALANCES, {
+          user_id: this.virtualAccountFilters.userId
+        })
+        const response = await this.apiGet(url)
         if (response.success && response.data) {
           // 过滤出虚拟资产类型（DIAMOND, POINTS 等）
           const balances = response.data?.balances || response.data
@@ -828,7 +833,7 @@ document.addEventListener('alpine:init', () => {
             : []
         }
       } catch (error) {
-        console.warn('虚拟账户查询失败:', error.message)
+        logger.warn('虚拟账户查询失败:', error.message)
         this.virtualAccounts = []
       }
     },
@@ -838,10 +843,10 @@ document.addEventListener('alpine:init', () => {
         // 后端 API 要求 user_id 是必填参数，没有时显示提示
         if (!this.virtualTxFilters.userId) {
           this.virtualTransactions = []
-          console.log('请输入用户ID进行查询')
+          logger.info('请输入用户ID进行查询')
           return
         }
-        const response = await this.apiGet(API_ENDPOINTS.ASSETS.TRANSACTIONS, {
+        const response = await this.apiGet(ASSET_ENDPOINTS.TRANSACTIONS, {
           user_id: this.virtualTxFilters.userId,
           account_type: this.virtualTxFilters.accountType,
           type: 'virtual'
@@ -851,19 +856,19 @@ document.addEventListener('alpine:init', () => {
           this.virtualTransactions = Array.isArray(virtTxData) ? virtTxData : []
         }
       } catch (error) {
-        console.warn('虚拟交易查询失败:', error.message)
+        logger.warn('虚拟交易查询失败:', error.message)
         this.virtualTransactions = []
       }
     },
 
     async loadAssetStats() {
       try {
-        const response = await this.apiGet(API_ENDPOINTS.ASSETS.STATS)
+        const response = await this.apiGet(ASSET_ENDPOINTS.STATS)
         if (response.success && response.data) {
           this.assetStats = response.data
         }
       } catch (error) {
-        console.error('加载资产统计失败:', error)
+        logger.error('加载资产统计失败:', error)
       }
     },
 
@@ -894,8 +899,8 @@ document.addEventListener('alpine:init', () => {
         this.saving = true
         const form = this.editingMaterialType ? this.materialTypeEditForm : this.materialTypeAddForm
         const endpoint = this.editingMaterialType
-          ? API.buildURL(API_ENDPOINTS.MATERIAL.ASSET_TYPE_DETAIL, { asset_code: form.asset_code })
-          : API_ENDPOINTS.MATERIAL.ASSET_TYPES
+          ? buildURL(ASSET_ENDPOINTS.MATERIAL_ASSET_TYPE_DETAIL, { asset_code: form.asset_code })
+          : ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES
         const method = this.editingMaterialType ? 'apiPut' : 'apiPost'
         await this[method](endpoint, form)
         this.$refs.materialTypeModal?.hide()
@@ -930,5 +935,5 @@ document.addEventListener('alpine:init', () => {
     }
   }))
 
-  console.log('✅ [AssetManagementPage] Alpine 组件已注册 (Mixin v3.0)')
+  logger.info('[AssetManagementPage] Alpine 组件已注册 (Mixin v3.0)')
 })

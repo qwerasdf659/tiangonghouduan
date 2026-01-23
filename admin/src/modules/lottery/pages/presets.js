@@ -8,6 +8,11 @@
  * @module lottery/pages/presets
  */
 
+
+import { logger } from '../../../utils/logger.js'
+import { LOTTERY_ENDPOINTS } from '../../../api/lottery.js'
+import { buildURL } from '../../../api/base.js'
+import { USER_ENDPOINTS } from '../../../api/user.js'
 /**
  * @typedef {Object} InterventionFilters
  * @property {string} status - 状态筛选（active/used/expired/cancelled）
@@ -164,7 +169,7 @@ function presetsPage() {
      * @returns {Promise<void>}
      */
     async init() {
-      console.log('✅ 抽奖干预管理页面初始化 (Mixin v3.0)')
+      logger.info('抽奖干预管理页面初始化 (Mixin v3.0)')
 
       // 使用 Mixin 的认证检查
       if (!this.checkAuth()) {
@@ -186,12 +191,12 @@ function presetsPage() {
      */
     async loadPrizes() {
       try {
-        const response = await apiRequest(API_ENDPOINTS.PRIZE.LIST)
+        const response = await apiRequest(LOTTERY_ENDPOINTS.PRIZE_LIST)
         if (response && response.success) {
           this.allPrizes = response.data?.prizes || []
         }
       } catch (error) {
-        console.error('加载奖品列表失败:', error)
+        logger.error('加载奖品列表失败:', error)
       }
     },
 
@@ -214,7 +219,7 @@ function presetsPage() {
           params.append('user_search', this.filters.userSearch.trim())
         if (this.filters.prizeType) params.append('prize_type', this.filters.prizeType)
 
-        const response = await apiRequest(`${API_ENDPOINTS.LOTTERY_INTERVENTION.LIST}?${params}`)
+        const response = await apiRequest(`${LOTTERY_ENDPOINTS.INTERVENTION_LIST}?${params}`)
 
         if (response && response.success) {
           this.interventions = response.data?.interventions || []
@@ -275,14 +280,14 @@ function presetsPage() {
 
       try {
         const response = await apiRequest(
-          `${API_ENDPOINTS.USER.LIST}?search=${encodeURIComponent(this.userSearchKeyword.trim())}&page_size=10`
+          `${USER_ENDPOINTS.USER_LIST}?search=${encodeURIComponent(this.userSearchKeyword.trim())}&page_size=10`
         )
 
         if (response && response.success) {
           this.userSearchResults = response.data?.users || []
         }
       } catch (error) {
-        console.error('搜索用户失败:', error)
+        logger.error('搜索用户失败:', error)
         this.userSearchResults = []
       } finally {
         this.searchingUser = false
@@ -353,7 +358,7 @@ function presetsPage() {
           ? `${this.interventionForm.reason || '管理员强制中奖'} - ${this.interventionForm.note}`
           : this.interventionForm.reason || '管理员强制中奖'
 
-        const response = await apiRequest(API_ENDPOINTS.LOTTERY_INTERVENTION.FORCE_WIN, {
+        const response = await apiRequest(LOTTERY_ENDPOINTS.INTERVENTION_FORCE_WIN, {
           method: 'POST',
           body: JSON.stringify({
             user_id: parseInt(this.selectedUser.user_id),
@@ -372,7 +377,7 @@ function presetsPage() {
           throw new Error(response?.message || '创建失败')
         }
       } catch (error) {
-        console.error('创建干预规则失败:', error)
+        logger.error('创建干预规则失败:', error)
         this.showError('创建失败：' + error.message)
       } finally {
         this.submitting = false
@@ -394,7 +399,7 @@ function presetsPage() {
 
       try {
         const response = await apiRequest(
-          API.buildURL(API_ENDPOINTS.LOTTERY_INTERVENTION.DETAIL, { id })
+          buildURL(LOTTERY_ENDPOINTS.INTERVENTION_DETAIL, { id })
         )
 
         if (response && response.success) {
@@ -404,7 +409,7 @@ function presetsPage() {
           this.showError(response?.message || '获取详情失败')
         }
       } catch (error) {
-        console.error('获取干预规则详情失败:', error)
+        logger.error('获取干预规则详情失败:', error)
         this.showError('获取详情失败: ' + error.message)
       } finally {
         this.globalLoading = false
@@ -427,7 +432,7 @@ function presetsPage() {
 
       try {
         const response = await apiRequest(
-          API.buildURL(API_ENDPOINTS.LOTTERY_INTERVENTION.CANCEL, { id }),
+          buildURL(LOTTERY_ENDPOINTS.INTERVENTION_CANCEL, { id }),
           { method: 'POST' }
         )
 
@@ -438,7 +443,7 @@ function presetsPage() {
           throw new Error(response?.message || '取消失败')
         }
       } catch (error) {
-        console.error('取消干预规则失败:', error)
+        logger.error('取消干预规则失败:', error)
         this.showError('取消失败：' + error.message)
       } finally {
         this.globalLoading = false
@@ -588,5 +593,5 @@ function presetsPage() {
 // Alpine.js 组件注册
 document.addEventListener('alpine:init', () => {
   Alpine.data('presetsPage', presetsPage)
-  console.log('✅ [PresetsPage] Alpine 组件已注册 (Mixin v3.0)')
+  logger.info('[PresetsPage] Alpine 组件已注册 (Mixin v3.0)')
 })

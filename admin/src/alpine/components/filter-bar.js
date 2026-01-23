@@ -12,6 +12,8 @@
  * </div>
  */
 
+
+import { logger } from '../../utils/logger.js'
 /**
  * Filter Bar 组件数据
  * @param {Object} config - 配置选项
@@ -29,7 +31,7 @@ function filterBar(config = {}) {
 
     // 初始化
     init() {
-      console.log('[FilterBar] 初始化')
+      logger.info('[FilterBar] 初始化')
       this.initValues()
     },
 
@@ -42,7 +44,7 @@ function filterBar(config = {}) {
 
     // 执行搜索
     search() {
-      console.log('[FilterBar] 搜索:', this.values)
+      logger.info('[FilterBar] 搜索:', this.values)
 
       if (this.onSearch) {
         this.onSearch(this.getValues())
@@ -54,7 +56,7 @@ function filterBar(config = {}) {
 
     // 重置筛选
     reset() {
-      console.log('[FilterBar] 重置')
+      logger.info('[FilterBar] 重置')
       this.initValues()
 
       if (this.onReset) {
@@ -151,4 +153,4 @@ function advancedFilter(config = {}) {
   }
 }
 
-console.log('📦 FilterBar 组件已加载')
+logger.info('FilterBar 组件已加载')

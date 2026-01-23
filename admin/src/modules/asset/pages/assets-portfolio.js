@@ -7,6 +7,9 @@
  * @date 2026-01-23
  */
 
+
+import { logger } from '../../../utils/logger.js'
+import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 function assetsPortfolioPage() {
   return {
     // ==================== Mixin 组合 ====================
@@ -39,7 +42,7 @@ function assetsPortfolioPage() {
      * 初始化
      */
     init() {
-      console.log('✅ 运营资产中心页面初始化 (Mixin v3.0)')
+      logger.info('运营资产中心页面初始化 (Mixin v3.0)')
 
       // 使用 Mixin 的认证检查
       if (!this.checkAuth()) {
@@ -67,7 +70,7 @@ function assetsPortfolioPage() {
     async loadAssetOverview() {
       try {
         // 使用 MATERIAL.ASSET_TYPES 获取资产类型列表作为总览数据
-        const response = await apiRequest(API_ENDPOINTS.MATERIAL.ASSET_TYPES)
+        const response = await apiRequest(ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES)
         if (response && response.success) {
           const assetTypes = response.data?.asset_types || response.data || []
           this.assetOverview = assetTypes.map(item => ({
@@ -89,7 +92,7 @@ function assetsPortfolioPage() {
           }
         }
       } catch (error) {
-        console.error('加载资产总览失败:', error)
+        logger.error('加载资产总览失败:', error)
         this.showError('加载资产总览失败')
       }
     },
@@ -99,13 +102,13 @@ function assetsPortfolioPage() {
      */
     async loadAssetTypes() {
       try {
-        const response = await apiRequest(API_ENDPOINTS.MATERIAL.ASSET_TYPES)
+        const response = await apiRequest(ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES)
         if (response && response.success) {
           const data = response.data?.asset_types || response.data
           this.assetTypes = Array.isArray(data) ? data : []
         }
       } catch (error) {
-        console.error('加载资产类型失败:', error)
+        logger.error('加载资产类型失败:', error)
         this.showError('加载资产类型失败')
       }
     },
@@ -129,5 +132,5 @@ function assetsPortfolioPage() {
 // Alpine.js 组件注册
 document.addEventListener('alpine:init', () => {
   Alpine.data('assetsPortfolioPage', assetsPortfolioPage)
-  console.log('✅ [AssetsPortfolioPage] Alpine 组件已注册 (Mixin v3.0)')
+  logger.info('[AssetsPortfolioPage] Alpine 组件已注册 (Mixin v3.0)')
 })

@@ -12,6 +12,8 @@
  * </div>
  */
 
+
+import { logger } from '../../utils/logger.js'
 /**
  * Data Table 组件数据
  * @param {Object} config - 配置选项
@@ -40,7 +42,7 @@ function dataTable(config = {}) {
 
     // 初始化
     init() {
-      console.log('[DataTable] 初始化')
+      logger.info('[DataTable] 初始化')
     },
 
     // 设置数据
@@ -239,4 +241,4 @@ function dataTable(config = {}) {
   }
 }
 
-console.log('📦 DataTable 组件已加载')
+logger.info('DataTable 组件已加载')

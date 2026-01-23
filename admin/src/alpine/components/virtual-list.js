@@ -31,6 +31,8 @@
  * </div>
  */
 
+
+import { logger } from '../../utils/logger.js'
 // ========== 基础虚拟列表组件 ==========
 
 /**
@@ -196,7 +198,7 @@ function virtualList(config = {}) {
         }
 
         this.updateVisibleItems()
-        console.log(`[VirtualList] 初始化完成，容器高度: ${this.containerHeight}px`)
+        logger.info(`[VirtualList] 初始化完成，容器高度: ${this.containerHeight}px`)
       })
     },
 
@@ -218,7 +220,7 @@ function virtualList(config = {}) {
       }
 
       this.updateVisibleItems()
-      console.log(`[VirtualList] 设置数据: ${this.items.length} 项`)
+      logger.info(`[VirtualList] 设置数据: ${this.items.length} 项`)
     },
 
     /**
@@ -230,7 +232,7 @@ function virtualList(config = {}) {
       this.items = [...this.items, ...newItems]
       this.loadingMore = false
       this.updateVisibleItems()
-      console.log(`[VirtualList] 追加数据: ${newItems.length} 项，总计: ${this.items.length} 项`)
+      logger.info(`[VirtualList] 追加数据: ${newItems.length} 项，总计: ${this.items.length} 项`)
     },
 
     /**
@@ -320,7 +322,7 @@ function virtualList(config = {}) {
         behavior
       })
 
-      console.log(`[VirtualList] 滚动到索引: ${targetIndex}`)
+      logger.info(`[VirtualList] 滚动到索引: ${targetIndex}`)
     },
 
     /**
@@ -795,7 +797,7 @@ function virtualTable(config = {}) {
 // ========== 注册为 Alpine 组件 ==========
 
 document.addEventListener('alpine:init', () => {
-  console.log('🔧 注册虚拟列表组件...')
+  logger.info('🔧 注册虚拟列表组件...')
 
   // 注册基础虚拟列表
   Alpine.data('virtualList', virtualList)
@@ -803,13 +805,12 @@ document.addEventListener('alpine:init', () => {
   // 注册虚拟表格
   Alpine.data('virtualTable', virtualTable)
 
-  console.log('✅ 虚拟列表组件已注册')
+  logger.info('虚拟列表组件已注册')
 })
 
-// ========== 导出到全局 ==========
-
-window.virtualList = virtualList
-window.virtualTable = virtualTable
+// ========== window.xxx 已移除（方案 A：彻底 ES Module） ==========
+// 请使用 ES Module 导入：
+//   import { virtualList, virtualTable } from '@/alpine/components/virtual-list.js'
 
 // ========== CSS 样式（可选，也可放入外部 CSS） ==========
 
@@ -886,4 +887,4 @@ if (typeof document !== 'undefined') {
   }
 }
 
-console.log('✅ VirtualList 虚拟列表组件已加载')
+logger.info('VirtualList 虚拟列表组件已加载')

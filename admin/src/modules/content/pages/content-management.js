@@ -10,7 +10,7 @@
  * @requires Alpine.js
  * @requires createPageMixin - 页面基础混入
  * @requires API - API工具类
- * @requires API_ENDPOINTS - API端点配置
+ * @requires SYSTEM_ENDPOINTS - 系统模块API端点配置
  *
  * 后端API对应：
  * - /api/v4/console/system/announcements (公告管理)
@@ -25,8 +25,12 @@
  * 注意：后端没有 /api/v4/console/notifications API，已移除通知管理功能
  */
 
+
+import { logger } from '../../../utils/logger.js'
+import { buildURL } from '../../../api/base.js'
+import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
 document.addEventListener('alpine:init', () => {
-  console.log('[ContentManagement] 注册 Alpine 组件...')
+  logger.info('[ContentManagement] 注册 Alpine 组件...')
 
   /**
    * 内容管理主组件
@@ -169,7 +173,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     init() {
-      console.log('✅ 内容管理页面初始化')
+      logger.info('内容管理页面初始化')
       if (!this.checkAuth()) return
       const urlParams = new URLSearchParams(window.location.search)
       this.currentPage = urlParams.get('page') || 'announcements'
@@ -197,7 +201,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {Promise<void>}
      */
     async loadPageData() {
-      console.log('[ContentManagement] 加载页面数据:', this.currentPage)
+      logger.info('[ContentManagement] 加载页面数据:', this.currentPage)
       switch (this.currentPage) {
         case 'announcements':
           await this.loadAnnouncements()
@@ -221,15 +225,14 @@ document.addEventListener('alpine:init', () => {
      */
     async loadAnnouncements() {
       try {
-        console.log('[ContentManagement] 加载公告列表...')
-        // 使用正确的 API 端点: API_ENDPOINTS.ANNOUNCEMENT.LIST
-        const response = await this.apiGet(API_ENDPOINTS.ANNOUNCEMENT.LIST)
+        logger.info('[ContentManagement] 加载公告列表...')
+        const response = await this.apiGet(SYSTEM_ENDPOINTS.ANNOUNCEMENT_LIST)
         if (response?.success) {
           this.announcements = response.data?.list || response.data?.announcements || []
-          console.log('[ContentManagement] 公告数量:', this.announcements.length)
+          logger.info('[ContentManagement] 公告数量:', this.announcements.length)
         }
       } catch (error) {
-        console.error('加载公告失败:', error)
+        logger.error('加载公告失败:', error)
         this.announcements = []
       }
     },
@@ -306,12 +309,11 @@ document.addEventListener('alpine:init', () => {
           expires_at: this.announcementForm.expires_at || null
         }
 
-        // 使用正确的 API 端点
         const url = this.isEditMode
-          ? API.buildURL(API_ENDPOINTS.ANNOUNCEMENT.UPDATE, {
+          ? buildURL(SYSTEM_ENDPOINTS.ANNOUNCEMENT_UPDATE, {
               id: this.announcementForm.announcement_id
             })
-          : API_ENDPOINTS.ANNOUNCEMENT.CREATE
+          : SYSTEM_ENDPOINTS.ANNOUNCEMENT_CREATE
         const method = this.isEditMode ? 'PUT' : 'POST'
 
         const response = await this.apiCall(url, { method, body: JSON.stringify(payload) })
@@ -322,7 +324,7 @@ document.addEventListener('alpine:init', () => {
           this.showSuccess(this.isEditMode ? '公告已更新' : '公告已发布')
         }
       } catch (error) {
-        console.error('保存公告失败:', error)
+        logger.error('保存公告失败:', error)
         this.showError('保存公告失败: ' + error.message)
       } finally {
         this.saving = false
@@ -364,15 +366,15 @@ document.addEventListener('alpine:init', () => {
      */
     async loadBanners() {
       try {
-        console.log('[ContentManagement] 加载轮播图列表...')
+        logger.info('[ContentManagement] 加载轮播图列表...')
         const params = new URLSearchParams()
         if (this.bannerFilters?.position) params.append('position', this.bannerFilters.position)
         if (this.bannerFilters?.status) params.append('status', this.bannerFilters.status)
 
-        const response = await this.apiGet(`${API_ENDPOINTS.POPUP_BANNER.LIST}?${params}`)
+        const response = await this.apiGet(`${SYSTEM_ENDPOINTS.POPUP_BANNER_LIST}?${params}`)
         if (response?.success) {
           this.banners = response.data?.list || response.data?.banners || []
-          console.log('[ContentManagement] 轮播图数量:', this.banners.length)
+          logger.info('[ContentManagement] 轮播图数量:', this.banners.length)
           // 计算统计
           this.bannerStats = {
             total: this.banners.length,
@@ -384,7 +386,7 @@ document.addEventListener('alpine:init', () => {
           }
         }
       } catch (error) {
-        console.error('加载轮播图失败:', error)
+        logger.error('加载轮播图失败:', error)
         this.banners = []
       }
     },
@@ -469,8 +471,8 @@ document.addEventListener('alpine:init', () => {
         }
 
         const url = this.isEditMode
-          ? `${API_ENDPOINTS.POPUP_BANNER.LIST}/${this.bannerForm.banner_id}`
-          : API_ENDPOINTS.POPUP_BANNER.LIST
+          ? buildURL(SYSTEM_ENDPOINTS.POPUP_BANNER_UPDATE, { id: this.bannerForm.banner_id })
+          : SYSTEM_ENDPOINTS.POPUP_BANNER_CREATE
         const method = this.isEditMode ? 'PUT' : 'POST'
 
         const response = await this.apiCall(url, { method, body: JSON.stringify(payload) })
@@ -481,7 +483,7 @@ document.addEventListener('alpine:init', () => {
           this.showSuccess(this.isEditMode ? '轮播图已更新' : '轮播图已创建')
         }
       } catch (error) {
-        console.error('保存轮播图失败:', error)
+        logger.error('保存轮播图失败:', error)
         this.showError('保存轮播图失败: ' + error.message)
       } finally {
         this.saving = false
@@ -500,10 +502,11 @@ document.addEventListener('alpine:init', () => {
     async toggleBannerStatus(banner) {
       try {
         const newStatus = !banner.is_active
+        const bannerId = banner.banner_id || banner.id
         const response = await this.apiCall(
-          `${API_ENDPOINTS.POPUP_BANNER.LIST}/${banner.banner_id || banner.id}`,
+          buildURL(SYSTEM_ENDPOINTS.POPUP_BANNER_TOGGLE, { id: bannerId }),
           {
-            method: 'PUT',
+            method: 'POST',
             body: JSON.stringify({ is_active: newStatus })
           }
         )
@@ -609,15 +612,15 @@ document.addEventListener('alpine:init', () => {
      */
     async loadImages() {
       try {
-        console.log('[ContentManagement] 加载图片列表...')
+        logger.info('[ContentManagement] 加载图片列表...')
         const params = new URLSearchParams()
         if (this.imageFilters?.type) params.append('type', this.imageFilters.type)
         if (this.imageFilters?.keyword) params.append('keyword', this.imageFilters.keyword)
 
-        const response = await this.apiGet(`${API_ENDPOINTS.IMAGE.LIST}?${params}`)
+        const response = await this.apiGet(`${SYSTEM_ENDPOINTS.IMAGE_LIST}?${params}`)
         if (response?.success) {
           this.images = response.data?.list || response.data?.images || []
-          console.log('[ContentManagement] 图片数量:', this.images.length)
+          logger.info('[ContentManagement] 图片数量:', this.images.length)
           // 计算统计
           this.imageStats = {
             total: this.images.length,
@@ -625,7 +628,7 @@ document.addEventListener('alpine:init', () => {
           }
         }
       } catch (error) {
-        console.error('加载图片失败:', error)
+        logger.error('加载图片失败:', error)
         this.images = []
       }
     },
@@ -680,7 +683,7 @@ document.addEventListener('alpine:init', () => {
         formData.append('filename', file.name)
         formData.append('type', 'general')
 
-        const response = await fetch(API_ENDPOINTS.IMAGE.UPLOAD, {
+        const response = await fetch(SYSTEM_ENDPOINTS.IMAGE_UPLOAD, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${localStorage.getItem('admin_token')}`
@@ -698,7 +701,7 @@ document.addEventListener('alpine:init', () => {
           this.showError(result?.message || '上传失败')
         }
       } catch (error) {
-        console.error('上传图片失败:', error)
+        logger.error('上传图片失败:', error)
         this.showError('上传失败: ' + error.message)
       } finally {
         this.uploading = false
@@ -823,15 +826,15 @@ document.addEventListener('alpine:init', () => {
 
         switch (this.deleteType) {
           case 'announcement':
-            url = API.buildURL(API_ENDPOINTS.ANNOUNCEMENT.DELETE, { id: targetId })
+            url = buildURL(SYSTEM_ENDPOINTS.ANNOUNCEMENT_DELETE, { id: targetId })
             successMsg = '公告已删除'
             break
           case 'banner':
-            url = `${API_ENDPOINTS.POPUP_BANNER.LIST}/${targetId}`
+            url = buildURL(SYSTEM_ENDPOINTS.POPUP_BANNER_DELETE, { id: targetId })
             successMsg = '轮播图已删除'
             break
           case 'image':
-            url = `${API_ENDPOINTS.IMAGE.LIST}/${targetId}`
+            url = buildURL(SYSTEM_ENDPOINTS.IMAGE_DELETE, { id: targetId })
             successMsg = '图片已删除'
             break
         }
@@ -844,7 +847,7 @@ document.addEventListener('alpine:init', () => {
           this.showSuccess(successMsg)
         }
       } catch (error) {
-        console.error('删除失败:', error)
+        logger.error('删除失败:', error)
         this.showError('删除失败: ' + error.message)
       } finally {
         this.deleting = false
@@ -888,7 +891,7 @@ document.addEventListener('alpine:init', () => {
     }
   }))
 
-  console.log('✅ [ContentManagementPage] Alpine 组件已注册 (Mixin v3.0)')
+  logger.info('[ContentManagementPage] Alpine 组件已注册 (Mixin v3.0)')
 })
 
-console.log('📦 [ContentManagement] 页面脚本已加载 (Mixin v3.0)')
+logger.info('[ContentManagement] 页面脚本已加载 (Mixin v3.0)')

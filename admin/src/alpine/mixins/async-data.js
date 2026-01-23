@@ -29,7 +29,7 @@
  *
  * function userPage() {
  *   const loaderConfig = createDataLoaderConfig({
- *     endpoint: API_ENDPOINTS.USER.LIST,
+ *     endpoint: USER_ENDPOINTS.LIST,
  *     dataKey: 'users',
  *     listField: 'users'
  *   })
@@ -46,6 +46,8 @@
  * }
  */
 
+
+import { logger } from '../../utils/logger.js'
 import { request } from '@/api/base.js'
 
 /**
@@ -176,7 +178,7 @@ export function asyncDataMixin() {
 
         return { success: true, data: result }
       } catch (error) {
-        console.error(`${errorMessage}:`, error)
+        logger.error(`${errorMessage}:`, error)
         this.error = error.message
 
         if (showError) {
@@ -305,7 +307,7 @@ export function asyncDataMixin() {
 
         return { success: true, data: result }
       } catch (error) {
-        console.error(`${errorMessage}:`, error)
+        logger.error(`${errorMessage}:`, error)
         this.error = error.message
 
         if (showError) {
@@ -361,7 +363,7 @@ export function asyncDataMixin() {
 
         return { success: true, data: result }
       } catch (error) {
-        console.error(`${errorMessage}:`, error)
+        logger.error(`${errorMessage}:`, error)
         this.error = error.message
 
         if (showError) {
@@ -397,50 +399,51 @@ export function asyncDataMixin() {
     /**
      * 显示成功消息
      * @param {string} message - 消息内容
+     * @param {number} duration - 显示时长（毫秒）
      */
-    showSuccess(message) {
-      // 使用全局 toast 或 alert
-      if (typeof window.showToast === 'function') {
-        window.showToast(message, 'success')
-      } else {
-        console.log('✅', message)
+    showSuccess(message, duration = 3000) {
+      // 优先使用 Alpine.store('notification')
+      if (typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('notification')) {
+        return Alpine.store('notification').success(message, duration)
       }
+      // 降级：使用 logger（window.showToast 已移除 - 方案 A）
+      logger.info(`✅ ${message}`)
     },
 
     /**
      * 显示错误消息
      * @param {string} message - 消息内容
+     * @param {number} duration - 显示时长（毫秒）
      */
-    showError(message) {
-      if (typeof window.showToast === 'function') {
-        window.showToast(message, 'error')
-      } else {
-        console.error('❌', message)
+    showError(message, duration = 5000) {
+      if (typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('notification')) {
+        return Alpine.store('notification').error(message, duration)
       }
+      logger.error(`❌ ${message}`)
     },
 
     /**
      * 显示警告消息
      * @param {string} message - 消息内容
+     * @param {number} duration - 显示时长（毫秒）
      */
-    showWarning(message) {
-      if (typeof window.showToast === 'function') {
-        window.showToast(message, 'warning')
-      } else {
-        console.warn('⚠️', message)
+    showWarning(message, duration = 4000) {
+      if (typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('notification')) {
+        return Alpine.store('notification').warning(message, duration)
       }
+      logger.warn(`⚠️ ${message}`)
     },
 
     /**
      * 显示信息消息
      * @param {string} message - 消息内容
+     * @param {number} duration - 显示时长（毫秒）
      */
-    showInfo(message) {
-      if (typeof window.showToast === 'function') {
-        window.showToast(message, 'info')
-      } else {
-        console.info('ℹ️', message)
+    showInfo(message, duration = 3000) {
+      if (typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('notification')) {
+        return Alpine.store('notification').info(message, duration)
       }
+      logger.info(`ℹ️ ${message}`)
     },
 
     // ========== 标准化数据加载方法（解决 24 处重复 loadData 模式）==========
@@ -469,7 +472,7 @@ export function asyncDataMixin() {
      *
      * @example 基本用法
      * await this.loadListData({
-     *   endpoint: API_ENDPOINTS.USER.LIST,
+     *   endpoint: USER_ENDPOINTS.LIST,
      *   filters: this.filters,
      *   dataKey: 'users',
      *   listField: 'users'
@@ -477,7 +480,7 @@ export function asyncDataMixin() {
      *
      * @example 使用预配置
      * // 页面初始化时设置 _loaderConfig
-     * this._loaderConfig = { endpoint: API_ENDPOINTS.USER.LIST, dataKey: 'users', listField: 'users' }
+     * this._loaderConfig = { endpoint: USER_ENDPOINTS.LIST, dataKey: 'users', listField: 'users' }
      * // 后续只需调用
      * await this.loadListData({ filters: this.filters })
      */
@@ -499,7 +502,7 @@ export function asyncDataMixin() {
       } = config
 
       if (!endpoint) {
-        console.error('[asyncDataMixin] loadListData: endpoint 是必需的')
+        logger.error('[asyncDataMixin] loadListData: endpoint 是必需的')
         return { success: false, error: new Error('endpoint is required') }
       }
 
@@ -666,7 +669,7 @@ export function asyncDataMixin() {
         const result = await asyncFn()
         return { success: true, data: result }
       } catch (error) {
-        console.error('操作失败:', error)
+        logger.error('操作失败:', error)
         return { success: false, error }
       }
     },
@@ -747,8 +750,8 @@ export function asyncDataMixin() {
      *
      * @example
      * await this.loadMultipleData([
-     *   { endpoint: API_ENDPOINTS.USER.LIST, dataKey: 'users', listField: 'users' },
-     *   { endpoint: API_ENDPOINTS.ROLE.LIST, dataKey: 'roles', listField: 'roles' }
+     *   { endpoint: USER_ENDPOINTS.LIST, dataKey: 'users', listField: 'users' },
+     *   { endpoint: USER_ENDPOINTS.ROLE_LIST, dataKey: 'roles', listField: 'roles' }
      * ])
      */
     async loadMultipleData(loaders, options = {}) {

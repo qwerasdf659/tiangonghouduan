@@ -10,7 +10,7 @@
  * @requires Alpine.js - 响应式框架
  * @requires ECharts - 图表库
  * @requires createPageMixin - 页面基础功能混入
- * @requires API_ENDPOINTS - API端点配置
+ * @requires SYSTEM_ENDPOINTS - 系统管理API端点配置
  *
  * 功能模块：
  * 1. 核心指标 - 总用户、抽奖次数、中奖率、消费金额
@@ -26,6 +26,12 @@
  * - GET /api/v4/console/system/statistics/export (导出报表)
  */
 
+
+// ES Module 导入
+import { logger } from '../../../utils/logger.js'
+import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
+import { request, getToken } from '../../../api/base.js'
+import { loadECharts } from '../../../utils/index.js'
 /**
  * @typedef {Object} StatisticsFilters
  * @property {string} period - 时间周期 ('today'|'yesterday'|'week'|'month'|'custom')
@@ -153,7 +159,7 @@ function statisticsPage() {
      * @returns {Promise<void>}
      */
     async init() {
-      console.log('✅ 数据统计报表页面初始化 (Mixin v3.0)')
+      logger.info('数据统计报表页面初始化 (ES Module v3.1)')
 
       // 使用 Mixin 的认证检查
       if (!this.checkAuth()) {
@@ -162,10 +168,10 @@ function statisticsPage() {
 
       // 动态加载 ECharts（懒加载优化）
       try {
-        await window.loadECharts()
-        console.log('[Statistics] ECharts 加载完成')
+        await loadECharts()
+        logger.info('[Statistics] ECharts 加载完成')
       } catch (error) {
-        console.error('[Statistics] ECharts 加载失败:', error)
+        logger.error('[Statistics] ECharts 加载失败:', error)
       }
 
       // 初始化图表
@@ -316,7 +322,7 @@ function statisticsPage() {
           params.append('end_date', this.filters.endDate)
         }
 
-        const response = await apiRequest(`${API_ENDPOINTS.SYSTEM.CHARTS}?${params.toString()}`)
+        const response = await request({ url: `${SYSTEM_ENDPOINTS.CHARTS}?${params.toString()}` })
 
         if (response && response.success) {
           return response.data
@@ -557,7 +563,7 @@ function statisticsPage() {
         }
 
         const response = await fetch(
-          `${API_ENDPOINTS.SYSTEM.STATISTICS_EXPORT}?${params.toString()}`,
+          `${SYSTEM_ENDPOINTS.STATISTICS_EXPORT}?${params.toString()}`,
           {
             headers: { Authorization: `Bearer ${getToken()}` }
           }
@@ -578,7 +584,7 @@ function statisticsPage() {
           this.showError('无法生成Excel文件')
         }
       } catch (error) {
-        console.error('导出Excel失败:', error)
+        logger.error('导出Excel失败:', error)
         this.showError(`导出失败: ${error.message}`)
       } finally {
         this.exporting = false
@@ -604,7 +610,7 @@ function statisticsPage() {
         }
 
         const response = await fetch(
-          `${API_ENDPOINTS.SYSTEM.STATISTICS_EXPORT}?${params.toString()}`,
+          `${SYSTEM_ENDPOINTS.STATISTICS_EXPORT}?${params.toString()}`,
           {
             headers: { Authorization: `Bearer ${getToken()}` }
           }
@@ -625,7 +631,7 @@ function statisticsPage() {
           this.showError('无法生成PDF文件')
         }
       } catch (error) {
-        console.error('导出PDF失败:', error)
+        logger.error('导出PDF失败:', error)
         this.showError(`导出失败: ${error.message}`)
       } finally {
         this.exporting = false
@@ -649,5 +655,5 @@ function statisticsPage() {
 // ========== Alpine.js CSP 兼容注册 ==========
 document.addEventListener('alpine:init', () => {
   Alpine.data('statisticsPage', statisticsPage)
-  console.log('✅ [StatisticsPage] Alpine 组件已注册 (Mixin v3.0)')
+  logger.info('[StatisticsPage] Alpine 组件已注册 (Mixin v3.0)')
 })

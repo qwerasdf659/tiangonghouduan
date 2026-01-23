@@ -7,6 +7,8 @@
  * @date 2026-01-23
  */
 
+
+import { logger } from '../utils/logger.js'
 import { request, buildURL, buildQueryString } from './base.js'
 
 // ========== 类型定义 ==========
@@ -266,7 +268,7 @@ export const ContentAPI = {
    * @example
    * // 获取反馈详情
    * const result = await ContentAPI.getFeedbackDetail(123)
-   * console.log(result.data.content) // 反馈内容
+   * logger.debug(result.data.content) // 反馈内容
    */
   async getFeedbackDetail(id) {
     const url = buildURL(CONTENT_ENDPOINTS.FEEDBACK_DETAIL, { id })
@@ -356,7 +358,7 @@ export const ContentAPI = {
    * @example
    * // 获取活动详情
    * const result = await ContentAPI.getActivityDetail('act_12345')
-   * console.log(result.data.name) // 活动名称
+   * logger.debug(result.data.name) // 活动名称
    */
   async getActivityDetail(id) {
     const url = buildURL(CONTENT_ENDPOINTS.ACTIVITIES_DETAIL, { id })

@@ -262,7 +262,91 @@ export const USER_ENDPOINTS = {
   /** @type {string} [POST] 清理过期会话 */
   SESSIONS_CLEANUP: '/api/v4/console/sessions/cleanup',
   /** @type {string} [GET] 获取在线用户 */
-  SESSIONS_ONLINE_USERS: '/api/v4/console/sessions/online-users'
+  SESSIONS_ONLINE_USERS: '/api/v4/console/sessions/online-users',
+  /** @type {string} [POST] 失效用户所有会话（强制下线） - Body: { user_type, user_id, reason? } */
+  SESSIONS_DEACTIVATE_USER: '/api/v4/console/sessions/deactivate-user',
+
+  // 用户统计
+  /** @type {string} [GET] 获取用户统计 - Query: { period? } */
+  STATS: '/api/v4/console/user-management/stats',
+
+  // 概率调整
+  /** @type {string} [POST] 调整用户中奖概率 - Path: :user_id, Body: { probability, reason } */
+  ADJUST_PROBABILITY: '/api/v4/console/lottery-management/users/:user_id/probability-adjust',
+
+  // 认证（使用后端 console/auth 路径）
+  /** @type {string} [POST] 登录 - Body: { mobile, verification_code } */
+  AUTH_LOGIN: '/api/v4/console/auth/login',
+  /** @type {string} [POST] 登出 */
+  AUTH_LOGOUT: '/api/v4/console/auth/logout',
+
+  // 权限扩展
+  /** @type {string} [GET] 获取权限列表 */
+  PERMISSION_LIST: '/api/v4/console/permissions',
+
+  // 角色扩展
+  /** @type {string} [GET] 获取角色列表 */
+  ROLE_LIST: '/api/v4/console/roles',
+  /** @type {string} [GET] 获取角色权限 - Path: :role_id */
+  ROLE_PERMISSIONS: '/api/v4/console/roles/:role_id/permissions',
+  /** @type {string} [POST] 分配权限给角色 - Path: :role_id, Body: { permission_ids } */
+  ROLE_ASSIGN_PERMISSION: '/api/v4/console/roles/:role_id/permissions',
+  /** @type {string} [DELETE] 移除角色权限 - Path: :role_id/:permission_id */
+  ROLE_REMOVE_PERMISSION: '/api/v4/console/roles/:role_id/permissions/:permission_id',
+
+  // 用户角色管理
+  /** @type {string} [GET] 获取用户角色列表 */
+  USER_ROLE_LIST: '/api/v4/console/user-roles',
+  /** @type {string} [POST] 分配角色给用户 - Body: { user_id, role_id } */
+  USER_ROLE_ASSIGN: '/api/v4/console/user-roles',
+  /** @type {string} [DELETE] 移除用户角色 - Path: :user_id/:role_id */
+  USER_ROLE_REMOVE: '/api/v4/console/user-roles/:user_id/:role_id',
+
+  // 角色变更历史（来自 business-records 路由）
+  /** @type {string} [GET] 获取角色变更历史 - Query: { user_id?, operator_id?, old_role?, new_role?, start_date?, end_date?, page?, page_size? } */
+  ROLE_CHANGE_HISTORY_LIST: '/api/v4/console/business-records/user-role-changes',
+  /** @type {string} [GET] 获取角色变更详情 - Path: :record_id */
+  ROLE_CHANGE_HISTORY_DETAIL: '/api/v4/console/business-records/user-role-changes/:record_id',
+
+  // 状态变更历史（来自 business-records 路由）
+  /** @type {string} [GET] 获取状态变更历史 - Query: { user_id?, operator_id?, old_status?, new_status?, start_date?, end_date?, page?, page_size? } */
+  STATUS_CHANGE_HISTORY_LIST: '/api/v4/console/business-records/user-status-changes',
+  /** @type {string} [GET] 获取状态变更详情 - Path: :record_id */
+  STATUS_CHANGE_HISTORY_DETAIL: '/api/v4/console/business-records/user-status-changes/:record_id',
+
+  // 高级状态扩展
+  /** @type {string} [GET] 获取高级状态统计 */
+  PREMIUM_STATUS_STATS: '/api/v4/console/user-premium/stats',
+  /** @type {string} [POST] 延长高级状态 - Path: :user_id, Body: { days } */
+  PREMIUM_STATUS_EXTEND: '/api/v4/console/user-premium/:user_id/extend',
+  /** @type {string} [POST] 撤销高级状态 - Path: :user_id */
+  PREMIUM_STATUS_REVOKE: '/api/v4/console/user-premium/:user_id/revoke',
+
+  // 风控配置扩展（兼容别名）
+  /** @type {string} [GET] 获取风控配置列表 */
+  RISK_PROFILE_LIST: '/api/v4/console/risk-profiles',
+  /** @type {string} [POST] 创建风控配置 - Body: { user_id, risk_level, limits } */
+  RISK_PROFILE_CREATE: '/api/v4/console/risk-profiles',
+  /** @type {string} [PUT] 更新风控配置 - Path: :id */
+  RISK_PROFILE_UPDATE: '/api/v4/console/risk-profiles/:id',
+  /** @type {string} [POST] 冻结用户 - Path: :user_id */
+  RISK_PROFILE_FREEZE: '/api/v4/console/risk-profiles/:user_id/freeze',
+  /** @type {string} [POST] 解冻用户 - Path: :user_id */
+  RISK_PROFILE_UNFREEZE: '/api/v4/console/risk-profiles/:user_id/unfreeze',
+
+  // 用户层级扩展（兼容别名）
+  /** @type {string} [POST] 激活用户层级 - Path: :user_id */
+  USER_HIERARCHY_ACTIVATE: '/api/v4/console/user-hierarchy/:user_id/activate',
+  /** @type {string} [POST] 停用用户层级 - Path: :user_id */
+  USER_HIERARCHY_DEACTIVATE: '/api/v4/console/user-hierarchy/:user_id/deactivate',
+  /** @type {string} [POST] 创建层级关系 */
+  USER_HIERARCHY_CREATE: '/api/v4/console/user-hierarchy',
+  /** @type {string} [GET] 获取层级列表 */
+  USER_HIERARCHY_LIST: '/api/v4/console/user-hierarchy',
+  /** @type {string} [GET] 获取层级角色 */
+  USER_HIERARCHY_ROLES: '/api/v4/console/user-hierarchy/roles',
+  /** @type {string} [GET] 获取下级用户 - Path: :user_id */
+  USER_HIERARCHY_SUBORDINATES: '/api/v4/console/user-hierarchy/:user_id/subordinates'
 }
 
 // ========== API 调用方法 ==========
@@ -308,7 +392,7 @@ export const UserAPI = {
    * @example
    * // 获取用户详情
    * const result = await UserAPI.getDetail(12345)
-   * console.log(result.data) // { user_id, mobile, nickname, ... }
+   * logger.debug(result.data) // { user_id, mobile, nickname, ... }
    */
   async getDetail(userId) {
     const url = buildURL(USER_ENDPOINTS.DETAIL, { user_id: userId })
@@ -667,6 +751,70 @@ export const UserAPI = {
   async updateUserRiskProfile(userId, data) {
     const url = buildURL(USER_ENDPOINTS.RISK_PROFILES_UPDATE, { user_id: userId })
     return await request({ url, method: 'PUT', data })
+  },
+
+  // ===== 角色变更历史 =====
+
+  /**
+   * 获取角色变更历史列表
+   * @async
+   * @param {Object} [params={}] - 查询参数
+   * @param {number} [params.user_id] - 被变更角色的用户ID
+   * @param {number} [params.operator_id] - 执行变更的操作员ID
+   * @param {string} [params.old_role] - 变更前角色
+   * @param {string} [params.new_role] - 变更后角色
+   * @param {string} [params.start_date] - 开始日期
+   * @param {string} [params.end_date] - 结束日期
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @returns {Promise<ApiResponse>} 角色变更记录列表响应
+   */
+  async getRoleChangeHistory(params = {}) {
+    const url = USER_ENDPOINTS.ROLE_CHANGE_HISTORY_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取角色变更记录详情
+   * @async
+   * @param {number|string} recordId - 记录 ID
+   * @returns {Promise<ApiResponse>} 角色变更记录详情响应
+   */
+  async getRoleChangeHistoryDetail(recordId) {
+    const url = buildURL(USER_ENDPOINTS.ROLE_CHANGE_HISTORY_DETAIL, { record_id: recordId })
+    return await request({ url, method: 'GET' })
+  },
+
+  // ===== 状态变更历史 =====
+
+  /**
+   * 获取状态变更历史列表
+   * @async
+   * @param {Object} [params={}] - 查询参数
+   * @param {number} [params.user_id] - 被变更状态的用户ID
+   * @param {number} [params.operator_id] - 执行变更的操作员ID
+   * @param {string} [params.old_status] - 变更前状态
+   * @param {string} [params.new_status] - 变更后状态
+   * @param {string} [params.start_date] - 开始日期
+   * @param {string} [params.end_date] - 结束日期
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @returns {Promise<ApiResponse>} 状态变更记录列表响应
+   */
+  async getStatusChangeHistory(params = {}) {
+    const url = USER_ENDPOINTS.STATUS_CHANGE_HISTORY_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取状态变更记录详情
+   * @async
+   * @param {number|string} recordId - 记录 ID
+   * @returns {Promise<ApiResponse>} 状态变更记录详情响应
+   */
+  async getStatusChangeHistoryDetail(recordId) {
+    const url = buildURL(USER_ENDPOINTS.STATUS_CHANGE_HISTORY_DETAIL, { record_id: recordId })
+    return await request({ url, method: 'GET' })
   }
 }
 

@@ -7,6 +7,8 @@
  * @date 2026-01-23
  */
 
+
+import { logger } from '../utils/logger.js'
 import { request, buildURL, buildQueryString } from './base.js'
 
 // ========== 类型定义 ==========
@@ -93,7 +95,39 @@ export const STORE_ENDPOINTS = {
   CONSUMPTION_RECORDS: '/api/v4/console/consumption/records',
   CONSUMPTION_PENDING: '/api/v4/console/consumption/pending',
   CONSUMPTION_APPROVE: '/api/v4/console/consumption/approve/:id',
-  CONSUMPTION_REJECT: '/api/v4/console/consumption/reject/:id'
+  CONSUMPTION_REJECT: '/api/v4/console/consumption/reject/:id',
+
+  // 门店统计
+  STATS: '/api/v4/console/stores/stats',
+
+  // 员工管理
+  STAFF_LIST: '/api/v4/console/staff',
+  STAFF_DETAIL: '/api/v4/console/staff/:store_staff_id',
+  STAFF_CREATE: '/api/v4/console/staff',
+  STAFF_UPDATE: '/api/v4/console/staff/:store_staff_id',
+  STAFF_DELETE: '/api/v4/console/staff/:store_staff_id',
+
+  // 消费记录扩展
+  CONSUMPTION_LIST: '/api/v4/console/consumption/records',
+  CONSUMPTION_DETAIL: '/api/v4/console/consumption/records/:id',
+  CONSUMPTION_STATS: '/api/v4/console/consumption/stats',
+  CONSUMPTION_AUDIT: '/api/v4/console/consumption/audit/:id',
+
+  // 商户积分扩展
+  MERCHANT_POINTS_HISTORY: '/api/v4/console/merchant-points/:id/history',
+
+  // 商户日志
+  MERCHANT_LOGS_LIST: '/api/v4/console/audit-logs',
+  MERCHANT_LOGS_EXPORT: '/api/v4/console/audit-logs/export',
+  MERCHANT_LOGS_STATS: '/api/v4/console/audit-logs/stats',
+
+  // 地区管理
+  REGION_PROVINCES: '/api/v4/console/regions/provinces',
+  REGION_CHILDREN: '/api/v4/console/regions/:parent_code/children',
+  REGION_SEARCH: '/api/v4/console/regions/search',
+  REGION_PATH: '/api/v4/console/regions/path/:region_code',
+  REGION_STATS: '/api/v4/console/regions/stats',
+  REGION_VALIDATE: '/api/v4/console/regions/validate'
 }
 
 // ========== API 调用方法 ==========
@@ -139,7 +173,7 @@ export const StoreAPI = {
    * @example
    * // 获取门店详情
    * const result = await StoreAPI.getDetail(123)
-   * console.log(result.data.name) // 门店名称
+   * logger.debug(result.data.name) // 门店名称
    */
   async getDetail(storeId) {
     const url = buildURL(STORE_ENDPOINTS.DETAIL, { store_id: storeId })
@@ -353,7 +387,7 @@ export const StoreAPI = {
    * @example
    * // 获取待处理统计
    * const result = await StoreAPI.getMerchantPointsStats()
-   * console.log(result.data.pending_count) // 待审核数量
+   * logger.debug(result.data.pending_count) // 待审核数量
    */
   async getMerchantPointsStats() {
     return await request({ url: STORE_ENDPOINTS.MERCHANT_POINTS_STATS, method: 'GET' })
@@ -452,6 +486,154 @@ export const StoreAPI = {
   async rejectConsumption(id, data) {
     const url = buildURL(STORE_ENDPOINTS.CONSUMPTION_REJECT, { id })
     return await request({ url, method: 'POST', data })
+  },
+
+  // ===== 地区管理 =====
+
+  /**
+   * 获取省级区划列表
+   * @async
+   * @returns {Promise<Object>} 省级区划列表
+   * @throws {Error} 网络请求失败
+   *
+   * @example
+   * const result = await StoreAPI.getProvinces()
+   * // 返回省份列表用于级联选择器第一级
+   */
+  async getProvinces() {
+    return await request({ url: STORE_ENDPOINTS.REGION_PROVINCES, method: 'GET' })
+  },
+
+  /**
+   * 获取子级区划列表
+   * @async
+   * @param {string} parentCode - 父级区划代码
+   * @returns {Promise<Object>} 子级区划列表
+   * @throws {Error} 网络请求失败
+   *
+   * @example
+   * const result = await StoreAPI.getRegionChildren('110000')
+   * // 返回北京市下的市/区列表
+   */
+  async getRegionChildren(parentCode) {
+    const url = buildURL(STORE_ENDPOINTS.REGION_CHILDREN, { parent_code: parentCode })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 搜索区划
+   * @async
+   * @param {Object} params - 搜索参数
+   * @param {string} params.keyword - 搜索关键词（至少2个字符）
+   * @param {number} [params.level] - 限制层级（1=省, 2=市, 3=区县, 4=街道）
+   * @param {number} [params.limit=20] - 结果数量限制
+   * @returns {Promise<Object>} 搜索结果列表
+   * @throws {Error} 网络请求失败
+   */
+  async searchRegions(params = {}) {
+    const url = STORE_ENDPOINTS.REGION_SEARCH + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取区划完整路径
+   * @async
+   * @param {string} regionCode - 区划代码
+   * @returns {Promise<Object>} 完整路径信息
+   * @throws {Error} 网络请求失败
+   */
+  async getRegionPath(regionCode) {
+    const url = buildURL(STORE_ENDPOINTS.REGION_PATH, { region_code: regionCode })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取区划统计信息
+   * @async
+   * @returns {Promise<Object>} 区划统计信息
+   * @throws {Error} 网络请求失败
+   */
+  async getRegionStats() {
+    return await request({ url: STORE_ENDPOINTS.REGION_STATS, method: 'GET' })
+  },
+
+  /**
+   * 校验区划代码
+   * @async
+   * @param {Object} data - 校验数据
+   * @param {string} data.province_code - 省级区划代码
+   * @param {string} data.city_code - 市级区划代码
+   * @param {string} data.district_code - 区县级区划代码
+   * @param {string} data.street_code - 街道级区划代码
+   * @returns {Promise<Object>} 校验结果
+   * @throws {Error} 网络请求失败
+   */
+  async validateRegionCodes(data) {
+    return await request({ url: STORE_ENDPOINTS.REGION_VALIDATE, method: 'POST', data })
+  },
+
+  // ===== 员工管理 =====
+
+  /**
+   * 获取员工列表
+   * @async
+   * @param {Object} [params={}] - 查询参数
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @param {number} [params.store_id] - 门店ID筛选
+   * @param {string} [params.status] - 状态筛选
+   * @returns {Promise<Object>} 员工列表
+   */
+  async getStaffList(params = {}) {
+    const url = STORE_ENDPOINTS.STAFF_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取员工详情
+   * @async
+   * @param {number} staffId - 员工ID
+   * @returns {Promise<Object>} 员工详情
+   */
+  async getStaffDetail(staffId) {
+    const url = buildURL(STORE_ENDPOINTS.STAFF_DETAIL, { store_staff_id: staffId })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 创建员工（绑定门店）
+   * @async
+   * @param {Object} data - 员工数据
+   * @param {number} data.user_id - 用户ID
+   * @param {number} data.store_id - 门店ID
+   * @param {string} [data.role='staff'] - 角色（staff/manager）
+   * @returns {Promise<Object>} 创建结果
+   */
+  async createStaff(data) {
+    return await request({ url: STORE_ENDPOINTS.STAFF_CREATE, method: 'POST', data })
+  },
+
+  /**
+   * 更新员工信息
+   * @async
+   * @param {number} staffId - 员工ID
+   * @param {Object} data - 更新数据
+   * @returns {Promise<Object>} 更新结果
+   */
+  async updateStaff(staffId, data) {
+    const url = buildURL(STORE_ENDPOINTS.STAFF_UPDATE, { store_staff_id: staffId })
+    return await request({ url, method: 'PUT', data })
+  },
+
+  /**
+   * 删除员工（解除门店绑定）
+   * @async
+   * @param {number} staffId - 员工ID
+   * @returns {Promise<Object>} 删除结果
+   */
+  async deleteStaff(staffId) {
+    const url = buildURL(STORE_ENDPOINTS.STAFF_DELETE, { store_staff_id: staffId })
+    return await request({ url, method: 'DELETE' })
   }
 }
 

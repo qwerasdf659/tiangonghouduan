@@ -15,7 +15,7 @@
  * - 模板统计信息展示
  *
  * @requires createCrudMixin - CRUD操作基础Mixin
- * @requires API_ENDPOINTS - API端点配置
+ * @requires ASSET_ENDPOINTS - 资产API端点配置
  * @requires apiRequest - API请求工具函数
  * @requires showLoading - 显示全局loading
  * @requires hideLoading - 隐藏全局loading
@@ -28,6 +28,10 @@
  *   </template>
  * </div>
  */
+
+import { logger } from '../../../utils/logger.js'
+import { ASSET_ENDPOINTS } from '../../../api/asset.js'
+import { buildURL } from '../../../api/base.js'
 document.addEventListener('alpine:init', () => {
   // 使用 createCrudMixin 获取标准功能
   const baseMixin =
@@ -150,7 +154,7 @@ document.addEventListener('alpine:init', () => {
      * @async
      * @description 根据筛选条件从后端获取物品模板列表
      * @returns {Promise<void>}
-     * @fires API_ENDPOINTS.ITEM_TEMPLATE.LIST
+     * @fires ASSET_ENDPOINTS.ITEM_TEMPLATES_LIST
      */
     async loadTemplates() {
       showLoading()
@@ -163,7 +167,7 @@ document.addEventListener('alpine:init', () => {
         if (this.filters.search) params.append('keyword', this.filters.search)
 
         const url =
-          API_ENDPOINTS.ITEM_TEMPLATE.LIST + (params.toString() ? `?${params.toString()}` : '')
+          ASSET_ENDPOINTS.ITEM_TEMPLATES_LIST + (params.toString() ? `?${params.toString()}` : '')
         const response = await apiRequest(url)
 
         if (response && response.success) {
@@ -173,7 +177,7 @@ document.addEventListener('alpine:init', () => {
           this.showError('加载失败', response?.message || '获取物品模板失败')
         }
       } catch (error) {
-        console.error('加载物品模板失败:', error)
+        logger.error('加载物品模板失败:', error)
         this.showError('加载失败', error.message)
       } finally {
         hideLoading()
@@ -222,13 +226,13 @@ document.addEventListener('alpine:init', () => {
      * @param {number|string} templateId - 模板ID
      * @description 获取模板详情并填充到表单中，然后显示编辑模态框
      * @returns {Promise<void>}
-     * @fires API_ENDPOINTS.ITEM_TEMPLATE.DETAIL
+     * @fires ASSET_ENDPOINTS.ITEM_TEMPLATES_DETAIL
      */
     async editTemplate(templateId) {
       showLoading()
       try {
         const response = await apiRequest(
-          API.buildURL(API_ENDPOINTS.ITEM_TEMPLATE.DETAIL, { id: templateId })
+          buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATES_DETAIL, { id: templateId })
         )
         if (response && response.success) {
           const t = response.data
@@ -249,7 +253,7 @@ document.addEventListener('alpine:init', () => {
           this.showError('加载失败', response?.message || '获取模板详情失败')
         }
       } catch (error) {
-        console.error('加载模板详情失败:', error)
+        logger.error('加载模板详情失败:', error)
         this.showError('加载失败', error.message)
       } finally {
         hideLoading()
@@ -262,8 +266,8 @@ document.addEventListener('alpine:init', () => {
      * @description 验证表单数据并提交到后端，根据templateId判断是创建还是更新
      * @returns {Promise<void>}
      * @throws {Error} 当JSON格式错误或必填字段缺失时
-     * @fires API_ENDPOINTS.ITEM_TEMPLATE.CREATE
-     * @fires API_ENDPOINTS.ITEM_TEMPLATE.UPDATE
+     * @fires ASSET_ENDPOINTS.ITEM_TEMPLATES_CREATE
+     * @fires ASSET_ENDPOINTS.ITEM_TEMPLATES_UPDATE
      */
     async submitTemplate() {
       if (this.isSubmitting) return
@@ -299,8 +303,8 @@ document.addEventListener('alpine:init', () => {
       showLoading()
       try {
         const url = this.form.templateId
-          ? API.buildURL(API_ENDPOINTS.ITEM_TEMPLATE.UPDATE, { id: this.form.templateId })
-          : API_ENDPOINTS.ITEM_TEMPLATE.CREATE
+          ? buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATES_UPDATE, { id: this.form.templateId })
+          : ASSET_ENDPOINTS.ITEM_TEMPLATES_CREATE
         const method = this.form.templateId ? 'PUT' : 'POST'
 
         const response = await apiRequest(url, { method, body: JSON.stringify(data) })
@@ -313,7 +317,7 @@ document.addEventListener('alpine:init', () => {
           this.showError('保存失败', response?.message || '操作失败')
         }
       } catch (error) {
-        console.error('保存模板失败:', error)
+        logger.error('保存模板失败:', error)
         this.showError('保存失败', error.message)
       } finally {
         this.isSubmitting = false
@@ -327,7 +331,7 @@ document.addEventListener('alpine:init', () => {
      * @param {number|string} templateId - 模板ID
      * @description 确认后删除指定的物品模板
      * @returns {Promise<void>}
-     * @fires API_ENDPOINTS.ITEM_TEMPLATE.DELETE
+     * @fires ASSET_ENDPOINTS.ITEM_TEMPLATES_DELETE
      */
     async deleteTemplate(templateId) {
       if (!confirm('确定要删除此物品模板吗？此操作不可恢复！')) return
@@ -335,7 +339,7 @@ document.addEventListener('alpine:init', () => {
       showLoading()
       try {
         const response = await apiRequest(
-          API.buildURL(API_ENDPOINTS.ITEM_TEMPLATE.DELETE, { id: templateId }),
+          buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATES_DELETE, { id: templateId }),
           {
             method: 'DELETE'
           }
@@ -348,7 +352,7 @@ document.addEventListener('alpine:init', () => {
           this.showError('删除失败', response?.message || '操作失败')
         }
       } catch (error) {
-        console.error('删除模板失败:', error)
+        logger.error('删除模板失败:', error)
         this.showError('删除失败', error.message)
       } finally {
         hideLoading()
@@ -366,7 +370,7 @@ document.addEventListener('alpine:init', () => {
       } else if (typeof showToast === 'function') {
         showToast(message, 'success')
       } else {
-        console.log('✅', message)
+        logger.info('', message)
       }
     },
 
@@ -381,7 +385,7 @@ document.addEventListener('alpine:init', () => {
       } else if (typeof showToast === 'function') {
         showToast(message, 'info')
       } else {
-        console.log('ℹ️', message)
+        logger.info('', message)
       }
     },
 
@@ -398,7 +402,7 @@ document.addEventListener('alpine:init', () => {
       } else if (typeof showToast === 'function') {
         showToast(fullMessage, 'error')
       } else {
-        console.error('❌', fullMessage)
+        logger.error('❌', fullMessage)
       }
     }
   }))

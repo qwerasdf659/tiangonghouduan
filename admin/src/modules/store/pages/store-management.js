@@ -9,9 +9,8 @@
  *
  * @requires Alpine.js
  * @requires createPageMixin - 页面基础功能混入
- * @requires API_ENDPOINTS.STORE - 门店相关API端点
- * @requires API_ENDPOINTS.STAFF - 员工相关API端点
- * @requires API_ENDPOINTS.REGION - 地区相关API端点
+ * @requires STORE_ENDPOINTS - 门店/员工相关API端点
+ * @requires SYSTEM_ENDPOINTS - 地区相关API端点
  *
  * 包含子模块：
  * - 门店列表 (stores) - 门店CRUD操作
@@ -34,18 +33,23 @@
  * </div>
  */
 
+import { logger } from '../../../utils/logger.js'
+import { STORE_ENDPOINTS } from '../../../api/store.js'
+import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
+import { buildURL } from '../../../api/base.js'
+import { createPageMixin } from '../../../alpine/mixins/index.js'
+
 /**
  * 注册门店管理相关Alpine组件
- * @description 等待Alpine和createPageMixin就绪后注册所有组件
+ * @description 在 alpine:init 事件中调用，此时 Alpine.js 和所有依赖都已加载完成
  * @returns {void}
  */
 function registerStoreManagementComponents() {
-  console.log('[StoreManagement] 注册 Alpine 组件 (Mixin v3.1)...')
+  logger.info('[StoreManagement] 注册 Alpine 组件 (Mixin v3.1)...')
 
-  // 检查 Alpine 和 createPageMixin 是否可用
-  if (typeof window.Alpine === 'undefined' || typeof window.createPageMixin !== 'function') {
-    console.log('[StoreManagement] 等待 Alpine 初始化...')
-    setTimeout(registerStoreManagementComponents, 50)
+  // 检查 Alpine.js 是否已加载
+  if (typeof window.Alpine === 'undefined') {
+    logger.error('[StoreManagement] Alpine.js 未加载，请检查脚本加载顺序')
     return
   }
 
@@ -83,7 +87,7 @@ function registerStoreManagementComponents() {
      * @returns {void}
      */
     init() {
-      console.log('✅ 门店管理导航初始化')
+      logger.info('门店管理导航初始化')
       if (!this.checkAuth()) return
       const urlParams = new URLSearchParams(window.location.search)
       this.currentPage = urlParams.get('page') || 'stores'
@@ -209,7 +213,7 @@ function registerStoreManagementComponents() {
      * @returns {void}
      */
     init() {
-      console.log('✅ 门店管理内容初始化')
+      logger.info('门店管理内容初始化')
 
       // 加载省份数据（供门店添加/编辑使用）
       this.loadProvinces()
@@ -264,7 +268,7 @@ function registerStoreManagementComponents() {
         if (this.storeFilters.keyword) params.append('keyword', this.storeFilters.keyword)
 
         const response = await this.apiGet(
-          `${API_ENDPOINTS.STORE.LIST}?${params}`,
+          `${STORE_ENDPOINTS.LIST}?${params}`,
           {},
           { showLoading: false }
         )
@@ -273,7 +277,7 @@ function registerStoreManagementComponents() {
           this.stores = response.data?.items || response.data?.stores || response.data?.list || []
         }
       } catch (error) {
-        console.error('加载门店失败:', error)
+        logger.error('加载门店失败:', error)
         this.stores = []
       }
     },
@@ -287,7 +291,7 @@ function registerStoreManagementComponents() {
     async loadStoreStats() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.STORE.STATS,
+          STORE_ENDPOINTS.STATS,
           {},
           { showError: false, showLoading: false }
         )
@@ -324,7 +328,7 @@ function registerStoreManagementComponents() {
     async loadStoreRanking() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.STORE.LIST + '/ranking',
+          STORE_ENDPOINTS.LIST + '/ranking',
           {},
           { showLoading: false, showError: false }
         )
@@ -455,11 +459,11 @@ function registerStoreManagementComponents() {
         let response
         if (this.editingStoreId) {
           response = await this.apiCall(
-            API.buildURL(API_ENDPOINTS.STORE.UPDATE, { store_id: this.editingStoreId }),
+            buildURL(STORE_ENDPOINTS.UPDATE, { store_id: this.editingStoreId }),
             { method: 'PUT', data: payload }
           )
         } else {
-          response = await this.apiCall(API_ENDPOINTS.STORE.CREATE, {
+          response = await this.apiCall(STORE_ENDPOINTS.CREATE, {
             method: 'POST',
             data: payload
           })
@@ -472,7 +476,7 @@ function registerStoreManagementComponents() {
           this.loadStoreStats()
         }
       } catch (error) {
-        console.error('保存门店失败:', error)
+        logger.error('保存门店失败:', error)
         this.showError('保存失败: ' + error.message)
       } finally {
         this.saving = false
@@ -507,7 +511,7 @@ function registerStoreManagementComponents() {
     async loadProvinces() {
       try {
         const response = await this.apiGet(
-          API_ENDPOINTS.REGION.PROVINCES,
+          SYSTEM_ENDPOINTS.REGION_PROVINCES,
           {},
           { showLoading: false, showError: false }
         )
@@ -516,7 +520,7 @@ function registerStoreManagementComponents() {
           this.provinces = Array.isArray(provincesData) ? provincesData : []
         }
       } catch (error) {
-        console.error('加载省份失败:', error)
+        logger.error('加载省份失败:', error)
         this.provinces = []
       }
     },
@@ -536,7 +540,7 @@ function registerStoreManagementComponents() {
 
       try {
         const response = await this.apiGet(
-          API.buildURL(API_ENDPOINTS.REGION.CHILDREN, {
+          buildURL(SYSTEM_ENDPOINTS.REGION_CHILDREN, {
             parent_code: this.storeForm.province_code
           }),
           {},
@@ -547,7 +551,7 @@ function registerStoreManagementComponents() {
           this.cities = Array.isArray(citiesData) ? citiesData : []
         }
       } catch (error) {
-        console.error('加载城市失败:', error)
+        logger.error('加载城市失败:', error)
         this.cities = []
       }
     },
@@ -565,7 +569,7 @@ function registerStoreManagementComponents() {
 
       try {
         const response = await this.apiGet(
-          API.buildURL(API_ENDPOINTS.REGION.CHILDREN, { parent_code: this.storeForm.city_code }),
+          buildURL(SYSTEM_ENDPOINTS.REGION_CHILDREN, { parent_code: this.storeForm.city_code }),
           {},
           { showLoading: false, showError: false }
         )
@@ -574,7 +578,7 @@ function registerStoreManagementComponents() {
           this.districts = Array.isArray(districtsData) ? districtsData : []
         }
       } catch (error) {
-        console.error('加载区县失败:', error)
+        logger.error('加载区县失败:', error)
         this.districts = []
       }
     },
@@ -590,7 +594,7 @@ function registerStoreManagementComponents() {
 
       try {
         const response = await this.apiGet(
-          API.buildURL(API_ENDPOINTS.REGION.CHILDREN, {
+          buildURL(SYSTEM_ENDPOINTS.REGION_CHILDREN, {
             parent_code: this.storeForm.district_code
           }),
           {},
@@ -601,7 +605,7 @@ function registerStoreManagementComponents() {
           this.streets = Array.isArray(streetsData) ? streetsData : []
         }
       } catch (error) {
-        console.error('加载街道失败:', error)
+        logger.error('加载街道失败:', error)
         this.streets = []
       }
     },
@@ -612,7 +616,7 @@ function registerStoreManagementComponents() {
     async loadCitiesForEdit(provinceCode) {
       try {
         const response = await this.apiGet(
-          API.buildURL(API_ENDPOINTS.REGION.CHILDREN, { parent_code: provinceCode }),
+          buildURL(SYSTEM_ENDPOINTS.REGION_CHILDREN, { parent_code: provinceCode }),
           {},
           { showLoading: false, showError: false }
         )
@@ -621,7 +625,7 @@ function registerStoreManagementComponents() {
           this.cities = Array.isArray(citiesData) ? citiesData : []
         }
       } catch (error) {
-        console.error('加载城市失败:', error)
+        logger.error('加载城市失败:', error)
         this.cities = []
       }
     },
@@ -632,7 +636,7 @@ function registerStoreManagementComponents() {
     async loadDistrictsForEdit(cityCode) {
       try {
         const response = await this.apiGet(
-          API.buildURL(API_ENDPOINTS.REGION.CHILDREN, { parent_code: cityCode }),
+          buildURL(SYSTEM_ENDPOINTS.REGION_CHILDREN, { parent_code: cityCode }),
           {},
           { showLoading: false, showError: false }
         )
@@ -641,7 +645,7 @@ function registerStoreManagementComponents() {
           this.districts = Array.isArray(districtsData) ? districtsData : []
         }
       } catch (error) {
-        console.error('加载区县失败:', error)
+        logger.error('加载区县失败:', error)
         this.districts = []
       }
     },
@@ -652,7 +656,7 @@ function registerStoreManagementComponents() {
     async loadStreetsForEdit(districtCode) {
       try {
         const response = await this.apiGet(
-          API.buildURL(API_ENDPOINTS.REGION.CHILDREN, { parent_code: districtCode }),
+          buildURL(SYSTEM_ENDPOINTS.REGION_CHILDREN, { parent_code: districtCode }),
           {},
           { showLoading: false, showError: false }
         )
@@ -661,7 +665,7 @@ function registerStoreManagementComponents() {
           this.streets = Array.isArray(streetsData) ? streetsData : []
         }
       } catch (error) {
-        console.error('加载街道失败:', error)
+        logger.error('加载街道失败:', error)
         this.streets = []
       }
     },
@@ -706,7 +710,7 @@ function registerStoreManagementComponents() {
         if (this.staffFilters.keyword) params.append('keyword', this.staffFilters.keyword)
 
         const response = await this.apiGet(
-          `${API_ENDPOINTS.STAFF.LIST}?${params}`,
+          `${STORE_ENDPOINTS.STAFF_LIST}?${params}`,
           {},
           { showLoading: false }
         )
@@ -729,7 +733,7 @@ function registerStoreManagementComponents() {
           }
         }
       } catch (error) {
-        console.error('加载员工失败:', error)
+        logger.error('加载员工失败:', error)
         this.staffList = []
       }
     },
@@ -785,7 +789,7 @@ function registerStoreManagementComponents() {
         `确认删除员工「${staff.name}」？`,
         async () => {
           const response = await this.apiCall(
-            API.buildURL(API_ENDPOINTS.STAFF.DETAIL, { store_staff_id: staff.staff_id }),
+            buildURL(STORE_ENDPOINTS.STAFF_DETAIL, { store_staff_id: staff.staff_id }),
             { method: 'DELETE' }
           )
           if (response?.success) this.loadStaff()
@@ -819,11 +823,11 @@ function registerStoreManagementComponents() {
         let response
         if (this.editingStaffId) {
           response = await this.apiCall(
-            API.buildURL(API_ENDPOINTS.STAFF.DETAIL, { store_staff_id: this.editingStaffId }),
+            buildURL(STORE_ENDPOINTS.STAFF_UPDATE, { store_staff_id: this.editingStaffId }),
             { method: 'PUT', body: JSON.stringify(payload) }
           )
         } else {
-          response = await this.apiCall(API_ENDPOINTS.STAFF.CREATE, {
+          response = await this.apiCall(STORE_ENDPOINTS.STAFF_CREATE, {
             method: 'POST',
             body: JSON.stringify(payload)
           })
@@ -835,7 +839,7 @@ function registerStoreManagementComponents() {
           this.loadStaff()
         }
       } catch (error) {
-        console.error('保存员工失败:', error)
+        logger.error('保存员工失败:', error)
         this.showError('保存失败: ' + error.message)
       } finally {
         this.saving = false
@@ -898,22 +902,10 @@ function registerStoreManagementComponents() {
     }
   }))
 
-  console.log('✅ [StoreManagement] Alpine 组件已注册')
+  logger.info('[StoreManagement] Alpine 组件已注册')
 }
 
-// 🔧 修复：多种初始化方式确保组件被注册
-if (typeof window.Alpine !== 'undefined' && typeof window.createPageMixin === 'function') {
-  console.log('[StoreManagement] Alpine 已可用，直接注册组件')
-  registerStoreManagementComponents()
-} else {
-  document.addEventListener('alpine:init', registerStoreManagementComponents)
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      setTimeout(registerStoreManagementComponents, 100)
-    })
-  } else {
-    setTimeout(registerStoreManagementComponents, 100)
-  }
-}
+// 使用 alpine:init 事件注册组件（推荐的标准方式）
+document.addEventListener('alpine:init', registerStoreManagementComponents)
 
-console.log('📦 [StoreManagement] 页面脚本已加载')
+logger.info('[StoreManagement] 页面脚本已加载')

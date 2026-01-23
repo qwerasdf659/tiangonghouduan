@@ -91,7 +91,74 @@ export const SYSTEM_ENDPOINTS = {
   // 配置工具
   CONFIG_TOOLS_VALIDATE: '/api/v4/console/config-tools/validate',
   CONFIG_TOOLS_EXPORT: '/api/v4/console/config-tools/export',
-  CONFIG_TOOLS_IMPORT: '/api/v4/console/config-tools/import'
+  CONFIG_TOOLS_IMPORT: '/api/v4/console/config-tools/import',
+
+  // 字典管理 - 类目
+  DICT_CATEGORY_LIST: '/api/v4/console/dictionaries/categories',
+  DICT_CATEGORY_DETAIL: '/api/v4/console/dictionaries/categories/:code',
+  DICT_CATEGORY_CREATE: '/api/v4/console/dictionaries/categories',
+  DICT_CATEGORY_UPDATE: '/api/v4/console/dictionaries/categories/:code',
+  DICT_CATEGORY_DELETE: '/api/v4/console/dictionaries/categories/:code',
+
+  // 字典管理 - 稀有度
+  DICT_RARITY_LIST: '/api/v4/console/dictionaries/rarities',
+  DICT_RARITY_DETAIL: '/api/v4/console/dictionaries/rarities/:code',
+  DICT_RARITY_CREATE: '/api/v4/console/dictionaries/rarities',
+  DICT_RARITY_UPDATE: '/api/v4/console/dictionaries/rarities/:code',
+  DICT_RARITY_DELETE: '/api/v4/console/dictionaries/rarities/:code',
+
+  // 字典管理 - 资产分组
+  DICT_ASSET_GROUP_LIST: '/api/v4/console/dictionaries/asset-groups',
+  DICT_ASSET_GROUP_DETAIL: '/api/v4/console/dictionaries/asset-groups/:code',
+  DICT_ASSET_GROUP_CREATE: '/api/v4/console/dictionaries/asset-groups',
+  DICT_ASSET_GROUP_UPDATE: '/api/v4/console/dictionaries/asset-groups/:code',
+  DICT_ASSET_GROUP_DELETE: '/api/v4/console/dictionaries/asset-groups/:code',
+
+  // 字典管理 - 全量获取
+  DICT_ALL: '/api/v4/console/dictionaries/all',
+
+  // 字典管理 - 兼容别名（映射到 categories 作为默认字典类型）
+  // 注意：后端按类型分离字典 API，这些别名用于 dict.js composable 兼容
+  DICT_LIST: '/api/v4/console/dictionaries/categories',
+  DICT_DETAIL: '/api/v4/console/dictionaries/categories/:code',
+  DICT_CREATE: '/api/v4/console/dictionaries/categories',
+  DICT_UPDATE: '/api/v4/console/dictionaries/categories/:code',
+  DICT_DELETE: '/api/v4/console/dictionaries/categories/:code',
+
+  // 功能开关
+  FEATURE_FLAG_LIST: '/api/v4/console/feature-flags',
+  FEATURE_FLAG_DETAIL: '/api/v4/console/feature-flags/:flagKey',
+  FEATURE_FLAG_CREATE: '/api/v4/console/feature-flags',
+  FEATURE_FLAG_UPDATE: '/api/v4/console/feature-flags/:flagKey',
+  FEATURE_FLAG_DELETE: '/api/v4/console/feature-flags/:flagKey',
+  FEATURE_FLAG_TOGGLE: '/api/v4/console/feature-flags/:flagKey/toggle',
+  FEATURE_FLAG_WHITELIST_ADD: '/api/v4/console/feature-flags/:flagKey/whitelist',
+  FEATURE_FLAG_WHITELIST_REMOVE: '/api/v4/console/feature-flags/:flagKey/whitelist',
+  FEATURE_FLAG_BLACKLIST_ADD: '/api/v4/console/feature-flags/:flagKey/blacklist',
+  FEATURE_FLAG_BLACKLIST_REMOVE: '/api/v4/console/feature-flags/:flagKey/blacklist',
+  FEATURE_FLAG_CHECK: '/api/v4/console/feature-flags/:flagKey/check/:userId',
+
+  // 系统配置（全局）
+  SYSTEM_CONFIG_LIST: '/api/v4/console/settings',
+  SYSTEM_CONFIG_GET: '/api/v4/console/system/config',
+  SYSTEM_CONFIG_UPDATE: '/api/v4/console/system/config',
+  SYSTEM_CONFIG_MAINTENANCE: '/api/v4/console/system/config/maintenance',
+  SYSTEM_CONFIG_PRICING: '/api/v4/console/settings/pricing',
+  SYSTEM_CONFIG_UPDATE_PRICING: '/api/v4/console/settings/pricing',
+
+  // 行政区划
+  REGION_PROVINCES: '/api/v4/console/regions/provinces',
+  REGION_CHILDREN: '/api/v4/console/regions/:parent_code/children',
+
+  // 风控告警（兼容别名）
+  RISK_ALERT_LIST: '/api/v4/console/risk-alerts',
+  RISK_ALERT_REVIEW: '/api/v4/console/risk-alerts/:id/review',
+  RISK_ALERT_MARK_ALL_READ: '/api/v4/console/risk-alerts/mark-all-read',
+
+  // 审计日志（兼容别名）
+  AUDIT_LOG_LIST: '/api/v4/console/audit-logs',
+  AUDIT_LOG_DETAIL: '/api/v4/console/audit-logs/:id',
+  AUDIT_LOG_EXPORT: '/api/v4/console/audit-logs/export'
 }
 
 // ========== API 调用方法 ==========
@@ -1192,6 +1259,369 @@ export const SystemAPI = {
    */
   async terminateAllSessions() {
     return await request({ url: SYSTEM_ENDPOINTS.SESSIONS_TERMINATE_ALL, method: 'POST' })
+  },
+
+  // ===== 字典管理 - 类目 =====
+
+  /**
+   * 获取类目字典列表
+   * @param {Object} [params={}] - 查询参数
+   * @param {boolean} [params.is_enabled] - 是否启用
+   * @param {string} [params.keyword] - 关键词搜索
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @returns {Promise<Object>} 类目列表响应
+   */
+  async getCategoryList(params = {}) {
+    const url = SYSTEM_ENDPOINTS.DICT_CATEGORY_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取类目详情
+   * @param {string} code - 类目代码
+   * @returns {Promise<Object>} 类目详情响应
+   */
+  async getCategoryDetail(code) {
+    const url = buildURL(SYSTEM_ENDPOINTS.DICT_CATEGORY_DETAIL, { code })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 创建类目
+   * @param {Object} data - 类目数据
+   * @param {string} data.category_code - 类目代码
+   * @param {string} data.display_name - 显示名称
+   * @param {string} [data.description] - 描述
+   * @param {string} [data.icon_url] - 图标URL
+   * @param {number} [data.sort_order=0] - 排序顺序
+   * @param {boolean} [data.is_enabled=true] - 是否启用
+   * @returns {Promise<Object>} 创建结果响应
+   */
+  async createCategory(data) {
+    return await request({ url: SYSTEM_ENDPOINTS.DICT_CATEGORY_CREATE, method: 'POST', data })
+  },
+
+  /**
+   * 更新类目
+   * @param {string} code - 类目代码
+   * @param {Object} data - 更新数据
+   * @returns {Promise<Object>} 更新结果响应
+   */
+  async updateCategory(code, data) {
+    const url = buildURL(SYSTEM_ENDPOINTS.DICT_CATEGORY_UPDATE, { code })
+    return await request({ url, method: 'PUT', data })
+  },
+
+  /**
+   * 删除类目
+   * @param {string} code - 类目代码
+   * @returns {Promise<Object>} 删除结果响应
+   */
+  async deleteCategory(code) {
+    const url = buildURL(SYSTEM_ENDPOINTS.DICT_CATEGORY_DELETE, { code })
+    return await request({ url, method: 'DELETE' })
+  },
+
+  // ===== 字典管理 - 稀有度 =====
+
+  /**
+   * 获取稀有度字典列表
+   * @param {Object} [params={}] - 查询参数
+   * @returns {Promise<Object>} 稀有度列表响应
+   */
+  async getRarityList(params = {}) {
+    const url = SYSTEM_ENDPOINTS.DICT_RARITY_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取稀有度详情
+   * @param {string} code - 稀有度代码
+   * @returns {Promise<Object>} 稀有度详情响应
+   */
+  async getRarityDetail(code) {
+    const url = buildURL(SYSTEM_ENDPOINTS.DICT_RARITY_DETAIL, { code })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 创建稀有度
+   * @param {Object} data - 稀有度数据
+   * @returns {Promise<Object>} 创建结果响应
+   */
+  async createRarity(data) {
+    return await request({ url: SYSTEM_ENDPOINTS.DICT_RARITY_CREATE, method: 'POST', data })
+  },
+
+  /**
+   * 更新稀有度
+   * @param {string} code - 稀有度代码
+   * @param {Object} data - 更新数据
+   * @returns {Promise<Object>} 更新结果响应
+   */
+  async updateRarity(code, data) {
+    const url = buildURL(SYSTEM_ENDPOINTS.DICT_RARITY_UPDATE, { code })
+    return await request({ url, method: 'PUT', data })
+  },
+
+  /**
+   * 删除稀有度
+   * @param {string} code - 稀有度代码
+   * @returns {Promise<Object>} 删除结果响应
+   */
+  async deleteRarity(code) {
+    const url = buildURL(SYSTEM_ENDPOINTS.DICT_RARITY_DELETE, { code })
+    return await request({ url, method: 'DELETE' })
+  },
+
+  // ===== 字典管理 - 资产分组 =====
+
+  /**
+   * 获取资产分组列表
+   * @param {Object} [params={}] - 查询参数
+   * @returns {Promise<Object>} 资产分组列表响应
+   */
+  async getAssetGroupList(params = {}) {
+    const url = SYSTEM_ENDPOINTS.DICT_ASSET_GROUP_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取资产分组详情
+   * @param {string} code - 资产分组代码
+   * @returns {Promise<Object>} 资产分组详情响应
+   */
+  async getAssetGroupDetail(code) {
+    const url = buildURL(SYSTEM_ENDPOINTS.DICT_ASSET_GROUP_DETAIL, { code })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 创建资产分组
+   * @param {Object} data - 资产分组数据
+   * @returns {Promise<Object>} 创建结果响应
+   */
+  async createAssetGroup(data) {
+    return await request({ url: SYSTEM_ENDPOINTS.DICT_ASSET_GROUP_CREATE, method: 'POST', data })
+  },
+
+  /**
+   * 更新资产分组
+   * @param {string} code - 资产分组代码
+   * @param {Object} data - 更新数据
+   * @returns {Promise<Object>} 更新结果响应
+   */
+  async updateAssetGroup(code, data) {
+    const url = buildURL(SYSTEM_ENDPOINTS.DICT_ASSET_GROUP_UPDATE, { code })
+    return await request({ url, method: 'PUT', data })
+  },
+
+  /**
+   * 删除资产分组
+   * @param {string} code - 资产分组代码
+   * @returns {Promise<Object>} 删除结果响应
+   */
+  async deleteAssetGroup(code) {
+    const url = buildURL(SYSTEM_ENDPOINTS.DICT_ASSET_GROUP_DELETE, { code })
+    return await request({ url, method: 'DELETE' })
+  },
+
+  /**
+   * 获取所有字典数据
+   * @returns {Promise<Object>} 所有字典数据响应
+   */
+  async getAllDictionaries() {
+    return await request({ url: SYSTEM_ENDPOINTS.DICT_ALL, method: 'GET' })
+  },
+
+  // ===== 功能开关管理 =====
+
+  /**
+   * 获取功能开关列表
+   * @param {Object} [params={}] - 查询参数
+   * @param {boolean} [params.is_enabled] - 是否启用
+   * @param {string} [params.rollout_strategy] - 发布策略
+   * @returns {Promise<Object>} 功能开关列表响应
+   */
+  async getFeatureFlags(params = {}) {
+    const url = SYSTEM_ENDPOINTS.FEATURE_FLAG_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取功能开关详情
+   * @param {string} flagKey - 功能键名
+   * @returns {Promise<Object>} 功能开关详情响应
+   */
+  async getFeatureFlagDetail(flagKey) {
+    const url = buildURL(SYSTEM_ENDPOINTS.FEATURE_FLAG_DETAIL, { flagKey })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 创建功能开关
+   * @param {Object} data - 功能开关数据
+   * @param {string} data.flag_key - 功能键名
+   * @param {string} data.name - 功能名称
+   * @param {string} [data.description] - 描述
+   * @param {boolean} [data.is_enabled=false] - 是否启用
+   * @param {string} [data.rollout_strategy='all'] - 发布策略
+   * @returns {Promise<Object>} 创建结果响应
+   */
+  async createFeatureFlag(data) {
+    return await request({ url: SYSTEM_ENDPOINTS.FEATURE_FLAG_CREATE, method: 'POST', data })
+  },
+
+  /**
+   * 更新功能开关
+   * @param {string} flagKey - 功能键名
+   * @param {Object} data - 更新数据
+   * @returns {Promise<Object>} 更新结果响应
+   */
+  async updateFeatureFlag(flagKey, data) {
+    const url = buildURL(SYSTEM_ENDPOINTS.FEATURE_FLAG_UPDATE, { flagKey })
+    return await request({ url, method: 'PUT', data })
+  },
+
+  /**
+   * 删除功能开关
+   * @param {string} flagKey - 功能键名
+   * @returns {Promise<Object>} 删除结果响应
+   */
+  async deleteFeatureFlag(flagKey) {
+    const url = buildURL(SYSTEM_ENDPOINTS.FEATURE_FLAG_DELETE, { flagKey })
+    return await request({ url, method: 'DELETE' })
+  },
+
+  /**
+   * 切换功能开关状态
+   * @param {string} flagKey - 功能键名
+   * @returns {Promise<Object>} 切换结果响应
+   */
+  async toggleFeatureFlag(flagKey) {
+    const url = buildURL(SYSTEM_ENDPOINTS.FEATURE_FLAG_TOGGLE, { flagKey })
+    return await request({ url, method: 'PATCH' })
+  },
+
+  /**
+   * 添加功能开关白名单用户
+   * @param {string} flagKey - 功能键名
+   * @param {Object} data - 白名单数据
+   * @param {number} data.user_id - 用户ID
+   * @returns {Promise<Object>} 添加结果响应
+   */
+  async addFeatureFlagWhitelist(flagKey, data) {
+    const url = buildURL(SYSTEM_ENDPOINTS.FEATURE_FLAG_WHITELIST_ADD, { flagKey })
+    return await request({ url, method: 'POST', data })
+  },
+
+  /**
+   * 移除功能开关白名单用户
+   * @param {string} flagKey - 功能键名
+   * @param {Object} data - 白名单数据
+   * @param {number} data.user_id - 用户ID
+   * @returns {Promise<Object>} 移除结果响应
+   */
+  async removeFeatureFlagWhitelist(flagKey, data) {
+    const url = buildURL(SYSTEM_ENDPOINTS.FEATURE_FLAG_WHITELIST_REMOVE, { flagKey })
+    return await request({ url, method: 'DELETE', data })
+  },
+
+  /**
+   * 添加功能开关黑名单用户
+   * @param {string} flagKey - 功能键名
+   * @param {Object} data - 黑名单数据
+   * @param {number} data.user_id - 用户ID
+   * @returns {Promise<Object>} 添加结果响应
+   */
+  async addFeatureFlagBlacklist(flagKey, data) {
+    const url = buildURL(SYSTEM_ENDPOINTS.FEATURE_FLAG_BLACKLIST_ADD, { flagKey })
+    return await request({ url, method: 'POST', data })
+  },
+
+  /**
+   * 移除功能开关黑名单用户
+   * @param {string} flagKey - 功能键名
+   * @param {Object} data - 黑名单数据
+   * @param {number} data.user_id - 用户ID
+   * @returns {Promise<Object>} 移除结果响应
+   */
+  async removeFeatureFlagBlacklist(flagKey, data) {
+    const url = buildURL(SYSTEM_ENDPOINTS.FEATURE_FLAG_BLACKLIST_REMOVE, { flagKey })
+    return await request({ url, method: 'DELETE', data })
+  },
+
+  /**
+   * 检查用户的功能开关状态
+   * @param {string} flagKey - 功能键名
+   * @param {number} userId - 用户ID
+   * @returns {Promise<Object>} 检查结果响应
+   */
+  async checkFeatureFlagForUser(flagKey, userId) {
+    const url = buildURL(SYSTEM_ENDPOINTS.FEATURE_FLAG_CHECK, { flagKey, userId })
+    return await request({ url, method: 'GET' })
+  },
+
+  // ===== 系统配置（全局） =====
+
+  /**
+   * 获取系统配置列表（所有设置概览）
+   * @returns {Promise<Object>} 配置列表响应
+   */
+  async getSystemConfigList() {
+    return await request({ url: SYSTEM_ENDPOINTS.SYSTEM_CONFIG_LIST, method: 'GET' })
+  },
+
+  /**
+   * 获取系统配置
+   * @returns {Promise<Object>} 系统配置响应
+   */
+  async getSystemConfig() {
+    return await request({ url: SYSTEM_ENDPOINTS.SYSTEM_CONFIG_GET, method: 'GET' })
+  },
+
+  /**
+   * 更新系统配置
+   * @param {Object} data - 配置数据
+   * @returns {Promise<Object>} 更新结果响应
+   */
+  async updateSystemConfig(data) {
+    return await request({ url: SYSTEM_ENDPOINTS.SYSTEM_CONFIG_UPDATE, method: 'PUT', data })
+  },
+
+  /**
+   * 获取维护模式配置
+   * @returns {Promise<Object>} 维护模式配置响应
+   */
+  async getMaintenanceConfig() {
+    return await request({ url: SYSTEM_ENDPOINTS.SYSTEM_CONFIG_MAINTENANCE, method: 'GET' })
+  },
+
+  /**
+   * 更新维护模式配置
+   * @param {Object} data - 维护模式配置数据
+   * @returns {Promise<Object>} 更新结果响应
+   */
+  async updateMaintenanceConfig(data) {
+    return await request({ url: SYSTEM_ENDPOINTS.SYSTEM_CONFIG_MAINTENANCE, method: 'PUT', data })
+  },
+
+  /**
+   * 获取定价配置
+   * @returns {Promise<Object>} 定价配置响应
+   */
+  async getPricingConfig() {
+    return await request({ url: SYSTEM_ENDPOINTS.SYSTEM_CONFIG_PRICING, method: 'GET' })
+  },
+
+  /**
+   * 更新定价配置
+   * @param {Object} data - 定价配置数据
+   * @returns {Promise<Object>} 更新结果响应
+   */
+  async updatePricingConfig(data) {
+    return await request({ url: SYSTEM_ENDPOINTS.SYSTEM_CONFIG_UPDATE_PRICING, method: 'PUT', data })
   }
 }
 

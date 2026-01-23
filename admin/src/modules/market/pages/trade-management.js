@@ -8,8 +8,7 @@
  *
  * @requires Alpine.js
  * @requires createPageMixin - 页面基础功能混入
- * @requires API_ENDPOINTS.C2C_MARKET - C2C市场API端点
- * @requires API_ENDPOINTS.BUSINESS_RECORDS - 业务记录API端点
+ * @requires MARKET_ENDPOINTS - 市场模块API端点（C2C市场、业务记录等）
  *
  * @example
  * <!-- 使用导航组件 -->
@@ -27,8 +26,12 @@
  * </div>
  */
 
+
+import { logger } from '../../../utils/logger.js'
+import { MARKET_ENDPOINTS } from '../../../api/market.js'
+import { buildURL } from '../../../api/base.js'
 document.addEventListener('alpine:init', () => {
-  console.log('[TradeManagement] 注册 Alpine 组件 (Mixin v3.0)...')
+  logger.info('[TradeManagement] 注册 Alpine 组件 (Mixin v3.0)...')
 
   // 存储当前子页面
   Alpine.store('tradePage', 'trade-orders')
@@ -73,7 +76,7 @@ document.addEventListener('alpine:init', () => {
         this.currentPage = page
       }
       Alpine.store('tradePage', this.currentPage)
-      console.log('[TradeNavigation] 当前页面:', this.currentPage)
+      logger.info('[TradeNavigation] 当前页面:', this.currentPage)
     },
 
     /**
@@ -94,7 +97,7 @@ document.addEventListener('alpine:init', () => {
 
       // 触发数据加载事件
       window.dispatchEvent(new CustomEvent('trade-page-changed', { detail: pageId }))
-      console.log('[TradeNavigation] 切换到:', pageId)
+      logger.info('[TradeNavigation] 切换到:', pageId)
     }
   }))
 
@@ -209,7 +212,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     init() {
-      console.log('[TradePageContent] 初始化...')
+      logger.info('[TradePageContent] 初始化...')
 
       // 根据当前页面加载数据
       this.loadPageData()
@@ -228,7 +231,7 @@ document.addEventListener('alpine:init', () => {
      */
     async loadPageData() {
       const page = this.currentPage
-      console.log('[TradePageContent] 加载数据:', page)
+      logger.info('[TradePageContent] 加载数据:', page)
 
       switch (page) {
         case 'trade-orders':
@@ -266,7 +269,7 @@ document.addEventListener('alpine:init', () => {
         Object.keys(params).forEach(k => !params[k] && delete params[k])
 
         const res = await request({
-          url: API_ENDPOINTS.C2C_MARKET.ORDERS,
+          url: MARKET_ENDPOINTS.C2C_MARKET_ORDERS,
           method: 'GET',
           params
         })
@@ -279,7 +282,7 @@ document.addEventListener('alpine:init', () => {
           }
         }
       } catch (e) {
-        console.error('[TradeManagement] 加载交易订单失败:', e)
+        logger.error('[TradeManagement] 加载交易订单失败:', e)
         this.$toast?.error('加载交易订单失败')
       } finally {
         this.loading = false
@@ -294,7 +297,7 @@ document.addEventListener('alpine:init', () => {
      */
     async loadTradeStats() {
       try {
-        const res = await request({ url: API_ENDPOINTS.C2C_MARKET.ORDERS_STATS, method: 'GET' })
+        const res = await request({ url: MARKET_ENDPOINTS.C2C_MARKET_ORDERS_STATS, method: 'GET' })
         if (res.success && res.data) {
           this.tradeStats = {
             total: res.data.total || 0,
@@ -304,7 +307,7 @@ document.addEventListener('alpine:init', () => {
           }
         }
       } catch (e) {
-        console.error('[TradeManagement] 加载交易统计失败:', e)
+        logger.error('[TradeManagement] 加载交易统计失败:', e)
       }
     },
 
@@ -376,7 +379,7 @@ document.addEventListener('alpine:init', () => {
     async loadMarketplaceSummary() {
       try {
         const res = await request({
-          url: API_ENDPOINTS.C2C_MARKET.LISTINGS_SUMMARY,
+          url: MARKET_ENDPOINTS.C2C_MARKET_LISTINGS_SUMMARY,
           method: 'GET'
         })
         if (res.success && res.data) {
@@ -387,7 +390,7 @@ document.addEventListener('alpine:init', () => {
           }
         }
       } catch (e) {
-        console.error('[TradeManagement] 加载上架摘要失败:', e)
+        logger.error('[TradeManagement] 加载上架摘要失败:', e)
       }
     },
 
@@ -409,7 +412,7 @@ document.addEventListener('alpine:init', () => {
         if (params.status === 'all') delete params.status
 
         const res = await request({
-          url: API_ENDPOINTS.C2C_MARKET.LISTINGS_USER_STATS,
+          url: MARKET_ENDPOINTS.C2C_MARKET_LISTINGS_USER_STATS,
           method: 'GET',
           params
         })
@@ -427,7 +430,7 @@ document.addEventListener('alpine:init', () => {
           }
         }
       } catch (e) {
-        console.error('[TradeManagement] 加载上架统计失败:', e)
+        logger.error('[TradeManagement] 加载上架统计失败:', e)
         this.$toast?.error('加载上架统计失败')
       } finally {
         this.loading = false
@@ -466,7 +469,7 @@ document.addEventListener('alpine:init', () => {
 
         // 使用正确的后端API路径
         const res = await request({
-          url: API_ENDPOINTS.BUSINESS_RECORDS.REDEMPTION_ORDERS,
+          url: MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION,
           method: 'GET',
           params
         })
@@ -479,7 +482,7 @@ document.addEventListener('alpine:init', () => {
           }
         }
       } catch (e) {
-        console.error('[TradeManagement] 加载兑换订单失败:', e)
+        logger.error('[TradeManagement] 加载兑换订单失败:', e)
         this.$toast?.error('加载兑换订单失败')
       } finally {
         this.loading = false
@@ -514,7 +517,7 @@ document.addEventListener('alpine:init', () => {
 
     // 注意：后端 /api/v4/console/business-records/redemption-orders 是只读查询接口
     // 不支持审批/拒绝操作，管理员需通过核销操作处理订单
-    // 核销操作请使用 API_ENDPOINTS.BUSINESS_RECORDS.REDEEM
+    // 核销操作请使用 MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_REDEEM
 
     /**
      * 核销兑换订单
@@ -530,7 +533,7 @@ document.addEventListener('alpine:init', () => {
 
       try {
         const res = await request({
-          url: API.buildURL(API_ENDPOINTS.BUSINESS_RECORDS.REDEEM, { order_id: order.order_id }),
+          url: buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_REDEEM, { order_id: order.order_id }),
           method: 'POST'
         })
 
@@ -541,7 +544,7 @@ document.addEventListener('alpine:init', () => {
           this.$toast?.error(res.message || '核销失败')
         }
       } catch (e) {
-        console.error('[TradeManagement] 核销订单失败:', e)
+        logger.error('[TradeManagement] 核销订单失败:', e)
         this.$toast?.error('核销失败')
       }
     },
@@ -560,7 +563,7 @@ document.addEventListener('alpine:init', () => {
 
       try {
         const res = await request({
-          url: API.buildURL(API_ENDPOINTS.BUSINESS_RECORDS.CANCEL, { order_id: order.order_id }),
+          url: buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_CANCEL, { order_id: order.order_id }),
           method: 'POST'
         })
 
@@ -571,7 +574,7 @@ document.addEventListener('alpine:init', () => {
           this.$toast?.error(res.message || '操作失败')
         }
       } catch (e) {
-        console.error('[TradeManagement] 取消订单失败:', e)
+        logger.error('[TradeManagement] 取消订单失败:', e)
         this.$toast?.error('操作失败')
       }
     }
@@ -672,7 +675,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     init() {
-      console.log('✅ 交易管理页面初始化 (合并组件)')
+      logger.info('交易管理页面初始化 (合并组件)')
       if (!this.checkAuth()) return
       const urlParams = new URLSearchParams(window.location.search)
       this.currentPage = urlParams.get('page') || 'trade-orders'
@@ -718,7 +721,7 @@ document.addEventListener('alpine:init', () => {
      */
     async loadTradeOrders() {
       try {
-        const response = await this.apiGet(API_ENDPOINTS.TRADE_ORDERS.LIST, {
+        const response = await this.apiGet(MARKET_ENDPOINTS.TRADE_ORDERS_LIST, {
           ...this.tradeFilters,
           page: this.tradeCurrentPage,
           pageSize: this.tradePageSize
@@ -733,7 +736,7 @@ document.addEventListener('alpine:init', () => {
           this.tradeStats = { total: this.tradeOrders.length, created: 0, frozen: 0, completed: 0 }
         }
       } catch (error) {
-        console.error('加载交易订单失败:', error)
+        logger.error('加载交易订单失败:', error)
       }
     },
 
@@ -754,13 +757,13 @@ document.addEventListener('alpine:init', () => {
      */
     async loadMarketplaceStats() {
       try {
-        const response = await this.apiGet(API_ENDPOINTS.MARKETPLACE_STATS.LISTING_STATS)
+        const response = await this.apiGet(MARKET_ENDPOINTS.C2C_MARKET_STATS)
         if (response.success && response.data) {
           const marketData = response.data?.list || response.data
           this.marketplaceStats = Array.isArray(marketData) ? marketData : []
         }
       } catch (error) {
-        console.error('加载上架统计失败:', error)
+        logger.error('加载上架统计失败:', error)
       }
     },
 
@@ -771,7 +774,7 @@ document.addEventListener('alpine:init', () => {
      */
     async loadRedemptionOrders() {
       try {
-        const response = await this.apiGet(API_ENDPOINTS.BUSINESS_RECORDS.REDEMPTION_ORDERS, {
+        const response = await this.apiGet(MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION, {
           ...this.redemptionFilters,
           page: this.redemptionCurrentPage,
           pageSize: this.redemptionPageSize
@@ -785,7 +788,7 @@ document.addEventListener('alpine:init', () => {
           }
         }
       } catch (error) {
-        console.error('加载兑换订单失败:', error)
+        logger.error('加载兑换订单失败:', error)
       }
     },
 
@@ -850,5 +853,5 @@ document.addEventListener('alpine:init', () => {
     }
   }))
 
-  console.log('[TradeManagement] ✅ Alpine 组件已注册')
+  logger.info('[TradeManagement] ✅ Alpine 组件已注册')
 })

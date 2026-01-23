@@ -17,6 +17,8 @@
  * import { AuthAPI } from '@/api/index.js'
  */
 
+
+import { logger } from '../utils/logger.js'
 import { request, getToken, setToken, clearToken } from './base.js'
 
 // ========== API 端点 ==========
@@ -140,7 +142,7 @@ export const AuthAPI = {
    * // 基本登录
    * const result = await AuthAPI.login('13612345678', '123456')
    * if (result.success) {
-   *   console.log('登录成功', result.data.user)
+   *   logger.info('登录成功', result.data.user)
    *   // Token 已自动保存到 localStorage
    * }
    *
@@ -148,7 +150,7 @@ export const AuthAPI = {
    * // 处理新用户自动注册
    * const result = await AuthAPI.login('13612345678', '123456')
    * if (result.success && result.data.is_new_user) {
-   *   console.log('新用户已自动注册并登录')
+   *   logger.info('新用户已自动注册并登录')
    *   // 可引导用户完善资料
    * }
    *
@@ -169,7 +171,7 @@ export const AuthAPI = {
    *     }
    *   }
    * } catch (error) {
-   *   console.error('网络错误', error)
+   *   logger.error('网络错误', error)
    * }
    */
   async login(mobile, verification_code) {
@@ -208,7 +210,7 @@ export const AuthAPI = {
    * if (result.success) {
    *   const { user } = result.data
    *   if (user.role_level >= 100) {
-   *     console.log('管理员登录成功', user.roles)
+   *     logger.info('管理员登录成功', user.roles)
    *     // 跳转到管理后台
    *     window.location.href = '/admin/dashboard'
    *   }
@@ -357,8 +359,8 @@ export const AuthAPI = {
    * // 验证登录状态
    * const result = await AuthAPI.verifyToken()
    * if (result.success && result.data.token_valid) {
-   *   console.log('用户已登录', result.data.user_id)
-   *   console.log('角色级别', result.data.role_level)
+   *   logger.info('用户已登录', result.data.user_id)
+   *   logger.info('角色级别', result.data.role_level)
    * } else {
    *   // Token 无效，跳转登录
    *   window.location.href = '/login'
@@ -412,7 +414,7 @@ export const AuthAPI = {
    * const result = await AuthAPI.refreshToken()
    * if (result.success) {
    *   // 新 Token 已自动保存
-   *   console.log('Token 已刷新')
+   *   logger.info('Token 已刷新')
    * } else {
    *   // 刷新失败，需要重新登录
    *   window.location.href = '/login'

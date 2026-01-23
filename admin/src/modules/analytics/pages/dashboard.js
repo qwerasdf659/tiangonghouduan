@@ -12,9 +12,17 @@
  * @version 3.0.0 (Mixin 重构版)
  * @date 2026-01-23
  *
- * @requires ../../../api/api-config - API端点配置
+ * @requires ../../../api/index - API模块入口
  * @requires ../../../alpine/mixins/index - createPageMixin
+ * @requires ../../../utils/logger - 统一日志工具
  */
+
+// ES Module 导入
+import { logger } from '../../../utils/logger.js'
+import { loadECharts } from '../../../utils/index.js'
+import { createPageMixin } from '../../../alpine/mixins/index.js'
+import { SYSTEM_ENDPOINTS } from '../../../api/index.js'
+import { http } from '../../../api/base.js'
 
 /**
  * @typedef {Object} DashboardStats
@@ -132,7 +140,7 @@ function dashboardPage() {
      * @fires loadTrendData - 加载趋势数据
      */
     async init() {
-      console.log('✅ 仪表盘页面初始化 (Mixin v3.0)')
+      logger.info('✅ 仪表盘页面初始化 (ES Module v3.1)')
 
       // 使用 Mixin 的认证检查
       if (!this.checkAuth()) {
@@ -141,10 +149,10 @@ function dashboardPage() {
 
       // 动态加载 ECharts（懒加载优化）
       try {
-        await window.loadECharts()
-        console.log('[Dashboard] ECharts 加载完成')
+        await loadECharts()
+        logger.info('[Dashboard] ECharts 加载完成')
       } catch (error) {
-        console.error('[Dashboard] ECharts 加载失败:', error)
+        logger.error('[Dashboard] ECharts 加载失败:', error)
       }
 
       // 初始化图表
@@ -336,7 +344,7 @@ function dashboardPage() {
      */
     async loadDashboardData() {
       const result = await this.withLoading(async () => {
-        const response = await apiRequest(API_ENDPOINTS.SYSTEM.DASHBOARD)
+        const response = await http.get(SYSTEM_ENDPOINTS.DASHBOARD)
 
         if (response?.success && response.data) {
           return response.data
@@ -394,9 +402,9 @@ function dashboardPage() {
           this.stats.messages = data.customer_service.today_messages || 0
         }
 
-        console.log('✅ 仪表盘数据加载成功', data)
+        logger.info('仪表盘数据加载成功', data)
       } else {
-        console.warn('⚠️ 仪表盘数据加载失败或为空')
+        logger.warn('仪表盘数据加载失败或为空')
       }
     },
 
@@ -415,7 +423,7 @@ function dashboardPage() {
      */
     async loadTrendData() {
       try {
-        const response = await apiRequest(`${API_ENDPOINTS.SYSTEM.DASHBOARD_TRENDS}?days=7`)
+        const response = await http.get(SYSTEM_ENDPOINTS.DASHBOARD_TRENDS, { days: 7 })
 
         if (response?.success && response.data) {
           const dailyStats = response.data.trends?.daily_stats || []
@@ -430,11 +438,11 @@ function dashboardPage() {
               series: [{ data: draws }, { data: wins }]
             })
 
-            console.log('✅ 趋势数据加载成功')
+            logger.info('趋势数据加载成功')
           }
         }
       } catch (error) {
-        console.error('❌ 加载趋势数据失败:', error)
+        logger.error('加载趋势数据失败', error)
       }
     }
   }
@@ -443,5 +451,5 @@ function dashboardPage() {
 // ========== Alpine.js CSP 兼容注册 ==========
 document.addEventListener('alpine:init', () => {
   Alpine.data('dashboardPage', dashboardPage)
-  console.log('✅ [DashboardPage] Alpine 组件已注册 (Mixin v3.0)')
+  logger.debug('[DashboardPage] Alpine 组件已注册 (Mixin v3.0)')
 })

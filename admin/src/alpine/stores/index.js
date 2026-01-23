@@ -15,11 +15,13 @@
  * 注意：基础 Store (auth, ui, notification) 在 init.js 中定义
  */
 
+
+import { logger } from '../../utils/logger.js'
 // 确保在 Alpine 初始化时检查 Store
 document.addEventListener('alpine:init', () => {
   // 等待其他 Store 模块加载
   setTimeout(() => {
-    console.log('📦 Alpine Stores 状态检查:')
+    logger.info('Alpine Stores 状态检查:')
 
     const stores = [
       'auth', // 基础：认证状态
@@ -32,9 +34,9 @@ document.addEventListener('alpine:init', () => {
 
     stores.forEach(name => {
       const exists = Alpine.store(name) !== undefined
-      console.log(`   ${exists ? '✅' : '❌'} ${name}`)
+      logger.info(`${exists ? '✅' : '❌'} ${name}`)
     })
   }, 100)
 })
 
-console.log('✅ Alpine Stores 入口文件已加载')
+logger.info('Alpine Stores 入口文件已加载')

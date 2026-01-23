@@ -25,8 +25,10 @@
  * const confirmed = await Alpine.store('confirm').danger('确定要删除吗？')
  */
 
+
+import { logger } from '../../utils/logger.js'
 document.addEventListener('alpine:init', () => {
-  console.log('🔧 注册确认对话框 Store...')
+  logger.info('🔧 注册确认对话框 Store...')
 
   /**
    * 确认对话框 Store
@@ -265,10 +267,10 @@ document.addEventListener('alpine:init', () => {
     }
   })
 
-  console.log('✅ 确认对话框 Store 已注册')
+  logger.info('确认对话框 Store 已注册')
 })
 
-// ========== 全局快捷函数 ==========
+// ========== ES Module 导出（方案 A：彻底 ES Module） ==========
 
 /**
  * 全局确认函数（替代 window.confirm）
@@ -278,27 +280,31 @@ document.addEventListener('alpine:init', () => {
  * @returns {Promise<boolean>}
  *
  * @example
- * if (await confirm('确定要删除吗？')) {
+ * import { $confirm } from '@/alpine/stores/confirm-dialog.js'
+ * if (await $confirm('确定要删除吗？')) {
  *   // 用户点击了确定
  * }
  */
-window.$confirm = async function (message, options = {}) {
+export async function $confirm(message, options = {}) {
   if (typeof Alpine !== 'undefined' && Alpine.store('confirm')) {
     return Alpine.store('confirm').show({ message, ...options })
   }
 
   // 降级到原生 confirm
-  return window.confirm(message)
+  return confirm(message)
 }
 
 /**
  * 危险操作确认快捷方法
+ * @param {string} message - 确认消息
+ * @param {string} title - 对话框标题
+ * @returns {Promise<boolean>}
  */
-window.$confirmDanger = async function (message, title = '危险操作') {
+export async function $confirmDanger(message, title = '危险操作') {
   if (typeof Alpine !== 'undefined' && Alpine.store('confirm')) {
     return Alpine.store('confirm').danger(message, title)
   }
-  return window.confirm(message)
+  return confirm(message)
 }
 
-console.log('✅ 确认对话框模块已加载')
+logger.info('确认对话框模块已加载')

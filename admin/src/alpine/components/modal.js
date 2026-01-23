@@ -15,6 +15,8 @@
  * </div>
  */
 
+
+import { logger } from '../../utils/logger.js'
 /**
  * Modal 组件数据
  * @param {Object} config - 配置选项
@@ -145,9 +147,12 @@ function confirmModal(config = {}) {
 }
 
 /**
- * 全局确认对话框帮助函数
+ * 确认对话框帮助函数
+ * @param {string} message - 确认消息
+ * @param {string} title - 对话框标题
+ * @returns {Promise<boolean>} 用户选择结果
  */
-window.showConfirm = async function (message, title = '确认操作') {
+export async function showConfirm(message, title = '确认操作') {
   return new Promise(resolve => {
     if (confirm(message)) {
       resolve(true)
@@ -157,4 +162,8 @@ window.showConfirm = async function (message, title = '确认操作') {
   })
 }
 
-console.log('📦 Modal 组件已加载')
+// ========== window.xxx 已移除（方案 A：彻底 ES Module） ==========
+// 请使用 ES Module 导入：
+//   import { showConfirm } from '@/alpine/components/modal.js'
+
+logger.info('Modal 组件已加载')

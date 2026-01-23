@@ -10,7 +10,8 @@
  * @requires Alpine.js - 响应式框架
  * @requires Socket.IO - WebSocket库
  * @requires createPageMixin - 页面基础功能混入
- * @requires API_ENDPOINTS - API端点配置
+ * @requires CONTENT_ENDPOINTS - 内容模块API端点配置
+ * @requires USER_ENDPOINTS - 用户模块API端点配置
  *
  * 功能模块：
  * 1. 会话管理 - 会话列表、筛选、搜索
@@ -27,6 +28,11 @@
  * - POST /api/v4/console/customer-service/sessions/:id/transfer (转接会话)
  */
 
+
+import { logger } from '../../../utils/logger.js'
+import { buildURL } from '../../../api/base.js'
+import { CONTENT_ENDPOINTS } from '../../../api/content.js'
+import { USER_ENDPOINTS } from '../../../api/user.js'
 /**
  * @typedef {Object} ChatSession
  * @property {number} session_id - 会话ID
@@ -118,7 +124,7 @@ function customerServicePage() {
      * @returns {void}
      */
     init() {
-      console.log('✅ 客服工作台页面初始化 (Mixin v3.0)')
+      logger.info('客服工作台页面初始化 (Mixin v3.0)')
 
       // 使用 Mixin 的认证检查
       if (!this.checkAuth()) {
@@ -158,7 +164,7 @@ function customerServicePage() {
       try {
         // 检查Socket.IO库是否已加载
         if (typeof io === 'undefined') {
-          console.warn('⚠️ Socket.IO库未加载，WebSocket功能不可用，使用轮询模式')
+          logger.warn('⚠️ Socket.IO库未加载，WebSocket功能不可用，使用轮询模式')
           this.startPolling()
           return
         }
@@ -168,7 +174,7 @@ function customerServicePage() {
           transports: ['websocket', 'polling']
         })
 
-        this.wsConnection.on('connect', () => console.log('✅ WebSocket连接成功'))
+        this.wsConnection.on('connect', () => logger.info('WebSocket连接成功'))
         this.wsConnection.on('message', data => this.handleWebSocketMessage(data))
         this.wsConnection.on('new_message', data =>
           this.handleWebSocketMessage({ type: 'new_message', ...data })
@@ -176,14 +182,14 @@ function customerServicePage() {
         this.wsConnection.on('session_update', data =>
           this.handleWebSocketMessage({ type: 'session_update', ...data })
         )
-        this.wsConnection.on('error', error => console.error('WebSocket错误:', error))
-        this.wsConnection.on('disconnect', reason => console.log('WebSocket连接已断开:', reason))
+        this.wsConnection.on('error', error => logger.error('WebSocket错误:', error))
+        this.wsConnection.on('disconnect', reason => logger.info('WebSocket连接已断开:', reason))
         this.wsConnection.on('connect_error', error => {
-          console.error('WebSocket连接失败:', error)
+          logger.error('WebSocket连接失败:', error)
           this.startPolling()
         })
       } catch (error) {
-        console.error('WebSocket初始化失败:', error)
+        logger.error('WebSocket初始化失败:', error)
         this.startPolling()
       }
     },
@@ -250,7 +256,7 @@ function customerServicePage() {
         if (this.searchKeyword) params.append('search', this.searchKeyword)
 
         const response = await apiRequest(
-          API_ENDPOINTS.CUSTOMER_SERVICE.SESSIONS + '?' + params.toString()
+          CONTENT_ENDPOINTS.CUSTOMER_SERVICE_SESSIONS + '?' + params.toString()
         )
 
         if (response && response.success) {
@@ -259,7 +265,7 @@ function customerServicePage() {
           this.showError(response?.message || '获取会话列表失败')
         }
       } catch (error) {
-        console.error('加载会话失败:', error)
+        logger.error('加载会话失败:', error)
         if (!silent) this.showError(error.message)
       } finally {
         if (!silent) {
@@ -282,7 +288,7 @@ function customerServicePage() {
 
       try {
         const response = await apiRequest(
-          API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.SESSION_MESSAGES, { session_id: sessionId })
+          buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_SESSION_MESSAGES, { session_id: sessionId })
         )
 
         if (response && response.success) {
@@ -304,7 +310,7 @@ function customerServicePage() {
           this.showError(response?.message || '获取会话信息失败')
         }
       } catch (error) {
-        console.error('打开会话失败:', error)
+        logger.error('打开会话失败:', error)
         this.showError(error.message)
       } finally {
         this.loadingOverlay = false
@@ -322,14 +328,14 @@ function customerServicePage() {
       if (!silent) this.loadingOverlay = true
       try {
         const response = await apiRequest(
-          API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.SESSION_MESSAGES, { session_id: sessionId })
+          buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_SESSION_MESSAGES, { session_id: sessionId })
         )
         if (response && response.success) {
           this.currentMessages = response.data.messages || []
           this.$nextTick(() => this.scrollToBottom())
         }
       } catch (error) {
-        if (!silent) console.error('加载消息失败:', error)
+        if (!silent) logger.error('加载消息失败:', error)
       } finally {
         if (!silent) this.loadingOverlay = false
       }
@@ -356,7 +362,7 @@ function customerServicePage() {
 
       try {
         const response = await apiRequest(
-          API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.SEND_MESSAGE, {
+          API.buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_SEND_MESSAGE, {
             session_id: this.currentSessionId
           }),
           {
@@ -384,7 +390,7 @@ function customerServicePage() {
           this.showError(response?.message || '消息发送失败')
         }
       } catch (error) {
-        console.error('发送消息失败:', error)
+        logger.error('发送消息失败:', error)
         this.showError(error.message)
       }
     },
@@ -409,13 +415,13 @@ function customerServicePage() {
     async markAsRead(sessionId) {
       try {
         await apiRequest(
-          API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.MARK_READ, { session_id: sessionId }),
+          API.buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_MARK_READ, { session_id: sessionId }),
           {
             method: 'POST'
           }
         )
       } catch (error) {
-        console.error('标记已读失败:', error)
+        logger.error('标记已读失败:', error)
       }
     },
 
@@ -447,7 +453,7 @@ function customerServicePage() {
       this.loadingOverlay = true
       try {
         const response = await apiRequest(
-          API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.TRANSFER, {
+          API.buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_TRANSFER, {
             session_id: this.currentSessionId
           }),
           {
@@ -465,7 +471,7 @@ function customerServicePage() {
           this.showError(response?.message || '操作失败')
         }
       } catch (error) {
-        console.error('转接失败:', error)
+        logger.error('转接失败:', error)
         this.showError(error.message)
       } finally {
         this.loadingOverlay = false
@@ -485,7 +491,7 @@ function customerServicePage() {
         '确认结束当前会话？',
         async () => {
           const response = await apiRequest(
-            API.buildURL(API_ENDPOINTS.CUSTOMER_SERVICE.CLOSE, {
+            API.buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_CLOSE, {
               session_id: this.currentSessionId
             }),
             { method: 'POST', body: JSON.stringify({ close_reason: '问题已解决' }) }
@@ -540,14 +546,14 @@ function customerServicePage() {
         }
 
         const response = await apiRequest(
-          API.buildURL(API_ENDPOINTS.USER.DETAIL, { user_id: userId })
+          API.buildURL(USER_ENDPOINTS.DETAIL, { user_id: userId })
         )
         if (response && response.success) {
           this.userInfoData = response.data.user || response.data
           this.showModal('userInfoModal')
         }
       } catch (error) {
-        console.error('获取用户信息失败:', error)
+        logger.error('获取用户信息失败:', error)
         this.showError(error.message)
       } finally {
         this.loadingOverlay = false
@@ -559,12 +565,12 @@ function customerServicePage() {
      */
     async loadAdminList() {
       try {
-        const response = await apiRequest(API_ENDPOINTS.USER.LIST + '?role_filter=admin')
+        const response = await apiRequest(USER_ENDPOINTS.LIST + '?role_filter=admin')
         if (response && response.success) {
           this.adminList = response.data.users || []
         }
       } catch (error) {
-        console.error('加载客服列表失败:', error)
+        logger.error('加载客服列表失败:', error)
       }
     },
 
@@ -644,5 +650,5 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('customerServicePage', customerServicePage)
   // 添加别名（HTML 使用 customerService()）
   Alpine.data('customerService', customerServicePage)
-  console.log('✅ [CustomerServicePage] Alpine 组件已注册 (Mixin v3.0)')
+  logger.info('[CustomerServicePage] Alpine 组件已注册 (Mixin v3.0)')
 })

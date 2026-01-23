@@ -17,7 +17,7 @@
  * - 配置项的增删改查
  *
  * @requires createDashboardMixin - 仪表板基础Mixin，提供认证、loading状态等
- * @requires API_ENDPOINTS - API端点配置对象
+ * @requires SYSTEM_ENDPOINTS - 系统API端点配置对象
  * @requires apiRequest - API请求工具函数
  * @requires showLoading - 显示全局loading
  * @requires hideLoading - 隐藏全局loading
@@ -32,6 +32,10 @@
  * </div>
  */
 
+
+import { logger } from '../../../utils/logger.js'
+import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
+import { buildURL } from '../../../api/base.js'
 document.addEventListener('alpine:init', () => {
   // 使用 createDashboardMixin 获取标准功能
   const baseMixin = typeof createDashboardMixin === 'function' ? createDashboardMixin() : {}
@@ -146,17 +150,17 @@ document.addEventListener('alpine:init', () => {
      * @async
      * @description 从后端API获取各配置分类的配置项数量统计
      * @returns {Promise<void>}
-     * @fires API_ENDPOINTS.SETTINGS.LIST
+     * @fires SYSTEM_ENDPOINTS.SETTINGS_LIST
      */
     async loadConfigList() {
       try {
-        const response = await apiRequest(API_ENDPOINTS.SETTINGS.LIST)
+        const response = await apiRequest(SYSTEM_ENDPOINTS.SETTINGS_LIST)
         if (response && response.success) {
           const summary = response.data || {}
           this.categoryCounts = summary.categories || {}
         }
       } catch (error) {
-        console.error('加载配置列表失败:', error)
+        logger.error('加载配置列表失败:', error)
       } finally {
         this.configListLoaded = true
       }
@@ -168,7 +172,7 @@ document.addEventListener('alpine:init', () => {
      * @param {string} category - 配置分类标识符 (basic|points|notification|security|marketplace)
      * @description 加载指定分类的所有配置项，并初始化可编辑设置
      * @returns {Promise<void>}
-     * @fires API_ENDPOINTS.SETTINGS.CATEGORY
+     * @fires SYSTEM_ENDPOINTS.SETTINGS_CATEGORY
      */
     async loadCategorySettings(category) {
       this.currentCategory = category
@@ -178,7 +182,7 @@ document.addEventListener('alpine:init', () => {
 
       try {
         const response = await apiRequest(
-          API.buildURL(API_ENDPOINTS.SETTINGS.CATEGORY, { category })
+          buildURL(SYSTEM_ENDPOINTS.SETTINGS_CATEGORY, { category })
         )
         if (response && response.success) {
           const data = response.data || {}
@@ -197,7 +201,7 @@ document.addEventListener('alpine:init', () => {
           })
         }
       } catch (error) {
-        console.error('加载分类配置失败:', error)
+        logger.error('加载分类配置失败:', error)
         this.categorySettings = []
       } finally {
         this.settingsLoading = false
@@ -210,7 +214,7 @@ document.addEventListener('alpine:init', () => {
      * @description 将editableSettings中的修改保存到后端，支持JSON类型验证
      * @returns {Promise<void>}
      * @throws {Error} 当JSON格式无效或保存失败时
-     * @fires API_ENDPOINTS.SETTINGS.UPDATE
+     * @fires SYSTEM_ENDPOINTS.SETTINGS_UPDATE
      */
     async saveSettings() {
       const settingsToUpdate = {}
@@ -240,7 +244,7 @@ document.addEventListener('alpine:init', () => {
       showLoading()
       try {
         const response = await apiRequest(
-          API.buildURL(API_ENDPOINTS.SETTINGS.UPDATE, { category: this.currentCategory }),
+          buildURL(SYSTEM_ENDPOINTS.SETTINGS_UPDATE, { category: this.currentCategory }),
           {
             method: 'PUT',
             body: JSON.stringify({ settings: settingsToUpdate })
@@ -268,7 +272,7 @@ document.addEventListener('alpine:init', () => {
      * @async
      * @description 打开功能开关模态框并加载安全设置中的布尔类型配置项
      * @returns {Promise<void>}
-     * @fires API_ENDPOINTS.SETTINGS.SECURITY
+     * @fires SYSTEM_ENDPOINTS.SETTINGS_SECURITY
      */
     async showFeatureFlagsModal() {
       this.featureFlagsLoading = true
@@ -277,7 +281,7 @@ document.addEventListener('alpine:init', () => {
       this.showModal('featureFlagsModal')
 
       try {
-        const response = await apiRequest(API_ENDPOINTS.SETTINGS.SECURITY)
+        const response = await apiRequest(SYSTEM_ENDPOINTS.SETTINGS_SECURITY)
         if (response && response.success) {
           const settings = response.data?.settings || []
           this.featureFlags = settings.filter(s => s.value_type === 'boolean')
@@ -286,7 +290,7 @@ document.addEventListener('alpine:init', () => {
           })
         }
       } catch (error) {
-        console.error('加载功能开关失败:', error)
+        logger.error('加载功能开关失败:', error)
       } finally {
         this.featureFlagsLoading = false
       }
@@ -298,12 +302,12 @@ document.addEventListener('alpine:init', () => {
      * @description 将功能开关的开启/关闭状态保存到后端
      * @returns {Promise<void>}
      * @throws {Error} 当保存失败时
-     * @fires API_ENDPOINTS.SETTINGS.SECURITY
+     * @fires SYSTEM_ENDPOINTS.SETTINGS_SECURITY
      */
     async saveFeatureFlags() {
       showLoading()
       try {
-        const response = await apiRequest(API_ENDPOINTS.SETTINGS.SECURITY, {
+        const response = await apiRequest(SYSTEM_ENDPOINTS.SETTINGS_SECURITY, {
           method: 'PUT',
           body: JSON.stringify({ settings: this.featureFlagValues })
         })
@@ -326,13 +330,13 @@ document.addEventListener('alpine:init', () => {
      * @async
      * @description 打开维护模式模态框并加载当前维护模式设置
      * @returns {Promise<void>}
-     * @fires API_ENDPOINTS.SETTINGS.BASIC
+     * @fires SYSTEM_ENDPOINTS.SETTINGS_BASIC
      */
     async showMaintenanceModal() {
       this.showModal('maintenanceModal')
 
       try {
-        const response = await apiRequest(API_ENDPOINTS.SETTINGS.BASIC)
+        const response = await apiRequest(SYSTEM_ENDPOINTS.SETTINGS_BASIC)
         if (response && response.success) {
           const settings = response.data?.settings || []
           const maintenanceEnabled = settings.find(s => s.setting_key === 'maintenance_mode')
@@ -350,7 +354,7 @@ document.addEventListener('alpine:init', () => {
           }
         }
       } catch (error) {
-        console.error('加载维护模式配置失败:', error)
+        logger.error('加载维护模式配置失败:', error)
       }
     },
 
@@ -360,7 +364,7 @@ document.addEventListener('alpine:init', () => {
      * @description 将维护模式的启用状态、提示消息和结束时间保存到后端
      * @returns {Promise<void>}
      * @throws {Error} 当保存失败时
-     * @fires API_ENDPOINTS.SETTINGS.BASIC
+     * @fires SYSTEM_ENDPOINTS.SETTINGS_BASIC
      */
     async saveMaintenanceMode() {
       showLoading()
@@ -374,7 +378,7 @@ document.addEventListener('alpine:init', () => {
           settings.maintenance_end_time = new Date(this.maintenanceForm.endTime).toISOString()
         }
 
-        const response = await apiRequest(API_ENDPOINTS.SETTINGS.BASIC, {
+        const response = await apiRequest(SYSTEM_ENDPOINTS.SETTINGS_BASIC, {
           method: 'PUT',
           body: JSON.stringify({ settings })
         })
@@ -408,7 +412,7 @@ document.addEventListener('alpine:init', () => {
      * @description 将新配置项添加到当前选中的配置分类中，支持多种数据类型
      * @returns {Promise<void>}
      * @throws {Error} 当配置键名为空、未选择分类或保存失败时
-     * @fires API_ENDPOINTS.SETTINGS.UPDATE
+     * @fires SYSTEM_ENDPOINTS.SETTINGS_UPDATE
      */
     async addConfig() {
       if (!this.newConfig.key.trim()) {
@@ -434,7 +438,7 @@ document.addEventListener('alpine:init', () => {
 
         const settingsToUpdate = { [this.newConfig.key]: value }
         const response = await apiRequest(
-          API.buildURL(API_ENDPOINTS.SETTINGS.UPDATE, { category: this.currentCategory }),
+          buildURL(SYSTEM_ENDPOINTS.SETTINGS_UPDATE, { category: this.currentCategory }),
           {
             method: 'PUT',
             body: JSON.stringify({ settings: settingsToUpdate })
@@ -457,5 +461,5 @@ document.addEventListener('alpine:init', () => {
     }
   }))
 
-  console.log('✅ [ConfigTools] Alpine 组件已注册')
+  logger.info('[ConfigTools] Alpine 组件已注册')
 })

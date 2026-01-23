@@ -19,6 +19,8 @@
  * }
  */
 
+
+import { logger } from '../../utils/logger.js'
 import { getToken, clearToken } from '@/api/base.js'
 
 export function authGuardMixin() {
@@ -47,7 +49,7 @@ export function authGuardMixin() {
       const token = getToken()
 
       if (!token) {
-        console.warn('[AuthGuard] 用户未登录，跳转到登录页')
+        logger.warn('[AuthGuard] 用户未登录，跳转到登录页')
         window.location.href = redirectUrl
         return false
       }
@@ -72,7 +74,7 @@ export function authGuardMixin() {
           this.userInfo = user // 向后兼容
         }
       } catch (error) {
-        console.error('[AuthGuard] 加载用户信息失败:', error)
+        logger.error('[AuthGuard] 加载用户信息失败:', error)
       }
     },
 
@@ -94,7 +96,7 @@ export function authGuardMixin() {
           return this.currentUser
         }
       } catch (error) {
-        console.error('[AuthGuard] 解析用户信息失败:', error)
+        logger.error('[AuthGuard] 解析用户信息失败:', error)
       }
 
       return null
@@ -180,7 +182,7 @@ export function authGuardMixin() {
           }
         }
       } catch (error) {
-        console.error('[AuthGuard] 刷新用户信息失败:', error)
+        logger.error('[AuthGuard] 刷新用户信息失败:', error)
       }
     }
   }

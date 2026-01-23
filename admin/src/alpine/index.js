@@ -2,8 +2,8 @@
  * Alpine.js 初始化入口（ES Module 版本）
  *
  * @description 初始化 Alpine.js，注册全局组件和指令
- * @version 2.0.0
- * @date 2026-01-23
+ * @version 2.0.1
+ * @date 2026-01-24
  *
  * 使用方式：在 main.js 中导入
  * import { initAlpine } from '@/alpine/index.js'
@@ -11,6 +11,7 @@
  */
 
 import Alpine from 'alpinejs'
+import { logger } from '../utils/logger.js'
 
 // 导入 Mixin
 import {
@@ -34,12 +35,68 @@ import {
  */
 export function initAlpine() {
   // 注册全局 Magic Properties
+  // $toast - 使用 Alpine.store('notification') 统一实现
   Alpine.magic('toast', () => {
-    return (message, type = 'info') => {
-      if (typeof window.showToast === 'function') {
-        window.showToast(message, type)
-      } else {
-        console.log(`[${type.toUpperCase()}] ${message}`)
+    return {
+      /**
+       * 显示成功消息
+       * @param {string} message - 消息内容
+       * @param {number} duration - 显示时长（毫秒）
+       */
+      success(message, duration = 3000) {
+        if (Alpine.store('notification')) {
+          return Alpine.store('notification').success(message, duration)
+        }
+        logger.info(`[SUCCESS] ${message}`)
+      },
+
+      /**
+       * 显示错误消息
+       * @param {string} message - 消息内容
+       * @param {number} duration - 显示时长（毫秒）
+       */
+      error(message, duration = 5000) {
+        if (Alpine.store('notification')) {
+          return Alpine.store('notification').error(message, duration)
+        }
+        logger.error(`[ERROR] ${message}`)
+      },
+
+      /**
+       * 显示警告消息
+       * @param {string} message - 消息内容
+       * @param {number} duration - 显示时长（毫秒）
+       */
+      warning(message, duration = 4000) {
+        if (Alpine.store('notification')) {
+          return Alpine.store('notification').warning(message, duration)
+        }
+        logger.warn(`[WARNING] ${message}`)
+      },
+
+      /**
+       * 显示提示消息
+       * @param {string} message - 消息内容
+       * @param {number} duration - 显示时长（毫秒）
+       */
+      info(message, duration = 3000) {
+        if (Alpine.store('notification')) {
+          return Alpine.store('notification').info(message, duration)
+        }
+        logger.info(`[INFO] ${message}`)
+      },
+
+      /**
+       * 通用显示方法（兼容旧代码）
+       * @param {string} message - 消息内容
+       * @param {string} type - 消息类型
+       * @param {number} duration - 显示时长（毫秒）
+       */
+      show(message, type = 'info', duration = 3000) {
+        if (Alpine.store('notification')) {
+          return Alpine.store('notification').showToast(message, type, duration)
+        }
+        logger.info(`[${type.toUpperCase()}] ${message}`)
       }
     }
   })
@@ -57,7 +114,7 @@ export function initAlpine() {
           this.user = JSON.parse(userInfo)
         }
       } catch (e) {
-        console.warn('无法恢复用户信息')
+        logger.warn('无法恢复用户信息')
       }
     },
 
@@ -114,7 +171,7 @@ export function initAlpine() {
           this.userInfo = JSON.parse(userInfo)
         }
       } catch (e) {
-        console.warn('无法恢复管理员信息')
+        logger.warn('无法恢复管理员信息')
       }
     },
 
@@ -128,30 +185,17 @@ export function initAlpine() {
     }
   })
 
-  // 挂载到 window 供页面脚本使用
+  // 挂载 Alpine 到 window（Alpine 框架自身需要）
   window.Alpine = Alpine
-
-  // 挂载 Mixin 工具（兼容旧代码）
-  window.createPageMixin = createPageMixin
-  window.createCrudPageMixin = createCrudPageMixin
-  window.createCrudMixin = createCrudMixin
-  window.createBatchOperationMixin = createBatchOperationMixin
-  window.createDashboardMixin = createDashboardMixin
-  window.createSimpleListMixin = createSimpleListMixin
-  window.createFormMixin = createFormMixin
-
-  // 挂载单个 Mixin（兼容旧代码）
-  window.paginationMixin = paginationMixin
-  window.asyncDataMixin = asyncDataMixin
-  window.modalMixin = modalMixin
-  window.tableSelectionMixin = tableSelectionMixin
-  window.formValidationMixin = formValidationMixin
-  window.authGuardMixin = authGuardMixin
+  
+  // ========== window.xxx 已移除（方案 A：彻底 ES Module） ==========
+  // Mixin 工具请使用 ES Module 导入：
+  //   import { createPageMixin, paginationMixin } from '@/alpine/mixins/index.js'
 
   // 启动 Alpine
   Alpine.start()
 
-  console.log('✅ Alpine.js 已初始化（ES Module 版本）')
+  logger.info('Alpine.js 已初始化（ES Module 版本）')
 }
 
 /**
@@ -162,7 +206,7 @@ export function initAlpine() {
  */
 export function registerComponent(name, component) {
   Alpine.data(name, component)
-  console.log(`✅ 注册组件: ${name}`)
+  logger.debug(`注册组件: ${name}`)
 }
 
 /**
@@ -173,7 +217,7 @@ export function registerComponent(name, component) {
  */
 export function registerDirective(name, handler) {
   Alpine.directive(name, handler)
-  console.log(`✅ 注册指令: x-${name}`)
+  logger.debug(`注册指令: x-${name}`)
 }
 
 // 导出 Alpine 实例供高级用法

@@ -10,12 +10,14 @@
  * <div x-data="adminPage({
  *   pageId: 'users',
  *   title: '用户管理',
- *   apiEndpoint: API_ENDPOINTS.USER.LIST
+ *   apiEndpoint: USER_ENDPOINTS.LIST
  * })">
  *   ...
  * </div>
  */
 
+
+import { logger } from '../../utils/logger.js'
 /**
  * Admin Page 组件数据
  * @param {Object} config - 页面配置
@@ -73,7 +75,7 @@ function adminPage(config = {}) {
 
     // ========== 初始化 ==========
     async init() {
-      console.log(`[AdminPage] 初始化页面: ${this.pageId}`)
+      logger.info(`[AdminPage] 初始化页面: ${this.pageId}`)
 
       // 设置页面标题
       Alpine.store('ui').setPageTitle(this.title, this.icon)
@@ -95,7 +97,7 @@ function adminPage(config = {}) {
     // ========== 数据加载 ==========
     async loadData() {
       if (!this.apiEndpoint) {
-        console.warn('[AdminPage] 未配置 API 端点')
+        logger.warn('[AdminPage] 未配置 API 端点')
         return
       }
 
@@ -119,7 +121,7 @@ function adminPage(config = {}) {
         })
 
         const url = `${this.apiEndpoint}${params.toString() ? '?' + params.toString() : ''}`
-        console.log(`[AdminPage] 加载数据: ${url}`)
+        logger.info(`[AdminPage] 加载数据: ${url}`)
 
         const response = await apiRequest(url)
 
@@ -147,14 +149,14 @@ function adminPage(config = {}) {
             this.onDataLoaded(this.data, response.data)
           }
 
-          console.log(`[AdminPage] 数据加载成功: ${this.data.length} 条`)
+          logger.info(`[AdminPage] 数据加载成功: ${this.data.length} 条`)
         } else {
           this.error = response?.message || '加载失败'
-          console.error('[AdminPage] 数据加载失败:', this.error)
+          logger.error('[AdminPage] 数据加载失败:', this.error)
         }
       } catch (error) {
         this.error = error.message
-        console.error('[AdminPage] 数据加载异常:', error)
+        logger.error('[AdminPage] 数据加载异常:', error)
       } finally {
         this.loading = false
       }
@@ -186,7 +188,7 @@ function adminPage(config = {}) {
           this.updateStats(response.data)
         }
       } catch (error) {
-        console.warn('[AdminPage] 统计数据加载失败:', error)
+        logger.warn('[AdminPage] 统计数据加载失败:', error)
       }
     },
 
@@ -404,4 +406,4 @@ function adminPage(config = {}) {
   }
 }
 
-console.log('📦 AdminPage 组件已加载')
+logger.info('AdminPage 组件已加载')

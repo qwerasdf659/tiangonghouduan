@@ -20,7 +20,7 @@
  * - POST /api/v4/console/orphan-frozen/cleanup - 清理孤儿冻结
  *
  * @requires createBatchOperationMixin - 批量操作混入
- * @requires API_ENDPOINTS - API端点配置
+ * @requires ASSET_ENDPOINTS - 资产相关API端点
  * @requires apiRequest - API请求函数
  *
  * @example
@@ -32,6 +32,11 @@
  * </div>
  */
 
+
+import { logger } from '../../../utils/logger.js'
+import { ASSET_ENDPOINTS } from '../../../api/asset.js'
+import { buildURL, request } from '../../../api/base.js'
+import { createBatchOperationMixin } from '../../../alpine/mixins/index.js'
 /**
  * 孤儿冻结项目对象类型
  * @typedef {Object} OrphanItem
@@ -158,7 +163,7 @@ function orphanFrozenPage() {
      * @returns {void}
      */
     init() {
-      console.log('✅ 孤儿冻结清理页面初始化 (Mixin v3.0)')
+      logger.info('孤儿冻结清理页面初始化 (Mixin v3.0)')
 
       // 使用 Mixin 的认证检查
       if (!this.checkAuth()) {
@@ -193,10 +198,10 @@ function orphanFrozenPage() {
         // 并行获取检测结果和统计数据
         const [detectResponse, statsResponse] = await Promise.all([
           apiRequest(
-            API_ENDPOINTS.ORPHAN_FROZEN.DETECT +
+            ASSET_ENDPOINTS.ORPHAN_FROZEN_DETECT +
               (detectParams.toString() ? '?' + detectParams.toString() : '')
           ),
-          apiRequest(API_ENDPOINTS.ORPHAN_FROZEN.STATS)
+          apiRequest(ASSET_ENDPOINTS.ORPHAN_FROZEN_STATS)
         ])
 
         // 处理检测结果
@@ -238,7 +243,7 @@ function orphanFrozenPage() {
       this.scanning = true
 
       try {
-        const response = await apiRequest(API_ENDPOINTS.ORPHAN_FROZEN.DETECT, {
+        const response = await apiRequest(ASSET_ENDPOINTS.ORPHAN_FROZEN_DETECT, {
           method: 'GET'
         })
 
@@ -250,7 +255,7 @@ function orphanFrozenPage() {
           this.showError(response?.message || '扫描失败')
         }
       } catch (error) {
-        console.error('扫描失败:', error)
+        logger.error('扫描失败:', error)
         this.showError('扫描失败：' + error.message)
       } finally {
         this.scanning = false
@@ -343,7 +348,7 @@ function orphanFrozenPage() {
       this.cleaning = true
 
       try {
-        const response = await apiRequest(API_ENDPOINTS.ORPHAN_FROZEN.CLEANUP, {
+        const response = await apiRequest(ASSET_ENDPOINTS.ORPHAN_FROZEN_CLEANUP, {
           method: 'POST',
           body: JSON.stringify({
             dry_run: false,
@@ -369,7 +374,7 @@ function orphanFrozenPage() {
           this.showError(response?.message || '清理失败')
         }
       } catch (error) {
-        console.error('清理失败:', error)
+        logger.error('清理失败:', error)
         this.showError('清理失败：' + error.message)
       } finally {
         this.cleaning = false
@@ -394,7 +399,7 @@ function orphanFrozenPage() {
       this.cleaning = true
 
       try {
-        const response = await apiRequest(API_ENDPOINTS.ORPHAN_FROZEN.CLEANUP, {
+        const response = await apiRequest(ASSET_ENDPOINTS.ORPHAN_FROZEN_CLEANUP, {
           method: 'POST',
           body: JSON.stringify({
             dry_run: false,
@@ -413,7 +418,7 @@ function orphanFrozenPage() {
           this.showError(response?.message || '清理失败')
         }
       } catch (error) {
-        console.error('清理失败:', error)
+        logger.error('清理失败:', error)
         this.showError('清理失败：' + error.message)
       } finally {
         this.cleaning = false
@@ -560,7 +565,7 @@ function orphanFrozenPage() {
         this.showSuccess('解冻操作已执行')
         await this.loadData()
       } catch (error) {
-        console.error('解冻失败:', error)
+        logger.error('解冻失败:', error)
         this.showError('解冻失败：' + error.message)
       }
     }
@@ -576,5 +581,5 @@ function orphanFrozenPage() {
  */
 document.addEventListener('alpine:init', () => {
   Alpine.data('orphanFrozenPage', orphanFrozenPage)
-  console.log('✅ [OrphanFrozenPage] Alpine 组件已注册 (Mixin v3.0)')
+  logger.info('[OrphanFrozenPage] Alpine 组件已注册 (Mixin v3.0)')
 })

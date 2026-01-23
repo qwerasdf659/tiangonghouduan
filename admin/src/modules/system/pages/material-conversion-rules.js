@@ -16,7 +16,7 @@
  * - 风险检测（循环检测、套利检测）
  *
  * @requires createCrudMixin - CRUD操作混入
- * @requires API_ENDPOINTS - API端点配置
+ * @requires ASSET_ENDPOINTS - 资产管理API端点配置
  * @requires apiRequest - API请求函数
  *
  * @example
@@ -28,6 +28,10 @@
  * </div>
  */
 
+
+import { logger } from '../../../utils/logger.js'
+import { ASSET_ENDPOINTS } from '../../../api/asset.js'
+import { buildURL } from '../../../api/base.js'
 /**
  * 转换规则对象类型
  * @typedef {Object} ConversionRule
@@ -151,7 +155,7 @@ function materialConversionRulesPage() {
      * @returns {Promise<void>}
      */
     async init() {
-      console.log('✅ 材料转换规则管理页面初始化 (Mixin v3.0)')
+      logger.info('材料转换规则管理页面初始化 (Mixin v3.0)')
 
       // 使用 Mixin 的认证检查
       if (!this.checkAuth()) {
@@ -172,7 +176,7 @@ function materialConversionRulesPage() {
      * @returns {Promise<void>}
      */
     async loadAssetTypes() {
-      const result = await this.apiGet(API_ENDPOINTS.MATERIAL.ASSET_TYPES, {}, { showError: false })
+      const result = await this.apiGet(ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES, {}, { showError: false })
 
       if (result.success) {
         this.assetTypes = result.data?.asset_types || []
@@ -198,7 +202,7 @@ function materialConversionRulesPage() {
      */
     async loadRules() {
       const result = await this.withLoading(async () => {
-        const response = await apiRequest(API_ENDPOINTS.MATERIAL.CONVERSION_RULES)
+        const response = await apiRequest(ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULES)
 
         if (response && response.success) {
           return response.data?.rules || []
@@ -273,7 +277,7 @@ function materialConversionRulesPage() {
       this.submitting = true
 
       const result = await this.apiPost(
-        API_ENDPOINTS.MATERIAL.CONVERSION_RULES,
+        ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULES,
         {
           from_asset_code: this.addForm.from_asset_code,
           to_asset_code: this.addForm.to_asset_code,
@@ -342,7 +346,7 @@ function materialConversionRulesPage() {
       this.submitting = true
 
       const result = await this.apiPut(
-        API.buildURL(API_ENDPOINTS.MATERIAL.CONVERSION_RULE_DETAIL, {
+        buildURL(ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULE_DETAIL, {
           rule_id: this.editForm.rule_id
         }),
         {
@@ -381,7 +385,7 @@ function materialConversionRulesPage() {
         `确定要${action}该转换规则吗？`,
         async () => {
           const response = await apiRequest(
-            API.buildURL(API_ENDPOINTS.MATERIAL.CONVERSION_RULE_DETAIL, { rule_id: ruleId }),
+            buildURL(ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULE_DETAIL, { rule_id: ruleId }),
             {
               method: 'PUT',
               body: JSON.stringify({ is_enabled: newStatus })
@@ -496,5 +500,5 @@ function materialConversionRulesPage() {
  */
 document.addEventListener('alpine:init', () => {
   Alpine.data('materialConversionRulesPage', materialConversionRulesPage)
-  console.log('✅ [MaterialConversionRulesPage] Alpine 组件已注册 (Mixin v3.0)')
+  logger.info('[MaterialConversionRulesPage] Alpine 组件已注册 (Mixin v3.0)')
 })

@@ -16,6 +16,8 @@
  * @see routes/v4/console/marketplace.js - 后端路由定义
  */
 
+
+import { logger } from '../utils/logger.js'
 import { request, buildURL, buildQueryString } from './base.js'
 
 // ========== 类型定义 ==========
@@ -164,6 +166,16 @@ export const MARKET_ENDPOINTS = {
   EXCHANGE_ORDERS_SIMPLE: '/api/v4/console/marketplace/exchange_market/orders',
   /** @type {string} [GET] 获取兑换统计 */
   EXCHANGE_STATS: '/api/v4/console/marketplace/exchange_market/statistics',
+  /** @type {string} [GET] 获取兑换完整统计 */
+  EXCHANGE_FULL_STATS: '/api/v4/console/marketplace/exchange_market/statistics/full',
+  /** @type {string} [GET] 获取兑换趋势数据 */
+  EXCHANGE_TREND: '/api/v4/console/marketplace/exchange_market/statistics/trend',
+  /** @type {string} [GET] 获取兑换订单统计 */
+  EXCHANGE_ORDER_STATS: '/api/v4/console/marketplace/exchange_market/orders/stats',
+  /** @type {string} [POST] 发货订单 - Path: :order_no */
+  EXCHANGE_ORDER_SHIP: '/api/v4/console/marketplace/exchange_market/orders/:order_no/ship',
+  /** @type {string} [POST] 取消订单 - Path: :order_no */
+  EXCHANGE_ORDER_CANCEL: '/api/v4/console/marketplace/exchange_market/orders/:order_no/cancel',
 
   // 交易订单
   /** @type {string} [GET] 获取C2C交易订单 - Query: { page?, page_size?, status? } */
@@ -191,7 +203,81 @@ export const MARKET_ENDPOINTS = {
   /** @type {string} [GET] 获取孤儿冻结统计 */
   ORPHAN_STATS: '/api/v4/console/orphan-frozen/stats',
   /** @type {string} [POST] 清理孤儿冻结 - Body: { ids?, force? } */
-  ORPHAN_CLEANUP: '/api/v4/console/orphan-frozen/cleanup'
+  ORPHAN_CLEANUP: '/api/v4/console/orphan-frozen/cleanup',
+
+  // C2C市场扩展
+  /** @type {string} [GET] 获取C2C订单 */
+  C2C_MARKET_ORDERS: '/api/v4/console/c2c-market/orders',
+  /** @type {string} [GET] 获取C2C订单统计 */
+  C2C_MARKET_ORDERS_STATS: '/api/v4/console/c2c-market/orders/stats',
+  /** @type {string} [GET] 获取上架汇总 */
+  C2C_MARKET_LISTINGS_SUMMARY: '/api/v4/console/c2c-market/listings/summary',
+  /** @type {string} [GET] 获取用户上架统计 */
+  C2C_MARKET_LISTINGS_USER_STATS: '/api/v4/console/c2c-market/listings/user-stats',
+
+  // 市场统计扩展
+  /** @type {string} [GET] 商品统计 */
+  MARKETPLACE_STATS_ITEM_STATS: '/api/v4/console/marketplace/stats/items',
+  /** @type {string} [GET] 订单统计 */
+  MARKETPLACE_STATS_ORDER_STATS: '/api/v4/console/marketplace/stats/orders',
+  /** @type {string} [GET] 市场综合统计 */
+  MARKETPLACE_STATS: '/api/v4/console/marketplace/stats',
+
+  // 业务记录查询
+  /** @type {string} [GET] 抽奖清除设置记录列表 */
+  BUSINESS_RECORDS_LOTTERY_CLEAR: '/api/v4/console/business-records/lottery-clear-settings',
+  /** @type {string} [GET] 抽奖清除设置记录详情 */
+  BUSINESS_RECORDS_LOTTERY_CLEAR_DETAIL: '/api/v4/console/business-records/lottery-clear-settings/:record_id',
+  /** @type {string} [GET] 核销订单列表 */
+  BUSINESS_RECORDS_REDEMPTION: '/api/v4/console/business-records/redemption-orders',
+  /** @type {string} [GET] 核销订单详情 */
+  BUSINESS_RECORDS_REDEMPTION_DETAIL: '/api/v4/console/business-records/redemption-orders/:order_id',
+  /** @type {string} [POST] 核销订单执行核销 */
+  BUSINESS_RECORDS_REDEMPTION_REDEEM: '/api/v4/console/business-records/redemption-orders/:order_id/redeem',
+  /** @type {string} [POST] 核销订单取消 */
+  BUSINESS_RECORDS_REDEMPTION_CANCEL: '/api/v4/console/business-records/redemption-orders/:order_id/cancel',
+  /** @type {string} [GET] 内容审核记录列表 */
+  BUSINESS_RECORDS_CONTENT_REVIEWS: '/api/v4/console/business-records/content-reviews',
+  /** @type {string} [GET] 内容审核记录详情 */
+  BUSINESS_RECORDS_CONTENT_REVIEWS_DETAIL: '/api/v4/console/business-records/content-reviews/:audit_id',
+  /** @type {string} [GET] 用户角色变更记录列表 */
+  BUSINESS_RECORDS_ROLE_CHANGES: '/api/v4/console/business-records/user-role-changes',
+  /** @type {string} [GET] 用户角色变更记录详情 */
+  BUSINESS_RECORDS_ROLE_CHANGES_DETAIL: '/api/v4/console/business-records/user-role-changes/:record_id',
+  /** @type {string} [GET] 用户状态变更记录列表 */
+  BUSINESS_RECORDS_STATUS_CHANGES: '/api/v4/console/business-records/user-status-changes',
+  /** @type {string} [GET] 用户状态变更记录详情 */
+  BUSINESS_RECORDS_STATUS_CHANGES_DETAIL: '/api/v4/console/business-records/user-status-changes/:record_id',
+  /** @type {string} [GET] 兑换记录列表 */
+  BUSINESS_RECORDS_EXCHANGE: '/api/v4/console/business-records/exchange-records',
+  /** @type {string} [GET] 兑换记录详情 */
+  BUSINESS_RECORDS_EXCHANGE_DETAIL: '/api/v4/console/business-records/exchange-records/:record_id',
+  /** @type {string} [GET] 聊天消息记录列表 */
+  BUSINESS_RECORDS_CHAT: '/api/v4/console/business-records/chat-messages',
+  /** @type {string} [GET] 聊天消息记录详情 */
+  BUSINESS_RECORDS_CHAT_DETAIL: '/api/v4/console/business-records/chat-messages/:message_id',
+  /** @type {string} [GET] 聊天消息统计汇总 */
+  BUSINESS_RECORDS_CHAT_STATS: '/api/v4/console/business-records/chat-messages/statistics/summary',
+
+  // 交易订单扩展
+  /** @type {string} [GET] 交易订单列表 */
+  TRADE_ORDERS_LIST: '/api/v4/console/trade-orders',
+  /** @type {string} [GET] 交易订单详情 */
+  TRADE_ORDERS_DETAIL: '/api/v4/console/trade-orders/:id',
+  /** @type {string} [GET] 交易订单统计 */
+  TRADE_ORDERS_STATS: '/api/v4/console/trade-orders/stats',
+  /** @type {string} [GET] 用户交易订单统计 */
+  TRADE_ORDERS_USER_STATS: '/api/v4/console/trade-orders/user/:user_id/stats',
+  /** @type {string} [GET] 按业务ID查询交易订单 */
+  TRADE_ORDERS_BY_BUSINESS_ID: '/api/v4/console/trade-orders/by-business-id/:business_id',
+
+  // C2C市场扩展（补充）
+  /** @type {string} [GET] C2C市场列表 */
+  C2C_MARKET_LIST: '/api/v4/console/marketplace/listings',
+  /** @type {string} [GET] C2C市场详情 */
+  C2C_MARKET_DETAIL: '/api/v4/console/marketplace/listings/:listing_id',
+  /** @type {string} [GET] C2C市场统计 */
+  C2C_MARKET_STATS: '/api/v4/console/marketplace/listing-stats'
 }
 
 // ========== API 调用方法 ==========
@@ -282,7 +368,7 @@ export const MarketAPI = {
    *
    * @example
    * const detail = await MarketAPI.getExchangeItemDetail(123)
-   * console.log(detail.data.item.name)
+   * logger.debug(detail.data.item.name)
    *
    * @throws {Error} 商品不存在时返回 404
    */
@@ -439,7 +525,7 @@ export const MarketAPI = {
    *
    * @example
    * const stats = await MarketAPI.getExchangeStats()
-   * console.log(`上架商品: ${stats.data.active_items}`)
+   * logger.info(`上架商品: ${stats.data.active_items}`)
    */
   async getExchangeStats() {
     return await request({ url: MARKET_ENDPOINTS.EXCHANGE_STATS, method: 'GET' })
@@ -805,7 +891,7 @@ export const MarketAPI = {
    * @example
    * const result = await MarketAPI.detectOrphanFrozen()
    * if (result.data.total_count > 0) {
-   *   console.warn(`发现 ${result.data.total_count} 条孤儿冻结`)
+   *   logger.warn(`发现 ${result.data.total_count} 条孤儿冻结`)
    * }
    */
   async detectOrphanFrozen() {
@@ -865,6 +951,343 @@ export const MarketAPI = {
    */
   async cleanupOrphanFrozen(data) {
     return await request({ url: MARKET_ENDPOINTS.ORPHAN_CLEANUP, method: 'POST', data })
+  },
+
+  // ===== 业务记录查询 =====
+
+  /**
+   * 获取抽奖清除设置记录列表
+   * @async
+   * @param {Object} [params={}] - 查询参数
+   * @param {number} [params.user_id] - 被清除设置的用户ID
+   * @param {number} [params.admin_id] - 执行清除的管理员ID
+   * @param {string} [params.setting_type] - 清除的设置类型
+   * @param {string} [params.start_date] - 开始日期
+   * @param {string} [params.end_date] - 结束日期
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @returns {Promise<Object>} 记录列表
+   */
+  async getLotteryClearRecords(params = {}) {
+    const url = MARKET_ENDPOINTS.BUSINESS_RECORDS_LOTTERY_CLEAR + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取抽奖清除设置记录详情
+   * @async
+   * @param {number} recordId - 记录ID
+   * @returns {Promise<Object>} 记录详情
+   */
+  async getLotteryClearRecordDetail(recordId) {
+    const url = buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_LOTTERY_CLEAR_DETAIL, { record_id: recordId })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取核销订单列表
+   * @async
+   * @param {Object} [params={}] - 查询参数
+   * @param {string} [params.status] - 订单状态
+   * @param {number} [params.user_id] - 用户ID
+   * @param {number} [params.store_id] - 门店ID
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @returns {Promise<Object>} 订单列表
+   */
+  async getRedemptionOrders(params = {}) {
+    const url = MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取核销订单详情
+   * @async
+   * @param {number} orderId - 订单ID
+   * @returns {Promise<Object>} 订单详情
+   */
+  async getRedemptionOrderDetail(orderId) {
+    const url = buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_DETAIL, { order_id: orderId })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 执行核销订单
+   * @async
+   * @param {number} orderId - 订单ID
+   * @param {Object} [data={}] - 核销数据
+   * @returns {Promise<Object>} 核销结果
+   */
+  async redeemOrder(orderId, data = {}) {
+    const url = buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_REDEEM, { order_id: orderId })
+    return await request({ url, method: 'POST', data })
+  },
+
+  /**
+   * 取消核销订单
+   * @async
+   * @param {number} orderId - 订单ID
+   * @param {Object} [data={}] - 取消数据
+   * @returns {Promise<Object>} 取消结果
+   */
+  async cancelRedemptionOrder(orderId, data = {}) {
+    const url = buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_CANCEL, { order_id: orderId })
+    return await request({ url, method: 'POST', data })
+  },
+
+  /**
+   * 获取内容审核记录列表
+   * @async
+   * @param {Object} [params={}] - 查询参数
+   * @param {string} [params.status] - 审核状态
+   * @param {string} [params.content_type] - 内容类型
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @returns {Promise<Object>} 记录列表
+   */
+  async getContentReviews(params = {}) {
+    const url = MARKET_ENDPOINTS.BUSINESS_RECORDS_CONTENT_REVIEWS + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取内容审核记录详情
+   * @async
+   * @param {number} auditId - 审核ID
+   * @returns {Promise<Object>} 记录详情
+   */
+  async getContentReviewDetail(auditId) {
+    const url = buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_CONTENT_REVIEWS_DETAIL, { audit_id: auditId })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取用户角色变更记录列表
+   * @async
+   * @param {Object} [params={}] - 查询参数
+   * @param {number} [params.user_id] - 用户ID
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @returns {Promise<Object>} 记录列表
+   */
+  async getRoleChangeRecords(params = {}) {
+    const url = MARKET_ENDPOINTS.BUSINESS_RECORDS_ROLE_CHANGES + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取用户角色变更记录详情
+   * @async
+   * @param {number} recordId - 记录ID
+   * @returns {Promise<Object>} 记录详情
+   */
+  async getRoleChangeRecordDetail(recordId) {
+    const url = buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_ROLE_CHANGES_DETAIL, { record_id: recordId })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取用户状态变更记录列表
+   * @async
+   * @param {Object} [params={}] - 查询参数
+   * @param {number} [params.user_id] - 用户ID
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @returns {Promise<Object>} 记录列表
+   */
+  async getStatusChangeRecords(params = {}) {
+    const url = MARKET_ENDPOINTS.BUSINESS_RECORDS_STATUS_CHANGES + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取用户状态变更记录详情
+   * @async
+   * @param {number} recordId - 记录ID
+   * @returns {Promise<Object>} 记录详情
+   */
+  async getStatusChangeRecordDetail(recordId) {
+    const url = buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_STATUS_CHANGES_DETAIL, { record_id: recordId })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取兑换记录列表
+   * @async
+   * @param {Object} [params={}] - 查询参数
+   * @param {number} [params.user_id] - 用户ID
+   * @param {number} [params.item_id] - 商品ID
+   * @param {string} [params.status] - 订单状态
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @returns {Promise<Object>} 记录列表
+   */
+  async getExchangeRecords(params = {}) {
+    const url = MARKET_ENDPOINTS.BUSINESS_RECORDS_EXCHANGE + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取兑换记录详情
+   * @async
+   * @param {number} recordId - 记录ID
+   * @returns {Promise<Object>} 记录详情
+   */
+  async getExchangeRecordDetail(recordId) {
+    const url = buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_EXCHANGE_DETAIL, { record_id: recordId })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取聊天消息记录列表
+   * @async
+   * @param {Object} [params={}] - 查询参数
+   * @param {number} [params.session_id] - 会话ID
+   * @param {number} [params.sender_id] - 发送者ID
+   * @param {string} [params.message_type] - 消息类型
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @returns {Promise<Object>} 记录列表
+   */
+  async getChatMessages(params = {}) {
+    const url = MARKET_ENDPOINTS.BUSINESS_RECORDS_CHAT + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取聊天消息详情
+   * @async
+   * @param {number} messageId - 消息ID
+   * @returns {Promise<Object>} 消息详情
+   */
+  async getChatMessageDetail(messageId) {
+    const url = buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_CHAT_DETAIL, { message_id: messageId })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取聊天消息统计汇总
+   * @async
+   * @param {Object} [params={}] - 查询参数
+   * @returns {Promise<Object>} 统计汇总
+   */
+  async getChatMessageStats(params = {}) {
+    const url = MARKET_ENDPOINTS.BUSINESS_RECORDS_CHAT_STATS + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  // ===== 交易订单扩展 =====
+
+  /**
+   * 获取交易订单列表（扩展）
+   * @async
+   * @param {Object} [params={}] - 查询参数
+   * @param {number} [params.buyer_user_id] - 买家ID
+   * @param {number} [params.seller_user_id] - 卖家ID
+   * @param {string} [params.status] - 订单状态
+   * @param {string} [params.asset_code] - 结算资产代码
+   * @param {string} [params.start_time] - 开始时间
+   * @param {string} [params.end_time] - 结束时间
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @returns {Promise<Object>} 订单列表
+   */
+  async getTradeOrdersList(params = {}) {
+    const url = MARKET_ENDPOINTS.TRADE_ORDERS_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取交易订单详情（通过ID）
+   * @async
+   * @param {number} orderId - 订单ID
+   * @returns {Promise<Object>} 订单详情
+   */
+  async getTradeOrderById(orderId) {
+    const url = buildURL(MARKET_ENDPOINTS.TRADE_ORDERS_DETAIL, { id: orderId })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取交易订单统计
+   * @async
+   * @param {Object} [params={}] - 查询参数
+   * @param {string} [params.start_time] - 开始时间
+   * @param {string} [params.end_time] - 结束时间
+   * @returns {Promise<Object>} 统计数据
+   */
+  async getTradeOrdersStats(params = {}) {
+    const url = MARKET_ENDPOINTS.TRADE_ORDERS_STATS + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取用户交易订单统计
+   * @async
+   * @param {number} userId - 用户ID
+   * @param {Object} [params={}] - 查询参数
+   * @returns {Promise<Object>} 用户统计数据
+   */
+  async getUserTradeOrdersStats(userId, params = {}) {
+    const url = buildURL(MARKET_ENDPOINTS.TRADE_ORDERS_USER_STATS, { user_id: userId }) + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 按业务ID查询交易订单
+   * @async
+   * @param {string} businessId - 业务ID
+   * @returns {Promise<Object>} 订单信息
+   */
+  async getTradeOrderByBusinessId(businessId) {
+    const url = buildURL(MARKET_ENDPOINTS.TRADE_ORDERS_BY_BUSINESS_ID, { business_id: businessId })
+    return await request({ url, method: 'GET' })
+  },
+
+  // ===== 市场综合统计 =====
+
+  /**
+   * 获取市场综合统计
+   * @async
+   * @param {Object} [params={}] - 查询参数
+   * @returns {Promise<Object>} 市场统计数据
+   */
+  async getMarketplaceStats(params = {}) {
+    const url = MARKET_ENDPOINTS.MARKETPLACE_STATS + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取C2C市场列表（别名）
+   * @async
+   * @param {Object} [params={}] - 查询参数
+   * @returns {Promise<Object>} 市场列表
+   */
+  async getC2CMarketList(params = {}) {
+    const url = MARKET_ENDPOINTS.C2C_MARKET_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取C2C市场详情
+   * @async
+   * @param {number} listingId - 挂牌ID
+   * @returns {Promise<Object>} 挂牌详情
+   */
+  async getC2CMarketDetail(listingId) {
+    const url = buildURL(MARKET_ENDPOINTS.C2C_MARKET_DETAIL, { listing_id: listingId })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取C2C市场统计
+   * @async
+   * @param {Object} [params={}] - 查询参数
+   * @returns {Promise<Object>} 统计数据
+   */
+  async getC2CMarketStats(params = {}) {
+    const url = MARKET_ENDPOINTS.C2C_MARKET_STATS + buildQueryString(params)
+    return await request({ url, method: 'GET' })
   }
 }
 

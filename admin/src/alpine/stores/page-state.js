@@ -23,8 +23,10 @@
  * }
  */
 
+
+import { logger } from '../../utils/logger.js'
 document.addEventListener('alpine:init', () => {
-  console.log('🔧 注册页面状态 Store...')
+  logger.info('🔧 注册页面状态 Store...')
 
   /**
    * 页面状态 Store
@@ -57,9 +59,9 @@ document.addEventListener('alpine:init', () => {
 
       try {
         sessionStorage.setItem(key, JSON.stringify(data))
-        console.log(`[PageState] 保存: ${pageKey}`)
+        logger.info(`[PageState] 保存: ${pageKey}`)
       } catch (e) {
-        console.warn(`[PageState] 保存失败: ${pageKey}`, e)
+        logger.warn(`[PageState] 保存失败: ${pageKey}`, e)
       }
     },
 
@@ -81,14 +83,14 @@ document.addEventListener('alpine:init', () => {
         // 检查是否过期
         if (Date.now() > data.expireAt) {
           sessionStorage.removeItem(key)
-          console.log(`[PageState] 已过期: ${pageKey}`)
+          logger.info(`[PageState] 已过期: ${pageKey}`)
           return null
         }
 
-        console.log(`[PageState] 恢复: ${pageKey}`)
+        logger.info(`[PageState] 恢复: ${pageKey}`)
         return data.state
       } catch (e) {
-        console.warn(`[PageState] 恢复失败: ${pageKey}`, e)
+        logger.warn(`[PageState] 恢复失败: ${pageKey}`, e)
         return null
       }
     },
@@ -101,7 +103,7 @@ document.addEventListener('alpine:init', () => {
     clear(pageKey) {
       const key = this.prefix + pageKey
       sessionStorage.removeItem(key)
-      console.log(`[PageState] 清除: ${pageKey}`)
+      logger.info(`[PageState] 清除: ${pageKey}`)
     },
 
     /**
@@ -118,7 +120,7 @@ document.addEventListener('alpine:init', () => {
       }
 
       keysToRemove.forEach(key => sessionStorage.removeItem(key))
-      console.log(`[PageState] 清除所有: ${keysToRemove.length} 条`)
+      logger.info(`[PageState] 清除所有: ${keysToRemove.length} 条`)
     },
 
     /**
@@ -198,7 +200,7 @@ document.addEventListener('alpine:init', () => {
     }
   })
 
-  console.log('✅ 页面状态 Store 已注册')
+  logger.info('页面状态 Store 已注册')
 })
 
-console.log('✅ 页面状态模块已加载')
+logger.info('页面状态模块已加载')

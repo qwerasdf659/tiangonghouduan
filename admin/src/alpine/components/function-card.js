@@ -17,6 +17,8 @@
  * </div>
  */
 
+
+import { logger } from '../../utils/logger.js'
 /**
  * Function Card 单个卡片组件
  * @param {Object} config - 配置选项
@@ -43,7 +45,7 @@ function functionCard(config = {}) {
 
     // 初始化
     init() {
-      console.log(`[FunctionCard] 初始化: ${this.title}`)
+      logger.info(`[FunctionCard] 初始化: ${this.title}`)
     },
 
     // 点击处理
@@ -103,7 +105,7 @@ function functionCardGrid(config = {}) {
 
     // 初始化
     init() {
-      console.log(`[FunctionCardGrid] 初始化: ${this.cards.length} 个卡片`)
+      logger.info(`[FunctionCardGrid] 初始化: ${this.cards.length} 个卡片`)
     },
 
     // 获取列样式类
@@ -230,4 +232,4 @@ if (typeof document !== 'undefined') {
   document.head.appendChild(style)
 }
 
-console.log('📦 FunctionCard 组件已加载')
+logger.info('FunctionCard 组件已加载')

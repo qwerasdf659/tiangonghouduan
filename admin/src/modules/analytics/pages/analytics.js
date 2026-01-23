@@ -10,7 +10,8 @@
  * @requires Alpine.js
  * @requires ECharts - 图表库
  * @requires createPageMixin - 页面基础混入
- * @requires API_ENDPOINTS - API端点配置
+ * @requires ANALYTICS_ENDPOINTS - 分析API端点配置
+ * @requires LOTTERY_ENDPOINTS - 抽奖API端点配置
  *
  * 功能模块：
  * 1. 今日统计 - 活跃用户、抽奖次数、积分流转等
@@ -25,6 +26,13 @@
  * - GET /api/v4/console/analytics/lottery-trends (抽奖趋势)
  */
 
+
+// ES Module 导入
+import { logger } from '../../../utils/logger.js'
+import { ANALYTICS_ENDPOINTS } from '../../../api/analytics.js'
+import { LOTTERY_ENDPOINTS } from '../../../api/lottery.js'
+import { buildURL } from '../../../api/base.js'
+import { loadECharts } from '../../../utils/index.js'
 /**
  * @typedef {Object} AnalyticsStats
  * @property {number} activeUsers - 活跃用户数
@@ -152,7 +160,7 @@ function analyticsPage() {
      * @returns {Promise<void>}
      */
     async init() {
-      console.log('✅ 运营分析页面初始化 (Mixin v3.0)')
+      logger.info('运营分析页面初始化 (ES Module v3.1)')
 
       // 使用 Mixin 的认证检查
       if (!this.checkAuth()) {
@@ -161,10 +169,10 @@ function analyticsPage() {
 
       // 动态加载 ECharts（懒加载优化）
       try {
-        await window.loadECharts()
-        console.log('[Analytics] ECharts 加载完成')
+        await loadECharts()
+        logger.info('[Analytics] ECharts 加载完成')
       } catch (error) {
-        console.error('[Analytics] ECharts 加载失败:', error)
+        logger.error('[Analytics] ECharts 加载失败:', error)
       }
 
       // 初始化图表
@@ -367,7 +375,7 @@ function analyticsPage() {
      */
     async loadTodayStats() {
       try {
-        const response = await apiRequest(API_ENDPOINTS.ANALYTICS.TODAY_STATS)
+        const response = await apiRequest(ANALYTICS_ENDPOINTS.TODAY_STATS)
 
         if (response && response.success) {
           const data = response.data
@@ -382,7 +390,7 @@ function analyticsPage() {
           this.stats.newItems = data.inventory_stats?.new_items_today || 0
         }
       } catch (error) {
-        console.error('加载今日统计数据失败:', error)
+        logger.error('加载今日统计数据失败:', error)
       }
     },
 
@@ -396,7 +404,7 @@ function analyticsPage() {
       const days = this.filters.timeRange
 
       try {
-        const response = await apiRequest(`${API_ENDPOINTS.ANALYTICS.DECISIONS}?days=${days}`)
+        const response = await apiRequest(`${ANALYTICS_ENDPOINTS.DECISIONS}?days=${days}`)
 
         if (response && response.success) {
           const data = response.data
@@ -423,7 +431,7 @@ function analyticsPage() {
           await this.loadLotteryTrends(days)
         }
       } catch (error) {
-        console.error('加载决策分析数据失败:', error)
+        logger.error('加载决策分析数据失败:', error)
       }
     },
 
@@ -435,7 +443,8 @@ function analyticsPage() {
      */
     async loadStrategyStats() {
       try {
-        const response = await apiRequest(API_ENDPOINTS.LOTTERY_STRATEGY_STATS.OVERVIEW)
+        // 使用默认活动ID 1 获取策略统计概览
+        const response = await apiRequest(buildURL(LOTTERY_ENDPOINTS.STRATEGY_STATS_OVERVIEW, { campaign_id: 1 }))
 
         if (response && response.success) {
           this.strategyStats = {
@@ -448,7 +457,7 @@ function analyticsPage() {
           }
         }
       } catch (error) {
-        console.error('加载策略统计失败:', error)
+        logger.error('加载策略统计失败:', error)
       }
     },
 
@@ -460,7 +469,8 @@ function analyticsPage() {
      */
     async loadTierDistribution() {
       try {
-        const response = await apiRequest(API_ENDPOINTS.LOTTERY_STRATEGY_STATS.TIER_DISTRIBUTION)
+        // 使用默认活动ID 1 获取档位分布
+        const response = await apiRequest(buildURL(LOTTERY_ENDPOINTS.STRATEGY_STATS_TIER, { campaign_id: 1 }))
 
         if (response && response.success) {
           this.tierDistribution = response.data?.distribution || response.data || []
@@ -481,7 +491,7 @@ function analyticsPage() {
           }
         }
       } catch (error) {
-        console.error('加载等级分布失败:', error)
+        logger.error('加载等级分布失败:', error)
       }
     },
 
@@ -534,7 +544,7 @@ function analyticsPage() {
         if (days >= 90) period = 'quarter'
 
         const response = await apiRequest(
-          `${API_ENDPOINTS.ANALYTICS.LOTTERY_TRENDS}?period=${period}&granularity=daily`
+          `${ANALYTICS_ENDPOINTS.LOTTERY_TRENDS}?period=${period}&granularity=daily`
         )
 
         if (response && response.success) {
@@ -600,7 +610,7 @@ function analyticsPage() {
           }
         }
       } catch (error) {
-        console.error('加载抽奖趋势数据失败:', error)
+        logger.error('加载抽奖趋势数据失败:', error)
       }
     },
 
@@ -678,7 +688,7 @@ function analyticsPage() {
 
         this.showSuccess('导出成功')
       } catch (error) {
-        console.error('导出失败:', error)
+        logger.error('导出失败:', error)
         this.showError('导出失败: ' + error.message)
       }
     },
@@ -700,5 +710,5 @@ function analyticsPage() {
 // ========== Alpine.js CSP 兼容注册 ==========
 document.addEventListener('alpine:init', () => {
   Alpine.data('analyticsPage', analyticsPage)
-  console.log('✅ [AnalyticsPage] Alpine 组件已注册 (Mixin v3.0)')
+  logger.info('[AnalyticsPage] Alpine 组件已注册 (Mixin v3.0)')
 })

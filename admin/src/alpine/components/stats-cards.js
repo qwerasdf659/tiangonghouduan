@@ -12,6 +12,8 @@
  * </div>
  */
 
+
+import { logger } from '../../utils/logger.js'
 /**
  * Stats Cards 组件数据
  * @param {Object} config - 配置选项
@@ -26,7 +28,7 @@ function statsCards(config = {}) {
 
     // 初始化
     init() {
-      console.log('[StatsCards] 初始化')
+      logger.info('[StatsCards] 初始化')
     },
 
     // 设置数据
@@ -155,4 +157,4 @@ function statCard(config = {}) {
   }
 }
 
-console.log('📦 StatsCards 组件已加载')
+logger.info('StatsCards 组件已加载')

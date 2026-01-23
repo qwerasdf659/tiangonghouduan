@@ -24,6 +24,8 @@
  * - POST /api/v4/console/asset-adjustment/adjust (资产调整)
  */
 
+
+import { logger } from '../../../utils/logger.js'
 /**
  * @typedef {Object} AssetBalance
  * @property {string} asset_code - 资产代码
@@ -194,7 +196,7 @@ function assetAdjustmentPage() {
      * @returns {Promise<void>}
      */
     async init() {
-      console.log('🚀 初始化资产调整页面 (Mixin版)...')
+      logger.info('初始化资产调整页面 (Mixin版)...')
 
       // 调用 Mixin 的初始化
       if (baseMixin.init) {
@@ -223,7 +225,7 @@ function assetAdjustmentPage() {
           this.userInfo = JSON.parse(stored)
         }
       } catch (e) {
-        console.error('加载用户信息失败:', e)
+        logger.error('加载用户信息失败:', e)
       }
     },
 
@@ -259,11 +261,11 @@ function assetAdjustmentPage() {
           const result = await response.json()
           if (result.success) {
             this.assetTypes = result.data?.asset_types || result.data || []
-            console.log(`📊 加载资产类型: ${this.assetTypes.length} 个`)
+            logger.info(`📊 加载资产类型: ${this.assetTypes.length} 个`)
           }
         }
       } catch (error) {
-        console.error('加载资产类型失败:', error)
+        logger.error('加载资产类型失败:', error)
       }
     },
 
@@ -287,11 +289,11 @@ function assetAdjustmentPage() {
           const result = await response.json()
           if (result.success) {
             this.campaigns = result.data?.campaigns || []
-            console.log(`📊 加载活动列表: ${this.campaigns.length} 个`)
+            logger.info(`📊 加载活动列表: ${this.campaigns.length} 个`)
           }
         }
       } catch (error) {
-        console.error('加载活动列表失败:', error)
+        logger.error('加载活动列表失败:', error)
       }
     },
 
@@ -343,7 +345,7 @@ function assetAdjustmentPage() {
         // 加载用户资产
         await this.loadUserAssets(targetUserId)
       } catch (error) {
-        console.error('搜索用户失败:', error)
+        logger.error('搜索用户失败:', error)
         this.showError('搜索失败: ' + error.message)
       } finally {
         this.searching = false
@@ -377,7 +379,7 @@ function assetAdjustmentPage() {
           this.currentUser = result.data.user
           this.balances = result.data.balances || []
 
-          console.log(`✅ 加载用户资产完成: ${this.balances.length} 种`)
+          logger.info(`加载用户资产完成: ${this.balances.length} 种`)
 
           // 加载调整记录
           this.currentPage = 1
@@ -386,7 +388,7 @@ function assetAdjustmentPage() {
           this.showError(result.message || '查询失败')
         }
       } catch (error) {
-        console.error('加载用户资产失败:', error)
+        logger.error('加载用户资产失败:', error)
         this.showError(error.message)
       } finally {
         this.loading = false
@@ -452,7 +454,7 @@ function assetAdjustmentPage() {
           }
         }
       } catch (error) {
-        console.error('加载调整记录失败:', error)
+        logger.error('加载调整记录失败:', error)
       } finally {
         this.loadingRecords = false
       }
@@ -571,7 +573,7 @@ function assetAdjustmentPage() {
           this.showError(result.message || '调整失败')
         }
       } catch (error) {
-        console.error('资产调整失败:', error)
+        logger.error('资产调整失败:', error)
         this.showError(error.message)
       } finally {
         this.submitting = false
@@ -707,5 +709,5 @@ function assetAdjustmentPage() {
 // Alpine.js 组件注册
 document.addEventListener('alpine:init', () => {
   Alpine.data('assetAdjustmentPage', assetAdjustmentPage)
-  console.log('✅ [AssetAdjustmentPage] Alpine 组件已注册')
+  logger.info('[AssetAdjustmentPage] Alpine 组件已注册')
 })

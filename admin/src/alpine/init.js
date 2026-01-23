@@ -9,8 +9,10 @@
  * @date 2026-01-22
  */
 
+
+import { logger } from '../utils/logger.js'
 document.addEventListener('alpine:init', () => {
-  console.log('🔧 Alpine.js 初始化开始...')
+  logger.info('🔧 Alpine.js 初始化开始...')
 
   // ========== 全局 Store 注册 ==========
 
@@ -452,14 +454,14 @@ document.addEventListener('alpine:init', () => {
     })
   })
 
-  console.log('✅ Alpine.js 初始化完成')
+  logger.info('Alpine.js 初始化完成')
 })
 
 // 页面加载完成后的检查
 document.addEventListener('DOMContentLoaded', () => {
   // 检查 Alpine 是否正确加载
   if (typeof Alpine === 'undefined') {
-    console.error('❌ Alpine.js 未加载')
+    logger.error('❌ Alpine.js 未加载')
     return
   }
 
@@ -541,8 +543,8 @@ function hideLoading() {
   }
 }
 
-// 导出到全局作用域（兼容非模块化使用）
-window.showLoading = showLoading
-window.hideLoading = hideLoading
+// ========== window.xxx 已移除（方案 A：彻底 ES Module） ==========
+// 请使用 ES Module 导入：
+//   import { showLoading, hideLoading } from '@/alpine/init.js'
 
-console.log('📦 Alpine.js 初始化配置已加载')
+logger.info('Alpine.js 初始化配置已加载')

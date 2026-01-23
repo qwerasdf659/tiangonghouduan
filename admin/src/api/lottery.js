@@ -18,6 +18,8 @@
  * const prizes = await LotteryAPI.getPrizeList({ campaign_id: 1, page: 1, page_size: 20 })
  */
 
+
+import { logger } from '../utils/logger.js'
 import { request, buildURL, buildQueryString } from './base.js'
 
 // ========== 类型定义 ==========
@@ -183,6 +185,7 @@ export const LOTTERY_ENDPOINTS = {
   PRIZE_DELETE: '/api/v4/console/prize-pool/prize/:prize_id',
   PRIZE_DETAIL: '/api/v4/console/prize-pool/prize/:prize_id',
   PRIZE_ADD_STOCK: '/api/v4/console/prize-pool/prize/:prize_id/add-stock',
+  PRIZE_TOGGLE: '/api/v4/console/prize-pool/prize/:prize_id/toggle',
 
   // 活动管理
   CAMPAIGN_LIST: '/api/v4/console/system-data/lottery-campaigns',
@@ -212,32 +215,33 @@ export const LOTTERY_ENDPOINTS = {
   TIER_RULES_UPDATE: '/api/v4/console/lottery-tier-rules/:id',
   TIER_RULES_DELETE: '/api/v4/console/lottery-tier-rules/:id',
 
-  // 抽奖监控
-  MONITORING_HOURLY: '/api/v4/console/lottery-monitoring/hourly-metrics',
-  MONITORING_SUMMARY: '/api/v4/console/lottery-monitoring/hourly-metrics/summary/:campaign_id',
-  MONITORING_STATS: '/api/v4/console/lottery-monitoring/stats',
-  MONITORING_USER_EXPERIENCE: '/api/v4/console/lottery-monitoring/user-experience-states',
-  MONITORING_USER_GLOBAL: '/api/v4/console/lottery-monitoring/user-global-states',
-  MONITORING_USER_QUOTAS: '/api/v4/console/lottery-monitoring/user-quotas',
-
-  // 策略统计
-  STRATEGY_STATS_OVERVIEW: '/api/v4/console/lottery-strategy-stats/overview',
-  STRATEGY_STATS_TIER: '/api/v4/console/lottery-strategy-stats/tier-distribution',
-  STRATEGY_STATS_PITY: '/api/v4/console/lottery-strategy-stats/pity-stats',
-
-  // 抽奖配额
-  QUOTA_STATISTICS: '/api/v4/console/lottery-quota/statistics',
-  QUOTA_RULES: '/api/v4/console/lottery-quota/rules',
-  QUOTA_RULE_DETAIL: '/api/v4/console/lottery-quota/rules/:id',
-  QUOTA_RULE_DISABLE: '/api/v4/console/lottery-quota/rules/:id/disable',
-
-  // 概率调整
-  PROBABILITY_ADJUST: '/api/v4/console/lottery-management/probability-adjust',
-
-  // 抽奖干预
+  // 抽奖干预管理（后端路由: /api/v4/console/lottery-management/interventions）
   INTERVENTION_LIST: '/api/v4/console/lottery-management/interventions',
   INTERVENTION_DETAIL: '/api/v4/console/lottery-management/interventions/:id',
   INTERVENTION_CANCEL: '/api/v4/console/lottery-management/interventions/:id/cancel',
+
+  // 策略统计（后端路由: /api/v4/console/lottery-strategy-stats）
+  // 注意: STRATEGY_STATS_OVERVIEW 为兼容旧代码的别名，实际使用 REALTIME 端点
+  STRATEGY_STATS_OVERVIEW: '/api/v4/console/lottery-strategy-stats/realtime/:campaign_id',
+  STRATEGY_STATS_REALTIME: '/api/v4/console/lottery-strategy-stats/realtime/:campaign_id',
+  STRATEGY_STATS_HOURLY: '/api/v4/console/lottery-strategy-stats/hourly/:campaign_id',
+  STRATEGY_STATS_DAILY: '/api/v4/console/lottery-strategy-stats/daily/:campaign_id',
+  STRATEGY_STATS_TIER: '/api/v4/console/lottery-strategy-stats/tier-distribution/:campaign_id',
+  STRATEGY_STATS_EXPERIENCE: '/api/v4/console/lottery-strategy-stats/experience-triggers/:campaign_id',
+  STRATEGY_STATS_BUDGET: '/api/v4/console/lottery-strategy-stats/budget-consumption/:campaign_id',
+
+  // 抽奖配额（后端路由: /api/v4/console/lottery-quota）
+  QUOTA_RULES_LIST: '/api/v4/console/lottery-quota/rules',
+  QUOTA_RULES_DETAIL: '/api/v4/console/lottery-quota/rules/:id',
+  QUOTA_RULES_CREATE: '/api/v4/console/lottery-quota/rules',
+  QUOTA_RULES_DISABLE: '/api/v4/console/lottery-quota/rules/:id/disable',
+  QUOTA_USER_STATUS: '/api/v4/console/lottery-quota/users/:user_id/status',
+  QUOTA_USER_BONUS: '/api/v4/console/lottery-quota/users/:user_id/bonus',
+  QUOTA_USER_CHECK: '/api/v4/console/lottery-quota/users/:user_id/check',
+  QUOTA_STATISTICS: '/api/v4/console/lottery-quota/statistics',
+
+  // 概率调整和强制中奖
+  PROBABILITY_ADJUST: '/api/v4/console/lottery-management/probability-adjust',
   INTERVENTION_FORCE_WIN: '/api/v4/console/lottery-management/force-win',
 
   // 活动定价
@@ -253,7 +257,42 @@ export const LOTTERY_ENDPOINTS = {
   CAMPAIGNS_LIST: '/api/v4/lottery/campaigns',
   CAMPAIGNS_DETAIL: '/api/v4/lottery/campaigns/:campaign_code',
   CAMPAIGNS_CONDITIONS: '/api/v4/activities/:code/conditions',
-  CAMPAIGNS_CONFIGURE_CONDITIONS: '/api/v4/activities/:code/configure-conditions'
+  CAMPAIGNS_CONFIGURE_CONDITIONS: '/api/v4/activities/:code/configure-conditions',
+
+  // 抽奖监控（后端路由: /api/v4/console/lottery-monitoring）
+  MONITORING_HOURLY_LIST: '/api/v4/console/lottery-monitoring/hourly-metrics',
+  MONITORING_HOURLY_DETAIL: '/api/v4/console/lottery-monitoring/hourly-metrics/:id',
+  MONITORING_HOURLY_SUMMARY: '/api/v4/console/lottery-monitoring/hourly-metrics/summary/:campaign_id',
+  MONITORING_USER_EXPERIENCE_LIST: '/api/v4/console/lottery-monitoring/user-experience-states',
+  MONITORING_USER_EXPERIENCE_DETAIL: '/api/v4/console/lottery-monitoring/user-experience-states/:user_id/:campaign_id',
+  MONITORING_USER_GLOBAL_LIST: '/api/v4/console/lottery-monitoring/user-global-states',
+  MONITORING_USER_GLOBAL_DETAIL: '/api/v4/console/lottery-monitoring/user-global-states/:user_id',
+  MONITORING_QUOTA_GRANTS_LIST: '/api/v4/console/lottery-monitoring/quota-grants',
+  MONITORING_QUOTA_GRANTS_DETAIL: '/api/v4/console/lottery-monitoring/quota-grants/:id',
+  MONITORING_USER_QUOTAS_LIST: '/api/v4/console/lottery-monitoring/user-quotas',
+  MONITORING_USER_QUOTAS_DETAIL: '/api/v4/console/lottery-monitoring/user-quotas/:user_id/:campaign_id',
+  MONITORING_USER_QUOTAS_STATS: '/api/v4/console/lottery-monitoring/user-quotas/stats/:campaign_id',
+
+  // 业务记录
+  BUSINESS_RECORDS_LIST: '/api/v4/console/business-records',
+  BUSINESS_RECORDS_DETAIL: '/api/v4/console/business-records/:id',
+  BUSINESS_RECORDS_EXPORT: '/api/v4/console/business-records/export',
+  BUSINESS_RECORDS_REDEEM: '/api/v4/console/business-records/:id/redeem',
+  BUSINESS_RECORDS_CANCEL: '/api/v4/console/business-records/:id/cancel',
+  BUSINESS_RECORDS_BATCH_EXPIRE: '/api/v4/console/business-records/batch-expire',
+  BUSINESS_RECORDS_REDEMPTION_ORDERS: '/api/v4/console/business-records/redemption-orders',
+
+  // 活动预算（基于后端实际提供的端点）
+  // 注意：后端没有提供 LIST、CREATE、DELETE、STATS、TOGGLE 端点
+  // 预算管理通过 batch-status 和单活动操作完成
+  CAMPAIGN_BUDGET_BATCH_STATUS: '/api/v4/console/campaign-budget/batch-status',
+  CAMPAIGN_BUDGET_DETAIL: '/api/v4/console/campaign-budget/campaigns/:campaign_id',
+  CAMPAIGN_BUDGET_UPDATE: '/api/v4/console/campaign-budget/campaigns/:campaign_id',
+  CAMPAIGN_BUDGET_STATUS: '/api/v4/console/campaign-budget/campaigns/:campaign_id/budget-status',
+  CAMPAIGN_BUDGET_POOL_ADD: '/api/v4/console/campaign-budget/campaigns/:campaign_id/pool/add',
+  CAMPAIGN_BUDGET_VALIDATE: '/api/v4/console/campaign-budget/campaigns/:campaign_id/validate',
+  CAMPAIGN_BUDGET_VALIDATE_LAUNCH: '/api/v4/console/campaign-budget/campaigns/:campaign_id/validate-for-launch',
+  CAMPAIGN_BUDGET_USER: '/api/v4/console/campaign-budget/users/:user_id'
 }
 
 // ========== API 调用方法 ==========
@@ -293,7 +332,7 @@ export const LotteryAPI = {
    *   user_id: 123,
    *   count: 1
    * })
-   * console.log(result.data.results) // [{ prize_id: 5, prize_name: '一等奖', ... }]
+   * logger.debug(result.data.results) // [{ prize_id: 5, prize_name: '一等奖', ... }]
    *
    * @example
    * // 执行十连抽
@@ -499,7 +538,7 @@ export const LotteryAPI = {
    *
    * @example
    * const stats = await LotteryAPI.getPresetStats()
-   * console.log(`预设使用率: ${stats.data.usage_rate}`)
+   * logger.info(`预设使用率: ${stats.data.usage_rate}`)
    */
   async getPresetStats() {
     return await request({ url: LOTTERY_ENDPOINTS.PRESET_STATS, method: 'GET' })
@@ -671,7 +710,7 @@ export const LotteryAPI = {
    * @example
    * // 补充 100 个库存
    * const result = await LotteryAPI.addPrizeStock(5, { quantity: 100 })
-   * console.log(`库存已从 ${result.data.old_quantity} 增加到 ${result.data.new_quantity}`)
+   * logger.info(`库存已从 ${result.data.old_quantity} 增加到 ${result.data.new_quantity}`)
    */
   async addPrizeStock(prizeId, data) {
     const url = buildURL(LOTTERY_ENDPOINTS.PRIZE_ADD_STOCK, { prize_id: prizeId })

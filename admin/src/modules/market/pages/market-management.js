@@ -10,7 +10,8 @@
  *
  * @requires Alpine.js - 响应式框架
  * @requires createDashboardMixin - 仪表板基础混入
- * @requires API_ENDPOINTS - API端点配置
+ * @requires MARKET_ENDPOINTS - 市场模块API端点配置
+ * @requires ASSET_ENDPOINTS - 资产模块API端点配置
  *
  * 功能模块：
  * 1. 兑换商品管理 - 商品CRUD、库存管理
@@ -25,6 +26,10 @@
  * - GET /api/v4/console/marketplace/trade-orders (交易订单)
  */
 
+
+import { logger } from '../../../utils/logger.js'
+import { MARKET_ENDPOINTS } from '../../../api/market.js'
+import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 /**
  * @typedef {Object} ExchangeItem
  * @property {number} item_id - 商品ID
@@ -185,7 +190,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     init() {
-      console.log('✅ 市场管理整合页面初始化 (Mixin v3.0)')
+      logger.info('市场管理整合页面初始化 (Mixin v3.0)')
 
       // 使用 Mixin 的认证检查
       if (!this.checkAuth()) {
@@ -222,13 +227,13 @@ document.addEventListener('alpine:init', () => {
      */
     async loadAssetTypes() {
       try {
-        const response = await apiRequest(API_ENDPOINTS.MATERIAL.ASSET_TYPES + '?is_enabled=true')
+        const response = await apiRequest(ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES + '?is_enabled=true')
         if (response && response.success) {
           const assetData = response.data?.asset_types || response.data?.list || response.data
           this.assetTypes = Array.isArray(assetData) ? assetData : []
         }
       } catch (error) {
-        console.error('加载资产类型失败:', error)
+        logger.error('加载资产类型失败:', error)
         // 使用默认值
         this.assetTypes = [
           { asset_code: 'red_shard', display_name: '碎红水晶' },
@@ -244,13 +249,13 @@ document.addEventListener('alpine:init', () => {
      */
     async loadExchangeItems() {
       try {
-        const response = await apiRequest(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEMS)
+        const response = await apiRequest(MARKET_ENDPOINTS.EXCHANGE_ITEMS)
         if (response && response.success) {
           const itemsData = response.data?.items || response.data?.list || response.data
           this.exchangeItems = Array.isArray(itemsData) ? itemsData : []
         }
       } catch (error) {
-        console.error('加载兑换商品失败:', error)
+        logger.error('加载兑换商品失败:', error)
         this.exchangeItems = []
       }
     },
@@ -262,13 +267,13 @@ document.addEventListener('alpine:init', () => {
      */
     async loadExchangeOrders() {
       try {
-        const response = await apiRequest(API_ENDPOINTS.MARKETPLACE.EXCHANGE_ORDERS)
+        const response = await apiRequest(MARKET_ENDPOINTS.EXCHANGE_ORDERS)
         if (response && response.success) {
           const ordersData = response.data?.orders || response.data?.list || response.data
           this.exchangeOrders = Array.isArray(ordersData) ? ordersData : []
         }
       } catch (error) {
-        console.error('加载兑换订单失败:', error)
+        logger.error('加载兑换订单失败:', error)
         this.exchangeOrders = []
       }
     },
@@ -280,13 +285,13 @@ document.addEventListener('alpine:init', () => {
      */
     async loadTradeOrders() {
       try {
-        const response = await apiRequest(API_ENDPOINTS.MARKETPLACE.TRADE_ORDERS)
+        const response = await apiRequest(MARKET_ENDPOINTS.TRADE_ORDERS)
         if (response && response.success) {
           const tradesData = response.data?.trades || response.data?.list || response.data
           this.tradeOrders = Array.isArray(tradesData) ? tradesData : []
         }
       } catch (error) {
-        console.error('加载交易订单失败:', error)
+        logger.error('加载交易订单失败:', error)
         this.tradeOrders = []
       }
     },
@@ -419,7 +424,7 @@ document.addEventListener('alpine:init', () => {
         try {
           // 尝试获取详细信息
           const response = await apiRequest(
-            `${API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEMS}/${item.item_id || item.id}`
+            `${MARKET_ENDPOINTS.EXCHANGE_ITEMS}/${item.item_id || item.id}`
           )
 
           if (response && response.success) {
@@ -452,7 +457,7 @@ document.addEventListener('alpine:init', () => {
 
           this.showModal('exchangeItemModal')
         } catch (error) {
-          console.error('获取商品详情失败:', error)
+          logger.error('获取商品详情失败:', error)
           // 使用列表数据作为后备
           this.itemForm = {
             item_id: item.item_id || item.id,
@@ -491,7 +496,7 @@ document.addEventListener('alpine:init', () => {
       this.saving = true
 
       try {
-        const baseUrl = API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEMS
+        const baseUrl = MARKET_ENDPOINTS.EXCHANGE_ITEMS
         const url = this.editingItem ? `${baseUrl}/${this.itemForm.item_id}` : baseUrl
         const method = this.editingItem ? 'PUT' : 'POST'
 
@@ -519,7 +524,7 @@ document.addEventListener('alpine:init', () => {
           this.showError(response?.message || '操作失败')
         }
       } catch (error) {
-        console.error('保存商品失败:', error)
+        logger.error('保存商品失败:', error)
         this.showError(error.message || '操作失败')
       } finally {
         this.saving = false
@@ -534,7 +539,7 @@ document.addEventListener('alpine:init', () => {
         await this.confirmAndExecute(
           '确定要删除这个商品吗？此操作不可恢复！',
           async () => {
-            const response = await apiRequest(`${API_ENDPOINTS.MARKETPLACE.EXCHANGE_ITEMS}/${id}`, {
+            const response = await apiRequest(`${MARKET_ENDPOINTS.EXCHANGE_ITEMS}/${id}`, {
               method: 'DELETE'
             })
 
@@ -572,5 +577,5 @@ document.addEventListener('alpine:init', () => {
     }
   }))
 
-  console.log('✅ [MarketManagement] Alpine 组件已注册 (Mixin v3.0 - CRUD 完整实现)')
+  logger.info('[MarketManagement] Alpine 组件已注册 (Mixin v3.0 - CRUD 完整实现)')
 })

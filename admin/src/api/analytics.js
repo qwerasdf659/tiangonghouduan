@@ -7,6 +7,8 @@
  * @date 2026-01-23
  */
 
+
+import { logger } from '../utils/logger.js'
 import { request, buildURL, buildQueryString } from './base.js'
 
 // ========== 类型定义 ==========
@@ -71,7 +73,23 @@ export const ANALYTICS_ENDPOINTS = {
 
   // 活动预算
   CAMPAIGN_BUDGET_BATCH_STATUS: '/api/v4/console/campaign-budget/batch-status',
-  CAMPAIGN_BUDGET_DETAIL: '/api/v4/console/campaign-budget/campaigns/:campaign_id'
+  CAMPAIGN_BUDGET_DETAIL: '/api/v4/console/campaign-budget/campaigns/:campaign_id',
+
+  // 策略统计（与后端实际路由对齐，需要 campaign_id 参数）
+  STRATEGY_STATS_REALTIME: '/api/v4/console/lottery-strategy-stats/realtime/:campaign_id',
+  STRATEGY_STATS_HOURLY: '/api/v4/console/lottery-strategy-stats/hourly/:campaign_id',
+  STRATEGY_STATS_DAILY: '/api/v4/console/lottery-strategy-stats/daily/:campaign_id',
+  STRATEGY_STATS_TIER_DISTRIBUTION: '/api/v4/console/lottery-strategy-stats/tier-distribution/:campaign_id',
+  STRATEGY_STATS_EXPERIENCE: '/api/v4/console/lottery-strategy-stats/experience-triggers/:campaign_id',
+  STRATEGY_STATS_BUDGET: '/api/v4/console/lottery-strategy-stats/budget-consumption/:campaign_id',
+
+  // 客服统计
+  CUSTOMER_SERVICE_SESSIONS: '/api/v4/console/customer-service/sessions',
+  CUSTOMER_SERVICE_SESSION_MESSAGES: '/api/v4/console/customer-service/sessions/:session_id/messages',
+  CUSTOMER_SERVICE_SEND_MESSAGE: '/api/v4/console/customer-service/sessions/:session_id/messages',
+  CUSTOMER_SERVICE_CLOSE: '/api/v4/console/customer-service/sessions/:session_id/close',
+  CUSTOMER_SERVICE_MARK_READ: '/api/v4/console/customer-service/sessions/:session_id/mark-read',
+  CUSTOMER_SERVICE_TRANSFER: '/api/v4/console/customer-service/sessions/:session_id/transfer'
 }
 
 // ========== API 调用方法 ==========
@@ -88,8 +106,8 @@ export const AnalyticsAPI = {
    * @example
    * // 获取今日统计数据
    * const result = await AnalyticsAPI.getTodayStats()
-   * console.log(result.data.new_users) // 今日新增用户
-   * console.log(result.data.active_users) // 今日活跃用户
+   * logger.debug(result.data.new_users) // 今日新增用户
+   * logger.debug(result.data.active_users) // 今日活跃用户
    */
   async getTodayStats() {
     return await request({ url: ANALYTICS_ENDPOINTS.TODAY_STATS, method: 'GET' })
@@ -286,8 +304,8 @@ export const AnalyticsAPI = {
    * @example
    * // 获取财务概览
    * const result = await AnalyticsAPI.getFinanceOverview()
-   * console.log(result.data.total_revenue) // 总收入
-   * console.log(result.data.pending_settlement) // 待结算金额
+   * logger.debug(result.data.total_revenue) // 总收入
+   * logger.debug(result.data.pending_settlement) // 待结算金额
    */
   async getFinanceOverview() {
     return await request({ url: ANALYTICS_ENDPOINTS.FINANCE_OVERVIEW, method: 'GET' })
@@ -321,11 +339,21 @@ export const AnalyticsAPI = {
 
   /**
    * 获取结算列表
-   * @param {Object} params - 查询参数
    * @async
-   * @returns {Promise<Object>}
+   * @param {Object} [params={}] - 查询参数
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @param {string} [params.status] - 状态筛选 ('pending'|'completed')
+   * @returns {Promise<Object>} 结算列表
    * @throws {Error} 结算数据访问权限不足
    * @throws {Error} 网络请求失败
+   *
+   * @example
+   * // 获取待结算列表
+   * const result = await AnalyticsAPI.getSettlements({
+   *   status: 'pending',
+   *   page: 1
+   * })
    */
   async getSettlements(params = {}) {
     const url = ANALYTICS_ENDPOINTS.FINANCE_SETTLEMENTS + buildQueryString(params)
@@ -334,11 +362,22 @@ export const AnalyticsAPI = {
 
   /**
    * 获取财务报表
-   * @param {Object} params - 查询参数
    * @async
-   * @returns {Promise<Object>}
+   * @param {Object} [params={}] - 查询参数
+   * @param {string} [params.type] - 报表类型 ('daily'|'weekly'|'monthly')
+   * @param {string} [params.start_date] - 开始日期
+   * @param {string} [params.end_date] - 结束日期
+   * @returns {Promise<Object>} 财务报表数据
    * @throws {Error} 报表访问权限不足
    * @throws {Error} 网络请求失败
+   *
+   * @example
+   * // 获取月度财务报表
+   * const result = await AnalyticsAPI.getFinanceReports({
+   *   type: 'monthly',
+   *   start_date: '2026-01-01',
+   *   end_date: '2026-01-31'
+   * })
    */
   async getFinanceReports(params = {}) {
     const url = ANALYTICS_ENDPOINTS.FINANCE_REPORTS + buildQueryString(params)
@@ -350,7 +389,13 @@ export const AnalyticsAPI = {
   /**
    * 获取活动预算批量状态
    * @async
-   * @returns {Promise<Object>}
+   * @returns {Promise<Object>} 所有活动的预算状态汇总
+   * @throws {Error} 网络请求失败
+   *
+   * @example
+   * // 获取所有活动的预算状态
+   * const result = await AnalyticsAPI.getCampaignBudgetBatchStatus()
+   * logger.debug(result.data) // 活动预算状态列表
    */
   async getCampaignBudgetBatchStatus() {
     return await request({ url: ANALYTICS_ENDPOINTS.CAMPAIGN_BUDGET_BATCH_STATUS, method: 'GET' })
@@ -358,9 +403,17 @@ export const AnalyticsAPI = {
 
   /**
    * 获取活动预算详情
-   * @param {string} campaignId - 活动 ID
    * @async
-   * @returns {Promise<Object>}
+   * @param {string} campaignId - 活动 ID
+   * @returns {Promise<Object>} 活动预算详细信息
+   * @throws {Error} 活动不存在
+   * @throws {Error} 网络请求失败
+   *
+   * @example
+   * // 获取指定活动的预算详情
+   * const result = await AnalyticsAPI.getCampaignBudgetDetail('camp_12345')
+   * logger.debug(result.data.budget) // 预算金额
+   * logger.debug(result.data.spent) // 已使用金额
    */
   async getCampaignBudgetDetail(campaignId) {
     const url = buildURL(ANALYTICS_ENDPOINTS.CAMPAIGN_BUDGET_DETAIL, { campaign_id: campaignId })

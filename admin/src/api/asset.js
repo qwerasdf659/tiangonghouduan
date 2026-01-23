@@ -17,6 +17,8 @@
  * @see routes/v4/console/material.js - 材料转换规则管理
  */
 
+
+import { logger } from '../utils/logger.js'
 import { request, buildURL, buildQueryString } from './base.js'
 
 // ========== API 端点 ==========
@@ -65,7 +67,28 @@ export const ASSET_ENDPOINTS = {
   ITEM_INSTANCES_USER: '/api/v4/console/item-instances/user/:user_id',
   ITEM_INSTANCES_TRANSFER: '/api/v4/console/item-instances/:instance_id/transfer',
   ITEM_INSTANCES_FREEZE: '/api/v4/console/item-instances/:instance_id/freeze',
-  ITEM_INSTANCES_UNFREEZE: '/api/v4/console/item-instances/:instance_id/unfreeze'
+  ITEM_INSTANCES_UNFREEZE: '/api/v4/console/item-instances/:instance_id/unfreeze',
+
+  // 孤立冻结资产
+  ORPHAN_FROZEN_DETECT: '/api/v4/console/orphan-frozen/detect',
+  ORPHAN_FROZEN_CLEANUP: '/api/v4/console/orphan-frozen/cleanup',
+  ORPHAN_FROZEN_STATS: '/api/v4/console/orphan-frozen/stats',
+
+  // 钻石账户（已合并至 asset-adjustment 统一管理）
+  DIAMOND_ACCOUNT_LIST: '/api/v4/console/asset-adjustment/asset-types', // 获取资产类型列表
+  DIAMOND_ACCOUNT_DETAIL: '/api/v4/console/asset-adjustment/user/:user_id/balances', // 获取用户资产余额
+  DIAMOND_ACCOUNT_STATS: '/api/v4/console/assets/stats', // 资产统计（通用）
+  DIAMOND_ACCOUNT_ADJUST: '/api/v4/console/asset-adjustment/adjust', // 资产调整（统一入口）
+
+  // 债务管理
+  DEBT_LIST: '/api/v4/console/debts',
+  DEBT_DETAIL: '/api/v4/console/debts/:id',
+  DEBT_STATS: '/api/v4/console/debts/stats',
+  DEBT_REPAY: '/api/v4/console/debts/:id/repay',
+  DEBT_WRITE_OFF: '/api/v4/console/debts/:id/write-off',
+
+  // 交易订单
+  TRADE_ORDERS_LIST: '/api/v4/console/trade-orders'
 }
 
 // ========== API 调用方法 ==========
@@ -223,7 +246,7 @@ export const AssetAPI = {
    * @example
    * // 获取用户123的所有资产余额
    * const result = await AssetAPI.getUserBalances(123)
-   * console.log(result.data.balances)
+   * logger.debug(result.data.balances)
    *
    * @see GET /api/v4/console/asset-adjustment/user/:user_id/balances
    */

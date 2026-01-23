@@ -17,7 +17,7 @@
  *
  * @requires createPageMixin - 页面基础混入
  * @requires ECharts - 图表库（延迟加载）
- * @requires API_ENDPOINTS - API端点配置
+ * @requires SYSTEM_ENDPOINTS - 系统API端点配置
  * @requires apiRequest - API请求函数
  *
  * @example
@@ -30,6 +30,12 @@
  * </div>
  */
 
+
+// ES Module 导入
+import { logger } from '../../../utils/logger.js'
+import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
+import { buildURL } from '../../../api/base.js'
+import { loadECharts } from '../../../utils/index.js'
 /**
  * 风控告警对象类型
  * @typedef {Object} RiskAlert
@@ -168,7 +174,7 @@ function riskAlertsPage() {
      * @returns {Promise<void>}
      */
     async init() {
-      console.log('✅ 风控告警页面初始化 (Mixin v3.1)')
+      logger.info('风控告警页面初始化 (ES Module v3.2)')
 
       // 使用 Mixin 的认证检查
       if (!this.checkAuth()) {
@@ -177,10 +183,10 @@ function riskAlertsPage() {
 
       // 动态加载 ECharts（懒加载优化）
       try {
-        await window.loadECharts()
-        console.log('[RiskAlerts] ECharts 加载完成')
+        await loadECharts()
+        logger.info('[RiskAlerts] ECharts 加载完成')
       } catch (error) {
-        console.error('[RiskAlerts] ECharts 加载失败:', error)
+        logger.error('[RiskAlerts] ECharts 加载失败:', error)
       }
 
       // 初始化 ECharts
@@ -383,7 +389,7 @@ function riskAlertsPage() {
         params.append('page_size', this.pageSize)
 
         const url =
-          API_ENDPOINTS.RISK_ALERT.LIST + (params.toString() ? `?${params.toString()}` : '')
+          SYSTEM_ENDPOINTS.RISK_ALERT_LIST + (params.toString() ? `?${params.toString()}` : '')
         const response = await apiRequest(url)
 
         if (response && response.success) {
@@ -545,7 +551,7 @@ function riskAlertsPage() {
         async () => {
           // 批量处理逻辑
           const promises = this.selectedAlerts.map(alertId =>
-            apiRequest(API.buildURL(API_ENDPOINTS.RISK_ALERT.REVIEW, { alert_id: alertId }), {
+            apiRequest(buildURL(SYSTEM_ENDPOINTS.RISK_ALERT_REVIEW, { id: alertId }), {
               method: 'POST',
               body: JSON.stringify({ status: 'reviewed', review_notes: '批量处理' })
             })
@@ -645,7 +651,7 @@ function riskAlertsPage() {
       this.submitting = true
       try {
         const response = await apiRequest(
-          API.buildURL(API_ENDPOINTS.RISK_ALERT.REVIEW, { alert_id: this.handleForm.alert_id }),
+          buildURL(SYSTEM_ENDPOINTS.RISK_ALERT_REVIEW, { id: this.handleForm.alert_id }),
           {
             method: 'POST',
             body: JSON.stringify({
@@ -666,7 +672,7 @@ function riskAlertsPage() {
           this.showError(response?.message || '操作失败')
         }
       } catch (error) {
-        console.error('处理告警失败:', error)
+        logger.error('处理告警失败:', error)
         this.showError(error.message)
       } finally {
         this.submitting = false
@@ -684,7 +690,7 @@ function riskAlertsPage() {
       const result = await this.confirmAndExecute(
         '确定要将所有告警标记为已读吗？',
         async () => {
-          const response = await apiRequest(API_ENDPOINTS.RISK_ALERT.MARK_ALL_READ, {
+          const response = await apiRequest(SYSTEM_ENDPOINTS.RISK_ALERT_MARK_ALL_READ, {
             method: 'POST'
           })
 
@@ -975,5 +981,5 @@ function riskAlertsPage() {
  */
 document.addEventListener('alpine:init', () => {
   Alpine.data('riskAlertsPage', riskAlertsPage)
-  console.log('✅ [RiskAlertsPage] Alpine 组件已注册 (Mixin v3.1)')
+  logger.info('[RiskAlertsPage] Alpine 组件已注册 (Mixin v3.1)')
 })
