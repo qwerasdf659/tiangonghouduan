@@ -9,10 +9,10 @@
 <body class="bg-gray-100 min-h-screen" x-data="tradeManagementPage()" x-init="init()" x-cloak>
   
   <!-- 导航栏 -->
-  <nav class="bg-emerald-600 text-white shadow-lg">
+  <nav class="bg-blue-600 text-white shadow-lg">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <a href="/admin/dashboard.html" class="hover:text-emerald-200">← 返回仪表盘</a>
+        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
         <span class="text-lg font-semibold">💱 交易管理</span>
       </div>
       <div class="flex items-center space-x-4">
@@ -71,7 +71,7 @@
             <input type="text" x-model="tradeFilters.seller_user_id" placeholder="卖家ID" class="w-full px-3 py-2 border rounded-lg">
           </div>
           <div>
-            <button @click="loadTradeOrders()" class="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">
+            <button @click="loadTradeOrders()" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-emerald-700">
               🔍 搜索
             </button>
           </div>

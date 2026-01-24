@@ -30,9 +30,59 @@
 
 
 import { logger } from '../../../utils/logger.js'
-import { buildURL } from '../../../api/base.js'
+import { buildURL, request } from '../../../api/base.js'
 import { CONTENT_ENDPOINTS } from '../../../api/content.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
+import { Alpine, createPageMixin } from '../../../alpine/index.js'
+import { io } from 'socket.io-client'
+
+/**
+ * API请求封装
+ * @param {string} url - 请求URL
+ * @param {Object} options - 请求选项
+ * @returns {Promise<Object>} 响应数据
+ */
+async function apiRequest(url, options = {}) {
+  const method = options.method || 'GET'
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers
+  }
+  
+  const token = localStorage.getItem('admin_token')
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  
+  const fetchOptions = { method, headers }
+  if (options.body) {
+    fetchOptions.body = options.body
+  }
+  
+  const response = await fetch(url, fetchOptions)
+  return await response.json()
+}
+
+/**
+ * 获取当前用户信息
+ * @returns {Object|null} 用户信息
+ */
+function getCurrentUser() {
+  try {
+    const userStr = localStorage.getItem('admin_user')
+    return userStr ? JSON.parse(userStr) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 获取认证Token
+ * @returns {string|null} Token
+ */
+function getToken() {
+  return localStorage.getItem('admin_token')
+}
 /**
  * @typedef {Object} ChatSession
  * @property {number} session_id - 会话ID
@@ -87,6 +137,20 @@ function customerServicePage() {
       mobile: '',
       avatar: ''
     },
+    
+    /** 当前选中的会话对象 (用于模板访问) */
+    selectedSession: null,
+    
+    /** HTML模板兼容：sessions 和 messages 别名 */
+    get sessions() {
+      return this.allSessions
+    },
+    get messages() {
+      return this.currentMessages
+    },
+    
+    /** 提交状态 */
+    submitting: false,
 
     /** 筛选 */
     searchKeyword: '',
@@ -162,16 +226,14 @@ function customerServicePage() {
      */
     initWebSocket() {
       try {
-        // 检查Socket.IO库是否已加载
-        if (typeof io === 'undefined') {
-          logger.warn('⚠️ Socket.IO库未加载，WebSocket功能不可用，使用轮询模式')
-          this.startPolling()
-          return
-        }
-
-        this.wsConnection = io({
+        // 使用导入的 socket.io-client
+        const wsUrl = window.location.origin
+        logger.info('🔌 正在连接WebSocket...', wsUrl)
+        
+        this.wsConnection = io(wsUrl, {
           auth: { token: getToken() },
-          transports: ['websocket', 'polling']
+          transports: ['websocket', 'polling'],
+          path: '/socket.io'
         })
 
         this.wsConnection.on('connect', () => logger.info('WebSocket连接成功'))
@@ -295,6 +357,9 @@ function customerServicePage() {
           const session = response.data.session
           const messages = response.data.messages || []
 
+          // 更新选中会话
+          this.selectedSession = session
+          
           // 更新当前聊天用户信息
           this.currentChatUser = {
             nickname: session.user?.nickname || session.user_nickname || '未命名用户',
@@ -362,7 +427,7 @@ function customerServicePage() {
 
       try {
         const response = await apiRequest(
-          API.buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_SEND_MESSAGE, {
+          buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_SEND_MESSAGE, {
             session_id: this.currentSessionId
           }),
           {
@@ -415,7 +480,7 @@ function customerServicePage() {
     async markAsRead(sessionId) {
       try {
         await apiRequest(
-          API.buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_MARK_READ, { session_id: sessionId }),
+          buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_MARK_READ, { session_id: sessionId }),
           {
             method: 'POST'
           }
@@ -453,7 +518,7 @@ function customerServicePage() {
       this.loadingOverlay = true
       try {
         const response = await apiRequest(
-          API.buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_TRANSFER, {
+          buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_TRANSFER, {
             session_id: this.currentSessionId
           }),
           {
@@ -491,7 +556,7 @@ function customerServicePage() {
         '确认结束当前会话？',
         async () => {
           const response = await apiRequest(
-            API.buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_CLOSE, {
+            buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_CLOSE, {
               session_id: this.currentSessionId
             }),
             { method: 'POST', body: JSON.stringify({ close_reason: '问题已解决' }) }
@@ -516,6 +581,7 @@ function customerServicePage() {
      */
     closeCurrentChat() {
       this.currentSessionId = null
+      this.selectedSession = null
       this.currentMessages = []
       this.currentChatUser = { nickname: '', mobile: '', avatar: '' }
       this.messageInput = ''
@@ -546,7 +612,7 @@ function customerServicePage() {
         }
 
         const response = await apiRequest(
-          API.buildURL(USER_ENDPOINTS.DETAIL, { user_id: userId })
+          buildURL(USER_ENDPOINTS.DETAIL, { user_id: userId })
         )
         if (response && response.success) {
           this.userInfoData = response.data.user || response.data
@@ -637,10 +703,56 @@ function customerServicePage() {
      * 滚动到底部
      */
     scrollToBottom() {
-      const container = this.$refs.chatMessages
+      const container = this.$refs.chatMessages || this.$refs.messageContainer
       if (container) {
         container.scrollTop = container.scrollHeight
       }
+    },
+
+    // ==================== HTML模板兼容方法 ====================
+
+    /**
+     * 选择会话（HTML模板别名）
+     * @param {Object} session - 会话对象
+     */
+    selectSession(session) {
+      if (session && session.session_id) {
+        this.openSession(session.session_id)
+      }
+    },
+
+    /**
+     * 格式化日期（HTML模板需要）
+     * @param {string} dateStr - 日期字符串
+     * @returns {string} 格式化后的日期
+     */
+    formatDate(dateStr) {
+      if (!dateStr) return '-'
+      try {
+        const date = new Date(dateStr)
+        return date.toLocaleString('zh-CN', {
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      } catch {
+        return dateStr
+      }
+    },
+
+    /**
+     * 查看用户资料（HTML模板别名）
+     */
+    viewUserProfile() {
+      this.viewUserInfo()
+    },
+
+    /**
+     * 确认转接（HTML模板需要）
+     */
+    async confirmTransfer() {
+      await this.submitTransfer()
     }
   }
 }

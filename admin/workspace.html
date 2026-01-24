@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理后台 - 抽奖系统工作台</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/admin/favicon.svg">
+  
+  <!-- 注意：样式通过 JS 模块导入，无需外部链接 -->
+  
+  <!-- 自定义样式 - 确保布局变量可用 -->
+  <style>
+    /* 布局变量（从 variables.css 复制以确保兼容性） */
+    :root {
+      --sidebar-width: 260px;
+      --sidebar-collapsed-width: 72px;
+      --header-height: 56px;
+      --tab-bar-height: 40px;
+    }
+    
+    /* 加载中状态 */
+    .workspace-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: var(--content-bg, #f3f4f6);
+    }
+    
+    .workspace-loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #e2e8f0;
+      border-top-color: var(--primary, #3b82f6);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* 隐藏未初始化的 Alpine 元素 */
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+<body class="bg-gray-100">
+  <!-- 加载中状态 -->
+  <div id="loading-screen" class="workspace-loading">
+    <div class="workspace-loading-spinner"></div>
+  </div>
+
+  <!-- 工作台主容器 -->
+  <div 
+    class="admin-layout" 
+    x-data="workspaceTabs()" 
+    x-cloak
+    @toggle-mobile-menu.window="$refs.sidebar && ($refs.sidebar.mobileOpen = !$refs.sidebar.mobileOpen)"
+  >
+    <!-- 侧边栏 -->
+    <aside 
+      class="admin-sidebar"
+      x-data="sidebarNav()"
+      x-ref="sidebar"
+      :class="{ 'collapsed': collapsed, 'mobile-open': mobileOpen }"
+    >
+      <!-- Logo 区域 -->
+      <div class="sidebar-logo">
+        <span class="logo-icon">🎰</span>
+        <span class="logo-text">抽奖管理后台</span>
+      </div>
+
+      <!-- 导航菜单 -->
+      <nav class="sidebar-nav scrollbar-thin">
+        <template x-for="group in navGroups" :key="group.id">
+          <div>
+            <!-- 单项菜单（如工作台） -->
+            <template x-if="group.type === 'single'">
+              <a 
+                class="nav-single"
+                :class="{ 'active': isItemActive(group.url) }"
+                @click.prevent="navigateTo(group.url, group.id, group.name, group.icon)"
+                href="javascript:;"
+              >
+                <span class="nav-icon" x-text="group.icon"></span>
+                <span class="nav-text" x-text="group.name"></span>
+              </a>
+            </template>
+
+            <!-- 分组菜单 -->
+            <template x-if="group.type !== 'single' && group.items">
+              <div 
+                class="nav-group"
+                :class="{ 'expanded': isGroupExpanded(group.id) }"
+              >
+                <!-- 分组标题 -->
+                <div 
+                  class="nav-group-title"
+                  @click="toggleGroup(group.id)"
+                >
+                  <span class="nav-icon" x-text="group.icon"></span>
+                  <span class="nav-text" x-text="group.name"></span>
+                  <span class="toggle-icon">▼</span>
+                </div>
+
+                <!-- 分组子项 -->
+                <div class="nav-group-items">
+                  <template x-for="item in group.items" :key="item.id">
+                    <a 
+                      class="nav-item"
+                      :class="{ 'active': isItemActive(item.url) }"
+                      @click.prevent="navigateTo(item.url, item.id, item.name, group.icon)"
+                      href="javascript:;"
+                    >
+                      <span x-text="item.name"></span>
+                      <template x-if="item.badge">
+                        <span class="ml-auto w-2 h-2 bg-red-500 rounded-full"></span>
+                      </template>
+                    </a>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </nav>
+
+      <!-- 侧边栏底部 -->
+      <div class="sidebar-footer">
+        <button 
+          class="collapse-btn"
+          @click="toggleCollapse()"
+          :title="collapsed ? '展开菜单' : '折叠菜单'"
+        >
+          <span x-show="!collapsed">◀ 折叠菜单</span>
+          <span x-show="collapsed">▶</span>
+        </button>
+      </div>
+    </aside>
+    
+    <!-- 主内容区 -->
+    <main class="admin-main">
+      <!-- 顶部栏 -->
+      <header class="workspace-header">
+        <div class="header-left">
+          <!-- 移动端菜单按钮 -->
+          <button 
+            class="mobile-menu-btn"
+            @click="$dispatch('toggle-mobile-menu')"
+            title="菜单"
+          >
+            ☰
+          </button>
+
+          <!-- 面包屑导航 -->
+          <nav class="breadcrumb-nav">
+            <span>管理后台</span>
+            <span>/</span>
+            <span x-text="getActiveTab()?.title || '工作台'"></span>
+          </nav>
+        </div>
+
+        <div class="header-right">
+          <!-- 全局搜索 -->
+          <div class="global-search">
+            <span class="global-search-icon">🔍</span>
+            <input 
+              type="text" 
+              placeholder="搜索功能..." 
+              @keyup.enter="handleGlobalSearch($event.target.value)"
+            />
+          </div>
+
+          <!-- 刷新按钮 -->
+          <button 
+            class="header-btn" 
+            title="刷新当前页面"
+            @click="refreshCurrentTab()"
+          >
+            🔄
+          </button>
+
+          <!-- 通知按钮 -->
+          <button class="header-btn" title="消息通知">
+            🔔
+            <span class="notification-dot"></span>
+          </button>
+
+          <!-- 主题切换 -->
+          <div class="theme-switcher" x-data="themeSwitcher()" @click.away="closeDropdown()">
+            <button 
+              class="theme-btn"
+              @click="toggleDropdown()"
+              :title="'当前主题: ' + getCurrentThemeInfo().name"
+            >
+              <span x-text="getCurrentThemeInfo().icon">☀️</span>
+            </button>
+
+            <!-- 主题下拉菜单 -->
+            <div 
+              class="theme-dropdown"
+              x-show="isOpen"
+              x-transition:enter="transition ease-out duration-200"
+              x-transition:enter-start="opacity-0 transform scale-95"
+              x-transition:enter-end="opacity-100 transform scale-100"
+              x-transition:leave="transition ease-in duration-150"
+              x-transition:leave-start="opacity-100 transform scale-100"
+              x-transition:leave-end="opacity-0 transform scale-95"
+              style="display: none;"
+            >
+              <div class="theme-dropdown-title">选择主题</div>
+              <template x-for="theme in themes" :key="theme.id">
+                <button 
+                  class="theme-option"
+                  :class="{ 'active': currentTheme === theme.id }"
+                  @click="setTheme(theme.id)"
+                >
+                  <span class="theme-icon" x-text="theme.icon"></span>
+                  <span class="theme-name" x-text="theme.name"></span>
+                  <div class="theme-preview">
+                    <template x-for="(color, i) in theme.colors" :key="i">
+                      <span class="theme-preview-color" :style="{ backgroundColor: color }"></span>
+                    </template>
+                  </div>
+                  <span class="theme-check" x-show="currentTheme === theme.id">✓</span>
+                </button>
+              </template>
+              
+              <div class="theme-divider"></div>
+              
+              <!-- 快速切换暗色模式 -->
+              <button 
+                class="theme-option"
+                @click="toggleDarkMode()"
+              >
+                <span class="theme-icon">🌓</span>
+                <span class="theme-name">快速切换明/暗</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 用户下拉菜单 -->
+          <div class="user-dropdown relative" x-data="{ open: false }" @click.away="open = false">
+            <div @click="open = !open" class="flex items-center gap-2 cursor-pointer">
+              <span class="user-avatar">A</span>
+              <span class="user-name">管理员</span>
+              <span class="text-xs text-gray-400">▼</span>
+            </div>
+            
+            <!-- 下拉菜单 -->
+            <div 
+              x-show="open"
+              x-transition
+              class="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
+              style="display: none;"
+            >
+              <a href="/admin/profile.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                👤 个人设置
+              </a>
+              <a href="/admin/system-settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                ⚙️ 系统设置
+              </a>
+              <div class="border-t border-gray-200 my-1"></div>
+              <button 
+                @click="handleLogout()"
+                class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+              >
+                🚪 退出登录
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+      
+      <!-- Tab 工作台 -->
+      <div class="workspace-tab-bar">
+        <!-- Tab 列表 -->
+        <template x-for="tab in tabs" :key="tab.id">
+          <button 
+            class="workspace-tab"
+            :class="{ 'active': isActiveTab(tab.id) }"
+            @click="switchTab(tab.id)"
+            @contextmenu="showContextMenu(tab.id, $event)"
+            :title="tab.title"
+          >
+            <span class="tab-icon" x-text="tab.icon"></span>
+            <span class="tab-title" x-text="tab.title"></span>
+            <span 
+              class="tab-close-btn"
+              @click.stop="closeTab(tab.id)"
+              title="关闭此标签"
+              x-show="tabs.length > 1"
+              style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-left: 6px; border-radius: 50%; background: rgba(0,0,0,0.1); color: #666; font-size: 12px; cursor: pointer; transition: all 0.2s;"
+              onmouseover="this.style.background='#ef4444'; this.style.color='white';"
+              onmouseout="this.style.background='rgba(0,0,0,0.1)'; this.style.color='#666';"
+            >✕</span>
+          </button>
+        </template>
+
+        <!-- Tab 操作按钮 -->
+        <button 
+          class="workspace-tab tab-add"
+          @click="closeAllTabs()"
+          title="关闭所有并返回工作台"
+          x-show="tabs.length > 1"
+        >
+          ✕ 关闭所有
+        </button>
+      </div>
+
+      <!-- Tab 内容区域 -->
+      <div class="workspace-content">
+        <template x-for="tab in tabs" :key="tab.id">
+          <div 
+            class="tab-panel"
+            :class="{ 'active': isActiveTab(tab.id) }"
+            :data-tab-id="tab.id"
+          >
+            <!-- 使用 iframe 加载页面内容 -->
+            <iframe 
+              :src="tab.url"
+              :name="'tab-' + tab.id"
+              title="页面内容"
+              loading="lazy"
+            ></iframe>
+          </div>
+        </template>
+
+        <!-- 空状态 -->
+        <div 
+          class="empty-state"
+          x-show="tabs.length === 0"
+          style="height: 100%;"
+        >
+          <div class="empty-state-icon">📋</div>
+          <div class="empty-state-text">暂无打开的页面</div>
+          <div class="empty-state-description">从左侧菜单选择功能开始使用</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- JavaScript -->
+  <script type="module">
+    // 导入样式
+    import './src/styles/index.css'
+    
+    // 导入并初始化 Alpine.js
+    import { initAlpine } from './src/alpine/index.js'
+    
+    // 初始化 Alpine.js
+    initAlpine()
+    
+    // 隐藏加载状态
+    setTimeout(() => {
+      const loadingScreen = document.getElementById('loading-screen')
+      if (loadingScreen) {
+        loadingScreen.style.opacity = '0'
+        loadingScreen.style.transition = 'opacity 0.3s'
+        setTimeout(() => loadingScreen.remove(), 300)
+      }
+    }, 100)
+    
+    // 全局搜索处理
+    window.handleGlobalSearch = function(keyword) {
+      console.log('搜索:', keyword)
+      // 可扩展：实现全局搜索逻辑
+    }
+    
+    // 退出登录处理
+    window.handleLogout = async function() {
+      if (!confirm('确定要退出登录吗？')) return
+      
+      try {
+        const response = await fetch('/api/v4/auth/logout', {
+          method: 'POST',
+          credentials: 'include'
+        })
+        
+        if (response.ok || response.status === 401) {
+          localStorage.removeItem('admin_token')
+          localStorage.removeItem('admin_user_info')
+          localStorage.removeItem('workspace_tabs')
+          localStorage.removeItem('sidebar_collapsed')
+          localStorage.removeItem('sidebar_expanded_groups')
+          window.location.href = '/admin/login.html'
+        }
+      } catch (error) {
+        console.error('退出登录失败:', error)
+        // 即使API失败也清理本地状态
+        localStorage.removeItem('admin_token')
+        localStorage.removeItem('admin_user_info')
+        window.location.href = '/admin/login.html'
+      }
+    }
+    
+    console.log('🎰 抽奖管理后台工作台已加载 - 深蓝科技风')
+  </script>
+</body>
+</html>
+

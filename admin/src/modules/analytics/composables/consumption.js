@@ -22,6 +22,7 @@ export function useConsumptionState() {
     /** @type {Object} 消费记录筛选条件 */
     consumptionFilters: {
       user_id: '',
+      userId: '', // 兼容HTML模板
       status: '',
       payment_method: '',
       startDate: '',
@@ -30,7 +31,11 @@ export function useConsumptionState() {
     /** @type {Object} 消费统计 */
     consumptionStats: { total: 0, totalAmount: 0, pendingCount: 0, todayCount: 0 },
     /** @type {Object|null} 选中的消费记录详情 */
-    selectedConsumption: null
+    selectedConsumption: null,
+    /** @type {Object} 财务汇总统计（用于财务统计页面） */
+    financeStats: { todayRevenue: 0, monthRevenue: 0, pendingCount: 0, totalDebt: 0 },
+    /** @type {Object} 拒绝表单 */
+    rejectForm: { reason: '' }
   }
 }
 
@@ -40,6 +45,13 @@ export function useConsumptionState() {
  */
 export function useConsumptionMethods() {
   return {
+    /**
+     * 加载消费记录（兼容HTML中的loadConsumption调用）
+     */
+    async loadConsumption() {
+      return this.loadConsumptions()
+    },
+
     /**
      * 加载消费记录
      */
@@ -165,6 +177,69 @@ export function useConsumptionMethods() {
         },
         { successMessage: `消费记录已${actionText}` }
       )
+    },
+
+    /**
+     * 通过消费记录审核
+     * @param {Object} record - 消费记录对象
+     */
+    async approveConsumption(record) {
+      return this.auditConsumption(record, 'approve')
+    },
+
+    /**
+     * 拒绝消费记录审核
+     * @param {Object} record - 消费记录对象
+     */
+    async rejectConsumption(record) {
+      this.selectedConsumption = record
+      this.rejectForm = { reason: '' }
+      this.showModal('rejectModal')
+    },
+
+    /**
+     * 显示拒绝模态框
+     * @param {Object} record - 消费记录对象
+     */
+    showRejectModal(record) {
+      this.selectedConsumption = record
+      this.rejectForm = { reason: '' }
+      this.showModal('rejectModal')
+    },
+
+    /**
+     * 确认拒绝
+     */
+    async confirmReject() {
+      if (!this.rejectForm.reason) {
+        this.showError('请输入拒绝原因')
+        return
+      }
+
+      try {
+        this.saving = true
+        const response = await this.apiCall(
+          buildURL(STORE_ENDPOINTS.CONSUMPTION_AUDIT, { id: this.selectedConsumption.id }),
+          { 
+            method: 'PUT', 
+            data: { 
+              action: 'reject',
+              reason: this.rejectForm.reason 
+            } 
+          }
+        )
+
+        if (response?.success) {
+          this.showSuccess('消费记录已拒绝')
+          this.hideModal('rejectModal')
+          await this.loadConsumptions()
+          await this.loadConsumptionStats()
+        }
+      } catch (error) {
+        this.showError('操作失败: ' + (error.message || '未知错误'))
+      } finally {
+        this.saving = false
+      }
     },
 
     /**

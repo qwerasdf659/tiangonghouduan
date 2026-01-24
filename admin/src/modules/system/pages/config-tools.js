@@ -35,7 +35,13 @@
 
 import { logger } from '../../../utils/logger.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
-import { buildURL } from '../../../api/base.js'
+import { buildURL, request } from '../../../api/base.js'
+import { createDashboardMixin } from '../../../alpine/mixins/index.js'
+
+// API请求封装
+const apiRequest = async (url, options = {}) => {
+  return await request({ url, ...options })
+}
 document.addEventListener('alpine:init', () => {
   // 使用 createDashboardMixin 获取标准功能
   const baseMixin = typeof createDashboardMixin === 'function' ? createDashboardMixin() : {}

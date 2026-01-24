@@ -34,8 +34,14 @@
 // ES Module 导入
 import { logger } from '../../../utils/logger.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
-import { buildURL } from '../../../api/base.js'
+import { buildURL, request } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/index.js'
+import { createPageMixin } from '../../../alpine/mixins/index.js'
+
+// API请求封装
+const apiRequest = async (url, options = {}) => {
+  return await request({ url, ...options })
+}
 /**
  * 风控告警对象类型
  * @typedef {Object} RiskAlert

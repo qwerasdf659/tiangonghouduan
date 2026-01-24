@@ -32,6 +32,7 @@ import { logger } from '../../../utils/logger.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
 import { request, getToken } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/index.js'
+import { createPageMixin } from '../../../alpine/mixins/index.js'
 /**
  * @typedef {Object} StatisticsFilters
  * @property {string} period - 时间周期 ('today'|'yesterday'|'week'|'month'|'custom')
@@ -337,82 +338,99 @@ function statisticsPage() {
 
     /**
      * 渲染统计数据
-     * @param {Object} data - API返回的统计数据
-     * @description 处理API数据并更新页面各项指标和图表
+     * @param {Object} data - API返回的统计图表数据（后端 /api/v4/statistics/charts 格式）
+     * @description 处理API数据并更新页面各项指标
+     * 
+     * 后端数据格式:
+     * {
+     *   user_growth: [{ date, count, cumulative }],
+     *   user_types: { regular: { count, percentage }, admin: {...}, merchant: {...}, total },
+     *   lottery_trend: [{ date, count, high_tier_count, high_tier_rate }],
+     *   consumption_trend: [{ date, count, amount, avg_amount }],
+     *   points_flow: [{ date, earned, spent, balance_change }],
+     *   top_prizes: [{ prize_name, count, percentage }],
+     *   active_hours: [{ hour, activity_count }]
+     * }
      * @returns {void}
      */
     renderStatistics(data) {
-      // 1. 核心指标
-      this.stats.totalUsers = data.user_types?.total || 0
-      this.stats.totalDraws = (data.lottery_trend || []).reduce(
-        (sum, item) => sum + (item.count || 0),
-        0
-      )
-
-      const totalHighTier = (data.lottery_trend || []).reduce(
-        (sum, item) => sum + (item.high_tier_count || 0),
-        0
-      )
-      this.stats.winRate =
-        this.stats.totalDraws > 0 ? (totalHighTier / this.stats.totalDraws) * 100 : 0
-
-      this.stats.totalRevenue = (data.consumption_trend || []).reduce(
-        (sum, item) => sum + parseFloat(item.amount || 0),
-        0
-      )
-
-      // 计算趋势
-      this.stats.userTrend = this.calculateGrowthTrend(data.user_growth)
-      this.stats.drawTrend = this.calculateArrayTrend(data.lottery_trend, 'count')
-      this.stats.winRateTrend = this.calculateArrayTrend(data.lottery_trend, 'high_tier_rate')
-      this.stats.revenueTrend = this.calculateArrayTrend(data.consumption_trend, 'amount')
-
-      // 2. 用户统计
+      // 后端 /api/v4/statistics/charts 返回的数据结构
       const userGrowth = data.user_growth || []
-      this.userStats.newUsers = userGrowth.reduce((sum, item) => sum + (item.count || 0), 0)
-      this.userStats.activeUsers = (data.active_hours || []).reduce(
-        (sum, item) => sum + (item.activity_count || 0),
-        0
-      )
-      this.userStats.adminUsers = data.user_types?.admin?.count || 0
-      this.userStats.regularUsers = data.user_types?.regular?.count || 0
+      const userTypes = data.user_types || {}
+      const lotteryTrend = data.lottery_trend || []
+      const consumptionTrend = data.consumption_trend || []
+      const pointsFlow = data.points_flow || []
+      const topPrizes = data.top_prizes || []
+      const activeHours = data.active_hours || []
 
-      // 3. 抽奖统计
-      this.lotteryStats.totalDraws = this.stats.totalDraws
-      this.lotteryStats.highTierWins = totalHighTier
-      this.lotteryStats.regularWins = this.stats.totalDraws - totalHighTier
-      this.lotteryStats.winRate = this.stats.winRate
+      // 1. 核心指标 - 从趋势数据汇总
+      const totalNewUsers = userGrowth.reduce((sum, item) => sum + (item.count || 0), 0)
+      const lastUserRecord = userGrowth.length > 0 ? userGrowth[userGrowth.length - 1] : {}
+      this.stats.totalUsers = lastUserRecord.cumulative || userTypes.total || 0
+      
+      const totalDraws = lotteryTrend.reduce((sum, item) => sum + (item.count || 0), 0)
+      this.stats.totalDraws = totalDraws
+
+      // 计算总体高档奖励率
+      const totalHighTierWins = lotteryTrend.reduce((sum, item) => sum + (item.high_tier_count || 0), 0)
+      this.stats.winRate = totalDraws > 0 ? ((totalHighTierWins / totalDraws) * 100).toFixed(2) : 0
+
+      const totalRevenue = consumptionTrend.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0)
+      this.stats.totalRevenue = totalRevenue
+
+      // 趋势计算（比较前后半段数据）
+      this.stats.userTrend = this.calculateGrowthTrend(userGrowth)
+      this.stats.drawTrend = this.calculateArrayTrend(lotteryTrend, 'count')
+      this.stats.winRateTrend = 0 // 暂不计算
+      this.stats.revenueTrend = this.calculateArrayTrend(consumptionTrend, 'amount')
+
+      // 2. 用户统计 - 使用后端用户类型数据
+      this.userStats.newUsers = totalNewUsers
+      this.userStats.activeUsers = userTypes.regular?.count || 0
+      this.userStats.adminUsers = userTypes.admin?.count || 0
+      this.userStats.regularUsers = userTypes.regular?.count || 0
+
+      // 3. 抽奖统计 - 使用后端趋势数据
+      this.lotteryStats.totalDraws = totalDraws
+      this.lotteryStats.highTierWins = totalHighTierWins
+      this.lotteryStats.regularWins = totalDraws - totalHighTierWins
+      this.lotteryStats.winRate = parseFloat(this.stats.winRate) || 0
 
       // 4. 消费统计
-      this.consumptionStats.total = this.stats.totalRevenue
-      this.consumptionStats.approved = this.stats.totalRevenue
+      const totalConsumptionCount = consumptionTrend.reduce((sum, item) => sum + (item.count || 0), 0)
+      this.consumptionStats.total = totalRevenue
+      this.consumptionStats.approved = totalRevenue
       this.consumptionStats.pending = 0
       this.consumptionStats.rejected = 0
 
       // 5. 积分统计
-      const pointsData = data.points_flow || []
-      this.pointsStats.issued = pointsData.reduce((sum, item) => sum + (item.earned || 0), 0)
-      this.pointsStats.consumed = pointsData.reduce((sum, item) => sum + (item.spent || 0), 0)
-      this.pointsStats.current = pointsData.reduce(
-        (sum, item) => sum + (item.balance_change || 0),
-        0
-      )
-      this.pointsStats.average =
-        this.stats.totalUsers > 0 ? Math.round(this.pointsStats.current / this.stats.totalUsers) : 0
+      const totalEarned = pointsFlow.reduce((sum, item) => sum + (item.earned || 0), 0)
+      const totalSpent = pointsFlow.reduce((sum, item) => sum + (item.spent || 0), 0)
+      this.pointsStats.issued = totalEarned
+      this.pointsStats.consumed = totalSpent
+      this.pointsStats.current = totalEarned - totalSpent
+      this.pointsStats.average = userTypes.total > 0 ? Math.round((totalEarned - totalSpent) / userTypes.total) : 0
 
       // 6. 奖品统计
-      this.prizeStats = (data.top_prizes || []).map(prize => ({
-        prize_name: prize.prize_name || '未知奖品',
-        count: prize.count || 0,
-        percentage: parseFloat(prize.percentage || 0)
+      this.prizeStats = topPrizes.map(prize => ({
+        name: prize.prize_name,
+        count: prize.count,
+        percentage: prize.percentage
       }))
 
       // 7. 活跃时段统计
-      this.renderActiveHoursStats(data.active_hours || [])
+      this.renderActiveHoursStats(activeHours)
 
-      // 8. 更新图表
+      // 8. 渲染图表
       this.renderTrendChart(data)
-      this.renderUserTypeChart(data.user_types)
+      this.renderUserTypeChart(userTypes)
+
+      logger.info('统计图表数据已渲染', {
+        totalUsers: this.stats.totalUsers,
+        totalDraws: this.stats.totalDraws,
+        totalRevenue: this.stats.totalRevenue,
+        prizeCount: this.prizeStats.length
+      })
     },
 
     /**
@@ -543,6 +561,16 @@ function statisticsPage() {
     },
 
     // ==================== 导出方法 ====================
+
+    /**
+     * 导出报表（简化版 - 直接导出Excel）
+     * @async
+     * @description 导出按钮点击时调用
+     * @returns {Promise<void>}
+     */
+    async exportReport() {
+      return this.exportToExcel()
+    },
 
     /**
      * 导出Excel格式报表

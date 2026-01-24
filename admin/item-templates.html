@@ -9,10 +9,10 @@
 <body class="bg-gray-100 min-h-screen" x-data="itemTemplatesPage()" x-init="init()" x-cloak>
   
   <!-- 导航栏 -->
-  <nav class="bg-cyan-600 text-white shadow-lg">
+  <nav class="bg-blue-600 text-white shadow-lg">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <a href="/admin/dashboard.html" class="hover:text-cyan-200">← 返回仪表盘</a>
+        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
         <span class="text-lg font-semibold">📦 物品模板管理</span>
       </div>
       <div class="flex items-center space-x-4">
@@ -87,7 +87,7 @@
             <input type="text" class="w-full px-3 py-2 border rounded-lg" x-model="filters.search" placeholder="名称或编码" @keyup.enter="loadTemplates()">
           </div>
           <div class="flex space-x-2">
-            <button @click="loadTemplates()" class="flex-1 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">
+            <button @click="loadTemplates()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-cyan-700">
               🔍 搜索
             </button>
             <button @click="openCreateModal()" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
@@ -209,7 +209,7 @@
       </div>
       <div class="p-4 border-t flex justify-end space-x-3">
         <button @click="hideModal('templateModal')" class="px-4 py-2 border rounded hover:bg-gray-50">取消</button>
-        <button @click="submitTemplate()" :disabled="isSubmitting" class="px-4 py-2 bg-cyan-600 text-white rounded hover:bg-cyan-700 disabled:opacity-50">
+        <button @click="submitTemplate()" :disabled="isSubmitting" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-cyan-700 disabled:opacity-50">
           <span x-show="isSubmitting" class="mr-1">⏳</span>
           保存
         </button>

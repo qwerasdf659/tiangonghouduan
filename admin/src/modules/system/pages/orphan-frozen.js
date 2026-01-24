@@ -36,7 +36,30 @@
 import { logger } from '../../../utils/logger.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 import { buildURL, request } from '../../../api/base.js'
-import { createBatchOperationMixin } from '../../../alpine/mixins/index.js'
+import { Alpine, createBatchOperationMixin } from '../../../alpine/index.js'
+
+// API请求辅助函数
+async function apiRequest(url, options = {}) {
+  const method = options.method || 'GET'
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers
+  }
+  
+  // 添加认证token
+  const token = localStorage.getItem('admin_token')
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  
+  const fetchOptions = { method, headers }
+  if (options.body) {
+    fetchOptions.body = options.body
+  }
+  
+  const response = await fetch(url, fetchOptions)
+  return await response.json()
+}
 /**
  * 孤儿冻结项目对象类型
  * @typedef {Object} OrphanItem
@@ -122,6 +145,12 @@ function orphanFrozenPage() {
 
     /** @type {boolean} 清理确认复选框状态 */
     confirmCleanChecked: false,
+
+    /** @type {OrphanItem|null} 当前选中查看详情的资产 (HTML模板兼容) */
+    selectedAsset: null,
+
+    /** @type {OrphanItem|null} 当前资产 */
+    currentAsset: null,
 
     // ==================== 计算属性 ====================
 
@@ -532,8 +561,8 @@ function orphanFrozenPage() {
      * @returns {void}
      */
     viewAssetDetail(asset) {
+      this.selectedAsset = asset
       this.currentAsset = asset
-      this.showModal('detailModal')
     },
 
     /**

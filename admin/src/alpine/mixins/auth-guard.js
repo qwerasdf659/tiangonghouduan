@@ -42,10 +42,10 @@ export function authGuardMixin() {
      * 检查登录状态
      * 如果未登录则跳转到登录页
      *
-     * @param {string} [redirectUrl='/login.html'] - 跳转地址
+     * @param {string} [redirectUrl='/admin/login.html'] - 跳转地址
      * @returns {boolean} 是否已登录
      */
-    checkAuth(redirectUrl = '/login.html') {
+    checkAuth(redirectUrl = '/admin/login.html') {
       const token = getToken()
 
       if (!token) {
@@ -152,7 +152,7 @@ export function authGuardMixin() {
       localStorage.removeItem('user_info')
       this.currentUser = null
       this.isAuthenticated = false
-      window.location.href = '/login.html'
+      window.location.href = '/admin/login.html'
     },
 
     /**

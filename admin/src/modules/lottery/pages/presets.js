@@ -11,8 +11,14 @@
 
 import { logger } from '../../../utils/logger.js'
 import { LOTTERY_ENDPOINTS } from '../../../api/lottery.js'
-import { buildURL } from '../../../api/base.js'
+import { buildURL, request } from '../../../api/base.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
+import { Alpine, createCrudMixin } from '../../../alpine/index.js'
+
+// API 请求封装
+const apiRequest = async (url, options = {}) => {
+  return await request({ url, ...options })
+}
 /**
  * @typedef {Object} InterventionFilters
  * @property {string} status - 状态筛选（active/used/expired/cancelled）

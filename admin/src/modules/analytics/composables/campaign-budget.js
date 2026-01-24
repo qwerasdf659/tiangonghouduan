@@ -39,7 +39,11 @@ export function useCampaignBudgetState() {
       campaign_id: '',
       budget_mode: 'UNLIMITED',
       pool_budget_remaining: 0,
-      allowed_campaign_ids: []
+      allowed_campaign_ids: [],
+      // HTML模板需要的字段
+      type: 'daily',
+      amount: 0,
+      alertThreshold: 80
     },
     /** @type {boolean} 预算编辑模式 */
     budgetEditMode: false
@@ -189,6 +193,13 @@ export function useCampaignBudgetMethods() {
       this.selectedBudget = budget
       this.budgetEditMode = true
       this.showModal('budgetFormModal')
+    },
+
+    /**
+     * 提交预算（别名，供HTML模板使用）
+     */
+    async submitBudget() {
+      return this.saveBudget()
     },
 
     /**

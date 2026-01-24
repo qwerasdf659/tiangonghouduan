@@ -30,6 +30,13 @@
 import { logger } from '../../../utils/logger.js'
 import { MARKET_ENDPOINTS } from '../../../api/market.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
+import { buildURL, request } from '../../../api/base.js'
+import { createDashboardMixin } from '../../../alpine/mixins/index.js'
+
+// API请求封装
+const apiRequest = async (url, options = {}) => {
+  return await request({ url, ...options })
+}
 /**
  * @typedef {Object} ExchangeItem
  * @property {number} item_id - 商品ID

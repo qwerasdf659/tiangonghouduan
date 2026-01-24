@@ -27,8 +27,9 @@
 
 
 import { logger } from '../../../utils/logger.js'
-import { buildURL } from '../../../api/base.js'
+import { buildURL, request } from '../../../api/base.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
+import { Alpine, createPageMixin } from '../../../alpine/index.js'
 document.addEventListener('alpine:init', () => {
   logger.info('[ContentManagement] 注册 Alpine 组件...')
 

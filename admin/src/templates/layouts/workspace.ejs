@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof title !== 'undefined' ? title : '管理后台' %> - 抽奖系统</title>
+  
+  <!-- 预连接优化 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  
+  <!-- 字体 -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- 样式 -->
+  <link rel="stylesheet" href="/assets/styles.css">
+  
+  <!-- 自定义样式 -->
+  <style>
+    /* 工作台特定样式 */
+    .admin-layout {
+      display: flex;
+      min-height: 100vh;
+    }
+  </style>
+</head>
+<body class="bg-gray-100">
+  <!-- 工作台主容器 -->
+  <div class="admin-layout" x-data="workspaceTabs()">
+    <!-- 侧边栏 -->
+    <%- include('../partials/sidebar') %>
+    
+    <!-- 主内容区 -->
+    <main class="admin-main">
+      <!-- 顶部栏 -->
+      <%- include('../partials/workspace-header') %>
+      
+      <!-- Tab 工作台 -->
+      <%- include('../partials/workspace-tabs') %>
+    </main>
+  </div>
+
+  <!-- JavaScript -->
+  <script type="module">
+    import { initAlpine } from '/assets/main.js'
+    
+    // 初始化 Alpine.js
+    initAlpine()
+    
+    // 全局搜索处理
+    window.handleGlobalSearch = function(keyword) {
+      console.log('搜索:', keyword)
+      // 可扩展：实现全局搜索逻辑
+    }
+    
+    // 退出登录处理
+    window.handleLogout = async function() {
+      if (!confirm('确定要退出登录吗？')) return
+      
+      try {
+        const response = await fetch('/api/v4/auth/logout', {
+          method: 'POST',
+          credentials: 'include'
+        })
+        
+        if (response.ok) {
+          localStorage.removeItem('admin_token')
+          localStorage.removeItem('admin_user_info')
+          window.location.href = '/admin/login.html'
+        }
+      } catch (error) {
+        console.error('退出登录失败:', error)
+        alert('退出登录失败，请重试')
+      }
+    }
+  </script>
+</body>
+</html>
+

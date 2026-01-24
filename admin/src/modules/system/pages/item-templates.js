@@ -31,7 +31,13 @@
 
 import { logger } from '../../../utils/logger.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
-import { buildURL } from '../../../api/base.js'
+import { buildURL, request } from '../../../api/base.js'
+import { createCrudMixin } from '../../../alpine/mixins/index.js'
+
+// API请求封装
+const apiRequest = async (url, options = {}) => {
+  return await request({ url, ...options })
+}
 document.addEventListener('alpine:init', () => {
   // 使用 createCrudMixin 获取标准功能
   const baseMixin =

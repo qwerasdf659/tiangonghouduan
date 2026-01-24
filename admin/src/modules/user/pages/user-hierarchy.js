@@ -17,7 +17,13 @@
 
 import { logger } from '../../../utils/logger.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
-import { buildURL } from '../../../api/base.js'
+import { buildURL, request } from '../../../api/base.js'
+import { Alpine, createCrudMixin } from '../../../alpine/index.js'
+
+// API请求封装
+const apiRequest = async (url, options = {}) => {
+  return await request({ url, ...options })
+}
 /**
  * @typedef {Object} HierarchyFilters
  * @property {string} roleLevel - 角色等级筛选

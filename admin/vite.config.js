@@ -82,6 +82,7 @@ function getPageConfig(pageName) {
 export default defineConfig({
   root: resolve(__dirname),
   base: '/admin/',
+  publicDir: 'public',
   
   plugins: [
     // EJS 模板插件配置

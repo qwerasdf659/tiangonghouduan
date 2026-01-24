@@ -6,11 +6,14 @@
  * @since 2026-01-23
  */
 
-
+/* global localStorage, sessionStorage */
 import { logger } from '../utils/logger.js'
-// ============================================================================
-// 类型定义 - API 通用类型
-// ============================================================================
+
+/*
+ * ============================================================================
+ * 类型定义 - API 通用类型
+ * ============================================================================
+ */
 
 /**
  * 标准 API 响应结构
@@ -92,14 +95,77 @@ import { logger } from '../utils/logger.js'
  * @property {number} [affected_count] - 影响的记录数
  */
 
-// ============================================================================
-// Token 管理
-// ============================================================================
+/*
+ * ============================================================================
+ * Token 管理
+ * 策略：localStorage 存储 Token + Session Cookie 标记浏览器会话
+ * - 同一浏览器窗口内的多个标签页共享登录状态（Cookie 跨标签页共享）
+ * - 关闭整个浏览器后需要重新登录（Session Cookie 自动清除）
+ * ============================================================================
+ */
 
 const TOKEN_KEY = 'admin_token'
+const USER_KEY = 'admin_user'
+const SESSION_COOKIE_NAME = 'admin_browser_session'
+
+/**
+ * 获取 Cookie 值
+ * @param {string} name - Cookie 名称
+ * @returns {string|null} Cookie 值或 null
+ */
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'))
+  return match ? match[2] : null
+}
+
+/**
+ * 设置 Session Cookie（关闭浏览器后自动清除）
+ * @param {string} name - Cookie 名称
+ * @param {string} value - Cookie 值
+ * @returns {void} 无返回值
+ */
+function setSessionCookie(name, value) {
+  // 不设置 expires 或 max-age，这样就是 Session Cookie，关闭浏览器后自动清除
+  document.cookie = `${name}=${value}; path=/; SameSite=Lax`
+}
+
+/**
+ * 删除 Cookie
+ * @param {string} name - Cookie 名称
+ * @returns {void} 无返回值
+ */
+function deleteCookie(name) {
+  document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+}
+
+/**
+ * 检查并初始化浏览器会话
+ * @description 使用 Session Cookie 检测浏览器是否被关闭过
+ * @returns {void} 无返回值
+ */
+export function checkBrowserSession() {
+  const hasSessionCookie = getCookie(SESSION_COOKIE_NAME)
+  const hasToken = localStorage.getItem(TOKEN_KEY)
+
+  if (hasToken && !hasSessionCookie) {
+    /*
+     * localStorage 有 token 但没有 Session Cookie
+     * 说明浏览器曾被关闭（Cookie 已自动清除），需要重新登录
+     */
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
+    logger.info('[Auth] 检测到浏览器已重启，已清除登录数据')
+  }
+
+  // 设置/刷新 Session Cookie（确保当前浏览器会话有效）
+  if (hasToken || hasSessionCookie) {
+    setSessionCookie(SESSION_COOKIE_NAME, 'active')
+  }
+}
 
 /**
  * 获取存储的 Token
+ * @description 使用 localStorage 存储，跨标签页共享；结合 sessionStorage 检测浏览器会话
  * @returns {string|null} Token 字符串或 null
  */
 export function getToken() {
@@ -108,17 +174,53 @@ export function getToken() {
 
 /**
  * 设置 Token
+ * @description 存储到 localStorage（跨标签页共享），同时设置 Session Cookie
  * @param {string} token - Token 字符串
+ * @returns {void} 无返回值
  */
 export function setToken(token) {
   localStorage.setItem(TOKEN_KEY, token)
+  setSessionCookie(SESSION_COOKIE_NAME, 'active')
 }
 
 /**
  * 清除 Token
+ * @returns {void} 无返回值
  */
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY)
+  deleteCookie(SESSION_COOKIE_NAME)
+}
+
+/**
+ * 获取存储的用户信息
+ * @returns {Object|null} 用户信息对象或 null
+ */
+export function getUser() {
+  const userStr = localStorage.getItem(USER_KEY)
+  if (!userStr) return null
+  try {
+    return JSON.parse(userStr)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 设置用户信息
+ * @param {Object} user - 用户信息对象
+ * @returns {void} 无返回值
+ */
+export function setUser(user) {
+  localStorage.setItem(USER_KEY, JSON.stringify(user))
+}
+
+/**
+ * 清除用户信息
+ * @returns {void} 无返回值
+ */
+export function clearUser() {
+  localStorage.removeItem(USER_KEY)
 }
 
 /**
@@ -191,7 +293,7 @@ export async function request(options) {
   // 添加 Token
   const token = getToken()
   if (token) {
-    requestHeaders['Authorization'] = `Bearer ${token}`
+    requestHeaders.Authorization = `Bearer ${token}`
   }
 
   // 准备请求配置
@@ -242,6 +344,7 @@ export const http = {
    * @param {string} url - 请求 URL
    * @param {Object} [params] - 查询参数
    * @param {Object} [options] - 其他配置
+   * @returns {Promise<Object>} API 响应数据
    * @throws {Error} 网络请求失败或服务器错误
    */
   get: (url, params, options = {}) => request({ url, method: 'GET', params, ...options }),
@@ -251,6 +354,7 @@ export const http = {
    * @param {string} url - 请求 URL
    * @param {Object} [data] - 请求数据
    * @param {Object} [options] - 其他配置
+   * @returns {Promise<Object>} API 响应数据
    * @throws {Error} 请求数据验证失败
    * @throws {Error} 网络请求失败或服务器错误
    */
@@ -261,6 +365,7 @@ export const http = {
    * @param {string} url - 请求 URL
    * @param {Object} [data] - 请求数据
    * @param {Object} [options] - 其他配置
+   * @returns {Promise<Object>} API 响应数据
    * @throws {Error} 资源不存在
    * @throws {Error} 网络请求失败或服务器错误
    */
@@ -271,6 +376,7 @@ export const http = {
    * @param {string} url - 请求 URL
    * @param {Object} [data] - 请求数据
    * @param {Object} [options] - 其他配置
+   * @returns {Promise<Object>} API 响应数据
    * @throws {Error} 资源不存在
    * @throws {Error} 网络请求失败或服务器错误
    */
@@ -280,6 +386,7 @@ export const http = {
    * DELETE 请求
    * @param {string} url - 请求 URL
    * @param {Object} [options] - 其他配置
+   * @returns {Promise<Object>} API 响应数据
    * @throws {Error} 资源不存在或无法删除
    * @throws {Error} 网络请求失败或服务器错误
    */

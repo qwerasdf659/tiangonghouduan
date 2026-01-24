@@ -33,7 +33,13 @@
 
 import { logger } from '../../../utils/logger.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
-import { buildURL } from '../../../api/base.js'
+import { buildURL, request } from '../../../api/base.js'
+import { createBatchOperationMixin } from '../../../alpine/mixins/index.js'
+
+// API请求封装
+const apiRequest = async (url, options = {}) => {
+  return await request({ url, ...options })
+}
 /**
  * 会话对象类型
  * @typedef {Object} UserSession

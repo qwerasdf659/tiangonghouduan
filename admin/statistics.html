@@ -10,10 +10,10 @@
 <body class="bg-gray-100 min-h-screen" x-data="statisticsPage()" x-init="init()" x-cloak>
   
   <!-- 导航栏 -->
-  <nav class="bg-indigo-600 text-white shadow-lg">
+  <nav class="bg-blue-600 text-white shadow-lg">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <a href="/admin/dashboard.html" class="hover:text-indigo-200">← 返回仪表盘</a>
+        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
         <span class="text-lg font-semibold">📊 数据统计报表</span>
       </div>
       <div class="flex items-center space-x-4">
@@ -47,7 +47,7 @@
             <input type="date" x-model="filters.endDate" class="w-full px-3 py-2 border rounded-lg">
           </div>
           <div>
-            <button @click="loadStatistics()" :disabled="loading" class="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+            <button @click="loadStatistics()" :disabled="loading" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
               <span x-show="!loading">🔍 查询</span>
               <span x-show="loading">加载中...</span>
             </button>
@@ -173,15 +173,15 @@
           <h5 class="font-semibold">📈 用户增长趋势</h5>
         </div>
         <div class="p-4">
-          <div id="userTrendChart" class="chart-container"></div>
+          <div x-ref="trendChart" class="chart-container"></div>
         </div>
       </div>
       <div class="bg-white rounded-lg shadow">
         <div class="p-4 border-b">
-          <h5 class="font-semibold">📊 抽奖趋势</h5>
+          <h5 class="font-semibold">📊 用户类型分布</h5>
         </div>
         <div class="p-4">
-          <div id="lotteryTrendChart" class="chart-container"></div>
+          <div x-ref="userTypeChart" class="chart-container"></div>
         </div>
       </div>
     </div>

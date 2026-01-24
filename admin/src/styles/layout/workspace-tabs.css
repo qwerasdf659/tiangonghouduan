@@ -1,0 +1,318 @@
+/**
+ * Tab 工作台样式
+ * @description 多标签页管理的样式
+ */
+
+/* ========== 顶部栏 ========== */
+.workspace-header {
+  height: var(--header-height);
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--header-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* 移动端菜单按钮 */
+.mobile-menu-btn {
+  display: none;
+  padding: 8px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #64748b;
+}
+
+@media (max-width: 1024px) {
+  .mobile-menu-btn {
+    display: block;
+  }
+}
+
+/* 面包屑 */
+.breadcrumb-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.breadcrumb-nav a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.breadcrumb-nav a:hover {
+  text-decoration: underline;
+}
+
+/* 全局搜索 */
+.global-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.global-search-icon {
+  position: absolute;
+  left: 12px;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.global-search input {
+  width: 240px;
+  padding: 8px 12px 8px 36px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s;
+  background: #f8fafc;
+}
+
+.global-search input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  background: #ffffff;
+}
+
+/* 通知按钮 */
+.header-btn {
+  position: relative;
+  padding: 8px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #64748b;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.header-btn:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.notification-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  background: var(--danger);
+  border-radius: 50%;
+}
+
+/* 用户下拉菜单 */
+.user-dropdown {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 4px;
+  background: #f8fafc;
+  border-radius: 24px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.user-dropdown:hover {
+  background: #f1f5f9;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primary-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+/* ========== Tab 栏 ========== */
+.workspace-tab-bar {
+  height: var(--tab-bar-height);
+  background: var(--tab-bar-bg);
+  border-bottom: 1px solid var(--header-border);
+  display: flex;
+  align-items: flex-end;
+  padding: 0 16px;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.workspace-tab-bar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.workspace-tab-bar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 2px;
+}
+
+/* Tab 项 */
+.workspace-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--tab-text);
+  transition: all 0.2s;
+  white-space: nowrap;
+  max-width: 180px;
+}
+
+.workspace-tab:hover {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+.workspace-tab.active {
+  background: linear-gradient(to bottom, #eff6ff, #dbeafe);
+  color: var(--primary);
+  font-weight: 600;
+  border-color: #bfdbfe;
+  margin-bottom: -1px;
+  padding-bottom: 9px;
+  position: relative;
+}
+
+/* 选中标签页底部高亮指示器 */
+.workspace-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 8px;
+  right: 8px;
+  height: 3px;
+  background: var(--primary);
+  border-radius: 3px 3px 0 0;
+}
+
+.workspace-tab .tab-icon {
+  font-size: 14px;
+  transition: color 0.2s;
+}
+
+.workspace-tab.active .tab-icon {
+  color: var(--primary);
+}
+
+.workspace-tab .tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.workspace-tab .tab-close {
+  padding: 2px 6px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: all 0.2s;
+  cursor: pointer;
+  margin-left: 4px;
+}
+
+.workspace-tab:hover .tab-close {
+  opacity: 1;
+}
+
+.workspace-tab.active .tab-close {
+  opacity: 0.8;
+}
+
+.workspace-tab .tab-close:hover {
+  background: #fee2e2;
+  color: var(--danger);
+}
+
+/* 新增 Tab 按钮 */
+.workspace-tab.tab-add {
+  border: 1px dashed #cbd5e1;
+  color: #64748b;
+  padding: 6px 12px;
+}
+
+.workspace-tab.tab-add:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: transparent;
+}
+
+/* ========== 内容区 ========== */
+.workspace-content {
+  flex: 1;
+  background: var(--content-bg);
+  position: relative;
+}
+
+.tab-panel {
+  display: none;
+  height: 100%;
+}
+
+.tab-panel.active {
+  display: block;
+}
+
+.tab-panel iframe {
+  width: 100%;
+  height: calc(100vh - var(--header-height) - var(--tab-bar-height));
+  border: none;
+}
+
+/* ========== 响应式设计 ========== */
+@media (max-width: 768px) {
+  .workspace-header {
+    padding: 0 16px;
+  }
+  
+  .global-search {
+    display: none;
+  }
+  
+  .workspace-tab .tab-title {
+    max-width: 80px;
+  }
+}
+

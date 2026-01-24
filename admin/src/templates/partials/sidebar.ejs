@@ -1,0 +1,77 @@
+<%# 侧边栏导航模板 - 深蓝科技风 %>
+<aside 
+  class="admin-sidebar"
+  :class="{ 'collapsed': collapsed, 'mobile-open': mobileOpen }"
+  x-data="sidebarNav()"
+>
+  <!-- Logo 区域 -->
+  <div class="sidebar-logo">
+    <span class="logo-icon">🎰</span>
+    <span class="logo-text">抽奖管理后台</span>
+  </div>
+
+  <!-- 导航菜单 -->
+  <nav class="sidebar-nav scrollbar-thin">
+    <template x-for="group in navGroups" :key="group.id">
+      <!-- 单项菜单（如工作台） -->
+      <template x-if="group.type === 'single'">
+        <a 
+          class="nav-single"
+          :class="{ 'active': isItemActive(group.url) }"
+          @click.prevent="navigateTo(group.url, group.id, group.name, group.icon)"
+          href="javascript:;"
+        >
+          <span class="nav-icon" x-text="group.icon"></span>
+          <span class="nav-text" x-text="group.name"></span>
+        </a>
+      </template>
+
+      <!-- 分组菜单 -->
+      <template x-if="group.type !== 'single' && group.items">
+        <div 
+          class="nav-group"
+          :class="{ 'expanded': isGroupExpanded(group.id) }"
+        >
+          <!-- 分组标题 -->
+          <div 
+            class="nav-group-title"
+            @click="toggleGroup(group.id)"
+          >
+            <span class="nav-icon" x-text="group.icon"></span>
+            <span class="nav-text" x-text="group.name"></span>
+            <span class="toggle-icon">▼</span>
+          </div>
+
+          <!-- 分组子项 -->
+          <div class="nav-group-items">
+            <template x-for="item in group.items" :key="item.id">
+              <a 
+                class="nav-item"
+                :class="{ 'active': isItemActive(item.url) }"
+                @click.prevent="navigateTo(item.url, item.id, item.name, group.icon)"
+                href="javascript:;"
+              >
+                <span x-text="item.name"></span>
+                <template x-if="item.badge">
+                  <span class="ml-auto w-2 h-2 bg-red-500 rounded-full"></span>
+                </template>
+              </a>
+            </template>
+          </div>
+        </div>
+      </template>
+    </template>
+  </nav>
+
+  <!-- 侧边栏底部 -->
+  <div class="sidebar-footer">
+    <button 
+      class="collapse-btn"
+      @click="toggleCollapse()"
+      :title="collapsed ? '展开菜单' : '折叠菜单'"
+    >
+      <span x-show="!collapsed">◀ 折叠菜单</span>
+      <span x-show="collapsed">▶</span>
+    </button>
+  </div>
+</aside>

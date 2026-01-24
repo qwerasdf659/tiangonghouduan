@@ -16,9 +16,8 @@
  * @requires composables/*
  */
 
-/* global Alpine, createPageMixin */
-
 import { logger } from '../../../utils/logger.js'
+import { Alpine, createPageMixin } from '../../../alpine/index.js'
 
 // 导入所有 composables 模块
 import {

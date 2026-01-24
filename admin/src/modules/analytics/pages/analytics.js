@@ -31,8 +31,14 @@
 import { logger } from '../../../utils/logger.js'
 import { ANALYTICS_ENDPOINTS } from '../../../api/analytics.js'
 import { LOTTERY_ENDPOINTS } from '../../../api/lottery.js'
-import { buildURL } from '../../../api/base.js'
+import { buildURL, request } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/index.js'
+import { createPageMixin } from '../../../alpine/mixins/index.js'
+
+// API请求封装
+const apiRequest = async (url, options = {}) => {
+  return await request({ url, ...options })
+}
 /**
  * @typedef {Object} AnalyticsStats
  * @property {number} activeUsers - 活跃用户数

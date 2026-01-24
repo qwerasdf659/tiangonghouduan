@@ -2,9 +2,16 @@
  * Tailwind CSS 入口文件
  * 
  * @description 引入 Tailwind CSS 并定义自定义样式
- * @version 2.0.0
- * @date 2026-01-23
+ * @version 2.1.0
+ * @date 2026-01-25
  */
+
+/* ========== 新布局样式（侧边栏 + Tab 工作台） - 必须在 @tailwind 之前 ========== */
+@import './layout/variables.css';
+@import './layout/sidebar.css';
+@import './layout/workspace-tabs.css';
+@import './layout/themes.css';
+@import './layout/theme-switcher.css';
 
 /* ========== Tailwind 基础 ========== */
 @tailwind base;

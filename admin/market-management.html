@@ -9,10 +9,10 @@
 <body class="bg-gray-100 min-h-screen">
   
   <!-- 导航栏 -->
-  <nav class="bg-amber-600 text-white shadow-lg">
+  <nav class="bg-blue-600 text-white shadow-lg">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <a href="/admin/dashboard.html" class="hover:text-amber-200">← 返回仪表盘</a>
+        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
         <span class="text-lg font-semibold">🏪 市场管理中心</span>
       </div>
     </div>
@@ -45,7 +45,7 @@
         <div class="bg-white rounded-lg shadow">
           <div class="p-4 border-b flex justify-between items-center">
             <h5 class="font-semibold">兑换商品列表</h5>
-            <button @click="openItemModal()" class="px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700">
+            <button @click="openItemModal()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-amber-700">
               ➕ 新增商品
             </button>
           </div>
@@ -108,7 +108,7 @@
               </select>
               <input type="text" x-model="orderFilters.userId" placeholder="用户ID" class="px-3 py-2 border rounded-lg">
               <input type="date" x-model="orderFilters.startDate" class="px-3 py-2 border rounded-lg">
-              <button @click="loadExchangeOrders()" class="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700">🔍 搜索</button>
+              <button @click="loadExchangeOrders()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-amber-700">🔍 搜索</button>
             </div>
           </div>
           <div class="overflow-x-auto">
@@ -305,7 +305,7 @@
         </div>
         <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-3">
           <button type="button" @click="hideModal('exchangeItemModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
-          <button type="submit" class="px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50" :disabled="submitting">
+          <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-amber-700 disabled:opacity-50" :disabled="submitting">
             保存
           </button>
         </div>

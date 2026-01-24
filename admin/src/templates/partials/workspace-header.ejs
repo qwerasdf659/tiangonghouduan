@@ -1,0 +1,122 @@
+<%# 工作台顶部栏模板 - 深蓝科技风 %>
+<header class="workspace-header">
+  <div class="header-left">
+    <!-- 移动端菜单按钮 -->
+    <button 
+      class="mobile-menu-btn"
+      @click="$dispatch('toggle-mobile-menu')"
+      title="菜单"
+    >
+      ☰
+    </button>
+
+    <!-- 面包屑导航 -->
+    <nav class="breadcrumb-nav">
+      <span>管理后台</span>
+      <span>/</span>
+      <span x-text="getActiveTab()?.title || '工作台'"></span>
+    </nav>
+  </div>
+
+  <div class="header-right">
+    <!-- 全局搜索 -->
+    <div class="global-search">
+      <span class="global-search-icon">🔍</span>
+      <input 
+        type="text" 
+        placeholder="搜索功能..." 
+        @keyup.enter="handleGlobalSearch($event.target.value)"
+      />
+    </div>
+
+    <!-- 通知按钮 -->
+    <button class="header-btn" title="消息通知">
+      🔔
+      <span class="notification-dot"></span>
+    </button>
+
+    <!-- 主题切换 -->
+    <div class="theme-switcher" x-data="themeSwitcher()" @click.away="closeDropdown()">
+      <button 
+        class="theme-btn"
+        @click="toggleDropdown()"
+        :title="'当前主题: ' + getCurrentThemeInfo().name"
+      >
+        <span x-text="getCurrentThemeInfo().icon">☀️</span>
+      </button>
+
+      <!-- 主题下拉菜单 -->
+      <div 
+        class="theme-dropdown"
+        x-show="isOpen"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 transform scale-95"
+        x-transition:enter-end="opacity-100 transform scale-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 transform scale-100"
+        x-transition:leave-end="opacity-0 transform scale-95"
+      >
+        <div class="theme-dropdown-title">选择主题</div>
+        <template x-for="theme in themes" :key="theme.id">
+          <button 
+            class="theme-option"
+            :class="{ 'active': currentTheme === theme.id }"
+            @click="setTheme(theme.id)"
+          >
+            <span class="theme-icon" x-text="theme.icon"></span>
+            <span class="theme-name" x-text="theme.name"></span>
+            <div class="theme-preview">
+              <template x-for="(color, i) in theme.colors" :key="i">
+                <span class="theme-preview-color" :style="{ backgroundColor: color }"></span>
+              </template>
+            </div>
+            <span class="theme-check" x-show="currentTheme === theme.id">✓</span>
+          </button>
+        </template>
+        
+        <div class="theme-divider"></div>
+        
+        <!-- 快速切换暗色模式 -->
+        <button 
+          class="theme-option"
+          @click="toggleDarkMode()"
+        >
+          <span class="theme-icon">🌓</span>
+          <span class="theme-name">快速切换明/暗</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 用户下拉菜单 -->
+    <div class="user-dropdown" x-data="{ open: false }" @click.away="open = false">
+      <div @click="open = !open" class="flex items-center gap-2 cursor-pointer">
+        <span class="user-avatar">A</span>
+        <span class="user-name">管理员</span>
+        <span class="text-xs text-gray-400">▼</span>
+      </div>
+      
+      <!-- 下拉菜单 -->
+      <div 
+        x-show="open"
+        x-transition
+        class="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
+        style="display: none;"
+      >
+        <a href="/admin/profile.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+          👤 个人设置
+        </a>
+        <a href="/admin/system-settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+          ⚙️ 系统设置
+        </a>
+        <div class="border-t border-gray-200 my-1"></div>
+        <button 
+          @click="handleLogout()"
+          class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+        >
+          🚪 退出登录
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+

@@ -32,6 +32,7 @@
 import { logger } from '../../../utils/logger.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 import { buildURL } from '../../../api/base.js'
+import { Alpine, createPageMixin } from '../../../alpine/index.js'
 /**
  * @typedef {Object} MaterialType
  * @property {string} asset_code - 资产代码

@@ -28,9 +28,12 @@
  * </form>
  */
 
-
+/* global Alpine */
 import { logger } from '../../../utils/logger.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
+import { AUTH_ENDPOINTS } from '../../../api/auth.js'
+import { getToken, setToken, clearToken, setUser, clearUser, checkBrowserSession } from '../../../api/base.js'
+
 /**
  * 登录页面Alpine.js组件工厂函数
  * @function loginPage
@@ -74,26 +77,75 @@ function loginPage() {
      * x-init="init()"
      */
     init() {
-      logger.info('登录页面初始化 (v3.0)')
+      logger.info('登录页面初始化 (v3.1)')
+      // 检查浏览器会话：如果是新的浏览器会话（浏览器曾被关闭），清除旧 token
+      checkBrowserSession()
       this.checkExistingSession()
     },
 
     /**
      * 检查是否已存在有效会话
      * @method checkExistingSession
+     * @async
      * @description
-     * 检查localStorage中是否存在admin_token，
-     * 如果存在则认为用户已登录，显示提示后自动跳转到仪表盘。
-     * @returns {void}
+     * 检查sessionStorage中是否存在admin_token，并验证其有效性。
+     * 如果token有效且用户是管理员，则自动跳转到仪表盘。
+     * 如果token无效或已过期，则清除token并留在登录页。
+     * 注意：使用sessionStorage存储，关闭浏览器后需要重新登录。
+     * @returns {Promise<void>} 无返回值
      */
-    checkExistingSession() {
-      const token = localStorage.getItem('admin_token')
-      if (token) {
-        // 已经登录，跳转到仪表盘
+    async checkExistingSession() {
+      const token = getToken()
+      if (!token) {
+        logger.debug('无现有token，留在登录页')
+        return
+      }
+
+      logger.info('检测到现有token，验证有效性...')
+
+      try {
+        // 调用后端验证接口
+        const response = await fetch(AUTH_ENDPOINTS.VERIFY, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          }
+        })
+
+        const result = await response.json()
+
+        // 检查token是否有效
+        if (!response.ok || !result.success) {
+          logger.warn('Token验证失败，清除无效token')
+          clearToken()
+          clearUser()
+          return
+        }
+
+        // 检查用户是否有管理员权限
+        const userData = result.data
+        const isAdmin = this.checkAdminAccess(userData)
+
+        if (!isAdmin) {
+          logger.warn('用户不具备管理员权限，清除token')
+          clearToken()
+          clearUser()
+          this.showMessage('您没有管理后台访问权限', true)
+          return
+        }
+
+        // Token有效且是管理员，跳转到仪表盘
+        logger.info('Token验证成功，用户是管理员，准备跳转')
         this.showMessage('已登录，正在跳转...', false)
         setTimeout(() => {
-          window.location.href = '/admin/dashboard.html'
+          window.location.href = '/admin/workspace.html'
         }, 500)
+      } catch (error) {
+        logger.error('Token验证请求失败:', error)
+        // 验证请求失败时，清除token让用户重新登录
+        clearToken()
+        clearUser()
       }
     },
 
@@ -139,12 +191,12 @@ function loginPage() {
      * 处理登录表单提交，完成以下流程：
      * 1. 验证手机号和验证码输入
      * 2. 调用后端登录API (POST /api/v4/auth/login)
-     * 3. 存储返回的Token到localStorage
-     * 4. 存储用户信息到localStorage
+     * 3. 存储返回的Token到sessionStorage（关闭浏览器后自动清除）
+     * 4. 存储用户信息到sessionStorage
      * 5. 验证管理员权限
      * 6. 成功后跳转到仪表盘页面
      *
-     * @returns {Promise<void>}
+     * @returns {Promise<void>} 无返回值
      * @throws {Error} 登录失败时显示错误消息
      *
      * @example
@@ -195,19 +247,19 @@ function loginPage() {
           throw new Error('服务器未返回有效的 Token')
         }
 
-        // 存储 Token
-        localStorage.setItem('admin_token', token)
+        // 存储 Token（使用 sessionStorage，关闭浏览器后自动清除）
+        setToken(token)
 
         // 存储用户信息
         if (data.user) {
-          localStorage.setItem('admin_user', JSON.stringify(data.user))
+          setUser(data.user)
         }
 
         // 检查管理员权限
         const isAdmin = this.checkAdminAccess(data.user)
         if (!isAdmin) {
-          localStorage.removeItem('admin_token')
-          localStorage.removeItem('admin_user')
+          clearToken()
+          clearUser()
           throw new Error('您没有管理后台访问权限')
         }
 
@@ -215,7 +267,7 @@ function loginPage() {
 
         // 跳转到仪表盘
         setTimeout(() => {
-          window.location.href = '/admin/dashboard.html'
+          window.location.href = '/admin/workspace.html'
         }, 500)
       } catch (error) {
         logger.error('登录失败:', error)

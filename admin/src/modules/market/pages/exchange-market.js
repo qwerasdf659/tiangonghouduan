@@ -12,6 +12,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
+import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import {
   useExchangeItemsState,
   useExchangeItemsMethods,

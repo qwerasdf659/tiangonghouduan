@@ -1,4 +1,3 @@
-/* global Alpine, createPageMixin */
 /**
  * Finance Management Page - Alpine.js Mixin 重构版
  * 财务管理整合页面组件
@@ -24,6 +23,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
+import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import {
   useConsumptionState,
   useConsumptionMethods,
@@ -67,6 +67,13 @@ document.addEventListener('alpine:init', () => {
       return Alpine.store('financePage')
     },
 
+    /**
+     * 初始化导航组件
+     */
+    init() {
+      logger.debug('[FinanceNav] 导航组件初始化')
+    },
+
     switchPage(pageId) {
       Alpine.store('financePage', pageId)
       logger.debug('[FinanceNav] 切换到页面:', pageId)
@@ -93,6 +100,57 @@ document.addEventListener('alpine:init', () => {
       // ========== 基础状态 ==========
       subPages: SUB_PAGES,
       saving: false,
+      
+      // ========== 财务统计 ==========
+      financeStats: {
+        todayRevenue: '0.00',
+        monthRevenue: '0.00',
+        pendingCount: 0,
+        totalDebt: '0.00'
+      },
+      
+      // ========== 拒绝表单 ==========
+      rejectForm: {
+        reason: ''
+      },
+      
+      // ========== 欠账还款表单 ==========
+      debtRepayForm: {
+        amount: 0,
+        note: ''
+      },
+      
+      // ========== 钻石调整表单 ==========
+      diamondAdjustForm: {
+        type: 'add',
+        amount: 0,
+        reason: ''
+      },
+      
+      // ========== 预算表单（fallback，composable 会覆盖） ==========
+      budgetForm: {
+        type: 'daily',
+        amount: 0,
+        alertThreshold: 80,
+        campaign_id: '',
+        budget_mode: 'UNLIMITED',
+        pool_budget_remaining: 0
+      },
+      
+      // ========== 消费筛选（fallback，composable 会覆盖） ==========
+      consumptionFilters: {
+        userId: '',
+        user_id: '',
+        status: '',
+        startDate: '',
+        endDate: ''
+      },
+      
+      // ========== 选中项 ==========
+      selectedConsumption: null,
+      selectedDebt: null,
+      selectedDiamondAccount: null,
+      selectedMerchant: null,
 
       // ========== 各模块状态 ==========
       ...useConsumptionState(),

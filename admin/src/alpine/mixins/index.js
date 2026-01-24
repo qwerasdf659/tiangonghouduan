@@ -32,6 +32,7 @@ export { modalMixin } from './modal.js'
 export { tableSelectionMixin } from './table-selection.js'
 export { formValidationMixin } from './form-validation.js'
 export { authGuardMixin } from './auth-guard.js'
+export { withDraftAutoSave, createDraftFormMixin } from './draft-auto-save.js'
 
 // ========== 组合工具 ==========
 
@@ -408,6 +409,9 @@ export function createFormMixin() {
   })
 }
 
+// ========== 草稿自动保存 ==========
+import { withDraftAutoSave, createDraftFormMixin } from './draft-auto-save.js'
+
 // ========== 导出所有 ==========
 export default {
   paginationMixin,
@@ -423,5 +427,7 @@ export default {
   createBatchOperationMixin,
   createDashboardMixin,
   createSimpleListMixin,
-  createFormMixin
+  createFormMixin,
+  withDraftAutoSave,
+  createDraftFormMixin
 }

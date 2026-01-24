@@ -27,8 +27,15 @@ import {
   createBatchOperationMixin,
   createDashboardMixin,
   createSimpleListMixin,
-  createFormMixin
+  createFormMixin,
+  withDraftAutoSave,
+  createDraftFormMixin
 } from './mixins/index.js'
+
+// 导入布局组件
+import { sidebarNav } from './components/sidebar-nav.js'
+import { workspaceTabs } from './components/workspace-tabs.js'
+import { themeSwitcher } from './components/theme-switcher.js'
 
 /**
  * 初始化 Alpine.js
@@ -192,6 +199,12 @@ export function initAlpine() {
   // Mixin 工具请使用 ES Module 导入：
   //   import { createPageMixin, paginationMixin } from '@/alpine/mixins/index.js'
 
+  // ========== 注册布局组件 ==========
+  Alpine.data('sidebarNav', sidebarNav)
+  Alpine.data('workspaceTabs', workspaceTabs)
+  Alpine.data('themeSwitcher', themeSwitcher)
+  logger.debug('布局组件已注册: sidebarNav, workspaceTabs, themeSwitcher')
+
   // 启动 Alpine
   Alpine.start()
 
@@ -237,5 +250,14 @@ export {
   createBatchOperationMixin,
   createDashboardMixin,
   createSimpleListMixin,
-  createFormMixin
+  createFormMixin,
+  withDraftAutoSave,
+  createDraftFormMixin
+}
+
+// 导出布局组件
+export {
+  sidebarNav,
+  workspaceTabs,
+  themeSwitcher
 }

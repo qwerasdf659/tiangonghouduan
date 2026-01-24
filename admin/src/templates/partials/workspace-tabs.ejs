@@ -1,0 +1,63 @@
+<%# Tab 工作台标签栏模板 %>
+<div class="workspace-tab-bar">
+  <!-- Tab 列表 -->
+  <template x-for="tab in tabs" :key="tab.id">
+    <button 
+      class="workspace-tab"
+      :class="{ 'active': isActiveTab(tab.id) }"
+      @click="switchTab(tab.id)"
+      @contextmenu="showContextMenu(tab.id, $event)"
+      :title="tab.title"
+    >
+      <span class="tab-icon" x-text="tab.icon"></span>
+      <span class="tab-title" x-text="tab.title"></span>
+      <button 
+        class="tab-close"
+        @click.stop="closeTab(tab.id)"
+        title="关闭"
+        x-show="tabs.length > 1"
+      >×</button>
+    </button>
+  </template>
+
+  <!-- 新增 Tab 按钮 -->
+  <button 
+    class="workspace-tab tab-add"
+    @click="openTab({ id: 'dashboard', title: '工作台', icon: '📊', url: '/admin/statistics.html' })"
+    title="打开工作台"
+    x-show="!tabs.find(t => t.id === 'dashboard')"
+  >
+    + 工作台
+  </button>
+</div>
+
+<!-- Tab 内容区域 -->
+<div class="workspace-content">
+  <template x-for="tab in tabs" :key="tab.id">
+    <div 
+      class="tab-panel"
+      :class="{ 'active': isActiveTab(tab.id) }"
+      :data-tab-id="tab.id"
+    >
+      <!-- 使用 iframe 加载页面内容 -->
+      <iframe 
+        :src="tab.url"
+        :name="'tab-' + tab.id"
+        title="页面内容"
+        loading="lazy"
+      ></iframe>
+    </div>
+  </template>
+
+  <!-- 空状态 -->
+  <div 
+    class="empty-state"
+    x-show="tabs.length === 0"
+    style="height: 100%;"
+  >
+    <div class="empty-state-icon">📋</div>
+    <div class="empty-state-text">暂无打开的页面</div>
+    <div class="empty-state-description">从左侧菜单选择功能开始使用</div>
+  </div>
+</div>
+

@@ -26,6 +26,10 @@
 
 
 import { logger } from '../../../utils/logger.js'
+import { Alpine, createCrudMixin } from '../../../alpine/index.js'
+
+// API基础地址
+const API_BASE_URL = '/api/v4'
 /**
  * @typedef {Object} AssetBalance
  * @property {string} asset_code - 资产代码
@@ -152,6 +156,12 @@ function assetAdjustmentPage() {
      * @type {{status: string}}
      */
     filters: { status: '' },
+
+    /**
+     * 当前选中的记录（用于查看详情）
+     * @type {Object|null}
+     */
+    selectedRecord: null,
 
     // ==================== 调整表单 ====================
 
@@ -656,6 +666,25 @@ function assetAdjustmentPage() {
       } catch {
         return dateStr
       }
+    },
+
+    /**
+     * 格式化日期（HTML模板别名）
+     * @param {string} dateStr - 日期字符串
+     * @returns {string} 格式化后的中文日期时间
+     */
+    formatDate(dateStr) {
+      return this.formatDateTime(dateStr)
+    },
+
+    /**
+     * 查看记录详情
+     * @param {Object} record - 记录对象
+     * @returns {void}
+     */
+    viewRecordDetail(record) {
+      this.selectedRecord = record
+      this.showModal('recordDetailModal')
     },
 
     /**

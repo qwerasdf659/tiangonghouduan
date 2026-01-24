@@ -8,23 +8,30 @@
  */
 
 // 消费记录模块
-export { useConsumptionState, useConsumptionMethods } from './consumption.js'
+import { useConsumptionState, useConsumptionMethods } from './consumption.js'
+export { useConsumptionState, useConsumptionMethods }
 
 // 钻石账户模块
-export { useDiamondAccountsState, useDiamondAccountsMethods } from './diamond-accounts.js'
+import { useDiamondAccountsState, useDiamondAccountsMethods } from './diamond-accounts.js'
+export { useDiamondAccountsState, useDiamondAccountsMethods }
 
 // 商户积分模块
-export { useMerchantPointsState, useMerchantPointsMethods } from './merchant-points.js'
+import { useMerchantPointsState, useMerchantPointsMethods } from './merchant-points.js'
+export { useMerchantPointsState, useMerchantPointsMethods }
 
 // 债务管理模块
-export { useDebtManagementState, useDebtManagementMethods } from './debt-management.js'
+import { useDebtManagementState, useDebtManagementMethods } from './debt-management.js'
+export { useDebtManagementState, useDebtManagementMethods }
 
 // 活动预算模块
-export { useCampaignBudgetState, useCampaignBudgetMethods } from './campaign-budget.js'
+import { useCampaignBudgetState, useCampaignBudgetMethods } from './campaign-budget.js'
+export { useCampaignBudgetState, useCampaignBudgetMethods }
 
 // 商户操作日志模块
-export { useMerchantLogsState, useMerchantLogsMethods } from './merchant-logs.js'
+import { useMerchantLogsState, useMerchantLogsMethods } from './merchant-logs.js'
+export { useMerchantLogsState, useMerchantLogsMethods }
 
+// 默认导出（现在可以使用本地绑定）
 export default {
   useConsumptionState,
   useConsumptionMethods,

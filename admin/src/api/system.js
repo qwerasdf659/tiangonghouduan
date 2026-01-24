@@ -14,8 +14,8 @@ import { request, buildURL, buildQueryString } from './base.js'
 export const SYSTEM_ENDPOINTS = {
   // 系统基础
   DASHBOARD: '/api/v4/console/system/dashboard',
-  DASHBOARD_TRENDS: '/api/v4/console/analytics/decisions/analytics', // 仪表盘趋势数据
-  CHARTS: '/api/v4/console/analytics/decisions/analytics', // 统计图表数据（与DASHBOARD_TRENDS相同）
+  DASHBOARD_TRENDS: '/api/v4/console/system/dashboard', // 仪表盘趋势数据（使用dashboard接口）
+  CHARTS: '/api/v4/system/statistics/charts', // 统计图表数据（返回 user_growth/user_types/lottery_trend/consumption_trend 等）
   LOTTERY_TRENDS: '/api/v4/console/analytics/lottery/trends', // 抽奖趋势数据
   PERFORMANCE_REPORT: '/api/v4/console/analytics/performance/report', // 性能报告
   TODAY_STATS: '/api/v4/console/analytics/stats/today', // 今日统计

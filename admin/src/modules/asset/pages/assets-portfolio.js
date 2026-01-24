@@ -10,6 +10,13 @@
 
 import { logger } from '../../../utils/logger.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
+import { buildURL, request } from '../../../api/base.js'
+import { createPageMixin } from '../../../alpine/mixins/index.js'
+
+// API请求封装
+const apiRequest = async (url, options = {}) => {
+  return await request({ url, ...options })
+}
 function assetsPortfolioPage() {
   return {
     // ==================== Mixin 组合 ====================
