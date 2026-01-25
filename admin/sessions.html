@@ -25,19 +25,19 @@
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
       <div class="bg-white rounded-lg shadow p-6 text-center">
-        <i class="text-4xl text-blue-500 mb-2">👥</i>
-        <h6 class="text-gray-500 mt-2">在线用户</h6>
-        <h2 class="text-3xl font-bold text-blue-600" x-text="statistics.onlineUsers"></h2>
+        <i class="text-4xl text-blue-500 mb-2">📊</i>
+        <h6 class="text-gray-500 mt-2">总会话数</h6>
+        <h2 class="text-3xl font-bold text-blue-600" x-text="total || sessions.length"></h2>
       </div>
       <div class="bg-white rounded-lg shadow p-6 text-center">
-        <i class="text-4xl text-green-500 mb-2">🔗</i>
+        <i class="text-4xl text-green-500 mb-2">✅</i>
         <h6 class="text-gray-500 mt-2">活跃会话</h6>
         <h2 class="text-3xl font-bold text-green-600" x-text="statistics.activeSessions"></h2>
       </div>
       <div class="bg-white rounded-lg shadow p-6 text-center">
-        <i class="text-4xl text-yellow-500 mb-2">👤</i>
-        <h6 class="text-gray-500 mt-2">用户会话</h6>
-        <h2 class="text-3xl font-bold text-yellow-600" x-text="statistics.userSessions"></h2>
+        <i class="text-4xl text-orange-500 mb-2">⏰</i>
+        <h6 class="text-gray-500 mt-2">已过期</h6>
+        <h2 class="text-3xl font-bold text-orange-600" x-text="statistics.expiredCount || 0"></h2>
       </div>
       <div class="bg-white rounded-lg shadow p-6 text-center">
         <i class="text-4xl text-purple-500 mb-2">🛡️</i>
@@ -99,7 +99,7 @@
             🚪 强制下线其他设备
           </button>
         </div>
-        <button class="px-4 py-2 border border-blue-500 text-blue-500 rounded-lg hover:bg-blue-50" @click="loadData()">
+        <button class="px-4 py-2 border border-blue-500 text-blue-500 rounded-lg hover:bg-blue-50" @click="refreshData()">
           🔄 刷新
         </button>
       </div>
@@ -215,51 +215,51 @@
         >下一页</button>
       </div>
     </nav>
-  </div>
 
-  <!-- 会话详情模态框 -->
-  <div x-data="{ open: false }" x-show="open" @session-detail.window="open = true; $dispatch('set-session', $event.detail)" @keydown.escape.window="open = false" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
-    <div class="flex items-center justify-center min-h-screen px-4">
-      <div class="fixed inset-0 bg-black opacity-50" @click="open = false"></div>
-      <div class="bg-white rounded-lg shadow-xl z-10 w-full max-w-lg" x-data="sessionsPage()" @set-session.window="selectedSession = $event.detail">
-        <div class="px-6 py-4 border-b flex justify-between items-center">
-          <h5 class="text-lg font-semibold">ℹ️ 会话详情</h5>
-          <button @click="$dispatch('close-modal')" class="text-gray-500 hover:text-gray-700">&times;</button>
-        </div>
-        <div class="p-6" x-show="selectedSession">
-          <table class="w-full text-sm">
-            <tr class="border-b"><th class="py-2 text-left w-1/3 text-gray-600">会话ID</th><td class="py-2"><code class="text-xs" x-text="selectedSession?.user_session_id || selectedSession?.session_id"></code></td></tr>
-            <tr class="border-b"><th class="py-2 text-left text-gray-600">用户ID</th><td class="py-2" x-text="selectedSession?.user_id"></td></tr>
-            <tr class="border-b"><th class="py-2 text-left text-gray-600">用户昵称</th><td class="py-2" x-text="selectedSession?.user_info?.nickname || '-'"></td></tr>
-            <tr class="border-b"><th class="py-2 text-left text-gray-600">用户类型</th><td class="py-2" x-text="selectedSession?.user_type === 'admin' ? '管理员' : '普通用户'"></td></tr>
-            <tr class="border-b"><th class="py-2 text-left text-gray-600">状态</th><td class="py-2"><span class="px-2 py-1 text-xs rounded" :class="{ 'bg-green-100 text-green-800': getSessionStatus(selectedSession) === 'active', 'bg-yellow-100 text-yellow-800': getSessionStatus(selectedSession) === 'expired', 'bg-red-100 text-red-800': getSessionStatus(selectedSession) === 'revoked' }" x-text="getStatusLabel(getSessionStatus(selectedSession))"></span></td></tr>
-            <tr class="border-b"><th class="py-2 text-left text-gray-600">IP地址</th><td class="py-2" x-text="selectedSession?.login_ip || selectedSession?.ip_address || '-'"></td></tr>
-            <tr class="border-b"><th class="py-2 text-left text-gray-600">是否过期</th><td class="py-2" x-text="selectedSession?.is_expired ? '是' : '否'"></td></tr>
-            <tr class="border-b"><th class="py-2 text-left text-gray-600">是否有效</th><td class="py-2" x-text="selectedSession?.is_valid ? '是' : '否'"></td></tr>
-            <tr class="border-b"><th class="py-2 text-left text-gray-600">创建时间</th><td class="py-2" x-text="formatDateTime(selectedSession?.created_at)"></td></tr>
-            <tr class="border-b"><th class="py-2 text-left text-gray-600">最后活动</th><td class="py-2" x-text="formatDateTime(selectedSession?.last_activity || selectedSession?.last_active_at)"></td></tr>
-            <tr><th class="py-2 text-left text-gray-600">过期时间</th><td class="py-2" x-text="formatDateTime(selectedSession?.expires_at)"></td></tr>
-          </table>
-          <div x-show="isCurrentSession(selectedSession)" class="mt-4 p-3 bg-blue-50 text-blue-700 rounded">
-            ℹ️ 这是您当前的会话，无法撤销
+    <!-- 会话详情模态框 (在主 x-data 作用域内) -->
+    <div x-show="showDetailModal" x-transition class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+      <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black opacity-50" @click="showDetailModal = false"></div>
+        <div class="bg-white rounded-lg shadow-xl z-10 w-full max-w-lg relative">
+          <div class="px-6 py-4 border-b flex justify-between items-center">
+            <h5 class="text-lg font-semibold">ℹ️ 会话详情</h5>
+            <button @click="showDetailModal = false" class="text-gray-500 hover:text-gray-700">&times;</button>
           </div>
-        </div>
-        <div class="px-6 py-4 border-t flex justify-end space-x-2">
-          <button 
-            type="button"
-            class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-            x-show="selectedSession && !isCurrentSession(selectedSession) && getSessionStatus(selectedSession) === 'active'"
-            @click="revokeSessionFromModal(); open = false"
-          >撤销会话</button>
-          <button type="button" class="px-4 py-2 border rounded hover:bg-gray-50" @click="open = false">关闭</button>
+          <div class="p-6" x-show="selectedSession">
+            <table class="w-full text-sm">
+              <tr class="border-b"><th class="py-2 text-left w-1/3 text-gray-600">会话ID</th><td class="py-2"><code class="text-xs" x-text="selectedSession?.user_session_id || selectedSession?.session_id"></code></td></tr>
+              <tr class="border-b"><th class="py-2 text-left text-gray-600">用户ID</th><td class="py-2" x-text="selectedSession?.user_id"></td></tr>
+              <tr class="border-b"><th class="py-2 text-left text-gray-600">用户昵称</th><td class="py-2" x-text="selectedSession?.user_info?.nickname || '-'"></td></tr>
+              <tr class="border-b"><th class="py-2 text-left text-gray-600">用户类型</th><td class="py-2" x-text="selectedSession?.user_type === 'admin' ? '管理员' : '普通用户'"></td></tr>
+              <tr class="border-b"><th class="py-2 text-left text-gray-600">状态</th><td class="py-2"><span class="px-2 py-1 text-xs rounded" :class="{ 'bg-green-100 text-green-800': getSessionStatus(selectedSession) === 'active', 'bg-yellow-100 text-yellow-800': getSessionStatus(selectedSession) === 'expired', 'bg-red-100 text-red-800': getSessionStatus(selectedSession) === 'revoked' }" x-text="getStatusLabel(getSessionStatus(selectedSession))"></span></td></tr>
+              <tr class="border-b"><th class="py-2 text-left text-gray-600">IP地址</th><td class="py-2" x-text="selectedSession?.login_ip || selectedSession?.ip_address || '-'"></td></tr>
+              <tr class="border-b"><th class="py-2 text-left text-gray-600">是否过期</th><td class="py-2" x-text="selectedSession?.is_expired ? '是' : '否'"></td></tr>
+              <tr class="border-b"><th class="py-2 text-left text-gray-600">是否有效</th><td class="py-2" x-text="selectedSession?.is_valid ? '是' : '否'"></td></tr>
+              <tr class="border-b"><th class="py-2 text-left text-gray-600">创建时间</th><td class="py-2" x-text="formatDateTime(selectedSession?.created_at)"></td></tr>
+              <tr class="border-b"><th class="py-2 text-left text-gray-600">最后活动</th><td class="py-2" x-text="formatDateTime(selectedSession?.last_activity || selectedSession?.last_active_at)"></td></tr>
+              <tr><th class="py-2 text-left text-gray-600">过期时间</th><td class="py-2" x-text="formatDateTime(selectedSession?.expires_at)"></td></tr>
+            </table>
+            <div x-show="isCurrentSession(selectedSession)" class="mt-4 p-3 bg-blue-50 text-blue-700 rounded">
+              ℹ️ 这是您当前的会话，无法撤销
+            </div>
+          </div>
+          <div class="px-6 py-4 border-t flex justify-end space-x-2">
+            <button 
+              type="button"
+              class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+              x-show="selectedSession && !isCurrentSession(selectedSession) && getSessionStatus(selectedSession) === 'active'"
+              @click="revokeSession(selectedSession.user_session_id || selectedSession.session_id); showDetailModal = false"
+            >撤销会话</button>
+            <button type="button" class="px-4 py-2 border rounded hover:bg-gray-50" @click="showDetailModal = false">关闭</button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- 全局加载遮罩 -->
-  <div x-data="sessionsPage()" x-show="globalLoading" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" style="display: none;">
-    <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-white"></div>
+    <!-- 全局加载遮罩 (在主 x-data 作用域内) -->
+    <div x-show="globalLoading" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" style="display: none;">
+      <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-white"></div>
+    </div>
   </div>
 
   <%- include('partials/footer') %>

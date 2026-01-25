@@ -232,7 +232,7 @@ module.exports = sequelize => {
       modelName: 'AssetTransaction',
       tableName: 'asset_transactions',
       timestamps: true,
-      created_at: 'created_at',
+      createdAt: 'created_at', // 映射createdAt到数据库的created_at列
       updatedAt: false, // 流水表不需要updated_at字段（不可修改）
       underscored: true,
       comment: '资产流水表（记录所有资产变动，支持幂等性控制和审计追溯）',

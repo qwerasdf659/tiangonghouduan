@@ -78,10 +78,13 @@ export function useMerchantLogsMethods() {
         )
 
         if (response?.success) {
-          this.merchantLogs = response.data?.logs || response.data?.list || []
+          // 后端返回 items 字段
+          this.merchantLogs = response.data?.items || response.data?.logs || response.data?.list || []
           if (response.data?.pagination) {
             this.total = response.data.pagination.total || 0
             this.totalPages = response.data.pagination.total_pages || 1
+            // 从分页信息更新统计
+            this.updateStatsFromList(response.data.pagination)
           }
         }
       } catch (error) {
@@ -92,24 +95,22 @@ export function useMerchantLogsMethods() {
 
     /**
      * 加载日志统计
+     * 注：后端无通用stats接口，统计数据从列表分页信息中获取
      */
     async loadLogStats() {
-      try {
-        const response = await this.apiGet(
-          STORE_ENDPOINTS.MERCHANT_LOGS_STATS,
-          {},
-          { showLoading: false, showError: false }
-        )
-        if (response?.success && response.data) {
-          this.logStats = {
-            totalLogs: response.data.total_logs ?? 0,
-            todayLogs: response.data.today_logs ?? 0,
-            warningLogs: response.data.warning_logs ?? 0,
-            errorLogs: response.data.error_logs ?? 0
-          }
-        }
-      } catch (error) {
-        logger.error('加载日志统计失败:', error)
+      // 后端只有 /stats/store/:store_id 和 /stats/operator/:operator_id
+      // 没有通用的 stats 接口，统计数据通过 loadMerchantLogs 的分页信息更新
+      // 此方法保留为空实现，避免调用不存在的API
+      logger.info('日志统计：使用列表分页数据')
+    },
+
+    /**
+     * 更新统计信息（从列表响应中提取）
+     * @param {Object} paginationData - 分页数据
+     */
+    updateStatsFromList(paginationData) {
+      if (paginationData) {
+        this.logStats.totalLogs = paginationData.total || 0
       }
     },
 

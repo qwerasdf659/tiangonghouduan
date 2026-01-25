@@ -39,13 +39,13 @@ const apiRequest = async (url, options = {}) => {
   return await request({ url, ...options })
 }
 /**
- * 转换规则对象类型
+ * 转换规则对象类型（使用后端字段名）
  * @typedef {Object} ConversionRule
  * @property {number} rule_id - 规则ID
  * @property {string} from_asset_code - 源资产代码
  * @property {string} to_asset_code - 目标资产代码
- * @property {number} input_quantity - 输入数量
- * @property {number} output_quantity - 输出数量
+ * @property {number} from_amount - 源资产数量（后端字段名）
+ * @property {number} to_amount - 目标资产数量（后端字段名）
  * @property {string} effective_at - 生效时间
  * @property {boolean} is_enabled - 是否启用
  * @property {boolean} [cycle_detected] - 是否检测到循环
@@ -108,39 +108,39 @@ function materialConversionRulesPage() {
     },
 
     /**
-     * 添加规则表单数据
+     * 添加规则表单数据（使用后端字段名）
      * @type {Object}
      * @property {string} from_asset_code - 源资产代码
      * @property {string} to_asset_code - 目标资产代码
-     * @property {string} input_quantity - 输入数量
-     * @property {string} output_quantity - 输出数量
+     * @property {string} from_amount - 源资产数量
+     * @property {string} to_amount - 目标资产数量
      * @property {string} effective_at - 生效时间
      * @property {string} is_enabled - 是否启用 ('1'|'0')
      */
     addForm: {
       from_asset_code: '',
       to_asset_code: '',
-      input_quantity: '',
-      output_quantity: '',
+      from_amount: '',
+      to_amount: '',
       effective_at: '',
       is_enabled: '1'
     },
 
     /**
-     * 编辑规则表单数据
+     * 编辑规则表单数据（使用后端字段名）
      * @type {Object}
      * @property {string} rule_id - 规则ID
      * @property {string} direction - 转换方向显示文本
-     * @property {string} input_quantity - 输入数量
-     * @property {string} output_quantity - 输出数量
+     * @property {string} from_amount - 源资产数量
+     * @property {string} to_amount - 目标资产数量
      * @property {string} effective_at - 生效时间
      * @property {string} is_enabled - 是否启用 ('1'|'0')
      */
     editForm: {
       rule_id: '',
       direction: '',
-      input_quantity: '',
-      output_quantity: '',
+      from_amount: '',
+      to_amount: '',
       effective_at: '',
       is_enabled: '1'
     },
@@ -250,8 +250,8 @@ function materialConversionRulesPage() {
       this.addForm = {
         from_asset_code: '',
         to_asset_code: '',
-        input_quantity: '',
-        output_quantity: '',
+        from_amount: '',
+        to_amount: '',
         effective_at: '',
         is_enabled: '1'
       }
@@ -272,8 +272,8 @@ function materialConversionRulesPage() {
       if (
         !this.addForm.from_asset_code ||
         !this.addForm.to_asset_code ||
-        !this.addForm.input_quantity ||
-        !this.addForm.output_quantity ||
+        !this.addForm.from_amount ||
+        !this.addForm.to_amount ||
         !this.addForm.effective_at
       ) {
         this.showError('请填写所有必填字段')
@@ -287,8 +287,8 @@ function materialConversionRulesPage() {
         {
           from_asset_code: this.addForm.from_asset_code,
           to_asset_code: this.addForm.to_asset_code,
-          input_quantity: parseInt(this.addForm.input_quantity),
-          output_quantity: parseInt(this.addForm.output_quantity),
+          from_amount: parseInt(this.addForm.from_amount),
+          to_amount: parseInt(this.addForm.to_amount),
           effective_at: this.addForm.effective_at,
           is_enabled: parseInt(this.addForm.is_enabled)
         },
@@ -308,21 +308,21 @@ function materialConversionRulesPage() {
     // ==================== 编辑规则 ====================
 
     /**
-     * 打开编辑规则弹窗
-     * @method openEditModal
-     * @param {number|string} ruleId - 要编辑的规则ID
-     * @description 根据规则ID查找规则数据，填充编辑表单并显示编辑弹窗
+     * 打开查看规则详情弹窗
+     * @method openViewModal
+     * @param {number|string} ruleId - 规则ID
+     * @description 根据规则ID查找规则数据并显示详情（后端设计不支持编辑，只能查看）
      * @returns {void}
      */
-    openEditModal(ruleId) {
+    openViewModal(ruleId) {
       const rule = this.rules.find(r => r.rule_id === parseInt(ruleId))
       if (!rule) return
 
       this.editForm = {
         rule_id: rule.rule_id,
         direction: `${rule.from_asset_code} → ${rule.to_asset_code}`,
-        input_quantity: rule.input_quantity,
-        output_quantity: rule.output_quantity,
+        from_amount: rule.from_amount,
+        to_amount: rule.to_amount,
         effective_at: this._formatDateTimeLocal(rule.effective_at),
         is_enabled: rule.is_enabled ? '1' : '0'
       }
@@ -331,78 +331,29 @@ function materialConversionRulesPage() {
     },
 
     /**
-     * 提交编辑规则
+     * 禁用转换规则
      * @async
-     * @method submitEdit
-     * @description
-     * 验证表单数据后更新规则到后端。
-     * 如果后端返回风控验证警告，则显示警告但不关闭弹窗。
-     * @returns {Promise<void>}
-     */
-    async submitEdit() {
-      if (
-        !this.editForm.input_quantity ||
-        !this.editForm.output_quantity ||
-        !this.editForm.effective_at
-      ) {
-        this.showError('请填写所有必填字段')
-        return
-      }
-
-      this.submitting = true
-
-      const result = await this.apiPut(
-        buildURL(ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULE_DETAIL, {
-          rule_id: this.editForm.rule_id
-        }),
-        {
-          input_quantity: parseInt(this.editForm.input_quantity),
-          output_quantity: parseInt(this.editForm.output_quantity),
-          effective_at: this.editForm.effective_at,
-          is_enabled: parseInt(this.editForm.is_enabled)
-        },
-        { showSuccess: true, successMessage: '更新成功' }
-      )
-
-      this.submitting = false
-
-      if (result.success) {
-        this.hideModal('editModal')
-        await this.loadRules()
-      } else if (result.data?.validation) {
-        this.editValidationWarnings = this._parseValidationWarnings(result.data.validation)
-      }
-    },
-
-    /**
-     * 切换规则启用/禁用状态
-     * @async
-     * @method toggleStatus
+     * @method disableRule
      * @param {number} ruleId - 规则ID
-     * @param {boolean} currentStatus - 当前启用状态
-     * @description 显示确认对话框后切换规则的启用状态
+     * @description 显示确认对话框后禁用规则（后端设计：改比例需新增规则，不支持重新启用）
      * @returns {Promise<void>}
      */
-    async toggleStatus(ruleId, currentStatus) {
-      const newStatus = currentStatus ? 0 : 1
-      const action = newStatus ? '启用' : '禁用'
-
+    async disableRule(ruleId) {
       const result = await this.confirmAndExecute(
-        `确定要${action}该转换规则吗？`,
+        '确定要禁用该转换规则吗？\n注意：禁用后无法重新启用，如需启用请创建新规则。',
         async () => {
           const response = await apiRequest(
-            buildURL(ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULE_DETAIL, { rule_id: ruleId }),
+            buildURL(ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULE_DISABLE, { rule_id: ruleId }),
             {
-              method: 'PUT',
-              body: JSON.stringify({ is_enabled: newStatus })
+              method: 'PUT'
             }
           )
           if (response && response.success) {
             return response.data
           }
-          throw new Error(response?.message || `${action}失败`)
+          throw new Error(response?.message || '禁用失败')
         },
-        { showSuccess: true, successMessage: `${action}成功` }
+        { showSuccess: true, successMessage: '禁用成功' }
       )
 
       if (result.success) {
@@ -450,11 +401,11 @@ function materialConversionRulesPage() {
      * @returns {string} 格式化的转换比例（保留4位小数）
      *
      * @example
-     * // 输入100，输出80
-     * getRatio({ input_quantity: 100, output_quantity: 80 }) // '0.8000'
+     * // from_amount=1, to_amount=20
+     * getRatio({ from_amount: 1, to_amount: 20 }) // '20.0000'
      */
     getRatio(rule) {
-      return (rule.output_quantity / rule.input_quantity).toFixed(4)
+      return (rule.to_amount / rule.from_amount).toFixed(4)
     },
 
     /**

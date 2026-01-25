@@ -249,6 +249,29 @@ class BeijingTimeHelper {
   }
 
   /**
+   * 解析时间字符串为Date对象（用于数据库查询）
+   * 支持 ISO 格式、北京时间格式等各种时间字符串
+   * @param {string|Date} timeStr - 时间字符串或Date对象
+   * @returns {Date} 解析后的Date对象
+   */
+  static parseBeijingTime(timeStr) {
+    if (!timeStr) {
+      return null
+    }
+    // 如果已经是 Date 对象，直接返回
+    if (timeStr instanceof Date) {
+      return timeStr
+    }
+    // 解析字符串为 Date 对象
+    const parsed = new Date(timeStr)
+    if (isNaN(parsed.getTime())) {
+      console.warn(`[BeijingTimeHelper] 无法解析时间字符串: ${timeStr}`)
+      return null
+    }
+    return parsed
+  }
+
+  /**
    * 格式化为友好的相对时间显示（中文）
    * @param {Date|string} date - 输入时间
    * @returns {string} 相对时间字符串

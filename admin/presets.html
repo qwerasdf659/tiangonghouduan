@@ -97,14 +97,14 @@
             <template x-if="interventions.length === 0">
               <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">暂无干预规则</td></tr>
             </template>
-            <template x-for="item in interventions" :key="item.intervention_id">
+            <template x-for="item in interventions" :key="item.setting_id">
               <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3 text-sm" x-text="item.intervention_id"></td>
-                <td class="px-4 py-3 text-sm" x-text="item.user_nickname || item.user_id"></td>
+                <td class="px-4 py-3 text-sm font-mono text-xs" x-text="item.setting_id"></td>
+                <td class="px-4 py-3 text-sm" x-text="item.user_info?.nickname || item.user_id"></td>
                 <td class="px-4 py-3">
-                  <span :class="item.type === 'force_win' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'" class="px-2 py-1 text-xs rounded" x-text="item.type === 'force_win' ? '强制中奖' : '禁止中奖'"></span>
+                  <span :class="item.setting_type === 'force_win' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'" class="px-2 py-1 text-xs rounded" x-text="getSettingTypeLabel(item.setting_type)"></span>
                 </td>
-                <td class="px-4 py-3 text-sm" x-text="item.prize_name || '-'"></td>
+                <td class="px-4 py-3 text-sm" x-text="item.prize_info?.prize_name || '-'"></td>
                 <td class="px-4 py-3">
                   <span :class="{
                     'bg-green-100 text-green-700': item.status === 'active',
@@ -113,11 +113,11 @@
                     'bg-red-100 text-red-700': item.status === 'cancelled'
                   }" class="px-2 py-1 text-xs rounded" x-text="getStatusText(item.status)"></span>
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(item.expire_time)"></td>
+                <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(item.expires_at)"></td>
                 <td class="px-4 py-3">
                   <div class="flex space-x-2">
-                    <button @click="viewIntervention(item)" class="text-blue-500 hover:text-blue-700 text-sm">查看</button>
-                    <button x-show="item.status === 'active'" @click="cancelIntervention(item)" class="text-red-500 hover:text-red-700 text-sm">取消</button>
+                    <button @click="viewIntervention(item.setting_id)" class="text-blue-500 hover:text-blue-700 text-sm">查看</button>
+                    <button x-show="item.status === 'active'" @click="cancelIntervention(item.setting_id)" class="text-red-500 hover:text-red-700 text-sm">取消</button>
                   </div>
                 </td>
               </tr>
@@ -142,10 +142,9 @@
   <div x-ref="createModal" 
        x-show="isModalOpen('createModal')" 
        x-cloak
-       class="fixed inset-0 z-50 flex items-center justify-center"
-       style="display: none;">
-    <div class="fixed inset-0 bg-black/50" @click="hideModal('createModal')"></div>
-    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 z-10">
+       class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="fixed inset-0 bg-black/50 z-40" @click="hideModal('createModal')"></div>
+    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 z-50" @click.stop>
       <div class="p-4 border-b flex justify-between items-center">
         <h5 class="font-semibold">🎯 新增干预规则</h5>
         <button @click="hideModal('createModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
@@ -206,22 +205,21 @@
   <div x-ref="viewModal" 
        x-show="isModalOpen('viewModal')" 
        x-cloak
-       class="fixed inset-0 z-50 flex items-center justify-center"
-       style="display: none;">
-    <div class="fixed inset-0 bg-black/50" @click="hideModal('viewModal')"></div>
-    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+       class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="fixed inset-0 bg-black/50 z-40" @click="hideModal('viewModal')"></div>
+    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 z-50" @click.stop>
       <div class="p-4 border-b flex justify-between items-center">
         <h5 class="font-semibold">📋 干预规则详情</h5>
         <button @click="hideModal('viewModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
       </div>
       <div class="p-6 space-y-3" x-show="viewData">
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">规则ID:</span><span class="font-mono" x-text="viewData?.intervention_id"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">用户:</span><span x-text="viewData?.user_nickname || viewData?.user_id"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">类型:</span><span x-text="viewData?.type === 'force_win' ? '强制中奖' : '禁止中奖'"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">目标奖品:</span><span x-text="viewData?.prize_name || '-'"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">规则ID:</span><span class="font-mono text-xs" x-text="viewData?.setting_id"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">用户:</span><span x-text="viewData?.user?.nickname || viewData?.user_id"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">类型:</span><span x-text="getSettingTypeLabel(viewData?.setting_type)"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">目标奖品:</span><span x-text="viewData?.prize_info?.prize_name || '-'"></span></div>
         <div class="flex justify-between border-b pb-2"><span class="text-gray-500">状态:</span><span x-text="getStatusText(viewData?.status)"></span></div>
         <div class="flex justify-between border-b pb-2"><span class="text-gray-500">创建时间:</span><span x-text="formatDate(viewData?.created_at)"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">过期时间:</span><span x-text="formatDate(viewData?.expire_time)"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">过期时间:</span><span x-text="formatDate(viewData?.expires_at)"></span></div>
         <div><span class="text-gray-500">备注:</span><p class="mt-1 p-2 bg-gray-50 rounded" x-text="viewData?.reason || '-'"></p></div>
       </div>
       <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">

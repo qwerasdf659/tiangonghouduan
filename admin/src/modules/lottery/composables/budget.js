@@ -44,37 +44,43 @@ export function useBudgetMethods() {
   return {
     /**
      * 加载预算数据
+     * @description apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }
      */
     async loadBudgetData() {
       try {
+        console.log('📊 [Budget] loadBudgetData 开始执行')
         const params = new URLSearchParams()
         params.append('limit', 50)
         if (this.budgetFilters.status) {
           params.append('status', this.budgetFilters.status)
         }
 
+        // apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }
         const response = await this.apiGet(
           `${LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_BATCH_STATUS}?${params}`,
           {},
           { showLoading: false }
         )
 
-        if (response?.success) {
-          const { campaigns, summary } = response.data || {}
+        console.log('📊 [Budget] API 返回数据:', response)
 
+        // 解包 withLoading 返回的结构
+        const data = response?.success ? response.data : response
+        console.log('📊 [Budget] 解包后数据:', data)
+
+        if (data) {
+          const { campaigns, summary } = data
+
+          // 使用后端返回的汇总数据
           this.budgetSummary = {
             total_budget: summary?.total_budget || 0,
             total_used: summary?.total_used || 0,
             total_remaining: summary?.total_remaining || 0,
-            total_campaigns: summary?.total_campaigns || 0
+            total_campaigns: summary?.total_campaigns || campaigns?.length || 0
           }
 
+          // 仅前端筛选 budget_mode（活动状态已由后端 API 筛选）
           let filteredCampaigns = campaigns || []
-          if (this.budgetFilters.status) {
-            filteredCampaigns = filteredCampaigns.filter(
-              c => c.status === this.budgetFilters.status
-            )
-          }
           if (this.budgetFilters.budgetType) {
             filteredCampaigns = filteredCampaigns.filter(
               c => c.budget_mode === this.budgetFilters.budgetType
@@ -82,9 +88,11 @@ export function useBudgetMethods() {
           }
 
           this.budgetCampaigns = filteredCampaigns
+          console.log('✅ [Budget] 数据加载完成, campaigns:', filteredCampaigns.length)
         }
       } catch (error) {
         logger.error('加载预算数据失败:', error)
+        console.error('❌ [Budget] loadBudgetData 失败:', error)
         this.budgetCampaigns = []
       }
     },
@@ -120,6 +128,7 @@ export function useBudgetMethods() {
 
     /**
      * 提交预算设置
+     * @description apiCall 成功时返回 response.data，失败时抛出错误
      */
     async submitBudget() {
       const campaignId = this.budgetForm.campaign_id || this.editingBudgetCampaignId
@@ -130,7 +139,8 @@ export function useBudgetMethods() {
 
       try {
         this.saving = true
-        const response = await this.apiCall(
+        // apiCall 成功时返回 response.data，失败时抛出错误
+        await this.apiCall(
           buildURL(LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_UPDATE, { campaign_id: campaignId }),
           {
             method: 'PUT',
@@ -142,11 +152,10 @@ export function useBudgetMethods() {
           }
         )
 
-        if (response?.success) {
-          this.showSuccess('预算设置成功')
-          this.hideModal('budgetModal')
-          await this.loadBudgetData()
-        }
+        // 如果没有抛出错误，则表示成功
+        this.showSuccess('预算设置成功')
+        this.hideModal('budgetModal')
+        await this.loadBudgetData()
       } catch (error) {
         this.showError('预算设置失败: ' + (error.message || '未知错误'))
       } finally {

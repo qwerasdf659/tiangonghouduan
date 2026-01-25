@@ -13,6 +13,8 @@
 
 import { logger } from '../../../utils/logger.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
+import { request, buildURL } from '../../../api/base.js'
+import { MARKET_ENDPOINTS } from '../../../api/market.js'
 import {
   useExchangeItemsState,
   useExchangeItemsMethods,
@@ -26,9 +28,9 @@ import {
  * 子页面配置
  */
 const SUB_PAGES = [
-  { id: 'items', title: '商品管理', icon: 'bi-box-seam' },
-  { id: 'orders', title: '订单管理', icon: 'bi-receipt' },
-  { id: 'stats', title: '统计分析', icon: 'bi-graph-up' }
+  { id: 'items', title: '商品管理', icon: '📦', name: '商品管理' },
+  { id: 'orders', title: '订单管理', icon: '📋', name: '订单管理' },
+  { id: 'stats', title: '统计分析', icon: '📊', name: '统计分析' }
 ]
 
 document.addEventListener('alpine:init', () => {
@@ -77,10 +79,10 @@ document.addEventListener('alpine:init', () => {
   }))
 
   /**
-   * 兑换市场页面内容组件
+   * 兑换市场页面组件
    * 使用 composables 模式管理各子模块的状态和方法
    */
-  Alpine.data('exchangePageContent', () => {
+  Alpine.data('exchangeMarket', () => {
     const pageMixin = createPageMixin({
       pageTitle: '兑换市场',
       loadDataOnInit: false
@@ -105,7 +107,7 @@ document.addEventListener('alpine:init', () => {
 
       // ========== 生命周期 ==========
       async init() {
-        logger.info('[ExchangePageContent] 初始化...')
+        logger.info('[ExchangeMarket] 组件初始化...')
 
         if (typeof pageMixin.init === 'function') {
           await pageMixin.init.call(this)
@@ -128,7 +130,7 @@ document.addEventListener('alpine:init', () => {
        */
       async loadPageData() {
         const page = this.currentPage
-        logger.debug('[ExchangePageContent] 加载数据:', page)
+        logger.debug('[ExchangeMarket] 加载数据:', page)
 
         try {
           switch (page) {
@@ -144,7 +146,7 @@ document.addEventListener('alpine:init', () => {
               break
           }
         } catch (error) {
-          logger.error('[ExchangePageContent] 加载数据失败:', error)
+          logger.error('[ExchangeMarket] 加载数据失败:', error)
           this.showError?.('加载数据失败')
         }
       },
@@ -230,6 +232,15 @@ document.addEventListener('alpine:init', () => {
       ...useExchangeOrdersState(),
       ...useExchangeStatsState(),
 
+      // ========== HTML 模板兼容属性 ==========
+      /** 市场统计（HTML 模板使用） */
+      marketStats: {
+        totalItems: 0,
+        todayOrders: 0,
+        pendingShipments: 0,
+        pointsConsumed: 0
+      },
+
       async init() {
         logger.info('[ExchangeMarket] 初始化主组件...')
 
@@ -250,14 +261,30 @@ document.addEventListener('alpine:init', () => {
         switch (this.currentPage) {
           case 'items':
             await Promise.all([this.loadItems(), this.loadItemStats()])
+            this._updateMarketStats()
             break
           case 'orders':
             await Promise.all([this.loadOrders(), this.loadOrderStats()])
+            this._updateMarketStats()
             break
           case 'stats':
             await this.loadExchangeStats()
+            this._updateMarketStats()
             this.$nextTick(() => this.initCharts())
             break
+        }
+      },
+
+      /**
+       * 更新 marketStats（HTML 模板兼容）
+       */
+      _updateMarketStats() {
+        this.marketStats = {
+          totalItems: this.exchangeStats?.items?.activeCount || this.items?.length || 0,
+          todayOrders: this.exchangeStats?.orders?.total || this.orders?.length || 0,
+          pendingShipments: this.exchangeStats?.orders?.pending || 
+            (this.orders?.filter(o => o.status === 'pending')?.length) || 0,
+          pointsConsumed: this.exchangeStats?.revenue?.total_points || 0
         }
       },
 
@@ -267,6 +294,18 @@ document.addEventListener('alpine:init', () => {
 
       formatAmount(amount) {
         return amount != null ? Number(amount).toLocaleString('zh-CN') : '0'
+      },
+
+      /**
+       * 格式化日期（HTML 模板使用）
+       */
+      formatDate(dateStr) {
+        if (!dateStr) return '-'
+        try {
+          return new Date(dateStr).toLocaleString('zh-CN')
+        } catch {
+          return dateStr
+        }
       },
 
       formatDateTime(dateStr) {
@@ -281,6 +320,73 @@ document.addEventListener('alpine:init', () => {
       getAssetTypeName(code) {
         const type = this.assetTypes.find(t => t.asset_code === code)
         return type?.asset_name || code || '-'
+      },
+
+      // ========== HTML 模板兼容方法 ==========
+
+      /**
+       * 删除商品（兼容 HTML 模板传入 item 对象）
+       * @param {Object|number} itemOrId - 商品对象或商品ID
+       */
+      async deleteItem(itemOrId) {
+        const itemId = typeof itemOrId === 'object' ? itemOrId.item_id : itemOrId
+        if (!itemId) {
+          logger.error('[ExchangeMarket] deleteItem: 无效的商品ID')
+          return
+        }
+
+        if (!confirm('确定要删除此商品吗？')) return
+
+        try {
+          const res = await request({
+            url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_DETAIL, { item_id: itemId }),
+            method: 'DELETE'
+          })
+          if (res.success) {
+            this.showSuccess?.('删除成功')
+            this.loadItems()
+            this.loadItemStats()
+            this._updateMarketStats()
+          } else {
+            this.showError?.(res.message || '删除失败')
+          }
+        } catch (e) {
+          logger.error('[ExchangeMarket] 删除商品失败:', e)
+          this.showError?.('删除失败')
+        }
+      },
+
+      /**
+       * 完成订单（HTML 模板使用）
+       * @param {Object} order - 订单对象
+       */
+      async completeOrder(order) {
+        if (!confirm(`确定要完成订单 ${order.order_no || order.order_id} 吗？`)) return
+
+        try {
+          this.saving = true
+          const res = await request({
+            url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_COMPLETE || MARKET_ENDPOINTS.EXCHANGE_ORDER_SHIP, {
+              order_no: order.order_no || order.order_id
+            }),
+            method: 'POST',
+            data: { status: 'completed' }
+          })
+
+          if (res.success) {
+            this.showSuccess?.('订单已完成')
+            this.loadOrders()
+            this.loadOrderStats()
+            this._updateMarketStats()
+          } else {
+            this.showError?.(res.message || '操作失败')
+          }
+        } catch (e) {
+          logger.error('[ExchangeMarket] 完成订单失败:', e)
+          this.showError?.('操作失败')
+        } finally {
+          this.saving = false
+        }
       }
     }
   })

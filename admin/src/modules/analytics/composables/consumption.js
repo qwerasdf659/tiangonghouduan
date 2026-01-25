@@ -54,33 +54,54 @@ export function useConsumptionMethods() {
 
     /**
      * 加载消费记录
+     * 后端接口: GET /api/v4/console/consumption/records
+     * 返回: { records: [...], pagination: {...}, statistics: {...} }
      */
     async loadConsumptions() {
       try {
         const params = new URLSearchParams()
-        params.append('page', this.page)
-        params.append('page_size', this.pageSize)
-        if (this.consumptionFilters.user_id)
-          params.append('user_id', this.consumptionFilters.user_id)
+        params.append('page', this.page || 1)
+        params.append('page_size', this.pageSize || 20)
+        // 支持两种筛选条件命名（HTML 用 userId，后端用 user_id）
+        const userId = this.consumptionFilters.userId || this.consumptionFilters.user_id
+        if (userId) params.append('search', userId) // 后端使用 search 参数
         if (this.consumptionFilters.status) params.append('status', this.consumptionFilters.status)
-        if (this.consumptionFilters.payment_method)
-          params.append('payment_method', this.consumptionFilters.payment_method)
-        if (this.consumptionFilters.startDate)
+        if (this.consumptionFilters.startDate) {
           params.append('start_date', this.consumptionFilters.startDate)
-        if (this.consumptionFilters.endDate)
+        }
+        if (this.consumptionFilters.endDate) {
           params.append('end_date', this.consumptionFilters.endDate)
+        }
 
         const response = await this.apiGet(
-          `${STORE_ENDPOINTS.CONSUMPTION_LIST}?${params}`,
+          `${STORE_ENDPOINTS.CONSUMPTION_RECORDS}?${params}`,
           {},
           { showLoading: false }
         )
 
         if (response?.success) {
-          this.consumptions = response.data?.records || response.data?.list || []
+          // 后端返回 records 数组，字段: record_id, consumption_amount, status, created_at, user, merchant
+          const rawRecords = response.data?.records || response.data?.list || []
+          // 映射字段以兼容 HTML 模板
+          this.consumptions = rawRecords.map(r => ({
+            ...r,
+            id: r.record_id,
+            amount: r.consumption_amount, // 后端返回分，HTML 会 /100
+            user_name: r.user?.nickname || r.user?.mobile || r.user_id,
+            store_name: r.merchant?.nickname || r.merchant?.mobile || `商户${r.merchant_id || '-'}`
+          }))
           if (response.data?.pagination) {
             this.total = response.data.pagination.total || 0
             this.totalPages = response.data.pagination.total_pages || 1
+          }
+          // 同时获取统计数据（后端在同一接口返回）
+          if (response.data?.statistics) {
+            this.consumptionStats = {
+              total: this.total,
+              totalAmount: 0,
+              pendingCount: response.data.statistics.pending ?? 0,
+              todayCount: response.data.statistics.today ?? 0
+            }
           }
         }
       } catch (error) {
@@ -90,26 +111,11 @@ export function useConsumptionMethods() {
     },
 
     /**
-     * 加载消费统计
+     * 加载消费统计（从 records 接口获取，后端不单独提供 stats 接口）
      */
     async loadConsumptionStats() {
-      try {
-        const response = await this.apiGet(
-          STORE_ENDPOINTS.CONSUMPTION_STATS,
-          {},
-          { showLoading: false, showError: false }
-        )
-        if (response?.success && response.data) {
-          this.consumptionStats = {
-            total: response.data.total ?? 0,
-            totalAmount: response.data.total_amount ?? 0,
-            pendingCount: response.data.pending_count ?? 0,
-            todayCount: response.data.today_count ?? 0
-          }
-        }
-      } catch (error) {
-        logger.error('加载消费统计失败:', error)
-      }
+      // 统计数据已在 loadConsumptions 中获取，这里只做空实现避免报错
+      logger.debug('loadConsumptionStats: 统计数据已在 loadConsumptions 中获取')
     },
 
     /**
@@ -157,38 +163,29 @@ export function useConsumptionMethods() {
     },
 
     /**
-     * 审核消费记录
+     * 通过消费记录审核
+     * 后端接口: POST /api/v4/console/consumption/approve/:id
      * @param {Object} record - 消费记录对象
-     * @param {string} action - 审核动作 ('approve'|'reject')
      */
-    async auditConsumption(record, action) {
-      const actionText = action === 'approve' ? '通过' : '拒绝'
+    async approveConsumption(record) {
+      const recordId = record.record_id || record.id
       await this.confirmAndExecute(
-        `确定${actionText}此消费记录？`,
+        '确定通过此消费记录？',
         async () => {
           const response = await this.apiCall(
-            buildURL(STORE_ENDPOINTS.CONSUMPTION_AUDIT, { id: record.id }),
-            { method: 'PUT', data: { action } }
+            buildURL(STORE_ENDPOINTS.CONSUMPTION_APPROVE, { id: recordId }),
+            { method: 'POST', data: {} }
           )
           if (response?.success) {
             await this.loadConsumptions()
-            await this.loadConsumptionStats()
           }
         },
-        { successMessage: `消费记录已${actionText}` }
+        { successMessage: '消费记录已通过' }
       )
     },
 
     /**
-     * 通过消费记录审核
-     * @param {Object} record - 消费记录对象
-     */
-    async approveConsumption(record) {
-      return this.auditConsumption(record, 'approve')
-    },
-
-    /**
-     * 拒绝消费记录审核
+     * 拒绝消费记录审核（打开弹窗）
      * @param {Object} record - 消费记录对象
      */
     async rejectConsumption(record) {
@@ -209,23 +206,22 @@ export function useConsumptionMethods() {
 
     /**
      * 确认拒绝
+     * 后端接口: POST /api/v4/console/consumption/reject/:id
      */
     async confirmReject() {
-      if (!this.rejectForm.reason) {
-        this.showError('请输入拒绝原因')
+      if (!this.rejectForm.reason || this.rejectForm.reason.trim().length < 5) {
+        this.showError('请输入拒绝原因（至少5个字符）')
         return
       }
 
       try {
         this.saving = true
+        const recordId = this.selectedConsumption.record_id || this.selectedConsumption.id
         const response = await this.apiCall(
-          buildURL(STORE_ENDPOINTS.CONSUMPTION_AUDIT, { id: this.selectedConsumption.id }),
+          buildURL(STORE_ENDPOINTS.CONSUMPTION_REJECT, { id: recordId }),
           { 
-            method: 'PUT', 
-            data: { 
-              action: 'reject',
-              reason: this.rejectForm.reason 
-            } 
+            method: 'POST', 
+            data: { admin_notes: this.rejectForm.reason }
           }
         )
 
@@ -233,7 +229,6 @@ export function useConsumptionMethods() {
           this.showSuccess('消费记录已拒绝')
           this.hideModal('rejectModal')
           await this.loadConsumptions()
-          await this.loadConsumptionStats()
         }
       } catch (error) {
         this.showError('操作失败: ' + (error.message || '未知错误'))
@@ -281,4 +276,3 @@ export function useConsumptionMethods() {
 }
 
 export default { useConsumptionState, useConsumptionMethods }
-

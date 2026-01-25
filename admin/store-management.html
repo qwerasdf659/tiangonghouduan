@@ -98,15 +98,15 @@
             <template x-for="store in stores" :key="store.store_id">
               <div class="store-card p-4 bg-white">
                 <div class="flex justify-between items-start mb-3">
-                  <h6 class="font-semibold" x-text="store.name"></h6>
+                  <h6 class="font-semibold" x-text="store.store_name || store.name || '未命名门店'"></h6>
                   <span 
                     :class="getStoreStatusClass(store.status)" 
-                    class="px-2 py-1 text-xs rounded"
+                    class="px-2 py-1 text-xs rounded text-white"
                     x-text="getStoreStatusText(store.status)"
                   ></span>
                 </div>
-                <p class="text-gray-500 text-sm mb-2">📍 <span x-text="store.address || '暂无地址'"></span></p>
-                <p class="text-gray-500 text-sm mb-2">📞 <span x-text="store.phone || '暂无电话'"></span></p>
+                <p class="text-gray-500 text-sm mb-2">📍 <span x-text="store.store_address || store.address || '暂无地址'"></span></p>
+                <p class="text-gray-500 text-sm mb-2">📞 <span x-text="store.contact_mobile || store.phone || '暂无电话'"></span></p>
                 <div class="flex justify-between items-center text-gray-500 text-sm mb-3">
                   <span>👥 <span x-text="store.staff_count || 0"></span> 员工</span>
                   <span>📅 <span x-text="formatDateSafe(store.created_at)"></span></span>
@@ -141,7 +141,7 @@
             <select class="px-3 py-2 border rounded text-sm" x-model="staffFilters.store_id" @change="loadStaff()">
               <option value="">全部门店</option>
               <template x-for="store in stores" :key="store.store_id">
-                <option :value="store.store_id" x-text="store.name"></option>
+                <option :value="store.store_id" x-text="store.store_name"></option>
               </template>
             </select>
             <select class="px-3 py-2 border rounded text-sm" x-model="staffFilters.role" @change="loadStaff()">
@@ -175,26 +175,28 @@
                 <template x-if="staffList.length === 0">
                   <tr><td colspan="7" class="text-center text-gray-500 py-8">暂无员工数据</td></tr>
                 </template>
-                <template x-for="staff in staffList" :key="staff.staff_id">
+                <template x-for="staff in staffList" :key="staff.store_staff_id">
                   <tr class="hover:bg-gray-50">
                     <td class="px-4 py-3">
                       <div class="flex items-center">
-                        <img :src="staff.avatar || '/admin/images/default-avatar.png'" :alt="staff.name" class="staff-avatar mr-3">
+                        <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium mr-3">
+                          <span x-text="(staff.user_nickname || '员工').charAt(0)"></span>
+                        </div>
                         <div>
-                          <div class="font-medium" x-text="staff.name"></div>
-                          <small class="text-gray-500" x-text="staff.employee_no || '-'"></small>
+                          <div class="font-medium" x-text="staff.user_nickname || '-'"></div>
+                          <small class="text-gray-500" x-text="staff.user_mobile || '-'"></small>
                         </div>
                       </div>
                     </td>
                     <td class="px-4 py-3 text-sm" x-text="staff.store_name || '-'"></td>
-                    <td class="px-4 py-3"><span class="px-2 py-1 bg-cyan-100 text-cyan-700 text-xs rounded" x-text="getStaffRoleText(staff.role)"></span></td>
-                    <td class="px-4 py-3 text-sm" x-text="staff.phone || '-'"></td>
-                    <td class="px-4 py-3 text-sm" x-text="formatDateSafe(staff.hire_date)"></td>
+                    <td class="px-4 py-3"><span class="px-2 py-1 bg-cyan-100 text-cyan-700 text-xs rounded" x-text="staff.role_name || getStaffRoleText(staff.role_in_store)"></span></td>
+                    <td class="px-4 py-3 text-sm" x-text="staff.user_mobile || '-'"></td>
+                    <td class="px-4 py-3 text-sm" x-text="formatDateSafe(staff.joined_at)"></td>
                     <td class="px-4 py-3">
                       <span 
-                        :class="staff.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
+                        :class="staff.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
                         class="px-2 py-1 text-xs rounded"
-                        x-text="staff.is_active ? '在职' : '离职'"
+                        x-text="staff.status_name || (staff.status === 'active' ? '在职' : '离职')"
                       ></span>
                     </td>
                     <td class="px-4 py-3">
@@ -265,7 +267,7 @@
                           x-text="index + 1"
                         ></span>
                       </td>
-                      <td class="px-3 py-2" x-text="store.name"></td>
+                      <td class="px-3 py-2" x-text="store.store_name"></td>
                       <td class="px-3 py-2 text-green-600" x-text="'¥' + (store.revenue || 0).toLocaleString()"></td>
                     </tr>
                   </template>
@@ -318,7 +320,7 @@
         <div class="p-4 space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">门店名称 <span class="text-red-500">*</span></label>
-            <input type="text" class="w-full px-3 py-2 border rounded" x-model="storeForm.name" required>
+            <input type="text" class="w-full px-3 py-2 border rounded" x-model="storeForm.store_name" required>
           </div>
 
           <!-- 省市区街道联动选择 -->
@@ -327,8 +329,8 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">省份</label>
               <select class="w-full px-3 py-2 border rounded" x-model="storeForm.province_code" @change="isEditMode ? loadCitiesForEdit() : loadCities()">
                 <option value="">请选择省份</option>
-                <template x-for="p in provinces" :key="p.code">
-                  <option :value="p.code" x-text="p.name"></option>
+                <template x-for="p in provinces" :key="p.region_code">
+                  <option :value="p.region_code" x-text="p.region_name"></option>
                 </template>
               </select>
             </div>
@@ -336,8 +338,8 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">城市</label>
               <select class="w-full px-3 py-2 border rounded" x-model="storeForm.city_code" @change="isEditMode ? loadDistrictsForEdit() : loadDistricts()" :disabled="!storeForm.province_code">
                 <option value="">请选择城市</option>
-                <template x-for="c in cities" :key="c.code">
-                  <option :value="c.code" x-text="c.name"></option>
+                <template x-for="c in cities" :key="c.region_code">
+                  <option :value="c.region_code" x-text="c.region_name"></option>
                 </template>
               </select>
             </div>
@@ -348,8 +350,8 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">区县</label>
               <select class="w-full px-3 py-2 border rounded" x-model="storeForm.district_code" @change="isEditMode ? loadStreetsForEdit() : loadStreets()" :disabled="!storeForm.city_code">
                 <option value="">请选择区县</option>
-                <template x-for="d in districts" :key="d.code">
-                  <option :value="d.code" x-text="d.name"></option>
+                <template x-for="d in districts" :key="d.region_code">
+                  <option :value="d.region_code" x-text="d.region_name"></option>
                 </template>
               </select>
             </div>
@@ -357,8 +359,8 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">街道</label>
               <select class="w-full px-3 py-2 border rounded" x-model="storeForm.street_code" :disabled="!storeForm.district_code">
                 <option value="">请选择街道</option>
-                <template x-for="s in streets" :key="s.code">
-                  <option :value="s.code" x-text="s.name"></option>
+                <template x-for="s in streets" :key="s.region_code">
+                  <option :value="s.region_code" x-text="s.region_name"></option>
                 </template>
               </select>
             </div>
@@ -366,8 +368,8 @@
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">详细地址</label>
-            <input type="text" class="w-full px-3 py-2 border rounded" x-model="storeForm.address" placeholder="请输入详细地址">
-            <small class="text-gray-500">完整地址：<span x-text="getFullAddress()"></span></small>
+            <input type="text" class="w-full px-3 py-2 border rounded" x-model="storeForm.store_address" placeholder="请输入详细地址">
+            <small class="text-gray-500">完整地址：<span x-text="getFormFullAddress()"></span></small>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
@@ -397,7 +399,7 @@
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">门店描述</label>
-            <textarea class="w-full px-3 py-2 border rounded" x-model="storeForm.description" rows="3"></textarea>
+            <textarea class="w-full px-3 py-2 border rounded" x-model="storeForm.notes" rows="3"></textarea>
           </div>
         </div>
         <div class="p-4 border-t flex justify-end space-x-3">
@@ -429,24 +431,24 @@
         <template x-if="selectedStore">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="col-span-2">
-              <h4 class="text-xl font-bold" x-text="selectedStore.name"></h4>
+              <h4 class="text-xl font-bold" x-text="selectedStore.store_name || selectedStore.name || '未命名门店'"></h4>
               <span 
                 :class="getStoreStatusClass(selectedStore.status)"
-                class="px-2 py-1 text-xs rounded"
+                class="px-2 py-1 text-xs rounded text-white"
                 x-text="getStoreStatusText(selectedStore.status)"
               ></span>
             </div>
             <div>
               <strong class="text-gray-600">门店ID：</strong>
-              <code class="bg-gray-100 px-2 py-1 rounded text-sm" x-text="selectedStore.store_id || selectedStore.id"></code>
+              <code class="bg-gray-100 px-2 py-1 rounded text-sm" x-text="selectedStore.store_id"></code>
             </div>
             <div>
               <strong class="text-gray-600">联系电话：</strong>
-              <span x-text="selectedStore.phone || '暂无'"></span>
+              <span x-text="selectedStore.contact_mobile || '暂无'"></span>
             </div>
             <div class="col-span-2">
               <strong class="text-gray-600">门店地址：</strong>
-              <span x-text="selectedStore.address || '暂无地址'"></span>
+              <span x-text="getFullAddress(selectedStore)"></span>
             </div>
             <div>
               <strong class="text-gray-600">员工数量：</strong>
@@ -456,9 +458,9 @@
               <strong class="text-gray-600">创建时间：</strong>
               <span x-text="formatDateSafe(selectedStore.created_at)"></span>
             </div>
-            <div class="col-span-2" x-show="selectedStore.description">
+            <div class="col-span-2" x-show="selectedStore.notes">
               <strong class="text-gray-600">门店描述：</strong>
-              <p class="text-gray-500 mt-1" x-text="selectedStore.description"></p>
+              <p class="text-gray-500 mt-1" x-text="selectedStore.notes"></p>
             </div>
           </div>
         </template>
@@ -501,7 +503,7 @@
             <select class="w-full px-3 py-2 border rounded" x-model="staffForm.store_id">
               <option value="">请选择门店</option>
               <template x-for="store in stores" :key="store.store_id">
-                <option :value="store.store_id" x-text="store.name"></option>
+                <option :value="store.store_id" x-text="store.store_name"></option>
               </template>
             </select>
           </div>

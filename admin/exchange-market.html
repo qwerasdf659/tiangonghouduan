@@ -61,7 +61,7 @@
                 <tr class="hover:bg-gray-50">
                   <td class="px-4 py-3 text-sm" x-text="item.item_id"></td>
                   <td class="px-4 py-3 text-sm" x-text="item.name"></td>
-                  <td class="px-4 py-3 text-sm font-mono" x-text="item.price + ' 积分'"></td>
+                  <td class="px-4 py-3 text-sm font-mono" x-text="(item.cost_amount || item.price || 0) + ' ' + (item.cost_asset_code || '积分')"></td>
                   <td class="px-4 py-3 text-sm" x-text="item.stock"></td>
                   <td class="px-4 py-3">
                     <span 
@@ -93,15 +93,16 @@
         </div>
         <div class="p-4 border-b bg-gray-50">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <input type="text" x-model="orderFilters.orderId" placeholder="订单号" class="px-3 py-2 border rounded">
-            <input type="text" x-model="orderFilters.userId" placeholder="用户ID" class="px-3 py-2 border rounded">
+            <input type="text" x-model="orderFilters.order_no" placeholder="订单号" class="px-3 py-2 border rounded">
             <select x-model="orderFilters.status" class="px-3 py-2 border rounded">
               <option value="">全部状态</option>
               <option value="pending">待发货</option>
               <option value="shipped">已发货</option>
               <option value="completed">已完成</option>
+              <option value="cancelled">已取消</option>
             </select>
             <button @click="loadOrders()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
+            <button @click="resetOrderFilters?.()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">🔄 重置</button>
           </div>
         </div>
         <div class="overflow-x-auto">
@@ -120,29 +121,32 @@
             <tbody class="divide-y">
               <template x-for="order in orders" :key="order.order_no || order.record_id">
                 <tr class="hover:bg-gray-50">
-                  <td class="px-4 py-3 text-sm font-mono" x-text="order.order_id"></td>
-                  <td class="px-4 py-3 text-sm" x-text="order.user_name || order.user_id"></td>
-                  <td class="px-4 py-3 text-sm" x-text="order.item_name"></td>
-                  <td class="px-4 py-3 text-sm" x-text="order.points_consumed"></td>
+                  <td class="px-4 py-3 text-sm font-mono" x-text="order.order_no"></td>
+                  <td class="px-4 py-3 text-sm" x-text="order.user_nickname || order.user_mobile || order.user_id"></td>
+                  <td class="px-4 py-3 text-sm" x-text="order.item_snapshot?.name || order.item_name || '-'"></td>
+                  <td class="px-4 py-3 text-sm" x-text="(order.pay_amount || order.cost_amount || 0) + ' ' + (order.pay_asset_code || order.cost_asset_code || '')"></td>
                   <td class="px-4 py-3">
                     <span 
                       :class="{
                         'bg-yellow-100 text-yellow-700': order.status === 'pending',
                         'bg-blue-100 text-blue-700': order.status === 'shipped',
-                        'bg-green-100 text-green-700': order.status === 'completed'
+                        'bg-green-100 text-green-700': order.status === 'completed',
+                        'bg-red-100 text-red-700': order.status === 'cancelled'
                       }"
                       class="px-2 py-1 text-xs rounded"
-                      x-text="order.status === 'pending' ? '待发货' : order.status === 'shipped' ? '已发货' : '已完成'"
+                      x-text="order.status === 'pending' ? '待发货' : order.status === 'shipped' ? '已发货' : order.status === 'completed' ? '已完成' : '已取消'"
                     ></span>
                   </td>
                   <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(order.created_at)"></td>
                   <td class="px-4 py-3">
-                    <template x-if="order.status === 'pending'">
-                      <button @click="shipOrder(order)" class="text-blue-500 hover:text-blue-700 text-sm">发货</button>
-                    </template>
-                    <template x-if="order.status === 'shipped'">
-                      <button @click="completeOrder(order)" class="text-green-500 hover:text-green-700 text-sm">完成</button>
-                    </template>
+                    <div class="flex space-x-2">
+                      <template x-if="order.status === 'pending'">
+                        <button @click="shipOrder(order)" class="text-blue-500 hover:text-blue-700 text-sm">发货</button>
+                      </template>
+                      <template x-if="order.status === 'shipped'">
+                        <button @click="completeOrder(order)" class="text-green-500 hover:text-green-700 text-sm">完成</button>
+                      </template>
+                    </div>
                   </td>
                 </tr>
               </template>
@@ -174,9 +178,7 @@
       </div>
     </div>
 
-  </div>
-
-  <!-- ==================== Modal 组件区域 ==================== -->
+    <!-- ==================== Modal 组件区域 ==================== -->
 
   <!-- 1. 商品编辑模态框 -->
   <div x-ref="itemModal"
@@ -266,61 +268,66 @@
         <h5 class="font-semibold">📦 订单详情</h5>
         <button @click="hideModal('orderDetailModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
       </div>
-      <div class="p-6" x-show="selectedOrder">
-        <div class="space-y-3">
-          <div class="flex justify-between border-b pb-2">
-            <span class="text-gray-500">订单号</span>
-            <span class="font-mono" x-text="selectedOrder?.order_id"></span>
-          </div>
-          <div class="flex justify-between border-b pb-2">
-            <span class="text-gray-500">用户</span>
-            <span x-text="selectedOrder?.user_name || selectedOrder?.user_id"></span>
-          </div>
-          <div class="flex justify-between border-b pb-2">
-            <span class="text-gray-500">商品</span>
-            <span x-text="selectedOrder?.item_name"></span>
-          </div>
-          <div class="flex justify-between border-b pb-2">
-            <span class="text-gray-500">消耗积分</span>
-            <span class="font-mono text-green-600" x-text="selectedOrder?.points_consumed"></span>
-          </div>
-          <div class="flex justify-between border-b pb-2">
-            <span class="text-gray-500">状态</span>
-            <span :class="{
-              'text-yellow-600': selectedOrder?.status === 'pending',
-              'text-blue-600': selectedOrder?.status === 'shipped',
-              'text-green-600': selectedOrder?.status === 'completed'
-            }" x-text="selectedOrder?.status === 'pending' ? '待发货' : selectedOrder?.status === 'shipped' ? '已发货' : '已完成'"></span>
-          </div>
-          <div class="flex justify-between border-b pb-2">
-            <span class="text-gray-500">下单时间</span>
-            <span x-text="formatDate(selectedOrder?.created_at)"></span>
-          </div>
-          <div x-show="selectedOrder?.shipped_at" class="flex justify-between border-b pb-2">
-            <span class="text-gray-500">发货时间</span>
-            <span x-text="formatDate(selectedOrder?.shipped_at)"></span>
-          </div>
-          <div x-show="selectedOrder?.completed_at" class="flex justify-between border-b pb-2">
-            <span class="text-gray-500">完成时间</span>
-            <span x-text="formatDate(selectedOrder?.completed_at)"></span>
-          </div>
-          <div x-show="selectedOrder?.address">
-            <span class="text-gray-500 block mb-1">收货地址</span>
-            <p class="bg-gray-50 rounded p-2 text-sm" x-text="selectedOrder?.address"></p>
+      <template x-if="selectedOrder">
+        <div class="p-6">
+          <div class="space-y-3">
+            <div class="flex justify-between border-b pb-2">
+              <span class="text-gray-500">订单号</span>
+              <span class="font-mono" x-text="selectedOrder.order_no"></span>
+            </div>
+            <div class="flex justify-between border-b pb-2">
+              <span class="text-gray-500">用户</span>
+              <span x-text="selectedOrder.user_nickname || selectedOrder.user_mobile || selectedOrder.user_id"></span>
+            </div>
+            <div class="flex justify-between border-b pb-2">
+              <span class="text-gray-500">商品</span>
+              <span x-text="selectedOrder.item_snapshot?.name || '-'"></span>
+            </div>
+            <div class="flex justify-between border-b pb-2">
+              <span class="text-gray-500">消耗资产</span>
+              <span class="font-mono text-green-600" x-text="(selectedOrder.pay_amount || 0) + ' ' + (selectedOrder.pay_asset_code || '')"></span>
+            </div>
+            <div class="flex justify-between border-b pb-2">
+              <span class="text-gray-500">状态</span>
+              <span :class="{
+                'text-yellow-600': selectedOrder.status === 'pending',
+                'text-blue-600': selectedOrder.status === 'shipped',
+                'text-green-600': selectedOrder.status === 'completed',
+                'text-red-600': selectedOrder.status === 'cancelled'
+              }" x-text="selectedOrder.status === 'pending' ? '待发货' : selectedOrder.status === 'shipped' ? '已发货' : selectedOrder.status === 'completed' ? '已完成' : '已取消'"></span>
+            </div>
+            <div class="flex justify-between border-b pb-2">
+              <span class="text-gray-500">下单时间</span>
+              <span x-text="formatDate(selectedOrder.created_at)"></span>
+            </div>
+            <div x-show="selectedOrder.shipped_at" class="flex justify-between border-b pb-2">
+              <span class="text-gray-500">发货时间</span>
+              <span x-text="formatDate(selectedOrder.shipped_at)"></span>
+            </div>
+            <div x-show="selectedOrder.completed_at" class="flex justify-between border-b pb-2">
+              <span class="text-gray-500">完成时间</span>
+              <span x-text="formatDate(selectedOrder.completed_at)"></span>
+            </div>
+            <div x-show="selectedOrder.address">
+              <span class="text-gray-500 block mb-1">收货地址</span>
+              <p class="bg-gray-50 rounded p-2 text-sm" x-text="selectedOrder.address"></p>
+            </div>
           </div>
         </div>
-      </div>
+      </template>
       <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2">
         <button type="button" @click="hideModal('orderDetailModal')" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">关闭</button>
-        <template x-if="selectedOrder?.status === 'pending'">
+        <template x-if="selectedOrder && selectedOrder.status === 'pending'">
           <button type="button" @click="shipOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">📦 发货</button>
         </template>
-        <template x-if="selectedOrder?.status === 'shipped'">
+        <template x-if="selectedOrder && selectedOrder.status === 'shipped'">
           <button type="button" @click="completeOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">✓ 完成</button>
         </template>
       </div>
     </div>
   </div>
+
+  </div> <!-- 关闭 x-data="exchangeMarket()" 容器 -->
 
   <!-- 页面专属逻辑 -->
   <%- include('partials/footer') %>

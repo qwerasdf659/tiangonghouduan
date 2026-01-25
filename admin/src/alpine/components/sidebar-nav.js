@@ -1,7 +1,7 @@
 /**
  * 侧边栏导航组件
  * @description 管理侧边栏导航的展开/折叠和菜单状态
- * @version 1.0.0
+ * @version 1.1.0
  * @date 2026-01-25
  */
 
@@ -17,6 +17,8 @@ export function sidebarNav() {
     mobileOpen: false,
     // 默认展开的分组
     expandedGroups: ['operations', 'lottery'],
+    // 当前激活的菜单项ID（用于工作台Tab模式下的高亮）
+    activeItemId: null,
     
     // 导航配置（7大业务模块）
     navGroups: [
@@ -123,6 +125,63 @@ export function sidebarNav() {
       
       // 根据当前 URL 高亮对应菜单并展开分组
       this.highlightCurrentPage()
+      
+      // 监听 Tab 打开/切换事件，更新菜单高亮状态
+      window.addEventListener('open-tab', (e) => {
+        this.setActiveItem(e.detail.id, e.detail.url)
+      })
+      
+      // 监听 Tab 切换事件
+      window.addEventListener('switch-tab', (e) => {
+        this.setActiveItem(e.detail.id, e.detail.url)
+      })
+      
+      // 从 localStorage 恢复当前激活的 Tab 状态
+      this.restoreActiveItemFromTabs()
+    },
+    
+    /**
+     * 从 localStorage 恢复当前激活的菜单项
+     */
+    restoreActiveItemFromTabs() {
+      try {
+        const state = JSON.parse(localStorage.getItem('workspace_tabs'))
+        if (state && state.activeTabId) {
+          this.activeItemId = state.activeTabId
+          // 展开对应的分组
+          this.expandGroupForItem(state.activeTabId)
+        }
+      } catch (e) {
+        console.warn('恢复激活菜单项失败', e)
+      }
+    },
+    
+    /**
+     * 设置当前激活的菜单项
+     * @param {string} itemId - 菜单项ID
+     * @param {string} url - 菜单项URL
+     */
+    setActiveItem(itemId, url) {
+      this.activeItemId = itemId
+      // 展开对应的分组
+      this.expandGroupForItem(itemId)
+    },
+    
+    /**
+     * 根据菜单项ID展开对应的分组
+     * @param {string} itemId - 菜单项ID
+     */
+    expandGroupForItem(itemId) {
+      for (const group of this.navGroups) {
+        if (group.items) {
+          const found = group.items.find(item => item.id === itemId)
+          if (found && !this.expandedGroups.includes(group.id)) {
+            this.expandedGroups.push(group.id)
+            localStorage.setItem('sidebar_expanded_groups', JSON.stringify(this.expandedGroups))
+            break
+          }
+        }
+      }
     },
     
     /**
@@ -192,9 +251,31 @@ export function sidebarNav() {
     /**
      * 判断菜单项是否激活
      * @param {string} url - 菜单URL
+     * @param {string} itemId - 菜单项ID（可选）
      * @returns {boolean}
      */
-    isItemActive(url) {
+    isItemActive(url, itemId) {
+      // 如果在工作台模式下（有 activeItemId），优先使用 Tab 状态判断
+      if (this.activeItemId) {
+        // 如果提供了 itemId，直接比较
+        if (itemId) {
+          return this.activeItemId === itemId
+        }
+        // 根据 URL 查找对应的 itemId
+        for (const group of this.navGroups) {
+          if (group.type === 'single' && group.url === url) {
+            return this.activeItemId === group.id
+          }
+          if (group.items) {
+            const item = group.items.find(i => i.url === url)
+            if (item) {
+              return this.activeItemId === item.id
+            }
+          }
+        }
+      }
+      
+      // 非工作台模式，使用传统的 URL 匹配
       const currentPath = window.location.pathname + window.location.search
       return currentPath.includes(url.split('?')[0])
     },

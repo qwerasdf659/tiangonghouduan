@@ -138,11 +138,11 @@ export const SYSTEM_ENDPOINTS = {
   FEATURE_FLAG_BLACKLIST_REMOVE: '/api/v4/console/feature-flags/:flagKey/blacklist',
   FEATURE_FLAG_CHECK: '/api/v4/console/feature-flags/:flagKey/check/:userId',
 
-  // 系统配置（全局）
+  // 系统配置（全局）- 使用 settings API
   SYSTEM_CONFIG_LIST: '/api/v4/console/settings',
-  SYSTEM_CONFIG_GET: '/api/v4/console/system/config',
-  SYSTEM_CONFIG_UPDATE: '/api/v4/console/system/config',
-  SYSTEM_CONFIG_MAINTENANCE: '/api/v4/console/system/config/maintenance',
+  SYSTEM_CONFIG_GET: '/api/v4/console/settings/basic', // 修正：使用 settings/basic 接口
+  SYSTEM_CONFIG_UPDATE: '/api/v4/console/settings/basic', // 修正：使用 settings/basic 接口
+  SYSTEM_CONFIG_MAINTENANCE: '/api/v4/console/settings/basic', // 修正：使用 settings/basic 接口
   SYSTEM_CONFIG_PRICING: '/api/v4/console/settings/pricing',
   SYSTEM_CONFIG_UPDATE_PRICING: '/api/v4/console/settings/pricing',
 

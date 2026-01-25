@@ -318,18 +318,23 @@ class HierarchyManagementService {
     /*
      * 5. 记录操作日志（用于审计追踪）
      * 根据功能重复检查报告决策（2026-01-09）：改用 AdminOperationLog
+     * 2026-01-25: 添加 idempotency_key（关键操作必需）
+     * idempotency_key 使用业务主键派生：hierarchy_deactivate_{target}_{operator}_{timestamp}
      */
+    const operationTimestamp = BeijingTimeHelper.generateIdTimestamp()
     await AuditLogService.logOperation({
       operator_id: operator_user_id,
       operation_type: 'user_status_change',
       target_type: 'User',
       target_id: target_user_id,
       action: include_subordinates ? 'batch_deactivate' : 'deactivate',
-      changes: {
+      after_data: {
         affected_users: usersToDeactivate,
         affected_count: usersToDeactivate.length
       },
       reason,
+      // 关键操作必须提供 idempotency_key（业务主键派生）
+      idempotency_key: `hierarchy_deactivate_${target_user_id}_${operator_user_id}_${operationTimestamp}`,
       transaction
     })
 
@@ -424,18 +429,22 @@ class HierarchyManagementService {
     /*
      * 5. 记录操作日志
      * 根据功能重复检查报告决策（2026-01-09）：改用 AdminOperationLog
+     * 2026-01-25: 添加 idempotency_key（关键操作必需）
      */
+    const activateTimestamp = BeijingTimeHelper.generateIdTimestamp()
     await AuditLogService.logOperation({
       operator_id: operator_user_id,
       operation_type: 'user_status_change',
       target_type: 'User',
       target_id: target_user_id,
       action: 'activate',
-      changes: {
+      after_data: {
         affected_users: usersToActivate,
         affected_count: usersToActivate.length
       },
       reason: '批量激活权限',
+      // 关键操作必须提供 idempotency_key（业务主键派生）
+      idempotency_key: `hierarchy_activate_${target_user_id}_${operator_user_id}_${activateTimestamp}`,
       transaction
     })
 

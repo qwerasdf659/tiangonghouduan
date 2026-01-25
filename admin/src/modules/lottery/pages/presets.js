@@ -175,15 +175,38 @@ function presetsPage() {
      * @returns {Promise<void>}
      */
     async init() {
+      console.log('[PRESETS] 页面初始化开始')
       logger.info('抽奖干预管理页面初始化 (Mixin v3.0)')
 
+      // 验证关键属性
+      logger.debug('组件状态检查:', {
+        hasInterventions: Array.isArray(this.interventions),
+        hasFilters: !!this.filters,
+        hasTotalRecords: typeof this.totalRecords !== 'undefined'
+      })
+
       // 使用 Mixin 的认证检查
+      console.log('[PRESETS] 执行认证检查...')
       if (!this.checkAuth()) {
+        console.warn('[PRESETS] 认证检查未通过，跳过数据加载')
+        logger.warn('认证检查未通过，跳过数据加载')
         return
       }
+      console.log('[PRESETS] 认证检查通过')
 
       // 加载数据
-      await Promise.all([this.loadPrizes(), this.loadData()])
+      try {
+        console.log('[PRESETS] 开始加载奖品和干预列表...')
+        await Promise.all([this.loadPrizes(), this.loadData()])
+        console.log('[PRESETS] 数据加载完成，奖品数量:', this.allPrizes.length)
+        logger.info('页面初始化完成', { 
+          interventionsCount: this.interventions.length,
+          prizesCount: this.allPrizes.length 
+        })
+      } catch (error) {
+        console.error('[PRESETS] 页面初始化失败:', error)
+        logger.error('页面初始化失败:', error)
+      }
     },
 
     // ==================== 数据加载 ====================
@@ -197,12 +220,35 @@ function presetsPage() {
      */
     async loadPrizes() {
       try {
+        logger.debug('开始加载奖品列表', { endpoint: LOTTERY_ENDPOINTS.PRIZE_LIST })
         const response = await apiRequest(LOTTERY_ENDPOINTS.PRIZE_LIST)
+        
+        // 详细日志：打印完整响应用于调试
+        console.log('[DEBUG] 奖品列表API完整响应:', JSON.stringify(response, null, 2))
+        logger.debug('奖品列表响应', { 
+          success: response?.success, 
+          dataKeys: Object.keys(response?.data || {}),
+          prizesCount: response?.data?.prizes?.length || 0
+        })
+        
         if (response && response.success) {
           this.allPrizes = response.data?.prizes || []
+          logger.info('奖品列表加载成功', { count: this.allPrizes.length })
+          
+          // 调试：打印前3个奖品
+          if (this.allPrizes.length > 0) {
+            console.log('[DEBUG] 前3个奖品:', this.allPrizes.slice(0, 3))
+          } else {
+            console.warn('[DEBUG] 奖品列表为空！请检查后端数据')
+          }
+        } else {
+          logger.warn('奖品列表响应失败', { response })
+          console.error('[DEBUG] API响应失败:', response)
         }
       } catch (error) {
         logger.error('加载奖品列表失败:', error)
+        console.error('[DEBUG] 加载奖品列表异常:', error)
+        this.showError('加载奖品列表失败: ' + error.message)
       }
     },
 
@@ -223,14 +269,18 @@ function presetsPage() {
         if (this.filters.status) params.append('status', this.filters.status)
         if (this.filters.userSearch.trim())
           params.append('user_search', this.filters.userSearch.trim())
-        if (this.filters.prizeType) params.append('prize_type', this.filters.prizeType)
+        if (this.filters.prizeType) params.append('setting_type', this.filters.prizeType)
 
         const response = await apiRequest(`${LOTTERY_ENDPOINTS.INTERVENTION_LIST}?${params}`)
 
         if (response && response.success) {
           this.interventions = response.data?.interventions || []
           const paginationData = response.data?.pagination || {}
-          this.total = paginationData.total || this.interventions.length
+          // 使用 paginationMixin 提供的 totalRecords 字段
+          this.totalRecords = paginationData.total || this.interventions.length
+          logger.debug('干预规则加载成功', { count: this.interventions.length, total: this.totalRecords })
+        } else {
+          logger.warn('干预规则加载响应异常', response)
         }
       }, '加载干预规则...')
     },
@@ -285,12 +335,16 @@ function presetsPage() {
       this.userSearched = false
 
       try {
+        // 使用正确的端点名称：USER_ENDPOINTS.LIST（不是 USER_LIST）
         const response = await apiRequest(
-          `${USER_ENDPOINTS.USER_LIST}?search=${encodeURIComponent(this.userSearchKeyword.trim())}&page_size=10`
+          `${USER_ENDPOINTS.LIST}?search=${encodeURIComponent(this.userSearchKeyword.trim())}&page_size=10`
         )
 
         if (response && response.success) {
           this.userSearchResults = response.data?.users || []
+          logger.debug('用户搜索结果', { count: this.userSearchResults.length })
+        } else {
+          logger.warn('用户搜索响应异常', response)
         }
       } catch (error) {
         logger.error('搜索用户失败:', error)
@@ -366,12 +420,12 @@ function presetsPage() {
 
         const response = await apiRequest(LOTTERY_ENDPOINTS.INTERVENTION_FORCE_WIN, {
           method: 'POST',
-          body: JSON.stringify({
+          data: {
             user_id: parseInt(this.selectedUser.user_id),
             prize_id: parseInt(this.interventionForm.prize_id),
             duration_minutes: durationMinutes,
             reason: reason
-          })
+          }
         })
 
         if (response && response.success) {
@@ -397,15 +451,20 @@ function presetsPage() {
      *
      * @description 根据规则ID获取并显示干预规则的详细信息
      * @async
-     * @param {number|string} id - 干预规则ID
+     * @param {string} settingId - 干预规则ID（setting_id格式：setting_xxx）
      * @returns {Promise<void>}
      */
-    async viewIntervention(id) {
+    async viewIntervention(settingId) {
+      if (!settingId) {
+        this.showError('规则ID无效')
+        return
+      }
+
       this.globalLoading = true
 
       try {
         const response = await apiRequest(
-          buildURL(LOTTERY_ENDPOINTS.INTERVENTION_DETAIL, { id })
+          buildURL(LOTTERY_ENDPOINTS.INTERVENTION_DETAIL, { id: settingId })
         )
 
         if (response && response.success) {
@@ -427,10 +486,15 @@ function presetsPage() {
      *
      * @description 取消指定的干预规则，取消后无法恢复
      * @async
-     * @param {number|string} id - 干预规则ID
+     * @param {string} settingId - 干预规则ID（setting_id格式：setting_xxx）
      * @returns {Promise<void>}
      */
-    async cancelIntervention(id) {
+    async cancelIntervention(settingId) {
+      if (!settingId) {
+        this.showError('规则ID无效')
+        return
+      }
+
       const confirmed = await this.confirmDanger('确定要取消此干预规则吗？取消后无法恢复。')
       if (!confirmed) return
 
@@ -438,7 +502,7 @@ function presetsPage() {
 
       try {
         const response = await apiRequest(
-          buildURL(LOTTERY_ENDPOINTS.INTERVENTION_CANCEL, { id }),
+          buildURL(LOTTERY_ENDPOINTS.INTERVENTION_CANCEL, { id: settingId }),
           { method: 'POST' }
         )
 

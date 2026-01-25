@@ -151,6 +151,9 @@ function statisticsPage() {
       userType: null
     },
 
+    /** ECharts 核心模块引用 */
+    _echarts: null,
+
     // ==================== 生命周期 ====================
 
     /**
@@ -169,10 +172,11 @@ function statisticsPage() {
 
       // 动态加载 ECharts（懒加载优化）
       try {
-        await loadECharts()
-        logger.info('[Statistics] ECharts 加载完成')
+        this._echarts = await loadECharts()
+        logger.info('[Statistics] ECharts 加载完成', { hasEcharts: !!this._echarts })
       } catch (error) {
         logger.error('[Statistics] ECharts 加载失败:', error)
+        this.showError('图表组件加载失败，部分功能可能不可用')
       }
 
       // 初始化图表
@@ -198,15 +202,24 @@ function statisticsPage() {
     initCharts() {
       const trendContainer = this.$refs.trendChart
       const userTypeContainer = this.$refs.userTypeChart
+      const echarts = this._echarts
 
-      if (trendContainer && typeof echarts !== 'undefined') {
+      logger.info('[Statistics] 初始化图表', {
+        hasTrendContainer: !!trendContainer,
+        hasUserTypeContainer: !!userTypeContainer,
+        hasEcharts: !!echarts
+      })
+
+      if (trendContainer && echarts) {
         this._charts.trend = echarts.init(trendContainer)
         this._charts.trend.setOption(this.getTrendChartOption([], [], [], []))
+        logger.info('[Statistics] 趋势图初始化完成')
       }
 
-      if (userTypeContainer && typeof echarts !== 'undefined') {
+      if (userTypeContainer && echarts) {
         this._charts.userType = echarts.init(userTypeContainer)
         this._charts.userType.setOption(this.getUserTypeChartOption([]))
+        logger.info('[Statistics] 用户类型图初始化完成')
       }
     },
 

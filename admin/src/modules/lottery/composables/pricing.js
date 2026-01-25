@@ -38,7 +38,9 @@ export function usePricingState() {
     /** @type {boolean} 是否编辑模式 */
     isEditPricing: false,
     /** @type {Object|null} 选中的定价活动 */
-    selectedPricingCampaign: null
+    selectedPricingCampaign: null,
+    /** @type {boolean} 是否正在刷新定价配置 */
+    refreshingPricing: false
   }
 }
 
@@ -50,18 +52,82 @@ export function usePricingMethods() {
   return {
     /**
      * 加载定价配置列表
+     * 
+     * 优化后的实现：使用批量接口一次性获取所有活动的定价配置
+     * 避免 N+1 请求问题，消除控制台 404 错误
      */
     async loadPricingConfigs() {
+      console.log('🔄 [Pricing] loadPricingConfigs 开始加载...')
       try {
-        const response = await this.apiGet(LOTTERY_ENDPOINTS.PRICING_GET)
-        if (response?.success) {
-          const pricingData = response.data?.list || response.data?.configs || response.data
-          this.pricingConfigs = Array.isArray(pricingData) ? pricingData : []
-          logger.debug('[LotteryManagement] 定价配置数量:', this.pricingConfigs.length)
+        // 使用批量接口一次性获取所有定价配置
+        const response = await this.apiGet(LOTTERY_ENDPOINTS.PRICING_CONFIGS_ALL)
+        
+        if (!response?.success) {
+          logger.warn('[Pricing] 获取定价配置列表失败:', response?.message)
+          this.pricingConfigs = []
+          return
         }
+
+        const configs = response.data?.configs || []
+        
+        // 处理返回的配置数据
+        const pricingList = configs.map(config => {
+          // 确保 pricing_config 是对象格式
+          let pricing_config = config.pricing_config
+          if (typeof pricing_config === 'string') {
+            try {
+              pricing_config = JSON.parse(pricing_config)
+            } catch (e) {
+              console.warn(`[Pricing] 活动 ${config.campaign_code} pricing_config 解析失败`)
+              pricing_config = {}
+            }
+          }
+          
+          return {
+            ...config,
+            pricing_config
+          }
+        })
+
+        this.pricingConfigs = pricingList
+        
+        console.log('📊 [Pricing] 定价配置加载完成:', {
+          count: this.pricingConfigs.length,
+          configs: this.pricingConfigs.map(c => ({
+            campaign_code: c.campaign_code,
+            campaign_name: c.campaign_name,
+            version: c.version,
+            status: c.status
+          }))
+        })
+        
+        logger.debug('[LotteryManagement] 定价配置数量:', this.pricingConfigs.length)
       } catch (error) {
         logger.error('加载定价配置失败:', error)
         this.pricingConfigs = []
+      }
+    },
+
+    /**
+     * 刷新定价配置（带视觉反馈）
+     */
+    async refreshPricingWithFeedback() {
+      this.refreshingPricing = true
+      try {
+        await this.loadPricingConfigs()
+        // 使用 Alpine.store 显示成功通知
+        if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
+          Alpine.store('notification').success(`定价配置已刷新，共 ${this.pricingConfigs.length} 条配置`)
+        }
+        console.log('✅ 定价配置已刷新')
+      } catch (error) {
+        // 使用 Alpine.store 显示错误通知
+        if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
+          Alpine.store('notification').error('刷新失败: ' + error.message)
+        }
+        console.error('❌ 刷新失败:', error)
+      } finally {
+        this.refreshingPricing = false
       }
     },
 
@@ -73,9 +139,11 @@ export function usePricingMethods() {
       if (!campaignCode) return
       try {
         const endpoint = buildURL(LOTTERY_ENDPOINTS.PRICING_VERSIONS, { code: campaignCode })
-        const response = await this.apiGet(endpoint)
-        if (response?.success) {
-          this.pricingVersions = response.data?.versions || response.data || []
+        // apiGet 返回的是 response.data，不是完整 response 对象
+        const data = await this.apiGet(endpoint)
+        // data 直接就是 response.data 的内容
+        if (data) {
+          this.pricingVersions = data.versions || data || []
         }
       } catch (error) {
         logger.error('加载定价版本失败:', error)
@@ -105,22 +173,54 @@ export function usePricingMethods() {
      * @param {Object} pricing - 定价配置对象
      */
     editPricing(pricing) {
+      console.log('✏️ [Pricing] editPricing 被调用', pricing)
       this.isEditPricing = true
-      this.editingPricingId = pricing.pricing_id || pricing.id
+      this.editingPricingId = pricing.config_id || pricing.pricing_id || pricing.id
+      
+      // 从后端数据中提取定价信息
+      // 注意：pricing_config 可能是对象或 JSON 字符串
+      let pricingConfig = pricing.pricing_config || {}
+      if (typeof pricingConfig === 'string') {
+        try {
+          pricingConfig = JSON.parse(pricingConfig)
+          console.log('📦 [Pricing] pricing_config 已从字符串解析:', pricingConfig)
+        } catch (e) {
+          console.warn('⚠️ [Pricing] pricing_config 解析失败:', e.message)
+          pricingConfig = {}
+        }
+      }
+      
+      // 提取基础价格：优先从 pricing_config.base_cost 获取
+      const baseCost = pricingConfig.base_cost ?? pricingConfig.baseCost ?? pricing.base_cost ?? pricing.price_per_draw ?? 0
+      console.log('💰 [Pricing] 提取的基础价格 base_cost:', baseCost)
+      
+      // 提取折扣率：从 draw_buttons 中的10连抽获取折扣，或使用默认值
+      let discountRate = 1.0
+      if (pricingConfig.draw_buttons && Array.isArray(pricingConfig.draw_buttons)) {
+        const tenDraw = pricingConfig.draw_buttons.find(btn => btn.count === 10)
+        if (tenDraw && tenDraw.discount) {
+          discountRate = tenDraw.discount
+        }
+      }
+      
       this.pricingForm = {
         campaign_code: pricing.campaign_code || '',
-        price_per_draw: pricing.price_per_draw || 0,
-        discount_rate: pricing.discount_rate || 1.0,
+        price_per_draw: baseCost,
+        discount_rate: discountRate,
         min_purchase: pricing.min_purchase || 1,
         max_purchase: pricing.max_purchase || 10,
-        effective_from: pricing.effective_from || '',
-        effective_to: pricing.effective_to || ''
+        effective_from: pricing.effective_from || pricing.effective_at || '',
+        effective_to: pricing.effective_to || pricing.expired_at || ''
       }
+      console.log('📝 [Pricing] 填充表单数据:', this.pricingForm)
       this.showModal('pricingModal')
     },
 
     /**
      * 保存定价配置
+     * 
+     * 后端API设计：创建新版本（POST），不支持直接更新
+     * 请求格式要求：{ pricing_config: { draw_buttons: [...] }, activate_immediately: true }
      */
     async savePricing() {
       if (!this.pricingForm.campaign_code) {
@@ -134,21 +234,37 @@ export function usePricingMethods() {
 
       this.saving = true
       try {
-        const endpoint = this.isEditPricing
-          ? buildURL(LOTTERY_ENDPOINTS.PRICING_CREATE, { code: this.pricingForm.campaign_code })
-          : buildURL(LOTTERY_ENDPOINTS.PRICING_CREATE, { code: this.pricingForm.campaign_code })
+        const endpoint = buildURL(LOTTERY_ENDPOINTS.PRICING_CREATE, { code: this.pricingForm.campaign_code })
 
-        const response = await this.apiCall(endpoint, {
-          method: this.isEditPricing ? 'PUT' : 'POST',
-          data: this.pricingForm
-        })
-
-        if (response?.success) {
-          this.showSuccess(this.isEditPricing ? '定价配置更新成功' : '定价配置创建成功')
-          this.hideModal('pricingModal')
-          await this.loadPricingConfigs()
+        // 构建符合后端API期望的请求格式
+        // 后端期望: { pricing_config: { base_cost, draw_buttons: [...] }, activate_immediately }
+        const baseCost = parseFloat(this.pricingForm.price_per_draw) || 100
+        const discountRate = parseFloat(this.pricingForm.discount_rate) || 1.0
+        
+        const requestData = {
+          pricing_config: {
+            base_cost: baseCost,
+            draw_buttons: [
+              { count: 1, discount: 1.0, label: '单抽', enabled: true, sort_order: 1 },
+              { count: 3, discount: 1.0, label: '3连抽', enabled: true, sort_order: 3 },
+              { count: 5, discount: 1.0, label: '5连抽', enabled: true, sort_order: 5 },
+              { count: 10, discount: discountRate, label: discountRate < 1 ? `10连抽(${Math.round(discountRate * 100) / 10}折)` : '10连抽', enabled: true, sort_order: 10 }
+            ]
+          },
+          activate_immediately: true
         }
+
+        console.log('📤 [Pricing] 发送请求:', endpoint, requestData)
+
+        // apiPost 成功时返回 response.data，失败时抛出错误
+        await this.apiPost(endpoint, requestData)
+
+        // 如果没有抛出错误，则表示成功
+        this.showSuccess(this.isEditPricing ? '定价配置已更新（创建新版本）' : '定价配置创建成功')
+        this.hideModal('pricingModal')
+        await this.loadPricingConfigs()
       } catch (error) {
+        console.error('❌ [Pricing] 保存失败:', error)
         this.showError('保存定价配置失败: ' + (error.message || '未知错误'))
       } finally {
         this.saving = false
@@ -168,10 +284,10 @@ export function usePricingMethods() {
             code: pricing.campaign_code,
             version: version
           })
-          const response = await this.apiCall(endpoint, { method: 'POST' })
-          if (response?.success) {
-            await this.loadPricingConfigs()
-          }
+          // apiPut 成功时返回 response.data，失败时抛出错误
+          await this.apiPut(endpoint, {})
+          // 如果没有抛出错误，则表示成功
+          await this.loadPricingConfigs()
         },
         { successMessage: '定价版本已激活' }
       )
@@ -190,10 +306,10 @@ export function usePricingMethods() {
             code: pricing.campaign_code,
             version: version
           })
-          const response = await this.apiCall(endpoint, { method: 'POST' })
-          if (response?.success) {
-            await this.loadPricingConfigs()
-          }
+          // apiPut 成功时返回 response.data，失败时抛出错误
+          await this.apiPut(endpoint, {})
+          // 如果没有抛出错误，则表示成功
+          await this.loadPricingConfigs()
         },
         { successMessage: '定价版本已归档', confirmText: '确认归档' }
       )
@@ -204,6 +320,7 @@ export function usePricingMethods() {
      * @param {Object} pricing - 定价配置对象
      */
     viewPricingVersions(pricing) {
+      console.log('📋 [Pricing] viewPricingVersions 被调用', pricing)
       this.selectedPricingCampaign = pricing
       this.loadPricingVersions(pricing.campaign_code)
       this.showModal('pricingVersionsModal')
@@ -257,4 +374,3 @@ export function usePricingMethods() {
 }
 
 export default { usePricingState, usePricingMethods }
-

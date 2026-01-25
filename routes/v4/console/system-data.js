@@ -522,6 +522,231 @@ router.get(
   }
 )
 
+/**
+ * POST /api/v4/console/system-data/lottery-campaigns
+ * @desc 创建抽奖活动
+ * @access Admin only (role_level >= 100)
+ */
+router.post(
+  '/lottery-campaigns',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const {
+        campaign_name,
+        campaign_code,
+        campaign_type,
+        description,
+        start_time,
+        end_time,
+        status,
+        rules_text,
+        budget_mode,
+        cost_per_draw,
+        max_draws_per_user_daily,
+        max_draws_per_user_total,
+        total_prize_pool,
+        remaining_prize_pool,
+        prize_distribution_config
+      } = req.body
+
+      // 验证必填字段
+      if (!campaign_name) {
+        return res.apiError('活动名称不能为空', 'VALIDATION_ERROR', null, 400)
+      }
+      if (!campaign_code) {
+        return res.apiError('活动代码不能为空', 'VALIDATION_ERROR', null, 400)
+      }
+      if (!campaign_type) {
+        return res.apiError('活动类型不能为空', 'VALIDATION_ERROR', null, 400)
+      }
+
+      const { LotteryCampaign } = require('../../../models')
+
+      const campaign = await LotteryCampaign.create({
+        campaign_name,
+        campaign_code,
+        campaign_type,
+        description: description || '',
+        start_time: start_time ? new Date(start_time) : null,
+        end_time: end_time ? new Date(end_time) : null,
+        status: status || 'draft',
+        rules_text: rules_text || '',
+        budget_mode: budget_mode || 'user',
+        cost_per_draw: cost_per_draw || 10,
+        max_draws_per_user_daily: max_draws_per_user_daily || 3,
+        max_draws_per_user_total: max_draws_per_user_total || null,
+        total_prize_pool: total_prize_pool || 0,
+        remaining_prize_pool: remaining_prize_pool || 0,
+        prize_distribution_config: prize_distribution_config || { tiers: [] },
+        created_by: req.user.user_id
+      })
+
+      logger.info('创建抽奖活动成功', {
+        admin_id: req.user.user_id,
+        campaign_id: campaign.campaign_id,
+        campaign_name
+      })
+
+      return res.apiSuccess(campaign, '创建抽奖活动成功')
+    } catch (error) {
+      return handleServiceError(error, res, '创建抽奖活动')
+    }
+  }
+)
+
+/**
+ * PUT /api/v4/console/system-data/lottery-campaigns/:campaign_id
+ * @desc 更新抽奖活动
+ * @access Admin only (role_level >= 100)
+ */
+router.put(
+  '/lottery-campaigns/:campaign_id',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { campaign_id } = req.params
+      const {
+        campaign_name,
+        campaign_type,
+        description,
+        start_time,
+        end_time,
+        status,
+        rules_text,
+        budget_mode,
+        cost_per_draw,
+        max_draws_per_user_daily,
+        max_draws_per_user_total,
+        total_prize_pool,
+        remaining_prize_pool,
+        prize_distribution_config
+      } = req.body
+
+      const { LotteryCampaign } = require('../../../models')
+
+      const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id))
+      if (!campaign) {
+        return res.apiError('活动不存在', 'NOT_FOUND', null, 404)
+      }
+
+      // 更新字段（campaign_code 不可修改）
+      const updateData = {}
+      if (campaign_name !== undefined) updateData.campaign_name = campaign_name
+      if (campaign_type !== undefined) updateData.campaign_type = campaign_type
+      if (description !== undefined) updateData.description = description
+      if (start_time !== undefined) updateData.start_time = start_time ? new Date(start_time) : null
+      if (end_time !== undefined) updateData.end_time = end_time ? new Date(end_time) : null
+      if (status !== undefined) updateData.status = status
+      if (rules_text !== undefined) updateData.rules_text = rules_text
+      if (budget_mode !== undefined) updateData.budget_mode = budget_mode
+      if (cost_per_draw !== undefined) updateData.cost_per_draw = cost_per_draw
+      if (max_draws_per_user_daily !== undefined) updateData.max_draws_per_user_daily = max_draws_per_user_daily
+      if (max_draws_per_user_total !== undefined) updateData.max_draws_per_user_total = max_draws_per_user_total
+      if (total_prize_pool !== undefined) updateData.total_prize_pool = total_prize_pool
+      if (remaining_prize_pool !== undefined) updateData.remaining_prize_pool = remaining_prize_pool
+      if (prize_distribution_config !== undefined) updateData.prize_distribution_config = prize_distribution_config
+
+      await campaign.update(updateData)
+
+      logger.info('更新抽奖活动成功', {
+        admin_id: req.user.user_id,
+        campaign_id: parseInt(campaign_id),
+        updated_fields: Object.keys(updateData)
+      })
+
+      return res.apiSuccess(campaign, '更新抽奖活动成功')
+    } catch (error) {
+      return handleServiceError(error, res, '更新抽奖活动')
+    }
+  }
+)
+
+/**
+ * PUT /api/v4/console/system-data/lottery-campaigns/:campaign_id/status
+ * @desc 更新抽奖活动状态
+ * @access Admin only (role_level >= 100)
+ */
+router.put(
+  '/lottery-campaigns/:campaign_id/status',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { campaign_id } = req.params
+      const { status } = req.body
+
+      if (!status || !['draft', 'active', 'paused', 'ended'].includes(status)) {
+        return res.apiError('无效的状态值', 'VALIDATION_ERROR', null, 400)
+      }
+
+      const { LotteryCampaign } = require('../../../models')
+
+      const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id))
+      if (!campaign) {
+        return res.apiError('活动不存在', 'NOT_FOUND', null, 404)
+      }
+
+      await campaign.update({ status })
+
+      logger.info('更新抽奖活动状态成功', {
+        admin_id: req.user.user_id,
+        campaign_id: parseInt(campaign_id),
+        old_status: campaign.status,
+        new_status: status
+      })
+
+      return res.apiSuccess(campaign, '更新活动状态成功')
+    } catch (error) {
+      return handleServiceError(error, res, '更新抽奖活动状态')
+    }
+  }
+)
+
+/**
+ * DELETE /api/v4/console/system-data/lottery-campaigns/:campaign_id
+ * @desc 删除抽奖活动
+ * @access Admin only (role_level >= 100)
+ */
+router.delete(
+  '/lottery-campaigns/:campaign_id',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { campaign_id } = req.params
+
+      const { LotteryCampaign, LotteryPrize } = require('../../../models')
+
+      const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id))
+      if (!campaign) {
+        return res.apiError('活动不存在', 'NOT_FOUND', null, 404)
+      }
+
+      // 检查是否有关联的奖品
+      const prizeCount = await LotteryPrize.count({ where: { campaign_id: parseInt(campaign_id) } })
+      if (prizeCount > 0) {
+        return res.apiError('活动下存在奖品，无法删除', 'HAS_RELATED_DATA', { prize_count: prizeCount }, 400)
+      }
+
+      // 软删除或硬删除（根据业务需求）
+      await campaign.destroy()
+
+      logger.info('删除抽奖活动成功', {
+        admin_id: req.user.user_id,
+        campaign_id: parseInt(campaign_id),
+        campaign_name: campaign.campaign_name
+      })
+
+      return res.apiSuccess(null, '删除抽奖活动成功')
+    } catch (error) {
+      return handleServiceError(error, res, '删除抽奖活动')
+    }
+  }
+)
+
 /*
  * =================================================================
  * 用户每日抽奖配额表查询接口

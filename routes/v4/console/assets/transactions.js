@@ -92,20 +92,24 @@ router.get(
       )
 
       // 格式化返回数据（添加资产名称映射）
-      const transactions = result.transactions.map(tx => ({
-        transaction_id: tx.transaction_id,
-        asset_code: tx.asset_code,
-        asset_name: getAssetDisplayName(tx.asset_code),
-        tx_type: tx.business_type,
-        amount: Number(tx.delta_amount),
-        balance_before: Number(tx.balance_before),
-        balance_after: Number(tx.balance_after),
-        description: tx.description || null,
-        reason: tx.meta?.reason || tx.description || null,
-        operator_name: tx.meta?.admin_id ? `管理员#${tx.meta.admin_id}` : null,
-        idempotency_key: tx.idempotency_key,
-        created_at: tx.created_at
-      }))
+      // 注意：Sequelize模型需要使用.get()或.toJSON()获取完整字段
+      const transactions = result.transactions.map(tx => {
+        const plainTx = tx.get ? tx.get({ plain: true }) : tx
+        return {
+          transaction_id: plainTx.transaction_id,
+          asset_code: plainTx.asset_code,
+          asset_name: getAssetDisplayName(plainTx.asset_code),
+          tx_type: plainTx.business_type,
+          amount: Number(plainTx.delta_amount),
+          balance_before: Number(plainTx.balance_before),
+          balance_after: Number(plainTx.balance_after),
+          description: plainTx.description || null,
+          reason: plainTx.meta?.reason || plainTx.description || null,
+          operator_name: plainTx.meta?.admin_id ? `管理员#${plainTx.meta.admin_id}` : null,
+          idempotency_key: plainTx.idempotency_key,
+          created_at: plainTx.created_at
+        }
+      })
 
       return res.apiSuccess({
         transactions,

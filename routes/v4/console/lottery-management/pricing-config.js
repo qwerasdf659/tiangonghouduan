@@ -71,7 +71,8 @@ function getPricingConfigService(req) {
 async function getCampaignByCode(req) {
   const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
   const code = req.validated?.code || req.params.code
-  const campaign = await lottery_engine.getCampaignByCode(code)
+  // 管理后台需要查看所有状态的活动，不检查活动状态
+  const campaign = await lottery_engine.getCampaignByCode(code, { checkStatus: false })
 
   if (!campaign) {
     const error = new Error(`活动不存在: ${code}`)
@@ -82,6 +83,44 @@ async function getCampaignByCode(req) {
 
   return campaign
 }
+
+/**
+ * GET /pricing-configs
+ * 批量获取所有活动的当前生效定价配置
+ *
+ * @description 一次性获取所有活动的 active 状态定价配置，避免前端 N+1 请求
+ *
+ * 响应说明：
+ * - configs: 所有活动的定价配置数组
+ * - total: 配置总数
+ *
+ * 每个配置包含：
+ * - campaign_id: 活动ID
+ * - campaign_code: 活动业务码
+ * - campaign_name: 活动名称
+ * - campaign_status: 活动状态
+ * - version: 版本号
+ * - pricing_config: 定价配置 JSON
+ * - status: 配置状态
+ * - effective_at: 生效时间
+ * - created_by: 创建人ID
+ * - created_at: 创建时间
+ */
+router.get(
+  '/pricing-configs',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const PricingConfigService = getPricingConfigService(req)
+
+    // 调用 Service 批量获取所有活动的定价配置
+    const pricing_configs = await PricingConfigService.getAllActivePricingConfigs()
+
+    return res.apiSuccess({
+      configs: pricing_configs,
+      total: pricing_configs.length
+    }, '获取所有定价配置成功')
+  })
+)
 
 /**
  * GET /campaigns/:code/pricing

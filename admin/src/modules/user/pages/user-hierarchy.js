@@ -218,6 +218,8 @@ document.addEventListener('alpine:init', () => {
      * @throws {Error} 当API请求失败时抛出错误
      */
     async loadData() {
+      logger.info('[UserHierarchy] 开始加载层级列表...')
+      
       const result = await this.withLoading(async () => {
         const params = {
           ...this.buildPaginationParams()
@@ -248,6 +250,12 @@ document.addEventListener('alpine:init', () => {
         }
 
         this._updateStatistics(result.data)
+        logger.info('[UserHierarchy] 层级列表加载完成', { 
+          count: this.totalRecords, 
+          rows: this.hierarchyList.length 
+        })
+      } else {
+        logger.error('[UserHierarchy] 层级列表加载失败', result)
       }
     },
 
@@ -270,6 +278,24 @@ document.addEventListener('alpine:init', () => {
     },
 
     // ==================== 筛选方法 ====================
+
+    /**
+     * 刷新数据（带反馈）
+     *
+     * @description 刷新层级列表数据并显示反馈
+     * @async
+     * @returns {Promise<void>}
+     */
+    async refreshData() {
+      logger.info('[UserHierarchy] 用户点击刷新按钮')
+      try {
+        await this.loadData()
+        this.showSuccess('刷新成功')
+      } catch (error) {
+        logger.error('[UserHierarchy] 刷新失败', error)
+        this.showError('刷新失败: ' + error.message)
+      }
+    },
 
     /**
      * 应用筛选条件
@@ -402,6 +428,16 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     openDeactivateModal(userId, userInfo) {
+      // 检查是否尝试停用自己
+      const currentUser = this.getCurrentUser()
+      const currentUserId = currentUser?.user_id || currentUser?.userId
+      
+      if (currentUserId && parseInt(userId) === parseInt(currentUserId)) {
+        this.showWarning('不能停用自己的权限')
+        logger.warn('[UserHierarchy] 阻止停用自己的权限', { userId, currentUserId })
+        return
+      }
+
       this.deactivateForm = {
         userId,
         userInfo: `${userInfo} (ID: ${userId})`,
@@ -425,6 +461,15 @@ document.addEventListener('alpine:init', () => {
         return
       }
 
+      // 双重检查：防止停用自己
+      const currentUser = this.getCurrentUser()
+      const currentUserId = currentUser?.user_id || currentUser?.userId
+      if (currentUserId && parseInt(this.deactivateForm.userId) === parseInt(currentUserId)) {
+        this.showWarning('不能停用自己的权限')
+        this.hideModal('deactivateModal')
+        return
+      }
+
       const result = await this.apiPost(
         buildURL(USER_ENDPOINTS.USER_HIERARCHY_DEACTIVATE, {
           user_id: this.deactivateForm.userId
@@ -440,6 +485,14 @@ document.addEventListener('alpine:init', () => {
         this.showSuccess(`成功停用 ${result.data.deactivated_count} 个用户的权限`)
         this.hideModal('deactivateModal')
         this.loadData()
+      } else {
+        // 改进错误提示：解析后端错误消息
+        const errorMessage = result.message || '停用失败'
+        if (errorMessage.includes('无权限操作该用户')) {
+          this.showError('无权限停用该用户，只能停用您的下级用户')
+        } else {
+          this.showError(errorMessage)
+        }
       }
     },
 

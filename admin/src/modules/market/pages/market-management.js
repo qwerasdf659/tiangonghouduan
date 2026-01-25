@@ -31,7 +31,7 @@ import { logger } from '../../../utils/logger.js'
 import { MARKET_ENDPOINTS } from '../../../api/market.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 import { buildURL, request } from '../../../api/base.js'
-import { createDashboardMixin } from '../../../alpine/mixins/index.js'
+import { createPageMixin } from '../../../alpine/mixins/index.js'
 
 // API请求封装
 const apiRequest = async (url, options = {}) => {
@@ -128,8 +128,8 @@ document.addEventListener('alpine:init', () => {
    * @returns {Object} Alpine.js组件配置对象
    */
   Alpine.data('marketPageContent', () => ({
-    // 组合 Mixin
-    ...createDashboardMixin(),
+    // 组合 Mixin（使用 createPageMixin 以支持模态框）
+    ...createPageMixin(),
 
     // ==================== 数据状态 ====================
 
@@ -581,6 +581,145 @@ document.addEventListener('alpine:init', () => {
     viewTradeDetail(trade) {
       this.selectedTrade = trade
       this.showModal('tradeDetailModal')
+    },
+
+    // ==================== HTML 模板辅助方法 ====================
+
+    /**
+     * 格式化日期显示
+     * @param {string} dateStr - ISO日期字符串
+     * @returns {string} 本地化日期字符串
+     */
+    formatDate(dateStr) {
+      if (!dateStr) return '-'
+      return new Date(dateStr).toLocaleString('zh-CN')
+    },
+
+    /**
+     * 格式化数字显示
+     * @param {number} num - 数字
+     * @returns {string} 格式化后的数字字符串
+     */
+    formatNumber(num) {
+      if (num === null || num === undefined) return '0'
+      return Number(num).toLocaleString('zh-CN')
+    },
+
+    /**
+     * 打开商品编辑模态框（新增模式）
+     */
+    openItemModal() {
+      this.editingItem = false
+      this.itemForm = {
+        item_id: null,
+        item_name: '',
+        item_description: '',
+        cost_asset_code: '',
+        cost_amount: 1,
+        cost_price: 0,
+        stock: 0,
+        sort_order: 100,
+        status: 'active'
+      }
+      this.showModal('exchangeItemModal')
+    },
+
+    /**
+     * 编辑商品（简化版，接受单个item参数）
+     * @param {Object} item - 商品对象
+     */
+    editItem(item) {
+      this.editingItem = true
+      this.itemForm = {
+        item_id: item.item_id || item.id,
+        item_name: item.item_name || item.name || '',
+        item_description: item.item_description || item.description || '',
+        cost_asset_code: item.cost_asset_code || '',
+        cost_amount: item.cost_amount || item.points_cost || 1,
+        cost_price: item.cost_price || 0,
+        stock: item.stock || 0,
+        sort_order: item.sort_order || 100,
+        status: item.status || (item.is_enabled ? 'active' : 'inactive')
+      }
+      this.showModal('exchangeItemModal')
+    },
+
+    /**
+     * 删除商品（简化版，接受单个item参数）
+     * @param {Object} item - 商品对象
+     */
+    async deleteItem(item) {
+      const id = item.item_id || item.id
+      await this.confirmAndExecute(
+        '确定要删除这个商品吗？此操作不可恢复！',
+        async () => {
+          const response = await apiRequest(`${MARKET_ENDPOINTS.EXCHANGE_ITEMS}/${id}`, {
+            method: 'DELETE'
+          })
+
+          if (response && response.success) {
+            this.showSuccess('商品已删除')
+            await this.loadExchangeItems()
+            this._calculateStats()
+          } else {
+            this.showError(response?.message || '删除失败')
+          }
+        },
+        { title: '删除商品', confirmText: '确认删除', type: 'danger' }
+      )
+    },
+
+    /**
+     * 切换商品状态（上架/下架）
+     * @param {Object} item - 商品对象
+     */
+    async toggleItemStatus(item) {
+      const id = item.item_id || item.id
+      const newStatus = item.status === 'active' ? 'inactive' : 'active'
+      
+      try {
+        const response = await apiRequest(`${MARKET_ENDPOINTS.EXCHANGE_ITEMS}/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus })
+        })
+
+        if (response && response.success) {
+          this.showSuccess(newStatus === 'active' ? '已上架' : '已下架')
+          await this.loadExchangeItems()
+          this._calculateStats()
+        } else {
+          this.showError(response?.message || '操作失败')
+        }
+      } catch (error) {
+        logger.error('切换商品状态失败:', error)
+        this.showError('操作失败')
+      }
+    },
+
+    /**
+     * 处理订单
+     * @param {Object} order - 订单对象
+     */
+    async processOrder(order) {
+      const orderId = order.order_id || order.id
+      
+      try {
+        const response = await apiRequest(`${MARKET_ENDPOINTS.EXCHANGE_ORDERS}/${orderId}/process`, {
+          method: 'POST'
+        })
+
+        if (response && response.success) {
+          this.showSuccess('订单已处理')
+          await this.loadExchangeOrders()
+          this._calculateStats()
+        } else {
+          this.showError(response?.message || '处理失败')
+        }
+      } catch (error) {
+        logger.error('处理订单失败:', error)
+        this.showError('处理失败')
+      }
     }
   }))
 

@@ -2,10 +2,10 @@
  * 全局确认对话框 Store
  * 解决：重复的 confirm() 调用、不美观的原生对话框
  *
- * @file public/admin/js/alpine/stores/confirm-dialog.js
- * @description 提供美观的 Bootstrap Modal 确认对话框
- * @version 1.0.0
- * @date 2026-01-23
+ * @file admin/src/alpine/stores/confirm-dialog.js
+ * @description 提供美观的 Tailwind CSS + Alpine.js 确认对话框（不依赖 Bootstrap）
+ * @version 2.0.0
+ * @date 2026-01-26
  *
  * @example
  * // 在组件中使用
@@ -27,8 +27,9 @@
 
 
 import { logger } from '../../utils/logger.js'
+
 document.addEventListener('alpine:init', () => {
-  logger.info('🔧 注册确认对话框 Store...')
+  logger.info('🔧 注册确认对话框 Store (Tailwind 版本)...')
 
   /**
    * 确认对话框 Store
@@ -54,8 +55,8 @@ document.addEventListener('alpine:init', () => {
     /** Promise 回调 */
     _resolve: null,
 
-    /** Modal 实例 */
-    _modalInstance: null,
+    /** DOM 是否已初始化 */
+    _domInitialized: false,
 
     // ========== 方法 ==========
 
@@ -90,11 +91,7 @@ document.addEventListener('alpine:init', () => {
       return new Promise(resolve => {
         this._resolve = resolve
         this.visible = true
-
-        // 显示 Bootstrap Modal
-        if (this._modalInstance) {
-          this._modalInstance.show()
-        }
+        logger.debug('[ConfirmDialog] 显示对话框', this.config)
       })
     },
 
@@ -102,11 +99,8 @@ document.addEventListener('alpine:init', () => {
      * 确认操作
      */
     confirm() {
+      logger.debug('[ConfirmDialog] 用户点击确认')
       this.visible = false
-
-      if (this._modalInstance) {
-        this._modalInstance.hide()
-      }
 
       if (this._resolve) {
         this._resolve(true)
@@ -118,11 +112,8 @@ document.addEventListener('alpine:init', () => {
      * 取消操作
      */
     cancel() {
+      logger.debug('[ConfirmDialog] 用户点击取消')
       this.visible = false
-
-      if (this._modalInstance) {
-        this._modalInstance.hide()
-      }
 
       if (this._resolve) {
         this._resolve(false)
@@ -140,7 +131,7 @@ document.addEventListener('alpine:init', () => {
         title,
         message,
         type: 'danger',
-        confirmText: '确定删除'
+        confirmText: '确定'
       })
     },
 
@@ -182,66 +173,131 @@ document.addEventListener('alpine:init', () => {
     // ========== 私有方法 ==========
 
     /**
-     * 获取默认图标
+     * 获取默认图标（使用 emoji 替代 Bootstrap Icons）
      * @private
      */
     _getDefaultIcon(type) {
       const icons = {
-        primary: 'bi-question-circle',
-        success: 'bi-check-circle',
-        warning: 'bi-exclamation-triangle',
-        danger: 'bi-exclamation-circle',
-        info: 'bi-info-circle'
+        primary: '❓',
+        success: '✅',
+        warning: '⚠️',
+        danger: '🚨',
+        info: 'ℹ️'
       }
       return icons[type] || icons.primary
     },
 
     /**
-     * 确保 Modal DOM 存在
+     * 获取按钮样式类
+     * @private
+     */
+    _getButtonClass(type) {
+      const classes = {
+        primary: 'bg-blue-500 hover:bg-blue-600 text-white',
+        success: 'bg-green-500 hover:bg-green-600 text-white',
+        warning: 'bg-yellow-500 hover:bg-yellow-600 text-white',
+        danger: 'bg-red-500 hover:bg-red-600 text-white',
+        info: 'bg-blue-400 hover:bg-blue-500 text-white'
+      }
+      return classes[type] || classes.primary
+    },
+
+    /**
+     * 获取标题样式类
+     * @private
+     */
+    _getTitleClass(type) {
+      const classes = {
+        primary: 'text-blue-600',
+        success: 'text-green-600',
+        warning: 'text-yellow-600',
+        danger: 'text-red-600',
+        info: 'text-blue-500'
+      }
+      return classes[type] || classes.primary
+    },
+
+    /**
+     * 确保 Modal DOM 存在（纯 Tailwind CSS 实现）
      * @private
      */
     _ensureModalDOM() {
       const modalId = 'globalConfirmModal'
 
       if (document.getElementById(modalId)) {
-        if (!this._modalInstance) {
-          const el = document.getElementById(modalId)
-          if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-            this._modalInstance = new bootstrap.Modal(el, { backdrop: 'static' })
-          }
-        }
         return
       }
 
-      // 创建 Modal HTML
+      // 创建 Tailwind CSS Modal HTML
       const modalHTML = `
-        <div class="modal fade" id="${modalId}" tabindex="-1" aria-labelledby="${modalId}Label" aria-hidden="true"
-             x-data
-             @keydown.escape.window="Alpine.store('confirm').cancel()">
-          <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-              <div class="modal-header" :class="'border-' + Alpine.store('confirm').config.type">
-                <h5 class="modal-title" id="${modalId}Label">
-                  <i class="bi me-2" :class="Alpine.store('confirm').config.icon"></i>
-                  <span x-text="Alpine.store('confirm').config.title"></span>
-                </h5>
-                <button type="button" class="btn-close" @click="Alpine.store('confirm').cancel()"></button>
+        <div id="${modalId}" 
+             x-data="{ get store() { return Alpine.store('confirm') } }"
+             x-show="store.visible"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             @keydown.escape.window="store.visible && store.cancel()"
+             class="fixed inset-0 z-[9999] overflow-y-auto"
+             style="display: none;">
+          
+          <!-- 背景遮罩 -->
+          <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity" 
+               @click="store.cancel()"></div>
+          
+          <!-- 对话框容器 -->
+          <div class="flex min-h-full items-center justify-center p-4">
+            <!-- 对话框内容 -->
+            <div x-show="store.visible"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 scale-95"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 x-transition:leave="transition ease-in duration-150"
+                 x-transition:leave-start="opacity-100 scale-100"
+                 x-transition:leave-end="opacity-0 scale-95"
+                 class="relative bg-white rounded-lg shadow-xl w-full max-w-md transform"
+                 @click.stop>
+              
+              <!-- 头部 -->
+              <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold flex items-center gap-2"
+                    :class="{
+                      'text-blue-600': store.config.type === 'primary',
+                      'text-green-600': store.config.type === 'success',
+                      'text-yellow-600': store.config.type === 'warning',
+                      'text-red-600': store.config.type === 'danger',
+                      'text-blue-500': store.config.type === 'info'
+                    }">
+                  <span x-text="store.config.icon"></span>
+                  <span x-text="store.config.title"></span>
+                </h3>
               </div>
-              <div class="modal-body">
-                <p class="mb-0" x-text="Alpine.store('confirm').config.message" style="white-space: pre-wrap;"></p>
+              
+              <!-- 内容 -->
+              <div class="px-6 py-4">
+                <p class="text-gray-700 whitespace-pre-wrap" x-text="store.config.message"></p>
               </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" 
-                        x-show="Alpine.store('confirm').config.showCancel"
-                        @click="Alpine.store('confirm').cancel()"
-                        x-text="Alpine.store('confirm').config.cancelText">
+              
+              <!-- 底部按钮 -->
+              <div class="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+                <button x-show="store.config.showCancel"
+                        @click="store.cancel()"
+                        class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                        x-text="store.config.cancelText">
                 </button>
-                <button type="button" 
-                        class="btn"
-                        :class="'btn-' + Alpine.store('confirm').config.type"
-                        @click="Alpine.store('confirm').confirm()"
-                        x-text="Alpine.store('confirm').config.confirmText"
-                        :disabled="Alpine.store('confirm').config.loading">
+                <button @click="store.confirm()"
+                        class="px-4 py-2 rounded-lg transition-colors"
+                        :class="{
+                          'bg-blue-500 hover:bg-blue-600 text-white': store.config.type === 'primary',
+                          'bg-green-500 hover:bg-green-600 text-white': store.config.type === 'success',
+                          'bg-yellow-500 hover:bg-yellow-600 text-white': store.config.type === 'warning',
+                          'bg-red-500 hover:bg-red-600 text-white': store.config.type === 'danger',
+                          'bg-blue-400 hover:bg-blue-500 text-white': store.config.type === 'info'
+                        }"
+                        :disabled="store.config.loading"
+                        x-text="store.config.confirmText">
                 </button>
               </div>
             </div>
@@ -250,27 +306,15 @@ document.addEventListener('alpine:init', () => {
       `
 
       document.body.insertAdjacentHTML('beforeend', modalHTML)
-
-      // 初始化 Bootstrap Modal
-      const el = document.getElementById(modalId)
-      if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-        this._modalInstance = new bootstrap.Modal(el, { backdrop: 'static' })
-
-        // 监听 Modal 隐藏事件
-        el.addEventListener('hidden.bs.modal', () => {
-          // 如果用户点击了遮罩或按了 ESC，触发取消
-          if (this.visible) {
-            this.cancel()
-          }
-        })
-      }
+      this._domInitialized = true
+      logger.info('[ConfirmDialog] Tailwind Modal DOM 已创建')
     }
   })
 
-  logger.info('确认对话框 Store 已注册')
+  logger.info('✅ 确认对话框 Store 已注册 (Tailwind 版本)')
 })
 
-// ========== ES Module 导出（方案 A：彻底 ES Module） ==========
+// ========== ES Module 导出 ==========
 
 /**
  * 全局确认函数（替代 window.confirm）
@@ -307,4 +351,4 @@ export async function $confirmDanger(message, title = '危险操作') {
   return confirm(message)
 }
 
-logger.info('确认对话框模块已加载')
+logger.info('确认对话框模块已加载 (Tailwind 版本)')

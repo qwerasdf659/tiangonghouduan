@@ -62,7 +62,7 @@ router.get(
   '/batch-status',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { campaign_ids, limit = 20 } = req.query
+    const { campaign_ids, status, limit = 20 } = req.query
 
     try {
       // 解析 campaign_ids（支持逗号分隔或单独指定）
@@ -78,8 +78,10 @@ router.get(
       const { ActivityService } = getServices(req)
 
       // 通过 Service 层获取批量预算状态（符合路由层规范）
+      // 支持按活动状态筛选（status: active/draft/completed/paused）
       const { campaigns: results, summary } = await ActivityService.getBatchBudgetStatus({
         campaign_ids: targetIds,
+        status: status || '',
         limit: parseInt(limit) || 20
       })
 

@@ -8,15 +8,16 @@
  */
 
 // 兑换商品管理模块
-export { useExchangeItemsState, useExchangeItemsMethods } from './exchange-items.js'
+import { useExchangeItemsState, useExchangeItemsMethods } from './exchange-items.js'
 
 // 兑换订单管理模块
-export { useExchangeOrdersState, useExchangeOrdersMethods } from './exchange-orders.js'
+import { useExchangeOrdersState, useExchangeOrdersMethods } from './exchange-orders.js'
 
 // 兑换统计分析模块
-export { useExchangeStatsState, useExchangeStatsMethods } from './exchange-stats.js'
+import { useExchangeStatsState, useExchangeStatsMethods } from './exchange-stats.js'
 
-export default {
+// 命名导出
+export {
   useExchangeItemsState,
   useExchangeItemsMethods,
   useExchangeOrdersState,

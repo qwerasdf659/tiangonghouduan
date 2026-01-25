@@ -119,7 +119,9 @@ export const STORE_ENDPOINTS = {
   // 商户日志
   MERCHANT_LOGS_LIST: '/api/v4/console/audit-logs',
   MERCHANT_LOGS_EXPORT: '/api/v4/console/audit-logs/export',
-  MERCHANT_LOGS_STATS: '/api/v4/console/audit-logs/stats',
+  // 注：后端无通用stats接口，只有 /stats/store/:store_id 和 /stats/operator/:operator_id
+  MERCHANT_LOGS_STATS_BY_STORE: '/api/v4/console/audit-logs/stats/store',
+  MERCHANT_LOGS_STATS_BY_OPERATOR: '/api/v4/console/audit-logs/stats/operator',
 
   // 地区管理
   REGION_PROVINCES: '/api/v4/console/regions/provinces',

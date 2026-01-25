@@ -18,6 +18,7 @@ const router = express.Router()
 const {
   sharedComponents,
   adminAuthMiddleware,
+  adminOpsAuthMiddleware, // P1只读API中间件（admin+ops，ops只读）
   asyncHandler,
   validators
 } = require('./shared/middleware')
@@ -112,7 +113,7 @@ router.post(
  */
 router.get(
   '/list',
-  adminAuthMiddleware,
+  adminOpsAuthMiddleware, // P1只读API：允许admin和ops角色访问
   asyncHandler(async (req, res) => {
     try {
       const { campaign_id, status } = req.query

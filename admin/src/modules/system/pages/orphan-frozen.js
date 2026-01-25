@@ -35,7 +35,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
-import { buildURL, request } from '../../../api/base.js'
+// 注意：使用本地 apiRequest 函数而非 request，以便更好地处理错误
 import { Alpine, createBatchOperationMixin } from '../../../alpine/index.js'
 
 // API请求辅助函数
@@ -131,10 +131,14 @@ function orphanFrozenPage() {
     /**
      * 筛选条件
      * @type {Object}
-     * @property {string} assetType - 资产类型筛选
+     * @property {string} type - 类型筛选（orphan/frozen）
+     * @property {string} assetType - 资产代码筛选
+     * @property {string} status - 状态筛选
      */
     filters: {
-      assetType: ''
+      type: '',      // 类型：orphan/frozen（当前后端只支持orphan）
+      assetType: '', // 资产代码筛选
+      status: ''     // 状态筛选
     },
 
     /** @type {OrphanItem[]} 已选中的项目列表 */
@@ -192,13 +196,16 @@ function orphanFrozenPage() {
      * @returns {void}
      */
     init() {
+      console.log('🚀 [orphanFrozenPage] init() 被调用')
       logger.info('孤儿冻结清理页面初始化 (Mixin v3.0)')
 
       // 使用 Mixin 的认证检查
       if (!this.checkAuth()) {
+        console.warn('⚠️ [orphanFrozenPage] checkAuth() 返回 false，跳过加载')
         return
       }
 
+      console.log('✅ [orphanFrozenPage] checkAuth() 通过，开始加载数据')
       // 加载数据
       this.loadData()
     },
@@ -213,52 +220,126 @@ function orphanFrozenPage() {
      * @returns {Promise<void>}
      */
     async loadData() {
+      console.log('📥 [orphanFrozenPage] loadData() 开始执行', { filters: this.filters })
+      
       this.orphanList = []
       this.assets = []
       this.selectedItems = []
+      this.loading = true
 
-      await this.withLoading(async () => {
+      try {
         // 构建查询参数
         const detectParams = new URLSearchParams()
         if (this.filters.assetType) {
           detectParams.append('asset_code', this.filters.assetType)
         }
 
+        const detectUrl = ASSET_ENDPOINTS.ORPHAN_FROZEN_DETECT +
+          (detectParams.toString() ? '?' + detectParams.toString() : '')
+        const statsUrl = ASSET_ENDPOINTS.ORPHAN_FROZEN_STATS
+        
+        console.log('📡 [orphanFrozenPage] 请求API', { detectUrl, statsUrl })
+
         // 并行获取检测结果和统计数据
         const [detectResponse, statsResponse] = await Promise.all([
-          apiRequest(
-            ASSET_ENDPOINTS.ORPHAN_FROZEN_DETECT +
-              (detectParams.toString() ? '?' + detectParams.toString() : '')
-          ),
-          apiRequest(ASSET_ENDPOINTS.ORPHAN_FROZEN_STATS)
+          apiRequest(detectUrl),
+          apiRequest(statsUrl)
         ])
 
-        // 处理检测结果
+        console.log('📨 [orphanFrozenPage] API响应', { 
+          detectSuccess: detectResponse?.success,
+          statsSuccess: statsResponse?.success,
+          detectData: detectResponse?.data,
+          statsData: statsResponse?.data
+        })
+
+        // 处理检测结果 - 直接使用后端字段，仅补充前端需要的默认值
         if (detectResponse && detectResponse.success) {
-          this.orphanList = detectResponse.data.orphan_items || []
+          const generatedAt = detectResponse.data.generated_at || new Date().toISOString()
+          
+          // 以后端为准，仅补充后端没有返回的字段
+          this.orphanList = (detectResponse.data.orphan_items || []).map(item => ({
+            // 直接使用后端返回的字段
+            ...item,
+            // 补充后端未返回但前端显示需要的字段
+            type: 'orphan', // 后端无此字段，默认为孤儿类型
+            status: 'pending', // 后端无此字段，默认待处理
+            discovered_at: generatedAt // 使用顶层的检测时间
+          }))
           this.assets = this.orphanList // HTML 模板别名
           this.total = this.orphanList.length
-        }
-
-        // 处理统计数据
-        if (statsResponse && statsResponse.success) {
-          const orphanCount =
-            statsResponse.data.total_orphan_count || detectResponse?.data?.orphan_count || 0
-          const totalAmount =
-            statsResponse.data.total_orphan_amount || detectResponse?.data?.total_orphan_amount || 0
-
-          this.stats = {
-            total_orphan_count: orphanCount,
-            total_orphan_amount: totalAmount,
-            affected_user_count: statsResponse.data.affected_user_count || 0,
-            // HTML 模板兼容字段
-            orphanCount: orphanCount,
-            frozenCount: statsResponse.data.frozen_count || 0,
-            totalValue: totalAmount,
-            processedCount: statsResponse.data.processed_count || 0
+          
+          logger.info('[孤儿冻结页面] 加载数据完成', {
+            count: this.orphanList.length,
+            sample: this.orphanList[0] || null
+          })
+        } else {
+          console.warn('⚠️ [orphanFrozenPage] 检测API返回失败', detectResponse)
+          logger.warn('[孤儿冻结页面] 检测API返回失败', { 
+            response: detectResponse 
+          })
+          // 设置空列表
+          this.orphanList = []
+          this.assets = []
+          this.total = 0
+          
+          // 显示错误信息给用户
+          if (detectResponse?.code === 'UNAUTHORIZED' || detectResponse?.code === 'TOKEN_EXPIRED') {
+            this.showError('登录已过期，请重新登录')
+            window.location.href = '/admin/login.html'
+            return
+          } else if (detectResponse?.message) {
+            this.showError('加载失败: ' + detectResponse.message)
           }
         }
-      }, '加载孤儿冻结数据...')
+
+        // 处理统计数据 - 直接使用后端字段名
+        if (statsResponse && statsResponse.success) {
+          const data = statsResponse.data
+          const orphanCount = data.total_orphan_count || 0
+          const totalAmount = data.total_orphan_amount || 0
+
+          this.stats = {
+            // 后端原始字段
+            total_orphan_count: orphanCount,
+            total_orphan_amount: totalAmount,
+            affected_user_count: data.affected_user_count || 0,
+            // HTML 模板使用的字段（与后端保持一致的语义）
+            orphanCount: orphanCount,
+            frozenCount: 0, // 当前只检测孤儿冻结，此值为0
+            totalValue: totalAmount,
+            processedCount: 0 // 需后端支持，暂设为0
+          }
+          
+          logger.info('[孤儿冻结页面] 统计数据已更新', this.stats)
+        } else {
+          console.warn('⚠️ [orphanFrozenPage] 统计API返回失败', statsResponse)
+          logger.warn('[孤儿冻结页面] 统计API返回失败', { 
+            response: statsResponse 
+          })
+        }
+        
+        // 加载完成提示
+        console.log('✅ [orphanFrozenPage] 数据加载完成', { 
+          orphanCount: this.orphanList.length,
+          stats: this.stats 
+        })
+        
+        // 显示加载结果提示给用户
+        const orphanCount = this.orphanList.length
+        if (orphanCount > 0) {
+          this.showInfo(`加载完成，发现 ${orphanCount} 条孤儿冻结数据`)
+        } else {
+          this.showSuccess('加载完成，暂无孤儿冻结数据')
+        }
+        
+      } catch (error) {
+        console.error('❌ [orphanFrozenPage] 加载数据失败', { error: error.message, stack: error.stack })
+        this.showError('加载数据失败: ' + error.message)
+      } finally {
+        this.loading = false
+        console.log('🏁 [orphanFrozenPage] loadData() 执行完毕, loading =', this.loading)
+      }
     },
 
     /**
@@ -269,21 +350,32 @@ function orphanFrozenPage() {
      * @returns {Promise<void>}
      */
     async scanOrphans() {
+      console.log('🔎 [orphanFrozenPage] scanOrphans() 开始执行')
       this.scanning = true
 
       try {
         const response = await apiRequest(ASSET_ENDPOINTS.ORPHAN_FROZEN_DETECT, {
           method: 'GET'
         })
+        
+        console.log('📡 [orphanFrozenPage] scanOrphans 响应', response)
 
         if (response && response.success) {
           const foundCount = response.data.orphan_count || 0
           this.showSuccess(`扫描完成，发现 ${foundCount} 条孤儿冻结数据`)
-          this.loadData()
+          await this.loadData()
         } else {
+          console.warn('⚠️ [orphanFrozenPage] 扫描API返回失败', response)
+          // 处理认证错误
+          if (response?.code === 'UNAUTHORIZED' || response?.code === 'TOKEN_EXPIRED') {
+            this.showError('登录已过期，请重新登录')
+            window.location.href = '/admin/login.html'
+            return
+          }
           this.showError(response?.message || '扫描失败')
         }
       } catch (error) {
+        console.error('❌ [orphanFrozenPage] 扫描失败', error)
         logger.error('扫描失败:', error)
         this.showError('扫描失败：' + error.message)
       } finally {
@@ -480,7 +572,8 @@ function orphanFrozenPage() {
      * @returns {Promise<boolean>} 用户是否确认
      */
     async confirmDanger(message) {
-      if (Alpine.store('confirm')) {
+      // 检查 Alpine store 和 Bootstrap 是否都可用
+      if (Alpine.store('confirm') && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
         return await Alpine.store('confirm').danger({
           title: '危险操作',
           message: message,
@@ -488,6 +581,7 @@ function orphanFrozenPage() {
           cancelText: '取消'
         })
       }
+      // 回退到原生 confirm
       return confirm(message)
     },
 
@@ -518,6 +612,7 @@ function orphanFrozenPage() {
      * @returns {Promise<void>}
      */
     async loadAssets() {
+      console.log('🔍 [orphanFrozenPage] loadAssets() 被点击调用')
       await this.loadData()
     },
 
@@ -528,6 +623,7 @@ function orphanFrozenPage() {
      * @returns {Promise<void>}
      */
     async scanOrphanAssets() {
+      console.log('🔎 [orphanFrozenPage] scanOrphanAssets() 被点击调用')
       await this.scanOrphans()
     },
 
@@ -551,6 +647,101 @@ function orphanFrozenPage() {
     formatDate(dateStr) {
       if (!dateStr) return '-'
       return new Date(dateStr).toLocaleString('zh-CN')
+    },
+
+    // ==================== Tailwind Toast 实现 ====================
+
+    /**
+     * 显示 Tailwind 风格的 Toast 消息
+     * @method _showToast
+     * @param {string} message - 消息内容
+     * @param {string} type - 消息类型 (success/error/warning/info)
+     * @param {number} duration - 显示时长（毫秒）
+     */
+    _showToast(message, type = 'info', duration = 3000) {
+      // 确保 Toast 容器存在
+      let container = document.getElementById('tailwind-toast-container')
+      if (!container) {
+        container = document.createElement('div')
+        container.id = 'tailwind-toast-container'
+        container.className = 'fixed top-4 right-4 z-[9999] flex flex-col gap-2'
+        document.body.appendChild(container)
+      }
+
+      // 类型配置
+      const typeConfig = {
+        success: { bg: 'bg-green-500', icon: '✅' },
+        error: { bg: 'bg-red-500', icon: '❌' },
+        warning: { bg: 'bg-yellow-500', icon: '⚠️' },
+        info: { bg: 'bg-blue-500', icon: 'ℹ️' }
+      }
+      const config = typeConfig[type] || typeConfig.info
+
+      // 创建 Toast 元素
+      const toastId = 'toast_' + Date.now()
+      const toast = document.createElement('div')
+      toast.id = toastId
+      toast.className = `${config.bg} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 transform transition-all duration-300 translate-x-full opacity-0`
+      toast.innerHTML = `
+        <span class="text-lg">${config.icon}</span>
+        <span class="flex-1">${message}</span>
+        <button class="ml-2 hover:opacity-75" onclick="this.parentElement.remove()">✕</button>
+      `
+      container.appendChild(toast)
+
+      // 动画进入
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-x-full', 'opacity-0')
+        toast.classList.add('translate-x-0', 'opacity-100')
+      })
+
+      // 自动移除
+      setTimeout(() => {
+        toast.classList.add('translate-x-full', 'opacity-0')
+        setTimeout(() => toast.remove(), 300)
+      }, duration)
+
+      console.log(`🔔 [Toast] ${type.toUpperCase()}: ${message}`)
+    },
+
+    /**
+     * 显示成功消息（覆盖 mixin 方法）
+     * @method showSuccess
+     * @param {string} message - 成功消息
+     * @param {number} duration - 显示时长
+     */
+    showSuccess(message, duration = 3000) {
+      this._showToast(message, 'success', duration)
+    },
+
+    /**
+     * 显示错误消息（覆盖 mixin 方法）
+     * @method showError
+     * @param {string} message - 错误消息
+     * @param {number} duration - 显示时长
+     */
+    showError(message, duration = 5000) {
+      this._showToast(message, 'error', duration)
+    },
+
+    /**
+     * 显示警告消息
+     * @method showWarning
+     * @param {string} message - 警告消息
+     * @param {number} duration - 显示时长
+     */
+    showWarning(message, duration = 4000) {
+      this._showToast(message, 'warning', duration)
+    },
+
+    /**
+     * 显示信息消息
+     * @method showInfo
+     * @param {string} message - 信息消息
+     * @param {number} duration - 显示时长
+     */
+    showInfo(message, duration = 3000) {
+      this._showToast(message, 'info', duration)
     },
 
     /**
@@ -605,10 +796,30 @@ function orphanFrozenPage() {
 
 /**
  * 注册Alpine.js组件
- * @description 监听alpine:init事件，注册orphanFrozenPage组件到Alpine
- * @listens alpine:init
+ * @description 直接注册组件到Alpine（避免alpine:init事件时序问题）
+ * 
+ * 由于ES模块异步加载，使用alpine:init事件可能导致注册时机过晚。
+ * 直接使用导入的Alpine实例注册组件更可靠。
  */
-document.addEventListener('alpine:init', () => {
+
+// 标记是否已注册，避免重复注册
+let _registered = false
+
+function registerOrphanFrozenComponent() {
+  if (_registered) {
+    logger.debug('[OrphanFrozenPage] 组件已注册，跳过')
+    return
+  }
+  
   Alpine.data('orphanFrozenPage', orphanFrozenPage)
+  _registered = true
   logger.info('[OrphanFrozenPage] Alpine 组件已注册 (Mixin v3.0)')
+}
+
+// 直接注册（ES模块导入的Alpine已经可用）
+registerOrphanFrozenComponent()
+
+// 作为后备，也监听alpine:init事件（以防上面的调用时机过早）
+document.addEventListener('alpine:init', () => {
+  registerOrphanFrozenComponent()
 })

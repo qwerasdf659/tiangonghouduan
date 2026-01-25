@@ -13,6 +13,9 @@
 import Alpine from 'alpinejs'
 import { logger } from '../utils/logger.js'
 
+// 导入 Stores（确保在 Alpine 初始化前加载）
+import '../alpine/stores/confirm-dialog.js'
+
 // 导入 Mixin
 import {
   paginationMixin,
@@ -164,6 +167,71 @@ export function initAlpine() {
           this[key] = false
         }
       })
+    }
+  })
+
+  // 注册通知状态 store（Tailwind CSS 版本）
+  Alpine.store('notification', {
+    items: [],
+    containerId: 'toastContainer',
+
+    // 确保 Toast 容器存在
+    ensureContainer() {
+      let container = document.getElementById(this.containerId)
+      if (!container) {
+        container = document.createElement('div')
+        container.id = this.containerId
+        container.className = 'fixed top-4 right-4 z-50 flex flex-col gap-2'
+        document.body.appendChild(container)
+      }
+      return container
+    },
+
+    // 显示 Toast
+    showToast(message, type = 'info', duration = 3000) {
+      const container = this.ensureContainer()
+      const toastId = 'toast_' + Date.now()
+
+      // 类型颜色配置
+      const typeConfig = {
+        success: { bg: 'bg-green-500', icon: '✅' },
+        error: { bg: 'bg-red-500', icon: '❌' },
+        warning: { bg: 'bg-yellow-500', icon: '⚠️' },
+        info: { bg: 'bg-blue-500', icon: 'ℹ️' }
+      }
+      const config = typeConfig[type] || typeConfig.info
+
+      // 创建 Toast 元素
+      const toast = document.createElement('div')
+      toast.id = toastId
+      toast.className = `${config.bg} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in`
+      toast.innerHTML = `
+        <span>${config.icon}</span>
+        <span>${message}</span>
+        <button onclick="this.parentElement.remove()" class="ml-2 hover:opacity-80">×</button>
+      `
+      container.appendChild(toast)
+
+      // 自动移除
+      setTimeout(() => toast.remove(), duration)
+      
+      logger.debug(`[Toast-${type}] ${message}`)
+    },
+
+    success(message, duration = 3000) {
+      this.showToast(message, 'success', duration)
+    },
+
+    error(message, duration = 5000) {
+      this.showToast(message, 'error', duration)
+    },
+
+    warning(message, duration = 4000) {
+      this.showToast(message, 'warning', duration)
+    },
+
+    info(message, duration = 3000) {
+      this.showToast(message, 'info', duration)
     }
   })
 

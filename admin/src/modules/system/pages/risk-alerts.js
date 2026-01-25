@@ -130,16 +130,16 @@ function riskAlertsPage() {
     },
 
     /**
-     * 筛选条件
+     * 筛选条件（字段名与后端API参数一致）
      * @type {Object}
-     * @property {string} level - 级别筛选
-     * @property {string} type - 类型筛选
+     * @property {string} severity - 严重程度筛选
+     * @property {string} alert_type - 告警类型筛选
      * @property {string} status - 状态筛选
      * @property {string} time - 时间范围筛选
      */
     filters: {
-      level: '',
-      type: '',
+      severity: '',
+      alert_type: '',
       status: '',
       time: 'today'
     },
@@ -162,6 +162,9 @@ function riskAlertsPage() {
 
     /** @type {Object|null} ECharts类型分布图实例 */
     typeDistChart: null,
+
+    /** ECharts 核心模块引用 */
+    _echarts: null,
 
     // ==================== 生命周期 ====================
 
@@ -189,10 +192,11 @@ function riskAlertsPage() {
 
       // 动态加载 ECharts（懒加载优化）
       try {
-        await loadECharts()
-        logger.info('[RiskAlerts] ECharts 加载完成')
+        this._echarts = await loadECharts()
+        logger.info('[RiskAlerts] ECharts 加载完成', { hasEcharts: !!this._echarts })
       } catch (error) {
         logger.error('[RiskAlerts] ECharts 加载失败:', error)
+        this.showError('图表组件加载失败，部分功能可能不可用')
       }
 
       // 初始化 ECharts
@@ -243,18 +247,29 @@ function riskAlertsPage() {
      */
     initCharts() {
       this.$nextTick(() => {
+        const echarts = this._echarts
+
+        logger.info('[RiskAlerts] 初始化图表', { hasEcharts: !!echarts })
+
+        if (!echarts) {
+          logger.warn('[RiskAlerts] ECharts 未加载，跳过图表初始化')
+          return
+        }
+
         // 使用 getElementById 而非 $refs（HTML 使用 id 属性）
         const levelContainer = document.getElementById('levelDistChart')
         const typeContainer = document.getElementById('typeDistChart')
 
-        if (levelContainer && typeof echarts !== 'undefined') {
+        if (levelContainer) {
           this.levelDistChart = echarts.init(levelContainer)
           this.levelDistChart.setOption(this.getLevelChartOption([]))
+          logger.info('[RiskAlerts] 级别分布图初始化完成')
         }
 
-        if (typeContainer && typeof echarts !== 'undefined') {
+        if (typeContainer) {
           this.typeDistChart = echarts.init(typeContainer)
           this.typeDistChart.setOption(this.getTypeChartOption([], []))
+          logger.info('[RiskAlerts] 类型分布图初始化完成')
         }
       })
     },
@@ -323,9 +338,9 @@ function riskAlertsPage() {
      * @returns {void}
      */
     updateCharts() {
-      // 统计告警严重程度分布
+      // 统计告警严重程度分布（直接使用后端字段 severity）
       const severityStats = { critical: 0, high: 0, medium: 0, low: 0 }
-      // 统计告警类型分布
+      // 统计告警类型分布（直接使用后端字段 alert_type）
       const alertTypeStats = {
         frequency_limit: 0,
         amount_limit: 0,
@@ -334,12 +349,14 @@ function riskAlertsPage() {
       }
 
       this.alerts.forEach(alert => {
-        const severity = alert.severity || alert.level
-        if (severityStats.hasOwnProperty(severity)) {
+        // 后端返回的字段是 severity
+        const severity = alert.severity
+        if (severity && severityStats.hasOwnProperty(severity)) {
           severityStats[severity]++
         }
-        const alertType = alert.alert_type || alert.type
-        if (alertTypeStats.hasOwnProperty(alertType)) {
+        // 后端返回的字段是 alert_type
+        const alertType = alert.alert_type
+        if (alertType && alertTypeStats.hasOwnProperty(alertType)) {
           alertTypeStats[alertType]++
         }
       })
@@ -387,10 +404,30 @@ function riskAlertsPage() {
     async loadAlerts() {
       const result = await this.withLoading(async () => {
         const params = new URLSearchParams()
-        if (this.filters.level) params.append('severity', this.filters.level)
-        if (this.filters.type) params.append('alert_type', this.filters.type)
+        // 直接使用后端字段名
+        if (this.filters.severity) params.append('severity', this.filters.severity)
+        if (this.filters.alert_type) params.append('alert_type', this.filters.alert_type)
         if (this.filters.status) params.append('status', this.filters.status)
-        if (this.filters.time) params.append('time_range', this.filters.time)
+        
+        // 转换时间范围为 start_time（后端使用 start_time/end_time，不支持 time_range）
+        if (this.filters.time && this.filters.time !== 'all') {
+          const now = new Date()
+          let startTime = new Date()
+          
+          switch (this.filters.time) {
+            case 'today':
+              startTime.setHours(0, 0, 0, 0)
+              break
+            case 'week':
+              startTime.setDate(now.getDate() - 7)
+              break
+            case 'month':
+              startTime.setDate(now.getDate() - 30)
+              break
+          }
+          params.append('start_time', startTime.toISOString())
+        }
+        
         params.append('page', this.currentPage)
         params.append('page_size', this.pageSize)
 
@@ -425,17 +462,14 @@ function riskAlertsPage() {
      * @returns {AlertStats} 计算得出的统计数据
      */
     calculateStatsFromAlerts() {
+      // 直接使用后端字段 severity
       return {
         critical: this.alerts.filter(
-          a => (a.severity || a.level) === 'critical' || (a.severity || a.level) === 'high'
+          a => a.severity === 'critical' || a.severity === 'high'
         ).length,
-        warning: this.alerts.filter(
-          a => (a.severity || a.level) === 'warning' || (a.severity || a.level) === 'medium'
-        ).length,
-        info: this.alerts.filter(
-          a => (a.severity || a.level) === 'info' || (a.severity || a.level) === 'low'
-        ).length,
-        resolved: this.alerts.filter(a => a.status === 'reviewed' || a.status === 'resolved').length
+        warning: this.alerts.filter(a => a.severity === 'medium').length,
+        info: this.alerts.filter(a => a.severity === 'low').length,
+        resolved: this.alerts.filter(a => a.status === 'reviewed' || a.status === 'ignored').length
       }
     },
 
@@ -447,28 +481,33 @@ function riskAlertsPage() {
      * @returns {void}
      */
     updateStats(stats) {
+      // 后端统计API返回 by_severity 和 by_status 对象
+      const bySeverity = stats.by_severity || {}
+      const byStatus = stats.by_status || {}
+      
+      // 严重告警 = critical + high
       this.stats.critical =
+        (bySeverity.critical || 0) + (bySeverity.high || 0) ||
         stats.critical ||
-        stats.high ||
-        this.alerts.filter(
-          a => (a.severity || a.level) === 'critical' || (a.severity || a.level) === 'high'
-        ).length
+        this.alerts.filter(a => a.severity === 'critical' || a.severity === 'high').length
+      
+      // 警告 = medium
       this.stats.warning =
+        bySeverity.medium ||
         stats.warning ||
-        stats.medium ||
-        this.alerts.filter(
-          a => (a.severity || a.level) === 'warning' || (a.severity || a.level) === 'medium'
-        ).length
+        this.alerts.filter(a => a.severity === 'medium').length
+      
+      // 提示 = low
       this.stats.info =
+        bySeverity.low ||
         stats.info ||
-        stats.low ||
-        this.alerts.filter(
-          a => (a.severity || a.level) === 'info' || (a.severity || a.level) === 'low'
-        ).length
+        this.alerts.filter(a => a.severity === 'low').length
+      
+      // 已处理 = reviewed + ignored
       this.stats.resolved =
+        (byStatus.reviewed || 0) + (byStatus.ignored || 0) ||
         stats.resolved ||
-        stats.reviewed ||
-        this.alerts.filter(a => a.status === 'reviewed' || a.status === 'resolved').length
+        this.alerts.filter(a => a.status === 'reviewed' || a.status === 'ignored').length
     },
 
     // ==================== 分页操作 ====================
@@ -612,10 +651,12 @@ function riskAlertsPage() {
      * @returns {Promise<void>}
      */
     async loadAlertTimeline(alertId) {
-      if (this.selectedAlert && this.selectedAlert.reviewed_at) {
+      // 后端返回 reviewed_at 可能是对象或字符串
+      const reviewedAt = this.selectedAlert?.reviewed_at
+      if (this.selectedAlert && reviewedAt) {
         this.timeline = [
           {
-            created_at: this.selectedAlert.reviewed_at,
+            created_at: reviewedAt,
             status: this.selectedAlert.status,
             action: `状态更新为: ${this.getStatusText(this.selectedAlert.status)}`,
             remark: this.selectedAlert.review_notes,
@@ -777,16 +818,27 @@ function riskAlertsPage() {
 
     /**
      * 格式化日期为中文显示格式
+     * 支持后端返回的时间对象格式：{ iso, beijing, timestamp, relative }
      * @method formatDate
-     * @param {string|null} dateStr - ISO日期字符串
+     * @param {string|Object|null} dateValue - ISO日期字符串或时间对象
      * @returns {string} 格式化后的日期字符串
      */
-    formatDate(dateStr) {
-      if (!dateStr) return '-'
+    formatDate(dateValue) {
+      if (!dateValue) return '-'
       try {
-        return new Date(dateStr).toLocaleString('zh-CN')
+        // 如果是后端返回的时间对象格式
+        if (typeof dateValue === 'object' && dateValue !== null) {
+          // 优先使用 beijing 格式（北京时间）
+          if (dateValue.beijing) return dateValue.beijing
+          // 或者使用 iso 格式
+          if (dateValue.iso) return new Date(dateValue.iso).toLocaleString('zh-CN')
+          // 或者使用 relative 格式
+          if (dateValue.relative) return dateValue.relative
+        }
+        // 如果是字符串格式
+        return new Date(dateValue).toLocaleString('zh-CN')
       } catch {
-        return dateStr
+        return typeof dateValue === 'string' ? dateValue : '-'
       }
     },
 
@@ -937,13 +989,26 @@ function riskAlertsPage() {
 
     /**
      * 格式化时间为相对时间显示
+     * 支持后端返回的时间对象格式：{ iso, beijing, timestamp, relative }
      * @method formatTime
-     * @param {string|null} dateStr - ISO日期字符串
+     * @param {string|Object|null} dateValue - ISO日期字符串或时间对象
      * @returns {string} 相对时间文本，如 '5分钟前'、'2小时前'
      */
-    formatTime(dateStr) {
-      if (!dateStr) return '-'
-      const date = new Date(dateStr)
+    formatTime(dateValue) {
+      if (!dateValue) return '-'
+      
+      // 如果是后端返回的时间对象格式，直接使用 relative 字段
+      if (typeof dateValue === 'object' && dateValue !== null) {
+        if (dateValue.relative) return dateValue.relative
+        // 使用 iso 或 timestamp 计算
+        dateValue = dateValue.iso || dateValue.timestamp
+      }
+      
+      if (!dateValue) return '-'
+      
+      const date = new Date(dateValue)
+      if (isNaN(date.getTime())) return '-'
+      
       const now = new Date()
       const diff = now - date
 
@@ -956,11 +1021,11 @@ function riskAlertsPage() {
     /**
      * 格式化日期时间（兼容别名）
      * @method formatDateTime
-     * @param {string|null} dateStr - ISO日期字符串
+     * @param {string|Object|null} dateValue - ISO日期字符串或时间对象
      * @returns {string} 格式化后的日期时间字符串
      */
-    formatDateTime(dateStr) {
-      return this.formatDate(dateStr)
+    formatDateTime(dateValue) {
+      return this.formatDate(dateValue)
     },
 
     /**

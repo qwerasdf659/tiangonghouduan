@@ -91,7 +91,8 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('financePageContent', () => {
     const pageMixin = createPageMixin({
       pageTitle: '财务管理',
-      loadDataOnInit: false
+      loadDataOnInit: false,
+      pagination: { pageSize: 20 }  // 启用分页功能，为各子模块提供 page/pageSize
     })
 
     return {
@@ -100,6 +101,12 @@ document.addEventListener('alpine:init', () => {
       // ========== 基础状态 ==========
       subPages: SUB_PAGES,
       saving: false,
+      
+      // ========== 分页状态（为 composables 提供直接属性） ==========
+      page: 1,
+      pageSize: 20,
+      total: 0,
+      totalPages: 1,
       
       // ========== 财务统计 ==========
       financeStats: {

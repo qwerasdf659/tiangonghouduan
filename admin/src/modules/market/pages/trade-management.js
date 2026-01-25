@@ -627,8 +627,12 @@ document.addEventListener('alpine:init', () => {
     tradeOrders: [],
     /** @type {Object|null} 当前选中的交易订单 */
     selectedTradeOrder: null,
+    /** @type {Object|null} 旧版兼容：选中的交易（用于旧版模态框） */
+    selectedTrade: null,
     /** @type {{total: number, created: number, frozen: number, completed: number}} 交易统计 */
     tradeStats: { total: 0, created: 0, frozen: 0, completed: 0 },
+    /** @type {{totalTrades: number, completedTrades: number, pendingTrades: number, totalVolume: number}} HTML 统计卡片使用 */
+    stats: { totalTrades: 0, completedTrades: 0, pendingTrades: 0, totalVolume: 0 },
     /** @type {Object} 交易订单筛选条件 */
     tradeFilters: { status: '', buyer_user_id: '', seller_user_id: '', listing_id: '' },
     /** @type {number} 交易订单当前页码 */
@@ -735,6 +739,8 @@ document.addEventListener('alpine:init', () => {
             total: this.tradeOrders.length
           }
           this.tradeStats = { total: this.tradeOrders.length, created: 0, frozen: 0, completed: 0 }
+          // 更新统计卡片
+          this._updateStats()
         }
       } catch (error) {
         logger.error('加载交易订单失败:', error)
@@ -844,6 +850,22 @@ document.addEventListener('alpine:init', () => {
     },
 
     /**
+     * 获取交易订单状态显示文本（HTML模板使用）
+     * @param {string} status - 交易状态码
+     * @returns {string} 状态显示文本
+     */
+    getTradeOrderStatusText(status) {
+      const map = {
+        created: '待支付',
+        frozen: '冻结中',
+        completed: '已完成',
+        cancelled: '已取消',
+        pending: '待处理'
+      }
+      return map[status] || status
+    },
+
+    /**
      * 格式化日期显示
      * @param {string} dateStr - ISO日期字符串
      * @returns {string} 本地化日期字符串
@@ -851,6 +873,54 @@ document.addEventListener('alpine:init', () => {
     formatDate(dateStr) {
       if (!dateStr) return '-'
       return new Date(dateStr).toLocaleString('zh-CN')
+    },
+
+    /**
+     * 格式化数字显示
+     * @param {number} num - 数字
+     * @returns {string} 格式化后的数字字符串
+     */
+    formatNumber(num) {
+      if (num === null || num === undefined) return '0'
+      return Number(num).toLocaleString('zh-CN')
+    },
+
+    /**
+     * 查看交易订单详情
+     * @param {Object} trade - 交易订单对象
+     * @returns {void}
+     */
+    viewTradeOrderDetail(trade) {
+      this.selectedTradeOrder = trade
+      this.selectedTrade = trade  // 兼容旧版模态框
+      this.showModal('tradeDetailModal')
+    },
+
+    /**
+     * 切换交易订单列表页码
+     * @param {number} page - 目标页码
+     * @returns {void}
+     */
+    changeTradePage(page) {
+      if (page < 1 || page > (this.tradePagination?.totalPages || 1)) return
+      this.tradeCurrentPage = page
+      this.loadTradeOrders()
+    },
+
+    /**
+     * 更新统计卡片数据
+     * @private
+     * @returns {void}
+     */
+    _updateStats() {
+      this.stats = {
+        totalTrades: this.tradeOrders.length,
+        completedTrades: this.tradeOrders.filter(t => t.status === 'completed').length,
+        pendingTrades: this.tradeOrders.filter(t => t.status === 'pending' || t.status === 'created').length,
+        totalVolume: this.tradeOrders
+          .filter(t => t.status === 'completed')
+          .reduce((sum, t) => sum + (t.price || t.total_price || 0), 0)
+      }
     }
   }))
 

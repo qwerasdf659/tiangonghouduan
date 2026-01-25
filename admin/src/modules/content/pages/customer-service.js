@@ -357,14 +357,14 @@ function customerServicePage() {
           const session = response.data.session
           const messages = response.data.messages || []
 
-          // 更新选中会话
+          // 更新选中会话（直接使用后端返回的嵌套结构）
           this.selectedSession = session
           
-          // 更新当前聊天用户信息
+          // 更新当前聊天用户信息（使用后端返回的 user 嵌套对象）
           this.currentChatUser = {
-            nickname: session.user?.nickname || session.user_nickname || '未命名用户',
-            mobile: session.user?.mobile || session.user_mobile || '',
-            avatar: session.user?.avatar_url || session.user_avatar || this.defaultAvatar
+            nickname: session.user?.nickname || '未命名用户',
+            mobile: session.user?.mobile || '',
+            avatar: session.user?.avatar_url || this.defaultAvatar
           }
 
           this.currentMessages = messages
@@ -438,9 +438,10 @@ function customerServicePage() {
 
         if (response && response.success) {
           this.messageInput = ''
+          // 使用后端字段名 content（不是 message_content）
           this.currentMessages.push({
             sender_type: 'admin',
-            message_content: content,
+            content: content,
             created_at: new Date().toISOString()
           })
           this.$nextTick(() => this.scrollToBottom())
@@ -603,7 +604,11 @@ function customerServicePage() {
         const session = this.allSessions.find(
           s => String(s.session_id) === String(this.currentSessionId)
         )
-        if (!session) return
+        
+        if (!session) {
+          this.showError('找不到会话信息')
+          return
+        }
 
         const userId = session.user?.user_id || session.user_id
         if (!userId) {
@@ -611,12 +616,14 @@ function customerServicePage() {
           return
         }
 
-        const response = await apiRequest(
-          buildURL(USER_ENDPOINTS.DETAIL, { user_id: userId })
-        )
+        const url = buildURL(USER_ENDPOINTS.DETAIL, { user_id: userId })
+        const response = await apiRequest(url)
+        
         if (response && response.success) {
           this.userInfoData = response.data.user || response.data
           this.showModal('userInfoModal')
+        } else {
+          this.showError(response?.message || '获取用户信息失败')
         }
       } catch (error) {
         logger.error('获取用户信息失败:', error)

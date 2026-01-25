@@ -764,6 +764,50 @@ class LotteryCampaignPricingConfigService {
       skipped: skipped_configs.length
     }
   }
+
+  /**
+   * 获取所有活动的当前生效定价配置（批量查询）
+   *
+   * @description 一次性获取所有活动的 active 状态定价配置，用于管理后台批量展示
+   *
+   * @param {Object} options - 查询选项
+   * @param {Object} [options.transaction] - 事务对象（可选）
+   * @returns {Promise<Array>} 所有活动的定价配置数组
+   */
+  static async getAllActivePricingConfigs(options = {}) {
+    const { transaction } = options
+
+    // 查询所有 active 状态的定价配置
+    const pricing_configs = await LotteryCampaignPricingConfig.findAll({
+      where: { status: 'active' },
+      include: [{
+        model: LotteryCampaign,
+        as: 'campaign',
+        attributes: ['campaign_id', 'campaign_code', 'campaign_name', 'status']
+      }],
+      order: [['campaign_id', 'ASC'], ['version', 'DESC']],
+      transaction
+    })
+
+    logger.info('[PricingConfigService] 批量获取所有活动定价配置', {
+      count: pricing_configs.length
+    })
+
+    // 格式化返回数据
+    return pricing_configs.map(config => ({
+      campaign_id: config.campaign_id,
+      campaign_code: config.campaign?.campaign_code,
+      campaign_name: config.campaign?.campaign_name,
+      campaign_status: config.campaign?.status,
+      version: config.version,
+      pricing_config: config.pricing_config,
+      status: config.status,
+      effective_at: config.effective_at,
+      created_by: config.created_by,
+      created_at: config.created_at,
+      updated_at: config.updated_at
+    }))
+  }
 }
 
 module.exports = LotteryCampaignPricingConfigService

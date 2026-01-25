@@ -3,8 +3,13 @@
  *
  * @file admin/src/modules/analytics/composables/diamond-accounts.js
  * @description 用户钻石余额管理和调整
- * @version 1.0.0
- * @date 2026-01-24
+ * @version 2.0.0
+ * @date 2026-01-25
+ *
+ * 后端API设计说明：
+ * - /api/v4/console/assets/transactions 需要 user_id 必填参数
+ * - /api/v4/console/assets/stats 返回全局资产统计
+ * - /api/v4/console/asset-adjustment/user/:user_id/balances 获取用户资产余额
  */
 
 import { logger } from '../../../utils/logger.js'
@@ -17,12 +22,16 @@ import { buildURL } from '../../../api/base.js'
  */
 export function useDiamondAccountsState() {
   return {
-    /** @type {Array} 钻石账户列表 */
+    /** @type {Array} 钻石账户列表（用户搜索结果） */
     diamondAccounts: [],
     /** @type {Object} 钻石账户筛选条件 */
-    diamondFilters: { user_id: '', minBalance: '', maxBalance: '' },
-    /** @type {Object} 钻石账户统计 */
-    diamondStats: { totalAccounts: 0, totalBalance: 0, activeAccounts: 0 },
+    diamondFilters: { user_id: '' },
+    /** @type {Object} 钻石账户统计（全局统计） */
+    diamondStats: {
+      holderCount: 0,
+      totalCirculation: 0,
+      totalFrozen: 0
+    },
     /** @type {Object|null} 选中的钻石账户 */
     selectedDiamondAccount: null,
     /** @type {Object} 钻石调整表单 */
@@ -31,7 +40,11 @@ export function useDiamondAccountsState() {
       amount: 0,
       type: 'add',
       reason: ''
-    }
+    },
+    /** @type {boolean} 是否已搜索用户 */
+    diamondSearched: false,
+    /** @type {string} 搜索提示信息 */
+    diamondSearchTip: '请输入用户ID查询钻石账户'
   }
 }
 
@@ -42,108 +55,180 @@ export function useDiamondAccountsState() {
 export function useDiamondAccountsMethods() {
   return {
     /**
-     * 加载钻石账户列表（通过资产流水查询有钻石资产的用户）
-     * 后端已将钻石合并到asset-adjustment统一管理
+     * 加载钻石账户
+     * 后端设计：/api/v4/console/assets/transactions 需要 user_id 必填
+     * 前端适配：用户搜索模式，需要先输入用户ID
      */
     async loadDiamondAccounts() {
-      try {
-        const params = new URLSearchParams()
-        params.append('page', this.page)
-        params.append('page_size', this.pageSize)
-        params.append('asset_code', 'DIAMOND') // 筛选钻石资产
-        if (this.diamondFilters.user_id) params.append('user_id', this.diamondFilters.user_id)
+      // 如果没有提供用户ID，显示提示信息
+      if (!this.diamondFilters.user_id) {
+        this.diamondAccounts = []
+        this.diamondSearched = false
+        this.diamondSearchTip = '请输入用户ID查询钻石账户'
+        this.total = 0
+        this.totalPages = 0
+        logger.debug('[DiamondAccounts] 未提供用户ID，等待用户搜索')
+        return
+      }
 
-        const response = await this.apiGet(
-          `${ASSET_ENDPOINTS.TRANSACTIONS}?${params}`,
+      try {
+        this.diamondSearched = true
+        this.diamondSearchTip = ''
+
+        // 1. 获取用户资产余额（包含钻石）
+        const balanceResponse = await this.apiGet(
+          buildURL(ASSET_ENDPOINTS.ADJUSTMENT_USER_BALANCES, {
+            user_id: this.diamondFilters.user_id
+          }),
           {},
-          { showLoading: false }
+          { showLoading: true, showError: false }
         )
 
-        if (response?.success) {
-          // 从交易记录中提取用户钻石余额信息
-          const transactions = response.data?.transactions || response.data?.list || []
-          // 按用户分组，获取最新余额
-          const userMap = new Map()
-          transactions.forEach(tx => {
-            if (!userMap.has(tx.user_id)) {
-              userMap.set(tx.user_id, {
-                user_id: tx.user_id,
-                nickname: tx.nickname || `用户${tx.user_id}`,
-                balance: tx.balance_after ?? 0,
-                last_updated: tx.created_at
-              })
-            }
-          })
-          this.diamondAccounts = Array.from(userMap.values())
-          if (response.data?.pagination) {
-            this.total = response.data.pagination.total || 0
-            this.totalPages = response.data.pagination.total_pages || 1
-          }
+        if (balanceResponse?.success) {
+          const userData = balanceResponse.data?.user || {}
+          const balances = balanceResponse.data?.balances || []
+          const diamondBalance = balances.find(b => b.asset_code === 'DIAMOND')
+
+          // 构建账户信息
+          this.diamondAccounts = [{
+            user_id: userData.user_id || this.diamondFilters.user_id,
+            nickname: userData.nickname || `用户${this.diamondFilters.user_id}`,
+            mobile: userData.mobile || '',
+            status: userData.status || '',
+            balance: diamondBalance?.available_amount ?? 0,
+            frozen: diamondBalance?.frozen_amount ?? 0,
+            total: diamondBalance?.total ?? (diamondBalance?.available_amount ?? 0),
+            has_diamond: !!diamondBalance
+          }]
+          this.total = 1
+          this.totalPages = 1
+        } else {
+          this.diamondAccounts = []
+          this.total = 0
+          this.totalPages = 0
+          this.diamondSearchTip = balanceResponse?.message || '用户不存在'
         }
+
+        // 2. 获取用户钻石流水（可选，用于详情展示）
+        // 流水会在 viewDiamondDetail 中加载
+
       } catch (error) {
-        logger.error('加载钻石账户失败:', error)
+        logger.error('[DiamondAccounts] 加载失败:', error)
         this.diamondAccounts = []
+        this.total = 0
+        this.totalPages = 0
+        if (error.message?.includes('不存在') || error.message?.includes('404')) {
+          this.diamondSearchTip = '用户不存在'
+        } else {
+          this.diamondSearchTip = '查询失败: ' + (error.message || '未知错误')
+        }
       }
     },
 
     /**
-     * 加载钻石账户统计（使用通用资产统计API）
+     * 加载钻石全局统计
+     * 使用 /api/v4/console/assets/stats 获取全局资产统计
      */
     async loadDiamondStats() {
       try {
         const response = await this.apiGet(
-          `${ASSET_ENDPOINTS.STATS}?asset_code=DIAMOND`,
+          ASSET_ENDPOINTS.STATS,
           {},
           { showLoading: false, showError: false }
         )
         if (response?.success && response.data) {
-          // 适配通用资产统计返回格式
-          const stats = response.data
-          this.diamondStats = {
-            totalAccounts: stats.total_users ?? stats.total_accounts ?? 0,
-            totalBalance: stats.total_balance ?? stats.diamond_total ?? 0,
-            activeAccounts: stats.active_users ?? stats.active_accounts ?? 0
+          // 从资产统计中提取钻石数据
+          const assetStats = response.data.asset_stats || []
+          const diamondStat = assetStats.find(s => s.asset_code === 'DIAMOND')
+
+          if (diamondStat) {
+            this.diamondStats = {
+              holderCount: diamondStat.holder_count ?? 0,
+              totalCirculation: diamondStat.total_circulation ?? 0,
+              totalFrozen: diamondStat.total_frozen ?? 0,
+              totalIssued: diamondStat.total_issued ?? 0
+            }
+          } else {
+            this.diamondStats = {
+              holderCount: 0,
+              totalCirculation: 0,
+              totalFrozen: 0,
+              totalIssued: 0
+            }
           }
         }
       } catch (error) {
-        logger.error('加载钻石统计失败:', error)
+        logger.error('[DiamondAccounts] 加载统计失败:', error)
       }
     },
 
     /**
-     * 搜索钻石账户
+     * 搜索钻石账户（用户输入用户ID后触发）
      */
     searchDiamondAccounts() {
+      if (!this.diamondFilters.user_id) {
+        this.showError('请输入用户ID')
+        return
+      }
       this.page = 1
       this.loadDiamondAccounts()
     },
 
     /**
-     * 查看钻石账户详情（获取用户所有资产余额）
+     * 清空钻石账户搜索
+     */
+    clearDiamondSearch() {
+      this.diamondFilters.user_id = ''
+      this.diamondAccounts = []
+      this.diamondSearched = false
+      this.diamondSearchTip = '请输入用户ID查询钻石账户'
+      this.total = 0
+      this.totalPages = 0
+    },
+
+    /**
+     * 查看钻石账户详情（获取用户钻石流水）
      * @param {Object} account - 钻石账户对象
      */
     async viewDiamondDetail(account) {
       try {
+        // 获取用户钻石流水
+        const params = new URLSearchParams()
+        params.append('user_id', account.user_id)
+        params.append('asset_code', 'DIAMOND')
+        params.append('page', '1')
+        params.append('page_size', '20')
+
         const response = await this.apiGet(
-          buildURL(ASSET_ENDPOINTS.ADJUSTMENT_USER_BALANCES, { user_id: account.user_id }),
+          `${ASSET_ENDPOINTS.TRANSACTIONS}?${params}`,
           {},
           { showLoading: true }
         )
+
         if (response?.success) {
-          // 从用户资产余额中提取钻石信息
-          const balances = response.data?.balances || response.data || []
-          const diamondBalance = balances.find(b => b.asset_code === 'DIAMOND') || {}
+          const transactions = response.data?.transactions || []
+
           this.selectedDiamondAccount = {
             user_id: account.user_id,
             nickname: account.nickname,
-            balance: diamondBalance.balance ?? 0,
+            mobile: account.mobile,
+            balance: account.balance,
+            frozen: account.frozen,
             asset_code: 'DIAMOND',
-            all_balances: balances // 保留所有资产余额供参考
+            transactions: transactions.map(tx => ({
+              transaction_id: tx.transaction_id,
+              amount: tx.amount,
+              balance_before: tx.balance_before,
+              balance_after: tx.balance_after,
+              tx_type: tx.tx_type,
+              reason: tx.reason || tx.description,
+              created_at: tx.created_at
+            }))
           }
           this.showModal('diamondDetailModal')
         }
       } catch (error) {
-        logger.error('加载钻石账户详情失败:', error)
+        logger.error('[DiamondAccounts] 加载详情失败:', error)
         this.showError('加载钻石账户详情失败')
       }
     },
@@ -154,7 +239,7 @@ export function useDiamondAccountsMethods() {
      */
     openDiamondAdjustModal(account) {
       this.diamondAdjustForm = {
-        user_id: account.user_id,
+        user_id: account?.user_id || '',
         amount: 0,
         type: 'add',
         reason: ''
@@ -167,7 +252,7 @@ export function useDiamondAccountsMethods() {
      */
     async submitDiamondAdjust() {
       if (!this.diamondAdjustForm.user_id) {
-        this.showError('用户信息无效')
+        this.showError('请输入用户ID')
         return
       }
       if (!this.diamondAdjustForm.amount || this.diamondAdjustForm.amount <= 0) {
@@ -181,20 +266,25 @@ export function useDiamondAccountsMethods() {
 
       try {
         this.saving = true
+
         // 后端统一资产调整API：正数=增加，负数=扣减
         const adjustAmount = this.diamondAdjustForm.type === 'add'
           ? Math.abs(this.diamondAdjustForm.amount)
           : -Math.abs(this.diamondAdjustForm.amount)
+
+        // 生成幂等键（后端要求必填）
+        const idempotencyKey = `admin_adjust_diamond_${this.diamondAdjustForm.user_id}_${Date.now()}`
 
         const response = await this.apiCall(
           ASSET_ENDPOINTS.ADJUSTMENT_ADJUST,
           {
             method: 'POST',
             data: {
-              user_id: this.diamondAdjustForm.user_id,
-              asset_code: 'DIAMOND', // 指定资产类型为钻石
+              user_id: Number(this.diamondAdjustForm.user_id),
+              asset_code: 'DIAMOND',
               amount: adjustAmount,
-              reason: this.diamondAdjustForm.reason
+              reason: this.diamondAdjustForm.reason,
+              idempotency_key: idempotencyKey
             }
           }
         )
@@ -204,7 +294,11 @@ export function useDiamondAccountsMethods() {
             `钻石${this.diamondAdjustForm.type === 'add' ? '增加' : '扣除'}成功`
           )
           this.hideModal('diamondAdjustModal')
-          await this.loadDiamondAccounts()
+
+          // 如果当前有搜索的用户，刷新数据
+          if (this.diamondFilters.user_id) {
+            await this.loadDiamondAccounts()
+          }
           await this.loadDiamondStats()
         }
       } catch (error) {
@@ -217,4 +311,3 @@ export function useDiamondAccountsMethods() {
 }
 
 export default { useDiamondAccountsState, useDiamondAccountsMethods }
-

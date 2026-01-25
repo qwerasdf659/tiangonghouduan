@@ -93,9 +93,19 @@ export function workspaceTabs() {
      * @param {string} id - Tab ID
      */
     switchTab(id) {
-      if (!this.tabs.find(t => t.id === id)) return
+      const tab = this.tabs.find(t => t.id === id)
+      if (!tab) return
       this.activeTabId = id
       this.saveState()
+      
+      // 发送 Tab 切换事件，通知侧边栏更新高亮
+      window.dispatchEvent(new CustomEvent('switch-tab', {
+        detail: { 
+          id: tab.id,
+          url: tab.url,
+          title: tab.title
+        }
+      }))
     },
     
     /**

@@ -119,6 +119,9 @@ function dashboardPage() {
      */
     distributionChart: null,
 
+    /** ECharts 核心模块引用 */
+    _echarts: null,
+
     // ==================== 生命周期 ====================
 
     /**
@@ -149,10 +152,11 @@ function dashboardPage() {
 
       // 动态加载 ECharts（懒加载优化）
       try {
-        await loadECharts()
-        logger.info('[Dashboard] ECharts 加载完成')
+        this._echarts = await loadECharts()
+        logger.info('[Dashboard] ECharts 加载完成', { hasEcharts: !!this._echarts })
       } catch (error) {
         logger.error('[Dashboard] ECharts 加载失败:', error)
+        this.showError('图表组件加载失败，部分功能可能不可用')
       }
 
       // 初始化图表
@@ -228,9 +232,18 @@ function dashboardPage() {
      * @requires echarts - 全局ECharts库需已加载
      */
     initCharts() {
+      const echarts = this._echarts
+
+      logger.info('[Dashboard] 初始化图表', { hasEcharts: !!echarts })
+
+      if (!echarts) {
+        logger.warn('[Dashboard] ECharts 未加载，跳过图表初始化')
+        return
+      }
+
       // 抽奖趋势图
       const trendContainer = this.$refs.trendChart || document.getElementById('lotteryTrendChart')
-      if (trendContainer && typeof echarts !== 'undefined') {
+      if (trendContainer) {
         this.trendChart = echarts.init(trendContainer)
         this.trendChart.setOption({
           tooltip: {
@@ -257,10 +270,10 @@ function dashboardPage() {
               type: 'line',
               smooth: true,
               areaStyle: {
-                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                color: echarts.graphic ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [
                   { offset: 0, color: 'rgba(13, 110, 253, 0.3)' },
                   { offset: 1, color: 'rgba(13, 110, 253, 0.05)' }
-                ])
+                ]) : 'rgba(13, 110, 253, 0.2)'
               },
               lineStyle: { color: '#0d6efd', width: 2 },
               itemStyle: { color: '#0d6efd' },
@@ -271,10 +284,10 @@ function dashboardPage() {
               type: 'line',
               smooth: true,
               areaStyle: {
-                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                color: echarts.graphic ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [
                   { offset: 0, color: 'rgba(25, 135, 84, 0.3)' },
                   { offset: 1, color: 'rgba(25, 135, 84, 0.05)' }
-                ])
+                ]) : 'rgba(25, 135, 84, 0.2)'
               },
               lineStyle: { color: '#198754', width: 2 },
               itemStyle: { color: '#198754' },
@@ -282,12 +295,13 @@ function dashboardPage() {
             }
           ]
         })
+        logger.info('[Dashboard] 趋势图初始化完成')
       }
 
       // 今日数据分布饼图
       const distContainer =
         this.$refs.distributionChart || document.getElementById('todayDistributionChart')
-      if (distContainer && typeof echarts !== 'undefined') {
+      if (distContainer) {
         this.distributionChart = echarts.init(distContainer)
         this.distributionChart.setOption({
           tooltip: {
@@ -318,6 +332,7 @@ function dashboardPage() {
             }
           ]
         })
+        logger.info('[Dashboard] 分布饼图初始化完成')
       }
     },
 

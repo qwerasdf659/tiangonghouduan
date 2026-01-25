@@ -36,9 +36,21 @@ import { USER_ENDPOINTS } from '../../../api/user.js'
 import { buildURL, request } from '../../../api/base.js'
 import { createBatchOperationMixin } from '../../../alpine/mixins/index.js'
 
-// API请求封装
+/**
+ * API请求封装 - 带错误处理
+ * @param {string} url - API URL
+ * @param {Object} options - 请求配置
+ * @returns {Promise<Object>} API响应
+ */
 const apiRequest = async (url, options = {}) => {
-  return await request({ url, ...options })
+  try {
+    const response = await request({ url, ...options })
+    logger.debug('[Sessions] API响应:', url, response?.success)
+    return response
+  } catch (error) {
+    logger.error('[Sessions] API请求失败:', url, error.message)
+    throw error
+  }
 }
 /**
  * 会话对象类型
@@ -83,6 +95,9 @@ function sessionsPage() {
     /** @type {UserSession[]} 会话列表 */
     sessions: [],
 
+    /** @type {number} 会话总数 */
+    total: 0,
+
     /** @type {number[]} 选中的会话ID列表 */
     selectedSessions: [],
 
@@ -94,6 +109,9 @@ function sessionsPage() {
 
     /** @type {boolean} 全局加载状态 */
     globalLoading: false,
+
+    /** @type {boolean} 显示详情模态框 */
+    showDetailModal: false,
 
     /**
      * 筛选条件
@@ -118,7 +136,8 @@ function sessionsPage() {
       onlineUsers: '-',
       activeSessions: '-',
       userSessions: '-',
-      adminSessions: '-'
+      adminSessions: '-',
+      expiredCount: '-'
     },
 
     // ==================== 生命周期 ====================
@@ -134,10 +153,11 @@ function sessionsPage() {
      * @returns {void}
      */
     init() {
-      logger.info('会话管理页面初始化 (Mixin v3.0)')
+      logger.info('[Sessions] 页面初始化开始 (Mixin v3.0)')
 
       // 使用 Mixin 的认证检查
       if (!this.checkAuth()) {
+        logger.warn('[Sessions] 认证检查失败，跳转登录')
         return
       }
 
@@ -145,12 +165,26 @@ function sessionsPage() {
       const token = localStorage.getItem('admin_token')
       if (token) {
         try {
-          const payload = JSON.parse(atob(token.split('.')[1]))
-          this.currentSessionId = payload.session_id
+          const parts = token.split('.')
+          if (parts.length >= 2) {
+            const payload = JSON.parse(atob(parts[1]))
+            this.currentSessionId = payload.session_id
+            logger.debug('[Sessions] 当前会话ID:', this.currentSessionId)
+          }
         } catch (e) {
-          logger.error('解析token失败:', e)
+          logger.error('[Sessions] 解析token失败:', e.message)
         }
       }
+
+      // 确保用户信息已加载
+      if (!this.userInfo) {
+        this._loadUserInfo?.()
+      }
+      
+      logger.info('[Sessions] 用户信息:', {
+        user_id: this.userInfo?.user_id,
+        is_admin: this.userInfo?.is_admin
+      })
 
       // 加载会话列表
       this.loadData()
@@ -167,16 +201,19 @@ function sessionsPage() {
      * @returns {Promise<void>}
      */
     async loadData(page = null) {
+      logger.info('[Sessions] loadData 开始', { page, currentPage: this.currentPage })
+      
       if (page !== null) {
         this.currentPage = page
       }
       this.selectedSessions = []
+      this.loading = true
 
-      await this.withLoading(async () => {
+      try {
         const params = new URLSearchParams()
-        params.append('page', this.currentPage)
-        params.append('page_size', this.pageSize)
-        params.append('sort_by', this.filters.sortBy)
+        params.append('page', this.currentPage || 1)
+        params.append('page_size', this.pageSize || 20)
+        params.append('sort_by', this.filters.sortBy || 'last_activity')
         params.append('sort_order', 'desc')
 
         if (this.filters.status === 'active') {
@@ -194,17 +231,29 @@ function sessionsPage() {
         }
 
         const url = USER_ENDPOINTS.SESSIONS_LIST + '?' + params.toString()
+        logger.debug('[Sessions] 请求URL:', url)
+        
         const response = await apiRequest(url)
 
         if (response && response.success) {
           const sessionData = response.data?.sessions || response.data
           this.sessions = Array.isArray(sessionData) ? sessionData : []
-          this.total = response.data.pagination?.total || this.sessions.length
+          this.total = response.data?.pagination?.total || this.sessions.length
+          logger.info('[Sessions] 加载成功', { count: this.sessions.length, total: this.total })
+          
+          // 异步加载统计数据
           this.loadStats()
         } else {
-          this.showError(response?.message || '获取会话列表失败')
+          const errorMsg = response?.message || '获取会话列表失败'
+          logger.error('[Sessions] 加载失败:', errorMsg)
+          this.showError(errorMsg)
         }
-      }, '加载会话列表...')
+      } catch (error) {
+        logger.error('[Sessions] loadData 异常:', error.message)
+        this.showError(error.message || '加载会话列表失败')
+      } finally {
+        this.loading = false
+      }
     },
 
     /**
@@ -216,9 +265,11 @@ function sessionsPage() {
      */
     async loadStats() {
       try {
+        logger.debug('[Sessions] 加载统计数据...')
         const response = await apiRequest(USER_ENDPOINTS.SESSIONS_STATS)
+        
         if (response && response.success) {
-          const stats = response.data
+          const stats = response.data || {}
           const userStats = stats.by_user_type?.user || { active_sessions: 0, unique_users: 0 }
           const adminStats = stats.by_user_type?.admin || { active_sessions: 0, unique_users: 0 }
 
@@ -226,11 +277,17 @@ function sessionsPage() {
             onlineUsers: (userStats.unique_users || 0) + (adminStats.unique_users || 0),
             activeSessions: stats.total_active_sessions || 0,
             userSessions: userStats.active_sessions || 0,
-            adminSessions: adminStats.active_sessions || 0
+            adminSessions: adminStats.active_sessions || 0,
+            expiredCount: stats.expired_pending_cleanup || 0
           }
+          
+          logger.info('[Sessions] 统计数据加载成功', this.statistics)
+        } else {
+          logger.warn('[Sessions] 统计数据响应异常:', response)
         }
       } catch (error) {
-        logger.error('加载统计数据失败:', error)
+        logger.error('[Sessions] 加载统计数据失败:', error.message)
+        // 保持默认值，不影响页面显示
       }
     },
 
@@ -240,12 +297,13 @@ function sessionsPage() {
      * 查看会话详情
      * @method viewSessionDetail
      * @param {UserSession} session - 会话对象
-     * @description 设置选中会话并显示详情弹窗
+     * @description 设置选中会话并显示详情模态框
      * @returns {void}
      */
     viewSessionDetail(session) {
+      logger.debug('[Sessions] 查看会话详情:', session.user_session_id || session.session_id)
       this.selectedSession = session
-      this.showModal('sessionDetailModal')
+      this.showDetailModal = true
     },
 
     /**
@@ -271,31 +329,39 @@ function sessionsPage() {
      * @returns {Promise<void>}
      */
     async revokeSession(sessionId) {
+      logger.info('[Sessions] revokeSession 开始:', sessionId)
+      
       if (String(sessionId) === String(this.currentSessionId)) {
         this.showError('无法撤销当前会话')
         return
       }
 
       const confirmed = await this.confirmDanger('确定要撤销此会话吗？用户将被强制下线。')
-      if (!confirmed) return
+      if (!confirmed) {
+        logger.debug('[Sessions] 用户取消撤销')
+        return
+      }
 
       this.globalLoading = true
 
       try {
-        const url = buildURL(USER_ENDPOINTS.SESSIONS_DEACTIVATE, {
-          id: sessionId
-        })
+        const url = buildURL(USER_ENDPOINTS.SESSIONS_DEACTIVATE, { id: sessionId })
+        logger.debug('[Sessions] 撤销URL:', url)
+        
         const response = await apiRequest(url, { method: 'POST' })
 
         if (response && response.success) {
-          this.showSuccess('会话已撤销')
-          this.loadData()
+          this.showSuccess('会话已撤销，用户已被下线')
+          logger.info('[Sessions] 撤销成功:', sessionId)
+          await this.loadData()
         } else {
-          this.showError(response?.message || '操作失败')
+          const errorMsg = response?.message || '撤销操作失败'
+          logger.error('[Sessions] 撤销失败:', errorMsg)
+          this.showError(errorMsg)
         }
       } catch (error) {
-        logger.error('撤销会话失败:', error)
-        this.showError(error.message)
+        logger.error('[Sessions] 撤销会话异常:', error.message)
+        this.showError(error.message || '撤销会话失败')
       } finally {
         this.globalLoading = false
       }
@@ -309,39 +375,58 @@ function sessionsPage() {
      * @returns {Promise<void>}
      */
     async revokeSelected() {
+      logger.info('[Sessions] revokeSelected 开始', { selected: this.selectedSessions })
+      
       const selected = this.selectedSessions.filter(
         id => String(id) !== String(this.currentSessionId)
       )
 
       if (selected.length === 0) {
-        this.showError('请选择要撤销的会话')
+        this.showError('请选择要撤销的会话（当前会话无法撤销）')
         return
       }
 
-      const confirmed = await this.confirmDanger(`确定要撤销选中的 ${selected.length} 个会话吗？`)
-      if (!confirmed) return
+      const confirmed = await this.confirmDanger(`确定要撤销选中的 ${selected.length} 个会话吗？用户将被强制下线。`)
+      if (!confirmed) {
+        logger.debug('[Sessions] 用户取消撤销操作')
+        return
+      }
 
       this.globalLoading = true
 
       try {
         let successCount = 0
+        let failCount = 0
+        
         for (const sessionId of selected) {
           try {
-            const url = buildURL(USER_ENDPOINTS.SESSIONS_DEACTIVATE, {
-              id: sessionId
-            })
+            const url = buildURL(USER_ENDPOINTS.SESSIONS_DEACTIVATE, { id: sessionId })
+            logger.debug('[Sessions] 撤销会话:', sessionId)
             const response = await apiRequest(url, { method: 'POST' })
-            if (response && response.success) successCount++
+            if (response && response.success) {
+              successCount++
+            } else {
+              failCount++
+              logger.warn('[Sessions] 撤销失败:', sessionId, response?.message)
+            }
           } catch (e) {
-            logger.error(`撤销会话 ${sessionId} 失败:`, e)
+            failCount++
+            logger.error(`[Sessions] 撤销会话 ${sessionId} 异常:`, e.message)
           }
         }
 
-        this.showSuccess(`批量撤销完成：成功 ${successCount}/${selected.length} 个`)
-        this.loadData()
+        if (successCount > 0) {
+          this.showSuccess(`批量撤销完成：成功 ${successCount}/${selected.length} 个`)
+        } else {
+          this.showError('批量撤销失败，请重试')
+        }
+        
+        // 清空选择并刷新
+        this.selectedSessions = []
+        await this.loadData()
       } catch (error) {
-        logger.error('批量撤销失败:', error)
-        this.showError(error.message)
+        logger.error('[Sessions] 批量撤销异常:', error.message)
+        this.showError(error.message || '批量撤销失败')
       } finally {
         this.globalLoading = false
       }
@@ -355,24 +440,33 @@ function sessionsPage() {
      * @returns {Promise<void>}
      */
     async revokeExpired() {
-      const confirmed = await this.confirmDanger('确定要清理所有已过期的会话吗？')
-      if (!confirmed) return
+      logger.info('[Sessions] revokeExpired 开始')
+      
+      const confirmed = await this.confirmDanger('确定要清理所有已过期的会话吗？这将从数据库中删除过期的会话记录。')
+      if (!confirmed) {
+        logger.debug('[Sessions] 用户取消清理操作')
+        return
+      }
 
       this.globalLoading = true
 
       try {
+        logger.debug('[Sessions] 发送清理请求...')
         const response = await apiRequest(USER_ENDPOINTS.SESSIONS_CLEANUP, { method: 'POST' })
 
         if (response && response.success) {
-          const count = response.data.deleted_count || response.data.count || 0
+          const count = response.data?.deleted_count || response.data?.count || 0
           this.showSuccess(`已清理 ${count} 个过期会话`)
-          this.loadData()
+          logger.info('[Sessions] 清理成功:', count)
+          await this.loadData()
         } else {
-          this.showError(response?.message || '操作失败')
+          const errorMsg = response?.message || '清理操作失败'
+          logger.error('[Sessions] 清理失败:', errorMsg)
+          this.showError(errorMsg)
         }
       } catch (error) {
-        logger.error('清理过期会话失败:', error)
-        this.showError(error.message)
+        logger.error('[Sessions] 清理过期会话异常:', error.message)
+        this.showError(error.message || '清理过期会话失败')
       } finally {
         this.globalLoading = false
       }
@@ -386,36 +480,52 @@ function sessionsPage() {
      * @returns {Promise<void>}
      */
     async revokeAllExceptCurrent() {
-      const confirmed = await this.confirmDanger('确定要强制下线所有其他设备吗？')
-      if (!confirmed) return
+      logger.info('[Sessions] revokeAllExceptCurrent 开始', { userInfo: this.userInfo })
+      
+      const confirmed = await this.confirmDanger('确定要强制下线所有其他设备吗？其他设备上的会话将被立即终止。')
+      if (!confirmed) {
+        logger.debug('[Sessions] 用户取消强制下线操作')
+        return
+      }
 
-      if (!this.userInfo || !this.userInfo.user_id) {
-        this.showError('无法获取当前用户信息')
+      // 获取用户信息
+      const userInfo = this.userInfo || this.currentUser
+      if (!userInfo || !userInfo.user_id) {
+        logger.error('[Sessions] 无法获取当前用户信息')
+        this.showError('无法获取当前用户信息，请刷新页面后重试')
         return
       }
 
       this.globalLoading = true
 
       try {
+        logger.debug('[Sessions] 发送强制下线请求...', { 
+          user_id: userInfo.user_id,
+          is_admin: userInfo.is_admin 
+        })
+        
         const response = await apiRequest(USER_ENDPOINTS.SESSIONS_DEACTIVATE_USER, {
           method: 'POST',
-          body: JSON.stringify({
-            user_type: this.userInfo.is_admin ? 'admin' : 'user',
-            user_id: this.userInfo.user_id,
+          data: {
+            user_type: userInfo.is_admin ? 'admin' : 'user',
+            user_id: userInfo.user_id,
             reason: '用户主动下线其他设备'
-          })
+          }
         })
 
         if (response && response.success) {
-          const count = response.data.affected_count || response.data.count || 0
-          this.showSuccess(`已撤销 ${count} 个会话`)
-          this.loadData()
+          const count = response.data?.affected_count || response.data?.count || 0
+          this.showSuccess(`已撤销 ${count} 个其他会话`)
+          logger.info('[Sessions] 强制下线成功:', count)
+          await this.loadData()
         } else {
-          this.showError(response?.message || '撤销失败')
+          const errorMsg = response?.message || '撤销失败'
+          logger.error('[Sessions] 强制下线失败:', errorMsg)
+          this.showError(errorMsg)
         }
       } catch (error) {
-        logger.error('撤销其他会话失败:', error)
-        this.showError(error.message)
+        logger.error('[Sessions] 撤销其他会话异常:', error.message)
+        this.showError(error.message || '强制下线失败')
       } finally {
         this.globalLoading = false
       }
@@ -516,15 +626,77 @@ function sessionsPage() {
      * @returns {Promise<boolean>} 用户是否确认
      */
     async confirmDanger(message) {
-      if (Alpine.store('confirm')) {
-        return await Alpine.store('confirm').danger({
+      logger.debug('[Sessions] confirmDanger 调用:', message)
+      
+      // 检查 Alpine.store('confirm') 是否可用
+      if (typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('confirm')) {
+        logger.debug('[Sessions] 使用 Alpine confirm store')
+        // 使用 show() 方法，它接受对象参数
+        return await Alpine.store('confirm').show({
           title: '确认操作',
           message: message,
+          type: 'danger',
           confirmText: '确认',
           cancelText: '取消'
         })
       }
+      
+      // 降级到原生 confirm
+      logger.warn('[Sessions] Alpine confirm store 不可用，使用原生 confirm')
       return confirm(message)
+    },
+
+    /**
+     * 刷新数据并显示结果提示
+     * @async
+     * @method refreshData
+     * @description 刷新会话列表并显示成功/失败提示
+     * @returns {Promise<void>}
+     */
+    async refreshData() {
+      logger.info('[Sessions] 用户点击刷新')
+      
+      // 保存刷新前的会话数量
+      const prevCount = this.sessions?.length || 0
+      
+      try {
+        await this.loadData()
+        
+        // 刷新成功，显示提示
+        const newCount = this.sessions?.length || 0
+        const message = `刷新成功，共 ${newCount} 个会话`
+        
+        logger.info('[Sessions] 刷新成功:', message)
+        
+        // 直接调用 Alpine store 显示 Toast
+        if (typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('notification')) {
+          logger.debug('[Sessions] 调用 notification store 显示成功提示')
+          Alpine.store('notification').success(message)
+        } else {
+          logger.warn('[Sessions] notification store 不可用，使用 alert')
+          alert(message)
+        }
+      } catch (error) {
+        const errorMsg = '刷新失败: ' + (error.message || '未知错误')
+        logger.error('[Sessions] 刷新失败:', error.message)
+        
+        if (typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('notification')) {
+          Alpine.store('notification').error(errorMsg)
+        } else {
+          alert(errorMsg)
+        }
+      }
+    },
+
+    /**
+     * 获取分页页码数组（HTML模板兼容方法）
+     * @method getPaginationPages
+     * @description 将 getter 包装为方法供 HTML 模板中 x-for 调用
+     * @returns {Array<number|string>} 可见页码数组
+     */
+    getPaginationPages() {
+      // 使用 mixin 中的 visiblePages getter
+      return this.visiblePages || this.paginationPages || []
     }
   }
 }

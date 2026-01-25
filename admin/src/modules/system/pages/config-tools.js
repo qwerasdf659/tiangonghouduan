@@ -36,15 +36,30 @@
 import { logger } from '../../../utils/logger.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
 import { buildURL, request } from '../../../api/base.js'
-import { createDashboardMixin } from '../../../alpine/mixins/index.js'
+import { createPageMixin } from '../../../alpine/mixins/index.js'
 
 // API请求封装
 const apiRequest = async (url, options = {}) => {
   return await request({ url, ...options })
 }
+
+// 全局loading函数（兼容性）
+const showLoading = () => {
+  if (typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('loading')) {
+    Alpine.store('loading').show()
+  }
+}
+const hideLoading = () => {
+  if (typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('loading')) {
+    Alpine.store('loading').hide()
+  }
+}
+
 document.addEventListener('alpine:init', () => {
-  // 使用 createDashboardMixin 获取标准功能
-  const baseMixin = typeof createDashboardMixin === 'function' ? createDashboardMixin() : {}
+  // 使用 createPageMixin 获取标准功能（包含 modal 支持）
+  const baseMixin = typeof createPageMixin === 'function' 
+    ? createPageMixin({ modal: true, asyncData: true, authGuard: true }) 
+    : {}
 
   /**
    * 配置工具页面Alpine.js组件
@@ -92,8 +107,24 @@ document.addEventListener('alpine:init', () => {
     featureFlags: [],
     dictionaries: [], // 数据字典列表
     logs: [], // 日志列表
-    diagnosticResult: {}, // 诊断结果
+    diagnosticResult: null, // 诊断结果（null 时不显示）
     featureFlagValues: {},
+    
+    // 操作状态变量（解决 Alpine Expression Error）
+    recalculating: false,  // 数据重算状态
+    diagnosing: false,     // 诊断状态
+    maintenanceMode: false, // 维护模式状态
+    
+    // 字典表单
+    dictForm: {
+      dict_code: '',
+      dict_name: '',
+      dict_value: '',
+      sort_order: 0,
+      status: 'active'
+    },
+    editingDictId: null,
+    
     maintenanceForm: {
       enabled: false,
       message: '系统正在升级维护中，预计30分钟后恢复，给您带来不便敬请谅解。',
@@ -111,7 +142,10 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     init() {
+      logger.info('[ConfigTools] 初始化开始')
       this.loadConfigList()
+      // 异步加载其他数据
+      this.initData()
     },
 
     /**
@@ -253,7 +287,7 @@ document.addEventListener('alpine:init', () => {
           buildURL(SYSTEM_ENDPOINTS.SETTINGS_UPDATE, { category: this.currentCategory }),
           {
             method: 'PUT',
-            body: JSON.stringify({ settings: settingsToUpdate })
+            data: { settings: settingsToUpdate }
           }
         )
 
@@ -315,7 +349,7 @@ document.addEventListener('alpine:init', () => {
       try {
         const response = await apiRequest(SYSTEM_ENDPOINTS.SETTINGS_SECURITY, {
           method: 'PUT',
-          body: JSON.stringify({ settings: this.featureFlagValues })
+          data: { settings: this.featureFlagValues }
         })
 
         if (response && response.success) {
@@ -386,7 +420,7 @@ document.addEventListener('alpine:init', () => {
 
         const response = await apiRequest(SYSTEM_ENDPOINTS.SETTINGS_BASIC, {
           method: 'PUT',
-          body: JSON.stringify({ settings })
+          data: { settings }
         })
 
         if (response && response.success) {
@@ -447,12 +481,12 @@ document.addEventListener('alpine:init', () => {
           buildURL(SYSTEM_ENDPOINTS.SETTINGS_UPDATE, { category: this.currentCategory }),
           {
             method: 'PUT',
-            body: JSON.stringify({ settings: settingsToUpdate })
+            data: { settings: settingsToUpdate }
           }
         )
 
         if (response && response.success) {
-          this.$toast.success('配置添加成功')
+          this.showSuccess('配置添加成功')
           this.hideModal('addConfigModal')
           this.loadCategorySettings(this.currentCategory)
           this.loadConfigList()
@@ -460,10 +494,445 @@ document.addEventListener('alpine:init', () => {
           throw new Error(response?.message || '添加失败')
         }
       } catch (error) {
-        this.$toast.error('添加失败：' + error.message)
+        this.showError('添加失败：' + error.message)
       } finally {
         hideLoading()
       }
+    },
+
+    // ==================== 新增方法（解决 Alpine Expression Error）====================
+
+    /**
+     * 数据统计重算
+     * @async
+     */
+    async recalculateStats() {
+      if (this.recalculating) return
+      
+      this.recalculating = true
+      try {
+        // 使用仪表盘 API 刷新统计数据
+        const response = await apiRequest(SYSTEM_ENDPOINTS.DASHBOARD)
+        if (response && response.success) {
+          this.showSuccess('数据统计重算完成')
+          logger.info('[ConfigTools] 数据统计重算成功', response.data)
+        } else {
+          throw new Error(response?.message || '重算失败')
+        }
+      } catch (error) {
+        this.showError('数据重算失败：' + error.message)
+        logger.error('[ConfigTools] 数据统计重算失败:', error)
+      } finally {
+        this.recalculating = false
+      }
+    },
+
+    /**
+     * 系统诊断
+     * @async
+     */
+    async runDiagnostics() {
+      if (this.diagnosing) return
+      
+      this.diagnosing = true
+      this.diagnosticResult = null
+      
+      try {
+        // 使用健康检查 API 进行系统诊断
+        const response = await apiRequest(SYSTEM_ENDPOINTS.HEALTH)
+        
+        if (response) {
+          // 构建诊断结果对象
+          this.diagnosticResult = {
+            '数据库': {
+              status: response.checks?.database?.status === 'connected' ? 'ok' : 'error',
+              message: response.checks?.database?.status === 'connected' 
+                ? `连接正常 (延迟: ${response.checks?.database?.latency || 0}ms)` 
+                : '连接异常'
+            },
+            'Redis缓存': {
+              status: response.checks?.redis?.status === 'connected' ? 'ok' : 'error',
+              message: response.checks?.redis?.status === 'connected' 
+                ? '连接正常' 
+                : '连接异常或未配置'
+            },
+            '系统状态': {
+              status: response.status === 'healthy' ? 'ok' : 'error',
+              message: response.status === 'healthy' ? '系统运行正常' : '系统存在异常'
+            },
+            '运行时间': {
+              status: 'ok',
+              message: `已运行 ${Math.floor((response.uptime || 0) / 3600)} 小时`
+            }
+          }
+          
+          this.showSuccess('系统诊断完成')
+          logger.info('[ConfigTools] 系统诊断完成', this.diagnosticResult)
+        } else {
+          throw new Error('诊断响应异常')
+        }
+      } catch (error) {
+        this.diagnosticResult = {
+          '诊断错误': {
+            status: 'error',
+            message: error.message || '诊断失败'
+          }
+        }
+        this.showError('系统诊断失败：' + error.message)
+        logger.error('[ConfigTools] 系统诊断失败:', error)
+      } finally {
+        this.diagnosing = false
+      }
+    },
+
+    /**
+     * 加载操作日志
+     * @async
+     */
+    async loadLogs() {
+      try {
+        const response = await apiRequest(SYSTEM_ENDPOINTS.AUDIT_LOGS_LIST + '?limit=20')
+        if (response && response.success) {
+          this.logs = response.data?.logs || response.data?.list || []
+          logger.info('[ConfigTools] 加载日志成功', { count: this.logs.length })
+        }
+      } catch (error) {
+        logger.error('[ConfigTools] 加载日志失败:', error)
+        this.logs = []
+      }
+    },
+
+    /**
+     * 加载数据字典
+     * @async
+     */
+    async loadDictionaries() {
+      try {
+        const response = await apiRequest(SYSTEM_ENDPOINTS.DICT_ALL)
+        if (response && response.success) {
+          // 合并所有字典类型并转换为统一格式
+          const categories = response.data?.categories || []
+          const rarities = response.data?.rarities || []
+          const assetGroups = response.data?.asset_groups || []
+          
+          // 转换为统一格式：dict_id, dict_code, dict_name, dict_value, sort_order, status
+          this.dictionaries = [
+            ...categories.map((d, idx) => ({
+              dict_id: `cat_${d.category_code || idx}`,
+              dict_code: d.category_code || '',
+              dict_name: d.display_name || '',
+              dict_value: d.description || '',
+              sort_order: d.sort_order || 0,
+              status: 'active',
+              dict_type: 'category',
+              _raw: d
+            })),
+            ...rarities.map((d, idx) => ({
+              dict_id: `rar_${d.rarity_code || idx}`,
+              dict_code: d.rarity_code || '',
+              dict_name: d.display_name || '',
+              dict_value: d.color_hex || d.description || '',
+              sort_order: d.sort_order || 0,
+              status: 'active',
+              dict_type: 'rarity',
+              _raw: d
+            })),
+            ...assetGroups.map((d, idx) => ({
+              dict_id: `grp_${d.group_code || idx}`,
+              dict_code: d.group_code || '',
+              dict_name: d.display_name || '',
+              dict_value: d.description || '',
+              sort_order: d.sort_order || 0,
+              status: 'active',
+              dict_type: 'asset_group',
+              _raw: d
+            }))
+          ]
+          
+          logger.info('[ConfigTools] 加载数据字典成功', { count: this.dictionaries.length })
+        }
+      } catch (error) {
+        logger.error('[ConfigTools] 加载数据字典失败:', error)
+        this.dictionaries = []
+      }
+    },
+
+    /**
+     * 打开添加字典模态框
+     */
+    openAddDictModal() {
+      this.dictForm = {
+        dict_code: '',
+        dict_name: '',
+        dict_value: '',
+        sort_order: 0,
+        status: 'active'
+      }
+      this.editingDictId = null
+      this.showModal('addDictModal')
+    },
+
+    /**
+     * 编辑字典
+     * @param {Object} dict - 字典对象
+     */
+    editDict(dict) {
+      logger.info('[ConfigTools] 编辑字典', dict)
+      this.dictForm = { 
+        dict_code: dict.dict_code,
+        dict_name: dict.dict_name,
+        dict_value: dict.dict_value,
+        sort_order: dict.sort_order,
+        status: dict.status,
+        dict_type: dict.dict_type
+      }
+      this.editingDictId = dict.dict_id
+      this.showModal('addDictModal')
+    },
+
+    /**
+     * 删除字典
+     * @param {Object} dict - 字典对象
+     */
+    async deleteDict(dict) {
+      if (!confirm(`确定要删除字典 "${dict.dict_name}" 吗？`)) {
+        return
+      }
+      
+      // 使用转换后的 dict_code 字段
+      const code = dict.dict_code
+      if (!code) {
+        this.showError('删除失败：字典代码不存在')
+        return
+      }
+      
+      showLoading()
+      try {
+        let url = ''
+        
+        // 根据 dict_type 选择 API
+        if (dict.dict_type === 'category') {
+          url = buildURL(SYSTEM_ENDPOINTS.DICT_CATEGORY_DELETE, { code })
+        } else if (dict.dict_type === 'rarity') {
+          url = buildURL(SYSTEM_ENDPOINTS.DICT_RARITY_DELETE, { code })
+        } else if (dict.dict_type === 'asset_group') {
+          url = buildURL(SYSTEM_ENDPOINTS.DICT_ASSET_GROUP_DELETE, { code })
+        } else {
+          throw new Error('未知的字典类型')
+        }
+        
+        logger.info('[ConfigTools] 删除字典', { code, type: dict.dict_type, url })
+        
+        const response = await apiRequest(url, { method: 'DELETE' })
+        if (response && response.success) {
+          this.showSuccess(`字典 "${dict.dict_name}" 删除成功`)
+          this.loadDictionaries()
+        } else {
+          throw new Error(response?.message || '删除失败')
+        }
+      } catch (error) {
+        this.showError('删除失败：' + error.message)
+        logger.error('[ConfigTools] 删除字典失败:', error)
+      } finally {
+        hideLoading()
+      }
+    },
+
+    /**
+     * 提交字典表单（新增或编辑）
+     * @async
+     */
+    async submitDict() {
+      if (!this.dictForm.dict_code || !this.dictForm.dict_name) {
+        this.showWarning('请填写字典代码和名称')
+        return
+      }
+
+      showLoading()
+      try {
+        const code = this.dictForm.dict_code
+        const dictType = this.dictForm.dict_type || 'category'
+        const isEdit = !!this.editingDictId
+        
+        // 构建请求数据
+        const requestData = {
+          display_name: this.dictForm.dict_name,
+          description: this.dictForm.dict_value || '',
+          sort_order: parseInt(this.dictForm.sort_order) || 0
+        }
+        
+        let url = ''
+        let method = isEdit ? 'PUT' : 'POST'
+        
+        // 根据字典类型选择 API
+        if (dictType === 'category') {
+          url = isEdit 
+            ? buildURL(SYSTEM_ENDPOINTS.DICT_CATEGORY_UPDATE, { code })
+            : SYSTEM_ENDPOINTS.DICT_CATEGORY_LIST
+          if (!isEdit) requestData.category_code = code
+        } else if (dictType === 'rarity') {
+          url = isEdit 
+            ? buildURL(SYSTEM_ENDPOINTS.DICT_RARITY_UPDATE, { code })
+            : SYSTEM_ENDPOINTS.DICT_RARITY_LIST
+          if (!isEdit) requestData.rarity_code = code
+        } else if (dictType === 'asset_group') {
+          url = isEdit 
+            ? buildURL(SYSTEM_ENDPOINTS.DICT_ASSET_GROUP_UPDATE, { code })
+            : SYSTEM_ENDPOINTS.DICT_ASSET_GROUP_LIST
+          if (!isEdit) requestData.group_code = code
+        }
+        
+        logger.info('[ConfigTools] 提交字典', { isEdit, dictType, code, url, requestData })
+        
+        const response = await apiRequest(url, {
+          method,
+          data: requestData  // 使用 data 而非 body，request 函数会自动 JSON.stringify
+        })
+        
+        if (response && response.success) {
+          this.showSuccess(isEdit ? '修改成功' : '新增成功')
+          this.hideModal('addDictModal')
+          this.loadDictionaries()
+        } else {
+          throw new Error(response?.message || '操作失败')
+        }
+      } catch (error) {
+        this.showError('操作失败：' + error.message)
+        logger.error('[ConfigTools] 提交字典失败:', error)
+      } finally {
+        hideLoading()
+      }
+    },
+
+    /**
+     * 切换维护模式
+     * @async
+     */
+    async toggleMaintenanceMode() {
+      showLoading()
+      try {
+        const newMode = !this.maintenanceMode
+        const settings = {
+          maintenance_mode: newMode,
+          maintenance_message: this.maintenanceForm.message
+        }
+
+        if (this.maintenanceForm.estimatedEndTime) {
+          settings.maintenance_end_time = new Date(this.maintenanceForm.estimatedEndTime).toISOString()
+        }
+
+        const response = await apiRequest(SYSTEM_ENDPOINTS.SETTINGS_BASIC, {
+          method: 'PUT',
+          data: { settings }
+        })
+
+        if (response && response.success) {
+          this.maintenanceMode = newMode
+          this.maintenanceForm.enabled = newMode
+          this.showSuccess(newMode ? '维护模式已开启' : '维护模式已关闭')
+          this.hideModal('maintenanceModal')
+        } else {
+          throw new Error(response?.message || '操作失败')
+        }
+      } catch (error) {
+        this.showError('操作失败：' + error.message)
+      } finally {
+        hideLoading()
+      }
+    },
+
+    /**
+     * 切换功能开关
+     * @param {Object} flag - 功能开关对象
+     */
+    async toggleFeatureFlag(flag) {
+      try {
+        const flagKey = flag.setting_key || flag.flag_key
+        this.featureFlagValues[flagKey] = !this.featureFlagValues[flagKey]
+        logger.info('[ConfigTools] 功能开关切换', { key: flagKey, value: this.featureFlagValues[flagKey] })
+      } catch (error) {
+        this.showError('切换失败：' + error.message)
+      }
+    },
+
+    /**
+     * 提交添加配置
+     * @async
+     */
+    async submitAddConfig() {
+      if (!this.configForm.key.trim()) {
+        this.showWarning('请输入配置键名')
+        return
+      }
+
+      if (!this.currentCategory) {
+        this.showWarning('请先从左侧选择一个配置分类')
+        return
+      }
+
+      showLoading()
+      try {
+        let value = this.configForm.value
+        // 根据值类型进行转换
+        if (value === 'true') value = true
+        else if (value === 'false') value = false
+        else if (!isNaN(Number(value)) && value.trim() !== '') value = Number(value)
+
+        const settingsToUpdate = { [this.configForm.key]: value }
+        const response = await apiRequest(
+          buildURL(SYSTEM_ENDPOINTS.SETTINGS_UPDATE, { category: this.currentCategory }),
+          {
+            method: 'PUT',
+            data: { settings: settingsToUpdate }
+          }
+        )
+
+        if (response && response.success) {
+          this.showSuccess('配置添加成功')
+          this.hideModal('addConfigModal')
+          this.loadCategorySettings(this.currentCategory)
+          this.loadConfigList()
+        } else {
+          throw new Error(response?.message || '添加失败')
+        }
+      } catch (error) {
+        this.showError('添加失败：' + error.message)
+      } finally {
+        hideLoading()
+      }
+    },
+
+    /**
+     * 格式化日期
+     * @param {string} dateStr - 日期字符串
+     * @returns {string} 格式化后的日期
+     */
+    formatDate(dateStr) {
+      if (!dateStr) return '-'
+      try {
+        const date = new Date(dateStr)
+        return date.toLocaleString('zh-CN', {
+          timeZone: 'Asia/Shanghai',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        })
+      } catch {
+        return dateStr
+      }
+    },
+
+    /**
+     * 组件初始化后加载数据
+     */
+    async initData() {
+      await Promise.all([
+        this.loadDictionaries(),
+        this.loadLogs()
+      ])
     }
   }))
 

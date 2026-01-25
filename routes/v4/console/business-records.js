@@ -229,11 +229,17 @@ router.get(
       const { count, rows } = await RedemptionOrder.findAndCountAll({
         where,
         include: [
-          { model: User, as: 'redeemer', attributes: ['user_id', 'nickname', 'mobile'] },
+          {
+            model: User,
+            as: 'redeemer',
+            attributes: ['user_id', 'nickname', 'mobile'],
+            required: false  // LEFT JOIN - 待核销状态时 redeemer_user_id 为 NULL
+          },
           {
             model: ItemInstance,
             as: 'item_instance',
-            attributes: ['item_instance_id', 'item_type', 'meta']
+            attributes: ['item_instance_id', 'item_type', 'meta'],
+            required: false  // LEFT JOIN - 确保即使关联不存在也返回主表记录
           }
         ],
         ...pagination
@@ -264,6 +270,148 @@ router.get(
 )
 
 /**
+ * GET /api/v4/console/business-records/redemption-orders/statistics
+ * @desc 获取核销订单统计数据
+ * @access Admin only (role_level >= 100)
+ */
+router.get(
+  '/redemption-orders/statistics',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { RedemptionOrder } = require('../../../models')
+      const { fn, col } = require('sequelize')
+
+      // 按状态分组统计
+      const statusCounts = await RedemptionOrder.findAll({
+        attributes: ['status', [fn('COUNT', col('order_id')), 'count']],
+        group: ['status'],
+        raw: true
+      })
+
+      // 转换为对象格式
+      const stats = {
+        total: 0,
+        pending: 0,
+        fulfilled: 0,
+        expired: 0,
+        cancelled: 0
+      }
+
+      statusCounts.forEach(item => {
+        const count = parseInt(item.count) || 0
+        stats[item.status] = count
+        stats.total += count
+      })
+
+      logger.info('获取核销订单统计成功', { admin_id: req.user.user_id, stats })
+
+      return res.apiSuccess(stats, '获取核销订单统计成功')
+    } catch (error) {
+      return handleServiceError(error, res, '获取核销订单统计')
+    }
+  }
+)
+
+/**
+ * GET /api/v4/console/business-records/redemption-orders/export
+ * @desc 导出核销订单数据为CSV
+ * @access Admin only (role_level >= 100)
+ *
+ * @query {string} [status] - 订单状态筛选
+ * @query {string} [format=csv] - 导出格式（仅支持csv）
+ */
+router.get(
+  '/redemption-orders/export',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { status, start_date, end_date } = req.query
+      const { RedemptionOrder, User, ItemInstance, Op } = require('../../../models')
+
+      // 构建查询条件
+      const where = {}
+      if (status) where.status = status
+      if (start_date || end_date) {
+        where.created_at = {}
+        if (start_date) where.created_at[Op.gte] = new Date(start_date)
+        if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
+      }
+
+      // 查询所有符合条件的数据（不分页）
+      const orders = await RedemptionOrder.findAll({
+        where,
+        include: [
+          {
+            model: User,
+            as: 'redeemer',
+            attributes: ['user_id', 'nickname', 'mobile'],
+            required: false  // LEFT JOIN
+          },
+          {
+            model: ItemInstance,
+            as: 'item_instance',
+            attributes: ['item_instance_id', 'item_type', 'meta'],
+            required: false  // LEFT JOIN
+          }
+        ],
+        order: [['created_at', 'DESC']],
+        limit: 10000 // 限制最大导出数量
+      })
+
+      // 生成CSV内容
+      const csvHeader = '订单ID,核销码,用户ID,用户昵称,用户手机,奖品类型,奖品名称,状态,创建时间,过期时间,核销时间\n'
+      
+      const csvRows = orders.map(order => {
+        const redeemer = order.redeemer || {}
+        const itemInstance = order.item_instance || {}
+        const meta = itemInstance.meta || {}
+        
+        // 状态映射
+        const statusMap = {
+          pending: '待核销',
+          fulfilled: '已核销',
+          expired: '已过期',
+          cancelled: '已取消'
+        }
+        
+        return [
+          order.order_id,
+          order.code_hash ? order.code_hash.substring(0, 8) + '...' : '-',
+          redeemer.user_id || '-',
+          redeemer.nickname || '-',
+          redeemer.mobile || '-',
+          itemInstance.item_type || '-',
+          meta.prize_name || meta.name || '-',
+          statusMap[order.status] || order.status,
+          order.created_at ? new Date(order.created_at).toLocaleString('zh-CN') : '-',
+          order.expires_at ? new Date(order.expires_at).toLocaleString('zh-CN') : '-',
+          order.fulfilled_at ? new Date(order.fulfilled_at).toLocaleString('zh-CN') : '-'
+        ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
+      }).join('\n')
+
+      const csvContent = '\uFEFF' + csvHeader + csvRows // 添加BOM以支持Excel中文显示
+
+      logger.info('导出核销订单成功', {
+        admin_id: req.user.user_id,
+        count: orders.length,
+        status_filter: status || 'all'
+      })
+
+      // 设置响应头
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+      res.setHeader('Content-Disposition', `attachment; filename="redemption_orders_${new Date().toISOString().slice(0, 10)}.csv"`)
+      
+      return res.send(csvContent)
+    } catch (error) {
+      return handleServiceError(error, res, '导出核销订单')
+    }
+  }
+)
+
+/**
  * GET /api/v4/console/business-records/redemption-orders/:order_id
  * @desc 获取核销订单详情
  * @access Admin only (role_level >= 100)
@@ -279,8 +427,17 @@ router.get(
 
       const order = await RedemptionOrder.findByPk(order_id, {
         include: [
-          { model: User, as: 'redeemer', attributes: ['user_id', 'nickname', 'mobile'] },
-          { model: ItemInstance, as: 'item_instance' }
+          {
+            model: User,
+            as: 'redeemer',
+            attributes: ['user_id', 'nickname', 'mobile'],
+            required: false  // LEFT JOIN
+          },
+          {
+            model: ItemInstance,
+            as: 'item_instance',
+            required: false  // LEFT JOIN
+          }
         ]
       })
 
@@ -487,6 +644,69 @@ router.post(
       }
     } catch (error) {
       return handleServiceError(error, res, '取消订单')
+    }
+  }
+)
+
+/**
+ * POST /api/v4/console/business-records/redemption-orders/batch-expire
+ * @desc 批量将核销码设为过期
+ * @access Admin only (role_level >= 100)
+ *
+ * @body {string[]} order_ids - 订单ID数组
+ */
+router.post(
+  '/redemption-orders/batch-expire',
+  authenticateToken,
+  requireRole(['admin', 'ops']),
+  async (req, res) => {
+    try {
+      const { order_ids } = req.body
+      const adminUserId = req.user.user_id
+
+      if (!order_ids || !Array.isArray(order_ids) || order_ids.length === 0) {
+        return res.apiError('请提供要处理的订单ID列表', 'INVALID_PARAMS', null, 400)
+      }
+
+      const { RedemptionOrder, sequelize, Op } = require('../../../models')
+
+      // 开启事务
+      const transaction = await sequelize.transaction()
+
+      try {
+        // 只更新状态为 pending 的订单
+        const [updatedCount] = await RedemptionOrder.update(
+          { status: 'expired' },
+          {
+            where: {
+              order_id: { [Op.in]: order_ids },
+              status: 'pending' // 只处理待核销的订单
+            },
+            transaction
+          }
+        )
+
+        await transaction.commit()
+
+        logger.info('批量过期核销码成功', {
+          admin_id: adminUserId,
+          requested_count: order_ids.length,
+          updated_count: updatedCount
+        })
+
+        return res.apiSuccess(
+          {
+            requested_count: order_ids.length,
+            updated_count: updatedCount
+          },
+          `成功将 ${updatedCount} 个核销码设为过期`
+        )
+      } catch (error) {
+        await transaction.rollback()
+        throw error
+      }
+    } catch (error) {
+      return handleServiceError(error, res, '批量过期核销码')
     }
   }
 )

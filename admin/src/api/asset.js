@@ -39,6 +39,7 @@ export const ASSET_ENDPOINTS = {
   MATERIAL_ASSET_TYPE_DETAIL: '/api/v4/console/material/asset-types/:asset_code',
   MATERIAL_CONVERSION_RULES: '/api/v4/console/material/conversion-rules',
   MATERIAL_CONVERSION_RULE_DETAIL: '/api/v4/console/material/conversion-rules/:rule_id',
+  MATERIAL_CONVERSION_RULE_DISABLE: '/api/v4/console/material/conversion-rules/:rule_id/disable',
   MATERIAL_USER_BALANCE: '/api/v4/console/material/users/:user_id/balance',
   MATERIAL_USER_ADJUST: '/api/v4/console/material/users/:user_id/adjust',
   MATERIAL_USERS: '/api/v4/console/material/users',
@@ -80,12 +81,16 @@ export const ASSET_ENDPOINTS = {
   DIAMOND_ACCOUNT_STATS: '/api/v4/console/assets/stats', // 资产统计（通用）
   DIAMOND_ACCOUNT_ADJUST: '/api/v4/console/asset-adjustment/adjust', // 资产调整（统一入口）
 
-  // 债务管理
-  DEBT_LIST: '/api/v4/console/debts',
-  DEBT_DETAIL: '/api/v4/console/debts/:id',
-  DEBT_STATS: '/api/v4/console/debts/stats',
-  DEBT_REPAY: '/api/v4/console/debts/:id/repay',
-  DEBT_WRITE_OFF: '/api/v4/console/debts/:id/write-off',
+  // 债务管理 - 适配后端 debt-management 路由
+  DEBT_LIST: '/api/v4/console/debt-management/pending',           // 待冲销欠账列表
+  DEBT_DETAIL: '/api/v4/console/debt-management/by-campaign',     // 按活动汇总欠账
+  DEBT_STATS: '/api/v4/console/debt-management/dashboard',        // 欠账看板总览
+  DEBT_REPAY: '/api/v4/console/debt-management/clear',            // 执行欠账清偿
+  DEBT_WRITE_OFF: '/api/v4/console/debt-management/clear',        // 核销（使用相同的清偿接口）
+  DEBT_BY_PRIZE: '/api/v4/console/debt-management/by-prize',      // 按奖品汇总
+  DEBT_BY_CREATOR: '/api/v4/console/debt-management/by-creator',  // 按责任人汇总
+  DEBT_TREND: '/api/v4/console/debt-management/trend',            // 欠账趋势
+  DEBT_LIMITS: '/api/v4/console/debt-management/limits',          // 欠账上限配置
 
   // 交易订单
   TRADE_ORDERS_LIST: '/api/v4/console/trade-orders'

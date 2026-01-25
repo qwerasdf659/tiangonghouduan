@@ -102,7 +102,11 @@ function analyticsPage() {
       pointsIssued: 0,
       pointsSpent: 0,
       exchangeOrders: 0,
-      newItems: 0
+      newItems: 0,
+      // HTML 模板使用的别名
+      totalDraws: 0,
+      totalWins: 0,
+      pointsConsumed: 0
     },
 
     /**
@@ -152,6 +156,9 @@ function analyticsPage() {
       userSource: null
     },
 
+    /** ECharts 核心模块引用 */
+    _echarts: null,
+
     // ==================== 生命周期 ====================
 
     /**
@@ -175,10 +182,11 @@ function analyticsPage() {
 
       // 动态加载 ECharts（懒加载优化）
       try {
-        await loadECharts()
-        logger.info('[Analytics] ECharts 加载完成')
+        this._echarts = await loadECharts()
+        logger.info('[Analytics] ECharts 加载完成', { hasEcharts: !!this._echarts })
       } catch (error) {
         logger.error('[Analytics] ECharts 加载失败:', error)
+        this.showError('图表组件加载失败，部分功能可能不可用')
       }
 
       // 初始化图表
@@ -201,28 +209,47 @@ function analyticsPage() {
      * @returns {void}
      */
     initCharts() {
+      const echarts = this._echarts
+
+      logger.info('[Analytics] 初始化图表', {
+        hasEcharts: !!echarts,
+        hasUserTrendChart: !!this.$refs.userTrendChart,
+        hasLotteryTrendChart: !!this.$refs.lotteryTrendChart,
+        hasPointsFlowChart: !!this.$refs.pointsFlowChart,
+        hasUserSourceChart: !!this.$refs.userSourceChart
+      })
+
+      if (!echarts) {
+        logger.warn('[Analytics] ECharts 未加载，跳过图表初始化')
+        return
+      }
+
       // 用户趋势图
-      if (this.$refs.userTrendChart && typeof echarts !== 'undefined') {
+      if (this.$refs.userTrendChart) {
         this.charts.userTrend = echarts.init(this.$refs.userTrendChart)
         this.charts.userTrend.setOption(this.getUserTrendOption([]))
+        logger.info('[Analytics] 用户趋势图初始化完成')
       }
 
       // 抽奖趋势图
-      if (this.$refs.lotteryTrendChart && typeof echarts !== 'undefined') {
+      if (this.$refs.lotteryTrendChart) {
         this.charts.lotteryTrend = echarts.init(this.$refs.lotteryTrendChart)
         this.charts.lotteryTrend.setOption(this.getLotteryTrendOption([]))
+        logger.info('[Analytics] 抽奖趋势图初始化完成')
       }
 
       // 积分流转图
-      if (this.$refs.pointsFlowChart && typeof echarts !== 'undefined') {
+      if (this.$refs.pointsFlowChart) {
         this.charts.pointsFlow = echarts.init(this.$refs.pointsFlowChart)
         this.charts.pointsFlow.setOption(this.getPointsFlowOption([]))
+        logger.info('[Analytics] 积分流转图初始化完成')
       }
 
       // 用户类型分布
-      if (this.$refs.userSourceChart && typeof echarts !== 'undefined') {
+      if (this.$refs.userSourceChart) {
         this.charts.userSource = echarts.init(this.$refs.userSourceChart)
         this.charts.userSource.setOption(this.getUserSourceOption([]))
+        logger.info('[Analytics] 用户类型分布图初始化完成')
       }
     },
 
@@ -232,6 +259,14 @@ function analyticsPage() {
      * @returns {Object} ECharts配置对象
      */
     getUserTrendOption(data) {
+      const echarts = this._echarts
+      const areaStyleColor = echarts
+        ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(13, 110, 253, 0.3)' },
+            { offset: 1, color: 'rgba(13, 110, 253, 0.05)' }
+          ])
+        : 'rgba(13, 110, 253, 0.2)'
+
       return {
         tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
         legend: { show: false },
@@ -243,12 +278,7 @@ function analyticsPage() {
             name: '活跃用户',
             type: 'line',
             smooth: true,
-            areaStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: 'rgba(13, 110, 253, 0.3)' },
-                { offset: 1, color: 'rgba(13, 110, 253, 0.05)' }
-              ])
-            },
+            areaStyle: { color: areaStyleColor },
             lineStyle: { color: '#0d6efd', width: 2 },
             itemStyle: { color: '#0d6efd' },
             data: data.map(d => d.active_users || d.count || 0)
@@ -263,6 +293,14 @@ function analyticsPage() {
      * @returns {Object} ECharts配置对象
      */
     getLotteryTrendOption(data) {
+      const echarts = this._echarts
+      const barColor = echarts
+        ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#198754' },
+            { offset: 1, color: 'rgba(25, 135, 84, 0.6)' }
+          ])
+        : '#198754'
+
       return {
         tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
         legend: { show: false },
@@ -274,12 +312,7 @@ function analyticsPage() {
             name: '抽奖次数',
             type: 'bar',
             barWidth: '60%',
-            itemStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: '#198754' },
-                { offset: 1, color: 'rgba(25, 135, 84, 0.6)' }
-              ])
-            },
+            itemStyle: { color: barColor },
             data: data.map(d => d.draws || d.total_draws || 0)
           }
         ]
@@ -326,17 +359,29 @@ function analyticsPage() {
      */
     getUserSourceOption(data) {
       return {
-        tooltip: { trigger: 'item', formatter: '{a} <br/>{b}: {c} ({d}%)' },
+        tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
         legend: { orient: 'horizontal', bottom: 0, data: data.map(d => d.name) },
         series: [
           {
             name: '用户类型',
             type: 'pie',
             radius: ['40%', '70%'],
-            avoidLabelOverlap: false,
-            label: { show: false, position: 'center' },
-            emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' } },
-            labelLine: { show: false },
+            avoidLabelOverlap: true,
+            label: {
+              show: true,
+              position: 'outside',
+              formatter: '{b}\n{c} ({d}%)',
+              fontSize: 12,
+              color: '#333'
+            },
+            labelLine: {
+              show: true,
+              length: 10,
+              length2: 15
+            },
+            emphasis: {
+              label: { show: true, fontSize: 14, fontWeight: 'bold' }
+            },
             data: data
           }
         ]
@@ -385,6 +430,7 @@ function analyticsPage() {
 
         if (response && response.success) {
           const data = response.data
+          logger.info('[Analytics] TODAY_STATS 数据:', data)
 
           this.stats.activeUsers = data.user_stats?.active_users_today || 0
           this.stats.totalUsers = data.user_stats?.total_users || 0
@@ -394,6 +440,9 @@ function analyticsPage() {
           this.stats.pointsSpent = data.points_stats?.points_spent_today || 0
           this.stats.exchangeOrders = data.inventory_stats?.used_items_today || 0
           this.stats.newItems = data.inventory_stats?.new_items_today || 0
+
+          // 注意：这里先设置今日数据，loadDecisionAnalytics 会用总数据覆盖
+          this.stats.pointsConsumed = this.stats.pointsSpent
         }
       } catch (error) {
         logger.error('加载今日统计数据失败:', error)
@@ -414,21 +463,31 @@ function analyticsPage() {
 
         if (response && response.success) {
           const data = response.data
+          logger.info('[Analytics] DECISIONS 数据:', data)
+
           this.dailyStats = data.trends?.daily_stats || data.daily_stats || []
 
-          // 处理决策分析摘要
+          // 处理决策分析摘要 - 使用 overview 字段（后端实际返回的结构）
+          const overview = data.overview || {}
           this.decisionSummary = {
-            totalDecisions: data.summary?.total_decisions ?? data.total_decisions ?? 0,
-            winDecisions: data.summary?.win_decisions ?? data.win_decisions ?? 0,
-            loseDecisions: data.summary?.lose_decisions ?? data.lose_decisions ?? 0,
-            avgWinRate: data.summary?.avg_win_rate
-              ? (data.summary.avg_win_rate * 100).toFixed(2)
-              : data.avg_win_rate
-                ? (data.avg_win_rate * 100).toFixed(2)
-                : 0,
-            topStrategies: data.top_strategies || [],
+            totalDecisions: overview.total_draws || data.summary?.total_decisions || 0,
+            winDecisions: overview.high_tier_draws || data.summary?.win_decisions || 0,
+            loseDecisions: (overview.total_draws || 0) - (overview.high_tier_draws || 0),
+            avgWinRate: overview.high_tier_rate || data.summary?.avg_win_rate || 0,
+            topStrategies: data.users?.top_users || data.top_strategies || [],
             tierDistribution: data.tier_distribution || []
           }
+
+          // 更新统计卡片数据 - 使用总数据（不是今日数据）
+          this.stats.totalDraws = overview.total_draws || 0
+          this.stats.totalWins = overview.high_tier_draws || 0
+
+          logger.info('[Analytics] 更新统计卡片:', {
+            totalDraws: this.stats.totalDraws,
+            totalWins: this.stats.totalWins,
+            activeUsers: this.stats.activeUsers,
+            pointsConsumed: this.stats.pointsConsumed
+          })
 
           // 更新图表
           this.updateChartsWithData(data)
@@ -555,15 +614,19 @@ function analyticsPage() {
 
         if (response && response.success) {
           const data = response.data
+          logger.info('[Analytics] LOTTERY_TRENDS 数据:', data)
 
           // 更新用户活跃趋势图
           if (data.user_activity && data.user_activity.length > 0 && this.charts.userTrend) {
             const userDates = data.user_activity.map(item => item.period)
             const activeUsers = data.user_activity.map(item => item.active_users)
+            logger.info('[Analytics] 更新用户趋势图:', { dates: userDates, users: activeUsers })
             this.charts.userTrend.setOption({
               xAxis: { data: userDates },
               series: [{ data: activeUsers }]
             })
+          } else {
+            logger.warn('[Analytics] 用户活跃趋势数据为空或图表未初始化')
           }
 
           // 更新抽奖趋势
@@ -574,15 +637,19 @@ function analyticsPage() {
           ) {
             const lotteryDates = data.lottery_activity.map(item => item.period)
             const totalDraws = data.lottery_activity.map(item => item.total_draws)
+            logger.info('[Analytics] 更新抽奖趋势图:', { dates: lotteryDates, draws: totalDraws })
             this.charts.lotteryTrend.setOption({
               xAxis: { data: lotteryDates },
               series: [{ data: totalDraws }]
             })
+          } else {
+            logger.warn('[Analytics] 抽奖趋势数据为空或图表未初始化')
           }
 
-          // 更新积分流转图
+          // 更新积分流转图（使用抽奖数据模拟积分流转）
           if (data.lottery_activity && data.lottery_activity.length > 0 && this.charts.pointsFlow) {
             const dates = data.lottery_activity.map(item => item.period)
+            // 模拟积分：每次抽奖消耗 10 积分，每用户可获得 50 积分
             const pointsOut = data.lottery_activity.map(item => item.total_draws * 10)
             const pointsIn = data.lottery_activity.map(item => item.unique_users * 50)
             this.charts.pointsFlow.setOption({
@@ -591,21 +658,21 @@ function analyticsPage() {
             })
           }
 
-          // 更新用户类型分布
+          // 更新用户类型分布（使用 summary 数据）
           if (data.summary && this.charts.userSource) {
-            const peakUsers = data.summary.peak_users || 100
+            const peakUsers = data.summary.peak_users || this.stats.totalUsers || 10
             this.charts.userSource.setOption({
               series: [
                 {
                   data: [
-                    { value: peakUsers, name: '普通用户', itemStyle: { color: '#0d6efd' } },
+                    { value: Math.max(1, peakUsers - Math.floor(peakUsers * 0.15)), name: '普通用户', itemStyle: { color: '#0d6efd' } },
                     {
-                      value: Math.floor(peakUsers * 0.05),
+                      value: Math.max(1, Math.floor(peakUsers * 0.05)),
                       name: '管理员',
                       itemStyle: { color: '#198754' }
                     },
                     {
-                      value: Math.floor(peakUsers * 0.1),
+                      value: Math.max(1, Math.floor(peakUsers * 0.1)),
                       name: '商家',
                       itemStyle: { color: '#ffc107' }
                     }
@@ -621,6 +688,23 @@ function analyticsPage() {
     },
 
     // ==================== 事件处理 ====================
+
+    /**
+     * 设置日期范围
+     * @param {string} range - 日期范围 ('today'|'week'|'month')
+     * @description 设置预设的日期范围并重新加载数据
+     * @returns {void}
+     */
+    setDateRange(range) {
+      const rangeMapping = {
+        'today': '1',
+        'week': '7',
+        'month': '30'
+      }
+      this.filters.timeRange = rangeMapping[range] || '30'
+      logger.info('[Analytics] 设置日期范围', { range, timeRange: this.filters.timeRange })
+      this.loadAllData()
+    },
 
     /**
      * 处理时间范围变更

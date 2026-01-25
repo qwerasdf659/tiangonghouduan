@@ -59,19 +59,19 @@
               <template x-for="asset in materialTypes" :key="asset.asset_code">
                 <tr class="hover:bg-gray-50">
                   <td class="px-4 py-3 text-sm font-mono" x-text="asset.asset_code"></td>
-                  <td class="px-4 py-3 text-sm" x-text="asset.asset_name"></td>
-                  <td class="px-4 py-3 text-sm" x-text="asset.category"></td>
+                  <td class="px-4 py-3 text-sm" x-text="asset.display_name"></td>
+                  <td class="px-4 py-3 text-sm" x-text="asset.group_code"></td>
                   <td class="px-4 py-3">
                     <span 
-                      :class="asset.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
+                      :class="asset.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
                       class="px-2 py-1 text-xs rounded"
-                      x-text="asset.status === 'active' ? '启用' : '禁用'"
+                      x-text="asset.is_enabled ? '启用' : '禁用'"
                     ></span>
                   </td>
                   <td class="px-4 py-3">
                     <div class="flex space-x-2">
                       <button @click="editMaterialType(asset)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
-                      <button @click="toggleMaterialTypeStatus(asset.asset_code, asset.status)" class="text-yellow-500 hover:text-yellow-700 text-sm" x-text="asset.status === 'active' ? '禁用' : '启用'"></button>
+                      <button @click="toggleMaterialTypeStatus(asset.asset_code, asset.is_enabled)" class="text-yellow-500 hover:text-yellow-700 text-sm" x-text="asset.is_enabled ? '禁用' : '启用'"></button>
                     </div>
                   </td>
                 </tr>
@@ -94,7 +94,7 @@
             <select x-model="materialAccountFilters.assetCode" class="px-3 py-2 border rounded">
               <option value="">全部资产类型</option>
               <template x-for="asset in materialTypes" :key="asset.asset_code">
-                <option :value="asset.asset_code" x-text="asset.asset_name"></option>
+                <option :value="asset.asset_code" x-text="asset.display_name"></option>
               </template>
             </select>
             <button @click="loadMaterialAccounts()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
@@ -112,10 +112,16 @@
               </tr>
             </thead>
             <tbody class="divide-y">
-              <template x-for="ua in materialAccounts" :key="ua.id">
+              <tr x-show="materialAccounts.length === 0">
+                <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                  <div x-show="!materialAccountFilters.userId">💡 请输入用户ID后点击搜索</div>
+                  <div x-show="materialAccountFilters.userId">暂无数据</div>
+                </td>
+              </tr>
+              <template x-for="(ua, index) in materialAccounts" :key="ua.asset_code + '_' + (ua.campaign_id || index)">
                 <tr class="hover:bg-gray-50">
                   <td class="px-4 py-3 text-sm" x-text="ua.user_id"></td>
-                  <td class="px-4 py-3 text-sm" x-text="ua.asset_name"></td>
+                  <td class="px-4 py-3 text-sm" x-text="ua.display_name"></td>
                   <td class="px-4 py-3 text-sm font-mono" x-text="ua.balance"></td>
                   <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(ua.updated_at)"></td>
                   <td class="px-4 py-3">
@@ -141,7 +147,7 @@
             <select x-model="logFilters.assetCode" class="px-3 py-2 border rounded">
               <option value="">全部资产类型</option>
               <template x-for="asset in materialTypes" :key="asset.asset_code">
-                <option :value="asset.asset_code" x-text="asset.asset_name"></option>
+                <option :value="asset.asset_code" x-text="asset.display_name"></option>
               </template>
             </select>
             <input type="date" x-model="logFilters.startDate" class="px-3 py-2 border rounded">
@@ -162,12 +168,18 @@
               </tr>
             </thead>
             <tbody class="divide-y">
-              <template x-for="log in materialTransactions" :key="log.log_id">
+              <tr x-show="materialTransactions.length === 0">
+                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                  <div x-show="!logFilters.userId">💡 请输入用户ID后点击搜索</div>
+                  <div x-show="logFilters.userId">暂无数据</div>
+                </td>
+              </tr>
+              <template x-for="log in materialTransactions" :key="log.transaction_id">
                 <tr class="hover:bg-gray-50">
-                  <td class="px-4 py-3 text-sm" x-text="log.log_id"></td>
-                  <td class="px-4 py-3 text-sm" x-text="log.user_id"></td>
+                  <td class="px-4 py-3 text-sm" x-text="log.transaction_id"></td>
+                  <td class="px-4 py-3 text-sm" x-text="log.user_id || '-'"></td>
                   <td class="px-4 py-3 text-sm" x-text="log.asset_name"></td>
-                  <td class="px-4 py-3 text-sm" x-text="log.change_type"></td>
+                  <td class="px-4 py-3 text-sm" x-text="log.tx_type"></td>
                   <td class="px-4 py-3 text-sm" :class="log.amount > 0 ? 'text-green-600' : 'text-red-600'" x-text="(log.amount > 0 ? '+' : '') + log.amount"></td>
                   <td class="px-4 py-3 text-sm font-mono" x-text="log.balance_after"></td>
                   <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(log.created_at)"></td>
@@ -175,6 +187,217 @@
               </template>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 物品实例 -->
+    <div x-show="currentPage === 'item-instances'" x-cloak>
+      <div class="bg-white rounded-lg shadow">
+        <div class="p-4 border-b">
+          <h5 class="font-semibold">🎁 物品模板管理</h5>
+        </div>
+        <div class="p-4 border-b bg-gray-50">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <select x-model="itemInstanceFilters.templateCode" class="px-3 py-2 border rounded">
+              <option value="">全部物品类型</option>
+              <option value="voucher">优惠券</option>
+              <option value="physical">实物商品</option>
+              <option value="collectible">收藏品</option>
+            </select>
+            <select x-model="itemInstanceFilters.status" class="px-3 py-2 border rounded">
+              <option value="">全部状态</option>
+              <option value="enabled">启用</option>
+              <option value="disabled">禁用</option>
+            </select>
+            <button @click="loadItemInstances()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">模板ID</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">模板代码</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">物品名称</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">类型</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">稀有度</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <tr x-show="itemInstances.length === 0">
+                <td colspan="6" class="px-4 py-8 text-center text-gray-500">暂无物品模板数据</td>
+              </tr>
+              <template x-for="item in itemInstances" :key="item.item_template_id">
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-3 text-sm" x-text="item.item_template_id"></td>
+                  <td class="px-4 py-3 text-sm font-mono" x-text="item.template_code"></td>
+                  <td class="px-4 py-3 text-sm" x-text="item.display_name"></td>
+                  <td class="px-4 py-3 text-sm" x-text="item.item_type"></td>
+                  <td class="px-4 py-3 text-sm" x-text="item.rarity?.display_name || item.rarity_code"></td>
+                  <td class="px-4 py-3">
+                    <span 
+                      :class="item.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
+                      class="px-2 py-1 text-xs rounded"
+                      x-text="item.is_enabled ? '启用' : '禁用'"
+                    ></span>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 虚拟账户 -->
+    <div x-show="currentPage === 'virtual-accounts'" x-cloak>
+      <div class="bg-white rounded-lg shadow">
+        <div class="p-4 border-b">
+          <h5 class="font-semibold">💎 虚拟账户查询</h5>
+        </div>
+        <div class="p-4 border-b bg-gray-50">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <input type="text" x-model="virtualAccountFilters.userId" placeholder="用户ID" class="px-3 py-2 border rounded">
+            <select x-model="virtualAccountFilters.accountType" class="px-3 py-2 border rounded">
+              <option value="">全部账户类型</option>
+              <option value="DIAMOND">钻石</option>
+              <option value="POINTS">积分</option>
+              <option value="CREDITS">信用点</option>
+            </select>
+            <button @click="loadVirtualAccounts()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户ID</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">账户类型</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">可用余额</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">冻结余额</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">总额</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <tr x-show="virtualAccounts.length === 0">
+                <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                  <div x-show="!virtualAccountFilters.userId">💡 请输入用户ID后点击搜索</div>
+                  <div x-show="virtualAccountFilters.userId">暂无数据</div>
+                </td>
+              </tr>
+              <template x-for="va in virtualAccounts" :key="va.asset_code">
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-3 text-sm" x-text="virtualAccountFilters.userId"></td>
+                  <td class="px-4 py-3 text-sm" x-text="va.asset_code"></td>
+                  <td class="px-4 py-3 text-sm font-mono text-green-600" x-text="va.available_amount"></td>
+                  <td class="px-4 py-3 text-sm font-mono text-orange-600" x-text="va.frozen_amount"></td>
+                  <td class="px-4 py-3 text-sm font-mono" x-text="va.total"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 虚拟交易 -->
+    <div x-show="currentPage === 'virtual-transactions'" x-cloak>
+      <div class="bg-white rounded-lg shadow">
+        <div class="p-4 border-b">
+          <h5 class="font-semibold">📊 虚拟交易记录</h5>
+        </div>
+        <div class="p-4 border-b bg-gray-50">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <input type="text" x-model="virtualTxFilters.userId" placeholder="用户ID（必填）" class="px-3 py-2 border rounded">
+            <select x-model="virtualTxFilters.accountType" class="px-3 py-2 border rounded">
+              <option value="">全部账户类型</option>
+              <option value="DIAMOND">钻石</option>
+              <option value="POINTS">积分</option>
+              <option value="CREDITS">信用点</option>
+            </select>
+            <select x-model="virtualTxFilters.direction" class="px-3 py-2 border rounded">
+              <option value="">全部方向</option>
+              <option value="in">收入</option>
+              <option value="out">支出</option>
+            </select>
+            <button @click="loadVirtualTransactions()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">交易ID</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">账户类型</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">业务类型</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">变动金额</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">变动后余额</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">时间</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <tr x-show="virtualTransactions.length === 0">
+                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                  <div x-show="!virtualTxFilters.userId">💡 请输入用户ID后点击搜索</div>
+                  <div x-show="virtualTxFilters.userId">暂无数据</div>
+                </td>
+              </tr>
+              <template x-for="tx in virtualTransactions" :key="tx.transaction_id">
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-3 text-sm" x-text="tx.transaction_id"></td>
+                  <td class="px-4 py-3 text-sm" x-text="tx.asset_code"></td>
+                  <td class="px-4 py-3 text-sm" x-text="tx.tx_type"></td>
+                  <td class="px-4 py-3 text-sm" :class="tx.amount > 0 ? 'text-green-600' : 'text-red-600'" x-text="(tx.amount > 0 ? '+' : '') + tx.amount"></td>
+                  <td class="px-4 py-3 text-sm font-mono" x-text="tx.balance_after"></td>
+                  <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(tx.created_at)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 资产统计 -->
+    <div x-show="currentPage === 'asset-stats'" x-cloak>
+      <div class="bg-white rounded-lg shadow">
+        <div class="p-4 border-b">
+          <h5 class="font-semibold">📈 资产统计概览</h5>
+        </div>
+        <div class="p-6">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="bg-blue-50 rounded-lg p-6 text-center">
+              <div class="text-3xl font-bold text-blue-600" x-text="(assetStats.totalMaterialValue || 0).toLocaleString()"></div>
+              <div class="text-gray-600 mt-2">材料流通总量</div>
+            </div>
+            <div class="bg-purple-50 rounded-lg p-6 text-center">
+              <div class="text-3xl font-bold text-purple-600" x-text="(assetStats.totalVirtualValue || 0).toLocaleString()"></div>
+              <div class="text-gray-600 mt-2">虚拟资产流通量</div>
+            </div>
+            <div class="bg-green-50 rounded-lg p-6 text-center">
+              <div class="text-3xl font-bold text-green-600" x-text="assetStats.totalAssetTypes || 0"></div>
+              <div class="text-gray-600 mt-2">资产类型数</div>
+            </div>
+            <div class="bg-orange-50 rounded-lg p-6 text-center">
+              <div class="text-3xl font-bold text-orange-600" x-text="assetStats.totalHolders || 0"></div>
+              <div class="text-gray-600 mt-2">持有者数量</div>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            <div class="bg-gray-50 rounded-lg p-6 text-center">
+              <div class="text-3xl font-bold text-gray-700" x-text="(assetStats.totalCirculation || 0).toLocaleString()"></div>
+              <div class="text-gray-600 mt-2">总流通量</div>
+            </div>
+            <div class="bg-red-50 rounded-lg p-6 text-center">
+              <div class="text-3xl font-bold text-red-600" x-text="(assetStats.totalFrozen || 0).toLocaleString()"></div>
+              <div class="text-gray-600 mt-2">总冻结量</div>
+            </div>
+          </div>
+          <div class="mt-6 text-center">
+            <button @click="loadAssetStats()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">🔄 刷新统计</button>
+          </div>
         </div>
       </div>
     </div>

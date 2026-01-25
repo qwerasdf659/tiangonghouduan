@@ -68,15 +68,18 @@ export function modalMixin() {
       const modalEl = this.$refs?.[refName]
       if (modalEl) {
         modalEl.classList.add('show')
-        modalEl.style.display = 'block'
+        // 不强制设置 display:block，让 x-show 控制
       }
 
       // 设置 body 样式
       document.body.classList.add('modal-open')
       document.body.style.overflow = 'hidden'
 
-      // 创建遮罩层（如果 Modal 不使用 x-show 的内置遮罩）
-      if (options.backdrop !== false && modalEl && !modalEl.classList.contains('has-backdrop')) {
+      // 检查 Modal 内是否已有遮罩层（子元素中有 bg-black/50 类）
+      const hasInlineBackdrop = modalEl?.querySelector('[class*="bg-black"]')
+
+      // 仅当 Modal 没有内置遮罩层且明确需要时才创建
+      if (options.backdrop === true && !hasInlineBackdrop) {
         this._createBackdrop(refName)
       }
 
@@ -90,7 +93,7 @@ export function modalMixin() {
         this.$dispatch('modal-shown', { name: refName })
       }
 
-      logger.info(`[ModalMixin] 显示 Modal: ${refName}`)
+      logger.debug(`[ModalMixin] 显示 Modal: ${refName}`)
       return true
     },
 
@@ -106,10 +109,10 @@ export function modalMixin() {
       const modalEl = this.$refs?.[refName]
       if (modalEl) {
         modalEl.classList.remove('show')
-        modalEl.style.display = 'none'
+        // 不强制设置 display:none，让 x-show 控制
       }
 
-      // 移除遮罩层
+      // 移除可能创建的遮罩层
       this._removeBackdrop(refName)
 
       // 更新打开状态
@@ -126,7 +129,7 @@ export function modalMixin() {
         this.$dispatch('modal-hidden', { name: refName })
       }
 
-      logger.info(`[ModalMixin] 隐藏 Modal: ${refName}`)
+      logger.debug(`[ModalMixin] 隐藏 Modal: ${refName}`)
       return true
     },
 

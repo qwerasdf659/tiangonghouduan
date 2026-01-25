@@ -334,16 +334,22 @@ class ActivityService {
    *
    * @param {Object} options - 查询选项
    * @param {Array<number>} options.campaign_ids - 活动ID列表（可选）
+   * @param {string} options.status - 活动状态筛选（可选，如：active/draft/completed/paused）
    * @param {number} options.limit - 限制返回数量（默认20，最大50）
    * @returns {Promise<Object>} 活动预算状态列表和汇总
    */
   static async getBatchBudgetStatus(options = {}) {
-    const { campaign_ids = [], limit = 20 } = options
+    const { campaign_ids = [], status = '', limit = 20 } = options
     const maxLimit = Math.min(parseInt(limit) || 20, 50)
 
-    // 构建查询条件
-    const whereCondition =
-      campaign_ids.length > 0 ? { campaign_id: { [Op.in]: campaign_ids } } : { status: 'active' }
+    // 构建查询条件（支持 status 参数筛选）
+    let whereCondition = {}
+    if (campaign_ids.length > 0) {
+      whereCondition = { campaign_id: { [Op.in]: campaign_ids } }
+    } else if (status && ['active', 'draft', 'completed', 'paused'].includes(status)) {
+      whereCondition = { status }
+    }
+    // 如果没有指定条件，则返回所有活动（不再默认只返回 active）
 
     // 批量获取活动预算信息
     const campaigns = await models.LotteryCampaign.findAll({

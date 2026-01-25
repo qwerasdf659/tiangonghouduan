@@ -118,13 +118,13 @@
               <th class="px-4 py-3 text-left">
                 <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll()" class="rounded">
               </th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">资产ID</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">账户ID</th>
               <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">类型</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">原用户ID</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">资产详情</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">价值</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户ID</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">描述</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">孤儿金额</th>
               <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">发现时间</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">检测时间</th>
               <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
             </tr>
           </thead>
@@ -132,18 +132,18 @@
             <template x-if="assets.length === 0">
               <tr><td colspan="9" class="px-4 py-8 text-center text-gray-500">暂无孤儿/冻结资产</td></tr>
             </template>
-            <template x-for="asset in assets" :key="asset.asset_id">
+            <template x-for="asset in assets" :key="asset.account_id">
               <tr class="hover:bg-gray-50">
                 <td class="px-4 py-3">
                   <input type="checkbox" :checked="isItemSelected(asset)" @change="toggleRowSelection(asset)" class="rounded">
                 </td>
-                <td class="px-4 py-3 text-sm font-mono" x-text="asset.asset_id"></td>
+                <td class="px-4 py-3 text-sm font-mono" x-text="asset.account_id"></td>
                 <td class="px-4 py-3">
                   <span :class="asset.type === 'orphan' ? 'bg-gray-100 text-gray-700' : 'bg-blue-100 text-blue-700'" class="px-2 py-1 text-xs rounded" x-text="asset.type === 'orphan' ? '孤儿' : '冻结'"></span>
                 </td>
-                <td class="px-4 py-3 text-sm" x-text="asset.original_user_id || '-'"></td>
+                <td class="px-4 py-3 text-sm" x-text="asset.user_id || '-'"></td>
                 <td class="px-4 py-3 text-sm" x-text="asset.description"></td>
-                <td class="px-4 py-3 text-sm font-mono text-orange-600" x-text="formatNumber(asset.value)"></td>
+                <td class="px-4 py-3 text-sm font-mono text-orange-600" x-text="formatNumber(asset.orphan_amount)"></td>
                 <td class="px-4 py-3">
                   <span :class="{
                     'bg-yellow-100 text-yellow-700': asset.status === 'pending',
@@ -181,21 +181,18 @@
   <div x-show="selectedAsset" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="selectedAsset = null">
     <div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
       <div class="p-4 border-b">
-        <h5 class="font-semibold">资产详情</h5>
+        <h5 class="font-semibold">孤儿冻结详情</h5>
       </div>
       <div class="p-4 space-y-3">
-        <div class="flex justify-between"><span class="text-gray-500">资产ID:</span><span class="font-mono" x-text="selectedAsset?.asset_id"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">类型:</span><span x-text="selectedAsset?.type === 'orphan' ? '孤儿资产' : '冻结资产'"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">原用户ID:</span><span x-text="selectedAsset?.original_user_id || '-'"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">资产分类:</span><span x-text="selectedAsset?.asset_type"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">账户ID:</span><span class="font-mono" x-text="selectedAsset?.account_id"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">用户ID:</span><span x-text="selectedAsset?.user_id || '-'"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">资产代码:</span><span x-text="selectedAsset?.asset_code"></span></div>
         <div class="flex justify-between"><span class="text-gray-500">描述:</span><span x-text="selectedAsset?.description"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">价值:</span><span class="font-mono text-orange-600" x-text="formatNumber(selectedAsset?.value)"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">状态:</span><span x-text="getStatusText(selectedAsset?.status)"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">发现时间:</span><span x-text="formatDate(selectedAsset?.discovered_at)"></span></div>
-        <div x-show="selectedAsset?.frozen_reason">
-          <span class="text-gray-500">冻结原因:</span>
-          <p class="mt-1 p-2 bg-gray-50 rounded" x-text="selectedAsset?.frozen_reason"></p>
-        </div>
+        <div class="flex justify-between"><span class="text-gray-500">冻结金额:</span><span class="font-mono text-blue-600" x-text="formatNumber(selectedAsset?.frozen_amount)"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">活跃挂牌金额:</span><span class="font-mono text-green-600" x-text="formatNumber(selectedAsset?.listed_amount)"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">孤儿冻结金额:</span><span class="font-mono text-orange-600 font-bold" x-text="formatNumber(selectedAsset?.orphan_amount)"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">可用余额:</span><span class="font-mono" x-text="formatNumber(selectedAsset?.available_amount)"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">检测时间:</span><span x-text="formatDate(selectedAsset?.discovered_at)"></span></div>
       </div>
       <div class="p-4 border-t flex justify-end">
         <button @click="selectedAsset = null" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">关闭</button>

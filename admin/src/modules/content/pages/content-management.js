@@ -27,7 +27,7 @@
 
 
 import { logger } from '../../../utils/logger.js'
-import { buildURL, request } from '../../../api/base.js'
+import { buildURL, request, getToken } from '../../../api/base.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 document.addEventListener('alpine:init', () => {
@@ -128,6 +128,18 @@ document.addEventListener('alpine:init', () => {
       end_time: ''
     },
 
+    /**
+     * 待上传的轮播图图片文件（新建时使用）
+     * @type {File|null}
+     */
+    bannerImageFile: null,
+
+    /**
+     * 轮播图图片预览URL（本地预览）
+     * @type {string}
+     */
+    bannerImagePreview: '',
+
     // ==================== 图片资源相关 ====================
 
     /**
@@ -149,6 +161,12 @@ document.addEventListener('alpine:init', () => {
      * @type {boolean}
      */
     deleting: false,
+
+    /**
+     * 轮播图图片上传中状态
+     * @type {boolean}
+     */
+    uploadingBannerImage: false,
 
     /**
      * 是否处于编辑模式
@@ -317,7 +335,8 @@ document.addEventListener('alpine:init', () => {
           : SYSTEM_ENDPOINTS.ANNOUNCEMENT_CREATE
         const method = this.isEditMode ? 'PUT' : 'POST'
 
-        const response = await this.apiCall(url, { method, body: JSON.stringify(payload) })
+        // 使用 data 属性，request() 函数会自动 JSON.stringify
+        const response = await this.apiCall(url, { method, data: payload })
 
         if (response?.success) {
           this.hideModal('announcementModal')
@@ -399,6 +418,9 @@ document.addEventListener('alpine:init', () => {
      */
     openCreateBannerModal() {
       this.isEditMode = false
+      // 清理之前的文件选择状态
+      this.bannerImageFile = null
+      this.bannerImagePreview = ''
       this.bannerForm = {
         banner_id: null,
         title: '',
@@ -430,6 +452,9 @@ document.addEventListener('alpine:init', () => {
      */
     editBanner(banner) {
       this.isEditMode = true
+      // 清理之前的文件选择状态
+      this.bannerImageFile = null
+      this.bannerImagePreview = ''
       this.bannerForm = {
         banner_id: banner.banner_id || banner.id,
         title: banner.title || '',
@@ -446,42 +471,139 @@ document.addEventListener('alpine:init', () => {
     },
 
     /**
+     * 上传轮播图图片
+     * @async
+     * @param {Event} event - 文件选择事件
+     * @description 上传图片到服务器并获取URL
+     * @returns {Promise<void>}
+     */
+    /**
+     * 选择轮播图图片（暂存文件，本地预览）
+     * 后端 popup-banners 接口使用 multipart/form-data，需要在保存时一起发送文件
+     */
+    selectBannerImage(event) {
+      const file = event.target.files?.[0]
+      if (!file) return
+
+      // 验证文件类型
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+      if (!allowedTypes.includes(file.type)) {
+        this.showError('不支持的图片格式，请选择 JPG/PNG/GIF/WebP')
+        event.target.value = ''
+        return
+      }
+
+      // 验证文件大小 (5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        this.showError('图片大小不能超过 5MB')
+        event.target.value = ''
+        return
+      }
+
+      // 暂存文件
+      this.bannerImageFile = file
+      // 生成本地预览URL
+      this.bannerImagePreview = URL.createObjectURL(file)
+      logger.info('轮播图图片已选择:', file.name)
+    },
+
+    /**
+     * 清除选择的轮播图图片
+     */
+    clearBannerImage() {
+      this.bannerImageFile = null
+      if (this.bannerImagePreview) {
+        URL.revokeObjectURL(this.bannerImagePreview)
+        this.bannerImagePreview = ''
+      }
+      this.bannerForm.image_url = ''
+    },
+
+    /**
      * 保存轮播图
      * @async
      * @description 验证表单并提交轮播图数据（创建或更新）
      * @returns {Promise<void>}
      */
     async saveBanner() {
-      if (!this.bannerForm.image_url?.trim()) {
-        this.showError('请上传或填写图片地址')
+      // 调试日志
+      logger.info('saveBanner 调用:', {
+        isEditMode: this.isEditMode,
+        hasImageFile: !!this.bannerImageFile,
+        imageFileType: this.bannerImageFile ? this.bannerImageFile.constructor.name : 'null',
+        imageFileName: this.bannerImageFile ? this.bannerImageFile.name : 'null',
+        imageFileSize: this.bannerImageFile ? this.bannerImageFile.size : 0,
+        bannerFormTitle: this.bannerForm.title,
+        bannerFormImageUrl: this.bannerForm.image_url
+      })
+
+      // 新建时必须有图片文件，编辑时可选
+      if (!this.isEditMode && !this.bannerImageFile) {
+        this.showError('请选择轮播图图片')
+        return
+      }
+
+      // 验证图片文件是否是有效的 File 对象
+      if (!this.isEditMode && !(this.bannerImageFile instanceof File)) {
+        logger.error('bannerImageFile 不是有效的 File 对象:', this.bannerImageFile)
+        this.showError('图片文件无效，请重新选择')
+        return
+      }
+
+      if (!this.bannerForm.title?.trim()) {
+        this.showError('请输入标题')
         return
       }
 
       this.saving = true
       try {
-        const payload = {
-          title: this.bannerForm.title?.trim() || '',
-          position: this.bannerForm.position,
-          display_order: this.bannerForm.sort_order || 0,
-          is_active: this.bannerForm.is_active,
-          image_url: this.bannerForm.image_url || '',
-          link_url: this.bannerForm.link_url || '',
-          start_time: this.bannerForm.start_time || null,
-          end_time: this.bannerForm.end_time || null,
-          description: this.bannerForm.description || ''
-        }
-
         const url = this.isEditMode
           ? buildURL(SYSTEM_ENDPOINTS.POPUP_BANNER_UPDATE, { id: this.bannerForm.banner_id })
           : SYSTEM_ENDPOINTS.POPUP_BANNER_CREATE
         const method = this.isEditMode ? 'PUT' : 'POST'
 
-        const response = await this.apiCall(url, { method, body: JSON.stringify(payload) })
+        // 使用 FormData 发送（后端使用 multer 接收）
+        const formData = new FormData()
+        formData.append('title', this.bannerForm.title?.trim() || '')
+        formData.append('position', this.bannerForm.position || 'home')
+        formData.append('display_order', String(this.bannerForm.sort_order || 0))
+        formData.append('is_active', String(this.bannerForm.is_active))
+        formData.append('link_url', this.bannerForm.link_url || '')
+        if (this.bannerForm.start_time) {
+          formData.append('start_time', this.bannerForm.start_time)
+        }
+        if (this.bannerForm.end_time) {
+          formData.append('end_time', this.bannerForm.end_time)
+        }
 
-        if (response?.success) {
+        // 如果有新选择的图片文件，添加到 FormData
+        if (this.bannerImageFile) {
+          logger.info('正在添加图片到 FormData:', {
+            name: this.bannerImageFile.name,
+            type: this.bannerImageFile.type,
+            size: this.bannerImageFile.size
+          })
+          formData.append('image', this.bannerImageFile, this.bannerImageFile.name)
+        }
+
+        // 直接使用 fetch 发送 FormData（不能用 JSON）
+        const token = getToken()
+        const response = await fetch(url, {
+          method,
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          body: formData
+        })
+
+        const result = await response.json()
+        if (result.success) {
           this.hideModal('bannerModal')
+          this.clearBannerImage() // 清理暂存的文件
           await this.loadBanners()
           this.showSuccess(this.isEditMode ? '轮播图已更新' : '轮播图已创建')
+        } else {
+          throw new Error(result.message || '保存失败')
         }
       } catch (error) {
         logger.error('保存轮播图失败:', error)
@@ -508,7 +630,7 @@ document.addEventListener('alpine:init', () => {
           buildURL(SYSTEM_ENDPOINTS.POPUP_BANNER_TOGGLE, { id: bannerId }),
           {
             method: 'POST',
-            body: JSON.stringify({ is_active: newStatus })
+            data: { is_active: newStatus }
           }
         )
         if (response?.success) {
@@ -681,8 +803,8 @@ document.addEventListener('alpine:init', () => {
       try {
         const formData = new FormData()
         formData.append('image', file)
-        formData.append('filename', file.name)
-        formData.append('type', 'general')
+        formData.append('business_type', 'uploads')  // 必填参数：业务类型
+        formData.append('category', 'general')       // 可选参数：资源分类
 
         const response = await fetch(SYSTEM_ENDPOINTS.IMAGE_UPLOAD, {
           method: 'POST',

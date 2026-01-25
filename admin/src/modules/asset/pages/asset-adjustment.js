@@ -163,6 +163,65 @@ function assetAdjustmentPage() {
      */
     selectedRecord: null,
 
+    // ==================== 统计数据（HTML模板需要） ====================
+
+    /**
+     * 统计数据对象
+     * @type {Object}
+     */
+    stats: {
+      totalAdjustments: 0,
+      totalIncrease: 0,
+      totalDecrease: 0,
+      pendingApprovals: 0
+    },
+
+    /**
+     * 调账记录列表（HTML模板别名）
+     * @type {Array}
+     */
+    records: [],
+
+    /**
+     * 总记录数
+     * @type {number}
+     */
+    totalRecords: 0,
+
+    /**
+     * 材料类型列表（HTML模板别名）
+     * @type {Array}
+     */
+    materialTypes: [],
+
+    // ==================== 分页控制 ====================
+
+    /**
+     * 当前页码
+     * @type {number}
+     */
+    currentPage: 1,
+
+    /**
+     * 每页大小
+     * @type {number}
+     */
+    pageSize: 20,
+
+    /**
+     * 分页信息
+     * @type {Object|null}
+     */
+    pagination: null,
+
+    // ==================== 模态框控制 ====================
+
+    /**
+     * 打开的模态框集合
+     * @type {Set}
+     */
+    openModals: new Set(),
+
     // ==================== 调整表单 ====================
 
     /**
@@ -171,8 +230,10 @@ function assetAdjustmentPage() {
      */
     form: {
       user_id: '',
+      user_info: '',
       asset_type: '',
       material_code: '',
+      campaign_id: '',  // 🔴 新增：预算积分需要关联活动ID
       direction: 'increase',
       amount: '',
       reason_type: 'error_correction',
@@ -208,6 +269,9 @@ function assetAdjustmentPage() {
     async init() {
       logger.info('初始化资产调整页面 (Mixin版)...')
 
+      // 初始化openModals为Set
+      this.openModals = new Set()
+
       // 调用 Mixin 的初始化
       if (baseMixin.init) {
         baseMixin.init.call(this)
@@ -221,6 +285,11 @@ function assetAdjustmentPage() {
 
       // 加载活动列表
       await this.loadCampaigns()
+
+      // 注意：不自动加载调账记录，因为需要先选择用户
+      // 调账记录在用户搜索成功后加载
+
+      logger.info('资产调整页面初始化完成')
     },
 
     /**
@@ -270,8 +339,27 @@ function assetAdjustmentPage() {
         if (response.ok) {
           const result = await response.json()
           if (result.success) {
-            this.assetTypes = result.data?.asset_types || result.data || []
-            logger.info(`📊 加载资产类型: ${this.assetTypes.length} 个`)
+            const rawAssetTypes = result.data?.asset_types || result.data || []
+
+            // 去重处理：基于 asset_code 去重，保留第一个
+            const seenCodes = new Set()
+            this.assetTypes = rawAssetTypes.filter(t => {
+              if (seenCodes.has(t.asset_code)) {
+                return false
+              }
+              seenCodes.add(t.asset_code)
+              return true
+            })
+
+            // 同步材料类型到materialTypes（HTML模板需要）
+            this.materialTypes = this.assetTypes
+              .filter(t => t.category === 'material')
+              .map(t => ({
+                code: t.asset_code,
+                name: t.display_name || t.name
+              }))
+
+            logger.info(`📊 加载资产类型: ${this.assetTypes.length} 个 (去重前${rawAssetTypes.length}个), 材料类型: ${this.materialTypes.length} 个`)
           }
         }
       } catch (error) {
@@ -288,8 +376,9 @@ function assetAdjustmentPage() {
     async loadCampaigns() {
       try {
         const token = localStorage.getItem('admin_token')
+        // 修正API路径: /admin/ -> /console/
         const response = await fetch(
-          `${API_BASE_URL}/admin/campaign-budget/batch-status?limit=50`,
+          `${API_BASE_URL}/console/campaign-budget/batch-status?limit=50`,
           {
             headers: { Authorization: `Bearer ${token}` }
           }
@@ -307,6 +396,98 @@ function assetAdjustmentPage() {
       }
     },
 
+    /**
+     * 加载调账记录（HTML模板调用）
+     * @async
+     * @returns {Promise<void>}
+     */
+    async loadRecords() {
+      console.log('🔄 [loadRecords] 刷新按钮被点击，开始加载记录...')
+      
+      // 如果没有用户ID，直接返回空记录（API要求user_id必填）
+      if (!this.currentUser?.user_id && !this.form?.user_id) {
+        logger.info('未选择用户，跳过加载调账记录')
+        this.records = []
+        this.transactions = []
+        this.totalRecords = 0
+        this.updateStats()
+        return
+      }
+
+      this.loadingRecords = true
+
+      try {
+        const token = localStorage.getItem('admin_token')
+        const userId = this.currentUser?.user_id || this.form?.user_id
+        
+        const params = new URLSearchParams({
+          user_id: userId,
+          page: this.currentPage,
+          page_size: this.pageSize
+        })
+
+        if (this.filters.status) {
+          params.append('status', this.filters.status)
+        }
+
+        const response = await fetch(`${API_BASE_URL}/console/assets/transactions?${params}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          if (result.success) {
+            this.records = result.data?.transactions || result.data?.records || []
+            this.transactions = this.records
+            this.pagination = result.data?.pagination || null
+            this.totalRecords = result.data?.pagination?.total || this.records.length
+
+            // 更新统计数据
+            this.updateStats()
+
+            logger.info(`📊 加载调账记录: ${this.records.length} 条`)
+            
+            // 显示刷新成功提示
+            console.log(`✅ [loadRecords] 刷新完成，共 ${this.totalRecords} 条记录`)
+            this.showSuccess(`已刷新，共 ${this.totalRecords} 条记录`)
+          }
+        }
+      } catch (error) {
+        logger.error('加载调账记录失败:', error)
+        this.records = []
+        this.totalRecords = 0
+      } finally {
+        this.loadingRecords = false
+      }
+    },
+
+    /**
+     * 更新统计数据
+     * @description 根据当前记录计算统计信息
+     */
+    updateStats() {
+      this.stats.totalAdjustments = this.totalRecords
+
+      // 计算增加/减少总额
+      // API返回的amount字段：正数表示增加，负数表示减少
+      let totalIncrease = 0
+      let totalDecrease = 0
+
+      this.records.forEach(record => {
+        const amount = Number(record.amount) || 0
+        if (amount > 0) {
+          totalIncrease += amount
+        } else if (amount < 0) {
+          totalDecrease += Math.abs(amount)
+        }
+      })
+
+      this.stats.totalIncrease = totalIncrease
+      this.stats.totalDecrease = totalDecrease
+      // 新架构中没有待审批状态，直接完成
+      this.stats.pendingApprovals = 0
+    },
+
     // ==================== 用户搜索 ====================
 
     /**
@@ -316,18 +497,25 @@ function assetAdjustmentPage() {
      * @returns {Promise<void>}
      */
     async handleSearch() {
+      logger.info('🔍 handleSearch() 被调用')
+      logger.info('searchUserId:', this.searchUserId, 'searchMobile:', this.searchMobile)
+      
       if (!this.searchUserId && !this.searchMobile) {
+        logger.warn('未输入用户ID或手机号')
         this.showError('请输入用户ID或手机号')
         return
       }
 
       this.searching = true
+      logger.info('开始搜索用户...')
 
       try {
         let targetUserId = this.searchUserId
+        logger.info('targetUserId (初始):', targetUserId)
 
         // 如果只有手机号，先查询用户ID
         if (!targetUserId && this.searchMobile) {
+          logger.info('通过手机号搜索用户:', this.searchMobile)
           const token = localStorage.getItem('admin_token')
           const userResponse = await fetch(
             `${API_BASE_URL}/admin/users?search=${this.searchMobile}`,
@@ -348,17 +536,21 @@ function assetAdjustmentPage() {
         }
 
         if (!targetUserId) {
+          logger.warn('无效的用户ID')
           this.showError('请输入有效的用户ID或手机号')
           return
         }
 
+        logger.info('准备加载用户资产, targetUserId:', targetUserId)
         // 加载用户资产
         await this.loadUserAssets(targetUserId)
+        logger.info('✅ 加载用户资产完成')
       } catch (error) {
         logger.error('搜索用户失败:', error)
         this.showError('搜索失败: ' + error.message)
       } finally {
         this.searching = false
+        logger.info('搜索完成, searching:', this.searching)
       }
     },
 
@@ -370,35 +562,51 @@ function assetAdjustmentPage() {
      * @returns {Promise<void>}
      */
     async loadUserAssets(userId) {
+      logger.info('📊 loadUserAssets() 被调用, userId:', userId)
       this.loading = true
 
       try {
         const token = localStorage.getItem('admin_token')
-        const response = await fetch(
-          `${API_BASE_URL}/console/asset-adjustment/user/${userId}/balances`,
-          {
-            headers: { Authorization: `Bearer ${token}` }
-          }
-        )
+        logger.info('Token存在:', !!token, token ? token.substring(0, 20) + '...' : 'null')
+        
+        const url = `${API_BASE_URL}/console/asset-adjustment/user/${userId}/balances`
+        logger.info('请求URL:', url)
+        
+        const response = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
 
-        if (!response.ok) throw new Error('加载用户资产失败')
+        logger.info('响应状态:', response.status)
+        
+        if (!response.ok) {
+          const errorText = await response.text()
+          logger.error('响应错误:', errorText)
+          throw new Error(`加载用户资产失败: ${response.status}`)
+        }
 
         const result = await response.json()
+        logger.info('响应数据:', result)
 
         if (result.success) {
           this.currentUser = result.data.user
           this.balances = result.data.balances || []
+          
+          // 🔴 关键：设置 form.user_id，提交时需要用到
+          this.form.user_id = String(this.currentUser?.user_id || userId)
+          
+          // 同步到 form 以便在HTML模板中显示用户信息
+          this.form.user_info = `✅ 已加载用户: ${this.currentUser?.nickname || '未知'} (ID: ${this.form.user_id})`
 
-          logger.info(`加载用户资产完成: ${this.balances.length} 种`)
+          logger.info(`✅ 加载用户资产完成: ${this.balances.length} 种, form.user_id=${this.form.user_id}`)
 
           // 加载调整记录
           this.currentPage = 1
-          await this.loadAdjustmentRecords()
+          await this.loadRecords()
         } else {
           this.showError(result.message || '查询失败')
         }
       } catch (error) {
-        logger.error('加载用户资产失败:', error)
+        logger.error('❌ 加载用户资产失败:', error)
         this.showError(error.message)
       } finally {
         this.loading = false
@@ -693,7 +901,16 @@ function assetAdjustmentPage() {
      * @returns {void}
      */
     showSuccess(message) {
-      this.$toast.success(message)
+      logger.info('✅ showSuccess:', message)
+      // 使用 Alpine.store('notification') 显示Toast
+      if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
+        Alpine.store('notification').success(message)
+      } else if (this.$toast?.success) {
+        this.$toast.success(message)
+      } else {
+        // 降级为alert
+        alert('✅ ' + message)
+      }
     },
 
     /**
@@ -702,7 +919,16 @@ function assetAdjustmentPage() {
      * @returns {void}
      */
     showError(message) {
-      this.$toast.error(message)
+      logger.error('❌ showError:', message)
+      // 使用 Alpine.store('notification') 显示Toast
+      if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
+        Alpine.store('notification').error(message)
+      } else if (this.$toast?.error) {
+        this.$toast.error(message)
+      } else {
+        // 降级为alert
+        alert('❌ ' + message)
+      }
     },
 
     /**
@@ -730,7 +956,303 @@ function assetAdjustmentPage() {
      * @returns {Promise<void>}
      */
     async searchUser() {
-      await this.handleSearch()
+      logger.info('🔍 searchUser() 被调用')
+      logger.info('form.user_id:', this.form.user_id)
+      
+      // 🔴 修复：同步 form.user_id 到 searchUserId
+      // 如果输入框为空，清空搜索状态
+      const inputUserId = (this.form.user_id || '').trim()
+      
+      if (!inputUserId) {
+        // 清空搜索状态和当前用户
+        this.searchUserId = ''
+        this.currentUser = null
+        this.balances = []
+        this.records = []
+        this.totalRecords = 0
+        this.form.user_info = ''
+        this.updateStats()
+        this.showError('请输入用户ID')
+        logger.info('输入为空，已清空搜索状态')
+        return
+      }
+      
+      // 设置搜索ID
+      this.searchUserId = inputUserId
+      logger.info('设置 searchUserId:', this.searchUserId)
+      
+      try {
+        await this.handleSearch()
+      } catch (error) {
+        logger.error('searchUser 错误:', error)
+        this.showError('搜索失败: ' + error.message)
+      }
+    },
+
+    // ==================== 模态框控制 ====================
+
+    /**
+     * 检查模态框是否打开
+     * @param {string} modalId - 模态框ID
+     * @returns {boolean}
+     */
+    isModalOpen(modalId) {
+      return this.openModals.has(modalId)
+    },
+
+    /**
+     * 显示模态框
+     * @param {string} modalId - 模态框ID
+     */
+    showModal(modalId) {
+      this.openModals.add(modalId)
+    },
+
+    /**
+     * 隐藏模态框
+     * @param {string} modalId - 模态框ID
+     */
+    hideModal(modalId) {
+      this.openModals.delete(modalId)
+    },
+
+    // ==================== 分页控制 ====================
+
+    /**
+     * 是否有上一页
+     * @returns {boolean}
+     */
+    get hasPrevPage() {
+      return this.currentPage > 1
+    },
+
+    /**
+     * 是否有下一页
+     * @returns {boolean}
+     */
+    get hasNextPage() {
+      if (!this.pagination) return false
+      return this.currentPage < (this.pagination.total_pages || 1)
+    },
+
+    /**
+     * 分页信息文本
+     * @returns {string}
+     */
+    get paginationInfo() {
+      if (!this.pagination) {
+        return `第 ${this.currentPage} 页`
+      }
+      return `第 ${this.currentPage}/${this.pagination.total_pages || 1} 页`
+    },
+
+    /**
+     * 上一页
+     */
+    prevPage() {
+      if (this.hasPrevPage) {
+        this.currentPage--
+        this.loadRecords()
+      }
+    },
+
+    /**
+     * 下一页
+     */
+    nextPage() {
+      if (this.hasNextPage) {
+        this.currentPage++
+        this.loadRecords()
+      }
+    },
+
+    // ==================== 资产类型辅助方法 ====================
+
+    /**
+     * 获取资产类型文本（HTML模板需要）
+     * @param {string} assetType - 资产类型代码
+     * @returns {string} 资产类型的中文名称
+     */
+    getAssetTypeText(assetType) {
+      if (!assetType) return '-'
+
+      // 内置类型映射
+      const typeMap = {
+        points: '积分',
+        POINTS: '积分',
+        balance: '余额',
+        BALANCE: '余额',
+        material: '材料',
+        MATERIAL: '材料',
+        DIAMOND: '钻石',
+        BUDGET_POINTS: '预算积分'
+      }
+
+      if (typeMap[assetType]) {
+        return typeMap[assetType]
+      }
+
+      // 从资产类型列表中查找
+      const found = this.assetTypes.find(t => t.asset_code === assetType)
+      if (found) {
+        return found.display_name || found.name || assetType
+      }
+
+      return assetType
+    },
+
+    // ==================== 记录操作方法 ====================
+
+    /**
+     * 查看记录详情
+     * @param {Object} record - 记录对象
+     */
+    viewRecord(record) {
+      this.selectedRecord = record
+    },
+
+    /**
+     * 审批记录
+     * @async
+     * @param {Object} record - 记录对象
+     */
+    async approveRecord(record) {
+      if (!confirm(`确定要审批通过调账记录 ${record.adjustment_id} 吗？`)) {
+        return
+      }
+
+      try {
+        const token = localStorage.getItem('admin_token')
+        const response = await fetch(`${API_BASE_URL}/console/asset-adjustment/approve/${record.adjustment_id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'approved' })
+        })
+
+        const result = await response.json()
+        if (result.success) {
+          this.showSuccess('审批成功')
+          await this.loadRecords()
+        } else {
+          this.showError(result.message || '审批失败')
+        }
+      } catch (error) {
+        logger.error('审批失败:', error)
+        this.showError(error.message)
+      }
+    },
+
+    // ==================== 提交调账 ====================
+
+    /**
+     * 提交调账（HTML表单使用）
+     * @async
+     */
+    async submitAdjustment() {
+      // 🔴 收集所有验证错误，一次性提示用户
+      const errors = []
+      
+      if (!this.form.user_id) {
+        errors.push('• 用户ID（必填）')
+      }
+      if (!this.form.asset_type) {
+        errors.push('• 资产类型（必填）')
+      }
+      // 预算积分必须选择活动
+      if (this.form.asset_type === 'BUDGET_POINTS' && !this.form.campaign_id) {
+        errors.push('• 关联活动（预算积分必填）')
+      }
+      // 材料类型必须选择具体材料
+      if (this.form.asset_type === 'material' && !this.form.material_code) {
+        errors.push('• 材料类型（必填）')
+      }
+      if (!this.form.amount || this.form.amount <= 0) {
+        errors.push('• 调账数量（必须大于0）')
+      }
+      if (!this.form.reason) {
+        errors.push('• 调账原因（必填）')
+      }
+
+      // 如果有验证错误，弹窗提示用户
+      if (errors.length > 0) {
+        const errorMessage = '请填写以下必填项：\n\n' + errors.join('\n')
+        alert(errorMessage)
+        return
+      }
+
+      this.submitting = true
+
+      try {
+        const token = localStorage.getItem('admin_token')
+        const amount = this.form.direction === 'decrease'
+          ? -Math.abs(this.form.amount)
+          : Math.abs(this.form.amount)
+
+        // 构建资产代码（资产类型已经是正确的格式如 POINTS, DIAMOND, BUDGET_POINTS）
+        let assetCode = this.form.asset_type
+        // 如果是材料类型，使用具体的材料代码
+        if (this.form.asset_type === 'material' && this.form.material_code) {
+          assetCode = this.form.material_code
+        }
+        
+        logger.info('提交调账:', { user_id: this.form.user_id, assetCode, amount, campaign_id: this.form.campaign_id })
+
+        const data = {
+          user_id: parseInt(this.form.user_id),
+          asset_code: assetCode,
+          amount: amount,
+          reason: `[${this.form.reason_type}] ${this.form.reason}`,
+          idempotency_key: `admin_adjust_${this.userInfo?.user_id || 0}_${this.form.user_id}_${assetCode}_${Date.now()}`
+        }
+
+        // 🔴 新增：预算积分需要添加 campaign_id
+        if (this.form.asset_type === 'BUDGET_POINTS' && this.form.campaign_id) {
+          data.campaign_id = parseInt(this.form.campaign_id)
+        }
+
+        const response = await fetch(`${API_BASE_URL}/console/asset-adjustment/adjust`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(data)
+        })
+
+        const result = await response.json()
+
+        if (result.success) {
+          this.showSuccess('调账成功')
+          // 保存当前用户信息
+          const currentUserId = this.form.user_id
+          const currentUserInfo = this.form.user_info
+          // 重置表单（保留用户信息以便连续调账）
+          this.form = {
+            user_id: currentUserId,
+            user_info: currentUserInfo,
+            asset_type: '',
+            material_code: '',
+            campaign_id: '',  // 🔴 重置活动ID
+            direction: 'increase',
+            amount: '',
+            reason_type: 'error_correction',
+            reason: ''
+          }
+          // 刷新用户资产和记录
+          await this.loadUserAssets(currentUserId)
+          await this.loadRecords()
+        } else {
+          this.showError(result.message || '调账失败')
+        }
+      } catch (error) {
+        logger.error('调账失败:', error)
+        this.showError(error.message)
+      } finally {
+        this.submitting = false
+      }
     }
   }
 }

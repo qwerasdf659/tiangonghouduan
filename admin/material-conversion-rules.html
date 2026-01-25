@@ -100,8 +100,8 @@
                   </div>
                 </td>
                 <td class="px-4 py-3">
-                  <strong x-text="rule.input_quantity"></strong> : <strong x-text="rule.output_quantity"></strong>
-                  <br><small class="text-gray-500" x-text="'(' + getRatio(rule) + ')'"></small>
+                  <strong x-text="rule.from_amount"></strong> : <strong x-text="rule.to_amount"></strong>
+                  <br><small class="text-gray-500" x-text="'(比例: ' + getRatio(rule) + ')'"></small>
                 </td>
                 <td class="px-4 py-3 text-sm text-gray-600" x-text="formatDate(rule.effective_at)"></td>
                 <td class="px-4 py-3">
@@ -124,13 +124,14 @@
                   </span>
                 </td>
                 <td class="px-4 py-3 space-x-2">
-                  <button class="px-2 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600" @click="openEditModal(rule.rule_id)">
-                    编辑
+                  <button class="px-2 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600" @click="openViewModal(rule.rule_id)">
+                    查看
                   </button>
-                  <button class="px-2 py-1 rounded text-sm"
-                          :class="rule.is_enabled ? 'bg-yellow-500 text-white hover:bg-yellow-600' : 'bg-green-500 text-white hover:bg-green-600'"
-                          @click="toggleStatus(rule.rule_id, rule.is_enabled)">
-                    <span x-text="rule.is_enabled ? '禁用' : '启用'"></span>
+                  <!-- 只有启用的规则可以被禁用；禁用后不可重新启用，需创建新规则 -->
+                  <button x-show="rule.is_enabled"
+                          class="px-2 py-1 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600"
+                          @click="disableRule(rule.rule_id)">
+                    禁用
                   </button>
                 </td>
               </tr>
@@ -176,13 +177,13 @@
               <small class="text-gray-500 text-xs">用户获得的资产</small>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">输入数量 <span class="text-red-500">*</span></label>
-              <input type="number" class="w-full px-3 py-2 border rounded-lg" x-model="addForm.input_quantity" required min="1" placeholder="如: 10">
+              <label class="block text-sm font-medium text-gray-700 mb-1">源资产数量 <span class="text-red-500">*</span></label>
+              <input type="number" class="w-full px-3 py-2 border rounded-lg" x-model="addForm.from_amount" required min="1" placeholder="如: 10">
               <small class="text-gray-500 text-xs">每次转换所需的源资产数量</small>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">输出数量 <span class="text-red-500">*</span></label>
-              <input type="number" class="w-full px-3 py-2 border rounded-lg" x-model="addForm.output_quantity" required min="1" placeholder="如: 1">
+              <label class="block text-sm font-medium text-gray-700 mb-1">目标资产数量 <span class="text-red-500">*</span></label>
+              <input type="number" class="w-full px-3 py-2 border rounded-lg" x-model="addForm.to_amount" required min="1" placeholder="如: 1">
               <small class="text-gray-500 text-xs">每次转换获得的目标资产数量</small>
             </div>
             <div>
@@ -216,7 +217,7 @@
     </div>
   </div>
 
-  <!-- 编辑转换规则模态框 -->
+  <!-- 查看转换规则详情模态框（后端设计：不支持编辑，修改比例需创建新规则） -->
   <div x-ref="editModal"
        x-show="isModalShown('editModal')"
        x-cloak
@@ -224,52 +225,42 @@
        @click.self="hideModal('editModal')">
     <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
       <div class="p-4 border-b flex justify-between items-center">
-        <h5 class="font-semibold">✏️ 编辑转换规则</h5>
+        <h5 class="font-semibold">📋 规则详情</h5>
         <button @click="hideModal('editModal')" class="text-gray-400 hover:text-gray-600">✕</button>
       </div>
       <div class="p-4">
-        <form @submit.prevent="submitEdit()">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="md:col-span-2">
-              <label class="block text-sm font-medium text-gray-700 mb-1">转换方向</label>
-              <input type="text" class="w-full px-3 py-2 border rounded-lg bg-gray-50" x-model="editForm.direction" disabled>
-              <small class="text-gray-500 text-xs">转换方向不可修改</small>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">输入数量 <span class="text-red-500">*</span></label>
-              <input type="number" class="w-full px-3 py-2 border rounded-lg" x-model="editForm.input_quantity" required min="1">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">输出数量 <span class="text-red-500">*</span></label>
-              <input type="number" class="w-full px-3 py-2 border rounded-lg" x-model="editForm.output_quantity" required min="1">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">生效时间 <span class="text-red-500">*</span></label>
-              <input type="datetime-local" class="w-full px-3 py-2 border rounded-lg" x-model="editForm.effective_at" required>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">启用状态</label>
-              <select class="w-full px-3 py-2 border rounded-lg" x-model="editForm.is_enabled">
-                <option value="1">启用</option>
-                <option value="0">禁用</option>
-              </select>
-            </div>
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+          <p class="text-sm text-blue-800">
+            ℹ️ <strong>设计说明：</strong>转换规则采用版本化管理，修改比例需新增规则（禁止覆盖历史）。
+            如需修改转换比例，请创建新规则并禁用旧规则。
+          </p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">转换方向</label>
+            <input type="text" class="w-full px-3 py-2 border rounded-lg bg-gray-100" x-model="editForm.direction" disabled>
           </div>
-          <!-- 风控提示区域 -->
-          <template x-for="warning in editValidationWarnings" :key="warning.type">
-            <div class="validation-warning">
-              <strong class="text-yellow-700" x-text="'⚠️ ' + warning.title + '：'"></strong>
-              <span class="text-yellow-800" x-text="warning.message"></span>
-            </div>
-          </template>
-        </form>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">源资产数量</label>
+            <input type="number" class="w-full px-3 py-2 border rounded-lg bg-gray-100" x-model="editForm.from_amount" disabled>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">目标资产数量</label>
+            <input type="number" class="w-full px-3 py-2 border rounded-lg bg-gray-100" x-model="editForm.to_amount" disabled>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">生效时间</label>
+            <input type="datetime-local" class="w-full px-3 py-2 border rounded-lg bg-gray-100" x-model="editForm.effective_at" disabled>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">启用状态</label>
+            <input type="text" class="w-full px-3 py-2 border rounded-lg bg-gray-100" 
+                   :value="editForm.is_enabled === '1' ? '已启用' : '已禁用'" disabled>
+          </div>
+        </div>
       </div>
-      <div class="p-4 border-t flex justify-end space-x-3">
-        <button @click="hideModal('editModal')" class="px-4 py-2 border rounded hover:bg-gray-50">取消</button>
-        <button @click="submitEdit()" :disabled="submitting" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-teal-700 disabled:opacity-50">
-          <span x-show="submitting" class="mr-1">⏳</span>
-          保存更新
-        </button>
+      <div class="p-4 border-t flex justify-end">
+        <button @click="hideModal('editModal')" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">关闭</button>
       </div>
     </div>
   </div>

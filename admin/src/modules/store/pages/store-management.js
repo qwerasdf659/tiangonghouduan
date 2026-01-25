@@ -139,16 +139,16 @@ function registerStoreManagementComponents() {
      * @type {Object}
      */
     storeForm: {
-      name: '',
+      store_name: '',
       contact_mobile: '',
       province_code: '',
       city_code: '',
       district_code: '',
       street_code: '',
-      address: '',
+      store_address: '',
       contact_name: '',
       status: 'active',
-      description: ''
+      notes: ''
     },
     /** @type {number|null} 正在编辑的门店ID */
     editingStoreId: null,
@@ -326,22 +326,11 @@ function registerStoreManagementComponents() {
      * @returns {Promise<void>}
      */
     async loadStoreRanking() {
-      try {
-        const response = await this.apiGet(
-          STORE_ENDPOINTS.LIST + '/ranking',
-          {},
-          { showLoading: false, showError: false }
-        )
-        if (response?.success) {
-          const rankingData = response.data?.ranking || response.data
-          this.storeRanking = Array.isArray(rankingData) ? rankingData : []
-        }
-      } catch (error) {
-        // 使用门店列表并排序
-        this.storeRanking = [...this.stores]
-          .sort((a, b) => (b.revenue || 0) - (a.revenue || 0))
-          .slice(0, 10)
-      }
+      // 直接使用已加载的门店列表按业绩排序（避免调用不存在的 API）
+      // 后端暂未提供 /ranking 接口，使用前端排序作为替代方案
+      this.storeRanking = [...this.stores]
+        .sort((a, b) => (b.revenue || 0) - (a.revenue || 0))
+        .slice(0, 10)
     },
 
     /**
@@ -353,16 +342,16 @@ function registerStoreManagementComponents() {
       this.editingStoreId = null
       this.isEditMode = false
       this.storeForm = {
-        name: '',
+        store_name: '',
         contact_mobile: '',
         province_code: '',
         city_code: '',
         district_code: '',
         street_code: '',
-        address: '',
+        store_address: '',
         contact_name: '',
         status: 'active',
-        description: ''
+        notes: ''
       }
       // 清空省市区联动数据
       this.cities = []
@@ -388,16 +377,16 @@ function registerStoreManagementComponents() {
       this.editingStoreId = store.store_id || store.id
       this.isEditMode = true
       this.storeForm = {
-        name: store.name || store.store_name || '',
-        contact_mobile: store.contact_mobile || store.phone || '',
+        store_name: store.store_name || '',
+        contact_mobile: store.contact_mobile || '',
         province_code: store.province_code || '',
         city_code: store.city_code || '',
         district_code: store.district_code || '',
         street_code: store.street_code || '',
-        address: store.address || store.store_address || '',
+        store_address: store.store_address || '',
         contact_name: store.contact_name || '',
         status: store.status || 'active',
-        description: store.description || store.notes || ''
+        notes: store.notes || ''
       }
 
       // 加载省市区联动数据
@@ -671,18 +660,19 @@ function registerStoreManagementComponents() {
     },
 
     /**
-     * 获取地区名称
+     * 获取地区名称（使用后端字段 region_code/region_name）
      */
     getRegionName(code, list) {
       if (!code || !list || list.length === 0) return ''
-      const region = list.find(r => r.code === code || r.region_code === code)
-      return region?.name || region?.region_name || ''
+      const region = list.find(r => r.region_code === code)
+      return region?.region_name || ''
     },
 
     /**
-     * 获取完整地址显示
+     * 获取完整地址显示（用于门店详情/列表）
      */
     getFullAddress(store) {
+      if (!store) return '-'
       const parts = []
       if (store.province_name) parts.push(store.province_name)
       if (store.city_name) parts.push(store.city_name)
@@ -690,6 +680,26 @@ function registerStoreManagementComponents() {
       if (store.street_name) parts.push(store.street_name)
       if (store.store_address || store.address) parts.push(store.store_address || store.address)
       return parts.join(' ') || store.address || '-'
+    },
+
+    /**
+     * 获取表单中的完整地址预览（用于门店表单）
+     */
+    getFormFullAddress() {
+      const parts = []
+      // 从当前选中的省市区街道获取名称
+      const provinceName = this.getRegionName(this.storeForm.province_code, this.provinces)
+      const cityName = this.getRegionName(this.storeForm.city_code, this.cities)
+      const districtName = this.getRegionName(this.storeForm.district_code, this.districts)
+      const streetName = this.getRegionName(this.storeForm.street_code, this.streets)
+      
+      if (provinceName) parts.push(provinceName)
+      if (cityName) parts.push(cityName)
+      if (districtName) parts.push(districtName)
+      if (streetName) parts.push(streetName)
+      if (this.storeForm.store_address) parts.push(this.storeForm.store_address)
+      
+      return parts.join(' ') || '-'
     },
 
     // ==================== 员工管理方法 ====================
@@ -763,14 +773,14 @@ function registerStoreManagementComponents() {
      * @returns {void}
      */
     editStaff(staff) {
-      this.editingStaffId = staff.staff_id || staff.id
+      this.editingStaffId = staff.store_staff_id || staff.id
       this.isEditMode = true
       this.staffForm = {
-        name: staff.name || '',
-        phone: staff.phone || '',
-        role: staff.role || 'waiter',
+        name: staff.user_nickname || '',
+        phone: staff.user_mobile || '',
+        role: staff.role_in_store || 'staff',
         store_id: staff.store_id || '',
-        hire_date: this.formatDateTimeLocal(staff.hire_date)
+        hire_date: this.formatDateTimeLocal(staff.joined_at)
       }
       this.showModal('staffModal')
     },
@@ -785,11 +795,12 @@ function registerStoreManagementComponents() {
      * @returns {Promise<void>}
      */
     async deleteStaff(staff) {
+      const staffName = staff.user_nickname || staff.name || '该员工'
       await this.confirmAndExecute(
-        `确认删除员工「${staff.name}」？`,
+        `确认删除员工「${staffName}」？`,
         async () => {
           const response = await this.apiCall(
-            buildURL(STORE_ENDPOINTS.STAFF_DETAIL, { store_staff_id: staff.staff_id }),
+            buildURL(STORE_ENDPOINTS.STAFF_DETAIL, { store_staff_id: staff.store_staff_id }),
             { method: 'DELETE' }
           )
           if (response?.success) this.loadStaff()
@@ -852,8 +863,8 @@ function registerStoreManagementComponents() {
      * @returns {string} 角色显示文本
      */
     getStaffRoleText(role) {
-      const map = { manager: '店长', cashier: '收银员', waiter: '服务员', chef: '厨师' }
-      return map[role] || role
+      const map = { manager: '店长', staff: '员工', cashier: '收银员', waiter: '服务员', chef: '厨师' }
+      return map[role] || role || '员工'
     },
 
     /**
@@ -874,9 +885,16 @@ function registerStoreManagementComponents() {
      * @param {string} dateStr - ISO日期字符串
      * @returns {string} YYYY-MM-DD格式的日期字符串
      */
-    formatDateTimeLocal(dateStr) {
-      if (!dateStr) return ''
+    formatDateTimeLocal(dateValue) {
+      if (!dateValue) return ''
       try {
+        // 处理后端返回的对象格式 { iso, beijing, timestamp, relative }
+        let dateStr = dateValue
+        if (typeof dateValue === 'object') {
+          dateStr = dateValue.iso || dateValue.beijing || dateValue.timestamp
+        }
+        if (!dateStr) return ''
+        
         const date = new Date(dateStr)
         if (isNaN(date.getTime())) return ''
         return date.toISOString().split('T')[0]
@@ -890,14 +908,21 @@ function registerStoreManagementComponents() {
      * @param {string} dateStr - ISO日期字符串
      * @returns {string} 本地化日期字符串
      */
-    formatDateSafe(dateStr) {
-      if (!dateStr) return '-'
+    formatDateSafe(dateValue) {
+      if (!dateValue) return '-'
       try {
+        // 处理后端返回的对象格式 { iso, beijing, timestamp, relative }
+        let dateStr = dateValue
+        if (typeof dateValue === 'object') {
+          dateStr = dateValue.beijing || dateValue.iso || dateValue.timestamp
+        }
+        if (!dateStr) return '-'
+        
         const date = new Date(dateStr)
-        if (isNaN(date.getTime())) return dateStr
+        if (isNaN(date.getTime())) return String(dateValue)
         return date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' })
       } catch {
-        return dateStr
+        return String(dateValue)
       }
     }
   }))

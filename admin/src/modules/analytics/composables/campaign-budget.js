@@ -83,6 +83,16 @@ export function useCampaignBudgetMethods() {
             rawBudgets = Object.values(rawBudgets)
           }
 
+          // 转换后端返回的嵌套结构为扁平结构（供前端使用）
+          rawBudgets = rawBudgets.map(budget => ({
+            ...budget,
+            // 扁平化 pool_budget 字段
+            pool_budget_remaining: budget.pool_budget?.remaining ?? budget.pool_budget_remaining ?? 0,
+            pool_budget_total: budget.pool_budget?.total ?? budget.pool_budget_total ?? 0,
+            pool_budget_used: budget.pool_budget?.used ?? 0,
+            usage_rate: budget.pool_budget?.usage_rate ?? '0%'
+          }))
+
           // 应用筛选
           this.budgets = rawBudgets.filter(budget => {
             // 状态筛选
@@ -102,8 +112,20 @@ export function useCampaignBudgetMethods() {
           this.total = this.budgets.length
           this.totalPages = Math.ceil(this.budgets.length / (this.pageSize || 20))
 
-          // 同时计算统计数据
-          this.calculateBudgetStats(rawBudgets)
+          // 使用后端返回的 summary 或从数据计算统计
+          if (response.data.summary) {
+            this.budgetStats = {
+              totalBudget: response.data.summary.total_budget || 0,
+              usedBudget: response.data.summary.total_used || 0,
+              remainingBudget: response.data.summary.total_remaining || 0,
+              utilizationRate: response.data.summary.total_budget > 0 
+                ? Math.round((response.data.summary.total_used / response.data.summary.total_budget) * 100) 
+                : 0
+            }
+          } else {
+            // 从数据计算统计
+            this.calculateBudgetStats(rawBudgets)
+          }
         }
       } catch (error) {
         logger.error('加载活动预算失败:', error)

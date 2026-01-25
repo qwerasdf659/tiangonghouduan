@@ -509,10 +509,11 @@ router.get('/', (req, res) => {
           '/system-data/market-listings/statistics/summary',
           '/system-data/lottery-campaigns',
           '/system-data/lottery-campaigns/:campaign_id',
+          '/system-data/lottery-campaigns/:campaign_id/status',
           '/system-data/lottery-daily-quotas',
           '/system-data/lottery-daily-quotas/:quota_id'
         ],
-        note: '系统级数据只读查询（accounts/user_roles/market_listings/lottery_campaigns/lottery_user_daily_draw_quota）；仅限 admin 访问'
+        note: '系统级数据管理（accounts/user_roles/market_listings/lottery_campaigns含CRUD/lottery_user_daily_draw_quota）；仅限 admin 访问'
       },
       feature_flags: {
         description: '功能开关管理（2026-01-21 Feature Flag 灰度发布）',

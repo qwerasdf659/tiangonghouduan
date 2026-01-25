@@ -69,21 +69,45 @@
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">用户ID</label>
               <div class="flex space-x-2">
-                <input type="text" x-model="form.user_id" class="flex-1 px-3 py-2 border rounded-lg" placeholder="输入用户ID">
-                <button @click="searchUser()" class="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">查找</button>
+                <input type="text" x-model="form.user_id" class="flex-1 px-3 py-2 border rounded-lg" placeholder="输入用户ID" @keyup.enter="searchUser()">
+                <button type="button" @click="searchUser()" :disabled="searching" class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                  <span x-show="!searching">🔍 查找</span>
+                  <span x-show="searching" class="flex items-center">
+                    <svg class="animate-spin -ml-1 mr-1 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    搜索中...
+                  </span>
+                </button>
               </div>
               <p x-show="form.user_info" class="mt-1 text-sm text-green-600" x-text="form.user_info"></p>
+              <p x-show="currentUser" class="mt-1 text-sm text-blue-600">
+                ✅ 已加载用户: <span x-text="currentUser?.nickname || currentUser?.user_id"></span>
+              </p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">资产类型</label>
               <select x-model="form.asset_type" class="w-full px-3 py-2 border rounded-lg">
                 <option value="">请选择</option>
-                <option value="points">积分</option>
-                <option value="balance">余额</option>
+                <option value="POINTS">积分</option>
+                <option value="DIAMOND">钻石</option>
+                <option value="BUDGET_POINTS">预算积分</option>
                 <option value="material">材料</option>
               </select>
             </div>
-            <div x-show="form.asset_type === 'material'">
+            <!-- 活动选择 (仅预算积分时显示) -->
+            <div x-show="form.asset_type === 'BUDGET_POINTS'" x-cloak>
+              <label class="block text-sm font-medium text-gray-700 mb-1">关联活动 <span class="text-red-500">*</span></label>
+              <select x-model="form.campaign_id" class="w-full px-3 py-2 border rounded-lg">
+                <option value="">请选择活动</option>
+                <template x-for="campaign in campaigns" :key="campaign.campaign_id">
+                  <option :value="campaign.campaign_id" x-text="campaign.name || campaign.campaign_name || ('活动#' + campaign.campaign_id)"></option>
+                </template>
+              </select>
+              <p x-show="campaigns.length === 0" class="mt-1 text-sm text-yellow-600">⚠️ 暂无可用活动，请先创建活动</p>
+            </div>
+            <div x-show="form.asset_type === 'material'" x-cloak>
               <label class="block text-sm font-medium text-gray-700 mb-1">材料类型</label>
               <select x-model="form.material_code" class="w-full px-3 py-2 border rounded-lg">
                 <option value="">请选择</option>
@@ -138,15 +162,26 @@
                 <option value="approved">已通过</option>
                 <option value="rejected">已拒绝</option>
               </select>
-              <button @click="loadRecords()" class="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600">刷新</button>
+              <button @click="loadRecords()" 
+                      :disabled="loadingRecords"
+                      class="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                <span x-show="!loadingRecords">刷新</span>
+                <span x-show="loadingRecords" class="flex items-center">
+                  <svg class="animate-spin -ml-1 mr-1 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  刷新中...
+                </span>
+              </button>
             </div>
           </div>
           <div class="overflow-x-auto max-h-[600px]">
             <table class="w-full">
               <thead class="bg-gray-50 sticky top-0">
                 <tr>
-                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">调账ID</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">交易ID</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作人</th>
                   <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">资产类型</th>
                   <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">变动</th>
                   <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
@@ -158,31 +193,24 @@
                 <template x-if="records.length === 0">
                   <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">暂无调账记录</td></tr>
                 </template>
-                <template x-for="record in records" :key="record.adjustment_id">
+                <template x-for="(record, index) in records" :key="record.transaction_id || index">
                   <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3 text-sm font-mono" x-text="record.adjustment_id"></td>
+                    <td class="px-4 py-3 text-sm font-mono" x-text="record.transaction_id || '-'"></td>
                     <td class="px-4 py-3 text-sm">
-                      <div x-text="record.user_nickname || record.user_id"></div>
-                      <div class="text-gray-400 text-xs" x-text="'ID: ' + record.user_id"></div>
+                      <div x-text="record.operator_name || currentUser?.nickname || '-'"></div>
+                      <div class="text-gray-400 text-xs" x-text="'ID: ' + (currentUser?.user_id || '-')"></div>
                     </td>
-                    <td class="px-4 py-3 text-sm" x-text="getAssetTypeText(record.asset_type)"></td>
-                    <td class="px-4 py-3 text-sm font-mono" :class="record.direction === 'increase' ? 'text-green-600' : 'text-red-600'">
-                      <span x-text="(record.direction === 'increase' ? '+' : '-') + formatNumber(record.amount)"></span>
+                    <td class="px-4 py-3 text-sm" x-text="record.asset_name || getAssetTypeText(record.asset_code)"></td>
+                    <td class="px-4 py-3 text-sm font-mono" :class="Number(record.amount) >= 0 ? 'text-green-600' : 'text-red-600'">
+                      <span x-text="(Number(record.amount) >= 0 ? '+' : '') + formatNumber(record.amount)"></span>
                     </td>
                     <td class="px-4 py-3">
-                      <span :class="{
-                        'bg-yellow-100 text-yellow-700': record.status === 'pending',
-                        'bg-green-100 text-green-700': record.status === 'approved',
-                        'bg-red-100 text-red-700': record.status === 'rejected'
-                      }" class="px-2 py-1 text-xs rounded" x-text="getStatusText(record.status)"></span>
+                      <span class="px-2 py-1 text-xs rounded bg-green-100 text-green-700">已完成</span>
                     </td>
                     <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(record.created_at)"></td>
                     <td class="px-4 py-3">
                       <div class="flex space-x-2">
                         <button @click="viewRecord(record)" class="text-blue-500 hover:text-blue-700 text-sm">详情</button>
-                        <template x-if="record.status === 'pending'">
-                          <button @click="approveRecord(record)" class="text-green-500 hover:text-green-700 text-sm">审批</button>
-                        </template>
                       </div>
                     </td>
                   </tr>
@@ -289,19 +317,21 @@
   <div x-show="selectedRecord" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="selectedRecord = null">
     <div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
       <div class="p-4 border-b">
-        <h5 class="font-semibold">调账详情</h5>
+        <h5 class="font-semibold">交易详情</h5>
       </div>
       <div class="p-4 space-y-3">
-        <div class="flex justify-between"><span class="text-gray-500">调账ID:</span><span class="font-mono" x-text="selectedRecord?.adjustment_id"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">用户:</span><span x-text="selectedRecord?.user_nickname || selectedRecord?.user_id"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">资产类型:</span><span x-text="getAssetTypeText(selectedRecord?.asset_type)"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">变动数量:</span><span class="font-mono" :class="selectedRecord?.direction === 'increase' ? 'text-green-600' : 'text-red-600'" x-text="(selectedRecord?.direction === 'increase' ? '+' : '-') + formatNumber(selectedRecord?.amount)"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">状态:</span><span x-text="getStatusText(selectedRecord?.status)"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">操作人:</span><span x-text="selectedRecord?.operator_name || selectedRecord?.operator_id"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">交易ID:</span><span class="font-mono" x-text="selectedRecord?.transaction_id"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">用户:</span><span x-text="currentUser?.nickname || currentUser?.user_id || '-'"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">资产类型:</span><span x-text="selectedRecord?.asset_name || getAssetTypeText(selectedRecord?.asset_code)"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">变动数量:</span><span class="font-mono" :class="Number(selectedRecord?.amount) >= 0 ? 'text-green-600' : 'text-red-600'" x-text="(Number(selectedRecord?.amount) >= 0 ? '+' : '') + formatNumber(selectedRecord?.amount)"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">变动前余额:</span><span class="font-mono" x-text="formatNumber(selectedRecord?.balance_before)"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">变动后余额:</span><span class="font-mono" x-text="formatNumber(selectedRecord?.balance_after)"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">业务类型:</span><span x-text="selectedRecord?.tx_type || '-'"></span></div>
+        <div class="flex justify-between"><span class="text-gray-500">操作人:</span><span x-text="selectedRecord?.operator_name || '-'"></span></div>
         <div class="flex justify-between"><span class="text-gray-500">创建时间:</span><span x-text="formatDate(selectedRecord?.created_at)"></span></div>
         <div>
-          <span class="text-gray-500">调账原因:</span>
-          <p class="mt-1 p-2 bg-gray-50 rounded text-sm" x-text="selectedRecord?.reason"></p>
+          <span class="text-gray-500">说明:</span>
+          <p class="mt-1 p-2 bg-gray-50 rounded text-sm" x-text="selectedRecord?.reason || selectedRecord?.description || '无'"></p>
         </div>
       </div>
       <div class="p-4 border-t flex justify-end">

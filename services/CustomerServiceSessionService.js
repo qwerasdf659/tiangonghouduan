@@ -692,7 +692,7 @@ class CustomerServiceSessionService {
     try {
       logger.info(`👁️ 管理员 ${admin_id} 标记会话 ${session_id} 为已读`)
 
-      // 验证会话权限
+      // 验证会话是否存在
       const session = await CustomerServiceSession.findOne({
         where: { session_id }
       })
@@ -701,8 +701,10 @@ class CustomerServiceSessionService {
         throw new Error('会话不存在')
       }
 
+      // 管理后台的管理员可以标记任何会话为已读（非破坏性操作）
+      // 仅记录日志，不做权限限制
       if (session.admin_id && session.admin_id !== admin_id) {
-        throw new Error('无权限操作此会话')
+        logger.info(`📝 管理员 ${admin_id} 正在查看其他管理员 ${session.admin_id} 的会话 ${session_id}`)
       }
 
       // 标记用户发送的未读消息为已读
@@ -765,9 +767,10 @@ class CustomerServiceSessionService {
       throw new Error('会话不存在')
     }
 
-    // 验证权限
+    // 管理后台的管理员可以转接任何会话
+    // 仅记录日志，不做权限限制
     if (session.admin_id && session.admin_id !== current_admin_id) {
-      throw new Error('无权限转接此会话')
+      logger.info(`📝 管理员 ${current_admin_id} 正在转接其他管理员 ${session.admin_id} 的会话 ${session_id}`)
     }
 
     // 获取客服信息
@@ -853,9 +856,10 @@ class CustomerServiceSessionService {
       throw new Error('会话不存在')
     }
 
-    // 验证权限
+    // 管理后台的管理员可以关闭任何会话
+    // 仅记录日志，不做权限限制
     if (session.admin_id && session.admin_id !== admin_id) {
-      throw new Error('无权限关闭此会话')
+      logger.info(`📝 管理员 ${admin_id} 正在关闭其他管理员 ${session.admin_id} 的会话 ${session_id}`)
     }
 
     // 更新会话状态

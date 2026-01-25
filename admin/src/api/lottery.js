@@ -245,6 +245,7 @@ export const LOTTERY_ENDPOINTS = {
   INTERVENTION_FORCE_WIN: '/api/v4/console/lottery-management/force-win',
 
   // 活动定价
+  PRICING_CONFIGS_ALL: '/api/v4/console/lottery-management/pricing-configs', // 批量获取所有定价配置
   PRICING_GET: '/api/v4/console/lottery-management/campaigns/:code/pricing',
   PRICING_VERSIONS: '/api/v4/console/lottery-management/campaigns/:code/pricing/versions',
   PRICING_CREATE: '/api/v4/console/lottery-management/campaigns/:code/pricing',
@@ -260,6 +261,7 @@ export const LOTTERY_ENDPOINTS = {
   CAMPAIGNS_CONFIGURE_CONDITIONS: '/api/v4/activities/:code/configure-conditions',
 
   // 抽奖监控（后端路由: /api/v4/console/lottery-monitoring）
+  MONITORING_STATS: '/api/v4/console/lottery-monitoring/stats',
   MONITORING_HOURLY_LIST: '/api/v4/console/lottery-monitoring/hourly-metrics',
   MONITORING_HOURLY_DETAIL: '/api/v4/console/lottery-monitoring/hourly-metrics/:id',
   MONITORING_HOURLY_SUMMARY: '/api/v4/console/lottery-monitoring/hourly-metrics/summary/:campaign_id',
@@ -273,14 +275,14 @@ export const LOTTERY_ENDPOINTS = {
   MONITORING_USER_QUOTAS_DETAIL: '/api/v4/console/lottery-monitoring/user-quotas/:user_id/:campaign_id',
   MONITORING_USER_QUOTAS_STATS: '/api/v4/console/lottery-monitoring/user-quotas/stats/:campaign_id',
 
-  // 业务记录
-  BUSINESS_RECORDS_LIST: '/api/v4/console/business-records',
-  BUSINESS_RECORDS_DETAIL: '/api/v4/console/business-records/:id',
-  BUSINESS_RECORDS_EXPORT: '/api/v4/console/business-records/export',
-  BUSINESS_RECORDS_REDEEM: '/api/v4/console/business-records/:id/redeem',
-  BUSINESS_RECORDS_CANCEL: '/api/v4/console/business-records/:id/cancel',
-  BUSINESS_RECORDS_BATCH_EXPIRE: '/api/v4/console/business-records/batch-expire',
+  // 核销订单 - 使用后端实际路径
   BUSINESS_RECORDS_REDEMPTION_ORDERS: '/api/v4/console/business-records/redemption-orders',
+  BUSINESS_RECORDS_REDEMPTION_STATISTICS: '/api/v4/console/business-records/redemption-orders/statistics',
+  BUSINESS_RECORDS_REDEMPTION_DETAIL: '/api/v4/console/business-records/redemption-orders/:order_id',
+  BUSINESS_RECORDS_REDEMPTION_REDEEM: '/api/v4/console/business-records/redemption-orders/:order_id/redeem',
+  BUSINESS_RECORDS_REDEMPTION_CANCEL: '/api/v4/console/business-records/redemption-orders/:order_id/cancel',
+  BUSINESS_RECORDS_BATCH_EXPIRE: '/api/v4/console/business-records/redemption-orders/batch-expire',
+  BUSINESS_RECORDS_EXPORT: '/api/v4/console/business-records/redemption-orders/export',
 
   // 活动预算（基于后端实际提供的端点）
   // 注意：后端没有提供 LIST、CREATE、DELETE、STATS、TOGGLE 端点
