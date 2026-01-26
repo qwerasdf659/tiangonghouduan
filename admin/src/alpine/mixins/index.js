@@ -43,6 +43,17 @@ import { tableSelectionMixin } from './table-selection.js'
 import { formValidationMixin } from './form-validation.js'
 import { authGuardMixin } from './auth-guard.js'
 
+// 导入统一的日期格式化函数（北京时间）
+import {
+  formatDate as formatDateUtil,
+  formatDateTime as formatDateTimeUtil,
+  formatDateOnly as formatDateOnlyUtil,
+  formatDateTimeShort as formatDateTimeShortUtil,
+  formatDateTimeLocal as formatDateTimeLocalUtil,
+  formatRelativeTime as formatRelativeTimeUtil,
+  formatNumber as formatNumberUtil
+} from '../../utils/index.js'
+
 /**
  * 创建页面 Mixin
  * 组合多个 Mixin 并与自定义属性合并
@@ -97,7 +108,71 @@ export function createPageMixin(mixinConfig = {}, customProps = {}) {
     authGuard = true // 默认启用认证守卫（管理后台页面通常需要）
   } = mixinConfig
 
-  const composed = {}
+  const composed = {
+    // ========== 统一日期格式化函数（北京时间 Asia/Shanghai）==========
+    /**
+     * 格式化日期为北京时间
+     * @param {string|Date|Object} dateValue - 日期值
+     * @returns {string} 北京时间字符串
+     */
+    formatDate(dateValue) {
+      return formatDateUtil(dateValue)
+    },
+
+    /**
+     * 格式化日期时间为北京时间（包含秒）
+     * @param {string|Date|Object} dateValue - 日期值
+     * @returns {string} 北京时间字符串
+     */
+    formatDateTime(dateValue) {
+      return formatDateTimeUtil(dateValue)
+    },
+
+    /**
+     * 格式化日期（仅日期部分）
+     * @param {string|Date|Object} dateValue - 日期值
+     * @returns {string} 日期字符串
+     */
+    formatDateOnly(dateValue) {
+      return formatDateOnlyUtil(dateValue)
+    },
+
+    /**
+     * 格式化日期时间（不含秒）
+     * @param {string|Date|Object} dateValue - 日期值
+     * @returns {string} 北京时间字符串（不含秒）
+     */
+    formatDateTimeShort(dateValue) {
+      return formatDateTimeShortUtil(dateValue)
+    },
+
+    /**
+     * 格式化日期为 datetime-local 输入框格式
+     * @param {string|Date} dateValue - 日期值
+     * @returns {string} datetime-local 格式字符串
+     */
+    formatDateTimeLocal(dateValue) {
+      return formatDateTimeLocalUtil(dateValue)
+    },
+
+    /**
+     * 格式化为相对时间（如：刚刚、5分钟前）
+     * @param {string|Date} dateValue - 日期值
+     * @returns {string} 相对时间描述
+     */
+    formatRelativeTime(dateValue) {
+      return formatRelativeTimeUtil(dateValue)
+    },
+
+    /**
+     * 格式化数字（千分位）
+     * @param {number} num - 数字
+     * @returns {string} 格式化后的数字
+     */
+    formatNumber(num) {
+      return formatNumberUtil(num)
+    }
+  }
 
   // 1. 异步数据（通常都需要）
   if (asyncData) {

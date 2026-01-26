@@ -77,8 +77,10 @@ router.get(
       // P1-9：通过 ServiceManager 获取服务
       const { ActivityService } = getServices(req)
 
-      // 通过 Service 层获取批量预算状态（符合路由层规范）
-      // 支持按活动状态筛选（status: active/draft/completed/paused）
+      /*
+       * 通过 Service 层获取批量预算状态（符合路由层规范）
+       * 支持按活动状态筛选（status: active/draft/completed/paused）
+       */
       const { campaigns: results, summary } = await ActivityService.getBatchBudgetStatus({
         campaign_ids: targetIds,
         status: status || '',

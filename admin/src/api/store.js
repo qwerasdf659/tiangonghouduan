@@ -125,7 +125,7 @@ export const STORE_ENDPOINTS = {
 
   // 地区管理
   REGION_PROVINCES: '/api/v4/console/regions/provinces',
-  REGION_CHILDREN: '/api/v4/console/regions/:parent_code/children',
+  REGION_CHILDREN: '/api/v4/console/regions/children/:parent_code',
   REGION_SEARCH: '/api/v4/console/regions/search',
   REGION_PATH: '/api/v4/console/regions/path/:region_code',
   REGION_STATS: '/api/v4/console/regions/stats',

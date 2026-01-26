@@ -58,24 +58,24 @@ class MaterialConversionRule extends Model {
       comment: '关联更新人（用于审计）'
     })
 
-    // 🔴 P1-1 新增：关联源材料类型（用于按 group_code 过滤规则）
+    // 关联源材料类型（用于材料存在性验证 + 终点货币检查 + 全局套利检测）
     MaterialConversionRule.belongsTo(models.MaterialAssetType, {
       foreignKey: 'from_asset_code',
       targetKey: 'asset_code',
       as: 'fromMaterial',
       onDelete: 'RESTRICT',
       onUpdate: 'CASCADE',
-      comment: '关联源材料类型（用于按 group_code 过滤规则）'
+      comment: '关联源材料类型（用于风控校验）'
     })
 
-    // 🔴 P1-1 新增：关联目标材料类型（用于按 group_code 过滤规则）
+    // 关联目标材料类型（用于材料存在性验证 + 全局套利检测）
     MaterialConversionRule.belongsTo(models.MaterialAssetType, {
       foreignKey: 'to_asset_code',
       targetKey: 'asset_code',
       as: 'toMaterial',
       onDelete: 'RESTRICT',
       onUpdate: 'CASCADE',
-      comment: '关联目标材料类型（用于按 group_code 过滤规则）'
+      comment: '关联目标材料类型（用于风控校验）'
     })
   }
 

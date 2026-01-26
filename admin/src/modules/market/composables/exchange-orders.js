@@ -60,9 +60,10 @@ export function useExchangeOrdersMethods() {
         })
 
         if (res.success) {
-          this.orders = res.data?.list || res.data || []
+          // 后端返回 { orders: [...], pagination: {...} }
+          this.orders = res.data?.orders || []
           this.orderPagination = {
-            totalPages: res.data?.pagination?.totalPages || 1,
+            totalPages: res.data?.pagination?.total_pages || 1,
             total: res.data?.pagination?.total || this.orders.length
           }
         }
@@ -75,24 +76,20 @@ export function useExchangeOrdersMethods() {
     },
 
     /**
-     * 加载订单统计信息
+     * 计算订单统计信息（从已加载的订单列表计算，后端暂无独立统计接口）
      */
     async loadOrderStats() {
+      // 从分页信息和订单列表计算统计
+      // 注意：这只统计当前已加载的数据
       try {
-        const res = await request({
-          url: MARKET_ENDPOINTS.EXCHANGE_ORDER_STATS,
-          method: 'GET'
-        })
-        if (res.success && res.data) {
-          this.orderStats = {
-            total: res.data.total || 0,
-            pending: res.data.pending || 0,
-            shipped: res.data.shipped || res.data.completed || 0,
-            cancelled: res.data.cancelled || 0
-          }
-        }
+        const total = this.orderPagination?.total || this.orders.length
+        const pending = this.orders.filter(o => o.status === 'pending').length
+        const shipped = this.orders.filter(o => o.status === 'shipped' || o.status === 'completed').length
+        const cancelled = this.orders.filter(o => o.status === 'cancelled').length
+        
+        this.orderStats = { total, pending, shipped, cancelled }
       } catch (e) {
-        logger.error('[ExchangeOrders] 加载订单统计失败:', e)
+        logger.error('[ExchangeOrders] 计算订单统计失败:', e)
       }
     },
 

@@ -156,7 +156,7 @@ function registerSystemSettingsComponents() {
               await this.loadAuditLogs()
               break
             case 'pricing-config':
-              await this.loadPricingConfigs()
+              await this.loadPointsConfigs()
               break
           }
         },

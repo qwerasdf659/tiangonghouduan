@@ -25,19 +25,20 @@ export function useExchangeItemsState() {
     /** @type {Object} 商品统计信息 */
     itemStats: { total: 0, active: 0, lowStock: 0, totalSold: 0 },
     /** @type {Object} 商品筛选条件 */
-    itemFilters: { status: '', cost_asset_code: '', sort_by: 'sort_order' },
+    itemFilters: { status: '', cost_asset_code: '', sort_by: 'sort_order', sort_order: 'ASC' },
     /** @type {number} 商品当前页码 */
     itemCurrentPage: 1,
     /** @type {number} 商品每页数量 */
     itemPageSize: 20,
     /** @type {Object} 商品分页信息 */
     itemPagination: { totalPages: 1, total: 0 },
-    /** @type {Object} 商品表单数据 */
+    /** @type {Object} 商品表单数据 - 字段名与后端模型一致 */
     itemForm: {
-      item_name: '',
-      item_description: '',
+      name: '',
+      description: '',
       cost_asset_code: '',
       cost_amount: 1,
+      cost_price: 0,
       stock: 0,
       sort_order: 100,
       status: 'active'
@@ -60,7 +61,8 @@ export function useExchangeItemsMethods() {
       try {
         const res = await request({ url: ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES, method: 'GET' })
         if (res.success) {
-          this.assetTypes = res.data?.list || res.data || []
+          // 后端返回 { asset_types: [...] }
+          this.assetTypes = res.data?.asset_types || []
         }
       } catch (e) {
         logger.error('[ExchangeItems] 加载资产类型失败:', e)
@@ -87,9 +89,11 @@ export function useExchangeItemsMethods() {
         })
 
         if (res.success) {
-          this.items = res.data?.list || res.data || []
+          // 后端返回数据结构: { items: [...], pagination: {...} }
+          const newItems = res.data?.items || res.data?.list || []
+          this.items = Array.isArray(newItems) ? [...newItems] : []
           this.itemPagination = {
-            totalPages: res.data?.pagination?.totalPages || 1,
+            totalPages: res.data?.pagination?.total_pages || res.data?.pagination?.totalPages || 1,
             total: res.data?.pagination?.total || this.items.length
           }
         }
@@ -139,10 +143,11 @@ export function useExchangeItemsMethods() {
     openAddItemModal() {
       this.editingItemId = null
       this.itemForm = {
-        item_name: '',
-        item_description: '',
+        name: '',
+        description: '',
         cost_asset_code: '',
         cost_amount: 1,
+        cost_price: 0,
         stock: 0,
         sort_order: 100,
         status: 'active'
@@ -152,18 +157,19 @@ export function useExchangeItemsMethods() {
 
     /**
      * 编辑商品
-     * @param {Object} item - 商品对象
+     * @param {Object} item - 商品对象（字段名与后端模型一致）
      */
     editItem(item) {
       this.editingItemId = item.item_id
       this.itemForm = {
-        item_name: item.item_name,
-        item_description: item.item_description || '',
-        cost_asset_code: item.cost_asset_code,
-        cost_amount: item.cost_amount,
-        stock: item.stock,
+        name: item.name || '',
+        description: item.description || '',
+        cost_asset_code: item.cost_asset_code || '',
+        cost_amount: item.cost_amount || 1,
+        cost_price: item.cost_price || 0,
+        stock: item.stock || 0,
         sort_order: item.sort_order || 100,
-        status: item.status
+        status: item.status || 'active'
       }
       this.showModal('itemModal')
     },
@@ -172,7 +178,7 @@ export function useExchangeItemsMethods() {
      * 保存商品（新增或更新）
      */
     async saveItem() {
-      if (!this.itemForm.item_name || !this.itemForm.cost_asset_code) {
+      if (!this.itemForm.name || !this.itemForm.cost_asset_code) {
         this.showError?.('请填写必填项')
         return
       }
@@ -190,9 +196,17 @@ export function useExchangeItemsMethods() {
 
         if (res.success) {
           this.showSuccess?.(this.editingItemId ? '更新成功' : '添加成功')
-          this.hideModal('itemModal')
-          this.loadItems()
-          this.loadItemStats()
+          this.hideModal?.('itemModal')
+          
+          // 新增商品后：回到第一页，按创建时间倒序，确保新商品显示在最前面
+          if (!this.editingItemId) {
+            this.itemCurrentPage = 1
+            this.itemFilters.sort_by = 'created_at'
+            this.itemFilters.sort_order = 'DESC'
+          }
+          
+          await this.loadItems()
+          await this.loadItemStats?.()
         } else {
           this.showError?.(res.message || '操作失败')
         }

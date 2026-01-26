@@ -1,8 +1,8 @@
 /**
- * 交易管理整合页面 - Alpine.js 组件 (Mixin v3.0)
+ * C2C交易管理页面 - Alpine.js 组件 (Mixin v3.0)
  *
- * @file public/admin/js/pages/trade-management.js
- * @description 整合C2C交易订单、上架统计、兑换订单的完整交易管理页面
+ * @file admin/src/modules/market/pages/trade-management.js
+ * @description C2C用户间交易管理页面，包含交易订单和上架统计
  * @version 3.0.0
  * @date 2026-01-23
  *
@@ -60,8 +60,7 @@ document.addEventListener('alpine:init', () => {
      */
     subPages: [
       { id: 'trade-orders', title: 'C2C交易订单', icon: 'bi-arrow-left-right' },
-      { id: 'marketplace-stats', title: '上架统计', icon: 'bi-bar-chart' },
-      { id: 'redemption-orders', title: '兑换订单', icon: 'bi-arrow-repeat' }
+      { id: 'marketplace-stats', title: '上架统计', icon: 'bi-bar-chart' }
     ],
 
     /**
@@ -262,7 +261,7 @@ document.addEventListener('alpine:init', () => {
         this.loading = true
         const params = {
           page: this.tradeCurrentPage,
-          pageSize: this.tradePageSize,
+          page_size: this.tradePageSize,  // 后端使用 snake_case
           ...this.tradeFilters
         }
 
@@ -270,16 +269,19 @@ document.addEventListener('alpine:init', () => {
         Object.keys(params).forEach(k => !params[k] && delete params[k])
 
         const res = await request({
-          url: MARKET_ENDPOINTS.C2C_MARKET_ORDERS,
+          url: MARKET_ENDPOINTS.TRADE_ORDERS_LIST,  // 使用正确的后端端点
           method: 'GET',
           params
         })
 
         if (res.success) {
-          this.tradeOrders = res.data?.list || res.data || []
+          // 后端返回 orders 数组
+          this.tradeOrders = res.data?.orders || res.data?.list || []
+          // 后端使用 snake_case: total_count, total_pages
+          const pagination = res.data?.pagination || {}
           this.tradePagination = {
-            totalPages: res.data?.pagination?.totalPages || 1,
-            total: res.data?.pagination?.total || this.tradeOrders.length
+            totalPages: pagination.total_pages || pagination.totalPages || 1,
+            total: pagination.total_count || pagination.total || this.tradeOrders.length
           }
         }
       } catch (e) {
@@ -298,13 +300,16 @@ document.addEventListener('alpine:init', () => {
      */
     async loadTradeStats() {
       try {
-        const res = await request({ url: MARKET_ENDPOINTS.C2C_MARKET_ORDERS_STATS, method: 'GET' })
+        const res = await request({ url: MARKET_ENDPOINTS.TRADE_ORDERS_STATS, method: 'GET' })
         if (res.success && res.data) {
+          // 后端返回格式: { by_status: {...}, completed_summary: {...} }
+          const byStatus = res.data.by_status || {}
+          const summary = res.data.completed_summary || {}
           this.tradeStats = {
-            total: res.data.total || 0,
-            created: res.data.created || res.data.pending || 0,
-            frozen: res.data.frozen || 0,
-            completed: res.data.completed || 0
+            total: summary.total_orders || Object.values(byStatus).reduce((a, b) => a + (b || 0), 0),
+            created: byStatus.created || 0,
+            frozen: byStatus.frozen || 0,
+            completed: byStatus.completed || 0
           }
         }
       } catch (e) {
@@ -618,8 +623,7 @@ document.addEventListener('alpine:init', () => {
      */
     subPages: [
       { id: 'trade-orders', name: 'C2C交易订单', icon: '🔄' },
-      { id: 'marketplace-stats', name: '上架统计', icon: '📊' },
-      { id: 'redemption-orders', name: '兑换订单', icon: '🎁' }
+      { id: 'marketplace-stats', name: '上架统计', icon: '📊' }
     ],
 
     // C2C交易订单
@@ -726,24 +730,37 @@ document.addEventListener('alpine:init', () => {
      */
     async loadTradeOrders() {
       try {
-        const response = await this.apiGet(MARKET_ENDPOINTS.TRADE_ORDERS_LIST, {
+        logger.info('[TradeManagement] 加载交易订单...', this.tradeFilters)
+        // apiGet 返回 { success, data } 结构
+        const result = await this.apiGet(MARKET_ENDPOINTS.TRADE_ORDERS_LIST, {
           ...this.tradeFilters,
           page: this.tradeCurrentPage,
-          pageSize: this.tradePageSize
+          page_size: this.tradePageSize  // 后端使用 snake_case
         })
-        if (response.success && response.data) {
-          const tradeData = response.data?.list || response.data
+        
+        logger.info('[TradeManagement] API 响应:', result)
+        
+        if (result && result.success && result.data) {
+          // 后端返回 orders 数组（不是 list）
+          const data = result.data
+          const tradeData = data?.orders || data?.list || []
           this.tradeOrders = Array.isArray(tradeData) ? tradeData : []
-          this.tradePagination = response.data.pagination || {
-            totalPages: 1,
-            total: this.tradeOrders.length
+          // 后端使用 snake_case: total_count, total_pages
+          const pagination = data.pagination || {}
+          this.tradePagination = {
+            totalPages: pagination.total_pages || pagination.totalPages || 1,
+            total: pagination.total_count || pagination.total || this.tradeOrders.length
           }
           this.tradeStats = { total: this.tradeOrders.length, created: 0, frozen: 0, completed: 0 }
           // 更新统计卡片
           this._updateStats()
+          logger.info('[TradeManagement] 加载完成，订单数:', this.tradeOrders.length)
+        } else {
+          logger.warn('[TradeManagement] API 返回失败:', result)
         }
       } catch (error) {
-        logger.error('加载交易订单失败:', error)
+        logger.error('[TradeManagement] 加载交易订单失败:', error)
+        this.$toast?.error('加载交易订单失败: ' + error.message)
       }
     },
 
@@ -764,9 +781,11 @@ document.addEventListener('alpine:init', () => {
      */
     async loadMarketplaceStats() {
       try {
-        const response = await this.apiGet(MARKET_ENDPOINTS.C2C_MARKET_STATS)
-        if (response.success && response.data) {
-          const marketData = response.data?.list || response.data
+        // apiGet 返回 { success, data } 结构
+        const result = await this.apiGet(MARKET_ENDPOINTS.C2C_MARKET_STATS)
+        if (result && result.success && result.data) {
+          const data = result.data
+          const marketData = data?.list || data?.stats || data
           this.marketplaceStats = Array.isArray(marketData) ? marketData : []
         }
       } catch (error) {
@@ -781,17 +800,20 @@ document.addEventListener('alpine:init', () => {
      */
     async loadRedemptionOrders() {
       try {
-        const response = await this.apiGet(MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION, {
+        // apiGet 返回 { success, data } 结构
+        const result = await this.apiGet(MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION, {
           ...this.redemptionFilters,
           page: this.redemptionCurrentPage,
-          pageSize: this.redemptionPageSize
+          page_size: this.redemptionPageSize  // 后端使用 snake_case
         })
-        if (response.success && response.data) {
-          const redemptionData = response.data?.list || response.data
+        if (result && result.success && result.data) {
+          const data = result.data
+          const redemptionData = data?.orders || data?.list || data
           this.redemptionOrders = Array.isArray(redemptionData) ? redemptionData : []
-          this.redemptionPagination = response.data.pagination || {
-            totalPages: 1,
-            total: this.redemptionOrders.length
+          const pagination = data.pagination || {}
+          this.redemptionPagination = {
+            totalPages: pagination.total_pages || pagination.totalPages || 1,
+            total: pagination.total_count || pagination.total || this.redemptionOrders.length
           }
         }
       } catch (error) {
@@ -866,13 +888,34 @@ document.addEventListener('alpine:init', () => {
     },
 
     /**
-     * 格式化日期显示
-     * @param {string} dateStr - ISO日期字符串
-     * @returns {string} 本地化日期字符串
+     * 格式化日期显示（强制北京时间）
+     * @param {string} dateStr - 日期字符串（数据库返回的已是北京时间）
+     * @returns {string} 本地化日期字符串（北京时间）
      */
     formatDate(dateStr) {
       if (!dateStr) return '-'
-      return new Date(dateStr).toLocaleString('zh-CN')
+      
+      // 数据库配置 dateStrings: true，返回的是不带时区的北京时间字符串
+      // 格式如: "2026-01-25 20:10:36"，这已经是北京时间，不需要再转换
+      if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateStr)) {
+        // 将 "YYYY-MM-DD HH:mm:ss" 转换为 "YYYY/MM/DD HH:mm:ss" 格式显示
+        return dateStr.replace(/-/g, '/')
+      }
+      
+      // 如果是 ISO 格式或 Date 对象，则转换为北京时间
+      try {
+        return new Date(dateStr).toLocaleString('zh-CN', {
+          timeZone: 'Asia/Shanghai',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        })
+      } catch (e) {
+        return String(dateStr)
+      }
     },
 
     /**
@@ -910,16 +953,18 @@ document.addEventListener('alpine:init', () => {
     /**
      * 更新统计卡片数据
      * @private
+     * @description 使用后端字段名: gross_amount, net_amount 等
      * @returns {void}
      */
     _updateStats() {
       this.stats = {
-        totalTrades: this.tradeOrders.length,
+        totalTrades: this.tradePagination.total || this.tradeOrders.length,
         completedTrades: this.tradeOrders.filter(t => t.status === 'completed').length,
-        pendingTrades: this.tradeOrders.filter(t => t.status === 'pending' || t.status === 'created').length,
+        pendingTrades: this.tradeOrders.filter(t => t.status === 'pending' || t.status === 'created' || t.status === 'frozen').length,
+        // 后端字段: gross_amount, price_amount 等
         totalVolume: this.tradeOrders
           .filter(t => t.status === 'completed')
-          .reduce((sum, t) => sum + (t.price || t.total_price || 0), 0)
+          .reduce((sum, t) => sum + (t.gross_amount || t.price_amount || t.price || 0), 0)
       }
     }
   }))

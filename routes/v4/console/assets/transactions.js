@@ -91,8 +91,10 @@ router.get(
         }
       )
 
-      // 格式化返回数据（添加资产名称映射）
-      // 注意：Sequelize模型需要使用.get()或.toJSON()获取完整字段
+      /*
+       * 格式化返回数据（添加资产名称映射）
+       * 注意：Sequelize模型需要使用.get()或.toJSON()获取完整字段
+       */
       const transactions = result.transactions.map(tx => {
         const plainTx = tx.get ? tx.get({ plain: true }) : tx
         return {

@@ -32,7 +32,7 @@
             :class="currentPage === page.id ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-200'"
             class="px-4 py-2 rounded text-sm font-medium transition-colors"
           >
-            <span x-text="page.icon + ' ' + page.title"></span>
+            <i :class="'bi ' + page.icon" class="mr-1"></i><span x-text="page.title"></span>
           </button>
         </template>
       </div>
@@ -144,12 +144,17 @@
                 <option :value="store.store_id" x-text="store.store_name"></option>
               </template>
             </select>
+            <select class="px-3 py-2 border rounded text-sm" x-model="staffFilters.status" @change="loadStaff()">
+              <option value="">全部状态（排除已删除）</option>
+              <option value="active">在职</option>
+              <option value="inactive">离职</option>
+              <option value="pending">待审核</option>
+              <option value="deleted">已删除</option>
+            </select>
             <select class="px-3 py-2 border rounded text-sm" x-model="staffFilters.role" @change="loadStaff()">
               <option value="">全部角色</option>
               <option value="manager">店长</option>
-              <option value="cashier">收银员</option>
-              <option value="waiter">服务员</option>
-              <option value="chef">厨师</option>
+              <option value="staff">员工</option>
             </select>
             <input type="text" class="px-3 py-2 border rounded text-sm w-48" placeholder="搜索员工姓名..." x-model="staffFilters.keyword">
             <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm" @click="loadStaff()">
@@ -194,15 +199,32 @@
                     <td class="px-4 py-3 text-sm" x-text="formatDateSafe(staff.joined_at)"></td>
                     <td class="px-4 py-3">
                       <span 
-                        :class="staff.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
+                        :class="getStaffStatusClass(staff.status)"
                         class="px-2 py-1 text-xs rounded"
-                        x-text="staff.status_name || (staff.status === 'active' ? '在职' : '离职')"
+                        x-text="getStaffStatusText(staff.status)"
                       ></span>
                     </td>
                     <td class="px-4 py-3">
                       <div class="flex space-x-2">
-                        <button @click="editStaff(staff)" class="text-blue-600 hover:text-blue-800 text-sm">✏️ 编辑</button>
-                        <button @click="deleteStaff(staff)" class="text-red-600 hover:text-red-800 text-sm">🗑️ 删除</button>
+                        <!-- 在职员工：编辑 + 离职 -->
+                        <template x-if="staff.status === 'active'">
+                          <div class="flex space-x-2">
+                            <button @click="editStaff(staff)" class="text-blue-600 hover:text-blue-800 text-sm">✏️ 编辑</button>
+                            <button @click="resignStaff(staff)" class="text-amber-600 hover:text-amber-800 text-sm">📤 离职</button>
+                          </div>
+                        </template>
+                        <!-- 离职员工：删除 -->
+                        <template x-if="staff.status === 'inactive'">
+                          <button @click="permanentDeleteStaff(staff)" class="text-red-600 hover:text-red-800 text-sm">🗑️ 删除</button>
+                        </template>
+                        <!-- 待审核员工：编辑 -->
+                        <template x-if="staff.status === 'pending'">
+                          <button @click="editStaff(staff)" class="text-blue-600 hover:text-blue-800 text-sm">✏️ 编辑</button>
+                        </template>
+                        <!-- 已删除员工：查看信息（只读） -->
+                        <template x-if="staff.status === 'deleted'">
+                          <span class="text-gray-400 text-sm">已删除 (<span x-text="formatDateSafe(staff.deleted_at)"></span>)</span>
+                        </template>
                       </div>
                     </td>
                   </tr>
@@ -298,14 +320,11 @@
       </div>
     </div>
 
-  </div>
-
-  <!-- ==================== Modal 组件 ==================== -->
-  
-  <!-- 门店表单 Modal -->
-  <div 
-    x-data="storePageContent()"
-    x-show="isModalOpen('storeModal')" 
+    <!-- ==================== Modal 组件 ==================== -->
+    
+    <!-- 门店表单 Modal -->
+    <div 
+      x-show="isModalOpen('storeModal')" 
     x-ref="storeModal"
     class="fixed inset-0 z-50 flex items-center justify-center"
     x-cloak
@@ -411,12 +430,11 @@
         </div>
       </form>
     </div>
-  </div>
+    </div>
 
-  <!-- 门店详情 Modal -->
-  <div 
-    x-data="storePageContent()"
-    x-show="isModalOpen('storeDetailModal')" 
+    <!-- 门店详情 Modal -->
+    <div 
+      x-show="isModalOpen('storeDetailModal')" 
     x-ref="storeDetailModal"
     class="fixed inset-0 z-50 flex items-center justify-center"
     x-cloak
@@ -472,12 +490,11 @@
         </button>
       </div>
     </div>
-  </div>
+    </div>
 
-  <!-- 员工表单 Modal -->
-  <div 
-    x-data="storePageContent()"
-    x-show="isModalOpen('staffModal')" 
+    <!-- 员工表单 Modal -->
+    <div 
+      x-show="isModalOpen('staffModal')" 
     x-ref="staffModal"
     class="fixed inset-0 z-50 flex items-center justify-center"
     x-cloak
@@ -530,6 +547,8 @@
         </div>
       </form>
     </div>
+    </div>
+
   </div>
 
   <!-- 页面专属逻辑 -->

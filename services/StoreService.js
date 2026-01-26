@@ -313,15 +313,19 @@ class StoreService {
     const staffCounts = {
       active: 0,
       inactive: 0,
-      pending: 0
+      pending: 0,
+      deleted: 0
     }
 
     staffStats.forEach(stat => {
-      staffCounts[stat.status] = parseInt(stat.get('count'), 10)
+      if (staffCounts.hasOwnProperty(stat.status)) {
+        staffCounts[stat.status] = parseInt(stat.get('count'), 10)
+      }
     })
 
     const result = StoreService.formatStoreForAPI(store)
     result.staff_counts = staffCounts
+    // total_staff 不包括已删除的员工
     result.total_staff = staffCounts.active + staffCounts.inactive + staffCounts.pending
 
     return result

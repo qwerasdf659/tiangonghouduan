@@ -124,9 +124,11 @@ export function useAdvancedStatusMethods() {
         )
 
         if (response?.success) {
-          this.premiumUsers = response.data?.list || response.data?.users || []
+          // 后端返回 statuses 数组，直接使用后端字段名
+          this.premiumUsers = response.data?.statuses || []
           if (response.data?.pagination) {
-            this.premiumPagination.total = response.data.pagination.total || 0
+            // 后端返回 total_count，适配后端字段
+            this.premiumPagination.total = response.data.pagination.total_count || 0
             this.premiumPagination.totalPages = response.data.pagination.total_pages || 1
           }
         }
@@ -134,6 +136,16 @@ export function useAdvancedStatusMethods() {
         logger.error('加载高级状态失败:', error)
         this.premiumUsers = []
       }
+    },
+
+    /**
+     * 切换高级状态分页
+     * @param {number} page - 目标页码
+     */
+    changePremiumPage(page) {
+      if (page < 1 || page > this.premiumPagination.totalPages) return
+      this.premiumPage = page
+      this.loadPremiumUsers()
     },
 
     /**
@@ -147,11 +159,13 @@ export function useAdvancedStatusMethods() {
           { showLoading: false, showError: false }
         )
         if (response?.success && response.data) {
+          // 后端返回 summary 对象，适配后端字段名
+          const summary = response.data.summary || response.data
           this.premiumStats = {
-            total: response.data.total ?? 0,
-            active: response.data.active ?? 0,
-            expired: response.data.expired ?? 0,
-            expiring_soon: response.data.expiring_soon ?? 0
+            total: summary.total_records ?? summary.total ?? 0,
+            active: summary.active_users ?? summary.active ?? 0,
+            expired: summary.expired_users ?? summary.expired ?? 0,
+            expiring_soon: summary.expiring_soon ?? 0
           }
         }
       } catch (error) {
@@ -233,9 +247,12 @@ export function useAdvancedStatusMethods() {
         )
 
         if (response?.success) {
-          this.riskProfiles = response.data?.profiles || response.data?.list || []
+          // 后端返回 { list: [...], pagination: {...} }
+          const list = response.data?.profiles || response.data?.list || []
+          // 过滤掉可能的无效数据
+          this.riskProfiles = list.filter(item => item && (item.risk_profile_id || item.user_id))
           if (response.data?.pagination) {
-            this.riskPagination.total = response.data.pagination.total || 0
+            this.riskPagination.total = response.data.pagination.total_count || response.data.pagination.total || 0
             this.riskPagination.totalPages = response.data.pagination.total_pages || 1
           }
         }
@@ -246,22 +263,36 @@ export function useAdvancedStatusMethods() {
     },
 
     /**
+     * 切换风控配置分页
+     * @param {number} page - 目标页码
+     */
+    changeRiskPage(page) {
+      if (page < 1 || page > this.riskPagination.totalPages) return
+      this.riskPage = page
+      this.loadRiskProfiles()
+    },
+
+    /**
      * 打开风控配置模态框
      * @param {Object|null} profile - 风控配置对象
      */
     openRiskModal(profile = null) {
       if (profile) {
+        // 从 thresholds JSON 字段获取阈值，兼容旧字段格式
+        const thresholds = profile.thresholds || {}
         this.riskForm = {
           user_id: profile.user_id || '',
-          daily_points_limit: profile.daily_points_limit || 10000,
-          single_transaction_limit: profile.single_transaction_limit || 1000,
-          daily_lottery_limit: profile.daily_lottery_limit || 100,
+          user_level: profile.user_level || 'normal',
+          daily_points_limit: thresholds.daily_points_limit || profile.daily_points_limit || 10000,
+          single_transaction_limit: thresholds.single_transaction_limit || profile.single_transaction_limit || 1000,
+          daily_lottery_limit: thresholds.daily_lottery_limit || profile.daily_lottery_limit || 100,
           freeze_reason: ''
         }
         this.selectedRiskProfile = profile
       } else {
         this.riskForm = {
           user_id: '',
+          user_level: 'normal',
           daily_points_limit: 10000,
           single_transaction_limit: 1000,
           daily_lottery_limit: 100,
@@ -269,34 +300,63 @@ export function useAdvancedStatusMethods() {
         }
         this.selectedRiskProfile = null
       }
-      this.showModal('riskModal')
+      this.showModal('riskProfileModal')
+    },
+
+    /**
+     * 打开编辑风控配置模态框（别名）
+     * @param {Object} profile - 风控配置对象
+     */
+    openEditRiskModal(profile) {
+      this.openRiskModal(profile)
     },
 
     /**
      * 提交风控配置
      */
     async submitRiskProfile() {
-      if (!this.riskForm.user_id) {
+      // 等级配置不需要user_id，用户配置才需要
+      const isLevelConfig = this.selectedRiskProfile?.config_type === 'level'
+      if (!isLevelConfig && !this.riskForm.user_id) {
         this.showError('请输入用户ID')
         return
       }
 
       try {
         this.saving = true
+        // 使用正确的主键字段名 risk_profile_id
+        const profileId = this.selectedRiskProfile?.risk_profile_id || this.selectedRiskProfile?.id
         const url = this.selectedRiskProfile
           ? buildURL(USER_ENDPOINTS.RISK_PROFILE_UPDATE, {
-              id: this.selectedRiskProfile.id
+              id: profileId
             })
           : USER_ENDPOINTS.RISK_PROFILE_CREATE
 
+        // 构建提交数据，使用 thresholds JSON 格式
+        const submitData = {
+          thresholds: {
+            daily_points_limit: this.riskForm.daily_points_limit,
+            single_transaction_limit: this.riskForm.single_transaction_limit,
+            daily_lottery_limit: this.riskForm.daily_lottery_limit
+          }
+        }
+        // 用户配置需要 user_id
+        if (!isLevelConfig && this.riskForm.user_id) {
+          submitData.user_id = this.riskForm.user_id
+        }
+        // 等级配置需要 user_level
+        if (isLevelConfig) {
+          submitData.user_level = this.selectedRiskProfile.user_level
+        }
+
         const response = await this.apiCall(url, {
           method: this.selectedRiskProfile ? 'PUT' : 'POST',
-          data: this.riskForm
+          data: submitData
         })
 
         if (response?.success) {
           this.showSuccess(this.selectedRiskProfile ? '风控配置已更新' : '风控配置已创建')
-          this.hideModal('riskModal')
+          this.hideModal('riskProfileModal')
           await this.loadRiskProfiles()
         }
       } catch (error) {
@@ -352,6 +412,13 @@ export function useAdvancedStatusMethods() {
      * 加载角色变更历史
      */
     async loadRoleChangeHistory() {
+      // [DEBUG] 调试日志 - 待删除
+      logger.info('[DEBUG] loadRoleChangeHistory 被调用，筛选条件:', {
+        user_id: this.roleHistoryFilters.user_id,
+        operator_id: this.roleHistoryFilters.operator_id,
+        page: this.roleHistoryPage
+      })
+
       try {
         const params = new URLSearchParams()
         params.append('page', this.roleHistoryPage)
@@ -365,29 +432,56 @@ export function useAdvancedStatusMethods() {
         if (this.roleHistoryFilters.endDate)
           params.append('end_date', this.roleHistoryFilters.endDate)
 
-        const response = await this.apiGet(
-          `${USER_ENDPOINTS.ROLE_CHANGE_HISTORY_LIST}?${params}`,
-          {},
-          { showLoading: false }
-        )
+        const url = `${USER_ENDPOINTS.ROLE_CHANGE_HISTORY_LIST}?${params}`
+        // [DEBUG] 调试日志 - 待删除
+        logger.info('[DEBUG] 请求URL:', url)
+
+        const response = await this.apiGet(url, {}, { showLoading: true })
+
+        // [DEBUG] 调试日志 - 待删除
+        logger.info('[DEBUG] API响应:', response)
 
         if (response?.success) {
-          this.roleChangeHistory = response.data?.history || response.data?.list || []
+          this.roleChangeHistory = response.data?.history || response.data?.list || response.data?.records || []
           if (response.data?.pagination) {
-            this.roleHistoryPagination.total = response.data.pagination.total || 0
+            this.roleHistoryPagination.total = response.data.pagination.total || response.data.pagination.total_count || 0
             this.roleHistoryPagination.totalPages = response.data.pagination.total_pages || 1
           }
+          logger.info('[DEBUG] 加载完成，记录数:', this.roleChangeHistory.length)
+          // 显示刷新成功提示
+          this.showSuccess && this.showSuccess(`刷新成功，共 ${this.roleChangeHistory.length} 条记录`)
+        } else {
+          logger.warn('[DEBUG] API返回失败:', response)
+          this.showError(response?.message || '加载角色变更历史失败')
         }
       } catch (error) {
-        logger.error('加载角色变更历史失败:', error)
+        logger.error('[DEBUG] 加载角色变更历史异常:', error)
+        this.showError('加载角色变更历史失败: ' + (error.message || '未知错误'))
         this.roleChangeHistory = []
       }
+    },
+
+    /**
+     * 切换角色变更历史分页
+     * @param {number} page - 目标页码
+     */
+    changeRoleHistoryPage(page) {
+      if (page < 1 || page > this.roleHistoryPagination.totalPages) return
+      this.roleHistoryPage = page
+      this.loadRoleChangeHistory()
     },
 
     /**
      * 加载状态变更历史
      */
     async loadStatusChangeHistory() {
+      // [DEBUG] 调试日志 - 待删除
+      logger.info('[DEBUG] loadStatusChangeHistory 被调用，筛选条件:', {
+        user_id: this.statusHistoryFilters.user_id,
+        operator_id: this.statusHistoryFilters.operator_id,
+        page: this.statusHistoryPage
+      })
+
       try {
         const params = new URLSearchParams()
         params.append('page', this.statusHistoryPage)
@@ -401,23 +495,41 @@ export function useAdvancedStatusMethods() {
         if (this.statusHistoryFilters.endDate)
           params.append('end_date', this.statusHistoryFilters.endDate)
 
-        const response = await this.apiGet(
-          `${USER_ENDPOINTS.STATUS_CHANGE_HISTORY_LIST}?${params}`,
-          {},
-          { showLoading: false }
-        )
+        const url = `${USER_ENDPOINTS.STATUS_CHANGE_HISTORY_LIST}?${params}`
+        // [DEBUG] 调试日志 - 待删除
+        logger.info('[DEBUG] 请求URL:', url)
+
+        const response = await this.apiGet(url, {}, { showLoading: true })
+
+        // [DEBUG] 调试日志 - 待删除
+        logger.info('[DEBUG] API响应:', response)
 
         if (response?.success) {
-          this.statusChangeHistory = response.data?.history || response.data?.list || []
+          this.statusChangeHistory = response.data?.history || response.data?.list || response.data?.records || []
           if (response.data?.pagination) {
-            this.statusHistoryPagination.total = response.data.pagination.total || 0
+            this.statusHistoryPagination.total = response.data.pagination.total || response.data.pagination.total_count || 0
             this.statusHistoryPagination.totalPages = response.data.pagination.total_pages || 1
           }
+          logger.info('[DEBUG] 加载完成，记录数:', this.statusChangeHistory.length)
+        } else {
+          logger.warn('[DEBUG] API返回失败:', response)
+          this.showError(response?.message || '加载状态变更历史失败')
         }
       } catch (error) {
-        logger.error('加载状态变更历史失败:', error)
+        logger.error('[DEBUG] 加载状态变更历史异常:', error)
+        this.showError('加载状态变更历史失败: ' + (error.message || '未知错误'))
         this.statusChangeHistory = []
       }
+    },
+
+    /**
+     * 切换状态变更历史分页
+     * @param {number} page - 目标页码
+     */
+    changeStatusHistoryPage(page) {
+      if (page < 1 || page > this.statusHistoryPagination.totalPages) return
+      this.statusHistoryPage = page
+      this.loadStatusChangeHistory()
     },
 
     // ==================== 概率调整 ====================
@@ -487,7 +599,8 @@ export function useAdvancedStatusMethods() {
      * @returns {string} 解锁方式文本
      */
     getUnlockMethodText(method) {
-      const map = { purchase: '购买', activity: '活动', gift: '赠送', system: '系统' }
+      // 后端枚举值: points, exchange, vip, manual
+      const map = { points: '积分兑换', exchange: '道具兑换', vip: 'VIP特权', manual: '手动授权' }
       return map[method] || method || '-'
     },
 

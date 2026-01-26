@@ -278,7 +278,6 @@ async function analyzeDatabase() {
     console.log('\n========================================')
     console.log('✅ 数据库分析完成')
     console.log('========================================')
-
   } catch (error) {
     console.error('❌ 分析失败:', error.message)
     console.error(error.stack)
@@ -288,4 +287,3 @@ async function analyzeDatabase() {
 }
 
 analyzeDatabase()
-

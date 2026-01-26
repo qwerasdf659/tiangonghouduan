@@ -41,34 +41,190 @@ export { $confirm, $confirmDanger }
 // ========== 格式化函数 ==========
 
 /**
- * 格式化日期
- * @param {string|Date} date - 日期
- * @param {string} format - 格式模板
- * @returns {string} 格式化后的日期字符串
+ * 北京时间配置（全局统一）
+ * @constant {Object} BEIJING_TIMEZONE_CONFIG
  */
-export function formatDate(date, format = 'YYYY-MM-DD HH:mm:ss') {
-  if (!date) return '-'
+const BEIJING_TIMEZONE_CONFIG = {
+  timeZone: 'Asia/Shanghai',
+  locale: 'zh-CN'
+}
 
-  const d = new Date(date)
-  if (isNaN(d.getTime())) return '-'
+/**
+ * 格式化日期为北京时间（强制使用 Asia/Shanghai 时区）
+ *
+ * 重要说明：
+ * - 数据库配置 dateStrings: true + timezone: '+08:00'
+ * - 数据库返回的日期字符串（如 '2026-01-25 20:10:36'）已经是北京时间
+ * - UTC 格式（如 '2026-01-25T20:10:36.000Z'）需要转换为北京时间
+ *
+ * @param {string|Date|Object} dateValue - 日期值（支持字符串、Date对象、后端时间对象）
+ * @param {Object} options - 格式化选项
+ * @param {boolean} options.showSeconds - 是否显示秒，默认 true
+ * @param {boolean} options.dateOnly - 是否只显示日期，默认 false
+ * @returns {string} 格式化后的北京时间字符串
+ *
+ * @example
+ * formatDate('2026-01-25T20:10:36.000Z') // '2026/01/26 04:10:36'（UTC转北京时间）
+ * formatDate('2026-01-25 20:10:36')      // '2026/01/25 20:10:36'（已是北京时间，直接格式化）
+ * formatDate(new Date())                 // 当前北京时间
+ */
+export function formatDate(dateValue, options = {}) {
+  if (!dateValue) return '-'
 
-  const pad = n => String(n).padStart(2, '0')
+  const { showSeconds = true, dateOnly = false } = options
 
-  const replacements = {
-    YYYY: d.getFullYear(),
-    MM: pad(d.getMonth() + 1),
-    DD: pad(d.getDate()),
-    HH: pad(d.getHours()),
-    mm: pad(d.getMinutes()),
-    ss: pad(d.getSeconds())
+  try {
+    // 处理后端返回的时间对象格式 { iso, beijing, timestamp, relative }
+    let dateStr = dateValue
+    if (typeof dateValue === 'object' && dateValue !== null && !(dateValue instanceof Date)) {
+      // 优先使用 beijing 格式（已经是北京时间字符串）
+      if (dateValue.beijing) return dateValue.beijing
+      // 使用 iso 格式
+      dateStr = dateValue.iso || dateValue.timestamp || dateValue
+    }
+
+    // 检查是否是数据库返回的纯日期字符串（无时区信息，已是北京时间）
+    // 格式如: '2026-01-25 20:10:36' 或 '2026-01-25'
+    if (typeof dateStr === 'string') {
+      // 如果没有 T、Z 或 +/-时区偏移，说明是数据库返回的北京时间字符串
+      const isPlainDbFormat = !dateStr.includes('T') && !dateStr.includes('Z') && !dateStr.match(/[+-]\d{2}:\d{2}$/)
+
+      if (isPlainDbFormat) {
+        // 数据库返回的已经是北京时间，直接格式化显示
+        // 将 '2026-01-25 20:10:36' 转换为 '2026/01/25 20:10:36'
+        const parts = dateStr.match(/(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}):?(\d{2})?)?/)
+        if (parts) {
+          const [, year, month, day, hour = '00', minute = '00', second = '00'] = parts
+          if (dateOnly) {
+            return `${year}/${month}/${day}`
+          }
+          if (showSeconds) {
+            return `${year}/${month}/${day} ${hour}:${minute}:${second}`
+          }
+          return `${year}/${month}/${day} ${hour}:${minute}`
+        }
+      }
+    }
+
+    // 处理带时区的日期（UTC、ISO格式等）
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return '-'
+
+    // 构建格式化选项 - 强制使用北京时间
+    const formatOptions = {
+      timeZone: BEIJING_TIMEZONE_CONFIG.timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }
+
+    if (!dateOnly) {
+      formatOptions.hour = '2-digit'
+      formatOptions.minute = '2-digit'
+      if (showSeconds) {
+        formatOptions.second = '2-digit'
+      }
+      formatOptions.hour12 = false
+    }
+
+    return date.toLocaleString(BEIJING_TIMEZONE_CONFIG.locale, formatOptions)
+  } catch (e) {
+    console.warn('[formatDate] 日期格式化失败:', dateValue, e)
+    return '-'
   }
+}
 
-  let result = format
-  for (const [key, value] of Object.entries(replacements)) {
-    result = result.replace(key, value)
+/**
+ * 格式化日期时间为北京时间（formatDate 别名）
+ * @param {string|Date|Object} dateValue - 日期值
+ * @returns {string} 格式化后的北京时间字符串
+ */
+export function formatDateTime(dateValue) {
+  return formatDate(dateValue, { showSeconds: true })
+}
+
+/**
+ * 格式化日期（仅日期，不含时间）
+ * @param {string|Date|Object} dateValue - 日期值
+ * @returns {string} 格式化后的日期字符串 (如 '2026/01/25')
+ */
+export function formatDateOnly(dateValue) {
+  return formatDate(dateValue, { dateOnly: true })
+}
+
+/**
+ * 格式化日期时间（不含秒）
+ * @param {string|Date|Object} dateValue - 日期值
+ * @returns {string} 格式化后的日期时间字符串 (如 '2026/01/25 20:10')
+ */
+export function formatDateTimeShort(dateValue) {
+  return formatDate(dateValue, { showSeconds: false })
+}
+
+/**
+ * 格式化日期为 datetime-local 输入框格式（北京时间）
+ * @param {string|Date} dateValue - 日期值
+ * @returns {string} ISO格式的本地日期时间 (如 '2026-01-25T20:10')
+ */
+export function formatDateTimeLocal(dateValue) {
+  if (!dateValue) return ''
+  try {
+    const date = new Date(dateValue)
+    if (isNaN(date.getTime())) return ''
+
+    // 转换为北京时间
+    const beijingDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }))
+
+    const year = beijingDate.getFullYear()
+    const month = String(beijingDate.getMonth() + 1).padStart(2, '0')
+    const day = String(beijingDate.getDate()).padStart(2, '0')
+    const hours = String(beijingDate.getHours()).padStart(2, '0')
+    const minutes = String(beijingDate.getMinutes()).padStart(2, '0')
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`
+  } catch {
+    return ''
   }
+}
 
-  return result
+/**
+ * 获取当前北京时间
+ * @returns {Date} 北京时间 Date 对象
+ */
+export function getBeijingNow() {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }))
+}
+
+/**
+ * 格式化相对时间（如：刚刚、5分钟前、2小时前）
+ * @param {string|Date} dateValue - 日期值
+ * @returns {string} 相对时间描述
+ */
+export function formatRelativeTime(dateValue) {
+  if (!dateValue) return '-'
+
+  try {
+    const date = new Date(dateValue)
+    if (isNaN(date.getTime())) return '-'
+
+    const now = new Date()
+    const diffMs = now - date
+    const diffSeconds = Math.floor(diffMs / 1000)
+    const diffMinutes = Math.floor(diffSeconds / 60)
+    const diffHours = Math.floor(diffMinutes / 60)
+    const diffDays = Math.floor(diffHours / 24)
+
+    if (diffSeconds < 60) return '刚刚'
+    if (diffMinutes < 60) return `${diffMinutes}分钟前`
+    if (diffHours < 24) return `${diffHours}小时前`
+    if (diffDays < 7) return `${diffDays}天前`
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}周前`
+
+    // 超过30天显示具体日期
+    return formatDate(date, { showSeconds: false })
+  } catch {
+    return '-'
+  }
 }
 
 /**
@@ -277,8 +433,15 @@ export default {
   isEChartsLoaded,
   getECharts,
   preloadECharts,
-  // 格式化
+  // 日期格式化（北京时间）
   formatDate,
+  formatDateTime,
+  formatDateOnly,
+  formatDateTimeShort,
+  formatDateTimeLocal,
+  formatRelativeTime,
+  getBeijingNow,
+  // 数字格式化
   formatAmount,
   formatNumber,
   formatFileSize,

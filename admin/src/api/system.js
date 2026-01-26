@@ -143,12 +143,13 @@ export const SYSTEM_ENDPOINTS = {
   SYSTEM_CONFIG_GET: '/api/v4/console/settings/basic', // 修正：使用 settings/basic 接口
   SYSTEM_CONFIG_UPDATE: '/api/v4/console/settings/basic', // 修正：使用 settings/basic 接口
   SYSTEM_CONFIG_MAINTENANCE: '/api/v4/console/settings/basic', // 修正：使用 settings/basic 接口
-  SYSTEM_CONFIG_PRICING: '/api/v4/console/settings/pricing',
-  SYSTEM_CONFIG_UPDATE_PRICING: '/api/v4/console/settings/pricing',
+  // 积分配置（定价配置）- 使用 points 分类，后端不支持 pricing 分类
+  SYSTEM_CONFIG_POINTS: '/api/v4/console/settings/points',
+  SYSTEM_CONFIG_UPDATE_POINTS: '/api/v4/console/settings/points',
 
   // 行政区划
   REGION_PROVINCES: '/api/v4/console/regions/provinces',
-  REGION_CHILDREN: '/api/v4/console/regions/:parent_code/children',
+  REGION_CHILDREN: '/api/v4/console/regions/children/:parent_code',
 
   // 风控告警（兼容别名）
   RISK_ALERT_LIST: '/api/v4/console/risk-alerts',

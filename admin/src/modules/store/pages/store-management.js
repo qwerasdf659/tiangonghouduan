@@ -170,9 +170,9 @@ function registerStoreManagementComponents() {
     staffList: [],
     /**
      * 员工筛选条件
-     * @type {{store_id: string, role: string, keyword: string}}
+     * @type {{store_id: string, status: string, role: string, keyword: string}}
      */
-    staffFilters: { store_id: '', role: '', keyword: '' },
+    staffFilters: { store_id: '', status: '', role: '', keyword: '' },
     /** @type {{total: number, totalPages: number}} 员工分页信息 */
     staffPagination: { total: 0, totalPages: 1 },
     /**
@@ -421,11 +421,11 @@ function registerStoreManagementComponents() {
      * @returns {Promise<void>}
      */
     async saveStore() {
-      if (!this.storeForm.name.trim()) {
+      if (!this.storeForm.store_name?.trim()) {
         this.showError('请输入门店名称')
         return
       }
-      if (!this.storeForm.address.trim()) {
+      if (!this.storeForm.store_address?.trim()) {
         this.showError('请输入详细地址')
         return
       }
@@ -433,8 +433,8 @@ function registerStoreManagementComponents() {
       this.saving = true
       try {
         const payload = {
-          store_name: this.storeForm.name.trim(),
-          store_address: this.storeForm.address.trim(),
+          store_name: this.storeForm.store_name.trim(),
+          store_address: this.storeForm.store_address.trim(),
           contact_mobile: this.storeForm.contact_mobile?.trim() || '',
           contact_name: this.storeForm.contact_name?.trim() || '',
           province_code: this.storeForm.province_code || '',
@@ -442,7 +442,7 @@ function registerStoreManagementComponents() {
           district_code: this.storeForm.district_code || '',
           street_code: this.storeForm.street_code || '',
           status: this.storeForm.status,
-          notes: this.storeForm.description || ''
+          notes: this.storeForm.notes || ''
         }
 
         let response
@@ -718,6 +718,14 @@ function registerStoreManagementComponents() {
         if (this.staffFilters.store_id) params.append('store_id', this.staffFilters.store_id)
         if (this.staffFilters.role) params.append('role', this.staffFilters.role)
         if (this.staffFilters.keyword) params.append('keyword', this.staffFilters.keyword)
+        // 员工状态筛选
+        if (this.staffFilters.status) {
+          params.append('status', this.staffFilters.status)
+          // 如果查询 deleted 状态，需要传递 include_deleted=true
+          if (this.staffFilters.status === 'deleted') {
+            params.append('include_deleted', 'true')
+          }
+        }
 
         const response = await this.apiGet(
           `${STORE_ENDPOINTS.STAFF_LIST}?${params}`,
@@ -786,27 +794,107 @@ function registerStoreManagementComponents() {
     },
 
     /**
-     * 删除员工
+     * 员工离职操作
      * @async
-     * @description 确认后删除指定员工
+     * @description 将在职员工标记为离职状态（不带 force 参数）
      * @param {Object} staff - 员工对象
-     * @param {number} staff.staff_id - 员工ID
-     * @param {string} staff.name - 员工姓名
+     * @param {number} staff.store_staff_id - 员工ID
+     * @param {string} staff.user_nickname - 员工姓名
      * @returns {Promise<void>}
      */
-    async deleteStaff(staff) {
+    async resignStaff(staff) {
       const staffName = staff.user_nickname || staff.name || '该员工'
       await this.confirmAndExecute(
-        `确认删除员工「${staffName}」？`,
+        `确认将员工「${staffName}」标记为离职？\n离职后员工将无法继续执行工作操作，但记录会保留。`,
         async () => {
+          // 调用 DELETE 接口，不传 force 参数 → 离职操作
           const response = await this.apiCall(
             buildURL(STORE_ENDPOINTS.STAFF_DETAIL, { store_staff_id: staff.store_staff_id }),
             { method: 'DELETE' }
           )
           if (response?.success) this.loadStaff()
         },
-        { successMessage: '员工已删除' }
+        { successMessage: `员工「${staffName}」已离职` }
       )
+    },
+
+    /**
+     * 永久删除员工（软删除）
+     * @async
+     * @description 将离职员工标记为已删除状态（带 force=true 参数）
+     * @param {Object} staff - 员工对象
+     * @param {number} staff.store_staff_id - 员工ID
+     * @param {string} staff.user_nickname - 员工姓名
+     * @returns {Promise<void>}
+     */
+    async permanentDeleteStaff(staff) {
+      const staffName = staff.user_nickname || staff.name || '该员工'
+      
+      // 使用自定义确认对话框，包含删除原因输入
+      const reason = await this.showDeleteReasonDialog(staffName)
+      if (reason === null) return // 用户取消
+      
+      try {
+        // 调用 DELETE 接口，传 reason 参数 → 删除操作（后端会根据 status=inactive 自动执行删除）
+        const url = buildURL(STORE_ENDPOINTS.STAFF_DETAIL, { store_staff_id: staff.store_staff_id })
+        const deleteUrl = reason ? `${url}?reason=${encodeURIComponent(reason)}` : url
+        
+        const response = await this.apiCall(deleteUrl, { method: 'DELETE' })
+        if (response?.success) {
+          this.showSuccess(`员工「${staffName}」已删除`)
+          this.loadStaff()
+        }
+      } catch (error) {
+        logger.error('删除员工失败:', error)
+        this.showError('删除失败: ' + error.message)
+      }
+    },
+
+    /**
+     * 显示删除原因对话框
+     * @param {string} staffName - 员工姓名
+     * @returns {Promise<string|null>} 删除原因或null（取消）
+     */
+    async showDeleteReasonDialog(staffName) {
+      return new Promise(resolve => {
+        // 使用 Alpine store 的 confirm dialog 或简单 prompt
+        const reason = prompt(
+          `确定要删除员工「${staffName}」吗？\n\n请输入删除原因（可选）：\n\n注意：删除后记录将被标记为已删除，不会物理删除。`,
+          ''
+        )
+        // 用户点击取消返回 null，确定返回原因（可能为空字符串）
+        resolve(reason)
+      })
+    },
+
+    /**
+     * 获取员工状态CSS类名
+     * @param {string} status - 员工状态码
+     * @returns {string} Tailwind CSS 类名
+     */
+    getStaffStatusClass(status) {
+      const map = {
+        active: 'bg-green-100 text-green-700',
+        inactive: 'bg-gray-100 text-gray-700',
+        pending: 'bg-amber-100 text-amber-700',
+        deleted: 'bg-red-100 text-red-500'
+      }
+      return map[status] || 'bg-gray-100 text-gray-700'
+    },
+
+    /**
+     * 获取员工状态显示文本
+     * @param {string} status - 员工状态码
+     * @returns {string} 状态显示文本
+     */
+    getStaffStatusText(status) {
+      const map = {
+        active: '在职',
+        inactive: '离职',
+        pending: '待审核',
+        deleted: '已删除'
+      }
+      return map[status] || status || '未知'
     },
 
     /**

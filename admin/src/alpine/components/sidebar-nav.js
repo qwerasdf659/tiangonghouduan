@@ -66,8 +66,7 @@ export function sidebarNav() {
         icon: '🏪',
         items: [
           { id: 'exchange', name: '兑换市场', url: '/admin/exchange-market.html' },
-          { id: 'trade', name: 'C2C交易', url: '/admin/trade-management.html' },
-          { id: 'market-mgmt', name: '市场管理', url: '/admin/market-management.html' }
+          { id: 'trade', name: 'C2C交易', url: '/admin/trade-management.html' }
         ]
       },
       {

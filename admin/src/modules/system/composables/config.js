@@ -35,16 +35,16 @@ export function useConfigState() {
     originalConfig: null,
     /** @type {boolean} 配置已修改 */
     configModified: false,
-    /** @type {Array} 定价配置列表 */
-    pricingConfigs: [],
-    /** @type {Object} 编辑中的定价配置 */
-    editingPricing: null,
-    /** @type {Object} 定价默认值（用于定价配置表单） */
-    pricingDefaults: {
-      lottery_cost: 100,
-      daily_lottery_limit: 10,
-      points_exchange_rate: 100,
-      min_withdraw_amount: 10
+    /** @type {Array} 积分配置列表（原定价配置） */
+    pointsConfigs: [],
+    /** @type {Object} 编辑中的积分配置 */
+    editingPoints: null,
+    /** @type {Object} 积分配置默认值（使用后端字段名） */
+    pointsDefaults: {
+      lottery_cost_points: 100,     // 抽奖消耗积分
+      daily_lottery_limit: 10,      // 每日抽奖次数限制
+      sign_in_points: 10,           // 签到积分
+      initial_points: 0             // 新用户初始积分
     }
   }
 }
@@ -201,103 +201,126 @@ export function useConfigMethods() {
       )
     },
 
-    // ==================== 定价配置 ====================
+    // ==================== 积分配置（定价配置）====================
 
     /**
-     * 加载定价配置
+     * 加载积分配置（从后端 points 分类）
+     * @description 后端返回格式: { settings: [{ setting_key, setting_value, parsed_value, display_name }, ...] }
      */
-    async loadPricingConfigs() {
+    async loadPointsConfigs() {
       try {
+        console.log('[SystemConfig] 开始加载积分配置, 调用接口:', SYSTEM_ENDPOINTS.SYSTEM_CONFIG_POINTS)
         const response = await this.apiGet(
-          SYSTEM_ENDPOINTS.SYSTEM_CONFIG_PRICING,
+          SYSTEM_ENDPOINTS.SYSTEM_CONFIG_POINTS,
           {},
           { showLoading: false }
         )
-        if (response?.success) {
-          this.pricingConfigs = response.data?.configs || response.data?.list || []
-          // 将配置列表转换为 pricingDefaults 对象
-          this.pricingConfigs.forEach(config => {
-            const key = config.config_key || config.key
-            const value = config.config_value || config.value
-            if (key && this.pricingDefaults.hasOwnProperty(key)) {
-              this.pricingDefaults[key] = parseInt(value) || this.pricingDefaults[key]
+        console.log('[SystemConfig] 积分配置 API 响应:', response)
+        
+        if (response?.success && response.data) {
+          // 后端返回 settings 数组格式
+          const settingsArray = response.data.settings || []
+          this.pointsConfigs = settingsArray
+          
+          // 将配置列表转换为 pointsDefaults 对象
+          settingsArray.forEach(config => {
+            const key = config.setting_key || config.key
+            const value = config.parsed_value !== undefined ? config.parsed_value : config.setting_value
+            if (key && this.pointsDefaults.hasOwnProperty(key)) {
+              this.pointsDefaults[key] = typeof value === 'number' ? value : (parseInt(value) || this.pointsDefaults[key])
             }
           })
+          
+          console.log('[SystemConfig] 解析后的积分配置:', this.pointsDefaults)
         }
       } catch (error) {
-        logger.error('加载定价配置失败:', error)
-        this.pricingConfigs = []
+        console.error('[SystemConfig] 加载积分配置失败:', error)
+        logger.error('加载积分配置失败:', error)
+        this.pointsConfigs = []
       }
     },
 
     /**
-     * 保存定价配置（批量保存）
+     * 保存积分配置（批量保存到后端 points 分类）
+     * @description PUT /api/v4/console/settings/points { settings: { key: value, ... } }
      */
-    async savePricingConfigs() {
+    async savePointsConfigs() {
       try {
         this.saving = true
-        // 构建配置数据
+        // 构建后端期望的格式（使用后端字段名）
         const settingsData = {
           settings: {
-            lottery_cost: this.pricingDefaults.lottery_cost,
-            daily_lottery_limit: this.pricingDefaults.daily_lottery_limit,
-            points_exchange_rate: this.pricingDefaults.points_exchange_rate,
-            min_withdraw_amount: this.pricingDefaults.min_withdraw_amount
+            lottery_cost_points: this.pointsDefaults.lottery_cost_points,
+            daily_lottery_limit: this.pointsDefaults.daily_lottery_limit,
+            sign_in_points: this.pointsDefaults.sign_in_points,
+            initial_points: this.pointsDefaults.initial_points
           }
         }
 
-        const response = await this.apiCall(SYSTEM_ENDPOINTS.SYSTEM_CONFIG_UPDATE, {
+        console.log('[SystemConfig] 保存积分配置, 数据:', settingsData)
+
+        const response = await this.apiCall(SYSTEM_ENDPOINTS.SYSTEM_CONFIG_UPDATE_POINTS, {
           method: 'PUT',
           data: settingsData
         })
 
         if (response?.success) {
-          this.showSuccess('定价配置保存成功')
+          this.showSuccess('积分配置保存成功')
         }
       } catch (error) {
-        this.showError('保存定价配置失败: ' + (error.message || '未知错误'))
+        this.showError('保存积分配置失败: ' + (error.message || '未知错误'))
       } finally {
         this.saving = false
       }
     },
 
     /**
-     * 编辑定价配置
-     * @param {Object} config - 定价配置对象
+     * 编辑积分配置
+     * @param {Object} config - 积分配置对象
      */
-    editPricingConfig(config) {
-      this.editingPricing = { ...config }
-      this.showModal('pricingModal')
+    editPointsConfig(config) {
+      this.editingPoints = { ...config }
+      this.showModal('pointsModal')
     },
 
     /**
-     * 保存定价配置
+     * 保存单个积分配置项
      */
-    async savePricingConfig() {
-      if (!this.editingPricing) return
+    async savePointsConfig() {
+      if (!this.editingPoints) return
 
       try {
         this.saving = true
-        const response = await this.apiCall(
-          buildURL(SYSTEM_ENDPOINTS.SYSTEM_CONFIG_UPDATE_PRICING, {
-            key: this.editingPricing.config_key
-          }),
-          {
-            method: 'PUT',
-            data: { config_value: this.editingPricing.config_value }
+        // 使用 points 分类端点保存单个配置
+        const settingsData = {
+          settings: {
+            [this.editingPoints.setting_key]: this.editingPoints.setting_value
           }
-        )
+        }
+        
+        const response = await this.apiCall(SYSTEM_ENDPOINTS.SYSTEM_CONFIG_UPDATE_POINTS, {
+          method: 'PUT',
+          data: settingsData
+        })
 
         if (response?.success) {
-          this.showSuccess('定价配置保存成功')
-          this.hideModal('pricingModal')
-          await this.loadPricingConfigs()
+          this.showSuccess('积分配置保存成功')
+          this.hideModal('pointsModal')
+          await this.loadPointsConfigs()
         }
       } catch (error) {
-        this.showError('保存定价配置失败: ' + (error.message || '未知错误'))
+        this.showError('保存积分配置失败: ' + (error.message || '未知错误'))
       } finally {
         this.saving = false
       }
+    },
+
+    // 兼容旧方法名（过渡期使用）
+    async loadPricingConfigs() {
+      return this.loadPointsConfigs()
+    },
+    async savePricingConfigs() {
+      return this.savePointsConfigs()
     }
   }
 }

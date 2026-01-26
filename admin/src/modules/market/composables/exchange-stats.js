@@ -48,30 +48,43 @@ export function useExchangeStatsMethods() {
     async loadExchangeStats() {
       try {
         this.loading = true
-        const res = await request({
-          url: MARKET_ENDPOINTS.EXCHANGE_FULL_STATS,
-          method: 'GET'
-        })
+        // 并行请求统计数据和订单数据
+        const [statsRes, ordersRes] = await Promise.all([
+          request({ url: MARKET_ENDPOINTS.EXCHANGE_FULL_STATS, method: 'GET' }),
+          request({ url: MARKET_ENDPOINTS.EXCHANGE_ORDERS, method: 'GET', params: { page: 1, pageSize: 1000 } })
+        ])
 
-        if (res.success && res.data) {
-          this.exchangeStats = {
-            orders: {
-              total: res.data.orders?.total || 0,
-              pending: res.data.orders?.pending || 0,
-              completed: res.data.orders?.completed || 0,
-              shipped: res.data.orders?.shipped || 0,
-              cancelled: res.data.orders?.cancelled || 0
-            },
-            revenue: {
-              total_virtual_value: res.data.revenue?.total_virtual_value || 0,
-              total_points: res.data.revenue?.total_points || 0
-            },
-            items: {
-              activeCount: res.data.items?.activeCount || res.data.items?.active_count || 0,
-              activeStock: res.data.items?.activeStock || res.data.items?.active_stock || 0,
-              inactiveCount: res.data.items?.inactiveCount || res.data.items?.inactive_count || 0,
-              inactiveStock: res.data.items?.inactiveStock || res.data.items?.inactive_stock || 0
-            }
+        // 后端统计接口返回：total_items, active_items, low_stock_items, total_exchanges
+        const stats = statsRes.success ? statsRes.data : {}
+        
+        // 从订单列表计算订单统计
+        const orders = ordersRes.success ? (ordersRes.data?.orders || []) : []
+        const orderStats = {
+          total: ordersRes.data?.pagination?.total || orders.length,
+          pending: orders.filter(o => o.status === 'pending').length,
+          completed: orders.filter(o => o.status === 'completed').length,
+          shipped: orders.filter(o => o.status === 'shipped').length,
+          cancelled: orders.filter(o => o.status === 'cancelled').length
+        }
+
+        // 计算总消耗（从订单中累计，确保转换为数字）
+        const totalConsumed = orders.reduce((sum, o) => {
+          const amount = parseInt(o.cost_amount) || parseInt(o.pay_amount) || 0
+          return sum + amount
+        }, 0)
+
+        this.exchangeStats = {
+          orders: orderStats,
+          revenue: {
+            total_virtual_value: totalConsumed,
+            total_points: stats.total_exchanges || 0
+          },
+          items: {
+            activeCount: stats.active_items || 0,
+            activeStock: 0, // 后端暂无此数据
+            inactiveCount: (stats.total_items || 0) - (stats.active_items || 0),
+            inactiveStock: 0,
+            lowStockCount: stats.low_stock_items || 0
           }
         }
       } catch (e) {
@@ -84,22 +97,13 @@ export function useExchangeStatsMethods() {
 
     /**
      * 加载趋势数据
+     * 注意：后端暂无趋势接口，使用空数据
      */
     async loadTrendData() {
-      try {
-        const res = await request({
-          url: MARKET_ENDPOINTS.EXCHANGE_TREND,
-          method: 'GET',
-          params: { range: this.trendRange }
-        })
-
-        if (res.success && res.data) {
-          this.trendData = res.data.list || res.data || []
-          this.updateTrendChart()
-        }
-      } catch (e) {
-        logger.error('[ExchangeStats] 加载趋势数据失败:', e)
-      }
+      // 后端暂无 /statistics/trend 接口，暂时使用空数据
+      logger.info('[ExchangeStats] 趋势接口暂未实现，使用空数据')
+      this.trendData = []
+      this.updateTrendChart()
     },
 
     /**

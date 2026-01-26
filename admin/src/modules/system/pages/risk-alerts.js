@@ -135,13 +135,13 @@ function riskAlertsPage() {
      * @property {string} severity - 严重程度筛选
      * @property {string} alert_type - 告警类型筛选
      * @property {string} status - 状态筛选
-     * @property {string} time - 时间范围筛选
+     * @property {string} time - 时间范围筛选（默认全部，不限制时间）
      */
     filters: {
       severity: '',
       alert_type: '',
       status: '',
-      time: 'today'
+      time: ''  // 默认为空（显示全部时间范围），避免筛选掉历史数据
     },
 
     /**
@@ -410,7 +410,8 @@ function riskAlertsPage() {
         if (this.filters.status) params.append('status', this.filters.status)
         
         // 转换时间范围为 start_time（后端使用 start_time/end_time，不支持 time_range）
-        if (this.filters.time && this.filters.time !== 'all') {
+        // 空值或空字符串表示不限制时间，显示全部数据
+        if (this.filters.time && this.filters.time.trim() !== '') {
           const now = new Date()
           let startTime = new Date()
           
@@ -424,8 +425,15 @@ function riskAlertsPage() {
             case 'month':
               startTime.setDate(now.getDate() - 30)
               break
+            default:
+              // 未知时间范围或空值，不添加时间筛选
+              startTime = null
+              break
           }
-          params.append('start_time', startTime.toISOString())
+          
+          if (startTime) {
+            params.append('start_time', startTime.toISOString())
+          }
         }
         
         params.append('page', this.currentPage)
@@ -598,7 +606,7 @@ function riskAlertsPage() {
           const promises = this.selectedAlerts.map(alertId =>
             apiRequest(buildURL(SYSTEM_ENDPOINTS.RISK_ALERT_REVIEW, { id: alertId }), {
               method: 'POST',
-              body: JSON.stringify({ status: 'reviewed', review_notes: '批量处理' })
+              data: { status: 'reviewed', review_notes: '批量处理' }
             })
           )
           await Promise.all(promises)
@@ -697,14 +705,15 @@ function riskAlertsPage() {
 
       this.submitting = true
       try {
+        // 使用 data 而非 body（request 函数会自动 JSON.stringify）
         const response = await apiRequest(
           buildURL(SYSTEM_ENDPOINTS.RISK_ALERT_REVIEW, { id: this.handleForm.alert_id }),
           {
             method: 'POST',
-            body: JSON.stringify({
+            data: {
               status: this.handleForm.status,
               review_notes: this.handleForm.remark
-            })
+            }
           }
         )
 

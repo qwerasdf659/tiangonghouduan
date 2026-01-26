@@ -93,14 +93,23 @@ function handleServiceError(error, res, operation) {
  * - page_size: 每页数量（默认20，最大100）
  * - store_id: 门店ID筛选
  * - user_id: 用户ID筛选
- * - status: 状态筛选（active/inactive/pending）
+ * - status: 状态筛选（active/inactive/pending/deleted）
  * - role_in_store: 门店内角色筛选（staff/manager）
+ * - include_deleted: 是否包含已删除记录（默认不包含，传 'true' 包含）
  *
  * @access Admin only (role_level >= 100)
  */
 router.get('/', authenticateToken, requireRole(['admin', 'ops']), async (req, res) => {
   try {
-    const { page = 1, page_size = 20, store_id, user_id, status, role_in_store } = req.query
+    const {
+      page = 1,
+      page_size = 20,
+      store_id,
+      user_id,
+      status,
+      role_in_store,
+      include_deleted
+    } = req.query
 
     // 验证分页参数
     const validatedPageSize = Math.min(parseInt(page_size, 10) || 20, 100)
@@ -111,7 +120,8 @@ router.get('/', authenticateToken, requireRole(['admin', 'ops']), async (req, re
       store_id: store_id ? parseInt(store_id, 10) : undefined,
       user_id: user_id ? parseInt(user_id, 10) : undefined,
       status,
-      role_in_store
+      role_in_store,
+      include_deleted: include_deleted === 'true'
     })
 
     return res.apiSuccess(result, '获取员工列表成功')
@@ -549,67 +559,138 @@ router.put('/:store_staff_id/role', authenticateToken, requireAdmin, async (req,
  */
 
 /**
- * DELETE /:store_staff_id - 员工离职（指定门店）
+ * DELETE /:store_staff_id - 员工离职/删除
  *
- * @description 解除员工与指定门店的绑定关系（离职）
+ * @description 根据员工状态执行不同操作：
+ *   - 在职员工（active）+ 无 force：执行离职（status → inactive）
+ *   - 在职员工（active）+ force=true：强制删除（status → deleted）
+ *   - 离职员工（inactive）：执行删除（status → deleted）
+ *   - 已删除员工（deleted）：拒绝操作
  *
  * Query Parameters:
- * - reason: 离职原因
+ *   - reason: 离职/删除原因
+ *   - force: 是否强制删除（仅对 active 状态有效）
  *
  * @access Admin only (role_level >= 100)
+ * @since 2026-01-26 重构：支持离职+删除双操作
  */
 router.delete('/:store_staff_id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { store_staff_id } = req.params
-    const { reason } = req.query
+    const { reason, force } = req.query
     const operator_id = req.user.user_id
 
+    // 参数验证
     if (!store_staff_id || isNaN(parseInt(store_staff_id, 10))) {
       return res.apiError('员工记录ID无效', 'INVALID_STORE_STAFF_ID', null, 400)
     }
 
-    // 先获取员工记录
-    const staffDetail = await StaffManagementService.getStaffDetail(parseInt(store_staff_id, 10))
+    const storeStaffId = parseInt(store_staff_id, 10)
+
+    // 获取员工记录
+    const staffDetail = await StaffManagementService.getStaffDetail(storeStaffId)
 
     if (!staffDetail) {
       return res.apiError('员工记录不存在', 'STAFF_NOT_FOUND', null, 404)
     }
 
-    if (staffDetail.status !== 'active') {
-      return res.apiError('员工已离职或处于非在职状态', 'STAFF_NOT_ACTIVE', null, 400)
-    }
+    // 根据状态分发处理逻辑
+    const isForce = force === 'true'
+    let result
+    let message
 
-    // 执行离职事务（结果用于确认事务成功，响应使用 staffDetail 构建）
-    await TransactionManager.execute(async transaction => {
-      return await StaffManagementService.removeStaffFromStore(
-        {
+    switch (staffDetail.status) {
+      case 'active':
+        if (isForce) {
+          // 强制删除在职员工
+          result = await TransactionManager.execute(async transaction => {
+            return await StaffManagementService.permanentDeleteStaff(
+              {
+                store_staff_id: storeStaffId,
+                operator_id,
+                reason: reason || '强制删除',
+                force: true
+              },
+              { transaction }
+            )
+          })
+          message = '员工记录已强制删除'
+
+          logger.info('✅ 员工强制删除成功', {
+            store_staff_id: storeStaffId,
+            user_id: staffDetail.user_id,
+            store_id: staffDetail.store_id,
+            operator_id
+          })
+        } else {
+          // 正常离职操作
+          result = await TransactionManager.execute(async transaction => {
+            return await StaffManagementService.removeStaffFromStore(
+              {
+                user_id: staffDetail.user_id,
+                store_id: staffDetail.store_id,
+                operator_id,
+                reason
+              },
+              { transaction }
+            )
+          })
+          message = '员工离职成功'
+
+          logger.info('✅ 员工离职成功', {
+            store_staff_id: storeStaffId,
+            user_id: staffDetail.user_id,
+            store_id: staffDetail.store_id,
+            operator_id
+          })
+        }
+        break
+
+      case 'inactive':
+        // 删除离职员工记录
+        result = await TransactionManager.execute(async transaction => {
+          return await StaffManagementService.permanentDeleteStaff(
+            {
+              store_staff_id: storeStaffId,
+              operator_id,
+              reason: reason || '删除离职员工记录',
+              force: false
+            },
+            { transaction }
+          )
+        })
+        message = '员工记录已删除'
+
+        logger.info('✅ 员工记录删除成功', {
+          store_staff_id: storeStaffId,
           user_id: staffDetail.user_id,
           store_id: staffDetail.store_id,
-          operator_id,
-          reason
-        },
-        { transaction }
-      )
-    })
+          operator_id
+        })
+        break
 
-    logger.info('✅ 员工离职成功', {
-      store_staff_id,
-      user_id: staffDetail.user_id,
-      store_id: staffDetail.store_id,
-      operator_id
-    })
+      case 'deleted':
+        return res.apiError('员工记录已删除', 'STAFF_ALREADY_DELETED', null, 400)
+
+      case 'pending':
+        return res.apiError('待审核员工不能直接删除，请先拒绝审核', 'STAFF_PENDING', null, 400)
+
+      default:
+        return res.apiError(`员工状态异常: ${staffDetail.status}`, 'INVALID_STATUS', null, 400)
+    }
 
     return res.apiSuccess(
       {
-        store_staff_id: parseInt(store_staff_id, 10),
+        store_staff_id: storeStaffId,
         user_id: staffDetail.user_id,
         store_id: staffDetail.store_id,
-        status: 'inactive'
+        previous_status: staffDetail.status,
+        new_status: result.status
       },
-      '员工离职成功'
+      message
     )
   } catch (error) {
-    return handleServiceError(error, res, '员工离职')
+    return handleServiceError(error, res, '员工离职/删除')
   }
 })
 

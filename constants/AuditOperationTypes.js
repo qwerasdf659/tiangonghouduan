@@ -187,6 +187,15 @@ const OPERATION_TYPES = Object.freeze({
    */
   MARKET_LISTING_ADMIN_WITHDRAW: 'market_listing_admin_withdraw',
 
+  // ==================== 员工管理类（V4.6.1 新增）====================
+  /**
+   * 员工永久删除（软删除）
+   * @description 管理员删除员工记录（离职员工或强制删除在职员工）
+   * @example StaffManagementService.permanentDeleteStaff()
+   * @since 2026-01-26
+   */
+  STAFF_PERMANENT_DELETE: 'staff_permanent_delete',
+
   // ==================== 系统配置类 ====================
   /**
    * 系统配置修改
@@ -313,7 +322,10 @@ const OPERATION_TYPE_DESCRIPTIONS = Object.freeze({
   [OPERATION_TYPES.FEATURE_FLAG_CREATE]: '功能开关创建',
   [OPERATION_TYPES.FEATURE_FLAG_UPDATE]: '功能开关更新',
   [OPERATION_TYPES.FEATURE_FLAG_DELETE]: '功能开关删除',
-  [OPERATION_TYPES.FEATURE_FLAG_TOGGLE]: '功能开关启用/禁用'
+  [OPERATION_TYPES.FEATURE_FLAG_TOGGLE]: '功能开关启用/禁用',
+
+  // 员工管理类（V4.6.1 新增）
+  [OPERATION_TYPES.STAFF_PERMANENT_DELETE]: '员工记录删除'
 })
 
 /**
@@ -362,7 +374,10 @@ const CRITICAL_OPERATIONS = Object.freeze(
 
     // ========== 功能开关关键操作（Feature Flag V4.6.0 新增）==========
     OPERATION_TYPES.FEATURE_FLAG_DELETE, // 功能开关删除 - 不可恢复的破坏性操作
-    OPERATION_TYPES.FEATURE_FLAG_TOGGLE // 功能开关切换 - 影响系统功能可用性
+    OPERATION_TYPES.FEATURE_FLAG_TOGGLE, // 功能开关切换 - 影响系统功能可用性
+
+    // ========== 员工管理关键操作（V4.6.1 新增）==========
+    OPERATION_TYPES.STAFF_PERMANENT_DELETE // 员工删除 - 影响员工权限和系统安全
   ])
 )
 

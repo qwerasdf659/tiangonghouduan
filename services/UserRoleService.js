@@ -648,10 +648,10 @@ class UserRoleService {
    * @returns {Promise<Object>} 角色列表
    */
   static async getRoleList() {
-    // 查询所有激活的角色
+    // 查询所有激活的角色（包含permissions字段用于前端权限展示）
     const roles = await Role.findAll({
       where: { is_active: true },
-      attributes: ['role_id', 'role_uuid', 'role_name', 'role_level', 'description'],
+      attributes: ['role_id', 'role_uuid', 'role_name', 'role_level', 'description', 'permissions'],
       order: [['role_level', 'DESC']]
     })
 
@@ -660,10 +660,12 @@ class UserRoleService {
     return {
       roles: roles.map(role => ({
         id: role.role_id,
+        role_id: role.role_id,
         role_uuid: role.role_uuid,
         role_name: role.role_name,
         role_level: role.role_level,
-        description: role.description
+        description: role.description,
+        permissions: role.permissions || {}
       }))
     }
   }

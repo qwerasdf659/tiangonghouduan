@@ -73,15 +73,17 @@ describe('LotteryPricingService - 抽奖定价服务', () => {
       expect(pricing.total_cost).toBe(pricing.base_cost * 1) // 单抽 = base_cost × 1
     })
 
-    it('应该正确计算10连抽价格（九折）', async () => {
+    it('应该正确计算10连抽价格（根据数据库配置的折扣）', async () => {
       // 执行查询
       const pricing = await LotteryPricingService.getDrawPricing(10, test_campaign_id)
 
       // 验证定价计算
+      // 注意：折扣值由数据库配置决定，不硬编码具体值
       expect(pricing.draw_count).toBe(10)
-      expect(pricing.discount).toBe(0.9) // 10连抽九折
+      expect(pricing.discount).toBeGreaterThan(0)
+      expect(pricing.discount).toBeLessThanOrEqual(1)
       expect(pricing.original_cost).toBe(pricing.base_cost * 10)
-      expect(pricing.total_cost).toBe(Math.floor(pricing.base_cost * 10 * 0.9))
+      expect(pricing.total_cost).toBe(Math.floor(pricing.base_cost * 10 * pricing.discount))
       expect(pricing.saved_points).toBe(pricing.original_cost - pricing.total_cost)
     })
 

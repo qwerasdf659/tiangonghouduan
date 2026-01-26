@@ -701,8 +701,10 @@ class CustomerServiceSessionService {
         throw new Error('会话不存在')
       }
 
-      // 管理后台的管理员可以标记任何会话为已读（非破坏性操作）
-      // 仅记录日志，不做权限限制
+      /*
+       * 管理后台的管理员可以标记任何会话为已读（非破坏性操作）
+       * 仅记录日志，不做权限限制
+       */
       if (session.admin_id && session.admin_id !== admin_id) {
         logger.info(`📝 管理员 ${admin_id} 正在查看其他管理员 ${session.admin_id} 的会话 ${session_id}`)
       }
@@ -767,8 +769,10 @@ class CustomerServiceSessionService {
       throw new Error('会话不存在')
     }
 
-    // 管理后台的管理员可以转接任何会话
-    // 仅记录日志，不做权限限制
+    /*
+     * 管理后台的管理员可以转接任何会话
+     * 仅记录日志，不做权限限制
+     */
     if (session.admin_id && session.admin_id !== current_admin_id) {
       logger.info(`📝 管理员 ${current_admin_id} 正在转接其他管理员 ${session.admin_id} 的会话 ${session_id}`)
     }
@@ -856,8 +860,10 @@ class CustomerServiceSessionService {
       throw new Error('会话不存在')
     }
 
-    // 管理后台的管理员可以关闭任何会话
-    // 仅记录日志，不做权限限制
+    /*
+     * 管理后台的管理员可以关闭任何会话
+     * 仅记录日志，不做权限限制
+     */
     if (session.admin_id && session.admin_id !== admin_id) {
       logger.info(`📝 管理员 ${admin_id} 正在关闭其他管理员 ${session.admin_id} 的会话 ${session_id}`)
     }

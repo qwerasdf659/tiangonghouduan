@@ -3,6 +3,9 @@
  *
  * 验证 P1 修复的核心逻辑（不依赖复杂的测试数据）
  *
+ * V2.1 更新（2026-01-26）：
+ * - P1-1 现已支持跨组转换 + 终点货币限制 + 全局套利检测
+ *
  * P1-9 J2-RepoWide 改造：
  * - 通过 ServiceManager 统一获取服务
  * - 服务 key 使用 snake_case（E2-Strict）
@@ -15,7 +18,7 @@ const { sequelize } = require('../models')
 describe('P1 修复简化验证', () => {
   // 🔴 P1-9：ServiceManager 在 jest.setup.js 中已全局初始化
 
-  describe('P1-1：材料转换风控校验按 group_code 限定', () => {
+  describe('P1-1：材料转换风控校验（V2.1 全局套利检测 + 终点货币限制）', () => {
     test('MaterialConversionValidator 应该有 validate 方法', () => {
       const MaterialConversionValidator = require('../utils/materialConversionValidator')
       expect(MaterialConversionValidator).toBeDefined()

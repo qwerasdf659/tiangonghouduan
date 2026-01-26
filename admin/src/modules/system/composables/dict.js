@@ -18,6 +18,11 @@ import { buildURL } from '../../../api/base.js'
 
 /**
  * 字典类型配置
+ * 
+ * 字段映射说明（后端字段名 → 前端使用）：
+ * - categories: category_code, display_name, description
+ * - rarities: rarity_code, display_name, description, color_hex, tier
+ * - asset-groups: group_code, display_name, description, group_type, color_hex
  */
 const DICT_TYPES = {
   categories: {
@@ -27,8 +32,10 @@ const DICT_TYPES = {
     createEndpoint: SYSTEM_ENDPOINTS.DICT_CATEGORY_CREATE,
     updateEndpoint: SYSTEM_ENDPOINTS.DICT_CATEGORY_UPDATE,
     deleteEndpoint: SYSTEM_ENDPOINTS.DICT_CATEGORY_DELETE,
-    idField: 'code',
-    fields: ['code', 'name', 'description', 'display_name', 'sort_order', 'icon', 'status']
+    idField: 'category_code',  // 后端主键字段名
+    codeField: 'category_code', // 代码字段（用于显示）
+    nameField: 'display_name',  // 名称字段（用于显示）
+    fields: ['category_code', 'display_name', 'description', 'icon_url', 'sort_order', 'is_enabled']
   },
   rarities: {
     name: '稀有度字典',
@@ -37,8 +44,10 @@ const DICT_TYPES = {
     createEndpoint: SYSTEM_ENDPOINTS.DICT_RARITY_CREATE,
     updateEndpoint: SYSTEM_ENDPOINTS.DICT_RARITY_UPDATE,
     deleteEndpoint: SYSTEM_ENDPOINTS.DICT_RARITY_DELETE,
-    idField: 'code',
-    fields: ['code', 'name', 'color', 'description', 'level', 'drop_rate_modifier', 'status']
+    idField: 'rarity_code',     // 后端主键字段名
+    codeField: 'rarity_code',   // 代码字段（用于显示）
+    nameField: 'display_name',  // 名称字段（用于显示）
+    fields: ['rarity_code', 'display_name', 'description', 'color_hex', 'tier', 'sort_order', 'is_enabled']
   },
   'asset-groups': {
     name: '资产分组字典',
@@ -47,8 +56,10 @@ const DICT_TYPES = {
     createEndpoint: SYSTEM_ENDPOINTS.DICT_ASSET_GROUP_CREATE,
     updateEndpoint: SYSTEM_ENDPOINTS.DICT_ASSET_GROUP_UPDATE,
     deleteEndpoint: SYSTEM_ENDPOINTS.DICT_ASSET_GROUP_DELETE,
-    idField: 'code',
-    fields: ['code', 'name', 'description', 'display_name', 'sort_order', 'status']
+    idField: 'group_code',      // 后端主键字段名
+    codeField: 'group_code',    // 代码字段（用于显示）
+    nameField: 'display_name',  // 名称字段（用于显示）
+    fields: ['group_code', 'display_name', 'description', 'group_type', 'color_hex', 'sort_order', 'is_enabled', 'is_tradable']
   }
 }
 
@@ -66,14 +77,16 @@ export function useDictState() {
     dictList: [],
     /** @type {Object} 字典筛选条件 */
     dictFilters: { keyword: '', status: '' },
-    /** @type {Object} 字典表单 */
+    /** @type {Object} 字典表单（使用后端字段名） */
     dictForm: {
-      code: '',
-      name: '',
-      description: '',
-      display_name: '',
-      sort_order: 0,
-      status: 'active'
+      category_code: '',    // 类目: category_code / 稀有度: rarity_code / 资产分组: group_code
+      display_name: '',     // 显示名称
+      description: '',      // 描述
+      icon_url: '',         // 图标URL（类目）
+      color_hex: '',        // 颜色（稀有度/资产分组）
+      tier: 1,              // 等级（稀有度）
+      sort_order: 0,        // 排序
+      is_enabled: true      // 是否启用
     },
     /** @type {Object|null} 选中的字典项 */
     selectedDict: null,
@@ -173,18 +186,18 @@ export function useDictMethods() {
     },
 
     /**
-     * 获取空的字典表单
+     * 获取空的字典表单（使用后端字段名）
      * @returns {Object} 空表单
      */
     getEmptyDictForm() {
       const config = this.getCurrentDictConfig()
-      const form = { status: 'active' }
+      const form = { is_enabled: true }
       config.fields.forEach(field => {
-        if (field === 'sort_order' || field === 'level') {
+        if (field === 'sort_order' || field === 'tier') {
           form[field] = 0
-        } else if (field === 'drop_rate_modifier') {
-          form[field] = 1.0
-        } else if (field !== 'status') {
+        } else if (field === 'is_enabled' || field === 'is_tradable') {
+          form[field] = true
+        } else if (!form.hasOwnProperty(field)) {
           form[field] = ''
         }
       })
@@ -198,7 +211,8 @@ export function useDictMethods() {
     editDict(dict) {
       const config = this.getCurrentDictConfig()
       this.isEditDict = true
-      this.editingDictCode = dict[config.idField] || dict.code
+      // 使用配置的idField获取主键值
+      this.editingDictCode = dict[config.idField]
       this.dictForm = { ...dict }
       this.showModal('dictModal')
     },
@@ -209,7 +223,7 @@ export function useDictMethods() {
      */
     async viewDictDetail(dict) {
       const config = this.getCurrentDictConfig()
-      const code = dict[config.idField] || dict.code
+      const code = dict[config.idField]
       try {
         const url = buildURL(config.detailEndpoint, { code })
         const response = await this.apiGet(url, {}, { showLoading: true })
@@ -228,8 +242,12 @@ export function useDictMethods() {
      */
     async submitDictForm() {
       const config = this.getCurrentDictConfig()
+      
+      // 获取当前字典类型的代码字段和名称字段
+      const codeValue = this.dictForm[config.codeField]
+      const nameValue = this.dictForm[config.nameField]
 
-      if (!this.dictForm.code || !this.dictForm.name) {
+      if (!codeValue || !nameValue) {
         this.showError('请填写编码和名称')
         return
       }
@@ -271,8 +289,8 @@ export function useDictMethods() {
      */
     async deleteDict(dict) {
       const config = this.getCurrentDictConfig()
-      const code = dict[config.idField] || dict.code
-      const name = dict.name || dict.display_name || code
+      const code = dict[config.idField]
+      const name = dict[config.nameField] || code
 
       await this.confirmAndExecute(
         `确定删除字典「${name}」？`,
@@ -301,17 +319,48 @@ export function useDictMethods() {
     },
 
     /**
-     * 格式化状态显示
-     * @param {string} status - 状态值
+     * 格式化状态显示（后端使用 is_enabled: boolean）
+     * @param {boolean|string} status - 状态值（boolean或字符串）
      * @returns {Object} 状态显示配置
      */
     formatDictStatus(status) {
+      // 处理布尔值（后端字段 is_enabled）
+      if (typeof status === 'boolean') {
+        return status 
+          ? { label: '启用', class: 'bg-green-100 text-green-800' }
+          : { label: '禁用', class: 'bg-gray-100 text-gray-800' }
+      }
+      // 兼容字符串状态
       const statusMap = {
         active: { label: '启用', class: 'bg-green-100 text-green-800' },
         inactive: { label: '禁用', class: 'bg-gray-100 text-gray-800' },
-        deprecated: { label: '已废弃', class: 'bg-red-100 text-red-800' }
+        deprecated: { label: '已废弃', class: 'bg-red-100 text-red-800' },
+        'true': { label: '启用', class: 'bg-green-100 text-green-800' },
+        'false': { label: '禁用', class: 'bg-gray-100 text-gray-800' }
       }
-      return statusMap[status] || { label: status, class: 'bg-gray-100 text-gray-800' }
+      return statusMap[String(status)] || { label: String(status), class: 'bg-gray-100 text-gray-800' }
+    },
+
+    /**
+     * 获取字典项的代码值（根据当前字典类型）
+     * @param {Object} dict - 字典对象
+     * @returns {string} 代码值
+     */
+    getDictCode(dict) {
+      if (!dict) return '-'
+      const config = this.getCurrentDictConfig()
+      return dict[config.codeField] || '-'
+    },
+
+    /**
+     * 获取字典项的名称值（根据当前字典类型）
+     * @param {Object} dict - 字典对象
+     * @returns {string} 名称值
+     */
+    getDictName(dict) {
+      if (!dict) return '-'
+      const config = this.getCurrentDictConfig()
+      return dict[config.nameField] || '-'
     }
   }
 }

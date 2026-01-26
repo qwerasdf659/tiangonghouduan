@@ -2,9 +2,14 @@
  * P1 修复验证测试
  *
  * 验证三项 P1 修复：
- * 1. P1-1：材料转换风控校验按 group_code 限定
+ * 1. P1-1：材料转换风控校验（V2.1：全局套利检测 + 终点货币限制）
  * 2. P1-2：交易下单幂等冲突校验强制 DIAMOND-only
  * 3. P1-3：asset_transactions.user_id 重复外键清理（已通过迁移验证）
+ *
+ * V2.1 更新（2026-01-26）：
+ * - 移除跨组限制，允许不同 group_code 之间的转换
+ * - 新增终点货币（DIAMOND）禁止流出检查
+ * - 套利检测范围从"组内"扩大到"全局"
  *
  * P1-9 J2-RepoWide 改造：
  * - 通过 ServiceManager 统一获取服务
@@ -92,9 +97,12 @@ describe('P1 修复验证测试', () => {
     }
   })
 
-  describe('P1-1：材料转换风控校验按 group_code 限定', () => {
-    test('应该拒绝跨组转换规则（red组 → orange组）', async () => {
-      // 准备测试数据：红组材料 → 橙组材料（跨组转换）
+  describe('P1-1：材料转换风控校验（V2.1 全局套利检测 + 终点货币限制）', () => {
+    test('V2.1：应该允许跨组转换规则（red组 → orange组）', async () => {
+      /*
+       * V2.1 业务变更：移除跨组限制，允许不同 group_code 之间的转换
+       * 准备测试数据：红组材料 → 橙组材料（跨组转换）
+       */
       const newRule = {
         from_asset_code: 'test_red_shard',
         to_asset_code: 'test_orange_shard',
@@ -107,11 +115,33 @@ describe('P1 修复验证测试', () => {
       // 执行风控校验
       const result = await MaterialConversionValidator.validate(newRule, { transaction })
 
-      // 验证：应该拒绝跨组转换
+      // 验证：V2.1 现在允许跨组转换（除非有环路/套利/终点货币问题）
+      expect(result.valid).toBe(true)
+      expect(result.errors).toHaveLength(0)
+    })
+
+    test('V2.1：应该拒绝终点货币（DIAMOND）作为转换源', async () => {
+      /*
+       * V2.1 新增硬约束：终点货币（DIAMOND）禁止流出
+       * 业务规则：钻石是系统「终点货币」，只进不出
+       */
+      const newRule = {
+        from_asset_code: 'DIAMOND',
+        to_asset_code: 'test_red_shard',
+        from_amount: 20,
+        to_amount: 1,
+        is_enabled: true,
+        effective_at: new Date()
+      }
+
+      // 执行风控校验
+      const result = await MaterialConversionValidator.validate(newRule, { transaction })
+
+      // 验证：应该拒绝 DIAMOND 作为转换源
       expect(result.valid).toBe(false)
       expect(result.errors.length).toBeGreaterThan(0)
-      expect(result.errors[0]).toMatch(/跨组转换规则被拒绝/)
-      expect(result.errors[0]).toMatch(/red.*orange/)
+      expect(result.errors[0]).toMatch(/终点货币/)
+      expect(result.errors[0]).toMatch(/DIAMOND/)
     })
 
     test('应该允许组内转换规则（red组内：test_red_shard → test_red_crystal）', async () => {
@@ -125,11 +155,11 @@ describe('P1 修复验证测试', () => {
         effective_at: new Date()
       }
 
-      // 执行风控校验（假设组内无环路）
+      // 执行风控校验（假设无环路）
       const result = await MaterialConversionValidator.validate(newRule, { transaction })
 
       /*
-       * 验证：组内转换应该通过基本校验（除非有环路）
+       * 验证：转换规则应该通过基本校验（除非有环路）
        * 注意：如果实际存在环路，这个测试会失败，这是正常的
        */
       if (!result.valid) {
@@ -138,10 +168,10 @@ describe('P1 修复验证测试', () => {
       }
     })
 
-    test('应该只在同一 group_code 内检测环路', async () => {
+    test('V2.1：环路检测应该在全局范围进行', async () => {
       /*
-       * 这个测试验证环路检测只在组内进行
-       * 准备测试数据：红组内可能形成环路的规则
+       * V2.1 变更：环路检测范围从"组内"扩大到"全局"
+       * 准备测试数据：可能形成环路的规则
        */
       const newRule = {
         from_asset_code: 'test_red_shard',
@@ -154,9 +184,9 @@ describe('P1 修复验证测试', () => {
 
       const result = await MaterialConversionValidator.validate(newRule, { transaction })
 
-      // 如果检测到环路，错误信息应该包含组标识
+      // 如果检测到环路，错误信息应该包含"全局"标识
       if (!result.valid && result.errors.some(e => e.includes('循环转换路径'))) {
-        expect(result.errors[0]).toMatch(/red.*组内/)
+        expect(result.errors[0]).toMatch(/全局/)
       }
     })
   })

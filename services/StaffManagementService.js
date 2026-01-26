@@ -586,14 +586,23 @@ class StaffManagementService {
    * @param {Object} filters - 筛选条件
    * @param {number} [filters.store_id] - 门店ID（可选）
    * @param {number} [filters.user_id] - 员工用户ID（可选）
-   * @param {string} [filters.status] - 状态（可选）：active/inactive/pending
+   * @param {string} [filters.status] - 状态（可选）：active/inactive/pending/deleted
    * @param {string} [filters.role_in_store] - 门店内角色（可选）：staff/manager
+   * @param {boolean} [filters.include_deleted=false] - 是否包含已删除记录（默认不包含）
    * @param {number} [filters.page=1] - 页码
    * @param {number} [filters.page_size=20] - 每页数量
    * @returns {Promise<Object>} { staff, total, page, page_size }
    */
   static async getStaffList(filters = {}) {
-    const { store_id, user_id, status, role_in_store, page = 1, page_size = 20 } = filters
+    const {
+      store_id,
+      user_id,
+      status,
+      role_in_store,
+      include_deleted = false,
+      page = 1,
+      page_size = 20
+    } = filters
 
     // 构建查询条件
     const whereClause = {}
@@ -604,7 +613,12 @@ class StaffManagementService {
       whereClause.user_id = user_id
     }
     if (status) {
+      // 如果明确指定状态，使用该状态（包括 deleted）
       whereClause.status = status
+    } else if (!include_deleted) {
+      // 默认排除已删除的记录（V4.6.1 新增）
+      const { Op } = require('sequelize')
+      whereClause.status = { [Op.ne]: 'deleted' }
     }
     if (role_in_store) {
       whereClause.role_in_store = role_in_store
@@ -833,6 +847,120 @@ class StaffManagementService {
 
     const roleInfo = await StaffManagementService.getUserStoreRole(user_id, store_id)
     return roleInfo?.is_manager || false
+  }
+
+  /**
+   * 永久删除员工记录（软删除）
+   *
+   * 业务场景：
+   * - 删除离职员工的历史记录（status=inactive → deleted）
+   * - 强制删除录入错误的在职员工（status=active → deleted，需 force=true）
+   *
+   * 操作类型：
+   * - 常规删除：离职员工（inactive）直接删除
+   * - 强制删除：在职员工（active）需要 force=true 参数
+   *
+   * @param {Object} data - 删除数据
+   * @param {number} data.store_staff_id - 员工记录ID
+   * @param {number} data.operator_id - 操作者ID
+   * @param {string} [data.reason] - 删除原因
+   * @param {boolean} [data.force=false] - 是否强制删除（允许删除在职员工）
+   * @param {Object} options - 选项参数
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
+   * @returns {Promise<StoreStaff>} 更新后的员工记录
+   * @throws {Error} 员工不存在、状态不允许删除等情况
+   *
+   * @since 2026-01-26
+   * @see docs/员工管理删除逻辑优化方案.md
+   */
+  static async permanentDeleteStaff(data, options = {}) {
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(
+      options,
+      'StaffManagementService.permanentDeleteStaff'
+    )
+
+    // 1. 查找员工记录
+    const staffRecord = await StoreStaff.findByPk(data.store_staff_id, {
+      transaction
+    })
+
+    if (!staffRecord) {
+      throw new Error(`员工记录不存在: store_staff_id=${data.store_staff_id}`)
+    }
+
+    // 2. 状态检查
+    if (staffRecord.status === 'deleted') {
+      throw new Error(`员工记录已删除: store_staff_id=${data.store_staff_id}`)
+    }
+
+    if (staffRecord.status === 'active' && !data.force) {
+      throw new Error(
+        `在职员工需要先离职或使用强制删除: store_staff_id=${data.store_staff_id}, status=${staffRecord.status}`
+      )
+    }
+
+    if (staffRecord.status === 'pending') {
+      throw new Error(`待审核员工不能直接删除，请先拒绝审核: store_staff_id=${data.store_staff_id}`)
+    }
+
+    // 3. 保存删除前状态（用于审计日志）
+    const beforeData = {
+      store_staff_id: staffRecord.store_staff_id,
+      user_id: staffRecord.user_id,
+      store_id: staffRecord.store_id,
+      status: staffRecord.status,
+      role_in_store: staffRecord.role_in_store
+    }
+
+    // 4. 执行软删除（更新 status 为 deleted）
+    const deleteReason = data.reason || (data.force ? '强制删除' : '员工记录删除')
+    await staffRecord.update(
+      {
+        status: 'deleted',
+        deleted_at: BeijingTimeHelper.createDatabaseTime(),
+        delete_reason: deleteReason,
+        updated_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      { transaction }
+    )
+
+    // 5. 记录审计日志（关键操作需要幂等键）
+    await AuditLogService.logOperation({
+      operator_id: data.operator_id,
+      operation_type: 'staff_permanent_delete',
+      target_type: 'StoreStaff',
+      target_id: staffRecord.store_staff_id,
+      action: 'delete',
+      before_data: beforeData,
+      after_data: {
+        status: 'deleted',
+        deleted_at: staffRecord.deleted_at,
+        delete_reason: staffRecord.delete_reason
+      },
+      reason: deleteReason,
+      idempotency_key: `staff_delete:${staffRecord.store_staff_id}:${data.operator_id}:${Date.now()}`,
+      is_critical_operation: true,
+      transaction
+    })
+
+    // 6. 清除权限缓存
+    await invalidateUserPermissions(
+      staffRecord.user_id,
+      data.force ? '员工强制删除' : '员工记录删除',
+      data.operator_id
+    )
+
+    logger.info('✅ 员工记录删除成功（软删除）', {
+      store_staff_id: staffRecord.store_staff_id,
+      user_id: staffRecord.user_id,
+      store_id: staffRecord.store_id,
+      previous_status: beforeData.status,
+      force: data.force || false,
+      operator_id: data.operator_id
+    })
+
+    return staffRecord
   }
 }
 

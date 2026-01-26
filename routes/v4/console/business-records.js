@@ -233,13 +233,13 @@ router.get(
             model: User,
             as: 'redeemer',
             attributes: ['user_id', 'nickname', 'mobile'],
-            required: false  // LEFT JOIN - 待核销状态时 redeemer_user_id 为 NULL
+            required: false // LEFT JOIN - 待核销状态时 redeemer_user_id 为 NULL
           },
           {
             model: ItemInstance,
             as: 'item_instance',
             attributes: ['item_instance_id', 'item_type', 'meta'],
-            required: false  // LEFT JOIN - 确保即使关联不存在也返回主表记录
+            required: false // LEFT JOIN - 确保即使关联不存在也返回主表记录
           }
         ],
         ...pagination
@@ -348,13 +348,13 @@ router.get(
             model: User,
             as: 'redeemer',
             attributes: ['user_id', 'nickname', 'mobile'],
-            required: false  // LEFT JOIN
+            required: false // LEFT JOIN
           },
           {
             model: ItemInstance,
             as: 'item_instance',
             attributes: ['item_instance_id', 'item_type', 'meta'],
-            required: false  // LEFT JOIN
+            required: false // LEFT JOIN
           }
         ],
         order: [['created_at', 'DESC']],
@@ -431,12 +431,12 @@ router.get(
             model: User,
             as: 'redeemer',
             attributes: ['user_id', 'nickname', 'mobile'],
-            required: false  // LEFT JOIN
+            required: false // LEFT JOIN
           },
           {
             model: ItemInstance,
             as: 'item_instance',
-            required: false  // LEFT JOIN
+            required: false // LEFT JOIN
           }
         ]
       })

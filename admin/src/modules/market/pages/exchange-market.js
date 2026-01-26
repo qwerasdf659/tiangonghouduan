@@ -79,141 +79,8 @@ document.addEventListener('alpine:init', () => {
   }))
 
   /**
-   * 兑换市场页面组件
-   * 使用 composables 模式管理各子模块的状态和方法
-   */
-  Alpine.data('exchangeMarket', () => {
-    const pageMixin = createPageMixin({
-      pageTitle: '兑换市场',
-      loadDataOnInit: false
-    })
-
-    return {
-      ...pageMixin,
-
-      // ========== 基础状态 ==========
-      subPages: SUB_PAGES,
-      saving: false,
-
-      // ========== 各模块状态 ==========
-      ...useExchangeItemsState(),
-      ...useExchangeOrdersState(),
-      ...useExchangeStatsState(),
-
-      // ========== 计算属性 ==========
-      get currentPage() {
-        return Alpine.store('exchangePage')
-      },
-
-      // ========== 生命周期 ==========
-      async init() {
-        logger.info('[ExchangeMarket] 组件初始化...')
-
-        if (typeof pageMixin.init === 'function') {
-          await pageMixin.init.call(this)
-        }
-
-        // 加载资产类型
-        this.loadAssetTypes()
-
-        // 根据当前页面加载数据
-        await this.loadPageData()
-
-        // 监听页面切换
-        window.addEventListener('exchange-page-changed', () => {
-          this.loadPageData()
-        })
-      },
-
-      /**
-       * 根据当前页面加载对应数据
-       */
-      async loadPageData() {
-        const page = this.currentPage
-        logger.debug('[ExchangeMarket] 加载数据:', page)
-
-        try {
-          switch (page) {
-            case 'items':
-              await Promise.all([this.loadItems(), this.loadItemStats()])
-              break
-            case 'orders':
-              await Promise.all([this.loadOrders(), this.loadOrderStats()])
-              break
-            case 'stats':
-              await this.loadExchangeStats()
-              this.$nextTick(() => this.initCharts())
-              break
-          }
-        } catch (error) {
-          logger.error('[ExchangeMarket] 加载数据失败:', error)
-          this.showError?.('加载数据失败')
-        }
-      },
-
-      // ========== 页面切换 ==========
-      switchPage(pageId) {
-        Alpine.store('exchangePage', pageId)
-        window.dispatchEvent(new CustomEvent('exchange-page-changed', { detail: { page: pageId } }))
-      },
-
-      isActive(pageId) {
-        return this.currentPage === pageId
-      },
-
-      // ========== 各模块方法 ==========
-      ...useExchangeItemsMethods(),
-      ...useExchangeOrdersMethods(),
-      ...useExchangeStatsMethods(),
-
-      // ========== 通用工具方法 ==========
-
-      /**
-       * 格式化金额
-       * @param {number} amount - 金额
-       * @returns {string} 格式化后的金额
-       */
-      formatAmount(amount) {
-        if (amount === null || amount === undefined) return '0'
-        return Number(amount).toLocaleString('zh-CN')
-      },
-
-      /**
-       * 格式化日期时间
-       * @param {string} dateStr - 日期字符串
-       * @returns {string} 格式化后的日期
-       */
-      formatDateTime(dateStr) {
-        if (!dateStr) return '-'
-        try {
-          const date = new Date(dateStr)
-          return date.toLocaleString('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-          })
-        } catch {
-          return dateStr
-        }
-      },
-
-      /**
-       * 获取资产类型名称
-       * @param {string} code - 资产类型代码
-       * @returns {string} 资产类型名称
-       */
-      getAssetTypeName(code) {
-        const type = this.assetTypes.find(t => t.asset_code === code)
-        return type?.asset_name || code || '-'
-      }
-    }
-  })
-
-  /**
-   * 兑换市场主组件（兼容旧版）
-   * @deprecated 建议使用 exchangeNavigation + exchangePageContent
+   * 兑换市场主组件
+   * 整合商品管理、订单管理、统计分析的完整兑换市场页面
    */
   Alpine.data('exchangeMarket', () => {
     const pageMixin = createPageMixin({
@@ -284,7 +151,8 @@ document.addEventListener('alpine:init', () => {
           todayOrders: this.exchangeStats?.orders?.total || this.orders?.length || 0,
           pendingShipments: this.exchangeStats?.orders?.pending || 
             (this.orders?.filter(o => o.status === 'pending')?.length) || 0,
-          pointsConsumed: this.exchangeStats?.revenue?.total_points || 0
+          // 使用累计消耗的资产数量
+          pointsConsumed: this.exchangeStats?.revenue?.total_virtual_value || 0
         }
       },
 

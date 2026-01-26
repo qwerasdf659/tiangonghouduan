@@ -12,9 +12,11 @@
  * - **循环拦截（必拦截）**：新增/启用规则后，存在从某个 asset_code 出发可回到自身的路径
  * - **套利闭环拦截（必拦截）**：存在任意闭环使得"沿环路换一圈资产数量不减反增"
  *   - 判定方法：将每条规则倍率 r=to_amount/from_amount 对数化为边权 w=-log(r)，做有向图负环检测（Bellman-Ford）
- *   - 范围限定：同一 group_code + 已生效（effective_at <= NOW()）+ is_enabled=true 的规则集合内
+ *   - 范围限定：全局所有已生效（effective_at <= NOW()）+ is_enabled=true 的规则集合内
+ * - **终点货币禁止流出（必拦截）**：DIAMOND 等终点货币禁止作为 from_asset_code
  *
  * 创建时间：2025-12-15
+ * 更新时间：2026-01-26（V2.1 支持跨组转换 + 终点货币限制）
  */
 
 'use strict'
@@ -211,11 +213,12 @@ class MaterialConversionValidator {
   }
 
   /**
-   * 完整风控校验（循环拦截 + 套利闭环检测）
+   * 完整风控校验（循环拦截 + 套利闭环检测 + 终点货币限制）
    *
-   * 🔴 P1-1 修复：按 group_code 限定风控校验范围
-   * - 不同材料体系（group_code）独立治理，避免跨组误判
-   * - 只在同一 group_code 内检测环路和套利闭环
+   * 🔴 V2.1 更新：
+   * - 移除跨组限制，允许不同 group_code 之间的转换
+   * - 新增终点货币（DIAMOND）禁止流出检查
+   * - 套利检测范围从"组内"扩大到"全局"
    *
    * @param {MaterialConversionRule} newRule - 新增的规则（或待启用的规则）
    * @param {Object} options - 选项参数
@@ -226,10 +229,10 @@ class MaterialConversionValidator {
     const errors = []
 
     try {
-      // 🔴 P1-1 关键修复：必须先获取新规则涉及的材料的 group_code
+      // 🔴 V2.1：获取新规则涉及的材料信息（用于终点货币检查和材料存在性验证）
       const { MaterialAssetType } = require('../models')
 
-      // 查询源材料和目标材料的 group_code（使用 asset_code 查询，非主键）
+      // 查询源材料和目标材料信息（验证存在性 + 终点货币检查）
       const [fromMaterial, toMaterial] = await Promise.all([
         MaterialAssetType.findOne({
           where: { asset_code: newRule.from_asset_code },
@@ -251,20 +254,28 @@ class MaterialConversionValidator {
         return { valid: false, errors }
       }
 
-      // 🔴 P1-1 防呆：强制校验源材料和目标材料必须属于同一 group_code
-      if (fromMaterial.group_code !== toMaterial.group_code) {
+      /*
+       * 🔴 V2.1 硬约束：终点货币（如 DIAMOND）禁止作为转换源
+       * 业务规则：钻石是系统「终点货币」，只进不出
+       */
+      const TERMINAL_CURRENCIES = ['DIAMOND']
+      if (TERMINAL_CURRENCIES.includes(newRule.from_asset_code)) {
         errors.push(
-          `跨组转换规则被拒绝：源材料 ${newRule.from_asset_code} (${fromMaterial.group_code}组) ` +
-            `与目标材料 ${newRule.to_asset_code} (${toMaterial.group_code}组) 不属于同一材料组`
+          `转换规则被拒绝：${newRule.from_asset_code} 是终点货币（只进不出），禁止转化为其他资产。` +
+            `如需调整此规则，请修改 TERMINAL_CURRENCIES 配置。`
         )
         return { valid: false, errors }
       }
 
-      const targetGroupCode = fromMaterial.group_code
+      /*
+       * 🔴 V2.1 移除跨组限制：允许不同 group_code 之间的转换
+       * 原跨组校验代码已删除，现在依赖全局套利检测进行风控
+       */
 
       /*
-       * 🔴 P1-1 核心修复：查询规则时按 group_code 限定范围
-       * 只查询与新规则同一 group_code 的已生效且启用的规则
+       * 🔴 V2.1 核心修改：全局范围查询规则
+       * 查询所有已生效且启用的规则（不再按 group_code 过滤）
+       * 这样可以检测跨组规则组合形成的闭环和套利路径
        */
       const effectiveRules = await MaterialConversionRule.findAll({
         where: {
@@ -277,35 +288,32 @@ class MaterialConversionValidator {
           {
             model: MaterialAssetType,
             as: 'fromMaterial',
-            where: { group_code: targetGroupCode },
+            // 🔴 V2.1 移除 where: { group_code: targetGroupCode } 条件
             attributes: ['asset_code', 'group_code']
           }
         ],
         transaction: options.transaction
       })
 
-      // 将新规则加入规则集合（用于模拟新规则启用后的图结构）
+      // 将新规则加入规则集合（模拟新规则启用后的图结构）
       const allRules = [...effectiveRules, newRule]
 
-      // 构建规则有向图（仅包含同一 group_code 的规则）
+      // 构建规则有向图（全局规则）
       const graph = this.buildRuleGraph(allRules)
 
-      // 1. 循环拦截检测（组内独立检测）
+      // 1. 循环拦截检测（全局范围检测）
       const cycleResult = this.detectCycle(graph)
       if (cycleResult.hasCycle) {
         const cyclePath = cycleResult.cycle.join(' → ')
-        errors.push(
-          `检测到循环转换路径（${targetGroupCode}组内）：${cyclePath}。` +
-            '禁止出现可回到自身的转换闭环。'
-        )
+        errors.push(`检测到循环转换路径（全局）：${cyclePath}。` + '禁止出现可回到自身的转换闭环。')
       }
 
-      // 2. 套利闭环检测（负环检测，组内独立检测）
+      // 2. 套利闭环检测（负环检测，全局范围检测）
       const negativeCycleResult = this.detectNegativeCycle(graph)
       if (negativeCycleResult.hasNegativeCycle) {
         const cyclePath = negativeCycleResult.cycle.join(' → ')
         errors.push(
-          `检测到套利闭环（${targetGroupCode}组内）：${cyclePath}。` +
+          `检测到套利闭环（全局）：${cyclePath}。` +
             '沿此环路转换一圈可增加资产总量，存在套利风险。'
         )
       }

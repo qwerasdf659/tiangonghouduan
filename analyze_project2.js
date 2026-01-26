@@ -280,7 +280,6 @@ async function analyze() {
     console.log('\n\n========================================')
     console.log('✅ 分析完成')
     console.log('========================================')
-
   } catch (error) {
     console.error('❌ 错误:', error.message)
     console.error(error.stack)
@@ -290,4 +289,3 @@ async function analyze() {
 }
 
 analyze()
-

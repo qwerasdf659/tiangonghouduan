@@ -1,0 +1,95 @@
+# 数据库备份摘要报告
+## 备份信息
+- 备份日期（北京时间）: 2026-01-26
+- 备份时间: 2026/01/26 04:53:28
+- 数据库: restaurant_points_dev
+- 主机: dbconn.sealosbja.site:42569
+
+## 备份统计
+- 总表数: 69
+- 总行数: 66797
+- 空表数: 10
+- 错误表数: 0
+
+## 备份文件
+- JSON备份: complete_backup_2026-01-26_2026-01-26_04-53-28.json (34.26 MB)
+- SQL备份: complete_backup_2026-01-26_2026-01-26_04-53-28.sql (12.32 MB)
+- MD5校验: BACKUP_MD5.txt
+
+## 表详情
+✅ account_asset_balances: 24 行
+✅ accounts: 27 行
+✅ admin_operation_logs: 4527 行
+✅ administrative_regions: 44703 行
+✅ api_idempotency_requests: 1434 行
+✅ asset_group_defs: 8 行
+✅ asset_transactions: 5680 行
+✅ authentication_sessions: 70 行
+✅ category_defs: 8 行
+✅ chat_messages: 8 行
+✅ consumption_records: 10 行
+✅ content_review_records: 306 行
+✅ customer_service_sessions: 1 行
+✅ exchange_items: 31 行
+✅ exchange_records: 7 行
+✅ feature_flags: 7 行
+✅ feedbacks: 26 行
+✅ image_resources: 5 行
+✅ item_instance_events: 1141 行
+✅ item_instances: 2190 行
+✅ item_templates: 15 行
+✅ lottery_campaign_pricing_config: 11 行
+✅ lottery_campaign_quota_grants: 0 行
+✅ lottery_campaign_user_quota: 0 行
+✅ lottery_campaigns: 4 行
+✅ lottery_clear_setting_records: 549 行
+✅ lottery_daily_metrics: 0 行
+✅ lottery_draw_decisions: 0 行
+✅ lottery_draw_quota_rules: 7 行
+✅ lottery_draws: 17 行
+✅ lottery_hourly_metrics: 0 行
+✅ lottery_management_settings: 2515 行
+✅ lottery_presets: 2 行
+✅ lottery_prizes: 30 行
+✅ lottery_strategy_config: 17 行
+✅ lottery_tier_matrix_config: 12 行
+✅ lottery_tier_rules: 9 行
+✅ lottery_user_daily_draw_quota: 7 行
+✅ lottery_user_experience_state: 0 行
+✅ lottery_user_global_state: 0 行
+✅ market_listings: 48 行
+✅ material_asset_types: 4 行
+✅ material_conversion_rules: 1 行
+✅ merchant_operation_logs: 77 行
+✅ popup_banners: 3 行
+✅ preset_budget_debt: 0 行
+✅ preset_debt_limits: 1 行
+✅ preset_inventory_debt: 0 行
+✅ products: 52 行
+✅ rarity_defs: 6 行
+✅ redemption_orders: 1020 行
+✅ risk_alerts: 6 行
+✅ roles: 10 行
+✅ sequelizemeta: 282 行
+✅ store_staff: 3 行
+✅ stores: 5 行
+✅ system_announcements: 8 行
+✅ system_dictionaries: 244 行
+✅ system_dictionary_history: 0 行
+✅ system_settings: 39 行
+✅ trade_orders: 4 行
+✅ user_hierarchy: 9 行
+✅ user_premium_status: 1 行
+✅ user_risk_profiles: 3 行
+✅ user_role_change_records: 196 行
+✅ user_roles: 23 行
+✅ user_status_change_records: 196 行
+✅ users: 31 行
+✅ websocket_startup_logs: 1117 行
+
+## 外键约束统计
+- 总外键数: 98
+- 涉及表数: 48
+
+## 备份完成
+✅ 备份已成功完成于 2026/01/26 04:53:28

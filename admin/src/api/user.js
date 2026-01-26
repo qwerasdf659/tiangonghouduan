@@ -266,9 +266,8 @@ export const USER_ENDPOINTS = {
   /** @type {string} [POST] 失效用户所有会话（强制下线） - Body: { user_type, user_id, reason? } */
   SESSIONS_DEACTIVATE_USER: '/api/v4/console/sessions/deactivate-user',
 
-  // 用户统计
-  /** @type {string} [GET] 获取用户统计 - Query: { period? } */
-  STATS: '/api/v4/console/user-management/stats',
+  // 用户统计（后端暂未实现）
+  // STATS: '/api/v4/console/user-management/stats',
 
   // 概率调整
   /** @type {string} [POST] 调整用户中奖概率 - Path: :user_id, Body: { probability, reason } */
@@ -280,27 +279,20 @@ export const USER_ENDPOINTS = {
   /** @type {string} [POST] 登出 */
   AUTH_LOGOUT: '/api/v4/console/auth/logout',
 
-  // 权限扩展
+  // 权限扩展（使用 /api/v4/permissions 独立模块）
   /** @type {string} [GET] 获取权限列表 */
-  PERMISSION_LIST: '/api/v4/console/permissions',
+  PERMISSION_LIST: '/api/v4/permissions/me',
 
-  // 角色扩展
+  // 角色扩展（使用 user-management 模块）
   /** @type {string} [GET] 获取角色列表 */
-  ROLE_LIST: '/api/v4/console/roles',
-  /** @type {string} [GET] 获取角色权限 - Path: :role_id */
-  ROLE_PERMISSIONS: '/api/v4/console/roles/:role_id/permissions',
-  /** @type {string} [POST] 分配权限给角色 - Path: :role_id, Body: { permission_ids } */
-  ROLE_ASSIGN_PERMISSION: '/api/v4/console/roles/:role_id/permissions',
-  /** @type {string} [DELETE] 移除角色权限 - Path: :role_id/:permission_id */
-  ROLE_REMOVE_PERMISSION: '/api/v4/console/roles/:role_id/permissions/:permission_id',
+  ROLE_LIST: '/api/v4/console/user-management/roles',
+  // 注意：后端没有角色权限CRUD的独立API，权限是嵌入在角色的 permissions JSON 字段中
 
   // 用户角色管理
-  /** @type {string} [GET] 获取用户角色列表 */
-  USER_ROLE_LIST: '/api/v4/console/user-roles',
-  /** @type {string} [POST] 分配角色给用户 - Body: { user_id, role_id } */
-  USER_ROLE_ASSIGN: '/api/v4/console/user-roles',
-  /** @type {string} [DELETE] 移除用户角色 - Path: :user_id/:role_id */
-  USER_ROLE_REMOVE: '/api/v4/console/user-roles/:user_id/:role_id',
+  /** @type {string} [GET] 查询用户角色列表（只读，来自 system-data 模块） */
+  USER_ROLE_LIST: '/api/v4/console/system-data/user-roles',
+  // 注意：后端没有 POST/DELETE 用户角色的 API
+  // 用户角色变更应使用 UPDATE_ROLE (PUT /api/v4/console/user-management/users/:user_id/role)
 
   // 角色变更历史（来自 business-records 路由）
   /** @type {string} [GET] 获取角色变更历史 - Query: { user_id?, operator_id?, old_role?, new_role?, start_date?, end_date?, page?, page_size? } */

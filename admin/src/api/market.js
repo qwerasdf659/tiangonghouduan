@@ -167,7 +167,8 @@ export const MARKET_ENDPOINTS = {
   /** @type {string} [GET] 获取兑换统计 */
   EXCHANGE_STATS: '/api/v4/console/marketplace/exchange_market/statistics',
   /** @type {string} [GET] 获取兑换完整统计 */
-  EXCHANGE_FULL_STATS: '/api/v4/console/marketplace/exchange_market/statistics/full',
+  // 使用后端存在的统计接口（后端无 /full 接口）
+  EXCHANGE_FULL_STATS: '/api/v4/console/marketplace/exchange_market/statistics',
   /** @type {string} [GET] 获取兑换趋势数据 */
   EXCHANGE_TREND: '/api/v4/console/marketplace/exchange_market/statistics/trend',
   /** @type {string} [GET] 获取兑换订单统计 */

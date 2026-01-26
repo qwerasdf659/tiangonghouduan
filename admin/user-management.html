@@ -31,9 +31,11 @@
           <button 
             @click="switchPage(page.id)"
             :class="currentPage === page.id ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'"
-            class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
-            x-text="page.icon + ' ' + page.title"
-          ></button>
+            class="px-6 py-3 font-medium whitespace-nowrap transition-colors flex items-center gap-2"
+          >
+            <i :class="page.icon"></i>
+            <span x-text="page.title"></span>
+          </button>
         </template>
       </div>
     </div>
@@ -148,14 +150,14 @@
                 </tr>
               </thead>
               <tbody class="divide-y">
-                <template x-for="role in roles" :key="role.role_code">
+                <template x-for="role in roles" :key="role.role_id">
                   <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3 text-sm font-mono" x-text="role.role_code"></td>
+                    <td class="px-4 py-3 text-sm font-mono" x-text="role.role_id"></td>
                     <td class="px-4 py-3 text-sm" x-text="role.role_name"></td>
                     <td class="px-4 py-3">
                       <span class="px-2 py-1 text-xs rounded text-white" 
-                            :class="role.permission_level >= 80 ? 'bg-red-500' : (role.permission_level >= 40 ? 'bg-yellow-500' : 'bg-gray-400')"
-                            x-text="'Lv.' + role.permission_level"></span>
+                            :class="role.role_level >= 80 ? 'bg-red-500' : (role.role_level >= 40 ? 'bg-yellow-500' : 'bg-gray-400')"
+                            x-text="'Lv.' + role.role_level"></span>
                     </td>
                     <td class="px-4 py-3 text-sm text-gray-500" x-text="role.description || '-'"></td>
                     <td class="px-4 py-3">
@@ -172,14 +174,19 @@
         </div>
       </div>
 
-      <!-- 权限管理页 -->
+      <!-- 权限管理页（只读展示 - 权限嵌入在角色中） -->
       <div x-show="currentPage === 'permission-list'" x-cloak>
         <div class="bg-white rounded-lg shadow">
-          <div class="p-4 border-b flex justify-between items-center">
-            <h5 class="font-semibold">权限管理</h5>
-            <button @click="openCreateModal('permission')" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
-              ➕ 新增权限
-            </button>
+          <div class="p-4 border-b">
+            <div class="flex justify-between items-center">
+              <h5 class="font-semibold">权限配置概览</h5>
+              <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded">
+                📋 权限由角色定义，请在"角色管理"中配置
+              </span>
+            </div>
+            <p class="text-sm text-gray-500 mt-2">
+              💡 系统权限嵌入在角色配置中。如需修改权限，请编辑对应角色的权限配置。
+            </p>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full">
@@ -188,17 +195,24 @@
                   <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">权限代码</th>
                   <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">权限名称</th>
                   <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">描述</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">拥有角色</th>
                 </tr>
               </thead>
               <tbody class="divide-y">
+                <template x-if="!loading && permissions.length === 0">
+                  <tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">暂无权限数据，请先在角色管理中配置角色权限</td></tr>
+                </template>
                 <template x-for="perm in permissions" :key="perm.permission_code">
                   <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3 text-sm font-mono" x-text="perm.permission_code"></td>
-                    <td class="px-4 py-3 text-sm" x-text="perm.permission_name"></td>
+                    <td class="px-4 py-3 text-sm font-mono bg-gray-50" x-text="perm.permission_code"></td>
+                    <td class="px-4 py-3 text-sm font-medium" x-text="perm.permission_name"></td>
                     <td class="px-4 py-3 text-sm text-gray-500" x-text="perm.description || '-'"></td>
                     <td class="px-4 py-3">
-                      <button @click="editPermission(perm)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                      <div class="flex flex-wrap gap-1">
+                        <template x-for="role in (perm.roles || [])" :key="role">
+                          <span class="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded" x-text="role"></span>
+                        </template>
+                      </div>
                     </td>
                   </tr>
                 </template>
@@ -223,21 +237,39 @@
                 <tr>
                   <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户ID</th>
                   <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户昵称</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">手机号</th>
                   <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">角色</th>
                   <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">分配时间</th>
                   <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
                 </tr>
               </thead>
               <tbody class="divide-y">
-                <template x-for="ur in userRoles" :key="ur.id">
+                <template x-for="(ur, index) in userRoles" :key="`${ur.user_id}_${ur.role_id}_${index}`">
                   <tr class="hover:bg-gray-50">
                     <td class="px-4 py-3 text-sm" x-text="ur.user_id"></td>
                     <td class="px-4 py-3 text-sm" x-text="ur.user?.nickname || '-'"></td>
-                    <td class="px-4 py-3 text-sm" x-text="ur.role?.role_name || ur.role_code"></td>
-                    <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(ur.created_at)"></td>
-                    <td class="px-4 py-3">
-                      <button @click="revokeUserRole(ur)" class="text-red-500 hover:text-red-700 text-sm">撤销</button>
+                    <td class="px-4 py-3 text-sm" x-text="ur.user?.mobile || '-'"></td>
+                    <td class="px-4 py-3 text-sm">
+                      <span class="px-2 py-1 rounded text-xs" 
+                            :class="ur.role?.role_level >= 100 ? 'bg-red-100 text-red-700' : ur.role?.role_level >= 50 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'"
+                            x-text="ur.role?.role_name || ur.role_name || '-'"></span>
                     </td>
+                    <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(ur.assigned_at || ur.created_at)"></td>
+                    <td class="px-4 py-3">
+                      <select @change="changeUserRole(ur, $event.target.value); $event.target.value=''" 
+                              class="text-sm border rounded px-2 py-1">
+                        <option value="">更改角色...</option>
+                        <template x-for="role in roles" :key="role.role_id">
+                          <option :value="role.role_name" x-text="role.role_name" 
+                                  :disabled="role.role_name === (ur.role?.role_name || ur.role_name)"></option>
+                        </template>
+                      </select>
+                    </td>
+                  </tr>
+                </template>
+                <template x-if="!userRoles || userRoles.length === 0">
+                  <tr>
+                    <td colspan="6" class="px-4 py-8 text-center text-gray-500">暂无用户角色数据</td>
                   </tr>
                 </template>
               </tbody>
@@ -331,7 +363,7 @@
                       ></span>
                     </td>
                     <td class="px-4 py-3 text-sm" x-text="getUnlockMethodText(user.unlock_method)"></td>
-                    <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(user.unlocked_at || user.created_at)"></td>
+                    <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(user.unlock_time || user.created_at)"></td>
                     <td class="px-4 py-3 text-sm text-gray-500" x-text="user.expires_at ? formatDate(user.expires_at) : '永久'"></td>
                     <td class="px-4 py-3">
                       <button @click="viewPremiumDetail(user)" class="text-blue-500 hover:text-blue-700 text-sm">查看详情</button>
@@ -400,7 +432,7 @@
                 <template x-for="fuser in frozenUsers.slice(0, 10)" :key="fuser.user_id">
                   <span class="px-2 py-1 bg-red-200 text-red-800 rounded text-sm">
                     <span x-text="fuser.user_id"></span>
-                    <button @click="unfreezeUser(fuser.user_id)" class="ml-1 text-red-600 hover:text-red-800">✕</button>
+                    <button @click="unfreezeUser(fuser)" class="ml-1 text-red-600 hover:text-red-800">✕</button>
                   </span>
                 </template>
                 <template x-if="frozenUsers.length > 10">
@@ -431,13 +463,20 @@
                 <template x-if="!loading && riskProfiles.length === 0">
                   <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">暂无风控配置数据</td></tr>
                 </template>
-                <template x-for="profile in riskProfiles" :key="profile.id || profile.user_id">
+                <template x-for="(profile, index) in riskProfiles" :key="profile.risk_profile_id || `risk_${index}`">
                   <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3 text-sm" x-text="profile.user_id || '-'"></td>
+                    <td class="px-4 py-3 text-sm">
+                      <template x-if="profile.user_id">
+                        <span x-text="profile.user_id"></span>
+                      </template>
+                      <template x-if="!profile.user_id">
+                        <span class="text-gray-400 text-xs">[等级默认]</span>
+                      </template>
+                    </td>
                     <td class="px-4 py-3 text-sm" x-text="profile.user_level || '默认'"></td>
-                    <td class="px-4 py-3 text-sm" x-text="profile.daily_points_limit || '-'"></td>
-                    <td class="px-4 py-3 text-sm" x-text="profile.single_transaction_limit || '-'"></td>
-                    <td class="px-4 py-3 text-sm" x-text="profile.daily_lottery_limit || '-'"></td>
+                    <td class="px-4 py-3 text-sm" x-text="profile.thresholds?.daily_points_limit || profile.daily_points_limit || '-'"></td>
+                    <td class="px-4 py-3 text-sm" x-text="profile.thresholds?.single_transaction_limit || profile.single_transaction_limit || '-'"></td>
+                    <td class="px-4 py-3 text-sm" x-text="profile.thresholds?.daily_lottery_limit || profile.daily_lottery_limit || '-'"></td>
                     <td class="px-4 py-3">
                       <span 
                         :class="profile.is_frozen ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'"
@@ -450,7 +489,7 @@
                         <button @click="openEditRiskModal(profile)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
                         <template x-if="profile.user_id">
                           <button 
-                            @click="profile.is_frozen ? unfreezeUser(profile.user_id) : freezeUser(profile.user_id, '管理员操作')" 
+                            @click="profile.is_frozen ? unfreezeUser(profile) : freezeUser(profile)" 
                             :class="profile.is_frozen ? 'text-blue-500 hover:text-blue-700' : 'text-red-500 hover:text-red-700'"
                             class="text-sm"
                             x-text="profile.is_frozen ? '解冻' : '冻结'"
@@ -476,9 +515,162 @@
         </div>
       </div>
 
+      <!-- 角色变更历史页 -->
+      <div x-show="currentPage === 'role-history'" x-cloak>
+        <div class="bg-white rounded-lg shadow">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">📜 角色变更历史</h5>
+            <button @click="loadRoleChangeHistory(); showSuccess('数据已刷新')" 
+                    class="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                    :disabled="loading">
+              <span x-show="loading" class="inline-block w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin mr-1"></span>
+              🔄 刷新
+            </button>
+          </div>
+          
+          <!-- 筛选区域 -->
+          <div class="p-4 border-b bg-gray-50">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <input type="text" x-model="roleHistoryFilters.user_id" placeholder="用户ID" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="text" x-model="roleHistoryFilters.operator_id" placeholder="操作人ID" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="date" x-model="roleHistoryFilters.startDate" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="date" x-model="roleHistoryFilters.endDate" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <button @click="loadRoleChangeHistory()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+                🔍 搜索
+              </button>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户ID</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户昵称</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">原角色</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">新角色</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">变更原因</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作人</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">变更时间</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-if="!roleChangeHistory || roleChangeHistory.length === 0">
+                  <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">暂无角色变更记录</td></tr>
+                </template>
+                <template x-for="(record, index) in roleChangeHistory" :key="`role-change-${record.id || index}`">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 text-sm" x-text="record.user_id"></td>
+                    <td class="px-4 py-3 text-sm" x-text="record.user?.nickname || record.nickname || '-'"></td>
+                    <td class="px-4 py-3 text-sm">
+                      <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs" x-text="record.old_role || record.old_role_name || '-'"></span>
+                    </td>
+                    <td class="px-4 py-3 text-sm">
+                      <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs" x-text="record.new_role || record.new_role_name || '-'"></span>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-500" x-text="record.reason || record.change_reason || '-'"></td>
+                    <td class="px-4 py-3 text-sm" x-text="record.operator?.nickname || record.operator_id || '-'"></td>
+                    <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(record.created_at || record.change_time)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 分页 -->
+          <div class="p-4 border-t flex justify-between items-center">
+            <span class="text-sm text-gray-500">共 <span x-text="roleHistoryPagination.total || 0"></span> 条记录</span>
+            <div class="flex space-x-2">
+              <button @click="goToRoleHistoryPage(roleHistoryPage - 1)" :disabled="roleHistoryPage <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
+              <span class="px-3 py-1">第 <span x-text="roleHistoryPage"></span> / <span x-text="roleHistoryPagination.totalPages || 1"></span> 页</span>
+              <button @click="goToRoleHistoryPage(roleHistoryPage + 1)" :disabled="roleHistoryPage >= (roleHistoryPagination.totalPages || 1)" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 状态变更历史页 -->
+      <div x-show="currentPage === 'status-history'" x-cloak>
+        <div class="bg-white rounded-lg shadow">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">📋 状态变更历史</h5>
+            <button @click="loadStatusChangeHistory(); showSuccess('数据已刷新')" 
+                    class="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                    :disabled="loading">
+              <span x-show="loading" class="inline-block w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin mr-1"></span>
+              🔄 刷新
+            </button>
+          </div>
+          
+          <!-- 筛选区域 -->
+          <div class="p-4 border-b bg-gray-50">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <input type="text" x-model="statusHistoryFilters.user_id" placeholder="用户ID" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="text" x-model="statusHistoryFilters.operator_id" placeholder="操作人ID" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="date" x-model="statusHistoryFilters.startDate" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="date" x-model="statusHistoryFilters.endDate" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <button @click="loadStatusChangeHistory()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+                🔍 搜索
+              </button>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户ID</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户昵称</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">原状态</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">新状态</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">变更原因</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作人</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">变更时间</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-if="!statusChangeHistory || statusChangeHistory.length === 0">
+                  <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">暂无状态变更记录</td></tr>
+                </template>
+                <template x-for="(record, index) in statusChangeHistory" :key="`status-change-${record.id || index}`">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 text-sm" x-text="record.user_id"></td>
+                    <td class="px-4 py-3 text-sm" x-text="record.user?.nickname || record.nickname || '-'"></td>
+                    <td class="px-4 py-3 text-sm">
+                      <span class="px-2 py-1 rounded text-xs"
+                            :class="record.old_status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
+                            x-text="record.old_status || '-'"></span>
+                    </td>
+                    <td class="px-4 py-3 text-sm">
+                      <span class="px-2 py-1 rounded text-xs"
+                            :class="record.new_status === 'active' ? 'bg-green-100 text-green-700' : record.new_status === 'frozen' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'"
+                            x-text="record.new_status || '-'"></span>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-500" x-text="record.reason || record.change_reason || '-'"></td>
+                    <td class="px-4 py-3 text-sm" x-text="record.operator?.nickname || record.operator_id || '-'"></td>
+                    <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(record.created_at || record.change_time)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 分页 -->
+          <div class="p-4 border-t flex justify-between items-center">
+            <span class="text-sm text-gray-500">共 <span x-text="statusHistoryPagination.total || 0"></span> 条记录</span>
+            <div class="flex space-x-2">
+              <button @click="goToStatusHistoryPage(statusHistoryPage - 1)" :disabled="statusHistoryPage <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
+              <span class="px-3 py-1">第 <span x-text="statusHistoryPage"></span> / <span x-text="statusHistoryPagination.totalPages || 1"></span> 页</span>
+              <button @click="goToStatusHistoryPage(statusHistoryPage + 1)" :disabled="statusHistoryPage >= (statusHistoryPagination.totalPages || 1)" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 用户统计页 -->
       <div x-show="currentPage === 'user-stats'" x-cloak>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <!-- 统计卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <div class="bg-white rounded-lg shadow p-6 text-center">
             <h6 class="text-gray-500 mb-2">总用户数</h6>
             <h2 class="text-3xl font-bold text-blue-600" x-text="userStats.totalUsers"></h2>
@@ -494,6 +686,112 @@
           <div class="bg-white rounded-lg shadow p-6 text-center">
             <h6 class="text-gray-500 mb-2">权限数量</h6>
             <h2 class="text-3xl font-bold text-orange-600" x-text="userStats.totalPermissions"></h2>
+          </div>
+        </div>
+
+        <!-- 角色分布和权限概览 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- 角色分布 -->
+          <div class="bg-white rounded-lg shadow">
+            <div class="p-4 border-b">
+              <h5 class="font-semibold">🎭 角色分布</h5>
+              <p class="text-sm text-gray-500 mt-1">系统中各角色的配置情况</p>
+            </div>
+            <div class="p-4">
+              <template x-if="roles && roles.length > 0">
+                <div class="space-y-4">
+                  <template x-for="role in roles" :key="role.role_uuid || role.id">
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center"
+                             :class="{
+                               'bg-red-100 text-red-600': role.role_level >= 100,
+                               'bg-orange-100 text-orange-600': role.role_level >= 60 && role.role_level < 100,
+                               'bg-blue-100 text-blue-600': role.role_level >= 30 && role.role_level < 60,
+                               'bg-gray-100 text-gray-600': role.role_level < 30
+                             }">
+                          <i class="bi bi-person-badge"></i>
+                        </div>
+                        <div>
+                          <div class="font-medium" x-text="role.role_name"></div>
+                          <div class="text-xs text-gray-500" x-text="role.description || '无描述'"></div>
+                        </div>
+                      </div>
+                      <div class="text-right">
+                        <div class="text-sm font-medium">级别: <span x-text="role.role_level"></span></div>
+                        <div class="text-xs text-gray-500">
+                          权限: <span x-text="role.permissions ? (typeof role.permissions === 'object' ? Object.keys(role.permissions).length : 0) : 0"></span>项
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+              <template x-if="!roles || roles.length === 0">
+                <div class="text-center py-8 text-gray-500">
+                  <i class="bi bi-inbox text-4xl mb-2"></i>
+                  <p>暂无角色数据</p>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- 权限概览 -->
+          <div class="bg-white rounded-lg shadow">
+            <div class="p-4 border-b">
+              <h5 class="font-semibold">🔐 权限概览</h5>
+              <p class="text-sm text-gray-500 mt-1">从角色中提取的权限分类</p>
+            </div>
+            <div class="p-4">
+              <template x-if="permissions && permissions.length > 0">
+                <div class="space-y-3 max-h-96 overflow-y-auto">
+                  <template x-for="perm in permissions" :key="perm.permission_code">
+                    <div class="flex items-center justify-between p-2 border-b border-gray-100">
+                      <div class="flex items-center space-x-2">
+                        <i class="bi bi-key text-purple-500"></i>
+                        <span class="font-medium" x-text="perm.permission_name || perm.permission_code"></span>
+                      </div>
+                      <div class="flex items-center space-x-2">
+                        <template x-for="role in (perm.roles || []).slice(0, 3)" :key="role">
+                          <span class="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded" x-text="role"></span>
+                        </template>
+                        <template x-if="(perm.roles || []).length > 3">
+                          <span class="text-xs text-gray-500">+<span x-text="(perm.roles || []).length - 3"></span></span>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+              <template x-if="!permissions || permissions.length === 0">
+                <div class="text-center py-8 text-gray-500">
+                  <i class="bi bi-lock text-4xl mb-2"></i>
+                  <p>暂无权限数据</p>
+                  <p class="text-xs mt-1">请先切换到"权限管理"页加载数据</p>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- 用户活跃度统计 -->
+        <div class="mt-6 bg-white rounded-lg shadow">
+          <div class="p-4 border-b">
+            <h5 class="font-semibold">📊 用户活跃度</h5>
+          </div>
+          <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+              <span class="text-gray-600">活跃用户比例</span>
+              <span class="font-medium" x-text="userStats.totalUsers > 0 ? Math.round((userStats.activeUsers / userStats.totalUsers) * 100) + '%' : '0%'"></span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-4">
+              <div class="bg-green-500 h-4 rounded-full transition-all duration-500"
+                   :style="'width: ' + (userStats.totalUsers > 0 ? (userStats.activeUsers / userStats.totalUsers * 100) : 0) + '%'"></div>
+            </div>
+            <div class="flex justify-between text-sm text-gray-500 mt-2">
+              <span>活跃: <span x-text="userStats.activeUsers"></span></span>
+              <span>非活跃: <span x-text="userStats.totalUsers - userStats.activeUsers"></span></span>
+            </div>
           </div>
         </div>
       </div>
@@ -519,10 +817,10 @@
               <div class="space-y-4">
                 <!-- 头像和基本信息 -->
                 <div class="flex items-center space-x-4 pb-4 border-b">
-                  <img :src="selectedUser.avatar_url || '/admin/images/default-avatar.png'" 
+                  <img :src="selectedUser.avatar_url || '/admin/images/default-avatar.svg'" 
                        class="w-20 h-20 rounded-full object-cover border-2 border-gray-200" 
                        alt="头像"
-                       @error="$event.target.src='/admin/images/default-avatar.png'">
+                       @error="$event.target.src='/admin/images/default-avatar.svg'">
                   <div>
                     <h3 class="text-lg font-semibold" x-text="selectedUser.nickname || '未设置昵称'"></h3>
                     <p class="text-gray-500">ID: <span x-text="selectedUser.user_id"></span></p>
@@ -630,15 +928,15 @@
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">选择角色</label>
                 <div class="space-y-2 max-h-60 overflow-y-auto">
-                  <template x-for="role in roles" :key="role.role_code">
+                  <template x-for="role in (roles || [])" :key="role.role_id">
                     <label class="flex items-center p-2 border rounded hover:bg-gray-50 cursor-pointer">
                       <input type="radio" name="userRole" 
-                             :value="role.role_code" 
+                             :value="role.role_uuid || role.id" 
                              x-model="selectedRoleCode"
                              class="mr-3">
                       <span class="px-2 py-0.5 text-xs rounded text-white mr-2" 
-                            :class="role.permission_level >= 80 ? 'bg-red-500' : (role.permission_level >= 40 ? 'bg-yellow-500' : 'bg-gray-400')">
-                        Lv.<span x-text="role.permission_level"></span>
+                            :class="role.role_level >= 80 ? 'bg-red-500' : (role.role_level >= 40 ? 'bg-yellow-500' : 'bg-gray-400')">
+                        Lv.<span x-text="role.role_level"></span>
                       </span>
                       <span x-text="role.role_name"></span>
                       <small class="text-gray-400 ml-2" x-text="role.description || ''"></small>
@@ -676,19 +974,25 @@
             <div class="p-6 space-y-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">用户ID <span class="text-red-500">*</span></label>
-                <input type="text" x-model="assignRoleForm.user_id" 
+                <input type="number" x-model="userRoleForm.user_id" 
                        class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
                        placeholder="请输入用户ID" required>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">选择角色 <span class="text-red-500">*</span></label>
-                <select x-model="assignRoleForm.role_code" 
+                <select x-model="userRoleForm.role_name" 
                         class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" required>
                   <option value="">请选择角色</option>
-                  <template x-for="role in roles" :key="role.role_code">
-                    <option :value="role.role_code" x-text="role.role_name"></option>
+                  <template x-for="role in roles" :key="role.role_id">
+                    <option :value="role.role_name" x-text="role.role_name"></option>
                   </template>
                 </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">变更原因</label>
+                <input type="text" x-model="userRoleForm.reason" 
+                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
+                       placeholder="选填，如：晋升为管理员">
               </div>
             </div>
             <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2">
@@ -780,13 +1084,19 @@
             <h5 class="font-semibold">🛡️ 编辑风控配置</h5>
             <button @click="hideModal('riskProfileModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
           </div>
-          <form @submit.prevent="saveRiskProfile()">
+          <form @submit.prevent="submitRiskProfile()">
             <div class="p-6 space-y-4">
-              <div>
+              <!-- 等级配置显示信息 -->
+              <template x-if="selectedRiskProfile && !selectedRiskProfile.user_id">
+                <div class="p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+                  📋 编辑 <strong x-text="selectedRiskProfile?.user_level || '默认'"></strong> 等级的默认风控配置
+                </div>
+              </template>
+              <div x-show="!selectedRiskProfile || selectedRiskProfile.user_id">
                 <label class="block text-sm font-medium text-gray-700 mb-1">用户ID <span class="text-red-500">*</span></label>
                 <input type="text" x-model="riskForm.user_id" 
                        class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
-                       placeholder="请输入用户ID" required>
+                       placeholder="请输入用户ID" :required="!selectedRiskProfile || selectedRiskProfile.user_id">
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">日积分限额</label>

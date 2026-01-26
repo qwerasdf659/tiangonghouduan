@@ -82,6 +82,13 @@ document.addEventListener('alpine:init', () => {
     // 基础混入
     ...createPageMixin({ pagination: { pageSize: 20 } }),
 
+    // ==================== 备用默认值（防止展开失败）====================
+    // 放在 composables 之前，会被 composables 的值覆盖
+    selectedRoleCode: '',
+    roles: [],
+    permissions: [],
+    selectedUserForRole: null,
+    
     // ==================== 从 Composables 导入状态 ====================
     ...useUsersState(),
     ...useRolesPermissionsState(),
@@ -139,6 +146,9 @@ document.addEventListener('alpine:init', () => {
               await this.loadStatusChangeHistory()
               break
             case 'user-stats':
+              await this.loadUsers()
+              await this.loadRoles()
+              await this.loadPermissions()
               await this.loadUserStats()
               break
           }

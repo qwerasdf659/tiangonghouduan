@@ -89,10 +89,10 @@ module.exports = sequelize => {
        * =================================================================
        */
       status: {
-        type: DataTypes.ENUM('active', 'inactive', 'pending'),
+        type: DataTypes.ENUM('active', 'inactive', 'pending', 'deleted'),
         allowNull: false,
         defaultValue: 'pending',
-        comment: '状态：active=在职，inactive=离职，pending=待审核'
+        comment: '状态：active=在职，inactive=离职，pending=待审核，deleted=已删除'
       },
 
       /*
@@ -136,6 +136,34 @@ module.exports = sequelize => {
         type: DataTypes.STRING(500),
         allowNull: true,
         comment: '备注信息'
+      },
+
+      /*
+       * =================================================================
+       * 删除相关字段（软删除支持）
+       * =================================================================
+       */
+
+      /**
+       * 删除时间（软删除）
+       * @description 当 status='deleted' 时设置，记录删除操作的时间
+       * @since 2026-01-26
+       */
+      deleted_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: '删除时间（status=deleted 时设置）'
+      },
+
+      /**
+       * 删除原因
+       * @description 记录删除操作的原因（录入错误、数据清理等）
+       * @since 2026-01-26
+       */
+      delete_reason: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+        comment: '删除原因'
       }
     },
     {
@@ -204,6 +232,26 @@ module.exports = sequelize => {
         // 仅员工（非店长）
         staff: {
           where: { role_in_store: 'staff', status: 'active' }
+        },
+
+        /**
+         * 仅已删除（软删除记录）
+         * @description 用于查询已删除的员工记录
+         * @since 2026-01-26
+         */
+        deleted: {
+          where: { status: 'deleted' }
+        },
+
+        /**
+         * 排除已删除（推荐用于列表查询）
+         * @description 排除已删除的记录，返回所有有效记录
+         * @since 2026-01-26
+         */
+        notDeleted: {
+          where: {
+            status: { [require('sequelize').Op.ne]: 'deleted' }
+          }
         }
       },
 
@@ -278,7 +326,8 @@ module.exports = sequelize => {
     const statusNames = {
       active: '在职',
       inactive: '离职',
-      pending: '待审核'
+      pending: '待审核',
+      deleted: '已删除'
     }
     return statusNames[this.status] || '未知'
   }
@@ -315,7 +364,10 @@ module.exports = sequelize => {
       operator_id: this.operator_id,
       notes: this.notes,
       created_at: BeijingTimeHelper.formatForAPI(this.created_at),
-      updated_at: BeijingTimeHelper.formatForAPI(this.updated_at)
+      updated_at: BeijingTimeHelper.formatForAPI(this.updated_at),
+      // 删除相关字段（软删除支持）
+      deleted_at: this.deleted_at ? BeijingTimeHelper.formatForAPI(this.deleted_at) : null,
+      delete_reason: this.delete_reason || null
     }
 
     // 关联的用户信息

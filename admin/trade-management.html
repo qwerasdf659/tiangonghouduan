@@ -107,13 +107,13 @@
             <template x-if="tradeOrders.length === 0">
               <tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">暂无交易记录</td></tr>
             </template>
-            <template x-for="trade in tradeOrders" :key="trade.trade_id">
+            <template x-for="trade in tradeOrders" :key="trade.order_id">
               <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3 text-sm font-mono" x-text="trade.trade_id"></td>
-                <td class="px-4 py-3 text-sm" x-text="trade.buyer_name || trade.buyer_id"></td>
-                <td class="px-4 py-3 text-sm" x-text="trade.seller_name || trade.seller_id"></td>
-                <td class="px-4 py-3 text-sm" x-text="trade.item_name"></td>
-                <td class="px-4 py-3 text-sm font-mono text-green-600" x-text="formatNumber(trade.price)"></td>
+                <td class="px-4 py-3 text-sm font-mono" x-text="trade.order_id || trade.trade_id"></td>
+                <td class="px-4 py-3 text-sm" x-text="trade.buyer?.nickname || trade.buyer_user_id"></td>
+                <td class="px-4 py-3 text-sm" x-text="trade.seller?.nickname || trade.seller_user_id"></td>
+                <td class="px-4 py-3 text-sm" x-text="trade.listing?.offer_asset_code || trade.asset_code || '-'"></td>
+                <td class="px-4 py-3 text-sm font-mono text-green-600" x-text="formatNumber(trade.gross_amount || trade.price_amount)"></td>
                 <td class="px-4 py-3">
                   <span :class="{
                     'bg-yellow-100 text-yellow-700': trade.status === 'pending',
@@ -160,11 +160,14 @@
         <button @click="hideModal('tradeDetailModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
       </div>
       <div class="p-6 space-y-3" x-show="selectedTradeOrder">
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">订单ID:</span><span class="font-mono" x-text="selectedTradeOrder?.order_id || selectedTradeOrder?.trade_id"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">买家:</span><span x-text="selectedTradeOrder?.buyer_nickname || selectedTradeOrder?.buyer_id"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">卖家:</span><span x-text="selectedTradeOrder?.seller_nickname || selectedTradeOrder?.seller_id"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">商品:</span><span x-text="selectedTradeOrder?.item_name || selectedTradeOrder?.listing_title"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">成交价:</span><span class="font-mono text-green-600" x-text="formatNumber(selectedTradeOrder?.price || selectedTradeOrder?.total_price)"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">订单ID:</span><span class="font-mono" x-text="selectedTradeOrder?.order_id"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">业务ID:</span><span class="font-mono text-xs" x-text="selectedTradeOrder?.business_id || '-'"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">买家:</span><span x-text="selectedTradeOrder?.buyer?.nickname || selectedTradeOrder?.buyer_user_id"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">卖家:</span><span x-text="selectedTradeOrder?.seller?.nickname || selectedTradeOrder?.seller_user_id"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">结算资产:</span><span x-text="selectedTradeOrder?.asset_code || '-'"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">总金额:</span><span class="font-mono text-green-600" x-text="formatNumber(selectedTradeOrder?.gross_amount)"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">手续费:</span><span class="font-mono text-orange-500" x-text="formatNumber(selectedTradeOrder?.fee_amount || 0)"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">净金额:</span><span class="font-mono text-blue-600" x-text="formatNumber(selectedTradeOrder?.net_amount)"></span></div>
         <div class="flex justify-between border-b pb-2">
           <span class="text-gray-500">状态:</span>
           <span class="px-2 py-1 text-xs rounded" :class="{
@@ -183,27 +186,7 @@
     </div>
   </div>
 
-  <!-- 旧版交易详情模态框 (兼容) -->
-  <div x-show="selectedTrade" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="selectedTrade = null">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
-      <div class="p-4 border-b">
-        <h5 class="font-semibold">交易详情</h5>
-      </div>
-      <div class="p-4 space-y-3">
-        <div class="flex justify-between"><span class="text-gray-500">交易ID:</span><span class="font-mono" x-text="selectedTrade?.trade_id"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">买家:</span><span x-text="selectedTrade?.buyer_name || selectedTrade?.buyer_id"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">卖家:</span><span x-text="selectedTrade?.seller_name || selectedTrade?.seller_id"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">商品:</span><span x-text="selectedTrade?.item_name"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">成交价:</span><span class="font-mono text-green-600" x-text="formatNumber(selectedTrade?.price)"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">状态:</span><span x-text="getStatusText(selectedTrade?.status)"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">创建时间:</span><span x-text="formatDate(selectedTrade?.created_at)"></span></div>
-        <div class="flex justify-between"><span class="text-gray-500">完成时间:</span><span x-text="formatDate(selectedTrade?.completed_at) || '-'"></span></div>
-      </div>
-      <div class="p-4 border-t flex justify-end">
-        <button @click="selectedTrade = null" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">关闭</button>
-      </div>
-    </div>
-  </div>
+  <!-- 旧版交易详情模态框 (已废弃，保留兼容) -->
 
   <%- include('partials/footer') %>
 

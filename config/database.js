@@ -101,7 +101,8 @@ const dbConfig = {
     bigNumberStrings: true,
     dateStrings: true,
     typeCast: true,
-    connectTimeout: 10000 // ✅ MySQL连接超时10秒（P2优化：从30s降到10s，与acquire对齐）
+    connectTimeout: 10000, // ✅ MySQL连接超时10秒（P2优化：从30s降到10s，与acquire对齐）
+    timezone: '+08:00' // ✅ 强制MySQL会话使用北京时间
   }
 }
 
