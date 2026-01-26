@@ -18,7 +18,7 @@ import { buildURL } from '../../../api/base.js'
 
 /**
  * 字典类型配置
- * 
+ *
  * 字段映射说明（后端字段名 → 前端使用）：
  * - categories: category_code, display_name, description
  * - rarities: rarity_code, display_name, description, color_hex, tier
@@ -32,9 +32,9 @@ const DICT_TYPES = {
     createEndpoint: SYSTEM_ENDPOINTS.DICT_CATEGORY_CREATE,
     updateEndpoint: SYSTEM_ENDPOINTS.DICT_CATEGORY_UPDATE,
     deleteEndpoint: SYSTEM_ENDPOINTS.DICT_CATEGORY_DELETE,
-    idField: 'category_code',  // 后端主键字段名
+    idField: 'category_code', // 后端主键字段名
     codeField: 'category_code', // 代码字段（用于显示）
-    nameField: 'display_name',  // 名称字段（用于显示）
+    nameField: 'display_name', // 名称字段（用于显示）
     fields: ['category_code', 'display_name', 'description', 'icon_url', 'sort_order', 'is_enabled']
   },
   rarities: {
@@ -44,10 +44,18 @@ const DICT_TYPES = {
     createEndpoint: SYSTEM_ENDPOINTS.DICT_RARITY_CREATE,
     updateEndpoint: SYSTEM_ENDPOINTS.DICT_RARITY_UPDATE,
     deleteEndpoint: SYSTEM_ENDPOINTS.DICT_RARITY_DELETE,
-    idField: 'rarity_code',     // 后端主键字段名
-    codeField: 'rarity_code',   // 代码字段（用于显示）
-    nameField: 'display_name',  // 名称字段（用于显示）
-    fields: ['rarity_code', 'display_name', 'description', 'color_hex', 'tier', 'sort_order', 'is_enabled']
+    idField: 'rarity_code', // 后端主键字段名
+    codeField: 'rarity_code', // 代码字段（用于显示）
+    nameField: 'display_name', // 名称字段（用于显示）
+    fields: [
+      'rarity_code',
+      'display_name',
+      'description',
+      'color_hex',
+      'tier',
+      'sort_order',
+      'is_enabled'
+    ]
   },
   'asset-groups': {
     name: '资产分组字典',
@@ -56,10 +64,19 @@ const DICT_TYPES = {
     createEndpoint: SYSTEM_ENDPOINTS.DICT_ASSET_GROUP_CREATE,
     updateEndpoint: SYSTEM_ENDPOINTS.DICT_ASSET_GROUP_UPDATE,
     deleteEndpoint: SYSTEM_ENDPOINTS.DICT_ASSET_GROUP_DELETE,
-    idField: 'group_code',      // 后端主键字段名
-    codeField: 'group_code',    // 代码字段（用于显示）
-    nameField: 'display_name',  // 名称字段（用于显示）
-    fields: ['group_code', 'display_name', 'description', 'group_type', 'color_hex', 'sort_order', 'is_enabled', 'is_tradable']
+    idField: 'group_code', // 后端主键字段名
+    codeField: 'group_code', // 代码字段（用于显示）
+    nameField: 'display_name', // 名称字段（用于显示）
+    fields: [
+      'group_code',
+      'display_name',
+      'description',
+      'group_type',
+      'color_hex',
+      'sort_order',
+      'is_enabled',
+      'is_tradable'
+    ]
   }
 }
 
@@ -79,14 +96,14 @@ export function useDictState() {
     dictFilters: { keyword: '', status: '' },
     /** @type {Object} 字典表单（使用后端字段名） */
     dictForm: {
-      category_code: '',    // 类目: category_code / 稀有度: rarity_code / 资产分组: group_code
-      display_name: '',     // 显示名称
-      description: '',      // 描述
-      icon_url: '',         // 图标URL（类目）
-      color_hex: '',        // 颜色（稀有度/资产分组）
-      tier: 1,              // 等级（稀有度）
-      sort_order: 0,        // 排序
-      is_enabled: true      // 是否启用
+      category_code: '', // 类目: category_code / 稀有度: rarity_code / 资产分组: group_code
+      display_name: '', // 显示名称
+      description: '', // 描述
+      icon_url: '', // 图标URL（类目）
+      color_hex: '', // 颜色（稀有度/资产分组）
+      tier: 1, // 等级（稀有度）
+      sort_order: 0, // 排序
+      is_enabled: true // 是否启用
     },
     /** @type {Object|null} 选中的字典项 */
     selectedDict: null,
@@ -138,9 +155,7 @@ export function useDictMethods() {
         if (this.dictFilters.keyword) params.append('keyword', this.dictFilters.keyword)
         if (this.dictFilters.status) params.append('status', this.dictFilters.status)
 
-        const url = params.toString()
-          ? `${config.listEndpoint}?${params}`
-          : config.listEndpoint
+        const url = params.toString() ? `${config.listEndpoint}?${params}` : config.listEndpoint
 
         const response = await this.apiGet(url, {}, { showLoading: false })
         if (response?.success) {
@@ -158,11 +173,7 @@ export function useDictMethods() {
      */
     async loadAllDictionaries() {
       try {
-        const response = await this.apiGet(
-          SYSTEM_ENDPOINTS.DICT_ALL,
-          {},
-          { showLoading: false }
-        )
+        const response = await this.apiGet(SYSTEM_ENDPOINTS.DICT_ALL, {}, { showLoading: false })
         if (response?.success && response.data) {
           this.allDictionaries = {
             categories: response.data.categories || [],
@@ -242,7 +253,7 @@ export function useDictMethods() {
      */
     async submitDictForm() {
       const config = this.getCurrentDictConfig()
-      
+
       // 获取当前字典类型的代码字段和名称字段
       const codeValue = this.dictForm[config.codeField]
       const nameValue = this.dictForm[config.nameField]
@@ -326,7 +337,7 @@ export function useDictMethods() {
     formatDictStatus(status) {
       // 处理布尔值（后端字段 is_enabled）
       if (typeof status === 'boolean') {
-        return status 
+        return status
           ? { label: '启用', class: 'bg-green-100 text-green-800' }
           : { label: '禁用', class: 'bg-gray-100 text-gray-800' }
       }
@@ -335,10 +346,12 @@ export function useDictMethods() {
         active: { label: '启用', class: 'bg-green-100 text-green-800' },
         inactive: { label: '禁用', class: 'bg-gray-100 text-gray-800' },
         deprecated: { label: '已废弃', class: 'bg-red-100 text-red-800' },
-        'true': { label: '启用', class: 'bg-green-100 text-green-800' },
-        'false': { label: '禁用', class: 'bg-gray-100 text-gray-800' }
+        true: { label: '启用', class: 'bg-green-100 text-green-800' },
+        false: { label: '禁用', class: 'bg-gray-100 text-gray-800' }
       }
-      return statusMap[String(status)] || { label: String(status), class: 'bg-gray-100 text-gray-800' }
+      return (
+        statusMap[String(status)] || { label: String(status), class: 'bg-gray-100 text-gray-800' }
+      )
     },
 
     /**

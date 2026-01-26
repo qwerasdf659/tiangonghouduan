@@ -51,8 +51,8 @@ import {
 function registerLotteryManagementComponents() {
   // 使用 console.log 确保输出不受 logger 级别限制
   console.log('🔧 [LotteryManagement] 开始注册 Alpine 组件...')
-  console.log('🔍 [LotteryManagement] Alpine 状态:', { 
-    Alpine: typeof Alpine, 
+  console.log('🔍 [LotteryManagement] Alpine 状态:', {
+    Alpine: typeof Alpine,
     createPageMixin: typeof createPageMixin,
     AlpineData: typeof Alpine?.data
   })
@@ -60,7 +60,10 @@ function registerLotteryManagementComponents() {
 
   if (!Alpine || typeof createPageMixin !== 'function') {
     console.error('❌ [LotteryManagement] 关键依赖未加载!')
-    logger.error('[LotteryManagement] 关键依赖未加载', { Alpine: !!Alpine, createPageMixin: typeof createPageMixin })
+    logger.error('[LotteryManagement] 关键依赖未加载', {
+      Alpine: !!Alpine,
+      createPageMixin: typeof createPageMixin
+    })
     return
   }
 
@@ -142,8 +145,11 @@ function registerLotteryManagementComponents() {
 
     // 调试日志 - 检查 quotaMethods
     console.log('[Quota Debug] quotaMethods keys:', Object.keys(quotaMethods || {}))
-    console.log('[Quota Debug] has openCreateQuotaModal:', typeof quotaMethods?.openCreateQuotaModal)
-    
+    console.log(
+      '[Quota Debug] has openCreateQuotaModal:',
+      typeof quotaMethods?.openCreateQuotaModal
+    )
+
     logger.debug('[LotteryPageContent] Composable check:', {
       pageMixin: Object.keys(pageMixin || {}),
       quotaMethods: Object.keys(quotaMethods || {}),
@@ -166,171 +172,183 @@ function registerLotteryManagementComponents() {
 
       // ==================== 通用状态 ====================
       page: 1,
-    pageSize: 20,
-    totalPages: 1,
-    total: 0,
-    saving: false,
-    isEditMode: false,
-    submitting: false,
+      pageSize: 20,
+      totalPages: 1,
+      total: 0,
+      saving: false,
+      isEditMode: false,
+      submitting: false,
 
-    get currentPage() {
-      return Alpine.store('lotteryPage')
-    },
+      get currentPage() {
+        return Alpine.store('lotteryPage')
+      },
 
-    /**
-     * 是否全选核销码（getter必须在主组件中定义，确保this上下文正确）
-     * @returns {boolean}
-     */
-    get isAllRedemptionSelected() {
-      const codes = this.redemptionCodes || []
-      const selectedIds = this.redemptionSelectedIds || []
-      return codes.length > 0 && selectedIds.length === codes.length
-    },
+      /**
+       * 是否全选核销码（getter必须在主组件中定义，确保this上下文正确）
+       * @returns {boolean}
+       */
+      get isAllRedemptionSelected() {
+        const codes = this.redemptionCodes || []
+        const selectedIds = this.redemptionSelectedIds || []
+        return codes.length > 0 && selectedIds.length === codes.length
+      },
 
-    // ==================== 初始化和数据加载 ====================
+      // ==================== 初始化和数据加载 ====================
 
-    init() {
-      console.log('✅ [LotteryPageContent] init() 开始执行')
-      console.log('📍 [LotteryPageContent] 当前页面:', this.currentPage)
-      // 关键诊断：检查 openCreateQuotaModal 是否存在
-      console.log('🔴 [CRITICAL] openCreateQuotaModal 存在:', typeof this.openCreateQuotaModal === 'function')
-      console.log('🔴 [CRITICAL] loadQuotas 存在:', typeof this.loadQuotas === 'function')
-      console.log('🔴 [CRITICAL] 所有配额方法:', ['openCreateQuotaModal', 'editQuota', 'submitQuotaForm', 'deleteQuota', 'loadQuotas'].map(m => `${m}: ${typeof this[m]}`))
-      console.log('📊 [LotteryPageContent] this 对象属性列表:', Object.keys(this).slice(0, 50))
-      console.log('🔍 [LotteryPageContent] 所有方法:', Object.keys(this).filter(k => typeof this[k] === 'function'))
-      this.loadPageData()
-      this.$watch('$store.lotteryPage', (newPage) => {
-        console.log('🔄 [LotteryPage] 页面切换到:', newPage)
+      init() {
+        console.log('✅ [LotteryPageContent] init() 开始执行')
+        console.log('📍 [LotteryPageContent] 当前页面:', this.currentPage)
+        // 关键诊断：检查 openCreateQuotaModal 是否存在
+        console.log(
+          '🔴 [CRITICAL] openCreateQuotaModal 存在:',
+          typeof this.openCreateQuotaModal === 'function'
+        )
+        console.log('🔴 [CRITICAL] loadQuotas 存在:', typeof this.loadQuotas === 'function')
+        console.log(
+          '🔴 [CRITICAL] 所有配额方法:',
+          ['openCreateQuotaModal', 'editQuota', 'submitQuotaForm', 'deleteQuota', 'loadQuotas'].map(
+            m => `${m}: ${typeof this[m]}`
+          )
+        )
+        console.log('📊 [LotteryPageContent] this 对象属性列表:', Object.keys(this).slice(0, 50))
+        console.log(
+          '🔍 [LotteryPageContent] 所有方法:',
+          Object.keys(this).filter(k => typeof this[k] === 'function')
+        )
         this.loadPageData()
-      })
-    },
-
-    async loadPageData() {
-      const page = this.currentPage
-      console.log('📂 [LotteryPage] loadPageData 被调用, page =', page)
-      await this.withLoading(
-        async () => {
-          switch (page) {
-            case 'campaigns':
-              await this.loadCampaigns()
-              await this.loadCampaignStats()
-              break
-            case 'prizes':
-              await this.loadPrizes()
-              // 加载活动列表供添加奖品时选择
-              if (!this.campaigns || this.campaigns.length === 0) {
-                await this.loadCampaigns()
-              }
-              break
-            case 'campaign-budget':
-              await this.loadBudgetData()
-              // 加载活动列表供预算管理选择
-              if (!this.campaigns || this.campaigns.length === 0) {
-                await this.loadCampaigns()
-              }
-              break
-            case 'lottery-strategy':
-              await this.loadStrategies()
-              await this.loadTierMatrix()
-              // 加载活动列表供策略配置选择
-              if (!this.campaigns || this.campaigns.length === 0) {
-                await this.loadCampaigns()
-              }
-              break
-            case 'lottery-quota':
-              await this.loadQuotas()
-              // 🔧 修复：加载活动列表供配额规则选择活动
-              if (!this.campaigns || this.campaigns.length === 0) {
-                console.log('📋 [LotteryPage] 配额管理页面加载活动列表...')
-                await this.loadCampaigns()
-              }
-              break
-            case 'lottery-pricing':
-              await this.loadPricingConfigs()
-              // 🔧 修复：加载活动列表供定价配置选择活动
-              if (!this.campaigns || this.campaigns.length === 0) {
-                console.log('📋 [LotteryPage] 定价配置页面加载活动列表...')
-                await this.loadCampaigns()
-              }
-              break
-            case 'lottery-metrics':
-              await this.loadLotteryMetrics()
-              // 加载活动列表供指标筛选
-              if (!this.campaigns || this.campaigns.length === 0) {
-                await this.loadCampaigns()
-              }
-              break
-            case 'redemption-codes':
-              console.log('🎫 [LotteryPage] 进入核销码管理页面')
-              await this.loadStores()
-              await this.loadRedemptionCodes()
-              console.log('✅ [LotteryPage] 核销码数据加载完成')
-              break
-          }
-        },
-        { loadingText: '加载数据...' }
-      )
-    },
-
-    // ==================== 从 Composables 导入方法 ====================
-    ...campaignsMethods,
-    ...prizesMethods,
-    ...budgetMethods,
-    ...strategyMethods,
-    ...quotaMethods,
-    ...pricingMethods,
-    ...metricsMethods,
-    ...redemptionMethods,
-
-    // ==================== 工具方法 ====================
-
-    formatDateTimeLocal(dateString) {
-      if (!dateString) return ''
-      try {
-        const date = new Date(dateString)
-        return date.toISOString().slice(0, 16)
-      } catch {
-        return ''
-      }
-    },
-
-    formatDate(dateString) {
-      if (!dateString) return '-'
-      try {
-        const date = new Date(dateString)
-        return date.toLocaleString('zh-CN', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit'
+        this.$watch('$store.lotteryPage', newPage => {
+          console.log('🔄 [LotteryPage] 页面切换到:', newPage)
+          this.loadPageData()
         })
-      } catch {
-        return dateString
-      }
-    },
+      },
 
-    formatCurrency(value) {
-      if (value === undefined || value === null) return '¥0.00'
-      return `¥${parseFloat(value).toFixed(2)}`
-    },
+      async loadPageData() {
+        const page = this.currentPage
+        console.log('📂 [LotteryPage] loadPageData 被调用, page =', page)
+        await this.withLoading(
+          async () => {
+            switch (page) {
+              case 'campaigns':
+                await this.loadCampaigns()
+                await this.loadCampaignStats()
+                break
+              case 'prizes':
+                await this.loadPrizes()
+                // 加载活动列表供添加奖品时选择
+                if (!this.campaigns || this.campaigns.length === 0) {
+                  await this.loadCampaigns()
+                }
+                break
+              case 'campaign-budget':
+                await this.loadBudgetData()
+                // 加载活动列表供预算管理选择
+                if (!this.campaigns || this.campaigns.length === 0) {
+                  await this.loadCampaigns()
+                }
+                break
+              case 'lottery-strategy':
+                await this.loadStrategies()
+                await this.loadTierMatrix()
+                // 加载活动列表供策略配置选择
+                if (!this.campaigns || this.campaigns.length === 0) {
+                  await this.loadCampaigns()
+                }
+                break
+              case 'lottery-quota':
+                await this.loadQuotas()
+                // 🔧 修复：加载活动列表供配额规则选择活动
+                if (!this.campaigns || this.campaigns.length === 0) {
+                  console.log('📋 [LotteryPage] 配额管理页面加载活动列表...')
+                  await this.loadCampaigns()
+                }
+                break
+              case 'lottery-pricing':
+                await this.loadPricingConfigs()
+                // 🔧 修复：加载活动列表供定价配置选择活动
+                if (!this.campaigns || this.campaigns.length === 0) {
+                  console.log('📋 [LotteryPage] 定价配置页面加载活动列表...')
+                  await this.loadCampaigns()
+                }
+                break
+              case 'lottery-metrics':
+                await this.loadLotteryMetrics()
+                // 加载活动列表供指标筛选
+                if (!this.campaigns || this.campaigns.length === 0) {
+                  await this.loadCampaigns()
+                }
+                break
+              case 'redemption-codes':
+                console.log('🎫 [LotteryPage] 进入核销码管理页面')
+                await this.loadStores()
+                await this.loadRedemptionCodes()
+                console.log('✅ [LotteryPage] 核销码数据加载完成')
+                break
+            }
+          },
+          { loadingText: '加载数据...' }
+        )
+      },
 
-    /**
-     * 安全格式化日期显示
-     * @param {string} dateStr - ISO日期字符串
-     * @returns {string} 本地化日期字符串
-     */
-    formatDateSafe(dateStr) {
-      if (!dateStr) return '-'
-      try {
-        const date = new Date(dateStr)
-        if (isNaN(date.getTime())) return dateStr
-        return date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' })
-      } catch {
-        return dateStr
+      // ==================== 从 Composables 导入方法 ====================
+      ...campaignsMethods,
+      ...prizesMethods,
+      ...budgetMethods,
+      ...strategyMethods,
+      ...quotaMethods,
+      ...pricingMethods,
+      ...metricsMethods,
+      ...redemptionMethods,
+
+      // ==================== 工具方法 ====================
+
+      formatDateTimeLocal(dateString) {
+        if (!dateString) return ''
+        try {
+          const date = new Date(dateString)
+          return date.toISOString().slice(0, 16)
+        } catch {
+          return ''
+        }
+      },
+
+      formatDate(dateString) {
+        if (!dateString) return '-'
+        try {
+          const date = new Date(dateString)
+          return date.toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        } catch {
+          return dateString
+        }
+      },
+
+      formatCurrency(value) {
+        if (value === undefined || value === null) return '¥0.00'
+        return `¥${parseFloat(value).toFixed(2)}`
+      },
+
+      /**
+       * 安全格式化日期显示
+       * @param {string} dateStr - ISO日期字符串
+       * @returns {string} 本地化日期字符串
+       */
+      formatDateSafe(dateStr) {
+        if (!dateStr) return '-'
+        try {
+          const date = new Date(dateStr)
+          if (isNaN(date.getTime())) return dateStr
+          return date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' })
+        } catch {
+          return dateStr
+        }
       }
     }
-  }})
+  })
 
   logger.info('[LotteryManagement] Alpine 组件注册完成')
 }

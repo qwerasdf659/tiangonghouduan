@@ -1,0 +1,183 @@
+/**
+ * 空状态样式
+ *
+ * @file src/styles/components/empty-state.css
+ * @description 各种空状态/错误状态的展示样式
+ * @version 1.0.0
+ * @date 2026-01-26
+ *
+ * 类型：
+ * - noData: 暂无数据
+ * - noSearch: 搜索无结果
+ * - error: 加载失败
+ * - noPermission: 无权限
+ * - empty: 引导创建
+ * - offline: 网络断开
+ * - maintenance: 系统维护
+ */
+
+/* ========== 空状态容器 ========== */
+
+.empty-state {
+  @apply flex flex-col items-center justify-center py-16 px-4 text-center;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.empty-state-compact {
+  @apply py-8;
+}
+
+.empty-state-full {
+  @apply min-h-[400px];
+}
+
+/* ========== 空状态图标 ========== */
+
+.empty-state-icon {
+  @apply text-6xl mb-4 opacity-80;
+  animation: bounceIn 0.5s ease-out;
+}
+
+.empty-state-icon-sm {
+  @apply text-4xl mb-3;
+}
+
+.empty-state-icon-lg {
+  @apply text-8xl mb-6;
+}
+
+/* 图标背景圈 */
+.empty-state-icon-circle {
+  @apply w-24 h-24 rounded-full flex items-center justify-center mb-4;
+  background-color: var(--color-bg-muted, #f3f4f6);
+}
+
+.empty-state-icon-circle .empty-state-icon {
+  @apply mb-0 text-4xl;
+}
+
+/* ========== 空状态标题 ========== */
+
+.empty-state-title {
+  @apply text-lg font-semibold mb-2;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.empty-state-title-sm {
+  @apply text-base;
+}
+
+.empty-state-title-lg {
+  @apply text-xl;
+}
+
+/* ========== 空状态描述 ========== */
+
+.empty-state-description {
+  @apply text-sm mb-6 max-w-sm;
+  color: var(--color-text-muted, #9ca3af);
+}
+
+.empty-state-description-lg {
+  @apply text-base max-w-md;
+}
+
+/* ========== 空状态操作按钮 ========== */
+
+.empty-state-action {
+  @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md transition-all duration-200;
+  background-color: var(--color-primary, #3b82f6);
+  color: white;
+}
+
+.empty-state-action:hover {
+  background-color: var(--color-primary-hover, #2563eb);
+  transform: translateY(-1px);
+  @apply shadow-md;
+}
+
+.empty-state-action:active {
+  transform: scale(0.98);
+}
+
+/* 次要操作按钮 */
+.empty-state-action-secondary {
+  @apply bg-transparent border;
+  border-color: var(--color-border, #e5e7eb);
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.empty-state-action-secondary:hover {
+  background-color: var(--color-bg-muted, #f3f4f6);
+  transform: translateY(-1px);
+}
+
+/* ========== 空状态类型变体 ========== */
+
+/* 错误状态 */
+.empty-state-error .empty-state-icon {
+  @apply text-red-400;
+}
+
+.empty-state-error .empty-state-title {
+  @apply text-red-600;
+}
+
+.empty-state-error .empty-state-action {
+  @apply bg-red-500 hover:bg-red-600;
+}
+
+/* 警告状态 */
+.empty-state-warning .empty-state-icon {
+  @apply text-yellow-400;
+}
+
+.empty-state-warning .empty-state-title {
+  @apply text-yellow-600;
+}
+
+/* 成功状态 */
+.empty-state-success .empty-state-icon {
+  @apply text-green-400;
+}
+
+.empty-state-success .empty-state-title {
+  @apply text-green-600;
+}
+
+/* 信息状态 */
+.empty-state-info .empty-state-icon {
+  @apply text-blue-400;
+}
+
+.empty-state-info .empty-state-title {
+  @apply text-blue-600;
+}
+
+/* ========== 动画 ========== */
+
+@keyframes bounceIn {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ========== 暗色主题适配 ========== */
+
+[data-theme='dark'] .empty-state-icon-circle,
+[data-theme='minimal-dark'] .empty-state-icon-circle,
+[data-theme='cyber'] .empty-state-icon-circle,
+[data-theme='neon'] .empty-state-icon-circle {
+  background-color: var(--color-bg-muted, #374151);
+}

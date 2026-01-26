@@ -41,10 +41,10 @@ export function useConfigState() {
     editingPoints: null,
     /** @type {Object} 积分配置默认值（使用后端字段名） */
     pointsDefaults: {
-      lottery_cost_points: 100,     // 抽奖消耗积分
-      daily_lottery_limit: 10,      // 每日抽奖次数限制
-      sign_in_points: 10,           // 签到积分
-      initial_points: 0             // 新用户初始积分
+      lottery_cost_points: 100, // 抽奖消耗积分
+      daily_lottery_limit: 10, // 每日抽奖次数限制
+      sign_in_points: 10, // 签到积分
+      initial_points: 0 // 新用户初始积分
     }
   }
 }
@@ -69,18 +69,19 @@ export function useConfigMethods() {
           { showLoading: false }
         )
         console.log('[SystemConfig] API 响应:', response)
-        
+
         if (response?.success && response.data) {
           // 后端返回 settings 数组格式，转换为键值对
           // 字段名: setting_key, setting_value (或 parsed_value)
           const settingsArray = response.data.settings || []
           console.log('[SystemConfig] settings 数组:', settingsArray)
-          
+
           const settingsMap = {}
           settingsArray.forEach(item => {
             // 后端字段名是 setting_key 和 parsed_value/setting_value
             const key = item.setting_key || item.key
-            const value = item.parsed_value !== undefined ? item.parsed_value : (item.setting_value || item.value)
+            const value =
+              item.parsed_value !== undefined ? item.parsed_value : item.setting_value || item.value
             if (key) {
               settingsMap[key] = value
             }
@@ -93,10 +94,15 @@ export function useConfigMethods() {
             site_name: settingsMap.system_name || settingsMap.site_name || '',
             contact_email: settingsMap.contact_email || settingsMap.customer_email || '',
             service_phone: settingsMap.customer_phone || settingsMap.service_phone || '',
-            enable_lottery: settingsMap.enable_lottery !== false && settingsMap.enable_lottery !== 'false',
-            enable_market: settingsMap.enable_market !== false && settingsMap.enable_market !== 'false',
-            enable_notification: settingsMap.enable_notification !== false && settingsMap.enable_notification !== 'false',
-            maintenance_mode: settingsMap.maintenance_mode === true || settingsMap.maintenance_mode === 'true',
+            enable_lottery:
+              settingsMap.enable_lottery !== false && settingsMap.enable_lottery !== 'false',
+            enable_market:
+              settingsMap.enable_market !== false && settingsMap.enable_market !== 'false',
+            enable_notification:
+              settingsMap.enable_notification !== false &&
+              settingsMap.enable_notification !== 'false',
+            maintenance_mode:
+              settingsMap.maintenance_mode === true || settingsMap.maintenance_mode === 'true',
             daily_lottery_limit: parseInt(settingsMap.daily_lottery_limit) || 10,
             lottery_cost: parseInt(settingsMap.lottery_cost) || 100,
             max_login_attempts: parseInt(settingsMap.max_login_attempts) || 5,
@@ -209,28 +215,33 @@ export function useConfigMethods() {
      */
     async loadPointsConfigs() {
       try {
-        console.log('[SystemConfig] 开始加载积分配置, 调用接口:', SYSTEM_ENDPOINTS.SYSTEM_CONFIG_POINTS)
+        console.log(
+          '[SystemConfig] 开始加载积分配置, 调用接口:',
+          SYSTEM_ENDPOINTS.SYSTEM_CONFIG_POINTS
+        )
         const response = await this.apiGet(
           SYSTEM_ENDPOINTS.SYSTEM_CONFIG_POINTS,
           {},
           { showLoading: false }
         )
         console.log('[SystemConfig] 积分配置 API 响应:', response)
-        
+
         if (response?.success && response.data) {
           // 后端返回 settings 数组格式
           const settingsArray = response.data.settings || []
           this.pointsConfigs = settingsArray
-          
+
           // 将配置列表转换为 pointsDefaults 对象
           settingsArray.forEach(config => {
             const key = config.setting_key || config.key
-            const value = config.parsed_value !== undefined ? config.parsed_value : config.setting_value
+            const value =
+              config.parsed_value !== undefined ? config.parsed_value : config.setting_value
             if (key && this.pointsDefaults.hasOwnProperty(key)) {
-              this.pointsDefaults[key] = typeof value === 'number' ? value : (parseInt(value) || this.pointsDefaults[key])
+              this.pointsDefaults[key] =
+                typeof value === 'number' ? value : parseInt(value) || this.pointsDefaults[key]
             }
           })
-          
+
           console.log('[SystemConfig] 解析后的积分配置:', this.pointsDefaults)
         }
       } catch (error) {
@@ -297,7 +308,7 @@ export function useConfigMethods() {
             [this.editingPoints.setting_key]: this.editingPoints.setting_value
           }
         }
-        
+
         const response = await this.apiCall(SYSTEM_ENDPOINTS.SYSTEM_CONFIG_UPDATE_POINTS, {
           method: 'PUT',
           data: settingsData
@@ -326,4 +337,3 @@ export function useConfigMethods() {
 }
 
 export default { useConfigState, useConfigMethods }
-

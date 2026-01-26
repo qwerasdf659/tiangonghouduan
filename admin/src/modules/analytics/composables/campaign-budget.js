@@ -87,7 +87,8 @@ export function useCampaignBudgetMethods() {
           rawBudgets = rawBudgets.map(budget => ({
             ...budget,
             // 扁平化 pool_budget 字段
-            pool_budget_remaining: budget.pool_budget?.remaining ?? budget.pool_budget_remaining ?? 0,
+            pool_budget_remaining:
+              budget.pool_budget?.remaining ?? budget.pool_budget_remaining ?? 0,
             pool_budget_total: budget.pool_budget?.total ?? budget.pool_budget_total ?? 0,
             pool_budget_used: budget.pool_budget?.used ?? 0,
             usage_rate: budget.pool_budget?.usage_rate ?? '0%'
@@ -118,9 +119,12 @@ export function useCampaignBudgetMethods() {
               totalBudget: response.data.summary.total_budget || 0,
               usedBudget: response.data.summary.total_used || 0,
               remainingBudget: response.data.summary.total_remaining || 0,
-              utilizationRate: response.data.summary.total_budget > 0 
-                ? Math.round((response.data.summary.total_used / response.data.summary.total_budget) * 100) 
-                : 0
+              utilizationRate:
+                response.data.summary.total_budget > 0
+                  ? Math.round(
+                      (response.data.summary.total_used / response.data.summary.total_budget) * 100
+                    )
+                  : 0
             }
           } else {
             // 从数据计算统计
@@ -239,7 +243,9 @@ export function useCampaignBudgetMethods() {
 
         // 只支持更新模式
         const response = await this.apiCall(
-          buildURL(LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_UPDATE, { campaign_id: this.budgetForm.campaign_id }),
+          buildURL(LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_UPDATE, {
+            campaign_id: this.budgetForm.campaign_id
+          }),
           {
             method: 'PUT',
             body: JSON.stringify({
@@ -277,7 +283,9 @@ export function useCampaignBudgetMethods() {
         `确定为该活动补充 ${amount} 预算积分？`,
         async () => {
           const response = await this.apiCall(
-            buildURL(LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_POOL_ADD, { campaign_id: budget.campaign_id }),
+            buildURL(LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_POOL_ADD, {
+              campaign_id: budget.campaign_id
+            }),
             {
               method: 'POST',
               body: JSON.stringify({ amount })

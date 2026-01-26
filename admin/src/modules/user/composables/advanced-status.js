@@ -235,8 +235,7 @@ export function useAdvancedStatusMethods() {
         const params = new URLSearchParams()
         params.append('page', this.riskPage)
         params.append('page_size', this.riskPageSize)
-        if (this.riskFilters.config_type)
-          params.append('config_type', this.riskFilters.config_type)
+        if (this.riskFilters.config_type) params.append('config_type', this.riskFilters.config_type)
         if (this.riskFilters.user_level) params.append('user_level', this.riskFilters.user_level)
         if (this.riskFilters.is_frozen) params.append('is_frozen', this.riskFilters.is_frozen)
 
@@ -252,7 +251,8 @@ export function useAdvancedStatusMethods() {
           // 过滤掉可能的无效数据
           this.riskProfiles = list.filter(item => item && (item.risk_profile_id || item.user_id))
           if (response.data?.pagination) {
-            this.riskPagination.total = response.data.pagination.total_count || response.data.pagination.total || 0
+            this.riskPagination.total =
+              response.data.pagination.total_count || response.data.pagination.total || 0
             this.riskPagination.totalPages = response.data.pagination.total_pages || 1
           }
         }
@@ -284,7 +284,8 @@ export function useAdvancedStatusMethods() {
           user_id: profile.user_id || '',
           user_level: profile.user_level || 'normal',
           daily_points_limit: thresholds.daily_points_limit || profile.daily_points_limit || 10000,
-          single_transaction_limit: thresholds.single_transaction_limit || profile.single_transaction_limit || 1000,
+          single_transaction_limit:
+            thresholds.single_transaction_limit || profile.single_transaction_limit || 1000,
           daily_lottery_limit: thresholds.daily_lottery_limit || profile.daily_lottery_limit || 100,
           freeze_reason: ''
         }
@@ -442,14 +443,17 @@ export function useAdvancedStatusMethods() {
         logger.info('[DEBUG] API响应:', response)
 
         if (response?.success) {
-          this.roleChangeHistory = response.data?.history || response.data?.list || response.data?.records || []
+          this.roleChangeHistory =
+            response.data?.history || response.data?.list || response.data?.records || []
           if (response.data?.pagination) {
-            this.roleHistoryPagination.total = response.data.pagination.total || response.data.pagination.total_count || 0
+            this.roleHistoryPagination.total =
+              response.data.pagination.total || response.data.pagination.total_count || 0
             this.roleHistoryPagination.totalPages = response.data.pagination.total_pages || 1
           }
           logger.info('[DEBUG] 加载完成，记录数:', this.roleChangeHistory.length)
           // 显示刷新成功提示
-          this.showSuccess && this.showSuccess(`刷新成功，共 ${this.roleChangeHistory.length} 条记录`)
+          this.showSuccess &&
+            this.showSuccess(`刷新成功，共 ${this.roleChangeHistory.length} 条记录`)
         } else {
           logger.warn('[DEBUG] API返回失败:', response)
           this.showError(response?.message || '加载角色变更历史失败')
@@ -505,9 +509,11 @@ export function useAdvancedStatusMethods() {
         logger.info('[DEBUG] API响应:', response)
 
         if (response?.success) {
-          this.statusChangeHistory = response.data?.history || response.data?.list || response.data?.records || []
+          this.statusChangeHistory =
+            response.data?.history || response.data?.list || response.data?.records || []
           if (response.data?.pagination) {
-            this.statusHistoryPagination.total = response.data.pagination.total || response.data.pagination.total_count || 0
+            this.statusHistoryPagination.total =
+              response.data.pagination.total || response.data.pagination.total_count || 0
             this.statusHistoryPagination.totalPages = response.data.pagination.total_pages || 1
           }
           logger.info('[DEBUG] 加载完成，记录数:', this.statusChangeHistory.length)
@@ -632,4 +638,3 @@ export function useAdvancedStatusMethods() {
 }
 
 export default { useAdvancedStatusState, useAdvancedStatusMethods }
-

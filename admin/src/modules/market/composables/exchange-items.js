@@ -197,14 +197,14 @@ export function useExchangeItemsMethods() {
         if (res.success) {
           this.showSuccess?.(this.editingItemId ? '更新成功' : '添加成功')
           this.hideModal?.('itemModal')
-          
+
           // 新增商品后：回到第一页，按创建时间倒序，确保新商品显示在最前面
           if (!this.editingItemId) {
             this.itemCurrentPage = 1
             this.itemFilters.sort_by = 'created_at'
             this.itemFilters.sort_order = 'DESC'
           }
-          
+
           await this.loadItems()
           await this.loadItemStats?.()
         } else {
@@ -292,4 +292,3 @@ export function useExchangeItemsMethods() {
 }
 
 export default { useExchangeItemsState, useExchangeItemsMethods }
-

@@ -51,14 +51,18 @@ export function useExchangeStatsMethods() {
         // 并行请求统计数据和订单数据
         const [statsRes, ordersRes] = await Promise.all([
           request({ url: MARKET_ENDPOINTS.EXCHANGE_FULL_STATS, method: 'GET' }),
-          request({ url: MARKET_ENDPOINTS.EXCHANGE_ORDERS, method: 'GET', params: { page: 1, pageSize: 1000 } })
+          request({
+            url: MARKET_ENDPOINTS.EXCHANGE_ORDERS,
+            method: 'GET',
+            params: { page: 1, pageSize: 1000 }
+          })
         ])
 
         // 后端统计接口返回：total_items, active_items, low_stock_items, total_exchanges
         const stats = statsRes.success ? statsRes.data : {}
-        
+
         // 从订单列表计算订单统计
-        const orders = ordersRes.success ? (ordersRes.data?.orders || []) : []
+        const orders = ordersRes.success ? ordersRes.data?.orders || [] : []
         const orderStats = {
           total: ordersRes.data?.pagination?.total || orders.length,
           pending: orders.filter(o => o.status === 'pending').length,
@@ -109,12 +113,12 @@ export function useExchangeStatsMethods() {
 
         // 获取订单数据（如果还没有订单数据，先加载）
         if (!this.orders || this.orders.length === 0) {
-          const ordersRes = await request({ 
-            url: MARKET_ENDPOINTS.EXCHANGE_ORDERS, 
-            method: 'GET', 
-            params: { page: 1, pageSize: 1000 } 
+          const ordersRes = await request({
+            url: MARKET_ENDPOINTS.EXCHANGE_ORDERS,
+            method: 'GET',
+            params: { page: 1, pageSize: 1000 }
           })
-          this.orders = ordersRes.success ? (ordersRes.data?.orders || []) : []
+          this.orders = ordersRes.success ? ordersRes.data?.orders || [] : []
         }
 
         // 生成日期数组
@@ -139,12 +143,12 @@ export function useExchangeStatsMethods() {
 
         // 转换为数组
         this.trendData = Array.from(dateMap.values())
-        logger.info('[ExchangeStats] 趋势数据计算完成', { 
-          days, 
+        logger.info('[ExchangeStats] 趋势数据计算完成', {
+          days,
           dataPoints: this.trendData.length,
           totalOrders: this.trendData.reduce((sum, d) => sum + d.order_count, 0)
         })
-        
+
         this.updateTrendChart()
       } catch (e) {
         logger.error('[ExchangeStats] 加载趋势数据失败:', e)
@@ -193,8 +197,8 @@ export function useExchangeStatsMethods() {
               avoidLabelOverlap: false,
               itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
               // 默认显示标签（不需要悬停）
-              label: { 
-                show: true, 
+              label: {
+                show: true,
                 position: 'outside',
                 formatter: '{b}: {c}',
                 fontSize: 12
@@ -266,7 +270,7 @@ export function useExchangeStatsMethods() {
         tooltip: {
           trigger: 'axis',
           axisPointer: { type: 'cross' },
-          formatter: function(params) {
+          formatter: function (params) {
             let result = params[0].axisValue + '<br/>'
             params.forEach(p => {
               const unit = p.seriesName === '兑换金额' ? ' 积分' : ' 单'
@@ -281,22 +285,22 @@ export function useExchangeStatsMethods() {
           type: 'category',
           boundaryGap: true,
           data: dates,
-          axisLabel: { 
+          axisLabel: {
             interval: this.trendRange === '7d' ? 0 : 'auto',
             fontSize: 11
           }
         },
         yAxis: [
-          { 
-            type: 'value', 
-            name: '订单数', 
+          {
+            type: 'value',
+            name: '订单数',
             position: 'left',
             minInterval: 1,
             max: maxOrders < 5 ? 5 : null
           },
-          { 
-            type: 'value', 
-            name: '金额', 
+          {
+            type: 'value',
+            name: '金额',
             position: 'right',
             max: maxRevenue < 100 ? 100 : null
           }
@@ -360,4 +364,3 @@ export function useExchangeStatsMethods() {
 }
 
 export default { useExchangeStatsState, useExchangeStatsMethods }
-

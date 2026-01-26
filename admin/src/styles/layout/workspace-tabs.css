@@ -306,13 +306,12 @@
   .workspace-header {
     padding: 0 16px;
   }
-  
+
   .global-search {
     display: none;
   }
-  
+
   .workspace-tab .tab-title {
     max-width: 80px;
   }
 }
-

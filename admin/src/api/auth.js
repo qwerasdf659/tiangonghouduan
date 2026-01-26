@@ -17,7 +17,6 @@
  * import { AuthAPI } from '@/api/index.js'
  */
 
-
 import { logger } from '../utils/logger.js'
 import { request, getToken, setToken, clearToken } from './base.js'
 

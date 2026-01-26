@@ -12,9 +12,9 @@ const logger = require('../utils/logger').logger
 // V4 核心服务
 const { UnifiedLotteryEngine } = require('./UnifiedLotteryEngine/UnifiedLotteryEngine')
 
-/*
+/**
  * V4 领域服务
- * 🆕 积分操作统一使用 AssetService（已移除 PointsService）
+ * 积分操作统一使用 AssetService
  */
 const ExchangeService = require('./ExchangeService')
 const ContentAuditEngine = require('./ContentAuditEngine')

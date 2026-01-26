@@ -28,7 +28,6 @@
  * - GET /api/v4/console/virtual-accounts (虚拟账户)
  */
 
-
 import { logger } from '../../../utils/logger.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 import { buildURL } from '../../../api/base.js'
@@ -220,13 +219,19 @@ document.addEventListener('alpine:init', () => {
         logger.debug('[AssetManagement] loadMaterialAccounts response:', response)
         if (response.success && response.data) {
           // 后端返回 data.fungible_assets 数组
-          const matAcctData = response.data?.fungible_assets || response.data?.list || response.data?.accounts || response.data
-          this.materialAccounts = Array.isArray(matAcctData) ? matAcctData.map(item => ({
-            ...item,
-            user_id: response.data?.user_id || this.materialAccountFilters.userId,
-            balance: item.available_amount || item.balance || 0,
-            updated_at: item.updated_at || new Date().toISOString()
-          })) : []
+          const matAcctData =
+            response.data?.fungible_assets ||
+            response.data?.list ||
+            response.data?.accounts ||
+            response.data
+          this.materialAccounts = Array.isArray(matAcctData)
+            ? matAcctData.map(item => ({
+                ...item,
+                user_id: response.data?.user_id || this.materialAccountFilters.userId,
+                balance: item.available_amount || item.balance || 0,
+                updated_at: item.updated_at || new Date().toISOString()
+              }))
+            : []
           logger.info(`[AssetManagement] 加载材料账户成功: ${this.materialAccounts.length} 条`)
         }
       } catch (error) {
@@ -265,8 +270,12 @@ document.addEventListener('alpine:init', () => {
         // 使用物品模板接口获取列表
         const response = await this.apiGet(ASSET_ENDPOINTS.ITEM_TEMPLATES_LIST, {
           item_type: this.itemInstanceFilters.templateCode || undefined,
-          is_enabled: this.itemInstanceFilters.status === 'enabled' ? true : 
-                     this.itemInstanceFilters.status === 'disabled' ? false : undefined
+          is_enabled:
+            this.itemInstanceFilters.status === 'enabled'
+              ? true
+              : this.itemInstanceFilters.status === 'disabled'
+                ? false
+                : undefined
         })
         logger.debug('[AssetManagement] loadItemInstances response:', response)
         if (response.success && response.data) {
@@ -337,15 +346,21 @@ document.addEventListener('alpine:init', () => {
         if (response.success && response.data) {
           const assetStats = response.data.asset_stats || []
           const summary = response.data.summary || {}
-          
+
           // 计算材料资产总值（排除 POINTS, DIAMOND, BUDGET_POINTS 等虚拟资产）
           const virtualAssetCodes = ['POINTS', 'DIAMOND', 'BUDGET_POINTS', 'CREDITS']
           const materialAssets = assetStats.filter(a => !virtualAssetCodes.includes(a.asset_code))
           const virtualAssets = assetStats.filter(a => virtualAssetCodes.includes(a.asset_code))
-          
-          const totalMaterialValue = materialAssets.reduce((sum, a) => sum + (a.total_circulation || 0), 0)
-          const totalVirtualValue = virtualAssets.reduce((sum, a) => sum + (a.total_circulation || 0), 0)
-          
+
+          const totalMaterialValue = materialAssets.reduce(
+            (sum, a) => sum + (a.total_circulation || 0),
+            0
+          )
+          const totalVirtualValue = virtualAssets.reduce(
+            (sum, a) => sum + (a.total_circulation || 0),
+            0
+          )
+
           this.assetStats = {
             totalMaterialValue,
             totalVirtualValue,

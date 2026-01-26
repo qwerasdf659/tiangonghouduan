@@ -77,8 +77,10 @@ describe('LotteryPricingService - 抽奖定价服务', () => {
       // 执行查询
       const pricing = await LotteryPricingService.getDrawPricing(10, test_campaign_id)
 
-      // 验证定价计算
-      // 注意：折扣值由数据库配置决定，不硬编码具体值
+      /*
+       * 验证定价计算
+       * 注意：折扣值由数据库配置决定，不硬编码具体值
+       */
       expect(pricing.draw_count).toBe(10)
       expect(pricing.discount).toBeGreaterThan(0)
       expect(pricing.discount).toBeLessThanOrEqual(1)

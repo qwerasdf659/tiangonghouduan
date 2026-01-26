@@ -5,7 +5,7 @@
  * @description 功能灰度发布控制
  * @version 1.1.0
  * @date 2026-01-25
- * 
+ *
  * 后端API基础路径: /api/v4/console/feature-flags
  * 后端使用 flag_key 作为路径参数（非 flag_id）
  */
@@ -26,7 +26,7 @@ export function useFeatureFlagsState() {
     /** @type {Object} 功能开关表单（与HTML和后端字段对齐） */
     featureFlagForm: {
       flag_key: '',
-      flag_name: '',        // 后端必需字段
+      flag_name: '', // 后端必需字段
       description: '',
       is_enabled: false,
       rollout_strategy: 'all',
@@ -53,7 +53,8 @@ export function useFeatureFlagsMethods() {
       try {
         const params = new URLSearchParams()
         if (this.flagFilters.keyword) params.append('keyword', this.flagFilters.keyword)
-        if (this.flagFilters.status) params.append('is_enabled', this.flagFilters.status === 'enabled')
+        if (this.flagFilters.status)
+          params.append('is_enabled', this.flagFilters.status === 'enabled')
 
         const queryString = params.toString()
         const url = queryString

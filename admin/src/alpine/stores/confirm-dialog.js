@@ -25,7 +25,6 @@
  * const confirmed = await Alpine.store('confirm').danger('确定要删除吗？')
  */
 
-
 import { logger } from '../../utils/logger.js'
 
 document.addEventListener('alpine:init', () => {

@@ -10,11 +10,38 @@
 export default {
   content: [
     './*.html',                        // 根目录下的 HTML 文件
-    './src/**/*.{js,ts,jsx,tsx}',      // JS/TS 源码
+    './src/**/*.{js,ts,jsx,tsx,css}',  // JS/TS/CSS 源码
     './src/templates/**/*.ejs',        // EJS 模板
     './public/**/*.html',              // public 目录下的 HTML
   ],
   darkMode: 'class',  // 支持暗色主题
+  // 确保骨架屏相关类不被 PurgeCSS 移除
+  safelist: [
+    // 骨架屏类
+    'skeleton', 'skeleton-text', 'skeleton-text-sm', 'skeleton-text-xs',
+    'skeleton-title', 'skeleton-title-lg', 'skeleton-avatar', 'skeleton-avatar-sm', 'skeleton-avatar-lg',
+    'skeleton-button', 'skeleton-button-sm', 'skeleton-button-lg',
+    'skeleton-card', 'skeleton-card-sm', 'skeleton-card-lg',
+    'skeleton-image', 'skeleton-image-square', 'skeleton-table', 'skeleton-table-row',
+    // Spinner 类
+    'spinner', 'spinner-sm', 'spinner-lg', 'spinner-xl',
+    'spinner-primary', 'spinner-success', 'spinner-danger', 'spinner-warning',
+    // 脉冲类
+    'pulse', 'pulse-avatar', 'pulse-text', 'pulse-card',
+    // 点加载类
+    'dots-loading', 'dots-loading-sm', 'dots-loading-lg',
+    // 进度条类
+    'progress-bar', 'progress-bar-fill', 'progress-bar-success', 'progress-bar-warning', 'progress-bar-danger',
+    'progress-indeterminate', 'progress-bar-thick',
+    // 加载遮罩
+    'loading-overlay', 'loading-overlay-blur', 'content-loading', 'content-loading-text',
+    // 空状态类
+    'empty-state', 'empty-state-icon', 'empty-state-title', 'empty-state-description', 'empty-state-action',
+    // 统计卡片
+    'stats-card', 'stats-card-loading',
+    // 动画类
+    'animate-pulse', 'animate-spin', 'animate-bounce',
+  ],
   theme: {
     extend: {
       colors: {

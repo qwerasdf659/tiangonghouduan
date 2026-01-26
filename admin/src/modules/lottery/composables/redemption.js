@@ -71,8 +71,11 @@ export function useRedemptionMethods() {
     async loadRedemptionStats() {
       try {
         console.log('🔄 [Redemption] 开始加载核销码统计...')
-        console.log('📡 [Redemption] 统计API端点:', LOTTERY_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_STATISTICS)
-        
+        console.log(
+          '📡 [Redemption] 统计API端点:',
+          LOTTERY_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_STATISTICS
+        )
+
         // apiGet 返回的是 { success, data } 格式
         const response = await this.apiGet(
           LOTTERY_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_STATISTICS,
@@ -80,7 +83,7 @@ export function useRedemptionMethods() {
           { showLoading: false, showError: false }
         )
         console.log('📊 [Redemption] 统计API响应:', response)
-        
+
         // 从 response.data 中提取统计数据
         if (response?.success && response.data) {
           const stats = response.data
@@ -106,7 +109,10 @@ export function useRedemptionMethods() {
     async loadRedemptionCodes(pageNum = 1) {
       try {
         console.log('🔄 [Redemption] 开始加载核销码列表, 页码:', pageNum)
-        console.log('🔐 [Redemption] 当前Token:', localStorage.getItem('admin_token')?.substring(0, 20) + '...')
+        console.log(
+          '🔐 [Redemption] 当前Token:',
+          localStorage.getItem('admin_token')?.substring(0, 20) + '...'
+        )
         this.page = pageNum
         this.redemptionSelectedIds = []
 
@@ -132,7 +138,7 @@ export function useRedemptionMethods() {
 
         const url = `${LOTTERY_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_ORDERS}?${params}`
         console.log('📡 [Redemption] 列表API URL:', url)
-        
+
         // apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }
         const response = await this.apiGet(url, {}, { showLoading: false })
         console.log('📋 [Redemption] 列表API响应:', response)
@@ -140,13 +146,19 @@ export function useRedemptionMethods() {
         // 解包 withLoading 返回的结构
         const data = response?.success ? response.data : response
         console.log('📋 [Redemption] 解包后数据:', data)
-        
+
         if (data) {
           this.redemptionCodes = data.orders || data.records || data.codes || []
           this.total = data.pagination?.total || this.redemptionCodes.length
-          this.totalPages = data.pagination?.total_pages || Math.ceil(this.total / (this.pageSize || 20))
+          this.totalPages =
+            data.pagination?.total_pages || Math.ceil(this.total / (this.pageSize || 20))
           console.log('✅ [Redemption] 核销码列表已更新, 数量:', this.redemptionCodes.length)
-          console.log('📊 [Redemption] 分页信息: total=', this.total, 'totalPages=', this.totalPages)
+          console.log(
+            '📊 [Redemption] 分页信息: total=',
+            this.total,
+            'totalPages=',
+            this.totalPages
+          )
           if (this.redemptionCodes.length > 0) {
             console.log('📄 [Redemption] 第一条记录:', this.redemptionCodes[0])
           }
@@ -307,7 +319,7 @@ export function useRedemptionMethods() {
      */
     async batchExpireRedemption() {
       console.log('⏰ [Redemption] 批量过期被点击, 选中数量:', this.redemptionSelectedIds.length)
-      
+
       if (this.redemptionSelectedIds.length === 0) {
         console.log('⚠️ [Redemption] 没有选中任何核销码')
         this.showWarning('请先选择要处理的核销码')
@@ -315,7 +327,7 @@ export function useRedemptionMethods() {
       }
 
       console.log('📋 [Redemption] 选中的核销码ID:', this.redemptionSelectedIds)
-      
+
       await this.confirmAndExecute(
         `确定要将选中的 ${this.redemptionSelectedIds.length} 个核销码设为过期吗？`,
         async () => {
@@ -344,7 +356,7 @@ export function useRedemptionMethods() {
         params.append('format', 'csv')
 
         const exportUrl = LOTTERY_ENDPOINTS.BUSINESS_RECORDS_EXPORT + '?' + params.toString()
-        
+
         // 获取Token
         const token = localStorage.getItem('admin_token')
         if (!token) {
@@ -353,13 +365,13 @@ export function useRedemptionMethods() {
         }
 
         this.showSuccess('正在准备导出文件...')
-        
+
         // 使用 fetch 带 Token 下载
         const response = await fetch(exportUrl, {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'text/csv, application/json'
+            Authorization: `Bearer ${token}`,
+            Accept: 'text/csv, application/json'
           }
         })
 
@@ -370,7 +382,7 @@ export function useRedemptionMethods() {
 
         // 检查响应类型
         const contentType = response.headers.get('content-type') || ''
-        
+
         if (contentType.includes('application/json')) {
           // API返回JSON错误
           const errorData = await response.json()
@@ -379,10 +391,10 @@ export function useRedemptionMethods() {
 
         // 获取文件内容
         const blob = await response.blob()
-        
+
         // 生成文件名
         const filename = `redemption_codes_${new Date().toISOString().slice(0, 10)}.csv`
-        
+
         // 触发下载
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
@@ -392,7 +404,7 @@ export function useRedemptionMethods() {
         a.click()
         window.URL.revokeObjectURL(url)
         document.body.removeChild(a)
-        
+
         this.showSuccess('导出成功')
       } catch (error) {
         console.error('❌ [Redemption] 导出失败:', error)
@@ -480,4 +492,3 @@ export function useRedemptionMethods() {
 }
 
 export default { useRedemptionState, useRedemptionMethods }
-

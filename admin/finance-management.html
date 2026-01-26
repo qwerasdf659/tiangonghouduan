@@ -6,7 +6,7 @@
     pageStyle: '[x-cloak] { display: none !important; }' 
   }) %>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="themed-bg-subtle min-h-screen">
   
   <!-- 导航栏 -->
   <nav class="bg-gray-800 text-white shadow-lg">
@@ -22,12 +22,12 @@
   <div class="container mx-auto px-4 py-6" x-data="financeNavigation()" x-init="init()">
     
     <!-- 子页面导航 -->
-    <div class="bg-white rounded-lg shadow mb-6">
+    <div class="themed-card rounded-lg shadow mb-6">
       <div class="flex border-b overflow-x-auto">
         <template x-for="page in subPages" :key="page.id">
           <button 
             @click="switchPage(page.id)"
-            :class="currentPage === page.id ? 'border-b-2 border-gray-800 text-gray-800 bg-gray-50' : 'text-gray-600 hover:bg-gray-50'"
+            :class="currentPage === page.id ? 'border-b-2 border-gray-800 themed-text themed-bg-base' : 'themed-text-muted themed-hover-bg'"
             class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
           >
             <i :class="page.icon" class="mr-1"></i>
@@ -42,11 +42,11 @@
 
     <!-- 消费记录审核 -->
     <div x-show="currentPage === 'consumption'" x-cloak>
-      <div class="bg-white rounded-lg shadow">
+      <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">消费记录审核</h5>
         </div>
-        <div class="p-4 border-b bg-gray-50">
+        <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <input type="text" x-model="consumptionFilters.userId" placeholder="用户ID" class="px-3 py-2 border rounded">
             <select x-model="consumptionFilters.status" class="px-3 py-2 border rounded">
@@ -61,20 +61,20 @@
         </div>
         <div class="overflow-x-auto">
           <table class="w-full">
-            <thead class="bg-gray-50">
+            <thead class="themed-bg-base">
               <tr>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">记录ID</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">门店</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">金额</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">提交时间</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">记录ID</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">门店</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">金额</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">提交时间</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
               </tr>
             </thead>
             <tbody class="divide-y">
               <template x-for="record in consumptions" :key="record.id || record.record_id">
-                <tr class="hover:bg-gray-50">
+                <tr class="themed-hover-bg">
                   <td class="px-4 py-3 text-sm" x-text="record.record_id"></td>
                   <td class="px-4 py-3 text-sm" x-text="record.user_name || record.user_id"></td>
                   <td class="px-4 py-3 text-sm" x-text="record.store_name"></td>
@@ -83,14 +83,14 @@
                     <span 
                       :class="{
                         'bg-yellow-100 text-yellow-700': record.status === 'pending',
-                        'bg-green-100 text-green-700': record.status === 'approved',
+                        'bg-green-100 themed-text-success': record.status === 'approved',
                         'bg-red-100 text-red-700': record.status === 'rejected'
                       }"
                       class="px-2 py-1 text-xs rounded"
                       x-text="record.status === 'pending' ? '待审核' : record.status === 'approved' ? '已通过' : '已拒绝'"
                     ></span>
                   </td>
-                  <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(record.created_at)"></td>
+                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(record.created_at)"></td>
                   <td class="px-4 py-3">
                     <template x-if="record.status === 'pending'">
                       <div class="flex space-x-2">
@@ -114,32 +114,32 @@
     <div x-show="currentPage === 'diamond-accounts'" x-cloak>
       <!-- 统计卡片 -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div class="bg-white rounded-lg shadow p-4 text-center">
-          <h6 class="text-gray-500 text-sm mb-1">持有用户数</h6>
-          <p class="text-2xl font-bold text-blue-600" x-text="diamondStats.holderCount || 0"></p>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <h6 class="themed-text-muted text-sm mb-1">持有用户数</h6>
+          <p class="text-2xl font-bold themed-text-primary" x-text="diamondStats.holderCount || 0"></p>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 text-center">
-          <h6 class="text-gray-500 text-sm mb-1">流通总量</h6>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <h6 class="themed-text-muted text-sm mb-1">流通总量</h6>
           <p class="text-2xl font-bold text-green-600" x-text="formatNumber(diamondStats.totalCirculation || 0)"></p>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 text-center">
-          <h6 class="text-gray-500 text-sm mb-1">冻结总量</h6>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <h6 class="themed-text-muted text-sm mb-1">冻结总量</h6>
           <p class="text-2xl font-bold text-yellow-600" x-text="formatNumber(diamondStats.totalFrozen || 0)"></p>
         </div>
       </div>
 
-      <div class="bg-white rounded-lg shadow">
+      <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold">💎 钻石账户查询</h5>
-          <button @click="openDiamondAdjustModal({})" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm">
+          <button @click="openDiamondAdjustModal({})" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary text-sm">
             ➕ 调整用户钻石
           </button>
         </div>
         <!-- 搜索区域 -->
-        <div class="p-4 border-b bg-gray-50">
+        <div class="p-4 border-b themed-bg-base">
           <div class="flex items-center gap-4">
             <div class="flex-1 max-w-md">
-              <label class="block text-sm font-medium text-gray-700 mb-1">用户ID</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">用户ID</label>
               <div class="flex gap-2">
                 <input 
                   type="number" 
@@ -150,13 +150,13 @@
                 >
                 <button 
                   @click="searchDiamondAccounts()" 
-                  class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary"
                 >
                   🔍 查询
                 </button>
                 <button 
                   @click="clearDiamondSearch()" 
-                  class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                  class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300"
                   x-show="diamondFilters.user_id"
                 >
                   清空
@@ -164,7 +164,7 @@
               </div>
             </div>
           </div>
-          <p class="text-sm text-gray-500 mt-2">
+          <p class="text-sm themed-text-muted mt-2">
             💡 后端API需要指定用户ID查询，请输入用户ID后点击查询
           </p>
         </div>
@@ -172,7 +172,7 @@
         <!-- 搜索结果 -->
         <div class="p-4">
           <!-- 未搜索提示 -->
-          <div x-show="!diamondSearched && !diamondFilters.user_id" class="text-center py-8 text-gray-500">
+          <div x-show="!diamondSearched && !diamondFilters.user_id" class="text-center py-8 themed-text-muted">
             <div class="text-4xl mb-2">💎</div>
             <p x-text="diamondSearchTip"></p>
           </div>
@@ -181,7 +181,7 @@
           <div x-show="diamondSearched || diamondFilters.user_id">
             <!-- 无结果 -->
             <template x-if="diamondAccounts.length === 0 && diamondSearched">
-              <div class="text-center py-8 text-gray-500">
+              <div class="text-center py-8 themed-text-muted">
                 <div class="text-4xl mb-2">🔍</div>
                 <p x-text="diamondSearchTip || '未找到该用户的钻石账户信息'"></p>
               </div>
@@ -191,35 +191,35 @@
             <template x-if="diamondAccounts.length > 0">
               <div class="overflow-x-auto">
                 <table class="w-full">
-                  <thead class="bg-gray-50">
+                  <thead class="themed-bg-base">
                     <tr>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户ID</th>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">昵称</th>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">手机号</th>
-                      <th class="px-4 py-3 text-right text-sm font-medium text-gray-600">可用余额</th>
-                      <th class="px-4 py-3 text-right text-sm font-medium text-gray-600">冻结余额</th>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户ID</th>
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">昵称</th>
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">手机号</th>
+                      <th class="px-4 py-3 text-right text-sm font-medium themed-text-muted">可用余额</th>
+                      <th class="px-4 py-3 text-right text-sm font-medium themed-text-muted">冻结余额</th>
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y">
                     <template x-for="account in diamondAccounts" :key="account.user_id">
-                      <tr class="hover:bg-gray-50">
+                      <tr class="themed-hover-bg">
                         <td class="px-4 py-3 text-sm font-mono" x-text="account.user_id"></td>
                         <td class="px-4 py-3 text-sm" x-text="account.nickname || '-'"></td>
-                        <td class="px-4 py-3 text-sm text-gray-500" x-text="account.mobile || '-'"></td>
-                        <td class="px-4 py-3 text-sm font-mono text-right text-blue-600" x-text="formatNumber(account.balance || 0)"></td>
+                        <td class="px-4 py-3 text-sm themed-text-muted" x-text="account.mobile || '-'"></td>
+                        <td class="px-4 py-3 text-sm font-mono text-right themed-text-primary" x-text="formatNumber(account.balance || 0)"></td>
                         <td class="px-4 py-3 text-sm font-mono text-right text-yellow-600" x-text="formatNumber(account.frozen || 0)"></td>
                         <td class="px-4 py-3">
                           <span 
-                            :class="account.has_diamond ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
+                            :class="account.has_diamond ? 'bg-green-100 themed-text-success' : 'themed-bg-subtle themed-text-muted'"
                             class="px-2 py-1 text-xs rounded"
                             x-text="account.has_diamond ? '已开通' : '未开通'"
                           ></span>
                         </td>
                         <td class="px-4 py-3">
                           <div class="flex space-x-2">
-                            <button @click="viewDiamondDetail(account)" class="text-blue-500 hover:text-blue-700 text-sm">查看流水</button>
+                            <button @click="viewDiamondDetail(account)" class="themed-text-primary hover:text-blue-700 text-sm">查看流水</button>
                             <button @click="openDiamondAdjustModal(account)" class="text-green-500 hover:text-green-700 text-sm">调整</button>
                           </div>
                         </td>
@@ -238,48 +238,48 @@
     <div x-show="currentPage === 'merchant-points'" x-cloak>
       <!-- 统计卡片 -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div class="bg-white rounded-lg shadow p-4 text-center">
-          <h6 class="text-gray-500 text-sm mb-1">商户总数</h6>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <h6 class="themed-text-muted text-sm mb-1">商户总数</h6>
           <p class="text-2xl font-bold text-orange-600" x-text="merchantStats?.totalMerchants || 0"></p>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 text-center">
-          <h6 class="text-gray-500 text-sm mb-1">积分总量</h6>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <h6 class="themed-text-muted text-sm mb-1">积分总量</h6>
           <p class="text-2xl font-bold text-green-600" x-text="formatNumber(merchantStats?.totalPoints || 0)"></p>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 text-center">
-          <h6 class="text-gray-500 text-sm mb-1">活跃商户</h6>
-          <p class="text-2xl font-bold text-blue-600" x-text="merchantStats?.activeMerchants || 0"></p>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <h6 class="themed-text-muted text-sm mb-1">活跃商户</h6>
+          <p class="text-2xl font-bold themed-text-primary" x-text="merchantStats?.activeMerchants || 0"></p>
         </div>
       </div>
 
-      <div class="bg-white rounded-lg shadow">
+      <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">🪙 商户积分申请列表</h5>
         </div>
         <!-- 筛选区域 -->
-        <div class="p-4 border-b bg-gray-50">
+        <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <input type="text" x-model="merchantFilters.merchant_id" placeholder="商户ID" class="px-3 py-2 border rounded">
             <input type="text" x-model="merchantFilters.keyword" placeholder="关键词" class="px-3 py-2 border rounded">
-            <button @click="searchMerchants()" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">🔍 搜索</button>
-            <button @click="merchantFilters = {}; loadMerchantPoints()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">重置</button>
+            <button @click="searchMerchants()" class="px-4 py-2 themed-btn-primary rounded">🔍 搜索</button>
+            <button @click="merchantFilters = {}; loadMerchantPoints()" class="px-4 py-2 bg-gray-300 themed-text-secondary rounded hover:bg-gray-400">重置</button>
           </div>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full">
-            <thead class="bg-gray-50">
+            <thead class="themed-bg-base">
               <tr>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">申请ID</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">用户</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">积分金额</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">申请时间</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">申请ID</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">积分金额</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">申请时间</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
               </tr>
             </thead>
             <tbody class="divide-y">
               <template x-for="item in merchantPoints" :key="item.audit_id || item.id">
-                <tr class="hover:bg-gray-50">
+                <tr class="themed-hover-bg">
                   <td class="px-4 py-3 text-sm font-mono" x-text="item.audit_id || item.id"></td>
                   <td class="px-4 py-3 text-sm" x-text="item.user_name || item.user_id"></td>
                   <td class="px-4 py-3 text-sm font-mono text-orange-600" x-text="item.points_amount || 0"></td>
@@ -287,17 +287,17 @@
                     <span 
                       :class="{
                         'bg-yellow-100 text-yellow-700': item.status === 'pending',
-                        'bg-green-100 text-green-700': item.status === 'approved',
+                        'bg-green-100 themed-text-success': item.status === 'approved',
                         'bg-red-100 text-red-700': item.status === 'rejected'
                       }"
                       class="px-2 py-1 text-xs rounded"
                       x-text="item.status === 'pending' ? '待审核' : item.status === 'approved' ? '已通过' : '已拒绝'"
                     ></span>
                   </td>
-                  <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDateTime(item.created_at)"></td>
+                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTime(item.created_at)"></td>
                   <td class="px-4 py-3">
                     <div class="flex space-x-2">
-                      <button @click="viewMerchantDetail(item)" class="text-blue-500 hover:text-blue-700 text-sm">详情</button>
+                      <button @click="viewMerchantDetail(item)" class="themed-text-primary hover:text-blue-700 text-sm">详情</button>
                       <template x-if="item.status === 'pending'">
                         <div class="flex space-x-2">
                           <button @click="approveMerchantPoints(item)" class="text-green-500 hover:text-green-700 text-sm">通过</button>
@@ -311,18 +311,18 @@
             </tbody>
           </table>
           <!-- 空数据提示 -->
-          <div x-show="merchantPoints.length === 0" class="text-center py-8 text-gray-500">
+          <div x-show="merchantPoints.length === 0" class="text-center py-8 themed-text-muted">
             <div class="text-4xl mb-2">🪙</div>
             <p>暂无商户积分申请记录</p>
           </div>
         </div>
         <!-- 分页 -->
-        <div class="p-4 border-t bg-gray-50 flex justify-between items-center" x-show="merchantPoints.length > 0">
-          <span class="text-sm text-gray-600">共 <span x-text="total"></span> 条记录</span>
+        <div class="p-4 border-t themed-bg-base flex justify-between items-center" x-show="merchantPoints.length > 0">
+          <span class="text-sm themed-text-muted">共 <span x-text="total"></span> 条记录</span>
           <div class="flex space-x-1">
-            <button @click="changePage(page - 1)" :disabled="page <= 1" class="px-3 py-1 border rounded text-sm hover:bg-gray-200 disabled:opacity-50">上一页</button>
+            <button @click="changePage(page - 1)" :disabled="page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
             <span class="px-3 py-1 text-sm">第 <span x-text="page"></span> / <span x-text="totalPages"></span> 页</span>
-            <button @click="changePage(page + 1)" :disabled="page >= totalPages" class="px-3 py-1 border rounded text-sm hover:bg-gray-200 disabled:opacity-50">下一页</button>
+            <button @click="changePage(page + 1)" :disabled="page >= totalPages" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">下一页</button>
           </div>
         </div>
       </div>
@@ -332,30 +332,30 @@
     <div x-show="currentPage === 'debt-management'" x-cloak>
       <!-- 统计卡片 -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white rounded-lg shadow p-4 text-center">
-          <h6 class="text-gray-500 text-sm mb-1">库存欠账数</h6>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <h6 class="themed-text-muted text-sm mb-1">库存欠账数</h6>
           <p class="text-2xl font-bold text-red-600" x-text="debtStats?.total_inventory_debt || 0"></p>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 text-center">
-          <h6 class="text-gray-500 text-sm mb-1">预算欠账额</h6>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <h6 class="themed-text-muted text-sm mb-1">预算欠账额</h6>
           <p class="text-2xl font-bold text-orange-600" x-text="formatAmount(debtStats?.total_budget_debt || 0)"></p>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 text-center">
-          <h6 class="text-gray-500 text-sm mb-1">待处理</h6>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <h6 class="themed-text-muted text-sm mb-1">待处理</h6>
           <p class="text-2xl font-bold text-yellow-600" x-text="debtStats?.pending_count || 0"></p>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 text-center">
-          <h6 class="text-gray-500 text-sm mb-1">今日清偿</h6>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <h6 class="themed-text-muted text-sm mb-1">今日清偿</h6>
           <p class="text-2xl font-bold text-green-600" x-text="debtStats?.cleared_today || 0"></p>
         </div>
       </div>
 
-      <div class="bg-white rounded-lg shadow">
+      <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">📋 待冲销欠账列表</h5>
         </div>
         <!-- 筛选区域 -->
-        <div class="p-4 border-b bg-gray-50">
+        <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <select x-model="debtFilters.debt_type" class="px-3 py-2 border rounded">
               <option value="">全部类型</option>
@@ -363,29 +363,29 @@
               <option value="budget">预算欠账</option>
             </select>
             <input type="text" x-model="debtFilters.campaign_id" placeholder="活动ID" class="px-3 py-2 border rounded">
-            <button @click="searchDebts()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">🔍 搜索</button>
-            <button @click="resetDebtFilters()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">重置</button>
+            <button @click="searchDebts()" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">🔍 搜索</button>
+            <button @click="resetDebtFilters()" class="px-4 py-2 bg-gray-300 themed-text-secondary rounded hover:bg-gray-400">重置</button>
           </div>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full">
-            <thead class="bg-gray-50">
+            <thead class="themed-bg-base">
               <tr>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">欠账ID</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">类型</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">活动/奖品</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">欠账数量/金额</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">创建时间</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">欠账ID</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">类型</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">活动/奖品</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">欠账数量/金额</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">创建时间</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
               </tr>
             </thead>
             <tbody class="divide-y">
               <template x-for="debt in debts" :key="debt.debt_id || debt.id">
-                <tr class="hover:bg-gray-50">
+                <tr class="themed-hover-bg">
                   <td class="px-4 py-3 text-sm font-mono" x-text="debt.debt_id || debt.id"></td>
                   <td class="px-4 py-3">
                     <span 
-                      :class="debt.debt_type === 'inventory' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'"
+                      :class="debt.debt_type === 'inventory' ? 'themed-bg-primary-light themed-text-primary' : 'bg-orange-100 text-orange-700'"
                       class="px-2 py-1 text-xs rounded"
                       x-text="debt.debt_type === 'inventory' ? '库存' : '预算'"
                     ></span>
@@ -395,10 +395,10 @@
                     <div class="text-gray-400 text-xs" x-text="'ID: ' + (debt.campaign_id || debt.prize_id || '-')"></div>
                   </td>
                   <td class="px-4 py-3 text-sm font-mono text-red-600" x-text="debt.owed_quantity || debt.owed_amount || 0"></td>
-                  <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDateTime(debt.created_at)"></td>
+                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTime(debt.created_at)"></td>
                   <td class="px-4 py-3">
                     <div class="flex space-x-2">
-                      <button @click="viewDebtDetail(debt)" class="text-blue-500 hover:text-blue-700 text-sm">详情</button>
+                      <button @click="viewDebtDetail(debt)" class="themed-text-primary hover:text-blue-700 text-sm">详情</button>
                       <button @click="openRepayModal(debt)" class="text-green-500 hover:text-green-700 text-sm">清偿</button>
                     </div>
                   </td>
@@ -407,18 +407,18 @@
             </tbody>
           </table>
           <!-- 空数据提示 -->
-          <div x-show="debts.length === 0" class="text-center py-8 text-gray-500">
+          <div x-show="debts.length === 0" class="text-center py-8 themed-text-muted">
             <div class="text-4xl mb-2">📋</div>
             <p>暂无待冲销欠账记录</p>
           </div>
         </div>
         <!-- 分页 -->
-        <div class="p-4 border-t bg-gray-50 flex justify-between items-center" x-show="debts.length > 0">
-          <span class="text-sm text-gray-600">共 <span x-text="total"></span> 条记录</span>
+        <div class="p-4 border-t themed-bg-base flex justify-between items-center" x-show="debts.length > 0">
+          <span class="text-sm themed-text-muted">共 <span x-text="total"></span> 条记录</span>
           <div class="flex space-x-1">
-            <button @click="changePage(page - 1)" :disabled="page <= 1" class="px-3 py-1 border rounded text-sm hover:bg-gray-200 disabled:opacity-50">上一页</button>
+            <button @click="changePage(page - 1)" :disabled="page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
             <span class="px-3 py-1 text-sm">第 <span x-text="page"></span> / <span x-text="totalPages"></span> 页</span>
-            <button @click="changePage(page + 1)" :disabled="page >= totalPages" class="px-3 py-1 border rounded text-sm hover:bg-gray-200 disabled:opacity-50">下一页</button>
+            <button @click="changePage(page + 1)" :disabled="page >= totalPages" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">下一页</button>
           </div>
         </div>
       </div>
@@ -428,30 +428,30 @@
     <div x-show="currentPage === 'campaign-budget'" x-cloak>
       <!-- 预算统计卡片 -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white rounded-lg shadow p-4 text-center">
-          <h6 class="text-gray-500 text-sm mb-1">总预算</h6>
-          <p class="text-2xl font-bold text-blue-600" x-text="budgetStats?.totalBudget || 0"></p>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <h6 class="themed-text-muted text-sm mb-1">总预算</h6>
+          <p class="text-2xl font-bold themed-text-primary" x-text="budgetStats?.totalBudget || 0"></p>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 text-center">
-          <h6 class="text-gray-500 text-sm mb-1">已使用</h6>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <h6 class="themed-text-muted text-sm mb-1">已使用</h6>
           <p class="text-2xl font-bold text-orange-600" x-text="budgetStats?.usedBudget || 0"></p>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 text-center">
-          <h6 class="text-gray-500 text-sm mb-1">剩余预算</h6>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <h6 class="themed-text-muted text-sm mb-1">剩余预算</h6>
           <p class="text-2xl font-bold text-green-600" x-text="budgetStats?.remainingBudget || 0"></p>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 text-center">
-          <h6 class="text-gray-500 text-sm mb-1">使用率</h6>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <h6 class="themed-text-muted text-sm mb-1">使用率</h6>
           <p class="text-2xl font-bold" :class="(budgetStats?.utilizationRate || 0) > 80 ? 'text-red-600' : 'text-green-600'" x-text="(budgetStats?.utilizationRate || 0) + '%'"></p>
         </div>
       </div>
 
-      <div class="bg-white rounded-lg shadow">
+      <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">📊 活动预算列表</h5>
         </div>
         <!-- 筛选区域 -->
-        <div class="p-4 border-b bg-gray-50">
+        <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <input type="text" x-model="budgetFilters.campaign_id" placeholder="活动ID" class="px-3 py-2 border rounded">
             <input type="text" x-model="budgetFilters.keyword" placeholder="活动名称关键词" class="px-3 py-2 border rounded">
@@ -460,29 +460,29 @@
               <option value="active">运行中</option>
               <option value="exhausted">已耗尽</option>
             </select>
-            <button @click="searchBudgets()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">🔍 搜索</button>
+            <button @click="searchBudgets()" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">🔍 搜索</button>
           </div>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full">
-            <thead class="bg-gray-50">
+            <thead class="themed-bg-base">
               <tr>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">活动ID</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">活动名称</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">预算模式</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">剩余预算</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">活动ID</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">活动名称</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">预算模式</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">剩余预算</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
               </tr>
             </thead>
             <tbody class="divide-y">
               <template x-for="budget in budgets" :key="budget.campaign_id">
-                <tr class="hover:bg-gray-50">
+                <tr class="themed-hover-bg">
                   <td class="px-4 py-3 text-sm font-mono" x-text="budget.campaign_id"></td>
                   <td class="px-4 py-3 text-sm" x-text="budget.campaign_name || budget.name || '-'"></td>
                   <td class="px-4 py-3">
                     <span 
-                      :class="budget.budget_mode === 'UNLIMITED' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'"
+                      :class="budget.budget_mode === 'UNLIMITED' ? 'themed-bg-primary-light themed-text-primary' : 'bg-purple-100 text-purple-700'"
                       class="px-2 py-1 text-xs rounded"
                       x-text="getBudgetModeText(budget.budget_mode)"
                     ></span>
@@ -490,14 +490,14 @@
                   <td class="px-4 py-3 text-sm font-mono" x-text="budget.pool_budget_remaining ?? budget.remaining ?? '-'"></td>
                   <td class="px-4 py-3">
                     <span 
-                      :class="getBudgetStatusFromData(budget) === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                      :class="getBudgetStatusFromData(budget) === 'active' ? 'bg-green-100 themed-text-success' : 'bg-red-100 text-red-700'"
                       class="px-2 py-1 text-xs rounded"
                       x-text="getBudgetStatusText(getBudgetStatusFromData(budget))"
                     ></span>
                   </td>
                   <td class="px-4 py-3">
                     <div class="flex space-x-2">
-                      <button @click="viewBudgetDetail(budget)" class="text-blue-500 hover:text-blue-700 text-sm">详情</button>
+                      <button @click="viewBudgetDetail(budget)" class="themed-text-primary hover:text-blue-700 text-sm">详情</button>
                       <button @click="openEditBudgetModal(budget)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
                     </div>
                   </td>
@@ -506,18 +506,18 @@
             </tbody>
           </table>
           <!-- 空数据提示 -->
-          <div x-show="budgets.length === 0" class="text-center py-8 text-gray-500">
+          <div x-show="budgets.length === 0" class="text-center py-8 themed-text-muted">
             <div class="text-4xl mb-2">📊</div>
             <p>暂无活动预算数据</p>
           </div>
         </div>
         <!-- 分页 -->
-        <div class="p-4 border-t bg-gray-50 flex justify-between items-center" x-show="budgets.length > 0">
-          <span class="text-sm text-gray-600">共 <span x-text="total"></span> 条记录</span>
+        <div class="p-4 border-t themed-bg-base flex justify-between items-center" x-show="budgets.length > 0">
+          <span class="text-sm themed-text-muted">共 <span x-text="total"></span> 条记录</span>
           <div class="flex space-x-1">
-            <button @click="changePage(page - 1)" :disabled="page <= 1" class="px-3 py-1 border rounded text-sm hover:bg-gray-200 disabled:opacity-50">上一页</button>
+            <button @click="changePage(page - 1)" :disabled="page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
             <span class="px-3 py-1 text-sm">第 <span x-text="page"></span> / <span x-text="totalPages"></span> 页</span>
-            <button @click="changePage(page + 1)" :disabled="page >= totalPages" class="px-3 py-1 border rounded text-sm hover:bg-gray-200 disabled:opacity-50">下一页</button>
+            <button @click="changePage(page + 1)" :disabled="page >= totalPages" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">下一页</button>
           </div>
         </div>
       </div>
@@ -525,12 +525,12 @@
 
     <!-- 商户日志 -->
     <div x-show="currentPage === 'merchant-logs'" x-cloak>
-      <div class="bg-white rounded-lg shadow">
+      <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">📋 商户操作日志</h5>
         </div>
         <!-- 筛选区域 -->
-        <div class="p-4 border-b bg-gray-50">
+        <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <input type="text" x-model="logFilters.merchant_id" placeholder="商户ID" class="px-3 py-2 border rounded">
             <select x-model="logFilters.action_type" class="px-3 py-2 border rounded">
@@ -541,49 +541,49 @@
               <option value="settlement">结算</option>
             </select>
             <input type="date" x-model="logFilters.startDate" class="px-3 py-2 border rounded">
-            <button @click="searchLogs()" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600">🔍 搜索</button>
+            <button @click="searchLogs()" class="px-4 py-2 themed-btn-primary rounded">🔍 搜索</button>
           </div>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full">
-            <thead class="bg-gray-50">
+            <thead class="themed-bg-base">
               <tr>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">日志ID</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">商户</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作类型</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">描述</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作时间</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">IP地址</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">日志ID</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">商户</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作类型</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">描述</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作时间</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">IP地址</th>
               </tr>
             </thead>
             <tbody class="divide-y">
               <template x-for="log in merchantLogs" :key="log.id">
-                <tr class="hover:bg-gray-50">
+                <tr class="themed-hover-bg">
                   <td class="px-4 py-3 text-sm font-mono" x-text="log.id"></td>
                   <td class="px-4 py-3 text-sm" x-text="log.store_info?.store_name || log.operator_info?.nickname || '-'"></td>
                   <td class="px-4 py-3">
-                    <span class="px-2 py-1 text-xs rounded bg-gray-100 text-gray-700" x-text="log.operation_type_name || log.operation_type || '-'"></span>
+                    <span class="px-2 py-1 text-xs rounded themed-bg-subtle themed-text-secondary" x-text="log.operation_type_name || log.operation_type || '-'"></span>
                   </td>
-                  <td class="px-4 py-3 text-sm text-gray-600 max-w-xs truncate" x-text="log.action_name || log.result_name || '-'" :title="log.action_name || log.result_name"></td>
-                  <td class="px-4 py-3 text-sm text-gray-500" x-text="log.created_at?.beijing || log.created_at?.relative || '-'"></td>
+                  <td class="px-4 py-3 text-sm themed-text-muted max-w-xs truncate" x-text="log.action_name || log.result_name || '-'" :title="log.action_name || log.result_name"></td>
+                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="log.created_at?.beijing || log.created_at?.relative || '-'"></td>
                   <td class="px-4 py-3 text-sm text-gray-400 font-mono" x-text="log.ip_address || '-'"></td>
                 </tr>
               </template>
             </tbody>
           </table>
           <!-- 空数据提示 -->
-          <div x-show="merchantLogs.length === 0" class="text-center py-8 text-gray-500">
+          <div x-show="merchantLogs.length === 0" class="text-center py-8 themed-text-muted">
             <div class="text-4xl mb-2">📋</div>
             <p>暂无商户操作日志</p>
           </div>
         </div>
         <!-- 分页 -->
-        <div class="p-4 border-t bg-gray-50 flex justify-between items-center" x-show="merchantLogs.length > 0">
-          <span class="text-sm text-gray-600">共 <span x-text="total"></span> 条记录</span>
+        <div class="p-4 border-t themed-bg-base flex justify-between items-center" x-show="merchantLogs.length > 0">
+          <span class="text-sm themed-text-muted">共 <span x-text="total"></span> 条记录</span>
           <div class="flex space-x-1">
-            <button @click="changePage(page - 1)" :disabled="page <= 1" class="px-3 py-1 border rounded text-sm hover:bg-gray-200 disabled:opacity-50">上一页</button>
+            <button @click="changePage(page - 1)" :disabled="page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
             <span class="px-3 py-1 text-sm">第 <span x-text="page"></span> / <span x-text="totalPages"></span> 页</span>
-            <button @click="changePage(page + 1)" :disabled="page >= totalPages" class="px-3 py-1 border rounded text-sm hover:bg-gray-200 disabled:opacity-50">下一页</button>
+            <button @click="changePage(page + 1)" :disabled="page >= totalPages" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">下一页</button>
           </div>
         </div>
       </div>
@@ -598,45 +598,45 @@
          class="fixed inset-0 z-50 flex items-center justify-center"
          style="display: none;">
       <div class="fixed inset-0 bg-black/50" @click="hideModal('consumptionDetailModal')"></div>
-      <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
         <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold">📋 消费记录详情</h5>
-          <button @click="hideModal('consumptionDetailModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          <button @click="hideModal('consumptionDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
         </div>
         <div class="p-6" x-show="selectedConsumption">
           <div class="space-y-3">
             <div class="flex justify-between border-b pb-2">
-              <span class="text-gray-600">记录ID</span>
+              <span class="themed-text-muted">记录ID</span>
               <span class="font-mono" x-text="selectedConsumption?.record_id"></span>
             </div>
             <div class="flex justify-between border-b pb-2">
-              <span class="text-gray-600">用户</span>
+              <span class="themed-text-muted">用户</span>
               <span x-text="selectedConsumption?.user_name || selectedConsumption?.user_id"></span>
             </div>
             <div class="flex justify-between border-b pb-2">
-              <span class="text-gray-600">门店</span>
+              <span class="themed-text-muted">门店</span>
               <span x-text="selectedConsumption?.store_name"></span>
             </div>
             <div class="flex justify-between border-b pb-2">
-              <span class="text-gray-600">金额</span>
+              <span class="themed-text-muted">金额</span>
               <span class="font-mono text-lg" x-text="'¥' + (selectedConsumption?.amount / 100).toFixed(2)"></span>
             </div>
             <div class="flex justify-between border-b pb-2">
-              <span class="text-gray-600">状态</span>
+              <span class="themed-text-muted">状态</span>
               <span class="px-2 py-1 text-xs rounded" :class="getConsumptionStatusClass(selectedConsumption?.status)" x-text="getConsumptionStatusText(selectedConsumption?.status)"></span>
             </div>
             <div class="flex justify-between border-b pb-2">
-              <span class="text-gray-600">提交时间</span>
+              <span class="themed-text-muted">提交时间</span>
               <span x-text="formatDate(selectedConsumption?.created_at)"></span>
             </div>
             <div x-show="selectedConsumption?.remark">
-              <span class="text-gray-600 block mb-1">备注</span>
-              <p class="text-gray-800 bg-gray-50 p-2 rounded" x-text="selectedConsumption?.remark"></p>
+              <span class="themed-text-muted block mb-1">备注</span>
+              <p class="themed-text themed-bg-base p-2 rounded" x-text="selectedConsumption?.remark"></p>
             </div>
           </div>
         </div>
-        <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2">
-          <button type="button" @click="hideModal('consumptionDetailModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">关闭</button>
+        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+          <button type="button" @click="hideModal('consumptionDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
           <template x-if="selectedConsumption?.status === 'pending'">
             <div class="flex space-x-2">
               <button type="button" @click="approveConsumption(selectedConsumption); hideModal('consumptionDetailModal')" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">✓ 通过</button>
@@ -654,20 +654,20 @@
          class="fixed inset-0 z-50 flex items-center justify-center"
          style="display: none;">
       <div class="fixed inset-0 bg-black/50" @click="hideModal('rejectModal')"></div>
-      <div class="relative bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 z-10">
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-sm mx-4 z-10">
         <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold text-red-600">⚠️ 拒绝审核</h5>
-          <button @click="hideModal('rejectModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          <button @click="hideModal('rejectModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
         </div>
         <form @submit.prevent="confirmReject()">
           <div class="p-6 space-y-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">拒绝原因 <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">拒绝原因 <span class="text-red-500">*</span></label>
               <textarea x-model="rejectForm.reason" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-red-500" rows="3" required placeholder="请输入拒绝原因..."></textarea>
             </div>
           </div>
-          <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2">
-            <button type="button" @click="hideModal('rejectModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+            <button type="button" @click="hideModal('rejectModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
             <button type="submit" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600" :disabled="saving">
               <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
               确认拒绝
@@ -684,37 +684,37 @@
          class="fixed inset-0 z-50 flex items-center justify-center"
          style="display: none;">
       <div class="fixed inset-0 bg-black/50" @click="hideModal('debtDetailModal')"></div>
-      <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 z-10 max-h-[90vh] overflow-y-auto">
-        <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 z-10 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
           <h5 class="font-semibold">💳 欠账详情</h5>
-          <button @click="hideModal('debtDetailModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          <button @click="hideModal('debtDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
         </div>
         <div class="p-6" x-show="selectedDebt">
           <div class="grid grid-cols-2 gap-4 mb-6">
             <div class="bg-red-50 rounded-lg p-4 text-center">
-              <p class="text-sm text-gray-600">欠账数量/金额</p>
+              <p class="text-sm themed-text-muted">欠账数量/金额</p>
               <p class="text-2xl font-bold text-red-600" x-text="selectedDebt?.owed_quantity || selectedDebt?.owed_amount || 0"></p>
             </div>
-            <div class="bg-blue-50 rounded-lg p-4 text-center">
-              <p class="text-sm text-gray-600">欠账类型</p>
-              <p class="text-lg font-bold text-blue-600" x-text="selectedDebt?.debt_type === 'inventory' ? '库存欠账' : '预算欠账'"></p>
+            <div class="themed-bg-primary-light rounded-lg p-4 text-center">
+              <p class="text-sm themed-text-muted">欠账类型</p>
+              <p class="text-lg font-bold themed-text-primary" x-text="selectedDebt?.debt_type === 'inventory' ? '库存欠账' : '预算欠账'"></p>
             </div>
           </div>
           <div class="space-y-3">
             <div class="flex justify-between border-b pb-2">
-              <span class="text-gray-600">欠账ID</span>
+              <span class="themed-text-muted">欠账ID</span>
               <span class="font-mono" x-text="selectedDebt?.debt_id || selectedDebt?.id"></span>
             </div>
             <div class="flex justify-between border-b pb-2">
-              <span class="text-gray-600">活动</span>
+              <span class="themed-text-muted">活动</span>
               <span x-text="selectedDebt?.campaign_name || ('ID: ' + (selectedDebt?.campaign_id || '-'))"></span>
             </div>
             <div class="flex justify-between border-b pb-2">
-              <span class="text-gray-600">奖品</span>
+              <span class="themed-text-muted">奖品</span>
               <span x-text="selectedDebt?.prize_name || ('ID: ' + (selectedDebt?.prize_id || '-'))"></span>
             </div>
             <div class="flex justify-between border-b pb-2">
-              <span class="text-gray-600">创建时间</span>
+              <span class="themed-text-muted">创建时间</span>
               <span x-text="formatDateTime(selectedDebt?.created_at)"></span>
             </div>
           </div>
@@ -722,10 +722,10 @@
             <h6 class="font-medium mb-3">清偿记录</h6>
             <div class="space-y-2">
               <template x-for="record in selectedDebt?.clear_records || []" :key="record.record_id">
-                <div class="bg-gray-50 rounded p-3 flex justify-between items-center">
+                <div class="themed-bg-base rounded p-3 flex justify-between items-center">
                   <div>
                     <span class="font-mono text-green-600" x-text="'¥' + (payment.amount / 100).toFixed(2)"></span>
-                    <span class="text-gray-500 text-sm ml-2" x-text="formatDate(payment.created_at)"></span>
+                    <span class="themed-text-muted text-sm ml-2" x-text="formatDate(payment.created_at)"></span>
                   </div>
                   <span class="text-gray-400 text-sm" x-text="payment.remark || ''"></span>
                 </div>
@@ -733,8 +733,8 @@
             </div>
           </div>
         </div>
-        <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2 sticky bottom-0">
-          <button type="button" @click="hideModal('debtDetailModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">关闭</button>
+        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2 sticky bottom-0">
+          <button type="button" @click="hideModal('debtDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
           <button type="button" @click="openRepayModal(selectedDebt)" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">💵 执行清偿</button>
         </div>
       </div>
@@ -747,41 +747,41 @@
          class="fixed inset-0 z-50 flex items-center justify-center"
          style="display: none;">
       <div class="fixed inset-0 bg-black/50" @click="hideModal('debtRepayModal')"></div>
-      <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
         <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold">💵 欠账清偿</h5>
-          <button @click="hideModal('debtRepayModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          <button @click="hideModal('debtRepayModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
         </div>
         <form @submit.prevent="submitDebtRepay()">
           <div class="p-6 space-y-4">
             <!-- 欠账信息 -->
-            <div class="bg-gray-50 rounded p-3">
+            <div class="themed-bg-base rounded p-3">
               <div class="grid grid-cols-2 gap-2 text-sm">
                 <div>
-                  <span class="text-gray-500">欠账ID:</span>
+                  <span class="themed-text-muted">欠账ID:</span>
                   <span class="font-mono" x-text="debtRepayForm.debt_id"></span>
                 </div>
                 <div>
-                  <span class="text-gray-500">类型:</span>
+                  <span class="themed-text-muted">类型:</span>
                   <span x-text="debtRepayForm.debt_type === 'inventory' ? '库存欠账' : '预算欠账'"></span>
                 </div>
               </div>
             </div>
             <div class="bg-red-50 rounded p-3 text-center">
-              <p class="text-sm text-gray-600">待清偿数量/金额</p>
+              <p class="text-sm themed-text-muted">待清偿数量/金额</p>
               <p class="text-xl font-bold text-red-600" x-text="debtRepayForm.amount || 0"></p>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">清偿数量/金额 <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">清偿数量/金额 <span class="text-red-500">*</span></label>
               <input type="number" x-model.number="debtRepayForm.amount" step="1" min="1" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-green-500" required>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">备注</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">备注</label>
               <input type="text" x-model="debtRepayForm.remark" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-green-500" placeholder="清偿备注...">
             </div>
           </div>
-          <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2">
-            <button type="button" @click="hideModal('debtRepayModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+            <button type="button" @click="hideModal('debtRepayModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
             <button type="submit" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600" :disabled="saving">
               <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
               确认清偿
@@ -798,16 +798,16 @@
          class="fixed inset-0 z-50 flex items-center justify-center"
          style="display: none;">
       <div class="fixed inset-0 bg-black/50" @click="hideModal('diamondAdjustModal')"></div>
-      <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
         <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold">💎 调整用户钻石</h5>
-          <button @click="hideModal('diamondAdjustModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          <button @click="hideModal('diamondAdjustModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
         </div>
         <form @submit.prevent="submitDiamondAdjust()">
           <div class="p-6 space-y-4">
             <!-- 用户ID输入 -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">用户ID <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">用户ID <span class="text-red-500">*</span></label>
               <input 
                 type="number" 
                 x-model.number="diamondAdjustForm.user_id" 
@@ -818,13 +818,13 @@
             </div>
 
             <!-- 当前余额显示（如有） -->
-            <div x-show="selectedDiamondAccount?.balance !== undefined" class="bg-blue-50 rounded p-3 text-center">
-              <p class="text-sm text-gray-600">当前钻石余额</p>
-              <p class="text-xl font-bold text-blue-600" x-text="formatNumber(selectedDiamondAccount?.balance || 0)"></p>
+            <div x-show="selectedDiamondAccount?.balance !== undefined" class="themed-bg-primary-light rounded p-3 text-center">
+              <p class="text-sm themed-text-muted">当前钻石余额</p>
+              <p class="text-xl font-bold themed-text-primary" x-text="formatNumber(selectedDiamondAccount?.balance || 0)"></p>
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">调整类型</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">调整类型</label>
               <select x-model="diamondAdjustForm.type" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
                 <option value="add">➕ 增加钻石</option>
                 <option value="subtract">➖ 扣除钻石</option>
@@ -832,7 +832,7 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">调整数量 <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">调整数量 <span class="text-red-500">*</span></label>
               <input 
                 type="number" 
                 x-model.number="diamondAdjustForm.amount" 
@@ -844,7 +844,7 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">调整原因 <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">调整原因 <span class="text-red-500">*</span></label>
               <textarea 
                 x-model="diamondAdjustForm.reason" 
                 class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
@@ -855,17 +855,17 @@
             </div>
 
             <!-- 预览 -->
-            <div class="bg-gray-50 rounded p-3 text-sm">
-              <p class="text-gray-600">
+            <div class="themed-bg-base rounded p-3 text-sm">
+              <p class="themed-text-muted">
                 <span x-show="diamondAdjustForm.type === 'add'">将为用户 <span class="font-mono" x-text="diamondAdjustForm.user_id || '?'"></span> <span class="text-green-600 font-medium">增加</span></span>
                 <span x-show="diamondAdjustForm.type === 'subtract'">将为用户 <span class="font-mono" x-text="diamondAdjustForm.user_id || '?'"></span> <span class="text-red-600 font-medium">扣除</span></span>
                 <span class="font-bold" x-text="diamondAdjustForm.amount || 0"></span> 钻石
               </p>
             </div>
           </div>
-          <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2">
-            <button type="button" @click="hideModal('diamondAdjustModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
-            <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" :disabled="saving">
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+            <button type="button" @click="hideModal('diamondAdjustModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+            <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary" :disabled="saving">
               <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
               确认调整
             </button>
@@ -881,25 +881,25 @@
          class="fixed inset-0 z-50 flex items-center justify-center"
          style="display: none;">
       <div class="fixed inset-0 bg-black/50" @click="hideModal('diamondDetailModal')"></div>
-      <div class="relative bg-white rounded-lg shadow-xl w-full max-w-3xl mx-4 z-10 max-h-[85vh] overflow-hidden flex flex-col">
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-3xl mx-4 z-10 max-h-[85vh] overflow-hidden flex flex-col">
         <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold">💎 钻石账户详情</h5>
-          <button @click="hideModal('diamondDetailModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          <button @click="hideModal('diamondDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
         </div>
         <div class="flex-1 overflow-y-auto p-4">
           <div class="space-y-4" x-show="selectedDiamondAccount">
             <!-- 账户信息 -->
             <div class="grid grid-cols-3 gap-4">
-              <div class="bg-blue-50 rounded-lg p-4 text-center">
-                <p class="text-sm text-gray-600">用户ID</p>
-                <p class="text-xl font-bold text-blue-600" x-text="selectedDiamondAccount?.user_id || '-'"></p>
+              <div class="themed-bg-primary-light rounded-lg p-4 text-center">
+                <p class="text-sm themed-text-muted">用户ID</p>
+                <p class="text-xl font-bold themed-text-primary" x-text="selectedDiamondAccount?.user_id || '-'"></p>
               </div>
               <div class="bg-green-50 rounded-lg p-4 text-center">
-                <p class="text-sm text-gray-600">可用余额</p>
+                <p class="text-sm themed-text-muted">可用余额</p>
                 <p class="text-xl font-bold text-green-600" x-text="formatNumber(selectedDiamondAccount?.balance || 0)"></p>
               </div>
               <div class="bg-yellow-50 rounded-lg p-4 text-center">
-                <p class="text-sm text-gray-600">冻结余额</p>
+                <p class="text-sm themed-text-muted">冻结余额</p>
                 <p class="text-xl font-bold text-yellow-600" x-text="formatNumber(selectedDiamondAccount?.frozen || 0)"></p>
               </div>
             </div>
@@ -907,7 +907,7 @@
             <!-- 用户信息 -->
             <div class="border-t pt-4">
               <h6 class="font-medium mb-2">用户信息</h6>
-              <div class="grid grid-cols-2 gap-2 text-sm text-gray-600">
+              <div class="grid grid-cols-2 gap-2 text-sm themed-text-muted">
                 <p><span class="font-medium">昵称：</span><span x-text="selectedDiamondAccount?.nickname || '-'"></span></p>
                 <p><span class="font-medium">手机：</span><span x-text="selectedDiamondAccount?.mobile || '-'"></span></p>
               </div>
@@ -919,25 +919,25 @@
               <template x-if="selectedDiamondAccount?.transactions?.length > 0">
                 <div class="overflow-x-auto">
                   <table class="w-full text-sm">
-                    <thead class="bg-gray-50">
+                    <thead class="themed-bg-base">
                       <tr>
-                        <th class="px-3 py-2 text-left font-medium text-gray-600">时间</th>
-                        <th class="px-3 py-2 text-left font-medium text-gray-600">类型</th>
-                        <th class="px-3 py-2 text-right font-medium text-gray-600">变动</th>
-                        <th class="px-3 py-2 text-right font-medium text-gray-600">余额</th>
-                        <th class="px-3 py-2 text-left font-medium text-gray-600">原因</th>
+                        <th class="px-3 py-2 text-left font-medium themed-text-muted">时间</th>
+                        <th class="px-3 py-2 text-left font-medium themed-text-muted">类型</th>
+                        <th class="px-3 py-2 text-right font-medium themed-text-muted">变动</th>
+                        <th class="px-3 py-2 text-right font-medium themed-text-muted">余额</th>
+                        <th class="px-3 py-2 text-left font-medium themed-text-muted">原因</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y">
                       <template x-for="tx in selectedDiamondAccount.transactions" :key="tx.transaction_id">
-                        <tr class="hover:bg-gray-50">
-                          <td class="px-3 py-2 text-gray-500" x-text="formatDateTime(tx.created_at)"></td>
+                        <tr class="themed-hover-bg">
+                          <td class="px-3 py-2 themed-text-muted" x-text="formatDateTime(tx.created_at)"></td>
                           <td class="px-3 py-2" x-text="tx.tx_type || '-'"></td>
                           <td class="px-3 py-2 text-right font-mono" 
                               :class="tx.amount > 0 ? 'text-green-600' : 'text-red-600'"
                               x-text="(tx.amount > 0 ? '+' : '') + tx.amount"></td>
-                          <td class="px-3 py-2 text-right font-mono text-gray-600" x-text="tx.balance_after"></td>
-                          <td class="px-3 py-2 text-gray-500 max-w-xs truncate" x-text="tx.reason || '-'" :title="tx.reason"></td>
+                          <td class="px-3 py-2 text-right font-mono themed-text-muted" x-text="tx.balance_after"></td>
+                          <td class="px-3 py-2 themed-text-muted max-w-xs truncate" x-text="tx.reason || '-'" :title="tx.reason"></td>
                         </tr>
                       </template>
                     </tbody>
@@ -950,9 +950,9 @@
             </div>
           </div>
         </div>
-        <div class="p-4 border-t bg-gray-50 flex justify-end space-x-2">
-          <button @click="hideModal('diamondDetailModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">关闭</button>
-          <button @click="openDiamondAdjustModal(selectedDiamondAccount)" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">调整钻石</button>
+        <div class="p-4 border-t themed-bg-base flex justify-end space-x-2">
+          <button @click="hideModal('diamondDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
+          <button @click="openDiamondAdjustModal(selectedDiamondAccount)" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">调整钻石</button>
         </div>
       </div>
     </div>
@@ -964,33 +964,33 @@
          class="fixed inset-0 z-50 flex items-center justify-center"
          style="display: none;">
       <div class="fixed inset-0 bg-black/50" @click="hideModal('merchantPointDetailModal')"></div>
-      <div class="relative bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[80vh] overflow-hidden flex flex-col">
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[80vh] overflow-hidden flex flex-col">
         <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold">🏪 商户积分详情</h5>
-          <button @click="hideModal('merchantPointDetailModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          <button @click="hideModal('merchantPointDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
         </div>
         <div class="flex-1 overflow-y-auto p-4">
           <div class="space-y-4" x-show="selectedMerchant">
             <div class="grid grid-cols-2 gap-4">
               <div class="bg-orange-50 rounded-lg p-4 text-center">
-                <p class="text-sm text-gray-600">商户ID</p>
+                <p class="text-sm themed-text-muted">商户ID</p>
                 <p class="text-xl font-bold text-orange-600" x-text="selectedMerchant?.merchant_id || selectedMerchant?.id || '-'"></p>
               </div>
               <div class="bg-green-50 rounded-lg p-4 text-center">
-                <p class="text-sm text-gray-600">积分余额</p>
+                <p class="text-sm themed-text-muted">积分余额</p>
                 <p class="text-xl font-bold text-green-600" x-text="selectedMerchant?.balance || selectedMerchant?.points || 0"></p>
               </div>
             </div>
             <div class="border-t pt-4">
               <h6 class="font-medium mb-2">商户信息</h6>
-              <div class="text-sm text-gray-600">
+              <div class="text-sm themed-text-muted">
                 <p><span class="font-medium">名称：</span><span x-text="selectedMerchant?.merchant_name || selectedMerchant?.name || '-'"></span></p>
               </div>
             </div>
           </div>
         </div>
-        <div class="p-4 border-t bg-gray-50 flex justify-end">
-          <button @click="hideModal('merchantPointDetailModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">关闭</button>
+        <div class="p-4 border-t themed-bg-base flex justify-end">
+          <button @click="hideModal('merchantPointDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
         </div>
       </div>
     </div>
@@ -1002,15 +1002,15 @@
          class="fixed inset-0 z-50 flex items-center justify-center"
          style="display: none;">
       <div class="fixed inset-0 bg-black/50" @click="hideModal('budgetModal')"></div>
-      <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
         <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold">📊 预算设置</h5>
-          <button @click="hideModal('budgetModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          <button @click="hideModal('budgetModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
         </div>
         <form @submit.prevent="submitBudget()">
           <div class="p-6 space-y-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">预算类型</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">预算类型</label>
               <select x-model="budgetForm.type" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-gray-500">
                 <option value="daily">日预算</option>
                 <option value="weekly">周预算</option>
@@ -1018,17 +1018,17 @@
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">预算金额 (元) <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">预算金额 (元) <span class="text-red-500">*</span></label>
               <input type="number" x-model.number="budgetForm.amount" step="0.01" min="0" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-gray-500" required>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">预警阈值 (%)</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">预警阈值 (%)</label>
               <input type="number" x-model.number="budgetForm.alertThreshold" min="0" max="100" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-gray-500" placeholder="80">
-              <p class="text-xs text-gray-500 mt-1">达到此比例时发送预警</p>
+              <p class="text-xs themed-text-muted mt-1">达到此比例时发送预警</p>
             </div>
           </div>
-          <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2">
-            <button type="button" @click="hideModal('budgetModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+            <button type="button" @click="hideModal('budgetModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
             <button type="submit" class="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800" :disabled="saving">保存预算</button>
           </div>
         </form>

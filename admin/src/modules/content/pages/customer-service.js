@@ -28,7 +28,6 @@
  * - POST /api/v4/console/customer-service/sessions/:id/transfer (转接会话)
  */
 
-
 import { logger } from '../../../utils/logger.js'
 import { buildURL, request } from '../../../api/base.js'
 import { CONTENT_ENDPOINTS } from '../../../api/content.js'
@@ -48,17 +47,17 @@ async function apiRequest(url, options = {}) {
     'Content-Type': 'application/json',
     ...options.headers
   }
-  
+
   const token = localStorage.getItem('admin_token')
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
   }
-  
+
   const fetchOptions = { method, headers }
   if (options.body) {
     fetchOptions.body = options.body
   }
-  
+
   const response = await fetch(url, fetchOptions)
   return await response.json()
 }
@@ -137,10 +136,10 @@ function customerServicePage() {
       mobile: '',
       avatar: ''
     },
-    
+
     /** 当前选中的会话对象 (用于模板访问) */
     selectedSession: null,
-    
+
     /** HTML模板兼容：sessions 和 messages 别名 */
     get sessions() {
       return this.allSessions
@@ -148,7 +147,7 @@ function customerServicePage() {
     get messages() {
       return this.currentMessages
     },
-    
+
     /** 提交状态 */
     submitting: false,
 
@@ -229,7 +228,7 @@ function customerServicePage() {
         // 使用导入的 socket.io-client
         const wsUrl = window.location.origin
         logger.info('🔌 正在连接WebSocket...', wsUrl)
-        
+
         this.wsConnection = io(wsUrl, {
           auth: { token: getToken() },
           transports: ['websocket', 'polling'],
@@ -359,7 +358,7 @@ function customerServicePage() {
 
           // 更新选中会话（直接使用后端返回的嵌套结构）
           this.selectedSession = session
-          
+
           // 更新当前聊天用户信息（使用后端返回的 user 嵌套对象）
           this.currentChatUser = {
             nickname: session.user?.nickname || '未命名用户',
@@ -604,7 +603,7 @@ function customerServicePage() {
         const session = this.allSessions.find(
           s => String(s.session_id) === String(this.currentSessionId)
         )
-        
+
         if (!session) {
           this.showError('找不到会话信息')
           return
@@ -618,7 +617,7 @@ function customerServicePage() {
 
         const url = buildURL(USER_ENDPOINTS.DETAIL, { user_id: userId })
         const response = await apiRequest(url)
-        
+
         if (response && response.success) {
           this.userInfoData = response.data.user || response.data
           this.showModal('userInfoModal')

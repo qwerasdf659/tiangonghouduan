@@ -147,36 +147,27 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
      */
     const LotteryPricingService = require('../../../services/lottery/LotteryPricingService')
 
-    // 使用统一定价服务获取所有启用档位的定价
-    const drawPricing = {}
+    /**
+     * 🔴 2026-01-26 技术债务清理：移除数组→对象格式转换兼容
+     * 前端已更新使用数组格式 draw_buttons（非旧的 single/triple/five/ten 对象键名）
+     */
+    let drawButtons = []
     let isConfigMissing = false
 
     try {
       const pricings = await LotteryPricingService.getAllDrawPricings(campaign.campaign_id)
 
       if (pricings && pricings.length > 0) {
-        // 将数组格式转换为对象格式（兼容旧的 API 返回结构）
-        pricings.forEach(pricing => {
-          const key =
-            pricing.draw_count === 1
-              ? 'single'
-              : pricing.draw_count === 3
-                ? 'triple'
-                : pricing.draw_count === 5
-                  ? 'five'
-                  : pricing.draw_count === 10
-                    ? 'ten'
-                    : `x${pricing.draw_count}`
-          drawPricing[key] = {
-            count: pricing.draw_count,
-            discount: pricing.discount,
-            label: pricing.label,
-            per_draw: pricing.per_draw,
-            total_cost: pricing.total_cost,
-            original_cost: pricing.original_cost,
-            saved_points: pricing.saved_points
-          }
-        })
+        // 直接返回数组格式，包含所有定价按钮
+        drawButtons = pricings.map(pricing => ({
+          draw_count: pricing.draw_count,
+          discount: pricing.discount,
+          label: pricing.label,
+          per_draw: pricing.per_draw,
+          total_cost: pricing.total_cost,
+          original_cost: pricing.original_cost,
+          saved_points: pricing.saved_points
+        }))
       } else {
         isConfigMissing = true
         logger.warn(`[CONFIG_WARN] 活动 ${campaign_code} 定价服务返回空配置`)
@@ -206,7 +197,7 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
       const adminConfig = {
         ...fullConfig,
         campaign_code: campaign.campaign_code,
-        draw_pricing: drawPricing
+        draw_buttons: drawButtons // 2026-01-26: 统一使用数组格式
       }
 
       // 如果配置缺失，在响应中添加警告信息（仅管理员可见）
@@ -232,7 +223,7 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
           exists: !!fullConfig.guarantee_rule,
           description: '连续抽奖有惊喜哦~'
         },
-        draw_pricing: drawPricing
+        draw_buttons: drawButtons // 2026-01-26: 统一使用数组格式
       }
 
       return res.apiSuccess(sanitizedConfig, '抽奖配置获取成功')

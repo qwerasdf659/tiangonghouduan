@@ -209,4 +209,3 @@ export function useAuditLogsMethods() {
 }
 
 export default { useAuditLogsState, useAuditLogsMethods }
-

@@ -28,12 +28,12 @@ export function useQuotaState() {
     quotas: [],
     /** @type {Object} 配额规则表单 - 使用后端字段 */
     quotaForm: {
-      rule_type: 'campaign',     // global/campaign/role/user
-      campaign_id: '',           // 活动ID（campaign类型必填，从下拉选择）
-      role_uuid: '',             // 角色UUID（role类型必填）
-      target_user_id: '',        // 目标用户ID（user类型必填）
-      limit_value: 10,           // 每日抽奖次数上限
-      reason: ''                 // 创建原因
+      rule_type: 'campaign', // global/campaign/role/user
+      campaign_id: '', // 活动ID（campaign类型必填，从下拉选择）
+      role_uuid: '', // 角色UUID（role类型必填）
+      target_user_id: '', // 目标用户ID（user类型必填）
+      limit_value: 10, // 每日抽奖次数上限
+      reason: '' // 创建原因
     },
     /** @type {number|string|null} 当前编辑的规则ID */
     editingQuotaId: null,
@@ -87,11 +87,11 @@ export function useQuotaMethods() {
           { showLoading: false }
         )
         console.log('📊 [Quota] API 返回数据:', response)
-        
+
         // 解包 withLoading 返回的结构
         const data = response?.success ? response.data : response
         console.log('📊 [Quota] 解包后数据:', data)
-        
+
         if (data) {
           this.quotas = data.rules || data.list || data || []
           this.quotaStats = this.generateQuotaStats(this.quotas)
@@ -177,7 +177,7 @@ export function useQuotaMethods() {
       // 使用后端字段名
       this.quotaForm = {
         rule_type: 'campaign',
-        campaign_id: this.campaigns?.[0]?.campaign_id || '',  // 默认选第一个活动
+        campaign_id: this.campaigns?.[0]?.campaign_id || '', // 默认选第一个活动
         role_uuid: '',
         target_user_id: '',
         limit_value: 10,
@@ -193,11 +193,11 @@ export function useQuotaMethods() {
     editQuota(quota) {
       this.editingQuotaId = quota.rule_id
       this.isEditQuota = true
-      
+
       // 后端返回 scope_type/scope_id，需要转换为前端表单字段
       const scopeType = quota.scope_type || 'campaign'
       const scopeId = quota.scope_id || ''
-      
+
       this.quotaForm = {
         rule_type: scopeType,
         campaign_id: scopeType === 'campaign' ? scopeId : '',
@@ -219,7 +219,7 @@ export function useQuotaMethods() {
         this.showError('请输入有效的限制次数（正整数）')
         return
       }
-      
+
       // 根据规则类型验证必填参数
       const ruleType = this.quotaForm.rule_type
       if (ruleType === 'campaign' && !this.quotaForm.campaign_id) {
@@ -237,13 +237,13 @@ export function useQuotaMethods() {
 
       try {
         this.saving = true
-        
+
         // 构建提交数据（只发送后端需要的字段）
         const submitData = {
           rule_type: this.quotaForm.rule_type,
           limit_value: parseInt(this.quotaForm.limit_value)
         }
-        
+
         // 根据规则类型添加对应字段
         if (ruleType === 'campaign') {
           submitData.campaign_id = parseInt(this.quotaForm.campaign_id)
@@ -252,7 +252,7 @@ export function useQuotaMethods() {
         } else if (ruleType === 'user') {
           submitData.target_user_id = parseInt(this.quotaForm.target_user_id)
         }
-        
+
         if (this.quotaForm.reason) {
           submitData.reason = this.quotaForm.reason
         }
@@ -308,10 +308,9 @@ export function useQuotaMethods() {
     async toggleQuotaStatus(quota) {
       try {
         // apiCall 成功时返回 response.data，失败时抛出错误
-        await this.apiCall(
-          buildURL(LOTTERY_ENDPOINTS.QUOTA_RULES_DISABLE, { id: quota.rule_id }),
-          { method: 'PUT' }
-        )
+        await this.apiCall(buildURL(LOTTERY_ENDPOINTS.QUOTA_RULES_DISABLE, { id: quota.rule_id }), {
+          method: 'PUT'
+        })
         // 如果没有抛出错误，则表示成功
         this.showSuccess('规则已禁用')
         await this.loadQuotas()
@@ -383,4 +382,3 @@ export function useQuotaMethods() {
 }
 
 export default { useQuotaState, useQuotaMethods }
-

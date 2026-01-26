@@ -780,12 +780,17 @@ class LotteryCampaignPricingConfigService {
     // 查询所有 active 状态的定价配置
     const pricing_configs = await LotteryCampaignPricingConfig.findAll({
       where: { status: 'active' },
-      include: [{
-        model: LotteryCampaign,
-        as: 'campaign',
-        attributes: ['campaign_id', 'campaign_code', 'campaign_name', 'status']
-      }],
-      order: [['campaign_id', 'ASC'], ['version', 'DESC']],
+      include: [
+        {
+          model: LotteryCampaign,
+          as: 'campaign',
+          attributes: ['campaign_id', 'campaign_code', 'campaign_name', 'status']
+        }
+      ],
+      order: [
+        ['campaign_id', 'ASC'],
+        ['version', 'DESC']
+      ],
       transaction
     })
 

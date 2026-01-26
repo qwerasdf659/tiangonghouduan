@@ -219,8 +219,8 @@ export function useConsumptionMethods() {
         const recordId = this.selectedConsumption.record_id || this.selectedConsumption.id
         const response = await this.apiCall(
           buildURL(STORE_ENDPOINTS.CONSUMPTION_REJECT, { id: recordId }),
-          { 
-            method: 'POST', 
+          {
+            method: 'POST',
             data: { admin_notes: this.rejectForm.reason }
           }
         )

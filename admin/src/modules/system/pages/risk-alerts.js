@@ -30,7 +30,6 @@
  * </div>
  */
 
-
 // ES Module 导入
 import { logger } from '../../../utils/logger.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
@@ -141,7 +140,7 @@ function riskAlertsPage() {
       severity: '',
       alert_type: '',
       status: '',
-      time: ''  // 默认为空（显示全部时间范围），避免筛选掉历史数据
+      time: '' // 默认为空（显示全部时间范围），避免筛选掉历史数据
     },
 
     /**
@@ -414,13 +413,13 @@ function riskAlertsPage() {
         if (this.filters.severity) params.append('severity', this.filters.severity)
         if (this.filters.alert_type) params.append('alert_type', this.filters.alert_type)
         if (this.filters.status) params.append('status', this.filters.status)
-        
+
         // 转换时间范围为 start_time（后端使用 start_time/end_time，不支持 time_range）
         // 空值或空字符串表示不限制时间，显示全部数据
         if (this.filters.time && this.filters.time.trim() !== '') {
           const now = new Date()
           let startTime = new Date()
-          
+
           switch (this.filters.time) {
             case 'today':
               startTime.setHours(0, 0, 0, 0)
@@ -436,12 +435,12 @@ function riskAlertsPage() {
               startTime = null
               break
           }
-          
+
           if (startTime) {
             params.append('start_time', startTime.toISOString())
           }
         }
-        
+
         params.append('page', this.currentPage)
         params.append('page_size', this.pageSize)
 
@@ -478,9 +477,8 @@ function riskAlertsPage() {
     calculateStatsFromAlerts() {
       // 直接使用后端字段 severity
       return {
-        critical: this.alerts.filter(
-          a => a.severity === 'critical' || a.severity === 'high'
-        ).length,
+        critical: this.alerts.filter(a => a.severity === 'critical' || a.severity === 'high')
+          .length,
         warning: this.alerts.filter(a => a.severity === 'medium').length,
         info: this.alerts.filter(a => a.severity === 'low').length,
         resolved: this.alerts.filter(a => a.status === 'reviewed' || a.status === 'ignored').length
@@ -498,25 +496,23 @@ function riskAlertsPage() {
       // 后端统计API返回 by_severity 和 by_status 对象
       const bySeverity = stats.by_severity || {}
       const byStatus = stats.by_status || {}
-      
+
       // 严重告警 = critical + high
       this.stats.critical =
         (bySeverity.critical || 0) + (bySeverity.high || 0) ||
         stats.critical ||
         this.alerts.filter(a => a.severity === 'critical' || a.severity === 'high').length
-      
+
       // 警告 = medium
       this.stats.warning =
         bySeverity.medium ||
         stats.warning ||
         this.alerts.filter(a => a.severity === 'medium').length
-      
+
       // 提示 = low
       this.stats.info =
-        bySeverity.low ||
-        stats.info ||
-        this.alerts.filter(a => a.severity === 'low').length
-      
+        bySeverity.low || stats.info || this.alerts.filter(a => a.severity === 'low').length
+
       // 已处理 = reviewed + ignored
       this.stats.resolved =
         (byStatus.reviewed || 0) + (byStatus.ignored || 0) ||
@@ -1011,19 +1007,19 @@ function riskAlertsPage() {
      */
     formatTime(dateValue) {
       if (!dateValue) return '-'
-      
+
       // 如果是后端返回的时间对象格式，直接使用 relative 字段
       if (typeof dateValue === 'object' && dateValue !== null) {
         if (dateValue.relative) return dateValue.relative
         // 使用 iso 或 timestamp 计算
         dateValue = dateValue.iso || dateValue.timestamp
       }
-      
+
       if (!dateValue) return '-'
-      
+
       const date = new Date(dateValue)
       if (isNaN(date.getTime())) return '-'
-      
+
       const now = new Date()
       const diff = now - date
 

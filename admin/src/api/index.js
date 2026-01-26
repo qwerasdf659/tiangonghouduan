@@ -40,15 +40,7 @@ import { AnalyticsAPI, ANALYTICS_ENDPOINTS } from './analytics.js'
 import { ContentAPI, CONTENT_ENDPOINTS } from './content.js'
 
 // ========== 导出基础模块 ==========
-export {
-  request,
-  http,
-  buildURL,
-  buildQueryString,
-  getToken,
-  setToken,
-  clearToken
-}
+export { request, http, buildURL, buildQueryString, getToken, setToken, clearToken }
 
 // ========== 导出业务模块 ==========
 export { AuthAPI, AUTH_ENDPOINTS }

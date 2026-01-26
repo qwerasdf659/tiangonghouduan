@@ -16,7 +16,6 @@
  * @see routes/v4/console/marketplace.js - 后端路由定义
  */
 
-
 import { logger } from '../utils/logger.js'
 import { request, buildURL, buildQueryString } from './base.js'
 
@@ -228,27 +227,34 @@ export const MARKET_ENDPOINTS = {
   /** @type {string} [GET] 抽奖清除设置记录列表 */
   BUSINESS_RECORDS_LOTTERY_CLEAR: '/api/v4/console/business-records/lottery-clear-settings',
   /** @type {string} [GET] 抽奖清除设置记录详情 */
-  BUSINESS_RECORDS_LOTTERY_CLEAR_DETAIL: '/api/v4/console/business-records/lottery-clear-settings/:record_id',
+  BUSINESS_RECORDS_LOTTERY_CLEAR_DETAIL:
+    '/api/v4/console/business-records/lottery-clear-settings/:record_id',
   /** @type {string} [GET] 核销订单列表 */
   BUSINESS_RECORDS_REDEMPTION: '/api/v4/console/business-records/redemption-orders',
   /** @type {string} [GET] 核销订单详情 */
-  BUSINESS_RECORDS_REDEMPTION_DETAIL: '/api/v4/console/business-records/redemption-orders/:order_id',
+  BUSINESS_RECORDS_REDEMPTION_DETAIL:
+    '/api/v4/console/business-records/redemption-orders/:order_id',
   /** @type {string} [POST] 核销订单执行核销 */
-  BUSINESS_RECORDS_REDEMPTION_REDEEM: '/api/v4/console/business-records/redemption-orders/:order_id/redeem',
+  BUSINESS_RECORDS_REDEMPTION_REDEEM:
+    '/api/v4/console/business-records/redemption-orders/:order_id/redeem',
   /** @type {string} [POST] 核销订单取消 */
-  BUSINESS_RECORDS_REDEMPTION_CANCEL: '/api/v4/console/business-records/redemption-orders/:order_id/cancel',
+  BUSINESS_RECORDS_REDEMPTION_CANCEL:
+    '/api/v4/console/business-records/redemption-orders/:order_id/cancel',
   /** @type {string} [GET] 内容审核记录列表 */
   BUSINESS_RECORDS_CONTENT_REVIEWS: '/api/v4/console/business-records/content-reviews',
   /** @type {string} [GET] 内容审核记录详情 */
-  BUSINESS_RECORDS_CONTENT_REVIEWS_DETAIL: '/api/v4/console/business-records/content-reviews/:audit_id',
+  BUSINESS_RECORDS_CONTENT_REVIEWS_DETAIL:
+    '/api/v4/console/business-records/content-reviews/:audit_id',
   /** @type {string} [GET] 用户角色变更记录列表 */
   BUSINESS_RECORDS_ROLE_CHANGES: '/api/v4/console/business-records/user-role-changes',
   /** @type {string} [GET] 用户角色变更记录详情 */
-  BUSINESS_RECORDS_ROLE_CHANGES_DETAIL: '/api/v4/console/business-records/user-role-changes/:record_id',
+  BUSINESS_RECORDS_ROLE_CHANGES_DETAIL:
+    '/api/v4/console/business-records/user-role-changes/:record_id',
   /** @type {string} [GET] 用户状态变更记录列表 */
   BUSINESS_RECORDS_STATUS_CHANGES: '/api/v4/console/business-records/user-status-changes',
   /** @type {string} [GET] 用户状态变更记录详情 */
-  BUSINESS_RECORDS_STATUS_CHANGES_DETAIL: '/api/v4/console/business-records/user-status-changes/:record_id',
+  BUSINESS_RECORDS_STATUS_CHANGES_DETAIL:
+    '/api/v4/console/business-records/user-status-changes/:record_id',
   /** @type {string} [GET] 兑换记录列表 */
   BUSINESS_RECORDS_EXCHANGE: '/api/v4/console/business-records/exchange-records',
   /** @type {string} [GET] 兑换记录详情 */
@@ -981,7 +987,9 @@ export const MarketAPI = {
    * @returns {Promise<Object>} 记录详情
    */
   async getLotteryClearRecordDetail(recordId) {
-    const url = buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_LOTTERY_CLEAR_DETAIL, { record_id: recordId })
+    const url = buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_LOTTERY_CLEAR_DETAIL, {
+      record_id: recordId
+    })
     return await request({ url, method: 'GET' })
   },
 
@@ -1058,7 +1066,9 @@ export const MarketAPI = {
    * @returns {Promise<Object>} 记录详情
    */
   async getContentReviewDetail(auditId) {
-    const url = buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_CONTENT_REVIEWS_DETAIL, { audit_id: auditId })
+    const url = buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_CONTENT_REVIEWS_DETAIL, {
+      audit_id: auditId
+    })
     return await request({ url, method: 'GET' })
   },
 
@@ -1083,7 +1093,9 @@ export const MarketAPI = {
    * @returns {Promise<Object>} 记录详情
    */
   async getRoleChangeRecordDetail(recordId) {
-    const url = buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_ROLE_CHANGES_DETAIL, { record_id: recordId })
+    const url = buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_ROLE_CHANGES_DETAIL, {
+      record_id: recordId
+    })
     return await request({ url, method: 'GET' })
   },
 
@@ -1108,7 +1120,9 @@ export const MarketAPI = {
    * @returns {Promise<Object>} 记录详情
    */
   async getStatusChangeRecordDetail(recordId) {
-    const url = buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_STATUS_CHANGES_DETAIL, { record_id: recordId })
+    const url = buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_STATUS_CHANGES_DETAIL, {
+      record_id: recordId
+    })
     return await request({ url, method: 'GET' })
   },
 
@@ -1230,7 +1244,9 @@ export const MarketAPI = {
    * @returns {Promise<Object>} 用户统计数据
    */
   async getUserTradeOrdersStats(userId, params = {}) {
-    const url = buildURL(MARKET_ENDPOINTS.TRADE_ORDERS_USER_STATS, { user_id: userId }) + buildQueryString(params)
+    const url =
+      buildURL(MARKET_ENDPOINTS.TRADE_ORDERS_USER_STATS, { user_id: userId }) +
+      buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 

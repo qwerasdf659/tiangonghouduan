@@ -1,0 +1,247 @@
+/**
+ * 统计卡片样式
+ *
+ * @file src/styles/components/stats-card.css
+ * @description 统计卡片和数字展示的样式
+ * @version 1.0.0
+ * @date 2026-01-26
+ */
+
+/* ========== 统计卡片基础 ========== */
+
+.stats-card {
+  @apply rounded-xl shadow-sm border p-5 transition-all duration-300;
+  background-color: var(--card-bg, #ffffff);
+  border-color: var(--color-border-light, #f3f4f6);
+}
+
+.stats-card:hover {
+  @apply shadow-md;
+  transform: translateY(-2px);
+}
+
+/* 紧凑版本 */
+.stats-card-compact {
+  @apply p-4;
+}
+
+/* 大尺寸版本 */
+.stats-card-lg {
+  @apply p-6;
+}
+
+/* ========== 统计卡片图标 ========== */
+
+.stats-card-icon {
+  @apply w-12 h-12 rounded-lg flex items-center justify-center text-2xl mb-3;
+}
+
+.stats-card-icon-sm {
+  @apply w-10 h-10 text-xl mb-2;
+}
+
+.stats-card-icon-lg {
+  @apply w-14 h-14 text-3xl mb-4;
+}
+
+/* 图标颜色变体 - 使用主题变量 */
+.stats-card.stats-primary .stats-card-icon {
+  background-color: var(--color-primary-light, #dbeafe);
+  color: var(--color-primary, #3b82f6);
+}
+
+/* 状态色图标 - 保持固定色 */
+.stats-card.stats-success .stats-card-icon {
+  @apply bg-green-100 text-green-600;
+}
+
+.stats-card.stats-warning .stats-card-icon {
+  @apply bg-orange-100 text-orange-600;
+}
+
+.stats-card.stats-danger .stats-card-icon {
+  @apply bg-red-100 text-red-600;
+}
+
+.stats-card.stats-info .stats-card-icon {
+  @apply bg-purple-100 text-purple-600;
+}
+
+/* ========== 统计卡片数值 ========== */
+
+.stats-card-value {
+  @apply text-3xl font-bold tabular-nums;
+  color: var(--color-text-primary, #1f2937);
+}
+
+.stats-card-value-sm {
+  @apply text-2xl;
+}
+
+.stats-card-value-lg {
+  @apply text-4xl;
+}
+
+/* 渐变文字效果 - 使用主题主色调 */
+.stats-card-value-gradient {
+  background: linear-gradient(
+    to right,
+    var(--color-primary, #3b82f6),
+    var(--color-primary-hover, #2563eb)
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ========== 统计卡片标签 ========== */
+
+.stats-card-label {
+  @apply text-sm mt-1;
+  color: var(--color-text-muted, #9ca3af);
+}
+
+.stats-card-label-lg {
+  @apply text-base;
+}
+
+/* ========== 统计卡片趋势 ========== */
+
+.stats-card-trend {
+  @apply flex items-center gap-1 text-xs mt-3 pt-3 border-t;
+  border-color: var(--color-border-light, #f3f4f6);
+}
+
+/* 趋势状态色 - 保持固定（成功/错误色） */
+.stats-card-trend.up {
+  @apply text-green-600;
+}
+
+.stats-card-trend.down {
+  @apply text-red-600;
+}
+
+.stats-card-trend.neutral {
+  color: var(--color-text-muted, #9ca3af);
+}
+
+.stats-card-trend-icon {
+  @apply text-base;
+}
+
+/* ========== 统计卡片迷你图表区域 ========== */
+
+.stats-card-chart {
+  @apply mt-3;
+}
+
+.stats-card-chart-inline {
+  @apply absolute top-4 right-4;
+}
+
+/* ========== 统计卡片网格布局 ========== */
+
+.stats-grid {
+  @apply grid gap-4;
+}
+
+.stats-grid-2 {
+  @apply grid-cols-1 md:grid-cols-2;
+}
+
+.stats-grid-3 {
+  @apply grid-cols-1 md:grid-cols-3;
+}
+
+.stats-grid-4 {
+  @apply grid-cols-1 md:grid-cols-2 lg:grid-cols-4;
+}
+
+.stats-grid-5 {
+  @apply grid-cols-1 md:grid-cols-2 lg:grid-cols-5;
+}
+
+/* ========== 统计卡片动画 ========== */
+
+.stats-card-animate {
+  animation: statsCardEnter 0.4s ease-out;
+}
+
+@keyframes statsCardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 交错动画 */
+.stats-grid .stats-card:nth-child(1) {
+  animation-delay: 0ms;
+}
+.stats-grid .stats-card:nth-child(2) {
+  animation-delay: 100ms;
+}
+.stats-grid .stats-card:nth-child(3) {
+  animation-delay: 200ms;
+}
+.stats-grid .stats-card:nth-child(4) {
+  animation-delay: 300ms;
+}
+.stats-grid .stats-card:nth-child(5) {
+  animation-delay: 400ms;
+}
+
+/* ========== 迷你图表样式 ========== */
+
+.mini-chart-container {
+  @apply relative;
+}
+
+.mini-chart-container canvas,
+.mini-chart-container svg {
+  @apply rounded;
+}
+
+/* 统计卡片内的图表定位 */
+.stats-card .mini-chart-container {
+  @apply absolute top-4 right-4;
+}
+
+/* 图表悬浮高亮 */
+.mini-chart-container:hover {
+  @apply opacity-90;
+}
+
+/* ========== 暗色主题适配 ========== */
+
+[data-theme='dark'] .stats-card.stats-success .stats-card-icon,
+[data-theme='minimal-dark'] .stats-card.stats-success .stats-card-icon,
+[data-theme='cyber'] .stats-card.stats-success .stats-card-icon,
+[data-theme='neon'] .stats-card.stats-success .stats-card-icon {
+  @apply bg-green-900/50 text-green-400;
+}
+
+[data-theme='dark'] .stats-card.stats-warning .stats-card-icon,
+[data-theme='minimal-dark'] .stats-card.stats-warning .stats-card-icon,
+[data-theme='cyber'] .stats-card.stats-warning .stats-card-icon,
+[data-theme='neon'] .stats-card.stats-warning .stats-card-icon {
+  @apply bg-orange-900/50 text-orange-400;
+}
+
+[data-theme='dark'] .stats-card.stats-danger .stats-card-icon,
+[data-theme='minimal-dark'] .stats-card.stats-danger .stats-card-icon,
+[data-theme='cyber'] .stats-card.stats-danger .stats-card-icon,
+[data-theme='neon'] .stats-card.stats-danger .stats-card-icon {
+  @apply bg-red-900/50 text-red-400;
+}
+
+[data-theme='dark'] .stats-card.stats-info .stats-card-icon,
+[data-theme='minimal-dark'] .stats-card.stats-info .stats-card-icon,
+[data-theme='cyber'] .stats-card.stats-info .stats-card-icon,
+[data-theme='neon'] .stats-card.stats-info .stats-card-icon {
+  @apply bg-purple-900/50 text-purple-400;
+}

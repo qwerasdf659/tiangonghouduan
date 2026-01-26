@@ -91,22 +91,21 @@ function assetsPortfolioPage() {
         logger.error('[AssetsPortfolioPage] ECharts 加载失败:', error)
       }
 
-      await this.withLoading(async () => {
-        await Promise.all([
-          this.loadAssetStats(),
-          this.loadAssetTypes(),
-          this.loadAssets()
-        ])
-        // 初始化图表（数据加载完成后）
-        this.$nextTick(() => {
-          this.initCharts()
-        })
-      }, { errorMessage: '加载资产数据失败' })
+      await this.withLoading(
+        async () => {
+          await Promise.all([this.loadAssetStats(), this.loadAssetTypes(), this.loadAssets()])
+          // 初始化图表（数据加载完成后）
+          this.$nextTick(() => {
+            this.initCharts()
+          })
+        },
+        { errorMessage: '加载资产数据失败' }
+      )
     },
 
     /**
      * 加载资产统计 - 获取总览数据
-     * 
+     *
      * 后端返回格式：
      * {
      *   asset_stats: [...],
@@ -119,17 +118,17 @@ function assetsPortfolioPage() {
         if (response && response.success && response.data) {
           const data = response.data
           const summary = data.summary || {}
-          
+
           this.overview = {
             totalValue: summary.total_circulation || 0,
             totalUsers: summary.total_holders || 0,
             totalAssets: summary.total_asset_types || 0,
             growthRate: 0 // 后端暂未提供增长率
           }
-          
+
           // 保存资产统计详情用于图表
           this._assetStats = data.asset_stats || []
-          
+
           logger.debug('[AssetsPortfolioPage] 资产统计加载成功:', this.overview)
         }
       } catch (error) {
@@ -164,7 +163,10 @@ function assetsPortfolioPage() {
      */
     async loadAssetTypes() {
       try {
-        const response = await request({ url: ASSET_ENDPOINTS.ADJUSTMENT_ASSET_TYPES, method: 'GET' })
+        const response = await request({
+          url: ASSET_ENDPOINTS.ADJUSTMENT_ASSET_TYPES,
+          method: 'GET'
+        })
         if (response && response.success) {
           const data = response.data?.asset_types || response.data
           this.assetTypes = Array.isArray(data) ? data : []
@@ -177,7 +179,7 @@ function assetsPortfolioPage() {
 
     /**
      * 加载资产列表（用户资产明细）
-     * 
+     *
      * 注意：后端没有"所有用户资产列表"API
      * - 如果指定了用户ID，使用 asset-adjustment 获取该用户资产余额
      * - 如果没有指定用户ID，显示提示信息
@@ -197,7 +199,7 @@ function assetsPortfolioPage() {
         const userId = this.searchForm.user_id
         const url = buildURL(ASSET_ENDPOINTS.ADJUSTMENT_USER_BALANCES, { user_id: userId })
         const response = await request({ url, method: 'GET' })
-        
+
         if (response && response.success) {
           const data = response.data
           // 转换为前端期望的格式
@@ -208,8 +210,9 @@ function assetsPortfolioPage() {
             const assetId = `${userId}_${item.asset_code || 'unknown'}${campaignPart}_${index}`
             // 显示名称：包含活动信息
             const campaignInfo = item.campaign_id ? ` (活动:${item.campaign_id})` : ''
-            const assetName = (item.asset_name || item.display_name || item.asset_code || '未知资产') + campaignInfo
-            
+            const assetName =
+              (item.asset_name || item.display_name || item.asset_code || '未知资产') + campaignInfo
+
             return {
               asset_id: assetId,
               user_id: parseInt(userId),
@@ -224,11 +227,11 @@ function assetsPortfolioPage() {
               updated_at: item.updated_at || new Date().toISOString()
             }
           })
-          
+
           // 资产余额无分页，直接使用数组长度
           this.totalRecords = this.assets.length
           this.totalPages = 1
-          
+
           logger.debug('[AssetsPortfolioPage] 资产列表加载成功:', this.assets.length, '条记录')
         }
       } catch (error) {
@@ -245,9 +248,12 @@ function assetsPortfolioPage() {
      */
     async searchAssets() {
       this.currentPage = 1
-      await this.withLoading(async () => {
-        await this.loadAssets()
-      }, { errorMessage: '搜索资产失败' })
+      await this.withLoading(
+        async () => {
+          await this.loadAssets()
+        },
+        { errorMessage: '搜索资产失败' }
+      )
     },
 
     /**
@@ -273,17 +279,17 @@ function assetsPortfolioPage() {
       this.historyLoading = true
       this.assetHistory = []
       this.showHistoryModal = true
-      
+
       try {
         // 构建查询参数
         const params = new URLSearchParams()
         params.append('user_id', asset.user_id)
         params.append('asset_code', asset.asset_type)
         params.append('page_size', '20')
-        
+
         const url = `${ASSET_ENDPOINTS.TRANSACTIONS}?${params.toString()}`
         const response = await request({ url, method: 'GET' })
-        
+
         if (response && response.success) {
           const data = response.data
           this.assetHistory = (data.transactions || []).map(tx => ({
@@ -295,7 +301,11 @@ function assetsPortfolioPage() {
             description: tx.description || tx.reason || tx.tx_type,
             created_at: tx.created_at
           }))
-          logger.debug('[AssetsPortfolioPage] 资产历史加载成功:', this.assetHistory.length, '条记录')
+          logger.debug(
+            '[AssetsPortfolioPage] 资产历史加载成功:',
+            this.assetHistory.length,
+            '条记录'
+          )
         }
       } catch (error) {
         logger.error('[AssetsPortfolioPage] 加载资产历史失败:', error)
@@ -319,14 +329,14 @@ function assetsPortfolioPage() {
      */
     formatTxType(type) {
       const typeMap = {
-        'admin_adjustment': '管理员调整',
-        'lottery_reward': '抽奖奖励',
-        'consumption': '消费',
-        'market_listing_freeze': '市场挂单冻结',
-        'market_listing_withdraw_unfreeze': '市场撤单解冻',
-        'market_purchase': '市场购买',
-        'transfer_in': '转入',
-        'transfer_out': '转出'
+        admin_adjustment: '管理员调整',
+        lottery_reward: '抽奖奖励',
+        consumption: '消费',
+        market_listing_freeze: '市场挂单冻结',
+        market_listing_withdraw_unfreeze: '市场撤单解冻',
+        market_purchase: '市场购买',
+        transfer_in: '转入',
+        transfer_out: '转出'
       }
       return typeMap[type] || type
     },
@@ -360,7 +370,7 @@ function assetsPortfolioPage() {
      */
     initCharts() {
       const echarts = this._echarts
-      
+
       // 检查 ECharts 是否可用
       if (!echarts) {
         logger.warn('[AssetsPortfolioPage] ECharts 未加载，跳过图表初始化')
@@ -377,24 +387,25 @@ function assetsPortfolioPage() {
     initAssetTypeChart() {
       const echarts = this._echarts
       if (!echarts) return
-      
+
       const chartDom = document.getElementById('assetTypeChart')
       if (!chartDom) return
 
       // 防止重复初始化：先检查是否已有实例
       this.assetTypeChart = echarts.getInstanceByDom(chartDom) || echarts.init(chartDom)
-      
+
       // 准备图表数据 - 优先使用资产统计数据
       const statsData = this._assetStats || []
-      const chartData = statsData.length > 0 
-        ? statsData.map(stat => ({
-            name: stat.asset_code,
-            value: stat.total_circulation || 0
-          }))
-        : this.assetTypes.map(type => ({
-            name: type.display_name || type.asset_name || type.name || type.asset_code,
-            value: type.total_supply || type.count || 0
-          }))
+      const chartData =
+        statsData.length > 0
+          ? statsData.map(stat => ({
+              name: stat.asset_code,
+              value: stat.total_circulation || 0
+            }))
+          : this.assetTypes.map(type => ({
+              name: type.display_name || type.asset_name || type.name || type.asset_code,
+              value: type.total_supply || type.count || 0
+            }))
 
       const option = {
         tooltip: {
@@ -406,19 +417,21 @@ function assetsPortfolioPage() {
           right: 10,
           top: 'center'
         },
-        series: [{
-          type: 'pie',
-          radius: ['40%', '70%'],
-          center: ['40%', '50%'],
-          data: chartData.length > 0 ? chartData : [{ name: '暂无数据', value: 1 }],
-          emphasis: {
-            itemStyle: {
-              shadowBlur: 10,
-              shadowOffsetX: 0,
-              shadowColor: 'rgba(0, 0, 0, 0.5)'
+        series: [
+          {
+            type: 'pie',
+            radius: ['40%', '70%'],
+            center: ['40%', '50%'],
+            data: chartData.length > 0 ? chartData : [{ name: '暂无数据', value: 1 }],
+            emphasis: {
+              itemStyle: {
+                shadowBlur: 10,
+                shadowOffsetX: 0,
+                shadowColor: 'rgba(0, 0, 0, 0.5)'
+              }
             }
           }
-        }]
+        ]
       }
 
       this.assetTypeChart.setOption(option)
@@ -430,7 +443,7 @@ function assetsPortfolioPage() {
     initValueTrendChart() {
       const echarts = this._echarts
       if (!echarts) return
-      
+
       const chartDom = document.getElementById('valueTrendChart')
       if (!chartDom) return
 
@@ -459,21 +472,23 @@ function assetsPortfolioPage() {
         yAxis: {
           type: 'value',
           axisLabel: {
-            formatter: (value) => this.formatNumber(value)
+            formatter: value => this.formatNumber(value)
           }
         },
-        series: [{
-          name: '资产价值',
-          type: 'line',
-          smooth: true,
-          data: values,
-          areaStyle: {
-            opacity: 0.3
-          },
-          lineStyle: {
-            width: 2
+        series: [
+          {
+            name: '资产价值',
+            type: 'line',
+            smooth: true,
+            data: values,
+            areaStyle: {
+              opacity: 0.3
+            },
+            lineStyle: {
+              width: 2
+            }
           }
-        }]
+        ]
       }
 
       this.valueTrendChart.setOption(option)
@@ -488,7 +503,9 @@ function assetsPortfolioPage() {
       if (value === null || value === undefined) return '¥0.00'
       const num = Number(value)
       if (isNaN(num)) return '¥0.00'
-      return '¥' + num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      return (
+        '¥' + num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      )
     },
 
     /**
@@ -518,17 +535,17 @@ function assetsPortfolioPage() {
      */
     getAssetTypeText(type) {
       const typeMap = {
-        'points': '积分',
-        'POINTS': '积分',
-        'balance': '余额',
-        'BALANCE': '余额',
-        'diamond': '钻石',
-        'DIAMOND': '钻石',
-        'material': '材料',
-        'MATERIAL': '材料',
-        'item': '物品',
-        'ITEM': '物品',
-        'BUDGET_POINTS': '预算积分'
+        points: '积分',
+        POINTS: '积分',
+        balance: '余额',
+        BALANCE: '余额',
+        diamond: '钻石',
+        DIAMOND: '钻石',
+        material: '材料',
+        MATERIAL: '材料',
+        item: '物品',
+        ITEM: '物品',
+        BUDGET_POINTS: '预算积分'
       }
       return typeMap[type] || type || '未知'
     }

@@ -17,11 +17,11 @@ import { LOTTERY_ENDPOINTS } from '../../../api/lottery.js'
 export function useMetricsState() {
   return {
     /** @type {Object} 抽奖指标 - 适配后端返回字段 */
-    lotteryMetrics: { 
-      totalDraws: 0,      // 后端: summary.total_draws
-      totalWins: 0,       // 后端: summary.total_wins
-      winRate: 0,         // 后端: summary.win_rate
-      totalValue: 0       // 后端: summary.total_value（奖品价值）
+    lotteryMetrics: {
+      totalDraws: 0, // 后端: summary.total_draws
+      totalWins: 0, // 后端: summary.total_wins
+      winRate: 0, // 后端: summary.win_rate
+      totalValue: 0 // 后端: summary.total_value（奖品价值）
     },
     /** @type {Array} 奖品分布 - 后端: prize_distribution */
     prizeDistribution: [],
@@ -61,7 +61,12 @@ export function useMetricsMethods() {
         // 调用综合统计接口，获取完整的监控数据
         // 使用 time_range: 'month' 统计最近30天数据
         const timeRange = this.monitoringFilters?.timeRange || 'month'
-        console.log('📊 [Metrics] 调用API:', LOTTERY_ENDPOINTS.MONITORING_STATS, '时间范围:', timeRange)
+        console.log(
+          '📊 [Metrics] 调用API:',
+          LOTTERY_ENDPOINTS.MONITORING_STATS,
+          '时间范围:',
+          timeRange
+        )
         const statsRes = await this.apiGet(
           `${LOTTERY_ENDPOINTS.MONITORING_STATS}?time_range=${timeRange}`,
           {},
@@ -76,14 +81,14 @@ export function useMetricsMethods() {
             prizeDistributionLength: (data.prize_distribution || []).length,
             recentDrawsLength: (data.recent_draws || []).length
           })
-          
+
           // 从 summary 字段提取汇总统计（适配后端实际返回字段）
           const summary = data.summary || {}
           this.lotteryMetrics = {
             totalDraws: summary.total_draws ?? 0,
             totalWins: summary.total_wins ?? 0,
             winRate: summary.win_rate ?? 0,
-            totalValue: summary.total_value ?? 0  // 后端返回的是奖品总价值，非用户数
+            totalValue: summary.total_value ?? 0 // 后端返回的是奖品总价值，非用户数
           }
           // 从 trend 字段提取小时趋势数据
           this.hourlyMetrics = data.trend || []
@@ -93,7 +98,7 @@ export function useMetricsMethods() {
           this.recentDraws = data.recent_draws || []
           // prize_stats 奖品统计
           this.prizeStats = data.prize_stats || []
-          
+
           console.log('📊 [Metrics] 状态已更新:', {
             lotteryMetrics: this.lotteryMetrics,
             prizeDistribution: this.prizeDistribution,
@@ -114,7 +119,7 @@ export function useMetricsMethods() {
         this._resetMetricsState()
       }
     },
-    
+
     /**
      * 重置指标状态
      * @private
@@ -136,7 +141,9 @@ export function useMetricsMethods() {
         await this.loadLotteryMetrics()
         // 使用 Alpine.store 显示成功通知
         if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
-          Alpine.store('notification').success(`指标数据已刷新，共 ${this.lotteryMetrics.totalDraws} 次抽奖`)
+          Alpine.store('notification').success(
+            `指标数据已刷新，共 ${this.lotteryMetrics.totalDraws} 次抽奖`
+          )
         }
         console.log('✅ 指标数据已刷新')
       } catch (error) {
@@ -295,4 +302,3 @@ export function useMetricsMethods() {
 }
 
 export default { useMetricsState, useMetricsMethods }
-

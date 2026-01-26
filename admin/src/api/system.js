@@ -1622,7 +1622,11 @@ export const SystemAPI = {
    * @returns {Promise<Object>} 更新结果响应
    */
   async updatePricingConfig(data) {
-    return await request({ url: SYSTEM_ENDPOINTS.SYSTEM_CONFIG_UPDATE_PRICING, method: 'PUT', data })
+    return await request({
+      url: SYSTEM_ENDPOINTS.SYSTEM_CONFIG_UPDATE_PRICING,
+      method: 'PUT',
+      data
+    })
   }
 }
 

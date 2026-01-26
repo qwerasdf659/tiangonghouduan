@@ -14,34 +14,33 @@
   --sidebar-text: #94a3b8;
   --sidebar-text-active: #ffffff;
   --sidebar-border: rgba(255, 255, 255, 0.1);
-  
+
   /* ========== 顶部栏 ========== */
   --header-height: 56px;
   --header-bg: #ffffff;
   --header-border: #e2e8f0;
-  
+
   /* ========== Tab 栏 ========== */
   --tab-bar-height: 40px;
   --tab-bar-bg: #f8fafc;
   --tab-active-bg: #ffffff;
   --tab-text: #64748b;
   --tab-text-active: #1e293b;
-  
+
   /* ========== 主色调 - 深蓝科技风 ========== */
   --primary: #3b82f6;
   --primary-hover: #2563eb;
   --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-  
+
   /* ========== 功能色 ========== */
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
   --info: #06b6d4;
-  
+
   /* ========== 内容区 ========== */
   --content-bg: #f3f4f6;
   --card-bg: #ffffff;
   --text-primary: #1e293b;
   --text-secondary: #64748b;
 }
-

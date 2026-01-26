@@ -20,18 +20,8 @@ export { logger, LOG_LEVELS }
 
 // ========== ECharts 懒加载 ==========
 // 同理，先 import 再 re-export
-import {
-  loadECharts,
-  isEChartsLoaded,
-  getECharts,
-  preloadECharts
-} from './echarts-lazy.js'
-export {
-  loadECharts,
-  isEChartsLoaded,
-  getECharts,
-  preloadECharts
-}
+import { loadECharts, isEChartsLoaded, getECharts, preloadECharts } from './echarts-lazy.js'
+export { loadECharts, isEChartsLoaded, getECharts, preloadECharts }
 
 // ========== 确认对话框 ==========
 // 从 Alpine Store 导出便捷函数
@@ -87,7 +77,8 @@ export function formatDate(dateValue, options = {}) {
     // 格式如: '2026-01-25 20:10:36' 或 '2026-01-25'
     if (typeof dateStr === 'string') {
       // 如果没有 T、Z 或 +/-时区偏移，说明是数据库返回的北京时间字符串
-      const isPlainDbFormat = !dateStr.includes('T') && !dateStr.includes('Z') && !dateStr.match(/[+-]\d{2}:\d{2}$/)
+      const isPlainDbFormat =
+        !dateStr.includes('T') && !dateStr.includes('Z') && !dateStr.match(/[+-]\d{2}:\d{2}$/)
 
       if (isPlainDbFormat) {
         // 数据库返回的已经是北京时间，直接格式化显示
@@ -464,4 +455,3 @@ export default {
   buildQueryString,
   buildURL
 }
-

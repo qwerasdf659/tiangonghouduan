@@ -23,21 +23,21 @@ export function useDebtManagementState() {
     debts: [],
     /** @type {Object} 债务筛选条件 - 适配后端 debt-management API */
     debtFilters: {
-      debt_type: '',        // 欠账类型: inventory|budget
-      campaign_id: ''       // 活动ID（可选）
+      debt_type: '', // 欠账类型: inventory|budget
+      campaign_id: '' // 活动ID（可选）
     },
     /** @type {Object} 债务统计 - 来自 /dashboard 接口 */
-    debtStats: { 
-      total_inventory_debt: 0,    // 库存欠账总数
-      total_budget_debt: 0,       // 预算欠账总额
-      pending_count: 0,           // 待处理数量
-      cleared_today: 0            // 今日清偿数量
+    debtStats: {
+      total_inventory_debt: 0, // 库存欠账总数
+      total_budget_debt: 0, // 预算欠账总额
+      pending_count: 0, // 待处理数量
+      cleared_today: 0 // 今日清偿数量
     },
     /** @type {Object|null} 选中的债务记录 */
     selectedDebt: null,
     /** @type {Object} 债务清偿表单 - 适配 /clear 接口 */
     debtRepayForm: {
-      debt_type: 'inventory',  // 欠账类型: inventory|budget
+      debt_type: 'inventory', // 欠账类型: inventory|budget
       debt_id: '',
       amount: 0,
       remark: ''
@@ -59,10 +59,8 @@ export function useDebtManagementMethods() {
         const params = new URLSearchParams()
         params.append('page', this.page)
         params.append('page_size', this.pageSize)
-        if (this.debtFilters.debt_type)
-          params.append('debt_type', this.debtFilters.debt_type)
-        if (this.debtFilters.campaign_id) 
-          params.append('campaign_id', this.debtFilters.campaign_id)
+        if (this.debtFilters.debt_type) params.append('debt_type', this.debtFilters.debt_type)
+        if (this.debtFilters.campaign_id) params.append('campaign_id', this.debtFilters.campaign_id)
 
         const response = await this.apiGet(
           `${ASSET_ENDPOINTS.DEBT_LIST}?${params}`,
@@ -72,7 +70,12 @@ export function useDebtManagementMethods() {
 
         if (response?.success) {
           // 后端返回的是 items (最新) 或 pending_debts 或 list
-          this.debts = response.data?.items || response.data?.pending_debts || response.data?.list || response.data?.rows || []
+          this.debts =
+            response.data?.items ||
+            response.data?.pending_debts ||
+            response.data?.list ||
+            response.data?.rows ||
+            []
           if (response.data?.pagination) {
             this.total = response.data.pagination.total || 0
             this.totalPages = response.data.pagination.total_pages || 1
@@ -102,9 +105,20 @@ export function useDebtManagementMethods() {
           const invDebt = response.data.inventory_debt || {}
           const budDebt = response.data.budget_debt || {}
           this.debtStats = {
-            total_inventory_debt: invDebt.remaining_quantity ?? invDebt.total_quantity ?? response.data.total_inventory_debt ?? 0,
-            total_budget_debt: budDebt.remaining_amount ?? budDebt.total_amount ?? response.data.total_budget_debt ?? 0,
-            pending_count: (invDebt.pending_count || 0) + (budDebt.pending_count || 0) || response.data.pending_count || 0,
+            total_inventory_debt:
+              invDebt.remaining_quantity ??
+              invDebt.total_quantity ??
+              response.data.total_inventory_debt ??
+              0,
+            total_budget_debt:
+              budDebt.remaining_amount ??
+              budDebt.total_amount ??
+              response.data.total_budget_debt ??
+              0,
+            pending_count:
+              (invDebt.pending_count || 0) + (budDebt.pending_count || 0) ||
+              response.data.pending_count ||
+              0,
             cleared_today: response.data.cleared_today ?? 0
           }
         }
@@ -173,15 +187,12 @@ export function useDebtManagementMethods() {
       try {
         this.saving = true
         // 后端 /clear 接口使用 POST 方法
-        const response = await this.apiPost(
-          ASSET_ENDPOINTS.DEBT_REPAY,
-          {
-            debt_type: this.debtRepayForm.debt_type,
-            debt_id: this.debtRepayForm.debt_id,
-            amount: this.debtRepayForm.amount,
-            remark: this.debtRepayForm.remark
-          }
-        )
+        const response = await this.apiPost(ASSET_ENDPOINTS.DEBT_REPAY, {
+          debt_type: this.debtRepayForm.debt_type,
+          debt_id: this.debtRepayForm.debt_id,
+          amount: this.debtRepayForm.amount,
+          remark: this.debtRepayForm.remark
+        })
 
         if (response?.success) {
           const message = response.data?.is_fully_cleared ? '欠账已完全清偿' : '欠账部分清偿成功'
@@ -206,15 +217,12 @@ export function useDebtManagementMethods() {
       await this.confirmAndExecute(
         `确定全额清偿此欠账？数量/金额: ${amount}`,
         async () => {
-          const response = await this.apiPost(
-            ASSET_ENDPOINTS.DEBT_WRITE_OFF,
-            {
-              debt_type: debt.debt_type || 'inventory',
-              debt_id: debt.debt_id || debt.id,
-              amount: amount,
-              remark: '管理员核销'
-            }
-          )
+          const response = await this.apiPost(ASSET_ENDPOINTS.DEBT_WRITE_OFF, {
+            debt_type: debt.debt_type || 'inventory',
+            debt_id: debt.debt_id || debt.id,
+            amount: amount,
+            remark: '管理员核销'
+          })
           if (response?.success) {
             await this.loadDebts()
             await this.loadDebtStats()

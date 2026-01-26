@@ -6,7 +6,7 @@
     pageStyle: '[x-cloak] { display: none !important; } .store-card { border: 1px solid #e5e7eb; border-radius: 0.5rem; transition: transform 0.2s, box-shadow 0.2s; } .store-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); } .staff-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }' 
   }) %>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="themed-bg-subtle min-h-screen">
   
   <!-- 导航栏 -->
   <nav class="bg-gray-700 text-white shadow-lg">
@@ -17,19 +17,19 @@
       </div>
       <div class="flex items-center space-x-4">
         <span x-data x-text="$store.auth?.user?.nickname ? `欢迎，${$store.auth.user.nickname}` : '欢迎，管理员'">欢迎，管理员</span>
-        <button onclick="logout()" class="px-3 py-1 border border-white rounded hover:bg-white hover:text-gray-700 text-sm">退出登录</button>
+        <button onclick="logout()" class="px-3 py-1 border border-white rounded hover:bg-white hover:themed-text-secondary text-sm">退出登录</button>
       </div>
     </div>
   </nav>
 
   <!-- 子模块导航 -->
-  <div class="bg-gray-50 border-b" x-data="storeNavigation()" x-cloak>
+  <div class="themed-bg-base border-b" x-data="storeNavigation()" x-cloak>
     <div class="container mx-auto px-4">
       <div class="flex space-x-1 py-2">
         <template x-for="page in subPages" :key="page.id">
           <button 
             @click="switchPage(page.id)"
-            :class="currentPage === page.id ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-200'"
+            :class="currentPage === page.id ? 'themed-bg-primary text-white' : 'themed-text-muted themed-hover-bg'"
             class="px-4 py-2 rounded text-sm font-medium transition-colors"
           >
             <i :class="'bi ' + page.icon" class="mr-1"></i><span x-text="page.title"></span>
@@ -46,32 +46,32 @@
     <div x-show="currentPage === 'stores'" x-cloak>
       <!-- 统计卡片 -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white rounded-lg shadow p-4 text-center">
+        <div class="themed-card rounded-lg shadow p-4 text-center">
           <div class="text-3xl mb-2">🏪</div>
-          <div class="text-gray-500 text-sm">总门店数</div>
-          <div class="text-2xl font-bold text-blue-600" x-text="storeStats.total || 0"></div>
+          <div class="themed-text-muted text-sm">总门店数</div>
+          <div class="text-2xl font-bold themed-text-primary" x-text="storeStats.total || 0"></div>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 text-center">
+        <div class="themed-card rounded-lg shadow p-4 text-center">
           <div class="text-3xl mb-2">✅</div>
-          <div class="text-gray-500 text-sm">营业中</div>
+          <div class="themed-text-muted text-sm">营业中</div>
           <div class="text-2xl font-bold text-green-600" x-text="storeStats.active || 0"></div>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 text-center">
+        <div class="themed-card rounded-lg shadow p-4 text-center">
           <div class="text-3xl mb-2">👥</div>
-          <div class="text-gray-500 text-sm">总员工数</div>
+          <div class="themed-text-muted text-sm">总员工数</div>
           <div class="text-2xl font-bold text-cyan-600" x-text="storeStats.totalStaff || 0"></div>
         </div>
-        <div class="bg-white rounded-lg shadow p-4 text-center">
+        <div class="themed-card rounded-lg shadow p-4 text-center">
           <div class="text-3xl mb-2">📈</div>
-          <div class="text-gray-500 text-sm">今日营业额</div>
+          <div class="themed-text-muted text-sm">今日营业额</div>
           <div class="text-2xl font-bold text-amber-600" x-text="'¥' + (storeStats.todayRevenue || 0)"></div>
         </div>
       </div>
 
-      <div class="bg-white rounded-lg shadow">
+      <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold text-lg">🏪 门店列表</h5>
-          <button @click="openCreateStoreModal()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+          <button @click="openCreateStoreModal()" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary text-sm">
             ➕ 添加门店
           </button>
         </div>
@@ -85,7 +85,7 @@
               <option value="closed">已关闭</option>
             </select>
             <input type="text" class="px-3 py-2 border rounded text-sm w-48" placeholder="搜索门店名称..." x-model="storeFilters.keyword">
-            <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm" @click="loadStores()">
+            <button class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary text-sm" @click="loadStores()">
               🔍 搜索
             </button>
           </div>
@@ -93,10 +93,10 @@
           <!-- 门店列表（卡片样式） -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <template x-if="stores.length === 0">
-              <div class="col-span-3 text-center text-gray-500 py-12">暂无门店数据</div>
+              <div class="col-span-3 text-center themed-text-muted py-12">暂无门店数据</div>
             </template>
             <template x-for="store in stores" :key="store.store_id">
-              <div class="store-card p-4 bg-white">
+              <div class="store-card p-4 themed-card">
                 <div class="flex justify-between items-start mb-3">
                   <h6 class="font-semibold" x-text="store.store_name || store.name || '未命名门店'"></h6>
                   <span 
@@ -105,14 +105,14 @@
                     x-text="getStoreStatusText(store.status)"
                   ></span>
                 </div>
-                <p class="text-gray-500 text-sm mb-2">📍 <span x-text="store.store_address || store.address || '暂无地址'"></span></p>
-                <p class="text-gray-500 text-sm mb-2">📞 <span x-text="store.contact_mobile || store.phone || '暂无电话'"></span></p>
-                <div class="flex justify-between items-center text-gray-500 text-sm mb-3">
+                <p class="themed-text-muted text-sm mb-2">📍 <span x-text="store.store_address || store.address || '暂无地址'"></span></p>
+                <p class="themed-text-muted text-sm mb-2">📞 <span x-text="store.contact_mobile || store.phone || '暂无电话'"></span></p>
+                <div class="flex justify-between items-center themed-text-muted text-sm mb-3">
                   <span>👥 <span x-text="store.staff_count || 0"></span> 员工</span>
                   <span>📅 <span x-text="formatDateSafe(store.created_at)"></span></span>
                 </div>
                 <div class="flex gap-2">
-                  <button class="flex-1 px-3 py-1 border border-blue-600 text-blue-600 rounded text-sm hover:bg-blue-50" @click="editStore(store)">
+                  <button class="flex-1 px-3 py-1 border themed-border-primary themed-text-primary rounded text-sm hover:bg-blue-50" @click="editStore(store)">
                     ✏️ 编辑
                   </button>
                   <button class="px-3 py-1 border border-cyan-600 text-cyan-600 rounded text-sm hover:bg-cyan-50" @click="viewStoreDetail(store)">
@@ -128,10 +128,10 @@
 
     <!-- ==================== 员工管理 ==================== -->
     <div x-show="currentPage === 'staff'" x-cloak>
-      <div class="bg-white rounded-lg shadow">
+      <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold text-lg">👥 员工管理</h5>
-          <button @click="openCreateStaffModal()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+          <button @click="openCreateStaffModal()" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary text-sm">
             ➕ 添加员工
           </button>
         </div>
@@ -157,7 +157,7 @@
               <option value="staff">员工</option>
             </select>
             <input type="text" class="px-3 py-2 border rounded text-sm w-48" placeholder="搜索员工姓名..." x-model="staffFilters.keyword">
-            <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm" @click="loadStaff()">
+            <button class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary text-sm" @click="loadStaff()">
               🔍 搜索
             </button>
           </div>
@@ -165,31 +165,31 @@
           <!-- 员工表格 -->
           <div class="overflow-x-auto">
             <table class="w-full">
-              <thead class="bg-gray-50">
+              <thead class="themed-bg-base">
                 <tr>
-                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">员工</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">所属门店</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">角色</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">手机号</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">入职日期</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">员工</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">所属门店</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">角色</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">手机号</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">入职日期</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
                 </tr>
               </thead>
               <tbody class="divide-y">
                 <template x-if="staffList.length === 0">
-                  <tr><td colspan="7" class="text-center text-gray-500 py-8">暂无员工数据</td></tr>
+                  <tr><td colspan="7" class="text-center themed-text-muted py-8">暂无员工数据</td></tr>
                 </template>
                 <template x-for="staff in staffList" :key="staff.store_staff_id">
-                  <tr class="hover:bg-gray-50">
+                  <tr class="themed-hover-bg">
                     <td class="px-4 py-3">
                       <div class="flex items-center">
-                        <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium mr-3">
+                        <div class="w-10 h-10 rounded-full themed-bg-primary-light flex items-center justify-center themed-text-primary font-medium mr-3">
                           <span x-text="(staff.user_nickname || '员工').charAt(0)"></span>
                         </div>
                         <div>
                           <div class="font-medium" x-text="staff.user_nickname || '-'"></div>
-                          <small class="text-gray-500" x-text="staff.user_mobile || '-'"></small>
+                          <small class="themed-text-muted" x-text="staff.user_mobile || '-'"></small>
                         </div>
                       </div>
                     </td>
@@ -209,7 +209,7 @@
                         <!-- 在职员工：编辑 + 离职 -->
                         <template x-if="staff.status === 'active'">
                           <div class="flex space-x-2">
-                            <button @click="editStaff(staff)" class="text-blue-600 hover:text-blue-800 text-sm">✏️ 编辑</button>
+                            <button @click="editStaff(staff)" class="themed-text-primary hover:text-blue-800 text-sm">✏️ 编辑</button>
                             <button @click="resignStaff(staff)" class="text-amber-600 hover:text-amber-800 text-sm">📤 离职</button>
                           </div>
                         </template>
@@ -219,7 +219,7 @@
                         </template>
                         <!-- 待审核员工：编辑 -->
                         <template x-if="staff.status === 'pending'">
-                          <button @click="editStaff(staff)" class="text-blue-600 hover:text-blue-800 text-sm">✏️ 编辑</button>
+                          <button @click="editStaff(staff)" class="themed-text-primary hover:text-blue-800 text-sm">✏️ 编辑</button>
                         </template>
                         <!-- 已删除员工：查看信息（只读） -->
                         <template x-if="staff.status === 'deleted'">
@@ -238,21 +238,21 @@
             <div class="flex justify-center space-x-1">
               <button 
                 class="px-3 py-1 border rounded text-sm" 
-                :class="page <= 1 ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'"
+                :class="page <= 1 ? 'text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
                 :disabled="page <= 1"
                 @click="changePage(page - 1)"
               >上一页</button>
               <template x-for="p in staffPagination.totalPages" :key="p">
                 <button 
                   class="px-3 py-1 border rounded text-sm" 
-                  :class="p === page ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'"
+                  :class="p === page ? 'themed-bg-primary text-white' : 'themed-hover-bg'"
                   @click="changePage(p)"
                   x-text="p"
                 ></button>
               </template>
               <button 
                 class="px-3 py-1 border rounded text-sm" 
-                :class="page >= staffPagination.totalPages ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'"
+                :class="page >= staffPagination.totalPages ? 'text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
                 :disabled="page >= staffPagination.totalPages"
                 @click="changePage(page + 1)"
               >下一页</button>
@@ -265,14 +265,14 @@
     <!-- ==================== 门店统计 ==================== -->
     <div x-show="currentPage === 'store-stats'" x-cloak>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div class="bg-white rounded-lg shadow">
+        <div class="themed-card rounded-lg shadow">
           <div class="p-4 border-b">
             <h6 class="font-semibold">📊 门店营业额排行</h6>
           </div>
           <div class="p-4">
             <div class="overflow-x-auto">
               <table class="w-full text-sm">
-                <thead class="bg-gray-50">
+                <thead class="themed-bg-base">
                   <tr>
                     <th class="px-3 py-2 text-left">排名</th>
                     <th class="px-3 py-2 text-left">门店名称</th>
@@ -284,7 +284,7 @@
                     <tr>
                       <td class="px-3 py-2">
                         <span 
-                          :class="index < 3 ? 'bg-amber-400 text-white' : 'bg-gray-200 text-gray-700'"
+                          :class="index < 3 ? 'bg-amber-400 text-white' : 'themed-bg-muted themed-text-secondary'"
                           class="px-2 py-1 text-xs rounded"
                           x-text="index + 1"
                         ></span>
@@ -298,14 +298,14 @@
             </div>
           </div>
         </div>
-        <div class="bg-white rounded-lg shadow">
+        <div class="themed-card rounded-lg shadow">
           <div class="p-4 border-b">
             <h6 class="font-semibold">📈 门店状态分布</h6>
           </div>
           <div class="p-4 space-y-3">
             <div class="flex justify-between items-center">
               <span>🟢 营业中</span>
-              <span class="px-2 py-1 bg-green-100 text-green-700 text-sm rounded" x-text="storeStats.active || 0"></span>
+              <span class="px-2 py-1 bg-green-100 themed-text-success text-sm rounded" x-text="storeStats.active || 0"></span>
             </div>
             <div class="flex justify-between items-center">
               <span>🟡 休息中</span>
@@ -313,7 +313,7 @@
             </div>
             <div class="flex justify-between items-center">
               <span>⚫ 已关闭</span>
-              <span class="px-2 py-1 bg-gray-100 text-gray-700 text-sm rounded" x-text="storeStats.closed || 0"></span>
+              <span class="px-2 py-1 themed-bg-subtle themed-text-secondary text-sm rounded" x-text="storeStats.closed || 0"></span>
             </div>
           </div>
         </div>
@@ -330,22 +330,22 @@
     x-cloak
   >
     <div class="absolute inset-0 bg-black bg-opacity-50" @click="hideModal('storeModal')"></div>
-    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
       <div class="p-4 border-b flex justify-between items-center">
         <h5 class="font-semibold">🏪 <span x-text="isEditMode ? '编辑门店' : '添加门店'"></span></h5>
-        <button @click="hideModal('storeModal')" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+        <button @click="hideModal('storeModal')" class="text-gray-400 hover:themed-text-muted text-xl">&times;</button>
       </div>
       <form @submit.prevent="saveStore">
         <div class="p-4 space-y-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">门店名称 <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">门店名称 <span class="text-red-500">*</span></label>
             <input type="text" class="w-full px-3 py-2 border rounded" x-model="storeForm.store_name" required>
           </div>
 
           <!-- 省市区街道联动选择 -->
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">省份</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">省份</label>
               <select class="w-full px-3 py-2 border rounded" x-model="storeForm.province_code" @change="isEditMode ? loadCitiesForEdit() : loadCities()">
                 <option value="">请选择省份</option>
                 <template x-for="p in provinces" :key="p.region_code">
@@ -354,7 +354,7 @@
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">城市</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">城市</label>
               <select class="w-full px-3 py-2 border rounded" x-model="storeForm.city_code" @change="isEditMode ? loadDistrictsForEdit() : loadDistricts()" :disabled="!storeForm.province_code">
                 <option value="">请选择城市</option>
                 <template x-for="c in cities" :key="c.region_code">
@@ -366,7 +366,7 @@
 
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">区县</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">区县</label>
               <select class="w-full px-3 py-2 border rounded" x-model="storeForm.district_code" @change="isEditMode ? loadStreetsForEdit() : loadStreets()" :disabled="!storeForm.city_code">
                 <option value="">请选择区县</option>
                 <template x-for="d in districts" :key="d.region_code">
@@ -375,7 +375,7 @@
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">街道</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">街道</label>
               <select class="w-full px-3 py-2 border rounded" x-model="storeForm.street_code" :disabled="!storeForm.district_code">
                 <option value="">请选择街道</option>
                 <template x-for="s in streets" :key="s.region_code">
@@ -386,29 +386,29 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">详细地址</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">详细地址</label>
             <input type="text" class="w-full px-3 py-2 border rounded" x-model="storeForm.store_address" placeholder="请输入详细地址">
-            <small class="text-gray-500">完整地址：<span x-text="getFormFullAddress()"></span></small>
+            <small class="themed-text-muted">完整地址：<span x-text="getFormFullAddress()"></span></small>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">联系人</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">联系人</label>
               <input type="text" class="w-full px-3 py-2 border rounded" x-model="storeForm.contact_name" placeholder="请输入联系人姓名">
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">联系电话</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">联系电话</label>
               <input type="text" class="w-full px-3 py-2 border rounded" x-model="storeForm.contact_mobile" placeholder="请输入联系电话">
             </div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">门店电话</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">门店电话</label>
             <input type="text" class="w-full px-3 py-2 border rounded" x-model="storeForm.phone">
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">门店状态</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">门店状态</label>
             <select class="w-full px-3 py-2 border rounded" x-model="storeForm.status">
               <option value="active">营业中</option>
               <option value="inactive">休息中</option>
@@ -417,13 +417,13 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">门店描述</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">门店描述</label>
             <textarea class="w-full px-3 py-2 border rounded" x-model="storeForm.notes" rows="3"></textarea>
           </div>
         </div>
         <div class="p-4 border-t flex justify-end space-x-3">
-          <button type="button" @click="hideModal('storeModal')" class="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50">取消</button>
-          <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700" :disabled="saving">
+          <button type="button" @click="hideModal('storeModal')" class="px-4 py-2 border rounded themed-text-secondary themed-hover-bg">取消</button>
+          <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary" :disabled="saving">
             <span x-show="saving" class="inline-block animate-spin mr-1">⏳</span>
             <span x-text="isEditMode ? '保存修改' : '添加门店'"></span>
           </button>
@@ -440,10 +440,10 @@
     x-cloak
   >
     <div class="absolute inset-0 bg-black bg-opacity-50" @click="hideModal('storeDetailModal')"></div>
-    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4">
       <div class="p-4 border-b flex justify-between items-center">
         <h5 class="font-semibold">🏪 门店详情</h5>
-        <button @click="hideModal('storeDetailModal')" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+        <button @click="hideModal('storeDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">&times;</button>
       </div>
       <div class="p-4">
         <template x-if="selectedStore">
@@ -457,35 +457,35 @@
               ></span>
             </div>
             <div>
-              <strong class="text-gray-600">门店ID：</strong>
-              <code class="bg-gray-100 px-2 py-1 rounded text-sm" x-text="selectedStore.store_id"></code>
+              <strong class="themed-text-muted">门店ID：</strong>
+              <code class="themed-bg-subtle px-2 py-1 rounded text-sm" x-text="selectedStore.store_id"></code>
             </div>
             <div>
-              <strong class="text-gray-600">联系电话：</strong>
+              <strong class="themed-text-muted">联系电话：</strong>
               <span x-text="selectedStore.contact_mobile || '暂无'"></span>
             </div>
             <div class="col-span-2">
-              <strong class="text-gray-600">门店地址：</strong>
+              <strong class="themed-text-muted">门店地址：</strong>
               <span x-text="getFullAddress(selectedStore)"></span>
             </div>
             <div>
-              <strong class="text-gray-600">员工数量：</strong>
+              <strong class="themed-text-muted">员工数量：</strong>
               <span x-text="(selectedStore.staff_count || 0) + ' 人'"></span>
             </div>
             <div>
-              <strong class="text-gray-600">创建时间：</strong>
+              <strong class="themed-text-muted">创建时间：</strong>
               <span x-text="formatDateSafe(selectedStore.created_at)"></span>
             </div>
             <div class="col-span-2" x-show="selectedStore.notes">
-              <strong class="text-gray-600">门店描述：</strong>
-              <p class="text-gray-500 mt-1" x-text="selectedStore.notes"></p>
+              <strong class="themed-text-muted">门店描述：</strong>
+              <p class="themed-text-muted mt-1" x-text="selectedStore.notes"></p>
             </div>
           </div>
         </template>
       </div>
       <div class="p-4 border-t flex justify-end space-x-3">
-        <button type="button" @click="hideModal('storeDetailModal')" class="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50">关闭</button>
-        <button type="button" @click="editStore(selectedStore); hideModal('storeDetailModal')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+        <button type="button" @click="hideModal('storeDetailModal')" class="px-4 py-2 border rounded themed-text-secondary themed-hover-bg">关闭</button>
+        <button type="button" @click="editStore(selectedStore); hideModal('storeDetailModal')" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">
           ✏️ 编辑
         </button>
       </div>
@@ -500,23 +500,23 @@
     x-cloak
   >
     <div class="absolute inset-0 bg-black bg-opacity-50" @click="hideModal('staffModal')"></div>
-    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4">
       <div class="p-4 border-b flex justify-between items-center">
         <h5 class="font-semibold">👤 <span x-text="isEditMode ? '编辑员工' : '添加员工'"></span></h5>
-        <button @click="hideModal('staffModal')" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+        <button @click="hideModal('staffModal')" class="text-gray-400 hover:themed-text-muted text-xl">&times;</button>
       </div>
       <form @submit.prevent="saveStaff">
         <div class="p-4 space-y-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">员工姓名 <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">员工姓名 <span class="text-red-500">*</span></label>
             <input type="text" class="w-full px-3 py-2 border rounded" x-model="staffForm.name" required>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">手机号码</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">手机号码</label>
             <input type="text" class="w-full px-3 py-2 border rounded" x-model="staffForm.phone">
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">所属门店</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">所属门店</label>
             <select class="w-full px-3 py-2 border rounded" x-model="staffForm.store_id">
               <option value="">请选择门店</option>
               <template x-for="store in stores" :key="store.store_id">
@@ -525,7 +525,7 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">员工角色</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">员工角色</label>
             <select class="w-full px-3 py-2 border rounded" x-model="staffForm.role">
               <option value="manager">店长</option>
               <option value="cashier">收银员</option>
@@ -534,13 +534,13 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">入职日期</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">入职日期</label>
             <input type="date" class="w-full px-3 py-2 border rounded" x-model="staffForm.hire_date">
           </div>
         </div>
         <div class="p-4 border-t flex justify-end space-x-3">
-          <button type="button" @click="hideModal('staffModal')" class="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50">取消</button>
-          <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700" :disabled="saving">
+          <button type="button" @click="hideModal('staffModal')" class="px-4 py-2 border rounded themed-text-secondary themed-hover-bg">取消</button>
+          <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary" :disabled="saving">
             <span x-show="saving" class="inline-block animate-spin mr-1">⏳</span>
             <span x-text="isEditMode ? '保存修改' : '添加员工'"></span>
           </button>

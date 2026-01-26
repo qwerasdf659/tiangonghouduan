@@ -3,14 +3,15 @@
  *
  * 必须在 alpine.min.js 之前加载
  *
- * @file public/admin/js/alpine/init.js
- * @description Alpine.js 全局配置、Store 注册和 Magic 属性定义
- * @version 1.0.0
- * @date 2026-01-22
+ * @file src/alpine/init.js
+ * @description Alpine.js 全局配置、Store 注册和 Magic 属性定义（无 Bootstrap 依赖）
+ * @version 2.0.0
+ * @date 2026-01-26
  */
 
-
 import { logger } from '../utils/logger.js'
+import { createToastStore, TOAST_TYPES } from './components/toast.js'
+
 document.addEventListener('alpine:init', () => {
   logger.info('🔧 Alpine.js 初始化开始...')
 
@@ -167,143 +168,10 @@ document.addEventListener('alpine:init', () => {
   })
 
   /**
-   * 通知状态 Store
-   * 管理 Toast 消息通知，自动创建和显示 DOM Toast
+   * 通知状态 Store（纯 Tailwind CSS 版本）
+   * 管理 Toast 消息通知
    */
-  Alpine.store('notification', {
-    items: [],
-    unreadCount: 0,
-    containerId: 'alpineToastContainer',
-
-    // 确保 Toast 容器存在
-    ensureContainer() {
-      let container = document.getElementById(this.containerId)
-      if (!container) {
-        container = document.createElement('div')
-        container.id = this.containerId
-        container.className = 'toast-container position-fixed top-0 end-0 p-3'
-        container.style.zIndex = '9999'
-        document.body.appendChild(container)
-      }
-      return container
-    },
-
-    // 创建并显示 Toast DOM 元素
-    showToastDOM(type, message, duration) {
-      const container = this.ensureContainer()
-      const toastId = 'toast_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-
-      // 类型配置映射
-      const typeConfig = {
-        success: { bg: 'bg-success', icon: 'bi-check-circle-fill' },
-        danger: { bg: 'bg-danger', icon: 'bi-x-circle-fill' },
-        warning: { bg: 'bg-warning text-dark', icon: 'bi-exclamation-triangle-fill' },
-        info: { bg: 'bg-info', icon: 'bi-info-circle-fill' }
-      }
-      const config = typeConfig[type] || typeConfig.info
-
-      // 创建 Toast HTML
-      const toastHTML = `
-        <div id="${toastId}" class="toast align-items-center text-white ${config.bg} border-0" role="alert" aria-live="assertive" aria-atomic="true">
-          <div class="d-flex">
-            <div class="toast-body">
-              <i class="bi ${config.icon} me-2"></i>
-              ${this.escapeHTML(message)}
-            </div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="关闭"></button>
-          </div>
-        </div>
-      `
-      container.insertAdjacentHTML('beforeend', toastHTML)
-
-      const toastEl = document.getElementById(toastId)
-      if (toastEl && typeof bootstrap !== 'undefined' && bootstrap.Toast) {
-        const toast = new bootstrap.Toast(toastEl, { delay: duration, autohide: true })
-        toast.show()
-        toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove())
-      } else {
-        // 降级方案：简单显示后移除
-        setTimeout(() => toastEl?.remove(), duration)
-      }
-    },
-
-    // HTML 转义防 XSS
-    escapeHTML(text) {
-      const div = document.createElement('div')
-      div.textContent = text
-      return div.innerHTML
-    },
-
-    // 添加通知（同时显示 DOM Toast）
-    add(type, message, duration = 3000) {
-      const id = Date.now() + Math.random()
-      this.items.push({ id, type, message, timestamp: new Date() })
-
-      // 自动显示 DOM Toast
-      this.showToastDOM(type, message, duration)
-
-      if (duration > 0) {
-        setTimeout(() => this.remove(id), duration)
-      }
-
-      return id
-    },
-
-    // 移除通知
-    remove(id) {
-      this.items = this.items.filter(item => item.id !== id)
-    },
-
-    // 清空所有通知
-    clear() {
-      this.items = []
-    },
-
-    // 便捷方法
-    success(message, duration = 3000) {
-      return this.add('success', message, duration)
-    },
-    error(message, duration = 5000) {
-      return this.add('danger', message, duration)
-    },
-    warning(message, duration = 4000) {
-      return this.add('warning', message, duration)
-    },
-    info(message, duration = 3000) {
-      return this.add('info', message, duration)
-    },
-
-    /**
-     * 兼容方法 - 支持两种参数格式
-     * 格式1: showToast(message, type) - 如 consumption.js, campaigns.js 等使用
-     * 格式2: showToast(type, message) - 如 lottery-quota.js 使用
-     * 自动识别参数格式并调用正确的方法
-     */
-    showToast(arg1, arg2 = 'info', duration = 3000) {
-      const validTypes = ['success', 'error', 'warning', 'info', 'danger']
-
-      // 判断参数格式
-      let type, message
-      if (validTypes.includes(arg1)) {
-        // 格式2: showToast(type, message)
-        type = arg1
-        message = arg2
-      } else if (validTypes.includes(arg2)) {
-        // 格式1: showToast(message, type)
-        type = arg2
-        message = arg1
-      } else {
-        // 默认: arg1 是消息, arg2 是类型或默认 info
-        type = 'info'
-        message = arg1
-      }
-
-      // 标准化 type
-      if (type === 'error') type = 'danger'
-
-      return this.add(type, message, duration)
-    }
-  })
+  Alpine.store('notification', createToastStore())
 
   // ========== 全局 Magic 属性 ==========
 
@@ -422,20 +290,36 @@ document.addEventListener('alpine:init', () => {
   // ========== 全局指令注册 ==========
 
   /**
-   * x-tooltip 指令
+   * x-tooltip 指令（纯 CSS 实现）
    * 使用方式：<span x-tooltip="'这是提示文字'">悬停显示</span>
    */
   Alpine.directive('tooltip', (el, { expression }, { evaluate }) => {
     const text = evaluate(expression)
     if (text) {
       el.setAttribute('title', text)
-      el.setAttribute('data-bs-toggle', 'tooltip')
-      el.setAttribute('data-bs-placement', 'top')
+      el.classList.add('tooltip-trigger')
 
-      // 初始化 Bootstrap Tooltip
-      if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
-        new bootstrap.Tooltip(el)
-      }
+      // 创建 Tooltip 元素
+      const tooltip = document.createElement('div')
+      tooltip.className =
+        'tooltip-content absolute hidden px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-lg z-50 whitespace-nowrap'
+      tooltip.textContent = text
+
+      el.style.position = 'relative'
+      el.appendChild(tooltip)
+
+      // 显示/隐藏逻辑
+      el.addEventListener('mouseenter', () => {
+        tooltip.classList.remove('hidden')
+        // 定位在元素上方
+        tooltip.style.bottom = '100%'
+        tooltip.style.left = '50%'
+        tooltip.style.transform = 'translateX(-50%) translateY(-4px)'
+      })
+
+      el.addEventListener('mouseleave', () => {
+        tooltip.classList.add('hidden')
+      })
     }
   })
 
@@ -446,10 +330,23 @@ document.addEventListener('alpine:init', () => {
   Alpine.directive('confirm', (el, { expression }, { evaluate }) => {
     const message = evaluate(expression) || '确定要执行此操作吗？'
 
-    el.addEventListener('click', e => {
-      if (!confirm(message)) {
+    el.addEventListener('click', async e => {
+      // 使用 Alpine Store 的确认对话框
+      if (typeof Alpine !== 'undefined' && Alpine.store('confirm')) {
         e.stopImmediatePropagation()
         e.preventDefault()
+
+        const confirmed = await Alpine.store('confirm').show({ message })
+        if (confirmed) {
+          // 触发 confirmed 事件
+          el.dispatchEvent(new CustomEvent('confirmed'))
+        }
+      } else {
+        // 降级到原生 confirm
+        if (!confirm(message)) {
+          e.stopImmediatePropagation()
+          e.preventDefault()
+        }
       }
     })
   })
@@ -478,7 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
 const LOADING_CONTAINER_ID = 'globalLoadingOverlay'
 
 /**
- * 确保加载遮罩 DOM 元素存在
+ * 确保加载遮罩 DOM 元素存在（纯 Tailwind CSS 版本）
  * @returns {HTMLElement} 加载遮罩容器元素
  */
 function ensureLoadingContainer() {
@@ -487,14 +384,12 @@ function ensureLoadingContainer() {
     container = document.createElement('div')
     container.id = LOADING_CONTAINER_ID
     container.className =
-      'position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center'
-    container.style.cssText = 'background: rgba(255, 255, 255, 0.8); z-index: 9998; display: none;'
+      'fixed inset-0 flex justify-center items-center bg-white/80 dark:bg-gray-900/80 z-[9998]'
+    container.style.display = 'none'
     container.innerHTML = `
       <div class="text-center">
-        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
-          <span class="visually-hidden">加载中...</span>
-        </div>
-        <div class="mt-2 text-muted" id="loadingText">加载中...</div>
+        <div class="inline-block w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+        <div class="mt-3 text-gray-600 dark:text-gray-300" id="loadingText">加载中...</div>
       </div>
     `
     document.body.appendChild(container)
@@ -506,7 +401,7 @@ function ensureLoadingContainer() {
  * 显示全局加载遮罩
  * @param {string} [message='加载中...'] - 加载提示文字
  */
-function showLoading(message = '加载中...') {
+export function showLoading(message = '加载中...') {
   const container = ensureLoadingContainer()
   const textEl = container.querySelector('#loadingText')
   if (textEl) {
@@ -527,7 +422,7 @@ function showLoading(message = '加载中...') {
 /**
  * 隐藏全局加载遮罩
  */
-function hideLoading() {
+export function hideLoading() {
   const container = document.getElementById(LOADING_CONTAINER_ID)
   if (container) {
     container.style.display = 'none'
@@ -543,8 +438,4 @@ function hideLoading() {
   }
 }
 
-// ========== window.xxx 已移除（方案 A：彻底 ES Module） ==========
-// 请使用 ES Module 导入：
-//   import { showLoading, hideLoading } from '@/alpine/init.js'
-
-logger.info('Alpine.js 初始化配置已加载')
+logger.info('Alpine.js 初始化配置已加载 (无 Bootstrap 依赖)')

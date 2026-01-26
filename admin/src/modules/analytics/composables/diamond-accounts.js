@@ -90,16 +90,18 @@ export function useDiamondAccountsMethods() {
           const diamondBalance = balances.find(b => b.asset_code === 'DIAMOND')
 
           // 构建账户信息
-          this.diamondAccounts = [{
-            user_id: userData.user_id || this.diamondFilters.user_id,
-            nickname: userData.nickname || `用户${this.diamondFilters.user_id}`,
-            mobile: userData.mobile || '',
-            status: userData.status || '',
-            balance: diamondBalance?.available_amount ?? 0,
-            frozen: diamondBalance?.frozen_amount ?? 0,
-            total: diamondBalance?.total ?? (diamondBalance?.available_amount ?? 0),
-            has_diamond: !!diamondBalance
-          }]
+          this.diamondAccounts = [
+            {
+              user_id: userData.user_id || this.diamondFilters.user_id,
+              nickname: userData.nickname || `用户${this.diamondFilters.user_id}`,
+              mobile: userData.mobile || '',
+              status: userData.status || '',
+              balance: diamondBalance?.available_amount ?? 0,
+              frozen: diamondBalance?.frozen_amount ?? 0,
+              total: diamondBalance?.total ?? diamondBalance?.available_amount ?? 0,
+              has_diamond: !!diamondBalance
+            }
+          ]
           this.total = 1
           this.totalPages = 1
         } else {
@@ -111,7 +113,6 @@ export function useDiamondAccountsMethods() {
 
         // 2. 获取用户钻石流水（可选，用于详情展示）
         // 流水会在 viewDiamondDetail 中加载
-
       } catch (error) {
         logger.error('[DiamondAccounts] 加载失败:', error)
         this.diamondAccounts = []
@@ -268,31 +269,27 @@ export function useDiamondAccountsMethods() {
         this.saving = true
 
         // 后端统一资产调整API：正数=增加，负数=扣减
-        const adjustAmount = this.diamondAdjustForm.type === 'add'
-          ? Math.abs(this.diamondAdjustForm.amount)
-          : -Math.abs(this.diamondAdjustForm.amount)
+        const adjustAmount =
+          this.diamondAdjustForm.type === 'add'
+            ? Math.abs(this.diamondAdjustForm.amount)
+            : -Math.abs(this.diamondAdjustForm.amount)
 
         // 生成幂等键（后端要求必填）
         const idempotencyKey = `admin_adjust_diamond_${this.diamondAdjustForm.user_id}_${Date.now()}`
 
-        const response = await this.apiCall(
-          ASSET_ENDPOINTS.ADJUSTMENT_ADJUST,
-          {
-            method: 'POST',
-            data: {
-              user_id: Number(this.diamondAdjustForm.user_id),
-              asset_code: 'DIAMOND',
-              amount: adjustAmount,
-              reason: this.diamondAdjustForm.reason,
-              idempotency_key: idempotencyKey
-            }
+        const response = await this.apiCall(ASSET_ENDPOINTS.ADJUSTMENT_ADJUST, {
+          method: 'POST',
+          data: {
+            user_id: Number(this.diamondAdjustForm.user_id),
+            asset_code: 'DIAMOND',
+            amount: adjustAmount,
+            reason: this.diamondAdjustForm.reason,
+            idempotency_key: idempotencyKey
           }
-        )
+        })
 
         if (response?.success) {
-          this.showSuccess(
-            `钻石${this.diamondAdjustForm.type === 'add' ? '增加' : '扣除'}成功`
-          )
+          this.showSuccess(`钻石${this.diamondAdjustForm.type === 'add' ? '增加' : '扣除'}成功`)
           this.hideModal('diamondAdjustModal')
 
           // 如果当前有搜索的用户，刷新数据

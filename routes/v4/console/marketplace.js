@@ -30,37 +30,6 @@ const TransactionManager = require('../../../utils/TransactionManager')
 
 const logger = require('../../../utils/logger').logger
 
-/*
- * ============================================================================
- * 📌 简化路径兼容中间件（2026-01-21）
- * 目的：与前端 api-config.js 中 MARKETPLACE 模块的简化路径定义保持一致
- * 前端使用短横线风格路径（exchange-items），这里提供映射
- * ============================================================================
- */
-router.use((req, res, next) => {
-  const pathMappings = {
-    '/exchange-items': '/exchange_market/items',
-    '/exchange-orders': '/exchange_market/orders',
-    '/exchange-stats': '/exchange_market/statistics',
-    '/trade-orders': '/trade_orders'
-  }
-
-  // 检查是否需要路径重写
-  const originalPath = req.path
-  for (const [simplePath, targetPath] of Object.entries(pathMappings)) {
-    if (
-      originalPath === simplePath ||
-      originalPath.startsWith(simplePath + '/') ||
-      originalPath.startsWith(simplePath + '?')
-    ) {
-      req.url = req.url.replace(simplePath, targetPath)
-      break
-    }
-  }
-
-  next()
-})
-
 /**
  * 管理员查询所有用户上架状态
  * GET /api/v4/console/marketplace/listing-stats

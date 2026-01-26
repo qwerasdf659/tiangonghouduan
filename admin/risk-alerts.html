@@ -7,13 +7,13 @@
   }) %>
   <!-- ECharts 已通过 main.js 统一导入，无需 CDN -->
 </head>
-<body class="bg-gray-100 min-h-screen" x-data="riskAlertsPage()" x-init="init()" x-cloak>
+<body class="themed-bg-subtle min-h-screen" x-data="riskAlertsPage()" x-init="init()" x-cloak>
   
   <!-- 导航栏 -->
-  <nav class="bg-red-600 text-white shadow-lg">
+  <nav class="themed-bg-primary text-white shadow-lg">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:text-red-200">← 返回工作台</a>
+        <a href="/admin/workspace.html" class="hover:opacity-80">← 返回工作台</a>
         <span class="text-lg font-semibold">🚨 风控告警</span>
       </div>
       <div class="flex items-center space-x-4">
@@ -26,31 +26,31 @@
   <div class="container mx-auto px-4 py-6">
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <div class="bg-white rounded-lg shadow p-4 text-center border-l-4 border-red-500">
+      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-red-500">
         <div class="text-4xl text-red-400 mb-2">🔴</div>
         <h4 class="text-2xl font-bold text-red-600" x-text="stats.critical">0</h4>
-        <p class="text-gray-500 text-sm">严重告警</p>
+        <p class="themed-text-muted text-sm">严重告警</p>
       </div>
-      <div class="bg-white rounded-lg shadow p-4 text-center border-l-4 border-yellow-500">
+      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-yellow-500">
         <div class="text-4xl text-yellow-400 mb-2">🟡</div>
         <h4 class="text-2xl font-bold text-yellow-600" x-text="stats.warning">0</h4>
-        <p class="text-gray-500 text-sm">警告</p>
+        <p class="themed-text-muted text-sm">警告</p>
       </div>
-      <div class="bg-white rounded-lg shadow p-4 text-center border-l-4 border-blue-500">
+      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 themed-border-primary">
         <div class="text-4xl text-blue-400 mb-2">🔵</div>
-        <h4 class="text-2xl font-bold text-blue-600" x-text="stats.info">0</h4>
-        <p class="text-gray-500 text-sm">提示</p>
+        <h4 class="text-2xl font-bold themed-text-primary" x-text="stats.info">0</h4>
+        <p class="themed-text-muted text-sm">提示</p>
       </div>
-      <div class="bg-white rounded-lg shadow p-4 text-center border-l-4 border-green-500">
+      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-green-500">
         <div class="text-4xl text-green-400 mb-2">✅</div>
         <h4 class="text-2xl font-bold text-green-600" x-text="stats.resolved">0</h4>
-        <p class="text-gray-500 text-sm">已处理</p>
+        <p class="themed-text-muted text-sm">已处理</p>
       </div>
     </div>
 
     <!-- 图表区域 -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-      <div class="bg-white rounded-lg shadow">
+      <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">告警级别分布</h5>
         </div>
@@ -58,7 +58,7 @@
           <div id="levelDistChart" class="chart-container"></div>
         </div>
       </div>
-      <div class="bg-white rounded-lg shadow">
+      <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">告警类型分布</h5>
         </div>
@@ -69,11 +69,11 @@
     </div>
 
     <!-- 筛选栏 -->
-    <div class="bg-white rounded-lg shadow mb-6">
+    <div class="themed-card rounded-lg shadow mb-6">
       <div class="p-4">
         <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">告警级别</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">告警级别</label>
             <select x-model="filters.severity" class="w-full px-3 py-2 border rounded-lg">
               <option value="">全部级别</option>
               <option value="critical">严重</option>
@@ -83,7 +83,7 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">告警类型</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">告警类型</label>
             <select x-model="filters.alert_type" class="w-full px-3 py-2 border rounded-lg">
               <option value="">全部类型</option>
               <option value="frequency_limit">频次限制</option>
@@ -93,7 +93,7 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">处理状态</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">处理状态</label>
             <select x-model="filters.status" class="w-full px-3 py-2 border rounded-lg">
               <option value="">全部状态</option>
               <option value="pending">待处理</option>
@@ -103,7 +103,7 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">时间范围</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">时间范围</label>
             <select x-model="filters.time" class="w-full px-3 py-2 border rounded-lg">
               <option value="">全部时间</option>
               <option value="today">今日</option>
@@ -112,7 +112,7 @@
             </select>
           </div>
           <div>
-            <button @click="loadAlerts()" class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+            <button @click="loadAlerts()" class="w-full px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary">
               🔍 搜索
             </button>
           </div>
@@ -126,36 +126,36 @@
     </div>
 
     <!-- 告警列表 -->
-    <div class="bg-white rounded-lg shadow">
+    <div class="themed-card rounded-lg shadow">
       <div class="p-4 border-b flex justify-between items-center">
         <h5 class="font-semibold">告警列表</h5>
-        <button @click="batchResolve()" :disabled="selectedAlerts.length === 0" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 text-sm">
+        <button @click="batchResolve()" :disabled="selectedAlerts.length === 0" class="px-4 py-2 themed-btn-primary rounded disabled:opacity-50 text-sm">
           批量处理选中
         </button>
       </div>
       <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead class="bg-gray-50">
+        <table class="w-full" x-data="resizableColumns({ storageKey: 'risk-alerts-columns', persistWidths: true })">
+          <thead class="themed-bg-base">
             <tr>
-              <th class="px-4 py-3 text-left">
+              <th class="px-4 py-3 text-left" style="width: 50px;">
                 <input type="checkbox" @change="toggleAllAlerts($event.target.checked)" class="rounded">
               </th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">告警ID</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">级别</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">类型</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">关联用户</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">描述</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">时间</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted resizable-header">告警ID</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted resizable-header">级别</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted resizable-header">类型</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted resizable-header">关联用户</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted resizable-header">描述</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted resizable-header">状态</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted resizable-header">时间</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
             </tr>
           </thead>
           <tbody class="divide-y">
             <template x-if="alerts.length === 0">
-              <tr><td colspan="9" class="px-4 py-8 text-center text-gray-500">暂无告警数据</td></tr>
+              <tr><td colspan="9" class="px-4 py-8 text-center themed-text-muted">暂无告警数据</td></tr>
             </template>
             <template x-for="alert in alerts" :key="alert.alert_id">
-              <tr class="hover:bg-gray-50">
+              <tr class="themed-hover-bg">
                 <td class="px-4 py-3">
                   <input type="checkbox" :value="alert.alert_id" x-model="selectedAlerts" class="rounded">
                 </td>
@@ -164,7 +164,7 @@
                   <span :class="{
                     'bg-red-100 text-red-700': alert.severity === 'critical' || alert.severity === 'high',
                     'bg-yellow-100 text-yellow-700': alert.severity === 'medium',
-                    'bg-blue-100 text-blue-700': alert.severity === 'low'
+                    'themed-bg-primary-light themed-text-primary': alert.severity === 'low'
                   }" class="px-2 py-1 text-xs rounded" x-text="getLevelText(alert.severity)"></span>
                 </td>
                 <td class="px-4 py-3 text-sm" x-text="getTypeText(alert.alert_type)"></td>
@@ -173,15 +173,15 @@
                 <td class="px-4 py-3">
                   <span :class="{
                     'bg-yellow-100 text-yellow-700': alert.status === 'pending',
-                    'bg-blue-100 text-blue-700': alert.status === 'reviewed',
-                    'bg-green-100 text-green-700': alert.status === 'resolved',
-                    'bg-gray-100 text-gray-700': alert.status === 'ignored'
+                    'themed-bg-primary-light themed-text-primary': alert.status === 'reviewed',
+                    'bg-green-100 themed-text-success': alert.status === 'resolved',
+                    'themed-bg-subtle themed-text-secondary': alert.status === 'ignored'
                   }" class="px-2 py-1 text-xs rounded" x-text="getStatusText(alert.status)"></span>
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(alert.created_at)"></td>
+                <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(alert.created_at)"></td>
                 <td class="px-4 py-3">
                   <div class="flex space-x-2">
-                    <button @click="viewAlertDetail(alert)" class="text-blue-500 hover:text-blue-700 text-sm">详情</button>
+                    <button @click="viewAlertDetail(alert)" class="themed-text-primary hover:text-blue-700 text-sm">详情</button>
                     <button x-show="alert.status === 'pending'" @click="openHandleModal(alert)" class="text-green-500 hover:text-green-700 text-sm">处理</button>
                   </div>
                 </td>
@@ -193,7 +193,7 @@
       
       <!-- 分页 -->
       <div class="p-4 border-t flex justify-between items-center">
-        <span class="text-sm text-gray-500" x-text="'共 ' + totalCount + ' 条记录'"></span>
+        <span class="text-sm themed-text-muted" x-text="'共 ' + totalCount + ' 条记录'"></span>
         <div class="flex space-x-2">
           <button @click="prevPage()" :disabled="currentPage <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
           <span class="px-3 py-1" x-text="'第 ' + currentPage + ' / ' + totalPages + ' 页'"></span>
@@ -210,28 +210,28 @@
        class="fixed inset-0 z-50 flex items-center justify-center"
        style="display: none;">
     <div class="fixed inset-0 bg-black/50" @click="hideModal('handleModal')"></div>
-    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
       <div class="p-4 border-b flex justify-between items-center">
         <h5 class="font-semibold">🔧 处理告警</h5>
-        <button @click="hideModal('handleModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        <button @click="hideModal('handleModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
       </div>
       <form @submit.prevent="submitHandle()">
         <div class="p-6 space-y-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">处理结果 <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">处理结果 <span class="text-red-500">*</span></label>
             <select x-model="handleForm.status" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500">
               <option value="reviewed">标记为已审核</option>
               <option value="ignored">忽略此告警</option>
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">处理备注</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">处理备注</label>
             <textarea x-model="handleForm.remark" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500" placeholder="请输入处理备注..."></textarea>
           </div>
         </div>
-        <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end space-x-2">
-          <button type="button" @click="hideModal('handleModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">取消</button>
-          <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50" :disabled="submitting">
+        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+          <button type="button" @click="hideModal('handleModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+          <button type="submit" class="px-4 py-2 themed-btn-primary rounded disabled:opacity-50" :disabled="submitting">
             <span x-show="submitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
             确认处理
           </button>
@@ -242,38 +242,38 @@
 
   <!-- 告警详情模态框 -->
   <div x-show="selectedAlert" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="selectedAlert = null">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
+    <div class="themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
       <div class="p-4 border-b flex justify-between items-center">
         <h5 class="font-semibold">告警详情</h5>
-        <button @click="selectedAlert = null" class="text-gray-500 hover:text-gray-700">&times;</button>
+        <button @click="selectedAlert = null" class="themed-text-muted hover:themed-text-secondary">&times;</button>
       </div>
       <div class="p-4 space-y-4">
         <div class="grid grid-cols-2 gap-4">
-          <div><span class="text-gray-500">告警ID:</span> <span class="font-mono" x-text="selectedAlert?.alert_id"></span></div>
-          <div><span class="text-gray-500">级别:</span> <span x-text="getLevelText(selectedAlert?.severity)"></span></div>
-          <div><span class="text-gray-500">类型:</span> <span x-text="getTypeText(selectedAlert?.alert_type)"></span></div>
-          <div><span class="text-gray-500">状态:</span> <span x-text="getStatusText(selectedAlert?.status)"></span></div>
-          <div><span class="text-gray-500">关联用户:</span> <span x-text="selectedAlert?.target_user_info?.nickname || selectedAlert?.target_user_info?.user_id || '-'"></span></div>
-          <div><span class="text-gray-500">触发时间:</span> <span x-text="formatDate(selectedAlert?.created_at)"></span></div>
+          <div><span class="themed-text-muted">告警ID:</span> <span class="font-mono" x-text="selectedAlert?.alert_id"></span></div>
+          <div><span class="themed-text-muted">级别:</span> <span x-text="getLevelText(selectedAlert?.severity)"></span></div>
+          <div><span class="themed-text-muted">类型:</span> <span x-text="getTypeText(selectedAlert?.alert_type)"></span></div>
+          <div><span class="themed-text-muted">状态:</span> <span x-text="getStatusText(selectedAlert?.status)"></span></div>
+          <div><span class="themed-text-muted">关联用户:</span> <span x-text="selectedAlert?.target_user_info?.nickname || selectedAlert?.target_user_info?.user_id || '-'"></span></div>
+          <div><span class="themed-text-muted">触发时间:</span> <span x-text="formatDate(selectedAlert?.created_at)"></span></div>
         </div>
         <div>
-          <p class="text-gray-500 mb-2">告警描述:</p>
-          <div class="p-3 bg-gray-50 rounded" x-text="selectedAlert?.alert_message"></div>
+          <p class="themed-text-muted mb-2">告警描述:</p>
+          <div class="p-3 themed-bg-base rounded" x-text="selectedAlert?.alert_message"></div>
         </div>
         <div x-show="selectedAlert?.rule_name">
-          <p class="text-gray-500 mb-2">规则信息:</p>
-          <div class="p-3 bg-gray-50 rounded">
-            <p><span class="text-gray-600">规则名称:</span> <span x-text="selectedAlert?.rule_name"></span></p>
-            <p><span class="text-gray-600">阈值:</span> <span x-text="selectedAlert?.rule_threshold"></span></p>
-            <p><span class="text-gray-600">实际值:</span> <span x-text="selectedAlert?.actual_value"></span></p>
-            <p><span class="text-gray-600">是否阻断:</span> <span x-text="selectedAlert?.is_blocked ? '是' : '否'"></span></p>
+          <p class="themed-text-muted mb-2">规则信息:</p>
+          <div class="p-3 themed-bg-base rounded">
+            <p><span class="themed-text-muted">规则名称:</span> <span x-text="selectedAlert?.rule_name"></span></p>
+            <p><span class="themed-text-muted">阈值:</span> <span x-text="selectedAlert?.rule_threshold"></span></p>
+            <p><span class="themed-text-muted">实际值:</span> <span x-text="selectedAlert?.actual_value"></span></p>
+            <p><span class="themed-text-muted">是否阻断:</span> <span x-text="selectedAlert?.is_blocked ? '是' : '否'"></span></p>
           </div>
         </div>
         <div x-show="timeline.length > 0">
-          <p class="text-gray-500 mb-2">处理时间线:</p>
+          <p class="themed-text-muted mb-2">处理时间线:</p>
           <div class="space-y-2">
             <template x-for="item in timeline" :key="item.id">
-              <div class="flex items-start p-2 bg-gray-50 rounded">
+              <div class="flex items-start p-2 themed-bg-base rounded">
                 <span class="text-gray-400 text-sm mr-2" x-text="formatDate(item.created_at)"></span>
                 <span x-text="item.action"></span>
               </div>

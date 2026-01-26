@@ -52,7 +52,7 @@ export function usePricingMethods() {
   return {
     /**
      * 加载定价配置列表
-     * 
+     *
      * 优化后的实现：使用批量接口一次性获取所有活动的定价配置
      * 避免 N+1 请求问题，消除控制台 404 错误
      */
@@ -61,7 +61,7 @@ export function usePricingMethods() {
       try {
         // 使用批量接口一次性获取所有定价配置
         const response = await this.apiGet(LOTTERY_ENDPOINTS.PRICING_CONFIGS_ALL)
-        
+
         if (!response?.success) {
           logger.warn('[Pricing] 获取定价配置列表失败:', response?.message)
           this.pricingConfigs = []
@@ -69,7 +69,7 @@ export function usePricingMethods() {
         }
 
         const configs = response.data?.configs || []
-        
+
         // 处理返回的配置数据
         const pricingList = configs.map(config => {
           // 确保 pricing_config 是对象格式
@@ -82,7 +82,7 @@ export function usePricingMethods() {
               pricing_config = {}
             }
           }
-          
+
           return {
             ...config,
             pricing_config
@@ -90,7 +90,7 @@ export function usePricingMethods() {
         })
 
         this.pricingConfigs = pricingList
-        
+
         console.log('📊 [Pricing] 定价配置加载完成:', {
           count: this.pricingConfigs.length,
           configs: this.pricingConfigs.map(c => ({
@@ -100,7 +100,7 @@ export function usePricingMethods() {
             status: c.status
           }))
         })
-        
+
         logger.debug('[LotteryManagement] 定价配置数量:', this.pricingConfigs.length)
       } catch (error) {
         logger.error('加载定价配置失败:', error)
@@ -117,7 +117,9 @@ export function usePricingMethods() {
         await this.loadPricingConfigs()
         // 使用 Alpine.store 显示成功通知
         if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
-          Alpine.store('notification').success(`定价配置已刷新，共 ${this.pricingConfigs.length} 条配置`)
+          Alpine.store('notification').success(
+            `定价配置已刷新，共 ${this.pricingConfigs.length} 条配置`
+          )
         }
         console.log('✅ 定价配置已刷新')
       } catch (error) {
@@ -176,7 +178,7 @@ export function usePricingMethods() {
       console.log('✏️ [Pricing] editPricing 被调用', pricing)
       this.isEditPricing = true
       this.editingPricingId = pricing.config_id || pricing.pricing_id || pricing.id
-      
+
       // 从后端数据中提取定价信息
       // 注意：pricing_config 可能是对象或 JSON 字符串
       let pricingConfig = pricing.pricing_config || {}
@@ -189,11 +191,16 @@ export function usePricingMethods() {
           pricingConfig = {}
         }
       }
-      
+
       // 提取基础价格：优先从 pricing_config.base_cost 获取
-      const baseCost = pricingConfig.base_cost ?? pricingConfig.baseCost ?? pricing.base_cost ?? pricing.price_per_draw ?? 0
+      const baseCost =
+        pricingConfig.base_cost ??
+        pricingConfig.baseCost ??
+        pricing.base_cost ??
+        pricing.price_per_draw ??
+        0
       console.log('💰 [Pricing] 提取的基础价格 base_cost:', baseCost)
-      
+
       // 提取折扣率：从 draw_buttons 中的10连抽获取折扣，或使用默认值
       let discountRate = 1.0
       if (pricingConfig.draw_buttons && Array.isArray(pricingConfig.draw_buttons)) {
@@ -202,7 +209,7 @@ export function usePricingMethods() {
           discountRate = tenDraw.discount
         }
       }
-      
+
       this.pricingForm = {
         campaign_code: pricing.campaign_code || '',
         price_per_draw: baseCost,
@@ -218,7 +225,7 @@ export function usePricingMethods() {
 
     /**
      * 保存定价配置
-     * 
+     *
      * 后端API设计：创建新版本（POST），不支持直接更新
      * 请求格式要求：{ pricing_config: { draw_buttons: [...] }, activate_immediately: true }
      */
@@ -234,13 +241,15 @@ export function usePricingMethods() {
 
       this.saving = true
       try {
-        const endpoint = buildURL(LOTTERY_ENDPOINTS.PRICING_CREATE, { code: this.pricingForm.campaign_code })
+        const endpoint = buildURL(LOTTERY_ENDPOINTS.PRICING_CREATE, {
+          code: this.pricingForm.campaign_code
+        })
 
         // 构建符合后端API期望的请求格式
         // 后端期望: { pricing_config: { base_cost, draw_buttons: [...] }, activate_immediately }
         const baseCost = parseFloat(this.pricingForm.price_per_draw) || 100
         const discountRate = parseFloat(this.pricingForm.discount_rate) || 1.0
-        
+
         const requestData = {
           pricing_config: {
             base_cost: baseCost,
@@ -248,7 +257,14 @@ export function usePricingMethods() {
               { count: 1, discount: 1.0, label: '单抽', enabled: true, sort_order: 1 },
               { count: 3, discount: 1.0, label: '3连抽', enabled: true, sort_order: 3 },
               { count: 5, discount: 1.0, label: '5连抽', enabled: true, sort_order: 5 },
-              { count: 10, discount: discountRate, label: discountRate < 1 ? `10连抽(${Math.round(discountRate * 100) / 10}折)` : '10连抽', enabled: true, sort_order: 10 }
+              {
+                count: 10,
+                discount: discountRate,
+                label:
+                  discountRate < 1 ? `10连抽(${Math.round(discountRate * 100) / 10}折)` : '10连抽',
+                enabled: true,
+                sort_order: 10
+              }
             ]
           },
           activate_immediately: true

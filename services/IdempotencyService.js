@@ -73,10 +73,6 @@ const SNAPSHOT_HARD_LIMIT = 65536 // 64KB
 /**
  * 业务操作 canonical 映射表（全量覆盖所有写接口）
  *
- * 【已拍板决策 2026-01-09】：显式 operation，禁止依赖 URL 推导
- * 【已拍板决策 2026-01-13】：决策4-B 严格模式 - 未映射直接拒绝启动/拒绝请求
- * 【已拍板决策 2026-01-19】：路径双轨清理 - 删除所有 deprecated 路径，只保留 canonical 路径
- *
  * - 幂等语义从 URL 解耦，使用稳定的 canonical_operation 作为幂等作用域
  * - 所有写接口必须在此映射表中显式定义
  * - 未定义的路径直接返回 500 错误（严格模式）
@@ -348,12 +344,12 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/popup-banners/:id/toggle': 'ADMIN_POPUP_BANNER_TOGGLE', // 切换弹窗 Banner 状态（新增）
   '/api/v4/console/popup-banners/order': 'ADMIN_POPUP_BANNER_ORDER', // 调整弹窗 Banner 排序（新增）
 
-  // ===== 欠账管理（2026-01-19 路径双轨清理新增）=====
+  // ===== 欠账管理 =====
   '/api/v4/console/debt-management/clear': 'ADMIN_DEBT_CLEAR', // 清偿欠账
   '/api/v4/console/debt-management/limits/:id': 'ADMIN_DEBT_LIMITS_UPDATE', // 更新欠账上限
   '/api/v4/console/debt-management/limits/:id/alert-check': 'ADMIN_DEBT_ALERT_CHECK', // 检查欠账告警状态
 
-  // ===== 活动预算验证（2026-01-19 路径双轨清理新增）=====
+  // ===== 活动预算验证 =====
   '/api/v4/console/campaign-budget/campaigns/:id/validate-for-launch':
     'ADMIN_CAMPAIGN_VALIDATE_FOR_LAUNCH', // 活动上线前校验
 
@@ -405,9 +401,7 @@ class IdempotencyService {
   /**
    * 获取 API 路径的 canonical operation
    *
-   * 【已拍板决策 2026-01-09】：显式 operation，禁止依赖 URL 推导
-   * 【已拍板决策 2026-01-13】：决策4-B 严格模式 - 未映射直接拒绝
-   *
+   * 业务规则：
    * - 所有写接口必须在 CANONICAL_OPERATION_MAP 中显式定义
    * - 未定义的路径直接返回 500 错误（严格模式）
    * - 规范化路径后再查找映射（处理动态参数如 :id）
@@ -612,12 +606,6 @@ class IdempotencyService {
 
   /**
    * 生成请求指纹（用于检测参数冲突）
-   *
-   * 【已拍板决策 2026-01-09】
-   * - 使用 canonical operation 替代 api_path
-   * - 强制不兼容策略：不做旧算法兼容，简洁优先
-   * - 旧路径记录在迁移前会自然过期（TTL=7天）或手动清理
-   *
    * 指纹包含：user_id, method, operation(canonical), query, body
    *
    * @param {Object} context - 请求上下文
@@ -795,10 +783,7 @@ class IdempotencyService {
 
         // 同类操作，检查参数是否一致
         if (existingRequest.request_hash !== request_hash) {
-          /*
-           * 参数不一致（可能是路径变更导致的指纹变化）
-           * 【已拍板决策 2026-01-09】：强制不兼容，不做双算比对
-           */
+          // 参数不一致（可能是路径变更导致的指纹变化）
           await transaction.rollback()
           const error = new Error(
             '幂等键冲突：相同的 idempotency_key 但参数不同。' +
@@ -816,16 +801,13 @@ class IdempotencyService {
             old_path: existingRequest.api_path,
             new_path: api_path,
             canonical_operation: current_canonical,
-            decision: '不写回，只回放结果' // ✅ 已拍板决策
+            decision: '不写回，只回放结果'
           })
         }
 
         // 参数一致，检查处理状态
         if (existingRequest.status === 'completed') {
-          /*
-           * 已完成，返回快照结果
-           * 【已拍板决策】：不写回更新旧记录，保留审计真实性
-           */
+          // 已完成，返回快照结果（不更新旧记录，保留审计真实性）
           await transaction.commit()
           logger.info('🔄 入口幂等拦截：请求已完成，返回首次结果', {
             idempotency_key,

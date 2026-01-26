@@ -15,7 +15,6 @@
  * 注意：基础 Store (auth, ui, notification) 在 init.js 中定义
  */
 
-
 import { logger } from '../../utils/logger.js'
 // 确保在 Alpine 初始化时检查 Store
 document.addEventListener('alpine:init', () => {

@@ -1049,6 +1049,7 @@ class TradeOrderService {
     // 为关联的挂牌添加状态显示名称
     for (const order of ordersData) {
       if (order.listing) {
+        // eslint-disable-next-line no-await-in-loop -- 需要顺序处理每个订单的关联数据
         await attachDisplayNames(order.listing, [
           { field: 'status', dictType: DICT_TYPES.LISTING_STATUS }
         ])
@@ -1221,6 +1222,7 @@ class TradeOrderService {
     for (const item of statusStats) {
       // 为每个状态添加显示名称
       const statusData = { status: item.status }
+      // eslint-disable-next-line no-await-in-loop -- 需要顺序处理每个状态的显示名称
       await attachDisplayNames(statusData, [
         { field: 'status', dictType: DICT_TYPES.TRADE_ORDER_STATUS }
       ])

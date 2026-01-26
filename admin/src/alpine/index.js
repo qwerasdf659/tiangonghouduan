@@ -40,6 +40,27 @@ import { sidebarNav } from './components/sidebar-nav.js'
 import { workspaceTabs } from './components/workspace-tabs.js'
 import { themeSwitcher } from './components/theme-switcher.js'
 
+// 导入交互增强组件
+import { emptyState, quickEmptyState, emptyStateFactory } from './components/empty-state.js'
+import {
+  animatedCounter,
+  currencyCounter,
+  percentCounter,
+  compactCounter,
+  animatedStatsCard
+} from './components/animated-counter.js'
+import { modal } from './components/modal.js'
+import { formValidation, rules as validationRules } from './components/form-validation.js'
+import { pageTransition, tabTransition, staggerTransition } from './components/page-transitions.js'
+import { miniChart, trendLine, trendBar, progressRing } from './components/mini-chart.js'
+
+// 导入新增功能组件
+import { imageLoader, blurLoader, initLazyImages } from './components/image-loader.js'
+import { shortcutsStore, enterConfirm } from './components/keyboard-shortcuts.js'
+import { infiniteScroll, virtualScroll } from './components/infinite-scroll.js'
+import { fileUpload } from './components/file-upload.js'
+import { resizableColumns } from './components/resizable-columns.js'
+
 /**
  * 初始化 Alpine.js
  */
@@ -214,7 +235,7 @@ export function initAlpine() {
 
       // 自动移除
       setTimeout(() => toast.remove(), duration)
-      
+
       logger.debug(`[Toast-${type}] ${message}`)
     },
 
@@ -262,7 +283,7 @@ export function initAlpine() {
 
   // 挂载 Alpine 到 window（Alpine 框架自身需要）
   window.Alpine = Alpine
-  
+
   // ========== window.xxx 已移除（方案 A：彻底 ES Module） ==========
   // Mixin 工具请使用 ES Module 导入：
   //   import { createPageMixin, paginationMixin } from '@/alpine/mixins/index.js'
@@ -272,6 +293,48 @@ export function initAlpine() {
   Alpine.data('workspaceTabs', workspaceTabs)
   Alpine.data('themeSwitcher', themeSwitcher)
   logger.debug('布局组件已注册: sidebarNav, workspaceTabs, themeSwitcher')
+
+  // ========== 注册交互增强组件 ==========
+  Alpine.data('emptyState', emptyState)
+  Alpine.data('quickEmptyState', quickEmptyState)
+  Alpine.data('animatedCounter', animatedCounter)
+  Alpine.data('currencyCounter', currencyCounter)
+  Alpine.data('percentCounter', percentCounter)
+  Alpine.data('compactCounter', compactCounter)
+  Alpine.data('animatedStatsCard', animatedStatsCard)
+  Alpine.data('modal', modal)
+  Alpine.data('formValidation', formValidation)
+  Alpine.data('pageTransition', pageTransition)
+  Alpine.data('tabTransition', tabTransition)
+  Alpine.data('staggerTransition', staggerTransition)
+  Alpine.data('miniChart', miniChart)
+  Alpine.data('trendLine', trendLine)
+  Alpine.data('trendBar', trendBar)
+  Alpine.data('progressRing', progressRing)
+  logger.debug(
+    '交互增强组件已注册: emptyState, animatedCounter, modal, formValidation, pageTransition, miniChart'
+  )
+
+  // ========== 注册新增功能组件 ==========
+  // 图片加载
+  Alpine.data('imageLoader', imageLoader)
+  Alpine.data('blurLoader', blurLoader)
+  
+  // 键盘快捷键
+  Alpine.data('enterConfirm', enterConfirm)
+  Alpine.store('shortcuts', shortcutsStore())
+  
+  // 无限滚动
+  Alpine.data('infiniteScroll', infiniteScroll)
+  Alpine.data('virtualScroll', virtualScroll)
+  
+  // 文件上传
+  Alpine.data('fileUpload', fileUpload)
+  
+  // 表格列拖拽
+  Alpine.data('resizableColumns', resizableColumns)
+  
+  logger.debug('新增功能组件已注册: imageLoader, shortcuts, infiniteScroll, fileUpload, resizableColumns')
 
   // 启动 Alpine
   Alpine.start()
@@ -324,8 +387,39 @@ export {
 }
 
 // 导出布局组件
+export { sidebarNav, workspaceTabs, themeSwitcher }
+
+// 导出交互增强组件
 export {
-  sidebarNav,
-  workspaceTabs,
-  themeSwitcher
+  emptyState,
+  quickEmptyState,
+  emptyStateFactory,
+  animatedCounter,
+  currencyCounter,
+  percentCounter,
+  compactCounter,
+  animatedStatsCard,
+  modal,
+  formValidation,
+  validationRules,
+  pageTransition,
+  tabTransition,
+  staggerTransition,
+  miniChart,
+  trendLine,
+  trendBar,
+  progressRing
+}
+
+// 导出新增功能组件
+export {
+  imageLoader,
+  blurLoader,
+  initLazyImages,
+  shortcutsStore,
+  enterConfirm,
+  infiniteScroll,
+  virtualScroll,
+  fileUpload,
+  resizableColumns
 }

@@ -128,12 +128,12 @@ export function useUsersMethods() {
         if (!this.roles || this.roles.length === 0) {
           await this.loadRoles()
         }
-        
+
         // 从角色的 permissions 字段中提取唯一权限数量
         const permissionSet = new Set()
-        for (const role of (this.roles || [])) {
+        for (const role of this.roles || []) {
           let permissions = role.permissions || {}
-          
+
           // 处理 permissions 是字符串的情况（某些旧数据格式）
           if (typeof permissions === 'string') {
             try {
@@ -142,7 +142,7 @@ export function useUsersMethods() {
               continue
             }
           }
-          
+
           // 确保是对象类型
           if (typeof permissions === 'object' && permissions !== null) {
             Object.keys(permissions).forEach(p => {
@@ -153,14 +153,14 @@ export function useUsersMethods() {
             })
           }
         }
-        
+
         this.userStats = {
           totalUsers: this.total || this.users.length,
           activeUsers: this.users.filter(u => u.status === 'active').length,
           totalRoles: this.roles?.length || 0,
           totalPermissions: permissionSet.size
         }
-        
+
         logger.info('用户统计加载完成', this.userStats)
       } catch (error) {
         logger.error('加载用户统计失败:', error)
@@ -361,8 +361,8 @@ export function useUsersMethods() {
       }
 
       // 从角色列表中查找角色名称
-      const selectedRole = this.roles.find(r => 
-        (r.role_uuid || r.id) === roleCode || r.role_name === roleCode
+      const selectedRole = this.roles.find(
+        r => (r.role_uuid || r.id) === roleCode || r.role_name === roleCode
       )
       const roleName = selectedRole?.role_name || roleCode
 
@@ -472,4 +472,3 @@ export function useUsersMethods() {
 }
 
 export default { useUsersState, useUsersMethods }
-

@@ -692,13 +692,13 @@ function registerStoreManagementComponents() {
       const cityName = this.getRegionName(this.storeForm.city_code, this.cities)
       const districtName = this.getRegionName(this.storeForm.district_code, this.districts)
       const streetName = this.getRegionName(this.storeForm.street_code, this.streets)
-      
+
       if (provinceName) parts.push(provinceName)
       if (cityName) parts.push(cityName)
       if (districtName) parts.push(districtName)
       if (streetName) parts.push(streetName)
       if (this.storeForm.store_address) parts.push(this.storeForm.store_address)
-      
+
       return parts.join(' ') || '-'
     },
 
@@ -829,16 +829,16 @@ function registerStoreManagementComponents() {
      */
     async permanentDeleteStaff(staff) {
       const staffName = staff.user_nickname || staff.name || '该员工'
-      
+
       // 使用自定义确认对话框，包含删除原因输入
       const reason = await this.showDeleteReasonDialog(staffName)
       if (reason === null) return // 用户取消
-      
+
       try {
         // 调用 DELETE 接口，传 reason 参数 → 删除操作（后端会根据 status=inactive 自动执行删除）
         const url = buildURL(STORE_ENDPOINTS.STAFF_DETAIL, { store_staff_id: staff.store_staff_id })
         const deleteUrl = reason ? `${url}?reason=${encodeURIComponent(reason)}` : url
-        
+
         const response = await this.apiCall(deleteUrl, { method: 'DELETE' })
         if (response?.success) {
           this.showSuccess(`员工「${staffName}」已删除`)
@@ -951,7 +951,13 @@ function registerStoreManagementComponents() {
      * @returns {string} 角色显示文本
      */
     getStaffRoleText(role) {
-      const map = { manager: '店长', staff: '员工', cashier: '收银员', waiter: '服务员', chef: '厨师' }
+      const map = {
+        manager: '店长',
+        staff: '员工',
+        cashier: '收银员',
+        waiter: '服务员',
+        chef: '厨师'
+      }
       return map[role] || role || '员工'
     },
 
@@ -982,7 +988,7 @@ function registerStoreManagementComponents() {
           dateStr = dateValue.iso || dateValue.beijing || dateValue.timestamp
         }
         if (!dateStr) return ''
-        
+
         const date = new Date(dateStr)
         if (isNaN(date.getTime())) return ''
         return date.toISOString().split('T')[0]
@@ -1005,7 +1011,7 @@ function registerStoreManagementComponents() {
           dateStr = dateValue.beijing || dateValue.iso || dateValue.timestamp
         }
         if (!dateStr) return '-'
-        
+
         const date = new Date(dateStr)
         if (isNaN(date.getTime())) return String(dateValue)
         return date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' })

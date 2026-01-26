@@ -26,13 +26,15 @@
  * - GET /api/v4/console/system/statistics/export (导出报表)
  */
 
-
 // ES Module 导入
 import { logger } from '../../../utils/logger.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
 import { request, getToken } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/index.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
+import { EASING_FUNCTIONS } from '../../../alpine/components/animated-counter.js'
+
+/* global Alpine, cancelAnimationFrame, requestAnimationFrame */
 /**
  * @typedef {Object} StatisticsFilters
  * @property {string} period - 时间周期 ('today'|'yesterday'|'week'|'month'|'custom')
@@ -101,6 +103,21 @@ function statisticsPage() {
       winRateTrend: 0,
       revenueTrend: 0
     },
+
+    /**
+     * 动画显示数值（用于平滑动画效果）
+     */
+    displayStats: {
+      totalUsers: 0,
+      totalDraws: 0,
+      winRate: 0,
+      totalRevenue: 0
+    },
+
+    /**
+     * 动画请求ID存储
+     */
+    _animationIds: {},
 
     /** 用户统计 */
     userStats: {
@@ -298,7 +315,7 @@ function statisticsPage() {
               length: 10,
               length2: 15
             },
-            data: data
+            data
           }
         ]
       }
@@ -363,7 +380,7 @@ function statisticsPage() {
      * 渲染统计数据
      * @param {Object} data - API返回的统计图表数据（后端 /api/v4/statistics/charts 格式）
      * @description 处理API数据并更新页面各项指标
-     * 
+     *
      * 后端数据格式:
      * {
      *   user_growth: [{ date, count, cumulative }],
@@ -390,15 +407,21 @@ function statisticsPage() {
       const totalNewUsers = userGrowth.reduce((sum, item) => sum + (item.count || 0), 0)
       const lastUserRecord = userGrowth.length > 0 ? userGrowth[userGrowth.length - 1] : {}
       this.stats.totalUsers = lastUserRecord.cumulative || userTypes.total || 0
-      
+
       const totalDraws = lotteryTrend.reduce((sum, item) => sum + (item.count || 0), 0)
       this.stats.totalDraws = totalDraws
 
       // 计算总体高档奖励率
-      const totalHighTierWins = lotteryTrend.reduce((sum, item) => sum + (item.high_tier_count || 0), 0)
+      const totalHighTierWins = lotteryTrend.reduce(
+        (sum, item) => sum + (item.high_tier_count || 0),
+        0
+      )
       this.stats.winRate = totalDraws > 0 ? ((totalHighTierWins / totalDraws) * 100).toFixed(2) : 0
 
-      const totalRevenue = consumptionTrend.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0)
+      const totalRevenue = consumptionTrend.reduce(
+        (sum, item) => sum + parseFloat(item.amount || 0),
+        0
+      )
       this.stats.totalRevenue = totalRevenue
 
       // 趋势计算（比较前后半段数据）
@@ -420,7 +443,6 @@ function statisticsPage() {
       this.lotteryStats.winRate = parseFloat(this.stats.winRate) || 0
 
       // 4. 消费统计
-      const totalConsumptionCount = consumptionTrend.reduce((sum, item) => sum + (item.count || 0), 0)
       this.consumptionStats.total = totalRevenue
       this.consumptionStats.approved = totalRevenue
       this.consumptionStats.pending = 0
@@ -432,7 +454,8 @@ function statisticsPage() {
       this.pointsStats.issued = totalEarned
       this.pointsStats.consumed = totalSpent
       this.pointsStats.current = totalEarned - totalSpent
-      this.pointsStats.average = userTypes.total > 0 ? Math.round((totalEarned - totalSpent) / userTypes.total) : 0
+      this.pointsStats.average =
+        userTypes.total > 0 ? Math.round((totalEarned - totalSpent) / userTypes.total) : 0
 
       // 6. 奖品统计
       this.prizeStats = topPrizes.map(prize => ({
@@ -447,6 +470,9 @@ function statisticsPage() {
       // 8. 渲染图表
       this.renderTrendChart(data)
       this.renderUserTypeChart(userTypes)
+
+      // 9. 启动数字动画
+      this.animateAllStats()
 
       logger.info('统计图表数据已渲染', {
         totalUsers: this.stats.totalUsers,
@@ -613,12 +639,9 @@ function statisticsPage() {
           params.append('end_date', this.filters.endDate)
         }
 
-        const response = await fetch(
-          `${SYSTEM_ENDPOINTS.STATISTICS_EXPORT}?${params.toString()}`,
-          {
-            headers: { Authorization: `Bearer ${getToken()}` }
-          }
-        )
+        const response = await fetch(`${SYSTEM_ENDPOINTS.STATISTICS_EXPORT}?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${getToken()}` }
+        })
 
         if (response.ok) {
           const blob = await response.blob()
@@ -660,12 +683,9 @@ function statisticsPage() {
           params.append('end_date', this.filters.endDate)
         }
 
-        const response = await fetch(
-          `${SYSTEM_ENDPOINTS.STATISTICS_EXPORT}?${params.toString()}`,
-          {
-            headers: { Authorization: `Bearer ${getToken()}` }
-          }
-        )
+        const response = await fetch(`${SYSTEM_ENDPOINTS.STATISTICS_EXPORT}?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${getToken()}` }
+        })
 
         if (response.ok) {
           const blob = await response.blob()
@@ -699,6 +719,70 @@ function statisticsPage() {
     formatNumber(value) {
       if (value === undefined || value === null) return '-'
       return Number(value).toLocaleString()
+    },
+
+    // ==================== 数字动画方法 ====================
+
+    /**
+     * 动画数值到目标值
+     * @param {string} key - 统计项键名
+     * @param {number} targetValue - 目标值
+     * @param {number} duration - 动画时长（毫秒）
+     * @returns {void}
+     */
+    animateValue(key, targetValue, duration = 1200) {
+      // 取消正在进行的动画
+      if (this._animationIds[key]) {
+        cancelAnimationFrame(this._animationIds[key])
+      }
+
+      const startValue = this.displayStats[key] || 0
+      const startTime = performance.now()
+      const easing = EASING_FUNCTIONS.easeOut
+
+      const animate = (currentTime) => {
+        const elapsed = currentTime - startTime
+        const progress = Math.min(elapsed / duration, 1)
+        const easedProgress = easing(progress)
+
+        this.displayStats[key] = startValue + (targetValue - startValue) * easedProgress
+
+        if (progress < 1) {
+          this._animationIds[key] = requestAnimationFrame(animate)
+        } else {
+          this.displayStats[key] = targetValue
+          this._animationIds[key] = null
+        }
+      }
+
+      this._animationIds[key] = requestAnimationFrame(animate)
+    },
+
+    /**
+     * 动画所有核心统计数值
+     * @returns {void}
+     */
+    animateAllStats() {
+      // 延迟启动动画，产生交错效果
+      setTimeout(() => this.animateValue('totalUsers', this.stats.totalUsers, 1200), 0)
+      setTimeout(() => this.animateValue('totalDraws', this.stats.totalDraws, 1200), 100)
+      setTimeout(() => this.animateValue('winRate', parseFloat(this.stats.winRate) || 0, 1200), 200)
+      setTimeout(() => this.animateValue('totalRevenue', this.stats.totalRevenue, 1200), 300)
+    },
+
+    /**
+     * 获取动画后的显示值（格式化）
+     * @param {string} key - 统计项键名
+     * @returns {string} 格式化后的字符串
+     */
+    getAnimatedValue(key) {
+      const value = this.displayStats[key]
+      if (value === undefined || value === null) return '-'
+      
+      if (key === 'winRate') {
+        return value.toFixed(2)
+      }
+      return Math.round(value).toLocaleString()
     }
   }
 }

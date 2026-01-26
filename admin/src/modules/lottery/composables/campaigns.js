@@ -88,11 +88,11 @@ export function useCampaignsMethods(context) {
           { showLoading: false }
         )
         console.log('📋 [Campaigns] API 返回数据:', response)
-        
+
         // 解包 withLoading 返回的结构: { success: true, data: { campaigns: [...] } }
         const data = response?.success ? response.data : response
         console.log('📋 [Campaigns] 解包后数据:', data)
-        
+
         if (data) {
           this.campaigns = data.campaigns || data.list || []
           // 更新分页信息
@@ -100,7 +100,12 @@ export function useCampaignsMethods(context) {
             this.totalPages = data.pagination.total_pages || 1
             this.totalCount = data.pagination.total || 0
           }
-          console.log('✅ [Campaigns] 数据加载完成, campaigns:', this.campaigns.length, 'total:', this.totalCount)
+          console.log(
+            '✅ [Campaigns] 数据加载完成, campaigns:',
+            this.campaigns.length,
+            'total:',
+            this.totalCount
+          )
         }
       } catch (error) {
         logger.error('加载活动失败:', error)
@@ -141,7 +146,7 @@ export function useCampaignsMethods(context) {
       const now = new Date()
       const startTime = new Date(now.getTime() + 24 * 60 * 60 * 1000)
       const endTime = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
-      
+
       this.campaignForm = {
         campaign_name: '',
         campaign_code: this.generateCampaignCode(),
@@ -238,7 +243,9 @@ export function useCampaignsMethods(context) {
           end_time: this.campaignForm.end_time,
           cost_per_draw: parseFloat(this.campaignForm.cost_per_draw) || 10,
           max_draws_per_user_daily: parseInt(this.campaignForm.max_draws_per_user_daily) || 3,
-          max_draws_per_user_total: this.campaignForm.max_draws_per_user_total ? parseInt(this.campaignForm.max_draws_per_user_total) : null,
+          max_draws_per_user_total: this.campaignForm.max_draws_per_user_total
+            ? parseInt(this.campaignForm.max_draws_per_user_total)
+            : null,
           total_prize_pool: parseFloat(this.campaignForm.total_prize_pool) || 10000,
           remaining_prize_pool: parseFloat(this.campaignForm.remaining_prize_pool) || 10000,
           status: this.campaignForm.status || 'draft',
@@ -286,10 +293,9 @@ export function useCampaignsMethods(context) {
         `确认删除活动「${campaign.campaign_name}」？此操作不可恢复`,
         async () => {
           // apiCall 成功时返回 response.data，失败时抛出错误
-          await this.apiCall(
-            `${LOTTERY_ENDPOINTS.CAMPAIGN_LIST}/${campaign.campaign_id}`,
-            { method: 'DELETE' }
-          )
+          await this.apiCall(`${LOTTERY_ENDPOINTS.CAMPAIGN_LIST}/${campaign.campaign_id}`, {
+            method: 'DELETE'
+          })
           // 如果没有抛出错误，则表示成功
           await this.loadCampaigns()
           await this.loadCampaignStats()
@@ -309,10 +315,10 @@ export function useCampaignsMethods(context) {
         `确认${newStatus === 'active' ? '启用' : '暂停'}活动「${campaign.campaign_name}」？`,
         async () => {
           // apiCall 成功时返回 response.data，失败时抛出错误
-          await this.apiCall(
-            `${LOTTERY_ENDPOINTS.CAMPAIGN_LIST}/${campaign.campaign_id}/status`,
-            { method: 'PUT', data: { status: newStatus } }
-          )
+          await this.apiCall(`${LOTTERY_ENDPOINTS.CAMPAIGN_LIST}/${campaign.campaign_id}/status`, {
+            method: 'PUT',
+            data: { status: newStatus }
+          })
           // 如果没有抛出错误，则表示成功
           await this.loadCampaigns()
           await this.loadCampaignStats()
@@ -349,4 +355,3 @@ export function useCampaignsMethods(context) {
 }
 
 export default { useCampaignsState, useCampaignsMethods }
-

@@ -7,10 +7,10 @@
   }) %>
   <!-- ECharts 已通过 main.js 统一导入，无需 CDN -->
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="themed-bg-subtle min-h-screen">
   
   <!-- 导航栏 -->
-  <nav class="bg-blue-600 text-white shadow-lg">
+  <nav class="themed-bg-primary text-white shadow-lg">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
         <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
@@ -23,54 +23,54 @@
   <div class="container mx-auto px-4 py-6" x-data="analyticsPage()" x-init="init()">
     
     <!-- 时间筛选 -->
-    <div class="bg-white rounded-lg shadow p-4 mb-6">
+    <div class="themed-card rounded-lg shadow p-4 mb-6">
       <div class="flex items-center space-x-4">
-        <span class="text-gray-600">时间范围：</span>
-        <button @click="setDateRange('today')" :class="filters.timeRange === '1' ? 'bg-purple-500 text-white' : 'bg-gray-100'" class="px-4 py-2 rounded">今日</button>
-        <button @click="setDateRange('week')" :class="filters.timeRange === '7' ? 'bg-purple-500 text-white' : 'bg-gray-100'" class="px-4 py-2 rounded">本周</button>
-        <button @click="setDateRange('month')" :class="filters.timeRange === '30' ? 'bg-purple-500 text-white' : 'bg-gray-100'" class="px-4 py-2 rounded">本月</button>
+        <span class="themed-text-muted">时间范围：</span>
+        <button @click="setDateRange('today')" :class="filters.timeRange === '1' ? 'themed-btn-primary' : 'themed-bg-subtle'" class="px-4 py-2 rounded">今日</button>
+        <button @click="setDateRange('week')" :class="filters.timeRange === '7' ? 'themed-btn-primary' : 'themed-bg-subtle'" class="px-4 py-2 rounded">本周</button>
+        <button @click="setDateRange('month')" :class="filters.timeRange === '30' ? 'themed-btn-primary' : 'themed-bg-subtle'" class="px-4 py-2 rounded">本月</button>
         <input type="date" x-model="filters.startDate" class="px-3 py-2 border rounded">
         <span>至</span>
         <input type="date" x-model="filters.endDate" class="px-3 py-2 border rounded">
-        <button @click="loadAllData()" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600">查询</button>
+        <button @click="loadAllData()" class="px-4 py-2 themed-btn-primary rounded">查询</button>
       </div>
     </div>
 
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-      <div class="bg-white rounded-lg shadow p-6 text-center">
-        <h6 class="text-gray-500 mb-2">总抽奖次数</h6>
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <h6 class="themed-text-muted mb-2">总抽奖次数</h6>
         <h2 class="text-3xl font-bold text-purple-600" x-text="stats.totalDraws"></h2>
       </div>
-      <div class="bg-white rounded-lg shadow p-6 text-center">
-        <h6 class="text-gray-500 mb-2">总中奖次数</h6>
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <h6 class="themed-text-muted mb-2">总中奖次数</h6>
         <h2 class="text-3xl font-bold text-green-600" x-text="stats.totalWins"></h2>
       </div>
-      <div class="bg-white rounded-lg shadow p-6 text-center">
-        <h6 class="text-gray-500 mb-2">活跃用户</h6>
-        <h2 class="text-3xl font-bold text-blue-600" x-text="stats.activeUsers"></h2>
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <h6 class="themed-text-muted mb-2">活跃用户</h6>
+        <h2 class="text-3xl font-bold themed-text-primary" x-text="stats.activeUsers"></h2>
       </div>
-      <div class="bg-white rounded-lg shadow p-6 text-center">
-        <h6 class="text-gray-500 mb-2">积分消耗</h6>
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <h6 class="themed-text-muted mb-2">积分消耗</h6>
         <h2 class="text-3xl font-bold text-yellow-600" x-text="stats.pointsConsumed"></h2>
       </div>
     </div>
 
     <!-- 图表区域 -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div class="bg-white rounded-lg shadow p-6">
+      <div class="themed-card rounded-lg shadow p-6">
         <h5 class="font-semibold mb-4">用户活跃趋势</h5>
         <div id="userTrendChart" class="h-80" x-ref="userTrendChart"></div>
       </div>
-      <div class="bg-white rounded-lg shadow p-6">
+      <div class="themed-card rounded-lg shadow p-6">
         <h5 class="font-semibold mb-4">抽奖趋势</h5>
         <div id="lotteryTrendChart" class="h-80" x-ref="lotteryTrendChart"></div>
       </div>
-      <div class="bg-white rounded-lg shadow p-6">
+      <div class="themed-card rounded-lg shadow p-6">
         <h5 class="font-semibold mb-4">积分流转趋势</h5>
         <div id="pointsFlowChart" class="h-80" x-ref="pointsFlowChart"></div>
       </div>
-      <div class="bg-white rounded-lg shadow p-6">
+      <div class="themed-card rounded-lg shadow p-6">
         <h5 class="font-semibold mb-4">用户类型分布</h5>
         <div id="userSourceChart" class="h-80" x-ref="userSourceChart"></div>
       </div>

@@ -473,13 +473,9 @@ class ImageService {
    * 格式化图片响应数据
    *
    * @description
-   *   架构决策（2026-01-08 / 2026-01-13 清理兼容代码）：
-   *   - 使用预生成的缩略图 key（存储在 thumbnail_paths 字段）
-   *   - 不使用 CDN，直连 Sealos 公网端点
-   *
-   *   架构决策（2026-01-19 缩略图降级兼容清理）：
-   *   - 已移除 ENABLE_THUMBNAIL_FALLBACK 环境变量控制
-   *   - 缺失 thumbnail_paths 时：记录 ERROR 日志 + 返回占位图 URL（生产安全兜底）
+   * - 使用预生成的缩略图 key（存储在 thumbnail_paths 字段）
+   * - 不使用 CDN，直连 Sealos 公网端点
+   * - 缺失 thumbnail_paths 时：记录 ERROR 日志 + 返回占位图 URL（生产安全兜底）
    *
    * @private
    * @param {Object} imageRecord - ImageResources 模型实例

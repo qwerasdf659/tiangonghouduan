@@ -92,7 +92,7 @@ document.addEventListener('alpine:init', () => {
     const pageMixin = createPageMixin({
       pageTitle: '财务管理',
       loadDataOnInit: false,
-      pagination: { pageSize: 20 }  // 启用分页功能，为各子模块提供 page/pageSize
+      pagination: { pageSize: 20 } // 启用分页功能，为各子模块提供 page/pageSize
     })
 
     return {
@@ -101,13 +101,13 @@ document.addEventListener('alpine:init', () => {
       // ========== 基础状态 ==========
       subPages: SUB_PAGES,
       saving: false,
-      
+
       // ========== 分页状态（为 composables 提供直接属性） ==========
       page: 1,
       pageSize: 20,
       total: 0,
       totalPages: 1,
-      
+
       // ========== 财务统计 ==========
       financeStats: {
         todayRevenue: '0.00',
@@ -115,25 +115,25 @@ document.addEventListener('alpine:init', () => {
         pendingCount: 0,
         totalDebt: '0.00'
       },
-      
+
       // ========== 拒绝表单 ==========
       rejectForm: {
         reason: ''
       },
-      
+
       // ========== 欠账还款表单 ==========
       debtRepayForm: {
         amount: 0,
         note: ''
       },
-      
+
       // ========== 钻石调整表单 ==========
       diamondAdjustForm: {
         type: 'add',
         amount: 0,
         reason: ''
       },
-      
+
       // ========== 预算表单（fallback，composable 会覆盖） ==========
       budgetForm: {
         type: 'daily',
@@ -143,7 +143,7 @@ document.addEventListener('alpine:init', () => {
         budget_mode: 'UNLIMITED',
         pool_budget_remaining: 0
       },
-      
+
       // ========== 消费筛选（fallback，composable 会覆盖） ==========
       consumptionFilters: {
         userId: '',
@@ -152,7 +152,7 @@ document.addEventListener('alpine:init', () => {
         startDate: '',
         endDate: ''
       },
-      
+
       // ========== 选中项 ==========
       selectedConsumption: null,
       selectedDebt: null,
@@ -181,7 +181,7 @@ document.addEventListener('alpine:init', () => {
         }
 
         // 监听页面切换
-        this.$watch('currentPage', async (newPage) => {
+        this.$watch('currentPage', async newPage => {
           logger.debug('[FinanceContent] 页面切换:', newPage)
           this.page = 1
           await this.loadCurrentPageData()
@@ -257,7 +257,12 @@ document.addEventListener('alpine:init', () => {
        */
       formatAmount(amount) {
         if (amount === null || amount === undefined) return '¥0.00'
-        return '¥' + Number(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+        return (
+          '¥' +
+          Number(amount)
+            .toFixed(2)
+            .replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+        )
       },
 
       /**

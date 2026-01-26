@@ -362,35 +362,40 @@ router.get(
       })
 
       // 生成CSV内容
-      const csvHeader = '订单ID,核销码,用户ID,用户昵称,用户手机,奖品类型,奖品名称,状态,创建时间,过期时间,核销时间\n'
-      
-      const csvRows = orders.map(order => {
-        const redeemer = order.redeemer || {}
-        const itemInstance = order.item_instance || {}
-        const meta = itemInstance.meta || {}
-        
-        // 状态映射
-        const statusMap = {
-          pending: '待核销',
-          fulfilled: '已核销',
-          expired: '已过期',
-          cancelled: '已取消'
-        }
-        
-        return [
-          order.order_id,
-          order.code_hash ? order.code_hash.substring(0, 8) + '...' : '-',
-          redeemer.user_id || '-',
-          redeemer.nickname || '-',
-          redeemer.mobile || '-',
-          itemInstance.item_type || '-',
-          meta.prize_name || meta.name || '-',
-          statusMap[order.status] || order.status,
-          order.created_at ? new Date(order.created_at).toLocaleString('zh-CN') : '-',
-          order.expires_at ? new Date(order.expires_at).toLocaleString('zh-CN') : '-',
-          order.fulfilled_at ? new Date(order.fulfilled_at).toLocaleString('zh-CN') : '-'
-        ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
-      }).join('\n')
+      const csvHeader =
+        '订单ID,核销码,用户ID,用户昵称,用户手机,奖品类型,奖品名称,状态,创建时间,过期时间,核销时间\n'
+
+      const csvRows = orders
+        .map(order => {
+          const redeemer = order.redeemer || {}
+          const itemInstance = order.item_instance || {}
+          const meta = itemInstance.meta || {}
+
+          // 状态映射
+          const statusMap = {
+            pending: '待核销',
+            fulfilled: '已核销',
+            expired: '已过期',
+            cancelled: '已取消'
+          }
+
+          return [
+            order.order_id,
+            order.code_hash ? order.code_hash.substring(0, 8) + '...' : '-',
+            redeemer.user_id || '-',
+            redeemer.nickname || '-',
+            redeemer.mobile || '-',
+            itemInstance.item_type || '-',
+            meta.prize_name || meta.name || '-',
+            statusMap[order.status] || order.status,
+            order.created_at ? new Date(order.created_at).toLocaleString('zh-CN') : '-',
+            order.expires_at ? new Date(order.expires_at).toLocaleString('zh-CN') : '-',
+            order.fulfilled_at ? new Date(order.fulfilled_at).toLocaleString('zh-CN') : '-'
+          ]
+            .map(field => `"${String(field).replace(/"/g, '""')}"`)
+            .join(',')
+        })
+        .join('\n')
 
       const csvContent = '\uFEFF' + csvHeader + csvRows // 添加BOM以支持Excel中文显示
 
@@ -402,8 +407,11 @@ router.get(
 
       // 设置响应头
       res.setHeader('Content-Type', 'text/csv; charset=utf-8')
-      res.setHeader('Content-Disposition', `attachment; filename="redemption_orders_${new Date().toISOString().slice(0, 10)}.csv"`)
-      
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="redemption_orders_${new Date().toISOString().slice(0, 10)}.csv"`
+      )
+
       return res.send(csvContent)
     } catch (error) {
       return handleServiceError(error, res, '导出核销订单')

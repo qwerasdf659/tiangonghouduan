@@ -7,7 +7,6 @@
  * @date 2026-01-23
  */
 
-
 import { logger } from '../utils/logger.js'
 import { request, buildURL, buildQueryString } from './base.js'
 
@@ -79,13 +78,16 @@ export const ANALYTICS_ENDPOINTS = {
   STRATEGY_STATS_REALTIME: '/api/v4/console/lottery-strategy-stats/realtime/:campaign_id',
   STRATEGY_STATS_HOURLY: '/api/v4/console/lottery-strategy-stats/hourly/:campaign_id',
   STRATEGY_STATS_DAILY: '/api/v4/console/lottery-strategy-stats/daily/:campaign_id',
-  STRATEGY_STATS_TIER_DISTRIBUTION: '/api/v4/console/lottery-strategy-stats/tier-distribution/:campaign_id',
-  STRATEGY_STATS_EXPERIENCE: '/api/v4/console/lottery-strategy-stats/experience-triggers/:campaign_id',
+  STRATEGY_STATS_TIER_DISTRIBUTION:
+    '/api/v4/console/lottery-strategy-stats/tier-distribution/:campaign_id',
+  STRATEGY_STATS_EXPERIENCE:
+    '/api/v4/console/lottery-strategy-stats/experience-triggers/:campaign_id',
   STRATEGY_STATS_BUDGET: '/api/v4/console/lottery-strategy-stats/budget-consumption/:campaign_id',
 
   // 客服统计
   CUSTOMER_SERVICE_SESSIONS: '/api/v4/console/customer-service/sessions',
-  CUSTOMER_SERVICE_SESSION_MESSAGES: '/api/v4/console/customer-service/sessions/:session_id/messages',
+  CUSTOMER_SERVICE_SESSION_MESSAGES:
+    '/api/v4/console/customer-service/sessions/:session_id/messages',
   CUSTOMER_SERVICE_SEND_MESSAGE: '/api/v4/console/customer-service/sessions/:session_id/messages',
   CUSTOMER_SERVICE_CLOSE: '/api/v4/console/customer-service/sessions/:session_id/close',
   CUSTOMER_SERVICE_MARK_READ: '/api/v4/console/customer-service/sessions/:session_id/mark-read',

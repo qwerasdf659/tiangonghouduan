@@ -56,14 +56,18 @@ export function useStrategyMethods() {
       try {
         console.log('⚙️ [Strategy] loadStrategies 开始执行')
         // apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }
-        const response = await this.apiGet(LOTTERY_ENDPOINTS.STRATEGY_LIST, {}, { showLoading: false })
+        const response = await this.apiGet(
+          LOTTERY_ENDPOINTS.STRATEGY_LIST,
+          {},
+          { showLoading: false }
+        )
         logger.debug('策略配置响应:', response)
         console.log('⚙️ [Strategy] API 返回数据:', response)
-        
+
         // 解包 withLoading 返回的结构
         const data = response?.success ? response.data : response
         console.log('⚙️ [Strategy] 解包后数据:', data)
-        
+
         if (data) {
           const strategies = data.list || data.strategies || []
           this.strategies = strategies
@@ -94,14 +98,18 @@ export function useStrategyMethods() {
       try {
         console.log('📊 [Strategy] loadTierMatrix 开始执行')
         // apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }
-        const response = await this.apiGet(LOTTERY_ENDPOINTS.MATRIX_LIST, {}, { showLoading: false })
+        const response = await this.apiGet(
+          LOTTERY_ENDPOINTS.MATRIX_LIST,
+          {},
+          { showLoading: false }
+        )
         logger.debug('矩阵配置响应:', response)
         console.log('📊 [Strategy] Matrix API 返回数据:', response)
-        
+
         // 解包 withLoading 返回的结构
         const data = response?.success ? response.data : response
         console.log('📊 [Strategy] Matrix 解包后数据:', data)
-        
+
         if (data) {
           const matrixData = data.list || data.matrix || data
           this.tierMatrix = Array.isArray(matrixData) ? matrixData : []
@@ -153,10 +161,10 @@ export function useStrategyMethods() {
       try {
         this.saving = true
         const configId = this.editingMatrixCell.matrix_config_id
-        const url = configId 
-          ? `${LOTTERY_ENDPOINTS.MATRIX_LIST}/${configId}` 
+        const url = configId
+          ? `${LOTTERY_ENDPOINTS.MATRIX_LIST}/${configId}`
           : LOTTERY_ENDPOINTS.MATRIX_LIST
-        
+
         // apiCall 成功时返回 response.data，失败时抛出错误
         await this.apiCall(url, {
           method: configId ? 'PUT' : 'POST',
@@ -240,4 +248,3 @@ export function useStrategyMethods() {
 }
 
 export default { useStrategyState, useStrategyMethods }
-

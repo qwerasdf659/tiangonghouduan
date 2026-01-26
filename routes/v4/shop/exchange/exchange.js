@@ -5,28 +5,20 @@
  * @description 用户兑换商品操作
  *
  * API列表：
- * - POST / - 兑换商品（V4.5.0 材料资产支付，路由挂载到 /api/v4/shop/exchange）
+ * - POST / - 兑换商品（V4.5.0 材料资产支付）
  *
  * 业务场景：
  * - 用户使用材料资产兑换商品
  * - 支持幂等性控制，防止重复下单
  *
- * 支付方式（V4.5.0）：
+ * 支付方式：
  * - 使用材料资产支付（cost_asset_code + cost_amount）
- * - 材料扣减通过AssetService执行
- * - 订单记录pay_asset_code和pay_amount字段
+ * - 材料扣减通过 AssetService 执行
+ * - 订单记录 pay_asset_code 和 pay_amount 字段
  *
- * 幂等性保证（业界标准形态 - 破坏性重构 2026-01-02）：
+ * 幂等性保证：
  * - 统一只接受 Header Idempotency-Key
  * - 缺失幂等键直接返回 400
- *
- * 路径双轨清理（2026-01-19）：
- * - 原路径：/api/v4/shop/exchange/exchange（已废弃删除）
- * - canonical 路径：/api/v4/shop/exchange（当前使用）
- * - 路由定义已从 /exchange 改为 /（根路径）
- *
- * 创建时间：2025年12月22日
- * 更新时间：2026年01月19日 - 路径双轨清理
  */
 
 const express = require('express')
@@ -50,13 +42,6 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * @returns {Object} data.order - 订单信息（包含pay_asset_code, pay_amount）
  * @returns {Object} data.remaining - 剩余余额
  * @returns {boolean} data.is_duplicate - 是否为幂等回放请求
- *
- * 业务场景：用户使用材料资产兑换商品
- * 幂等性控制（业界标准形态）：统一通过 Header Idempotency-Key 防止重复下单
- *
- * 【路径双轨清理 2026-01-19】：
- * - 原路径：/api/v4/shop/exchange/exchange（已废弃）
- * - canonical 路径：/api/v4/shop/exchange（当前使用）
  */
 router.post('/', authenticateToken, async (req, res) => {
   // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）

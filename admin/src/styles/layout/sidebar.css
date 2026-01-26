@@ -226,13 +226,12 @@
   .admin-sidebar {
     transform: translateX(-100%);
   }
-  
+
   .admin-sidebar.mobile-open {
     transform: translateX(0);
   }
-  
+
   .admin-main {
     margin-left: 0;
   }
 }
-

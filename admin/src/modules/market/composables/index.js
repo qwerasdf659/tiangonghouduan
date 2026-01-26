@@ -25,4 +25,3 @@ export {
   useExchangeStatsState,
   useExchangeStatsMethods
 }
-

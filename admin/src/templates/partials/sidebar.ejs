@@ -52,8 +52,11 @@
                 href="javascript:;"
               >
                 <span x-text="item.name"></span>
-                <template x-if="item.badge">
-                  <span class="ml-auto w-2 h-2 bg-red-500 rounded-full"></span>
+                <template x-if="item.badgeKey && $data[item.badgeKey] > 0">
+                  <span class="ml-auto flex items-center">
+                    <span class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                    <span class="ml-1 text-xs text-red-400" x-text="$data[item.badgeKey] > 99 ? '99+' : $data[item.badgeKey]"></span>
+                  </span>
                 </template>
               </a>
             </template>

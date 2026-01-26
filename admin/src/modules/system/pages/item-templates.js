@@ -208,7 +208,8 @@ document.addEventListener('alpine:init', () => {
           this.updateStats(response.data.pagination || {})
           logger.info('加载到物品模板:', this.templates.length, '个')
           // 搜索完成反馈
-          const hasFilters = this.filters.type || this.filters.rarity || this.filters.status || this.filters.search
+          const hasFilters =
+            this.filters.type || this.filters.rarity || this.filters.status || this.filters.search
           if (hasFilters) {
             this.showInfo(`搜索完成，找到 ${this.templates.length} 个模板`)
           }
@@ -368,7 +369,12 @@ document.addEventListener('alpine:init', () => {
       }
 
       if (!data.display_name || !data.template_code) {
-        logger.error('[submitTemplate] 验证失败 - displayName:', data.display_name, 'templateCode:', data.template_code)
+        logger.error(
+          '[submitTemplate] 验证失败 - displayName:',
+          data.display_name,
+          'templateCode:',
+          data.template_code
+        )
         this.showError('验证失败', '请填写模板名称和编码')
         return
       }

@@ -92,7 +92,7 @@ function registerSystemSettingsComponents() {
 
     // ==================== 导航状态 (从 systemNavigation 合并) ====================
     currentPage: 'system-config',
-    
+
     subPages: [
       { id: 'system-config', name: '系统配置', icon: '⚙️' },
       { id: 'dict-management', name: '字典管理', icon: '📚' },
@@ -113,7 +113,7 @@ function registerSystemSettingsComponents() {
     init() {
       console.log('[SystemSettings] 组件初始化开始')
       logger.debug('系统设置初始化 (合并版 v4.1)')
-      
+
       if (!this.checkAuth()) {
         console.warn('[SystemSettings] 认证检查失败')
         return
@@ -123,7 +123,7 @@ function registerSystemSettingsComponents() {
       const urlParams = new URLSearchParams(window.location.search)
       this.currentPage = urlParams.get('page') || 'system-config'
       console.log('[SystemSettings] 当前子页面:', this.currentPage)
-      
+
       // 立即加载数据
       this.loadPageData()
 

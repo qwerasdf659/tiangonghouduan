@@ -134,7 +134,11 @@ export function useRolesPermissionsMethods() {
      */
     async loadPermissionResources() {
       try {
-        const response = await this.apiGet(USER_ENDPOINTS.PERMISSION_RESOURCES, {}, { showLoading: false })
+        const response = await this.apiGet(
+          USER_ENDPOINTS.PERMISSION_RESOURCES,
+          {},
+          { showLoading: false }
+        )
         if (response?.success) {
           this.permissionResources = response.data?.resources || []
           logger.info('权限资源列表加载完成', { count: this.permissionResources.length })
@@ -238,7 +242,10 @@ export function useRolesPermissionsMethods() {
           response = await this.apiCall(url, { method: 'PUT', data: submitData })
         } else {
           // 创建角色
-          response = await this.apiCall(USER_ENDPOINTS.ROLE_CREATE, { method: 'POST', data: submitData })
+          response = await this.apiCall(USER_ENDPOINTS.ROLE_CREATE, {
+            method: 'POST',
+            data: submitData
+          })
         }
 
         if (response?.success) {
@@ -378,7 +385,10 @@ export function useRolesPermissionsMethods() {
      */
     isAllSelected(resourceCode, allActions) {
       const currentActions = this.tempPermissions[resourceCode] || []
-      return currentActions.length === allActions.length && allActions.every(a => currentActions.includes(a))
+      return (
+        currentActions.length === allActions.length &&
+        allActions.every(a => currentActions.includes(a))
+      )
     },
 
     /**
@@ -423,7 +433,10 @@ export function useRolesPermissionsMethods() {
             try {
               rolePermissions = JSON.parse(rolePermissions)
             } catch {
-              logger.warn('解析权限字符串失败', { role: role.role_name, permissions: rolePermissions })
+              logger.warn('解析权限字符串失败', {
+                role: role.role_name,
+                permissions: rolePermissions
+              })
               continue
             }
           }
@@ -478,7 +491,8 @@ export function useRolesPermissionsMethods() {
         params.append('page', this.page || 1)
         params.append('page_size', this.pageSize || 20)
         if (this.userRoleFilters.user_id) params.append('user_id', this.userRoleFilters.user_id)
-        if (this.userRoleFilters.role_name) params.append('role_name', this.userRoleFilters.role_name)
+        if (this.userRoleFilters.role_name)
+          params.append('role_name', this.userRoleFilters.role_name)
 
         const response = await this.apiGet(
           `${USER_ENDPOINTS.USER_ROLE_LIST}?${params}`,

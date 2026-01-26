@@ -18,7 +18,6 @@
  * const prizes = await LotteryAPI.getPrizeList({ campaign_id: 1, page: 1, page_size: 20 })
  */
 
-
 import { logger } from '../utils/logger.js'
 import { request, buildURL, buildQueryString } from './base.js'
 
@@ -227,7 +226,8 @@ export const LOTTERY_ENDPOINTS = {
   STRATEGY_STATS_HOURLY: '/api/v4/console/lottery-strategy-stats/hourly/:campaign_id',
   STRATEGY_STATS_DAILY: '/api/v4/console/lottery-strategy-stats/daily/:campaign_id',
   STRATEGY_STATS_TIER: '/api/v4/console/lottery-strategy-stats/tier-distribution/:campaign_id',
-  STRATEGY_STATS_EXPERIENCE: '/api/v4/console/lottery-strategy-stats/experience-triggers/:campaign_id',
+  STRATEGY_STATS_EXPERIENCE:
+    '/api/v4/console/lottery-strategy-stats/experience-triggers/:campaign_id',
   STRATEGY_STATS_BUDGET: '/api/v4/console/lottery-strategy-stats/budget-consumption/:campaign_id',
 
   // 抽奖配额（后端路由: /api/v4/console/lottery-quota）
@@ -264,23 +264,30 @@ export const LOTTERY_ENDPOINTS = {
   MONITORING_STATS: '/api/v4/console/lottery-monitoring/stats',
   MONITORING_HOURLY_LIST: '/api/v4/console/lottery-monitoring/hourly-metrics',
   MONITORING_HOURLY_DETAIL: '/api/v4/console/lottery-monitoring/hourly-metrics/:id',
-  MONITORING_HOURLY_SUMMARY: '/api/v4/console/lottery-monitoring/hourly-metrics/summary/:campaign_id',
+  MONITORING_HOURLY_SUMMARY:
+    '/api/v4/console/lottery-monitoring/hourly-metrics/summary/:campaign_id',
   MONITORING_USER_EXPERIENCE_LIST: '/api/v4/console/lottery-monitoring/user-experience-states',
-  MONITORING_USER_EXPERIENCE_DETAIL: '/api/v4/console/lottery-monitoring/user-experience-states/:user_id/:campaign_id',
+  MONITORING_USER_EXPERIENCE_DETAIL:
+    '/api/v4/console/lottery-monitoring/user-experience-states/:user_id/:campaign_id',
   MONITORING_USER_GLOBAL_LIST: '/api/v4/console/lottery-monitoring/user-global-states',
   MONITORING_USER_GLOBAL_DETAIL: '/api/v4/console/lottery-monitoring/user-global-states/:user_id',
   MONITORING_QUOTA_GRANTS_LIST: '/api/v4/console/lottery-monitoring/quota-grants',
   MONITORING_QUOTA_GRANTS_DETAIL: '/api/v4/console/lottery-monitoring/quota-grants/:id',
   MONITORING_USER_QUOTAS_LIST: '/api/v4/console/lottery-monitoring/user-quotas',
-  MONITORING_USER_QUOTAS_DETAIL: '/api/v4/console/lottery-monitoring/user-quotas/:user_id/:campaign_id',
+  MONITORING_USER_QUOTAS_DETAIL:
+    '/api/v4/console/lottery-monitoring/user-quotas/:user_id/:campaign_id',
   MONITORING_USER_QUOTAS_STATS: '/api/v4/console/lottery-monitoring/user-quotas/stats/:campaign_id',
 
   // 核销订单 - 使用后端实际路径
   BUSINESS_RECORDS_REDEMPTION_ORDERS: '/api/v4/console/business-records/redemption-orders',
-  BUSINESS_RECORDS_REDEMPTION_STATISTICS: '/api/v4/console/business-records/redemption-orders/statistics',
-  BUSINESS_RECORDS_REDEMPTION_DETAIL: '/api/v4/console/business-records/redemption-orders/:order_id',
-  BUSINESS_RECORDS_REDEMPTION_REDEEM: '/api/v4/console/business-records/redemption-orders/:order_id/redeem',
-  BUSINESS_RECORDS_REDEMPTION_CANCEL: '/api/v4/console/business-records/redemption-orders/:order_id/cancel',
+  BUSINESS_RECORDS_REDEMPTION_STATISTICS:
+    '/api/v4/console/business-records/redemption-orders/statistics',
+  BUSINESS_RECORDS_REDEMPTION_DETAIL:
+    '/api/v4/console/business-records/redemption-orders/:order_id',
+  BUSINESS_RECORDS_REDEMPTION_REDEEM:
+    '/api/v4/console/business-records/redemption-orders/:order_id/redeem',
+  BUSINESS_RECORDS_REDEMPTION_CANCEL:
+    '/api/v4/console/business-records/redemption-orders/:order_id/cancel',
   BUSINESS_RECORDS_BATCH_EXPIRE: '/api/v4/console/business-records/redemption-orders/batch-expire',
   BUSINESS_RECORDS_EXPORT: '/api/v4/console/business-records/redemption-orders/export',
 
@@ -293,7 +300,8 @@ export const LOTTERY_ENDPOINTS = {
   CAMPAIGN_BUDGET_STATUS: '/api/v4/console/campaign-budget/campaigns/:campaign_id/budget-status',
   CAMPAIGN_BUDGET_POOL_ADD: '/api/v4/console/campaign-budget/campaigns/:campaign_id/pool/add',
   CAMPAIGN_BUDGET_VALIDATE: '/api/v4/console/campaign-budget/campaigns/:campaign_id/validate',
-  CAMPAIGN_BUDGET_VALIDATE_LAUNCH: '/api/v4/console/campaign-budget/campaigns/:campaign_id/validate-for-launch',
+  CAMPAIGN_BUDGET_VALIDATE_LAUNCH:
+    '/api/v4/console/campaign-budget/campaigns/:campaign_id/validate-for-launch',
   CAMPAIGN_BUDGET_USER: '/api/v4/console/campaign-budget/users/:user_id'
 }
 

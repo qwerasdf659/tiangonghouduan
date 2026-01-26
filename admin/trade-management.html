@@ -6,10 +6,10 @@
     pageStyle: '[x-cloak] { display: none !important; }' 
   }) %>
 </head>
-<body class="bg-gray-100 min-h-screen" x-data="tradeManagementPage()" x-init="init()" x-cloak>
+<body class="themed-bg-subtle min-h-screen" x-data="tradeManagementPage()" x-init="init()" x-cloak>
   
   <!-- 导航栏 -->
-  <nav class="bg-blue-600 text-white shadow-lg">
+  <nav class="themed-bg-primary text-white shadow-lg">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
         <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
@@ -25,34 +25,34 @@
   <div class="container mx-auto px-4 py-6">
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <div class="bg-white rounded-lg shadow p-4 text-center">
+      <div class="themed-card rounded-lg shadow p-4 text-center">
         <div class="text-4xl text-blue-400 mb-2">📋</div>
-        <h4 class="text-2xl font-bold text-blue-600" x-text="stats.totalTrades">0</h4>
-        <p class="text-gray-500 text-sm">总交易数</p>
+        <h4 class="text-2xl font-bold themed-text-primary" x-text="stats.totalTrades">0</h4>
+        <p class="themed-text-muted text-sm">总交易数</p>
       </div>
-      <div class="bg-white rounded-lg shadow p-4 text-center">
+      <div class="themed-card rounded-lg shadow p-4 text-center">
         <div class="text-4xl text-green-400 mb-2">✅</div>
         <h4 class="text-2xl font-bold text-green-600" x-text="stats.completedTrades">0</h4>
-        <p class="text-gray-500 text-sm">已完成</p>
+        <p class="themed-text-muted text-sm">已完成</p>
       </div>
-      <div class="bg-white rounded-lg shadow p-4 text-center">
+      <div class="themed-card rounded-lg shadow p-4 text-center">
         <div class="text-4xl text-yellow-400 mb-2">⏳</div>
         <h4 class="text-2xl font-bold text-yellow-600" x-text="stats.pendingTrades">0</h4>
-        <p class="text-gray-500 text-sm">待处理</p>
+        <p class="themed-text-muted text-sm">待处理</p>
       </div>
-      <div class="bg-white rounded-lg shadow p-4 text-center">
+      <div class="themed-card rounded-lg shadow p-4 text-center">
         <div class="text-4xl text-orange-400 mb-2">💰</div>
         <h4 class="text-2xl font-bold text-orange-600" x-text="formatNumber(stats.totalVolume)">0</h4>
-        <p class="text-gray-500 text-sm">总成交额</p>
+        <p class="themed-text-muted text-sm">总成交额</p>
       </div>
     </div>
 
     <!-- 筛选栏 -->
-    <div class="bg-white rounded-lg shadow mb-6">
+    <div class="themed-card rounded-lg shadow mb-6">
       <div class="p-4">
         <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">交易状态</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">交易状态</label>
             <select x-model="tradeFilters.status" class="w-full px-3 py-2 border rounded-lg">
               <option value="">全部状态</option>
               <option value="pending">待处理</option>
@@ -63,15 +63,15 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">买家ID</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">买家ID</label>
             <input type="text" x-model="tradeFilters.buyer_user_id" placeholder="买家ID" class="w-full px-3 py-2 border rounded-lg">
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">卖家ID</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">卖家ID</label>
             <input type="text" x-model="tradeFilters.seller_user_id" placeholder="卖家ID" class="w-full px-3 py-2 border rounded-lg">
           </div>
           <div>
-            <button @click="loadTradeOrders()" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-emerald-700">
+            <button @click="loadTradeOrders()" class="w-full px-4 py-2 themed-btn-primary rounded-lg">
               🔍 搜索
             </button>
           </div>
@@ -85,30 +85,30 @@
     </div>
 
     <!-- 交易列表 -->
-    <div class="bg-white rounded-lg shadow">
+    <div class="themed-card rounded-lg shadow">
       <div class="p-4 border-b">
         <h5 class="font-semibold">交易记录</h5>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full">
-          <thead class="bg-gray-50">
+          <thead class="themed-bg-base">
             <tr>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">交易ID</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">买家</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">卖家</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">商品</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">成交价</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">时间</th>
-              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">交易ID</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">买家</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">卖家</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">商品</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">成交价</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">时间</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
             </tr>
           </thead>
           <tbody class="divide-y">
             <template x-if="tradeOrders.length === 0">
-              <tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">暂无交易记录</td></tr>
+              <tr><td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无交易记录</td></tr>
             </template>
             <template x-for="trade in tradeOrders" :key="trade.order_id">
-              <tr class="hover:bg-gray-50">
+              <tr class="themed-hover-bg">
                 <td class="px-4 py-3 text-sm font-mono" x-text="trade.order_id || trade.trade_id"></td>
                 <td class="px-4 py-3 text-sm" x-text="trade.buyer?.nickname || trade.buyer_user_id"></td>
                 <td class="px-4 py-3 text-sm" x-text="trade.seller?.nickname || trade.seller_user_id"></td>
@@ -117,16 +117,16 @@
                 <td class="px-4 py-3">
                   <span :class="{
                     'bg-yellow-100 text-yellow-700': trade.status === 'pending',
-                    'bg-blue-100 text-blue-700': trade.status === 'processing',
-                    'bg-green-100 text-green-700': trade.status === 'completed',
+                    'themed-bg-primary-light themed-text-primary': trade.status === 'processing',
+                    'bg-green-100 themed-text-success': trade.status === 'completed',
                     'bg-red-100 text-red-700': trade.status === 'cancelled',
                     'bg-orange-100 text-orange-700': trade.status === 'disputed'
                   }" class="px-2 py-1 text-xs rounded" x-text="getStatusText(trade.status)"></span>
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(trade.created_at)"></td>
+                <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(trade.created_at)"></td>
                 <td class="px-4 py-3">
                   <div class="flex space-x-2">
-                    <button @click="viewTradeOrderDetail(trade)" class="text-blue-500 hover:text-blue-700 text-sm">详情</button>
+                    <button @click="viewTradeOrderDetail(trade)" class="themed-text-primary hover:text-blue-700 text-sm">详情</button>
                   </div>
                 </td>
               </tr>
@@ -137,7 +137,7 @@
       
       <!-- 分页 -->
       <div class="p-4 border-t flex justify-between items-center">
-        <span class="text-sm text-gray-500" x-text="'共 ' + (tradePagination?.total || 0) + ' 条记录'"></span>
+        <span class="text-sm themed-text-muted" x-text="'共 ' + (tradePagination?.total || 0) + ' 条记录'"></span>
         <div class="flex space-x-2">
           <button @click="changeTradePage(tradeCurrentPage - 1)" :disabled="tradeCurrentPage <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
           <span class="px-3 py-1" x-text="tradeCurrentPage + ' / ' + (tradePagination?.totalPages || 1)"></span>
@@ -154,34 +154,34 @@
        class="fixed inset-0 z-50 flex items-center justify-center"
        style="display: none;">
     <div class="fixed inset-0 bg-black/50" @click="hideModal('tradeDetailModal')"></div>
-    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 z-10">
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 z-10">
       <div class="p-4 border-b flex justify-between items-center">
         <h5 class="font-semibold">📋 C2C交易订单详情</h5>
-        <button @click="hideModal('tradeDetailModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        <button @click="hideModal('tradeDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
       </div>
       <div class="p-6 space-y-3" x-show="selectedTradeOrder">
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">订单ID:</span><span class="font-mono" x-text="selectedTradeOrder?.order_id"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">业务ID:</span><span class="font-mono text-xs" x-text="selectedTradeOrder?.business_id || '-'"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">买家:</span><span x-text="selectedTradeOrder?.buyer?.nickname || selectedTradeOrder?.buyer_user_id"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">卖家:</span><span x-text="selectedTradeOrder?.seller?.nickname || selectedTradeOrder?.seller_user_id"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">结算资产:</span><span x-text="selectedTradeOrder?.asset_code || '-'"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">总金额:</span><span class="font-mono text-green-600" x-text="formatNumber(selectedTradeOrder?.gross_amount)"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">手续费:</span><span class="font-mono text-orange-500" x-text="formatNumber(selectedTradeOrder?.fee_amount || 0)"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">净金额:</span><span class="font-mono text-blue-600" x-text="formatNumber(selectedTradeOrder?.net_amount)"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">订单ID:</span><span class="font-mono" x-text="selectedTradeOrder?.order_id"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">业务ID:</span><span class="font-mono text-xs" x-text="selectedTradeOrder?.business_id || '-'"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">买家:</span><span x-text="selectedTradeOrder?.buyer?.nickname || selectedTradeOrder?.buyer_user_id"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">卖家:</span><span x-text="selectedTradeOrder?.seller?.nickname || selectedTradeOrder?.seller_user_id"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">结算资产:</span><span x-text="selectedTradeOrder?.asset_code || '-'"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">总金额:</span><span class="font-mono text-green-600" x-text="formatNumber(selectedTradeOrder?.gross_amount)"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">手续费:</span><span class="font-mono text-orange-500" x-text="formatNumber(selectedTradeOrder?.fee_amount || 0)"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">净金额:</span><span class="font-mono themed-text-primary" x-text="formatNumber(selectedTradeOrder?.net_amount)"></span></div>
         <div class="flex justify-between border-b pb-2">
-          <span class="text-gray-500">状态:</span>
+          <span class="themed-text-muted">状态:</span>
           <span class="px-2 py-1 text-xs rounded" :class="{
             'bg-yellow-100 text-yellow-700': selectedTradeOrder?.status === 'created',
-            'bg-blue-100 text-blue-700': selectedTradeOrder?.status === 'frozen',
-            'bg-green-100 text-green-700': selectedTradeOrder?.status === 'completed',
+            'themed-bg-primary-light themed-text-primary': selectedTradeOrder?.status === 'frozen',
+            'bg-green-100 themed-text-success': selectedTradeOrder?.status === 'completed',
             'bg-red-100 text-red-700': selectedTradeOrder?.status === 'cancelled'
           }" x-text="getTradeOrderStatusText(selectedTradeOrder?.status)"></span>
         </div>
-        <div class="flex justify-between border-b pb-2"><span class="text-gray-500">创建时间:</span><span x-text="formatDate(selectedTradeOrder?.created_at)"></span></div>
-        <div class="flex justify-between" x-show="selectedTradeOrder?.completed_at"><span class="text-gray-500">完成时间:</span><span x-text="formatDate(selectedTradeOrder?.completed_at)"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">创建时间:</span><span x-text="formatDate(selectedTradeOrder?.created_at)"></span></div>
+        <div class="flex justify-between" x-show="selectedTradeOrder?.completed_at"><span class="themed-text-muted">完成时间:</span><span x-text="formatDate(selectedTradeOrder?.completed_at)"></span></div>
       </div>
-      <div class="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
-        <button @click="hideModal('tradeDetailModal')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">关闭</button>
+      <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
+        <button @click="hideModal('tradeDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
       </div>
     </div>
   </div>

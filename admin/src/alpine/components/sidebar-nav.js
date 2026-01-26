@@ -19,7 +19,9 @@ export function sidebarNav() {
     expandedGroups: ['operations', 'lottery'],
     // 当前激活的菜单项ID（用于工作台Tab模式下的高亮）
     activeItemId: null,
-    
+    // 未处理的风控告警数量（动态获取）
+    pendingAlertCount: 0,
+
     // 导航配置（7大业务模块）
     navGroups: [
       {
@@ -35,7 +37,12 @@ export function sidebarNav() {
         icon: '📋',
         items: [
           { id: 'consumption', name: '消费记录审核', url: '/admin/finance-management.html' },
-          { id: 'risk', name: '风控告警', url: '/admin/risk-alerts.html', badge: true },
+          {
+            id: 'risk',
+            name: '风控告警',
+            url: '/admin/risk-alerts.html',
+            badgeKey: 'pendingAlertCount'
+          },
           { id: 'customer', name: '客服工作台', url: '/admin/customer-service.html' }
         ]
       },
@@ -56,7 +63,11 @@ export function sidebarNav() {
           { id: 'asset-mgmt', name: '资产管理', url: '/admin/asset-management.html' },
           { id: 'asset-adj', name: '资产调整', url: '/admin/asset-adjustment.html' },
           { id: 'orphan', name: '孤儿冻结清理', url: '/admin/orphan-frozen.html' },
-          { id: 'material-rules', name: '物料转换规则', url: '/admin/material-conversion-rules.html' },
+          {
+            id: 'material-rules',
+            name: '物料转换规则',
+            url: '/admin/material-conversion-rules.html'
+          },
           { id: 'assets-portfolio', name: '资产组合', url: '/admin/assets-portfolio.html' }
         ]
       },
@@ -101,7 +112,7 @@ export function sidebarNav() {
         ]
       }
     ],
-    
+
     /**
      * 初始化
      */
@@ -111,7 +122,7 @@ export function sidebarNav() {
       if (savedCollapsed !== null) {
         this.collapsed = savedCollapsed === 'true'
       }
-      
+
       // 从 localStorage 恢复展开的分组
       const savedGroups = localStorage.getItem('sidebar_expanded_groups')
       if (savedGroups) {
@@ -121,24 +132,56 @@ export function sidebarNav() {
           console.warn('恢复侧边栏分组状态失败', e)
         }
       }
-      
+
       // 根据当前 URL 高亮对应菜单并展开分组
       this.highlightCurrentPage()
-      
+
       // 监听 Tab 打开/切换事件，更新菜单高亮状态
-      window.addEventListener('open-tab', (e) => {
+      window.addEventListener('open-tab', e => {
         this.setActiveItem(e.detail.id, e.detail.url)
       })
-      
+
       // 监听 Tab 切换事件
-      window.addEventListener('switch-tab', (e) => {
+      window.addEventListener('switch-tab', e => {
         this.setActiveItem(e.detail.id, e.detail.url)
       })
-      
+
       // 从 localStorage 恢复当前激活的 Tab 状态
       this.restoreActiveItemFromTabs()
+
+      // 获取未处理的风控告警数量
+      this.fetchPendingAlertCount()
+
+      // 每5分钟刷新一次告警数量
+      setInterval(() => this.fetchPendingAlertCount(), 5 * 60 * 1000)
     },
-    
+
+    /**
+     * 获取未处理的风控告警数量
+     */
+    async fetchPendingAlertCount() {
+      try {
+        const token = localStorage.getItem('admin_token')
+        if (!token) return
+
+        const response = await fetch('/api/v4/shop/risk/alerts?status=pending&page_size=1', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.data) {
+            this.pendingAlertCount = data.data.total || 0
+          }
+        }
+      } catch (error) {
+        console.warn('获取告警数量失败:', error.message)
+      }
+    },
+
     /**
      * 从 localStorage 恢复当前激活的菜单项
      */
@@ -154,7 +197,7 @@ export function sidebarNav() {
         console.warn('恢复激活菜单项失败', e)
       }
     },
-    
+
     /**
      * 设置当前激活的菜单项
      * @param {string} itemId - 菜单项ID
@@ -165,7 +208,7 @@ export function sidebarNav() {
       // 展开对应的分组
       this.expandGroupForItem(itemId)
     },
-    
+
     /**
      * 根据菜单项ID展开对应的分组
      * @param {string} itemId - 菜单项ID
@@ -182,7 +225,7 @@ export function sidebarNav() {
         }
       }
     },
-    
+
     /**
      * 切换侧边栏折叠状态
      */
@@ -190,14 +233,14 @@ export function sidebarNav() {
       this.collapsed = !this.collapsed
       localStorage.setItem('sidebar_collapsed', this.collapsed)
     },
-    
+
     /**
      * 切换移动端菜单
      */
     toggleMobileMenu() {
       this.mobileOpen = !this.mobileOpen
     },
-    
+
     /**
      * 切换分组展开/折叠
      * @param {string} groupId - 分组ID
@@ -211,7 +254,7 @@ export function sidebarNav() {
       }
       localStorage.setItem('sidebar_expanded_groups', JSON.stringify(this.expandedGroups))
     },
-    
+
     /**
      * 判断分组是否展开
      * @param {string} groupId - 分组ID
@@ -220,19 +263,19 @@ export function sidebarNav() {
     isGroupExpanded(groupId) {
       return this.expandedGroups.includes(groupId)
     },
-    
+
     /**
      * 根据当前 URL 高亮菜单
      */
     highlightCurrentPage() {
       const currentPath = window.location.pathname + window.location.search
-      
+
       for (const group of this.navGroups) {
         if (group.type === 'single') {
           // 单项菜单不需要处理
           continue
         }
-        
+
         if (group.items) {
           for (const item of group.items) {
             if (currentPath.includes(item.url.split('?')[0])) {
@@ -246,7 +289,7 @@ export function sidebarNav() {
         }
       }
     },
-    
+
     /**
      * 判断菜单项是否激活
      * @param {string} url - 菜单URL
@@ -273,12 +316,12 @@ export function sidebarNav() {
           }
         }
       }
-      
+
       // 非工作台模式，使用传统的 URL 匹配
       const currentPath = window.location.pathname + window.location.search
       return currentPath.includes(url.split('?')[0])
     },
-    
+
     /**
      * 导航到指定页面（在 Tab 中打开）
      * @param {string} url - 目标URL
@@ -288,15 +331,17 @@ export function sidebarNav() {
      */
     navigateTo(url, itemId, itemName, icon) {
       // 通知 Tab 管理器打开新 Tab
-      window.dispatchEvent(new CustomEvent('open-tab', {
-        detail: { 
-          url, 
-          id: itemId,
-          title: itemName,
-          icon: icon || '📄'
-        }
-      }))
-      
+      window.dispatchEvent(
+        new CustomEvent('open-tab', {
+          detail: {
+            url,
+            id: itemId,
+            title: itemName,
+            icon: icon || '📄'
+          }
+        })
+      )
+
       // 移动端关闭菜单
       this.mobileOpen = false
     }
@@ -304,4 +349,3 @@ export function sidebarNav() {
 }
 
 export default sidebarNav
-

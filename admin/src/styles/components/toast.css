@@ -1,0 +1,153 @@
+/**
+ * Toast 通知样式
+ *
+ * @file src/styles/components/toast.css
+ * @description Toast 通知的 Tailwind CSS 样式（纯 Tailwind，无 Bootstrap）
+ * @version 1.0.0
+ * @date 2026-01-26
+ *
+ * 颜色策略：
+ * - 状态色保持固定（根据用户交互升级方案决策）
+ * - 错误=红色、成功=绿色、警告=黄色、信息=蓝色
+ * - 这些颜色在所有主题下保持一致，便于用户认知
+ */
+
+/* ========== Toast 容器 ========== */
+
+.toast-container {
+  @apply fixed top-4 right-4 z-[9999] flex flex-col gap-3 max-w-sm w-full pointer-events-none;
+}
+
+/* ========== Toast 基础样式 ========== */
+
+.toast {
+  @apply pointer-events-auto flex items-start gap-3 p-4 rounded-lg shadow-lg backdrop-blur-sm border transform transition-all duration-300 relative;
+}
+
+/* ========== 状态类型样式（固定色） ========== */
+
+/* 成功状态 - 绿色 */
+.toast-success {
+  @apply bg-green-50/95 border-green-200 text-green-800;
+}
+
+/* 错误/危险状态 - 红色 */
+.toast-error,
+.toast-danger {
+  @apply bg-red-50/95 border-red-200 text-red-800;
+}
+
+/* 警告状态 - 黄色 */
+.toast-warning {
+  @apply bg-yellow-50/95 border-yellow-200 text-yellow-800;
+}
+
+/* 信息状态 - 蓝色 */
+.toast-info {
+  @apply bg-blue-50/95 border-blue-200 text-blue-800;
+}
+
+/* ========== 暗色主题状态色调整 ========== */
+
+[data-theme='dark'] .toast-success,
+[data-theme='minimal-dark'] .toast-success,
+[data-theme='cyber'] .toast-success,
+[data-theme='neon'] .toast-success {
+  @apply bg-green-900/90 border-green-700 text-green-100;
+}
+
+[data-theme='dark'] .toast-error,
+[data-theme='dark'] .toast-danger,
+[data-theme='minimal-dark'] .toast-error,
+[data-theme='minimal-dark'] .toast-danger,
+[data-theme='cyber'] .toast-error,
+[data-theme='cyber'] .toast-danger,
+[data-theme='neon'] .toast-error,
+[data-theme='neon'] .toast-danger {
+  @apply bg-red-900/90 border-red-700 text-red-100;
+}
+
+[data-theme='dark'] .toast-warning,
+[data-theme='minimal-dark'] .toast-warning,
+[data-theme='cyber'] .toast-warning,
+[data-theme='neon'] .toast-warning {
+  @apply bg-yellow-900/90 border-yellow-700 text-yellow-100;
+}
+
+[data-theme='dark'] .toast-info,
+[data-theme='minimal-dark'] .toast-info,
+[data-theme='cyber'] .toast-info,
+[data-theme='neon'] .toast-info {
+  @apply bg-blue-900/90 border-blue-700 text-blue-100;
+}
+
+/* ========== Toast 子元素 ========== */
+
+.toast-icon {
+  @apply text-xl flex-shrink-0 font-bold;
+}
+
+.toast-content {
+  @apply flex-1 min-w-0;
+}
+
+.toast-title {
+  @apply font-medium text-sm;
+}
+
+.toast-message {
+  @apply text-xs opacity-80 mt-0.5;
+}
+
+.toast-close {
+  @apply p-1 rounded transition-colors flex-shrink-0 cursor-pointer;
+}
+
+.toast-close:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='dark'] .toast-close:hover,
+[data-theme='minimal-dark'] .toast-close:hover,
+[data-theme='cyber'] .toast-close:hover,
+[data-theme='neon'] .toast-close:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ========== Toast 进度条 ========== */
+
+.toast-progress {
+  @apply absolute bottom-0 left-0 h-1 bg-current opacity-20 rounded-b-lg;
+}
+
+/* ========== Toast 动画 ========== */
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.toast-enter {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.toast-exit {
+  animation: slideOutRight 0.2s ease-in forwards;
+}

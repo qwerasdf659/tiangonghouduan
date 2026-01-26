@@ -14,7 +14,6 @@
  * - 保留所有原有业务功能
  */
 
-
 import { logger } from '../../../utils/logger.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
 import { buildURL, request } from '../../../api/base.js'
@@ -203,7 +202,11 @@ document.addEventListener('alpine:init', () => {
      * @returns {Promise<void>} 无返回值
      */
     async loadRoles() {
-      const result = await this.apiGet(USER_ENDPOINTS.USER_HIERARCHY_ROLES, {}, { showError: false })
+      const result = await this.apiGet(
+        USER_ENDPOINTS.USER_HIERARCHY_ROLES,
+        {},
+        { showError: false }
+      )
       if (result.success) {
         this.rolesList = result.data || []
       }
@@ -219,7 +222,7 @@ document.addEventListener('alpine:init', () => {
      */
     async loadData() {
       logger.info('[UserHierarchy] 开始加载层级列表...')
-      
+
       const result = await this.withLoading(async () => {
         const params = {
           ...this.buildPaginationParams()
@@ -250,9 +253,9 @@ document.addEventListener('alpine:init', () => {
         }
 
         this._updateStatistics(result.data)
-        logger.info('[UserHierarchy] 层级列表加载完成', { 
-          count: this.totalRecords, 
-          rows: this.hierarchyList.length 
+        logger.info('[UserHierarchy] 层级列表加载完成', {
+          count: this.totalRecords,
+          rows: this.hierarchyList.length
         })
       } else {
         logger.error('[UserHierarchy] 层级列表加载失败', result)
@@ -431,7 +434,7 @@ document.addEventListener('alpine:init', () => {
       // 检查是否尝试停用自己
       const currentUser = this.getCurrentUser()
       const currentUserId = currentUser?.user_id || currentUser?.userId
-      
+
       if (currentUserId && parseInt(userId) === parseInt(currentUserId)) {
         this.showWarning('不能停用自己的权限')
         logger.warn('[UserHierarchy] 阻止停用自己的权限', { userId, currentUserId })

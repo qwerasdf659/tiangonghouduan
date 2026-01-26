@@ -62,12 +62,9 @@ export function useMerchantLogsMethods() {
         const params = new URLSearchParams()
         params.append('page', this.page)
         params.append('page_size', this.pageSize)
-        if (this.logFilters.merchant_id)
-          params.append('merchant_id', this.logFilters.merchant_id)
-        if (this.logFilters.action_type)
-          params.append('action_type', this.logFilters.action_type)
-        if (this.logFilters.operator_id)
-          params.append('operator_id', this.logFilters.operator_id)
+        if (this.logFilters.merchant_id) params.append('merchant_id', this.logFilters.merchant_id)
+        if (this.logFilters.action_type) params.append('action_type', this.logFilters.action_type)
+        if (this.logFilters.operator_id) params.append('operator_id', this.logFilters.operator_id)
         if (this.logFilters.startDate) params.append('start_date', this.logFilters.startDate)
         if (this.logFilters.endDate) params.append('end_date', this.logFilters.endDate)
 
@@ -79,7 +76,8 @@ export function useMerchantLogsMethods() {
 
         if (response?.success) {
           // 后端返回 items 字段
-          this.merchantLogs = response.data?.items || response.data?.logs || response.data?.list || []
+          this.merchantLogs =
+            response.data?.items || response.data?.logs || response.data?.list || []
           if (response.data?.pagination) {
             this.total = response.data.pagination.total || 0
             this.totalPages = response.data.pagination.total_pages || 1
@@ -152,10 +150,8 @@ export function useMerchantLogsMethods() {
     async exportLogs() {
       try {
         const params = new URLSearchParams()
-        if (this.logFilters.merchant_id)
-          params.append('merchant_id', this.logFilters.merchant_id)
-        if (this.logFilters.action_type)
-          params.append('action_type', this.logFilters.action_type)
+        if (this.logFilters.merchant_id) params.append('merchant_id', this.logFilters.merchant_id)
+        if (this.logFilters.action_type) params.append('action_type', this.logFilters.action_type)
         if (this.logFilters.startDate) params.append('start_date', this.logFilters.startDate)
         if (this.logFilters.endDate) params.append('end_date', this.logFilters.endDate)
 
@@ -191,7 +187,7 @@ export function useMerchantLogsMethods() {
      * @returns {string} 操作类型文本
      */
     getActionTypeText(actionType) {
-      const option = this.actionTypeOptions.find((opt) => opt.value === actionType)
+      const option = this.actionTypeOptions.find(opt => opt.value === actionType)
       return option?.label || actionType || '-'
     },
 

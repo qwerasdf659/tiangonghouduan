@@ -26,7 +26,6 @@
  * </div>
  */
 
-
 import { logger } from '../../../utils/logger.js'
 import { MARKET_ENDPOINTS } from '../../../api/market.js'
 import { buildURL, request } from '../../../api/base.js'
@@ -261,7 +260,7 @@ document.addEventListener('alpine:init', () => {
         this.loading = true
         const params = {
           page: this.tradeCurrentPage,
-          page_size: this.tradePageSize,  // 后端使用 snake_case
+          page_size: this.tradePageSize, // 后端使用 snake_case
           ...this.tradeFilters
         }
 
@@ -269,7 +268,7 @@ document.addEventListener('alpine:init', () => {
         Object.keys(params).forEach(k => !params[k] && delete params[k])
 
         const res = await request({
-          url: MARKET_ENDPOINTS.TRADE_ORDERS_LIST,  // 使用正确的后端端点
+          url: MARKET_ENDPOINTS.TRADE_ORDERS_LIST, // 使用正确的后端端点
           method: 'GET',
           params
         })
@@ -306,7 +305,8 @@ document.addEventListener('alpine:init', () => {
           const byStatus = res.data.by_status || {}
           const summary = res.data.completed_summary || {}
           this.tradeStats = {
-            total: summary.total_orders || Object.values(byStatus).reduce((a, b) => a + (b || 0), 0),
+            total:
+              summary.total_orders || Object.values(byStatus).reduce((a, b) => a + (b || 0), 0),
             created: byStatus.created || 0,
             frozen: byStatus.frozen || 0,
             completed: byStatus.completed || 0
@@ -539,7 +539,9 @@ document.addEventListener('alpine:init', () => {
 
       try {
         const res = await request({
-          url: buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_REDEEM, { order_id: order.order_id }),
+          url: buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_REDEEM, {
+            order_id: order.order_id
+          }),
           method: 'POST'
         })
 
@@ -569,7 +571,9 @@ document.addEventListener('alpine:init', () => {
 
       try {
         const res = await request({
-          url: buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_CANCEL, { order_id: order.order_id }),
+          url: buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_CANCEL, {
+            order_id: order.order_id
+          }),
           method: 'POST'
         })
 
@@ -735,11 +739,11 @@ document.addEventListener('alpine:init', () => {
         const result = await this.apiGet(MARKET_ENDPOINTS.TRADE_ORDERS_LIST, {
           ...this.tradeFilters,
           page: this.tradeCurrentPage,
-          page_size: this.tradePageSize  // 后端使用 snake_case
+          page_size: this.tradePageSize // 后端使用 snake_case
         })
-        
+
         logger.info('[TradeManagement] API 响应:', result)
-        
+
         if (result && result.success && result.data) {
           // 后端返回 orders 数组（不是 list）
           const data = result.data
@@ -804,7 +808,7 @@ document.addEventListener('alpine:init', () => {
         const result = await this.apiGet(MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION, {
           ...this.redemptionFilters,
           page: this.redemptionCurrentPage,
-          page_size: this.redemptionPageSize  // 后端使用 snake_case
+          page_size: this.redemptionPageSize // 后端使用 snake_case
         })
         if (result && result.success && result.data) {
           const data = result.data
@@ -894,14 +898,14 @@ document.addEventListener('alpine:init', () => {
      */
     formatDate(dateStr) {
       if (!dateStr) return '-'
-      
+
       // 数据库配置 dateStrings: true，返回的是不带时区的北京时间字符串
       // 格式如: "2026-01-25 20:10:36"，这已经是北京时间，不需要再转换
       if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateStr)) {
         // 将 "YYYY-MM-DD HH:mm:ss" 转换为 "YYYY/MM/DD HH:mm:ss" 格式显示
         return dateStr.replace(/-/g, '/')
       }
-      
+
       // 如果是 ISO 格式或 Date 对象，则转换为北京时间
       try {
         return new Date(dateStr).toLocaleString('zh-CN', {
@@ -935,7 +939,7 @@ document.addEventListener('alpine:init', () => {
      */
     viewTradeOrderDetail(trade) {
       this.selectedTradeOrder = trade
-      this.selectedTrade = trade  // 兼容旧版模态框
+      this.selectedTrade = trade // 兼容旧版模态框
       this.showModal('tradeDetailModal')
     },
 
@@ -960,7 +964,9 @@ document.addEventListener('alpine:init', () => {
       this.stats = {
         totalTrades: this.tradePagination.total || this.tradeOrders.length,
         completedTrades: this.tradeOrders.filter(t => t.status === 'completed').length,
-        pendingTrades: this.tradeOrders.filter(t => t.status === 'pending' || t.status === 'created' || t.status === 'frozen').length,
+        pendingTrades: this.tradeOrders.filter(
+          t => t.status === 'pending' || t.status === 'created' || t.status === 'frozen'
+        ).length,
         // 后端字段: gross_amount, price_amount 等
         totalVolume: this.tradeOrders
           .filter(t => t.status === 'completed')

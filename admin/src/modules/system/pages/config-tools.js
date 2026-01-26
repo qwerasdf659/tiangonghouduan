@@ -32,7 +32,6 @@
  * </div>
  */
 
-
 import { logger } from '../../../utils/logger.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
 import { buildURL, request } from '../../../api/base.js'
@@ -57,9 +56,10 @@ const hideLoading = () => {
 
 document.addEventListener('alpine:init', () => {
   // 使用 createPageMixin 获取标准功能（包含 modal 支持）
-  const baseMixin = typeof createPageMixin === 'function' 
-    ? createPageMixin({ modal: true, asyncData: true, authGuard: true }) 
-    : {}
+  const baseMixin =
+    typeof createPageMixin === 'function'
+      ? createPageMixin({ modal: true, asyncData: true, authGuard: true })
+      : {}
 
   /**
    * 配置工具页面Alpine.js组件
@@ -109,12 +109,12 @@ document.addEventListener('alpine:init', () => {
     logs: [], // 日志列表
     diagnosticResult: null, // 诊断结果（null 时不显示）
     featureFlagValues: {},
-    
+
     // 操作状态变量（解决 Alpine Expression Error）
-    recalculating: false,  // 数据重算状态
-    diagnosing: false,     // 诊断状态
+    recalculating: false, // 数据重算状态
+    diagnosing: false, // 诊断状态
     maintenanceMode: false, // 维护模式状态
-    
+
     // 字典表单
     dictForm: {
       dict_code: '',
@@ -124,7 +124,7 @@ document.addEventListener('alpine:init', () => {
       status: 'active'
     },
     editingDictId: null,
-    
+
     maintenanceForm: {
       enabled: false,
       message: '系统正在升级维护中，预计30分钟后恢复，给您带来不便敬请谅解。',
@@ -508,7 +508,7 @@ document.addEventListener('alpine:init', () => {
      */
     async recalculateStats() {
       if (this.recalculating) return
-      
+
       this.recalculating = true
       try {
         // 使用仪表盘 API 刷新统计数据
@@ -533,39 +533,39 @@ document.addEventListener('alpine:init', () => {
      */
     async runDiagnostics() {
       if (this.diagnosing) return
-      
+
       this.diagnosing = true
       this.diagnosticResult = null
-      
+
       try {
         // 使用健康检查 API 进行系统诊断
         const response = await apiRequest(SYSTEM_ENDPOINTS.HEALTH)
-        
+
         if (response) {
           // 构建诊断结果对象
           this.diagnosticResult = {
-            '数据库': {
+            数据库: {
               status: response.checks?.database?.status === 'connected' ? 'ok' : 'error',
-              message: response.checks?.database?.status === 'connected' 
-                ? `连接正常 (延迟: ${response.checks?.database?.latency || 0}ms)` 
-                : '连接异常'
+              message:
+                response.checks?.database?.status === 'connected'
+                  ? `连接正常 (延迟: ${response.checks?.database?.latency || 0}ms)`
+                  : '连接异常'
             },
-            'Redis缓存': {
+            Redis缓存: {
               status: response.checks?.redis?.status === 'connected' ? 'ok' : 'error',
-              message: response.checks?.redis?.status === 'connected' 
-                ? '连接正常' 
-                : '连接异常或未配置'
+              message:
+                response.checks?.redis?.status === 'connected' ? '连接正常' : '连接异常或未配置'
             },
-            '系统状态': {
+            系统状态: {
               status: response.status === 'healthy' ? 'ok' : 'error',
               message: response.status === 'healthy' ? '系统运行正常' : '系统存在异常'
             },
-            '运行时间': {
+            运行时间: {
               status: 'ok',
               message: `已运行 ${Math.floor((response.uptime || 0) / 3600)} 小时`
             }
           }
-          
+
           this.showSuccess('系统诊断完成')
           logger.info('[ConfigTools] 系统诊断完成', this.diagnosticResult)
         } else {
@@ -573,7 +573,7 @@ document.addEventListener('alpine:init', () => {
         }
       } catch (error) {
         this.diagnosticResult = {
-          '诊断错误': {
+          诊断错误: {
             status: 'error',
             message: error.message || '诊断失败'
           }
@@ -614,7 +614,7 @@ document.addEventListener('alpine:init', () => {
           const categories = response.data?.categories || []
           const rarities = response.data?.rarities || []
           const assetGroups = response.data?.asset_groups || []
-          
+
           // 转换为统一格式：dict_id, dict_code, dict_name, dict_value, sort_order, status
           this.dictionaries = [
             ...categories.map((d, idx) => ({
@@ -648,7 +648,7 @@ document.addEventListener('alpine:init', () => {
               _raw: d
             }))
           ]
-          
+
           logger.info('[ConfigTools] 加载数据字典成功', { count: this.dictionaries.length })
         }
       } catch (error) {
@@ -678,7 +678,7 @@ document.addEventListener('alpine:init', () => {
      */
     editDict(dict) {
       logger.info('[ConfigTools] 编辑字典', dict)
-      this.dictForm = { 
+      this.dictForm = {
         dict_code: dict.dict_code,
         dict_name: dict.dict_name,
         dict_value: dict.dict_value,
@@ -698,18 +698,18 @@ document.addEventListener('alpine:init', () => {
       if (!confirm(`确定要删除字典 "${dict.dict_name}" 吗？`)) {
         return
       }
-      
+
       // 使用转换后的 dict_code 字段
       const code = dict.dict_code
       if (!code) {
         this.showError('删除失败：字典代码不存在')
         return
       }
-      
+
       showLoading()
       try {
         let url = ''
-        
+
         // 根据 dict_type 选择 API
         if (dict.dict_type === 'category') {
           url = buildURL(SYSTEM_ENDPOINTS.DICT_CATEGORY_DELETE, { code })
@@ -720,9 +720,9 @@ document.addEventListener('alpine:init', () => {
         } else {
           throw new Error('未知的字典类型')
         }
-        
+
         logger.info('[ConfigTools] 删除字典', { code, type: dict.dict_type, url })
-        
+
         const response = await apiRequest(url, { method: 'DELETE' })
         if (response && response.success) {
           this.showSuccess(`字典 "${dict.dict_name}" 删除成功`)
@@ -753,42 +753,42 @@ document.addEventListener('alpine:init', () => {
         const code = this.dictForm.dict_code
         const dictType = this.dictForm.dict_type || 'category'
         const isEdit = !!this.editingDictId
-        
+
         // 构建请求数据
         const requestData = {
           display_name: this.dictForm.dict_name,
           description: this.dictForm.dict_value || '',
           sort_order: parseInt(this.dictForm.sort_order) || 0
         }
-        
+
         let url = ''
         let method = isEdit ? 'PUT' : 'POST'
-        
+
         // 根据字典类型选择 API
         if (dictType === 'category') {
-          url = isEdit 
+          url = isEdit
             ? buildURL(SYSTEM_ENDPOINTS.DICT_CATEGORY_UPDATE, { code })
             : SYSTEM_ENDPOINTS.DICT_CATEGORY_LIST
           if (!isEdit) requestData.category_code = code
         } else if (dictType === 'rarity') {
-          url = isEdit 
+          url = isEdit
             ? buildURL(SYSTEM_ENDPOINTS.DICT_RARITY_UPDATE, { code })
             : SYSTEM_ENDPOINTS.DICT_RARITY_LIST
           if (!isEdit) requestData.rarity_code = code
         } else if (dictType === 'asset_group') {
-          url = isEdit 
+          url = isEdit
             ? buildURL(SYSTEM_ENDPOINTS.DICT_ASSET_GROUP_UPDATE, { code })
             : SYSTEM_ENDPOINTS.DICT_ASSET_GROUP_LIST
           if (!isEdit) requestData.group_code = code
         }
-        
+
         logger.info('[ConfigTools] 提交字典', { isEdit, dictType, code, url, requestData })
-        
+
         const response = await apiRequest(url, {
           method,
-          data: requestData  // 使用 data 而非 body，request 函数会自动 JSON.stringify
+          data: requestData // 使用 data 而非 body，request 函数会自动 JSON.stringify
         })
-        
+
         if (response && response.success) {
           this.showSuccess(isEdit ? '修改成功' : '新增成功')
           this.hideModal('addDictModal')
@@ -818,7 +818,9 @@ document.addEventListener('alpine:init', () => {
         }
 
         if (this.maintenanceForm.estimatedEndTime) {
-          settings.maintenance_end_time = new Date(this.maintenanceForm.estimatedEndTime).toISOString()
+          settings.maintenance_end_time = new Date(
+            this.maintenanceForm.estimatedEndTime
+          ).toISOString()
         }
 
         const response = await apiRequest(SYSTEM_ENDPOINTS.SETTINGS_BASIC, {
@@ -849,7 +851,10 @@ document.addEventListener('alpine:init', () => {
       try {
         const flagKey = flag.setting_key || flag.flag_key
         this.featureFlagValues[flagKey] = !this.featureFlagValues[flagKey]
-        logger.info('[ConfigTools] 功能开关切换', { key: flagKey, value: this.featureFlagValues[flagKey] })
+        logger.info('[ConfigTools] 功能开关切换', {
+          key: flagKey,
+          value: this.featureFlagValues[flagKey]
+        })
       } catch (error) {
         this.showError('切换失败：' + error.message)
       }
@@ -929,10 +934,7 @@ document.addEventListener('alpine:init', () => {
      * 组件初始化后加载数据
      */
     async initData() {
-      await Promise.all([
-        this.loadDictionaries(),
-        this.loadLogs()
-      ])
+      await Promise.all([this.loadDictionaries(), this.loadLogs()])
     }
   }))
 

@@ -246,10 +246,10 @@
 }
 
 /* 暗色模式下的调整 */
-[data-theme="dark"] .theme-dropdown,
-[data-theme="minimal-dark"] .theme-dropdown,
-[data-theme="cyber"] .theme-dropdown,
-[data-theme="neon"] .theme-dropdown {
+[data-theme='dark'] .theme-dropdown,
+[data-theme='minimal-dark'] .theme-dropdown,
+[data-theme='cyber'] .theme-dropdown,
+[data-theme='neon'] .theme-dropdown {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
 }
 
@@ -259,7 +259,7 @@
     width: 280px;
     right: -40px;
   }
-  
+
   .theme-option .theme-scene {
     display: none;
   }

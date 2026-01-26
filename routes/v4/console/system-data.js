@@ -643,11 +643,17 @@ router.put(
       if (rules_text !== undefined) updateData.rules_text = rules_text
       if (budget_mode !== undefined) updateData.budget_mode = budget_mode
       if (cost_per_draw !== undefined) updateData.cost_per_draw = cost_per_draw
-      if (max_draws_per_user_daily !== undefined) updateData.max_draws_per_user_daily = max_draws_per_user_daily
-      if (max_draws_per_user_total !== undefined) updateData.max_draws_per_user_total = max_draws_per_user_total
+      if (max_draws_per_user_daily !== undefined) {
+        updateData.max_draws_per_user_daily = max_draws_per_user_daily
+      }
+      if (max_draws_per_user_total !== undefined) {
+        updateData.max_draws_per_user_total = max_draws_per_user_total
+      }
       if (total_prize_pool !== undefined) updateData.total_prize_pool = total_prize_pool
       if (remaining_prize_pool !== undefined) updateData.remaining_prize_pool = remaining_prize_pool
-      if (prize_distribution_config !== undefined) updateData.prize_distribution_config = prize_distribution_config
+      if (prize_distribution_config !== undefined) {
+        updateData.prize_distribution_config = prize_distribution_config
+      }
 
       await campaign.update(updateData)
 
@@ -728,7 +734,12 @@ router.delete(
       // 检查是否有关联的奖品
       const prizeCount = await LotteryPrize.count({ where: { campaign_id: parseInt(campaign_id) } })
       if (prizeCount > 0) {
-        return res.apiError('活动下存在奖品，无法删除', 'HAS_RELATED_DATA', { prize_count: prizeCount }, 400)
+        return res.apiError(
+          '活动下存在奖品，无法删除',
+          'HAS_RELATED_DATA',
+          { prize_count: prizeCount },
+          400
+        )
       }
 
       // 软删除或硬删除（根据业务需求）

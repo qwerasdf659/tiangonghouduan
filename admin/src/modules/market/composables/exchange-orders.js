@@ -84,9 +84,11 @@ export function useExchangeOrdersMethods() {
       try {
         const total = this.orderPagination?.total || this.orders.length
         const pending = this.orders.filter(o => o.status === 'pending').length
-        const shipped = this.orders.filter(o => o.status === 'shipped' || o.status === 'completed').length
+        const shipped = this.orders.filter(
+          o => o.status === 'shipped' || o.status === 'completed'
+        ).length
         const cancelled = this.orders.filter(o => o.status === 'cancelled').length
-        
+
         this.orderStats = { total, pending, shipped, cancelled }
       } catch (e) {
         logger.error('[ExchangeOrders] 计算订单统计失败:', e)
@@ -180,7 +182,10 @@ export function useExchangeOrdersMethods() {
      * @param {Object} order - 订单对象
      */
     async cancelOrder(order) {
-      const confirmed = await this.$confirm?.(`确定要取消订单 ${order.order_no} 吗？已支付的资产将退回用户账户。`, { type: 'danger' })
+      const confirmed = await this.$confirm?.(
+        `确定要取消订单 ${order.order_no} 吗？已支付的资产将退回用户账户。`,
+        { type: 'danger' }
+      )
       if (!confirmed) return
 
       try {
@@ -245,4 +250,3 @@ export function useExchangeOrdersMethods() {
 }
 
 export default { useExchangeOrdersState, useExchangeOrdersMethods }
-

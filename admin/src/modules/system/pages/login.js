@@ -32,7 +32,14 @@
 import { logger } from '../../../utils/logger.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
 import { AUTH_ENDPOINTS } from '../../../api/auth.js'
-import { getToken, setToken, clearToken, setUser, clearUser, checkBrowserSession } from '../../../api/base.js'
+import {
+  getToken,
+  setToken,
+  clearToken,
+  setUser,
+  clearUser,
+  checkBrowserSession
+} from '../../../api/base.js'
 
 /**
  * 登录页面Alpine.js组件工厂函数

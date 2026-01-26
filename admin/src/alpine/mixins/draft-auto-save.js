@@ -12,7 +12,7 @@
  */
 export function withDraftAutoSave(componentName) {
   const draftKey = `draft_${componentName}`
-  
+
   return {
     // 草稿保存的键名
     _draftKey: draftKey,
@@ -22,7 +22,7 @@ export function withDraftAutoSave(componentName) {
     _lastSaveTime: null,
     // 是否有未保存的变更
     _hasUnsavedChanges: false,
-    
+
     /**
      * 初始化草稿功能
      * @param {string|number} recordId - 当前编辑的记录ID（新建时为 'new'）
@@ -31,7 +31,7 @@ export function withDraftAutoSave(componentName) {
       this._draftRecordId = recordId
       this.restoreDraft()
     },
-    
+
     /**
      * 恢复草稿
      * @returns {Object|null} 恢复的草稿数据
@@ -40,23 +40,23 @@ export function withDraftAutoSave(componentName) {
       try {
         const draft = localStorage.getItem(this._draftKey)
         if (!draft) return null
-        
+
         const saved = JSON.parse(draft)
         const savedTime = new Date(saved.savedAt)
         const hours = (new Date() - savedTime) / 1000 / 60 / 60
-        
+
         // 24小时过期
         if (hours > 24) {
           localStorage.removeItem(this._draftKey)
           console.log('📝 草稿已过期，已清除')
           return null
         }
-        
+
         // 检查是否是同一条记录
         if (saved.recordId !== this._draftRecordId) {
           return null
         }
-        
+
         console.log(`📝 恢复草稿（${Math.round(hours * 60)}分钟前保存）`)
         this._lastSaveTime = savedTime
         return saved.formData
@@ -65,7 +65,7 @@ export function withDraftAutoSave(componentName) {
         return null
       }
     },
-    
+
     /**
      * 保存草稿
      * @param {Object} formData - 要保存的表单数据
@@ -73,11 +73,14 @@ export function withDraftAutoSave(componentName) {
     saveDraft(formData) {
       try {
         const now = new Date()
-        localStorage.setItem(this._draftKey, JSON.stringify({
-          recordId: this._draftRecordId,
-          formData: formData,
-          savedAt: now.toISOString()
-        }))
+        localStorage.setItem(
+          this._draftKey,
+          JSON.stringify({
+            recordId: this._draftRecordId,
+            formData: formData,
+            savedAt: now.toISOString()
+          })
+        )
         this._lastSaveTime = now
         this._hasUnsavedChanges = false
         console.log('💾 草稿已保存')
@@ -85,7 +88,7 @@ export function withDraftAutoSave(componentName) {
         console.warn('草稿保存失败', e)
       }
     },
-    
+
     /**
      * 清除草稿
      */
@@ -94,7 +97,7 @@ export function withDraftAutoSave(componentName) {
       this._hasUnsavedChanges = false
       console.log('🗑️ 草稿已清除')
     },
-    
+
     /**
      * 检查是否有草稿
      * @returns {boolean}
@@ -102,32 +105,32 @@ export function withDraftAutoSave(componentName) {
     hasDraft() {
       return localStorage.getItem(this._draftKey) !== null
     },
-    
+
     /**
      * 获取草稿保存时间的显示文本
      * @returns {string}
      */
     getDraftTimeText() {
       if (!this._lastSaveTime) return ''
-      
+
       const now = new Date()
       const diffMs = now - this._lastSaveTime
       const diffMinutes = Math.floor(diffMs / 60000)
-      
+
       if (diffMinutes < 1) return '刚刚保存'
       if (diffMinutes < 60) return `${diffMinutes}分钟前保存`
-      
+
       const diffHours = Math.floor(diffMinutes / 60)
       return `${diffHours}小时前保存`
     },
-    
+
     /**
      * 标记有未保存的变更
      */
     markAsChanged() {
       this._hasUnsavedChanges = true
     },
-    
+
     /**
      * 检查是否有未保存的变更
      * @returns {boolean}
@@ -150,7 +153,7 @@ export function createDraftFormMixin(formName, defaultFormData = {}) {
     formData: { ...defaultFormData },
     // 混入草稿保存功能
     ...withDraftAutoSave(formName),
-    
+
     /**
      * 打开编辑弹窗
      * @param {Object} record - 要编辑的记录
@@ -158,7 +161,7 @@ export function createDraftFormMixin(formName, defaultFormData = {}) {
     openEdit(record = null) {
       const recordId = record?.id || 'new'
       this.initDraft(recordId)
-      
+
       // 尝试恢复草稿
       const draftData = this.restoreDraft()
       if (draftData) {
@@ -169,7 +172,7 @@ export function createDraftFormMixin(formName, defaultFormData = {}) {
         this.formData = { ...defaultFormData }
       }
     },
-    
+
     /**
      * 表单数据变更处理（带防抖）
      */
@@ -177,21 +180,21 @@ export function createDraftFormMixin(formName, defaultFormData = {}) {
       this.markAsChanged()
       // 防抖保存将由模板中的 @input.debounce.500ms 处理
     },
-    
+
     /**
      * 保存表单草稿
      */
     saveFormDraft() {
       this.saveDraft(this.formData)
     },
-    
+
     /**
      * 提交成功后清理
      */
     onSubmitSuccess() {
       this.clearDraft()
     },
-    
+
     /**
      * 取消编辑
      * @returns {boolean} 是否确认取消
@@ -202,7 +205,7 @@ export function createDraftFormMixin(formName, defaultFormData = {}) {
       }
       return true
     },
-    
+
     /**
      * 强制取消（不保留草稿）
      */
@@ -216,4 +219,3 @@ export default {
   withDraftAutoSave,
   createDraftFormMixin
 }
-

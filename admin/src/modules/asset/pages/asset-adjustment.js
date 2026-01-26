@@ -24,7 +24,6 @@
  * - POST /api/v4/console/asset-adjustment/adjust (资产调整)
  */
 
-
 import { logger } from '../../../utils/logger.js'
 import { Alpine, createCrudMixin } from '../../../alpine/index.js'
 
@@ -233,7 +232,7 @@ function assetAdjustmentPage() {
       user_info: '',
       asset_type: '',
       material_code: '',
-      campaign_id: '',  // 🔴 新增：预算积分需要关联活动ID
+      campaign_id: '', // 🔴 新增：预算积分需要关联活动ID
       direction: 'increase',
       amount: '',
       reason_type: 'error_correction',
@@ -359,7 +358,9 @@ function assetAdjustmentPage() {
                 name: t.display_name || t.name
               }))
 
-            logger.info(`📊 加载资产类型: ${this.assetTypes.length} 个 (去重前${rawAssetTypes.length}个), 材料类型: ${this.materialTypes.length} 个`)
+            logger.info(
+              `📊 加载资产类型: ${this.assetTypes.length} 个 (去重前${rawAssetTypes.length}个), 材料类型: ${this.materialTypes.length} 个`
+            )
           }
         }
       } catch (error) {
@@ -403,7 +404,7 @@ function assetAdjustmentPage() {
      */
     async loadRecords() {
       console.log('🔄 [loadRecords] 刷新按钮被点击，开始加载记录...')
-      
+
       // 如果没有用户ID，直接返回空记录（API要求user_id必填）
       if (!this.currentUser?.user_id && !this.form?.user_id) {
         logger.info('未选择用户，跳过加载调账记录')
@@ -419,7 +420,7 @@ function assetAdjustmentPage() {
       try {
         const token = localStorage.getItem('admin_token')
         const userId = this.currentUser?.user_id || this.form?.user_id
-        
+
         const params = new URLSearchParams({
           user_id: userId,
           page: this.currentPage,
@@ -446,7 +447,7 @@ function assetAdjustmentPage() {
             this.updateStats()
 
             logger.info(`📊 加载调账记录: ${this.records.length} 条`)
-            
+
             // 显示刷新成功提示
             console.log(`✅ [loadRecords] 刷新完成，共 ${this.totalRecords} 条记录`)
             this.showSuccess(`已刷新，共 ${this.totalRecords} 条记录`)
@@ -499,7 +500,7 @@ function assetAdjustmentPage() {
     async handleSearch() {
       logger.info('🔍 handleSearch() 被调用')
       logger.info('searchUserId:', this.searchUserId, 'searchMobile:', this.searchMobile)
-      
+
       if (!this.searchUserId && !this.searchMobile) {
         logger.warn('未输入用户ID或手机号')
         this.showError('请输入用户ID或手机号')
@@ -568,16 +569,16 @@ function assetAdjustmentPage() {
       try {
         const token = localStorage.getItem('admin_token')
         logger.info('Token存在:', !!token, token ? token.substring(0, 20) + '...' : 'null')
-        
+
         const url = `${API_BASE_URL}/console/asset-adjustment/user/${userId}/balances`
         logger.info('请求URL:', url)
-        
+
         const response = await fetch(url, {
           headers: { Authorization: `Bearer ${token}` }
         })
 
         logger.info('响应状态:', response.status)
-        
+
         if (!response.ok) {
           const errorText = await response.text()
           logger.error('响应错误:', errorText)
@@ -590,14 +591,16 @@ function assetAdjustmentPage() {
         if (result.success) {
           this.currentUser = result.data.user
           this.balances = result.data.balances || []
-          
+
           // 🔴 关键：设置 form.user_id，提交时需要用到
           this.form.user_id = String(this.currentUser?.user_id || userId)
-          
+
           // 同步到 form 以便在HTML模板中显示用户信息
           this.form.user_info = `✅ 已加载用户: ${this.currentUser?.nickname || '未知'} (ID: ${this.form.user_id})`
 
-          logger.info(`✅ 加载用户资产完成: ${this.balances.length} 种, form.user_id=${this.form.user_id}`)
+          logger.info(
+            `✅ 加载用户资产完成: ${this.balances.length} 种, form.user_id=${this.form.user_id}`
+          )
 
           // 加载调整记录
           this.currentPage = 1
@@ -958,11 +961,11 @@ function assetAdjustmentPage() {
     async searchUser() {
       logger.info('🔍 searchUser() 被调用')
       logger.info('form.user_id:', this.form.user_id)
-      
+
       // 🔴 修复：同步 form.user_id 到 searchUserId
       // 如果输入框为空，清空搜索状态
       const inputUserId = (this.form.user_id || '').trim()
-      
+
       if (!inputUserId) {
         // 清空搜索状态和当前用户
         this.searchUserId = ''
@@ -976,11 +979,11 @@ function assetAdjustmentPage() {
         logger.info('输入为空，已清空搜索状态')
         return
       }
-      
+
       // 设置搜索ID
       this.searchUserId = inputUserId
       logger.info('设置 searchUserId:', this.searchUserId)
-      
+
       try {
         await this.handleSearch()
       } catch (error) {
@@ -1123,14 +1126,17 @@ function assetAdjustmentPage() {
 
       try {
         const token = localStorage.getItem('admin_token')
-        const response = await fetch(`${API_BASE_URL}/console/asset-adjustment/approve/${record.adjustment_id}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({ status: 'approved' })
-        })
+        const response = await fetch(
+          `${API_BASE_URL}/console/asset-adjustment/approve/${record.adjustment_id}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ status: 'approved' })
+          }
+        )
 
         const result = await response.json()
         if (result.success) {
@@ -1154,7 +1160,7 @@ function assetAdjustmentPage() {
     async submitAdjustment() {
       // 🔴 收集所有验证错误，一次性提示用户
       const errors = []
-      
+
       if (!this.form.user_id) {
         errors.push('• 用户ID（必填）')
       }
@@ -1187,9 +1193,10 @@ function assetAdjustmentPage() {
 
       try {
         const token = localStorage.getItem('admin_token')
-        const amount = this.form.direction === 'decrease'
-          ? -Math.abs(this.form.amount)
-          : Math.abs(this.form.amount)
+        const amount =
+          this.form.direction === 'decrease'
+            ? -Math.abs(this.form.amount)
+            : Math.abs(this.form.amount)
 
         // 构建资产代码（资产类型已经是正确的格式如 POINTS, DIAMOND, BUDGET_POINTS）
         let assetCode = this.form.asset_type
@@ -1197,8 +1204,13 @@ function assetAdjustmentPage() {
         if (this.form.asset_type === 'material' && this.form.material_code) {
           assetCode = this.form.material_code
         }
-        
-        logger.info('提交调账:', { user_id: this.form.user_id, assetCode, amount, campaign_id: this.form.campaign_id })
+
+        logger.info('提交调账:', {
+          user_id: this.form.user_id,
+          assetCode,
+          amount,
+          campaign_id: this.form.campaign_id
+        })
 
         const data = {
           user_id: parseInt(this.form.user_id),
@@ -1235,7 +1247,7 @@ function assetAdjustmentPage() {
             user_info: currentUserInfo,
             asset_type: '',
             material_code: '',
-            campaign_id: '',  // 🔴 重置活动ID
+            campaign_id: '', // 🔴 重置活动ID
             direction: 'increase',
             amount: '',
             reason_type: 'error_correction',

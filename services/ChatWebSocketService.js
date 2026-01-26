@@ -169,10 +169,7 @@ class ChatWebSocketService {
    */
   setupEventHandlers() {
     this.io.on('connection', socket => {
-      /**
-       * 🔐 从JWT自动注册用户身份（P0安全修复 - 2025年12月18日）
-       * 🔄 2026-01-19：统一使用 role_level >= 100 判断管理员（删除 is_admin 兼容）
-       */
+      // 从 JWT 自动注册用户身份，使用 role_level >= 100 判断管理员
       const userId = socket.user.user_id
       const isAdmin = socket.user.role_level >= 100
 

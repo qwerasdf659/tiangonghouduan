@@ -433,31 +433,25 @@ this.io = socketIO(server, {
 
 ## 5️⃣ **数据库迁移与双轨架构标准**
 
-### **双轨架构禁止长期存在**
+### **暴力重构策略（禁止双轨架构）**
 
-**强制要求**: 新旧表并存的双轨架构必须设置明确的迁移截止日期
+**强制要求**: 本项目采用暴力重构策略，禁止新旧表并存的双轨架构
 
 ```javascript
-// ✅ 设置迁移截止日期
-const MIGRATION_CUTOFF_DATE = new Date('2025-12-17')
-const now = new Date()
+// ✅ 正确：直接使用新表，不保留旧表兼容
+const items = await ItemInstance.findAll({ where: { owner_user_id: userId } })
 
-if (now > MIGRATION_CUTOFF_DATE) {
-  // 截止日期后：仅使用新表
-  const items = await ItemInstance.findAll({ where: { owner_user_id: userId } })
-  
-} else {
-  // 截止日期前：双轨读取（降级方案）
-  const [newItems, oldItems] = await Promise.all([
-    ItemInstance.findAll({ where: { owner_user_id: userId } }),
-    UserInventory.findAll({ where: { user_id: userId } })
-  ])
-  // 合并数据...
-}
-
-// ❌ 禁止：无期限的双轨逻辑
-const [newItems, oldItems] = await Promise.all([...])  // ❌ 永久双轨
+// ❌ 禁止：双轨读取逻辑
+// const [newItems, oldItems] = await Promise.all([
+//   ItemInstance.findAll({ ... }),
+//   OldTable.findAll({ ... })  // 禁止引用旧表
+// ])
 ```
+
+**原则**：
+- 迁移完成后立即删除旧表和旧代码
+- 不保留任何兼容性分支
+- 前后端同步更新，不做向后兼容
 
 ### **旧接口废弃标准流程**
 

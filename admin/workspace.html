@@ -46,7 +46,7 @@
     [x-cloak] { display: none !important; }
   </style>
 </head>
-<body class="bg-gray-100">
+<body class="themed-bg-subtle">
   <!-- 加载中状态 -->
   <div id="loading-screen" class="workspace-loading">
     <div class="workspace-loading-spinner"></div>
@@ -58,6 +58,9 @@
     x-data="workspaceTabs()" 
     x-cloak
     @toggle-mobile-menu.window="$refs.sidebar && ($refs.sidebar.mobileOpen = !$refs.sidebar.mobileOpen)"
+    @keydown.ctrl.k.prevent="$store.shortcuts?.trigger('openSearch')"
+    @keydown.escape="$store.shortcuts?.trigger('closeModal')"
+    @keydown.ctrl.s.prevent="$store.shortcuts?.trigger('save')"
   >
     <!-- 侧边栏 -->
     <aside 
@@ -313,16 +316,16 @@
             <div 
               x-show="open"
               x-transition
-              class="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
+              class="absolute right-0 top-full mt-2 w-48 themed-card rounded-lg shadow-lg border themed-border py-2 z-50"
               style="display: none;"
             >
-              <a href="/admin/profile.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+              <a href="/admin/profile.html" class="block px-4 py-2 text-sm themed-text-secondary themed-hover-bg">
                 👤 个人设置
               </a>
-              <a href="/admin/system-settings.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+              <a href="/admin/system-settings.html" class="block px-4 py-2 text-sm themed-text-secondary themed-hover-bg">
                 ⚙️ 系统设置
               </a>
-              <div class="border-t border-gray-200 my-1"></div>
+              <div class="border-t themed-border my-1"></div>
               <button 
                 @click="handleLogout()"
                 class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"

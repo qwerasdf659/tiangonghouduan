@@ -149,8 +149,10 @@ document.addEventListener('alpine:init', () => {
         this.marketStats = {
           totalItems: this.exchangeStats?.items?.activeCount || this.items?.length || 0,
           todayOrders: this.exchangeStats?.orders?.total || this.orders?.length || 0,
-          pendingShipments: this.exchangeStats?.orders?.pending || 
-            (this.orders?.filter(o => o.status === 'pending')?.length) || 0,
+          pendingShipments:
+            this.exchangeStats?.orders?.pending ||
+            this.orders?.filter(o => o.status === 'pending')?.length ||
+            0,
           // 使用累计消耗的资产数量
           pointsConsumed: this.exchangeStats?.revenue?.total_virtual_value || 0
         }
@@ -234,9 +236,12 @@ document.addEventListener('alpine:init', () => {
         try {
           this.saving = true
           const res = await request({
-            url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_COMPLETE || MARKET_ENDPOINTS.EXCHANGE_ORDER_SHIP, {
-              order_no: order.order_no || order.order_id
-            }),
+            url: buildURL(
+              MARKET_ENDPOINTS.EXCHANGE_ORDER_COMPLETE || MARKET_ENDPOINTS.EXCHANGE_ORDER_SHIP,
+              {
+                order_no: order.order_no || order.order_id
+              }
+            ),
             method: 'POST',
             data: { status: 'completed' }
           })

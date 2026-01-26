@@ -57,19 +57,14 @@ async function requireValidSession(req, res, next) {
     const sessionToken = req.user?.session_token
 
     /*
-     * 2. 如果没有 session_token，说明是旧版Token（无会话存储）
-     *    为了兼容旧Token，仅记录警告但允许通过
-     *    待所有用户重新登录后，可改为强制拒绝
+     * 2. 严格模式：缺少 session_token 直接拒绝
+     *    2026-01-26 技术债务清理：采用方案A严格模式，前端已更新
      */
     if (!sessionToken) {
       logger.warn(
-        `⚠️ [SensitiveOp] 敏感操作缺少session_token: user_id=${req.user?.user_id}, path=${req.path}`
+        `🔒 [SensitiveOp] 敏感操作缺少session_token: user_id=${req.user?.user_id}, path=${req.path}`
       )
-      /*
-       * 暂时允许通过，后续可改为拒绝：
-       * return res.apiError('会话信息缺失，请重新登录', 'SESSION_REQUIRED', null, 401)
-       */
-      return next()
+      return res.apiError('会话信息缺失，请重新登录', 'SESSION_REQUIRED', null, 401)
     }
 
     // 3. 验证会话是否仍然有效

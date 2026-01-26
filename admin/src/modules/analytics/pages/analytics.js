@@ -26,7 +26,6 @@
  * - GET /api/v4/console/analytics/lottery-trends (抽奖趋势)
  */
 
-
 // ES Module 导入
 import { logger } from '../../../utils/logger.js'
 import { ANALYTICS_ENDPOINTS } from '../../../api/analytics.js'
@@ -509,7 +508,9 @@ function analyticsPage() {
     async loadStrategyStats() {
       try {
         // 使用默认活动ID 1 获取策略统计概览
-        const response = await apiRequest(buildURL(LOTTERY_ENDPOINTS.STRATEGY_STATS_OVERVIEW, { campaign_id: 1 }))
+        const response = await apiRequest(
+          buildURL(LOTTERY_ENDPOINTS.STRATEGY_STATS_OVERVIEW, { campaign_id: 1 })
+        )
 
         if (response && response.success) {
           this.strategyStats = {
@@ -535,7 +536,9 @@ function analyticsPage() {
     async loadTierDistribution() {
       try {
         // 使用默认活动ID 1 获取档位分布
-        const response = await apiRequest(buildURL(LOTTERY_ENDPOINTS.STRATEGY_STATS_TIER, { campaign_id: 1 }))
+        const response = await apiRequest(
+          buildURL(LOTTERY_ENDPOINTS.STRATEGY_STATS_TIER, { campaign_id: 1 })
+        )
 
         if (response && response.success) {
           this.tierDistribution = response.data?.distribution || response.data || []
@@ -665,7 +668,11 @@ function analyticsPage() {
               series: [
                 {
                   data: [
-                    { value: Math.max(1, peakUsers - Math.floor(peakUsers * 0.15)), name: '普通用户', itemStyle: { color: '#0d6efd' } },
+                    {
+                      value: Math.max(1, peakUsers - Math.floor(peakUsers * 0.15)),
+                      name: '普通用户',
+                      itemStyle: { color: '#0d6efd' }
+                    },
                     {
                       value: Math.max(1, Math.floor(peakUsers * 0.05)),
                       name: '管理员',
@@ -697,9 +704,9 @@ function analyticsPage() {
      */
     setDateRange(range) {
       const rangeMapping = {
-        'today': '1',
-        'week': '7',
-        'month': '30'
+        today: '1',
+        week: '7',
+        month: '30'
       }
       this.filters.timeRange = rangeMapping[range] || '30'
       logger.info('[Analytics] 设置日期范围', { range, timeRange: this.filters.timeRange })

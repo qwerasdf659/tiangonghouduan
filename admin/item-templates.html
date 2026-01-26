@@ -6,10 +6,10 @@
     pageStyle: '[x-cloak] { display: none !important; } .template-card { transition: all 0.3s ease; border-top: 3px solid #06b6d4; } .template-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); } .template-icon { font-size: 2.5rem; margin-bottom: 10px; } .rarity-common { background: #6b7280; } .rarity-uncommon { background: #10b981; } .rarity-rare { background: #3b82f6; } .rarity-epic { background: #8b5cf6; } .rarity-legendary { background: #f97316; }' 
   }) %>
 </head>
-<body class="bg-gray-100 min-h-screen" x-data="itemTemplatesPage()" x-init="init()" x-cloak>
+<body class="themed-bg-subtle min-h-screen" x-data="itemTemplatesPage()" x-init="init()" x-cloak>
   
   <!-- 导航栏 -->
-  <nav class="bg-blue-600 text-white shadow-lg">
+  <nav class="themed-bg-primary text-white shadow-lg">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
         <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
@@ -25,34 +25,34 @@
   <div class="container mx-auto px-4 py-6">
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <div class="bg-white rounded-lg shadow p-4 text-center">
+      <div class="themed-card rounded-lg shadow p-4 text-center">
         <div class="text-4xl text-cyan-500 mb-2">📦</div>
-        <h6 class="text-gray-500 text-sm">模板总数</h6>
+        <h6 class="themed-text-muted text-sm">模板总数</h6>
         <h2 class="text-2xl font-bold text-cyan-600" x-text="stats.total">-</h2>
       </div>
-      <div class="bg-white rounded-lg shadow p-4 text-center">
+      <div class="themed-card rounded-lg shadow p-4 text-center">
         <div class="text-4xl text-green-500 mb-2">🏷️</div>
-        <h6 class="text-gray-500 text-sm">物品类型</h6>
+        <h6 class="themed-text-muted text-sm">物品类型</h6>
         <h2 class="text-2xl font-bold text-green-600" x-text="stats.types">-</h2>
       </div>
-      <div class="bg-white rounded-lg shadow p-4 text-center">
+      <div class="themed-card rounded-lg shadow p-4 text-center">
         <div class="text-4xl text-yellow-500 mb-2">✅</div>
-        <h6 class="text-gray-500 text-sm">已启用</h6>
+        <h6 class="themed-text-muted text-sm">已启用</h6>
         <h2 class="text-2xl font-bold text-yellow-600" x-text="stats.active">-</h2>
       </div>
-      <div class="bg-white rounded-lg shadow p-4 text-center">
+      <div class="themed-card rounded-lg shadow p-4 text-center">
         <div class="text-4xl text-purple-500 mb-2">⭐</div>
-        <h6 class="text-gray-500 text-sm">稀有度分布</h6>
+        <h6 class="themed-text-muted text-sm">稀有度分布</h6>
         <h2 class="text-2xl font-bold text-purple-600" x-text="stats.rarities">-</h2>
       </div>
     </div>
 
     <!-- 筛选和操作栏 -->
-    <div class="bg-white rounded-lg shadow mb-4">
+    <div class="themed-card rounded-lg shadow mb-4">
       <div class="p-4">
         <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">物品类型</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">物品类型</label>
             <select class="w-full px-3 py-2 border rounded-lg" x-model="filters.type" @change="loadTemplates()">
               <option value="">全部类型</option>
               <option value="voucher">优惠券</option>
@@ -64,7 +64,7 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">稀有度</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">稀有度</label>
             <select class="w-full px-3 py-2 border rounded-lg" x-model="filters.rarity" @change="loadTemplates()">
               <option value="">全部稀有度</option>
               <option value="common">普通</option>
@@ -75,7 +75,7 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
             <select class="w-full px-3 py-2 border rounded-lg" x-model="filters.status" @change="loadTemplates()">
               <option value="">全部状态</option>
               <option value="active">已启用</option>
@@ -83,18 +83,18 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">搜索</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">搜索</label>
             <input type="text" class="w-full px-3 py-2 border rounded-lg" x-model="filters.search" placeholder="名称或编码" @keyup.enter="loadTemplates()">
           </div>
           <div class="flex space-x-2">
-            <button @click="loadTemplates()" :disabled="loading" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed">
+            <button @click="loadTemplates()" :disabled="loading" class="px-4 py-2 themed-btn-primary rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
               <span x-show="loading" class="inline-block animate-spin mr-1">⏳</span>
               <span x-show="!loading">🔍</span> 搜索
             </button>
             <button @click="resetFilters()" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600" title="重置筛选条件">
               🔄 重置
             </button>
-            <button @click="openCreateModal()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+            <button @click="openCreateModal()" class="px-4 py-2 themed-btn-primary rounded-lg">
               ➕ 新建
             </button>
           </div>
@@ -105,7 +105,7 @@
     <!-- 模板卡片列表 -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       <template x-for="t in templates" :key="t.item_template_id">
-        <div class="template-card bg-white rounded-lg shadow p-4">
+        <div class="template-card themed-card rounded-lg shadow p-4">
           <div class="flex justify-between items-start mb-3">
             <div>
               <span class="text-2xl" x-text="getTypeIcon(t.item_type)">📦</span>
@@ -114,16 +114,16 @@
                     x-text="getRarityLabel(t.rarity_code, t.rarity)"></span>
             </div>
             <span class="px-2 py-1 rounded text-xs"
-                  :class="t.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
+                  :class="t.is_enabled ? 'bg-green-100 themed-text-success' : 'themed-bg-subtle themed-text-muted'"
                   x-text="t.is_enabled ? '启用' : '禁用'"></span>
           </div>
-          <h5 class="font-semibold text-gray-800 mb-1" x-text="t.display_name"></h5>
+          <h5 class="font-semibold themed-text mb-1" x-text="t.display_name"></h5>
           <p class="text-xs text-gray-400 font-mono mb-2" x-text="t.template_code"></p>
-          <p class="text-sm text-gray-500 mb-3" x-text="truncateText(t.description, 50)"></p>
+          <p class="text-sm themed-text-muted mb-3" x-text="truncateText(t.description, 50)"></p>
           <div class="flex justify-between items-center">
-            <span class="text-sm text-gray-500">💰 <span x-text="t.reference_price_points || 0"></span> 积分</span>
+            <span class="text-sm themed-text-muted">💰 <span x-text="t.reference_price_points || 0"></span> 积分</span>
             <div class="space-x-1">
-              <button class="px-2 py-1 border border-blue-300 text-blue-500 rounded text-sm hover:bg-blue-50" @click="editTemplate(t.item_template_id)">
+              <button class="px-2 py-1 border border-blue-300 themed-text-primary rounded text-sm hover:bg-blue-50" @click="editTemplate(t.item_template_id)">
                 编辑
               </button>
               <button class="px-2 py-1 border border-red-300 text-red-500 rounded text-sm hover:bg-red-50" @click="deleteTemplate(t.item_template_id)">
@@ -135,9 +135,9 @@
       </template>
       
       <!-- 空状态 -->
-      <div x-show="templates.length === 0" class="col-span-full text-center py-12 bg-white rounded-lg shadow">
+      <div x-show="templates.length === 0" class="col-span-full text-center py-12 themed-card rounded-lg shadow">
         <div class="text-5xl text-gray-300 mb-4">📭</div>
-        <p class="text-gray-500">暂无物品模板，点击"新建"按钮创建</p>
+        <p class="themed-text-muted">暂无物品模板，点击"新建"按钮创建</p>
       </div>
     </div>
   </div>
@@ -148,24 +148,24 @@
        x-cloak
        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
        @click.self="hideModal('templateModal')">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+    <div class="themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
       <div class="p-4 border-b flex justify-between items-center">
         <h5 class="font-semibold" x-text="form.templateId ? '✏️ 编辑物品模板' : '➕ 新建物品模板'"></h5>
-        <button @click="hideModal('templateModal')" class="text-gray-400 hover:text-gray-600">✕</button>
+        <button @click="hideModal('templateModal')" class="text-gray-400 hover:themed-text-muted">✕</button>
       </div>
       <div class="p-4">
         <form @submit.prevent="submitTemplate()">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">模板名称 <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">模板名称 <span class="text-red-500">*</span></label>
               <input type="text" class="w-full px-3 py-2 border rounded-lg" x-model="form.displayName" required>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">模板编码 <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">模板编码 <span class="text-red-500">*</span></label>
               <input type="text" class="w-full px-3 py-2 border rounded-lg" x-model="form.templateCode" required placeholder="唯一标识">
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">物品类型</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">物品类型</label>
               <select class="w-full px-3 py-2 border rounded-lg" x-model="form.itemType">
                 <option value="voucher">优惠券</option>
                 <option value="coupon">代金券</option>
@@ -176,7 +176,7 @@
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">稀有度</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">稀有度</label>
               <select class="w-full px-3 py-2 border rounded-lg" x-model="form.rarityCode">
                 <option value="common">普通</option>
                 <option value="uncommon">优良</option>
@@ -186,34 +186,34 @@
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
               <select class="w-full px-3 py-2 border rounded-lg" x-model="form.isEnabled">
                 <option :value="true">启用</option>
                 <option :value="false">禁用</option>
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">基础价值</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">基础价值</label>
               <input type="number" class="w-full px-3 py-2 border rounded-lg" x-model.number="form.referencePricePoints" min="0" step="0.01">
             </div>
             <div class="md:col-span-2">
-              <label class="block text-sm font-medium text-gray-700 mb-1">图标URL</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">图标URL</label>
               <input type="text" class="w-full px-3 py-2 border rounded-lg" x-model="form.imageUrl" placeholder="https://...">
             </div>
             <div class="md:col-span-2">
-              <label class="block text-sm font-medium text-gray-700 mb-1">模板描述</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">模板描述</label>
               <textarea class="w-full px-3 py-2 border rounded-lg" x-model="form.description" rows="2"></textarea>
             </div>
             <div class="md:col-span-2">
-              <label class="block text-sm font-medium text-gray-700 mb-1">扩展属性 (JSON格式)</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">扩展属性 (JSON格式)</label>
               <textarea class="w-full px-3 py-2 border rounded-lg font-mono text-sm" x-model="form.meta" rows="3" placeholder='{"key": "value"}'></textarea>
             </div>
           </div>
         </form>
       </div>
       <div class="p-4 border-t flex justify-end space-x-3">
-        <button @click="hideModal('templateModal')" class="px-4 py-2 border rounded hover:bg-gray-50">取消</button>
-        <button @click="submitTemplate()" :disabled="isSubmitting" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-cyan-700 disabled:opacity-50">
+        <button @click="hideModal('templateModal')" class="px-4 py-2 border rounded themed-hover-bg">取消</button>
+        <button @click="submitTemplate()" :disabled="isSubmitting" class="px-4 py-2 themed-btn-primary rounded disabled:opacity-50">
           <span x-show="isSubmitting" class="mr-1">⏳</span>
           保存
         </button>
@@ -225,9 +225,9 @@
   <div x-show="loading" 
        x-cloak
        class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-6 flex flex-col items-center">
+    <div class="themed-card rounded-lg p-6 flex flex-col items-center">
       <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
-      <p class="mt-3 text-gray-600">加载中...</p>
+      <p class="mt-3 themed-text-muted">加载中...</p>
     </div>
   </div>
 

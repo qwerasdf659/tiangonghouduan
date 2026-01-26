@@ -270,10 +270,12 @@ function dashboardPage() {
               type: 'line',
               smooth: true,
               areaStyle: {
-                color: echarts.graphic ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                  { offset: 0, color: 'rgba(13, 110, 253, 0.3)' },
-                  { offset: 1, color: 'rgba(13, 110, 253, 0.05)' }
-                ]) : 'rgba(13, 110, 253, 0.2)'
+                color: echarts.graphic
+                  ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                      { offset: 0, color: 'rgba(13, 110, 253, 0.3)' },
+                      { offset: 1, color: 'rgba(13, 110, 253, 0.05)' }
+                    ])
+                  : 'rgba(13, 110, 253, 0.2)'
               },
               lineStyle: { color: '#0d6efd', width: 2 },
               itemStyle: { color: '#0d6efd' },
@@ -284,10 +286,12 @@ function dashboardPage() {
               type: 'line',
               smooth: true,
               areaStyle: {
-                color: echarts.graphic ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                  { offset: 0, color: 'rgba(25, 135, 84, 0.3)' },
-                  { offset: 1, color: 'rgba(25, 135, 84, 0.05)' }
-                ]) : 'rgba(25, 135, 84, 0.2)'
+                color: echarts.graphic
+                  ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                      { offset: 0, color: 'rgba(25, 135, 84, 0.3)' },
+                      { offset: 1, color: 'rgba(25, 135, 84, 0.05)' }
+                    ])
+                  : 'rgba(25, 135, 84, 0.2)'
               },
               lineStyle: { color: '#198754', width: 2 },
               itemStyle: { color: '#198754' },

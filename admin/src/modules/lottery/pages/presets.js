@@ -8,7 +8,6 @@
  * @module lottery/pages/presets
  */
 
-
 import { logger } from '../../../utils/logger.js'
 import { LOTTERY_ENDPOINTS } from '../../../api/lottery.js'
 import { buildURL, request } from '../../../api/base.js'
@@ -199,9 +198,9 @@ function presetsPage() {
         console.log('[PRESETS] 开始加载奖品和干预列表...')
         await Promise.all([this.loadPrizes(), this.loadData()])
         console.log('[PRESETS] 数据加载完成，奖品数量:', this.allPrizes.length)
-        logger.info('页面初始化完成', { 
+        logger.info('页面初始化完成', {
           interventionsCount: this.interventions.length,
-          prizesCount: this.allPrizes.length 
+          prizesCount: this.allPrizes.length
         })
       } catch (error) {
         console.error('[PRESETS] 页面初始化失败:', error)
@@ -222,19 +221,19 @@ function presetsPage() {
       try {
         logger.debug('开始加载奖品列表', { endpoint: LOTTERY_ENDPOINTS.PRIZE_LIST })
         const response = await apiRequest(LOTTERY_ENDPOINTS.PRIZE_LIST)
-        
+
         // 详细日志：打印完整响应用于调试
         console.log('[DEBUG] 奖品列表API完整响应:', JSON.stringify(response, null, 2))
-        logger.debug('奖品列表响应', { 
-          success: response?.success, 
+        logger.debug('奖品列表响应', {
+          success: response?.success,
           dataKeys: Object.keys(response?.data || {}),
           prizesCount: response?.data?.prizes?.length || 0
         })
-        
+
         if (response && response.success) {
           this.allPrizes = response.data?.prizes || []
           logger.info('奖品列表加载成功', { count: this.allPrizes.length })
-          
+
           // 调试：打印前3个奖品
           if (this.allPrizes.length > 0) {
             console.log('[DEBUG] 前3个奖品:', this.allPrizes.slice(0, 3))
@@ -278,7 +277,10 @@ function presetsPage() {
           const paginationData = response.data?.pagination || {}
           // 使用 paginationMixin 提供的 totalRecords 字段
           this.totalRecords = paginationData.total || this.interventions.length
-          logger.debug('干预规则加载成功', { count: this.interventions.length, total: this.totalRecords })
+          logger.debug('干预规则加载成功', {
+            count: this.interventions.length,
+            total: this.totalRecords
+          })
         } else {
           logger.warn('干预规则加载响应异常', response)
         }

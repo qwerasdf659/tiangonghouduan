@@ -25,7 +25,6 @@
  * 注意：后端没有 /api/v4/console/notifications API，已移除通知管理功能
  */
 
-
 import { logger } from '../../../utils/logger.js'
 import { buildURL, request, getToken } from '../../../api/base.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
@@ -803,8 +802,8 @@ document.addEventListener('alpine:init', () => {
       try {
         const formData = new FormData()
         formData.append('image', file)
-        formData.append('business_type', 'uploads')  // 必填参数：业务类型
-        formData.append('category', 'general')       // 可选参数：资源分类
+        formData.append('business_type', 'uploads') // 必填参数：业务类型
+        formData.append('category', 'general') // 可选参数：资源分类
 
         const response = await fetch(SYSTEM_ENDPOINTS.IMAGE_UPLOAD, {
           method: 'POST',

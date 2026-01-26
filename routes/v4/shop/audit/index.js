@@ -119,17 +119,10 @@ router.get(
       // 调用服务层查询
       const result_data = await MerchantOperationLogService.queryLogs(filters)
 
-      // 转换响应格式以保持 API 兼容性
-      const logs = result_data.items.map(log => ({
-        ...log,
-        operator: log.operator_info,
-        store: log.store_info,
-        target_user: log.target_user_info
-      }))
-
+      // 2026-01-26 技术债务清理：移除响应字段别名，前端已更新使用 operator_info/store_info/target_user_info
       return res.apiSuccess(
         {
-          logs,
+          logs: result_data.items,
           pagination: result_data.pagination
         },
         '商家操作日志获取成功'
@@ -177,15 +170,8 @@ router.get(
         }
       }
 
-      // 转换响应格式以保持 API 兼容性
-      const result = {
-        ...log,
-        operator: log.operator_info,
-        store: log.store_info,
-        target_user: log.target_user_info
-      }
-
-      return res.apiSuccess(result, '日志详情获取成功')
+      // 2026-01-26 技术债务清理：移除响应字段别名，直接返回服务层数据
+      return res.apiSuccess(log, '日志详情获取成功')
     } catch (error) {
       logger.error('获取日志详情失败', { error: error.message })
       return handleServiceError(error, res, '获取日志详情失败')

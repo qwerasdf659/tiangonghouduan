@@ -17,24 +17,24 @@ export function workspaceTabs() {
     activeTabId: null,
     // 最大 Tab 数量
     maxTabs: 10,
-    
+
     /**
      * 初始化
      */
     init() {
       // 恢复 Tab 状态
       this.loadState()
-      
+
       // 监听侧边栏导航事件
-      window.addEventListener('open-tab', (e) => {
+      window.addEventListener('open-tab', e => {
         this.openTab(e.detail)
       })
-      
+
       // 监听浏览器前进/后退
       window.addEventListener('popstate', () => {
         // 可选：根据 URL 切换 Tab
       })
-      
+
       // 默认打开统计页面（作为工作台首页）
       if (this.tabs.length === 0) {
         this.openTab({
@@ -45,7 +45,7 @@ export function workspaceTabs() {
         })
       }
     },
-    
+
     /**
      * 打开新 Tab
      * @param {Object} config - Tab 配置
@@ -56,14 +56,14 @@ export function workspaceTabs() {
      */
     openTab(config) {
       const { id, title, icon, url } = config
-      
+
       // 已存在则切换
       const existing = this.tabs.find(t => t.id === id)
       if (existing) {
         this.switchTab(id)
         return
       }
-      
+
       // 超出限制则关闭最早打开的
       if (this.tabs.length >= this.maxTabs) {
         // 不关闭仪表盘
@@ -74,20 +74,20 @@ export function workspaceTabs() {
           this.tabs.shift()
         }
       }
-      
+
       // 添加新 Tab
-      this.tabs.push({ 
-        id, 
-        title, 
-        icon: icon || '📄', 
-        url, 
-        openTime: Date.now() 
+      this.tabs.push({
+        id,
+        title,
+        icon: icon || '📄',
+        url,
+        openTime: Date.now()
       })
-      
+
       this.activeTabId = id
       this.saveState()
     },
-    
+
     /**
      * 切换 Tab
      * @param {string} id - Tab ID
@@ -97,17 +97,19 @@ export function workspaceTabs() {
       if (!tab) return
       this.activeTabId = id
       this.saveState()
-      
+
       // 发送 Tab 切换事件，通知侧边栏更新高亮
-      window.dispatchEvent(new CustomEvent('switch-tab', {
-        detail: { 
-          id: tab.id,
-          url: tab.url,
-          title: tab.title
-        }
-      }))
+      window.dispatchEvent(
+        new CustomEvent('switch-tab', {
+          detail: {
+            id: tab.id,
+            url: tab.url,
+            title: tab.title
+          }
+        })
+      )
     },
-    
+
     /**
      * 关闭 Tab
      * @param {string} id - Tab ID
@@ -115,19 +117,17 @@ export function workspaceTabs() {
     closeTab(id) {
       const index = this.tabs.findIndex(t => t.id === id)
       if (index === -1) return
-      
+
       this.tabs.splice(index, 1)
-      
+
       // 关闭的是当前 Tab，切换到最后一个
       if (this.activeTabId === id) {
-        this.activeTabId = this.tabs.length > 0 
-          ? this.tabs[this.tabs.length - 1].id 
-          : null
+        this.activeTabId = this.tabs.length > 0 ? this.tabs[this.tabs.length - 1].id : null
       }
-      
+
       this.saveState()
     },
-    
+
     /**
      * 关闭其他 Tab
      * @param {string} keepId - 保留的 Tab ID
@@ -137,7 +137,7 @@ export function workspaceTabs() {
       this.activeTabId = keepId
       this.saveState()
     },
-    
+
     /**
      * 关闭所有 Tab
      */
@@ -145,7 +145,7 @@ export function workspaceTabs() {
       this.tabs = []
       this.activeTabId = null
       this.saveState()
-      
+
       // 重新打开统计页面
       this.openTab({
         id: 'statistics',
@@ -154,7 +154,7 @@ export function workspaceTabs() {
         url: '/admin/statistics.html'
       })
     },
-    
+
     /**
      * 判断是否为激活 Tab
      * @param {string} id - Tab ID
@@ -163,7 +163,7 @@ export function workspaceTabs() {
     isActiveTab(id) {
       return this.activeTabId === id
     },
-    
+
     /**
      * 获取当前激活的 Tab
      * @returns {Object|undefined}
@@ -171,7 +171,7 @@ export function workspaceTabs() {
     getActiveTab() {
       return this.tabs.find(t => t.id === this.activeTabId)
     },
-    
+
     /**
      * 刷新当前 Tab
      */
@@ -185,7 +185,7 @@ export function workspaceTabs() {
         }
       }
     },
-    
+
     /**
      * 右键菜单处理
      * @param {string} tabId - Tab ID
@@ -195,17 +195,20 @@ export function workspaceTabs() {
       event.preventDefault()
       // 可扩展：显示右键菜单
     },
-    
+
     /**
      * 保存状态到 localStorage
      */
     saveState() {
-      localStorage.setItem('workspace_tabs', JSON.stringify({
-        tabs: this.tabs,
-        activeTabId: this.activeTabId
-      }))
+      localStorage.setItem(
+        'workspace_tabs',
+        JSON.stringify({
+          tabs: this.tabs,
+          activeTabId: this.activeTabId
+        })
+      )
     },
-    
+
     /**
      * 从 localStorage 加载状态
      */
@@ -224,4 +227,3 @@ export function workspaceTabs() {
 }
 
 export default workspaceTabs
-

@@ -115,10 +115,13 @@ router.get(
     // 调用 Service 批量获取所有活动的定价配置
     const pricing_configs = await PricingConfigService.getAllActivePricingConfigs()
 
-    return res.apiSuccess({
-      configs: pricing_configs,
-      total: pricing_configs.length
-    }, '获取所有定价配置成功')
+    return res.apiSuccess(
+      {
+        configs: pricing_configs,
+        total: pricing_configs.length
+      },
+      '获取所有定价配置成功'
+    )
   })
 )
 

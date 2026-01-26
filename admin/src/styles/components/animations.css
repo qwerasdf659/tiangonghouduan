@@ -1,0 +1,407 @@
+/**
+ * 通用动画样式
+ *
+ * @file src/styles/components/animations.css
+ * @description 页面切换、Modal、Tab 等通用动画效果
+ * @version 1.0.0
+ * @date 2026-01-26
+ */
+
+/* ========== 基础动画关键帧 ========== */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scaleOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ========== 动画工具类 ========== */
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-fade-out {
+  animation: fadeOut 0.2s ease-in;
+}
+
+.animate-slide-in-up {
+  animation: slideInUp 0.3s ease-out;
+}
+
+.animate-slide-in-down {
+  animation: slideInDown 0.3s ease-out;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.3s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+.animate-scale-out {
+  animation: scaleOut 0.15s ease-in;
+}
+
+.animate-bounce-in {
+  animation: bounceIn 0.5s ease-out;
+}
+
+/* ========== 页面切换动画 ========== */
+
+.page-transition {
+  @apply transition-all duration-300;
+}
+
+.page-enter {
+  animation: pageEnter 0.3s ease-out;
+}
+
+.page-leave {
+  animation: pageLeave 0.2s ease-in;
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pageLeave {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* ========== Tab 内容切换动画 ========== */
+
+.tab-content-enter {
+  animation: tabEnter 0.25s ease-out;
+}
+
+@keyframes tabEnter {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ========== Modal 弹出动画 ========== */
+
+.modal-backdrop {
+  @apply fixed inset-0 backdrop-blur-sm z-40;
+  background-color: rgba(0, 0, 0, 0.5);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal-dialog {
+  @apply relative z-50;
+  animation: modalEnter 0.3s ease-out;
+}
+
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Modal 关闭动画 */
+.modal-exit .modal-backdrop {
+  animation: fadeOut 0.2s ease-in forwards;
+}
+
+.modal-exit .modal-dialog {
+  animation: modalExit 0.2s ease-in forwards;
+}
+
+@keyframes modalExit {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+}
+
+/* ========== 下拉菜单动画 ========== */
+
+.dropdown-enter {
+  animation: dropdownEnter 0.15s ease-out;
+}
+
+.dropdown-leave {
+  animation: dropdownLeave 0.1s ease-in;
+}
+
+@keyframes dropdownEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes dropdownLeave {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+}
+
+/* ========== 列表项动画 ========== */
+
+.list-item-enter {
+  animation: listItemEnter 0.2s ease-out;
+}
+
+@keyframes listItemEnter {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 列表项交错动画 */
+.list-stagger > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.list-stagger > *:nth-child(2) {
+  animation-delay: 50ms;
+}
+.list-stagger > *:nth-child(3) {
+  animation-delay: 100ms;
+}
+.list-stagger > *:nth-child(4) {
+  animation-delay: 150ms;
+}
+.list-stagger > *:nth-child(5) {
+  animation-delay: 200ms;
+}
+.list-stagger > *:nth-child(6) {
+  animation-delay: 250ms;
+}
+.list-stagger > *:nth-child(7) {
+  animation-delay: 300ms;
+}
+.list-stagger > *:nth-child(8) {
+  animation-delay: 350ms;
+}
+.list-stagger > *:nth-child(9) {
+  animation-delay: 400ms;
+}
+.list-stagger > *:nth-child(10) {
+  animation-delay: 450ms;
+}
+
+/* ========== 表单验证抖动 ========== */
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-5px);
+  }
+  40%,
+  80% {
+    transform: translateX(5px);
+  }
+}
+
+.animate-shake {
+  animation: shake 0.3s ease-in-out;
+}
+
+/* ========== 脉冲高亮 ========== */
+
+@keyframes pulse-highlight {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+.animate-pulse-highlight {
+  animation: pulse-highlight 1s ease-out;
+}
+
+/* ========== 数字滚动动画（用于统计卡片） ========== */
+
+.number-scroll {
+  @apply tabular-nums;
+  transition: all 0.3s ease-out;
+}
+
+/* ========== 悬停缩放效果 ========== */
+
+.hover-scale {
+  @apply transition-transform duration-200;
+}
+
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+.hover-scale-sm:hover {
+  transform: scale(1.01);
+}
+
+.hover-scale-lg:hover {
+  transform: scale(1.05);
+}
+
+/* ========== 悬停上浮效果 ========== */
+
+.hover-lift {
+  @apply transition-all duration-200;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  @apply shadow-md;
+}
+
+.hover-lift-lg:hover {
+  transform: translateY(-4px);
+  @apply shadow-lg;
+}

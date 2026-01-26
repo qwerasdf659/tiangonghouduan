@@ -318,7 +318,7 @@ class StoreService {
     }
 
     staffStats.forEach(stat => {
-      if (staffCounts.hasOwnProperty(stat.status)) {
+      if (Object.prototype.hasOwnProperty.call(staffCounts, stat.status)) {
         staffCounts[stat.status] = parseInt(stat.get('count'), 10)
       }
     })

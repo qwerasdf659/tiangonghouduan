@@ -28,7 +28,6 @@
  * </div>
  */
 
-
 import { logger } from '../../../utils/logger.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 import { buildURL, request } from '../../../api/base.js'
@@ -182,7 +181,11 @@ function materialConversionRulesPage() {
      * @returns {Promise<void>}
      */
     async loadAssetTypes() {
-      const result = await this.apiGet(ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES, {}, { showError: false })
+      const result = await this.apiGet(
+        ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES,
+        {},
+        { showError: false }
+      )
 
       if (result.success) {
         this.assetTypes = result.data?.asset_types || []

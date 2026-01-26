@@ -23,7 +23,6 @@
  * }
  */
 
-
 import { logger } from '../../utils/logger.js'
 document.addEventListener('alpine:init', () => {
   logger.info('🔧 注册页面状态 Store...')

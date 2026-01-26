@@ -1,13 +1,13 @@
 /**
  * 统一日志工具类
- * 
+ *
  * @description 替代 console.log 的统一日志系统，支持日志级别控制
  * @version 1.0.0
  * @date 2026-01-24
- * 
+ *
  * @example
  * import { logger } from '@/utils/logger.js'
- * 
+ *
  * logger.debug('调试信息', { data: xxx })
  * logger.info('普通信息')
  * logger.warn('警告信息')
@@ -73,12 +73,12 @@ const getCurrentLevel = () => {
   } catch (e) {
     // 忽略错误
   }
-  
+
   // 回退判断：检查 URL 是否包含 localhost 或 127.0.0.1
-  const isLocal = typeof window !== 'undefined' && 
-    (window.location.hostname === 'localhost' || 
-     window.location.hostname === '127.0.0.1')
-  
+  const isLocal =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+
   return isLocal ? LOG_LEVELS.DEBUG : LOG_LEVELS.WARN
 }
 
@@ -118,10 +118,10 @@ const formatMessage = (level, message) => {
  */
 const log = (level, message, ...args) => {
   if (level < currentLevel) return
-  
+
   const formattedMessage = formatMessage(level, message)
   const style = LEVEL_STYLES[level]
-  
+
   switch (level) {
     case LOG_LEVELS.DEBUG:
       console.log(`%c${formattedMessage}`, style, ...args)
@@ -220,7 +220,7 @@ export const logger = {
    */
   group(label, fn) {
     if (currentLevel > LOG_LEVELS.DEBUG) return
-    
+
     console.group(`📁 ${label}`)
     try {
       fn()
@@ -250,4 +250,3 @@ export const logger = {
 
 // 默认导出 logger 实例
 export default logger
-

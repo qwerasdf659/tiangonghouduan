@@ -30,7 +30,6 @@
  * </div>
  */
 
-
 import { logger } from '../../../utils/logger.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
 import { buildURL, request } from '../../../api/base.js'
@@ -180,7 +179,7 @@ function sessionsPage() {
       if (!this.userInfo) {
         this._loadUserInfo?.()
       }
-      
+
       logger.info('[Sessions] 用户信息:', {
         user_id: this.userInfo?.user_id,
         is_admin: this.userInfo?.is_admin
@@ -202,7 +201,7 @@ function sessionsPage() {
      */
     async loadData(page = null) {
       logger.info('[Sessions] loadData 开始', { page, currentPage: this.currentPage })
-      
+
       if (page !== null) {
         this.currentPage = page
       }
@@ -232,7 +231,7 @@ function sessionsPage() {
 
         const url = USER_ENDPOINTS.SESSIONS_LIST + '?' + params.toString()
         logger.debug('[Sessions] 请求URL:', url)
-        
+
         const response = await apiRequest(url)
 
         if (response && response.success) {
@@ -240,7 +239,7 @@ function sessionsPage() {
           this.sessions = Array.isArray(sessionData) ? sessionData : []
           this.total = response.data?.pagination?.total || this.sessions.length
           logger.info('[Sessions] 加载成功', { count: this.sessions.length, total: this.total })
-          
+
           // 异步加载统计数据
           this.loadStats()
         } else {
@@ -267,7 +266,7 @@ function sessionsPage() {
       try {
         logger.debug('[Sessions] 加载统计数据...')
         const response = await apiRequest(USER_ENDPOINTS.SESSIONS_STATS)
-        
+
         if (response && response.success) {
           const stats = response.data || {}
           const userStats = stats.by_user_type?.user || { active_sessions: 0, unique_users: 0 }
@@ -280,7 +279,7 @@ function sessionsPage() {
             adminSessions: adminStats.active_sessions || 0,
             expiredCount: stats.expired_pending_cleanup || 0
           }
-          
+
           logger.info('[Sessions] 统计数据加载成功', this.statistics)
         } else {
           logger.warn('[Sessions] 统计数据响应异常:', response)
@@ -330,7 +329,7 @@ function sessionsPage() {
      */
     async revokeSession(sessionId) {
       logger.info('[Sessions] revokeSession 开始:', sessionId)
-      
+
       if (String(sessionId) === String(this.currentSessionId)) {
         this.showError('无法撤销当前会话')
         return
@@ -347,7 +346,7 @@ function sessionsPage() {
       try {
         const url = buildURL(USER_ENDPOINTS.SESSIONS_DEACTIVATE, { id: sessionId })
         logger.debug('[Sessions] 撤销URL:', url)
-        
+
         const response = await apiRequest(url, { method: 'POST' })
 
         if (response && response.success) {
@@ -376,7 +375,7 @@ function sessionsPage() {
      */
     async revokeSelected() {
       logger.info('[Sessions] revokeSelected 开始', { selected: this.selectedSessions })
-      
+
       const selected = this.selectedSessions.filter(
         id => String(id) !== String(this.currentSessionId)
       )
@@ -386,7 +385,9 @@ function sessionsPage() {
         return
       }
 
-      const confirmed = await this.confirmDanger(`确定要撤销选中的 ${selected.length} 个会话吗？用户将被强制下线。`)
+      const confirmed = await this.confirmDanger(
+        `确定要撤销选中的 ${selected.length} 个会话吗？用户将被强制下线。`
+      )
       if (!confirmed) {
         logger.debug('[Sessions] 用户取消撤销操作')
         return
@@ -397,7 +398,7 @@ function sessionsPage() {
       try {
         let successCount = 0
         let failCount = 0
-        
+
         for (const sessionId of selected) {
           try {
             const url = buildURL(USER_ENDPOINTS.SESSIONS_DEACTIVATE, { id: sessionId })
@@ -420,7 +421,7 @@ function sessionsPage() {
         } else {
           this.showError('批量撤销失败，请重试')
         }
-        
+
         // 清空选择并刷新
         this.selectedSessions = []
         await this.loadData()
@@ -441,8 +442,10 @@ function sessionsPage() {
      */
     async revokeExpired() {
       logger.info('[Sessions] revokeExpired 开始')
-      
-      const confirmed = await this.confirmDanger('确定要清理所有已过期的会话吗？这将从数据库中删除过期的会话记录。')
+
+      const confirmed = await this.confirmDanger(
+        '确定要清理所有已过期的会话吗？这将从数据库中删除过期的会话记录。'
+      )
       if (!confirmed) {
         logger.debug('[Sessions] 用户取消清理操作')
         return
@@ -481,8 +484,10 @@ function sessionsPage() {
      */
     async revokeAllExceptCurrent() {
       logger.info('[Sessions] revokeAllExceptCurrent 开始', { userInfo: this.userInfo })
-      
-      const confirmed = await this.confirmDanger('确定要强制下线所有其他设备吗？其他设备上的会话将被立即终止。')
+
+      const confirmed = await this.confirmDanger(
+        '确定要强制下线所有其他设备吗？其他设备上的会话将被立即终止。'
+      )
       if (!confirmed) {
         logger.debug('[Sessions] 用户取消强制下线操作')
         return
@@ -499,11 +504,11 @@ function sessionsPage() {
       this.globalLoading = true
 
       try {
-        logger.debug('[Sessions] 发送强制下线请求...', { 
+        logger.debug('[Sessions] 发送强制下线请求...', {
           user_id: userInfo.user_id,
-          is_admin: userInfo.is_admin 
+          is_admin: userInfo.is_admin
         })
-        
+
         const response = await apiRequest(USER_ENDPOINTS.SESSIONS_DEACTIVATE_USER, {
           method: 'POST',
           data: {
@@ -627,7 +632,7 @@ function sessionsPage() {
      */
     async confirmDanger(message) {
       logger.debug('[Sessions] confirmDanger 调用:', message)
-      
+
       // 检查 Alpine.store('confirm') 是否可用
       if (typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('confirm')) {
         logger.debug('[Sessions] 使用 Alpine confirm store')
@@ -640,7 +645,7 @@ function sessionsPage() {
           cancelText: '取消'
         })
       }
-      
+
       // 降级到原生 confirm
       logger.warn('[Sessions] Alpine confirm store 不可用，使用原生 confirm')
       return confirm(message)
@@ -655,19 +660,19 @@ function sessionsPage() {
      */
     async refreshData() {
       logger.info('[Sessions] 用户点击刷新')
-      
+
       // 保存刷新前的会话数量
       const prevCount = this.sessions?.length || 0
-      
+
       try {
         await this.loadData()
-        
+
         // 刷新成功，显示提示
         const newCount = this.sessions?.length || 0
         const message = `刷新成功，共 ${newCount} 个会话`
-        
+
         logger.info('[Sessions] 刷新成功:', message)
-        
+
         // 直接调用 Alpine store 显示 Toast
         if (typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('notification')) {
           logger.debug('[Sessions] 调用 notification store 显示成功提示')
@@ -679,7 +684,7 @@ function sessionsPage() {
       } catch (error) {
         const errorMsg = '刷新失败: ' + (error.message || '未知错误')
         logger.error('[Sessions] 刷新失败:', error.message)
-        
+
         if (typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('notification')) {
           Alpine.store('notification').error(errorMsg)
         } else {

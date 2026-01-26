@@ -1,0 +1,672 @@
+/**
+ * 微交互和增强效果样式
+ *
+ * @file src/styles/components/interactions.css
+ * @description 按钮微交互、表格 hover、表单反馈等增强效果
+ * @version 1.0.0
+ * @date 2026-01-26
+ */
+
+/* ========== 按钮微交互 - 缩放效果 ========== */
+
+.btn-scale {
+  @apply transition-transform duration-150 ease-out;
+}
+
+.btn-scale:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+/* 大按钮使用更大的反馈 */
+.btn-scale-lg:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* 小按钮使用更小的反馈 */
+.btn-scale-sm:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+/* ========== 按钮微交互 - 涟漪效果 ========== */
+
+.btn-ripple {
+  @apply relative overflow-hidden;
+}
+
+.btn-ripple::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition:
+    width 0.6s ease-out,
+    height 0.6s ease-out,
+    opacity 0.6s ease-out;
+  opacity: 0;
+}
+
+.btn-ripple:active:not(:disabled)::after {
+  width: 300%;
+  height: 300%;
+  opacity: 0;
+  transition: 0s;
+}
+
+/* 深色背景使用深色涟漪 */
+.btn-ripple-dark::after {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+/* ========== 按钮悬停发光效果 ========== */
+
+.btn-glow {
+  @apply relative transition-all duration-300;
+}
+
+.btn-glow:hover:not(:disabled) {
+  box-shadow: 0 0 15px var(--color-primary, #3b82f6);
+}
+
+/* 危险按钮的发光色 */
+.btn-glow-danger:hover:not(:disabled) {
+  box-shadow: 0 0 15px #ef4444;
+}
+
+/* 成功按钮的发光色 */
+.btn-glow-success:hover:not(:disabled) {
+  box-shadow: 0 0 15px #22c55e;
+}
+
+/* ========== 按钮加载状态 ========== */
+
+.btn-loading {
+  @apply relative pointer-events-none;
+}
+
+.btn-loading .btn-text {
+  @apply opacity-0;
+}
+
+.btn-loading::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1.25em;
+  height: 1.25em;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: spinnerRotate 0.8s linear infinite;
+}
+
+/* ========== 表格行 hover 效果 ========== */
+
+.table-row-hover {
+  @apply transition-all duration-200 ease-out;
+}
+
+/* 基础 hover - 高亮 */
+.table-row-hover:hover {
+  background-color: var(--color-bg-hover, rgba(59, 130, 246, 0.05));
+}
+
+/* 带左边框指示器 */
+.table-row-indicator:hover {
+  border-left: 3px solid var(--color-primary, #3b82f6);
+  padding-left: calc(1rem - 3px);
+}
+
+/* 带轻微抬起效果 */
+.table-row-lift:hover {
+  transform: translateX(4px);
+  background-color: var(--color-bg-hover, rgba(59, 130, 246, 0.05));
+}
+
+/* 带阴影效果 */
+.table-row-shadow:hover {
+  @apply shadow-sm;
+  background-color: var(--color-bg-hover, rgba(59, 130, 246, 0.05));
+  z-index: 1;
+  position: relative;
+}
+
+/* 行选中状态 */
+.table-row-selected {
+  background-color: var(--color-bg-hover, rgba(59, 130, 246, 0.1)) !important;
+  border-left: 3px solid var(--color-primary, #3b82f6);
+}
+
+/* 条纹效果（可选） */
+.table-striped tbody tr:nth-child(even) {
+  background-color: var(--color-bg-tertiary, #f9fafb);
+}
+
+.table-striped tbody tr:nth-child(even):hover {
+  background-color: var(--color-bg-hover, rgba(59, 130, 246, 0.05));
+}
+
+/* ========== 表格单元格效果 ========== */
+
+.table-cell-action {
+  @apply transition-all duration-200;
+}
+
+.table-cell-action:hover {
+  color: var(--color-primary, #3b82f6);
+}
+
+/* 可点击单元格 */
+.table-cell-clickable {
+  @apply cursor-pointer transition-colors duration-200;
+}
+
+.table-cell-clickable:hover {
+  color: var(--color-primary, #3b82f6);
+}
+
+/* 操作按钮组 */
+.table-actions {
+  @apply flex items-center gap-2 opacity-50 transition-opacity duration-200;
+}
+
+tr:hover .table-actions,
+.table-row-hover:hover .table-actions {
+  @apply opacity-100;
+}
+
+/* ========== 表单输入增强 ========== */
+
+/* 浮动标签 */
+.form-floating {
+  @apply relative;
+}
+
+.form-floating .form-input {
+  @apply pt-6 pb-2;
+}
+
+.form-floating .form-label {
+  @apply absolute left-3 top-2 text-xs transition-all duration-200;
+  color: var(--color-text-muted, #9ca3af);
+}
+
+.form-floating .form-input:placeholder-shown + .form-label {
+  @apply top-4 text-sm;
+}
+
+.form-floating .form-input:focus + .form-label {
+  @apply top-2 text-xs;
+  color: var(--color-primary, #3b82f6);
+}
+
+/* 输入框聚焦发光 */
+.form-input-glow:focus {
+  box-shadow: 0 0 0 3px var(--color-primary-light, rgba(59, 130, 246, 0.2));
+}
+
+/* 错误状态抖动 */
+.form-input-error {
+  animation: shake 0.5s ease-in-out;
+  @apply border-red-500;
+}
+
+/* 成功状态 */
+.form-input-success {
+  @apply border-green-500;
+}
+
+/* 输入框图标 */
+.form-input-with-icon {
+  @apply relative;
+}
+
+.form-input-with-icon .form-input {
+  @apply pl-10;
+}
+
+.form-input-with-icon .form-icon {
+  @apply absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors;
+}
+
+.form-input-with-icon .form-input:focus ~ .form-icon {
+  color: var(--color-primary, #3b82f6);
+}
+
+/* 输入框验证图标 */
+.form-input-with-validation {
+  @apply pr-10;
+}
+
+.form-validation-icon {
+  @apply absolute right-3 top-1/2 -translate-y-1/2;
+}
+
+.form-validation-icon.valid {
+  @apply text-green-500;
+}
+
+.form-validation-icon.invalid {
+  @apply text-red-500;
+}
+
+/* ========== 卡片悬停效果 ========== */
+
+.card-hover {
+  @apply transition-all duration-300 ease-out;
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  @apply shadow-lg;
+}
+
+/* 卡片缩放效果 */
+.card-hover-scale:hover {
+  transform: scale(1.02);
+}
+
+/* 卡片边框发光 */
+.card-hover-glow:hover {
+  box-shadow: 0 0 20px var(--color-primary-light, rgba(59, 130, 246, 0.3));
+}
+
+/* ========== 链接悬停效果 ========== */
+
+.link-underline {
+  @apply relative;
+}
+
+.link-underline::after {
+  content: '';
+  @apply absolute bottom-0 left-0 w-0 h-0.5 transition-all duration-300;
+  background-color: var(--color-primary, #3b82f6);
+}
+
+.link-underline:hover::after {
+  @apply w-full;
+}
+
+/* ========== 图标按钮效果 ========== */
+
+.icon-btn {
+  @apply p-2 rounded-full transition-all duration-200 flex items-center justify-center;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background-color: var(--color-bg-hover, rgba(59, 130, 246, 0.1));
+  color: var(--color-primary, #3b82f6);
+}
+
+.icon-btn:active:not(:disabled) {
+  transform: scale(0.9);
+}
+
+/* 带徽章的图标 */
+.icon-btn-badge {
+  @apply relative;
+}
+
+.icon-btn-badge::after {
+  content: attr(data-count);
+  @apply absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs
+         rounded-full flex items-center justify-center;
+}
+
+/* ========== 折叠/展开效果 ========== */
+
+.collapse-content {
+  @apply overflow-hidden transition-all duration-300 ease-in-out;
+  max-height: 0;
+}
+
+.collapse-content.expanded {
+  max-height: var(--collapse-height, 1000px);
+}
+
+.collapse-trigger {
+  @apply cursor-pointer select-none;
+}
+
+.collapse-icon {
+  @apply transition-transform duration-300;
+}
+
+.collapse-trigger[aria-expanded='true'] .collapse-icon {
+  transform: rotate(180deg);
+}
+
+/* ========== 工具提示增强 ========== */
+
+.tooltip-trigger {
+  @apply relative cursor-help;
+}
+
+.tooltip-content {
+  @apply absolute z-50 px-2 py-1 text-xs rounded bg-gray-900 text-white whitespace-nowrap
+         opacity-0 invisible transition-all duration-200 pointer-events-none;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+}
+
+.tooltip-trigger:hover .tooltip-content {
+  @apply opacity-100 visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* 工具提示箭头 */
+.tooltip-content::after {
+  content: '';
+  @apply absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent;
+  border-top-color: #1f2937;
+}
+
+/* ========== 拖拽相关效果 ========== */
+
+.draggable {
+  @apply cursor-grab;
+}
+
+.draggable:active {
+  @apply cursor-grabbing;
+}
+
+.drag-ghost {
+  @apply opacity-50;
+}
+
+.drop-zone {
+  @apply border-2 border-dashed border-gray-300 rounded-lg transition-colors duration-200;
+}
+
+.drop-zone.drag-over {
+  border-color: var(--color-primary, #3b82f6);
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+/* ========== Focus 可见性 ========== */
+
+.focus-visible-ring:focus-visible {
+  @apply outline-none ring-2 ring-offset-2 ring-blue-500;
+}
+
+/* ========== 过渡工具类 ========== */
+
+.transition-fast {
+  @apply transition-all duration-150 ease-out;
+}
+
+.transition-normal {
+  @apply transition-all duration-300 ease-out;
+}
+
+.transition-slow {
+  @apply transition-all duration-500 ease-out;
+}
+
+/* ========== 暗色主题适配 ========== */
+
+[data-theme='dark'] .drop-zone,
+[data-theme='minimal-dark'] .drop-zone,
+[data-theme='cyber'] .drop-zone,
+[data-theme='neon'] .drop-zone {
+  @apply border-gray-600;
+}
+
+[data-theme='dark'] .tooltip-content,
+[data-theme='minimal-dark'] .tooltip-content,
+[data-theme='cyber'] .tooltip-content,
+[data-theme='neon'] .tooltip-content {
+  @apply bg-gray-800;
+}
+
+[data-theme='dark'] .tooltip-content::after,
+[data-theme='minimal-dark'] .tooltip-content::after,
+[data-theme='cyber'] .tooltip-content::after,
+[data-theme='neon'] .tooltip-content::after {
+  border-top-color: #374151;
+}
+
+/* ========== 图片模糊渐进加载 (P0) ========== */
+
+.img-blur-load {
+  @apply relative overflow-hidden bg-gray-200;
+}
+
+.img-blur-load img {
+  @apply w-full h-full object-cover transition-all duration-500;
+  filter: blur(20px);
+  transform: scale(1.1);
+}
+
+.img-blur-load img.loaded {
+  filter: blur(0);
+  transform: scale(1);
+}
+
+.img-blur-load .img-placeholder {
+  @apply absolute inset-0 flex items-center justify-center;
+  background: linear-gradient(135deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+  background-size: 200% 200%;
+  animation: placeholder-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes placeholder-shimmer {
+  0% {
+    background-position: -200% -200%;
+  }
+  100% {
+    background-position: 200% 200%;
+  }
+}
+
+/* 图片懒加载 - IntersectionObserver 支持 */
+.img-lazy {
+  @apply opacity-0 transition-opacity duration-500;
+}
+
+.img-lazy.loaded {
+  @apply opacity-100;
+}
+
+.img-lazy.error {
+  @apply opacity-50;
+}
+
+/* ========== 表单验证状态样式 (P2) ========== */
+
+/* 有效状态 */
+.is-valid {
+  @apply border-green-500 !important;
+}
+
+.is-valid:focus {
+  @apply ring-2 ring-green-200 border-green-500 !important;
+}
+
+.is-valid + .form-text,
+.is-valid ~ .valid-feedback {
+  @apply text-green-600;
+}
+
+/* 验证成功图标 */
+.is-valid ~ .validation-icon::after,
+.form-group.is-valid .validation-icon::after {
+  content: '✓';
+  @apply absolute right-3 top-1/2 -translate-y-1/2 text-green-500 text-lg font-bold;
+}
+
+/* 无效状态 */
+.is-invalid {
+  @apply border-red-500 !important;
+}
+
+.is-invalid:focus {
+  @apply ring-2 ring-red-200 border-red-500 !important;
+}
+
+.is-invalid + .form-text,
+.is-invalid ~ .invalid-feedback {
+  @apply text-red-600;
+}
+
+/* 验证失败图标 */
+.is-invalid ~ .validation-icon::after,
+.form-group.is-invalid .validation-icon::after {
+  content: '✗';
+  @apply absolute right-3 top-1/2 -translate-y-1/2 text-red-500 text-lg font-bold;
+}
+
+/* 验证反馈容器 */
+.valid-feedback,
+.invalid-feedback {
+  @apply text-sm mt-1 hidden;
+}
+
+.is-valid ~ .valid-feedback,
+.form-group.is-valid .valid-feedback {
+  @apply block text-green-600;
+}
+
+.is-invalid ~ .invalid-feedback,
+.form-group.is-invalid .invalid-feedback {
+  @apply block text-red-600;
+}
+
+/* 表单验证动画 - 输入错误抖动 */
+@keyframes form-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-4px);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+.form-shake {
+  animation: form-shake 0.5s ease-in-out;
+}
+
+/* 浮动标签 */
+.form-floating {
+  @apply relative;
+}
+
+.form-floating input,
+.form-floating textarea,
+.form-floating select {
+  @apply pt-6 pb-2;
+}
+
+.form-floating label {
+  @apply absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 transition-all duration-200 pointer-events-none;
+}
+
+.form-floating input:focus ~ label,
+.form-floating input:not(:placeholder-shown) ~ label,
+.form-floating textarea:focus ~ label,
+.form-floating textarea:not(:placeholder-shown) ~ label,
+.form-floating select:focus ~ label,
+.form-floating select:valid ~ label {
+  @apply top-2 text-xs text-blue-500;
+  transform: translateY(0);
+}
+
+/* ========== 键盘导航增强 ========== */
+
+/* 焦点可见指示器 */
+.keyboard-focus:focus-visible {
+  @apply outline-none ring-2 ring-blue-500 ring-offset-2;
+}
+
+/* 跳过导航链接 */
+.skip-link {
+  @apply absolute -top-10 left-0 bg-blue-600 text-white px-4 py-2 z-50 transition-all;
+}
+
+.skip-link:focus {
+  @apply top-0;
+}
+
+/* ========== 暗色主题适配 - 新增样式 ========== */
+
+[data-theme='dark'] .img-blur-load,
+[data-theme='minimal-dark'] .img-blur-load,
+[data-theme='cyber'] .img-blur-load,
+[data-theme='neon'] .img-blur-load {
+  @apply bg-gray-700;
+}
+
+[data-theme='dark'] .img-blur-load .img-placeholder,
+[data-theme='minimal-dark'] .img-blur-load .img-placeholder {
+  background: linear-gradient(135deg, #374151 25%, #4b5563 50%, #374151 75%);
+}
+
+[data-theme='dark'] .form-floating label,
+[data-theme='minimal-dark'] .form-floating label {
+  @apply text-gray-400;
+}
+
+/* ========== 表格列宽拖拽 (P3) ========== */
+
+.resizable-header {
+  @apply relative;
+  user-select: none;
+}
+
+.resize-handle {
+  @apply absolute right-0 top-0 bottom-0 w-1 cursor-col-resize;
+  background: transparent;
+  transition: background-color 0.2s ease;
+}
+
+.resize-handle:hover,
+.resize-handle.resizing {
+  @apply bg-blue-500;
+}
+
+.resizable-header:hover .resize-handle {
+  @apply bg-gray-300;
+}
+
+[data-theme='dark'] .resizable-header:hover .resize-handle,
+[data-theme='minimal-dark'] .resizable-header:hover .resize-handle {
+  @apply bg-gray-600;
+}
+
+/* 键盘焦点样式 */
+.keyboard-focus:focus {
+  @apply ring-2 ring-blue-500 ring-offset-2 outline-none;
+}
+
+/* 无限滚动加载指示器 */
+.infinite-scroll-sentinel {
+  @apply h-4 w-full;
+}
+
+.infinite-scroll-loading {
+  @apply flex items-center justify-center py-4 text-gray-500;
+}
+
+.infinite-scroll-end {
+  @apply text-center py-4 text-gray-400 text-sm;
+}

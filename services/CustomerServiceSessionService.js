@@ -706,7 +706,9 @@ class CustomerServiceSessionService {
        * 仅记录日志，不做权限限制
        */
       if (session.admin_id && session.admin_id !== admin_id) {
-        logger.info(`📝 管理员 ${admin_id} 正在查看其他管理员 ${session.admin_id} 的会话 ${session_id}`)
+        logger.info(
+          `📝 管理员 ${admin_id} 正在查看其他管理员 ${session.admin_id} 的会话 ${session_id}`
+        )
       }
 
       // 标记用户发送的未读消息为已读
@@ -774,7 +776,9 @@ class CustomerServiceSessionService {
      * 仅记录日志，不做权限限制
      */
     if (session.admin_id && session.admin_id !== current_admin_id) {
-      logger.info(`📝 管理员 ${current_admin_id} 正在转接其他管理员 ${session.admin_id} 的会话 ${session_id}`)
+      logger.info(
+        `📝 管理员 ${current_admin_id} 正在转接其他管理员 ${session.admin_id} 的会话 ${session_id}`
+      )
     }
 
     // 获取客服信息
@@ -865,7 +869,9 @@ class CustomerServiceSessionService {
      * 仅记录日志，不做权限限制
      */
     if (session.admin_id && session.admin_id !== admin_id) {
-      logger.info(`📝 管理员 ${admin_id} 正在关闭其他管理员 ${session.admin_id} 的会话 ${session_id}`)
+      logger.info(
+        `📝 管理员 ${admin_id} 正在关闭其他管理员 ${session.admin_id} 的会话 ${session_id}`
+      )
     }
 
     // 更新会话状态

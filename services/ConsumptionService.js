@@ -274,13 +274,8 @@ class ConsumptionService {
       )
     }
 
-    /*
+    /**
      * 步骤2：契约断言 - user_uuid 必须由路由层验证后传入
-     *
-     * 架构决策1（2026-01-13）：删除服务层兼容分支
-     * - 二维码验证单一入口：路由层（边界层）
-     * - 服务层不再验证二维码，user_uuid 为必传参数
-     * - 如果缺少 user_uuid，直接抛出 BusinessError（CONSUMPTION_MISSING_USER_UUID）
      *
      * 调用方职责：
      * - 路由层必须先通过 QRCodeValidator.validateQRCode() 验证二维码

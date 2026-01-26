@@ -201,6 +201,23 @@
   color: var(--color-primary);
 }
 
+/* 悬停文字色变体（用于 hover:themed-* 格式） */
+.hover\:themed-text:hover {
+  color: var(--color-text-primary);
+}
+
+.hover\:themed-text-secondary:hover {
+  color: var(--color-text-secondary);
+}
+
+.hover\:themed-text-muted:hover {
+  color: var(--color-text-muted, #6b7280);
+}
+
+.hover\:themed-text-primary:hover {
+  color: var(--color-primary);
+}
+
 /* 聚焦效果 */
 .themed-focus:focus {
   border-color: var(--color-primary);
@@ -396,15 +413,21 @@
    ===================================================== */
 
 .themed-shadow {
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.1),
+    0 1px 2px 0 rgba(0, 0, 0, 0.06);
 }
 
 .themed-shadow-md {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .themed-shadow-lg {
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
 /* =====================================================
@@ -432,9 +455,9 @@
 .themed-table,
 .themed-table-header,
 .themed-table-row {
-  transition: background-color 0.3s ease, 
-              border-color 0.3s ease, 
-              color 0.3s ease,
-              box-shadow 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease;
 }
-
