@@ -1036,6 +1036,420 @@ class UserRoleService {
     }
     return mobile.slice(0, 3) + '****' + mobile.slice(-4)
   }
+
+  // ==================== 角色管理 CRUD 方法（2026-01-26 新增）====================
+
+  /**
+   * 🆕 创建角色
+   *
+   * 事务边界治理（2026-01-26 角色权限管理功能）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
+   * 安全校验：
+   * - 角色名称唯一性检查
+   * - 角色等级不能高于操作者等级
+   * - 权限格式验证
+   *
+   * @param {Object} roleData - 角色数据
+   * @param {string} roleData.role_name - 角色名称（必填，唯一）
+   * @param {string} roleData.description - 角色描述（可选）
+   * @param {number} roleData.role_level - 角色等级（必填，0-100）
+   * @param {Object} roleData.permissions - 权限配置（可选，JSON格式）
+   * @param {number} operator_id - 操作者ID
+   * @param {Object} options - 选项参数
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
+   * @param {string} options.ip_address - IP地址（可选）
+   * @param {string} options.user_agent - 用户代理（可选）
+   * @returns {Promise<Object>} 创建的角色信息
+   * @throws {Error} 业务操作或审计日志失败时抛出错误
+   */
+  static async createRole(roleData, operator_id, options = {}) {
+    // 强制要求事务边界
+    const transaction = assertAndGetTransaction(options, 'UserRoleService.createRole')
+    const { ip_address, user_agent } = options
+    const { role_name, description, role_level, permissions = {} } = roleData
+
+    // 参数校验
+    if (!role_name || typeof role_name !== 'string' || role_name.trim() === '') {
+      throw new Error('角色名称不能为空')
+    }
+
+    if (typeof role_level !== 'number' || role_level < 0) {
+      throw new Error('角色等级必须是非负数字')
+    }
+
+    // 引入权限资源常量
+    const { isSystemRole, validatePermissions } = require('../constants/PermissionResources')
+
+    // 检查是否尝试创建系统内置角色名称
+    if (isSystemRole(role_name.trim())) {
+      throw new Error(`不能创建与系统内置角色同名的角色: ${role_name}`)
+    }
+
+    // 验证权限格式
+    if (permissions && Object.keys(permissions).length > 0) {
+      const permissionValidation = validatePermissions(permissions)
+      if (!permissionValidation.valid) {
+        throw new Error(`权限配置格式错误: ${permissionValidation.errors.join(', ')}`)
+      }
+    }
+
+    // 获取操作者权限级别
+    const { getUserRoles } = require('../middleware/auth')
+    const operatorRoles = await getUserRoles(operator_id)
+    const operatorMaxLevel =
+      operatorRoles.roles.length > 0 ? Math.max(...operatorRoles.roles.map(r => r.role_level)) : 0
+
+    // 权限等级校验：不能创建比自己权限更高的角色
+    if (role_level > operatorMaxLevel) {
+      throw new Error(
+        `权限不足：不能创建权限等级高于自己的角色（操作者级别: ${operatorMaxLevel}, 目标角色级别: ${role_level}）`
+      )
+    }
+
+    // 检查角色名称唯一性
+    const existingRole = await Role.findOne({
+      where: { role_name: role_name.trim() },
+      transaction
+    })
+
+    if (existingRole) {
+      throw new Error(`角色名称已存在: ${role_name}`)
+    }
+
+    // 创建角色
+    const newRole = await Role.create(
+      {
+        role_name: role_name.trim(),
+        description: description || null,
+        role_level,
+        permissions,
+        is_active: true
+      },
+      { transaction }
+    )
+
+    // 记录审计日志
+    const { OPERATION_TYPES } = require('../constants/AuditOperationTypes')
+    const idempotencyKey = `role_create_${newRole.role_id}_${Date.now()}`
+
+    await AuditLogService.logOperation({
+      operator_id,
+      operation_type: OPERATION_TYPES.ROLE_CREATE,
+      target_type: 'Role',
+      target_id: newRole.role_id,
+      action: 'create',
+      before_data: null,
+      after_data: {
+        role_id: newRole.role_id,
+        role_uuid: newRole.role_uuid,
+        role_name: newRole.role_name,
+        role_level: newRole.role_level,
+        permissions: newRole.permissions
+      },
+      reason: `创建角色: ${role_name}`,
+      idempotency_key: idempotencyKey,
+      ip_address,
+      user_agent,
+      transaction,
+      is_critical_operation: true
+    })
+
+    logger.info('角色创建成功', {
+      role_id: newRole.role_id,
+      role_name: newRole.role_name,
+      operator_id
+    })
+
+    return {
+      role_id: newRole.role_id,
+      role_uuid: newRole.role_uuid,
+      role_name: newRole.role_name,
+      role_level: newRole.role_level,
+      description: newRole.description,
+      permissions: newRole.permissions,
+      is_active: newRole.is_active,
+      created_at: newRole.created_at
+    }
+  }
+
+  /**
+   * ✏️ 更新角色
+   *
+   * 事务边界治理（2026-01-26 角色权限管理功能）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
+   * 安全校验：
+   * - 系统内置角色不可编辑
+   * - 角色等级不能修改为高于操作者等级
+   * - 权限格式验证
+   *
+   * @param {number} role_id - 角色ID
+   * @param {Object} updateData - 更新数据（部分更新）
+   * @param {string} updateData.description - 角色描述（可选）
+   * @param {number} updateData.role_level - 角色等级（可选）
+   * @param {Object} updateData.permissions - 权限配置（可选）
+   * @param {number} operator_id - 操作者ID
+   * @param {Object} options - 选项参数
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
+   * @param {string} options.ip_address - IP地址（可选）
+   * @param {string} options.user_agent - 用户代理（可选）
+   * @returns {Promise<Object>} 更新结果（包含 affected_user_ids 供调用方批量失效缓存）
+   * @throws {Error} 业务操作或审计日志失败时抛出错误
+   */
+  static async updateRole(role_id, updateData, operator_id, options = {}) {
+    // 强制要求事务边界
+    const transaction = assertAndGetTransaction(options, 'UserRoleService.updateRole')
+    const { ip_address, user_agent } = options
+    const { description, role_level, permissions } = updateData
+
+    // 查找角色
+    const role = await Role.findByPk(role_id, { transaction })
+    if (!role) {
+      throw new Error('角色不存在')
+    }
+
+    // 引入权限资源常量
+    const { isSystemRole, validatePermissions } = require('../constants/PermissionResources')
+
+    // 系统内置角色保护
+    if (isSystemRole(role.role_name)) {
+      throw new Error(`系统内置角色不可修改: ${role.role_name}`)
+    }
+
+    // 获取操作者权限级别
+    const { getUserRoles } = require('../middleware/auth')
+    const operatorRoles = await getUserRoles(operator_id)
+    const operatorMaxLevel =
+      operatorRoles.roles.length > 0 ? Math.max(...operatorRoles.roles.map(r => r.role_level)) : 0
+
+    // 权限等级校验：不能修改为比自己权限更高的等级
+    if (role_level !== undefined && role_level > operatorMaxLevel) {
+      throw new Error(
+        `权限不足：不能将角色等级设置为高于自己的级别（操作者级别: ${operatorMaxLevel}, 目标角色级别: ${role_level}）`
+      )
+    }
+
+    // 验证权限格式
+    if (permissions !== undefined && Object.keys(permissions).length > 0) {
+      const permissionValidation = validatePermissions(permissions)
+      if (!permissionValidation.valid) {
+        throw new Error(`权限配置格式错误: ${permissionValidation.errors.join(', ')}`)
+      }
+    }
+
+    // 保存旧数据（用于审计日志）
+    const beforeData = {
+      role_id: role.role_id,
+      role_name: role.role_name,
+      role_level: role.role_level,
+      description: role.description,
+      permissions: role.permissions
+    }
+
+    // 构建更新字段
+    const updateFields = {}
+    if (description !== undefined) updateFields.description = description
+    if (role_level !== undefined) updateFields.role_level = role_level
+    if (permissions !== undefined) updateFields.permissions = permissions
+
+    // 检查是否有更新
+    if (Object.keys(updateFields).length === 0) {
+      throw new Error('没有可更新的字段')
+    }
+
+    // 更新角色
+    await role.update(updateFields, { transaction })
+
+    // 查询受影响的用户（用于批量失效缓存）
+    const affectedUserRoles = await UserRole.findAll({
+      where: { role_id, is_active: true },
+      attributes: ['user_id'],
+      transaction
+    })
+    const affectedUserIds = affectedUserRoles.map(ur => ur.user_id)
+
+    // 记录审计日志
+    const { OPERATION_TYPES } = require('../constants/AuditOperationTypes')
+    const idempotencyKey = `role_update_${role_id}_${Date.now()}`
+
+    await AuditLogService.logOperation({
+      operator_id,
+      operation_type: OPERATION_TYPES.ROLE_UPDATE,
+      target_type: 'Role',
+      target_id: role.role_id,
+      action: 'update',
+      before_data: beforeData,
+      after_data: {
+        role_id: role.role_id,
+        role_name: role.role_name,
+        role_level: role.role_level,
+        description: role.description,
+        permissions: role.permissions
+      },
+      reason: `更新角色: ${role.role_name}`,
+      idempotency_key: idempotencyKey,
+      ip_address,
+      user_agent,
+      transaction,
+      is_critical_operation: true
+    })
+
+    logger.info('角色更新成功', {
+      role_id,
+      role_name: role.role_name,
+      operator_id,
+      affected_users: affectedUserIds.length
+    })
+
+    return {
+      role_id: role.role_id,
+      role_uuid: role.role_uuid,
+      role_name: role.role_name,
+      role_level: role.role_level,
+      description: role.description,
+      permissions: role.permissions,
+      updated_at: role.updated_at,
+      affected_user_ids: affectedUserIds,
+      // 事务提交后由调用方处理的副作用
+      post_commit_actions: {
+        invalidate_cache_for_users: affectedUserIds,
+        disconnect_ws_for_admin_users: affectedUserIds.length > 0
+      }
+    }
+  }
+
+  /**
+   * 🗑️ 删除角色（软删除）
+   *
+   * 事务边界治理（2026-01-26 角色权限管理功能）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
+   * 软删除策略：
+   * - 设置 is_active=false
+   * - 角色数据保留，现有用户保持原权限
+   * - 角色从"可分配列表"中消失
+   * - 数据可追溯，符合审计要求
+   *
+   * 安全校验：
+   * - 系统内置角色不可删除
+   *
+   * @param {number} role_id - 角色ID
+   * @param {number} operator_id - 操作者ID
+   * @param {Object} options - 选项参数
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
+   * @param {string} options.ip_address - IP地址（可选）
+   * @param {string} options.user_agent - 用户代理（可选）
+   * @returns {Promise<Object>} 删除结果（包含 affected_user_ids 供调用方批量失效缓存）
+   * @throws {Error} 业务操作或审计日志失败时抛出错误
+   */
+  static async deleteRole(role_id, operator_id, options = {}) {
+    // 强制要求事务边界
+    const transaction = assertAndGetTransaction(options, 'UserRoleService.deleteRole')
+    const { ip_address, user_agent } = options
+
+    // 查找角色
+    const role = await Role.findByPk(role_id, { transaction })
+    if (!role) {
+      throw new Error('角色不存在')
+    }
+
+    // 引入权限资源常量
+    const { isSystemRole } = require('../constants/PermissionResources')
+
+    // 系统内置角色保护
+    if (isSystemRole(role.role_name)) {
+      throw new Error(`系统内置角色不可删除: ${role.role_name}`)
+    }
+
+    // 检查角色是否已经被软删除
+    if (!role.is_active) {
+      throw new Error(`角色已经被删除: ${role.role_name}`)
+    }
+
+    // 查询受影响的用户
+    const affectedUserRoles = await UserRole.findAll({
+      where: { role_id, is_active: true },
+      attributes: ['user_id'],
+      transaction
+    })
+    const affectedUserIds = affectedUserRoles.map(ur => ur.user_id)
+
+    // 保存旧数据（用于审计日志）
+    const beforeData = {
+      role_id: role.role_id,
+      role_uuid: role.role_uuid,
+      role_name: role.role_name,
+      role_level: role.role_level,
+      description: role.description,
+      permissions: role.permissions,
+      is_active: role.is_active
+    }
+
+    // 执行软删除
+    await role.update({ is_active: false }, { transaction })
+
+    // 记录审计日志
+    const { OPERATION_TYPES } = require('../constants/AuditOperationTypes')
+    const idempotencyKey = `role_delete_${role_id}_${Date.now()}`
+
+    await AuditLogService.logOperation({
+      operator_id,
+      operation_type: OPERATION_TYPES.ROLE_DELETE,
+      target_type: 'Role',
+      target_id: role.role_id,
+      action: 'delete',
+      before_data: beforeData,
+      after_data: {
+        ...beforeData,
+        is_active: false
+      },
+      reason: `删除角色: ${role.role_name}`,
+      idempotency_key: idempotencyKey,
+      ip_address,
+      user_agent,
+      transaction,
+      is_critical_operation: true
+    })
+
+    logger.info('角色删除成功（软删除）', {
+      role_id,
+      role_name: role.role_name,
+      operator_id,
+      affected_users: affectedUserIds.length
+    })
+
+    return {
+      role_id: role.role_id,
+      role_name: role.role_name,
+      affected_users: affectedUserIds.length,
+      affected_user_ids: affectedUserIds,
+      // 事务提交后由调用方处理的副作用
+      post_commit_actions: {
+        invalidate_cache_for_users: affectedUserIds,
+        disconnect_ws_for_admin_users: affectedUserIds.length > 0
+      }
+    }
+  }
+
+  /**
+   * 📋 获取权限资源列表
+   *
+   * 返回系统定义的所有权限资源和可用操作，用于角色权限配置界面。
+   *
+   * @returns {Object} 权限资源列表
+   */
+  static getPermissionResources() {
+    const { getPermissionResources, SYSTEM_ROLES } = require('../constants/PermissionResources')
+
+    return {
+      resources: getPermissionResources(),
+      system_roles: SYSTEM_ROLES
+    }
+  }
 }
 
 module.exports = UserRoleService

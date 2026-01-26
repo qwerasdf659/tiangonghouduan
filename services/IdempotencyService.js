@@ -272,6 +272,10 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/user-management/users/:id/role': 'ADMIN_USER_ROLE_UPDATE', // 更新用户角色
   '/api/v4/console/user-management/users/:id/status': 'ADMIN_USER_STATUS_UPDATE', // 更新用户状态
 
+  // ===== 角色权限管理（2026-01-26 新增）=====
+  '/api/v4/console/user-management/roles': 'ADMIN_ROLE_CREATE', // 创建角色
+  '/api/v4/console/user-management/roles/:id': 'ADMIN_ROLE_UPDATE', // 更新/删除角色（:role_id → :id）
+
   /*
    * ===== 材料管理（2026-01-20 V2.2 路由重构）=====
    * 转换规则：事务实体，使用 :id

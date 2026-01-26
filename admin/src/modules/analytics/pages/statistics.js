@@ -283,11 +283,21 @@ function statisticsPage() {
             name: '用户类型',
             type: 'pie',
             radius: ['40%', '70%'],
-            avoidLabelOverlap: false,
+            avoidLabelOverlap: true,
             itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
-            label: { show: false, position: 'center' },
-            emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' } },
-            labelLine: { show: false },
+            label: {
+              show: true,
+              position: 'outside',
+              formatter: '{b}\n{c} ({d}%)',
+              fontSize: 12,
+              color: '#333'
+            },
+            emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
+            labelLine: {
+              show: true,
+              length: 10,
+              length2: 15
+            },
             data: data
           }
         ]

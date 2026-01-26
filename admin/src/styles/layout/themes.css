@@ -1,9 +1,15 @@
 /**
  * 主题样式定义
- * @description 支持一键切换的多主题配色方案
+ * @description 支持一键切换的25种配色方案
+ * @version 2.0.0
+ * @date 2026-01-26
  */
 
-/* ========== 亮色主题（默认）- 深蓝科技风 ========== */
+/* =====================================================
+   深色侧边栏系列 (20种)
+   ===================================================== */
+
+/* ========== 1. 深蓝科技风（默认/推荐）========== */
 :root,
 [data-theme="light"] {
   /* 主色调 */
@@ -53,222 +59,906 @@
   --card-bg: #ffffff;
 }
 
-/* ========== 暗色主题 ========== */
+/* ========== 2. 暗色主题 ========== */
 [data-theme="dark"] {
-  /* 主色调 */
   --color-primary: #60a5fa;
   --color-primary-hover: #3b82f6;
   --color-primary-light: #1e3a5f;
   
-  /* 背景色 */
   --color-bg-base: #0f172a;
   --color-bg-card: #1e293b;
   --color-bg-sidebar: #0f172a;
   
-  /* 文字色 */
   --color-text-primary: #f1f5f9;
   --color-text-secondary: #94a3b8;
   --color-text-inverse: #0f172a;
   
-  /* 边框色 */
   --color-border: #334155;
   --color-border-light: #1e293b;
   
-  /* 侧边栏 */
   --sidebar-bg: #0f172a;
   --sidebar-hover: #1e293b;
   --sidebar-active-gradient: linear-gradient(135deg, #60a5fa, #3b82f6);
   --sidebar-text: #94a3b8;
   --sidebar-text-active: #ffffff;
   
-  /* 顶部栏 */
   --header-bg: #1e293b;
   --header-border: #334155;
   
-  /* Tab 栏 */
   --tab-bar-bg: #1e293b;
   --tab-active-bg: #0f172a;
   --tab-text: #94a3b8;
   --tab-text-active: #f1f5f9;
   
-  /* 内容区 */
   --content-bg: #0f172a;
   --card-bg: #1e293b;
 }
 
-/* ========== 紫色主题 ========== */
+/* ========== 3. 紫色渐变风 ========== */
 [data-theme="purple"] {
-  /* 主色调 */
   --color-primary: #8b5cf6;
   --color-primary-hover: #7c3aed;
   --color-primary-light: #ede9fe;
   
-  /* 背景色 */
   --color-bg-base: #faf5ff;
   --color-bg-card: #ffffff;
   --color-bg-sidebar: #1a1625;
   
-  /* 文字色 */
   --color-text-primary: #1e1b4b;
   --color-text-secondary: #6b7280;
   --color-text-inverse: #ffffff;
   
-  /* 边框色 */
   --color-border: #e9d5ff;
   --color-border-light: #f3e8ff;
   
-  /* 侧边栏 - 深紫 */
   --sidebar-bg: #1a1625;
   --sidebar-hover: #2d2640;
   --sidebar-active-gradient: linear-gradient(135deg, #8b5cf6, #a855f7);
   --sidebar-text: #a78bfa;
   --sidebar-text-active: #ffffff;
   
-  /* 顶部栏 */
   --header-bg: #ffffff;
   --header-border: #e9d5ff;
   
-  /* Tab 栏 */
   --tab-bar-bg: #faf5ff;
   --tab-active-bg: #ffffff;
   --tab-text: #6b7280;
   --tab-text-active: #1e1b4b;
   
-  /* 内容区 */
   --content-bg: #faf5ff;
   --card-bg: #ffffff;
 }
 
-/* ========== 绿色主题 ========== */
+/* ========== 4. 暗绿商务风 ========== */
 [data-theme="green"] {
-  /* 主色调 */
   --color-primary: #10b981;
   --color-primary-hover: #059669;
   --color-primary-light: #d1fae5;
   
-  /* 背景色 */
   --color-bg-base: #ecfdf5;
   --color-bg-card: #ffffff;
   --color-bg-sidebar: #0d1f17;
   
-  /* 文字色 */
   --color-text-primary: #064e3b;
   --color-text-secondary: #6b7280;
   --color-text-inverse: #ffffff;
   
-  /* 边框色 */
   --color-border: #a7f3d0;
   --color-border-light: #d1fae5;
   
-  /* 侧边栏 - 深墨绿 */
   --sidebar-bg: #0d1f17;
   --sidebar-hover: #1a3d2e;
   --sidebar-active-gradient: linear-gradient(135deg, #10b981, #059669);
   --sidebar-text: #6ee7b7;
   --sidebar-text-active: #ffffff;
   
-  /* 顶部栏 */
   --header-bg: #ffffff;
   --header-border: #a7f3d0;
   
-  /* Tab 栏 */
   --tab-bar-bg: #ecfdf5;
   --tab-active-bg: #ffffff;
   --tab-text: #6b7280;
   --tab-text-active: #064e3b;
   
-  /* 内容区 */
   --content-bg: #ecfdf5;
   --card-bg: #ffffff;
 }
 
-/* ========== 暗黑极简风 ========== */
+/* ========== 5. 暗黑极简风 ========== */
 [data-theme="minimal-dark"] {
-  /* 主色调 */
   --color-primary: #f59e0b;
   --color-primary-hover: #d97706;
   --color-primary-light: #fef3c7;
   
-  /* 背景色 */
   --color-bg-base: #09090b;
   --color-bg-card: #18181b;
   --color-bg-sidebar: #18181b;
   
-  /* 文字色 */
   --color-text-primary: #fafafa;
   --color-text-secondary: #a1a1aa;
   --color-text-inverse: #18181b;
   
-  /* 边框色 */
   --color-border: #27272a;
   --color-border-light: #3f3f46;
   
-  /* 侧边栏 */
   --sidebar-bg: #18181b;
   --sidebar-hover: #27272a;
   --sidebar-active-gradient: linear-gradient(135deg, #f59e0b, #d97706);
   --sidebar-text: #a1a1aa;
   --sidebar-text-active: #ffffff;
   
-  /* 顶部栏 */
   --header-bg: #18181b;
   --header-border: #27272a;
   
-  /* Tab 栏 */
   --tab-bar-bg: #18181b;
   --tab-active-bg: #27272a;
   --tab-text: #a1a1aa;
   --tab-text-active: #fafafa;
   
-  /* 内容区 */
   --content-bg: #09090b;
   --card-bg: #18181b;
 }
 
-/* ========== 日落橙暖风（餐饮推荐） ========== */
+/* ========== 6. 蓝紫渐变风 ========== */
+[data-theme="indigo"] {
+  --color-primary: #6366f1;
+  --color-primary-hover: #4f46e5;
+  --color-primary-light: #e0e7ff;
+  
+  --color-bg-base: #f5f3ff;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #1e1b4b;
+  
+  --color-text-primary: #312e81;
+  --color-text-secondary: #6b7280;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #c7d2fe;
+  --color-border-light: #e0e7ff;
+  
+  --sidebar-bg: #1e1b4b;
+  --sidebar-hover: #312e81;
+  --sidebar-active-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
+  --sidebar-text: #a5b4fc;
+  --sidebar-text-active: #ffffff;
+  
+  --header-bg: #ffffff;
+  --header-border: #c7d2fe;
+  
+  --tab-bar-bg: #f5f3ff;
+  --tab-active-bg: #ffffff;
+  --tab-text: #6b7280;
+  --tab-text-active: #312e81;
+  
+  --content-bg: #f5f3ff;
+  --card-bg: #ffffff;
+}
+
+/* ========== 7. 玫瑰粉暖风 ========== */
+[data-theme="rose"] {
+  --color-primary: #f43f5e;
+  --color-primary-hover: #e11d48;
+  --color-primary-light: #ffe4e6;
+  
+  --color-bg-base: #fafaf9;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #1c1917;
+  
+  --color-text-primary: #292524;
+  --color-text-secondary: #78716c;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #fecdd3;
+  --color-border-light: #ffe4e6;
+  
+  --sidebar-bg: #1c1917;
+  --sidebar-hover: #292524;
+  --sidebar-active-gradient: linear-gradient(135deg, #f43f5e, #e11d48);
+  --sidebar-text: #a8a29e;
+  --sidebar-text-active: #ffffff;
+  
+  --header-bg: #ffffff;
+  --header-border: #fecdd3;
+  
+  --tab-bar-bg: #fafaf9;
+  --tab-active-bg: #ffffff;
+  --tab-text: #78716c;
+  --tab-text-active: #292524;
+  
+  --content-bg: #fafaf9;
+  --card-bg: #ffffff;
+}
+
+/* ========== 8. 海洋青蓝风 ========== */
+[data-theme="teal"] {
+  --color-primary: #14b8a6;
+  --color-primary-hover: #0d9488;
+  --color-primary-light: #ccfbf1;
+  
+  --color-bg-base: #f0fdfa;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #042f2e;
+  
+  --color-text-primary: #134e4a;
+  --color-text-secondary: #6b7280;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #99f6e4;
+  --color-border-light: #ccfbf1;
+  
+  --sidebar-bg: #042f2e;
+  --sidebar-hover: #134e4a;
+  --sidebar-active-gradient: linear-gradient(135deg, #14b8a6, #0d9488);
+  --sidebar-text: #5eead4;
+  --sidebar-text-active: #ffffff;
+  
+  --header-bg: #ffffff;
+  --header-border: #99f6e4;
+  
+  --tab-bar-bg: #f0fdfa;
+  --tab-active-bg: #ffffff;
+  --tab-text: #6b7280;
+  --tab-text-active: #134e4a;
+  
+  --content-bg: #f0fdfa;
+  --card-bg: #ffffff;
+}
+
+/* ========== 9. 暗红商务风 ========== */
+[data-theme="red"] {
+  --color-primary: #dc2626;
+  --color-primary-hover: #b91c1c;
+  --color-primary-light: #fee2e2;
+  
+  --color-bg-base: #fafafa;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #1a1a1a;
+  
+  --color-text-primary: #171717;
+  --color-text-secondary: #737373;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #fecaca;
+  --color-border-light: #fee2e2;
+  
+  --sidebar-bg: #1a1a1a;
+  --sidebar-hover: #2d2d2d;
+  --sidebar-active-gradient: linear-gradient(135deg, #dc2626, #b91c1c);
+  --sidebar-text: #9ca3af;
+  --sidebar-text-active: #ffffff;
+  
+  --header-bg: #ffffff;
+  --header-border: #fecaca;
+  
+  --tab-bar-bg: #fafafa;
+  --tab-active-bg: #ffffff;
+  --tab-text: #737373;
+  --tab-text-active: #171717;
+  
+  --content-bg: #fafafa;
+  --card-bg: #ffffff;
+}
+
+/* ========== 10. 赛博朋克风 ========== */
+[data-theme="cyber"] {
+  --color-primary: #f72585;
+  --color-primary-hover: #b5179e;
+  --color-primary-light: #fce7f3;
+  
+  --color-bg-base: #16213e;
+  --color-bg-card: #1a1a2e;
+  --color-bg-sidebar: #0a0a0a;
+  
+  --color-text-primary: #e0e0e0;
+  --color-text-secondary: #a0a0a0;
+  --color-text-inverse: #0a0a0a;
+  
+  --color-border: #3a3a5c;
+  --color-border-light: #2a2a4c;
+  
+  --sidebar-bg: #0a0a0a;
+  --sidebar-hover: #1a1a2e;
+  --sidebar-active-gradient: linear-gradient(135deg, #00f5d4, #00bbf9);
+  --sidebar-text: #00f5d4;
+  --sidebar-text-active: #ffffff;
+  
+  --header-bg: #1a1a2e;
+  --header-border: #3a3a5c;
+  
+  --tab-bar-bg: #1a1a2e;
+  --tab-active-bg: #16213e;
+  --tab-text: #a0a0a0;
+  --tab-text-active: #00f5d4;
+  
+  --content-bg: #16213e;
+  --card-bg: #1a1a2e;
+}
+
+/* ========== 11. 日落橙暖风（餐饮推荐）========== */
 [data-theme="sunset"] {
-  /* 主色调 */
   --color-primary: #ff6b35;
   --color-primary-hover: #ea580c;
   --color-primary-light: #ffedd5;
   
-  /* 背景色 */
   --color-bg-base: #fffbeb;
   --color-bg-card: #ffffff;
   --color-bg-sidebar: #1f1f1f;
   
-  /* 文字色 */
   --color-text-primary: #451a03;
   --color-text-secondary: #78716c;
   --color-text-inverse: #ffffff;
   
-  /* 边框色 */
   --color-border: #fed7aa;
   --color-border-light: #ffedd5;
   
-  /* 侧边栏 */
   --sidebar-bg: #1f1f1f;
   --sidebar-hover: #2d2d2d;
   --sidebar-active-gradient: linear-gradient(135deg, #ff6b35, #f7931e);
   --sidebar-text: #fbbf77;
   --sidebar-text-active: #ffffff;
   
-  /* 顶部栏 */
   --header-bg: #ffffff;
   --header-border: #fed7aa;
   
-  /* Tab 栏 */
   --tab-bar-bg: #fffbeb;
   --tab-active-bg: #ffffff;
   --tab-text: #78716c;
   --tab-text-active: #451a03;
   
-  /* 内容区 */
   --content-bg: #fffbeb;
   --card-bg: #ffffff;
 }
 
-/* ========== 主题切换时的过渡效果 ========== */
+/* ========== 12. 森林墨绿风 ========== */
+[data-theme="forest"] {
+  --color-primary: #84cc16;
+  --color-primary-hover: #65a30d;
+  --color-primary-light: #ecfccb;
+  
+  --color-bg-base: #f7fee7;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #14532d;
+  
+  --color-text-primary: #365314;
+  --color-text-secondary: #6b7280;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #bef264;
+  --color-border-light: #d9f99d;
+  
+  --sidebar-bg: #14532d;
+  --sidebar-hover: #166534;
+  --sidebar-active-gradient: linear-gradient(135deg, #84cc16, #65a30d);
+  --sidebar-text: #bbf7d0;
+  --sidebar-text-active: #ffffff;
+  
+  --header-bg: #ffffff;
+  --header-border: #bef264;
+  
+  --tab-bar-bg: #f7fee7;
+  --tab-active-bg: #ffffff;
+  --tab-text: #6b7280;
+  --tab-text-active: #365314;
+  
+  --content-bg: #f7fee7;
+  --card-bg: #ffffff;
+}
+
+/* ========== 13. 午夜蓝风 ========== */
+[data-theme="midnight"] {
+  --color-primary: #0ea5e9;
+  --color-primary-hover: #0284c7;
+  --color-primary-light: #e0f2fe;
+  
+  --color-bg-base: #f0f9ff;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #020617;
+  
+  --color-text-primary: #0c4a6e;
+  --color-text-secondary: #6b7280;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #7dd3fc;
+  --color-border-light: #bae6fd;
+  
+  --sidebar-bg: #020617;
+  --sidebar-hover: #0f172a;
+  --sidebar-active-gradient: linear-gradient(135deg, #0ea5e9, #0284c7);
+  --sidebar-text: #7dd3fc;
+  --sidebar-text-active: #ffffff;
+  
+  --header-bg: #ffffff;
+  --header-border: #7dd3fc;
+  
+  --tab-bar-bg: #f0f9ff;
+  --tab-active-bg: #ffffff;
+  --tab-text: #6b7280;
+  --tab-text-active: #0c4a6e;
+  
+  --content-bg: #f0f9ff;
+  --card-bg: #ffffff;
+}
+
+/* ========== 14. 咖啡棕暖风 ========== */
+[data-theme="coffee"] {
+  --color-primary: #d97706;
+  --color-primary-hover: #b45309;
+  --color-primary-light: #fef3c7;
+  
+  --color-bg-base: #fef3c7;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #292524;
+  
+  --color-text-primary: #78350f;
+  --color-text-secondary: #78716c;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #fcd34d;
+  --color-border-light: #fde68a;
+  
+  --sidebar-bg: #292524;
+  --sidebar-hover: #44403c;
+  --sidebar-active-gradient: linear-gradient(135deg, #d97706, #b45309);
+  --sidebar-text: #d6d3d1;
+  --sidebar-text-active: #ffffff;
+  
+  --header-bg: #ffffff;
+  --header-border: #fcd34d;
+  
+  --tab-bar-bg: #fef3c7;
+  --tab-active-bg: #ffffff;
+  --tab-text: #78716c;
+  --tab-text-active: #78350f;
+  
+  --content-bg: #fef3c7;
+  --card-bg: #ffffff;
+}
+
+/* ========== 15. 电竞霓虹风 ========== */
+[data-theme="neon"] {
+  --color-primary: #ec4899;
+  --color-primary-hover: #db2777;
+  --color-primary-light: #fce7f3;
+  
+  --color-bg-base: #18181b;
+  --color-bg-card: #27272a;
+  --color-bg-sidebar: #000000;
+  
+  --color-text-primary: #f4f4f5;
+  --color-text-secondary: #a1a1aa;
+  --color-text-inverse: #000000;
+  
+  --color-border: #3f3f46;
+  --color-border-light: #52525b;
+  
+  --sidebar-bg: #000000;
+  --sidebar-hover: #1a1a1a;
+  --sidebar-active-gradient: linear-gradient(135deg, #a855f7, #ec4899);
+  --sidebar-text: #c084fc;
+  --sidebar-text-active: #ffffff;
+  
+  --header-bg: #27272a;
+  --header-border: #3f3f46;
+  
+  --tab-bar-bg: #27272a;
+  --tab-active-bg: #18181b;
+  --tab-text: #a1a1aa;
+  --tab-text-active: #ec4899;
+  
+  --content-bg: #18181b;
+  --card-bg: #27272a;
+}
+
+/* ========== 16. 皇家金色风 ========== */
+[data-theme="gold"] {
+  --color-primary: #eab308;
+  --color-primary-hover: #ca8a04;
+  --color-primary-light: #fef9c3;
+  
+  --color-bg-base: #fefce8;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #1c1917;
+  
+  --color-text-primary: #713f12;
+  --color-text-secondary: #78716c;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #fde047;
+  --color-border-light: #fef08a;
+  
+  --sidebar-bg: #1c1917;
+  --sidebar-hover: #292524;
+  --sidebar-active-gradient: linear-gradient(135deg, #eab308, #ca8a04);
+  --sidebar-text: #fde047;
+  --sidebar-text-active: #ffffff;
+  
+  --header-bg: #ffffff;
+  --header-border: #fde047;
+  
+  --tab-bar-bg: #fefce8;
+  --tab-active-bg: #ffffff;
+  --tab-text: #78716c;
+  --tab-text-active: #713f12;
+  
+  --content-bg: #fefce8;
+  --card-bg: #ffffff;
+}
+
+/* ========== 17. 海军蓝正统风 ========== */
+[data-theme="navy"] {
+  --color-primary: #1e40af;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-light: #dbeafe;
+  
+  --color-bg-base: #eff6ff;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #1e3a5f;
+  
+  --color-text-primary: #1e3a8a;
+  --color-text-secondary: #6b7280;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #93c5fd;
+  --color-border-light: #bfdbfe;
+  
+  --sidebar-bg: #1e3a5f;
+  --sidebar-hover: #274a7a;
+  --sidebar-active-gradient: linear-gradient(135deg, #60a5fa, #3b82f6);
+  --sidebar-text: #93c5fd;
+  --sidebar-text-active: #ffffff;
+  
+  --header-bg: #ffffff;
+  --header-border: #93c5fd;
+  
+  --tab-bar-bg: #eff6ff;
+  --tab-active-bg: #ffffff;
+  --tab-text: #6b7280;
+  --tab-text-active: #1e3a8a;
+  
+  --content-bg: #eff6ff;
+  --card-bg: #ffffff;
+}
+
+/* ========== 18. 火山岩深灰风 ========== */
+[data-theme="volcano"] {
+  --color-primary: #f97316;
+  --color-primary-hover: #ea580c;
+  --color-primary-light: #ffedd5;
+  
+  --color-bg-base: #fafafa;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #262626;
+  
+  --color-text-primary: #171717;
+  --color-text-secondary: #737373;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #fdba74;
+  --color-border-light: #fed7aa;
+  
+  --sidebar-bg: #262626;
+  --sidebar-hover: #404040;
+  --sidebar-active-gradient: linear-gradient(135deg, #f97316, #ea580c);
+  --sidebar-text: #a3a3a3;
+  --sidebar-text-active: #ffffff;
+  
+  --header-bg: #ffffff;
+  --header-border: #fdba74;
+  
+  --tab-bar-bg: #fafafa;
+  --tab-active-bg: #ffffff;
+  --tab-text: #737373;
+  --tab-text-active: #171717;
+  
+  --content-bg: #fafafa;
+  --card-bg: #ffffff;
+}
+
+/* ========== 19. 星空紫夜风 ========== */
+[data-theme="starry"] {
+  --color-primary: #818cf8;
+  --color-primary-hover: #6366f1;
+  --color-primary-light: #e0e7ff;
+  
+  --color-bg-base: #eef2ff;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #0c0a1d;
+  
+  --color-text-primary: #312e81;
+  --color-text-secondary: #6b7280;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #a5b4fc;
+  --color-border-light: #c7d2fe;
+  
+  --sidebar-bg: #0c0a1d;
+  --sidebar-hover: #1a1832;
+  --sidebar-active-gradient: linear-gradient(135deg, #818cf8, #6366f1);
+  --sidebar-text: #a5b4fc;
+  --sidebar-text-active: #ffffff;
+  
+  --header-bg: #ffffff;
+  --header-border: #a5b4fc;
+  
+  --tab-bar-bg: #eef2ff;
+  --tab-active-bg: #ffffff;
+  --tab-text: #6b7280;
+  --tab-text-active: #312e81;
+  
+  --content-bg: #eef2ff;
+  --card-bg: #ffffff;
+}
+
+/* ========== 20. 中国红喜庆风 ========== */
+[data-theme="chinese-red"] {
+  --color-primary: #dc2626;
+  --color-primary-hover: #b91c1c;
+  --color-primary-light: #fee2e2;
+  
+  --color-bg-base: #fef2f2;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #450a0a;
+  
+  --color-text-primary: #7f1d1d;
+  --color-text-secondary: #78716c;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #fca5a5;
+  --color-border-light: #fecaca;
+  
+  --sidebar-bg: #450a0a;
+  --sidebar-hover: #7f1d1d;
+  --sidebar-active-gradient: linear-gradient(135deg, #ef4444, #dc2626);
+  --sidebar-text: #fca5a5;
+  --sidebar-text-active: #ffffff;
+  
+  --header-bg: #ffffff;
+  --header-border: #fca5a5;
+  
+  --tab-bar-bg: #fef2f2;
+  --tab-active-bg: #ffffff;
+  --tab-text: #78716c;
+  --tab-text-active: #7f1d1d;
+  
+  --content-bg: #fef2f2;
+  --card-bg: #ffffff;
+}
+
+/* =====================================================
+   浅色侧边栏系列 (6种)
+   ===================================================== */
+
+/* ========== 21. 翠绿清新风 ========== */
+[data-theme="fresh-green"] {
+  --color-primary: #22c55e;
+  --color-primary-hover: #16a34a;
+  --color-primary-light: #dcfce7;
+  
+  --color-bg-base: #f0fdf4;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #ffffff;
+  
+  --color-text-primary: #166534;
+  --color-text-secondary: #6b7280;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #86efac;
+  --color-border-light: #bbf7d0;
+  
+  --sidebar-bg: #ffffff;
+  --sidebar-hover: #f0fdf4;
+  --sidebar-active-gradient: linear-gradient(135deg, #22c55e, #16a34a);
+  --sidebar-text: #374151;
+  --sidebar-text-active: #ffffff;
+  --sidebar-border: #e5e7eb;
+  
+  --header-bg: #ffffff;
+  --header-border: #86efac;
+  
+  --tab-bar-bg: #f0fdf4;
+  --tab-active-bg: #ffffff;
+  --tab-text: #6b7280;
+  --tab-text-active: #166534;
+  
+  --content-bg: #f0fdf4;
+  --card-bg: #ffffff;
+}
+
+/* ========== 22. 浅色极简风 ========== */
+[data-theme="minimal-light"] {
+  --color-primary: #3b82f6;
+  --color-primary-hover: #2563eb;
+  --color-primary-light: #dbeafe;
+  
+  --color-bg-base: #f8fafc;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #ffffff;
+  
+  --color-text-primary: #1e293b;
+  --color-text-secondary: #64748b;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #e2e8f0;
+  --color-border-light: #f1f5f9;
+  
+  --sidebar-bg: #ffffff;
+  --sidebar-hover: #f1f5f9;
+  --sidebar-active-gradient: linear-gradient(135deg, #3b82f6, #2563eb);
+  --sidebar-text: #64748b;
+  --sidebar-text-active: #ffffff;
+  --sidebar-border: #e2e8f0;
+  
+  --header-bg: #ffffff;
+  --header-border: #e2e8f0;
+  
+  --tab-bar-bg: #f8fafc;
+  --tab-active-bg: #ffffff;
+  --tab-text: #64748b;
+  --tab-text-active: #1e293b;
+  
+  --content-bg: #f8fafc;
+  --card-bg: #ffffff;
+}
+
+/* ========== 23. 薰衣草紫风 ========== */
+[data-theme="lavender"] {
+  --color-primary: #a855f7;
+  --color-primary-hover: #9333ea;
+  --color-primary-light: #f3e8ff;
+  
+  --color-bg-base: #faf5ff;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #f3e8ff;
+  
+  --color-text-primary: #6b21a8;
+  --color-text-secondary: #78716c;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #d8b4fe;
+  --color-border-light: #e9d5ff;
+  
+  --sidebar-bg: #f3e8ff;
+  --sidebar-hover: #e9d5ff;
+  --sidebar-active-gradient: linear-gradient(135deg, #a855f7, #9333ea);
+  --sidebar-text: #6b21a8;
+  --sidebar-text-active: #ffffff;
+  --sidebar-border: #d8b4fe;
+  
+  --header-bg: #ffffff;
+  --header-border: #d8b4fe;
+  
+  --tab-bar-bg: #faf5ff;
+  --tab-active-bg: #ffffff;
+  --tab-text: #78716c;
+  --tab-text-active: #6b21a8;
+  
+  --content-bg: #faf5ff;
+  --card-bg: #ffffff;
+}
+
+/* ========== 24. 北欧极简风 ========== */
+[data-theme="nordic"] {
+  --color-primary: #475569;
+  --color-primary-hover: #334155;
+  --color-primary-light: #f1f5f9;
+  
+  --color-bg-base: #ffffff;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #fafafa;
+  
+  --color-text-primary: #1e293b;
+  --color-text-secondary: #64748b;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #e2e8f0;
+  --color-border-light: #f1f5f9;
+  
+  --sidebar-bg: #fafafa;
+  --sidebar-hover: #f5f5f5;
+  --sidebar-active-gradient: linear-gradient(135deg, #475569, #334155);
+  --sidebar-text: #64748b;
+  --sidebar-text-active: #ffffff;
+  --sidebar-border: #e5e7eb;
+  
+  --header-bg: #ffffff;
+  --header-border: #e2e8f0;
+  
+  --tab-bar-bg: #fafafa;
+  --tab-active-bg: #ffffff;
+  --tab-text: #64748b;
+  --tab-text-active: #1e293b;
+  
+  --content-bg: #ffffff;
+  --card-bg: #ffffff;
+}
+
+/* ========== 25. 樱花粉风 ========== */
+[data-theme="sakura"] {
+  --color-primary: #ec4899;
+  --color-primary-hover: #db2777;
+  --color-primary-light: #fce7f3;
+  
+  --color-bg-base: #fff1f2;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #fdf2f8;
+  
+  --color-text-primary: #9d174d;
+  --color-text-secondary: #78716c;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #fbcfe8;
+  --color-border-light: #fce7f3;
+  
+  --sidebar-bg: #fdf2f8;
+  --sidebar-hover: #fce7f3;
+  --sidebar-active-gradient: linear-gradient(135deg, #ec4899, #db2777);
+  --sidebar-text: #9d174d;
+  --sidebar-text-active: #ffffff;
+  --sidebar-border: #fbcfe8;
+  
+  --header-bg: #ffffff;
+  --header-border: #fbcfe8;
+  
+  --tab-bar-bg: #fff1f2;
+  --tab-active-bg: #ffffff;
+  --tab-text: #78716c;
+  --tab-text-active: #9d174d;
+  
+  --content-bg: #fff1f2;
+  --card-bg: #ffffff;
+}
+
+/* ========== 26. 薄荷清凉风 ========== */
+[data-theme="mint"] {
+  --color-primary: #34d399;
+  --color-primary-hover: #10b981;
+  --color-primary-light: #d1fae5;
+  
+  --color-bg-base: #f0fdf4;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #ecfdf5;
+  
+  --color-text-primary: #047857;
+  --color-text-secondary: #6b7280;
+  --color-text-inverse: #ffffff;
+  
+  --color-border: #6ee7b7;
+  --color-border-light: #a7f3d0;
+  
+  --sidebar-bg: #ecfdf5;
+  --sidebar-hover: #d1fae5;
+  --sidebar-active-gradient: linear-gradient(135deg, #34d399, #10b981);
+  --sidebar-text: #047857;
+  --sidebar-text-active: #ffffff;
+  --sidebar-border: #6ee7b7;
+  
+  --header-bg: #ffffff;
+  --header-border: #6ee7b7;
+  
+  --tab-bar-bg: #f0fdf4;
+  --tab-active-bg: #ffffff;
+  --tab-text: #6b7280;
+  --tab-text-active: #047857;
+  
+  --content-bg: #f0fdf4;
+  --card-bg: #ffffff;
+}
+
+/* =====================================================
+   通用样式
+   ===================================================== */
+
+/* 浅色侧边栏需要添加边框 */
+[data-theme="fresh-green"] .admin-sidebar,
+[data-theme="minimal-light"] .admin-sidebar,
+[data-theme="lavender"] .admin-sidebar,
+[data-theme="nordic"] .admin-sidebar,
+[data-theme="sakura"] .admin-sidebar,
+[data-theme="mint"] .admin-sidebar {
+  border-right: 1px solid var(--sidebar-border, var(--color-border));
+}
+
+/* 主题切换时的过渡效果 */
 body,
 .admin-layout,
 .admin-sidebar,
@@ -281,66 +971,88 @@ body,
   transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
-/* ========== 暗色主题下的特殊样式调整 ========== */
+/* =====================================================
+   暗色主题的特殊样式调整
+   ===================================================== */
+
 [data-theme="dark"] .card,
-[data-theme="minimal-dark"] .card {
+[data-theme="minimal-dark"] .card,
+[data-theme="cyber"] .card,
+[data-theme="neon"] .card {
   background: var(--color-bg-card);
   border-color: var(--color-border);
   color: var(--color-text-primary);
 }
 
 [data-theme="dark"] .form-input,
-[data-theme="minimal-dark"] .form-input {
+[data-theme="minimal-dark"] .form-input,
+[data-theme="cyber"] .form-input,
+[data-theme="neon"] .form-input {
   background: var(--color-bg-base);
   border-color: var(--color-border);
   color: var(--color-text-primary);
 }
 
 [data-theme="dark"] .form-input:focus,
-[data-theme="minimal-dark"] .form-input:focus {
+[data-theme="minimal-dark"] .form-input:focus,
+[data-theme="cyber"] .form-input:focus,
+[data-theme="neon"] .form-input:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
 }
 
 [data-theme="dark"] .table th,
-[data-theme="minimal-dark"] .table th {
+[data-theme="minimal-dark"] .table th,
+[data-theme="cyber"] .table th,
+[data-theme="neon"] .table th {
   background: var(--color-bg-card);
   color: var(--color-text-secondary);
 }
 
 [data-theme="dark"] .table td,
-[data-theme="minimal-dark"] .table td {
+[data-theme="minimal-dark"] .table td,
+[data-theme="cyber"] .table td,
+[data-theme="neon"] .table td {
   border-color: var(--color-border);
   color: var(--color-text-primary);
 }
 
 [data-theme="dark"] .table tbody tr:hover td,
-[data-theme="minimal-dark"] .table tbody tr:hover td {
+[data-theme="minimal-dark"] .table tbody tr:hover td,
+[data-theme="cyber"] .table tbody tr:hover td,
+[data-theme="neon"] .table tbody tr:hover td {
   background: var(--color-bg-base);
 }
 
-/* ========== 暗色主题下的徽章调整 ========== */
+/* 暗色主题下的徽章调整 */
 [data-theme="dark"] .badge-primary,
-[data-theme="minimal-dark"] .badge-primary {
+[data-theme="minimal-dark"] .badge-primary,
+[data-theme="cyber"] .badge-primary,
+[data-theme="neon"] .badge-primary {
   background: rgba(96, 165, 250, 0.2);
   color: #93c5fd;
 }
 
 [data-theme="dark"] .badge-success,
-[data-theme="minimal-dark"] .badge-success {
+[data-theme="minimal-dark"] .badge-success,
+[data-theme="cyber"] .badge-success,
+[data-theme="neon"] .badge-success {
   background: rgba(34, 197, 94, 0.2);
   color: #86efac;
 }
 
 [data-theme="dark"] .badge-warning,
-[data-theme="minimal-dark"] .badge-warning {
+[data-theme="minimal-dark"] .badge-warning,
+[data-theme="cyber"] .badge-warning,
+[data-theme="neon"] .badge-warning {
   background: rgba(245, 158, 11, 0.2);
   color: #fcd34d;
 }
 
 [data-theme="dark"] .badge-danger,
-[data-theme="minimal-dark"] .badge-danger {
+[data-theme="minimal-dark"] .badge-danger,
+[data-theme="cyber"] .badge-danger,
+[data-theme="neon"] .badge-danger {
   background: rgba(239, 68, 68, 0.2);
   color: #fca5a5;
 }
-

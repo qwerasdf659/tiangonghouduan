@@ -39,6 +39,7 @@
 const AUDIT_TARGET_TYPES = Object.freeze({
   // ========== 用户与权限 ==========
   USER: 'user',
+  ROLE: 'role', // 角色（角色管理功能 2026-01-26）
   USER_ROLE_CHANGE_RECORD: 'user_role_change_record',
   USER_STATUS_CHANGE_RECORD: 'user_status_change_record',
   CUSTOMER_SERVICE_SESSION: 'customer_service_session',
@@ -139,6 +140,7 @@ function isValidTargetType(targetType) {
 function getTargetTypeDisplayName(targetType) {
   const displayNames = {
     user: '用户',
+    role: '角色',
     user_role_change_record: '角色变更记录',
     user_status_change_record: '状态变更记录',
     customer_service_session: '客服会话',

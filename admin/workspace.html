@@ -188,17 +188,17 @@
             <span class="notification-dot"></span>
           </button>
 
-          <!-- 主题切换 -->
+          <!-- 主题切换 - 支持26种配色方案 -->
           <div class="theme-switcher" x-data="themeSwitcher()" @click.away="closeDropdown()">
             <button 
               class="theme-btn"
               @click="toggleDropdown()"
               :title="'当前主题: ' + getCurrentThemeInfo().name"
             >
-              <span x-text="getCurrentThemeInfo().icon">☀️</span>
+              <span x-text="getCurrentThemeInfo().icon">💙</span>
             </button>
 
-            <!-- 主题下拉菜单 -->
+            <!-- 主题下拉菜单 - 分组显示 -->
             <div 
               class="theme-dropdown"
               x-show="isOpen"
@@ -210,34 +210,94 @@
               x-transition:leave-end="opacity-0 transform scale-95"
               style="display: none;"
             >
-              <div class="theme-dropdown-title">选择主题</div>
-              <template x-for="theme in themes" :key="theme.id">
-                <button 
-                  class="theme-option"
-                  :class="{ 'active': currentTheme === theme.id }"
-                  @click="setTheme(theme.id)"
-                >
-                  <span class="theme-icon" x-text="theme.icon"></span>
-                  <span class="theme-name" x-text="theme.name"></span>
-                  <div class="theme-preview">
-                    <template x-for="(color, i) in theme.colors" :key="i">
-                      <span class="theme-preview-color" :style="{ backgroundColor: color }"></span>
+              <!-- 头部 -->
+              <div class="theme-dropdown-header">
+                <div class="theme-dropdown-title">🎨 选择主题风格</div>
+                <!-- 分类切换 -->
+                <div class="theme-category-tabs">
+                  <button 
+                    class="theme-category-tab"
+                    :class="{ 'active': activeCategory === 'all' }"
+                    @click="activeCategory = 'all'"
+                  >全部 (26)</button>
+                  <button 
+                    class="theme-category-tab"
+                    :class="{ 'active': activeCategory === 'dark-sidebar' }"
+                    @click="activeCategory = 'dark-sidebar'"
+                  >深色侧栏</button>
+                  <button 
+                    class="theme-category-tab"
+                    :class="{ 'active': activeCategory === 'light-sidebar' }"
+                    @click="activeCategory = 'light-sidebar'"
+                  >浅色侧栏</button>
+                </div>
+              </div>
+
+              <!-- 主题列表 -->
+              <div class="theme-dropdown-body">
+                <!-- 深色侧边栏主题 -->
+                <template x-if="activeCategory === 'all' || activeCategory === 'dark-sidebar'">
+                  <div>
+                    <div class="theme-group-title" x-show="activeCategory === 'all'">🌙 深色侧边栏</div>
+                    <template x-for="theme in getDarkSidebarThemes()" :key="theme.id">
+                      <button 
+                        class="theme-option"
+                        :class="{ 'active': currentTheme === theme.id }"
+                        @click="setTheme(theme.id)"
+                      >
+                        <span class="theme-icon" x-text="theme.icon"></span>
+                        <div class="theme-info">
+                          <span class="theme-name" x-text="theme.name"></span>
+                          <span class="theme-scene" x-text="theme.scene"></span>
+                        </div>
+                        <div class="theme-preview">
+                          <template x-for="(color, i) in theme.colors" :key="i">
+                            <span class="theme-preview-color" :style="{ backgroundColor: color }"></span>
+                          </template>
+                        </div>
+                        <span class="theme-check" x-show="currentTheme === theme.id">✓</span>
+                      </button>
                     </template>
                   </div>
-                  <span class="theme-check" x-show="currentTheme === theme.id">✓</span>
+                </template>
+
+                <!-- 浅色侧边栏主题 -->
+                <template x-if="activeCategory === 'all' || activeCategory === 'light-sidebar'">
+                  <div>
+                    <div class="theme-group-title" x-show="activeCategory === 'all'">☀️ 浅色侧边栏</div>
+                    <template x-for="theme in getLightSidebarThemes()" :key="theme.id">
+                      <button 
+                        class="theme-option"
+                        :class="{ 'active': currentTheme === theme.id }"
+                        @click="setTheme(theme.id)"
+                      >
+                        <span class="theme-icon" x-text="theme.icon"></span>
+                        <div class="theme-info">
+                          <span class="theme-name" x-text="theme.name"></span>
+                          <span class="theme-scene" x-text="theme.scene"></span>
+                        </div>
+                        <div class="theme-preview">
+                          <template x-for="(color, i) in theme.colors" :key="i">
+                            <span class="theme-preview-color" :style="{ backgroundColor: color }"></span>
+                          </template>
+                        </div>
+                        <span class="theme-check" x-show="currentTheme === theme.id">✓</span>
+                      </button>
+                    </template>
+                  </div>
+                </template>
+              </div>
+
+              <!-- 底部快速操作 -->
+              <div class="theme-dropdown-footer">
+                <button 
+                  class="theme-quick-switch"
+                  @click="toggleDarkMode()"
+                >
+                  <span class="theme-icon">🌓</span>
+                  <span>快速切换 深色/浅色</span>
                 </button>
-              </template>
-              
-              <div class="theme-divider"></div>
-              
-              <!-- 快速切换暗色模式 -->
-              <button 
-                class="theme-option"
-                @click="toggleDarkMode()"
-              >
-                <span class="theme-icon">🌓</span>
-                <span class="theme-name">快速切换明/暗</span>
-              </button>
+              </div>
             </div>
           </div>
 

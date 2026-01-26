@@ -198,9 +198,17 @@ export const USER_ENDPOINTS = {
   /** @type {string} [DELETE] 删除用户 - Path: :user_id */
   DELETE: '/api/v4/console/user-management/users/:user_id',
 
-  // 角色管理
+  // 角色管理 CRUD
   /** @type {string} [GET] 获取角色列表 */
   ROLES: '/api/v4/console/user-management/roles',
+  /** @type {string} [POST] 创建角色 - Body: { role_name, description?, role_level, permissions? } */
+  ROLE_CREATE: '/api/v4/console/user-management/roles',
+  /** @type {string} [PUT] 更新角色 - Path: :role_id, Body: { role_name?, description?, role_level?, permissions? } */
+  ROLE_UPDATE: '/api/v4/console/user-management/roles/:role_id',
+  /** @type {string} [DELETE] 删除角色（软删除） - Path: :role_id */
+  ROLE_DELETE: '/api/v4/console/user-management/roles/:role_id',
+  /** @type {string} [GET] 获取权限资源列表（角色配置用） */
+  PERMISSION_RESOURCES: '/api/v4/console/user-management/permission-resources',
 
   // 权限管理
   /** @type {string} [POST] 检查权限 - Body: { permission, resource? } */
@@ -460,6 +468,60 @@ export const UserAPI = {
    */
   async getRoles() {
     return await request({ url: USER_ENDPOINTS.ROLES, method: 'GET' })
+  },
+
+  /**
+   * 创建角色
+   * @async
+   * @param {Object} roleData - 角色数据
+   * @param {string} roleData.role_name - 角色名称（唯一）
+   * @param {string} [roleData.description] - 角色描述
+   * @param {number} roleData.role_level - 角色级别（0-999）
+   * @param {Object} [roleData.permissions] - 权限配置 { resource: [actions] }
+   * @returns {Promise<ApiResponse>} 创建结果响应
+   * @throws {Error} 当权限不足或角色名重复时抛出错误
+   */
+  async createRole(roleData) {
+    return await request({ url: USER_ENDPOINTS.ROLE_CREATE, method: 'POST', data: roleData })
+  },
+
+  /**
+   * 更新角色配置（编辑角色本身）
+   * @async
+   * @param {number|string} roleId - 角色 ID
+   * @param {Object} roleData - 更新数据
+   * @param {string} [roleData.role_name] - 新角色名称
+   * @param {string} [roleData.description] - 新描述
+   * @param {number} [roleData.role_level] - 新级别
+   * @param {Object} [roleData.permissions] - 新权限配置
+   * @returns {Promise<ApiResponse>} 更新结果响应
+   * @throws {Error} 当角色不存在或权限不足时抛出错误
+   */
+  async updateRoleConfig(roleId, roleData) {
+    const url = buildURL(USER_ENDPOINTS.ROLE_UPDATE, { role_id: roleId })
+    return await request({ url, method: 'PUT', data: roleData })
+  },
+
+  /**
+   * 删除角色（软删除）
+   * @async
+   * @param {number|string} roleId - 角色 ID
+   * @returns {Promise<ApiResponse>} 删除结果响应
+   * @throws {Error} 当角色不存在、是系统角色或仍有用户使用时抛出错误
+   */
+  async deleteRole(roleId) {
+    const url = buildURL(USER_ENDPOINTS.ROLE_DELETE, { role_id: roleId })
+    return await request({ url, method: 'DELETE' })
+  },
+
+  /**
+   * 获取权限资源列表
+   * @async
+   * @description 获取所有可配置的权限资源和操作，用于角色权限配置
+   * @returns {Promise<ApiResponse>} 权限资源列表响应
+   */
+  async getPermissionResources() {
+    return await request({ url: USER_ENDPOINTS.PERMISSION_RESOURCES, method: 'GET' })
   },
 
   /**

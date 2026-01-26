@@ -99,6 +99,30 @@ const OPERATION_TYPES = Object.freeze({
    */
   ROLE_CHANGE: 'role_change',
 
+  /**
+   * 角色创建（新增）
+   * @description 管理员创建新角色
+   * @example UserRoleService.createRole()
+   * @since 2026-01-26（角色权限管理功能）
+   */
+  ROLE_CREATE: 'role_create',
+
+  /**
+   * 角色更新（新增）
+   * @description 管理员编辑角色信息或权限配置
+   * @example UserRoleService.updateRole()
+   * @since 2026-01-26（角色权限管理功能）
+   */
+  ROLE_UPDATE: 'role_update',
+
+  /**
+   * 角色删除（软删除）（新增）
+   * @description 管理员删除角色（设置 is_active=false）
+   * @example UserRoleService.deleteRole()
+   * @since 2026-01-26（角色权限管理功能）
+   */
+  ROLE_DELETE: 'role_delete',
+
   // ==================== 奖品活动类 ====================
   /**
    * 奖品配置（修改奖品配置）
@@ -289,6 +313,9 @@ const OPERATION_TYPE_DESCRIPTIONS = Object.freeze({
   [OPERATION_TYPES.USER_STATUS_CHANGE]: '用户状态变更',
   [OPERATION_TYPES.ROLE_ASSIGN]: '角色分配',
   [OPERATION_TYPES.ROLE_CHANGE]: '角色变更',
+  [OPERATION_TYPES.ROLE_CREATE]: '角色创建',
+  [OPERATION_TYPES.ROLE_UPDATE]: '角色更新',
+  [OPERATION_TYPES.ROLE_DELETE]: '角色删除',
 
   // 奖品活动类
   [OPERATION_TYPES.PRIZE_CONFIG]: '奖品配置',
@@ -357,6 +384,9 @@ const CRITICAL_OPERATIONS = Object.freeze(
     // ========== 用户管理关键操作 ==========
     OPERATION_TYPES.USER_STATUS_CHANGE, // 用户状态变更 - 禁用/封禁影响用户登录
     OPERATION_TYPES.ROLE_CHANGE, // 角色变更 - 影响用户权限和角色
+    OPERATION_TYPES.ROLE_CREATE, // 角色创建 - 影响系统权限体系
+    OPERATION_TYPES.ROLE_UPDATE, // 角色更新 - 影响拥有该角色的所有用户权限
+    OPERATION_TYPES.ROLE_DELETE, // 角色删除 - 不可恢复的破坏性操作
 
     // ========== 奖品管理关键操作 ==========
     OPERATION_TYPES.PRIZE_STOCK_ADJUST, // 奖品库存调整 - 影响抽奖可用库存

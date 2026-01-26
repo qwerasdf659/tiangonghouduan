@@ -97,13 +97,60 @@ export function useExchangeStatsMethods() {
 
     /**
      * 加载趋势数据
-     * 注意：后端暂无趋势接口，使用空数据
+     * 基于现有订单数据计算趋势（前端聚合）
      */
     async loadTrendData() {
-      // 后端暂无 /statistics/trend 接口，暂时使用空数据
-      logger.info('[ExchangeStats] 趋势接口暂未实现，使用空数据')
-      this.trendData = []
-      this.updateTrendChart()
+      try {
+        // 计算日期范围
+        const now = new Date()
+        let days = 7
+        if (this.trendRange === '30d') days = 30
+        else if (this.trendRange === '90d') days = 90
+
+        // 获取订单数据（如果还没有订单数据，先加载）
+        if (!this.orders || this.orders.length === 0) {
+          const ordersRes = await request({ 
+            url: MARKET_ENDPOINTS.EXCHANGE_ORDERS, 
+            method: 'GET', 
+            params: { page: 1, pageSize: 1000 } 
+          })
+          this.orders = ordersRes.success ? (ordersRes.data?.orders || []) : []
+        }
+
+        // 生成日期数组
+        const dateMap = new Map()
+        for (let i = days - 1; i >= 0; i--) {
+          const date = new Date(now)
+          date.setDate(date.getDate() - i)
+          const dateStr = date.toISOString().split('T')[0]
+          dateMap.set(dateStr, { date: dateStr, order_count: 0, revenue: 0 })
+        }
+
+        // 按日期聚合订单数据
+        this.orders.forEach(order => {
+          if (!order.created_at) return
+          const orderDate = new Date(order.created_at).toISOString().split('T')[0]
+          if (dateMap.has(orderDate)) {
+            const data = dateMap.get(orderDate)
+            data.order_count++
+            data.revenue += parseInt(order.cost_amount) || parseInt(order.pay_amount) || 0
+          }
+        })
+
+        // 转换为数组
+        this.trendData = Array.from(dateMap.values())
+        logger.info('[ExchangeStats] 趋势数据计算完成', { 
+          days, 
+          dataPoints: this.trendData.length,
+          totalOrders: this.trendData.reduce((sum, d) => sum + d.order_count, 0)
+        })
+        
+        this.updateTrendChart()
+      } catch (e) {
+        logger.error('[ExchangeStats] 加载趋势数据失败:', e)
+        this.trendData = []
+        this.updateTrendChart()
+      }
     },
 
     /**
@@ -145,9 +192,15 @@ export function useExchangeStatsMethods() {
               radius: ['40%', '70%'],
               avoidLabelOverlap: false,
               itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
-              label: { show: false },
+              // 默认显示标签（不需要悬停）
+              label: { 
+                show: true, 
+                position: 'outside',
+                formatter: '{b}: {c}',
+                fontSize: 12
+              },
               emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
-              labelLine: { show: false },
+              labelLine: { show: true },
               data: [
                 { value: orders.pending, name: '待发货', itemStyle: { color: '#ffc107' } },
                 { value: orders.shipped, name: '已发货', itemStyle: { color: '#17a2b8' } },
@@ -197,25 +250,56 @@ export function useExchangeStatsMethods() {
     updateTrendChart() {
       if (!this.exchangeTrendChart) return
 
-      const dates = this.trendData.map(item => item.date)
+      // 格式化日期为 "MM-DD" 格式
+      const dates = this.trendData.map(item => {
+        const [, month, day] = item.date.split('-')
+        return `${month}-${day}`
+      })
       const orders = this.trendData.map(item => item.order_count || 0)
       const revenue = this.trendData.map(item => item.revenue || 0)
+
+      // 计算最大值用于Y轴
+      const maxOrders = Math.max(...orders, 1)
+      const maxRevenue = Math.max(...revenue, 1)
 
       const option = {
         tooltip: {
           trigger: 'axis',
-          axisPointer: { type: 'cross' }
+          axisPointer: { type: 'cross' },
+          formatter: function(params) {
+            let result = params[0].axisValue + '<br/>'
+            params.forEach(p => {
+              const unit = p.seriesName === '兑换金额' ? ' 积分' : ' 单'
+              result += `${p.marker} ${p.seriesName}: ${p.value}${unit}<br/>`
+            })
+            return result
+          }
         },
-        legend: { data: ['订单数', '兑换金额'] },
-        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+        legend: { data: ['订单数', '兑换金额'], top: 5 },
+        grid: { left: '3%', right: '4%', bottom: '3%', top: 50, containLabel: true },
         xAxis: {
           type: 'category',
-          boundaryGap: false,
-          data: dates
+          boundaryGap: true,
+          data: dates,
+          axisLabel: { 
+            interval: this.trendRange === '7d' ? 0 : 'auto',
+            fontSize: 11
+          }
         },
         yAxis: [
-          { type: 'value', name: '订单数', position: 'left' },
-          { type: 'value', name: '金额', position: 'right' }
+          { 
+            type: 'value', 
+            name: '订单数', 
+            position: 'left',
+            minInterval: 1,
+            max: maxOrders < 5 ? 5 : null
+          },
+          { 
+            type: 'value', 
+            name: '金额', 
+            position: 'right',
+            max: maxRevenue < 100 ? 100 : null
+          }
         ],
         series: [
           {
@@ -224,14 +308,25 @@ export function useExchangeStatsMethods() {
             smooth: true,
             data: orders,
             itemStyle: { color: '#5470c6' },
-            areaStyle: { opacity: 0.1 }
+            areaStyle: { opacity: 0.2 },
+            label: {
+              show: orders.some(v => v > 0),
+              position: 'top',
+              fontSize: 10
+            }
           },
           {
             name: '兑换金额',
             type: 'bar',
             yAxisIndex: 1,
             data: revenue,
-            itemStyle: { color: '#91cc75' }
+            itemStyle: { color: '#91cc75' },
+            barMaxWidth: 30,
+            label: {
+              show: revenue.some(v => v > 0),
+              position: 'top',
+              fontSize: 10
+            }
           }
         ]
       }

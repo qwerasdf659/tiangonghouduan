@@ -289,11 +289,17 @@ function riskAlertsPage() {
             name: '告警级别',
             type: 'pie',
             radius: ['40%', '70%'],
-            avoidLabelOverlap: false,
+            avoidLabelOverlap: true,
             itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
-            label: { show: false, position: 'center' },
-            emphasis: { label: { show: true, fontSize: 18, fontWeight: 'bold' } },
-            labelLine: { show: false },
+            // 默认显示标签：名称和数量
+            label: {
+              show: true,
+              position: 'outside',
+              formatter: '{b}: {c}',
+              fontSize: 12
+            },
+            labelLine: { show: true, length: 10, length2: 10 },
+            emphasis: { label: { fontSize: 14, fontWeight: 'bold' } },
             data: data
           }
         ]
