@@ -1056,3 +1056,147 @@ body,
   background: rgba(239, 68, 68, 0.2);
   color: #fca5a5;
 }
+
+/* =====================================================
+   Tailwind 颜色类的主题感知覆盖
+   使 iframe 内页面的颜色也能响应主题切换
+   ===================================================== */
+
+/* === 背景色覆盖 === */
+/* 页面背景 - 所有主题使用统一变量 */
+[data-theme] body.bg-gray-100,
+[data-theme] .bg-gray-100 {
+  background-color: var(--content-bg) !important;
+}
+
+/* 卡片背景 */
+[data-theme] .bg-white {
+  background-color: var(--card-bg) !important;
+}
+
+/* 主色调背景 */
+[data-theme] .bg-blue-600,
+[data-theme] .bg-indigo-600 {
+  background-color: var(--color-primary) !important;
+}
+
+[data-theme] .hover\:bg-blue-700:hover,
+[data-theme] .hover\:bg-indigo-700:hover {
+  background-color: var(--color-primary-hover) !important;
+}
+
+/* 浅色主色调背景 */
+[data-theme] .bg-blue-50,
+[data-theme] .bg-indigo-50 {
+  background-color: var(--color-primary-light) !important;
+}
+
+/* 灰色背景系列 */
+[data-theme] .bg-gray-50 {
+  background-color: var(--color-bg-base) !important;
+}
+
+/* === 文字色覆盖 === */
+[data-theme] .text-gray-900,
+[data-theme] .text-gray-800 {
+  color: var(--color-text-primary) !important;
+}
+
+[data-theme] .text-gray-700,
+[data-theme] .text-gray-600 {
+  color: var(--color-text-secondary) !important;
+}
+
+[data-theme] .text-gray-500 {
+  color: var(--color-text-secondary) !important;
+}
+
+/* 主色调文字 */
+[data-theme] .text-blue-600,
+[data-theme] .text-indigo-600 {
+  color: var(--color-primary) !important;
+}
+
+/* === 边框色覆盖 === */
+[data-theme] .border-gray-200,
+[data-theme] .border-gray-300 {
+  border-color: var(--color-border) !important;
+}
+
+[data-theme] .border-gray-100 {
+  border-color: var(--color-border-light) !important;
+}
+
+/* 主色调边框 */
+[data-theme] .border-blue-600,
+[data-theme] .border-indigo-600 {
+  border-color: var(--color-primary) !important;
+}
+
+/* === 导航栏覆盖 === */
+/* iframe 内的独立导航栏使用主题主色调 */
+[data-theme] nav.bg-blue-600 {
+  background-color: var(--color-primary) !important;
+}
+
+/* === 图标色覆盖 === */
+[data-theme] .text-indigo-400,
+[data-theme] .text-blue-400 {
+  color: var(--color-primary) !important;
+  opacity: 0.8;
+}
+
+/* === 阴影效果 === */
+[data-theme] .shadow,
+[data-theme] .shadow-sm,
+[data-theme] .shadow-lg {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* 暗色主题阴影调整 */
+[data-theme="dark"] .shadow,
+[data-theme="dark"] .shadow-sm,
+[data-theme="dark"] .shadow-lg,
+[data-theme="minimal-dark"] .shadow,
+[data-theme="minimal-dark"] .shadow-sm,
+[data-theme="minimal-dark"] .shadow-lg,
+[data-theme="cyber"] .shadow,
+[data-theme="cyber"] .shadow-sm,
+[data-theme="cyber"] .shadow-lg,
+[data-theme="neon"] .shadow,
+[data-theme="neon"] .shadow-sm,
+[data-theme="neon"] .shadow-lg {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+/* === 表单控件覆盖 === */
+[data-theme] input.border,
+[data-theme] select.border,
+[data-theme] textarea.border {
+  background-color: var(--card-bg) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text-primary) !important;
+}
+
+[data-theme] input:focus,
+[data-theme] select:focus,
+[data-theme] textarea:focus {
+  border-color: var(--color-primary) !important;
+}
+
+/* === 圆角白色背景容器覆盖 === */
+[data-theme] .rounded-lg.bg-white {
+  background-color: var(--card-bg) !important;
+}
+
+/* === 过渡效果 === */
+[data-theme] body,
+[data-theme] nav,
+[data-theme] .bg-white,
+[data-theme] .bg-gray-50,
+[data-theme] .bg-gray-100,
+[data-theme] input,
+[data-theme] select,
+[data-theme] textarea {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}

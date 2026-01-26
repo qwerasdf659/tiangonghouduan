@@ -1,0 +1,440 @@
+/**
+ * 主题感知工具类
+ * @description 替代 Tailwind 硬编码颜色类，支持主题切换
+ * @version 1.0.0
+ * @date 2026-01-26
+ */
+
+/* =====================================================
+   背景色类
+   ===================================================== */
+
+/* 卡片/容器背景（替代 bg-white） */
+.themed-card {
+  background-color: var(--card-bg);
+}
+
+/* 页面基础背景（替代 bg-gray-50） */
+.themed-bg-base {
+  background-color: var(--color-bg-base);
+}
+
+/* 内容区背景（替代 bg-gray-100） */
+.themed-bg-subtle {
+  background-color: var(--content-bg);
+}
+
+/* 弱化背景（替代 bg-gray-200, bg-gray-300） */
+.themed-bg-muted {
+  background-color: var(--color-bg-muted, #e5e7eb);
+}
+
+/* 主色调背景（替代 bg-blue-600, bg-blue-500） */
+.themed-bg-primary {
+  background-color: var(--color-primary);
+}
+
+.themed-bg-primary:hover {
+  background-color: var(--color-primary-hover);
+}
+
+/* 主色调浅色背景（替代 bg-blue-50, bg-blue-100） */
+.themed-bg-primary-light {
+  background-color: var(--color-primary-light);
+}
+
+/* 成功状态背景（替代 bg-green-600, bg-green-500） */
+.themed-bg-success {
+  background-color: var(--color-success);
+}
+
+.themed-bg-success:hover {
+  background-color: var(--color-success-hover, #16a34a);
+}
+
+/* 成功状态浅色背景（替代 bg-green-100, bg-green-50） */
+.themed-bg-success-light {
+  background-color: var(--color-success-light, #dcfce7);
+}
+
+/* 警告状态背景（替代 bg-yellow-500, bg-yellow-600） */
+.themed-bg-warning {
+  background-color: var(--color-warning);
+}
+
+/* 警告状态浅色背景（替代 bg-yellow-100, bg-yellow-50） */
+.themed-bg-warning-light {
+  background-color: var(--color-warning-light, #fef3c7);
+}
+
+/* 危险状态背景（替代 bg-red-600, bg-red-500） */
+.themed-bg-danger {
+  background-color: var(--color-danger);
+}
+
+.themed-bg-danger:hover {
+  background-color: var(--color-danger-hover, #dc2626);
+}
+
+/* 危险状态浅色背景（替代 bg-red-100, bg-red-50） */
+.themed-bg-danger-light {
+  background-color: var(--color-danger-light, #fee2e2);
+}
+
+/* 信息状态背景 */
+.themed-bg-info {
+  background-color: var(--color-info);
+}
+
+.themed-bg-info-light {
+  background-color: var(--color-info-light, #e0f2fe);
+}
+
+/* =====================================================
+   文字色类
+   ===================================================== */
+
+/* 主要文字（替代 text-gray-900, text-gray-800） */
+.themed-text {
+  color: var(--color-text-primary);
+}
+
+/* 次要文字（替代 text-gray-700） */
+.themed-text-secondary {
+  color: var(--color-text-secondary);
+}
+
+/* 弱化文字（替代 text-gray-600, text-gray-500） */
+.themed-text-muted {
+  color: var(--color-text-muted, #6b7280);
+}
+
+/* 提示文字（替代 text-gray-400） */
+.themed-text-hint {
+  color: var(--color-text-hint, #9ca3af);
+}
+
+/* 反色文字（深色背景上的白色文字，替代 text-white） */
+.themed-text-inverse {
+  color: var(--color-text-inverse, #ffffff);
+}
+
+/* 主色调文字（替代 text-blue-600, text-blue-500, text-blue-700） */
+.themed-text-primary {
+  color: var(--color-primary);
+}
+
+.themed-text-primary:hover {
+  color: var(--color-primary-hover);
+}
+
+/* 成功状态文字（替代 text-green-600, text-green-500, text-green-700） */
+.themed-text-success {
+  color: var(--color-success);
+}
+
+/* 警告状态文字（替代 text-yellow-600, text-yellow-700） */
+.themed-text-warning {
+  color: var(--color-warning);
+}
+
+/* 危险状态文字（替代 text-red-600, text-red-500, text-red-700） */
+.themed-text-danger {
+  color: var(--color-danger);
+}
+
+/* 信息状态文字 */
+.themed-text-info {
+  color: var(--color-info);
+}
+
+/* =====================================================
+   边框色类
+   ===================================================== */
+
+/* 默认边框（替代 border-gray-200, border-gray-300） */
+.themed-border {
+  border-color: var(--color-border);
+}
+
+/* 浅色边框（替代 border-gray-100） */
+.themed-border-light {
+  border-color: var(--color-border-light);
+}
+
+/* 主色调边框（替代 border-blue-500, border-blue-600） */
+.themed-border-primary {
+  border-color: var(--color-primary);
+}
+
+/* 成功状态边框（替代 border-green-500） */
+.themed-border-success {
+  border-color: var(--color-success);
+}
+
+/* 警告状态边框（替代 border-yellow-500） */
+.themed-border-warning {
+  border-color: var(--color-warning);
+}
+
+/* 危险状态边框（替代 border-red-500） */
+.themed-border-danger {
+  border-color: var(--color-danger);
+}
+
+/* =====================================================
+   交互状态类
+   ===================================================== */
+
+/* 悬停背景效果 */
+.themed-hover-bg:hover {
+  background-color: var(--color-bg-muted, #f3f4f6);
+}
+
+/* 悬停主色调效果 */
+.themed-hover-primary:hover {
+  background-color: var(--color-primary-hover);
+}
+
+/* 悬停文字效果 */
+.themed-hover-text:hover {
+  color: var(--color-primary);
+}
+
+/* 聚焦效果 */
+.themed-focus:focus {
+  border-color: var(--color-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+/* =====================================================
+   组合类（常用场景快捷方式）
+   ===================================================== */
+
+/* 标准卡片容器 */
+.themed-card-default {
+  background-color: var(--card-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+}
+
+/* 标准输入框 */
+.themed-input {
+  background-color: var(--card-bg);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.themed-input:focus {
+  border-color: var(--color-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+.themed-input::placeholder {
+  color: var(--color-text-hint, #9ca3af);
+}
+
+.themed-input:disabled {
+  background-color: var(--color-bg-muted, #f3f4f6);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* 标准选择框 */
+.themed-select {
+  background-color: var(--card-bg);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.themed-select:focus {
+  border-color: var(--color-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+/* 主色调按钮 */
+.themed-btn-primary {
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse, #ffffff);
+  border: none;
+}
+
+.themed-btn-primary:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.themed-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 次要按钮（边框样式） */
+.themed-btn-secondary {
+  background-color: transparent;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}
+
+.themed-btn-secondary:hover {
+  background-color: var(--color-primary-light);
+}
+
+/* 危险按钮 */
+.themed-btn-danger {
+  background-color: var(--color-danger);
+  color: var(--color-text-inverse, #ffffff);
+  border: none;
+}
+
+.themed-btn-danger:hover {
+  background-color: var(--color-danger-hover, #dc2626);
+}
+
+/* 成功按钮 */
+.themed-btn-success {
+  background-color: var(--color-success);
+  color: var(--color-text-inverse, #ffffff);
+  border: none;
+}
+
+.themed-btn-success:hover {
+  background-color: var(--color-success-hover, #16a34a);
+}
+
+/* =====================================================
+   表格相关类
+   ===================================================== */
+
+/* 表格容器 */
+.themed-table {
+  background-color: var(--card-bg);
+  border-color: var(--color-border);
+}
+
+/* 表头 */
+.themed-table-header {
+  background-color: var(--color-bg-base);
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
+}
+
+/* 表格行 */
+.themed-table-row {
+  border-color: var(--color-border);
+}
+
+.themed-table-row:hover {
+  background-color: var(--color-bg-base);
+}
+
+/* 表格单元格 */
+.themed-table-cell {
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+/* =====================================================
+   导航相关类
+   ===================================================== */
+
+/* 导航栏背景 */
+.themed-nav {
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse, #ffffff);
+}
+
+/* 导航链接 */
+.themed-nav-link {
+  color: var(--color-text-inverse, #ffffff);
+  opacity: 0.9;
+}
+
+.themed-nav-link:hover {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.themed-nav-link.active {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* =====================================================
+   徽章/标签类
+   ===================================================== */
+
+.themed-badge-primary {
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.themed-badge-success {
+  background-color: var(--color-success-light, #dcfce7);
+  color: var(--color-success);
+}
+
+.themed-badge-warning {
+  background-color: var(--color-warning-light, #fef3c7);
+  color: var(--color-warning);
+}
+
+.themed-badge-danger {
+  background-color: var(--color-danger-light, #fee2e2);
+  color: var(--color-danger);
+}
+
+.themed-badge-info {
+  background-color: var(--color-info-light, #e0f2fe);
+  color: var(--color-info);
+}
+
+/* =====================================================
+   阴影类（主题感知）
+   ===================================================== */
+
+.themed-shadow {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.themed-shadow-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.themed-shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* =====================================================
+   过渡效果
+   ===================================================== */
+
+.themed-card,
+.themed-bg-base,
+.themed-bg-subtle,
+.themed-bg-muted,
+.themed-bg-primary,
+.themed-bg-success,
+.themed-bg-warning,
+.themed-bg-danger,
+.themed-text,
+.themed-text-secondary,
+.themed-text-muted,
+.themed-text-hint,
+.themed-text-primary,
+.themed-border,
+.themed-input,
+.themed-select,
+.themed-btn-primary,
+.themed-btn-secondary,
+.themed-table,
+.themed-table-header,
+.themed-table-row {
+  transition: background-color 0.3s ease, 
+              border-color 0.3s ease, 
+              color 0.3s ease,
+              box-shadow 0.3s ease;
+}
+
