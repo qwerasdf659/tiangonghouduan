@@ -507,10 +507,10 @@ class UnifiedLotteryEngine {
         this.metrics.execution_times.length
     )
 
-    // 更新策略使用统计
+    // 更新管线使用统计（V4.6 改为 pipelines_used）
     if (strategyUsed) {
-      this.metrics.strategies_used[strategyUsed] =
-        (this.metrics.strategies_used[strategyUsed] || 0) + 1
+      this.metrics.pipelines_used[strategyUsed] =
+        (this.metrics.pipelines_used[strategyUsed] || 0) + 1
     }
   }
 
@@ -521,7 +521,7 @@ class UnifiedLotteryEngine {
    * @returns {number} return.total_executions - 总执行次数
    * @returns {number} return.successful_executions - 成功执行次数
    * @returns {number} return.average_execution_time - 平均执行时间（毫秒）
-   * @returns {Object} return.strategies_used - 策略使用统计
+   * @returns {Object} return.pipelines_used - 管线使用统计（V4.6 改为 pipelines_used）
    * @returns {string} return.last_reset_time - 上次重置时间
    * @returns {number} return.uptime - 运行时间（毫秒）
    * @returns {string} return.uptime_formatted - 格式化的运行时间

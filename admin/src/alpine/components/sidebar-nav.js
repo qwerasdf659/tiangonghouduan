@@ -50,7 +50,12 @@ export function sidebarNav() {
             url: '/admin/risk-alerts.html',
             badgeKey: 'pendingAlertCount'
           },
-          { id: 'customer', name: '客服工作台', url: '/admin/customer-service.html' }
+          { id: 'customer', name: '客服工作台', url: '/admin/customer-service.html' },
+          { id: 'item-tpl', name: '物品模板', url: '/admin/item-templates.html' },
+          { id: 'content', name: '内容管理', url: '/admin/content-management.html' },
+          { id: 'dict', name: '字典管理', url: '/admin/dict-management.html' },
+          { id: 'pricing', name: '定价配置', url: '/admin/pricing-config.html' },
+          { id: 'feature-flags', name: '功能开关', url: '/admin/feature-flags.html' }
         ]
       },
       {
@@ -98,24 +103,22 @@ export function sidebarNav() {
         ]
       },
       {
-        id: 'system',
-        name: '系统设置',
-        icon: '⚙️',
-        items: [
-          { id: 'settings', name: '系统配置', url: '/admin/system-settings.html' },
-          { id: 'content', name: '内容管理', url: '/admin/content-management.html' },
-          { id: 'sessions', name: '会话管理', url: '/admin/sessions.html' },
-          { id: 'item-tpl', name: '物品模板', url: '/admin/item-templates.html' },
-          { id: 'config-tools', name: '配置工具', url: '/admin/config-tools.html' }
-        ]
-      },
-      {
         id: 'analytics',
         name: '数据分析',
         icon: '📊',
         items: [
           { id: 'stats', name: '统计报表', url: '/admin/statistics.html' },
           { id: 'analytics', name: '运营分析', url: '/admin/analytics.html' }
+        ]
+      },
+      {
+        id: 'system',
+        name: '系统设置',
+        icon: '⚙️',
+        items: [
+          { id: 'settings', name: '系统配置', url: '/admin/system-settings.html' },
+          { id: 'sessions', name: '会话管理', url: '/admin/sessions.html' },
+          { id: 'config-tools', name: '配置工具', url: '/admin/config-tools.html' }
         ]
       }
     ],

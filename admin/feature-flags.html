@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '功能开关', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-yellow-200">← 返回工作台</a>
+        <span class="text-lg font-semibold">🎚️ 功能开关</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="featureFlags()">
+    
+    <!-- 功能开关列表 -->
+    <div class="themed-card rounded-lg shadow">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">🎛️ 功能开关管理</h5>
+        <button @click="openCreateFlagModal()" class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">
+          ➕ 新增开关
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="themed-bg-base">
+            <tr>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">开关键名</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">名称</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">发布策略</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">灰度比例</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <template x-if="featureFlags.length === 0">
+              <tr><td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无功能开关</td></tr>
+            </template>
+            <template x-for="(flag, index) in featureFlags" :key="flag.flag_key || index">
+              <tr class="themed-hover-bg">
+                <td class="px-4 py-3 text-sm font-mono" x-text="flag.flag_key"></td>
+                <td class="px-4 py-3 text-sm" x-text="flag.flag_name || '-'"></td>
+                <td class="px-4 py-3 text-sm">
+                  <span class="px-2 py-1 text-xs rounded cursor-pointer"
+                        :class="flag.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
+                        @click="toggleFeatureFlag(flag)"
+                        x-text="flag.is_enabled ? '✅ 启用' : '⭕ 禁用'"></span>
+                </td>
+                <td class="px-4 py-3 text-sm">
+                  <span class="px-2 py-1 text-xs rounded"
+                        :class="getStrategyClass(flag.rollout_strategy)"
+                        x-text="getStrategyText(flag.rollout_strategy)"></span>
+                </td>
+                <td class="px-4 py-3 text-sm">
+                  <template x-if="flag.rollout_strategy === 'percentage'">
+                    <span class="font-semibold text-blue-600" x-text="(flag.rollout_percentage || 100) + '%'"></span>
+                  </template>
+                  <template x-if="flag.rollout_strategy !== 'percentage'">
+                    <span class="themed-text-muted">-</span>
+                  </template>
+                </td>
+                <td class="px-4 py-3">
+                  <div class="flex space-x-2">
+                    <button @click="editFeatureFlag(flag)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                    <button @click="deleteFeatureFlag(flag)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 说明卡片 -->
+    <div class="themed-card rounded-lg shadow mt-6 p-4">
+      <h6 class="font-semibold mb-3">📖 发布策略说明</h6>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+        <div class="flex items-center space-x-2">
+          <span class="px-2 py-1 text-xs rounded bg-green-100 text-green-700">全量发布</span>
+          <span class="themed-text-muted">所有用户立即生效</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700">百分比灰度</span>
+          <span class="themed-text-muted">按比例随机选择用户</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700">用户名单</span>
+          <span class="themed-text-muted">指定用户ID列表</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="px-2 py-1 text-xs rounded bg-purple-100 text-purple-700">用户分群</span>
+          <span class="themed-text-muted">按用户分群条件</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="px-2 py-1 text-xs rounded bg-orange-100 text-orange-700">定时发布</span>
+          <span class="themed-text-muted">定时自动启用</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 功能开关表单 Modal（必须在主组件范围内） -->
+    <div x-ref="featureFlagModal" 
+         x-show="isModalOpen('featureFlagModal')" 
+         x-cloak 
+         class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('featureFlagModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold">🎚️ <span x-text="editingFlagKey ? '编辑功能开关' : '新增功能开关'"></span></h5>
+          <button @click="hideModal('featureFlagModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+        </div>
+        <form @submit.prevent="saveFeatureFlag()">
+          <div class="p-6 space-y-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">开关键名 <span class="text-red-500">*</span></label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500" 
+                     x-model="featureFlagForm.flag_key" 
+                     :disabled="!!editingFlagKey" 
+                     required
+                     placeholder="如: feature_new_ui, enable_payment_v2">
+              <p class="text-xs themed-text-muted mt-1" x-show="!editingFlagKey">snake_case格式，创建后不可修改</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">开关名称 <span class="text-red-500">*</span></label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500" 
+                     x-model="featureFlagForm.flag_name" 
+                     required
+                     placeholder="如: 新版界面、支付V2">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">描述</label>
+              <textarea class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500" 
+                        x-model="featureFlagForm.description" 
+                        rows="2" 
+                        placeholder="功能开关描述..."></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">发布策略</label>
+              <select class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                      x-model="featureFlagForm.rollout_strategy">
+                <option value="all">全量发布</option>
+                <option value="percentage">百分比灰度</option>
+                <option value="user_list">用户名单</option>
+                <option value="user_segment">用户分群</option>
+                <option value="schedule">定时发布</option>
+              </select>
+            </div>
+            <div x-show="featureFlagForm.rollout_strategy === 'percentage'">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">灰度比例</label>
+              <div class="flex items-center">
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500" 
+                       x-model.number="featureFlagForm.rollout_percentage" 
+                       min="0" max="100">
+                <span class="ml-2 text-sm themed-text-muted">%</span>
+              </div>
+            </div>
+            <div class="flex items-center">
+              <input type="checkbox" id="flagEnabled" x-model="featureFlagForm.is_enabled" class="mr-2 rounded">
+              <label for="flagEnabled" class="text-sm font-medium themed-text-secondary">立即启用</label>
+            </div>
+          </div>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
+            <button type="button" @click="hideModal('featureFlagModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300">取消</button>
+            <button type="submit" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50" :disabled="saving">
+              <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+              <span x-text="editingFlagKey ? '保存修改' : '创建开关'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div><!-- 关闭 featureFlags -->
+
+  <%- include('partials/footer') %>
+  <script type="module" src="./src/modules/operations/pages/feature-flags.js"></script>
+</body>
+</html>
+

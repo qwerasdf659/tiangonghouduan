@@ -18,14 +18,10 @@
 import { logger } from '../../../utils/logger.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 
-// 导入所有 composables 模块
+// 导入 composables 模块（方案A：只导入系统配置和审计日志）
 import {
   useConfigState,
   useConfigMethods,
-  useDictState,
-  useDictMethods,
-  useFeatureFlagsState,
-  useFeatureFlagsMethods,
   useAuditLogsState,
   useAuditLogsMethods
 } from '../composables/index.js'
@@ -45,23 +41,21 @@ function registerSystemSettingsComponents() {
   Alpine.store('systemPage', 'system-config')
 
   /**
-   * 系统设置导航组件
+   * 系统设置导航组件（方案A：精简版，只保留系统配置和审计日志）
    */
   Alpine.data('systemNavigation', () => ({
     ...createPageMixin(),
 
     currentPage: 'system-config',
 
+    // 方案A: 字典管理/定价配置/功能开关已分离为独立页面
     subPages: [
       { id: 'system-config', name: '系统配置', icon: 'bi-gear' },
-      { id: 'dict-management', name: '字典管理', icon: 'bi-book' },
-      { id: 'feature-flags', name: '功能开关', icon: 'bi-toggle-on' },
-      { id: 'audit-logs', name: '审计日志', icon: 'bi-journal-text' },
-      { id: 'pricing-config', name: '定价配置', icon: 'bi-currency-dollar' }
+      { id: 'audit-logs', name: '审计日志', icon: 'bi-journal-text' }
     ],
 
     init() {
-      logger.debug('系统设置导航初始化 (模块化 v4.0)')
+      logger.debug('系统设置导航初始化 (方案A v5.0 - 精简版)')
       if (!this.checkAuth()) return
 
       const urlParams = new URLSearchParams(window.location.search)
@@ -78,7 +72,7 @@ function registerSystemSettingsComponents() {
 
   /**
    * 系统设置内容组件 - 使用 composables 组合
-   * 合并了导航和内容组件的功能
+   * 方案A: 字典管理/定价配置/功能开关已分离为独立页面
    */
   Alpine.data('systemSettings', () => ({
     // 基础混入
@@ -86,19 +80,15 @@ function registerSystemSettingsComponents() {
 
     // ==================== 从 Composables 导入状态 ====================
     ...useConfigState(),
-    ...useDictState(),
-    ...useFeatureFlagsState(),
     ...useAuditLogsState(),
 
-    // ==================== 导航状态 (从 systemNavigation 合并) ====================
+    // ==================== 导航状态 ====================
     currentPage: 'system-config',
 
+    // 子页面配置（方案A：只保留系统配置和审计日志）
     subPages: [
       { id: 'system-config', name: '系统配置', icon: '⚙️' },
-      { id: 'dict-management', name: '字典管理', icon: '📚' },
-      { id: 'feature-flags', name: '功能开关', icon: '🔘' },
-      { id: 'audit-logs', name: '审计日志', icon: '📋' },
-      { id: 'pricing-config', name: '定价配置', icon: '💰' }
+      { id: 'audit-logs', name: '审计日志', icon: '📋' }
     ],
 
     // ==================== 通用状态 ====================
@@ -112,7 +102,7 @@ function registerSystemSettingsComponents() {
 
     init() {
       console.log('[SystemSettings] 组件初始化开始')
-      logger.debug('系统设置初始化 (合并版 v4.1)')
+      logger.debug('系统设置初始化 (方案A v5.0 - 精简版)')
 
       if (!this.checkAuth()) {
         console.warn('[SystemSettings] 认证检查失败')
@@ -122,6 +112,7 @@ function registerSystemSettingsComponents() {
       // 从 URL 参数读取当前页面
       const urlParams = new URLSearchParams(window.location.search)
       this.currentPage = urlParams.get('page') || 'system-config'
+
       console.log('[SystemSettings] 当前子页面:', this.currentPage)
 
       // 立即加载数据
@@ -146,17 +137,8 @@ function registerSystemSettingsComponents() {
             case 'system-config':
               await this.loadSystemConfig()
               break
-            case 'dict-management':
-              await this.loadDictList()
-              break
-            case 'feature-flags':
-              await this.loadFeatureFlags()
-              break
             case 'audit-logs':
               await this.loadAuditLogs()
-              break
-            case 'pricing-config':
-              await this.loadPointsConfigs()
               break
           }
         },
@@ -166,8 +148,6 @@ function registerSystemSettingsComponents() {
 
     // ==================== 从 Composables 导入方法 ====================
     ...useConfigMethods(),
-    ...useDictMethods(),
-    ...useFeatureFlagsMethods(),
     ...useAuditLogsMethods(),
 
     // ==================== 工具方法 ====================

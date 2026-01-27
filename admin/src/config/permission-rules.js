@@ -57,6 +57,13 @@ export const MENU_ACCESS_RULES = {
   'operations.consumption': { minLevel: 30, description: '消费记录审核' },
   'operations.risk': { minLevel: 30, description: '风控告警' },
 
+  // ========== 管理员专属（从系统设置移入日常运营） ==========
+  'operations.item-tpl': { minLevel: 100, description: '物品模板' },
+  'operations.content': { minLevel: 100, description: '内容管理' },
+  'operations.dict': { minLevel: 100, description: '字典管理' },
+  'operations.pricing': { minLevel: 100, description: '定价配置' },
+  'operations.feature-flags': { minLevel: 100, description: '功能开关' },
+
   lottery: { minLevel: 30, description: '抽奖活动（分组）' },
   'lottery.campaigns': { minLevel: 30, description: '活动管理' },
   'lottery.presets': { minLevel: 30, description: '抽奖预设' },
@@ -129,10 +136,15 @@ export const PAGE_ACCESS_RULES = {
 
   // ========== 管理员专属（role_level >= 100） ==========
   'system-settings.html': { minLevel: 100, menuId: 'system.settings' },
-  'content-management.html': { minLevel: 100, menuId: 'system.content' },
+  'content-management.html': { minLevel: 100, menuId: 'operations.content' },
   'sessions.html': { minLevel: 100, menuId: 'system.sessions' },
-  'item-templates.html': { minLevel: 100, menuId: 'system.item-tpl' },
-  'config-tools.html': { minLevel: 100, menuId: 'system.config-tools' }
+  'item-templates.html': { minLevel: 100, menuId: 'operations.item-tpl' },
+  'config-tools.html': { minLevel: 100, menuId: 'system.config-tools' },
+
+  // 方案A独立页面（从system-settings.html分离）
+  'dict-management.html': { minLevel: 100, menuId: 'operations.dict' },
+  'pricing-config.html': { minLevel: 100, menuId: 'operations.pricing' },
+  'feature-flags.html': { minLevel: 100, menuId: 'operations.feature-flags' }
 }
 
 // ========== 权限判断函数 ==========

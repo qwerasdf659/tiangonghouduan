@@ -155,6 +155,7 @@ class SettleStage extends BaseStage {
        */
       const skip_points_deduction = context.skip_points_deduction === true
       let points_deducted = 0
+      let asset_transaction_id = null // 资产流水ID（关联抽奖记录）
 
       if (draw_cost > 0 && !skip_points_deduction) {
         /**
@@ -164,7 +165,7 @@ class SettleStage extends BaseStage {
         const consume_idempotency_key = `${idempotency_key}:consume`
 
         // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
-        await AssetService.changeBalance(
+        const asset_result = await AssetService.changeBalance(
           {
             user_id,
             asset_code: 'POINTS',
@@ -184,10 +185,13 @@ class SettleStage extends BaseStage {
         )
 
         points_deducted = draw_cost
+        // 获取资产流水ID（用于关联抽奖记录，必填字段）
+        asset_transaction_id = asset_result.transaction_record?.transaction_id || null
 
         this.log('info', '用户积分扣减成功', {
           user_id,
           draw_cost,
+          asset_transaction_id,
           idempotency_key: consume_idempotency_key,
           skip_points_deduction
         })
@@ -247,6 +251,7 @@ class SettleStage extends BaseStage {
         draw_cost, // 🆕 传递抽奖成本
         draw_count, // 🆕 传递抽奖次数
         batch_id, // 🆕 Phase 2：连抽批次ID
+        asset_transaction_id, // 🆕 关联资产流水ID（必填字段）
         transaction
       })
 
@@ -255,6 +260,7 @@ class SettleStage extends BaseStage {
         draw_id,
         user_id,
         campaign_id,
+        idempotency_key, // 🆕 传递幂等键（必填字段）
         decision_snapshot,
         transaction
       })
@@ -609,6 +615,7 @@ class SettleStage extends BaseStage {
       draw_cost = 0, // 🆕 Phase 2：抽奖成本（禁止硬编码）
       draw_count = 1, // 🆕 Phase 2：抽奖次数
       batch_id = null, // 🆕 Phase 2：连抽批次ID
+      asset_transaction_id = null, // 🆕 关联资产流水ID（用于对账）
       transaction
     } = params
 
@@ -622,6 +629,14 @@ class SettleStage extends BaseStage {
      */
     const draw_type = draw_count > 1 ? 'multi' : 'single'
 
+    /*
+     * asset_transaction_id 处理策略：
+     * - 有积分扣减时：使用 AssetService 返回的流水 ID
+     * - 免费抽奖时（draw_cost=0）：使用 0 表示无流水记录
+     * - 连抽子请求跳过扣减时：使用 0 表示由批量扣减统一处理
+     */
+    const final_asset_transaction_id = asset_transaction_id || 0
+
     return await LotteryDraw.create(
       {
         draw_id,
@@ -633,6 +648,7 @@ class SettleStage extends BaseStage {
         campaign_id,
         draw_type, // 🆕 动态确定（single/multi）
         batch_id, // 🆕 Phase 2：连抽批次ID（null 表示单抽）
+        asset_transaction_id: final_asset_transaction_id, // 🆕 关联资产流水ID（必填字段）
         prize_id: final_prize.prize_id,
         prize_name: final_prize.prize_name,
         prize_type: final_prize.prize_type,
@@ -658,13 +674,15 @@ class SettleStage extends BaseStage {
    * @private
    */
   async _createDecisionRecord(params) {
-    const { draw_id, user_id, campaign_id, decision_snapshot, transaction } = params
+    const { draw_id, user_id, campaign_id, idempotency_key, decision_snapshot, transaction } =
+      params
 
     return await LotteryDrawDecision.create(
       {
         draw_id,
         user_id,
         campaign_id,
+        idempotency_key, // 🆕 幂等键（必填字段，与lottery_draws.idempotency_key对应）
         decision_type: 'normal_draw',
         user_segment: decision_snapshot.tier_decision?.user_segment || 'default',
         tier_weights_used: JSON.stringify(decision_snapshot.tier_decision?.tier_weights),

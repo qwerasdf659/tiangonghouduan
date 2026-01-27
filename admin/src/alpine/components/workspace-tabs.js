@@ -63,9 +63,22 @@ export function workspaceTabs() {
         return
       }
 
-      // 已存在则切换
+      // 已存在则检查 URL 是否需要更新
       const existing = this.tabs.find(t => t.id === id)
       if (existing) {
+        // 如果 URL 不同，更新 Tab 的 URL（解决方案A升级后的缓存问题）
+        if (existing.url !== url) {
+          console.log(`[WorkspaceTabs] 更新 Tab URL: ${existing.url} → ${url}`)
+          existing.url = url
+          this.saveState()
+          // 如果当前是激活的 Tab，刷新 iframe
+          if (this.activeTabId === id) {
+            const iframe = document.querySelector(`[data-tab-id="${id}"] iframe`)
+            if (iframe) {
+              iframe.src = url
+            }
+          }
+        }
         this.switchTab(id)
         return
       }

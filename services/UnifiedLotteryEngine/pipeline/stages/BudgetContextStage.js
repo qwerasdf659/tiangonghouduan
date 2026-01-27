@@ -38,7 +38,7 @@
  */
 
 const BaseStage = require('./BaseStage')
-const BudgetProviderFactory = require('../budget/BudgetProviderFactory')
+const { factory: budgetProviderFactory } = require('../budget/BudgetProviderFactory')
 
 /* 抽奖计算引擎 */
 const LotteryComputeEngine = require('../../compute/LotteryComputeEngine')
@@ -97,7 +97,7 @@ class BudgetContextStage extends BaseStage {
       })
 
       /* 1. 创建 BudgetProvider 实例 */
-      const budget_provider = BudgetProviderFactory.create(budget_mode, {
+      const budget_provider = budgetProviderFactory.createByMode(budget_mode, {
         user_id,
         campaign_id,
         campaign,
