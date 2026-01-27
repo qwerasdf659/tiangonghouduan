@@ -19,7 +19,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 /*
  * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
  * const ContentAuditEngine = require('../../../services/ContentAuditEngine')
@@ -30,7 +30,7 @@ const { logger } = require('../../../utils/logger')
 
 // 所有路由都需要管理员权限
 router.use(authenticateToken)
-router.use(requireAdmin)
+router.use(requireRoleLevel(100))
 
 /**
  * 获取商家积分申请完整统计

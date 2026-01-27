@@ -57,6 +57,12 @@ export function workspaceTabs() {
     openTab(config) {
       const { id, title, icon, url } = config
 
+      // 防止加载 workspace.html 到 iframe 中（会导致无限嵌套）
+      if (url && url.includes('workspace.html')) {
+        console.warn('[WorkspaceTabs] 阻止加载 workspace.html 到 Tab 中，避免嵌套')
+        return
+      }
+
       // 已存在则切换
       const existing = this.tabs.find(t => t.id === id)
       if (existing) {
@@ -216,11 +222,30 @@ export function workspaceTabs() {
       try {
         const state = JSON.parse(localStorage.getItem('workspace_tabs'))
         if (state) {
-          this.tabs = state.tabs || []
-          this.activeTabId = state.activeTabId
+          // 过滤掉 workspace.html 的 Tab（防止嵌套）
+          const safeTabs = (state.tabs || []).filter(tab => {
+            if (tab.url && tab.url.includes('workspace.html')) {
+              console.warn('[WorkspaceTabs] 过滤掉可能导致嵌套的 Tab:', tab.url)
+              return false
+            }
+            return true
+          })
+
+          this.tabs = safeTabs
+
+          // 如果过滤后激活的 Tab 不存在，重置为第一个 Tab
+          const activeExists = safeTabs.some(t => t.id === state.activeTabId)
+          this.activeTabId = activeExists ? state.activeTabId : safeTabs[0]?.id || null
+
+          // 如果有变化，保存状态
+          if (safeTabs.length !== (state.tabs || []).length) {
+            this.saveState()
+          }
         }
       } catch (e) {
         console.warn('加载 Tab 状态失败', e)
+        // 清理可能损坏的状态
+        localStorage.removeItem('workspace_tabs')
       }
     }
   }

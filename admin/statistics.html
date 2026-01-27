@@ -92,7 +92,7 @@
               </span>
             </div>
             <!-- 迷你趋势图 -->
-            <div class="w-20 h-10" x-data="trendLine({ data: stats.userTrendData || [10, 15, 12, 18, 22, 25, 30], color: '#818cf8' })" x-init="$nextTick(() => initChart($el))"></div>
+            <div class="w-20 h-10" x-data="trendLine({ data: stats.userTrendData || [10, 15, 12, 18, 22, 25, 30], color: '#818cf8' })"></div>
           </div>
         </div>
       </template>
@@ -108,7 +108,7 @@
               </span>
             </div>
             <!-- 迷你柱状图 -->
-            <div class="w-20 h-10" x-data="trendBar({ data: stats.drawTrendData || [5, 8, 12, 6, 15, 10, 18], color: '#22c55e' })" x-init="$nextTick(() => initChart($el))"></div>
+            <div class="w-20 h-10" x-data="trendBar({ data: stats.drawTrendData || [5, 8, 12, 6, 15, 10, 18], color: '#22c55e' })"></div>
           </div>
         </div>
       </template>
@@ -126,7 +126,7 @@
               </span>
             </div>
             <!-- 进度环 -->
-            <div class="w-12 h-12" x-data="progressRing({ value: stats.winRate || 45, color: '#eab308', size: 48 })" x-init="$nextTick(() => initChart($el))"></div>
+            <div class="w-12 h-12" x-data="progressRing({ data: stats.winRate || 45, color: '#eab308' })"></div>
           </div>
         </div>
       </template>
@@ -142,7 +142,7 @@
               </span>
             </div>
             <!-- 迷你趋势图 -->
-            <div class="w-20 h-10" x-data="trendLine({ data: stats.revenueTrendData || [100, 120, 110, 150, 180, 160, 200], color: '#f97316' })" x-init="$nextTick(() => initChart($el))"></div>
+            <div class="w-20 h-10" x-data="trendLine({ data: stats.revenueTrendData || [100, 120, 110, 150, 180, 160, 200], color: '#f97316' })"></div>
           </div>
         </div>
       </template>

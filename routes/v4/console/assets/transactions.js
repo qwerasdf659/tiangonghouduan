@@ -24,7 +24,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 
 /**
  * 错误处理包装器
@@ -53,7 +53,7 @@ function asyncHandler(fn) {
 router.get(
   '/',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const {
       user_id,

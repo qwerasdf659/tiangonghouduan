@@ -24,7 +24,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
@@ -92,7 +92,7 @@ function handleServiceError(error, res, operation) {
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量（最大100）
  */
-router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const {
     alert_type,
     severity,
@@ -142,7 +142,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/pending', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/pending', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const { alert_type, severity, store_id, operator_id, page = 1, page_size = 20 } = req.query
 
   try {
@@ -195,7 +195,7 @@ router.get('/pending', authenticateToken, requireAdmin, async (req, res) => {
  * @query {string} [start_time] - 统计开始时间
  * @query {string} [end_time] - 统计结束时间
  */
-router.get('/stats/summary', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/stats/summary', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const { start_time, end_time } = req.query
 
   try {
@@ -217,7 +217,7 @@ router.get('/stats/summary', authenticateToken, requireAdmin, async (req, res) =
  * @query {string} [start_time] - 统计开始时间
  * @query {string} [end_time] - 统计结束时间
  */
-router.get('/stats/store/:store_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/stats/store/:store_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const { store_id } = req.params
   const { start_time, end_time } = req.query
 
@@ -240,7 +240,7 @@ router.get('/stats/store/:store_id', authenticateToken, requireAdmin, async (req
  * @desc 获取所有告警类型列表
  * @access Admin only (role_level >= 100)
  */
-router.get('/types', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/types', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const MerchantRiskControlService = getRiskControlService(req)
     const types = await MerchantRiskControlService.getAlertTypesList()
@@ -258,7 +258,7 @@ router.get('/types', authenticateToken, requireAdmin, async (req, res) => {
  *
  * @param {number} alert_id - 告警ID
  */
-router.get('/:alert_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/:alert_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const { alert_id } = req.params
 
   if (!alert_id || isNaN(parseInt(alert_id, 10))) {
@@ -288,7 +288,7 @@ router.get('/:alert_id', authenticateToken, requireAdmin, async (req, res) => {
  * @body {string} status - 新状态（reviewed/ignored）
  * @body {string} [review_notes] - 复核备注
  */
-router.post('/:alert_id/review', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/:alert_id/review', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const { alert_id } = req.params
   const { status, review_notes } = req.body
   const reviewed_by = req.user.user_id

@@ -23,7 +23,7 @@
 const express = require('express')
 const router = express.Router()
 const { Op } = require('sequelize')
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const { AuthenticationSession, User } = require('../../../models')
 const logger = require('../../../utils/logger').logger
 const BeijingTimeHelper = require('../../../utils/timeHelper')
@@ -40,7 +40,7 @@ const BeijingTimeHelper = require('../../../utils/timeHelper')
  *
  * @returns {Object} 会话列表和分页信息
  */
-router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const {
       page = 1,
@@ -137,7 +137,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
  *
  * @returns {Object} 会话统计信息
  */
-router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 获取活跃会话统计（按用户类型分组）
     const activeStats = await AuthenticationSession.getActiveSessionStats()
@@ -187,7 +187,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
  *
  * @returns {Object} 在线用户列表
  */
-router.get('/online-users', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/online-users', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const now = BeijingTimeHelper.createBeijingTime()
     /*
@@ -279,7 +279,7 @@ router.get('/online-users', authenticateToken, requireAdmin, async (req, res) =>
  * @param {number} id - 会话ID（user_session_id）
  * @returns {Object} 会话详情
  */
-router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const sessionId = parseInt(req.params.id, 10)
     if (isNaN(sessionId) || sessionId <= 0) {
@@ -342,7 +342,7 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
  * @body {string} reason - 失效原因（可选）
  * @returns {Object} 操作结果
  */
-router.post('/:id/deactivate', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/:id/deactivate', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const sessionId = parseInt(req.params.id, 10)
     const { reason } = req.body
@@ -383,7 +383,7 @@ router.post('/:id/deactivate', authenticateToken, requireAdmin, async (req, res)
  * @body {string} reason - 失效原因（可选）
  * @returns {Object} 操作结果
  */
-router.post('/deactivate-user', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/deactivate-user', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { user_type, user_id, reason } = req.body
     // 参数校验
@@ -433,7 +433,7 @@ router.post('/deactivate-user', authenticateToken, requireAdmin, async (req, res
  *
  * @returns {Object} 清理结果
  */
-router.post('/cleanup', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/cleanup', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const deletedCount = await AuthenticationSession.cleanupExpiredSessions()
     logger.info(

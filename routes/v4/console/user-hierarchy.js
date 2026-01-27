@@ -23,14 +23,14 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireRole } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const TransactionManager = require('../../../utils/TransactionManager')
 const { logger } = require('../../../utils/logger')
 // P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 // 所有路由都需要管理员权限
 router.use(authenticateToken)
-router.use(requireRole(['admin', 'ops']))
+router.use(requireRoleLevel(30))
 
 /**
  * P1-9：通过中间件注入 HierarchyManagementService

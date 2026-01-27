@@ -22,7 +22,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const MerchantOperationLogService = require('../../../services/MerchantOperationLogService')
 const logger = require('../../../utils/logger').logger
 
@@ -77,7 +77,7 @@ function handleServiceError(error, res, operation) {
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量（最大100）
  */
-router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const result = await MerchantOperationLogService.queryLogs(req.query)
     return res.apiSuccess(result, '获取商家操作审计日志列表成功')
@@ -93,7 +93,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
  *
  * @param {number} merchant_log_id - 审计日志ID
  */
-router.get('/:merchant_log_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/:merchant_log_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const { merchant_log_id } = req.params
 
   if (!merchant_log_id || isNaN(parseInt(merchant_log_id))) {
@@ -122,7 +122,7 @@ router.get('/:merchant_log_id', authenticateToken, requireAdmin, async (req, res
  * @query {string} [start_time] - 统计开始时间（北京时间）
  * @query {string} [end_time] - 统计结束时间（北京时间）
  */
-router.get('/stats/store/:store_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/stats/store/:store_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const { store_id } = req.params
   const { start_time, end_time } = req.query
 
@@ -151,7 +151,7 @@ router.get('/stats/store/:store_id', authenticateToken, requireAdmin, async (req
  * @query {string} [start_time] - 统计开始时间（北京时间）
  * @query {string} [end_time] - 统计结束时间（北京时间）
  */
-router.get('/stats/operator/:operator_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/stats/operator/:operator_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const { operator_id } = req.params
   const { start_time, end_time } = req.query
 
@@ -179,7 +179,7 @@ router.get('/stats/operator/:operator_id', authenticateToken, requireAdmin, asyn
  * @body {number} [retention_days=180] - 保留天数（默认180天）
  * @body {boolean} [dry_run=false] - 干跑模式（只统计不删除）
  */
-router.post('/cleanup', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/cleanup', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const { retention_days = 180, dry_run = false } = req.body
 
   // 验证参数
@@ -216,7 +216,7 @@ router.post('/cleanup', authenticateToken, requireAdmin, async (req, res) => {
  * @desc 获取所有支持的操作类型列表
  * @access Admin only (role_level >= 100)
  */
-router.get('/operation-types', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/operation-types', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const {
     MERCHANT_OPERATION_TYPES,
     OPERATION_TYPE_DESCRIPTIONS

@@ -21,7 +21,7 @@ const logger = require('../../../utils/logger').logger
 const express = require('express')
 const router = express.Router()
 // 🔄 TR-005规范：删除遗留的 models 直接引用，改为通过 ServiceManager 获取 Service
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 
 /**
  * GET /api/v4/notifications - 获取通知列表
@@ -37,7 +37,7 @@ const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
  * @returns {Object} 401 - 未授权
  * @returns {Object} 500 - 服务器错误
  */
-router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 AnnouncementService（符合TR-005规范）
     const AnnouncementService = req.app.locals.services.getService('announcement')
@@ -85,7 +85,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
  * @returns {Object} 404 - 通知不存在
  * @returns {Object} 500 - 服务器错误
  */
-router.get('/:notification_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/:notification_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { notification_id } = req.params
 
@@ -133,7 +133,7 @@ router.get('/:notification_id', authenticateToken, requireAdmin, async (req, res
  * @returns {Object} 200 - 标记成功
  * @returns {Object} 404 - 通知不存在
  */
-router.post('/:notification_id/read', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/:notification_id/read', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { notification_id } = req.params
 
@@ -171,7 +171,7 @@ router.post('/:notification_id/read', authenticateToken, requireAdmin, async (re
  * @description 将所有活跃公告的view_count设置为1（视为已读）
  * @returns {Object} 200 - 操作成功
  */
-router.post('/read-all', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/read-all', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 AnnouncementService（符合TR-005规范）
     const AnnouncementService = req.app.locals.services.getService('announcement')
@@ -203,7 +203,7 @@ router.post('/read-all', authenticateToken, requireAdmin, async (req, res) => {
  * @description 将已读的公告标记为不活跃
  * @returns {Object} 200 - 操作成功
  */
-router.post('/clear', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/clear', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 AnnouncementService（符合TR-005规范）
     const AnnouncementService = req.app.locals.services.getService('announcement')
@@ -253,7 +253,7 @@ router.post('/clear', authenticateToken, requireAdmin, async (req, res) => {
  * @returns {Object} 200 - 发送成功
  * @returns {Object} 400 - 参数错误
  */
-router.post('/send', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/send', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { type, title, content, target = 'all' } = req.body
 

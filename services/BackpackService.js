@@ -80,7 +80,7 @@ class BackpackService {
        * 权限检查（用户只能查看自己的背包，除非是管理员）
        *
        * 设计说明：
-       * - 当前版本：允许查看（管理员权限检查在路由层通过 requireAdmin 中间件完成）
+       * - 当前版本：允许查看（管理员权限检查在路由层通过 requireRoleLevel(100) 中间件完成）
        * - 如需在Service层做额外检查，可注入auth模块的getUserRoles方法
        */
       if (viewer_user_id && viewer_user_id !== user_id) {

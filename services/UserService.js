@@ -522,18 +522,18 @@ class UserService {
         throw error
       }
 
-      // 步骤4: 管理员权限检查（role_level >= 100 为管理员）
+      // 步骤4: 后台访问权限检查（role_level > 0 即可登录后台，菜单按权限过滤）
       const { getUserRoles } = require('../middleware/auth')
       const userRoles = await getUserRoles(user.user_id)
 
-      if (userRoles.role_level < 100) {
-        logger.warn('用户不具备管理员权限', {
+      if (userRoles.role_level <= 0) {
+        logger.warn('用户不具备后台访问权限', {
           user_id: user.user_id,
           role_level: userRoles.role_level,
           mobile: mobile.substring(0, 3) + '****' + mobile.substring(7)
         })
 
-        const error = new Error('用户不具备管理员权限')
+        const error = new Error('用户不具备后台访问权限')
         error.code = 'INSUFFICIENT_PERMISSION'
         error.statusCode = 403
         throw error

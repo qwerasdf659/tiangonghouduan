@@ -25,7 +25,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
 const BeijingTimeHelper = require('../../../utils/timeHelper')
@@ -44,7 +44,7 @@ const TransactionManager = require('../../../utils/TransactionManager')
  *   pagination: Object - 分页信息
  * }
  */
-router.get('/pending', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/pending', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
     const ConsumptionService = req.app.locals.services.getService('consumption')
@@ -91,7 +91,7 @@ router.get('/pending', authenticateToken, requireAdmin, async (req, res) => {
  *   statistics: Object - 统计数据（待审核、今日审核、通过、拒绝）
  * }
  */
-router.get('/records', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/records', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
     const ConsumptionService = req.app.locals.services.getService('consumption')
@@ -147,7 +147,7 @@ router.get('/records', authenticateToken, requireAdmin, async (req, res) => {
  *   "admin_notes": "核实无误，审核通过"
  * }
  */
-router.post('/approve/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/approve/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
     const ConsumptionService = req.app.locals.services.getService('consumption')
@@ -219,7 +219,7 @@ router.post('/approve/:id', authenticateToken, requireAdmin, async (req, res) =>
  *   "admin_notes": "消费金额与实际不符"
  * }
  */
-router.post('/reject/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/reject/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
     const ConsumptionService = req.app.locals.services.getService('consumption')

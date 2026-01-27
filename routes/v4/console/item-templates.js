@@ -12,7 +12,7 @@
  * - DELETE /api/v4/console/item-templates/:id          删除模板
  * - PUT    /api/v4/console/item-templates/batch/status 批量更新状态
  *
- * 权限：仅管理员（requireAdmin）
+ * 权限：仅管理员（requireRoleLevel(100)）
  * 路径设计：事务实体使用 :id（自增主键）
  *
  * @version 1.0.0
@@ -23,7 +23,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const TransactionManager = require('../../../utils/TransactionManager')
 const logger = require('../../../utils/logger').logger
 
@@ -50,7 +50,7 @@ function getItemTemplateService(req) {
  * - page: 页码（默认1）
  * - page_size: 每页数量（默认20）
  */
-router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getItemTemplateService(req)
     const {
@@ -90,7 +90,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
 /**
  * GET /types - 获取物品类型列表（去重）
  */
-router.get('/types', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/types', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getItemTemplateService(req)
     const types = await service.getItemTypes()
@@ -105,7 +105,7 @@ router.get('/types', authenticateToken, requireAdmin, async (req, res) => {
 /**
  * GET /code/:code - 获取模板详情（按模板代码）
  */
-router.get('/code/:code', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/code/:code', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getItemTemplateService(req)
     const { code } = req.params
@@ -126,7 +126,7 @@ router.get('/code/:code', authenticateToken, requireAdmin, async (req, res) => {
 /**
  * GET /:id - 获取模板详情（按ID）
  */
-router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getItemTemplateService(req)
     const { id } = req.params
@@ -160,7 +160,7 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
  * - is_tradable: 是否可交易
  * - meta: 扩展元数据
  */
-router.post('/', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getItemTemplateService(req)
     const admin_id = req.user.user_id
@@ -197,7 +197,7 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
  * - is_enabled: 是否启用
  * - meta: 扩展元数据
  */
-router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getItemTemplateService(req)
     const { id } = req.params
@@ -222,7 +222,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
 /**
  * DELETE /:id - 删除物品模板
  */
-router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.delete('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getItemTemplateService(req)
     const { id } = req.params
@@ -251,7 +251,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
  * - item_template_ids: 模板ID列表
  * - is_enabled: 是否启用
  */
-router.put('/batch/status', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/batch/status', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getItemTemplateService(req)
     const { item_template_ids, is_enabled } = req.body

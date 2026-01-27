@@ -16,7 +16,7 @@
  * - POST   /api/v4/console/risk-profiles/user/:user_id/freeze   冻结用户
  * - POST   /api/v4/console/risk-profiles/user/:user_id/unfreeze 解冻用户
  *
- * 权限：仅管理员（requireAdmin）
+ * 权限：仅管理员（requireRoleLevel(100)）
  * 路径设计：事务实体使用 :id（自增主键），用户相关使用 :user_id
  *
  * @version 1.0.0
@@ -27,7 +27,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const TransactionManager = require('../../../utils/TransactionManager')
 const logger = require('../../../utils/logger').logger
 
@@ -52,7 +52,7 @@ function getRiskProfileService(req) {
  * - page: 页码（默认1）
  * - page_size: 每页数量（默认20）
  */
-router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getRiskProfileService(req)
     const { config_type, user_level, is_frozen, user_id, page, page_size } = req.query
@@ -81,7 +81,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
 /**
  * GET /levels - 获取等级默认配置列表
  */
-router.get('/levels', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/levels', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getRiskProfileService(req)
     const configs = await service.getLevelConfigs()
@@ -106,7 +106,7 @@ router.get('/levels', authenticateToken, requireAdmin, async (req, res) => {
 /**
  * GET /frozen - 获取冻结用户列表
  */
-router.get('/frozen', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/frozen', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getRiskProfileService(req)
     const { page, page_size } = req.query
@@ -126,7 +126,7 @@ router.get('/frozen', authenticateToken, requireAdmin, async (req, res) => {
 /**
  * GET /user/:user_id - 获取用户有效风控配置
  */
-router.get('/user/:user_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/user/:user_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getRiskProfileService(req)
     const { user_id } = req.params
@@ -149,7 +149,7 @@ router.get('/user/:user_id', authenticateToken, requireAdmin, async (req, res) =
 /**
  * GET /user/:user_id/frozen - 检查用户冻结状态
  */
-router.get('/user/:user_id/frozen', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/user/:user_id/frozen', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getRiskProfileService(req)
     const { user_id } = req.params
@@ -171,7 +171,7 @@ router.get('/user/:user_id/frozen', authenticateToken, requireAdmin, async (req,
 /**
  * GET /:id - 获取配置详情
  */
-router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getRiskProfileService(req)
     const { id } = req.params
@@ -197,7 +197,7 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
  * - thresholds: 风控阈值配置
  * - remarks: 备注
  */
-router.post('/levels', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/levels', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getRiskProfileService(req)
     const admin_id = req.user.user_id
@@ -225,7 +225,7 @@ router.post('/levels', authenticateToken, requireAdmin, async (req, res) => {
  * - thresholds: 风控阈值配置
  * - remarks: 备注
  */
-router.post('/user/:user_id', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/user/:user_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getRiskProfileService(req)
     const { user_id } = req.params
@@ -254,7 +254,7 @@ router.post('/user/:user_id', authenticateToken, requireAdmin, async (req, res) 
  * - thresholds: 风控阈值配置
  * - remarks: 备注
  */
-router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getRiskProfileService(req)
     const { id } = req.params
@@ -279,7 +279,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
 /**
  * DELETE /:id - 删除风控配置
  */
-router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.delete('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getRiskProfileService(req)
     const { id } = req.params
@@ -307,7 +307,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
  * 请求体：
  * - reason: 冻结原因（必填）
  */
-router.post('/user/:user_id/freeze', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/user/:user_id/freeze', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getRiskProfileService(req)
     const { user_id } = req.params
@@ -337,7 +337,7 @@ router.post('/user/:user_id/freeze', authenticateToken, requireAdmin, async (req
 /**
  * POST /user/:user_id/unfreeze - 解冻用户账户
  */
-router.post('/user/:user_id/unfreeze', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/user/:user_id/unfreeze', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getRiskProfileService(req)
     const { user_id } = req.params

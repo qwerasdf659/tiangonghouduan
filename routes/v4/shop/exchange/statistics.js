@@ -17,7 +17,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 
@@ -31,7 +31,7 @@ const logger = require('../../../../utils/logger').logger
  * @returns {Array} data.items - 商品销售统计
  * @returns {Object} data.materials - 材料消耗统计
  */
-router.get('/statistics', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/statistics', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ExchangeService（符合TR-005规范）
     const ExchangeService = req.app.locals.services.getService('exchange_market')

@@ -25,7 +25,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireRole } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const AuditLogService = require('../../../services/AuditLogService')
 const logger = require('../../../utils/logger').logger
 
@@ -78,7 +78,7 @@ function handleServiceError(error, res, operation) {
  * @query {string} [sort_by=created_at] - 排序字段
  * @query {string} [sort_order=DESC] - 排序方向（ASC/DESC）
  */
-router.get('/', authenticateToken, requireRole(['admin', 'ops']), async (req, res) => {
+router.get('/', authenticateToken, requireRoleLevel(30), async (req, res) => {
   try {
     const {
       operator_id,
@@ -132,7 +132,7 @@ router.get('/', authenticateToken, requireRole(['admin', 'ops']), async (req, re
  *
  * @param {number} log_id - 审计日志ID
  */
-router.get('/:log_id', authenticateToken, requireRole(['admin', 'ops']), async (req, res) => {
+router.get('/:log_id', authenticateToken, requireRoleLevel(30), async (req, res) => {
   const { log_id } = req.params
 
   if (!log_id || isNaN(parseInt(log_id))) {
@@ -174,7 +174,7 @@ router.get('/:log_id', authenticateToken, requireRole(['admin', 'ops']), async (
 router.get(
   '/statistics/summary',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     const { start_date, end_date } = req.query
 
@@ -210,7 +210,7 @@ router.get(
 router.get(
   '/operation-types',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const {
@@ -246,7 +246,7 @@ router.get(
  * @desc 获取所有支持的目标类型列表
  * @access Admin only (role_level >= 100)
  */
-router.get('/target-types', authenticateToken, requireRole(['admin', 'ops']), async (req, res) => {
+router.get('/target-types', authenticateToken, requireRoleLevel(30), async (req, res) => {
   try {
     const {
       TARGET_TYPES,

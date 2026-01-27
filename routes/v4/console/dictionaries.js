@@ -18,7 +18,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const { asyncHandler } = require('./shared/middleware')
 const TransactionManager = require('../../../utils/TransactionManager')
 const logger = require('../../../utils/logger').logger
@@ -54,7 +54,7 @@ const getDictionaryService = req => {
 router.get(
   '/categories',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const DictionaryService = getDictionaryService(req)
     const result = await DictionaryService.getCategoryList({
@@ -90,7 +90,7 @@ router.get(
 router.get(
   '/categories/:code',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const DictionaryService = getDictionaryService(req)
     const category = await DictionaryService.getCategoryByCode(req.params.code)
@@ -120,7 +120,7 @@ router.get(
 router.post(
   '/categories',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const { category_code, display_name, description, icon_url, sort_order, is_enabled } = req.body
 
@@ -179,7 +179,7 @@ router.post(
 router.put(
   '/categories/:code',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const DictionaryService = getDictionaryService(req)
 
@@ -208,7 +208,7 @@ router.put(
 router.delete(
   '/categories/:code',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const DictionaryService = getDictionaryService(req)
 
@@ -241,7 +241,7 @@ router.delete(
 router.get(
   '/rarities',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const DictionaryService = getDictionaryService(req)
     const result = await DictionaryService.getRarityList({
@@ -276,7 +276,7 @@ router.get(
 router.get(
   '/rarities/:code',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const DictionaryService = getDictionaryService(req)
     const rarity = await DictionaryService.getRarityByCode(req.params.code)
@@ -306,7 +306,7 @@ router.get(
 router.post(
   '/rarities',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const { rarity_code, display_name, description, color_hex, tier, sort_order, is_enabled } =
       req.body
@@ -348,7 +348,7 @@ router.post(
 router.put(
   '/rarities/:code',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const DictionaryService = getDictionaryService(req)
 
@@ -376,7 +376,7 @@ router.put(
 router.delete(
   '/rarities/:code',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const DictionaryService = getDictionaryService(req)
 
@@ -413,7 +413,7 @@ router.delete(
 router.get(
   '/asset-groups',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const DictionaryService = getDictionaryService(req)
     const result = await DictionaryService.getAssetGroupList({
@@ -455,7 +455,7 @@ router.get(
 router.get(
   '/asset-groups/:code',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const DictionaryService = getDictionaryService(req)
     const group = await DictionaryService.getAssetGroupByCode(req.params.code)
@@ -486,7 +486,7 @@ router.get(
 router.post(
   '/asset-groups',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const {
       group_code,
@@ -545,7 +545,7 @@ router.post(
 router.put(
   '/asset-groups/:code',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const DictionaryService = getDictionaryService(req)
 
@@ -573,7 +573,7 @@ router.put(
 router.delete(
   '/asset-groups/:code',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const DictionaryService = getDictionaryService(req)
 
@@ -607,7 +607,7 @@ router.delete(
 router.get(
   '/all',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const DictionaryService = getDictionaryService(req)
     const result = await DictionaryService.getAllDictionaries()

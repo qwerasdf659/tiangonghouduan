@@ -33,7 +33,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const TransactionManager = require('../../../utils/TransactionManager')
 /*
  * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
@@ -68,7 +68,7 @@ function asyncHandler(fn) {
 router.post(
   '/adjust',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const admin_id = req.user.user_id
     const { user_id, asset_code, amount, reason, campaign_id, idempotency_key } = req.body
@@ -218,7 +218,7 @@ router.post(
 router.post(
   '/batch-adjust',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const admin_id = req.user.user_id
     const { adjustments, batch_reason } = req.body
@@ -369,7 +369,7 @@ router.post(
 router.get(
   '/asset-types',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     // P1-9：通过 ServiceManager 获取服务（snake_case key）
     const MaterialManagementService = req.app.locals.services.getService('material_management')
@@ -435,7 +435,7 @@ router.get(
 router.get(
   '/user/:user_id/balances',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const { user_id } = req.params
 

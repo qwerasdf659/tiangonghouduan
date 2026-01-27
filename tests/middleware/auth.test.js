@@ -6,7 +6,7 @@
  * 🔴 P0-1修复（2026-01-08）：移除硬编码 user_id=31，从 global.testData 动态获取
  */
 
-const { authenticateToken, generateTokens, requireAdmin } = require('../../middleware/auth.js')
+const { authenticateToken, generateTokens, requireRoleLevel } = require('../../middleware/auth.js')
 const jwt = require('jsonwebtoken')
 
 describe('auth 中间件测试 - UUID角色系统', () => {
@@ -132,7 +132,7 @@ describe('auth 中间件测试 - UUID角色系统', () => {
   })
 
   describe('🔑 管理员权限验证测试', () => {
-    test('✅ 管理员token应该通过管理员验证', async () => {
+    test('✅ 管理员token应该通过管理员验证（role_level >= 100）', async () => {
       const req = {
         user: adminUser
       }
@@ -153,12 +153,14 @@ describe('auth 中间件测试 - UUID角色系统', () => {
         nextCalled = true
       }
 
-      await requireAdmin(req, res, next)
+      // 使用 requireRoleLevel(100) 替代废弃的 requireAdmin
+      const middleware = requireRoleLevel(100)
+      await middleware(req, res, next)
 
       expect(nextCalled).toBe(true)
     })
 
-    test('❌ 普通用户应该被拒绝管理员权限', async () => {
+    test('❌ 普通用户应该被拒绝管理员权限（role_level < 100）', async () => {
       // 模拟一个普通用户（role_level < 100）
       const normalUser = {
         user_id: 999, // 模拟的普通用户ID
@@ -187,7 +189,78 @@ describe('auth 中间件测试 - UUID角色系统', () => {
         nextCalled = true
       }
 
-      await requireAdmin(req, res, next)
+      // 使用 requireRoleLevel(100) 替代废弃的 requireAdmin
+      const middleware = requireRoleLevel(100)
+      await middleware(req, res, next)
+
+      expect(nextCalled).toBe(false)
+      expect(res.statusCode).toBe(403)
+    })
+
+    test('✅ 运营人员（role_level=30）应该通过 requireRoleLevel(30) 验证', async () => {
+      const opsUser = {
+        user_id: 998,
+        mobile: '13800000001',
+        status: 'active',
+        role_level: 30 // 运营权限级别
+      }
+
+      const req = {
+        user: opsUser
+      }
+      const res = {
+        statusCode: null,
+        jsonData: null,
+        status: function (code) {
+          this.statusCode = code
+          return this
+        },
+        json: function (data) {
+          this.jsonData = data
+          return this
+        }
+      }
+      let nextCalled = false
+      const next = () => {
+        nextCalled = true
+      }
+
+      const middleware = requireRoleLevel(30)
+      await middleware(req, res, next)
+
+      expect(nextCalled).toBe(true)
+    })
+
+    test('❌ 运营人员（role_level=30）应该被拒绝管理员权限（requireRoleLevel(100)）', async () => {
+      const opsUser = {
+        user_id: 998,
+        mobile: '13800000001',
+        status: 'active',
+        role_level: 30 // 运营权限级别
+      }
+
+      const req = {
+        user: opsUser
+      }
+      const res = {
+        statusCode: null,
+        jsonData: null,
+        status: function (code) {
+          this.statusCode = code
+          return this
+        },
+        json: function (data) {
+          this.jsonData = data
+          return this
+        }
+      }
+      let nextCalled = false
+      const next = () => {
+        nextCalled = true
+      }
+
+      const middleware = requireRoleLevel(100)
+      await middleware(req, res, next)
 
       expect(nextCalled).toBe(false)
       expect(res.statusCode).toBe(403)

@@ -15,11 +15,11 @@ const TransactionManager = require('../../../utils/TransactionManager')
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 
 // 所有路由都需要管理员权限
 router.use(authenticateToken)
-router.use(requireAdmin)
+router.use(requireRoleLevel(100))
 
 /**
  * 🛡️ 获取用户列表（基于UUID角色系统）

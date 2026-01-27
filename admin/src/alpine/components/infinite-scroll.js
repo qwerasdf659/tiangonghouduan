@@ -180,7 +180,10 @@ export function virtualScroll(config = {}) {
 
       this.startIndex = Math.max(0, Math.floor(this.scrollTop / this.itemHeight) - this.overscan)
 
-      this.endIndex = Math.min(this.items.length, this.startIndex + visibleCount + this.overscan * 2)
+      this.endIndex = Math.min(
+        this.items.length,
+        this.startIndex + visibleCount + this.overscan * 2
+      )
 
       this.visibleItems = this.items.slice(this.startIndex, this.endIndex)
     },
@@ -213,4 +216,3 @@ export function virtualScroll(config = {}) {
 }
 
 export default { infiniteScroll, virtualScroll }
-

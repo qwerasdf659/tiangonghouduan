@@ -21,7 +21,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const logger = require('../../../../utils/logger')
 
 // 导入子路由模块
@@ -37,7 +37,7 @@ const transactionsRoutes = require('./transactions')
  *
  * @since 2026-01-18 路由层合规性治理：移除直接 sequelize 访问，使用 AssetService.getSystemStats()
  */
-router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 通过 ServiceManager 获取 AssetService
     const AssetService = req.app.locals.services.getService('asset')

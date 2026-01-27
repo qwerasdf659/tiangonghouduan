@@ -27,7 +27,8 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireRole } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
+const { PERMISSION_LEVELS } = require('../../../shared/permission-constants')
 const logger = require('../../../utils/logger').logger
 const { Op } = require('sequelize')
 
@@ -98,7 +99,7 @@ function buildPaginationOptions(query, defaultSortBy = 'created_at') {
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/accounts', authenticateToken, requireRole(['admin', 'ops']), async (req, res) => {
+router.get('/accounts', authenticateToken, requireRoleLevel(PERMISSION_LEVELS.OPS), async (req, res) => {
   try {
     const { account_type, user_id, system_code, status } = req.query
     const pagination = buildPaginationOptions(req.query)
@@ -151,7 +152,7 @@ router.get('/accounts', authenticateToken, requireRole(['admin', 'ops']), async 
 router.get(
   '/accounts/:account_id',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
       const { account_id } = req.params
@@ -196,7 +197,7 @@ router.get(
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/user-roles', authenticateToken, requireRole(['admin', 'ops']), async (req, res) => {
+router.get('/user-roles', authenticateToken, requireRoleLevel(PERMISSION_LEVELS.OPS), async (req, res) => {
   try {
     const { user_id, role_name } = req.query
     const pagination = buildPaginationOptions(req.query)
@@ -263,7 +264,7 @@ router.get('/user-roles', authenticateToken, requireRole(['admin', 'ops']), asyn
 router.get(
   '/market-listings',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
       const { seller_user_id, status, listing_kind, asset_code, start_date, end_date } = req.query
@@ -324,7 +325,7 @@ router.get(
 router.get(
   '/market-listings/:listing_id',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
       const { listing_id } = req.params
@@ -356,7 +357,7 @@ router.get(
 router.get(
   '/market-listings/statistics/summary',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
       const { MarketListing } = require('../../../models')
@@ -429,7 +430,7 @@ router.get(
 router.get(
   '/lottery-campaigns',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
       const { status, budget_mode, start_date, end_date } = req.query
@@ -501,7 +502,7 @@ router.get(
 router.get(
   '/lottery-campaigns/:campaign_id',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
       const { campaign_id } = req.params
@@ -530,7 +531,7 @@ router.get(
 router.post(
   '/lottery-campaigns',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
       const {
@@ -604,7 +605,7 @@ router.post(
 router.put(
   '/lottery-campaigns/:campaign_id',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
       const { campaign_id } = req.params
@@ -678,7 +679,7 @@ router.put(
 router.put(
   '/lottery-campaigns/:campaign_id/status',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
       const { campaign_id } = req.params
@@ -719,7 +720,7 @@ router.put(
 router.delete(
   '/lottery-campaigns/:campaign_id',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
       const { campaign_id } = req.params
@@ -778,7 +779,7 @@ router.delete(
 router.get(
   '/lottery-daily-quotas',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
       const { user_id, campaign_id, quota_date } = req.query
@@ -829,7 +830,7 @@ router.get(
 router.get(
   '/lottery-daily-quotas/:quota_id',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
       const { quota_id } = req.params

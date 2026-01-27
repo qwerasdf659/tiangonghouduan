@@ -9,11 +9,13 @@
 const express = require('express')
 const router = express.Router()
 const { generateTokens, getUserRoles, authenticateToken } = require('../../../middleware/auth')
+const { asyncHandler } = require('./shared/middleware')
+
 /**
  * 🛡️ 管理员登录（基于UUID角色系统）
  * POST /api/v4/console/auth/login
  */
-router.post('/login', async (req, res) => {
+router.post('/login', asyncHandler(async (req, res) => {
   const { mobile, verification_code } = req.body
 
   // 验证必需参数
@@ -45,13 +47,13 @@ router.post('/login', async (req, res) => {
     },
     '管理员登录成功'
   )
-})
+}))
 
 /**
  * 🛡️ 管理员信息获取（基于UUID角色系统）
  * GET /api/v4/console/auth/profile
  */
-router.get('/profile', authenticateToken, async (req, res) => {
+router.get('/profile', authenticateToken, asyncHandler(async (req, res) => {
   // ✅ 通过 ServiceManager 获取 UserService
   const UserService = req.app.locals.services.getService('user')
 
@@ -71,9 +73,9 @@ router.get('/profile', authenticateToken, async (req, res) => {
   // 获取用户角色信息
   const userRoles = await getUserRoles(user.user_id)
 
-  // 验证管理员权限（role_level >= 100）
-  if (userRoles.role_level < 100) {
-    return res.apiError('用户不具备管理员权限', 'INSUFFICIENT_PERMISSION', null, 403)
+  // 验证后台访问权限（role_level > 0 即可访问后台，菜单按权限过滤）
+  if (userRoles.role_level <= 0) {
+    return res.apiError('用户不具备后台访问权限', 'INSUFFICIENT_PERMISSION', null, 403)
   }
 
   // 返回管理员信息 - 参数顺序：data第1个, message第2个
@@ -93,6 +95,6 @@ router.get('/profile', authenticateToken, async (req, res) => {
     },
     '获取管理员信息成功'
   )
-})
+}))
 
 module.exports = router

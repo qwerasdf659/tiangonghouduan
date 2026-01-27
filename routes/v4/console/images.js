@@ -21,7 +21,7 @@ const express = require('express')
 const router = express.Router()
 const multer = require('multer')
 const serviceManager = require('../../../services')
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const { asyncHandler } = require('./shared/middleware')
 
 /**
@@ -96,7 +96,7 @@ const upload = multer({
 router.post(
   '/upload',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   upload.single('image'),
   asyncHandler(async (req, res) => {
     // 1. 验证文件存在
@@ -153,7 +153,7 @@ router.post(
 router.get(
   '/:image_id',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const imageId = parseInt(req.params.image_id, 10)
     if (isNaN(imageId)) {
@@ -188,7 +188,7 @@ router.get(
 router.get(
   '/',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const { page, page_size: pageSize, business_type: businessType, status } = req.query
 
@@ -233,7 +233,7 @@ router.get(
 router.get(
   '/by-business',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const { business_type: businessType, context_id: contextId } = req.query
 
@@ -270,7 +270,7 @@ router.get(
 router.patch(
   '/:image_id/bind',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const imageId = parseInt(req.params.image_id, 10)
     // 🔴 修复：使用 context_id（与表结构一致）
@@ -313,7 +313,7 @@ router.patch(
 router.delete(
   '/:image_id',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const imageId = parseInt(req.params.image_id, 10)
     if (isNaN(imageId)) {

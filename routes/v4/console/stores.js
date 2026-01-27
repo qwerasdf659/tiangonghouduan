@@ -34,7 +34,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const StoreService = require('../../../services/StoreService')
 const logger = require('../../../utils/logger').logger
 const TransactionManager = require('../../../utils/TransactionManager')
@@ -99,7 +99,7 @@ function handleServiceError(error, res, operation) {
  *
  * @access Admin only (role_level >= 100)
  */
-router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const {
       page = 1,
@@ -143,7 +143,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
  *
  * @access Admin only (role_level >= 100)
  */
-router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const stats = await StoreService.getStoreStats()
 
@@ -160,7 +160,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
  *
  * @access Admin only (role_level >= 100)
  */
-router.get('/:store_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/:store_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { store_id } = req.params
 
@@ -210,7 +210,7 @@ router.get('/:store_id', authenticateToken, requireAdmin, async (req, res) => {
  *
  * @access Admin only (role_level >= 100)
  */
-router.post('/', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const storeData = req.body
     const operator_id = req.user.user_id
@@ -266,7 +266,7 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
  *
  * @access Admin only (role_level >= 100)
  */
-router.post('/batch-import', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/batch-import', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { stores } = req.body
     const operator_id = req.user.user_id
@@ -366,7 +366,7 @@ router.post('/batch-import', authenticateToken, requireAdmin, async (req, res) =
  *
  * @access Admin only (role_level >= 100)
  */
-router.put('/:store_id', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/:store_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { store_id } = req.params
     const updateData = req.body
@@ -405,7 +405,7 @@ router.put('/:store_id', authenticateToken, requireAdmin, async (req, res) => {
  *
  * @access Admin only (role_level >= 100)
  */
-router.delete('/:store_id', authenticateToken, requireAdmin, async (req, res) => {
+router.delete('/:store_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { store_id } = req.params
     const { force } = req.query
@@ -442,7 +442,7 @@ router.delete('/:store_id', authenticateToken, requireAdmin, async (req, res) =>
  *
  * @access Admin only (role_level >= 100)
  */
-router.post('/:store_id/activate', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/:store_id/activate', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { store_id } = req.params
     const operator_id = req.user.user_id
@@ -472,7 +472,7 @@ router.post('/:store_id/activate', authenticateToken, requireAdmin, async (req, 
  *
  * @access Admin only (role_level >= 100)
  */
-router.post('/:store_id/deactivate', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/:store_id/deactivate', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { store_id } = req.params
     const operator_id = req.user.user_id

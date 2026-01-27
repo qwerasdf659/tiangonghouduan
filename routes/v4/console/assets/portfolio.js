@@ -32,7 +32,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireRole } = require('../../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const logger = require('../../../../utils/logger')
 
 /**
@@ -75,7 +75,7 @@ const logger = require('../../../../utils/logger')
  * 查询参数：
  * - include_items: boolean（可选）- 是否包含物品详细列表（默认false）
  */
-router.get('/portfolio', authenticateToken, requireRole(['admin', 'ops']), async (req, res) => {
+router.get('/portfolio', authenticateToken, requireRoleLevel(30), async (req, res) => {
   try {
     const user_id = req.user.user_id
     const include_items = req.query.include_items === 'true'
@@ -112,7 +112,7 @@ router.get('/portfolio', authenticateToken, requireRole(['admin', 'ops']), async
 router.get(
   '/portfolio/items',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const user_id = req.user.user_id
@@ -149,7 +149,7 @@ router.get(
 router.get(
   '/portfolio/items/:item_instance_id',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const user_id = req.user.user_id
@@ -207,7 +207,7 @@ router.get(
  *   }
  * }
  */
-router.get('/item-events', authenticateToken, requireRole(['admin', 'ops']), async (req, res) => {
+router.get('/item-events', authenticateToken, requireRoleLevel(30), async (req, res) => {
   try {
     const user_id = req.user.user_id
     const item_instance_id = req.query.item_instance_id

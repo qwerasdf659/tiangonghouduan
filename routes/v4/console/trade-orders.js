@@ -23,7 +23,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
 const TradeOrderService = require('../../../services/TradeOrderService')
 
@@ -43,7 +43,7 @@ const TradeOrderService = require('../../../services/TradeOrderService')
  *
  * 返回：订单列表和分页信息
  */
-router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const {
       buyer_user_id,
@@ -93,7 +93,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
  *
  * 返回：统计汇总数据
  */
-router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { start_time, end_time, seller_user_id, buyer_user_id } = req.query
 
@@ -124,7 +124,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
  *
  * 返回：用户交易统计（作为买家和卖家的统计）
  */
-router.get('/user/:user_id/stats', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/user/:user_id/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const user_id = parseInt(req.params.user_id)
 
@@ -150,7 +150,7 @@ router.get('/user/:user_id/stats', authenticateToken, requireAdmin, async (req, 
  *
  * 返回：订单详情
  */
-router.get('/by-business-id/:business_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/by-business-id/:business_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { business_id } = req.params
 
@@ -175,7 +175,7 @@ router.get('/by-business-id/:business_id', authenticateToken, requireAdmin, asyn
  *
  * 返回：订单详情
  */
-router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const order_id = parseInt(req.params.id)
 

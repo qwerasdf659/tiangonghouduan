@@ -33,7 +33,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin, requireRole } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const StaffManagementService = require('../../../services/StaffManagementService')
 const logger = require('../../../utils/logger').logger
 const TransactionManager = require('../../../utils/TransactionManager')
@@ -99,7 +99,7 @@ function handleServiceError(error, res, operation) {
  *
  * @access Admin only (role_level >= 100)
  */
-router.get('/', authenticateToken, requireRole(['admin', 'ops']), async (req, res) => {
+router.get('/', authenticateToken, requireRoleLevel(30), async (req, res) => {
   try {
     const {
       page = 1,
@@ -140,7 +140,7 @@ router.get('/', authenticateToken, requireRole(['admin', 'ops']), async (req, re
  *
  * @access Admin only (role_level >= 100)
  */
-router.get('/stats', authenticateToken, requireRole(['admin', 'ops']), async (req, res) => {
+router.get('/stats', authenticateToken, requireRoleLevel(30), async (req, res) => {
   try {
     const { store_id } = req.query
 
@@ -177,7 +177,7 @@ router.get('/stats', authenticateToken, requireRole(['admin', 'ops']), async (re
 router.get(
   '/by-user/:user_id',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { user_id } = req.params
@@ -212,7 +212,7 @@ router.get(
 router.get(
   '/:store_staff_id',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { store_staff_id } = req.params
@@ -253,7 +253,7 @@ router.get(
  *
  * @access Admin only (role_level >= 100)
  */
-router.post('/', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { user_id, store_id, role_in_store = 'staff', notes } = req.body
     const operator_id = req.user.user_id
@@ -320,7 +320,7 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
  *
  * @access Admin only (role_level >= 100)
  */
-router.post('/transfer', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/transfer', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { user_id, from_store_id, to_store_id, notes } = req.body
     const operator_id = req.user.user_id
@@ -387,7 +387,7 @@ router.post('/transfer', authenticateToken, requireAdmin, async (req, res) => {
  *
  * @access Admin only (role_level >= 100)
  */
-router.post('/disable/:user_id', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/disable/:user_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { user_id } = req.params
     const { reason } = req.body
@@ -433,7 +433,7 @@ router.post('/disable/:user_id', authenticateToken, requireAdmin, async (req, re
  *
  * @access Admin only (role_level >= 100)
  */
-router.post('/enable', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/enable', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { user_id, store_id, notes } = req.body
     const operator_id = req.user.user_id
@@ -493,7 +493,7 @@ router.post('/enable', authenticateToken, requireAdmin, async (req, res) => {
  *
  * @access Admin only (role_level >= 100)
  */
-router.put('/:store_staff_id/role', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/:store_staff_id/role', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { store_staff_id } = req.params
     const { role_in_store, notes } = req.body
@@ -574,7 +574,7 @@ router.put('/:store_staff_id/role', authenticateToken, requireAdmin, async (req,
  * @access Admin only (role_level >= 100)
  * @since 2026-01-26 重构：支持离职+删除双操作
  */
-router.delete('/:store_staff_id', authenticateToken, requireAdmin, async (req, res) => {
+router.delete('/:store_staff_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { store_staff_id } = req.params
     const { reason, force } = req.query

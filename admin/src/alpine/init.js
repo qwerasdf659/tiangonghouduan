@@ -11,6 +11,14 @@
 
 import { logger } from '../utils/logger.js'
 import { createToastStore, TOAST_TYPES } from './components/toast.js'
+import {
+  hasMenuAccess,
+  hasPageAccess,
+  checkCurrentPageAccess,
+  getAccessibleMenuIds,
+  getUserRoleLevelDescription,
+  ROLE_LEVEL_THRESHOLDS
+} from '../config/permission-rules.js'
 
 document.addEventListener('alpine:init', () => {
   logger.info('🔧 Alpine.js 初始化开始...')
@@ -68,6 +76,59 @@ document.addEventListener('alpine:init', () => {
     updateUser(userData) {
       this.user = { ...this.user, ...userData }
       localStorage.setItem('admin_user', JSON.stringify(this.user))
+    },
+
+    // ========== 权限控制方法（基于 role_level）==========
+
+    /**
+     * 获取用户权限等级
+     * @returns {number} role_level，未登录返回 0
+     */
+    get roleLevel() {
+      return this.user?.role_level || 0
+    },
+
+    /**
+     * 获取用户权限等级描述
+     * @returns {string} 如 '客服'、'运营'、'管理员'
+     */
+    get roleLevelDescription() {
+      return getUserRoleLevelDescription()
+    },
+
+    /**
+     * 判断是否有菜单访问权限
+     * @param {string} menuId - 菜单ID（如 'operations.customer'）
+     * @returns {boolean}
+     */
+    hasMenuAccess(menuId) {
+      return hasMenuAccess(menuId)
+    },
+
+    /**
+     * 判断是否有页面访问权限
+     * @param {string} pagePath - 页面路径
+     * @returns {boolean}
+     */
+    hasPageAccess(pagePath) {
+      return hasPageAccess(pagePath)
+    },
+
+    /**
+     * 检查当前页面权限，无权限则跳转
+     * @param {Object} options - 配置选项
+     * @returns {boolean} 是否有权限
+     */
+    checkPageAccess(options = {}) {
+      return checkCurrentPageAccess(options)
+    },
+
+    /**
+     * 获取可访问的菜单ID列表
+     * @returns {string[]}
+     */
+    getAccessibleMenuIds() {
+      return getAccessibleMenuIds()
     }
   })
 

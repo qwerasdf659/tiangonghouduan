@@ -523,36 +523,80 @@ async function authenticateToken(req, res, next) {
 }
 
 /**
- * 🛡️ 管理员权限验证中间件（基于UUID角色系统）
- * @param {Object} req - 请求对象
- * @param {Object} res - 响应对象
- * @param {Function} next - 下一个中间件
- * @returns {Promise<void>} 无返回值（验证通过调用next()，失败返回错误响应）
+ * 🛡️ 基于 role_level 的权限检查中间件（推荐使用）
+ *
+ * @description 直接使用 role_level 数值判断，无映射表，无技术债务
+ * @file middleware/auth.js
+ * @created 2026-01-27（role_level 映射方案技术评估 - 决策已确认）
+ *
+ * 设计决策：
+ * - 废除 ROLE_LEVEL_MAP 映射表
+ * - role_level 为唯一权限判断依据
+ * - role_name 仅用于显示和日志
+ *
+ * 阈值参考（以数据库实际值为准）：
+ * - ADMIN: 100（超级管理员）
+ * - OPS: 30（运营及以上）
+ * - CUSTOMER_SERVICE: 1（客服及以上）
+ *
+ * @param {number} min_level - 最低权限等级
+ * @returns {Function} Express 中间件函数
+ *
+ * @example
+ * // 运营及以上（role_level >= 30）
+ * router.use(authenticateToken, requireRoleLevel(30))
+ *
+ * // 仅管理员（role_level >= 100）
+ * router.use(authenticateToken, requireRoleLevel(100))
+ *
+ * // 使用常量
+ * const { PERMISSION_LEVELS } = require('../shared/permission-constants')
+ * router.use(authenticateToken, requireRoleLevel(PERMISSION_LEVELS.OPS))
  */
-async function requireAdmin(req, res, next) {
-  try {
-    if (!req.user) {
-      return res.apiUnauthorized
-        ? res.apiUnauthorized('未认证用户', 'UNAUTHENTICATED')
-        : res.status(401).json({ success: false, code: 'UNAUTHENTICATED', message: '未认证用户' })
-    }
+function requireRoleLevel(min_level) {
+  return async (req, res, next) => {
+    try {
+      // 1. 验证是否已认证
+      if (!req.user) {
+        return res.apiUnauthorized
+          ? res.apiUnauthorized('未认证用户', 'UNAUTHENTICATED')
+          : res.status(401).json({ success: false, code: 'UNAUTHENTICATED', message: '未认证用户' })
+      }
 
-    if (req.user.role_level < 100) {
-      return res.apiForbidden
-        ? res.apiForbidden('需要管理员权限', 'INSUFFICIENT_PERMISSION')
-        : res
-            .status(403)
-            .json({ success: false, code: 'INSUFFICIENT_PERMISSION', message: '需要管理员权限' })
-    }
+      // 2. 获取用户权限等级
+      const user_level = req.user.role_level || 0
 
-    next()
-  } catch (error) {
-    logger.error('❌ 管理员权限验证失败:', error.message)
-    return res.apiError
-      ? res.apiError('权限验证失败', 'PERMISSION_CHECK_FAILED', null, 500)
-      : res
-          .status(500)
-          .json({ success: false, code: 'PERMISSION_CHECK_FAILED', message: '权限验证失败' })
+      // 3. 权限等级检查
+      if (user_level < min_level) {
+        logger.warn(
+          `🚫 [Auth] 权限等级不足: user_id=${req.user.user_id}, ` +
+            `需要>=${min_level}, 实际=${user_level}`
+        )
+        return res.apiForbidden
+          ? res.apiForbidden(`需要权限等级 ${min_level} 以上`, 'INSUFFICIENT_LEVEL', {
+              required_level: min_level,
+              current_level: user_level
+            })
+          : res.status(403).json({
+              success: false,
+              code: 'INSUFFICIENT_LEVEL',
+              message: `需要权限等级 ${min_level} 以上`,
+              data: { required_level: min_level, current_level: user_level }
+            })
+      }
+
+      // 4. 通过权限检查
+      next()
+    } catch (error) {
+      logger.error('❌ 权限等级检查失败:', error.message)
+      return res.apiError
+        ? res.apiError('权限验证失败', 'LEVEL_CHECK_FAILED', null, 500)
+        : res.status(500).json({
+            success: false,
+            code: 'LEVEL_CHECK_FAILED',
+            message: '权限验证失败'
+          })
+    }
   }
 }
 
@@ -672,111 +716,6 @@ function requirePermission(requiredPermission) {
         : res
             .status(500)
             .json({ success: false, code: 'PERMISSION_CHECK_FAILED', message: '权限验证失败' })
-    }
-  }
-}
-
-/**
- * 🛡️ 角色检查中间件（支持多角色 + 读写权限区分）
- *
- * 功能说明（2026-01-07 架构重构）：
- * - 支持多角色检查：requireRole(['admin', 'ops'])
- * - 按能力细分：ops 只读、admin 可写
- * - 普通用户：访问 console 接口返回 403
- *
- * 权限模型（已拍板 2026-01-07）：
- * - admin 角色（role_level >= 100）：可读可写所有 console 接口
- * - ops 角色（role_level = 30）：仅可读（GET 请求）；POST/PUT/DELETE 返回 403
- * - 普通用户（role_level < 30）：访问 console 接口返回 403
- *
- * @param {string|string[]} allowedRoles - 允许的角色名称（单个或数组）
- * @param {Object} _options - 配置选项（保留，未来扩展用）
- * @returns {Function} 中间件函数
- *
- * @example
- * // 允许 admin 和 ops 角色访问，ops 只能读
- * router.get('/portfolio', authenticateToken, requireRole(['admin', 'ops']), handler)
- *
- * // 仅允许 admin 角色访问（写操作）
- * router.post('/adjust', authenticateToken, requireRole('admin'), handler)
- */
-function requireRole(allowedRoles, _options = {}) {
-  // 统一转换为数组
-  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles]
-
-  return async (req, res, next) => {
-    try {
-      // 1. 验证是否已认证
-      if (!req.user) {
-        return res.apiUnauthorized
-          ? res.apiUnauthorized('未认证用户', 'UNAUTHENTICATED')
-          : res.status(401).json({ success: false, code: 'UNAUTHENTICATED', message: '未认证用户' })
-      }
-
-      // 2. 获取用户角色名称列表
-      const userRoleNames = req.user.roles?.map(r => r.role_name) || []
-      const userRoleLevel = req.user.role_level || 0
-
-      // 3. 检查是否有匹配的角色
-      const hasMatchingRole = roles.some(role => {
-        // 角色名称匹配
-        if (userRoleNames.includes(role)) {
-          return true
-        }
-
-        // 角色级别匹配（admin = 100+, ops = 30）
-        if (role === 'admin' && userRoleLevel >= 100) {
-          return true
-        }
-
-        return false
-      })
-
-      if (!hasMatchingRole) {
-        logger.warn(
-          `🚫 [Auth] 角色权限不足: user_id=${req.user.user_id}, 需要角色=[${roles.join(',')}], 用户角色=[${userRoleNames.join(',')}]`
-        )
-        return res.apiForbidden
-          ? res.apiForbidden(
-              '角色权限不足，需要 ' + roles.join(' 或 ') + ' 角色',
-              'INSUFFICIENT_ROLE'
-            )
-          : res.status(403).json({
-              success: false,
-              code: 'INSUFFICIENT_ROLE',
-              message: '角色权限不足，需要 ' + roles.join(' 或 ') + ' 角色'
-            })
-      }
-
-      // 4. 检查 ops 角色的读写权限（ops 只能读，不能写）
-      const isOpsRole = userRoleNames.includes('ops') && userRoleLevel < 100
-      const isWriteOperation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)
-
-      if (isOpsRole && isWriteOperation) {
-        logger.warn(
-          `🚫 [Auth] ops角色不能执行写操作: user_id=${req.user.user_id}, method=${req.method}, path=${req.path}`
-        )
-        return res.apiForbidden
-          ? res.apiForbidden(
-              'ops 角色仅可读，不能执行写操作（POST/PUT/PATCH/DELETE）',
-              'OPS_READ_ONLY'
-            )
-          : res.status(403).json({
-              success: false,
-              code: 'OPS_READ_ONLY',
-              message: 'ops 角色仅可读，不能执行写操作（POST/PUT/PATCH/DELETE）'
-            })
-      }
-
-      // 5. 通过权限检查
-      next()
-    } catch (error) {
-      logger.error('❌ 角色权限检查失败:', error.message)
-      return res.apiError
-        ? res.apiError('角色权限验证失败', 'ROLE_CHECK_FAILED', null, 500)
-        : res
-            .status(500)
-            .json({ success: false, code: 'ROLE_CHECK_FAILED', message: '角色权限验证失败' })
     }
   }
 }
@@ -1158,8 +1097,7 @@ module.exports = {
   verifyRefreshToken,
   authenticateToken,
   optionalAuth, // 可选认证中间件（用于公开接口）
-  requireAdmin,
-  requireRole, // 🆕 角色检查中间件（支持多角色 + 读写权限区分）
+  requireRoleLevel, // 🛡️ 基于 role_level 的权限检查中间件（推荐使用）
   requirePermission,
   requireMerchantDomainAccess, // 🆕 商家域准入中间件（AC1.4 域边界隔离）
   requireMerchantPermission, // 🆕 商家权限检查中间件（支持门店范围隔离）

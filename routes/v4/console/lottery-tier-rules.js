@@ -8,7 +8,7 @@
  * - 支持批量创建三档位规则
  *
  * 访问控制：
- * - 所有接口需要管理员权限（requireAdmin）
+ * - 所有接口需要管理员权限（requireRoleLevel(100)）
  *
  * API端点：
  * - GET    /                           - 获取档位规则列表（分页）
@@ -27,7 +27,7 @@
 const express = require('express')
 const router = express.Router()
 
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const TransactionManager = require('../../../utils/TransactionManager')
 const logger = require('../../../utils/logger').logger
 const { asyncHandler } = require('./shared/middleware')
@@ -46,7 +46,7 @@ const getLotteryTierRuleService = req => {
 /**
  * 中间件：认证 + 管理员权限
  */
-router.use(authenticateToken, requireAdmin)
+router.use(authenticateToken, requireRoleLevel(100))
 
 /**
  * GET / - 获取档位规则列表（分页）

@@ -17,7 +17,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger')
 
 /**
@@ -44,7 +44,7 @@ const getDebtManagementService = req => {
  * @access admin
  * @returns {Object} 欠账看板数据
  */
-router.get('/dashboard', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/dashboard', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const DebtManagementService = getDebtManagementService(req)
     const dashboard = await DebtManagementService.getDashboard()
@@ -66,7 +66,7 @@ router.get('/dashboard', authenticateToken, requireAdmin, async (req, res) => {
  * @access admin
  * @returns {Object} 按活动分组的欠账数据
  */
-router.get('/by-campaign', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/by-campaign', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const DebtManagementService = getDebtManagementService(req)
     const result = await DebtManagementService.getDebtByCampaign({
@@ -92,7 +92,7 @@ router.get('/by-campaign', authenticateToken, requireAdmin, async (req, res) => 
  * @access admin
  * @returns {Object} 按奖品分组的库存欠账数据
  */
-router.get('/by-prize', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/by-prize', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const DebtManagementService = getDebtManagementService(req)
     const result = await DebtManagementService.getDebtByPrize({
@@ -122,7 +122,7 @@ router.get('/by-prize', authenticateToken, requireAdmin, async (req, res) => {
  * @access admin
  * @returns {Object} 按责任人分组的欠账数据
  */
-router.get('/by-creator', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/by-creator', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const DebtManagementService = getDebtManagementService(req)
     const result = await DebtManagementService.getDebtByCreator({
@@ -152,7 +152,7 @@ router.get('/by-creator', authenticateToken, requireAdmin, async (req, res) => {
  * @access admin
  * @returns {Object} 欠账趋势数据
  */
-router.get('/trend', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/trend', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const DebtManagementService = getDebtManagementService(req)
     const result = await DebtManagementService.getDebtTrend({
@@ -185,7 +185,7 @@ router.get('/trend', authenticateToken, requireAdmin, async (req, res) => {
  * @access admin
  * @returns {Object} 待冲销欠账列表
  */
-router.get('/pending', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/pending', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const DebtManagementService = getDebtManagementService(req)
     const result = await DebtManagementService.getPendingDebts({
@@ -213,7 +213,7 @@ router.get('/pending', authenticateToken, requireAdmin, async (req, res) => {
  * @access admin
  * @returns {Object} 清偿结果
  */
-router.post('/clear', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/clear', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { debt_type, debt_id, amount, remark } = req.body
     const admin_id = req.user.user_id
@@ -262,7 +262,7 @@ router.post('/clear', authenticateToken, requireAdmin, async (req, res) => {
  * @access admin
  * @returns {Object} 欠账上限配置列表
  */
-router.get('/limits', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/limits', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const DebtManagementService = getDebtManagementService(req)
     const result = await DebtManagementService.getDebtLimits({
@@ -288,7 +288,7 @@ router.get('/limits', authenticateToken, requireAdmin, async (req, res) => {
  * @access admin
  * @returns {Object} 欠账上限配置
  */
-router.get('/limits/:campaign_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/limits/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const campaign_id = parseInt(req.params.campaign_id, 10)
     if (isNaN(campaign_id) || campaign_id <= 0) {
@@ -321,7 +321,7 @@ router.get('/limits/:campaign_id', authenticateToken, requireAdmin, async (req, 
  * @access admin
  * @returns {Object} 更新后的配置
  */
-router.put('/limits/:campaign_id', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/limits/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const campaign_id = parseInt(req.params.campaign_id, 10)
     if (isNaN(campaign_id) || campaign_id <= 0) {
@@ -360,7 +360,7 @@ router.put('/limits/:campaign_id', authenticateToken, requireAdmin, async (req, 
 router.get(
   '/limits/:campaign_id/alert-check',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   async (req, res) => {
     try {
       const campaign_id = parseInt(req.params.campaign_id, 10)

@@ -23,7 +23,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
 
 /**
@@ -50,7 +50,7 @@ function getPremiumService(req) {
  *
  * 返回：用户高级空间状态列表和分页信息
  */
-router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { user_id, is_unlocked, unlock_method, is_valid, page = 1, page_size = 20 } = req.query
 
@@ -81,7 +81,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
  *
  * 返回：统计汇总数据
  */
-router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const stats = await getPremiumService(req).getPremiumStats()
 
@@ -106,7 +106,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
  *
  * 返回：即将过期用户列表和分页信息
  */
-router.get('/expiring', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/expiring', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { hours = 24, page = 1, page_size = 20 } = req.query
 
@@ -137,7 +137,7 @@ router.get('/expiring', authenticateToken, requireAdmin, async (req, res) => {
  *
  * 返回：用户高级空间状态详情（无记录时返回默认状态，不返回404）
  */
-router.get('/:user_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/:user_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const user_id = parseInt(req.params.user_id)
 

@@ -18,7 +18,7 @@
  * - PUT    /api/v4/console/lottery-configs/matrix/:id           更新矩阵配置
  * - DELETE /api/v4/console/lottery-configs/matrix/:id           删除矩阵配置
  *
- * 权限：仅管理员（requireAdmin）
+ * 权限：仅管理员（requireRoleLevel(100)）
  * 路径设计：事务实体使用 :id（自增主键）
  *
  * @version 1.0.0
@@ -29,7 +29,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const TransactionManager = require('../../../utils/TransactionManager')
 const logger = require('../../../utils/logger').logger
 
@@ -58,7 +58,7 @@ function getLotteryConfigService(req) {
  * - page: 页码（默认1）
  * - page_size: 每页数量（默认20）
  */
-router.get('/strategies', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/strategies', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getLotteryConfigService(req)
     const { config_group, is_active, page, page_size } = req.query
@@ -85,7 +85,7 @@ router.get('/strategies', authenticateToken, requireAdmin, async (req, res) => {
 /**
  * GET /strategies/:id - 获取策略配置详情
  */
-router.get('/strategies/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/strategies/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getLotteryConfigService(req)
     const { id } = req.params
@@ -116,7 +116,7 @@ router.get('/strategies/:id', authenticateToken, requireAdmin, async (req, res) 
  * - effective_start: 生效开始时间
  * - effective_end: 生效结束时间
  */
-router.post('/strategies', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/strategies', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getLotteryConfigService(req)
     const admin_id = req.user.user_id
@@ -150,7 +150,7 @@ router.post('/strategies', authenticateToken, requireAdmin, async (req, res) => 
  * - effective_start: 生效开始时间
  * - effective_end: 生效结束时间
  */
-router.put('/strategies/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/strategies/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getLotteryConfigService(req)
     const { id } = req.params
@@ -175,7 +175,7 @@ router.put('/strategies/:id', authenticateToken, requireAdmin, async (req, res) 
 /**
  * DELETE /strategies/:id - 删除策略配置
  */
-router.delete('/strategies/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.delete('/strategies/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getLotteryConfigService(req)
     const { id } = req.params
@@ -213,7 +213,7 @@ router.delete('/strategies/:id', authenticateToken, requireAdmin, async (req, re
  * - page: 页码（默认1）
  * - page_size: 每页数量（默认20）
  */
-router.get('/matrix', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/matrix', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getLotteryConfigService(req)
     const { budget_tier, pressure_tier, is_active, page, page_size } = req.query
@@ -241,7 +241,7 @@ router.get('/matrix', authenticateToken, requireAdmin, async (req, res) => {
 /**
  * GET /matrix/:id - 获取矩阵配置详情
  */
-router.get('/matrix/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/matrix/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getLotteryConfigService(req)
     const { id } = req.params
@@ -270,7 +270,7 @@ router.get('/matrix/:id', authenticateToken, requireAdmin, async (req, res) => {
  * - description: 配置描述
  * - is_active: 是否启用（默认true）
  */
-router.post('/matrix', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/matrix', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getLotteryConfigService(req)
     const admin_id = req.user.user_id
@@ -302,7 +302,7 @@ router.post('/matrix', authenticateToken, requireAdmin, async (req, res) => {
  * - description: 配置描述
  * - is_active: 是否启用
  */
-router.put('/matrix/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/matrix/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getLotteryConfigService(req)
     const { id } = req.params
@@ -327,7 +327,7 @@ router.put('/matrix/:id', authenticateToken, requireAdmin, async (req, res) => {
 /**
  * DELETE /matrix/:id - 删除矩阵配置
  */
-router.delete('/matrix/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.delete('/matrix/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getLotteryConfigService(req)
     const { id } = req.params

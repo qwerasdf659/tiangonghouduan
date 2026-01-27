@@ -255,7 +255,8 @@ export function shortcutsStore() {
      */
     triggerSave() {
       // 查找活动表单
-      const activeForm = document.querySelector('form:focus-within') || document.querySelector('form')
+      const activeForm =
+        document.querySelector('form:focus-within') || document.querySelector('form')
 
       if (activeForm) {
         const submitBtn =
@@ -366,4 +367,3 @@ export function enterConfirm() {
 }
 
 export default { shortcutsStore, enterConfirm }
-

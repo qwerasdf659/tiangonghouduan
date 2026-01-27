@@ -101,7 +101,11 @@ function statisticsPage() {
       userTrend: 0,
       drawTrend: 0,
       winRateTrend: 0,
-      revenueTrend: 0
+      revenueTrend: 0,
+      // 趋势数据数组 - 供mini-chart组件使用
+      userTrendData: [],
+      drawTrendData: [],
+      revenueTrendData: []
     },
 
     /**
@@ -430,6 +434,11 @@ function statisticsPage() {
       this.stats.winRateTrend = 0 // 暂不计算
       this.stats.revenueTrend = this.calculateArrayTrend(consumptionTrend, 'amount')
 
+      // 趋势数据数组 - 供mini-chart组件使用
+      this.stats.userTrendData = userGrowth.map(item => item.count || 0)
+      this.stats.drawTrendData = lotteryTrend.map(item => item.count || 0)
+      this.stats.revenueTrendData = consumptionTrend.map(item => parseFloat(item.amount) || 0)
+
       // 2. 用户统计 - 使用后端用户类型数据
       this.userStats.newUsers = totalNewUsers
       this.userStats.activeUsers = userTypes.regular?.count || 0
@@ -740,7 +749,7 @@ function statisticsPage() {
       const startTime = performance.now()
       const easing = EASING_FUNCTIONS.easeOut
 
-      const animate = (currentTime) => {
+      const animate = currentTime => {
         const elapsed = currentTime - startTime
         const progress = Math.min(elapsed / duration, 1)
         const easedProgress = easing(progress)
@@ -778,7 +787,7 @@ function statisticsPage() {
     getAnimatedValue(key) {
       const value = this.displayStats[key]
       if (value === undefined || value === null) return '-'
-      
+
       if (key === 'winRate') {
         return value.toFixed(2)
       }

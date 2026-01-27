@@ -19,7 +19,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 // 时间格式化已移至 ConsumptionService 层处理，此处不再直接引用 BeijingTimeHelper
@@ -210,7 +210,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
  * - 恢复后用户端将重新显示该记录
  * - 恢复操作会清空deleted_at时间戳
  */
-router.post('/:id/restore', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/:id/restore', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
     const ConsumptionService = req.app.locals.services.getService('consumption')

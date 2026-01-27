@@ -45,6 +45,44 @@
     /* 隐藏未初始化的 Alpine 元素 */
     [x-cloak] { display: none !important; }
   </style>
+  
+  <!-- 防止 workspace 被嵌套在 iframe 中导致重复侧边栏 -->
+  <script>
+    (function() {
+      // 检测是否在 iframe 中
+      if (window.self !== window.top) {
+        console.warn('[Workspace] 检测到被嵌套在 iframe 中，跳出到顶层窗口');
+        // 跳出 iframe，在顶层窗口加载
+        window.top.location.href = window.location.href;
+      }
+      
+      // 清理可能导致问题的旧状态
+      // 如果 URL 包含特殊标记，说明是重新登录后的跳转
+      if (window.location.search.includes('fresh=1')) {
+        console.log('[Workspace] 检测到新登录，清理旧状态');
+        // 清理 Tab 状态，避免加载旧的嵌套页面
+        try {
+          const savedTabs = localStorage.getItem('workspace_tabs');
+          if (savedTabs) {
+            const state = JSON.parse(savedTabs);
+            // 检查是否有指向 workspace.html 的 Tab（会导致嵌套）
+            const hasNestedWorkspace = state.tabs && state.tabs.some(tab => 
+              tab.url && tab.url.includes('workspace.html')
+            );
+            if (hasNestedWorkspace) {
+              console.warn('[Workspace] 检测到可能导致嵌套的 Tab，清理状态');
+              localStorage.removeItem('workspace_tabs');
+            }
+          }
+        } catch (e) {
+          console.warn('[Workspace] 清理状态时出错:', e);
+        }
+        // 移除 URL 中的 fresh 参数
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+    })();
+  </script>
 </head>
 <body class="themed-bg-subtle">
   <!-- 加载中状态 -->
@@ -442,21 +480,46 @@
           credentials: 'include'
         })
         
+        // 无论API结果如何，都清理本地状态
+        clearAllLocalState()
+        
         if (response.ok || response.status === 401) {
-          localStorage.removeItem('admin_token')
-          localStorage.removeItem('admin_user_info')
-          localStorage.removeItem('workspace_tabs')
-          localStorage.removeItem('sidebar_collapsed')
-          localStorage.removeItem('sidebar_expanded_groups')
-          window.location.href = '/admin/login.html'
+          // 确保在顶层窗口跳转
+          if (window.self !== window.top) {
+            window.top.location.href = '/admin/login.html'
+          } else {
+            window.location.href = '/admin/login.html'
+          }
         }
       } catch (error) {
         console.error('退出登录失败:', error)
-        // 即使API失败也清理本地状态
-        localStorage.removeItem('admin_token')
-        localStorage.removeItem('admin_user_info')
-        window.location.href = '/admin/login.html'
+        // 即使API失败也清理本地状态并跳转
+        clearAllLocalState()
+        if (window.self !== window.top) {
+          window.top.location.href = '/admin/login.html'
+        } else {
+          window.location.href = '/admin/login.html'
+        }
       }
+    }
+    
+    // 彻底清理所有本地状态
+    function clearAllLocalState() {
+      // 清理认证相关
+      localStorage.removeItem('admin_token')
+      localStorage.removeItem('admin_user_info')
+      sessionStorage.removeItem('admin_token')
+      sessionStorage.removeItem('admin_user_info')
+      
+      // 清理工作区状态
+      localStorage.removeItem('workspace_tabs')
+      localStorage.removeItem('sidebar_collapsed')
+      localStorage.removeItem('sidebar_expanded_groups')
+      
+      // 清理浏览器会话标记
+      sessionStorage.removeItem('browser_session_id')
+      
+      console.log('[Workspace] 已清理所有本地状态')
     }
     
     console.log('🎰 抽奖管理后台工作台已加载 - 深蓝科技风')

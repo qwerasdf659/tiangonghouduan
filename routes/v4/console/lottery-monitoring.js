@@ -23,7 +23,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
 
 /**
@@ -55,7 +55,7 @@ function getLotteryAnalyticsService(req) {
  *
  * 返回：统计指标列表和分页信息
  */
-router.get('/hourly-metrics', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/hourly-metrics', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { campaign_id, start_time, end_time, page = 1, page_size = 24 } = req.query
 
@@ -88,7 +88,7 @@ router.get('/hourly-metrics', authenticateToken, requireAdmin, async (req, res) 
  *
  * 返回：指标详情
  */
-router.get('/hourly-metrics/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/hourly-metrics/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const metric_id = parseInt(req.params.id)
 
@@ -120,7 +120,7 @@ router.get('/hourly-metrics/:id', authenticateToken, requireAdmin, async (req, r
 router.get(
   '/hourly-metrics/summary/:campaign_id',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   async (req, res) => {
     try {
       const campaign_id = parseInt(req.params.campaign_id)
@@ -158,7 +158,7 @@ router.get(
  *
  * 返回：用户体验状态列表和分页信息
  */
-router.get('/user-experience-states', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/user-experience-states', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { campaign_id, user_id, min_empty_streak, page = 1, page_size = 20 } = req.query
 
@@ -196,7 +196,7 @@ router.get('/user-experience-states', authenticateToken, requireAdmin, async (re
 router.get(
   '/user-experience-states/:user_id/:campaign_id',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   async (req, res) => {
     try {
       const user_id = parseInt(req.params.user_id)
@@ -237,7 +237,7 @@ router.get(
  *
  * 返回：用户全局状态列表和分页信息
  */
-router.get('/user-global-states', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/user-global-states', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { user_id, luck_debt_level, min_draw_count, page = 1, page_size = 20 } = req.query
 
@@ -270,7 +270,7 @@ router.get('/user-global-states', authenticateToken, requireAdmin, async (req, r
  *
  * 返回：用户全局状态详情（无记录时返回默认状态，不返回404）
  */
-router.get('/user-global-states/:user_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/user-global-states/:user_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const user_id = parseInt(req.params.user_id)
 
@@ -319,7 +319,7 @@ router.get('/user-global-states/:user_id', authenticateToken, requireAdmin, asyn
  *
  * 返回：配额赠送记录列表和分页信息
  */
-router.get('/quota-grants', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/quota-grants', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const {
       campaign_id,
@@ -364,7 +364,7 @@ router.get('/quota-grants', authenticateToken, requireAdmin, async (req, res) =>
  *
  * 返回：赠送记录详情
  */
-router.get('/quota-grants/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/quota-grants/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const grant_id = parseInt(req.params.id)
 
@@ -399,7 +399,7 @@ router.get('/quota-grants/:id', authenticateToken, requireAdmin, async (req, res
  *
  * 返回：用户配额列表和分页信息
  */
-router.get('/user-quotas', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/user-quotas', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { campaign_id, user_id, has_remaining, page = 1, page_size = 20 } = req.query
 
@@ -436,7 +436,7 @@ router.get('/user-quotas', authenticateToken, requireAdmin, async (req, res) => 
 router.get(
   '/user-quotas/:user_id/:campaign_id',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   async (req, res) => {
     try {
       const user_id = parseInt(req.params.user_id)
@@ -464,7 +464,7 @@ router.get(
  *
  * 返回：配额统计汇总数据
  */
-router.get('/user-quotas/stats/:campaign_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/user-quotas/stats/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const campaign_id = parseInt(req.params.campaign_id)
 
@@ -501,7 +501,7 @@ router.get('/user-quotas/stats/:campaign_id', authenticateToken, requireAdmin, a
  * - recent_draws: 最近抽奖记录
  * - prize_stats: 奖品发放统计
  */
-router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { campaign_id, time_range = 'today', start_date, end_date } = req.query
 

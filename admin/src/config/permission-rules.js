@@ -1,0 +1,307 @@
+/**
+ * 权限规则配置（集中管理）
+ *
+ * @description 基于 role_level 的前端权限控制规则
+ * @version 2.0.0
+ * @date 2026-01-27
+ * @updated 2026-01-27（与后端 shared/permission-constants.js 对齐）
+ *
+ * 权限等级说明（与后端一致）：
+ * - role_level >= 100：管理员（admin）
+ * - role_level >= 30：运营（ops）- 只读权限
+ * - role_level >= 1：客服（customer_service）
+ * - role_level = 0：普通用户（user）
+ *
+ * @see shared/permission-constants.js - 后端权限常量定义（唯一真相源）
+ *
+ * @example
+ * import { PERMISSION_RULES, hasMenuAccess } from '@/config/permission-rules.js'
+ */
+
+// ========== 权限等级阈值（与后端 PERMISSION_LEVELS 对齐） ==========
+
+/**
+ * 角色等级阈值定义
+ * 注意：这些值必须与后端 shared/permission-constants.js 保持一致
+ */
+export const ROLE_LEVEL_THRESHOLDS = {
+  /** 管理员权限（role_level >= 100） */
+  ADMIN: 100,
+  /** 运营权限（role_level >= 30，只读） */
+  OPS: 30,
+  /** 客服权限（role_level >= 1） */
+  CUSTOMER_SERVICE: 1,
+  /** 普通用户（无后台权限） */
+  USER: 0
+}
+
+// ========== 菜单权限配置 ==========
+
+/**
+ * 菜单访问权限配置
+ * key: 菜单ID（对应 sidebar-nav.js 中的 group.id 或 item.id）
+ * value: { minLevel: 最低权限等级 }
+ *
+ * 规则：用户 role_level >= minLevel 才能访问该菜单
+ * 注意：minLevel 值必须与后端 PERMISSION_LEVELS 对齐
+ */
+export const MENU_ACCESS_RULES = {
+  // ========== 所有人可访问（role_level >= 0） ==========
+  dashboard: { minLevel: 0, description: '工作台' },
+
+  // ========== 客服可访问（role_level >= 1） ==========
+  'operations.customer': { minLevel: 1, description: '客服工作台' },
+
+  // ========== 运营可访问（role_level >= 30，只读） ==========
+  operations: { minLevel: 30, description: '日常运营（分组）' },
+  'operations.consumption': { minLevel: 30, description: '消费记录审核' },
+  'operations.risk': { minLevel: 30, description: '风控告警' },
+
+  lottery: { minLevel: 30, description: '抽奖活动（分组）' },
+  'lottery.campaigns': { minLevel: 30, description: '活动管理' },
+  'lottery.presets': { minLevel: 30, description: '抽奖预设' },
+
+  assets: { minLevel: 30, description: '资产中心（分组）' },
+  'assets.asset-mgmt': { minLevel: 30, description: '资产管理' },
+  'assets.asset-adj': { minLevel: 30, description: '资产调整' },
+  'assets.orphan': { minLevel: 30, description: '孤儿冻结清理' },
+  'assets.material-rules': { minLevel: 30, description: '物料转换规则' },
+  'assets.assets-portfolio': { minLevel: 30, description: '资产组合' },
+
+  market: { minLevel: 30, description: '市场交易（分组）' },
+  'market.exchange': { minLevel: 30, description: '兑换市场' },
+  'market.trade': { minLevel: 30, description: 'C2C交易' },
+
+  users: { minLevel: 30, description: '用户门店（分组）' },
+  'users.user-mgmt': { minLevel: 30, description: '用户管理' },
+  'users.user-hierarchy': { minLevel: 30, description: '用户层级' },
+  'users.stores': { minLevel: 30, description: '门店管理' },
+
+  analytics: { minLevel: 30, description: '数据分析（分组）' },
+  'analytics.stats': { minLevel: 30, description: '统计报表' },
+  'analytics.analytics': { minLevel: 30, description: '运营分析' },
+
+  // ========== 管理员专属（role_level >= 100） ==========
+  system: { minLevel: 100, description: '系统设置（分组）' },
+  'system.settings': { minLevel: 100, description: '系统配置' },
+  'system.content': { minLevel: 100, description: '内容管理' },
+  'system.sessions': { minLevel: 100, description: '会话管理' },
+  'system.item-tpl': { minLevel: 100, description: '物品模板' },
+  'system.config-tools': { minLevel: 100, description: '配置工具' }
+}
+
+// ========== 页面权限配置 ==========
+
+/**
+ * 页面访问权限配置
+ * key: 页面URL路径（不含 /admin/ 前缀）
+ * value: { minLevel: 最低权限等级, menuId: 对应菜单ID }
+ * 注意：minLevel 值必须与后端 PERMISSION_LEVELS 对齐
+ */
+export const PAGE_ACCESS_RULES = {
+  // ========== 所有人可访问（role_level >= 0） ==========
+  'statistics.html': { minLevel: 0, menuId: 'dashboard' },
+
+  // ========== 客服可访问（role_level >= 1） ==========
+  'customer-service.html': { minLevel: 1, menuId: 'operations.customer' },
+
+  // ========== 运营可访问（role_level >= 30，只读） ==========
+  'finance-management.html': { minLevel: 30, menuId: 'operations.consumption' },
+  'risk-alerts.html': { minLevel: 30, menuId: 'operations.risk' },
+
+  'lottery-management.html': { minLevel: 30, menuId: 'lottery.campaigns' },
+  'presets.html': { minLevel: 30, menuId: 'lottery.presets' },
+
+  'asset-management.html': { minLevel: 30, menuId: 'assets.asset-mgmt' },
+  'asset-adjustment.html': { minLevel: 30, menuId: 'assets.asset-adj' },
+  'orphan-frozen.html': { minLevel: 30, menuId: 'assets.orphan' },
+  'material-conversion-rules.html': { minLevel: 30, menuId: 'assets.material-rules' },
+  'assets-portfolio.html': { minLevel: 30, menuId: 'assets.assets-portfolio' },
+
+  'exchange-market.html': { minLevel: 30, menuId: 'market.exchange' },
+  'trade-management.html': { minLevel: 30, menuId: 'market.trade' },
+
+  'user-management.html': { minLevel: 30, menuId: 'users.user-mgmt' },
+  'user-hierarchy.html': { minLevel: 30, menuId: 'users.user-hierarchy' },
+  'store-management.html': { minLevel: 30, menuId: 'users.stores' },
+
+  'analytics.html': { minLevel: 30, menuId: 'analytics.analytics' },
+
+  // ========== 管理员专属（role_level >= 100） ==========
+  'system-settings.html': { minLevel: 100, menuId: 'system.settings' },
+  'content-management.html': { minLevel: 100, menuId: 'system.content' },
+  'sessions.html': { minLevel: 100, menuId: 'system.sessions' },
+  'item-templates.html': { minLevel: 100, menuId: 'system.item-tpl' },
+  'config-tools.html': { minLevel: 100, menuId: 'system.config-tools' }
+}
+
+// ========== 权限判断函数 ==========
+
+/**
+ * 获取用户的 role_level
+ * @returns {number} 用户权限等级，未登录返回 0
+ */
+export function getUserRoleLevel() {
+  try {
+    // 优先从 admin_user 获取（init.js 中 auth store 使用的 key）
+    const adminUser = localStorage.getItem('admin_user')
+    if (adminUser) {
+      const user = JSON.parse(adminUser)
+      return user?.role_level || 0
+    }
+
+    // 兼容 admin_user_info（index.js 中使用的 key）
+    const adminUserInfo = localStorage.getItem('admin_user_info')
+    if (adminUserInfo) {
+      const user = JSON.parse(adminUserInfo)
+      return user?.role_level || 0
+    }
+
+    return 0
+  } catch (e) {
+    console.warn('[Permission] 获取用户权限等级失败:', e)
+    return 0
+  }
+}
+
+/**
+ * 判断用户是否有菜单访问权限
+ * @param {string} menuId - 菜单ID（如 'operations.customer'）
+ * @returns {boolean} 是否有权限
+ */
+export function hasMenuAccess(menuId) {
+  const userLevel = getUserRoleLevel()
+  const rule = MENU_ACCESS_RULES[menuId]
+
+  // 未配置的菜单默认需要 role_level >= 30（运营及以上）
+  if (!rule) {
+    return userLevel >= ROLE_LEVEL_THRESHOLDS.OPS
+  }
+
+  return userLevel >= rule.minLevel
+}
+
+/**
+ * 判断用户是否有页面访问权限
+ * @param {string} pagePath - 页面路径（如 'lottery-management.html'）
+ * @returns {boolean} 是否有权限
+ */
+export function hasPageAccess(pagePath) {
+  const userLevel = getUserRoleLevel()
+
+  // 提取文件名（去除路径前缀）
+  const fileName = pagePath.split('/').pop()
+  const rule = PAGE_ACCESS_RULES[fileName]
+
+  // 未配置的页面默认需要 role_level >= 30（运营及以上）
+  if (!rule) {
+    return userLevel >= ROLE_LEVEL_THRESHOLDS.OPS
+  }
+
+  return userLevel >= rule.minLevel
+}
+
+/**
+ * 获取当前页面的权限要求
+ * @returns {Object|null} 权限规则对象
+ */
+export function getCurrentPageRule() {
+  const path = window.location.pathname
+  const fileName = path.split('/').pop()
+  return PAGE_ACCESS_RULES[fileName] || null
+}
+
+/**
+ * 检查当前页面权限并处理无权限情况
+ * @param {Object} options - 配置选项
+ * @param {string} [options.redirectUrl='/admin/statistics.html'] - 无权限时跳转地址
+ * @param {boolean} [options.showAlert=true] - 是否显示提示
+ * @returns {boolean} 是否有权限
+ */
+export function checkCurrentPageAccess(options = {}) {
+  const { redirectUrl = '/admin/statistics.html', showAlert = true } = options
+
+  const path = window.location.pathname
+  const hasAccess = hasPageAccess(path)
+
+  if (!hasAccess) {
+    console.warn(`[Permission] 无权限访问: ${path}，用户等级: ${getUserRoleLevel()}`)
+
+    if (showAlert) {
+      // 使用 Alpine store 的 toast（如果可用）
+      if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
+        Alpine.store('notification').warning('您没有访问此页面的权限')
+      } else {
+        alert('您没有访问此页面的权限')
+      }
+    }
+
+    // 延迟跳转，让用户看到提示
+    setTimeout(() => {
+      window.location.href = redirectUrl
+    }, 1500)
+
+    return false
+  }
+
+  return true
+}
+
+/**
+ * 获取用户可访问的菜单ID列表
+ * @returns {string[]} 可访问的菜单ID数组
+ */
+export function getAccessibleMenuIds() {
+  const userLevel = getUserRoleLevel()
+  const accessibleIds = []
+
+  Object.entries(MENU_ACCESS_RULES).forEach(([menuId, rule]) => {
+    if (userLevel >= rule.minLevel) {
+      accessibleIds.push(menuId)
+    }
+  })
+
+  return accessibleIds
+}
+
+/**
+ * 获取用户权限等级描述（与后端 getRoleLevelDescription 对齐）
+ * @returns {string} 权限等级描述
+ */
+export function getUserRoleLevelDescription() {
+  const level = getUserRoleLevel()
+
+  if (level >= ROLE_LEVEL_THRESHOLDS.ADMIN) {
+    return '超级管理员'
+  } else if (level >= 80) {
+    return '高级运营'
+  } else if (level >= ROLE_LEVEL_THRESHOLDS.OPS) {
+    return '运营'
+  } else if (level >= ROLE_LEVEL_THRESHOLDS.CUSTOMER_SERVICE) {
+    return '客服'
+  } else {
+    return '普通用户'
+  }
+}
+
+// ========== 导出所有 ==========
+
+export const PERMISSION_RULES = {
+  ROLE_LEVEL_THRESHOLDS,
+  MENU_ACCESS_RULES,
+  PAGE_ACCESS_RULES
+}
+
+export default {
+  PERMISSION_RULES,
+  ROLE_LEVEL_THRESHOLDS,
+  MENU_ACCESS_RULES,
+  PAGE_ACCESS_RULES,
+  getUserRoleLevel,
+  hasMenuAccess,
+  hasPageAccess,
+  getCurrentPageRule,
+  checkCurrentPageAccess,
+  getAccessibleMenuIds,
+  getUserRoleLevelDescription
+}

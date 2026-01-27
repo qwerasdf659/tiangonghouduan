@@ -20,7 +20,7 @@ const express = require('express')
 const router = express.Router()
 
 // 中间件
-const { authenticateToken, requireRole, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 
 // 服务
 const DisplayNameService = require('../../../services/DisplayNameService')
@@ -185,7 +185,7 @@ router.get('/cache/stats', async (req, res) => {
  * GET /api/v4/system/dictionaries/:dictId
  * 获取字典详情（包含历史版本）
  */
-router.get('/:dictId', authenticateToken, requireRole(['admin', 'ops']), async (req, res) => {
+router.get('/:dictId', authenticateToken, requireRoleLevel(30), async (req, res) => {
   try {
     const { dictId } = req.params
     const { SystemDictionary } = require('../../../models')
@@ -248,7 +248,7 @@ router.get('/:dictId', authenticateToken, requireRole(['admin', 'ops']), async (
  *   "reason": "修改原因"
  * }
  */
-router.put('/:dictId', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/:dictId', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { dictId } = req.params
     const { dict_name: dictName, dict_color: dictColor, reason } = req.body
@@ -320,7 +320,7 @@ router.put('/:dictId', authenticateToken, requireAdmin, async (req, res) => {
  *   "target_version": 1
  * }
  */
-router.post('/:dictId/rollback', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/:dictId/rollback', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { dictId } = req.params
     const { target_version: targetVersion } = req.body
@@ -373,7 +373,7 @@ router.post('/:dictId/rollback', authenticateToken, requireAdmin, async (req, re
  * POST /api/v4/system/dictionaries/cache/refresh
  * 刷新字典缓存
  */
-router.post('/cache/refresh', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/cache/refresh', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const operatorId = req.user.user_id
 
@@ -407,7 +407,7 @@ router.post('/cache/refresh', authenticateToken, requireAdmin, async (req, res) 
 router.get(
   '/history/:dictId',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { dictId } = req.params

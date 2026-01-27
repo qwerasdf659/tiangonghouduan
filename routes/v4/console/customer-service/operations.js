@@ -17,11 +17,11 @@
 const express = require('express')
 const router = express.Router()
 const logger = require('../../../../utils/logger').logger
-const { authenticateToken, requireAdmin } = require('../../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
 
-// 所有路由都需要管理员权限
-router.use(authenticateToken, requireAdmin)
+// 所有路由都需要后台访问权限（role_level >= 1 即可访问客服功能）
+router.use(authenticateToken, requireRoleLevel(1))
 
 /**
  * POST /:id/transfer - 转接会话

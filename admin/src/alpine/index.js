@@ -319,22 +319,24 @@ export function initAlpine() {
   // 图片加载
   Alpine.data('imageLoader', imageLoader)
   Alpine.data('blurLoader', blurLoader)
-  
+
   // 键盘快捷键
   Alpine.data('enterConfirm', enterConfirm)
   Alpine.store('shortcuts', shortcutsStore())
-  
+
   // 无限滚动
   Alpine.data('infiniteScroll', infiniteScroll)
   Alpine.data('virtualScroll', virtualScroll)
-  
+
   // 文件上传
   Alpine.data('fileUpload', fileUpload)
-  
+
   // 表格列拖拽
   Alpine.data('resizableColumns', resizableColumns)
-  
-  logger.debug('新增功能组件已注册: imageLoader, shortcuts, infiniteScroll, fileUpload, resizableColumns')
+
+  logger.debug(
+    '新增功能组件已注册: imageLoader, shortcuts, infiniteScroll, fileUpload, resizableColumns'
+  )
 
   // 启动 Alpine
   Alpine.start()

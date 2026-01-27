@@ -31,7 +31,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
@@ -125,7 +125,7 @@ function parseDateRange(query) {
  *   }
  * }
  */
-router.get('/realtime/:campaign_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/realtime/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const campaign_id = parseInt(req.params.campaign_id)
 
@@ -174,7 +174,7 @@ router.get('/realtime/:campaign_id', authenticateToken, requireAdmin, async (req
  *
  * 返回：小时级统计数据列表
  */
-router.get('/hourly/:campaign_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/hourly/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const campaign_id = parseInt(req.params.campaign_id)
 
@@ -234,7 +234,7 @@ router.get('/hourly/:campaign_id', authenticateToken, requireAdmin, async (req, 
  *
  * 返回：日级统计数据列表
  */
-router.get('/daily/:campaign_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/daily/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const campaign_id = parseInt(req.params.campaign_id)
 
@@ -306,7 +306,7 @@ router.get('/daily/:campaign_id', authenticateToken, requireAdmin, async (req, r
  *   ]
  * }
  */
-router.get('/tier-distribution/:campaign_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/tier-distribution/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const campaign_id = parseInt(req.params.campaign_id)
 
@@ -373,7 +373,7 @@ router.get('/tier-distribution/:campaign_id', authenticateToken, requireAdmin, a
 router.get(
   '/experience-triggers/:campaign_id',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   async (req, res) => {
     try {
       const campaign_id = parseInt(req.params.campaign_id)
@@ -437,7 +437,7 @@ router.get(
 router.get(
   '/budget-consumption/:campaign_id',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   async (req, res) => {
     try {
       const campaign_id = parseInt(req.params.campaign_id)

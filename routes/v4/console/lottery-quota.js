@@ -23,7 +23,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
 // P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
@@ -65,7 +65,7 @@ function formatQuotaRuleForApi(ruleInstanceOrPlain) {
  *
  * 返回：规则列表（含优先级信息）
  */
-router.get('/rules', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/rules', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { rule_type, campaign_id, is_active, page = 1, page_size = 20 } = req.query
 
@@ -106,7 +106,7 @@ router.get('/rules', authenticateToken, requireAdmin, async (req, res) => {
  *
  * 返回：规则详情（含优先级信息）
  */
-router.get('/rules/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/rules/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const rule_id = parseInt(req.params.id, 10)
 
@@ -146,7 +146,7 @@ router.get('/rules/:id', authenticateToken, requireAdmin, async (req, res) => {
  *
  * 返回：创建的规则信息
  */
-router.post('/rules', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/rules', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const {
       rule_type,
@@ -227,7 +227,7 @@ router.post('/rules', authenticateToken, requireAdmin, async (req, res) => {
  *
  * 返回：更新后的规则信息
  */
-router.put('/rules/:id/disable', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/rules/:id/disable', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const rule_id = parseInt(req.params.id, 10)
 
@@ -262,7 +262,7 @@ router.put('/rules/:id/disable', authenticateToken, requireAdmin, async (req, re
  *
  * 返回：用户当日配额状态（已用/剩余/上限/bonus）
  */
-router.get('/users/:user_id/status', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/users/:user_id/status', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { user_id } = req.params
     const { campaign_id } = req.query
@@ -336,7 +336,7 @@ router.get('/users/:user_id/status', authenticateToken, requireAdmin, async (req
  *
  * 返回：更新后的配额状态
  */
-router.post('/users/:user_id/bonus', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/users/:user_id/bonus', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { user_id } = req.params
     const { campaign_id, bonus_count, reason } = req.body
@@ -390,7 +390,7 @@ router.post('/users/:user_id/bonus', authenticateToken, requireAdmin, async (req
  *
  * 返回：配额规则和使用情况的汇总统计
  */
-router.get('/statistics', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/statistics', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { campaign_id } = req.query
 
@@ -425,7 +425,7 @@ router.get('/statistics', authenticateToken, requireAdmin, async (req, res) => {
  *
  * 返回：配额充足性检查结果
  */
-router.get('/users/:user_id/check', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/users/:user_id/check', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { user_id } = req.params
     const { campaign_id, draw_count = 1 } = req.query

@@ -258,4 +258,3 @@ export function fileUpload(config = {}) {
 }
 
 export default { fileUpload }
-

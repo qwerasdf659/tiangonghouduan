@@ -21,6 +21,12 @@
 
 import { logger } from '../../utils/logger.js'
 import { getToken, clearToken } from '@/api/base.js'
+import {
+  hasPageAccess,
+  checkCurrentPageAccess,
+  getUserRoleLevel,
+  getCurrentPageRule
+} from '../../config/permission-rules.js'
 
 export function authGuardMixin() {
   return {
@@ -119,6 +125,66 @@ export function authGuardMixin() {
       }
 
       return permList.some(p => user.permissions.includes(p))
+    },
+
+    // ========== 基于 role_level 的权限检查 ==========
+
+    /**
+     * 获取用户权限等级
+     * @returns {number} role_level，未登录返回 0
+     */
+    getRoleLevel() {
+      return getUserRoleLevel()
+    },
+
+    /**
+     * 检查当前页面的访问权限
+     * 如果无权限，显示提示并跳转到工作台
+     *
+     * @param {Object} [options] - 配置选项
+     * @param {string} [options.redirectUrl='/admin/statistics.html'] - 无权限时跳转地址
+     * @param {boolean} [options.showAlert=true] - 是否显示提示
+     * @returns {boolean} 是否有权限
+     */
+    checkPageAccess(options = {}) {
+      return checkCurrentPageAccess(options)
+    },
+
+    /**
+     * 检查指定页面路径是否有访问权限
+     * @param {string} pagePath - 页面路径
+     * @returns {boolean}
+     */
+    hasPageAccess(pagePath) {
+      return hasPageAccess(pagePath)
+    },
+
+    /**
+     * 综合检查：登录状态 + 页面权限
+     * 适用于需要同时检查登录和权限的页面
+     *
+     * @param {Object} [options] - 配置选项
+     * @param {string} [options.loginRedirect='/admin/login.html'] - 未登录跳转地址
+     * @param {string} [options.noPermissionRedirect='/admin/statistics.html'] - 无权限跳转地址
+     * @returns {boolean} 是否可以访问
+     */
+    checkAuthAndPermission(options = {}) {
+      const {
+        loginRedirect = '/admin/login.html',
+        noPermissionRedirect = '/admin/statistics.html'
+      } = options
+
+      // 1. 先检查登录状态
+      if (!this.checkAuth(loginRedirect)) {
+        return false
+      }
+
+      // 2. 再检查页面权限
+      if (!this.checkPageAccess({ redirectUrl: noPermissionRedirect })) {
+        return false
+      }
+
+      return true
     },
 
     /**

@@ -31,7 +31,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 
 /**
  * 错误处理包装器
@@ -70,7 +70,7 @@ function asyncHandler(fn) {
 router.get(
   '/detect',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const { user_id, asset_code, limit } = req.query
 
@@ -111,7 +111,7 @@ router.get(
 router.get(
   '/stats',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const OrphanFrozenCleanupService = req.app.locals.services.getService('orphan_frozen_cleanup')
 
@@ -150,7 +150,7 @@ router.get(
 router.post(
   '/cleanup',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const admin_id = req.user.user_id
     const admin_role_level = req.user.role_level || 0

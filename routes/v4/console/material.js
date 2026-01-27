@@ -26,7 +26,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const TransactionManager = require('../../../utils/TransactionManager')
 // const { Op } = require('sequelize') // 预留未来使用
 
@@ -43,7 +43,7 @@ const TransactionManager = require('../../../utils/TransactionManager')
  *
  * 返回：规则列表（含版本化信息）
  */
-router.get('/conversion-rules', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/conversion-rules', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { from_asset_code, to_asset_code, is_enabled, page = 1, page_size = 20 } = req.query
 
@@ -77,7 +77,7 @@ router.get('/conversion-rules', authenticateToken, requireAdmin, async (req, res
  *
  * 返回：规则详情
  */
-router.get('/conversion-rules/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/conversion-rules/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const rule_id = parseInt(req.params.id, 10)
     if (isNaN(rule_id) || rule_id <= 0) {
@@ -129,7 +129,7 @@ router.get('/conversion-rules/:id', authenticateToken, requireAdmin, async (req,
  *
  * 返回：创建的规则信息
  */
-router.post('/conversion-rules', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/conversion-rules', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const {
       // 必填字段
@@ -251,7 +251,7 @@ router.post('/conversion-rules', authenticateToken, requireAdmin, async (req, re
  *
  * 返回：更新后的规则信息
  */
-router.put('/conversion-rules/:id/disable', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/conversion-rules/:id/disable', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const rule_id = parseInt(req.params.id, 10)
     const MaterialManagementService = req.app.locals.services.getService('material_management')
@@ -285,7 +285,7 @@ router.put('/conversion-rules/:id/disable', authenticateToken, requireAdmin, asy
  *
  * 返回：材料资产类型列表
  */
-router.get('/asset-types', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/asset-types', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { group_code, is_enabled } = req.query
     const MaterialManagementService = req.app.locals.services.getService('material_management')
@@ -314,7 +314,7 @@ router.get('/asset-types', authenticateToken, requireAdmin, async (req, res) => 
  *
  * 返回：材料资产类型详情
  */
-router.get('/asset-types/:code', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/asset-types/:code', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const asset_code = req.params.code
     const MaterialManagementService = req.app.locals.services.getService('material_management')
@@ -345,7 +345,7 @@ router.get('/asset-types/:code', authenticateToken, requireAdmin, async (req, re
  *
  * 返回：创建的材料资产类型信息
  */
-router.post('/asset-types', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/asset-types', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const {
       asset_code,
@@ -434,7 +434,7 @@ router.post('/asset-types', authenticateToken, requireAdmin, async (req, res) =>
  *
  * 返回：更新后的材料资产类型信息
  */
-router.put('/asset-types/:code', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/asset-types/:code', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 配置实体使用业务码作为标识符
     const asset_code = req.params.code
@@ -503,7 +503,7 @@ router.put('/asset-types/:code', authenticateToken, requireAdmin, async (req, re
  *
  * 返回：更新后的材料资产类型信息
  */
-router.put('/asset-types/:code/disable', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/asset-types/:code/disable', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 配置实体使用业务码作为标识符
     const asset_code = req.params.code

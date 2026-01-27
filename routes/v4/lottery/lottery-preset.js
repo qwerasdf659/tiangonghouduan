@@ -15,13 +15,13 @@ const logger = require('../../../utils/logger').logger
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 
 /**
  * 为用户创建抽奖预设队列
  * POST /api/v4/lottery/preset/create
  */
-router.post('/create', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/create', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const adminId = req.user.user_id
     const { user_id, presets } = req.body
@@ -122,7 +122,7 @@ router.post('/create', authenticateToken, requireAdmin, async (req, res) => {
  * @returns {Object} pagination - 分页信息（total、page、page_size、total_pages）
  * @returns {Object} filters - 当前筛选条件
  */
-router.get('/list', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/list', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const adminId = req.user.user_id
 
@@ -197,7 +197,7 @@ router.get('/list', authenticateToken, requireAdmin, async (req, res) => {
  * @returns {string} usage_rate - 预设使用率（百分比）
  * @returns {Array} prize_type_distribution - 奖品类型分布统计
  */
-router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const adminId = req.user.user_id
 

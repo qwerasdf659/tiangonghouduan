@@ -16,7 +16,8 @@
  * P1-9：使用懒加载模式获取服务实例，避免顶部直接 require 服务
  * 抽奖引擎相关类 - 通过 ServiceManager 或懒加载获取
  */
-const { requireAdmin, requireRole, authenticateToken } = require('../../../../middleware/auth')
+const { requireRoleLevel, authenticateToken } = require('../../../../middleware/auth')
+const { PERMISSION_LEVELS } = require('../../../../shared/permission-constants')
 const logger = require('../../../../utils/logger').logger
 
 // 共享组件 - 延迟初始化（首次访问时初始化）
@@ -143,14 +144,23 @@ async function getSimpleSystemStats(serviceManager) {
  * 管理员权限验证中间件组合（仅admin可访问）
  * 用于写操作和敏感数据
  */
-const adminAuthMiddleware = [authenticateToken, requireAdmin]
+const adminAuthMiddleware = [authenticateToken, requireRoleLevel(100)]
 
 /**
- * 管理员+运营权限验证中间件组合（admin和ops可访问，ops只读）
- * 用于P1优先级只读API（符合docs/数据库表API覆盖率分析报告.md要求）
- * ops角色只能执行GET请求，POST/PUT/DELETE会被requireRole中间件拦截
+ * 运营及以上权限验证中间件组合（role_level >= 30）
+ *
+ * @description 用于 P1 优先级只读 API
+ * @note 2026-01-27 架构升级：使用 requireRoleLevel(30) 替代 requireRole(['admin', 'ops'])
+ *
+ * 可访问角色（role_level >= 30）：
+ * - admin (100)
+ * - regional_manager (80)
+ * - business_manager (60)
+ * - sales_staff (40)
+ * - merchant_manager (40)
+ * - ops (30)
  */
-const adminOpsAuthMiddleware = [authenticateToken, requireRole(['admin', 'ops'])]
+const adminOpsAuthMiddleware = [authenticateToken, requireRoleLevel(PERMISSION_LEVELS.OPS)]
 
 /**
  * 错误处理包装器

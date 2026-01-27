@@ -146,7 +146,13 @@ function loginPage() {
         logger.info('Token验证成功，用户是管理员，准备跳转')
         this.showMessage('已登录，正在跳转...', false)
         setTimeout(() => {
-          window.location.href = '/admin/workspace.html'
+          // 确保在顶层窗口跳转，避免 workspace 被嵌套
+          const targetUrl = '/admin/workspace.html?fresh=1'
+          if (window.self !== window.top) {
+            window.top.location.href = targetUrl
+          } else {
+            window.location.href = targetUrl
+          }
         }, 500)
       } catch (error) {
         logger.error('Token验证请求失败:', error)
@@ -240,10 +246,27 @@ function loginPage() {
           })
         })
 
-        const result = await response.json()
+        // 解析响应（增加错误处理）
+        let result
+        try {
+          result = await response.json()
+        } catch (parseError) {
+          logger.error('响应解析失败:', parseError)
+          throw new Error('服务器响应异常，请稍后重试')
+        }
 
+        // 处理业务错误
         if (!response.ok || !result.success) {
-          throw new Error(result.message || '登录失败')
+          // 根据错误码提供友好提示
+          const errorMessages = {
+            USER_NOT_FOUND: '该手机号未注册',
+            INSUFFICIENT_PERMISSION: '您没有管理后台访问权限',
+            USER_INACTIVE: '账户已被禁用，请联系管理员',
+            INVALID_VERIFICATION_CODE: '验证码错误',
+            MOBILE_REQUIRED: '请输入手机号'
+          }
+          const friendlyMessage = errorMessages[result.code] || result.message || '登录失败'
+          throw new Error(friendlyMessage)
         }
 
         // 登录成功
@@ -272,9 +295,14 @@ function loginPage() {
 
         this.showMessage('登录成功，正在跳转...', false)
 
-        // 跳转到仪表盘
+        // 跳转到仪表盘（确保在顶层窗口跳转，避免 workspace 被嵌套）
         setTimeout(() => {
-          window.location.href = '/admin/workspace.html'
+          const targetUrl = '/admin/workspace.html?fresh=1'
+          if (window.self !== window.top) {
+            window.top.location.href = targetUrl
+          } else {
+            window.location.href = targetUrl
+          }
         }, 500)
       } catch (error) {
         logger.error('登录失败:', error)
@@ -285,44 +313,44 @@ function loginPage() {
     },
 
     /**
-     * 检查用户是否具有管理员访问权限
+     * 检查用户是否具有后台访问权限
      * @method checkAdminAccess
      * @param {Object|null} user - 用户对象，来自登录API响应
-     * @param {number} [user.role_level] - 用户角色等级，>=100为管理员
+     * @param {number} [user.role_level] - 用户角色等级
      * @param {Array<Object>} [user.roles] - 用户角色列表
      * @param {string} user.roles[].role_name - 角色名称
      * @param {number} user.roles[].role_level - 角色等级
      * @param {string} user.roles[].role_uuid - 角色UUID
-     * @returns {boolean} 是否具有管理员权限
+     * @returns {boolean} 是否具有后台访问权限
      *
      * @description
-     * 管理员判断标准（以后端数据库为准）：
-     * 1. 用户直接的 role_level >= 100
-     * 2. 用户的 roles 数组中包含 role_name 为 'admin' 或 'super_admin' 的角色
-     * 3. 用户的 roles 数组中包含 role_level >= 100 的角色
+     * 后台访问权限判断标准（2026-01-27 更新）：
+     * - role_level > 0 即可登录后台
+     * - 登录后根据 role_level 显示不同的菜单（权限过滤）
+     *   - role_level >= 100: 管理员，看到所有菜单
+     *   - role_level >= 30: 运营，看到运营相关菜单（只读）
+     *   - role_level >= 1: 客服，只看到客服相关菜单
      *
      * @example
      * // 验证用户权限
      * const hasAccess = this.checkAdminAccess(userData)
      * if (!hasAccess) {
-     *   throw new Error('无管理员权限')
+     *   throw new Error('无后台访问权限')
      * }
      */
     checkAdminAccess(user) {
       if (!user) return false
 
-      // 方式1：检查 role_level（后端标准：>= 100 为管理员）
-      if (user.role_level >= 100) {
+      // 方式1：检查 role_level（role_level > 0 即可登录后台）
+      if (user.role_level > 0) {
         return true
       }
 
-      // 方式2：检查 roles 对象数组中是否包含管理员角色
+      // 方式2：检查 roles 对象数组中是否有任何有效角色
       if (Array.isArray(user.roles) && user.roles.length > 0) {
-        const adminRoles = ['admin', 'super_admin']
-        const hasAdminRole = user.roles.some(
-          role => adminRoles.includes(role.role_name) || role.role_level >= 100
-        )
-        if (hasAdminRole) {
+        // 任何 role_level > 0 的角色都允许登录
+        const hasValidRole = user.roles.some(role => role.role_level > 0)
+        if (hasValidRole) {
           return true
         }
       }

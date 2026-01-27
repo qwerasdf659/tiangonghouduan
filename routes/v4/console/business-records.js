@@ -28,7 +28,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireRole } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
 const { Op } = require('sequelize')
 
@@ -103,7 +103,7 @@ function buildPaginationOptions(query, defaultSortBy = 'created_at') {
 router.get(
   '/lottery-clear-settings',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { user_id, admin_id, setting_type, start_date, end_date } = req.query
@@ -163,7 +163,7 @@ router.get(
 router.get(
   '/lottery-clear-settings/:record_id',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { record_id } = req.params
@@ -208,7 +208,7 @@ router.get(
 router.get(
   '/redemption-orders',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { status, redeemer_user_id, start_date, end_date } = req.query
@@ -277,7 +277,7 @@ router.get(
 router.get(
   '/redemption-orders/statistics',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { RedemptionOrder } = require('../../../models')
@@ -325,7 +325,7 @@ router.get(
 router.get(
   '/redemption-orders/export',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { status, start_date, end_date } = req.query
@@ -427,7 +427,7 @@ router.get(
 router.get(
   '/redemption-orders/:order_id',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { order_id } = req.params
@@ -471,7 +471,7 @@ router.get(
 router.post(
   '/redemption-orders/:order_id/redeem',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { order_id } = req.params
@@ -580,7 +580,7 @@ router.post(
 router.post(
   '/redemption-orders/:order_id/cancel',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { order_id } = req.params
@@ -666,7 +666,7 @@ router.post(
 router.post(
   '/redemption-orders/batch-expire',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { order_ids } = req.body
@@ -742,7 +742,7 @@ router.post(
 router.get(
   '/content-reviews',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { auditable_type, audit_status, auditor_id, priority, start_date, end_date } = req.query
@@ -800,7 +800,7 @@ router.get(
 router.get(
   '/content-reviews/:audit_id',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { audit_id } = req.params
@@ -844,7 +844,7 @@ router.get(
 router.get(
   '/user-role-changes',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { user_id, operator_id, old_role, new_role, start_date, end_date } = req.query
@@ -905,7 +905,7 @@ router.get(
 router.get(
   '/user-role-changes/:record_id',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { record_id } = req.params
@@ -952,7 +952,7 @@ router.get(
 router.get(
   '/user-status-changes',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { user_id, operator_id, old_status, new_status, start_date, end_date } = req.query
@@ -1013,7 +1013,7 @@ router.get(
 router.get(
   '/user-status-changes/:record_id',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { record_id } = req.params
@@ -1060,7 +1060,7 @@ router.get(
 router.get(
   '/exchange-records',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { user_id, item_id, status, order_no, start_date, end_date } = req.query
@@ -1125,7 +1125,7 @@ router.get(
 router.get(
   '/exchange-records/:record_id',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { record_id } = req.params
@@ -1172,7 +1172,7 @@ router.get(
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/chat-messages', authenticateToken, requireRole(['admin', 'ops']), async (req, res) => {
+router.get('/chat-messages', authenticateToken, requireRoleLevel(30), async (req, res) => {
   try {
     const {
       session_id,
@@ -1254,7 +1254,7 @@ router.get('/chat-messages', authenticateToken, requireRole(['admin', 'ops']), a
 router.get(
   '/chat-messages/:message_id',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { message_id } = req.params
@@ -1305,7 +1305,7 @@ router.get(
 router.get(
   '/chat-messages/statistics/summary',
   authenticateToken,
-  requireRole(['admin', 'ops']),
+  requireRoleLevel(30),
   async (req, res) => {
     try {
       const { start_date, end_date } = req.query

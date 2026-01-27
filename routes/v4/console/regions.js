@@ -11,7 +11,7 @@
  * - 区划统计信息查询
  *
  * 技术特性：
- * - 仅限管理员访问（通过 requireRole('admin')）
+ * - 仅限管理员访问（通过 requireRoleLevel(100)）
  * - 使用 RegionService 进行业务处理
  * - 统一 ApiResponse 响应格式
  *
@@ -24,7 +24,7 @@
 const express = require('express')
 const router = express.Router()
 const ServiceManager = require('../../../services')
-const { authenticateToken, requireRole } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
 
 /*
@@ -35,7 +35,7 @@ const logger = require('../../../utils/logger').logger
 
 // 所有路由需要登录并具有管理员权限
 router.use(authenticateToken)
-router.use(requireRole('admin'))
+router.use(requireRoleLevel(100))
 
 /*
  * =================================================================

@@ -21,7 +21,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const TransactionManager = require('../../../utils/TransactionManager')
 /*
  * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
@@ -51,7 +51,7 @@ const logger = require('../../../utils/logger').logger
  * @returns {Object} data.pagination - 分页信息
  * @returns {Object} data.summary - 总体统计摘要
  */
-router.get('/listing-stats', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/listing-stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { page = 1, limit = 20, filter = 'all' } = req.query
 
@@ -132,7 +132,7 @@ router.get('/listing-stats', authenticateToken, requireAdmin, async (req, res) =
  *
  * @created 2026-01-09（web管理平台功能完善）
  */
-router.get('/exchange_market/items', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/exchange_market/items', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const {
       status = 'all',
@@ -199,7 +199,7 @@ router.get('/exchange_market/items', authenticateToken, requireAdmin, async (req
  *
  * @created 2026-01-09（web管理平台功能完善）
  */
-router.get('/exchange_market/statistics', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/exchange_market/statistics', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const admin_id = req.user.user_id
 
@@ -243,7 +243,7 @@ router.get('/exchange_market/statistics', authenticateToken, requireAdmin, async
  *
  * @created 2026-01-09（web管理平台功能完善）
  */
-router.get('/exchange_market/items/:item_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/exchange_market/items/:item_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { item_id } = req.params
     const admin_id = req.user.user_id
@@ -313,7 +313,7 @@ router.get('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
  * @body {string} status - 商品状态（必填：active/inactive）
  * @body {number} primary_image_id - 主图片ID（可选，关联 image_resources.image_id）
  */
-router.post('/exchange_market/items', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/exchange_market/items', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const {
     name,
     description = '',
@@ -421,7 +421,7 @@ router.post('/exchange_market/items', authenticateToken, requireAdmin, async (re
  *
  * @param {number} item_id - 商品ID
  */
-router.put('/exchange_market/items/:item_id', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/exchange_market/items/:item_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { item_id } = req.params
     const {
@@ -530,7 +530,7 @@ router.put('/exchange_market/items/:item_id', authenticateToken, requireAdmin, a
 router.delete(
   '/exchange_market/items/:item_id',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   async (req, res) => {
     try {
       const { item_id } = req.params
@@ -627,7 +627,7 @@ router.delete(
  * @created 2026-01-09（web管理平台功能完善）
  * @updated 2026-01-22（服务合并：使用 getOrders() 替代 getAdminOrders()）
  */
-router.get('/trade_orders', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/trade_orders', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const {
       status,
@@ -694,7 +694,7 @@ router.get('/trade_orders', authenticateToken, requireAdmin, async (req, res) =>
  *
  * @created 2026-01-09（web管理平台功能完善）
  */
-router.get('/trade_orders/:order_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/trade_orders/:order_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { order_id } = req.params
     const admin_id = req.user.user_id
@@ -770,7 +770,7 @@ router.get('/trade_orders/:order_id', authenticateToken, requireAdmin, async (re
 router.post(
   '/listings/:listing_id/force-withdraw',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   async (req, res) => {
     try {
       const { listing_id } = req.params
@@ -897,7 +897,7 @@ router.post(
  *
  * @created 2026-01-09（web管理平台功能完善）
  */
-router.get('/exchange_market/orders', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/exchange_market/orders', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const {
       status,
@@ -971,7 +971,7 @@ router.get('/exchange_market/orders', authenticateToken, requireAdmin, async (re
 router.get(
   '/exchange_market/orders/:order_no',
   authenticateToken,
-  requireAdmin,
+  requireRoleLevel(100),
   async (req, res) => {
     try {
       const { order_no } = req.params
@@ -1041,7 +1041,7 @@ router.get(
  *
  * @created 2026-01-09（P0-4）
  */
-router.get('/tradable-assets', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/tradable-assets', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const admin_id = req.user.user_id
 

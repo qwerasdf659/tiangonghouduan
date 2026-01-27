@@ -19,7 +19,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin, getUserRoles } = require('../../../../middleware/auth')
+const { authenticateToken, requireRoleLevel, getUserRoles } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 /*
  * P1-9：DataSanitizer 通过 ServiceManager 获取（snake_case key）
@@ -175,7 +175,7 @@ router.get('/orders/:order_no', authenticateToken, async (req, res) => {
  *
  * @returns {Object} 更新后的订单信息
  */
-router.post('/orders/:order_no/status', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/orders/:order_no/status', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ExchangeService（符合TR-005规范）
     const ExchangeService = req.app.locals.services.getService('exchange_market')

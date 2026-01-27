@@ -24,10 +24,10 @@
 const express = require('express')
 const router = express.Router()
 const { logger } = require('../../utils/logger')
-const { authenticateToken, requireAdmin } = require('../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../middleware/auth')
 // 🔐 所有接口都需要管理员权限
 router.use(authenticateToken)
-router.use(requireAdmin) // ✅ 修复：使用requireAdmin替代不存在的requireRole
+router.use(requireRoleLevel(100)) // 使用 requireRoleLevel(100) 限制仅管理员访问
 
 /**
  * 📊 获取当前调试配置

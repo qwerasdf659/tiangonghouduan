@@ -1,9 +1,11 @@
 /**
  * 侧边栏导航组件
- * @description 管理侧边栏导航的展开/折叠和菜单状态
- * @version 1.1.0
- * @date 2026-01-25
+ * @description 管理侧边栏导航的展开/折叠和菜单状态，支持基于 role_level 的权限过滤
+ * @version 1.2.0
+ * @date 2026-01-27
  */
+
+import { hasMenuAccess, getUserRoleLevel } from '../../config/permission-rules.js'
 
 /**
  * 创建侧边栏导航组件
@@ -21,8 +23,13 @@ export function sidebarNav() {
     activeItemId: null,
     // 未处理的风控告警数量（动态获取）
     pendingAlertCount: 0,
+    // 用户权限等级（用于权限过滤）
+    userRoleLevel: 0,
 
-    // 导航配置（7大业务模块）
+    // 原始导航配置（7大业务模块）- 过滤前的完整配置
+    _originalNavGroups: null,
+
+    // 导航配置（7大业务模块）- 会被权限过滤
     navGroups: [
       {
         id: 'dashboard',
@@ -117,6 +124,11 @@ export function sidebarNav() {
      * 初始化
      */
     init() {
+      // ========== 权限过滤（优先执行）==========
+      this.userRoleLevel = getUserRoleLevel()
+      this.filterNavByPermission()
+      console.log(`[SidebarNav] 用户权限等级: ${this.userRoleLevel}，菜单已过滤`)
+
       // 从 localStorage 恢复折叠状态
       const savedCollapsed = localStorage.getItem('sidebar_collapsed')
       if (savedCollapsed !== null) {
@@ -344,6 +356,65 @@ export function sidebarNav() {
 
       // 移动端关闭菜单
       this.mobileOpen = false
+    },
+
+    // ========== 权限过滤方法 ==========
+
+    /**
+     * 根据用户权限过滤导航菜单
+     * 基于 permission-rules.js 中的配置进行过滤
+     */
+    filterNavByPermission() {
+      // 保存原始配置（用于调试或重新过滤）
+      if (!this._originalNavGroups) {
+        this._originalNavGroups = JSON.parse(JSON.stringify(this.navGroups))
+      }
+
+      // 过滤导航分组
+      this.navGroups = this._originalNavGroups
+        .map(group => {
+          // 深拷贝分组对象
+          const filteredGroup = { ...group }
+
+          // 单项菜单（如工作台）
+          if (group.type === 'single') {
+            // 检查该菜单是否有权限
+            if (!hasMenuAccess(group.id)) {
+              return null // 无权限，过滤掉
+            }
+            return filteredGroup
+          }
+
+          // 分组菜单（含子菜单）
+          if (group.items && group.items.length > 0) {
+            // 过滤子菜单项
+            filteredGroup.items = group.items.filter(item => {
+              const menuId = `${group.id}.${item.id}`
+              return hasMenuAccess(menuId)
+            })
+
+            // 如果子菜单全部被过滤，则隐藏整个分组
+            if (filteredGroup.items.length === 0) {
+              return null
+            }
+          }
+
+          return filteredGroup
+        })
+        .filter(group => group !== null) // 移除被过滤的分组
+
+      // 更新展开的分组（移除不存在的分组）
+      const validGroupIds = this.navGroups.map(g => g.id)
+      this.expandedGroups = this.expandedGroups.filter(id => validGroupIds.includes(id))
+    },
+
+    /**
+     * 检查指定菜单是否有访问权限
+     * @param {string} menuId - 菜单ID（如 'operations.customer'）
+     * @returns {boolean}
+     */
+    hasMenuAccess(menuId) {
+      return hasMenuAccess(menuId)
     }
   }
 }

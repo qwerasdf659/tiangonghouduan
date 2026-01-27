@@ -25,7 +25,7 @@ const logger = require('../../../utils/logger').logger
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
 
 /**
@@ -50,7 +50,7 @@ const { handleServiceError } = require('../../../middleware/validation')
  * @returns {Object} 403 - 权限不足（非管理员）
  * @returns {Object} 500 - 服务器错误
  */
-router.get('/charts', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/charts', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 1. 通过 ServiceManager 获取 ReportingService（P2-C架构重构：合并StatisticsService）
     const ReportingService = req.app.locals.services.getService('reporting')
@@ -84,7 +84,7 @@ router.get('/charts', authenticateToken, requireAdmin, async (req, res) => {
  * @returns {Object} 401 - 未授权
  * @returns {Object} 500 - 服务器错误
  */
-router.get('/report', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/report', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 1. 通过 ServiceManager 获取 ReportingService（P2-C架构重构）
     const ReportingService = req.app.locals.services.getService('reporting')
@@ -126,7 +126,7 @@ router.get('/report', authenticateToken, requireAdmin, async (req, res) => {
  * 设置响应头：Content-Type、Content-Disposition、Content-Length
  * 直接使用 res.send() 发送二进制流
  */
-router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const XLSX = require('xlsx')
 

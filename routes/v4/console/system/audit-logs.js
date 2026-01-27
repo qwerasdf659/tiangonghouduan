@@ -16,7 +16,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, requireAdmin } = require('../../../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 /*
  * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
  * const AuditLogService = require('../../../../services/AuditLogService')
@@ -44,7 +44,7 @@ const logger = require('../../../../utils/logger').logger
  *
  * @security JWT + Admin权限
  */
-router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // P1-9：通过 ServiceManager 获取服务（snake_case key）
     const AuditLogService = req.app.locals.services.getService('audit_log')
@@ -121,7 +121,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
  *
  * @note 此路由必须在 /:log_id 之前定义，否则 "statistics" 会被当作 log_id 解析
  */
-router.get('/statistics', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/statistics', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // P1-9：通过 ServiceManager 获取服务（snake_case key）
     const AuditLogService = req.app.locals.services.getService('audit_log')
@@ -173,7 +173,7 @@ router.get('/statistics', authenticateToken, requireAdmin, async (req, res) => {
  *
  * @security JWT + Admin权限
  */
-router.get('/:log_id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/:log_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // P1-9：通过 ServiceManager 获取服务（snake_case key）
     const AuditLogService = req.app.locals.services.getService('audit_log')

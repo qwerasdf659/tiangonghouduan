@@ -27,7 +27,7 @@
 const express = require('express')
 const router = express.Router()
 const logger = require('../../utils/logger').logger
-const { authenticateToken, requireAdmin } = require('../../middleware/auth')
+const { authenticateToken, requireRoleLevel } = require('../../middleware/auth')
 /*
  * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
  * const ActivityService = require('../../services/ActivityService')
@@ -49,7 +49,7 @@ const { authenticateToken, requireAdmin } = require('../../middleware/auth')
  * @returns {Array} return.data.activities - 活动列表
  * @returns {number} return.data.total - 活动总数
  */
-router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { status, limit } = req.query
 
@@ -105,7 +105,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
  * @returns {Array} return.data.activities - 活动列表
  * @returns {number} return.data.total - 活动总数
  */
-router.get('/available', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/available', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const user_id = req.user.user_id
 
@@ -156,7 +156,7 @@ router.get('/available', authenticateToken, requireAdmin, async (req, res) => {
  * @returns {Array} return.data.failed_conditions - 未满足的条件列表
  * @returns {Array} return.data.messages - 提示消息列表
  */
-router.get('/:idOrCode/check-eligibility', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/:idOrCode/check-eligibility', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { idOrCode } = req.params
     const user_id = req.user.user_id
@@ -223,7 +223,7 @@ router.get('/:idOrCode/check-eligibility', authenticateToken, requireAdmin, asyn
  *
  * 注意：此接口仅验证参与资格，实际抽奖需要调用 /api/v4/lottery/draw
  */
-router.post('/:idOrCode/participate', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/:idOrCode/participate', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { idOrCode } = req.params
     const user_id = req.user.user_id
@@ -292,7 +292,7 @@ router.post('/:idOrCode/participate', authenticateToken, requireAdmin, async (re
  * @returns {Object} return.data.participation_conditions - 参与条件
  * @returns {Object} return.data.condition_error_messages - 条件错误提示
  */
-router.get('/:idOrCode/conditions', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/:idOrCode/conditions', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { idOrCode } = req.params
 
@@ -358,7 +358,7 @@ router.get('/:idOrCode/conditions', authenticateToken, requireAdmin, async (req,
  *   }
  * }
  */
-router.post('/:code/configure-conditions', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/:code/configure-conditions', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { code } = req.params
     const { participation_conditions, condition_error_messages } = req.body
