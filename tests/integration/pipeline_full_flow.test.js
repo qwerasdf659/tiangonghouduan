@@ -26,7 +26,7 @@
 const request = require('supertest')
 const app = require('../../app')
 const { TEST_DATA } = require('../helpers/test-data')
-const { TestAssertions, TestConfig } = require('../helpers/test-setup')
+const { TestAssertions, TestConfig, initRealTestData } = require('../helpers/test-setup')
 const { v4: uuidv4 } = require('uuid')
 
 /**
@@ -56,6 +56,9 @@ describe('🎯 Pipeline架构完整业务流程测试', () => {
     console.log(`🗄️ 数据库: ${TestConfig.database.database}`)
     console.log('='.repeat(70))
 
+    // 初始化真实测试数据
+    await initRealTestData()
+
     // 登录获取token
     const loginResponse = await request(app).post('/api/v4/auth/login').send({
       mobile: TEST_DATA.users.testUser.mobile,
@@ -71,19 +74,9 @@ describe('🎯 Pipeline架构完整业务流程测试', () => {
       throw new Error('测试前置条件失败：无法登录')
     }
 
-    // 获取活动代码
-    const configResponse = await request(app)
-      .get('/api/v4/lottery/config')
-      .set('Authorization', `Bearer ${authToken}`)
-
-    if (configResponse.status === 200 && configResponse.body.data?.campaign) {
-      campaignCode = configResponse.body.data.campaign.campaign_code
-      console.log(`📋 活动代码: ${campaignCode}`)
-    } else {
-      // 使用默认活动代码
-      campaignCode = 'DEFAULT'
-      console.log(`📋 使用默认活动代码: ${campaignCode}`)
-    }
+    // 获取活动代码（直接从 TestConfig.realData 获取，已在 initRealTestData 中查询数据库）
+    campaignCode = TestConfig.realData.testCampaign?.campaign_code || 'BASIC_LOTTERY'
+    console.log(`📋 活动代码: ${campaignCode}`)
   })
 
   afterAll(async () => {
@@ -126,16 +119,16 @@ describe('🎯 Pipeline架构完整业务流程测试', () => {
       if (response.status === 200) {
         TestAssertions.validateApiResponse(response.body, true)
 
-        // 验证返回数据结构
-        expect(response.body.data).toHaveProperty('results')
-        expect(Array.isArray(response.body.data.results)).toBe(true)
-        expect(response.body.data.results.length).toBe(1)
+        // 验证返回数据结构（API返回 prizes 数组）
+        expect(response.body.data).toHaveProperty('prizes')
+        expect(Array.isArray(response.body.data.prizes)).toBe(true)
+        expect(response.body.data.prizes.length).toBe(1)
 
-        const result = response.body.data.results[0]
-        console.log(`   ✅ 单抽成功，奖品: ${result.prize_name || result.item_name || '未知'}`)
+        const prize = response.body.data.prizes[0]
+        console.log(`   ✅ 单抽成功，奖品: ${prize.name || '未知'}`)
 
-        // 验证必要字段
-        expect(result).toHaveProperty('is_winner')
+        // 验证必要字段（根据实际API返回格式）
+        expect(prize).toHaveProperty('reward_tier')
       } else if (response.status === 400) {
         // 可能是积分不足或配额用尽
         console.log(`   ⚠️ 抽奖受限: ${response.body.message}`)
@@ -206,13 +199,13 @@ describe('🎯 Pipeline架构完整业务流程测试', () => {
       console.log(`   响应状态: ${response.status}`)
 
       if (response.status === 200) {
-        expect(response.body.data.results.length).toBe(3)
-        console.log(`   ✅ 3连抽成功，获得${response.body.data.results.length}个奖品`)
+        expect(response.body.data.prizes.length).toBe(3)
+        console.log(`   ✅ 3连抽成功，获得${response.body.data.prizes.length}个奖品`)
 
-        // 验证每个结果都有必要字段
-        response.body.data.results.forEach((result, index) => {
-          expect(result).toHaveProperty('is_winner')
-          console.log(`   奖品${index + 1}: ${result.prize_name || result.item_name || '未知'}`)
+        // 验证每个奖品都有必要字段
+        response.body.data.prizes.forEach((prize, index) => {
+          expect(prize).toHaveProperty('reward_tier')
+          console.log(`   奖品${index + 1}: ${prize.name || '未知'}`)
         })
       } else if (response.status === 400) {
         console.log(`   ⚠️ 3连抽受限: ${response.body.message}`)
@@ -236,8 +229,8 @@ describe('🎯 Pipeline架构完整业务流程测试', () => {
       console.log(`   响应状态: ${response.status}`)
 
       if (response.status === 200) {
-        expect(response.body.data.results.length).toBe(5)
-        console.log(`   ✅ 5连抽成功，获得${response.body.data.results.length}个奖品`)
+        expect(response.body.data.prizes.length).toBe(5)
+        console.log(`   ✅ 5连抽成功，获得${response.body.data.prizes.length}个奖品`)
       } else if (response.status === 400) {
         console.log(`   ⚠️ 5连抽受限: ${response.body.message}`)
       }
@@ -260,12 +253,12 @@ describe('🎯 Pipeline架构完整业务流程测试', () => {
       console.log(`   响应状态: ${response.status}`)
 
       if (response.status === 200) {
-        expect(response.body.data.results.length).toBe(10)
-        console.log(`   ✅ 10连抽成功，获得${response.body.data.results.length}个奖品`)
+        expect(response.body.data.prizes.length).toBe(10)
+        console.log(`   ✅ 10连抽成功，获得${response.body.data.prizes.length}个奖品`)
 
         // 检查是否应用了折扣
-        if (response.body.data.pricing) {
-          console.log(`   💰 定价信息: 折扣${response.body.data.pricing.discount || 1.0}`)
+        if (response.body.data.discount) {
+          console.log(`   💰 定价信息: 折扣${response.body.data.discount || 1.0}`)
         }
       } else if (response.status === 400) {
         console.log(`   ⚠️ 10连抽受限: ${response.body.message}`)

@@ -91,6 +91,16 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: 'normal',
         comment: '用户等级（normal-普通用户，vip-VIP用户，merchant-商户）'
+      },
+
+      /*
+       * 🔥 用户最后活跃时间（P1级警告修复 - 2026-01-28）
+       * 用于用户分群规则（segment_rules.js v4 版本）区分活跃度
+       */
+      last_active_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: '用户最后活跃时间（登录、抽奖等操作时更新，用于用户分群）'
       }
     },
     {

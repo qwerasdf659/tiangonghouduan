@@ -174,33 +174,28 @@ router.get('/stats', authenticateToken, requireRoleLevel(30), async (req, res) =
  *
  * @access Admin only (role_level >= 100)
  */
-router.get(
-  '/by-user/:user_id',
-  authenticateToken,
-  requireRoleLevel(30),
-  async (req, res) => {
-    try {
-      const { user_id } = req.params
+router.get('/by-user/:user_id', authenticateToken, requireRoleLevel(30), async (req, res) => {
+  try {
+    const { user_id } = req.params
 
-      if (!user_id || isNaN(parseInt(user_id, 10))) {
-        return res.apiError('用户ID无效', 'INVALID_USER_ID', null, 400)
-      }
-
-      const stores = await StaffManagementService.getUserStores(parseInt(user_id, 10))
-
-      return res.apiSuccess(
-        {
-          user_id: parseInt(user_id, 10),
-          stores,
-          store_count: stores.length
-        },
-        '获取用户门店列表成功'
-      )
-    } catch (error) {
-      return handleServiceError(error, res, '获取用户门店列表')
+    if (!user_id || isNaN(parseInt(user_id, 10))) {
+      return res.apiError('用户ID无效', 'INVALID_USER_ID', null, 400)
     }
+
+    const stores = await StaffManagementService.getUserStores(parseInt(user_id, 10))
+
+    return res.apiSuccess(
+      {
+        user_id: parseInt(user_id, 10),
+        stores,
+        store_count: stores.length
+      },
+      '获取用户门店列表成功'
+    )
+  } catch (error) {
+    return handleServiceError(error, res, '获取用户门店列表')
   }
-)
+})
 
 /**
  * GET /:store_staff_id - 获取员工详情
@@ -209,30 +204,25 @@ router.get(
  *
  * @access Admin only (role_level >= 100)
  */
-router.get(
-  '/:store_staff_id',
-  authenticateToken,
-  requireRoleLevel(30),
-  async (req, res) => {
-    try {
-      const { store_staff_id } = req.params
+router.get('/:store_staff_id', authenticateToken, requireRoleLevel(30), async (req, res) => {
+  try {
+    const { store_staff_id } = req.params
 
-      if (!store_staff_id || isNaN(parseInt(store_staff_id, 10))) {
-        return res.apiError('员工记录ID无效', 'INVALID_STORE_STAFF_ID', null, 400)
-      }
-
-      const staff = await StaffManagementService.getStaffDetail(parseInt(store_staff_id, 10))
-
-      if (!staff) {
-        return res.apiError('员工记录不存在', 'STAFF_NOT_FOUND', null, 404)
-      }
-
-      return res.apiSuccess(staff, '获取员工详情成功')
-    } catch (error) {
-      return handleServiceError(error, res, '获取员工详情')
+    if (!store_staff_id || isNaN(parseInt(store_staff_id, 10))) {
+      return res.apiError('员工记录ID无效', 'INVALID_STORE_STAFF_ID', null, 400)
     }
+
+    const staff = await StaffManagementService.getStaffDetail(parseInt(store_staff_id, 10))
+
+    if (!staff) {
+      return res.apiError('员工记录不存在', 'STAFF_NOT_FOUND', null, 404)
+    }
+
+    return res.apiSuccess(staff, '获取员工详情成功')
+  } catch (error) {
+    return handleServiceError(error, res, '获取员工详情')
   }
-)
+})
 
 /*
  * =================================================================

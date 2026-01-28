@@ -177,8 +177,11 @@ const SEGMENT_RULE_VERSIONS = {
         segment_key: 'highly_active',
         description: '高活跃用户（7天内有活动）',
         condition: user => {
-          if (!user || !user.last_active_at) return false
-          const lastActive = new Date(user.last_active_at)
+          if (!user) return false
+          // 优先使用 last_active_at，回退到 updated_at
+          const lastActiveTime = user.last_active_at || user.updated_at
+          if (!lastActiveTime) return false
+          const lastActive = new Date(lastActiveTime)
           const now = new Date()
           const daysDiff = (now - lastActive) / (1000 * 60 * 60 * 24)
           return daysDiff <= 7
@@ -189,8 +192,11 @@ const SEGMENT_RULE_VERSIONS = {
         segment_key: 'moderately_active',
         description: '中等活跃用户（30天内有活动）',
         condition: user => {
-          if (!user || !user.last_active_at) return false
-          const lastActive = new Date(user.last_active_at)
+          if (!user) return false
+          // 优先使用 last_active_at，回退到 updated_at
+          const lastActiveTime = user.last_active_at || user.updated_at
+          if (!lastActiveTime) return false
+          const lastActive = new Date(lastActiveTime)
           const now = new Date()
           const daysDiff = (now - lastActive) / (1000 * 60 * 60 * 24)
           return daysDiff <= 30

@@ -175,60 +175,65 @@ router.get('/orders/:order_no', authenticateToken, async (req, res) => {
  *
  * @returns {Object} 更新后的订单信息
  */
-router.post('/orders/:order_no/status', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    // 🔄 通过 ServiceManager 获取 ExchangeService（符合TR-005规范）
-    const ExchangeService = req.app.locals.services.getService('exchange_market')
+router.post(
+  '/orders/:order_no/status',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      // 🔄 通过 ServiceManager 获取 ExchangeService（符合TR-005规范）
+      const ExchangeService = req.app.locals.services.getService('exchange_market')
 
-    const { order_no } = req.params
-    const { status, remark = '' } = req.body
-    const operator_id = req.user.user_id
+      const { order_no } = req.params
+      const { status, remark = '' } = req.body
+      const operator_id = req.user.user_id
 
-    logger.info('管理员更新订单状态', {
-      operator_id,
-      order_no,
-      new_status: status,
-      remark
-    })
+      logger.info('管理员更新订单状态', {
+        operator_id,
+        order_no,
+        new_status: status,
+        remark
+      })
 
-    // 参数验证
-    if (!order_no || order_no.trim().length === 0) {
-      return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
+      // 参数验证
+      if (!order_no || order_no.trim().length === 0) {
+        return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
+      }
+
+      if (!status || status.trim().length === 0) {
+        return res.apiError('订单状态不能为空', 'BAD_REQUEST', null, 400)
+      }
+
+      // 状态白名单验证
+      const validStatuses = ['completed', 'shipped', 'cancelled']
+      if (!validStatuses.includes(status)) {
+        return res.apiError(
+          `无效的status参数，允许值：${validStatuses.join(', ')}`,
+          'BAD_REQUEST',
+          null,
+          400
+        )
+      }
+
+      // 调用服务层
+      const result = await ExchangeService.updateOrderStatus(order_no, status, operator_id, remark)
+
+      logger.info('订单状态更新成功', {
+        operator_id,
+        order_no,
+        new_status: status
+      })
+
+      return res.apiSuccess(result.order, result.message)
+    } catch (error) {
+      logger.error('更新订单状态失败', {
+        error: error.message,
+        operator_id: req.user?.user_id,
+        order_no: req.params.order_no
+      })
+      return handleServiceError(error, res, '更新订单状态失败')
     }
-
-    if (!status || status.trim().length === 0) {
-      return res.apiError('订单状态不能为空', 'BAD_REQUEST', null, 400)
-    }
-
-    // 状态白名单验证
-    const validStatuses = ['completed', 'shipped', 'cancelled']
-    if (!validStatuses.includes(status)) {
-      return res.apiError(
-        `无效的status参数，允许值：${validStatuses.join(', ')}`,
-        'BAD_REQUEST',
-        null,
-        400
-      )
-    }
-
-    // 调用服务层
-    const result = await ExchangeService.updateOrderStatus(order_no, status, operator_id, remark)
-
-    logger.info('订单状态更新成功', {
-      operator_id,
-      order_no,
-      new_status: status
-    })
-
-    return res.apiSuccess(result.order, result.message)
-  } catch (error) {
-    logger.error('更新订单状态失败', {
-      error: error.message,
-      operator_id: req.user?.user_id,
-      order_no: req.params.order_no
-    })
-    return handleServiceError(error, res, '更新订单状态失败')
   }
-})
+)
 
 module.exports = router

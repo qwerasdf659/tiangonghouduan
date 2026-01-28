@@ -150,22 +150,32 @@ router.get('/user/:user_id/stats', authenticateToken, requireRoleLevel(100), asy
  *
  * 返回：订单详情
  */
-router.get('/by-business-id/:business_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { business_id } = req.params
+router.get(
+  '/by-business-id/:business_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { business_id } = req.params
 
-    const order = await TradeOrderService.getOrderByBusinessId(business_id)
+      const order = await TradeOrderService.getOrderByBusinessId(business_id)
 
-    if (!order) {
-      return res.apiError('订单不存在', 'ORDER_NOT_FOUND', null, 404)
+      if (!order) {
+        return res.apiError('订单不存在', 'ORDER_NOT_FOUND', null, 404)
+      }
+
+      return res.apiSuccess(order, '获取订单详情成功')
+    } catch (error) {
+      logger.error('根据业务ID查询订单失败:', error)
+      return res.apiError(
+        `查询失败：${error.message}`,
+        'GET_ORDER_BY_BUSINESS_ID_FAILED',
+        null,
+        500
+      )
     }
-
-    return res.apiSuccess(order, '获取订单详情成功')
-  } catch (error) {
-    logger.error('根据业务ID查询订单失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'GET_ORDER_BY_BUSINESS_ID_FAILED', null, 500)
   }
-})
+)
 
 /**
  * GET /:id - 获取单个交易订单详情

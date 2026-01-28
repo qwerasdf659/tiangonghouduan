@@ -251,29 +251,34 @@ router.post('/conversion-rules', authenticateToken, requireRoleLevel(100), async
  *
  * 返回：更新后的规则信息
  */
-router.put('/conversion-rules/:id/disable', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const rule_id = parseInt(req.params.id, 10)
-    const MaterialManagementService = req.app.locals.services.getService('material_management')
+router.put(
+  '/conversion-rules/:id/disable',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const rule_id = parseInt(req.params.id, 10)
+      const MaterialManagementService = req.app.locals.services.getService('material_management')
 
-    // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
-    const result = await TransactionManager.execute(
-      async transaction => {
-        return await MaterialManagementService.disableConversionRule(rule_id, { transaction })
-      },
-      { description: 'disableConversionRule' }
-    )
+      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await MaterialManagementService.disableConversionRule(rule_id, { transaction })
+        },
+        { description: 'disableConversionRule' }
+      )
 
-    return res.apiSuccess(result, '禁用材料转换规则成功')
-  } catch (error) {
-    return res.apiError(
-      `禁用材料转换规则失败：${error.message}`,
-      error.error_code || 'disable_rule_failed',
-      error.details || null,
-      error.status_code || 500
-    )
+      return res.apiSuccess(result, '禁用材料转换规则成功')
+    } catch (error) {
+      return res.apiError(
+        `禁用材料转换规则失败：${error.message}`,
+        error.error_code || 'disable_rule_failed',
+        error.details || null,
+        error.status_code || 500
+      )
+    }
   }
-})
+)
 
 /**
  * 查询材料资产类型列表（管理员）
@@ -503,29 +508,34 @@ router.put('/asset-types/:code', authenticateToken, requireRoleLevel(100), async
  *
  * 返回：更新后的材料资产类型信息
  */
-router.put('/asset-types/:code/disable', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    // 配置实体使用业务码作为标识符
-    const asset_code = req.params.code
-    const MaterialManagementService = req.app.locals.services.getService('material_management')
+router.put(
+  '/asset-types/:code/disable',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      // 配置实体使用业务码作为标识符
+      const asset_code = req.params.code
+      const MaterialManagementService = req.app.locals.services.getService('material_management')
 
-    // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
-    const result = await TransactionManager.execute(
-      async transaction => {
-        return await MaterialManagementService.disableAssetType(asset_code, { transaction })
-      },
-      { description: 'disableAssetType' }
-    )
+      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await MaterialManagementService.disableAssetType(asset_code, { transaction })
+        },
+        { description: 'disableAssetType' }
+      )
 
-    return res.apiSuccess(result, '禁用材料资产类型成功')
-  } catch (error) {
-    return res.apiError(
-      `禁用材料资产类型失败：${error.message}`,
-      error.error_code || 'disable_asset_type_failed',
-      error.details || null,
-      error.status_code || 500
-    )
+      return res.apiSuccess(result, '禁用材料资产类型成功')
+    } catch (error) {
+      return res.apiError(
+        `禁用材料资产类型失败：${error.message}`,
+        error.error_code || 'disable_asset_type_failed',
+        error.details || null,
+        error.status_code || 500
+      )
+    }
   }
-})
+)
 
 module.exports = router

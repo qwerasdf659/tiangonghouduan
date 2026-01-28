@@ -515,80 +515,99 @@ const testDataGenerator = {
  *
  * 提供常见业务场景的完整测试数据
  * 创建时间: 2025-11-14
+ *
+ * 🔴 P0修复（2026-01-28）：
+ * - 使用 getter 延迟求值，避免在模块加载时访问 global.testData
+ * - 解决 Jest 测试初始化顺序问题（jest.setup.js beforeAll 在模块加载后执行）
  */
 const testScenarios = {
   /**
    * 场景1: 新用户首次抽奖
    * 业务规则: 首次抽奖100%获得积分奖品（V4.0：每次必得奖品，首次保底高档）
+   * 🔴 P0修复：使用 getter 延迟求值
    */
-  newUserFirstLottery: {
-    user: createTestData.user(),
-    campaign_id: TEST_DATA.lottery.testCampaign.campaign_id,
-    is_first_lottery: true,
-    expected_result: {
-      // V4.0语义更新：使用 reward_tier 替代 is_winner
-      reward_tier: 'high', // 首次抽奖保底高档奖励
-      prize_type: 'points'
+  get newUserFirstLottery() {
+    return {
+      user: createTestData.user(),
+      campaign_id: getTestCampaignId(),
+      is_first_lottery: true,
+      expected_result: {
+        // V4.0语义更新：使用 reward_tier 替代 is_winner
+        reward_tier: 'high', // 首次抽奖保底高档奖励
+        prize_type: 'points'
+      }
     }
   },
 
   /**
    * 场景2: 老用户5次未中高档保底
    * 业务规则: 5次未获得高档奖励后第6次必得高档（V4.0语义更新）
+   * 🔴 P0修复：使用 getter 延迟求值
    */
-  oldUserGuarantee: {
-    user: createTestData.user(),
-    campaign_id: TEST_DATA.lottery.testCampaign.campaign_id,
-    previous_lottery_count: 5,
-    all_previous_low_tier: true, // V4.0：改为低档计数
-    expected_result: {
-      reward_tier: 'high', // V4.0语义更新：替代 is_winner
-      trigger_reason: 'guarantee_mechanism'
+  get oldUserGuarantee() {
+    return {
+      user: createTestData.user(),
+      campaign_id: getTestCampaignId(),
+      previous_lottery_count: 5,
+      all_previous_low_tier: true, // V4.0：改为低档计数
+      expected_result: {
+        reward_tier: 'high', // V4.0语义更新：替代 is_winner
+        trigger_reason: 'guarantee_mechanism'
+      }
     }
   },
 
   /**
    * 场景3: 管理策略定向高档奖励
    * 业务规则: 特定用户100%获得高档奖励（V4.0语义更新）
+   * 🔴 P0修复：使用 getter 延迟求值
    */
-  managementTargetWin: {
-    user: createTestData.user(),
-    campaign_id: TEST_DATA.lottery.testCampaign.campaign_id,
-    is_management_target: true,
-    custom_probability: 1.0,
-    expected_result: {
-      reward_tier: 'high', // V4.0语义更新：替代 is_winner
-      trigger_reason: 'management_strategy'
+  get managementTargetWin() {
+    return {
+      user: createTestData.user(),
+      campaign_id: getTestCampaignId(),
+      is_management_target: true,
+      custom_probability: 1.0,
+      expected_result: {
+        reward_tier: 'high', // V4.0语义更新：替代 is_winner
+        trigger_reason: 'management_strategy'
+      }
     }
   },
 
   /**
    * 场景4: 积分不足兑换失败
    * 业务规则: 积分不足时兑换失败并提示
+   * 🔴 P0修复：使用 getter 延迟求值
    */
-  insufficientPointsExchange: {
-    user: createTestData.user(),
-    user_points: 50,
-    prize_cost: 100,
-    expected_result: {
-      success: false,
-      error_code: 'INSUFFICIENT_POINTS',
-      error_message: '积分不足'
+  get insufficientPointsExchange() {
+    return {
+      user: createTestData.user(),
+      user_points: 50,
+      prize_cost: 100,
+      expected_result: {
+        success: false,
+        error_code: 'INSUFFICIENT_POINTS',
+        error_message: '积分不足'
+      }
     }
   },
 
   /**
    * 场景5: 并发抽奖幂等性
    * 业务规则: 相同request_id的请求只处理一次
+   * 🔴 P0修复：使用 getter 延迟求值
    */
-  concurrentLotteryIdempotency: {
-    user: createTestData.user(),
-    campaign_id: TEST_DATA.lottery.testCampaign.campaign_id,
-    request_id: 'test-request-' + Date.now(),
-    concurrent_requests: 3,
-    expected_result: {
-      processed_count: 1,
-      duplicate_count: 2
+  get concurrentLotteryIdempotency() {
+    return {
+      user: createTestData.user(),
+      campaign_id: getTestCampaignId(),
+      request_id: 'test-request-' + Date.now(),
+      concurrent_requests: 3,
+      expected_result: {
+        processed_count: 1,
+        duplicate_count: 2
+      }
     }
   }
 }

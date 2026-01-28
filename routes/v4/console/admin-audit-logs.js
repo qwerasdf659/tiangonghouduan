@@ -171,75 +171,65 @@ router.get('/:log_id', authenticateToken, requireRoleLevel(30), async (req, res)
  * @query {string} [start_date] - 统计开始日期（北京时间，格式：YYYY-MM-DD）
  * @query {string} [end_date] - 统计结束日期（北京时间，格式：YYYY-MM-DD）
  */
-router.get(
-  '/statistics/summary',
-  authenticateToken,
-  requireRoleLevel(30),
-  async (req, res) => {
-    const { start_date, end_date } = req.query
+router.get('/statistics/summary', authenticateToken, requireRoleLevel(30), async (req, res) => {
+  const { start_date, end_date } = req.query
 
-    try {
-      logger.info('管理员查询操作审计日志统计', {
-        admin_id: req.user.user_id,
-        start_date,
-        end_date
-      })
+  try {
+    logger.info('管理员查询操作审计日志统计', {
+      admin_id: req.user.user_id,
+      start_date,
+      end_date
+    })
 
-      const statistics = await AuditLogService.getAuditStatistics({
-        start_date: start_date || null,
-        end_date: end_date || null
-      })
+    const statistics = await AuditLogService.getAuditStatistics({
+      start_date: start_date || null,
+      end_date: end_date || null
+    })
 
-      logger.info('获取管理员操作审计日志统计成功', {
-        admin_id: req.user.user_id,
-        total_logs: statistics.total_logs || 0
-      })
+    logger.info('获取管理员操作审计日志统计成功', {
+      admin_id: req.user.user_id,
+      total_logs: statistics.total_logs || 0
+    })
 
-      return res.apiSuccess(statistics, '获取管理员操作审计日志统计成功')
-    } catch (error) {
-      return handleServiceError(error, res, '获取管理员操作审计日志统计')
-    }
+    return res.apiSuccess(statistics, '获取管理员操作审计日志统计成功')
+  } catch (error) {
+    return handleServiceError(error, res, '获取管理员操作审计日志统计')
   }
-)
+})
 
 /**
  * GET /api/v4/console/admin-audit-logs/operation-types
  * @desc 获取所有支持的操作类型列表
  * @access Admin only (role_level >= 100)
  */
-router.get(
-  '/operation-types',
-  authenticateToken,
-  requireRoleLevel(30),
-  async (req, res) => {
-    try {
-      const {
-        OPERATION_TYPES,
-        OPERATION_TYPE_DESCRIPTIONS
-      } = require('../../../constants/AuditOperationTypes')
+router.get('/operation-types', authenticateToken, requireRoleLevel(30), async (req, res) => {
+  try {
+    const {
+      OPERATION_TYPES,
+      OPERATION_TYPE_DESCRIPTIONS
+    } = require('../../../constants/AuditOperationTypes')
 
-      const operationTypes = Object.entries(OPERATION_TYPES).map(([key, value]) => ({
-        code: value,
-        name: OPERATION_TYPE_DESCRIPTIONS[value] || value,
-        key
-      }))
+    const operationTypes = Object.entries(OPERATION_TYPES).map(([key, value]) => ({
+      code: value,
+      name: OPERATION_TYPE_DESCRIPTIONS[value] || value,
+      key
+    }))
 
-      logger.info('获取操作类型列表成功', {
-        admin_id: req.user.user_id,
-        count: operationTypes.length
-      })
+    logger.info('获取操作类型列表成功', {
+      admin_id: req.user.user_id,
+      count: operationTypes.length
+    })
 
-      return res.apiSuccess(
-        {
-          operation_types: operationTypes
-        },
-        '获取操作类型列表成功'
-      )
-    } catch (error) {
-      return handleServiceError(error, res, '获取操作类型列表')
-    }
+    return res.apiSuccess(
+      {
+        operation_types: operationTypes
+      },
+      '获取操作类型列表成功'
+    )
+  } catch (error) {
+    return handleServiceError(error, res, '获取操作类型列表')
   }
-)
+})
 
 /**
  * GET /api/v4/console/admin-audit-logs/target-types

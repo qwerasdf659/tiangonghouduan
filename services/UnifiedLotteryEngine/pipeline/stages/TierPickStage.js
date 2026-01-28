@@ -344,9 +344,12 @@ class TierPickStage extends BaseStage {
         return 'default'
       }
 
-      // 查询用户信息用于分群规则匹配
+      /*
+       * 查询用户信息用于分群规则匹配
+       * 注意：users 表当前没有 last_active_at 字段，使用 updated_at 作为替代
+       */
       const user = await User.findByPk(user_id, {
-        attributes: ['user_id', 'created_at', 'last_active_at']
+        attributes: ['user_id', 'created_at', 'updated_at']
       })
 
       if (!user) {

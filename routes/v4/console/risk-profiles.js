@@ -337,26 +337,31 @@ router.post('/user/:user_id/freeze', authenticateToken, requireRoleLevel(100), a
 /**
  * POST /user/:user_id/unfreeze - 解冻用户账户
  */
-router.post('/user/:user_id/unfreeze', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const service = getRiskProfileService(req)
-    const { user_id } = req.params
-    const admin_id = req.user.user_id
+router.post(
+  '/user/:user_id/unfreeze',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const service = getRiskProfileService(req)
+      const { user_id } = req.params
+      const admin_id = req.user.user_id
 
-    const result = await TransactionManager.execute(async transaction => {
-      return await service.unfreezeUser(parseInt(user_id), admin_id, { transaction })
-    })
+      const result = await TransactionManager.execute(async transaction => {
+        return await service.unfreezeUser(parseInt(user_id), admin_id, { transaction })
+      })
 
-    return res.apiSuccess(result, '解冻用户账户成功')
-  } catch (error) {
-    logger.error(`解冻用户[${req.params.user_id}]账户失败:`, error)
-    return res.apiError(
-      `解冻用户账户失败: ${error.message}`,
-      error.code || 'UNFREEZE_USER_FAILED',
-      null,
-      error.status || 500
-    )
+      return res.apiSuccess(result, '解冻用户账户成功')
+    } catch (error) {
+      logger.error(`解冻用户[${req.params.user_id}]账户失败:`, error)
+      return res.apiError(
+        `解冻用户账户失败: ${error.message}`,
+        error.code || 'UNFREEZE_USER_FAILED',
+        null,
+        error.status || 500
+      )
+    }
   }
-})
+)
 
 module.exports = router

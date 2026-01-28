@@ -136,9 +136,9 @@ class EligibilityStage extends BaseStage {
           },
           campaign_quota: user_quota
             ? {
-                granted_quota: user_quota.granted_quota,
-                used_quota: user_quota.used_quota,
-                remaining_quota: user_quota.granted_quota - user_quota.used_quota
+                quota_total: user_quota.quota_total,
+                quota_used: user_quota.quota_used,
+                quota_remaining: user_quota.quota_remaining
               }
             : null
         })
@@ -278,12 +278,12 @@ class EligibilityStage extends BaseStage {
       return { is_eligible: true, reason: null }
     }
 
-    // 检查配额是否用完
-    const remaining_quota = user_quota.granted_quota - user_quota.used_quota
+    // 检查配额是否用完（字段名: quota_total, quota_used, quota_remaining）
+    const remaining_quota = user_quota.quota_remaining
     if (remaining_quota <= 0) {
       return {
         is_eligible: false,
-        reason: `抽奖配额已用完（已使用 ${user_quota.used_quota}/${user_quota.granted_quota}）`
+        reason: `抽奖配额已用完（已使用 ${user_quota.quota_used}/${user_quota.quota_total}）`
       }
     }
 

@@ -99,50 +99,60 @@ function buildPaginationOptions(query, defaultSortBy = 'created_at') {
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/accounts', authenticateToken, requireRoleLevel(PERMISSION_LEVELS.OPS), async (req, res) => {
-  try {
-    const { account_type, user_id, system_code, status } = req.query
-    const pagination = buildPaginationOptions(req.query)
+router.get(
+  '/accounts',
+  authenticateToken,
+  requireRoleLevel(PERMISSION_LEVELS.OPS),
+  async (req, res) => {
+    try {
+      const { account_type, user_id, system_code, status } = req.query
+      const pagination = buildPaginationOptions(req.query)
 
-    const { Account, User } = require('../../../models')
+      const { Account, User } = require('../../../models')
 
-    // 构建查询条件
-    const where = {}
-    if (account_type) where.account_type = account_type
-    if (user_id) where.user_id = parseInt(user_id)
-    if (system_code) where.system_code = system_code
-    if (status) where.status = status
+      // 构建查询条件
+      const where = {}
+      if (account_type) where.account_type = account_type
+      if (user_id) where.user_id = parseInt(user_id)
+      if (system_code) where.system_code = system_code
+      if (status) where.status = status
 
-    const { count, rows } = await Account.findAndCountAll({
-      where,
-      include: [
-        { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'], required: false }
-      ],
-      ...pagination
-    })
+      const { count, rows } = await Account.findAndCountAll({
+        where,
+        include: [
+          {
+            model: User,
+            as: 'user',
+            attributes: ['user_id', 'nickname', 'mobile'],
+            required: false
+          }
+        ],
+        ...pagination
+      })
 
-    logger.info('查询账户列表成功', {
-      admin_id: req.user.user_id,
-      total: count,
-      page: pagination.page
-    })
+      logger.info('查询账户列表成功', {
+        admin_id: req.user.user_id,
+        total: count,
+        page: pagination.page
+      })
 
-    return res.apiSuccess(
-      {
-        accounts: rows,
-        pagination: {
-          total: count,
-          page: pagination.page,
-          page_size: pagination.page_size,
-          total_pages: Math.ceil(count / pagination.page_size)
-        }
-      },
-      '获取账户列表成功'
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '查询账户列表')
+      return res.apiSuccess(
+        {
+          accounts: rows,
+          pagination: {
+            total: count,
+            page: pagination.page,
+            page_size: pagination.page_size,
+            total_pages: Math.ceil(count / pagination.page_size)
+          }
+        },
+        '获取账户列表成功'
+      )
+    } catch (error) {
+      return handleServiceError(error, res, '查询账户列表')
+    }
   }
-})
+)
 
 /**
  * GET /api/v4/console/system-data/accounts/:account_id
@@ -197,49 +207,54 @@ router.get(
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/user-roles', authenticateToken, requireRoleLevel(PERMISSION_LEVELS.OPS), async (req, res) => {
-  try {
-    const { user_id, role_name } = req.query
-    const pagination = buildPaginationOptions(req.query)
+router.get(
+  '/user-roles',
+  authenticateToken,
+  requireRoleLevel(PERMISSION_LEVELS.OPS),
+  async (req, res) => {
+    try {
+      const { user_id, role_name } = req.query
+      const pagination = buildPaginationOptions(req.query)
 
-    const { UserRole, User, Role } = require('../../../models')
+      const { UserRole, User, Role } = require('../../../models')
 
-    // 构建查询条件
-    const where = {}
-    if (user_id) where.user_id = parseInt(user_id)
-    if (role_name) where.role_name = role_name
+      // 构建查询条件
+      const where = {}
+      if (user_id) where.user_id = parseInt(user_id)
+      if (role_name) where.role_name = role_name
 
-    const { count, rows } = await UserRole.findAndCountAll({
-      where,
-      include: [
-        { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: Role, as: 'role', required: false }
-      ],
-      ...pagination
-    })
+      const { count, rows } = await UserRole.findAndCountAll({
+        where,
+        include: [
+          { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
+          { model: Role, as: 'role', required: false }
+        ],
+        ...pagination
+      })
 
-    logger.info('查询用户角色列表成功', {
-      admin_id: req.user.user_id,
-      total: count,
-      page: pagination.page
-    })
+      logger.info('查询用户角色列表成功', {
+        admin_id: req.user.user_id,
+        total: count,
+        page: pagination.page
+      })
 
-    return res.apiSuccess(
-      {
-        user_roles: rows,
-        pagination: {
-          total: count,
-          page: pagination.page,
-          page_size: pagination.page_size,
-          total_pages: Math.ceil(count / pagination.page_size)
-        }
-      },
-      '获取用户角色列表成功'
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '查询用户角色列表')
+      return res.apiSuccess(
+        {
+          user_roles: rows,
+          pagination: {
+            total: count,
+            page: pagination.page,
+            page_size: pagination.page_size,
+            total_pages: Math.ceil(count / pagination.page_size)
+          }
+        },
+        '获取用户角色列表成功'
+      )
+    } catch (error) {
+      return handleServiceError(error, res, '查询用户角色列表')
+    }
   }
-})
+)
 
 /*
  * =================================================================

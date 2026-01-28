@@ -163,8 +163,8 @@ class LoadDecisionSourceStage extends BaseStage {
         include: [
           {
             model: User,
-            as: 'creator',
-            attributes: ['user_id', 'username', 'nickname']
+            as: 'admin', // 关联到创建该预设的管理员（LotteryPreset.associate 中定义）
+            attributes: ['user_id', 'nickname'] // users 表没有 username 字段
           }
         ]
       })
@@ -184,16 +184,19 @@ class LoadDecisionSourceStage extends BaseStage {
    * 检查是否有管理干预设置
    *
    * @param {number} user_id - 用户ID
-   * @param {number} campaign_id - 活动ID
+   * @param {number} _campaign_id - 活动ID（当前未使用，表中没有此字段）
    * @returns {Promise<Object|null>} 干预设置或 null
    * @private
    */
-  async _checkOverride(user_id, campaign_id) {
+  async _checkOverride(user_id, _campaign_id) {
     try {
+      /*
+       * 注意：LotteryManagementSetting 表当前没有 campaign_id 字段
+       * 管理干预设置是针对用户的，不区分活动
+       */
       const override = await LotteryManagementSetting.findOne({
         where: {
           user_id,
-          campaign_id,
           setting_type: { [Op.in]: ['force_win', 'force_lose'] },
           status: 'active'
         }
@@ -203,7 +206,6 @@ class LoadDecisionSourceStage extends BaseStage {
     } catch (error) {
       this.log('warn', '检查管理干预失败', {
         user_id,
-        campaign_id,
         error: error.message
       })
       return null

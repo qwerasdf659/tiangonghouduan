@@ -306,36 +306,41 @@ router.get('/daily/:campaign_id', authenticateToken, requireRoleLevel(100), asyn
  *   ]
  * }
  */
-router.get('/tier-distribution/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const campaign_id = parseInt(req.params.campaign_id)
+router.get(
+  '/tier-distribution/:campaign_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const campaign_id = parseInt(req.params.campaign_id)
 
-    if (isNaN(campaign_id)) {
-      return res.apiError('campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
+      if (isNaN(campaign_id)) {
+        return res.apiError('campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
+      }
+
+      const { start_time, end_time } = parseTimeRange(req.query)
+
+      // 🔴 修正：使用 options 对象参数格式
+      const result = await getLotteryAnalyticsService(req).getTierDistribution(campaign_id, {
+        start_time,
+        end_time
+      })
+
+      logger.info('查询奖品档位分布', {
+        admin_id: req.user.user_id,
+        campaign_id,
+        start_time,
+        end_time,
+        total_draws: result.total_draws
+      })
+
+      return res.apiSuccess(result, '获取奖品档位分布成功')
+    } catch (error) {
+      logger.error('获取奖品档位分布失败:', error)
+      return res.apiError(`查询失败：${error.message}`, 'GET_TIER_DISTRIBUTION_FAILED', null, 500)
     }
-
-    const { start_time, end_time } = parseTimeRange(req.query)
-
-    // 🔴 修正：使用 options 对象参数格式
-    const result = await getLotteryAnalyticsService(req).getTierDistribution(campaign_id, {
-      start_time,
-      end_time
-    })
-
-    logger.info('查询奖品档位分布', {
-      admin_id: req.user.user_id,
-      campaign_id,
-      start_time,
-      end_time,
-      total_draws: result.total_draws
-    })
-
-    return res.apiSuccess(result, '获取奖品档位分布成功')
-  } catch (error) {
-    logger.error('获取奖品档位分布失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'GET_TIER_DISTRIBUTION_FAILED', null, 500)
   }
-})
+)
 
 /*
  * ==========================================

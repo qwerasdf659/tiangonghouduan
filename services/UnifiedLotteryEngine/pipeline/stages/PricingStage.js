@@ -21,7 +21,8 @@
  * - BudgetContextStage.data.budget_before
  *
  * 输出到上下文：
- * - draw_cost: 本次抽奖消耗积分（= total_cost）
+ * - draw_cost: 本次抽奖批次的总消耗积分（= total_cost，用于扣款）
+ * - per_draw_cost: 每次抽奖的单位成本（= per_draw，用于记录到 lottery_draws.cost_points）
  * - original_cost: 原价
  * - discount: 折扣率（如 0.9）
  * - discount_label: 折扣标签（如 "10连抽(九折)"）
@@ -108,15 +109,45 @@ class PricingStage extends BaseStage {
         transaction
       })
 
-      // 验证积分是否充足
-      const points_sufficient = user_points >= pricing.total_cost
+      /**
+       * 🔧 P1修复：连抽场景下积分充足性检查逻辑
+       *
+       * 问题根因（2026-01-28 修复）：
+       * - 连抽场景下，execute_draw 在外层已经统一扣除全部积分
+       * - 然后循环调用 executeLottery，传递 skip_points_deduction: true
+       * - 但 BudgetContextStage 从数据库读取的是已扣除后的余额
+       * - 导致 PricingStage 检查时发现"积分不足"，事务回滚
+       *
+       * 解决方案：
+       * - 当 skip_points_deduction: true 时，跳过积分充足性检查
+       * - 因为积分已在外层被扣除，此处只需计算定价信息
+       */
+      const skip_points_deduction = context.skip_points_deduction === true
 
-      if (!points_sufficient) {
-        throw this.createError(
-          `积分不足：需要 ${pricing.total_cost} 积分，当前余额 ${user_points} 积分`,
-          'INSUFFICIENT_POINTS',
-          true
-        )
+      // 验证积分是否充足（跳过检查条件：skip_points_deduction=true）
+      let points_sufficient = true
+      if (!skip_points_deduction) {
+        // 正常流程：检查积分是否充足
+        points_sufficient = user_points >= pricing.total_cost
+
+        if (!points_sufficient) {
+          throw this.createError(
+            `积分不足：需要 ${pricing.total_cost} 积分，当前余额 ${user_points} 积分`,
+            'INSUFFICIENT_POINTS',
+            true
+          )
+        }
+      } else {
+        // 连抽场景：积分已在外层扣除，跳过检查
+        this.log('info', '跳过积分充足性检查（连抽模式：积分已在外层统一扣除）', {
+          user_id,
+          campaign_id,
+          draw_count,
+          skip_points_deduction: true,
+          budget_before_from_db: user_points,
+          required_cost: pricing.total_cost,
+          note: '积分已在 execute_draw 外层统一扣除，此处无需再验证'
+        })
       }
 
       /**
@@ -135,9 +166,10 @@ class PricingStage extends BaseStage {
 
       const result = {
         // 核心字段
-        draw_cost: pricing.total_cost,
-        total_cost: pricing.total_cost,
-        unit_cost: pricing.per_draw, // 折后单价
+        draw_cost: pricing.total_cost, // 批次总成本（用于扣款）
+        total_cost: pricing.total_cost, // 批次总成本（同 draw_cost）
+        per_draw_cost: pricing.per_draw, // 单次抽奖成本（用于 lottery_draws.cost_points）
+        unit_cost: pricing.per_draw, // 折后单价（同 per_draw_cost）
         original_cost,
 
         // 折扣相关

@@ -390,7 +390,7 @@ async function initRealTestData(mobile = '13612227930') {
     const campaign = await LotteryCampaign.findOne({
       where: { status: 'active' },
       order: [['campaign_id', 'ASC']], // 取第一个活跃活动
-      attributes: ['campaign_id', 'campaign_name', 'status']
+      attributes: ['campaign_id', 'campaign_name', 'campaign_code', 'status']
     })
 
     if (!campaign) {
@@ -399,8 +399,9 @@ async function initRealTestData(mobile = '13612227930') {
     } else {
       TestConfig.realData.testCampaign.campaign_id = campaign.campaign_id
       TestConfig.realData.testCampaign.campaignName = campaign.campaign_name
+      TestConfig.realData.testCampaign.campaign_code = campaign.campaign_code
       console.log(
-        `✅ initRealTestData: 测试活动 campaign_id=${campaign.campaign_id}, name=${campaign.campaign_name}`
+        `✅ initRealTestData: 测试活动 campaign_id=${campaign.campaign_id}, code=${campaign.campaign_code}, name=${campaign.campaign_name}`
       )
     }
 

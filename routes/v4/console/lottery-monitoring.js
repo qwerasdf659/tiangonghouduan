@@ -158,31 +158,36 @@ router.get(
  *
  * 返回：用户体验状态列表和分页信息
  */
-router.get('/user-experience-states', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { campaign_id, user_id, min_empty_streak, page = 1, page_size = 20 } = req.query
+router.get(
+  '/user-experience-states',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { campaign_id, user_id, min_empty_streak, page = 1, page_size = 20 } = req.query
 
-    const result = await getLotteryAnalyticsService(req).getUserExperienceStates({
-      campaign_id: campaign_id ? parseInt(campaign_id) : undefined,
-      user_id: user_id ? parseInt(user_id) : undefined,
-      min_empty_streak: min_empty_streak !== undefined ? parseInt(min_empty_streak) : undefined,
-      page: parseInt(page),
-      page_size: parseInt(page_size)
-    })
+      const result = await getLotteryAnalyticsService(req).getUserExperienceStates({
+        campaign_id: campaign_id ? parseInt(campaign_id) : undefined,
+        user_id: user_id ? parseInt(user_id) : undefined,
+        min_empty_streak: min_empty_streak !== undefined ? parseInt(min_empty_streak) : undefined,
+        page: parseInt(page),
+        page_size: parseInt(page_size)
+      })
 
-    logger.info('查询用户体验状态列表', {
-      admin_id: req.user.user_id,
-      campaign_id,
-      user_id,
-      total: result.pagination.total_count
-    })
+      logger.info('查询用户体验状态列表', {
+        admin_id: req.user.user_id,
+        campaign_id,
+        user_id,
+        total: result.pagination.total_count
+      })
 
-    return res.apiSuccess(result, '查询用户体验状态成功')
-  } catch (error) {
-    logger.error('查询用户体验状态失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'QUERY_EXPERIENCE_STATES_FAILED', null, 500)
+      return res.apiSuccess(result, '查询用户体验状态成功')
+    } catch (error) {
+      logger.error('查询用户体验状态失败:', error)
+      return res.apiError(`查询失败：${error.message}`, 'QUERY_EXPERIENCE_STATES_FAILED', null, 500)
+    }
   }
-})
+)
 
 /**
  * GET /user-experience-states/:user_id/:campaign_id - 获取用户在特定活动的体验状态
@@ -270,33 +275,38 @@ router.get('/user-global-states', authenticateToken, requireRoleLevel(100), asyn
  *
  * 返回：用户全局状态详情（无记录时返回默认状态，不返回404）
  */
-router.get('/user-global-states/:user_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const user_id = parseInt(req.params.user_id)
+router.get(
+  '/user-global-states/:user_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const user_id = parseInt(req.params.user_id)
 
-    const state = await getLotteryAnalyticsService(req).getUserGlobalState(user_id)
+      const state = await getLotteryAnalyticsService(req).getUserGlobalState(user_id)
 
-    // 用户没有全局状态记录是正常的（新用户/未参与抽奖），返回默认值而不是404
-    if (!state) {
-      return res.apiSuccess(
-        {
-          user_id,
-          total_draws: 0,
-          total_wins: 0,
-          luck_debt: 0,
-          historical_empty_rate: null,
-          message: '用户尚无抽奖记录'
-        },
-        '获取用户全局状态成功'
-      )
+      // 用户没有全局状态记录是正常的（新用户/未参与抽奖），返回默认值而不是404
+      if (!state) {
+        return res.apiSuccess(
+          {
+            user_id,
+            total_draws: 0,
+            total_wins: 0,
+            luck_debt: 0,
+            historical_empty_rate: null,
+            message: '用户尚无抽奖记录'
+          },
+          '获取用户全局状态成功'
+        )
+      }
+
+      return res.apiSuccess(state, '获取用户全局状态成功')
+    } catch (error) {
+      logger.error('获取用户全局状态失败:', error)
+      return res.apiError(`查询失败：${error.message}`, 'GET_GLOBAL_STATE_FAILED', null, 500)
     }
-
-    return res.apiSuccess(state, '获取用户全局状态成功')
-  } catch (error) {
-    logger.error('获取用户全局状态失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'GET_GLOBAL_STATE_FAILED', null, 500)
   }
-})
+)
 
 /*
  * ==========================================
@@ -464,18 +474,23 @@ router.get(
  *
  * 返回：配额统计汇总数据
  */
-router.get('/user-quotas/stats/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const campaign_id = parseInt(req.params.campaign_id)
+router.get(
+  '/user-quotas/stats/:campaign_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const campaign_id = parseInt(req.params.campaign_id)
 
-    const stats = await getLotteryAnalyticsService(req).getCampaignQuotaStats(campaign_id)
+      const stats = await getLotteryAnalyticsService(req).getCampaignQuotaStats(campaign_id)
 
-    return res.apiSuccess(stats, '获取活动配额统计成功')
-  } catch (error) {
-    logger.error('获取活动配额统计失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'GET_QUOTA_STATS_FAILED', null, 500)
+      return res.apiSuccess(stats, '获取活动配额统计成功')
+    } catch (error) {
+      logger.error('获取活动配额统计失败:', error)
+      return res.apiError(`查询失败：${error.message}`, 'GET_QUOTA_STATS_FAILED', null, 500)
+    }
   }
-})
+)
 
 /*
  * ==========================================

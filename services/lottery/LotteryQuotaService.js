@@ -86,7 +86,10 @@ class LotteryQuotaService {
     try {
       const { LotteryDrawQuotaRule, UserRole, Role } = require('../../models')
 
-      // 获取用户角色UUID列表
+      /*
+       * 获取用户角色UUID列表
+       * 🔧 修复：使用正确的关联别名 'role'（小写，与 UserRole.js 中定义的一致）
+       */
       let role_uuids = []
       try {
         const userRoles = await UserRole.findAll({
@@ -94,12 +97,12 @@ class LotteryQuotaService {
           include: [
             {
               model: Role,
-              as: 'Role',
+              as: 'role', // ✅ 正确的别名：小写 'role'，对应 UserRole.belongsTo(Role, { as: 'role' })
               attributes: ['role_uuid']
             }
           ]
         })
-        role_uuids = userRoles.map(ur => ur.Role?.role_uuid).filter(Boolean)
+        role_uuids = userRoles.map(ur => ur.role?.role_uuid).filter(Boolean)
       } catch (err) {
         logger.warn('获取用户角色UUID列表失败，将跳过角色级规则匹配:', err.message)
       }
@@ -143,7 +146,10 @@ class LotteryQuotaService {
     try {
       const { LotteryUserDailyDrawQuota, UserRole, Role } = require('../../models')
 
-      // 获取用户角色UUID列表
+      /*
+       * 获取用户角色UUID列表
+       * 🔧 修复：使用正确的关联别名 'role'（小写，与 UserRole.js 中定义的一致）
+       */
       let role_uuids = []
       try {
         const userRoles = await UserRole.findAll({
@@ -151,12 +157,12 @@ class LotteryQuotaService {
           include: [
             {
               model: Role,
-              as: 'Role',
+              as: 'role', // ✅ 正确的别名：小写 'role'，对应 UserRole.belongsTo(Role, { as: 'role' })
               attributes: ['role_uuid']
             }
           ]
         })
-        role_uuids = userRoles.map(ur => ur.Role?.role_uuid).filter(Boolean)
+        role_uuids = userRoles.map(ur => ur.role?.role_uuid).filter(Boolean)
       } catch (err) {
         logger.warn('获取用户角色UUID列表失败，将跳过角色级规则匹配:', err.message)
       }

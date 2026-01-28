@@ -93,11 +93,47 @@ router.post(
     }
 
     try {
-      const { campaign_code, draw_count = 1 } = req.body
+      const { campaign_code, draw_count: raw_draw_count = 1 } = req.body
       const user_id = req.user.user_id
 
       if (!campaign_code) {
         return res.apiError('缺少必需参数: campaign_code', 'MISSING_PARAMETER', {}, 400)
+      }
+
+      /*
+       * 🔴 P0 修复：draw_count 参数边界值验证
+       * 规则：
+       * - 必须为正整数（1-10）
+       * - 非数字类型返回 400 INVALID_DRAW_COUNT
+       * - 超出范围返回 400 DRAW_COUNT_OUT_OF_RANGE
+       */
+      const draw_count = parseInt(raw_draw_count, 10)
+
+      // 类型验证：必须是有效数字
+      if (isNaN(draw_count)) {
+        return res.apiError(
+          '抽奖次数必须是有效的数字',
+          'INVALID_DRAW_COUNT',
+          {
+            received: raw_draw_count,
+            expected: '正整数 1-10'
+          },
+          400
+        )
+      }
+
+      // 边界值验证：必须在 1-10 范围内
+      if (draw_count < 1 || draw_count > 10) {
+        return res.apiError(
+          '抽奖次数超出有效范围',
+          'DRAW_COUNT_OUT_OF_RANGE',
+          {
+            received: draw_count,
+            min: 1,
+            max: 10
+          },
+          400
+        )
       }
 
       /*

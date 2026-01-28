@@ -249,11 +249,11 @@ class PressureTierCalculator {
         return 0.5
       }
 
-      // 计算已发放奖品价值总和
+      // 计算已发放奖品价值总和（使用 reward_tier 判断中奖状态）
       const prize_value_sum = await LotteryDraw.sum('prize_value_points', {
         where: {
           campaign_id,
-          draw_status: { [Op.in]: ['won', 'completed'] }
+          reward_tier: { [Op.in]: ['high', 'mid', 'low'] } // 有效中奖的档位
         },
         transaction
       })
@@ -272,7 +272,7 @@ class PressureTierCalculator {
       if (total_budget === 0) {
         // 估算：奖品价值总和 * 预期发放次数
         const prize_total = await LotteryPrize.sum('prize_value_points', {
-          where: { campaign_id, is_active: true },
+          where: { campaign_id, status: 'active' },
           transaction
         })
 

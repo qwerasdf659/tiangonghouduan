@@ -126,6 +126,7 @@ class SettleStage extends BaseStage {
     /*
      * ========== 🆕 Phase 2 增强：获取定价信息 ==========
      * 🔴 禁止硬编码默认值，draw_cost 必须从 PricingStage 获取
+     * 🔧 2026-01-28 修复：区分 draw_cost（批次总成本）和 per_draw_cost（单次成本）
      */
     const pricing_data = this.getContextData(context, 'PricingStage.data')
     if (!pricing_data || pricing_data.draw_cost === undefined) {
@@ -135,7 +136,8 @@ class SettleStage extends BaseStage {
         true
       )
     }
-    const draw_cost = pricing_data.draw_cost
+    const draw_cost = pricing_data.draw_cost // 批次总成本（用于扣款）
+    const per_draw_cost = pricing_data.per_draw_cost || pricing_data.unit_cost || draw_cost // 单次抽奖成本（用于记录）
 
     // 获取预算上下文
     const budget_data = this.getContextData(context, 'BudgetContextStage.data') || {}
@@ -235,7 +237,7 @@ class SettleStage extends BaseStage {
         transaction
       })
 
-      // 5. 创建抽奖记录（使用真实的 draw_cost）
+      // 5. 创建抽奖记录（使用单次抽奖成本 per_draw_cost）
       const draw_record = await this._createDrawRecord({
         draw_id,
         user_id,
@@ -248,7 +250,7 @@ class SettleStage extends BaseStage {
         budget_data,
         budget_deducted,
         points_deducted, // 🆕 传递积分扣减信息
-        draw_cost, // 🆕 传递抽奖成本
+        per_draw_cost, // 🔧 2026-01-28 修复：传递单次抽奖成本（用于 cost_points 字段）
         draw_count, // 🆕 传递抽奖次数
         batch_id, // 🆕 Phase 2：连抽批次ID
         asset_transaction_id, // 🆕 关联资产流水ID（必填字段）
@@ -466,8 +468,18 @@ class SettleStage extends BaseStage {
    */
   async _deductBudget(budget_provider, amount, options) {
     try {
-      const result = await budget_provider.deduct(amount, options)
-      return result.deducted_amount || amount
+      const { user_id, campaign_id, prize_id, idempotency_key, transaction } = options
+      const result = await budget_provider.deductBudget(
+        {
+          user_id,
+          campaign_id,
+          amount,
+          reason: `抽奖扣减预算 prize_id=${prize_id}`,
+          reference_id: idempotency_key
+        },
+        { transaction }
+      )
+      return result.deducted || amount
     } catch (error) {
       this.log('error', '预算扣减失败', {
         amount,
@@ -592,7 +604,7 @@ class SettleStage extends BaseStage {
    * @param {Object} params.budget_data - 预算数据
    * @param {number} params.budget_deducted - 预算扣减金额
    * @param {number} params.points_deducted - 积分扣减金额（🆕 Phase 2）
-   * @param {number} params.draw_cost - 抽奖成本（🆕 Phase 2，从 PricingStage 获取）
+   * @param {number} params.per_draw_cost - 单次抽奖成本（🔧 2026-01-28 修复：用于 cost_points 字段）
    * @param {number} params.draw_count - 抽奖次数（🆕 Phase 2，1=单抽，>1=连抽）
    * @param {string} params.batch_id - 批次ID（🆕 Phase 2，连抽批次标识）
    * @param {Object} params.transaction - 事务对象
@@ -612,7 +624,7 @@ class SettleStage extends BaseStage {
       budget_data,
       budget_deducted,
       points_deducted = 0, // 🆕 Phase 2：积分扣减金额
-      draw_cost = 0, // 🆕 Phase 2：抽奖成本（禁止硬编码）
+      per_draw_cost = 0, // 🔧 2026-01-28 修复：单次抽奖成本（用于 cost_points 字段）
       draw_count = 1, // 🆕 Phase 2：抽奖次数
       batch_id = null, // 🆕 Phase 2：连抽批次ID
       asset_transaction_id = null, // 🆕 关联资产流水ID（用于对账）
@@ -625,14 +637,14 @@ class SettleStage extends BaseStage {
     /*
      * 🆕 Phase 2 增强：
      * - draw_type：根据 draw_count 动态确定（single/multi）
-     * - cost_points：使用真实的 draw_cost（从 PricingStage 获取），禁止硬编码
+     * - cost_points：使用单次抽奖成本 per_draw_cost（🔧 2026-01-28 修复）
      */
     const draw_type = draw_count > 1 ? 'multi' : 'single'
 
     /*
      * asset_transaction_id 处理策略：
      * - 有积分扣减时：使用 AssetService 返回的流水 ID
-     * - 免费抽奖时（draw_cost=0）：使用 0 表示无流水记录
+     * - 免费抽奖时（per_draw_cost=0）：使用 0 表示无流水记录
      * - 连抽子请求跳过扣减时：使用 0 表示由批量扣减统一处理
      */
     const final_asset_transaction_id = asset_transaction_id || 0
@@ -653,7 +665,7 @@ class SettleStage extends BaseStage {
         prize_name: final_prize.prize_name,
         prize_type: final_prize.prize_type,
         prize_value: final_prize.prize_value,
-        cost_points: draw_cost, // 🆕 使用真实的 draw_cost（禁止硬编码 100）
+        cost_points: per_draw_cost, // 🔧 2026-01-28 修复：使用单次抽奖成本（连抽时每条记录应该是 per_draw 而非 total_cost）
         reward_tier: final_tier,
         guarantee_triggered,
         prize_value_points: final_prize.prize_value_points || 0,
@@ -716,10 +728,13 @@ class SettleStage extends BaseStage {
    */
   async _updateUserQuota(user_id, campaign_id, transaction) {
     try {
-      // 使用原子操作更新配额
+      // 使用原子操作更新配额（字段名: quota_used, quota_remaining）
       const [affected_rows] = await sequelize.query(
         `UPDATE lottery_campaign_user_quota 
-         SET used_quota = used_quota + 1, updated_at = NOW()
+         SET quota_used = quota_used + 1, 
+             quota_remaining = GREATEST(quota_remaining - 1, 0),
+             last_used_at = NOW(),
+             updated_at = NOW()
          WHERE user_id = ? AND campaign_id = ? AND status = 'active'`,
         {
           replacements: [user_id, campaign_id],

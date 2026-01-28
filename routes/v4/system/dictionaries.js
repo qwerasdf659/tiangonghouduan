@@ -404,33 +404,28 @@ router.post('/cache/refresh', authenticateToken, requireRoleLevel(100), async (r
  * GET /api/v4/system/dictionaries/history/:dictId
  * 获取字典版本历史
  */
-router.get(
-  '/history/:dictId',
-  authenticateToken,
-  requireRoleLevel(30),
-  async (req, res) => {
-    try {
-      const { dictId } = req.params
+router.get('/history/:dictId', authenticateToken, requireRoleLevel(30), async (req, res) => {
+  try {
+    const { dictId } = req.params
 
-      const history = await DisplayNameService.getVersionHistory(parseInt(dictId, 10))
+    const history = await DisplayNameService.getVersionHistory(parseInt(dictId, 10))
 
-      return res.apiSuccess(
-        {
-          dict_id: parseInt(dictId, 10),
-          history,
-          count: history.length
-        },
-        '获取版本历史成功',
-        'DICT_HISTORY_SUCCESS'
-      )
-    } catch (error) {
-      logger.error('[DictionaryRoute] 获取版本历史失败', {
-        dict_id: req.params.dictId,
-        error: error.message
-      })
-      return res.apiError('获取版本历史失败', 'DICT_HISTORY_FAILED', { error: error.message }, 500)
-    }
+    return res.apiSuccess(
+      {
+        dict_id: parseInt(dictId, 10),
+        history,
+        count: history.length
+      },
+      '获取版本历史成功',
+      'DICT_HISTORY_SUCCESS'
+    )
+  } catch (error) {
+    logger.error('[DictionaryRoute] 获取版本历史失败', {
+      dict_id: req.params.dictId,
+      error: error.message
+    })
+    return res.apiError('获取版本历史失败', 'DICT_HISTORY_FAILED', { error: error.message }, 500)
   }
-)
+})
 
 module.exports = router

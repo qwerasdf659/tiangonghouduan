@@ -376,7 +376,16 @@ class LotteryComputeEngine {
    * @returns {Promise<Object>} 平滑后的结果
    */
   async applyExperienceSmoothing(params) {
-    const { user_id, campaign_id, selected_tier, tier_weights, experience_state } = params
+    const {
+      user_id,
+      campaign_id,
+      selected_tier,
+      tier_weights,
+      experience_state,
+      available_tiers,
+      effective_budget,
+      prizes_by_tier
+    } = params
 
     this._log('debug', '开始应用体验平滑', {
       user_id,
@@ -410,11 +419,16 @@ class LotteryComputeEngine {
       const anti_empty_result = this._applyAntiEmptyStreak({
         empty_streak: experience_state.empty_streak || 0,
         selected_tier: final_tier,
-        tier_weights: final_weights
+        tier_weights: final_weights,
+        available_tiers,
+        effective_budget,
+        prizes_by_tier,
+        user_id,
+        campaign_id
       })
 
-      if (anti_empty_result.forced_non_empty) {
-        final_tier = anti_empty_result.forced_tier
+      if (anti_empty_result.forced) {
+        final_tier = anti_empty_result.final_tier
         applied_mechanisms.push({
           type: 'anti_empty',
           empty_streak: experience_state.empty_streak,
@@ -428,7 +442,10 @@ class LotteryComputeEngine {
       const anti_high_result = this._applyAntiHighStreak({
         recent_high_count: experience_state.recent_high_count || 0,
         selected_tier: final_tier,
-        tier_weights: final_weights
+        tier_weights: final_weights,
+        prizes_by_tier,
+        user_id,
+        campaign_id
       })
 
       if (anti_high_result.tier_capped) {
@@ -1010,8 +1027,8 @@ class LotteryComputeEngine {
         tier_weights: final_weights
       })
 
-      if (anti_empty_result.forced_non_empty) {
-        final_tier = anti_empty_result.forced_tier
+      if (anti_empty_result.forced) {
+        final_tier = anti_empty_result.final_tier
         applied_mechanisms.push({
           type: 'anti_empty',
           empty_streak: experience_state.empty_streak,
@@ -1159,8 +1176,8 @@ class LotteryComputeEngine {
         tier_weights: final_weights
       })
 
-      if (anti_empty_result.forced_non_empty) {
-        final_tier = anti_empty_result.forced_tier
+      if (anti_empty_result.forced) {
+        final_tier = anti_empty_result.final_tier
         applied_mechanisms.push({
           type: 'anti_empty',
           empty_streak: experience_state.empty_streak,

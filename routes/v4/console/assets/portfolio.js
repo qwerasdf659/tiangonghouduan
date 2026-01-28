@@ -109,37 +109,32 @@ router.get('/portfolio', authenticateToken, requireRoleLevel(30), async (req, re
  * - item_type: string（可选）- 物品类型筛选
  * - status: string（可选）- 状态筛选（available/locked）
  */
-router.get(
-  '/portfolio/items',
-  authenticateToken,
-  requireRoleLevel(30),
-  async (req, res) => {
-    try {
-      const user_id = req.user.user_id
-      const page = Math.max(1, parseInt(req.query.page) || 1)
-      const page_size = Math.min(100, Math.max(1, parseInt(req.query.page_size) || 20))
-      const item_type = req.query.item_type || null
-      const status = req.query.status || null
+router.get('/portfolio/items', authenticateToken, requireRoleLevel(30), async (req, res) => {
+  try {
+    const user_id = req.user.user_id
+    const page = Math.max(1, parseInt(req.query.page) || 1)
+    const page_size = Math.min(100, Math.max(1, parseInt(req.query.page_size) || 20))
+    const item_type = req.query.item_type || null
+    const status = req.query.status || null
 
-      // 通过 ServiceManager 获取 AssetService（路由层规范）
-      const AssetService = req.app.locals.services.getService('asset')
+    // 通过 ServiceManager 获取 AssetService（路由层规范）
+    const AssetService = req.app.locals.services.getService('asset')
 
-      const result = await AssetService.getUserItemInstances(
-        { user_id },
-        { item_type, status, page, page_size }
-      )
+    const result = await AssetService.getUserItemInstances(
+      { user_id },
+      { item_type, status, page, page_size }
+    )
 
-      return res.apiSuccess(result, '获取物品列表成功')
-    } catch (error) {
-      logger.error('❌ 获取物品列表失败', {
-        user_id: req.user?.user_id,
-        error: error.message
-      })
+    return res.apiSuccess(result, '获取物品列表成功')
+  } catch (error) {
+    logger.error('❌ 获取物品列表失败', {
+      user_id: req.user?.user_id,
+      error: error.message
+    })
 
-      return res.apiError(error.message || '获取物品列表失败', 500)
-    }
+    return res.apiError(error.message || '获取物品列表失败', 500)
   }
-)
+})
 
 /**
  * GET /portfolio/items/:item_instance_id - 获取物品详情

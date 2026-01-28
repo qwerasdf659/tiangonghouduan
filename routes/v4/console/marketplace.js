@@ -199,35 +199,40 @@ router.get('/exchange_market/items', authenticateToken, requireRoleLevel(100), a
  *
  * @created 2026-01-09（web管理平台功能完善）
  */
-router.get('/exchange_market/statistics', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const admin_id = req.user.user_id
+router.get(
+  '/exchange_market/statistics',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const admin_id = req.user.user_id
 
-    logger.info('管理员查询兑换市场统计', { admin_id })
+      logger.info('管理员查询兑换市场统计', { admin_id })
 
-    // 🎯 通过 ServiceManager 获取 ExchangeService
-    const ExchangeService = req.app.locals.services.getService('exchange_market')
+      // 🎯 通过 ServiceManager 获取 ExchangeService
+      const ExchangeService = req.app.locals.services.getService('exchange_market')
 
-    // 调用服务层方法获取统计数据
-    const statistics = await ExchangeService.getMarketItemStatistics()
+      // 调用服务层方法获取统计数据
+      const statistics = await ExchangeService.getMarketItemStatistics()
 
-    logger.info('管理员查询兑换市场统计成功', {
-      admin_id,
-      total_items: statistics.total_items,
-      active_items: statistics.active_items
-    })
+      logger.info('管理员查询兑换市场统计成功', {
+        admin_id,
+        total_items: statistics.total_items,
+        active_items: statistics.active_items
+      })
 
-    return res.apiSuccess(statistics, '统计数据查询成功')
-  } catch (error) {
-    logger.error('管理员查询兑换市场统计失败', {
-      error: error.message,
-      stack: error.stack,
-      admin_id: req.user?.user_id
-    })
+      return res.apiSuccess(statistics, '统计数据查询成功')
+    } catch (error) {
+      logger.error('管理员查询兑换市场统计失败', {
+        error: error.message,
+        stack: error.stack,
+        admin_id: req.user?.user_id
+      })
 
-    return res.apiError(error.message || '查询统计数据失败', 'INTERNAL_ERROR', null, 500)
+      return res.apiError(error.message || '查询统计数据失败', 'INTERNAL_ERROR', null, 500)
+    }
   }
-})
+)
 
 /**
  * 管理员获取单个兑换商品详情（Admin Only）
@@ -243,51 +248,56 @@ router.get('/exchange_market/statistics', authenticateToken, requireRoleLevel(10
  *
  * @created 2026-01-09（web管理平台功能完善）
  */
-router.get('/exchange_market/items/:item_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { item_id } = req.params
-    const admin_id = req.user.user_id
+router.get(
+  '/exchange_market/items/:item_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { item_id } = req.params
+      const admin_id = req.user.user_id
 
-    logger.info('管理员查询兑换商品详情', {
-      admin_id,
-      item_id
-    })
+      logger.info('管理员查询兑换商品详情', {
+        admin_id,
+        item_id
+      })
 
-    // 参数验证
-    const itemId = parseInt(item_id)
-    if (isNaN(itemId) || itemId <= 0) {
-      return res.apiError('无效的商品ID', 'BAD_REQUEST', null, 400)
+      // 参数验证
+      const itemId = parseInt(item_id)
+      if (isNaN(itemId) || itemId <= 0) {
+        return res.apiError('无效的商品ID', 'BAD_REQUEST', null, 400)
+      }
+
+      // 🎯 通过 ServiceManager 获取 ExchangeService
+      const ExchangeService = req.app.locals.services.getService('exchange_market')
+
+      // 调用服务层方法获取商品详情
+      const result = await ExchangeService.getItemDetail(itemId)
+
+      logger.info('管理员查询兑换商品详情成功', {
+        admin_id,
+        item_id: itemId,
+        name: result.item?.name
+      })
+
+      return res.apiSuccess(result, '商品详情查询成功')
+    } catch (error) {
+      logger.error('管理员查询兑换商品详情失败', {
+        error: error.message,
+        stack: error.stack,
+        admin_id: req.user?.user_id,
+        item_id: req.params.item_id
+      })
+
+      // 业务错误处理
+      if (error.message === '商品不存在') {
+        return res.apiError(error.message, 'NOT_FOUND', null, 404)
+      }
+
+      return res.apiError(error.message || '查询商品详情失败', 'INTERNAL_ERROR', null, 500)
     }
-
-    // 🎯 通过 ServiceManager 获取 ExchangeService
-    const ExchangeService = req.app.locals.services.getService('exchange_market')
-
-    // 调用服务层方法获取商品详情
-    const result = await ExchangeService.getItemDetail(itemId)
-
-    logger.info('管理员查询兑换商品详情成功', {
-      admin_id,
-      item_id: itemId,
-      name: result.item?.name
-    })
-
-    return res.apiSuccess(result, '商品详情查询成功')
-  } catch (error) {
-    logger.error('管理员查询兑换商品详情失败', {
-      error: error.message,
-      stack: error.stack,
-      admin_id: req.user?.user_id,
-      item_id: req.params.item_id
-    })
-
-    // 业务错误处理
-    if (error.message === '商品不存在') {
-      return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    }
-
-    return res.apiError(error.message || '查询商品详情失败', 'INTERNAL_ERROR', null, 500)
   }
-})
+)
 
 /**
  * 创建兑换商品（管理员操作）
@@ -313,98 +323,103 @@ router.get('/exchange_market/items/:item_id', authenticateToken, requireRoleLeve
  * @body {string} status - 商品状态（必填：active/inactive）
  * @body {number} primary_image_id - 主图片ID（可选，关联 image_resources.image_id）
  */
-router.post('/exchange_market/items', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  const {
-    name,
-    description = '',
-    cost_asset_code,
-    cost_amount,
-    cost_price,
-    stock,
-    sort_order = 100,
-    status = 'active',
-    // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_id）
-    primary_image_id
-  } = req.body
+router.post(
+  '/exchange_market/items',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    const {
+      name,
+      description = '',
+      cost_asset_code,
+      cost_amount,
+      cost_price,
+      stock,
+      sort_order = 100,
+      status = 'active',
+      // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_id）
+      primary_image_id
+    } = req.body
 
-  const admin_id = req.user.user_id
+    const admin_id = req.user.user_id
 
-  logger.info('管理员创建兑换商品（材料资产支付）', {
-    admin_id,
-    name,
-    cost_asset_code,
-    cost_amount,
-    stock,
-    primary_image_id
-  })
-
-  // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
-  const ExchangeService = req.app.locals.services.getService('exchange_market')
-
-  // 🎯 2026-01-08 图片存储架构修复：使用 TransactionManager 包装事务
-  const transactionResult = await TransactionManager.execute(async transaction => {
-    // 调用服务层方法创建商品（V4.5.0 材料资产支付 + 图片存储架构）
-    const result = await ExchangeService.createExchangeItem(
-      {
-        name,
-        description,
-        cost_asset_code,
-        cost_amount,
-        cost_price,
-        stock,
-        sort_order,
-        status,
-        primary_image_id
-      },
+    logger.info('管理员创建兑换商品（材料资产支付）', {
       admin_id,
-      { transaction }
-    )
-
-    return result
-  })
-
-  /*
-   * 🔧 2026-01-09 修复：ExchangeService.createExchangeItem 直接返回
-   * { success, item, bound_image, timestamp }，不需要检查 .data
-   */
-  if (!transactionResult.success) {
-    const errorMessage = transactionResult.error?.message || '创建商品失败'
-    logger.error('创建兑换商品失败', {
-      error: errorMessage,
-      admin_id
+      name,
+      cost_asset_code,
+      cost_amount,
+      stock,
+      primary_image_id
     })
 
-    // 业务错误直接返回错误消息
-    if (
-      errorMessage.includes('不能为空') ||
-      errorMessage.includes('最长') ||
-      errorMessage.includes('无效') ||
-      errorMessage.includes('必须')
-    ) {
-      return res.apiError(errorMessage, 'BAD_REQUEST', null, 400)
+    // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
+    const ExchangeService = req.app.locals.services.getService('exchange_market')
+
+    // 🎯 2026-01-08 图片存储架构修复：使用 TransactionManager 包装事务
+    const transactionResult = await TransactionManager.execute(async transaction => {
+      // 调用服务层方法创建商品（V4.5.0 材料资产支付 + 图片存储架构）
+      const result = await ExchangeService.createExchangeItem(
+        {
+          name,
+          description,
+          cost_asset_code,
+          cost_amount,
+          cost_price,
+          stock,
+          sort_order,
+          status,
+          primary_image_id
+        },
+        admin_id,
+        { transaction }
+      )
+
+      return result
+    })
+
+    /*
+     * 🔧 2026-01-09 修复：ExchangeService.createExchangeItem 直接返回
+     * { success, item, bound_image, timestamp }，不需要检查 .data
+     */
+    if (!transactionResult.success) {
+      const errorMessage = transactionResult.error?.message || '创建商品失败'
+      logger.error('创建兑换商品失败', {
+        error: errorMessage,
+        admin_id
+      })
+
+      // 业务错误直接返回错误消息
+      if (
+        errorMessage.includes('不能为空') ||
+        errorMessage.includes('最长') ||
+        errorMessage.includes('无效') ||
+        errorMessage.includes('必须')
+      ) {
+        return res.apiError(errorMessage, 'BAD_REQUEST', null, 400)
+      }
+
+      return res.apiError(errorMessage, 'INTERNAL_ERROR', null, 500)
     }
 
-    return res.apiError(errorMessage, 'INTERNAL_ERROR', null, 500)
-  }
-
-  // 直接使用 transactionResult（已包含 item, bound_image, timestamp）
-  logger.info('兑换商品创建成功（材料资产支付）', {
-    admin_id,
-    item_id: transactionResult.item?.item_id,
-    name: transactionResult.item?.name,
-    cost_asset_code: transactionResult.item?.cost_asset_code,
-    cost_amount: transactionResult.item?.cost_amount,
-    bound_image: transactionResult.bound_image
-  })
-
-  return res.apiSuccess(
-    {
-      item: transactionResult.item,
+    // 直接使用 transactionResult（已包含 item, bound_image, timestamp）
+    logger.info('兑换商品创建成功（材料资产支付）', {
+      admin_id,
+      item_id: transactionResult.item?.item_id,
+      name: transactionResult.item?.name,
+      cost_asset_code: transactionResult.item?.cost_asset_code,
+      cost_amount: transactionResult.item?.cost_amount,
       bound_image: transactionResult.bound_image
-    },
-    '商品创建成功'
-  )
-})
+    })
+
+    return res.apiSuccess(
+      {
+        item: transactionResult.item,
+        bound_image: transactionResult.bound_image
+      },
+      '商品创建成功'
+    )
+  }
+)
 
 /**
  * 更新兑换商品（管理员操作）
@@ -421,101 +436,106 @@ router.post('/exchange_market/items', authenticateToken, requireRoleLevel(100), 
  *
  * @param {number} item_id - 商品ID
  */
-router.put('/exchange_market/items/:item_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { item_id } = req.params
-    const {
-      name,
-      description,
-      cost_asset_code,
-      cost_amount,
-      cost_price,
-      stock,
-      sort_order,
-      status,
-      // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_id）
-      primary_image_id
-    } = req.body
+router.put(
+  '/exchange_market/items/:item_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { item_id } = req.params
+      const {
+        name,
+        description,
+        cost_asset_code,
+        cost_amount,
+        cost_price,
+        stock,
+        sort_order,
+        status,
+        // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_id）
+        primary_image_id
+      } = req.body
 
-    const admin_id = req.user.user_id
+      const admin_id = req.user.user_id
 
-    logger.info('管理员更新兑换商品（材料资产支付）', {
-      admin_id,
-      item_id,
-      cost_asset_code,
-      primary_image_id,
-      cost_amount
-    })
+      logger.info('管理员更新兑换商品（材料资产支付）', {
+        admin_id,
+        item_id,
+        cost_asset_code,
+        primary_image_id,
+        cost_amount
+      })
 
-    // 参数验证
-    const itemId = parseInt(item_id)
-    if (isNaN(itemId) || itemId <= 0) {
-      return res.apiError('无效的商品ID', 'BAD_REQUEST', null, 400)
-    }
-
-    // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
-    const ExchangeService = req.app.locals.services.getService('exchange_market')
-
-    // 🎯 2026-01-08：使用事务包装更新操作（含图片处理）
-    const result = await TransactionManager.execute(
-      async transaction => {
-        return await ExchangeService.updateExchangeItem(
-          itemId,
-          {
-            name,
-            description,
-            cost_asset_code,
-            cost_amount,
-            cost_price,
-            stock,
-            sort_order,
-            status,
-            primary_image_id
-          },
-          { transaction }
-        )
-      },
-      {
-        description: `更新兑换商品 item_id=${itemId}`,
-        maxRetries: 1
+      // 参数验证
+      const itemId = parseInt(item_id)
+      if (isNaN(itemId) || itemId <= 0) {
+        return res.apiError('无效的商品ID', 'BAD_REQUEST', null, 400)
       }
-    )
 
-    logger.info('兑换商品更新成功（材料资产支付）', {
-      admin_id,
-      item_id: itemId,
-      name: result.item.name,
-      cost_asset_code: result.item.cost_asset_code,
-      cost_amount: result.item.cost_amount,
-      image_changes: result.image_changes
-    })
+      // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
+      const ExchangeService = req.app.locals.services.getService('exchange_market')
 
-    return res.apiSuccess(result, '商品更新成功')
-  } catch (error) {
-    logger.error('更新兑换商品失败', {
-      error: error.message,
-      stack: error.stack,
-      admin_id: req.user?.user_id,
-      item_id: req.params.item_id
-    })
+      // 🎯 2026-01-08：使用事务包装更新操作（含图片处理）
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await ExchangeService.updateExchangeItem(
+            itemId,
+            {
+              name,
+              description,
+              cost_asset_code,
+              cost_amount,
+              cost_price,
+              stock,
+              sort_order,
+              status,
+              primary_image_id
+            },
+            { transaction }
+          )
+        },
+        {
+          description: `更新兑换商品 item_id=${itemId}`,
+          maxRetries: 1
+        }
+      )
 
-    // 业务错误处理
-    if (error.message === '商品不存在') {
-      return res.apiError(error.message, 'NOT_FOUND', null, 404)
+      logger.info('兑换商品更新成功（材料资产支付）', {
+        admin_id,
+        item_id: itemId,
+        name: result.item.name,
+        cost_asset_code: result.item.cost_asset_code,
+        cost_amount: result.item.cost_amount,
+        image_changes: result.image_changes
+      })
+
+      return res.apiSuccess(result, '商品更新成功')
+    } catch (error) {
+      logger.error('更新兑换商品失败', {
+        error: error.message,
+        stack: error.stack,
+        admin_id: req.user?.user_id,
+        item_id: req.params.item_id
+      })
+
+      // 业务错误处理
+      if (error.message === '商品不存在') {
+        return res.apiError(error.message, 'NOT_FOUND', null, 404)
+      }
+
+      if (
+        error.message.includes('不能为空') ||
+        error.message.includes('最长') ||
+        error.message.includes('无效') ||
+        error.message.includes('必须')
+      ) {
+        return res.apiError(error.message, 'BAD_REQUEST', null, 400)
+      }
+
+      return res.apiError(error.message || '更新商品失败', 'INTERNAL_ERROR', null, 500)
     }
-
-    if (
-      error.message.includes('不能为空') ||
-      error.message.includes('最长') ||
-      error.message.includes('无效') ||
-      error.message.includes('必须')
-    ) {
-      return res.apiError(error.message, 'BAD_REQUEST', null, 400)
-    }
-
-    return res.apiError(error.message || '更新商品失败', 'INTERNAL_ERROR', null, 500)
   }
-})
+)
 
 /**
  * 删除兑换商品（管理员操作）
@@ -694,57 +714,62 @@ router.get('/trade_orders', authenticateToken, requireRoleLevel(100), async (req
  *
  * @created 2026-01-09（web管理平台功能完善）
  */
-router.get('/trade_orders/:order_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { order_id } = req.params
-    const admin_id = req.user.user_id
+router.get(
+  '/trade_orders/:order_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { order_id } = req.params
+      const admin_id = req.user.user_id
 
-    logger.info('管理员查询C2C交易订单详情', {
-      admin_id,
-      order_id
-    })
+      logger.info('管理员查询C2C交易订单详情', {
+        admin_id,
+        order_id
+      })
 
-    // 参数验证
-    const orderId = parseInt(order_id)
-    if (isNaN(orderId) || orderId <= 0) {
-      return res.apiError('无效的订单ID', 'BAD_REQUEST', null, 400)
+      // 参数验证
+      const orderId = parseInt(order_id)
+      if (isNaN(orderId) || orderId <= 0) {
+        return res.apiError('无效的订单ID', 'BAD_REQUEST', null, 400)
+      }
+
+      // P1-9：通过 ServiceManager 获取 TradeOrderService（snake_case key）
+      const TradeOrderService = req.app.locals.services.getService('trade_order')
+
+      // 调用服务层方法获取订单详情
+      const order = await TradeOrderService.getOrderDetail(orderId)
+
+      logger.info('管理员获取C2C交易订单详情成功', {
+        admin_id,
+        order_id: orderId,
+        status: order?.status
+      })
+
+      return res.apiSuccess(
+        {
+          success: true,
+          order
+        },
+        'C2C交易订单详情查询成功'
+      )
+    } catch (error) {
+      logger.error('管理员查询C2C交易订单详情失败', {
+        error: error.message,
+        stack: error.stack,
+        admin_id: req.user?.user_id,
+        order_id: req.params.order_id
+      })
+
+      // 业务错误处理
+      if (error.message.includes('不存在')) {
+        return res.apiError(error.message, 'NOT_FOUND', null, 404)
+      }
+
+      return res.apiError(error.message || '查询订单详情失败', 'INTERNAL_ERROR', null, 500)
     }
-
-    // P1-9：通过 ServiceManager 获取 TradeOrderService（snake_case key）
-    const TradeOrderService = req.app.locals.services.getService('trade_order')
-
-    // 调用服务层方法获取订单详情
-    const order = await TradeOrderService.getOrderDetail(orderId)
-
-    logger.info('管理员获取C2C交易订单详情成功', {
-      admin_id,
-      order_id: orderId,
-      status: order?.status
-    })
-
-    return res.apiSuccess(
-      {
-        success: true,
-        order
-      },
-      'C2C交易订单详情查询成功'
-    )
-  } catch (error) {
-    logger.error('管理员查询C2C交易订单详情失败', {
-      error: error.message,
-      stack: error.stack,
-      admin_id: req.user?.user_id,
-      order_id: req.params.order_id
-    })
-
-    // 业务错误处理
-    if (error.message.includes('不存在')) {
-      return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    }
-
-    return res.apiError(error.message || '查询订单详情失败', 'INTERNAL_ERROR', null, 500)
   }
-})
+)
 
 /**
  * 客服强制撤回挂牌（管理员操作）
@@ -897,62 +922,67 @@ router.post(
  *
  * @created 2026-01-09（web管理平台功能完善）
  */
-router.get('/exchange_market/orders', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const {
-      status,
-      user_id,
-      item_id,
-      order_no,
-      page = 1,
-      page_size = 20,
-      sort_by = 'created_at',
-      sort_order = 'DESC'
-    } = req.query
-    const admin_id = req.user.user_id
+router.get(
+  '/exchange_market/orders',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const {
+        status,
+        user_id,
+        item_id,
+        order_no,
+        page = 1,
+        page_size = 20,
+        sort_by = 'created_at',
+        sort_order = 'DESC'
+      } = req.query
+      const admin_id = req.user.user_id
 
-    logger.info('管理员查询兑换订单列表', {
-      admin_id,
-      status,
-      user_id,
-      item_id,
-      order_no,
-      page,
-      page_size
-    })
+      logger.info('管理员查询兑换订单列表', {
+        admin_id,
+        status,
+        user_id,
+        item_id,
+        order_no,
+        page,
+        page_size
+      })
 
-    // 🎯 通过 ServiceManager 获取 ExchangeService
-    const ExchangeService = req.app.locals.services.getService('exchange_market')
+      // 🎯 通过 ServiceManager 获取 ExchangeService
+      const ExchangeService = req.app.locals.services.getService('exchange_market')
 
-    // 调用服务层方法获取订单列表
-    const result = await ExchangeService.getAdminOrders({
-      status,
-      user_id: user_id ? parseInt(user_id) : null,
-      item_id: item_id ? parseInt(item_id) : null,
-      order_no,
-      page: parseInt(page),
-      page_size: parseInt(page_size),
-      sort_by,
-      sort_order
-    })
+      // 调用服务层方法获取订单列表
+      const result = await ExchangeService.getAdminOrders({
+        status,
+        user_id: user_id ? parseInt(user_id) : null,
+        item_id: item_id ? parseInt(item_id) : null,
+        order_no,
+        page: parseInt(page),
+        page_size: parseInt(page_size),
+        sort_by,
+        sort_order
+      })
 
-    logger.info('管理员查询兑换订单成功', {
-      admin_id,
-      total: result.pagination.total,
-      page: result.pagination.page
-    })
+      logger.info('管理员查询兑换订单成功', {
+        admin_id,
+        total: result.pagination.total,
+        page: result.pagination.page
+      })
 
-    return res.apiSuccess(result, '订单列表查询成功')
-  } catch (error) {
-    logger.error('管理员查询兑换订单失败', {
-      error: error.message,
-      stack: error.stack,
-      admin_id: req.user?.user_id
-    })
+      return res.apiSuccess(result, '订单列表查询成功')
+    } catch (error) {
+      logger.error('管理员查询兑换订单失败', {
+        error: error.message,
+        stack: error.stack,
+        admin_id: req.user?.user_id
+      })
 
-    return res.apiError(error.message || '查询订单列表失败', 'INTERNAL_ERROR', null, 500)
+      return res.apiError(error.message || '查询订单列表失败', 'INTERNAL_ERROR', null, 500)
+    }
   }
-})
+)
 
 /**
  * 管理员获取兑换订单详情（Admin Only）

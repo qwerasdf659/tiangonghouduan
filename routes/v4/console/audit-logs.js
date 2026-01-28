@@ -151,25 +151,30 @@ router.get('/stats/store/:store_id', authenticateToken, requireRoleLevel(100), a
  * @query {string} [start_time] - 统计开始时间（北京时间）
  * @query {string} [end_time] - 统计结束时间（北京时间）
  */
-router.get('/stats/operator/:operator_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  const { operator_id } = req.params
-  const { start_time, end_time } = req.query
+router.get(
+  '/stats/operator/:operator_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    const { operator_id } = req.params
+    const { start_time, end_time } = req.query
 
-  if (!operator_id || isNaN(parseInt(operator_id))) {
-    return res.apiError('无效的操作员ID', 'INVALID_OPERATOR_ID', null, 400)
+    if (!operator_id || isNaN(parseInt(operator_id))) {
+      return res.apiError('无效的操作员ID', 'INVALID_OPERATOR_ID', null, 400)
+    }
+
+    try {
+      const stats = await MerchantOperationLogService.getOperatorStats(parseInt(operator_id), {
+        start_time,
+        end_time
+      })
+
+      return res.apiSuccess(stats, '获取操作员审计日志统计成功')
+    } catch (error) {
+      return handleServiceError(error, res, '获取操作员审计日志统计')
+    }
   }
-
-  try {
-    const stats = await MerchantOperationLogService.getOperatorStats(parseInt(operator_id), {
-      start_time,
-      end_time
-    })
-
-    return res.apiSuccess(stats, '获取操作员审计日志统计成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取操作员审计日志统计')
-  }
-})
+)
 
 /**
  * POST /api/v4/console/audit-logs/cleanup

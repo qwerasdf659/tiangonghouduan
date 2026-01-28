@@ -133,33 +133,38 @@ router.get('/:notification_id', authenticateToken, requireRoleLevel(100), async 
  * @returns {Object} 200 - 标记成功
  * @returns {Object} 404 - 通知不存在
  */
-router.post('/:notification_id/read', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { notification_id } = req.params
+router.post(
+  '/:notification_id/read',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { notification_id } = req.params
 
-    // 🔄 通过 ServiceManager 获取 AnnouncementService（符合TR-005规范）
-    const AnnouncementService = req.app.locals.services.getService('announcement')
-    const announcement = await AnnouncementService.getAnnouncementById(notification_id, 'full')
+      // 🔄 通过 ServiceManager 获取 AnnouncementService（符合TR-005规范）
+      const AnnouncementService = req.app.locals.services.getService('announcement')
+      const announcement = await AnnouncementService.getAnnouncementById(notification_id, 'full')
 
-    if (!announcement) {
-      return res.apiError('通知不存在', 'NOTIFICATION_NOT_FOUND', null, 404)
+      if (!announcement) {
+        return res.apiError('通知不存在', 'NOTIFICATION_NOT_FOUND', null, 404)
+      }
+
+      // 增加浏览次数
+      await AnnouncementService.incrementViewCount(notification_id)
+
+      return res.apiSuccess(
+        {
+          notification_id,
+          is_read: true
+        },
+        '标记已读成功'
+      )
+    } catch (error) {
+      logger.error('[Notifications] ❌ 标记已读失败:', error)
+      return res.apiInternalError('标记已读失败', error.message, 'MARK_READ_ERROR')
     }
-
-    // 增加浏览次数
-    await AnnouncementService.incrementViewCount(notification_id)
-
-    return res.apiSuccess(
-      {
-        notification_id,
-        is_read: true
-      },
-      '标记已读成功'
-    )
-  } catch (error) {
-    logger.error('[Notifications] ❌ 标记已读失败:', error)
-    return res.apiInternalError('标记已读失败', error.message, 'MARK_READ_ERROR')
   }
-})
+)
 
 /**
  * POST /api/v4/notifications/read-all - 全部标记为已读
