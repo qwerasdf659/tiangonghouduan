@@ -24,6 +24,12 @@ require('dotenv').config()
 // 设置测试环境标识（允许覆盖）
 process.env.NODE_ENV = 'test'
 
+/*
+ * 🔧 测试环境配置
+ * 禁用API限流器，避免并发测试被429干扰
+ */
+process.env.DISABLE_RATE_LIMITER = 'true'
+
 // 🔧 仅在 .env 未配置时设置测试专用的JWT密钥（非敏感配置）
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-key-for-development-only'
 

@@ -265,6 +265,44 @@ router.post(
       })
       logger.info('[LotteryDraw] 抽奖成功', logData)
 
+      /*
+       * 🔔 WebSocket实时通知：推送抽奖结果给用户（2026-01-28 新增）
+       * 业务场景：用户抽奖成功后，实时推送中奖消息到客户端
+       * 实现说明：
+       * - 在线用户：通过WebSocket实时推送
+       * - 离线用户：消息保存到数据库，上线后可查看
+       * - 通知失败不影响抽奖结果返回（非关键路径）
+       */
+      try {
+        const NotificationService = require('../../../services/NotificationService')
+
+        // 并行发送所有奖品的通知（支持单抽和连抽）
+        const notificationPromises = sanitizedResult.prizes.map(prize =>
+          NotificationService.notifyLotteryWin(user_id, {
+            draw_id: sanitizedResult.lottery_session_id,
+            prize_name: prize.name,
+            prize_type: prize.type,
+            prize_value: prize.display_points,
+            reward_tier: prize.reward_tier,
+            campaign_code: sanitizedResult.campaign_code
+          })
+        )
+
+        await Promise.all(notificationPromises)
+
+        logger.info('[LotteryDraw] WebSocket通知已推送', {
+          user_id,
+          prizes_count: sanitizedResult.prizes.length,
+          lottery_session_id: sanitizedResult.lottery_session_id
+        })
+      } catch (notifyError) {
+        // 通知失败不影响业务流程
+        logger.warn('[LotteryDraw] WebSocket通知发送失败（非关键）', {
+          user_id,
+          error: notifyError.message
+        })
+      }
+
       return res.apiSuccess(sanitizedResult, '抽奖成功', 'DRAW_SUCCESS')
     } catch (error) {
       // 标记幂等请求为失败状态（允许重试）

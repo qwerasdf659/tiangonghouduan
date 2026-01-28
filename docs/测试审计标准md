@@ -1,0 +1,547 @@
+# 📋 测试审计标准文档 - 数据管理规范
+
+> **文档编号**: TEST-AUDIT-002  
+> **版本**: v1.0  
+> **创建时间**: 2026-01-28  
+> **审计周期**: 每季度一次  
+> **适用范围**: 餐厅积分抽奖系统全部测试代码
+
+---
+
+## 📑 目录
+
+1. [审计概述](#1-审计概述)
+2. [审计标准A：测试数据版本控制](#2-审计标准a测试数据版本控制)
+3. [审计标准B：敏感数据脱敏验证](#3-审计标准b敏感数据脱敏验证)
+4. [审计检查清单](#4-审计检查清单)
+5. [整改优先级与时限](#5-整改优先级与时限)
+6. [附录](#6-附录)
+
+---
+
+## 1. 审计概述
+
+### 1.1 审计目的
+
+确保测试体系符合以下要求：
+- **数据一致性**：测试配置与生产配置保持同步
+- **合规性**：敏感数据处理符合《个人信息保护法》等法规要求
+- **可维护性**：测试代码具备良好的可维护性和可扩展性
+
+### 1.2 审计范围
+
+| 审计领域 | 涉及目录 | 审计重点 |
+|---------|---------|---------|
+| 测试数据版本控制 | `tests/` 全目录 | 硬编码配置值 |
+| 敏感数据脱敏验证 | `tests/security/`、`tests/business/` | 脱敏测试覆盖率 |
+
+### 1.3 审计依据
+
+- 《个人信息保护法》第51条：数据处理者应当采取脱敏等安全措施
+- 《网络安全法》第42条：网络运营者不得泄露个人信息
+- 内部安全规范：日志脱敏、响应脱敏、存储加密
+
+### 1.4 不在本次审计范围
+
+| 排除项 | 原因 |
+|-------|------|
+| 测试数据隔离机制 | CI稳定性问题，非合规性问题，优先级中等 |
+| 性能基准回归机制 | CI/CD优化范畴，非测试数据管理问题 |
+
+---
+
+## 2. 审计标准A：测试数据版本控制
+
+### 2.1 标准定义
+
+**TEST-DATA-001**: 测试中使用的业务配置值应从数据库或配置中心动态读取，禁止硬编码。
+
+**违规影响**：
+- 🔴 **高风险**：测试结果与实际业务行为不一致，测试失去验证意义
+- 运营调整配置后，测试可能误判业务逻辑有bug
+
+### 2.2 审计检查项
+
+#### 检查项 A-1：保底机制配置
+
+| 检查要素 | 合规标准 | 违规示例 |
+|---------|---------|---------|
+| 保底阈值 | 从 `lottery_strategy_config` 表或活动配置读取 | `threshold: 10` 硬编码 |
+| 保底档位 | 从活动配置读取 | `target_tier: 'high'` 硬编码 |
+| 重置策略 | 从活动配置读取 | `reset_on_trigger: true` 硬编码 |
+
+**审计方法**：
+```bash
+# 搜索硬编码的保底配置
+grep -rn "threshold.*:.*\d\+" tests/ --include="*.test.js" | grep -v "node_modules"
+grep -rn "GUARANTEE_THRESHOLD.*=.*\d\+" tests/ --include="*.test.js"
+```
+
+**当前违规文件**：
+
+| 文件路径 | 违规行号 | 违规代码 |
+|---------|---------|---------|
+| `tests/services/unified_lottery_engine/pity_guarantee_trigger.test.js` | 47 | `threshold: 10` |
+| `tests/services/unified_lottery_engine/pity_guarantee_trigger.test.js` | 57 | `empty_streak_threshold: 5` |
+| `tests/integration/pity_full_chain.test.js` | 58 | `GUARANTEE_THRESHOLD = 10` |
+| `tests/specialized/stress_test.test.js` | 578 | `streak=10 硬保底` |
+
+#### 检查项 A-2：Pity 系统配置
+
+| 检查要素 | 合规标准 | 违规示例 |
+|---------|---------|---------|
+| 空奖阈值 | 从 `lottery_strategy_config` 表读取 | `empty_streak_threshold: 5` |
+| 概率倍数 | 从 `multiplier_table` 配置读取 | `boost_multiplier: 1.5` |
+| 最大连续次数 | 从配置读取 | `max_empty_streak: 10` |
+
+#### 检查项 A-3：预算档位阈值
+
+| 检查要素 | 合规标准 | 违规示例 |
+|---------|---------|---------|
+| 高档阈值 | 从 `lottery_strategy_config` 表读取 | `threshold_high: 100000` |
+| 中档阈值 | 从配置读取 | `threshold_mid: 50000` |
+| 低档阈值 | 从配置读取 | `threshold_low: 10000` |
+
+### 2.3 合规配置读取方案
+
+**配置来源优先级**：
+
+```
+1. 活动级配置 (campaign.prize_distribution_config)
+   ↓
+2. 全局配置 (lottery_strategy_config 表)
+   ↓
+3. 代码默认值（仅作兜底，需记录日志）
+```
+
+**合规实现示例**：
+
+```javascript
+// ✅ 合规写法：动态读取配置
+const { loadGuaranteeConfig } = require('../helpers/test-config-loader')
+
+describe('保底触发测试', () => {
+  let guaranteeConfig
+  
+  beforeAll(async () => {
+    // 从数据库动态读取，与生产环境保持一致
+    guaranteeConfig = await loadGuaranteeConfig(
+      global.testData?.testCampaign?.campaign_id
+    )
+  })
+  
+  test('达到阈值应触发保底', () => {
+    expect(drawCount).toBe(guaranteeConfig.threshold)
+  })
+})
+```
+
+```javascript
+// ❌ 违规写法：硬编码配置
+const DEFAULT_GUARANTEE_CONFIG = {
+  threshold: 10,  // 违规：硬编码
+}
+
+describe('保底触发测试', () => {
+  test('达到阈值应触发保底', () => {
+    expect(drawCount).toBe(10)  // 违规：魔法数字
+  })
+})
+```
+
+### 2.4 整改要求
+
+| 整改项 | 整改方式 | 负责人 | 截止时间 |
+|-------|---------|-------|---------|
+| 创建配置加载器 | 新建 `tests/helpers/test-config-loader.js` | 测试架构 | 整改后2周内 |
+| 改造保底测试 | 使用配置加载器替换硬编码 | 测试开发 | 整改后2周内 |
+| 改造压测用例 | 使用配置加载器替换硬编码 | 测试开发 | 整改后2周内 |
+
+---
+
+## 3. 审计标准B：敏感数据脱敏验证
+
+### 3.1 标准定义
+
+**TEST-SEC-001**: 系统中所有敏感数据脱敏功能必须有对应的测试用例验证其有效性。
+
+**合规要求**：
+- 《个人信息保护法》第51条
+- 《网络安全法》第42条
+- 等保2.0 数据安全要求
+
+**违规影响**：
+- 🔴🔴 **严重风险**：敏感数据泄露，面临监管处罚
+- 🔴🔴 **严重风险**：安全审计不合规
+
+### 3.2 审计检查项
+
+#### 检查项 B-1：手机号脱敏
+
+| 检查要素 | 合规标准 | 测试要求 |
+|---------|---------|---------|
+| API响应脱敏 | 返回 `136****7930` 格式 | 必须有测试验证 |
+| 日志脱敏 | 日志中不含完整手机号 | 必须有测试验证 |
+| 管理后台脱敏 | 管理员查看用户列表时脱敏 | 必须有测试验证 |
+
+**审计方法**：
+```bash
+# 搜索手机号脱敏相关测试
+grep -rn "mask.*mobile\|mobile.*\*\*\*\*\|136\*\*\*\*" tests/ --include="*.test.js"
+```
+
+**当前状态**：❌ 未发现相关测试用例
+
+**🚨 紧急发现**：`routes/v4/auth/profile.js` 第40行直接返回完整手机号，存在安全漏洞：
+
+```javascript
+// 违规代码（第37-50行）
+const responseData = {
+  user: {
+    mobile: user.mobile,  // ❌ 直接返回完整手机号！
+    // ...
+  }
+}
+```
+
+#### 检查项 B-2：奖品概率脱敏
+
+| 检查要素 | 合规标准 | 测试要求 |
+|---------|---------|---------|
+| 概率字段 | 普通用户不可见 `win_probability` | 必须有测试验证 |
+| 库存字段 | 普通用户不可见 `stock_quantity` | 必须有测试验证 |
+| 成本字段 | 普通用户不可见 `cost_points` | 必须有测试验证 |
+| 替代字段 | 使用 `rarity` 替代概率 | 必须有测试验证 |
+
+**审计方法**：
+```bash
+# 搜索奖品脱敏相关测试
+grep -rn "win_probability\|sanitizePrizes\|rarity" tests/ --include="*.test.js"
+```
+
+**当前状态**：❌ 未发现相关测试用例
+
+#### 检查项 B-3：用户权限脱敏
+
+| 检查要素 | 合规标准 | 测试要求 |
+|---------|---------|---------|
+| 角色信息 | 普通用户不可见 `role` | 必须有测试验证 |
+| 权限配置 | 普通用户不可见 `permissions` | 必须有测试验证 |
+| 管理员标识 | 普通用户不可见 `admin_flags` | 必须有测试验证 |
+
+**当前状态**：❌ 未发现相关测试用例
+
+#### 检查项 B-4：日志脱敏
+
+| 检查要素 | 合规标准 | 测试要求 |
+|---------|---------|---------|
+| 手机号 | 日志中显示为 `136****7930` | 必须有测试验证 |
+| 密码 | 日志中显示为 `[REDACTED]` | 必须有测试验证 |
+| Token | 日志中显示为 `[REDACTED]` | 必须有测试验证 |
+| IP地址 | 日志中显示为 `192.168.*.*` | 建议有测试验证 |
+
+**当前状态**：❌ 未发现相关测试用例
+
+#### 检查项 B-5：PII加密验证
+
+| 检查要素 | 合规标准 | 测试要求 |
+|---------|---------|---------|
+| PII_HASH_SECRET | 已配置且长度≥32字符 | 必须有测试验证 |
+| 加密效果 | 敏感数据存储前已加密 | 建议有测试验证 |
+
+**当前状态**：
+- ⚠️ 配置存在（`test-setup.js` 第22行）
+- ❌ 未发现验证加密效果的测试
+
+### 3.3 现有脱敏测试覆盖情况
+
+| 脱敏场景 | 实现位置 | 测试状态 | 审计结论 |
+|---------|---------|---------|---------|
+| feedback 字段脱敏 | `services/DataSanitizer.js` | ✅ 已覆盖 | 合规 |
+| 手机号脱敏（API） | `utils/logger.js` | ❌ 缺失 | **不合规** |
+| 手机号脱敏（日志） | `utils/logger.js` | ❌ 缺失 | **不合规** |
+| 奖品概率脱敏 | `services/DataSanitizer.js` | ❌ 缺失 | **不合规** |
+| 用户权限脱敏 | `services/DataSanitizer.js` | ❌ 缺失 | **不合规** |
+| PII加密验证 | `test-setup.js` | ❌ 缺失 | **不合规** |
+
+**现有唯一脱敏测试**：
+- 文件：`tests/business/feedback/api.test.js`
+- 覆盖：`user_ip`、`device_info`、`internal_notes`、`admin_id`
+- 评价：覆盖范围过窄，仅针对 feedback 模块
+
+### 3.4 整改要求
+
+| 整改项 | 整改方式 | 风险级别 | 截止时间 |
+|-------|---------|---------|---------|
+| 修复手机号暴露漏洞 | 修改 `routes/v4/auth/profile.js` | 🔴🔴 P0 | **立即** |
+| 创建脱敏测试套件 | 新建 `tests/security/data-masking.test.js` | 🔴🔴 P0 | 整改后1周内 |
+| 添加手机号脱敏测试 | 在测试套件中实现 | 🔴 P1 | 整改后1周内 |
+| 添加奖品概率脱敏测试 | 在测试套件中实现 | 🔴 P1 | 整改后1周内 |
+| 添加用户权限脱敏测试 | 在测试套件中实现 | 🔴 P1 | 整改后1周内 |
+| 添加日志脱敏测试 | 在测试套件中实现 | 🔴 P1 | 整改后2周内 |
+
+---
+
+## 4. 审计检查清单
+
+### 4.1 测试数据版本控制检查清单
+
+| 序号 | 检查项 | 检查方法 | 合规状态 |
+|-----|-------|---------|---------|
+| A-1-1 | 保底阈值无硬编码 | `grep -rn "threshold.*:.*\d\+" tests/` | ❌ 不合规 |
+| A-1-2 | 保底档位无硬编码 | `grep -rn "target_tier.*:.*'" tests/` | ❌ 不合规 |
+| A-2-1 | Pity阈值无硬编码 | `grep -rn "empty_streak.*:.*\d\+" tests/` | ❌ 不合规 |
+| A-2-2 | Pity倍数无硬编码 | `grep -rn "boost_multiplier.*:.*\d" tests/` | ❌ 不合规 |
+| A-3-1 | 存在配置加载器 | 检查 `tests/helpers/test-config-loader.js` | ❌ 不存在 |
+| A-3-2 | 测试使用配置加载器 | 检查 beforeAll 中是否调用 | ❌ 未使用 |
+
+### 4.2 敏感数据脱敏检查清单
+
+| 序号 | 检查项 | 检查方法 | 合规状态 |
+|-----|-------|---------|---------|
+| B-1-1 | API不返回完整手机号 | 检查 `/api/v4/auth/profile` 响应 | ❌ 不合规 |
+| B-1-2 | 手机号脱敏测试存在 | 搜索 `mask.*mobile` 测试 | ❌ 不存在 |
+| B-2-1 | 概率字段脱敏测试存在 | 搜索 `win_probability` 测试 | ❌ 不存在 |
+| B-2-2 | 库存字段脱敏测试存在 | 搜索 `stock_quantity` 测试 | ❌ 不存在 |
+| B-3-1 | 权限字段脱敏测试存在 | 搜索 `permissions` 脱敏测试 | ❌ 不存在 |
+| B-4-1 | 日志脱敏测试存在 | 搜索 `sanitize` 测试 | ❌ 不存在 |
+| B-5-1 | PII_HASH_SECRET 已配置 | 检查环境变量 | ✅ 已配置 |
+| B-5-2 | PII加密效果测试存在 | 搜索 PII 加密测试 | ❌ 不存在 |
+
+### 4.3 审计结论汇总
+
+| 审计标准 | 检查项总数 | 合规数 | 不合规数 | 合规率 |
+|---------|-----------|-------|---------|-------|
+| A: 测试数据版本控制 | 6 | 0 | 6 | **0%** |
+| B: 敏感数据脱敏验证 | 8 | 1 | 7 | **12.5%** |
+| **总计** | **14** | **1** | **13** | **7.1%** |
+
+---
+
+## 5. 整改优先级与时限
+
+### 5.1 优先级定义
+
+| 优先级 | 定义 | 整改时限 |
+|-------|------|---------|
+| 🔴🔴 **P0** | 存在安全漏洞或严重合规风险 | **立即 ~ 1周内** |
+| 🔴 **P1** | 影响测试有效性或存在潜在风险 | 2周内 |
+| 🟡 **P2** | 测试质量改进项 | 1个月内 |
+
+### 5.2 整改任务清单
+
+| 优先级 | 任务 | 负责人 | 工作量 | 截止时间 |
+|-------|------|-------|-------|---------|
+| 🔴🔴 P0 | 修复 `/auth/profile` 手机号暴露 | 后端开发 | 0.5h | **立即** |
+| 🔴🔴 P0 | 创建 `tests/security/data-masking.test.js` | 测试开发 | 1天 | 1周内 |
+| 🔴 P1 | 创建 `tests/helpers/test-config-loader.js` | 测试架构 | 0.5天 | 2周内 |
+| 🔴 P1 | 改造保底机制相关测试（移除硬编码） | 测试开发 | 1天 | 2周内 |
+| 🔴 P1 | 改造压测用例（移除硬编码） | 测试开发 | 0.5天 | 2周内 |
+| 🟡 P2 | 完善日志脱敏测试 | 测试开发 | 0.5天 | 1月内 |
+| 🟡 P2 | 添加 PII 加密效果验证测试 | 测试开发 | 0.5天 | 1月内 |
+
+### 5.3 整改验收标准
+
+| 审计标准 | 验收条件 |
+|---------|---------|
+| A: 测试数据版本控制 | 所有配置值从数据库动态读取，grep 搜索无硬编码违规 |
+| B: 敏感数据脱敏验证 | 脱敏测试套件完整，CI 中脱敏测试全部通过 |
+
+---
+
+## 6. 附录
+
+### 6.1 配置加载器参考实现
+
+**文件**: `tests/helpers/test-config-loader.js`
+
+```javascript
+/**
+ * 测试配置动态加载器
+ * 
+ * 审计标准 A 整改方案
+ * 
+ * @module tests/helpers/test-config-loader
+ * @since 2026-01-28
+ */
+
+'use strict'
+
+const { LotteryStrategyConfig, LotteryCampaign } = require('../../models')
+
+/**
+ * 从数据库动态加载保底配置
+ * 
+ * @param {number|null} campaignId - 活动ID（可选）
+ * @returns {Promise<Object>} 保底配置
+ */
+async function loadGuaranteeConfig(campaignId = null) {
+  // 1. 优先从活动配置读取
+  if (campaignId) {
+    const campaign = await LotteryCampaign.findByPk(campaignId)
+    const guarantee = campaign?.prize_distribution_config?.guarantee
+    if (guarantee?.threshold) {
+      console.log(`[config-loader] 活动配置: campaign_id=${campaignId}, threshold=${guarantee.threshold}`)
+      return guarantee
+    }
+  }
+  
+  // 2. 回退到全局配置
+  const config = await LotteryStrategyConfig.findOne({
+    where: { 
+      config_group: 'pity', 
+      config_key: 'hard_guarantee_threshold',
+      is_active: true
+    }
+  })
+  
+  const threshold = config ? JSON.parse(config.config_value) : 10
+  console.log(`[config-loader] 全局配置: threshold=${threshold}`)
+  
+  return {
+    enabled: true,
+    threshold,
+    target_tier: 'high',
+    reset_on_trigger: true
+  }
+}
+
+/**
+ * 从数据库动态加载 Pity 配置
+ */
+async function loadPityConfig() {
+  const configs = await LotteryStrategyConfig.findAll({
+    where: { config_group: 'pity', is_active: true }
+  })
+  
+  const configMap = {}
+  configs.forEach(c => {
+    configMap[c.config_key] = JSON.parse(c.config_value)
+  })
+  
+  return {
+    enabled: configMap.enabled ?? true,
+    empty_streak_threshold: configMap.hard_guarantee_threshold ?? 10,
+    boost_multiplier: configMap.multiplier_table?.[5] ?? 2.2,
+    max_empty_streak: configMap.hard_guarantee_threshold ?? 10
+  }
+}
+
+module.exports = { loadGuaranteeConfig, loadPityConfig }
+```
+
+### 6.2 脱敏测试套件参考实现
+
+**文件**: `tests/security/data-masking.test.js`
+
+```javascript
+/**
+ * 敏感数据脱敏验证测试
+ * 
+ * 审计标准 B 整改方案
+ * 
+ * 合规要求：
+ * - 《个人信息保护法》第51条
+ * - 《网络安全法》第42条
+ * 
+ * @module tests/security/data-masking
+ * @since 2026-01-28
+ */
+
+'use strict'
+
+const request = require('supertest')
+const app = require('../../app')
+const { maskMobile, sanitize } = require('../../utils/logger')
+const DataSanitizer = require('../../services/DataSanitizer')
+
+describe('🔐 敏感数据脱敏验证（审计标准B）', () => {
+  let userToken, adminToken
+
+  beforeAll(async () => {
+    // 初始化测试token
+  })
+
+  // B-1: 手机号脱敏
+  describe('B-1 手机号脱敏', () => {
+    test('B-1-1 maskMobile 函数正确脱敏', () => {
+      expect(maskMobile('13612227930')).toBe('136****7930')
+      expect(maskMobile(null)).toBeNull()
+    })
+
+    test('B-1-2 API响应中手机号已脱敏', async () => {
+      const response = await request(app)
+        .get('/api/v4/auth/profile')
+        .set('Authorization', `Bearer ${userToken}`)
+
+      if (response.body.data?.user?.mobile) {
+        expect(response.body.data.user.mobile).toMatch(/^\d{3}\*{4}\d{4}$/)
+      }
+    })
+  })
+
+  // B-2: 奖品概率脱敏
+  describe('B-2 奖品概率脱敏', () => {
+    test('B-2-1 普通用户不可见概率字段', async () => {
+      const response = await request(app)
+        .get('/api/v4/lottery/prizes')
+        .set('Authorization', `Bearer ${userToken}`)
+
+      if (response.body.data?.prizes?.length > 0) {
+        response.body.data.prizes.forEach(prize => {
+          expect(prize).not.toHaveProperty('win_probability')
+          expect(prize).not.toHaveProperty('stock_quantity')
+          expect(prize).toHaveProperty('rarity')
+        })
+      }
+    })
+  })
+
+  // B-4: 日志脱敏
+  describe('B-4 日志脱敏', () => {
+    test('B-4-1 sanitize 函数移除敏感字段', () => {
+      const data = { mobile: '13612227930', password: 'secret' }
+      const result = sanitize(data)
+      
+      expect(result.password).not.toBe('secret')
+      expect(result.mobile).toBe('136****7930')
+    })
+  })
+
+  // B-5: PII加密
+  describe('B-5 PII加密配置', () => {
+    test('B-5-1 PII_HASH_SECRET 已正确配置', () => {
+      expect(process.env.PII_HASH_SECRET).toBeDefined()
+      expect(process.env.PII_HASH_SECRET.length).toBeGreaterThanOrEqual(32)
+    })
+  })
+})
+```
+
+### 6.3 脱敏规则速查表
+
+| 数据类型 | 脱敏规则 | 输入示例 | 输出示例 |
+|---------|---------|---------|---------|
+| 手机号 | 保留前3后4 | `13612227930` | `136****7930` |
+| UUID | 保留前8位 | `abc12345-xxxx-xxxx` | `abc12345...` |
+| JWT Token | 完全隐藏 | `eyJhbG...` | `[REDACTED]` |
+| 密码 | 完全隐藏 | `mypassword` | `[REDACTED]` |
+| IP地址 | 保留前两段 | `192.168.1.100` | `192.168.*.*` |
+| 中奖概率 | 转换稀有度 | `0.001` | `legendary` |
+| 银行卡号 | 保留后4位 | `6222021234567890` | `************7890` |
+
+### 6.4 相关文档
+
+| 文档名称 | 路径 |
+|---------|------|
+| 测试体系架构规范 | `docs/测试体系架构规范.md` |
+| API响应格式规范 | `docs/API-Response-Guidelines.md` |
+| 数据安全规范 | `docs/数据安全规范.md` |
+
+---
+
+> **审计执行人**: 测试架构组  
+> **审计完成日期**: 2026-01-28  
+> **下次审计日期**: 2026-04-28  
+> **整改跟踪**: 由测试负责人每周更新整改进度
+

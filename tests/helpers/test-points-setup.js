@@ -393,10 +393,274 @@ async function resetTestUserDailyQuota(userId = null, campaignId = 1) {
   }
 }
 
+/**
+ * 清理测试用户当日挂牌记录（重置每日挂牌计数）
+ * 
+ * 业务背景：
+ * - MarketListingService 限制每用户每日最多 20 次挂牌
+ * - 大量测试会耗尽当日挂牌配额，导致后续测试失败
+ * - 此函数清理测试用户当天的挂牌记录，重置计数
+ *
+ * 警告：此函数会删除挂牌及相关订单，仅用于测试环境！
+ *
+ * @param {number} [userId] - 可选的用户ID，不传则使用测试用户
+ * @param {string} [assetCode='DIAMOND'] - 可选的币种代码
+ * @returns {Promise<{deleted_listings: number, deleted_orders: number}>}
+ * 
+ * @example
+ * // 在测试开始前清理挂牌计数
+ * beforeAll(async () => {
+ *   await resetTestUserDailyListings()
+ * })
+ */
+async function resetTestUserDailyListings(userId = null, assetCode = null) {
+  const { MarketListing, TradeOrder, Op } = require('../../models')
+  const BeijingTimeHelper = require('../../utils/timeHelper')
+  
+  // 确保测试数据已初始化
+  await initRealTestData()
+  
+  let user_id = userId
+  if (!user_id) {
+    user_id = await getRealTestUserId()
+  }
+  
+  if (!user_id) {
+    throw new Error('测试用户未初始化')
+  }
+
+  // 计算北京时间今天0点的UTC时间
+  const now = new Date()
+  const beijingOffset = 8 * 60 // 北京时间偏移量（分钟）
+  const utcOffset = now.getTimezoneOffset()
+  const todayStartBeijing = new Date(now)
+  todayStartBeijing.setMinutes(todayStartBeijing.getMinutes() + utcOffset + beijingOffset)
+  todayStartBeijing.setHours(0, 0, 0, 0)
+  const todayStart = new Date(todayStartBeijing.getTime() - (utcOffset + beijingOffset) * 60 * 1000)
+
+  console.log(`\n🧹 [test-points-setup] 清理测试用户当日挂牌记录`)
+  console.log(`   用户ID: ${user_id}`)
+  console.log(`   币种: ${assetCode || '全部'}`)
+  console.log(`   起始时间: ${todayStart.toISOString()}`)
+
+  try {
+    // 构建查询条件
+    const listingWhere = {
+      seller_user_id: user_id,
+      created_at: { [Op.gte]: todayStart }
+    }
+    if (assetCode) {
+      listingWhere.price_asset_code = assetCode
+    }
+
+    // 1. 查找当日挂牌
+    const listings = await MarketListing.findAll({
+      where: listingWhere,
+      attributes: ['listing_id', 'status']
+    })
+
+    if (listings.length === 0) {
+      console.log(`⚠️ [test-points-setup] 无当日挂牌记录需要清理\n`)
+      return { deleted_listings: 0, deleted_orders: 0 }
+    }
+
+    const listingIds = listings.map(l => l.listing_id)
+    console.log(`   找到 ${listingIds.length} 条当日挂牌记录`)
+
+    // 2. 删除关联的订单
+    const deletedOrders = await TradeOrder.destroy({
+      where: { listing_id: { [Op.in]: listingIds } }
+    })
+    console.log(`   删除 ${deletedOrders} 条关联订单`)
+
+    // 3. 删除挂牌记录
+    const deletedListings = await MarketListing.destroy({
+      where: { listing_id: { [Op.in]: listingIds } }
+    })
+
+    console.log(`✅ [test-points-setup] 挂牌记录清理完成`)
+    console.log(`   删除挂牌: ${deletedListings} 条`)
+    console.log(`   删除订单: ${deletedOrders} 条\n`)
+
+    return {
+      deleted_listings: deletedListings,
+      deleted_orders: deletedOrders
+    }
+  } catch (error) {
+    console.error(`❌ [test-points-setup] 挂牌记录清理失败: ${error.message}`)
+    throw error
+  }
+}
+
+/**
+ * 为测试用户设置更高的每日挂牌上限
+ * 
+ * 通过更新 user_risk_profiles 表的等级默认配置，
+ * 提高所有用户（包括测试用户）的每日挂牌上限。
+ * 
+ * 注意：由于数据库设计限制（uk_user_risk_profiles_level_default），
+ * 无法为单个用户创建个人配置，只能修改等级默认配置。
+ *
+ * @param {number} dailyMaxListings - 新的每日挂牌上限（默认 1000）
+ * @param {number} [userId] - 可选的用户ID（用于获取用户等级）
+ * @param {string} [assetCode='DIAMOND'] - 币种代码
+ * @returns {Promise<Object>} 配置结果
+ * 
+ * @example
+ * // 将测试用户的挂牌上限提高到 500
+ * await setTestUserListingLimit(500)
+ */
+async function setTestUserListingLimit(dailyMaxListings = 1000, userId = null, assetCode = 'DIAMOND') {
+  const { UserRiskProfile, User } = require('../../models')
+  
+  // 确保测试数据已初始化
+  await initRealTestData()
+  
+  let user_id = userId
+  if (!user_id) {
+    user_id = await getRealTestUserId()
+  }
+  
+  if (!user_id) {
+    throw new Error('测试用户未初始化')
+  }
+
+  console.log(`\n⚙️ [test-points-setup] 设置测试用户挂牌上限`)
+  console.log(`   用户ID: ${user_id}`)
+  console.log(`   币种: ${assetCode}`)
+  console.log(`   新上限: ${dailyMaxListings}`)
+
+  try {
+    // 获取用户等级
+    const user = await User.findByPk(user_id, { attributes: ['user_id', 'user_level'] })
+    const userLevel = user?.user_level || 'normal'
+
+    // 由于数据库唯一约束限制，更新等级默认配置而非创建用户配置
+    const levelConfig = await UserRiskProfile.findOne({
+      where: {
+        user_level: userLevel,
+        config_type: 'level'
+      }
+    })
+
+    if (levelConfig) {
+      // 更新等级配置的阈值
+      const currentThresholds = levelConfig.thresholds || {}
+      currentThresholds[assetCode] = {
+        ...currentThresholds[assetCode],
+        daily_max_listings: dailyMaxListings
+      }
+      
+      await levelConfig.update({
+        thresholds: currentThresholds,
+        remarks: `测试环境配置 - 挂牌上限更新为 ${dailyMaxListings} (${new Date().toISOString()})`
+      })
+
+      console.log(`✅ [test-points-setup] 挂牌上限设置完成`)
+      console.log(`   配置ID: ${levelConfig.risk_profile_id}`)
+      console.log(`   用户等级: ${userLevel}`)
+      console.log(`   操作: 更新等级默认配置\n`)
+
+      return {
+        user_id,
+        user_level: userLevel,
+        asset_code: assetCode,
+        daily_max_listings: dailyMaxListings,
+        config_id: levelConfig.risk_profile_id,
+        updated: true
+      }
+    } else {
+      console.log(`⚠️ [test-points-setup] 未找到等级 ${userLevel} 的配置，跳过设置\n`)
+      return {
+        user_id,
+        user_level: userLevel,
+        asset_code: assetCode,
+        daily_max_listings: dailyMaxListings,
+        config_id: null,
+        updated: false
+      }
+    }
+  } catch (error) {
+    console.error(`❌ [test-points-setup] 挂牌上限设置失败: ${error.message}`)
+    throw error
+  }
+}
+
+/**
+ * 准备市场测试环境（综合函数）
+ * 
+ * 为市场相关测试准备完整的测试环境：
+ * 1. 清理当日挂牌记录（重置计数）
+ * 2. 设置较高的挂牌上限
+ * 3. 确保用户有足够积分
+ *
+ * @param {Object} options - 配置选项
+ * @param {number} options.dailyMaxListings - 每日挂牌上限（默认 1000）
+ * @param {number} options.requiredPoints - 需要的积分（默认 100000）
+ * @param {boolean} options.clearTodayListings - 是否清理当日挂牌（默认 true）
+ * @returns {Promise<Object>} 准备结果
+ * 
+ * @example
+ * beforeAll(async () => {
+ *   await prepareMarketTestEnvironment({
+ *     dailyMaxListings: 500,
+ *     requiredPoints: 50000
+ *   })
+ * })
+ */
+async function prepareMarketTestEnvironment(options = {}) {
+  const {
+    dailyMaxListings = 1000,
+    requiredPoints = 100000,
+    clearTodayListings = true
+  } = options
+
+  console.log(`\n🏪 [test-points-setup] 准备市场测试环境...`)
+
+  const result = {
+    listings_cleared: 0,
+    orders_cleared: 0,
+    listing_limit_set: false,
+    points_ensured: false
+  }
+
+  try {
+    // 1. 清理当日挂牌记录
+    if (clearTodayListings) {
+      const clearResult = await resetTestUserDailyListings()
+      result.listings_cleared = clearResult.deleted_listings
+      result.orders_cleared = clearResult.deleted_orders
+    }
+
+    // 2. 设置挂牌上限
+    await setTestUserListingLimit(dailyMaxListings)
+    result.listing_limit_set = true
+
+    // 3. 确保积分充足
+    await ensureTestUserHasPoints(requiredPoints)
+    result.points_ensured = true
+
+    console.log(`✅ [test-points-setup] 市场测试环境准备完成`)
+    console.log(`   清理挂牌: ${result.listings_cleared} 条`)
+    console.log(`   清理订单: ${result.orders_cleared} 条`)
+    console.log(`   挂牌上限: ${dailyMaxListings}`)
+    console.log(`   积分目标: ${requiredPoints}\n`)
+
+    return result
+  } catch (error) {
+    console.error(`❌ [test-points-setup] 市场测试环境准备失败: ${error.message}`)
+    throw error
+  }
+}
+
 module.exports = {
   ensureTestUserHasPoints,
   getTestUserPointsBalance,
   calculateRequiredPoints,
   ensureTestUserHasQuota,
-  resetTestUserDailyQuota
+  resetTestUserDailyQuota,
+  // 市场测试相关辅助函数
+  resetTestUserDailyListings,
+  setTestUserListingLimit,
+  prepareMarketTestEnvironment
 }

@@ -717,6 +717,142 @@ class NotificationService {
     })
   }
 
+  // ==================== 抽奖活动状态变更通知（2026-01-28新增）====================
+
+  /**
+   * 活动状态变更广播（Task 7.2）
+   *
+   * 业务场景：当抽奖活动状态发生变化时（启动/暂停/结束），实时通知相关用户
+   * 通知对象：
+   * - 所有管理员：通过WebSocket广播通知，用于管理后台实时更新
+   * - 相关用户：通过系统消息通知，用于前端展示活动状态
+   *
+   * @param {Object} activityData - 活动数据
+   * @param {string} activityData.campaign_code - 活动编码
+   * @param {string} activityData.campaign_name - 活动名称
+   * @param {string} activityData.old_status - 原状态
+   * @param {string} activityData.new_status - 新状态
+   * @param {number} [activityData.operator_id] - 操作人ID
+   * @param {string} [activityData.reason] - 状态变更原因
+   * @returns {Promise<Object>} 通知结果
+   */
+  static async notifyActivityStatusChange(activityData) {
+    const { campaign_code, campaign_name, old_status, new_status, operator_id, reason } =
+      activityData
+
+    // 状态变更消息映射
+    const statusMessageMap = {
+      active: {
+        title: '🎉 抽奖活动已开始',
+        content: `【${campaign_name}】活动已开始，快来参与抽奖吧！`,
+        admin_content: `活动【${campaign_name}】已启动（${campaign_code}）`
+      },
+      paused: {
+        title: '⏸️ 抽奖活动已暂停',
+        content: `【${campaign_name}】活动已暂停${reason ? `，原因：${reason}` : ''}`,
+        admin_content: `活动【${campaign_name}】已暂停（${campaign_code}）`
+      },
+      ended: {
+        title: '🏁 抽奖活动已结束',
+        content: `【${campaign_name}】活动已结束，感谢您的参与！`,
+        admin_content: `活动【${campaign_name}】已结束（${campaign_code}）`
+      },
+      draft: {
+        title: '📝 抽奖活动已保存',
+        content: `【${campaign_name}】活动配置已保存为草稿`,
+        admin_content: `活动【${campaign_name}】已保存为草稿（${campaign_code}）`
+      }
+    }
+
+    const statusMessage = statusMessageMap[new_status] || {
+      title: '📢 活动状态变更',
+      content: `【${campaign_name}】活动状态已更新`,
+      admin_content: `活动【${campaign_name}】状态已变更（${campaign_code}）`
+    }
+
+    const results = {
+      success: true,
+      admin_notification: null,
+      user_notification: null
+    }
+
+    try {
+      // 1. 广播给所有在线管理员
+      results.admin_notification = await this.sendToAdmins({
+        type: 'activity_status_change',
+        title: statusMessage.title,
+        content: statusMessage.admin_content,
+        data: {
+          campaign_code,
+          campaign_name,
+          old_status,
+          new_status,
+          operator_id,
+          reason,
+          timestamp: BeijingTimeHelper.formatForAPI(new Date()).iso
+        }
+      })
+
+      // 记录广播日志
+      logger.info('[通知] 活动状态变更已广播给管理员', {
+        campaign_code,
+        old_status,
+        new_status,
+        broadcasted_count: results.admin_notification.broadcasted_count
+      })
+    } catch (error) {
+      logger.error('[通知] 管理员广播失败', {
+        campaign_code,
+        error: error.message
+      })
+      results.admin_notification = { success: false, error: error.message }
+    }
+
+    return results
+  }
+
+  /**
+   * 活动启动通知（快捷方法）
+   *
+   * @param {Object} activityData - 活动数据
+   * @returns {Promise<Object>} 通知结果
+   */
+  static async notifyActivityStarted(activityData) {
+    return await this.notifyActivityStatusChange({
+      ...activityData,
+      old_status: activityData.old_status || 'draft',
+      new_status: 'active'
+    })
+  }
+
+  /**
+   * 活动暂停通知（快捷方法）
+   *
+   * @param {Object} activityData - 活动数据
+   * @returns {Promise<Object>} 通知结果
+   */
+  static async notifyActivityPaused(activityData) {
+    return await this.notifyActivityStatusChange({
+      ...activityData,
+      old_status: activityData.old_status || 'active',
+      new_status: 'paused'
+    })
+  }
+
+  /**
+   * 活动结束通知（快捷方法）
+   *
+   * @param {Object} activityData - 活动数据
+   * @returns {Promise<Object>} 通知结果
+   */
+  static async notifyActivityEnded(activityData) {
+    return await this.notifyActivityStatusChange({
+      ...activityData,
+      old_status: activityData.old_status || 'active',
+      new_status: 'ended'
+    })
+  }
+
   // ==================== C2C 材料交易通知 ====================
 
   /**

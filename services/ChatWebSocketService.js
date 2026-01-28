@@ -236,6 +236,28 @@ class ChatWebSocketService {
         socket.emit('pong', { timestamp: BeijingTimeHelper.now() })
       })
 
+      // 2.5 会话恢复请求（Task 7.3 - 2026-01-28新增）
+      socket.on('reconnect_session', async data => {
+        try {
+          const result = await this.handleReconnection(socket, data)
+          wsLogger.info('会话恢复请求处理完成', {
+            user_id: socket.user?.user_id,
+            success: result.success,
+            offline_messages_count: result.offline_messages_count
+          })
+        } catch (error) {
+          wsLogger.error('会话恢复请求处理失败', {
+            user_id: socket.user?.user_id,
+            error: error.message
+          })
+          socket.emit('session_restore_error', {
+            error: 'SESSION_RESTORE_FAILED',
+            message: error.message,
+            timestamp: BeijingTimeHelper.now()
+          })
+        }
+      })
+
       // 3. 断开连接
       socket.on('disconnect', reason => {
         wsLogger.info(`🔌 客户端断开: ${socket.id}, 原因: ${reason}`)
@@ -733,6 +755,239 @@ class ChatWebSocketService {
    */
   static getInstance() {
     return chatWebSocketServiceInstance
+  }
+
+  // ==================== 会话恢复功能（Task 7.3 - 2026-01-28新增）====================
+
+  /**
+   * 获取用户的离线消息（用于断线重连后的会话恢复）
+   *
+   * @description 用户断线重连后，获取其在离线期间收到的消息
+   *
+   * 业务场景：
+   * - 用户网络断开后重新连接，需要获取离线期间的系统通知
+   * - 用户从后台切回前台，需要同步最新消息
+   * - 客户端重连时调用，确保消息不丢失
+   *
+   * @param {number} user_id - 用户ID
+   * @param {Object} options - 选项
+   * @param {Date} [options.since] - 从什么时间开始获取（默认获取最近24小时）
+   * @param {number} [options.limit=50] - 限制返回消息数量
+   * @returns {Promise<Object>} 离线消息结果 {messages, count, sync_timestamp}
+   *
+   * @example
+   * // 客户端重连后获取离线消息
+   * const offlineMessages = await ChatWebSocketService.getOfflineMessages(userId, {
+   *   since: lastSyncTime, // 上次同步时间
+   *   limit: 100
+   * })
+   */
+  async getOfflineMessages(user_id, options = {}) {
+    const { limit = 50 } = options
+    let { since } = options
+
+    // 默认获取最近24小时的消息
+    if (!since) {
+      since = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    }
+
+    try {
+      const { ChatMessage, CustomerServiceSession } = require('../models')
+
+      // 1. 查找用户的聊天会话
+      const sessions = await CustomerServiceSession.findAll({
+        where: { user_id },
+        attributes: ['session_id']
+      })
+
+      if (sessions.length === 0) {
+        return {
+          messages: [],
+          count: 0,
+          sync_timestamp: BeijingTimeHelper.now()
+        }
+      }
+
+      const sessionIds = sessions.map(s => s.session_id)
+
+      // 2. 查询离线期间的消息
+      const messages = await ChatMessage.findAll({
+        where: {
+          session_id: { [require('sequelize').Op.in]: sessionIds },
+          created_at: { [require('sequelize').Op.gte]: since },
+          // 只获取系统消息或发给用户的消息
+          [require('sequelize').Op.or]: [{ message_type: 'system' }, { sender_type: 'admin' }]
+        },
+        order: [['created_at', 'ASC']],
+        limit
+      })
+
+      wsLogger.info('获取离线消息完成', {
+        user_id,
+        since: since.toISOString(),
+        message_count: messages.length
+      })
+
+      return {
+        messages: messages.map(msg => ({
+          message_id: msg.message_id,
+          session_id: msg.session_id,
+          content: msg.content,
+          message_type: msg.message_type,
+          sender_type: msg.sender_type,
+          metadata: msg.metadata,
+          created_at: msg.created_at
+        })),
+        count: messages.length,
+        sync_timestamp: BeijingTimeHelper.now()
+      }
+    } catch (error) {
+      wsLogger.error('获取离线消息失败', {
+        user_id,
+        error: error.message
+      })
+
+      return {
+        messages: [],
+        count: 0,
+        sync_timestamp: BeijingTimeHelper.now(),
+        error: error.message
+      }
+    }
+  }
+
+  /**
+   * 处理客户端重连（会话恢复）
+   *
+   * @description 当客户端断线重连时，恢复其会话状态并推送离线消息
+   *
+   * 业务场景：
+   * - 客户端网络恢复后重新建立WebSocket连接
+   * - 移动端从后台切换到前台时重新连接
+   * - 页面刷新后重新连接
+   *
+   * 恢复流程：
+   * 1. 验证用户身份（已在握手阶段通过JWT完成）
+   * 2. 恢复用户的连接映射
+   * 3. 获取离线消息并推送
+   * 4. 发送会话恢复成功通知
+   *
+   * @param {Object} socket - Socket.IO socket对象
+   * @param {Object} options - 恢复选项
+   * @param {Date} [options.last_sync_time] - 上次同步时间
+   * @returns {Promise<Object>} 恢复结果 {success, offline_messages_count, sync_timestamp}
+   *
+   * @example
+   * // 客户端发送重连请求
+   * socket.emit('reconnect_session', { last_sync_time: '2026-01-28T10:00:00+08:00' })
+   *
+   * // 服务端处理
+   * socket.on('reconnect_session', async (data) => {
+   *   const result = await ChatWebSocketService.handleReconnection(socket, data)
+   *   socket.emit('session_restored', result)
+   * })
+   */
+  async handleReconnection(socket, options = {}) {
+    const { last_sync_time } = options
+    const userId = socket.user?.user_id
+    const isAdmin = socket.user?.role_level >= 100
+
+    if (!userId) {
+      wsLogger.warn('会话恢复失败：用户未认证', { socket_id: socket.id })
+      return {
+        success: false,
+        error: 'USER_NOT_AUTHENTICATED',
+        message: '用户未认证，无法恢复会话'
+      }
+    }
+
+    try {
+      wsLogger.info('开始会话恢复', {
+        user_id: userId,
+        is_admin: isAdmin,
+        last_sync_time: last_sync_time || 'not_provided'
+      })
+
+      // 1. 恢复连接映射（如果之前有断开的连接，更新为新的socket）
+      if (isAdmin) {
+        this.connectedAdmins.set(userId, socket.id)
+        wsLogger.info('管理员连接映射已恢复', { user_id: userId, socket_id: socket.id })
+      } else {
+        this.connectedUsers.set(userId, socket.id)
+        wsLogger.info('用户连接映射已恢复', { user_id: userId, socket_id: socket.id })
+      }
+
+      // 2. 获取离线消息
+      let offlineMessages = { messages: [], count: 0 }
+      if (!isAdmin) {
+        // 只为普通用户获取离线消息
+        const since = last_sync_time ? new Date(last_sync_time) : undefined
+        offlineMessages = await this.getOfflineMessages(userId, { since })
+
+        // 3. 推送离线消息
+        if (offlineMessages.count > 0) {
+          socket.emit('offline_messages', {
+            messages: offlineMessages.messages,
+            count: offlineMessages.count,
+            sync_timestamp: offlineMessages.sync_timestamp
+          })
+
+          wsLogger.info('离线消息已推送', {
+            user_id: userId,
+            message_count: offlineMessages.count
+          })
+        }
+      }
+
+      // 4. 发送会话恢复成功通知
+      const result = {
+        success: true,
+        user_id: userId,
+        is_admin: isAdmin,
+        offline_messages_count: offlineMessages.count,
+        sync_timestamp: BeijingTimeHelper.now(),
+        message: `会话恢复成功${offlineMessages.count > 0 ? `，已推送${offlineMessages.count}条离线消息` : ''}`
+      }
+
+      socket.emit('session_restored', result)
+
+      wsLogger.info('会话恢复完成', {
+        user_id: userId,
+        offline_messages_count: offlineMessages.count
+      })
+
+      return result
+    } catch (error) {
+      wsLogger.error('会话恢复失败', {
+        user_id: userId,
+        error: error.message
+      })
+
+      return {
+        success: false,
+        error: 'SESSION_RESTORE_FAILED',
+        message: `会话恢复失败: ${error.message}`
+      }
+    }
+  }
+
+  /**
+   * 获取连接状态（用于客户端显示连接状态）
+   *
+   * @param {number} user_id - 用户ID
+   * @param {string} user_type - 用户类型（user/admin）
+   * @returns {Object} 连接状态 {connected, socket_id, last_activity}
+   */
+  getConnectionStatus(user_id, user_type = 'user') {
+    const map = user_type === 'admin' ? this.connectedAdmins : this.connectedUsers
+    const socketId = map.get(user_id)
+
+    return {
+      connected: !!socketId,
+      socket_id: socketId || null,
+      user_type,
+      timestamp: BeijingTimeHelper.now()
+    }
   }
 }
 

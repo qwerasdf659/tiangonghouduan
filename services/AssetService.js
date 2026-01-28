@@ -700,20 +700,22 @@ class AssetService {
         )
       }
 
-      // 验证冻结余额充足
-      if (balance.frozen_amount < amount) {
+      // 验证冻结余额充足（注意：DECIMAL字段可能为字符串类型，需要显式转换为数字）
+      const frozenAmount = Number(balance.frozen_amount)
+      const unfreezeAmount = Number(amount)
+      if (frozenAmount < unfreezeAmount) {
         throw new Error(
-          `冻结余额不足：当前冻结余额${balance.frozen_amount}个${asset_code}，需要解冻${amount}个，差额${amount - balance.frozen_amount}个`
+          `冻结余额不足：当前冻结余额${frozenAmount}个${asset_code}，需要解冻${unfreezeAmount}个，差额${unfreezeAmount - frozenAmount}个`
         )
       }
 
       // 记录变动前余额
       const available_before = Number(balance.available_amount)
-      const frozen_before = Number(balance.frozen_amount)
+      const frozen_before = frozenAmount
 
       // 计算变动后余额
-      const available_after = available_before + amount
-      const frozen_after = frozen_before - amount
+      const available_after = available_before + unfreezeAmount
+      const frozen_after = frozen_before - unfreezeAmount
 
       // 更新余额（available增加，frozen减少）
       await balance.update(
@@ -875,10 +877,12 @@ class AssetService {
         )
       }
 
-      // 验证冻结余额充足
-      if (balance.frozen_amount < amount) {
+      // 验证冻结余额充足（注意：DECIMAL字段可能为字符串类型，需要显式转换为数字）
+      const frozenAmount = Number(balance.frozen_amount)
+      const settleAmount = Number(amount)
+      if (frozenAmount < settleAmount) {
         throw new Error(
-          `冻结余额不足：当前冻结余额${balance.frozen_amount}个${asset_code}，需要结算${amount}个，差额${amount - balance.frozen_amount}个`
+          `冻结余额不足：当前冻结余额${frozenAmount}个${asset_code}，需要结算${settleAmount}个，差额${settleAmount - frozenAmount}个`
         )
       }
 

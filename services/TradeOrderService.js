@@ -194,20 +194,24 @@ class TradeOrderService {
       const currentAssetCode = tempListing.price_asset_code // 已通过白名单校验
 
       // 验证参数一致性（严格校验）
+      /*
+       * 验证参数一致性
+       * 注意：数据库字段可能为字符串类型，需要转换后比较
+       */
       const parameterMismatch = []
 
-      if (existingOrder.listing_id !== listing_id) {
+      if (Number(existingOrder.listing_id) !== Number(listing_id)) {
         parameterMismatch.push(`listing_id: ${existingOrder.listing_id} ≠ ${listing_id}`)
       }
-      if (existingOrder.buyer_user_id !== buyer_id) {
+      if (Number(existingOrder.buyer_user_id) !== Number(buyer_id)) {
         parameterMismatch.push(`buyer_user_id: ${existingOrder.buyer_user_id} ≠ ${buyer_id}`)
       }
-      if (existingOrder.gross_amount !== currentGrossAmount) {
+      if (Number(existingOrder.gross_amount) !== Number(currentGrossAmount)) {
         parameterMismatch.push(
           `gross_amount: ${existingOrder.gross_amount} ≠ ${currentGrossAmount}`
         )
       }
-      if (existingOrder.asset_code !== currentAssetCode) {
+      if (String(existingOrder.asset_code) !== String(currentAssetCode)) {
         parameterMismatch.push(`asset_code: ${existingOrder.asset_code} ≠ ${currentAssetCode}`)
       }
 
@@ -356,12 +360,13 @@ class TradeOrderService {
       logger.info('[TradeOrderService] 手续费已禁用或物品信息缺失，跳过手续费计算')
     }
 
-    // 计算对账金额
-    const grossAmount = listing.price_amount
-    const netAmount = listing.price_amount - feeAmount
+    // 计算对账金额（确保类型一致，避免 Decimal 类型比较问题）
+    const grossAmount = Number(listing.price_amount)
+    const netAmount = grossAmount - feeAmount
 
-    // 验证对账公式
-    if (grossAmount !== feeAmount + netAmount) {
+    // 验证对账公式（使用数值比较，处理可能的浮点精度问题）
+    const expectedSum = feeAmount + netAmount
+    if (Math.abs(grossAmount - expectedSum) > 0.001) {
       throw new Error(
         `对账金额错误：gross_amount(${grossAmount}) ≠ fee_amount(${feeAmount}) + net_amount(${netAmount})`
       )

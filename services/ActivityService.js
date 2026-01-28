@@ -847,6 +847,180 @@ class ActivityService {
         : `活动 ${campaign.campaign_name} 配置校验失败，禁止上线`
     }
   }
+
+  /**
+   * 更新活动状态并发送WebSocket通知（Task 7.2）
+   *
+   * @description 更新活动状态并广播状态变更通知给管理员
+   *
+   * 业务场景：
+   * - 管理员启动活动：status 从 draft → active
+   * - 管理员暂停活动：status 从 active → paused
+   * - 管理员结束活动：status 从 active/paused → ended
+   * - 系统定时任务结束活动：活动过期自动变更状态
+   *
+   * WebSocket通知：
+   * - 状态变更成功后自动广播给所有在线管理员
+   * - 通知类型：activity_status_change
+   *
+   * @param {number} campaignId - 活动ID
+   * @param {string} newStatus - 新状态（active/paused/ended/draft）
+   * @param {Object} options - 选项
+   * @param {number} [options.operated_by] - 操作者ID
+   * @param {string} [options.reason] - 状态变更原因
+   * @param {Object} [options.transaction] - Sequelize事务
+   * @returns {Promise<Object>} 更新结果 {success, campaign, old_status, new_status, notification}
+   * @throws {Error} 活动不存在或状态变更失败
+   *
+   * @example
+   * // 启动活动
+   * const result = await ActivityService.updateCampaignStatus(1, 'active', {
+   *   operated_by: 31,
+   *   reason: '活动配置完成，正式上线'
+   * })
+   *
+   * // 暂停活动
+   * const result = await ActivityService.updateCampaignStatus(1, 'paused', {
+   *   operated_by: 31,
+   *   reason: '奖品库存不足，暂停活动'
+   * })
+   */
+  static async updateCampaignStatus(campaignId, newStatus, options = {}) {
+    const { operated_by, reason, transaction } = options
+
+    // 1. 验证新状态是否有效
+    const validStatuses = ['draft', 'active', 'paused', 'ended']
+    if (!validStatuses.includes(newStatus)) {
+      const error = new Error(`无效的活动状态: ${newStatus}，有效值：${validStatuses.join('/')}`)
+      error.code = 'INVALID_STATUS'
+      error.statusCode = 400
+      throw error
+    }
+
+    // 2. 查找活动
+    const campaign = await models.LotteryCampaign.findByPk(campaignId, { transaction })
+    if (!campaign) {
+      const error = new Error(`活动不存在: campaign_id=${campaignId}`)
+      error.code = 'CAMPAIGN_NOT_FOUND'
+      error.statusCode = 404
+      throw error
+    }
+
+    const oldStatus = campaign.status
+
+    // 3. 状态变更规则检查
+    const statusTransitions = {
+      draft: ['active'], // 草稿只能变为启用
+      active: ['paused', 'ended'], // 启用可以暂停或结束
+      paused: ['active', 'ended'], // 暂停可以恢复或结束
+      ended: [] // 结束状态不可变更
+    }
+
+    const allowedTransitions = statusTransitions[oldStatus] || []
+    if (!allowedTransitions.includes(newStatus)) {
+      const error = new Error(
+        `状态变更不允许: ${oldStatus} → ${newStatus}，允许的变更: ${allowedTransitions.join('/')}`
+      )
+      error.code = 'INVALID_STATUS_TRANSITION'
+      error.statusCode = 400
+      throw error
+    }
+
+    // 4. 启动前校验（仅当状态变为 active 时）
+    if (newStatus === 'active') {
+      const validation = await this.validateForLaunch(campaignId, { transaction })
+      if (!validation.valid) {
+        const error = new Error(`活动配置校验失败，无法启动: ${validation.error}`)
+        error.code = 'VALIDATION_FAILED'
+        error.statusCode = 400
+        error.validation = validation
+        throw error
+      }
+    }
+
+    // 5. 更新活动状态
+    await campaign.update({ status: newStatus }, { transaction })
+
+    logger.info('[ActivityService] 活动状态已更新', {
+      campaign_id: campaignId,
+      campaign_code: campaign.campaign_code,
+      old_status: oldStatus,
+      new_status: newStatus,
+      operated_by,
+      reason
+    })
+
+    // 6. 发送WebSocket通知（非阻塞，失败不影响主流程）
+    let notificationResult = null
+    try {
+      const NotificationService = require('./NotificationService')
+      notificationResult = await NotificationService.notifyActivityStatusChange({
+        campaign_code: campaign.campaign_code,
+        campaign_name: campaign.campaign_name,
+        old_status: oldStatus,
+        new_status: newStatus,
+        operator_id: operated_by,
+        reason
+      })
+
+      logger.info('[ActivityService] WebSocket状态变更通知已发送', {
+        campaign_code: campaign.campaign_code,
+        broadcasted_count: notificationResult?.admin_notification?.broadcasted_count
+      })
+    } catch (notifyError) {
+      // 通知失败不影响主流程
+      logger.warn('[ActivityService] WebSocket通知发送失败（非关键）', {
+        campaign_id: campaignId,
+        error: notifyError.message
+      })
+    }
+
+    return {
+      success: true,
+      campaign: {
+        campaign_id: campaign.campaign_id,
+        campaign_code: campaign.campaign_code,
+        campaign_name: campaign.campaign_name,
+        old_status: oldStatus,
+        new_status: newStatus
+      },
+      notification: notificationResult,
+      message: `活动状态已从 ${oldStatus} 变更为 ${newStatus}`
+    }
+  }
+
+  /**
+   * 启动活动（快捷方法）
+   *
+   * @param {number} campaignId - 活动ID
+   * @param {Object} options - 选项
+   * @returns {Promise<Object>} 更新结果
+   */
+  static async startCampaign(campaignId, options = {}) {
+    return await this.updateCampaignStatus(campaignId, 'active', options)
+  }
+
+  /**
+   * 暂停活动（快捷方法）
+   *
+   * @param {number} campaignId - 活动ID
+   * @param {Object} options - 选项
+   * @returns {Promise<Object>} 更新结果
+   */
+  static async pauseCampaign(campaignId, options = {}) {
+    return await this.updateCampaignStatus(campaignId, 'paused', options)
+  }
+
+  /**
+   * 结束活动（快捷方法）
+   *
+   * @param {number} campaignId - 活动ID
+   * @param {Object} options - 选项
+   * @returns {Promise<Object>} 更新结果
+   */
+  static async endCampaign(campaignId, options = {}) {
+    return await this.updateCampaignStatus(campaignId, 'ended', options)
+  }
 }
 
 module.exports = ActivityService
