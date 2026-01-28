@@ -17,6 +17,26 @@ const { Sequelize } = require('sequelize')
 // ⚡ 慢查询监控配置（2025年01月21日新增）
 const SLOW_QUERY_THRESHOLD = 1000 // 1秒阈值
 
+/**
+ * 脱敏SQL日志中的敏感信息
+ *
+ * 业务场景：
+ * - Sequelize SQL日志中可能包含手机号、密码等敏感信息
+ * - 根据P0-4验收标准，日志文件中不应存在完整手机号
+ *
+ * 脱敏规则：
+ * - 手机号：136****7930 格式
+ * - 其他敏感字段通过sanitize()统一处理
+ *
+ * @param {string} sql - 原始SQL语句
+ * @returns {string} 脱敏后的SQL语句
+ */
+function sanitizeSql(sql) {
+  if (!sql || typeof sql !== 'string') return sql
+  // 脱敏手机号：13612227930 -> 136****7930
+  return sql.replace(/(\d{3})\d{4}(\d{4})/g, '$1****$2')
+}
+
 /*
  * 🔴 集成数据库性能监控模块（2025-11-09新增）
  * 用于统计慢查询频率，支持性能监控和告警
@@ -63,17 +83,20 @@ const dbConfig = {
   database: process.env.DB_NAME,
   dialect: 'mysql',
   timezone: '+08:00', // 全系统统一使用北京时间
-  // ⚡ 使用慢查询监控日志（2025年01月21日优化）
+  /*
+   * ⚡ 使用慢查询监控日志（2025年01月21日优化）
+   * 🔐 P0-4验收标准：SQL日志必须脱敏手机号等敏感信息
+   */
   logging:
     process.env.NODE_ENV === 'development'
       ? (sql, timing) => {
-          // 开发环境：记录所有查询和慢查询
-          console.log(sql)
-          if (timing) slowQueryLogger(sql, timing)
+          // 开发环境：记录所有查询和慢查询（已脱敏）
+          console.log(sanitizeSql(sql))
+          if (timing) slowQueryLogger(sanitizeSql(sql), timing)
         }
       : (sql, timing) => {
-          // 生产环境：只记录慢查询
-          if (timing) slowQueryLogger(sql, timing)
+          // 生产环境：只记录慢查询（已脱敏）
+          if (timing) slowQueryLogger(sanitizeSql(sql), timing)
         },
   benchmark: true, // ⚡ 启用查询时间记录（必需）
   pool: {

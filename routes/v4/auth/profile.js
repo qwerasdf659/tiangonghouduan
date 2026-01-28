@@ -15,6 +15,8 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, getUserRoles } = require('../../../middleware/auth')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
+// 🔐 P0-1修复：引入手机号脱敏函数（审计标准B-1-2）
+const { sanitize } = require('../../../utils/logger')
 
 /**
  * 🛡️ 获取当前用户信息
@@ -37,7 +39,8 @@ router.get('/profile', authenticateToken, async (req, res) => {
   const responseData = {
     user: {
       user_id: user.user_id,
-      mobile: user.mobile,
+      // 🔐 P0-1修复：手机号脱敏处理，返回 136****7930 格式（审计标准B-1-2）
+      mobile: sanitize.mobile(user.mobile),
       nickname: user.nickname,
       role_level: userRoles.role_level, // 角色级别（>= 100 为管理员）
       roles: userRoles.roles,

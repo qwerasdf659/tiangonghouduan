@@ -278,6 +278,13 @@ export const LOTTERY_ENDPOINTS = {
     '/api/v4/console/lottery-monitoring/user-quotas/:user_id/:campaign_id',
   MONITORING_USER_QUOTAS_STATS: '/api/v4/console/lottery-monitoring/user-quotas/stats/:campaign_id',
 
+  // 用户抽奖档案聚合 API（P0）
+  MONITORING_USER_PROFILE: '/api/v4/console/lottery-monitoring/user-profile/:user_id',
+  // 活动 ROI 聚合 API（P1）
+  MONITORING_CAMPAIGN_ROI: '/api/v4/console/lottery-monitoring/campaign-roi/:campaign_id',
+  // 日报数据聚合 API（P2）
+  ANALYTICS_DAILY_REPORT: '/api/v4/console/lottery-analytics/daily-report',
+
   // 核销订单 - 使用后端实际路径
   BUSINESS_RECORDS_REDEMPTION_ORDERS: '/api/v4/console/business-records/redemption-orders',
   BUSINESS_RECORDS_REDEMPTION_STATISTICS:

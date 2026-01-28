@@ -16,56 +16,73 @@
  * - 触发保底后，计数器重置，重新开始累计
  * - 保底不会重复触发（需要重新累计达到阈值）
  *
+ * 配置来源：
+ * - 保底/Pity配置从数据库动态加载（LotteryStrategyConfig表）
+ * - 使用 test-config-loader.js 统一管理配置加载
+ * - 数据库无配置时回退到默认值
+ *
  * @module tests/services/unified_lottery_engine/pity_guarantee_trigger
  * @author 测试审计标准文档 任务8.4
  * @since 2026-01-28
  */
 
 const {
-  LotteryComputeEngine,
   PityCalculator,
   ExperienceStateManager
 } = require('../../../services/UnifiedLotteryEngine/compute')
 
 const models = require('../../../models')
-const { User, LotteryCampaign, LotteryPrize, LotteryUserExperienceState } = models
+const { User, LotteryCampaign, LotteryPrize } = models
+
+// 使用配置加载器获取动态配置
+const {
+  loadGuaranteeConfig,
+  loadPityConfig,
+  DEFAULT_GUARANTEE_CONFIG,
+  DEFAULT_PITY_CONFIG
+} = require('../../helpers/test-config-loader')
 
 describe('保底触发完整流程测试（任务8.4）', () => {
   let pity_calculator
   let experience_state_manager
-  let lottery_compute_engine
   let unified_lottery_engine
   let test_user = null
   let test_campaign = null
   let test_prizes = []
 
   /**
-   * 默认保底配置
+   * 动态加载的保底配置（从数据库或默认值）
+   * @type {Object}
    */
-  const DEFAULT_GUARANTEE_CONFIG = {
-    enabled: true,
-    threshold: 10, // 抽奖10次必出高价值奖品
-    target_tier: 'high', // 保底档位
-    reset_on_trigger: true // 触发后重置计数
-  }
+  let GUARANTEE_CONFIG = null
 
   /**
-   * 默认 Pity 配置（来自 StrategyConfig）
+   * 动态加载的 Pity 配置（从数据库或默认值）
+   * @type {Object}
    */
-  const DEFAULT_PITY_CONFIG = {
-    enabled: true,
-    empty_streak_threshold: 5, // 连续5次空奖触发 Pity
-    boost_multiplier: 1.5, // Pity 触发时提升概率
-    max_empty_streak: 10 // 最大连续空奖次数
-  }
+  let PITY_CONFIG = null
 
   beforeAll(async () => {
     console.log('🔍 初始化保底触发完整流程测试环境...')
 
+    // 动态加载保底和Pity配置（从数据库或使用默认值）
+    try {
+      GUARANTEE_CONFIG = await loadGuaranteeConfig()
+      PITY_CONFIG = await loadPityConfig()
+      console.log('✅ 配置加载成功:', {
+        guarantee_threshold: GUARANTEE_CONFIG.threshold,
+        pity_empty_streak_threshold: PITY_CONFIG.empty_streak_threshold,
+        pity_max_empty_streak: PITY_CONFIG.max_empty_streak
+      })
+    } catch (error) {
+      console.warn('⚠️ 配置加载失败，使用默认值:', error.message)
+      GUARANTEE_CONFIG = DEFAULT_GUARANTEE_CONFIG
+      PITY_CONFIG = DEFAULT_PITY_CONFIG
+    }
+
     // 创建计算器实例
     pity_calculator = new PityCalculator()
     experience_state_manager = new ExperienceStateManager()
-    lottery_compute_engine = new LotteryComputeEngine()
 
     // 获取服务实例（如果可用）
     try {
@@ -131,10 +148,13 @@ describe('保底触发完整流程测试（任务8.4）', () => {
     /**
      * 模拟检查保底触发条件
      * @param {Object} context - 上下文对象
-     * @param {Object} config - 保底配置
+     * @param {Object} config - 保底配置（默认使用动态加载的配置）
      * @returns {Object} 检查结果
      */
-    const checkGuaranteeTrigger = (context, config = DEFAULT_GUARANTEE_CONFIG) => {
+    const checkGuaranteeTrigger = (
+      context,
+      config = GUARANTEE_CONFIG || DEFAULT_GUARANTEE_CONFIG
+    ) => {
       if (!config.enabled) {
         return { triggered: false, reason: 'disabled' }
       }
@@ -162,7 +182,7 @@ describe('保底触发完整流程测试（任务8.4）', () => {
         last_high_tier_draw: 5 // 上次高价值在第5次
       }
 
-      const result = checkGuaranteeTrigger(context, DEFAULT_GUARANTEE_CONFIG)
+      const result = checkGuaranteeTrigger(context)
 
       console.log('📊 保底触发检查:')
       console.log(`   user_draw_count: ${context.user_draw_count}`)
@@ -184,7 +204,7 @@ describe('保底触发完整流程测试（任务8.4）', () => {
         last_high_tier_draw: 0
       }
 
-      const result = checkGuaranteeTrigger(context, DEFAULT_GUARANTEE_CONFIG)
+      const result = checkGuaranteeTrigger(context)
 
       console.log('📊 保底不触发检查:')
       console.log(`   draws_since_high_tier: ${result.draws_since_high_tier}`)
@@ -203,7 +223,7 @@ describe('保底触发完整流程测试（任务8.4）', () => {
         last_high_tier_draw: 0
       }
 
-      const result = checkGuaranteeTrigger(context, DEFAULT_GUARANTEE_CONFIG)
+      const result = checkGuaranteeTrigger(context)
 
       console.log('📊 刚好达到阈值:')
       console.log(`   draws_since_high_tier: ${result.draws_since_high_tier}`)
@@ -221,7 +241,8 @@ describe('保底触发完整流程测试（任务8.4）', () => {
         last_high_tier_draw: 0
       }
 
-      const disabledConfig = { ...DEFAULT_GUARANTEE_CONFIG, enabled: false }
+      // 使用动态加载的配置，并覆盖 enabled 为 false
+      const disabledConfig = { ...(GUARANTEE_CONFIG || DEFAULT_GUARANTEE_CONFIG), enabled: false }
       const result = checkGuaranteeTrigger(context, disabledConfig)
 
       console.log('📊 保底禁用检查:')
@@ -303,8 +324,9 @@ describe('保底触发完整流程测试（任务8.4）', () => {
         draws_since_high_tier: 10
       }
 
-      // 模拟重置逻辑
-      if (trigger_result.triggered && DEFAULT_GUARANTEE_CONFIG.reset_on_trigger) {
+      // 模拟重置逻辑（使用动态加载的配置或默认值）
+      const config = GUARANTEE_CONFIG || DEFAULT_GUARANTEE_CONFIG
+      if (trigger_result.triggered && config.reset_on_trigger) {
         state.last_high_tier_draw = state.user_draw_count
         state.pity_trigger_count += 1
       }
@@ -332,12 +354,15 @@ describe('保底触发完整流程测试（任务8.4）', () => {
         last_high_tier_draw: 15 // 刚触发保底重置
       }
 
+      // 使用动态加载的配置或默认值
+      const config = GUARANTEE_CONFIG || DEFAULT_GUARANTEE_CONFIG
+
       // 连续检查多次
       const checkResults = []
       for (let i = 0; i < 15; i++) {
         state.user_draw_count += 1
         const draws_since_high_tier = state.user_draw_count - state.last_high_tier_draw
-        const triggered = draws_since_high_tier >= DEFAULT_GUARANTEE_CONFIG.threshold
+        const triggered = draws_since_high_tier >= config.threshold
 
         checkResults.push({
           draw: i + 1,
@@ -783,7 +808,9 @@ describe('保底触发完整流程测试（任务8.4）', () => {
       }
 
       const simulation_results = []
-      const THRESHOLD = DEFAULT_GUARANTEE_CONFIG.threshold
+      // 使用动态加载的配置或默认值
+      const config = GUARANTEE_CONFIG || DEFAULT_GUARANTEE_CONFIG
+      const THRESHOLD = config.threshold
 
       // 模拟 THRESHOLD * 2 + 5 次抽奖（确保能触发两次保底）
       const TOTAL_DRAWS = THRESHOLD * 2 + 5
@@ -885,7 +912,9 @@ describe('保底触发完整流程测试（任务8.4）', () => {
 
   describe('边界条件验证', () => {
     test('阈值为1时应每次触发保底', () => {
-      const config = { ...DEFAULT_GUARANTEE_CONFIG, threshold: 1 }
+      // 使用动态加载的配置或默认值，并覆盖 threshold
+      const baseConfig = GUARANTEE_CONFIG || DEFAULT_GUARANTEE_CONFIG
+      const config = { ...baseConfig, threshold: 1 }
       const context = {
         user_draw_count: 1,
         last_high_tier_draw: 0
@@ -904,7 +933,9 @@ describe('保底触发完整流程测试（任务8.4）', () => {
     })
 
     test('阈值为0时行为应正确处理', () => {
-      const config = { ...DEFAULT_GUARANTEE_CONFIG, threshold: 0 }
+      // 使用动态加载的配置或默认值，并覆盖 threshold
+      const baseConfig = GUARANTEE_CONFIG || DEFAULT_GUARANTEE_CONFIG
+      const config = { ...baseConfig, threshold: 0 }
       const context = {
         user_draw_count: 0,
         last_high_tier_draw: 0
@@ -923,7 +954,9 @@ describe('保底触发完整流程测试（任务8.4）', () => {
     })
 
     test('超大阈值不应导致异常', () => {
-      const config = { ...DEFAULT_GUARANTEE_CONFIG, threshold: Number.MAX_SAFE_INTEGER }
+      // 使用动态加载的配置或默认值，并覆盖 threshold
+      const baseConfig = GUARANTEE_CONFIG || DEFAULT_GUARANTEE_CONFIG
+      const config = { ...baseConfig, threshold: Number.MAX_SAFE_INTEGER }
       const context = {
         user_draw_count: 1000000,
         last_high_tier_draw: 0

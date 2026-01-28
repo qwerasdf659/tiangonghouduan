@@ -53,6 +53,8 @@ const systemDataRoutes = require('./system-data') // 🆕 系统数据查询（2
 const featureFlagsRoutes = require('./feature-flags') // 🆕 功能开关管理（2026-01-21 Feature Flag 灰度发布）
 const lotteryStrategyStatsRoutes = require('./lottery-strategy-stats') // 🆕 抽奖策略统计（2026-01-22 策略引擎监控方案）
 const sessionsRoutes = require('./sessions') // 🆕 会话管理（2026-01-21 会话管理功能补齐）
+const lotteryCampaignsRoutes = require('./lottery-campaigns') // 🆕 抽奖活动列表管理（2026-01-28 P1 运营后台 ROI/复购率/库存预警）
+const lotteryAnalyticsRoutes = require('./lottery-analytics') // 🆕 抽奖分析（2026-01-28 P2 运营日报聚合）
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -97,6 +99,8 @@ router.use('/system-data', systemDataRoutes) // 🆕 系统数据查询路由（
 router.use('/feature-flags', featureFlagsRoutes) // 🆕 功能开关管理路由（2026-01-21 Feature Flag 灰度发布）
 router.use('/lottery-strategy-stats', lotteryStrategyStatsRoutes) // 🆕 抽奖策略统计路由（2026-01-22 策略引擎监控方案）
 router.use('/sessions', sessionsRoutes) // 🆕 会话管理路由（2026-01-21 会话管理功能补齐）
+router.use('/lottery-campaigns', lotteryCampaignsRoutes) // 🆕 抽奖活动列表管理路由（2026-01-28 P1 运营后台 ROI/复购率/库存预警）
+router.use('/lottery-analytics', lotteryAnalyticsRoutes) // 🆕 抽奖分析路由（2026-01-28 P2 运营日报聚合）
 
 /**
  * GET / - Admin API根路径信息
@@ -539,6 +543,16 @@ router.get('/', (req, res) => {
           '/sessions/online-users'
         ],
         note: '用户会话管理：会话列表、统计、强制登出、清理过期会话、在线用户监控；仅限 admin 访问'
+      },
+      lottery_campaigns: {
+        description: '抽奖活动列表管理（2026-01-28 P1 运营后台 ROI/复购率/库存预警）',
+        endpoints: ['/lottery/campaigns', '/lottery/campaigns/:campaign_id'],
+        note: '活动列表含 ROI、复购率、库存预警；ROI/复购率使用 Redis 缓存（5分钟 TTL）；仅限 admin 访问'
+      },
+      lottery_analytics: {
+        description: '抽奖分析（2026-01-28 P2 运营日报聚合）',
+        endpoints: ['/lottery-analytics/daily-report'],
+        note: '运营日报聚合：当日汇总、昨日/上周对比、告警、小时分布、档位分布、热门奖品、活动分布；仅限 admin 访问'
       }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },

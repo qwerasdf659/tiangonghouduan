@@ -20,7 +20,7 @@
 
 const express = require('express')
 const router = express.Router()
-const logger = require('../../../utils/logger').logger
+const { logger, sanitize } = require('../../../utils/logger')
 const {
   generateTokens,
   getUserRoles,
@@ -231,7 +231,7 @@ router.post('/logout', authenticateToken, async (req, res) => {
   await invalidateUserPermissions(user_id, 'user_logout', user_id)
 
   // 记录退出日志
-  logger.info(`✅ [Auth] 用户退出登录: user_id=${user_id}, mobile=${req.user.mobile}`)
+  logger.info(`✅ [Auth] 用户退出登录: user_id=${user_id}, mobile=${sanitize.mobile(req.user.mobile)}`)
 
   return res.apiSuccess(null, '退出登录成功', 'LOGOUT_SUCCESS')
 })

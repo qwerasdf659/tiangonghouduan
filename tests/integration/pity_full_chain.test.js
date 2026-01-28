@@ -23,6 +23,11 @@
  * - 高档奖品获取验证
  * - 计数器重置验证
  *
+ * 配置来源：
+ * - 保底阈值从数据库动态加载（LotteryStrategyConfig表）
+ * - 使用 test-config-loader.js 统一管理配置加载
+ * - 数据库无配置时回退到默认值
+ *
  * 数据库：restaurant_points_dev（真实数据库）
  *
  * @module tests/integration/pity_full_chain
@@ -34,6 +39,9 @@ const request = require('supertest')
 const app = require('../../app')
 const { TestConfig, initRealTestData } = require('../helpers/test-setup')
 const { v4: uuidv4 } = require('uuid')
+
+// 使用配置加载器获取动态配置
+const { loadGuaranteeConfig, DEFAULT_GUARANTEE_CONFIG } = require('../helpers/test-config-loader')
 
 /**
  * 生成幂等键
@@ -54,9 +62,23 @@ describe('📊 任务11.3：保底触发完整链路测试', () => {
   // 活动信息
   let campaignCode
 
-  // 保底配置（根据实际系统配置）
-  const GUARANTEE_THRESHOLD = 10 // 保底阈值（抽奖N次必出高档）
-  const HIGH_TIER_VALUES = ['high', 'ultra', 'legendary'] // 高档位标识
+  /**
+   * 动态加载的保底配置
+   * @type {Object}
+   */
+  let GUARANTEE_CONFIG = null
+
+  /**
+   * 保底阈值（从配置动态加载）
+   * @type {number}
+   */
+  let GUARANTEE_THRESHOLD = DEFAULT_GUARANTEE_CONFIG.threshold
+
+  /**
+   * 高档位标识列表（与 target_tier 关联）
+   * @type {string[]}
+   */
+  const HIGH_TIER_VALUES = ['high', 'ultra', 'legendary']
 
   // 测试常量
   const TEST_MOBILE = '13612227930'
@@ -70,6 +92,22 @@ describe('📊 任务11.3：保底触发完整链路测试', () => {
     console.log('='.repeat(70))
     console.log('📊 任务11.3：保底触发完整链路测试')
     console.log('='.repeat(70))
+
+    // 动态加载保底配置
+    try {
+      GUARANTEE_CONFIG = await loadGuaranteeConfig()
+      GUARANTEE_THRESHOLD = GUARANTEE_CONFIG.threshold
+      console.log('✅ 配置加载成功:', {
+        threshold: GUARANTEE_THRESHOLD,
+        target_tier: GUARANTEE_CONFIG.target_tier,
+        source: 'database'
+      })
+    } catch (error) {
+      console.warn('⚠️ 配置加载失败，使用默认值:', error.message)
+      GUARANTEE_CONFIG = DEFAULT_GUARANTEE_CONFIG
+      GUARANTEE_THRESHOLD = DEFAULT_GUARANTEE_CONFIG.threshold
+    }
+
     console.log('📋 业务流程：')
     console.log(`   1️⃣ 连续抽奖${GUARANTEE_THRESHOLD}次`)
     console.log('   2️⃣ 监控保底触发时机')

@@ -18,7 +18,7 @@ export function sidebarNav() {
     // 移动端菜单显示状态
     mobileOpen: false,
     // 默认展开的分组
-    expandedGroups: ['operations', 'lottery'],
+    expandedGroups: ['operations', 'lottery-ops'],
     // 当前激活的菜单项ID（用于工作台Tab模式下的高亮）
     activeItemId: null,
     // 未处理的风控告警数量（动态获取）
@@ -59,12 +59,41 @@ export function sidebarNav() {
         ]
       },
       {
-        id: 'lottery',
-        name: '抽奖活动',
+        id: 'lottery-ops',
+        name: '抽奖运营',
         icon: '🎰',
         items: [
-          { id: 'campaigns', name: '活动管理', url: '/admin/lottery-management.html' },
-          { id: 'presets', name: '抽奖预设', url: '/admin/presets.html' }
+          {
+            id: 'lottery-monitoring',
+            name: '实时监控',
+            url: '/admin/lottery-management.html?page=lottery-metrics',
+            badge: 'live'
+          },
+          {
+            id: 'lottery-campaigns',
+            name: '活动管理',
+            url: '/admin/lottery-management.html?page=campaigns'
+          },
+          {
+            id: 'lottery-prizes',
+            name: '奖品配置',
+            url: '/admin/lottery-management.html?page=prizes'
+          },
+          {
+            id: 'lottery-budget',
+            name: '预算控制',
+            url: '/admin/lottery-management.html?page=campaign-budget'
+          },
+          {
+            id: 'lottery-strategy',
+            name: '策略配置',
+            url: '/admin/lottery-management.html?page=lottery-strategy'
+          },
+          {
+            id: 'lottery-presets',
+            name: '干预预设',
+            url: '/admin/presets.html'
+          }
         ]
       },
       {

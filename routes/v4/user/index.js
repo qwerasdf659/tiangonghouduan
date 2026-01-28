@@ -24,6 +24,8 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
+// 🔐 P0-1修复：导入手机号脱敏函数
+const { sanitize } = require('../../../utils/logger')
 
 /**
  * GET /api/v4/user/me
@@ -31,13 +33,18 @@ const { authenticateToken } = require('../../../middleware/auth')
  * @access Private
  *
  * 📌 说明：完整用户信息请使用 /api/v4/auth/profile
+ *
+ * 🔐 安全说明（P0-1）：
+ * - mobile 字段已脱敏处理（前3后4，中间****）
+ * - 符合《个人信息保护法》第51条、《网络安全法》第42条
  */
 router.get('/me', authenticateToken, async (req, res) => {
   try {
     // 从token获取用户信息
     const userInfo = {
       user_uuid: req.user.user_uuid,
-      mobile: req.user.mobile,
+      // 🔐 P0-1修复：手机号脱敏（136****7930）
+      mobile: sanitize.mobile(req.user.mobile),
       nickname: req.user.nickname,
       status: req.user.status
     }

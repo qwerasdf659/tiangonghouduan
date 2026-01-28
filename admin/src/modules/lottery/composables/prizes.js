@@ -54,7 +54,18 @@ export function usePrizesState() {
     /** @type {Array} 批量奖品列表 */
     batchPrizes: [],
     /** @type {number} 批量奖品概率总和 */
-    batchProbabilitySum: 0
+    batchProbabilitySum: 0,
+
+    // ========== P2新增: 奖品发放统计 ==========
+    /** @type {Object} 奖品发放统计汇总 */
+    prizeIssuedStats: {
+      totalIssued: 0,         // 总发放数量
+      totalValue: 0,          // 总发放价值
+      todayIssued: 0,         // 今日发放数量
+      lowStockCount: 0        // 低库存奖品数量
+    },
+    /** @type {Array} 按奖品的发放明细 */
+    prizeDistributionDetail: []
   }
 }
 
@@ -371,6 +382,75 @@ export function usePrizesMethods() {
      */
     isPrizeActive(prize) {
       return prize.status === 'active'
+    },
+
+    // ========== P2新增: 奖品发放统计方法 ==========
+
+    /**
+     * 加载奖品发放统计
+     * 从监控 API 获取 prize_stats 数据
+     */
+    async loadPrizeIssuedStats() {
+      try {
+        logger.info('[Prizes] 加载奖品发放统计')
+        
+        // 使用监控统计 API 获取 prize_stats
+        const response = await this.apiGet(
+          `${LOTTERY_ENDPOINTS.MONITORING_STATS}?time_range=today`,
+          {},
+          { showLoading: false }
+        )
+
+        const data = response?.success ? response.data : response
+        
+        if (data) {
+          // 从 prize_stats 计算汇总
+          const prizeStats = data.prize_stats || []
+          
+          this.prizeDistributionDetail = prizeStats
+          
+          // 计算汇总数据
+          let totalIssued = 0
+          let totalValue = 0
+          let lowStockCount = 0
+
+          prizeStats.forEach(stat => {
+            totalIssued += stat.issued_count || stat.count || 0
+            totalValue += stat.total_value || 0
+          })
+
+          // 从当前奖品列表检查低库存
+          this.prizes.forEach(prize => {
+            const stock = prize.stock_quantity || 0
+            if (stock > 0 && stock < 100 && stock !== 999999) {
+              lowStockCount++
+            }
+          })
+
+          this.prizeIssuedStats = {
+            totalIssued,
+            totalValue,
+            todayIssued: totalIssued, // 今日发放（与 totalIssued 相同，因为筛选了 today）
+            lowStockCount
+          }
+
+          logger.info('[Prizes] 发放统计加载完成', this.prizeIssuedStats)
+        }
+      } catch (error) {
+        logger.error('[Prizes] 加载发放统计失败:', error)
+        // 保持默认值
+      }
+    },
+
+    /**
+     * 计算奖品发放比例（百分比）
+     * @param {Object} stat - 奖品统计对象
+     * @returns {number} 发放比例
+     */
+    getPrizeIssuedPercentage(stat) {
+      const total = this.prizeIssuedStats.totalIssued
+      if (total === 0) return 0
+      return ((stat.issued_count || stat.count || 0) / total * 100).toFixed(1)
     },
 
     // ========== 批量添加奖品方法 ==========

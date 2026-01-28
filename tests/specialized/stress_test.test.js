@@ -15,6 +15,11 @@
  * - 通过 ServiceManager 获取服务实例
  * - 使用 test-concurrent-utils.js 提供的并发测试工具
  * - 测试数据创建后需清理，避免污染数据库
+ * - 保底阈值等配置从数据库动态加载（LotteryStrategyConfig表）
+ *
+ * 配置来源：
+ * - 使用 test-config-loader.js 统一管理配置加载
+ * - 数据库无配置时回退到默认值
  *
  * 创建时间：2026-01-28 北京时间
  * 符合规范：01-核心开发质量标准.mdc
@@ -29,6 +34,14 @@ const { getTestService } = require('../helpers/UnifiedTestManager')
 const { executeConcurrent, delay } = require('../helpers/test-concurrent-utils')
 const { getTestUserId, getTestCampaignId } = require('../helpers/test-data')
 const { v4: uuidv4 } = require('uuid')
+
+// 使用配置加载器获取动态配置
+const {
+  loadGuaranteeConfig,
+  loadPityConfig,
+  DEFAULT_GUARANTEE_CONFIG,
+  DEFAULT_PITY_CONFIG
+} = require('../helpers/test-config-loader')
 
 // 压力测试超时设置（压力测试需要更长时间）
 jest.setTimeout(180000) // 3分钟
@@ -45,6 +58,18 @@ describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
   // 清理记录
   const cleanupItems = []
 
+  /**
+   * 动态加载的保底配置
+   * @type {Object}
+   */
+  let GUARANTEE_CONFIG = null
+
+  /**
+   * 动态加载的 Pity 配置
+   * @type {Object}
+   */
+  let PITY_CONFIG = null
+
   // ==================== 测试准备 ====================
 
   beforeAll(async () => {
@@ -54,6 +79,22 @@ describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
     // 数据库连接验证
     await sequelize.authenticate()
     console.log('✅ 数据库连接成功')
+
+    // 动态加载保底和Pity配置
+    try {
+      GUARANTEE_CONFIG = await loadGuaranteeConfig()
+      PITY_CONFIG = await loadPityConfig()
+      console.log('✅ 配置加载成功:', {
+        guarantee_threshold: GUARANTEE_CONFIG.threshold,
+        hard_pity_threshold: GUARANTEE_CONFIG.hard_pity_threshold,
+        pity_max_empty_streak: PITY_CONFIG.max_empty_streak,
+        source: 'database'
+      })
+    } catch (error) {
+      console.warn('⚠️ 配置加载失败，使用默认值:', error.message)
+      GUARANTEE_CONFIG = DEFAULT_GUARANTEE_CONFIG
+      PITY_CONFIG = DEFAULT_PITY_CONFIG
+    }
 
     // 获取服务实例（通过 ServiceManager）
     AssetService = getTestService('asset')
@@ -573,13 +614,17 @@ describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
         }
       }
 
-      // 验证硬保底阈值
-      const hardPityResults = groupedResults['10'] || []
+      // 从动态配置获取硬保底阈值
+      const hardPityThreshold =
+        PITY_CONFIG?.max_empty_streak || DEFAULT_PITY_CONFIG.max_empty_streak
+      const hardPityKey = String(hardPityThreshold)
+      const hardPityResults = groupedResults[hardPityKey] || []
       const allHardPity = hardPityResults.every(r => r.hard_pity_triggered === true)
 
       console.log(
-        `   🎯 streak=10 硬保底触发率: ${hardPityResults.filter(r => r.hard_pity_triggered).length}/${hardPityResults.length}`
+        `   🎯 streak=${hardPityThreshold} 硬保底触发率: ${hardPityResults.filter(r => r.hard_pity_triggered).length}/${hardPityResults.length}`
       )
+      console.log(`   📋 硬保底阈值来源: ${PITY_CONFIG ? 'database' : 'default'}`)
 
       expect(allConsistent).toBe(true)
       expect(allHardPity).toBe(true)

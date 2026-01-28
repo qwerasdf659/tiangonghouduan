@@ -22,7 +22,7 @@
 const express = require('express')
 const router = express.Router()
 const { v4: uuidv4 } = require('uuid') // 🆕 用于生成会话令牌
-const logger = require('../../../utils/logger').logger
+const { logger, sanitize } = require('../../../utils/logger')
 const { generateTokens, getUserRoles } = require('../../../middleware/auth')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const TransactionManager = require('../../../utils/TransactionManager')
@@ -86,16 +86,16 @@ router.post('/login', async (req, res) => {
 
   if (!user) {
     // 用户不存在，使用 TransactionManager 统一事务边界（符合治理决策）
-    logger.info(`用户 ${mobile} 不存在，开始自动注册...`)
+    logger.info(`用户 ${sanitize.mobile(mobile)} 不存在，开始自动注册...`)
 
     try {
       user = await TransactionManager.execute(async transaction => {
         return await UserService.registerUser(mobile, { transaction })
       })
       isNewUser = true
-      logger.info(`用户 ${mobile} 注册流程完成（用户+积分账户+角色）`)
+      logger.info(`用户 ${sanitize.mobile(mobile)} 注册流程完成（用户+积分账户+角色）`)
     } catch (error) {
-      logger.error(`用户 ${mobile} 注册失败:`, error)
+      logger.error(`用户 ${sanitize.mobile(mobile)} 注册失败:`, error)
 
       // 处理业务错误
       if (error.code === 'MOBILE_EXISTS') {
@@ -302,7 +302,7 @@ router.post('/quick-login', async (req, res) => {
     return res.apiError('手机号不能为空', 'MOBILE_REQUIRED', null, 400)
   }
 
-  logger.info(`📱 快速登录请求: ${mobile}`)
+  logger.info(`📱 快速登录请求: ${sanitize.mobile(mobile)}`)
 
   // 通过ServiceManager获取UserService
   const UserService = req.app.locals.services.getService('user')
@@ -315,16 +315,16 @@ router.post('/quick-login', async (req, res) => {
 
   // 如果用户不存在，自动创建用户账户
   if (!user) {
-    logger.info(`用户 ${mobile} 不存在，开始自动注册...`)
+    logger.info(`用户 ${sanitize.mobile(mobile)} 不存在，开始自动注册...`)
 
     try {
       // 使用 TransactionManager 统一事务边界（符合治理决策）
       user = await TransactionManager.execute(async transaction => {
         return await UserService.registerUser(mobile, { transaction })
       })
-      logger.info(`✅ 用户 ${mobile} 注册流程完成（用户+积分账户+角色）`)
+      logger.info(`✅ 用户 ${sanitize.mobile(mobile)} 注册流程完成（用户+积分账户+角色）`)
     } catch (error) {
-      logger.error(`❌ 用户 ${mobile} 注册失败:`, error)
+      logger.error(`❌ 用户 ${sanitize.mobile(mobile)} 注册失败:`, error)
 
       if (error.code === 'MOBILE_EXISTS') {
         // 决策21：登录场景禁用缓存
@@ -340,7 +340,7 @@ router.post('/quick-login', async (req, res) => {
 
   // 验证账户状态
   if (user.status !== 'active') {
-    logger.warn(`❌ 用户 ${mobile} 账户已被禁用，status: ${user.status}`)
+    logger.warn(`❌ 用户 ${sanitize.mobile(mobile)} 账户已被禁用，status: ${user.status}`)
     return res.apiError('用户账户已被禁用，无法登录', 'USER_INACTIVE', null, 403)
   }
 
@@ -351,7 +351,7 @@ router.post('/quick-login', async (req, res) => {
   await UserService.updateLoginStats(user.user_id)
 
   logger.info(
-    `✅ 用户 ${mobile} 更新登录统计：last_login=${user.last_login}, login_count=${user.login_count}`
+    `✅ 用户 ${sanitize.mobile(mobile)} 更新登录统计：last_login=${user.last_login}, login_count=${user.login_count}`
   )
 
   /**
@@ -415,7 +415,7 @@ router.post('/quick-login', async (req, res) => {
     timestamp: BeijingTimeHelper.apiTimestamp()
   }
 
-  logger.info(`✅ 用户 ${mobile} 微信授权登录成功`)
+  logger.info(`✅ 用户 ${sanitize.mobile(mobile)} 微信授权登录成功`)
 
   // 登录性能监控
   const loginDuration = Date.now() - loginStartTime

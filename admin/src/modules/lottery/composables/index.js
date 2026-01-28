@@ -31,6 +31,9 @@ export { useMetricsState, useMetricsMethods } from './metrics.js'
 // 核销码管理模块
 export { useRedemptionState, useRedemptionMethods } from './redemption.js'
 
+// 用户抽奖档案模块
+export { useUserProfileState, useUserProfileMethods } from './user-profile.js'
+
 /**
  * 组合所有状态
  * @returns {Object} 合并后的状态对象
@@ -44,7 +47,8 @@ export function useAllLotteryState() {
     ...useQuotaState(),
     ...usePricingState(),
     ...useMetricsState(),
-    ...useRedemptionState()
+    ...useRedemptionState(),
+    ...useUserProfileState()
   }
 }
 
@@ -61,6 +65,7 @@ export function useAllLotteryMethods() {
     ...useQuotaMethods(),
     ...usePricingMethods(),
     ...useMetricsMethods(),
-    ...useRedemptionMethods()
+    ...useRedemptionMethods(),
+    ...useUserProfileMethods()
   }
 }

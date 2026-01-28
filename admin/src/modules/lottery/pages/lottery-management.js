@@ -40,7 +40,9 @@ import {
   useMetricsState,
   useMetricsMethods,
   useRedemptionState,
-  useRedemptionMethods
+  useRedemptionMethods,
+  useUserProfileState,
+  useUserProfileMethods
 } from '../composables/index.js'
 
 /**
@@ -75,8 +77,8 @@ function registerLotteryManagementComponents() {
     useStrategyState: typeof useStrategyState
   })
 
-  // 全局 Store - 存储当前激活的子页面
-  Alpine.store('lotteryPage', 'campaigns')
+  // 全局 Store - 存储当前激活的子页面（默认为实时监控）
+  Alpine.store('lotteryPage', 'lottery-metrics')
 
   /**
    * 抽奖管理导航组件
@@ -84,16 +86,16 @@ function registerLotteryManagementComponents() {
   Alpine.data('lotteryNavigation', () => ({
     ...createPageMixin(),
 
-    currentPage: 'campaigns',
+    currentPage: 'lottery-metrics',
 
     subPages: [
+      { id: 'lottery-metrics', title: '实时监控', icon: '📊', highlight: true },
       { id: 'campaigns', title: '活动管理', icon: '🎁' },
       { id: 'prizes', title: '奖品管理', icon: '🏆' },
       { id: 'campaign-budget', title: '预算管理', icon: '💰' },
       { id: 'lottery-strategy', title: '策略配置', icon: '⚙️' },
       { id: 'lottery-quota', title: '配额管理', icon: '📊' },
       { id: 'lottery-pricing', title: '定价配置', icon: '💵' },
-      { id: 'lottery-metrics', title: '抽奖指标', icon: '📈' },
       { id: 'redemption-codes', title: '核销码管理', icon: '🎫' }
     ],
 
@@ -105,7 +107,7 @@ function registerLotteryManagementComponents() {
         return
       }
       const urlParams = new URLSearchParams(window.location.search)
-      this.currentPage = urlParams.get('page') || 'campaigns'
+      this.currentPage = urlParams.get('page') || 'lottery-metrics'
       console.log('📍 [LotteryNavigation] 设置当前页面:', this.currentPage)
       Alpine.store('lotteryPage', this.currentPage)
       console.log('✅ [LotteryNavigation] init() 完成，store 已更新')
@@ -132,6 +134,7 @@ function registerLotteryManagementComponents() {
     const pricingState = usePricingState()
     const metricsState = useMetricsState()
     const redemptionState = useRedemptionState()
+    const userProfileState = useUserProfileState()
 
     // 预先调用所有方法 composables
     const campaignsMethods = useCampaignsMethods()
@@ -142,6 +145,7 @@ function registerLotteryManagementComponents() {
     const pricingMethods = usePricingMethods()
     const metricsMethods = useMetricsMethods()
     const redemptionMethods = useRedemptionMethods()
+    const userProfileMethods = useUserProfileMethods()
 
     // 调试日志 - 检查 quotaMethods
     console.log('[Quota Debug] quotaMethods keys:', Object.keys(quotaMethods || {}))
@@ -169,6 +173,7 @@ function registerLotteryManagementComponents() {
       ...pricingState,
       ...metricsState,
       ...redemptionState,
+      ...userProfileState,
 
       // ==================== 通用状态 ====================
       page: 1,
@@ -234,6 +239,8 @@ function registerLotteryManagementComponents() {
                 break
               case 'prizes':
                 await this.loadPrizes()
+                // P2: 加载奖品发放统计
+                await this.loadPrizeIssuedStats()
                 // 加载活动列表供添加奖品时选择
                 if (!this.campaigns || this.campaigns.length === 0) {
                   await this.loadCampaigns()
@@ -241,6 +248,11 @@ function registerLotteryManagementComponents() {
                 break
               case 'campaign-budget':
                 await this.loadBudgetData()
+                // P1: 初始化预算趋势图（如果有选中的活动）
+                if (this.selectedBudgetCampaignId) {
+                  await this.loadBudgetTrendData()
+                  setTimeout(() => this.initBudgetTrendChart(), 200)
+                }
                 // 加载活动列表供预算管理选择
                 if (!this.campaigns || this.campaigns.length === 0) {
                   await this.loadCampaigns()
@@ -271,7 +283,10 @@ function registerLotteryManagementComponents() {
                 }
                 break
               case 'lottery-metrics':
-                await this.loadLotteryMetrics()
+                // 加载增强的监控数据（包含图表数据）
+                await this.loadEnhancedMetrics()
+                // 初始化图表（延迟执行确保 DOM 已渲染）
+                setTimeout(() => this.initMonitoringCharts(), 200)
                 // 加载活动列表供指标筛选
                 if (!this.campaigns || this.campaigns.length === 0) {
                   await this.loadCampaigns()
@@ -298,6 +313,7 @@ function registerLotteryManagementComponents() {
       ...pricingMethods,
       ...metricsMethods,
       ...redemptionMethods,
+      ...userProfileMethods,
 
       // ==================== 工具方法 ====================
 

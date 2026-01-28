@@ -53,7 +53,15 @@ export function useCampaignsState() {
     /** @type {number|string|null} 当前编辑的活动ID */
     editingCampaignId: null,
     /** @type {Object|null} 选中的活动 */
-    selectedCampaign: null
+    selectedCampaign: null,
+
+    // ========== P3新增: 活动ROI分析状态 ==========
+    /** @type {Object|null} 活动ROI分析数据 */
+    campaignRoiData: null,
+    /** @type {boolean} ROI分析加载状态 */
+    loadingCampaignRoi: false,
+    /** @type {boolean} 显示ROI分析模态框 */
+    showCampaignRoiModal: false
   }
 }
 
@@ -350,6 +358,90 @@ export function useCampaignsMethods(context) {
     getCampaignStatusText(status) {
       const map = { active: '进行中', inactive: '已结束', pending: '待开始', ended: '已结束' }
       return map[status] || status
+    },
+
+    // ========== P3新增: 活动ROI分析方法 ==========
+
+    /**
+     * 加载活动ROI分析数据
+     * @param {number} campaignId - 活动ID
+     */
+    async loadCampaignRoiData(campaignId) {
+      if (!campaignId) {
+        logger.warn('[Campaigns] 未指定活动ID')
+        return
+      }
+
+      this.loadingCampaignRoi = true
+      try {
+        logger.info('[Campaigns] 加载活动ROI分析', { campaign_id: campaignId })
+
+        const url = `${LOTTERY_ENDPOINTS.MONITORING_CAMPAIGN_ROI}`.replace(':campaign_id', campaignId)
+        
+        const response = await this.apiGet(
+          url,
+          {},
+          { showLoading: false }
+        )
+
+        const data = response?.success ? response.data : response
+
+        if (data) {
+          this.campaignRoiData = {
+            ...data,
+            campaign_id: campaignId,
+            campaign_name: this.campaigns.find(c => c.campaign_id === campaignId)?.campaign_name || '未知活动'
+          }
+          logger.info('[Campaigns] ROI分析数据加载成功')
+        }
+      } catch (error) {
+        logger.error('[Campaigns] 加载ROI分析失败:', error)
+        this.showError('加载ROI分析失败: ' + (error.message || '未知错误'))
+      } finally {
+        this.loadingCampaignRoi = false
+      }
+    },
+
+    /**
+     * 打开活动ROI分析模态框
+     * @param {Object} campaign - 活动对象
+     */
+    async openCampaignRoiModal(campaign) {
+      this.selectedCampaign = campaign
+      await this.loadCampaignRoiData(campaign.campaign_id)
+      this.showCampaignRoiModal = true
+    },
+
+    /**
+     * 关闭活动ROI分析模态框
+     */
+    closeCampaignRoiModal() {
+      this.showCampaignRoiModal = false
+      this.campaignRoiData = null
+    },
+
+    /**
+     * 格式化ROI值
+     * @param {number} value - ROI百分比
+     * @returns {string} 格式化后的字符串
+     */
+    formatRoiValue(value) {
+      if (value === null || value === undefined) return '-'
+      const sign = value >= 0 ? '+' : ''
+      return `${sign}${value.toFixed(1)}%`
+    },
+
+    /**
+     * 获取ROI颜色类
+     * @param {number} value - ROI百分比
+     * @returns {string} CSS 类名
+     */
+    getRoiColorClass(value) {
+      if (value === null || value === undefined) return 'text-gray-500'
+      if (value > 10) return 'text-green-600'
+      if (value > 0) return 'text-green-500'
+      if (value > -10) return 'text-yellow-600'
+      return 'text-red-600'
     }
   }
 }

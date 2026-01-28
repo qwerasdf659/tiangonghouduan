@@ -952,6 +952,28 @@ module.exports = sequelize => {
       },
 
       /**
+       * 每日预算上限
+       * @type {number}
+       * @业务含义 控制活动每日最大可发放的预算积分
+       * @场景 运营后台预算进度监控，当日消耗达到上限时预警
+       * @默认值 null（表示不限制每日预算）
+       */
+      daily_budget_limit: {
+        type: DataTypes.DECIMAL(15, 2),
+        allowNull: true,
+        defaultValue: null,
+        comment: '每日预算上限（积分），NULL表示不限制每日预算',
+        /**
+         * 获取每日预算上限
+         * @returns {number|null} 每日预算上限或null
+         */
+        get() {
+          const value = this.getDataValue('daily_budget_limit')
+          return value !== null ? parseFloat(value) : null
+        }
+      },
+
+      /**
        * 活动池总预算
        * @type {number}
        * @业务含义 仅 budget_mode=pool 时使用，设置活动的预算池上限

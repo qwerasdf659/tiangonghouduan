@@ -1007,12 +1007,17 @@ class DataSanitizer {
       logData = JSON.stringify(logData)
     }
 
+    /*
+     * 同时支持两种格式：
+     * - 字符串日志格式：win_probability: 0.05
+     * - JSON格式："win_probability":0.05
+     */
     return logData
-      .replace(/win_probability:\s*[\d.]+/g, 'win_probability: [HIDDEN]')
-      .replace(/preset_type:\s*\w+/g, 'preset_type: [HIDDEN]')
-      .replace(/cost_points:\s*\d+/g, 'cost_points: [HIDDEN]')
-      .replace(/market_value:\s*[\d.]+/g, 'market_value: [HIDDEN]')
-      .replace(/acquisition_cost:\s*\d+/g, 'acquisition_cost: [HIDDEN]')
+      .replace(/"?win_probability"?:\s*[\d.]+/g, 'win_probability: [HIDDEN]')
+      .replace(/"?preset_type"?:\s*"?\w+"?/g, 'preset_type: [HIDDEN]')
+      .replace(/"?cost_points"?:\s*\d+/g, 'cost_points: [HIDDEN]')
+      .replace(/"?market_value"?:\s*[\d.]+/g, 'market_value: [HIDDEN]')
+      .replace(/"?acquisition_cost"?:\s*\d+/g, 'acquisition_cost: [HIDDEN]')
   }
 
   // ========== 辅助方法 ==========
