@@ -188,18 +188,18 @@ const TEST_DATA = {
       }
     },
 
-    // 基础保底策略配置（对应 BasicGuaranteeStrategy）
+    // 普通抽奖流水线配置（对应 NormalDrawPipeline）
     // 🔴 P0-1修复：user_id 使用 getter 动态获取
-    get basicGuarantee() {
+    get normalDraw() {
       return {
         user_id: getTestUserId(), // 🔴 P0-1修复：动态获取，不再硬编码
         is_first_lottery: false,
         last_win_date: null,
         lottery_count: 5 // 5次不中必中
         /*
-         * 业务含义：基础保底策略测试数据
+         * 业务含义：普通抽奖流水线测试数据
          * 使用场景：测试普通用户抽奖（5次不中必中）
-         * 技术背景：对应 UnifiedLotteryEngine 的 BasicGuaranteeStrategy
+         * 技术背景：对应 UnifiedLotteryEngine 的 NormalDrawPipeline
          */
       }
     },

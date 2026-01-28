@@ -390,7 +390,29 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/feature-flags/:code': 'ADMIN_FEATURE_FLAG_UPDATE', // 更新或删除功能开关（PUT/DELETE）
   '/api/v4/console/feature-flags/:code/toggle': 'ADMIN_FEATURE_FLAG_TOGGLE', // 切换功能开关状态
   '/api/v4/console/feature-flags/:code/whitelist': 'ADMIN_FEATURE_FLAG_WHITELIST', // 白名单管理（POST/DELETE）
-  '/api/v4/console/feature-flags/:code/blacklist': 'ADMIN_FEATURE_FLAG_BLACKLIST' // 黑名单管理（POST/DELETE）
+  '/api/v4/console/feature-flags/:code/blacklist': 'ADMIN_FEATURE_FLAG_BLACKLIST', // 黑名单管理（POST/DELETE）
+
+  /*
+   * ===============================================================
+   * 测试专用路径（仅用于 Jest 集成测试，不对外暴露）
+   * @see tests/integration/async_task_compensation.test.js - P3-11
+   * ===============================================================
+   */
+  '/api/v4/test/action': 'TEST_ACTION', // 通用测试操作
+  '/api/v4/test/db-task': 'TEST_DB_TASK', // 数据库任务测试
+  '/api/v4/test/timeout-task': 'TEST_TIMEOUT_TASK', // 超时任务测试
+  '/api/v4/test/multi-task': 'TEST_MULTI_TASK', // 多重任务测试
+  '/api/v4/test/timeout-auto': 'TEST_TIMEOUT_AUTO', // 自动超时测试
+  '/api/v4/test/cleanup': 'TEST_CLEANUP', // 清理测试
+  '/api/v4/test/idempotent-action': 'TEST_IDEMPOTENT_ACTION', // 幂等性测试
+  '/api/v4/test/independent': 'TEST_INDEPENDENT', // 独立执行测试
+  '/api/v4/test/hash': 'TEST_HASH', // 哈希测试
+  '/api/v4/test/state': 'TEST_STATE', // 状态转换测试
+  '/api/v4/test/business': 'TEST_BUSINESS', // 业务事件测试
+  '/api/v4/test/empty': 'TEST_EMPTY', // 空值测试
+  '/api/v4/test/long': 'TEST_LONG', // 超长键测试
+  '/api/v4/test/concurrent': 'TEST_CONCURRENT', // 并发测试
+  '/api/v4/internal/reconciliation': 'INTERNAL_RECONCILIATION' // 内部对账任务
 }
 
 /**

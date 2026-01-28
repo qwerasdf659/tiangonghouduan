@@ -55,6 +55,7 @@ const lotteryStrategyStatsRoutes = require('./lottery-strategy-stats') // 🆕 �
 const sessionsRoutes = require('./sessions') // 🆕 会话管理（2026-01-21 会话管理功能补齐）
 const lotteryCampaignsRoutes = require('./lottery-campaigns') // 🆕 抽奖活动列表管理（2026-01-28 P1 运营后台 ROI/复购率/库存预警）
 const lotteryAnalyticsRoutes = require('./lottery-analytics') // 🆕 抽奖分析（2026-01-28 P2 运营日报聚合）
+const batchOperationsRoutes = require('./batch-operations') // 🆕 批量操作（2026-01-30 阶段C 批量操作API）
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -101,6 +102,7 @@ router.use('/lottery-strategy-stats', lotteryStrategyStatsRoutes) // 🆕 抽奖
 router.use('/sessions', sessionsRoutes) // 🆕 会话管理路由（2026-01-21 会话管理功能补齐）
 router.use('/lottery-campaigns', lotteryCampaignsRoutes) // 🆕 抽奖活动列表管理路由（2026-01-28 P1 运营后台 ROI/复购率/库存预警）
 router.use('/lottery-analytics', lotteryAnalyticsRoutes) // 🆕 抽奖分析路由（2026-01-28 P2 运营日报聚合）
+router.use('/batch-operations', batchOperationsRoutes) // 🆕 批量操作路由（2026-01-30 阶段C 批量赠送/核销/状态切换/预算调整）
 
 /**
  * GET / - Admin API根路径信息

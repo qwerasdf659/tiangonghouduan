@@ -313,9 +313,22 @@ export async function request(options) {
     // 处理 401 未授权
     if (response.status === 401) {
       clearToken()
-      // 跳转到登录页
+      // 跳转到登录页 - 确保在顶层窗口跳转，避免在 iframe 内跳转导致侧边栏仍然显示
       if (window.location.pathname !== '/admin/login.html') {
-        window.location.href = '/admin/login.html'
+        // 检测是否在 iframe 中
+        if (window.self !== window.top) {
+          // 在 iframe 中，通知顶层窗口跳转
+          try {
+            window.top.location.href = '/admin/login.html'
+          } catch (e) {
+            // 跨域 iframe 的情况，尝试 postMessage
+            logger.warn('[Auth] 无法直接跳转顶层窗口，尝试 postMessage', e)
+            window.parent.postMessage({ type: 'AUTH_EXPIRED', redirect: '/admin/login.html' }, '*')
+          }
+        } else {
+          // 不在 iframe 中，直接跳转
+          window.location.href = '/admin/login.html'
+        }
       }
       throw new Error('未授权，请重新登录')
     }

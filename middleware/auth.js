@@ -463,6 +463,41 @@ async function authenticateToken(req, res, next) {
     // 验证Token
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
 
+    /**
+     * 🆕 2026-01-29 会话有效性验证（P0-6 安全审计 - 多设备登录冲突处理）
+     *
+     * 业务规则：验证 JWT 中的 session_token 是否在数据库中仍然有效
+     * - 新设备登录时会使旧会话失效（is_active = false）
+     * - 旧设备的 Token 虽然 JWT 有效，但会话已失效，应拒绝访问
+     *
+     * @see docs/测试审计标准.md - P0-6 多设备登录冲突测试
+     */
+    if (decoded.session_token) {
+      const { AuthenticationSession } = require('../models')
+      const session = await AuthenticationSession.findValidByToken(decoded.session_token)
+
+      if (!session) {
+        logger.warn(
+          `🔒 [Auth] 会话已失效或过期: session_token=${decoded.session_token.substring(0, 8)}..., user_id=${decoded.user_id}`
+        )
+        return res.apiUnauthorized
+          ? res.apiUnauthorized(
+              '会话已失效，请重新登录（可能是其他设备登录导致）',
+              'SESSION_INVALIDATED'
+            )
+          : res.status(401).json({
+              success: false,
+              code: 'SESSION_INVALIDATED',
+              message: '会话已失效，请重新登录（可能是其他设备登录导致）'
+            })
+      }
+
+      // 更新会话最后活动时间（异步，不阻塞请求）
+      session.updateActivity().catch(err => {
+        logger.warn(`⚠️ [Auth] 更新会话活动时间失败（非致命）: ${err.message}`)
+      })
+    }
+
     // 从数据库获取最新用户信息（包含user_uuid字段）
     const user = await User.findOne({
       where: { user_id: decoded.user_id, status: 'active' },
@@ -489,7 +524,8 @@ async function authenticateToken(req, res, next) {
       status: user.status,
       role_level: userRoles.role_level, // 🔄 统一命名：使用role_level
       roles: userRoles.roles,
-      permissions: userRoles.permissions
+      permissions: userRoles.permissions,
+      session_token: decoded.session_token // 🆕 传递 session_token 供后续使用
     }
 
     // 一次性设置用户信息，避免竞态条件

@@ -72,7 +72,7 @@ function getSharedComponents(serviceManager = null) {
 }
 
 /**
- * 兼容旧代码：提供 sharedComponents 别名
+ * 懒加载组件封装：提供 sharedComponents 统一入口
  * 通过 getter 实现懒加载，首次访问时初始化组件
  * @type {Object}
  */

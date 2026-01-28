@@ -177,7 +177,7 @@ router.get('/items/:item_id', authenticateToken, async (req, res) => {
     logger.info('获取商品详情成功', {
       user_id,
       item_id: itemId,
-      name: result.item.name
+      item_name: result.item.item_name
     })
 
     return res.apiSuccess({ item: sanitizedItem }, '获取商品详情成功')

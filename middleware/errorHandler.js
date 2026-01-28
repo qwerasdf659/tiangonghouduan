@@ -149,7 +149,7 @@ function handleBusinessError(error, res, defaultMessage = '操作失败') {
     return res.apiError(error.message, error.code, null, error.statusCode)
   }
 
-  // 检查自定义的 statusCode 和 errorCode（兼容旧代码）
+  // 处理带有自定义 statusCode 的错误对象（非 BusinessError 实例）
   if (error.statusCode) {
     const errorCode = error.errorCode || error.code || 'SERVICE_ERROR'
     return res.apiError(error.message || defaultMessage, errorCode, null, error.statusCode)

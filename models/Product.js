@@ -16,10 +16,10 @@ module.exports = sequelize => {
         autoIncrement: true,
         comment: '商品唯一ID（主键）'
       },
-      name: {
+      product_name: {
         type: DataTypes.STRING(200),
         allowNull: false,
-        comment: '商品名称'
+        comment: '商品名称（产品的显示名称）'
       },
       description: {
         type: DataTypes.TEXT,
@@ -239,7 +239,7 @@ module.exports = sequelize => {
     const base_info = JSON.parse(
       JSON.stringify({
         product_id: this.product_id,
-        name: this.name,
+        product_name: this.product_name,
         description: this.description,
         category: this.category,
         status: this.status,

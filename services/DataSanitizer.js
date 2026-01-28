@@ -1298,7 +1298,7 @@ class DataSanitizer {
 
       return {
         id: item.item_id, // 数据库主键（唯一真相源）
-        name: item.name,
+        name: item.item_name, // 兑换商品名称（数据库字段为 item_name，API 输出为 name 保持前端兼容）
         description: item.description,
         // V4.5.0: 材料资产支付字段
         cost_asset_code: item.cost_asset_code,

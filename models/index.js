@@ -540,6 +540,37 @@ models.LotteryHourlyMetrics = require('./LotteryHourlyMetrics')(sequelize, DataT
  *    - 业务场景：实时监控空奖率/高价值率、Pity/AntiEmpty触发率、异常检测预警
  */
 
+models.LotteryAlert = require('./LotteryAlert').initModel(sequelize)
+/*
+ * ✅ LotteryAlert：抽奖系统告警表（运营监控专用）
+ *    - 用途：记录抽奖系统的实时告警信息，用于运营监控和异常检测
+ *    - 特点：独立于商家风控的 risk_alerts，包含 campaign_id、阈值偏差等专用字段
+ *    - 表名：lottery_alerts，主键：alert_id
+ *    - 业务场景：中奖率异常、预算告警、库存告警、用户异常、系统告警
+ *    - 设计决策来源：需求文档决策6（职责分离，便于独立演进）
+ */
+
+// 🔴 V4.8 批量操作基础设施（阶段C核心组件 - 2026-01-30）
+models.BatchOperationLog = require('./BatchOperationLog').initModel(sequelize)
+/*
+ * ✅ BatchOperationLog：批量操作日志表（幂等性控制与操作审计）
+ *    - 用途：记录所有批量操作的执行状态和结果，提供幂等性保障
+ *    - 特点：idempotency_key唯一约束（美团幂等性方案）、部分成功模式、操作审计
+ *    - 表名：batch_operation_logs，主键：batch_log_id
+ *    - 业务场景：批量赠送配额、批量设置干预规则、批量核销、批量状态切换、批量预算调整
+ *    - 设计决策来源：需求文档阶段C技术决策（美团独立幂等表 + Redis/MySQL双重校验）
+ */
+
+models.SystemConfig = require('./SystemConfig').initModel(sequelize)
+/*
+ * ✅ SystemConfig：系统配置表（动态配置管理）
+ *    - 用途：存储可动态调整的系统配置参数，支持批量操作限流配置
+ *    - 特点：config_key唯一约束、JSON配置值、分类管理、启用/禁用控制
+ *    - 表名：system_configs，主键：config_id
+ *    - 业务场景：批量操作限流配置、功能开关、系统参数调整
+ *    - 设计决策来源：需求文档阶段C技术决策（动态限流配置，运营可调整）
+ */
+
 models.LotteryDailyMetrics = require('./LotteryDailyMetrics')(sequelize, DataTypes)
 /*
  * ✅ LotteryDailyMetrics：抽奖日报统计表（按日聚合）

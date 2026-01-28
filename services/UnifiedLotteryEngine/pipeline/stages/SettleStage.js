@@ -681,6 +681,16 @@ class SettleStage extends BaseStage {
   /**
    * 创建决策记录
    *
+   * 🔴 2026-01-29 修复：补写策略引擎审计字段
+   * - budget_tier: 预算分层（B0/B1/B2/B3）
+   * - pressure_tier: 活动压力分层（P0/P1/P2）
+   * - effective_budget: 有效预算（统一计算口径）
+   * - pity_decision: Pity 系统决策信息（JSON）
+   * - luck_debt_decision: 运气债务决策信息（JSON）
+   * - experience_smoothing: 体验平滑机制应用记录（JSON）
+   * - weight_adjustment: BxPx 矩阵权重调整信息（JSON）
+   * - available_tiers: 可用档位列表（JSON）
+   *
    * @param {Object} params - 参数
    * @returns {Promise<Object>} 决策记录
    * @private
@@ -689,32 +699,190 @@ class SettleStage extends BaseStage {
     const { draw_id, user_id, campaign_id, idempotency_key, decision_snapshot, transaction } =
       params
 
+    // 提取预算快照数据
+    const budget_snapshot = decision_snapshot.budget_snapshot || {}
+
+    // 提取策略快照数据
+    const strategy_snapshot = decision_snapshot.strategy_snapshot || {}
+
+    // 构建 Pity 系统决策信息（JSON）
+    const pity_decision = {
+      enabled: strategy_snapshot.pity_system?.enabled || false,
+      soft_triggered: strategy_snapshot.pity_system?.soft_triggered || false,
+      hard_triggered: strategy_snapshot.pity_system?.hard_triggered || false,
+      boost_percentage: strategy_snapshot.pity_system?.boost_percentage || 0,
+      empty_streak: strategy_snapshot.experience_state?.empty_streak || 0
+    }
+
+    // 构建运气债务决策信息（JSON）
+    const luck_debt_decision = {
+      enabled: strategy_snapshot.luck_debt?.enabled || false,
+      global_draw_count: strategy_snapshot.luck_debt?.global_draw_count || 0,
+      historical_empty_rate: strategy_snapshot.luck_debt?.historical_empty_rate || 0,
+      debt_level: strategy_snapshot.luck_debt?.debt_level || 'none',
+      debt_multiplier: strategy_snapshot.luck_debt?.debt_multiplier || 1.0
+    }
+
+    // 构建体验平滑机制应用记录（JSON）
+    const experience_smoothing = {
+      pity_applied: pity_decision.soft_triggered || pity_decision.hard_triggered,
+      anti_empty_triggered: strategy_snapshot.anti_streak?.anti_empty_triggered || false,
+      anti_high_triggered: strategy_snapshot.anti_streak?.anti_high_triggered || false,
+      forced_tier: strategy_snapshot.anti_streak?.forced_tier || null,
+      capped_max_tier: strategy_snapshot.anti_streak?.capped_max_tier || null,
+      smoothing_applied:
+        pity_decision.soft_triggered ||
+        pity_decision.hard_triggered ||
+        strategy_snapshot.anti_streak?.anti_empty_triggered ||
+        strategy_snapshot.anti_streak?.anti_high_triggered,
+      applied_mechanisms: this._buildAppliedMechanismsList(strategy_snapshot)
+    }
+
+    // 构建 BxPx 矩阵权重调整信息（JSON）
+    const tier_decision = decision_snapshot.tier_decision || {}
+    const weight_adjustment = {
+      base_weights: tier_decision.base_weights || tier_decision.tier_weights || {},
+      adjusted_weights: tier_decision.adjusted_weights || tier_decision.tier_weights || {},
+      weight_adjustments: tier_decision.weight_adjustments || {},
+      total_multiplier: strategy_snapshot.total_weight_adjustment || 1.0,
+      cap_multiplier: budget_snapshot.cap_multiplier || null,
+      empty_weight_multiplier: budget_snapshot.empty_weight_multiplier || null
+    }
+
+    // 提取可用档位列表（JSON）
+    const prize_pool_snapshot = decision_snapshot.prize_pool_snapshot || {}
+    const available_tiers = prize_pool_snapshot.available_tiers || []
+
     return await LotteryDrawDecision.create(
       {
         draw_id,
         user_id,
         campaign_id,
-        idempotency_key, // 🆕 幂等键（必填字段，与lottery_draws.idempotency_key对应）
-        decision_type: 'normal_draw',
-        user_segment: decision_snapshot.tier_decision?.user_segment || 'default',
-        tier_weights_used: JSON.stringify(decision_snapshot.tier_decision?.tier_weights),
-        tier_random_value: decision_snapshot.tier_decision?.random_value,
-        tier_selected: decision_snapshot.tier_decision?.selected_tier,
-        tier_original: decision_snapshot.tier_decision?.original_tier,
-        tier_downgrade_path: JSON.stringify(decision_snapshot.tier_decision?.downgrade_path),
-        prize_pool_snapshot: JSON.stringify(decision_snapshot.prize_pool_snapshot),
-        prize_random_value: decision_snapshot.prize_decision?.random_value,
-        prize_selected_id: decision_snapshot.final_result?.prize_id,
+        idempotency_key, // 幂等键（必填字段，与lottery_draws.idempotency_key对应）
+        pipeline_type: 'normal',
+        segment_key: decision_snapshot.tier_decision?.user_segment || 'default',
+
+        // 档位选择相关
+        selected_tier: decision_snapshot.tier_decision?.selected_tier,
+        original_tier: decision_snapshot.tier_decision?.original_tier,
+        final_tier: decision_snapshot.final_result?.reward_tier,
+        tier_downgrade_triggered:
+          (decision_snapshot.tier_decision?.downgrade_path?.length || 0) > 1,
+        downgrade_count: Math.max(
+          0,
+          (decision_snapshot.tier_decision?.downgrade_path?.length || 1) - 1
+        ),
+
+        // 随机数审计
+        random_seed: Math.round((decision_snapshot.tier_decision?.random_value || 0) * 999999),
+
+        // 预算相关
+        budget_provider_type: budget_snapshot.budget_mode === 'none' ? 'none' : 'user',
+        budget_deducted: budget_snapshot.budget_before
+          ? budget_snapshot.budget_before - (budget_snapshot.budget_after || 0)
+          : 0,
+
+        // 保底相关
         guarantee_triggered: decision_snapshot.guarantee_decision?.guarantee_triggered || false,
-        guarantee_count: decision_snapshot.guarantee_decision?.user_draw_count,
-        budget_mode: decision_snapshot.budget_snapshot?.budget_mode,
-        budget_before: decision_snapshot.budget_snapshot?.budget_before,
-        decision_factors: JSON.stringify(decision_snapshot.decision_factors),
-        full_snapshot: JSON.stringify(decision_snapshot),
+        guarantee_type: decision_snapshot.guarantee_decision?.guarantee_triggered
+          ? 'consecutive'
+          : 'none',
+
+        // 决策上下文
+        decision_context: decision_snapshot.decision_factors || [],
+
+        // 时间戳
+        decision_at: BeijingTimeHelper.createBeijingTime(),
+
+        // ============== 策略引擎审计字段（2026-01-29 修复） ==============
+
+        // 预算分层（B0/B1/B2/B3）
+        budget_tier: budget_snapshot.budget_tier || null,
+
+        // 活动压力分层（P0/P1/P2）
+        pressure_tier: budget_snapshot.pressure_tier || null,
+
+        // 有效预算（统一计算口径）
+        effective_budget: budget_snapshot.effective_budget || null,
+
+        // 预算上限值
+        cap_value: budget_snapshot.calculated_cap || null,
+
+        // Pity 系统决策信息（JSON）
+        pity_decision,
+
+        // 运气债务决策信息（JSON）
+        luck_debt_decision,
+
+        // 体验平滑机制应用记录（JSON）
+        experience_smoothing,
+
+        // BxPx 矩阵权重调整信息（JSON）
+        weight_adjustment,
+
+        // 可用档位列表（JSON）
+        available_tiers,
+
         created_at: BeijingTimeHelper.createBeijingTime()
       },
       { transaction }
     )
+  }
+
+  /**
+   * 构建已应用的体验机制列表
+   *
+   * @param {Object} strategy_snapshot - 策略快照
+   * @returns {Array} 已应用的机制列表
+   * @private
+   */
+  _buildAppliedMechanismsList(strategy_snapshot) {
+    const mechanisms = []
+
+    // Pity 软保底
+    if (strategy_snapshot.pity_system?.soft_triggered) {
+      mechanisms.push({
+        type: 'pity_soft',
+        description: `Pity软保底：非空奖概率提升 ${strategy_snapshot.pity_system.boost_percentage || 0}%`
+      })
+    }
+
+    // Pity 硬保底
+    if (strategy_snapshot.pity_system?.hard_triggered) {
+      mechanisms.push({
+        type: 'pity_hard',
+        description: 'Pity硬保底：强制发放非空奖品'
+      })
+    }
+
+    // 防连续空奖
+    if (strategy_snapshot.anti_streak?.anti_empty_triggered) {
+      mechanisms.push({
+        type: 'anti_empty',
+        description: `防连续空奖：强制发放 ${strategy_snapshot.anti_streak.forced_tier || '非空'} 档位`
+      })
+    }
+
+    // 防连续高价值
+    if (strategy_snapshot.anti_streak?.anti_high_triggered) {
+      mechanisms.push({
+        type: 'anti_high',
+        description: `防连续高价值：档位上限为 ${strategy_snapshot.anti_streak.capped_max_tier || 'mid'}`
+      })
+    }
+
+    // 运气债务补偿
+    if (
+      strategy_snapshot.luck_debt?.debt_level &&
+      strategy_snapshot.luck_debt.debt_level !== 'none'
+    ) {
+      mechanisms.push({
+        type: 'luck_debt',
+        description: `运气债务补偿(${strategy_snapshot.luck_debt.debt_level})：权重乘数 ${strategy_snapshot.luck_debt.debt_multiplier || 1.0}`
+      })
+    }
+
+    return mechanisms
   }
 
   /**

@@ -14,7 +14,7 @@
  *
  * 路由挂载说明：
  * - 此模块挂载在 /api/v4/console/system 路径下
- * - 同时在 /api/v4/console 根路径挂载核心监控接口（兼容性）
+ * - 完整路径示例：/api/v4/console/system/status
  */
 
 const express = require('express')

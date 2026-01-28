@@ -944,7 +944,7 @@ module.exports = sequelize => {
        * @type {number}
        * @业务含义 该活动允许的最大库存欠账数量，0表示不限制（强烈不推荐）
        */
-      max_inventory_debt_qty: {
+      max_inventory_debt_quantity: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,

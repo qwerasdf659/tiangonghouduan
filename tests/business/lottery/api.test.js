@@ -410,9 +410,14 @@ describe('抽奖系统API测试（V4架构）', () => {
     })
 
     test('计算用户中奖概率 - POST /api/v4/probability/calculate', async () => {
+      /**
+       * V4.6 Phase 5 更新（2026-01-29）：
+       * - BasicGuaranteeStrategy 已移除，改为 NormalDrawPipeline 统一管线架构
+       * - 概率计算 API 使用 pipeline 参数替代 strategy 参数
+       */
       const probability_data = {
         user_id: test_user_id || testUser.user_id,
-        strategy: 'BasicGuaranteeStrategy',
+        pipeline: 'NormalDrawPipeline',
         campaign_id: 1
       }
 

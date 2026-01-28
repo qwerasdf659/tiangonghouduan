@@ -2676,8 +2676,15 @@ class LotteryAnalyticsService {
 
     try {
       // 1. 解析报告日期（北京时间）
-      const { startTime, endTime, yesterdayStart, yesterdayEnd, lastWeekStart, lastWeekEnd, displayDate } =
-        this._parseDailyReportDateRange(reportDate)
+      const {
+        startTime,
+        endTime,
+        yesterdayStart,
+        yesterdayEnd,
+        lastWeekStart,
+        lastWeekEnd,
+        displayDate
+      } = this._parseDailyReportDateRange(reportDate)
 
       // 2. 并行查询所有数据
       const [
@@ -2695,7 +2702,9 @@ class LotteryAnalyticsService {
         this._getDailyReportHourlyBreakdown(startTime, endTime, campaignId),
         this._getDailyReportTierBreakdown(startTime, endTime, campaignId),
         this._getDailyReportTopPrizes(startTime, endTime, 10),
-        campaignId ? Promise.resolve([]) : this._getDailyReportCampaignsBreakdown(startTime, endTime)
+        campaignId
+          ? Promise.resolve([])
+          : this._getDailyReportCampaignsBreakdown(startTime, endTime)
       ])
 
       // 3. 计算同比环比
@@ -2728,7 +2737,11 @@ class LotteryAnalyticsService {
 
       return response
     } catch (error) {
-      this.logger.error('生成运营日报失败', { report_date: reportDate, campaign_id: campaignId, error: error.message })
+      this.logger.error('生成运营日报失败', {
+        report_date: reportDate,
+        campaign_id: campaignId,
+        error: error.message
+      })
       throw error
     }
   }
@@ -2766,12 +2779,22 @@ class LotteryAnalyticsService {
 
     // 上周同日范围
     const lastWeekStart = new Date(targetDate.getTime() - 7 * 24 * 60 * 60 * 1000)
-    const lastWeekEnd = new Date(targetDate.getTime() - 7 * 24 * 60 * 60 * 1000 + 24 * 60 * 60 * 1000 - 1)
+    const lastWeekEnd = new Date(
+      targetDate.getTime() - 7 * 24 * 60 * 60 * 1000 + 24 * 60 * 60 * 1000 - 1
+    )
 
     // 格式化显示日期
     const displayDate = new Date(targetDate.getTime() + beijingOffset).toISOString().split('T')[0]
 
-    return { startTime, endTime, yesterdayStart, yesterdayEnd, lastWeekStart, lastWeekEnd, displayDate }
+    return {
+      startTime,
+      endTime,
+      yesterdayStart,
+      yesterdayEnd,
+      lastWeekStart,
+      lastWeekEnd,
+      displayDate
+    }
   }
 
   /**
@@ -2882,10 +2905,7 @@ class LotteryAnalyticsService {
         [literal("HOUR(CONVERT_TZ(created_at, '+00:00', '+08:00'))"), 'hour'],
         [fn('COUNT', col('draw_id')), 'draws'],
         [
-          fn(
-            'SUM',
-            literal("CASE WHEN reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END")
-          ),
+          fn('SUM', literal("CASE WHEN reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END")),
           'wins'
         ],
         [fn('COUNT', fn('DISTINCT', col('user_id'))), 'users']
@@ -2949,7 +2969,8 @@ class LotteryAnalyticsService {
       tier: t.reward_tier || 'unknown',
       count: parseInt(t.count || 0),
       cost: parseFloat(t.cost || 0),
-      percentage: totalCount > 0 ? parseFloat(((parseInt(t.count) / totalCount) * 100).toFixed(1)) : 0
+      percentage:
+        totalCount > 0 ? parseFloat(((parseInt(t.count) / totalCount) * 100).toFixed(1)) : 0
     }))
   }
 
@@ -2963,10 +2984,7 @@ class LotteryAnalyticsService {
    */
   async _getDailyReportTopPrizes(startTime, endTime, limit = 10) {
     const prizeData = await this.models.LotteryDraw.findAll({
-      attributes: [
-        'prize_id',
-        [fn('COUNT', col('draw_id')), 'count']
-      ],
+      attributes: ['prize_id', [fn('COUNT', col('draw_id')), 'count']],
       include: [
         {
           model: this.models.LotteryPrize,
@@ -2990,7 +3008,9 @@ class LotteryAnalyticsService {
       prize_name: p.prize?.prize_name || '未知奖品',
       count: parseInt(p.dataValues.count || 0),
       tier: p.prize?.reward_tier || 'unknown',
-      total_cost: parseFloat((parseInt(p.dataValues.count || 0) * parseFloat(p.prize?.cost_points || 0)).toFixed(2))
+      total_cost: parseFloat(
+        (parseInt(p.dataValues.count || 0) * parseFloat(p.prize?.cost_points || 0)).toFixed(2)
+      )
     }))
   }
 
@@ -3297,7 +3317,13 @@ class LotteryAnalyticsService {
 
     const campaigns = await this.models.LotteryCampaign.findAll({
       where: whereClause,
-      attributes: ['campaign_id', 'campaign_name', 'pool_budget_total', 'pool_budget_remaining', 'daily_budget_limit']
+      attributes: [
+        'campaign_id',
+        'campaign_name',
+        'pool_budget_total',
+        'pool_budget_remaining',
+        'daily_budget_limit'
+      ]
     })
 
     campaigns.forEach(campaign => {
@@ -3312,7 +3338,11 @@ class LotteryAnalyticsService {
             level: 'danger',
             type: 'budget_exhaust',
             message: `${campaign.campaign_name} 预算消耗已达${consumptionRate.toFixed(1)}%`,
-            related_entity: { type: 'campaign', id: campaign.campaign_id, name: campaign.campaign_name },
+            related_entity: {
+              type: 'campaign',
+              id: campaign.campaign_id,
+              name: campaign.campaign_name
+            },
             threshold: 90,
             current_value: consumptionRate,
             suggestion: '建议立即增加预算或暂停活动'
@@ -3322,7 +3352,11 @@ class LotteryAnalyticsService {
             level: 'warning',
             type: 'budget_warning',
             message: `${campaign.campaign_name} 预算消耗已达${consumptionRate.toFixed(1)}%`,
-            related_entity: { type: 'campaign', id: campaign.campaign_id, name: campaign.campaign_name },
+            related_entity: {
+              type: 'campaign',
+              id: campaign.campaign_id,
+              name: campaign.campaign_name
+            },
             threshold: 80,
             current_value: consumptionRate,
             suggestion: '建议关注预算消耗速度'
@@ -3347,12 +3381,21 @@ class LotteryAnalyticsService {
 
     const prizes = await this.models.LotteryPrize.findAll({
       where: whereClause,
-      attributes: ['prize_id', 'prize_name', 'reward_tier', 'stock_quantity', 'total_win_count', 'campaign_id'],
-      include: [{
-        model: this.models.LotteryCampaign,
-        as: 'campaign',
-        attributes: ['campaign_name']
-      }]
+      attributes: [
+        'prize_id',
+        'prize_name',
+        'reward_tier',
+        'stock_quantity',
+        'total_win_count',
+        'campaign_id'
+      ],
+      include: [
+        {
+          model: this.models.LotteryCampaign,
+          as: 'campaign',
+          attributes: ['campaign_name']
+        }
+      ]
     })
 
     prizes.forEach(prize => {
@@ -3405,15 +3448,20 @@ class LotteryAnalyticsService {
       attributes: [
         'campaign_id',
         [fn('COUNT', col('draw_id')), 'total_draws'],
-        [fn('SUM', literal("CASE WHEN reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END")), 'total_wins']
+        [
+          fn('SUM', literal("CASE WHEN reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END")),
+          'total_wins'
+        ]
       ],
       where: whereClause,
       group: ['campaign_id'],
-      include: [{
-        model: this.models.LotteryCampaign,
-        as: 'campaign',
-        attributes: ['campaign_name']
-      }],
+      include: [
+        {
+          model: this.models.LotteryCampaign,
+          as: 'campaign',
+          attributes: ['campaign_name']
+        }
+      ],
       raw: false
     })
 
@@ -3424,7 +3472,8 @@ class LotteryAnalyticsService {
       const totalDraws = parseInt(stat.dataValues.total_draws || 0)
       const totalWins = parseInt(stat.dataValues.total_wins || 0)
 
-      if (totalDraws >= 10) { // 至少10次抽奖才判定
+      if (totalDraws >= 10) {
+        // 至少10次抽奖才判定
         const winRate = (totalWins / totalDraws) * 100
 
         if (winRate > normalWinRate * 1.5) {
@@ -3432,7 +3481,11 @@ class LotteryAnalyticsService {
             level: 'danger',
             type: 'win_rate_high',
             message: `活动「${stat.campaign?.campaign_name || '未知'}」最近1小时中奖率异常高 (${winRate.toFixed(1)}%)`,
-            related_entity: { type: 'campaign', id: stat.campaign_id, name: stat.campaign?.campaign_name },
+            related_entity: {
+              type: 'campaign',
+              id: stat.campaign_id,
+              name: stat.campaign?.campaign_name
+            },
             threshold: normalWinRate * 1.5,
             current_value: winRate,
             suggestion: '建议检查概率配置是否异常'
@@ -3442,7 +3495,11 @@ class LotteryAnalyticsService {
             level: 'warning',
             type: 'win_rate_low',
             message: `活动「${stat.campaign?.campaign_name || '未知'}」最近1小时中奖率偏低 (${winRate.toFixed(1)}%)`,
-            related_entity: { type: 'campaign', id: stat.campaign_id, name: stat.campaign?.campaign_name },
+            related_entity: {
+              type: 'campaign',
+              id: stat.campaign_id,
+              name: stat.campaign?.campaign_name
+            },
             threshold: normalWinRate * 0.5,
             current_value: winRate,
             suggestion: '建议检查是否存在系统问题'
@@ -3469,18 +3526,17 @@ class LotteryAnalyticsService {
 
     // 查询1小时内抽奖超过100次的用户
     const highFreqUsers = await this.models.LotteryDraw.findAll({
-      attributes: [
-        'user_id',
-        [fn('COUNT', col('draw_id')), 'draw_count']
-      ],
+      attributes: ['user_id', [fn('COUNT', col('draw_id')), 'draw_count']],
       where: whereClause,
       group: ['user_id'],
       having: literal('COUNT(draw_id) > 100'),
-      include: [{
-        model: this.models.User,
-        as: 'user',
-        attributes: ['nickname', 'phone']
-      }],
+      include: [
+        {
+          model: this.models.User,
+          as: 'user',
+          attributes: ['nickname', 'mobile']
+        }
+      ],
       raw: false
     })
 
@@ -3603,17 +3659,17 @@ class LotteryAnalyticsService {
 
       // 4. 构建决策快照
       const decisionSnapshot = decision
-? {
-        decision_id: decision.decision_id,
-        random_number: decision.random_seed ? decision.random_seed / 1000000 : null,
-        selected_tier: decision.selected_tier || decision.final_tier,
-        original_tier: decision.original_tier,
-        downgrade_count: decision.downgrade_count || 0,
-        fallback_triggered: decision.fallback_triggered || false,
-        is_preset: decision.preset_used || false,
-        preset_id: decision.preset_id
-      }
-: null
+        ? {
+            decision_id: decision.decision_id,
+            random_number: decision.random_seed ? decision.random_seed / 1000000 : null,
+            selected_tier: decision.selected_tier || decision.final_tier,
+            original_tier: decision.original_tier,
+            downgrade_count: decision.downgrade_count || 0,
+            fallback_triggered: decision.fallback_triggered || false,
+            is_preset: decision.preset_used || false,
+            preset_id: decision.preset_id
+          }
+        : null
 
       // 5. 组装返回数据
       return {
@@ -3648,15 +3704,41 @@ class LotteryAnalyticsService {
    */
   _buildPipelineExecution(decision) {
     if (!decision) {
-      return [{ stage: 0, name: 'Unknown', status: 'no_decision_record', duration_ms: 0, output: {} }]
+      return [
+        { stage: 0, name: 'Unknown', status: 'no_decision_record', duration_ms: 0, output: {} }
+      ]
     }
 
     // 基于统一抽奖架构的11阶段Pipeline构建执行详情
     const stages = [
-      { stage: 1, name: 'LoadCampaignStage', status: 'success', duration_ms: 2, output: { campaign_valid: true } },
-      { stage: 2, name: 'LoadPrizesStage', status: 'success', duration_ms: 3, output: { prizes_loaded: true } },
-      { stage: 3, name: 'CheckQuotaStage', status: 'success', duration_ms: 2, output: { quota_valid: true } },
-      { stage: 4, name: 'LoadUserContextStage', status: 'success', duration_ms: 5, output: { user_loaded: true } },
+      {
+        stage: 1,
+        name: 'LoadCampaignStage',
+        status: 'success',
+        duration_ms: 2,
+        output: { campaign_valid: true }
+      },
+      {
+        stage: 2,
+        name: 'LoadPrizesStage',
+        status: 'success',
+        duration_ms: 3,
+        output: { prizes_loaded: true }
+      },
+      {
+        stage: 3,
+        name: 'CheckQuotaStage',
+        status: 'success',
+        duration_ms: 2,
+        output: { quota_valid: true }
+      },
+      {
+        stage: 4,
+        name: 'LoadUserContextStage',
+        status: 'success',
+        duration_ms: 5,
+        output: { user_loaded: true }
+      },
       {
         stage: 5,
         name: 'BudgetContextStage',
@@ -3732,7 +3814,9 @@ class LotteryAnalyticsService {
     if (decision.processing_time_ms) {
       const totalEstimated = stages.reduce((sum, s) => sum + s.duration_ms, 0)
       const ratio = decision.processing_time_ms / totalEstimated
-      stages.forEach(s => { s.duration_ms = Math.round(s.duration_ms * ratio) })
+      stages.forEach(s => {
+        s.duration_ms = Math.round(s.duration_ms * ratio)
+      })
     }
 
     return stages
@@ -3753,7 +3837,14 @@ class LotteryAnalyticsService {
    * @returns {Promise<Object>} 异常用户列表
    */
   async getAbnormalUsers(options = {}) {
-    const { type = 'all', time_range = '24h', campaign_id, min_risk_score, page = 1, page_size = 20 } = options
+    const {
+      type = 'all',
+      time_range = '24h',
+      campaign_id,
+      min_risk_score,
+      page = 1,
+      page_size = 20
+    } = options
     this.logger.info('获取异常用户列表', { type, time_range, campaign_id })
 
     try {
@@ -3761,41 +3852,61 @@ class LotteryAnalyticsService {
       const timeRangeMs = { '1h': 3600000, '24h': 86400000, '7d': 604800000 }
       const startTime = new Date(Date.now() - (timeRangeMs[time_range] || 86400000))
 
-      const whereClause = { created_at: { [Op.gte]: startTime } }
+      // 🔧 修复：明确指定表名避免 created_at 列名歧义
+      const whereClause = { '$LotteryDraw.created_at$': { [Op.gte]: startTime } }
       if (campaign_id) whereClause.campaign_id = campaign_id
 
       // 查询用户抽奖聚合数据
       const userStats = await this.models.LotteryDraw.findAll({
         attributes: [
           'user_id',
-          [fn('COUNT', col('draw_id')), 'draw_count'],
-          [fn('SUM', literal("CASE WHEN reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END")), 'win_count'],
-          [fn('SUM', literal("CASE WHEN reward_tier = 'high' THEN 1 ELSE 0 END")), 'high_tier_count'],
-          [fn('MAX', col('created_at')), 'last_draw_time']
+          [fn('COUNT', col('LotteryDraw.draw_id')), 'draw_count'],
+          [
+            fn(
+              'SUM',
+              literal(
+                "CASE WHEN LotteryDraw.reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END"
+              )
+            ),
+            'win_count'
+          ],
+          [
+            fn('SUM', literal("CASE WHEN LotteryDraw.reward_tier = 'high' THEN 1 ELSE 0 END")),
+            'high_tier_count'
+          ],
+          [fn('MAX', col('LotteryDraw.created_at')), 'last_draw_time']
         ],
         where: whereClause,
-        group: ['user_id'],
-        having: literal('COUNT(draw_id) >= 10'), // 至少10次抽奖才分析
-        include: [{
-          model: this.models.User,
-          as: 'user',
-          attributes: ['nickname', 'phone']
-        }],
+        group: ['LotteryDraw.user_id'],
+        having: literal('COUNT(LotteryDraw.draw_id) >= 10'), // 至少10次抽奖才分析
+        include: [
+          {
+            model: this.models.User,
+            as: 'user',
+            attributes: ['nickname', 'mobile'],
+            required: false // 左连接避免没有用户记录时丢失数据
+          }
+        ],
         raw: false
       })
 
       // 计算平均值用于判定异常
-      const _avgDrawCount = userStats.length > 0
-        ? userStats.reduce((sum, u) => sum + parseInt(u.dataValues.draw_count), 0) / userStats.length
-        : 0
-      void _avgDrawCount // 保留用于后续扩展
-      const avgWinRate = userStats.length > 0
-        ? userStats.reduce((sum, u) => {
-          const draws = parseInt(u.dataValues.draw_count)
-          const wins = parseInt(u.dataValues.win_count)
-          return sum + (draws > 0 ? wins / draws : 0)
-        }, 0) / userStats.length * 100
-        : 0
+      const _avgDrawCount =
+        userStats.length > 0
+          ? userStats.reduce((sum, u) => sum + parseInt(u.dataValues.draw_count), 0) /
+            userStats.length
+          : 0
+      // _avgDrawCount 保留用于后续扩展，暂未使用
+      const avgWinRate =
+        userStats.length > 0
+          ? (userStats.reduce((sum, u) => {
+              const draws = parseInt(u.dataValues.draw_count)
+              const wins = parseInt(u.dataValues.win_count)
+              return sum + (draws > 0 ? wins / draws : 0)
+            }, 0) /
+              userStats.length) *
+            100
+          : 0
 
       // 分析每个用户
       const abnormalUsers = []
@@ -3823,7 +3934,8 @@ class LotteryAnalyticsService {
         }
 
         // 高档位异常检测
-        if (drawCount > 20 && highTierCount / drawCount > 0.1) { // high档位中奖率 > 10%
+        if (drawCount > 20 && highTierCount / drawCount > 0.1) {
+          // high档位中奖率 > 10%
           riskScore += 35
           abnormalTypes.push('high_tier_abnormal')
         }
@@ -3926,7 +4038,10 @@ class LotteryAnalyticsService {
           [fn('COUNT', col('draw_id')), 'total_draws'],
           [fn('COUNT', fn('DISTINCT', col('user_id'))), 'unique_users'],
           [fn('SUM', col('cost_points')), 'total_cost_points'],
-          [fn('SUM', literal("CASE WHEN reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END")), 'total_wins']
+          [
+            fn('SUM', literal("CASE WHEN reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END")),
+            'total_wins'
+          ]
         ],
         where: whereClause,
         raw: true
@@ -3939,20 +4054,21 @@ class LotteryAnalyticsService {
 
       // 奖品成本统计
       const prizeStats = await this.models.LotteryDraw.findOne({
-        attributes: [
-          [fn('SUM', literal('COALESCE(prize.cost_points, 0)')), 'total_prize_value']
-        ],
+        attributes: [[fn('SUM', literal('COALESCE(prize.cost_points, 0)')), 'total_prize_value']],
         where: whereClause,
-        include: [{
-          model: this.models.LotteryPrize,
-          as: 'prize',
-          attributes: []
-        }],
+        include: [
+          {
+            model: this.models.LotteryPrize,
+            as: 'prize',
+            attributes: []
+          }
+        ],
         raw: true
       })
 
       const totalPrizeValue = parseFloat(prizeStats.total_prize_value || 0)
-      const roi = totalCostPoints > 0 ? ((totalCostPoints - totalPrizeValue) / totalCostPoints) * 100 : 0
+      const roi =
+        totalCostPoints > 0 ? ((totalCostPoints - totalPrizeValue) / totalCostPoints) * 100 : 0
 
       // 复购用户统计（至少2次抽奖的用户）
       const repeatUsers = await this.models.LotteryDraw.count({
@@ -4007,16 +4123,24 @@ class LotteryAnalyticsService {
           actual_draws: totalDraws,
           winners: totalWins,
           conversion_rate: {
-            draw_to_win: totalDraws > 0 ? parseFloat(((totalWins / totalDraws) * 100).toFixed(1)) : 0
+            draw_to_win:
+              totalDraws > 0 ? parseFloat(((totalWins / totalDraws) * 100).toFixed(1)) : 0
           }
         },
         time_distribution: {
           hourly_draws: hourlyDistribution,
           daily_draws: dailyDistribution,
-          peak_hour: hourlyDistribution.reduce((max, h) => h.count > max.count ? h : max, { hour: 0, count: 0 }).hour,
-          peak_day: dailyDistribution.length > 0
-            ? dailyDistribution.reduce((max, d) => d.count > max.count ? d : max, { date: '', count: 0 }).date
-            : null
+          peak_hour: hourlyDistribution.reduce((max, h) => (h.count > max.count ? h : max), {
+            hour: 0,
+            count: 0
+          }).hour,
+          peak_day:
+            dailyDistribution.length > 0
+              ? dailyDistribution.reduce((max, d) => (d.count > max.count ? d : max), {
+                  date: '',
+                  count: 0
+                }).date
+              : null
         },
         prize_analysis: {
           tier_distribution: tierDistribution,
@@ -4089,10 +4213,7 @@ class LotteryAnalyticsService {
    */
   async _getCampaignTierDistribution(campaignId) {
     const results = await this.models.LotteryDraw.findAll({
-      attributes: [
-        'reward_tier',
-        [fn('COUNT', col('draw_id')), 'count']
-      ],
+      attributes: ['reward_tier', [fn('COUNT', col('draw_id')), 'count']],
       where: { campaign_id: campaignId },
       group: ['reward_tier'],
       raw: true
@@ -4121,19 +4242,18 @@ class LotteryAnalyticsService {
    */
   async _getCampaignTopPrizes(campaignId, limit) {
     const results = await this.models.LotteryDraw.findAll({
-      attributes: [
-        'prize_id',
-        [fn('COUNT', col('draw_id')), 'count']
-      ],
+      attributes: ['prize_id', [fn('COUNT', col('draw_id')), 'count']],
       where: { campaign_id: campaignId, prize_id: { [Op.ne]: null } },
       group: ['prize_id'],
       order: [[fn('COUNT', col('draw_id')), 'DESC']],
       limit,
-      include: [{
-        model: this.models.LotteryPrize,
-        as: 'prize',
-        attributes: ['prize_name', 'cost_points']
-      }],
+      include: [
+        {
+          model: this.models.LotteryPrize,
+          as: 'prize',
+          attributes: ['prize_name', 'cost_points']
+        }
+      ],
       raw: false
     })
 
@@ -4161,16 +4281,14 @@ class LotteryAnalyticsService {
       raw: true
     })
 
-    const avgDrawsPerUser = parseInt(avgStats.unique_users) > 0
-      ? parseFloat((parseInt(avgStats.total_draws) / parseInt(avgStats.unique_users)).toFixed(1))
-      : 0
+    const avgDrawsPerUser =
+      parseInt(avgStats.unique_users) > 0
+        ? parseFloat((parseInt(avgStats.total_draws) / parseInt(avgStats.unique_users)).toFixed(1))
+        : 0
 
     // 最高抽奖次数用户
     const maxDrawUser = await this.models.LotteryDraw.findOne({
-      attributes: [
-        'user_id',
-        [fn('COUNT', col('draw_id')), 'count']
-      ],
+      attributes: ['user_id', [fn('COUNT', col('draw_id')), 'count']],
       where: { campaign_id: campaignId },
       group: ['user_id'],
       order: [[fn('COUNT', col('draw_id')), 'DESC']],
@@ -4180,11 +4298,11 @@ class LotteryAnalyticsService {
     return {
       avg_draws_per_user: avgDrawsPerUser,
       max_draws_user: maxDrawUser
-? {
-        user_id: maxDrawUser.user_id,
-        count: parseInt(maxDrawUser.count)
-      }
-: null
+        ? {
+            user_id: maxDrawUser.user_id,
+            count: parseInt(maxDrawUser.count)
+          }
+        : null
     }
   }
 
@@ -4195,27 +4313,41 @@ class LotteryAnalyticsService {
    * @returns {Promise<Object>} 体验指标数据
    */
   async _getCampaignExperienceMetrics(campaignId) {
+    // 🔧 修复：使用表中实际存在的字段
     const states = await this.models.LotteryUserExperienceState.findAll({
       where: { campaign_id: campaignId },
-      attributes: ['empty_streak', 'pity_trigger_count', 'anti_empty_trigger_count']
+      attributes: ['empty_streak', 'pity_trigger_count', 'total_empty_count', 'max_empty_streak']
     })
 
     if (states.length === 0) {
-      return { avg_empty_streak: 0, pity_trigger_count: 0, anti_empty_trigger_count: 0 }
+      return {
+        avg_empty_streak: 0,
+        pity_trigger_count: 0,
+        total_empty_count: 0,
+        max_empty_streak: 0
+      }
     }
 
     const avgEmptyStreak = states.reduce((sum, s) => sum + (s.empty_streak || 0), 0) / states.length
     const pityTriggerCount = states.reduce((sum, s) => sum + (s.pity_trigger_count || 0), 0)
-    const antiEmptyTriggerCount = states.reduce((sum, s) => sum + (s.anti_empty_trigger_count || 0), 0)
+    const totalEmptyCount = states.reduce((sum, s) => sum + (s.total_empty_count || 0), 0)
+    const maxEmptyStreak = Math.max(...states.map(s => s.max_empty_streak || 0), 0)
 
     return {
       avg_empty_streak: parseFloat(avgEmptyStreak.toFixed(1)),
       pity_trigger_count: pityTriggerCount,
-      anti_empty_trigger_count: antiEmptyTriggerCount
+      total_empty_count: totalEmptyCount,
+      max_empty_streak: maxEmptyStreak
     }
   }
 
-  /** 获取活动历史对比（内部方法）@private */
+  /**
+   * 获取活动历史对比（内部方法）
+   * @private
+   * @param {number} campaignId - 当前活动ID
+   * @param {Object} currentStats - 当前活动统计数据
+   * @returns {Promise<Object>} 历史对比数据
+   */
   async _getCampaignHistoryComparison(campaignId, currentStats) {
     // 查找上一个活动
     const previousCampaign = await this.models.LotteryCampaign.findOne({
@@ -4242,8 +4374,14 @@ class LotteryAnalyticsService {
 
     return {
       vs_last_campaign: {
-        draws_change: prevDraws > 0 ? parseFloat((((currentStats.total_draws - prevDraws) / prevDraws) * 100).toFixed(1)) : null,
-        users_change: prevUsers > 0 ? parseFloat((((currentStats.unique_users - prevUsers) / prevUsers) * 100).toFixed(1)) : null
+        draws_change:
+          prevDraws > 0
+            ? parseFloat((((currentStats.total_draws - prevDraws) / prevDraws) * 100).toFixed(1))
+            : null,
+        users_change:
+          prevUsers > 0
+            ? parseFloat((((currentStats.unique_users - prevUsers) / prevUsers) * 100).toFixed(1))
+            : null
       }
     }
   }
@@ -4269,8 +4407,28 @@ class LotteryAnalyticsService {
       const startTime = new Date(Date.now() - (timeRangeMs[time_range] || 604800000))
       const endTime = new Date()
 
+      /*
+       * 🔧 修复：lottery_draw_decisions 表没有 campaign_id 字段
+       * 需要通过 draw_id 关联 lottery_draws 表
+       */
       const whereClause = { created_at: { [Op.gte]: startTime } }
-      if (campaign_id) whereClause.campaign_id = campaign_id
+
+      // 如果需要筛选活动，先获取该活动的 draw_ids
+      let drawIds = null
+      if (campaign_id) {
+        const draws = await this.models.LotteryDraw.findAll({
+          attributes: ['draw_id'],
+          where: { campaign_id, created_at: { [Op.gte]: startTime } },
+          raw: true
+        })
+        drawIds = draws.map(d => d.draw_id)
+        if (drawIds.length > 0) {
+          whereClause.draw_id = { [Op.in]: drawIds }
+        } else {
+          // 没有数据时直接返回空结果
+          return this._emptyStrategyEffectivenessResult(startTime, endTime)
+        }
+      }
 
       // 1. BxPx 矩阵分析
       let bxpxMatrixAnalysis = null
@@ -4318,15 +4476,37 @@ class LotteryAnalyticsService {
     }
   }
 
-  /** 分析BxPx矩阵（内部方法）@private */
+  /**
+   * 返回空的策略效果分析结果（内部方法）
+   * @private
+   * @param {Date} startTime - 开始时间
+   * @param {Date} endTime - 结束时间
+   * @returns {Object} 空的策略分析结果
+   */
+  _emptyStrategyEffectivenessResult(startTime, endTime) {
+    return {
+      analysis_period: {
+        start: startTime.toISOString().replace('Z', '+08:00'),
+        end: endTime.toISOString().replace('Z', '+08:00')
+      },
+      bxpx_matrix_analysis: { hit_distribution: {}, effectiveness_score: 0 },
+      experience_mechanism_analysis: null,
+      tier_downgrade_analysis: { downgrade_count: 0, downgrade_rate: 0 },
+      overall_strategy_score: 0,
+      optimization_recommendations: ['没有足够的数据进行分析']
+    }
+  }
+
+  /**
+   * 分析BxPx矩阵命中分布（内部方法）
+   * @private
+   * @param {Object} whereClause - Sequelize查询条件
+   * @returns {Promise<Object>} BxPx矩阵分析结果
+   */
   async _analyzeBxPxMatrix(whereClause) {
     // 从决策记录中分析BxPx命中分布
     const decisions = await this.models.LotteryDrawDecision.findAll({
-      attributes: [
-        'budget_tier',
-        'pressure_tier',
-        [fn('COUNT', col('decision_id')), 'count']
-      ],
+      attributes: ['budget_tier', 'pressure_tier', [fn('COUNT', col('decision_id')), 'count']],
       where: whereClause,
       group: ['budget_tier', 'pressure_tier'],
       raw: true
@@ -4345,9 +4525,10 @@ class LotteryAnalyticsService {
 
     // 计算效果评分（基于分布均匀度）
     const expectedRate = 100 / Object.keys(hitDistribution).length || 12.5
-    const variance = Object.values(hitDistribution).reduce((sum, v) => {
-      return sum + Math.pow(v.rate - expectedRate, 2)
-    }, 0) / Object.keys(hitDistribution).length || 1
+    const variance =
+      Object.values(hitDistribution).reduce((sum, v) => {
+        return sum + Math.pow(v.rate - expectedRate, 2)
+      }, 0) / Object.keys(hitDistribution).length || 1
 
     const effectivenessScore = Math.max(0, Math.min(100, 100 - variance))
 
@@ -4358,12 +4539,23 @@ class LotteryAnalyticsService {
     }
   }
 
-  /** 分析体验机制（内部方法）@private */
+  /**
+   * 分析体验保护机制效果（内部方法）
+   * @private
+   * @param {Object} whereClause - Sequelize查询条件
+   * @returns {Promise<Object>} 体验机制分析结果
+   */
   async _analyzeExperienceMechanisms(whereClause) {
     // Pity机制分析
     const pityStats = await this.models.LotteryDrawDecision.findOne({
       attributes: [
-        [fn('COUNT', literal("CASE WHEN JSON_EXTRACT(pity_decision, '$.triggered') = true THEN 1 END")), 'trigger_count'],
+        [
+          fn(
+            'COUNT',
+            literal("CASE WHEN JSON_EXTRACT(pity_decision, '$.triggered') = true THEN 1 END")
+          ),
+          'trigger_count'
+        ],
         [fn('COUNT', col('decision_id')), 'total']
       ],
       where: whereClause,
@@ -4374,12 +4566,13 @@ class LotteryAnalyticsService {
     const total = parseInt(pityStats?.total || 1)
     const pityTriggerRate = (pityTriggerCount / total) * 100
 
-    // 体验状态统计
+    // 🔧 修复：使用表中实际存在的字段
     const experienceStats = await this.models.LotteryUserExperienceState.findOne({
       attributes: [
         [fn('SUM', col('pity_trigger_count')), 'total_pity'],
-        [fn('SUM', col('anti_empty_trigger_count')), 'total_anti_empty'],
-        [fn('AVG', col('empty_streak')), 'avg_empty_streak']
+        [fn('SUM', col('total_empty_count')), 'total_empty'],
+        [fn('AVG', col('empty_streak')), 'avg_empty_streak'],
+        [fn('MAX', col('max_empty_streak')), 'max_empty_streak']
       ],
       raw: true
     })
@@ -4391,7 +4584,8 @@ class LotteryAnalyticsService {
         effectiveness: pityTriggerRate > 1 && pityTriggerRate < 10 ? '触发频率适中' : '需要调整'
       },
       anti_empty_mechanism: {
-        trigger_count: parseInt(experienceStats?.total_anti_empty || 0),
+        total_empty_count: parseInt(experienceStats?.total_empty || 0),
+        max_empty_streak: parseInt(experienceStats?.max_empty_streak || 0),
         effectiveness: '正常运行'
       },
       luck_debt_mechanism: {
@@ -4401,13 +4595,21 @@ class LotteryAnalyticsService {
     }
   }
 
-  /** 分析档位降级（内部方法）@private */
+  /**
+   * 分析档位降级情况（内部方法）
+   * @private
+   * @param {Object} whereClause - Sequelize查询条件
+   * @returns {Promise<Object>} 档位降级分析结果
+   */
   async _analyzeTierDowngrade(whereClause) {
     const downgradeStats = await this.models.LotteryDrawDecision.findOne({
       attributes: [
         [fn('SUM', col('downgrade_count')), 'total_downgrades'],
         [fn('COUNT', col('decision_id')), 'total'],
-        [fn('SUM', literal('CASE WHEN fallback_triggered = true THEN 1 ELSE 0 END')), 'fallback_count']
+        [
+          fn('SUM', literal('CASE WHEN fallback_triggered = true THEN 1 ELSE 0 END')),
+          'fallback_count'
+        ]
       ],
       where: whereClause,
       raw: true
@@ -4427,7 +4629,14 @@ class LotteryAnalyticsService {
     }
   }
 
-  /** 计算整体策略评分（内部方法）@private */
+  /**
+   * 计算整体策略效果评分（内部方法）
+   * @private
+   * @param {Object} bxpx - BxPx矩阵分析结果
+   * @param {Object} experience - 体验机制分析结果
+   * @param {Object} downgrade - 档位降级分析结果
+   * @returns {number} 整体策略评分（0-100）
+   */
   _calculateOverallStrategyScore(bxpx, experience, downgrade) {
     let score = 70 // 基础分
 
@@ -4448,7 +4657,14 @@ class LotteryAnalyticsService {
     return Math.max(0, Math.min(100, Math.round(score)))
   }
 
-  /** 生成优化建议（内部方法）@private */
+  /**
+   * 生成策略优化建议（内部方法）
+   * @private
+   * @param {Object} bxpx - BxPx矩阵分析结果
+   * @param {Object} experience - 体验机制分析结果
+   * @param {Object} downgrade - 档位降级分析结果
+   * @returns {Array<Object>} 优化建议列表
+   */
   _generateOptimizationRecommendations(bxpx, experience, downgrade) {
     const recommendations = []
 

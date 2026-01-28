@@ -168,6 +168,7 @@
     "nodemon": "^3.0.2",
     "prettier": "^3.1.1",
     "sequelize-cli": "^6.6.2",
+    "socket.io-client": "^4.8.3",
     "supertest": "^6.3.4"
   },
   "keywords": [

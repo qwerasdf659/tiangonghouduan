@@ -69,9 +69,9 @@ export function useUserProfileMethods() {
         // 构建 API URL
         const url = buildURL(LOTTERY_ENDPOINTS.MONITORING_USER_PROFILE, { user_id: userId })
         const queryParams = campaignId ? `?campaign_id=${campaignId}` : ''
-        
+
         logger.info('加载用户抽奖档案', { userId, campaignId })
-        
+
         const response = await this.apiGet(
           `${url}${queryParams}`,
           {},
@@ -107,7 +107,7 @@ export function useUserProfileMethods() {
             prizeName: draw.prize_name || draw.result || '-',
             prizeType: draw.prize_type || '-',
             prizeValue: draw.prize_value || 0,
-            isWin: draw.is_win ?? (draw.prize_type !== 'empty'),
+            isWin: draw.is_win ?? draw.prize_type !== 'empty',
             rewardTier: draw.reward_tier || '-',
             drawTime: draw.draw_time || draw.created_at || '-'
           }))
@@ -156,7 +156,7 @@ export function useUserProfileMethods() {
       }
 
       await this.loadUserProfile(userId, this.searchCampaignId || null)
-      
+
       if (this.userProfile) {
         this.showUserProfileModal = true
       }
@@ -265,4 +265,3 @@ export function useUserProfileMethods() {
 }
 
 export default { useUserProfileState, useUserProfileMethods }
-

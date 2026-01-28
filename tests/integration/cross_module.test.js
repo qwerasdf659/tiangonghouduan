@@ -28,6 +28,8 @@ const {
   User
 } = require('../../models')
 const BeijingTimeHelper = require('../../utils/timeHelper')
+// 🔴 P0修复：使用统一的测试数据清理器
+const { testCleaner, cleanupAfterEach } = require('../helpers/TestDataCleaner')
 
 /**
  * 生成幂等键
@@ -48,10 +50,10 @@ describe('阶段八：跨模块集成测试', () => {
   let NotificationService
   let ChatWebSocketService
 
-  // 测试过程中创建的数据，用于清理
-  const created_item_instances = []
-  const created_listings = []
-  const created_orders = []
+  /*
+   * 🔴 P0修复：移除手动清理数组，改用 testCleaner 统一管理
+   * 原代码：const created_item_instances = [], created_listings = [], created_orders = []
+   */
 
   beforeAll(async () => {
     // 从全局测试数据获取测试用户和活动
@@ -87,35 +89,8 @@ describe('阶段八：跨模块集成测试', () => {
     })
   })
 
-  afterEach(async () => {
-    // 清理测试过程中创建的数据
-    for (const order_id of created_orders) {
-      try {
-        await TradeOrder.destroy({ where: { order_id }, force: true })
-      } catch (e) {
-        /* 忽略清理错误 */
-      }
-    }
-    created_orders.length = 0
-
-    for (const listing_id of created_listings) {
-      try {
-        await MarketListing.destroy({ where: { listing_id }, force: true })
-      } catch (e) {
-        /* 忽略清理错误 */
-      }
-    }
-    created_listings.length = 0
-
-    for (const item_instance_id of created_item_instances) {
-      try {
-        await ItemInstance.destroy({ where: { item_instance_id }, force: true })
-      } catch (e) {
-        /* 忽略清理错误 */
-      }
-    }
-    created_item_instances.length = 0
-  })
+  // 🔴 P0修复：使用统一的测试数据清理机制
+  afterEach(cleanupAfterEach)
 
   afterAll(async () => {
     // 确保所有连接正确关闭
@@ -240,9 +215,8 @@ describe('阶段八：跨模块集成测试', () => {
 
         // 计算奖品积分（如果奖品是积分类型）
         const prize = draw_result.prizes[0]
-        const prize_points = (prize.prize && prize.prize.type === 'points')
-          ? Number(prize.prize.value || 0)
-          : 0
+        const prize_points =
+          prize.prize && prize.prize.type === 'points' ? Number(prize.prize.value || 0) : 0
 
         // 净积分变化 = 奖品积分 - 消耗积分
         const expected_change = prize_points - draw_result.total_points_cost
@@ -271,8 +245,10 @@ describe('阶段八：跨模块集成测试', () => {
         expect(draw_record).not.toBeNull()
         expect(draw_record.cost_points).toBe(draw_result.total_points_cost)
 
-        // 10. 验证奖品发放（如果是物品类型奖品）
-        // prize 已在步骤8中定义
+        /*
+         * 10. 验证奖品发放（如果是物品类型奖品）
+         * prize 已在步骤8中定义
+         */
         if (prize.prize && ['coupon', 'physical'].includes(prize.prize.type)) {
           // 验证物品实例已创建
           const final_items = await ItemInstance.count({
@@ -462,7 +438,8 @@ describe('阶段八：跨模块集成测试', () => {
         expect(mint_result.item_instance).toBeDefined()
         // mintItem 返回 { item_instance, is_duplicate }，需要从 item_instance 中获取 ID
         test_item_instance_id = mint_result.item_instance.item_instance_id
-        created_item_instances.push(test_item_instance_id)
+        // 🔴 P0修复：使用统一清理器注册
+        testCleaner.registerById('ItemInstance', test_item_instance_id)
 
         console.log('🏭 物品铸造完成', {
           item_instance_id: test_item_instance_id,
@@ -487,7 +464,8 @@ describe('阶段八：跨模块集成测试', () => {
         expect(listing_result.listing).toBeDefined()
         expect(listing_result.listing.listing_id).toBeDefined()
         const listing_id = listing_result.listing.listing_id
-        created_listings.push(listing_id)
+        // 🔴 P0修复：使用统一清理器注册
+        testCleaner.registerById('MarketListing', listing_id)
 
         console.log('📦 物品上架完成', {
           listing_id,
@@ -535,7 +513,8 @@ describe('阶段八：跨模块集成测试', () => {
 
         expect(order_result).not.toBeNull()
         expect(order_result.order_id).toBeDefined()
-        created_orders.push(order_result.order_id)
+        // 🔴 P0修复：使用统一清理器注册
+        testCleaner.registerById('TradeOrder', order_result.order_id)
 
         console.log('🛒 订单创建完成', {
           order_id: order_result.order_id,

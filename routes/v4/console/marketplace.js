@@ -503,7 +503,7 @@ router.put(
       logger.info('兑换商品更新成功（材料资产支付）', {
         admin_id,
         item_id: itemId,
-        name: result.item.name,
+        item_name: result.item.item_name,
         cost_asset_code: result.item.cost_asset_code,
         cost_amount: result.item.cost_amount,
         image_changes: result.image_changes

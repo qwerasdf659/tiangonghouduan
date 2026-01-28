@@ -133,9 +133,13 @@ module.exports = sequelize => {
     return this.is_active && !this.isExpired()
   }
 
+  /**
+   * 🔄 更新会话活动时间
+   * @returns {Promise<AuthenticationSession>} 更新后的会话实例
+   */
   AuthenticationSession.prototype.updateActivity = function () {
     return this.update({
-      last_activity: BeijingTimeHelper.createBeijingTime()
+      last_activity: new Date() // ✅ 使用 UTC 时间戳，Sequelize 自动转换为北京时间
     })
   }
 
@@ -146,15 +150,30 @@ module.exports = sequelize => {
     })
   }
 
+  /**
+   * ⏰ 延长会话过期时间
+   * @param {number} additionalMinutes - 延长的分钟数，默认30分钟
+   * @returns {Promise<AuthenticationSession>} 更新后的会话实例
+   */
   AuthenticationSession.prototype.extendExpiry = function (additionalMinutes = 30) {
     const newExpiry = BeijingTimeHelper.futureTime(additionalMinutes * 60 * 1000)
     return this.update({
       expires_at: newExpiry,
-      last_activity: BeijingTimeHelper.createBeijingTime()
+      last_activity: new Date() // ✅ 使用 UTC 时间戳，Sequelize 自动转换为北京时间
     })
   }
 
   // 类方法
+  /**
+   * 🆕 创建新会话
+   * @param {Object} sessionData - 会话数据
+   * @param {string} sessionData.session_token - 会话令牌
+   * @param {string} sessionData.user_type - 用户类型 (user/admin)
+   * @param {number} sessionData.user_id - 用户ID
+   * @param {string} [sessionData.login_ip] - 登录IP地址
+   * @param {number} [sessionData.expires_in_minutes=120] - 过期时间（分钟），默认2小时
+   * @returns {Promise<AuthenticationSession>} 新创建的会话实例
+   */
   AuthenticationSession.createSession = async function (sessionData) {
     const {
       session_token,
@@ -164,6 +183,7 @@ module.exports = sequelize => {
       expires_in_minutes = 120 // 默认2小时
     } = sessionData
 
+    // ✅ futureTime 使用 Date.now()，与 new Date() 时间基准一致
     const expires_at = BeijingTimeHelper.futureTime(expires_in_minutes * 60 * 1000)
 
     return this.create({
@@ -173,7 +193,7 @@ module.exports = sequelize => {
       login_ip,
       expires_at,
       is_active: true,
-      last_activity: BeijingTimeHelper.createBeijingTime()
+      last_activity: new Date() // ✅ 使用 UTC 时间戳，Sequelize 自动转换为北京时间
     })
   }
 
@@ -186,18 +206,33 @@ module.exports = sequelize => {
     })
   }
 
+  /**
+   * 🔐 查找有效会话（活跃 + 未过期）
+   * 使用 new Date() 而不是 createBeijingTime()，因为：
+   * - 数据库配置了 timezone: '+08:00'，Sequelize 自动处理时区转换
+   * - expires_at 使用 futureTime() (基于 Date.now()) 创建
+   * - 比较时必须使用相同的时间基准 (UTC 时间戳)
+   * @param {string} session_token - 会话令牌
+   * @returns {Promise<AuthenticationSession|null>} 有效会话实例或null
+   */
   AuthenticationSession.findValidByToken = function (session_token) {
     return this.findOne({
       where: {
         session_token,
         is_active: true,
         expires_at: {
-          [sequelize.Sequelize.Op.gt]: BeijingTimeHelper.createBeijingTime()
+          [sequelize.Sequelize.Op.gt]: new Date() // ✅ 使用 UTC 时间戳比较
         }
       }
     })
   }
 
+  /**
+   * 🔐 查找用户的所有活跃会话
+   * @param {string} user_type - 用户类型 (user/admin)
+   * @param {number} user_id - 用户ID
+   * @returns {Promise<AuthenticationSession[]>} 活跃会话列表（按最后活动时间降序）
+   */
   AuthenticationSession.findUserActiveSessions = function (user_type, user_id) {
     return this.findAll({
       where: {
@@ -205,7 +240,7 @@ module.exports = sequelize => {
         user_id,
         is_active: true,
         expires_at: {
-          [sequelize.Sequelize.Op.gt]: BeijingTimeHelper.createBeijingTime()
+          [sequelize.Sequelize.Op.gt]: new Date() // ✅ 使用 UTC 时间戳比较
         }
       },
       order: [['last_activity', 'DESC']]
@@ -235,11 +270,15 @@ module.exports = sequelize => {
     return affectedCount[0]
   }
 
+  /**
+   * 🗑️ 清理过期会话
+   * @returns {Promise<number>} 删除的会话数量
+   */
   AuthenticationSession.cleanupExpiredSessions = async function () {
     const deletedCount = await this.destroy({
       where: {
         expires_at: {
-          [sequelize.Sequelize.Op.lt]: BeijingTimeHelper.createBeijingTime()
+          [sequelize.Sequelize.Op.lt]: new Date() // ✅ 使用 UTC 时间戳比较
         }
       }
     })
@@ -248,12 +287,16 @@ module.exports = sequelize => {
     return deletedCount
   }
 
+  /**
+   * 📊 获取活跃会话统计信息
+   * @returns {Promise<Object>} 按用户类型分组的统计数据
+   */
   AuthenticationSession.getActiveSessionStats = async function () {
     const stats = await this.findAll({
       where: {
         is_active: true,
         expires_at: {
-          [sequelize.Sequelize.Op.gt]: BeijingTimeHelper.createBeijingTime()
+          [sequelize.Sequelize.Op.gt]: new Date() // ✅ 使用 UTC 时间戳比较
         }
       },
       attributes: [

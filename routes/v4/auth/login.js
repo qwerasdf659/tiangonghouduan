@@ -140,6 +140,46 @@ router.post('/login', async (req, res) => {
   const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
 
   try {
+    /**
+     * 🆕 2026-01-29 多设备登录冲突处理（P0-6 安全审计）
+     *
+     * 业务规则：新设备登录时，使该用户的其他活跃会话失效
+     * - 实现"单设备登录"安全策略
+     * - 旧设备的 Token 将被认证中间件拒绝
+     * - 旧设备的 WebSocket 连接将自动断开
+     *
+     * @see docs/测试审计标准.md - P0-6 多设备登录冲突测试
+     */
+    const deactivatedCount = await AuthenticationSession.deactivateUserSessions(
+      userType,
+      user.user_id,
+      null // 不排除任何 Token（因为新 Token 还未创建）
+    )
+    if (deactivatedCount > 0) {
+      logger.info(
+        `🔒 [Session] 多设备登录检测: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id})`
+      )
+
+      /**
+       * 🆕 2026-01-29 WebSocket 断开通知（P0-6 验收标准）
+       *
+       * 业务规则：新设备登录后主动断开旧设备的 WebSocket 连接
+       * - 旧设备 App 端立即收到断开事件
+       * - 可触发客户端显示"您的账号在其他设备登录"提示
+       */
+      try {
+        const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
+        ChatWebSocketService.disconnectUser(user.user_id, userType)
+        logger.info(
+          `🔌 [Session] 已断开旧设备WebSocket连接: user_id=${user.user_id}, type=${userType}`
+        )
+      } catch (wsError) {
+        // WebSocket断开失败非致命（可能用户原本就没有连接）
+        logger.debug(`🔌 [Session] WebSocket断开跳过: ${wsError.message}`)
+      }
+    }
+
+    // 创建新会话
     await AuthenticationSession.createSession({
       session_token: sessionToken,
       user_type: userType,
@@ -365,6 +405,42 @@ router.post('/quick-login', async (req, res) => {
   const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
 
   try {
+    /**
+     * 🆕 2026-01-29 多设备登录冲突处理（P0-6 安全审计）- 快速登录
+     *
+     * 与普通登录相同的会话管理逻辑：新设备登录时使旧会话失效
+     * @see docs/测试审计标准.md - P0-6 多设备登录冲突测试
+     */
+    const deactivatedCount = await AuthenticationSession.deactivateUserSessions(
+      userType,
+      user.user_id,
+      null // 不排除任何 Token（因为新 Token 还未创建）
+    )
+    if (deactivatedCount > 0) {
+      logger.info(
+        `🔒 [Session] 快速登录多设备检测: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id})`
+      )
+
+      /**
+       * 🆕 2026-01-29 WebSocket 断开通知（P0-6 验收标准）
+       *
+       * 业务规则：新设备登录后主动断开旧设备的 WebSocket 连接
+       * - 旧设备 App 端立即收到断开事件
+       * - 可触发客户端显示"您的账号在其他设备登录"提示
+       */
+      try {
+        const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
+        ChatWebSocketService.disconnectUser(user.user_id, userType)
+        logger.info(
+          `🔌 [Session] 快速登录已断开旧设备WebSocket: user_id=${user.user_id}, type=${userType}`
+        )
+      } catch (wsError) {
+        // WebSocket断开失败非致命（可能用户原本就没有连接）
+        logger.debug(`🔌 [Session] WebSocket断开跳过: ${wsError.message}`)
+      }
+    }
+
+    // 创建新会话
     await AuthenticationSession.createSession({
       session_token: sessionToken,
       user_type: userType,

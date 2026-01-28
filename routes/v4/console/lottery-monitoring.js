@@ -37,6 +37,17 @@ function getLotteryAnalyticsService(req) {
   return req.app.locals.services.getService('lottery_analytics')
 }
 
+/**
+ * 获取 LotteryAlertService 的辅助函数
+ * （B1 实时告警列表API，从 lottery_alerts 表读取持久化告警数据）
+ *
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} LotteryAlertService 实例
+ */
+function getLotteryAlertService(req) {
+  return req.app.locals.services.getService('lottery_alert')
+}
+
 /*
  * ==========================================
  * 1. lottery_hourly_metrics - 抽奖小时统计指标
@@ -684,12 +695,109 @@ router.get(
 
 /*
  * ==========================================
- * 9. 实时告警列表 - P0 优先级
+ * 9. 告警管理操作 - P0 优先级（告警确认/解决）
  * ==========================================
  */
 
 /**
- * GET /realtime-alerts - 获取实时告警列表
+ * POST /realtime-alerts/:id/acknowledge - 确认告警
+ *
+ * 业务场景：运营人员确认已知晓该告警，但暂未解决
+ *
+ * 路径参数：
+ * - id: 告警ID（alert_id）
+ *
+ * 返回：更新后的告警详情
+ */
+router.post(
+  '/realtime-alerts/:id/acknowledge',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const alert_id = parseInt(req.params.id)
+
+      if (!alert_id || isNaN(alert_id)) {
+        return res.apiError('无效的告警ID', 'INVALID_ALERT_ID', null, 400)
+      }
+
+      const LotteryAlertService = getLotteryAlertService(req)
+      const alert = await LotteryAlertService.acknowledgeAlert(alert_id, req.user.user_id)
+
+      logger.info('告警已确认', {
+        admin_id: req.user.user_id,
+        alert_id
+      })
+
+      return res.apiSuccess(alert, '告警已确认')
+    } catch (error) {
+      logger.error('确认告警失败:', error)
+      if (error.message === '告警不存在') {
+        return res.apiError('告警不存在', 'ALERT_NOT_FOUND', null, 404)
+      }
+      return res.apiError(`操作失败：${error.message}`, 'ACKNOWLEDGE_ALERT_FAILED', null, 500)
+    }
+  }
+)
+
+/**
+ * POST /realtime-alerts/:id/resolve - 解决告警
+ *
+ * 业务场景：运营人员标记告警为已解决，并记录处理备注
+ *
+ * 路径参数：
+ * - id: 告警ID（alert_id）
+ *
+ * Body参数：
+ * - resolve_notes: 处理备注（可选）
+ *
+ * 返回：更新后的告警详情
+ */
+router.post(
+  '/realtime-alerts/:id/resolve',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const alert_id = parseInt(req.params.id)
+      const { resolve_notes } = req.body
+
+      if (!alert_id || isNaN(alert_id)) {
+        return res.apiError('无效的告警ID', 'INVALID_ALERT_ID', null, 400)
+      }
+
+      const LotteryAlertService = getLotteryAlertService(req)
+      const alert = await LotteryAlertService.resolveAlert(
+        alert_id,
+        req.user.user_id,
+        resolve_notes
+      )
+
+      logger.info('告警已解决', {
+        admin_id: req.user.user_id,
+        alert_id,
+        resolve_notes: resolve_notes || '无备注'
+      })
+
+      return res.apiSuccess(alert, '告警已解决')
+    } catch (error) {
+      logger.error('解决告警失败:', error)
+      if (error.message === '告警不存在') {
+        return res.apiError('告警不存在', 'ALERT_NOT_FOUND', null, 404)
+      }
+      return res.apiError(`操作失败：${error.message}`, 'RESOLVE_ALERT_FAILED', null, 500)
+    }
+  }
+)
+
+/*
+ * ==========================================
+ * 10. 实时计算告警 - P0 优先级（原有功能保留）
+ * ==========================================
+ */
+
+/**
+ * GET /realtime-alerts - 获取实时计算告警列表（实时检测，不持久化）
  *
  * P0 优先级 API：为运营后台提供实时风险预警
  *
@@ -746,7 +854,7 @@ router.get('/realtime-alerts', authenticateToken, requireRoleLevel(100), async (
 
 /*
  * ==========================================
- * 10. 单次抽奖Pipeline详情 - P1 优先级
+ * 11. 单次抽奖Pipeline详情 - P1 优先级
  * ==========================================
  */
 
@@ -803,7 +911,7 @@ router.get('/draw-details/:draw_id', authenticateToken, requireRoleLevel(100), a
 
 /*
  * ==========================================
- * 11. 异常用户列表 - P1 优先级
+ * 12. 异常用户列表 - P1 优先级
  * ==========================================
  */
 
@@ -872,7 +980,7 @@ router.get('/abnormal-users', authenticateToken, requireRoleLevel(100), async (r
 
 /*
  * ==========================================
- * 12. 活动复盘报告 - P2 优先级
+ * 13. 活动复盘报告 - P2 优先级
  * ==========================================
  */
 
@@ -940,7 +1048,7 @@ router.get(
 
 /*
  * ==========================================
- * 13. 策略效果分析 - P2 优先级
+ * 14. 策略效果分析 - P2 优先级
  * ==========================================
  */
 
@@ -996,7 +1104,12 @@ router.get(
       return res.apiSuccess(analysis, '获取策略效果分析成功')
     } catch (error) {
       logger.error('获取策略效果分析失败:', error)
-      return res.apiError(`查询失败：${error.message}`, 'GET_STRATEGY_EFFECTIVENESS_FAILED', null, 500)
+      return res.apiError(
+        `查询失败：${error.message}`,
+        'GET_STRATEGY_EFFECTIVENESS_FAILED',
+        null,
+        500
+      )
     }
   }
 )

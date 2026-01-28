@@ -84,6 +84,11 @@ const LotteryTierRuleService = require('./LotteryTierRuleService') // 抽奖档�
 
 // P2 API覆盖率补齐 - 监控查询服务（2026-01-21）
 const LotteryAnalyticsService = require('./LotteryAnalyticsService') // 抽奖分析服务（监控+统计）
+const LotteryAlertService = require('./LotteryAlertService') // 抽奖告警服务（B1 实时告警列表API）
+
+// 阶段C 批量操作基础设施服务（2026-01-30）
+const SystemConfigService = require('./SystemConfigService') // 系统配置服务（动态限流配置）
+const BatchOperationService = require('./BatchOperationService') // 批量操作服务（幂等性+状态管理）
 /*
  * 服务合并记录（2026-01-21）：
  * - LotteryMonitoringService + LotteryStrategyStatsService → LotteryAnalyticsService
@@ -328,12 +333,18 @@ class ServiceManager {
       // ========== P2 API覆盖率补齐 - 监控查询服务（2026-01-21） ==========
 
       this._services.set('lottery_analytics', new LotteryAnalyticsService(this.models)) // 抽奖分析服务（监控+统计合并）
+      this._services.set('lottery_alert', LotteryAlertService) // 抽奖告警服务（B1 实时告警列表API，2026-01-29，静态类）
       /*
        * 已合并的服务（2026-01-21）：
        * - lottery_monitoring + lottery_strategy_stats → LotteryAnalyticsService
        * - trade_order_query → TradeOrderService（静态方法直接调用，无需注册）
        * - user_premium_query → PremiumService（静态方法直接调用，无需注册）
        */
+
+      // ========== 阶段C 批量操作基础设施服务（2026-01-30） ==========
+
+      this._services.set('system_config', SystemConfigService) // 系统配置服务（动态限流配置，静态类）
+      this._services.set('batch_operation', BatchOperationService) // 批量操作服务（幂等性+状态管理，静态类）
 
       /**
        * V4.6 管线编排器

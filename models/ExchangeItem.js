@@ -35,10 +35,10 @@ module.exports = sequelize => {
       },
 
       // 基础信息
-      name: {
+      item_name: {
         type: DataTypes.STRING(200),
         allowNull: false,
-        comment: '商品名称'
+        comment: '商品名称（兑换商品的显示名称）'
       },
       description: {
         type: DataTypes.TEXT,

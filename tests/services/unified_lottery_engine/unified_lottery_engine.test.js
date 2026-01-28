@@ -60,7 +60,7 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
     expected_pipelines: ['NormalDrawPipeline'], // Phase 5：统一管线
     expected_count: 1, // Phase 5：1 条统一管线
     decision_sources: ['normal', 'preset', 'override'], // 决策来源类型
-    legacy_strategy_names: ['basic_guarantee', 'management', 'pipeline']
+    allowed_strategy_names: ['basic_guarantee', 'management', 'pipeline'] // 允许的策略标识名称
   }
 
   // 创建测试上下文 - 统一使用snake_case
@@ -206,7 +206,7 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
         expect(result.strategy_used).toBeDefined()
         expect(result.execution_time).toBeGreaterThan(0)
         // V4.6: 允许 Pipeline 架构的策略名称
-        const allowed_strategies = [...V4_PIPELINE_ARCHITECTURE.legacy_strategy_names, 'pipeline']
+        const allowed_strategies = [...V4_PIPELINE_ARCHITECTURE.allowed_strategy_names, 'pipeline']
         expect(allowed_strategies).toContain(result.strategy_used)
 
         console.log(`✅ 抽奖执行成功，策略: ${result.strategy_used}`)
@@ -315,10 +315,10 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
       const usage_stats = stats.pipelines_used || stats.strategies_used || {}
       const usage_keys = Object.keys(usage_stats)
       if (usage_keys.length > 0) {
-        // V4.6: 允许 Pipeline 或 legacy Strategy 名称
+        // V4.6: 允许 Pipeline 或 Strategy 名称
         const _allowed = [
           ...V4_PIPELINE_ARCHITECTURE.expected_pipelines,
-          ...V4_PIPELINE_ARCHITECTURE.legacy_strategy_names
+          ...V4_PIPELINE_ARCHITECTURE.allowed_strategy_names
         ]
         usage_keys.forEach(key => {
           // 只验证非空键名
@@ -427,7 +427,7 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
       // 应该降级到默认 Pipeline 或返回错误
       if (result.success) {
         // V4.6: 允许任何有效的策略/管线名称
-        const all_allowed = [...V4_PIPELINE_ARCHITECTURE.legacy_strategy_names, 'pipeline']
+        const all_allowed = [...V4_PIPELINE_ARCHITECTURE.allowed_strategy_names, 'pipeline']
         expect(all_allowed).toContain(result.strategy_used)
         console.log(`✅ 管线降级成功，使用: ${result.strategy_used}`)
       } else {
@@ -466,7 +466,7 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
         if (result.success) {
           expect(result.strategy_used).toBeDefined()
           // V4.6: 允许任何有效的策略/管线名称
-          const all_allowed = [...V4_PIPELINE_ARCHITECTURE.legacy_strategy_names, 'pipeline']
+          const all_allowed = [...V4_PIPELINE_ARCHITECTURE.allowed_strategy_names, 'pipeline']
           expect(all_allowed).toContain(result.strategy_used)
         }
       })

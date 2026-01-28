@@ -5,6 +5,27 @@
     title: '管理后台', 
     pageStyle: '[x-cloak] { display: none !important; } .login-container { min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }' 
   }) %>
+  <!-- 
+    安全措施：检测是否在 iframe 中
+    如果登录页在 iframe 中显示（说明权限过期后跳转到了 iframe 内的登录页），
+    需要跳出 iframe 到顶层窗口，避免侧边栏泄露信息
+  -->
+  <script>
+    (function() {
+      // 检测是否在 iframe 中
+      if (window.self !== window.top) {
+        console.log('[Login] 检测到登录页在 iframe 中，跳出到顶层窗口');
+        try {
+          // 直接让顶层窗口跳转到登录页
+          window.top.location.href = '/admin/login.html';
+        } catch (e) {
+          // 如果因为跨域无法直接操作，尝试 postMessage
+          console.warn('[Login] 无法直接跳转顶层窗口，尝试 postMessage', e);
+          window.parent.postMessage({ type: 'AUTH_EXPIRED', redirect: '/admin/login.html' }, '*');
+        }
+      }
+    })();
+  </script>
 </head>
 <body class="login-container flex items-center justify-center">
 

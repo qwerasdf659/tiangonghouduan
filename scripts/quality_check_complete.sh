@@ -25,9 +25,10 @@ node scripts/check-validators.js
 echo "✅ 验证器检查通过"
 echo ""
 
-# 3. ESLint代码质量（仅检查本次修改的文件）
-echo "3️⃣ ESLint代码质量（本次修改文件）..."
-npx eslint routes/v4/unified-engine/admin/lottery_management.js routes/v4/unified-engine/admin/settings.js routes/v4/unified-engine/admin/shared/middleware.js services/UnifiedLotteryEngine/strategies/BasicGuaranteeStrategy.js models/SystemSettings.js --quiet 2>&1
+# 3. ESLint代码质量（仅检查核心文件）
+echo "3️⃣ ESLint代码质量（核心文件）..."
+# V4.6 Phase 5 更新：BasicGuaranteeStrategy.js 已移除，改为 Pipeline 架构
+npx eslint routes/v4/console/ services/UnifiedLotteryEngine/ models/SystemSettings.js --quiet 2>&1
 if [ $? -eq 0 ]; then
   echo "✅ ESLint检查通过"
 else

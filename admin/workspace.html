@@ -523,6 +523,18 @@
     }
     
     console.log('🎰 抽奖管理后台工作台已加载 - 深蓝科技风')
+    
+    // 监听子 iframe 发送的认证过期消息
+    window.addEventListener('message', function(event) {
+      // 安全检查：只处理认证相关的消息
+      if (event.data && event.data.type === 'AUTH_EXPIRED') {
+        console.log('[Workspace] 收到认证过期消息，跳转到登录页');
+        // 清理所有本地状态
+        clearAllLocalState();
+        // 跳转到登录页
+        window.location.href = event.data.redirect || '/admin/login.html';
+      }
+    });
   </script>
 </body>
 </html>

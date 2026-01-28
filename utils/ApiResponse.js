@@ -487,8 +487,17 @@ class ApiResponse {
         return this.send(res, response)
       }
 
-      res.apiUnauthorized = (message = '未授权访问') => {
-        const response = this.unauthorized(message, 'UNAUTHORIZED')
+      /**
+       * 🔐 未授权响应（支持自定义错误码）
+       * @param {string} message - 错误消息
+       * @param {string} errorCode - 错误码，默认 'UNAUTHORIZED'
+       * @returns {Object} Express响应对象
+       * @example
+       *   res.apiUnauthorized('会话已失效', 'SESSION_INVALIDATED')
+       *   res.apiUnauthorized('未登录')  // 使用默认 'UNAUTHORIZED'
+       */
+      res.apiUnauthorized = (message = '未授权访问', errorCode = 'UNAUTHORIZED') => {
+        const response = this.unauthorized(message, errorCode)
         response.request_id = requestId
         return this.send(res, response)
       }

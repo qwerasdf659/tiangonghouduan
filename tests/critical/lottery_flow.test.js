@@ -13,8 +13,8 @@
  * 5. 查看奖品发货状态
  *
  * 技术架构：
- * - 抽奖引擎：services/UnifiedLotteryEngine (V4架构)
- * - 策略模式：BasicGuaranteeStrategy + ManagementStrategy
+ * - 抽奖引擎：services/UnifiedLotteryEngine (V4 Pipeline架构)
+ * - Pipeline模式：NormalDrawPipeline（普通抽奖）+ ManagementStrategy（管理策略）
  * - 事务保护：确保抽奖和积分发放原子性
  *
  * 测试目标：
@@ -137,13 +137,13 @@ describe('🎲 用户完整抽奖流程（核心关键路径 - V4架构）', () 
      * API路径：POST /api/v4/lottery/draw
      * 预期行为：
      * 1. 检测到首次抽奖
-     * 2. 应用BasicGuaranteeStrategy的首次保底机制
+     * 2. 应用NormalDrawPipeline的首次保底机制
      * 3. 100%中奖并获得积分奖品
      * 4. 积分自动发放到用户账户
      *
      * 技术细节：
      * - UnifiedLotteryEngine.executeLottery()
-     * - BasicGuaranteeStrategy处理首次抽奖逻辑
+     * - NormalDrawPipeline通过EligibilityStage处理首次抽奖逻辑
      * - 事务保护：抽奖结果、积分发放、日志记录原子性
      *
      * 成功标准：
@@ -234,7 +234,7 @@ describe('🎲 用户完整抽奖流程（核心关键路径 - V4架构）', () 
      * 3. 保底计数器在中奖后重置
      *
      * 技术细节：
-     * - BasicGuaranteeStrategy.MAX_NO_WIN_COUNT = 5
+     * - NormalDrawPipeline 的 EligibilityStage 管理保底计数
      * - 保底触发后probability = 1.0
      * - 中奖后no_win_count重置为0
      *
@@ -390,7 +390,7 @@ describe('🎲 用户完整抽奖流程（核心关键路径 - V4架构）', () 
      * 4. 记录管理策略使用日志
      *
      * 技术细节：
-     * - ManagementStrategy 优先级高于 BasicGuaranteeStrategy
+     * - ManagementStrategy 优先级高于 NormalDrawPipeline
      * - 需要管理员权限设置管理目标
      *
      * 技术实现：管理策略在lottery/preset.test.js中有完整测试

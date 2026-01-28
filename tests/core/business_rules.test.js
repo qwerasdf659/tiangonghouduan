@@ -461,14 +461,13 @@ describe('🧮 核心业务逻辑测试', () => {
     test('➕ 积分获得计算规则', async () => {
       console.log('📋 测试积分获得计算规则...')
 
-      // 🎯 使用明确存在的用户ID进行积分获得测试
-      const points_test_user_id = 39 // 使用积分较少的用户进行测试
-      const initialPoints = await getUserPoints(tester, points_test_user_id)
-      console.log(`📊 初始积分: ${initialPoints}`)
+      // 🔴 P0修复：使用动态获取的 test_user_id，不再硬编码
+      const initialPoints = await getUserPoints(tester, test_user_id)
+      console.log(`📊 初始积分: ${initialPoints} (user_id=${test_user_id})`)
 
       // 模拟积分获得操作（如完成任务）
       const earnData = {
-        user_id: points_test_user_id,
+        user_id: test_user_id,
         points: 100,
         reason: '业务逻辑测试-完成任务',
         operation: 'add'

@@ -573,7 +573,7 @@ class ExchangeService {
         meta: {
           idempotency_key, // 保留原幂等键用于追溯
           item_id,
-          name: item.name,
+          item_name: item.item_name,
           quantity,
           cost_amount: item.cost_amount,
           total_pay_amount: totalPayAmount
@@ -649,12 +649,12 @@ class ExchangeService {
           user_id,
           item_id,
           /*
-           * item_snapshot 字段：商品快照（2026-01-20 统一字段名）
-           * - 使用 name/description 与 ExchangeItem 模型一致
+           * item_snapshot 字段：商品快照（2026-01-29 字段名统一为 item_name）
+           * - 使用 item_name/description 与 ExchangeItem 模型一致
            */
           item_snapshot: {
             item_id: item.item_id,
-            name: item.name,
+            item_name: item.item_name,
             description: item.description,
             cost_asset_code: item.cost_asset_code,
             cost_amount: item.cost_amount
@@ -720,7 +720,7 @@ class ExchangeService {
       order: {
         order_no,
         record_id: record.record_id,
-        name: item.name,
+        item_name: item.item_name,
         quantity,
         pay_asset_code: item.cost_asset_code,
         pay_amount: totalPayAmount,
