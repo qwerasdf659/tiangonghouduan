@@ -9,7 +9,7 @@
 
 // ES Module 导入
 import { logger } from '../../../utils/logger.js'
-import { MARKET_ENDPOINTS } from '../../../api/market.js'
+import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
 import { request } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/index.js'
 

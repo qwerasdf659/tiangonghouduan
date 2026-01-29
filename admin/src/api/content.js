@@ -8,7 +8,7 @@
  */
 
 import { logger } from '../utils/logger.js'
-import { request, buildURL, buildQueryString } from './base.js'
+import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
 
 // ========== 类型定义 ==========
 
@@ -60,23 +60,23 @@ import { request, buildURL, buildQueryString } from './base.js'
 
 export const CONTENT_ENDPOINTS = {
   // 客服会话
-  CUSTOMER_SERVICE_SESSIONS: '/api/v4/console/customer-service/sessions',
+  CUSTOMER_SERVICE_SESSIONS: `${API_PREFIX}/console/customer-service/sessions`,
   CUSTOMER_SERVICE_SESSION_MESSAGES:
-    '/api/v4/console/customer-service/sessions/:session_id/messages',
-  CUSTOMER_SERVICE_SEND_MESSAGE: '/api/v4/console/customer-service/sessions/:session_id/send',
-  CUSTOMER_SERVICE_MARK_READ: '/api/v4/console/customer-service/sessions/:session_id/mark-read',
-  CUSTOMER_SERVICE_TRANSFER: '/api/v4/console/customer-service/sessions/:session_id/transfer',
-  CUSTOMER_SERVICE_CLOSE: '/api/v4/console/customer-service/sessions/:session_id/close',
+    `${API_PREFIX}/console/customer-service/sessions/:session_id/messages`,
+  CUSTOMER_SERVICE_SEND_MESSAGE: `${API_PREFIX}/console/customer-service/sessions/:session_id/send`,
+  CUSTOMER_SERVICE_MARK_READ: `${API_PREFIX}/console/customer-service/sessions/:session_id/mark-read`,
+  CUSTOMER_SERVICE_TRANSFER: `${API_PREFIX}/console/customer-service/sessions/:session_id/transfer`,
+  CUSTOMER_SERVICE_CLOSE: `${API_PREFIX}/console/customer-service/sessions/:session_id/close`,
 
   // 反馈管理
-  FEEDBACK_LIST: '/api/v4/console/system/feedbacks',
-  FEEDBACK_DETAIL: '/api/v4/console/system/feedbacks/:id',
-  FEEDBACK_REPLY: '/api/v4/console/system/feedbacks/:id/reply',
-  FEEDBACK_STATUS: '/api/v4/console/system/feedbacks/:id/status',
+  FEEDBACK_LIST: `${API_PREFIX}/console/system/feedbacks`,
+  FEEDBACK_DETAIL: `${API_PREFIX}/console/system/feedbacks/:id`,
+  FEEDBACK_REPLY: `${API_PREFIX}/console/system/feedbacks/:id/reply`,
+  FEEDBACK_STATUS: `${API_PREFIX}/console/system/feedbacks/:id/status`,
 
   // 活动管理
-  ACTIVITIES_LIST: '/api/v4/activities',
-  ACTIVITIES_DETAIL: '/api/v4/activities/:id'
+  ACTIVITIES_LIST: `${API_PREFIX}/activities`,
+  ACTIVITIES_DETAIL: `${API_PREFIX}/activities/:id`
 }
 
 // ========== API 调用方法 ==========

@@ -45,11 +45,10 @@ function registerFeatureFlagsComponents() {
      * 初始化
      */
     init() {
-      console.log('[FeatureFlags] 组件初始化开始')
-      logger.debug('[FeatureFlags] 功能开关页面初始化')
+      logger.debug('[FeatureFlags] 功能开关页面初始化开始')
 
       if (!this.checkAuth()) {
-        console.warn('[FeatureFlags] 认证检查失败')
+        logger.warn('[FeatureFlags] 认证检查失败')
         return
       }
 

@@ -14,7 +14,7 @@
 import { logger } from '../../../utils/logger.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import { request, buildURL } from '../../../api/base.js'
-import { MARKET_ENDPOINTS } from '../../../api/market.js'
+import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
 import {
   useExchangeItemsState,
   useExchangeItemsMethods,

@@ -42,11 +42,10 @@ function registerPricingConfigComponents() {
      * 初始化
      */
     init() {
-      console.log('[PricingConfig] 组件初始化开始')
-      logger.debug('[PricingConfig] 定价配置页面初始化')
+      logger.debug('[PricingConfig] 定价配置页面初始化开始')
 
       if (!this.checkAuth()) {
-        console.warn('[PricingConfig] 认证检查失败')
+        logger.warn('[PricingConfig] 认证检查失败')
         return
       }
 

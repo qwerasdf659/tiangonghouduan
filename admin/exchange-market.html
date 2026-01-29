@@ -60,7 +60,7 @@
               <template x-for="item in items" :key="item.item_id">
                 <tr class="themed-hover-bg">
                   <td class="px-4 py-3 text-sm" x-text="item.item_id"></td>
-                  <td class="px-4 py-3 text-sm" x-text="item.name"></td>
+                  <td class="px-4 py-3 text-sm" x-text="item.item_name"></td>
                   <td class="px-4 py-3 text-sm font-mono" x-text="(item.cost_amount || item.price || 0) + ' ' + (item.cost_asset_code || '积分')"></td>
                   <td class="px-4 py-3 text-sm" x-text="item.stock"></td>
                   <td class="px-4 py-3">
@@ -251,7 +251,7 @@
         <div class="p-6 space-y-4">
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">商品名称 <span class="text-red-500">*</span></label>
-            <input type="text" x-model="itemForm.name" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" required>
+            <input type="text" x-model="itemForm.item_name" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" required>
           </div>
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">商品描述</label>

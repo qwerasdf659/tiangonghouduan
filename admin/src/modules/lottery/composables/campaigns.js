@@ -8,7 +8,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { LOTTERY_ENDPOINTS } from '../../../api/lottery.js'
+import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
 
 /**
  * 活动管理状态
@@ -78,7 +78,7 @@ export function useCampaignsMethods(context) {
      */
     async loadCampaigns() {
       try {
-        console.log('📋 [Campaigns] loadCampaigns 开始执行')
+        logger.debug('📋 [Campaigns] loadCampaigns 开始执行')
         const params = new URLSearchParams()
         params.append('page', this.page)
         params.append('page_size', this.pageSize)
@@ -95,11 +95,11 @@ export function useCampaignsMethods(context) {
           {},
           { showLoading: false }
         )
-        console.log('📋 [Campaigns] API 返回数据:', response)
+        logger.debug('📋 [Campaigns] API 返回数据:', response)
 
         // 解包 withLoading 返回的结构: { success: true, data: { campaigns: [...] } }
         const data = response?.success ? response.data : response
-        console.log('📋 [Campaigns] 解包后数据:', data)
+        logger.debug('📋 [Campaigns] 解包后数据:', data)
 
         if (data) {
           this.campaigns = data.campaigns || data.list || []
@@ -108,7 +108,7 @@ export function useCampaignsMethods(context) {
             this.totalPages = data.pagination.total_pages || 1
             this.totalCount = data.pagination.total || 0
           }
-          console.log(
+          logger.debug(
             '✅ [Campaigns] 数据加载完成, campaigns:',
             this.campaigns.length,
             'total:',
@@ -116,8 +116,7 @@ export function useCampaignsMethods(context) {
           )
         }
       } catch (error) {
-        logger.error('加载活动失败:', error)
-        console.error('❌ [Campaigns] loadCampaigns 失败:', error)
+        logger.error('❌ [Campaigns] loadCampaigns 失败:', error)
         this.campaigns = []
       }
     },

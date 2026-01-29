@@ -403,7 +403,7 @@ function assetAdjustmentPage() {
      * @returns {Promise<void>}
      */
     async loadRecords() {
-      console.log('🔄 [loadRecords] 刷新按钮被点击，开始加载记录...')
+      logger.debug('🔄 [loadRecords] 刷新按钮被点击，开始加载记录...')
 
       // 如果没有用户ID，直接返回空记录（API要求user_id必填）
       if (!this.currentUser?.user_id && !this.form?.user_id) {
@@ -449,7 +449,7 @@ function assetAdjustmentPage() {
             logger.info(`📊 加载调账记录: ${this.records.length} 条`)
 
             // 显示刷新成功提示
-            console.log(`✅ [loadRecords] 刷新完成，共 ${this.totalRecords} 条记录`)
+            logger.debug(`✅ [loadRecords] 刷新完成，共 ${this.totalRecords} 条记录`)
             this.showSuccess(`已刷新，共 ${this.totalRecords} 条记录`)
           }
         }

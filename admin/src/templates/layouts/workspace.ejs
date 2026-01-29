@@ -43,13 +43,14 @@
   <!-- JavaScript -->
   <script type="module">
     import { initAlpine } from '/assets/main.js'
+    import { logger } from '/assets/utils/logger.js'
     
     // 初始化 Alpine.js
     initAlpine()
     
     // 全局搜索处理
     window.handleGlobalSearch = function(keyword) {
-      console.log('搜索:', keyword)
+      logger.debug('搜索:', keyword)
       // 可扩展：实现全局搜索逻辑
     }
     
@@ -69,7 +70,7 @@
           window.location.href = '/admin/login.html'
         }
       } catch (error) {
-        console.error('退出登录失败:', error)
+        logger.error('退出登录失败:', error)
         alert('退出登录失败，请重试')
       }
     }

@@ -8,7 +8,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { LOTTERY_ENDPOINTS } from '../../../api/lottery.js'
+import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
 import { buildURL } from '../../../api/base.js'
 import { STORE_ENDPOINTS } from '../../../api/store.js'
 
@@ -70,11 +70,8 @@ export function useRedemptionMethods() {
      */
     async loadRedemptionStats() {
       try {
-        console.log('🔄 [Redemption] 开始加载核销码统计...')
-        console.log(
-          '📡 [Redemption] 统计API端点:',
-          LOTTERY_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_STATISTICS
-        )
+        logger.debug('[Redemption] 开始加载核销码统计...')
+        logger.debug('[Redemption] 统计API端点:', LOTTERY_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_STATISTICS)
 
         // apiGet 返回的是 { success, data } 格式
         const response = await this.apiGet(
@@ -82,7 +79,7 @@ export function useRedemptionMethods() {
           {},
           { showLoading: false, showError: false }
         )
-        console.log('📊 [Redemption] 统计API响应:', response)
+        logger.debug('[Redemption] 统计API响应:', response)
 
         // 从 response.data 中提取统计数据
         if (response?.success && response.data) {
@@ -93,12 +90,12 @@ export function useRedemptionMethods() {
             fulfilled: stats.fulfilled || 0,
             expired: stats.expired || 0
           }
-          console.log('✅ [Redemption] 统计数据已更新:', this.redemptionStats)
+          logger.debug('[Redemption] 统计数据已更新:', this.redemptionStats)
         } else {
-          console.warn('⚠️ [Redemption] 统计API响应无效或为空')
+          logger.warn('[Redemption] 统计API响应无效或为空')
         }
       } catch (error) {
-        console.error('❌ [Redemption] 加载核销码统计失败:', error.message)
+        logger.error('[Redemption] 加载核销码统计失败:', error.message)
       }
     },
 
@@ -108,11 +105,7 @@ export function useRedemptionMethods() {
      */
     async loadRedemptionCodes(pageNum = 1) {
       try {
-        console.log('🔄 [Redemption] 开始加载核销码列表, 页码:', pageNum)
-        console.log(
-          '🔐 [Redemption] 当前Token:',
-          localStorage.getItem('admin_token')?.substring(0, 20) + '...'
-        )
+        logger.debug('[Redemption] 开始加载核销码列表, 页码:', pageNum)
         this.page = pageNum
         this.redemptionSelectedIds = []
 
@@ -137,37 +130,29 @@ export function useRedemptionMethods() {
         }
 
         const url = `${LOTTERY_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_ORDERS}?${params}`
-        console.log('📡 [Redemption] 列表API URL:', url)
+        logger.debug('[Redemption] 列表API URL:', url)
 
         // apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }
         const response = await this.apiGet(url, {}, { showLoading: false })
-        console.log('📋 [Redemption] 列表API响应:', response)
+        logger.debug('[Redemption] 列表API响应:', response)
 
         // 解包 withLoading 返回的结构
         const data = response?.success ? response.data : response
-        console.log('📋 [Redemption] 解包后数据:', data)
+        logger.debug('[Redemption] 解包后数据:', data)
 
         if (data) {
           this.redemptionCodes = data.orders || data.records || data.codes || []
           this.total = data.pagination?.total || this.redemptionCodes.length
           this.totalPages =
             data.pagination?.total_pages || Math.ceil(this.total / (this.pageSize || 20))
-          console.log('✅ [Redemption] 核销码列表已更新, 数量:', this.redemptionCodes.length)
-          console.log(
-            '📊 [Redemption] 分页信息: total=',
-            this.total,
-            'totalPages=',
-            this.totalPages
-          )
-          if (this.redemptionCodes.length > 0) {
-            console.log('📄 [Redemption] 第一条记录:', this.redemptionCodes[0])
-          }
+          logger.debug('[Redemption] 核销码列表已更新, 数量:', this.redemptionCodes.length)
+          logger.debug('[Redemption] 分页信息: total=', this.total, 'totalPages=', this.totalPages)
         } else {
-          console.warn('⚠️ [Redemption] 列表API响应无效或为空')
+          logger.warn('[Redemption] 列表API响应无效或为空')
           this.redemptionCodes = []
         }
       } catch (error) {
-        console.error('❌ [Redemption] 加载核销码失败:', error.message, error.stack)
+        logger.error('[Redemption] 加载核销码失败:', error.message)
         this.redemptionCodes = []
       }
     },
@@ -281,27 +266,27 @@ export function useRedemptionMethods() {
      * @param {string} orderId - 订单ID
      */
     toggleRedemptionSelect(orderId) {
-      console.log('🔘 [Redemption] 切换选中状态:', orderId)
+      logger.debug('[Redemption] 切换选中状态:', orderId)
       const index = this.redemptionSelectedIds.indexOf(orderId)
       if (index > -1) {
         this.redemptionSelectedIds.splice(index, 1)
       } else {
         this.redemptionSelectedIds.push(orderId)
       }
-      console.log('📋 [Redemption] 当前选中数量:', this.redemptionSelectedIds.length)
+      logger.debug('[Redemption] 当前选中数量:', this.redemptionSelectedIds.length)
     },
 
     /**
      * 全选/取消全选
      */
     toggleRedemptionSelectAll() {
-      console.log('🔘 [Redemption] 全选/取消全选')
+      logger.debug('[Redemption] 全选/取消全选')
       if (this.checkIsAllRedemptionSelected()) {
         this.redemptionSelectedIds = []
       } else {
         this.redemptionSelectedIds = (this.redemptionCodes || []).map(c => c.order_id)
       }
-      console.log('📋 [Redemption] 当前选中数量:', this.redemptionSelectedIds.length)
+      logger.debug('[Redemption] 当前选中数量:', this.redemptionSelectedIds.length)
     },
 
     /**
@@ -318,26 +303,26 @@ export function useRedemptionMethods() {
      * 批量过期
      */
     async batchExpireRedemption() {
-      console.log('⏰ [Redemption] 批量过期被点击, 选中数量:', this.redemptionSelectedIds.length)
+      logger.debug('[Redemption] 批量过期被点击, 选中数量:', this.redemptionSelectedIds.length)
 
       if (this.redemptionSelectedIds.length === 0) {
-        console.log('⚠️ [Redemption] 没有选中任何核销码')
+        logger.debug('[Redemption] 没有选中任何核销码')
         this.showWarning('请先选择要处理的核销码')
         return
       }
 
-      console.log('📋 [Redemption] 选中的核销码ID:', this.redemptionSelectedIds)
+      logger.debug('[Redemption] 选中的核销码ID:', this.redemptionSelectedIds)
 
       await this.confirmAndExecute(
         `确定要将选中的 ${this.redemptionSelectedIds.length} 个核销码设为过期吗？`,
         async () => {
-          console.log('🔄 [Redemption] 执行批量过期API调用...')
+          logger.debug('[Redemption] 执行批量过期API调用...')
           // apiCall 成功时返回 response.data，失败时抛出错误
           await this.apiCall(LOTTERY_ENDPOINTS.BUSINESS_RECORDS_BATCH_EXPIRE, {
             method: 'POST',
             data: { order_ids: this.redemptionSelectedIds }
           })
-          console.log('✅ [Redemption] 批量过期成功')
+          logger.debug('[Redemption] 批量过期成功')
           // 如果没有抛出错误，则表示成功
           this.redemptionSelectedIds = []
           await this.loadRedemptionCodes(this.page)
@@ -407,7 +392,7 @@ export function useRedemptionMethods() {
 
         this.showSuccess('导出成功')
       } catch (error) {
-        console.error('❌ [Redemption] 导出失败:', error)
+        logger.error('[Redemption] 导出失败:', error)
         this.showError(error.message || '导出失败')
       }
     },

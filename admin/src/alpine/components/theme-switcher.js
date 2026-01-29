@@ -1,9 +1,17 @@
 /**
  * 主题切换组件
  * @description 一键切换主题功能，支持25种配色方案
- * @version 2.0.0
- * @date 2026-01-26
+ * @version 2.1.0
+ * @date 2026-01-29
  */
+
+import { logger } from '../../utils/logger.js'
+
+/**
+ * 主题广播频道名称
+ * @constant {string}
+ */
+const THEME_CHANNEL_NAME = 'admin_theme_channel'
 
 /**
  * 创建主题切换组件
@@ -257,8 +265,28 @@ export function themeSwitcher() {
       this.applyTheme(themeId)
       // 保存到 localStorage
       localStorage.setItem('admin_theme', themeId)
+      // 通过 BroadcastChannel 广播主题变更给所有 iframe 和标签页
+      this.broadcastTheme(themeId)
       this.isOpen = false
-      console.log(`🎨 主题已切换: ${themeId}`)
+      logger.debug(`🎨 主题已切换: ${themeId}`)
+    },
+
+    /**
+     * 通过 BroadcastChannel 广播主题变更
+     * @param {string} themeId - 主题ID
+     */
+    broadcastTheme(themeId) {
+      if (typeof BroadcastChannel !== 'undefined') {
+        try {
+          const channel = new BroadcastChannel(THEME_CHANNEL_NAME)
+          channel.postMessage({ type: 'theme_change', theme: themeId })
+          // 发送后关闭频道，避免内存泄漏
+          channel.close()
+          logger.debug(`[主题广播] 已广播主题变更: ${themeId}`)
+        } catch (e) {
+          logger.warn('[主题广播] BroadcastChannel 发送失败')
+        }
+      }
     },
 
     /**
@@ -268,14 +296,14 @@ export function themeSwitcher() {
     applyTheme(themeId) {
       document.documentElement.setAttribute('data-theme', themeId)
 
-      // 同步到所有 iframe（如果有的话）
+      // 同步到所有 iframe（同域情况下直接设置，跨域通过 BroadcastChannel）
       document.querySelectorAll('iframe').forEach(iframe => {
         try {
           if (iframe.contentDocument?.documentElement) {
             iframe.contentDocument.documentElement.setAttribute('data-theme', themeId)
           }
         } catch (e) {
-          // 跨域 iframe 忽略
+          // 跨域 iframe 通过 BroadcastChannel 同步，无需额外处理
         }
       })
     },

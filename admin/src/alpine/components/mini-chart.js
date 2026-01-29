@@ -2,9 +2,9 @@
  * Mini Chart 迷你图表组件
  *
  * @file src/alpine/components/mini-chart.js
- * @description 基于 Alpine.js 和 ECharts 的迷你图表组件
- * @version 1.0.0
- * @date 2026-01-26
+ * @description 基于 Alpine.js 和 ECharts 的迷你图表组件（按需加载版本）
+ * @version 2.0.0
+ * @date 2026-01-29
  *
  * 使用方式：
  * <div x-data="miniChart({ type: 'line', data: [10, 20, 15, 30, 25] })"
@@ -13,7 +13,7 @@
  * </div>
  */
 
-import * as echarts from 'echarts'
+import { loadECharts } from '../../utils/echarts-lazy.js'
 import { logger } from '../../utils/logger.js'
 
 /**
@@ -182,6 +182,8 @@ function miniChart(config = {}) {
     // 状态
     chart: null,
     resizeObserver: null,
+    echartsModule: null,
+    isLoading: false,
 
     // 初始化
     init() {
@@ -189,7 +191,6 @@ function miniChart(config = {}) {
 
       this.$nextTick(() => {
         this.createChart()
-        this.setupResizeObserver()
       })
     },
 
@@ -204,8 +205,8 @@ function miniChart(config = {}) {
       }
     },
 
-    // 创建图表
-    createChart() {
+    // 创建图表（异步加载 ECharts）
+    async createChart() {
       const container = this.$refs.chartContainer || this.$el
 
       if (!container) {
@@ -217,10 +218,26 @@ function miniChart(config = {}) {
       if (this.width) container.style.width = `${this.width}px`
       if (this.height) container.style.height = `${this.height}px`
 
+      // 懒加载 ECharts
+      if (!this.echartsModule) {
+        this.isLoading = true
+        try {
+          this.echartsModule = await loadECharts()
+        } catch (error) {
+          logger.error('[MiniChart] ECharts 加载失败', error)
+          return
+        } finally {
+          this.isLoading = false
+        }
+      }
+
       // 初始化 ECharts
-      this.chart = echarts.init(container, null, {
+      this.chart = this.echartsModule.init(container, null, {
         renderer: 'canvas'
       })
+
+      // 设置响应式
+      this.setupResizeObserver()
 
       // 设置配置
       this.updateChart()

@@ -9,7 +9,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { buildURL, request } from '../../../api/base.js'
-import { MARKET_ENDPOINTS } from '../../../api/market.js'
+import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 
 /**
@@ -32,9 +32,9 @@ export function useExchangeItemsState() {
     itemPageSize: 20,
     /** @type {Object} 商品分页信息 */
     itemPagination: { totalPages: 1, total: 0 },
-    /** @type {Object} 商品表单数据 - 字段名与后端模型一致 */
+    /** @type {Object} 商品表单数据 - 直接使用后端字段名 */
     itemForm: {
-      name: '',
+      item_name: '',
       description: '',
       cost_asset_code: '',
       cost_amount: 1,
@@ -143,7 +143,7 @@ export function useExchangeItemsMethods() {
     openAddItemModal() {
       this.editingItemId = null
       this.itemForm = {
-        name: '',
+        item_name: '',
         description: '',
         cost_asset_code: '',
         cost_amount: 1,
@@ -162,7 +162,7 @@ export function useExchangeItemsMethods() {
     editItem(item) {
       this.editingItemId = item.item_id
       this.itemForm = {
-        name: item.name || '',
+        item_name: item.item_name || '',
         description: item.description || '',
         cost_asset_code: item.cost_asset_code || '',
         cost_amount: item.cost_amount || 1,
@@ -178,7 +178,7 @@ export function useExchangeItemsMethods() {
      * 保存商品（新增或更新）
      */
     async saveItem() {
-      if (!this.itemForm.name || !this.itemForm.cost_asset_code) {
+      if (!this.itemForm.item_name || !this.itemForm.cost_asset_code) {
         this.showError?.('请填写必填项')
         return
       }

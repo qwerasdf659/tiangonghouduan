@@ -62,19 +62,19 @@ export function useConfigMethods() {
      */
     async loadSystemConfig() {
       try {
-        console.log('[SystemConfig] 开始加载配置, 调用接口:', SYSTEM_ENDPOINTS.SYSTEM_CONFIG_GET)
+        logger.debug('[SystemConfig] 开始加载配置, 调用接口:', SYSTEM_ENDPOINTS.SYSTEM_CONFIG_GET)
         const response = await this.apiGet(
           SYSTEM_ENDPOINTS.SYSTEM_CONFIG_GET,
           {},
           { showLoading: false }
         )
-        console.log('[SystemConfig] API 响应:', response)
+        logger.debug('[SystemConfig] API 响应:', response)
 
         if (response?.success && response.data) {
           // 后端返回 settings 数组格式，转换为键值对
           // 字段名: setting_key, setting_value (或 parsed_value)
           const settingsArray = response.data.settings || []
-          console.log('[SystemConfig] settings 数组:', settingsArray)
+          logger.debug('[SystemConfig] settings 数组:', settingsArray)
 
           const settingsMap = {}
           settingsArray.forEach(item => {
@@ -87,7 +87,7 @@ export function useConfigMethods() {
             }
           })
 
-          console.log('[SystemConfig] 解析后的配置映射:', settingsMap)
+          logger.debug('[SystemConfig] 解析后的配置映射:', settingsMap)
 
           // 使用后端数据填充配置，保持默认值
           this.systemConfig = {
@@ -110,13 +110,12 @@ export function useConfigMethods() {
           }
           this.originalConfig = JSON.parse(JSON.stringify(this.systemConfig))
           this.configModified = false
-          console.log('[SystemConfig] 最终 systemConfig:', this.systemConfig)
+          logger.debug('[SystemConfig] 最终 systemConfig:', this.systemConfig)
         } else {
-          console.warn('[SystemConfig] API 返回失败或无数据:', response)
+          logger.warn('[SystemConfig] API 返回失败或无数据:', response)
         }
       } catch (error) {
-        console.error('[SystemConfig] 加载系统配置失败:', error)
-        logger.error('加载系统配置失败:', error)
+        logger.error('[SystemConfig] 加载系统配置失败:', error)
       }
     },
 
@@ -215,7 +214,7 @@ export function useConfigMethods() {
      */
     async loadPointsConfigs() {
       try {
-        console.log(
+        logger.debug(
           '[SystemConfig] 开始加载积分配置, 调用接口:',
           SYSTEM_ENDPOINTS.SYSTEM_CONFIG_POINTS
         )
@@ -224,7 +223,7 @@ export function useConfigMethods() {
           {},
           { showLoading: false }
         )
-        console.log('[SystemConfig] 积分配置 API 响应:', response)
+        logger.debug('[SystemConfig] 积分配置 API 响应:', response)
 
         if (response?.success && response.data) {
           // 后端返回 settings 数组格式
@@ -242,11 +241,10 @@ export function useConfigMethods() {
             }
           })
 
-          console.log('[SystemConfig] 解析后的积分配置:', this.pointsDefaults)
+          logger.debug('[SystemConfig] 解析后的积分配置:', this.pointsDefaults)
         }
       } catch (error) {
-        console.error('[SystemConfig] 加载积分配置失败:', error)
-        logger.error('加载积分配置失败:', error)
+        logger.error('[SystemConfig] 加载积分配置失败:', error)
         this.pointsConfigs = []
       }
     },
@@ -268,7 +266,7 @@ export function useConfigMethods() {
           }
         }
 
-        console.log('[SystemConfig] 保存积分配置, 数据:', settingsData)
+        logger.debug('[SystemConfig] 保存积分配置, 数据:', settingsData)
 
         const response = await this.apiCall(SYSTEM_ENDPOINTS.SYSTEM_CONFIG_UPDATE_POINTS, {
           method: 'PUT',

@@ -101,11 +101,10 @@ function registerSystemSettingsComponents() {
     // ==================== 初始化和数据加载 ====================
 
     init() {
-      console.log('[SystemSettings] 组件初始化开始')
-      logger.debug('系统设置初始化 (方案A v5.0 - 精简版)')
+      logger.debug('[SystemSettings] 组件初始化开始 (方案A v5.0 - 精简版)')
 
       if (!this.checkAuth()) {
-        console.warn('[SystemSettings] 认证检查失败')
+        logger.warn('[SystemSettings] 认证检查失败')
         return
       }
 
@@ -113,7 +112,7 @@ function registerSystemSettingsComponents() {
       const urlParams = new URLSearchParams(window.location.search)
       this.currentPage = urlParams.get('page') || 'system-config'
 
-      console.log('[SystemSettings] 当前子页面:', this.currentPage)
+      logger.debug('[SystemSettings] 当前子页面:', this.currentPage)
 
       // 立即加载数据
       this.loadPageData()
@@ -123,7 +122,7 @@ function registerSystemSettingsComponents() {
     },
 
     switchPage(pageId) {
-      console.log('[SystemSettings] 切换到子页面:', pageId)
+      logger.debug('[SystemSettings] 切换到子页面:', pageId)
       this.currentPage = pageId
       window.history.pushState({}, '', `?page=${pageId}`)
       this.loadPageData()

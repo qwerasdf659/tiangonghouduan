@@ -6,6 +6,7 @@
  */
 
 import { hasMenuAccess, getUserRoleLevel } from '../../config/permission-rules.js'
+import { logger } from '../../utils/logger.js'
 
 /**
  * 创建侧边栏导航组件
@@ -159,7 +160,7 @@ export function sidebarNav() {
       // ========== 权限过滤（优先执行）==========
       this.userRoleLevel = getUserRoleLevel()
       this.filterNavByPermission()
-      console.log(`[SidebarNav] 用户权限等级: ${this.userRoleLevel}，菜单已过滤`)
+      logger.debug(`[SidebarNav] 用户权限等级: ${this.userRoleLevel}，菜单已过滤`)
 
       // 从 localStorage 恢复折叠状态
       const savedCollapsed = localStorage.getItem('sidebar_collapsed')
@@ -173,7 +174,7 @@ export function sidebarNav() {
         try {
           this.expandedGroups = JSON.parse(savedGroups)
         } catch (e) {
-          console.warn('恢复侧边栏分组状态失败', e)
+          logger.warn('恢复侧边栏分组状态失败', e)
         }
       }
 
@@ -222,7 +223,7 @@ export function sidebarNav() {
           }
         }
       } catch (error) {
-        console.warn('获取告警数量失败:', error.message)
+        logger.warn('获取告警数量失败:', error.message)
       }
     },
 
@@ -238,7 +239,7 @@ export function sidebarNav() {
           this.expandGroupForItem(state.activeTabId)
         }
       } catch (e) {
-        console.warn('恢复激活菜单项失败', e)
+        logger.warn('恢复激活菜单项失败', e)
       }
     },
 

@@ -8,7 +8,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { LOTTERY_ENDPOINTS } from '../../../api/lottery.js'
+import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
 import { buildURL } from '../../../api/base.js'
 
 /**
@@ -37,7 +37,21 @@ export function useStrategyState() {
       cap: 100,
       empty_weight: 1.0,
       description: ''
-    }
+    },
+
+    // === 策略效果分析相关状态 (P2) ===
+    /** @type {Object|null} 策略效果分析数据 */
+    strategyEffectiveness: null,
+    /** @type {boolean} 策略效果分析加载状态 */
+    loadingStrategyEffectiveness: false,
+    /** @type {Object} 策略效果分析筛选条件 */
+    strategyEffectivenessFilters: {
+      campaign_id: '',
+      start_date: '',
+      end_date: ''
+    },
+    /** @type {boolean} 显示策略效果分析弹窗/页面 */
+    showStrategyEffectivenessPanel: false
   }
 }
 
@@ -54,19 +68,18 @@ export function useStrategyMethods() {
      */
     async loadStrategies() {
       try {
-        console.log('⚙️ [Strategy] loadStrategies 开始执行')
+        logger.debug('[Strategy] loadStrategies 开始执行')
         // apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }
         const response = await this.apiGet(
           LOTTERY_ENDPOINTS.STRATEGY_LIST,
           {},
           { showLoading: false }
         )
-        logger.debug('策略配置响应:', response)
-        console.log('⚙️ [Strategy] API 返回数据:', response)
+        logger.debug('[Strategy] API 返回数据:', response)
 
         // 解包 withLoading 返回的结构
         const data = response?.success ? response.data : response
-        console.log('⚙️ [Strategy] 解包后数据:', data)
+        logger.debug('[Strategy] 解包后数据:', data)
 
         if (data) {
           const strategies = data.list || data.strategies || []
@@ -78,12 +91,11 @@ export function useStrategyMethods() {
             groups[groupName].push(strategy)
             return groups
           }, {})
-          logger.debug('策略分组结果:', Object.keys(this.strategyGroups))
-          console.log('✅ [Strategy] 数据加载完成, strategies:', strategies.length)
+          logger.debug('[Strategy] 策略分组结果:', Object.keys(this.strategyGroups))
+          logger.debug('[Strategy] 数据加载完成, strategies:', strategies.length)
         }
       } catch (error) {
-        logger.error('加载策略失败:', error)
-        console.error('❌ [Strategy] loadStrategies 失败:', error)
+        logger.error('[Strategy] loadStrategies 失败:', error)
         this.strategies = []
         this.strategyGroups = {}
       }
@@ -96,29 +108,26 @@ export function useStrategyMethods() {
      */
     async loadTierMatrix() {
       try {
-        console.log('📊 [Strategy] loadTierMatrix 开始执行')
+        logger.debug('[Strategy] loadTierMatrix 开始执行')
         // apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }
         const response = await this.apiGet(
           LOTTERY_ENDPOINTS.MATRIX_LIST,
           {},
           { showLoading: false }
         )
-        logger.debug('矩阵配置响应:', response)
-        console.log('📊 [Strategy] Matrix API 返回数据:', response)
+        logger.debug('[Strategy] Matrix API 返回数据:', response)
 
         // 解包 withLoading 返回的结构
         const data = response?.success ? response.data : response
-        console.log('📊 [Strategy] Matrix 解包后数据:', data)
+        logger.debug('[Strategy] Matrix 解包后数据:', data)
 
         if (data) {
           const matrixData = data.list || data.matrix || data
           this.tierMatrix = Array.isArray(matrixData) ? matrixData : []
-          logger.debug('矩阵配置数量:', this.tierMatrix.length)
-          console.log('✅ [Strategy] Matrix 数据加载完成, count:', this.tierMatrix.length)
+          logger.debug('[Strategy] Matrix 数据加载完成, count:', this.tierMatrix.length)
         }
       } catch (error) {
-        logger.error('加载层级矩阵失败:', error)
-        console.error('❌ [Strategy] loadTierMatrix 失败:', error)
+        logger.error('[Strategy] loadTierMatrix 失败:', error)
         this.tierMatrix = []
       }
     },
@@ -243,6 +252,144 @@ export function useStrategyMethods() {
     getPressureTierName(tier) {
       const names = { P0: '低压', P1: '中压', P2: '高压' }
       return names[tier] || tier
+    },
+
+    // === 策略效果分析方法 (P2) ===
+
+    /**
+     * 加载策略效果分析数据
+     */
+    async loadStrategyEffectiveness() {
+      this.loadingStrategyEffectiveness = true
+      this.strategyEffectiveness = null
+      try {
+        const params = new URLSearchParams()
+        if (this.strategyEffectivenessFilters.campaign_id) {
+          params.append('campaign_id', this.strategyEffectivenessFilters.campaign_id)
+        }
+        if (this.strategyEffectivenessFilters.start_date) {
+          params.append('start_date', this.strategyEffectivenessFilters.start_date)
+        }
+        if (this.strategyEffectivenessFilters.end_date) {
+          params.append('end_date', this.strategyEffectivenessFilters.end_date)
+        }
+
+        const queryString = params.toString() ? `?${params.toString()}` : ''
+        const response = await this.apiGet(
+          `${LOTTERY_ENDPOINTS.STRATEGY_EFFECTIVENESS}${queryString}`,
+          {},
+          { showLoading: false }
+        )
+
+        if (response?.success) {
+          this.strategyEffectiveness = response.data
+          logger.info('[Strategy] 策略效果分析加载成功', { 
+            period: response.data?.analysis_period 
+          })
+        } else {
+          this.showError('加载策略效果分析失败: ' + (response?.message || '未知错误'))
+        }
+      } catch (error) {
+        logger.error('[Strategy] 加载策略效果分析失败:', error)
+        this.showError('加载策略效果分析失败: ' + (error.message || '网络错误'))
+      } finally {
+        this.loadingStrategyEffectiveness = false
+      }
+    },
+
+    /**
+     * 刷新策略效果分析
+     */
+    async refreshStrategyEffectiveness() {
+      await this.loadStrategyEffectiveness()
+      if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
+        Alpine.store('notification').success('策略效果分析已刷新')
+      }
+    },
+
+    /**
+     * 应用策略效果分析筛选
+     */
+    async applyStrategyEffectivenessFilters() {
+      await this.loadStrategyEffectiveness()
+    },
+
+    /**
+     * 重置策略效果分析筛选
+     */
+    async resetStrategyEffectivenessFilters() {
+      this.strategyEffectivenessFilters = {
+        campaign_id: '',
+        start_date: '',
+        end_date: ''
+      }
+      await this.loadStrategyEffectiveness()
+    },
+
+    /**
+     * 打开策略效果分析面板
+     */
+    async openStrategyEffectivenessPanel() {
+      this.showStrategyEffectivenessPanel = true
+      await this.loadStrategyEffectiveness()
+    },
+
+    /**
+     * 关闭策略效果分析面板
+     */
+    closeStrategyEffectivenessPanel() {
+      this.showStrategyEffectivenessPanel = false
+    },
+
+    /**
+     * 获取BxPx矩阵单元格颜色
+     * 基于hit_rate生成热力图颜色
+     * @param {number} hitRate - 命中率 (0-1)
+     * @returns {string} 背景色CSS类
+     */
+    getBxPxHeatmapColor(hitRate) {
+      if (hitRate === null || hitRate === undefined) return 'bg-gray-100'
+      if (hitRate >= 0.8) return 'bg-red-500 text-white'
+      if (hitRate >= 0.6) return 'bg-orange-400 text-white'
+      if (hitRate >= 0.4) return 'bg-yellow-300 text-gray-800'
+      if (hitRate >= 0.2) return 'bg-green-300 text-gray-800'
+      return 'bg-green-100 text-gray-600'
+    },
+
+    /**
+     * 获取策略评分颜色
+     * @param {number} score - 评分 (0-100)
+     * @returns {string} CSS类
+     */
+    getStrategyScoreColor(score) {
+      if (score >= 80) return 'text-green-600'
+      if (score >= 60) return 'text-yellow-600'
+      if (score >= 40) return 'text-orange-600'
+      return 'text-red-600'
+    },
+
+    /**
+     * 获取优化建议优先级样式
+     * @param {string} priority - 优先级 (high, medium, low)
+     * @returns {string} CSS类
+     */
+    getRecommendationPriorityStyle(priority) {
+      const styles = {
+        high: 'bg-red-100 border-l-4 border-red-500 text-red-700',
+        medium: 'bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700',
+        low: 'bg-blue-100 border-l-4 border-blue-500 text-blue-700'
+      }
+      return styles[priority] || styles.low
+    },
+
+    /**
+     * 格式化百分比
+     * @param {number} value - 数值 (0-1)
+     * @returns {string} 格式化的百分比
+     */
+    formatStrategyPercentage(value) {
+      if (value === null || value === undefined) return '-'
+      return `${(value * 100).toFixed(2)}%`
     }
   }
 }

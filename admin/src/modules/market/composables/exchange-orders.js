@@ -9,7 +9,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { buildURL, request } from '../../../api/base.js'
-import { MARKET_ENDPOINTS } from '../../../api/market.js'
+import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
 
 /**
  * 订单管理状态

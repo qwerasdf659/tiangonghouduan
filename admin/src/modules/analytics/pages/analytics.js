@@ -29,7 +29,7 @@
 // ES Module 导入
 import { logger } from '../../../utils/logger.js'
 import { ANALYTICS_ENDPOINTS } from '../../../api/analytics.js'
-import { LOTTERY_ENDPOINTS } from '../../../api/lottery.js'
+import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
 import { buildURL, request } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/index.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'

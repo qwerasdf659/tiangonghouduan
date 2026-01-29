@@ -5,6 +5,8 @@
  * @date 2026-01-25
  */
 
+import { logger } from '../../utils/logger.js'
+
 /**
  * 创建 Tab 工作台管理器
  * @returns {Object} Alpine 组件对象
@@ -59,7 +61,7 @@ export function workspaceTabs() {
 
       // 防止加载 workspace.html 到 iframe 中（会导致无限嵌套）
       if (url && url.includes('workspace.html')) {
-        console.warn('[WorkspaceTabs] 阻止加载 workspace.html 到 Tab 中，避免嵌套')
+        logger.warn('[WorkspaceTabs] 阻止加载 workspace.html 到 Tab 中，避免嵌套')
         return
       }
 
@@ -68,7 +70,7 @@ export function workspaceTabs() {
       if (existing) {
         // 如果 URL 不同，更新 Tab 的 URL（解决方案A升级后的缓存问题）
         if (existing.url !== url) {
-          console.log(`[WorkspaceTabs] 更新 Tab URL: ${existing.url} → ${url}`)
+          logger.debug(`[WorkspaceTabs] 更新 Tab URL: ${existing.url} → ${url}`)
           existing.url = url
           this.saveState()
           // 如果当前是激活的 Tab，刷新 iframe
@@ -238,7 +240,7 @@ export function workspaceTabs() {
           // 过滤掉 workspace.html 的 Tab（防止嵌套）
           const safeTabs = (state.tabs || []).filter(tab => {
             if (tab.url && tab.url.includes('workspace.html')) {
-              console.warn('[WorkspaceTabs] 过滤掉可能导致嵌套的 Tab:', tab.url)
+              logger.warn('[WorkspaceTabs] 过滤掉可能导致嵌套的 Tab:', tab.url)
               return false
             }
             return true
@@ -256,7 +258,7 @@ export function workspaceTabs() {
           }
         }
       } catch (e) {
-        console.warn('加载 Tab 状态失败', e)
+        logger.warn('加载 Tab 状态失败', e)
         // 清理可能损坏的状态
         localStorage.removeItem('workspace_tabs')
       }

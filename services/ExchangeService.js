@@ -117,7 +117,7 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
    */
   marketItemView: [
     'item_id', // 商品ID（Item ID）
-    'name', // 商品名称（Name）
+    'item_name', // 商品名称（Item Name）🔧 2026-01-29 修复：与数据库模型字段名一致
     'description', // 商品描述（Description）
     'cost_asset_code', // 材料资产代码（Cost Asset Code）
     'cost_amount', // 材料成本数量（Cost Amount）
@@ -137,7 +137,7 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
    */
   marketItemDetailView: [
     'item_id', // 商品ID（Item ID）
-    'name', // 商品名称（Name）
+    'item_name', // 商品名称（Item Name）🔧 2026-01-29 修复：与数据库模型字段名一致
     'description', // 商品描述（Description）
     'cost_asset_code', // 材料资产代码（Cost Asset Code）
     'cost_amount', // 材料成本数量（Cost Amount）
@@ -159,8 +159,8 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
    */
   adminMarketItemView: [
     'item_id', // 商品ID（Item ID）
-    'name', // 商品名称（Name）🔧 2026-01-09 修复：字段名匹配数据库模型
-    'description', // 商品描述（Description）🔧 2026-01-09 修复：字段名匹配数据库模型
+    'item_name', // 商品名称（Item Name）🔧 2026-01-29 修复：与数据库模型字段名一致
+    'description', // 商品描述（Description）
     'cost_asset_code', // 材料资产代码（Cost Asset Code）
     'cost_amount', // 材料成本数量（Cost Amount）
     'cost_price', // 成本价（Cost Price - 敏感信息，仅管理员可见）
@@ -1189,7 +1189,7 @@ class ExchangeService {
     // 创建商品（V4.5.0材料资产支付 + 图片存储架构）
     const item = await ExchangeItem.create(
       {
-        name: name.trim(),
+        item_name: name.trim(), // 🔧 2026-01-29 修复：与数据库模型字段名一致
         description: description.trim(),
         // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_id）
         primary_image_id: itemData.primary_image_id || null,
@@ -1287,7 +1287,7 @@ class ExchangeService {
       if (updateData.name.length > 100) {
         throw new Error('商品名称最长100字符')
       }
-      finalUpdateData.name = updateData.name.trim()
+      finalUpdateData.item_name = updateData.name.trim() // 🔧 2026-01-29 修复：与数据库模型字段名一致
     }
 
     if (updateData.description !== undefined) {
@@ -1785,7 +1785,7 @@ class ExchangeService {
         where.status = status
       }
       if (keyword) {
-        where.name = { [Op.like]: `%${keyword}%` }
+        where.item_name = { [Op.like]: `%${keyword}%` } // 🔧 2026-01-29 修复：与数据库模型字段名一致
       }
 
       // 分页参数

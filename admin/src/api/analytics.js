@@ -8,7 +8,7 @@
  */
 
 import { logger } from '../utils/logger.js'
-import { request, buildURL, buildQueryString } from './base.js'
+import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
 
 // ========== 类型定义 ==========
 
@@ -50,48 +50,48 @@ import { request, buildURL, buildQueryString } from './base.js'
 
 export const ANALYTICS_ENDPOINTS = {
   // 基础统计
-  TODAY_STATS: '/api/v4/console/analytics/stats/today',
-  DECISIONS: '/api/v4/console/analytics/decisions/analytics',
-  LOTTERY_TRENDS: '/api/v4/console/analytics/lottery/trends',
-  DASHBOARD_TRENDS: '/api/v4/console/analytics/decisions/analytics',
+  TODAY_STATS: `${API_PREFIX}/console/analytics/stats/today`,
+  DECISIONS: `${API_PREFIX}/console/analytics/decisions/analytics`,
+  LOTTERY_TRENDS: `${API_PREFIX}/console/analytics/lottery/trends`,
+  DASHBOARD_TRENDS: `${API_PREFIX}/console/analytics/decisions/analytics`,
 
   // 图表数据
-  CHARTS: '/api/v4/system/statistics/charts',
-  CHARTS_USER_GROWTH: '/api/v4/console/analytics/charts/user-growth',
-  CHARTS_REVENUE: '/api/v4/console/analytics/charts/revenue',
-  CHARTS_LOTTERY: '/api/v4/console/analytics/charts/lottery',
+  CHARTS: `${API_PREFIX}/system/statistics/charts`,
+  CHARTS_USER_GROWTH: `${API_PREFIX}/console/analytics/charts/user-growth`,
+  CHARTS_REVENUE: `${API_PREFIX}/console/analytics/charts/revenue`,
+  CHARTS_LOTTERY: `${API_PREFIX}/console/analytics/charts/lottery`,
 
   // 统计导出
-  STATISTICS_EXPORT: '/api/v4/system/statistics/export',
+  STATISTICS_EXPORT: `${API_PREFIX}/system/statistics/export`,
 
   // 财务管理
-  FINANCE_OVERVIEW: '/api/v4/console/finance/overview',
-  FINANCE_TRANSACTIONS: '/api/v4/console/finance/transactions',
-  FINANCE_SETTLEMENTS: '/api/v4/console/finance/settlements',
-  FINANCE_REPORTS: '/api/v4/console/finance/reports',
+  FINANCE_OVERVIEW: `${API_PREFIX}/console/finance/overview`,
+  FINANCE_TRANSACTIONS: `${API_PREFIX}/console/finance/transactions`,
+  FINANCE_SETTLEMENTS: `${API_PREFIX}/console/finance/settlements`,
+  FINANCE_REPORTS: `${API_PREFIX}/console/finance/reports`,
 
   // 活动预算
-  CAMPAIGN_BUDGET_BATCH_STATUS: '/api/v4/console/campaign-budget/batch-status',
-  CAMPAIGN_BUDGET_DETAIL: '/api/v4/console/campaign-budget/campaigns/:campaign_id',
+  CAMPAIGN_BUDGET_BATCH_STATUS: `${API_PREFIX}/console/campaign-budget/batch-status`,
+  CAMPAIGN_BUDGET_DETAIL: `${API_PREFIX}/console/campaign-budget/campaigns/:campaign_id`,
 
   // 策略统计（与后端实际路由对齐，需要 campaign_id 参数）
-  STRATEGY_STATS_REALTIME: '/api/v4/console/lottery-strategy-stats/realtime/:campaign_id',
-  STRATEGY_STATS_HOURLY: '/api/v4/console/lottery-strategy-stats/hourly/:campaign_id',
-  STRATEGY_STATS_DAILY: '/api/v4/console/lottery-strategy-stats/daily/:campaign_id',
+  STRATEGY_STATS_REALTIME: `${API_PREFIX}/console/lottery-strategy-stats/realtime/:campaign_id`,
+  STRATEGY_STATS_HOURLY: `${API_PREFIX}/console/lottery-strategy-stats/hourly/:campaign_id`,
+  STRATEGY_STATS_DAILY: `${API_PREFIX}/console/lottery-strategy-stats/daily/:campaign_id`,
   STRATEGY_STATS_TIER_DISTRIBUTION:
-    '/api/v4/console/lottery-strategy-stats/tier-distribution/:campaign_id',
+    `${API_PREFIX}/console/lottery-strategy-stats/tier-distribution/:campaign_id`,
   STRATEGY_STATS_EXPERIENCE:
-    '/api/v4/console/lottery-strategy-stats/experience-triggers/:campaign_id',
-  STRATEGY_STATS_BUDGET: '/api/v4/console/lottery-strategy-stats/budget-consumption/:campaign_id',
+    `${API_PREFIX}/console/lottery-strategy-stats/experience-triggers/:campaign_id`,
+  STRATEGY_STATS_BUDGET: `${API_PREFIX}/console/lottery-strategy-stats/budget-consumption/:campaign_id`,
 
   // 客服统计
-  CUSTOMER_SERVICE_SESSIONS: '/api/v4/console/customer-service/sessions',
+  CUSTOMER_SERVICE_SESSIONS: `${API_PREFIX}/console/customer-service/sessions`,
   CUSTOMER_SERVICE_SESSION_MESSAGES:
-    '/api/v4/console/customer-service/sessions/:session_id/messages',
-  CUSTOMER_SERVICE_SEND_MESSAGE: '/api/v4/console/customer-service/sessions/:session_id/messages',
-  CUSTOMER_SERVICE_CLOSE: '/api/v4/console/customer-service/sessions/:session_id/close',
-  CUSTOMER_SERVICE_MARK_READ: '/api/v4/console/customer-service/sessions/:session_id/mark-read',
-  CUSTOMER_SERVICE_TRANSFER: '/api/v4/console/customer-service/sessions/:session_id/transfer'
+    `${API_PREFIX}/console/customer-service/sessions/:session_id/messages`,
+  CUSTOMER_SERVICE_SEND_MESSAGE: `${API_PREFIX}/console/customer-service/sessions/:session_id/messages`,
+  CUSTOMER_SERVICE_CLOSE: `${API_PREFIX}/console/customer-service/sessions/:session_id/close`,
+  CUSTOMER_SERVICE_MARK_READ: `${API_PREFIX}/console/customer-service/sessions/:session_id/mark-read`,
+  CUSTOMER_SERVICE_TRANSFER: `${API_PREFIX}/console/customer-service/sessions/:session_id/transfer`
 }
 
 // ========== API 调用方法 ==========

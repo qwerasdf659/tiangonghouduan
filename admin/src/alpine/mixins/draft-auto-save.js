@@ -5,6 +5,8 @@
  * @date 2026-01-25
  */
 
+import { logger } from '../../utils/logger.js'
+
 /**
  * 创建草稿自动保存 Mixin
  * @param {string} componentName - 组件名称，用于生成唯一的存储键
@@ -48,7 +50,7 @@ export function withDraftAutoSave(componentName) {
         // 24小时过期
         if (hours > 24) {
           localStorage.removeItem(this._draftKey)
-          console.log('📝 草稿已过期，已清除')
+          logger.debug('📝 草稿已过期，已清除')
           return null
         }
 
@@ -57,11 +59,11 @@ export function withDraftAutoSave(componentName) {
           return null
         }
 
-        console.log(`📝 恢复草稿（${Math.round(hours * 60)}分钟前保存）`)
+        logger.debug(`📝 恢复草稿（${Math.round(hours * 60)}分钟前保存）`)
         this._lastSaveTime = savedTime
         return saved.formData
       } catch (e) {
-        console.warn('草稿恢复失败', e)
+        logger.warn('草稿恢复失败', e)
         return null
       }
     },
@@ -83,9 +85,9 @@ export function withDraftAutoSave(componentName) {
         )
         this._lastSaveTime = now
         this._hasUnsavedChanges = false
-        console.log('💾 草稿已保存')
+        logger.debug('💾 草稿已保存')
       } catch (e) {
-        console.warn('草稿保存失败', e)
+        logger.warn('草稿保存失败', e)
       }
     },
 
@@ -95,7 +97,7 @@ export function withDraftAutoSave(componentName) {
     clearDraft() {
       localStorage.removeItem(this._draftKey)
       this._hasUnsavedChanges = false
-      console.log('🗑️ 草稿已清除')
+      logger.debug('🗑️ 草稿已清除')
     },
 
     /**

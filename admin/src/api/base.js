@@ -4,10 +4,30 @@
  *
  * @module api/base
  * @since 2026-01-23
+ * @updated 2026-01-29 - 添加 API 版本常量
  */
 
 /* global localStorage, sessionStorage */
 import { logger } from '../utils/logger.js'
+
+/*
+ * ============================================================================
+ * API 版本配置
+ * ============================================================================
+ */
+
+/**
+ * API 版本号
+ * @description 统一管理 API 版本，便于全局升级
+ * @constant {string}
+ */
+export const API_VERSION = 'v4'
+
+/**
+ * API 基础路径前缀
+ * @constant {string}
+ */
+export const API_PREFIX = `/api/${API_VERSION}`
 
 /*
  * ============================================================================
@@ -261,6 +281,21 @@ export function buildURL(endpoint, pathParams = {}) {
 }
 
 /**
+ * 构建带版本的 API URL
+ * @param {string} path - API 路径（不含版本前缀，如 /users/:user_id）
+ * @param {Object} [pathParams] - 路径参数对象
+ * @returns {string} 完整 URL
+ *
+ * @example
+ * buildApiURL('/users/:user_id', { user_id: 123 })
+ * // 返回: '/api/v4/users/123'
+ */
+export function buildApiURL(path, pathParams = {}) {
+  const endpoint = `${API_PREFIX}${path}`
+  return buildURL(endpoint, pathParams)
+}
+
+/**
  * 统一请求函数
  * @param {Object} options - 请求配置
  * @param {string} options.url - 请求 URL
@@ -407,11 +442,14 @@ export const http = {
 }
 
 export default {
+  API_VERSION,
+  API_PREFIX,
   getToken,
   setToken,
   clearToken,
   buildQueryString,
   buildURL,
+  buildApiURL,
   request,
   http
 }

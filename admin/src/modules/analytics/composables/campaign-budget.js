@@ -17,7 +17,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { LOTTERY_ENDPOINTS } from '../../../api/lottery.js'
+import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
 import { buildURL } from '../../../api/base.js'
 
 /**

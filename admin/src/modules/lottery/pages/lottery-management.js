@@ -42,7 +42,18 @@ import {
   useRedemptionState,
   useRedemptionMethods,
   useUserProfileState,
-  useUserProfileMethods
+  useUserProfileMethods,
+  // 新增模块 - P0/P1/P2/P3 优先级功能
+  useAlertsState,
+  useAlertsMethods,
+  useRiskControlState,
+  useRiskControlMethods,
+  useReportState,
+  useReportMethods,
+  useDailyReportState,
+  useDailyReportMethods,
+  useBatchOperationsState,
+  useBatchOperationsMethods
 } from '../composables/index.js'
 
 /**
@@ -51,9 +62,8 @@ import {
  * @returns {void}
  */
 function registerLotteryManagementComponents() {
-  // 使用 console.log 确保输出不受 logger 级别限制
-  console.log('🔧 [LotteryManagement] 开始注册 Alpine 组件...')
-  console.log('🔍 [LotteryManagement] Alpine 状态:', {
+  logger.debug('🔧 [LotteryManagement] 开始注册 Alpine 组件...')
+  logger.debug('🔍 [LotteryManagement] Alpine 状态:', {
     Alpine: typeof Alpine,
     createPageMixin: typeof createPageMixin,
     AlpineData: typeof Alpine?.data
@@ -61,8 +71,7 @@ function registerLotteryManagementComponents() {
   logger.info('[LotteryManagement] 注册 Alpine 组件 (ES Module v4.1)...')
 
   if (!Alpine || typeof createPageMixin !== 'function') {
-    console.error('❌ [LotteryManagement] 关键依赖未加载!')
-    logger.error('[LotteryManagement] 关键依赖未加载', {
+    logger.error('❌ [LotteryManagement] 关键依赖未加载!', {
       Alpine: !!Alpine,
       createPageMixin: typeof createPageMixin
     })
@@ -90,6 +99,11 @@ function registerLotteryManagementComponents() {
 
     subPages: [
       { id: 'lottery-metrics', title: '实时监控', icon: '📊', highlight: true },
+      { id: 'lottery-alerts', title: '告警中心', icon: '🚨', highlight: true },
+      { id: 'lottery-risk-control', title: '风控面板', icon: '🛡️', highlight: true },
+      { id: 'strategy-effectiveness', title: '策略效果分析', icon: '📈', highlight: true },
+      { id: 'daily-report', title: '运营日报', icon: '📋', highlight: true },
+      { id: 'batch-operations', title: '批量操作工具', icon: '⚡', highlight: true },
       { id: 'campaigns', title: '活动管理', icon: '🎁' },
       { id: 'prizes', title: '奖品管理', icon: '🏆' },
       { id: 'campaign-budget', title: '预算管理', icon: '💰' },
@@ -100,17 +114,16 @@ function registerLotteryManagementComponents() {
     ],
 
     init() {
-      console.log('🎯 [LotteryNavigation] init() 开始执行')
-      logger.debug('✅ 抽奖管理导航初始化')
+      logger.debug('🎯 [LotteryNavigation] init() 开始执行')
       if (!this.checkAuth()) {
-        console.log('⚠️ [LotteryNavigation] checkAuth 返回 false，停止初始化')
+        logger.debug('⚠️ [LotteryNavigation] checkAuth 返回 false，停止初始化')
         return
       }
       const urlParams = new URLSearchParams(window.location.search)
       this.currentPage = urlParams.get('page') || 'lottery-metrics'
-      console.log('📍 [LotteryNavigation] 设置当前页面:', this.currentPage)
+      logger.debug('📍 [LotteryNavigation] 设置当前页面:', this.currentPage)
       Alpine.store('lotteryPage', this.currentPage)
-      console.log('✅ [LotteryNavigation] init() 完成，store 已更新')
+      logger.debug('✅ [LotteryNavigation] init() 完成，store 已更新')
     },
 
     switchPage(pageId) {
@@ -135,6 +148,12 @@ function registerLotteryManagementComponents() {
     const metricsState = useMetricsState()
     const redemptionState = useRedemptionState()
     const userProfileState = useUserProfileState()
+    // 新增模块状态
+    const alertsState = useAlertsState()
+    const riskControlState = useRiskControlState()
+    const reportState = useReportState()
+    const dailyReportState = useDailyReportState()
+    const batchOperationsState = useBatchOperationsState()
 
     // 预先调用所有方法 composables
     const campaignsMethods = useCampaignsMethods()
@@ -146,10 +165,16 @@ function registerLotteryManagementComponents() {
     const metricsMethods = useMetricsMethods()
     const redemptionMethods = useRedemptionMethods()
     const userProfileMethods = useUserProfileMethods()
+    // 新增模块方法
+    const alertsMethods = useAlertsMethods()
+    const riskControlMethods = useRiskControlMethods()
+    const reportMethods = useReportMethods()
+    const dailyReportMethods = useDailyReportMethods()
+    const batchOperationsMethods = useBatchOperationsMethods()
 
     // 调试日志 - 检查 quotaMethods
-    console.log('[Quota Debug] quotaMethods keys:', Object.keys(quotaMethods || {}))
-    console.log(
+    logger.debug('[Quota Debug] quotaMethods keys:', Object.keys(quotaMethods || {}))
+    logger.debug(
       '[Quota Debug] has openCreateQuotaModal:',
       typeof quotaMethods?.openCreateQuotaModal
     )
@@ -174,6 +199,12 @@ function registerLotteryManagementComponents() {
       ...metricsState,
       ...redemptionState,
       ...userProfileState,
+      // 新增模块状态
+      ...alertsState,
+      ...riskControlState,
+      ...reportState,
+      ...dailyReportState,
+      ...batchOperationsState,
 
       // ==================== 通用状态 ====================
       page: 1,
@@ -201,35 +232,35 @@ function registerLotteryManagementComponents() {
       // ==================== 初始化和数据加载 ====================
 
       init() {
-        console.log('✅ [LotteryPageContent] init() 开始执行')
-        console.log('📍 [LotteryPageContent] 当前页面:', this.currentPage)
+        logger.debug('✅ [LotteryPageContent] init() 开始执行')
+        logger.debug('📍 [LotteryPageContent] 当前页面:', this.currentPage)
         // 关键诊断：检查 openCreateQuotaModal 是否存在
-        console.log(
+        logger.debug(
           '🔴 [CRITICAL] openCreateQuotaModal 存在:',
           typeof this.openCreateQuotaModal === 'function'
         )
-        console.log('🔴 [CRITICAL] loadQuotas 存在:', typeof this.loadQuotas === 'function')
-        console.log(
+        logger.debug('🔴 [CRITICAL] loadQuotas 存在:', typeof this.loadQuotas === 'function')
+        logger.debug(
           '🔴 [CRITICAL] 所有配额方法:',
           ['openCreateQuotaModal', 'editQuota', 'submitQuotaForm', 'deleteQuota', 'loadQuotas'].map(
             m => `${m}: ${typeof this[m]}`
           )
         )
-        console.log('📊 [LotteryPageContent] this 对象属性列表:', Object.keys(this).slice(0, 50))
-        console.log(
+        logger.debug('📊 [LotteryPageContent] this 对象属性列表:', Object.keys(this).slice(0, 50))
+        logger.debug(
           '🔍 [LotteryPageContent] 所有方法:',
           Object.keys(this).filter(k => typeof this[k] === 'function')
         )
         this.loadPageData()
         this.$watch('$store.lotteryPage', newPage => {
-          console.log('🔄 [LotteryPage] 页面切换到:', newPage)
+          logger.debug('🔄 [LotteryPage] 页面切换到:', newPage)
           this.loadPageData()
         })
       },
 
       async loadPageData() {
         const page = this.currentPage
-        console.log('📂 [LotteryPage] loadPageData 被调用, page =', page)
+        logger.debug('📂 [LotteryPage] loadPageData 被调用, page =', page)
         await this.withLoading(
           async () => {
             switch (page) {
@@ -270,7 +301,7 @@ function registerLotteryManagementComponents() {
                 await this.loadQuotas()
                 // 🔧 修复：加载活动列表供配额规则选择活动
                 if (!this.campaigns || this.campaigns.length === 0) {
-                  console.log('📋 [LotteryPage] 配额管理页面加载活动列表...')
+                  logger.debug('📋 [LotteryPage] 配额管理页面加载活动列表...')
                   await this.loadCampaigns()
                 }
                 break
@@ -278,7 +309,7 @@ function registerLotteryManagementComponents() {
                 await this.loadPricingConfigs()
                 // 🔧 修复：加载活动列表供定价配置选择活动
                 if (!this.campaigns || this.campaigns.length === 0) {
-                  console.log('📋 [LotteryPage] 定价配置页面加载活动列表...')
+                  logger.debug('📋 [LotteryPage] 定价配置页面加载活动列表...')
                   await this.loadCampaigns()
                 }
                 break
@@ -293,10 +324,41 @@ function registerLotteryManagementComponents() {
                 }
                 break
               case 'redemption-codes':
-                console.log('🎫 [LotteryPage] 进入核销码管理页面')
+                logger.debug('🎫 [LotteryPage] 进入核销码管理页面')
                 await this.loadStores()
                 await this.loadRedemptionCodes()
-                console.log('✅ [LotteryPage] 核销码数据加载完成')
+                logger.debug('✅ [LotteryPage] 核销码数据加载完成')
+                break
+              case 'lottery-alerts':
+                logger.debug('🚨 [LotteryPage] 进入告警中心页面')
+                await this.loadAlerts()
+                break
+              case 'lottery-risk-control':
+                logger.debug('🛡️ [LotteryPage] 进入风控面板页面')
+                await this.loadAbnormalUsers()
+                break
+              case 'strategy-effectiveness':
+                logger.debug('📈 [LotteryPage] 进入策略效果分析页面')
+                // 加载活动列表供选择
+                if (!this.campaigns || this.campaigns.length === 0) {
+                  await this.loadCampaigns()
+                }
+                break
+              case 'daily-report':
+                logger.debug('📋 [LotteryPage] 进入运营日报页面')
+                await this.loadDailyReportPage()
+                // 加载活动列表供筛选
+                if (!this.campaigns || this.campaigns.length === 0) {
+                  await this.loadCampaigns()
+                }
+                break
+              case 'batch-operations':
+                logger.debug('⚡ [LotteryPage] 进入批量操作工具页面')
+                await this.loadBatchOperationLogs()
+                // 加载活动列表供选择
+                if (!this.campaigns || this.campaigns.length === 0) {
+                  await this.loadCampaigns()
+                }
                 break
             }
           },
@@ -314,6 +376,12 @@ function registerLotteryManagementComponents() {
       ...metricsMethods,
       ...redemptionMethods,
       ...userProfileMethods,
+      // 新增模块方法
+      ...alertsMethods,
+      ...riskControlMethods,
+      ...reportMethods,
+      ...dailyReportMethods,
+      ...batchOperationsMethods,
 
       // ==================== 工具方法 ====================
 
@@ -378,12 +446,12 @@ function registerLotteryManagementComponents() {
  */
 
 // 立即注册组件（模块加载时执行）
-console.log('📦 [LotteryManagement] 模块加载，准备注册组件...')
+logger.debug('📦 [LotteryManagement] 模块加载，准备注册组件...')
 try {
   registerLotteryManagementComponents()
-  console.log('✅ [LotteryManagement] 组件注册成功完成!')
+  logger.debug('✅ [LotteryManagement] 组件注册成功完成!')
 } catch (error) {
-  console.error('❌ [LotteryManagement] 组件注册失败:', error)
+  logger.error('❌ [LotteryManagement] 组件注册失败:', error)
 }
 
 export { registerLotteryManagementComponents }

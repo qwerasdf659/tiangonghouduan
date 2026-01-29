@@ -270,7 +270,7 @@
             <select x-model="adjustForm.campaignId" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500">
               <option value="">请选择活动</option>
               <template x-for="campaign in campaigns" :key="campaign.campaign_id">
-                <option :value="campaign.campaign_id" x-text="campaign.name"></option>
+                <option :value="campaign.campaign_id" x-text="campaign.campaign_name"></option>
               </template>
             </select>
           </div>

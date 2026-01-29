@@ -1,0 +1,246 @@
+/**
+ * 抽奖核心 API 模块
+ *
+ * @module api/lottery/core
+ * @description 抽奖执行、预设管理、奖品池、活动管理相关的 API 调用
+ * @version 2.0.0
+ * @date 2026-01-30
+ */
+
+import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
+
+// ========== API 端点 ==========
+
+export const LOTTERY_CORE_ENDPOINTS = {
+  // 基础抽奖
+  EXECUTE: `${API_PREFIX}/lottery/execute`,
+  HISTORY: `${API_PREFIX}/lottery/history`,
+  STRATEGIES: `${API_PREFIX}/lottery/strategies`,
+
+  // 预设管理
+  PRESET_LIST: `${API_PREFIX}/lottery/preset/list`,
+  PRESET_CREATE: `${API_PREFIX}/lottery/preset/create`,
+  PRESET_USER_LIST: `${API_PREFIX}/lottery/preset/user/:user_id`,
+  PRESET_DELETE: `${API_PREFIX}/lottery/preset/user/:user_id`,
+  PRESET_STATS: `${API_PREFIX}/lottery/preset/stats`,
+
+  // 奖品池管理
+  PRIZE_LIST: `${API_PREFIX}/console/prize-pool/list`,
+  PRIZE_BATCH_ADD: `${API_PREFIX}/console/prize-pool/batch-add`,
+  PRIZE_UPDATE: `${API_PREFIX}/console/prize-pool/prize/:prize_id`,
+  PRIZE_DELETE: `${API_PREFIX}/console/prize-pool/prize/:prize_id`,
+  PRIZE_DETAIL: `${API_PREFIX}/console/prize-pool/prize/:prize_id`,
+  PRIZE_ADD_STOCK: `${API_PREFIX}/console/prize-pool/prize/:prize_id/add-stock`,
+  PRIZE_TOGGLE: `${API_PREFIX}/console/prize-pool/prize/:prize_id/toggle`,
+
+  // 活动管理
+  CAMPAIGN_LIST: `${API_PREFIX}/console/system-data/lottery-campaigns`,
+  CAMPAIGN_DETAIL: `${API_PREFIX}/console/system-data/lottery-campaigns/:campaign_id`,
+
+  // 活动条件
+  CAMPAIGNS_LIST: `${API_PREFIX}/lottery/campaigns`,
+  CAMPAIGNS_DETAIL: `${API_PREFIX}/lottery/campaigns/:campaign_code`,
+  CAMPAIGNS_CONDITIONS: `${API_PREFIX}/activities/:code/conditions`,
+  CAMPAIGNS_CONFIGURE_CONDITIONS: `${API_PREFIX}/activities/:code/configure-conditions`
+}
+
+// ========== API 调用方法 ==========
+
+export const LotteryCoreAPI = {
+  // ===== 基础抽奖 =====
+
+  /**
+   * 执行抽奖
+   * @param {Object} data - 抽奖执行参数
+   * @param {number} data.campaign_id - 活动 ID（必填）
+   * @param {number} data.user_id - 用户 ID（必填）
+   * @param {number} [data.count=1] - 抽奖次数
+   * @returns {Promise<Object>} 抽奖结果
+   */
+  async execute(data) {
+    return await request({ url: LOTTERY_CORE_ENDPOINTS.EXECUTE, method: 'POST', data })
+  },
+
+  /**
+   * 获取抽奖历史记录
+   * @param {Object} [params={}] - 查询参数
+   * @param {number} [params.user_id] - 用户 ID
+   * @param {number} [params.campaign_id] - 活动 ID
+   * @param {string} [params.prize_type] - 奖品类型
+   * @param {string} [params.start_date] - 开始日期
+   * @param {string} [params.end_date] - 结束日期
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @returns {Promise<Object>} 分页的历史记录
+   */
+  async getHistory(params = {}) {
+    const url = LOTTERY_CORE_ENDPOINTS.HISTORY + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  // ===== 预设管理 =====
+
+  /**
+   * 获取预设列表（管理员视角）
+   * @param {Object} [params={}] - 查询参数
+   * @param {string} [params.status='all'] - 状态筛选（pending/used/all）
+   * @param {number} [params.user_id] - 用户 ID 筛选
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @returns {Promise<Object>} 分页的预设列表
+   */
+  async getPresetList(params = {}) {
+    const url = LOTTERY_CORE_ENDPOINTS.PRESET_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 创建抽奖预设
+   * @param {Object} data - 预设创建数据
+   * @param {number} data.user_id - 目标用户 ID
+   * @param {Array} data.presets - 预设列表
+   * @returns {Promise<Object>} 创建结果
+   */
+  async createPreset(data) {
+    return await request({ url: LOTTERY_CORE_ENDPOINTS.PRESET_CREATE, method: 'POST', data })
+  },
+
+  /**
+   * 获取用户预设
+   * @param {number} userId - 用户 ID
+   * @param {Object} [params={}] - 查询参数
+   * @returns {Promise<Object>} 用户的预设列表
+   */
+  async getUserPresets(userId, params = {}) {
+    const url =
+      buildURL(LOTTERY_CORE_ENDPOINTS.PRESET_USER_LIST, { user_id: userId }) +
+      buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 删除用户预设
+   * @param {number} userId - 用户 ID
+   * @returns {Promise<Object>} 删除结果
+   */
+  async deleteUserPresets(userId) {
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.PRESET_DELETE, { user_id: userId })
+    return await request({ url, method: 'DELETE' })
+  },
+
+  /**
+   * 获取预设统计信息
+   * @returns {Promise<Object>} 预设统计信息
+   */
+  async getPresetStats() {
+    return await request({ url: LOTTERY_CORE_ENDPOINTS.PRESET_STATS, method: 'GET' })
+  },
+
+  // ===== 奖品池管理 =====
+
+  /**
+   * 获取奖品列表
+   * @param {Object} [params={}] - 查询参数
+   * @param {number} [params.campaign_id] - 活动 ID 筛选
+   * @param {string} [params.status] - 状态筛选
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @returns {Promise<Object>} 奖品列表
+   */
+  async getPrizeList(params = {}) {
+    const url = LOTTERY_CORE_ENDPOINTS.PRIZE_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 批量添加奖品到奖品池
+   * @param {Object} data - 奖品数据
+   * @param {number} data.campaign_id - 活动 ID
+   * @param {Array} data.prizes - 奖品列表
+   * @returns {Promise<Object>} 添加结果
+   */
+  async batchAddPrize(data) {
+    return await request({ url: LOTTERY_CORE_ENDPOINTS.PRIZE_BATCH_ADD, method: 'POST', data })
+  },
+
+  /**
+   * 更新奖品信息
+   * @param {number} prizeId - 奖品 ID
+   * @param {Object} data - 更新数据
+   * @returns {Promise<Object>} 更新结果
+   */
+  async updatePrize(prizeId, data) {
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.PRIZE_UPDATE, { prize_id: prizeId })
+    return await request({ url, method: 'PUT', data })
+  },
+
+  /**
+   * 删除奖品
+   * @param {number} prizeId - 奖品 ID
+   * @returns {Promise<Object>} 删除结果
+   */
+  async deletePrize(prizeId) {
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.PRIZE_DELETE, { prize_id: prizeId })
+    return await request({ url, method: 'DELETE' })
+  },
+
+  /**
+   * 补充奖品库存
+   * @param {number} prizeId - 奖品 ID
+   * @param {Object} data - 库存数据
+   * @param {number} data.quantity - 补充数量
+   * @returns {Promise<Object>} 补充结果
+   */
+  async addPrizeStock(prizeId, data) {
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.PRIZE_ADD_STOCK, { prize_id: prizeId })
+    return await request({ url, method: 'POST', data })
+  },
+
+  // ===== 活动管理 =====
+
+  /**
+   * 获取活动列表
+   * @param {Object} [params={}] - 查询参数
+   * @returns {Promise<Object>} 活动列表
+   */
+  async getCampaignList(params = {}) {
+    const url = LOTTERY_CORE_ENDPOINTS.CAMPAIGN_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取活动详情
+   * @param {string} campaignId - 活动 ID
+   * @returns {Promise<Object>} 活动详情
+   */
+  async getCampaignDetail(campaignId) {
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGN_DETAIL, { campaign_id: campaignId })
+    return await request({ url, method: 'GET' })
+  },
+
+  // ===== 活动条件 =====
+
+  /**
+   * 获取活动条件
+   * @param {string} code - 活动代码
+   * @returns {Promise<Object>} 活动条件配置
+   */
+  async getActivityConditions(code) {
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGNS_CONDITIONS, { code })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 配置活动条件
+   * @param {string} code - 活动代码
+   * @param {Object} data - 条件配置数据
+   * @returns {Promise<Object>} 配置结果
+   */
+  async configureActivityConditions(code, data) {
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGNS_CONFIGURE_CONDITIONS, { code })
+    return await request({ url, method: 'POST', data })
+  }
+}
+
+export default LotteryCoreAPI
+

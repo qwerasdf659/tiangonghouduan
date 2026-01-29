@@ -18,81 +18,81 @@
  */
 
 import { logger } from '../utils/logger.js'
-import { request, buildURL, buildQueryString } from './base.js'
+import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
 
 // ========== API 端点 ==========
 
 export const ASSET_ENDPOINTS = {
   // 资产统计
-  STATS: '/api/v4/console/assets/stats',
-  TRANSACTIONS: '/api/v4/console/assets/transactions',
-  PORTFOLIO: '/api/v4/console/assets/portfolio',
+  STATS: `${API_PREFIX}/console/assets/stats`,
+  TRANSACTIONS: `${API_PREFIX}/console/assets/transactions`,
+  PORTFOLIO: `${API_PREFIX}/console/assets/portfolio`,
 
   // 资产调整
-  ADJUSTMENT_ASSET_TYPES: '/api/v4/console/asset-adjustment/asset-types',
-  ADJUSTMENT_USER_BALANCES: '/api/v4/console/asset-adjustment/user/:user_id/balances',
-  ADJUSTMENT_ADJUST: '/api/v4/console/asset-adjustment/adjust',
+  ADJUSTMENT_ASSET_TYPES: `${API_PREFIX}/console/asset-adjustment/asset-types`,
+  ADJUSTMENT_USER_BALANCES: `${API_PREFIX}/console/asset-adjustment/user/:user_id/balances`,
+  ADJUSTMENT_ADJUST: `${API_PREFIX}/console/asset-adjustment/adjust`,
 
   // 材料资产
-  MATERIAL_ASSET_TYPES: '/api/v4/console/material/asset-types',
-  MATERIAL_ASSET_TYPE_DETAIL: '/api/v4/console/material/asset-types/:asset_code',
-  MATERIAL_CONVERSION_RULES: '/api/v4/console/material/conversion-rules',
-  MATERIAL_CONVERSION_RULE_DETAIL: '/api/v4/console/material/conversion-rules/:rule_id',
-  MATERIAL_CONVERSION_RULE_DISABLE: '/api/v4/console/material/conversion-rules/:rule_id/disable',
-  MATERIAL_USER_BALANCE: '/api/v4/console/material/users/:user_id/balance',
-  MATERIAL_USER_ADJUST: '/api/v4/console/material/users/:user_id/adjust',
-  MATERIAL_USERS: '/api/v4/console/material/users',
-  MATERIAL_TRANSACTIONS: '/api/v4/console/material/transactions',
+  MATERIAL_ASSET_TYPES: `${API_PREFIX}/console/material/asset-types`,
+  MATERIAL_ASSET_TYPE_DETAIL: `${API_PREFIX}/console/material/asset-types/:asset_code`,
+  MATERIAL_CONVERSION_RULES: `${API_PREFIX}/console/material/conversion-rules`,
+  MATERIAL_CONVERSION_RULE_DETAIL: `${API_PREFIX}/console/material/conversion-rules/:rule_id`,
+  MATERIAL_CONVERSION_RULE_DISABLE: `${API_PREFIX}/console/material/conversion-rules/:rule_id/disable`,
+  MATERIAL_USER_BALANCE: `${API_PREFIX}/console/material/users/:user_id/balance`,
+  MATERIAL_USER_ADJUST: `${API_PREFIX}/console/material/users/:user_id/adjust`,
+  MATERIAL_USERS: `${API_PREFIX}/console/material/users`,
+  MATERIAL_TRANSACTIONS: `${API_PREFIX}/console/material/transactions`,
 
   // 钻石账户
-  DIAMOND_LIST: '/api/v4/console/diamond-accounts',
-  DIAMOND_DETAIL: '/api/v4/console/diamond-accounts/:user_id',
-  DIAMOND_ADJUST: '/api/v4/console/diamond-accounts/adjust',
-  DIAMOND_USER_BALANCE: '/api/v4/console/diamond/users/:user_id/balance',
-  DIAMOND_USER_ADJUST: '/api/v4/console/diamond/users/:user_id/adjust',
-  DIAMOND_USERS: '/api/v4/console/diamond/users',
-  DIAMOND_ACCOUNTS: '/api/v4/console/diamond/accounts',
+  DIAMOND_LIST: `${API_PREFIX}/console/diamond-accounts`,
+  DIAMOND_DETAIL: `${API_PREFIX}/console/diamond-accounts/:user_id`,
+  DIAMOND_ADJUST: `${API_PREFIX}/console/diamond-accounts/adjust`,
+  DIAMOND_USER_BALANCE: `${API_PREFIX}/console/diamond/users/:user_id/balance`,
+  DIAMOND_USER_ADJUST: `${API_PREFIX}/console/diamond/users/:user_id/adjust`,
+  DIAMOND_USERS: `${API_PREFIX}/console/diamond/users`,
+  DIAMOND_ACCOUNTS: `${API_PREFIX}/console/diamond/accounts`,
 
   // 物品模板
-  ITEM_TEMPLATES_LIST: '/api/v4/console/item-templates',
-  ITEM_TEMPLATES_DETAIL: '/api/v4/console/item-templates/:id',
-  ITEM_TEMPLATES_CREATE: '/api/v4/console/item-templates',
-  ITEM_TEMPLATES_UPDATE: '/api/v4/console/item-templates/:id',
-  ITEM_TEMPLATES_DELETE: '/api/v4/console/item-templates/:id',
-  ITEM_TEMPLATES_STATS: '/api/v4/console/item-templates/stats',
+  ITEM_TEMPLATES_LIST: `${API_PREFIX}/console/item-templates`,
+  ITEM_TEMPLATES_DETAIL: `${API_PREFIX}/console/item-templates/:id`,
+  ITEM_TEMPLATES_CREATE: `${API_PREFIX}/console/item-templates`,
+  ITEM_TEMPLATES_UPDATE: `${API_PREFIX}/console/item-templates/:id`,
+  ITEM_TEMPLATES_DELETE: `${API_PREFIX}/console/item-templates/:id`,
+  ITEM_TEMPLATES_STATS: `${API_PREFIX}/console/item-templates/stats`,
 
   // 物品实例
-  ITEM_INSTANCES_LIST: '/api/v4/console/item-instances',
-  ITEM_INSTANCES_DETAIL: '/api/v4/console/item-instances/:instance_id',
-  ITEM_INSTANCES_USER: '/api/v4/console/item-instances/user/:user_id',
-  ITEM_INSTANCES_TRANSFER: '/api/v4/console/item-instances/:instance_id/transfer',
-  ITEM_INSTANCES_FREEZE: '/api/v4/console/item-instances/:instance_id/freeze',
-  ITEM_INSTANCES_UNFREEZE: '/api/v4/console/item-instances/:instance_id/unfreeze',
+  ITEM_INSTANCES_LIST: `${API_PREFIX}/console/item-instances`,
+  ITEM_INSTANCES_DETAIL: `${API_PREFIX}/console/item-instances/:instance_id`,
+  ITEM_INSTANCES_USER: `${API_PREFIX}/console/item-instances/user/:user_id`,
+  ITEM_INSTANCES_TRANSFER: `${API_PREFIX}/console/item-instances/:instance_id/transfer`,
+  ITEM_INSTANCES_FREEZE: `${API_PREFIX}/console/item-instances/:instance_id/freeze`,
+  ITEM_INSTANCES_UNFREEZE: `${API_PREFIX}/console/item-instances/:instance_id/unfreeze`,
 
   // 孤立冻结资产
-  ORPHAN_FROZEN_DETECT: '/api/v4/console/orphan-frozen/detect',
-  ORPHAN_FROZEN_CLEANUP: '/api/v4/console/orphan-frozen/cleanup',
-  ORPHAN_FROZEN_STATS: '/api/v4/console/orphan-frozen/stats',
+  ORPHAN_FROZEN_DETECT: `${API_PREFIX}/console/orphan-frozen/detect`,
+  ORPHAN_FROZEN_CLEANUP: `${API_PREFIX}/console/orphan-frozen/cleanup`,
+  ORPHAN_FROZEN_STATS: `${API_PREFIX}/console/orphan-frozen/stats`,
 
   // 钻石账户（已合并至 asset-adjustment 统一管理）
-  DIAMOND_ACCOUNT_LIST: '/api/v4/console/asset-adjustment/asset-types', // 获取资产类型列表
-  DIAMOND_ACCOUNT_DETAIL: '/api/v4/console/asset-adjustment/user/:user_id/balances', // 获取用户资产余额
-  DIAMOND_ACCOUNT_STATS: '/api/v4/console/assets/stats', // 资产统计（通用）
-  DIAMOND_ACCOUNT_ADJUST: '/api/v4/console/asset-adjustment/adjust', // 资产调整（统一入口）
+  DIAMOND_ACCOUNT_LIST: `${API_PREFIX}/console/asset-adjustment/asset-types`, // 获取资产类型列表
+  DIAMOND_ACCOUNT_DETAIL: `${API_PREFIX}/console/asset-adjustment/user/:user_id/balances`, // 获取用户资产余额
+  DIAMOND_ACCOUNT_STATS: `${API_PREFIX}/console/assets/stats`, // 资产统计（通用）
+  DIAMOND_ACCOUNT_ADJUST: `${API_PREFIX}/console/asset-adjustment/adjust`, // 资产调整（统一入口）
 
   // 债务管理 - 适配后端 debt-management 路由
-  DEBT_LIST: '/api/v4/console/debt-management/pending', // 待冲销欠账列表
-  DEBT_DETAIL: '/api/v4/console/debt-management/by-campaign', // 按活动汇总欠账
-  DEBT_STATS: '/api/v4/console/debt-management/dashboard', // 欠账看板总览
-  DEBT_REPAY: '/api/v4/console/debt-management/clear', // 执行欠账清偿
-  DEBT_WRITE_OFF: '/api/v4/console/debt-management/clear', // 核销（使用相同的清偿接口）
-  DEBT_BY_PRIZE: '/api/v4/console/debt-management/by-prize', // 按奖品汇总
-  DEBT_BY_CREATOR: '/api/v4/console/debt-management/by-creator', // 按责任人汇总
-  DEBT_TREND: '/api/v4/console/debt-management/trend', // 欠账趋势
-  DEBT_LIMITS: '/api/v4/console/debt-management/limits', // 欠账上限配置
+  DEBT_LIST: `${API_PREFIX}/console/debt-management/pending`, // 待冲销欠账列表
+  DEBT_DETAIL: `${API_PREFIX}/console/debt-management/by-campaign`, // 按活动汇总欠账
+  DEBT_STATS: `${API_PREFIX}/console/debt-management/dashboard`, // 欠账看板总览
+  DEBT_REPAY: `${API_PREFIX}/console/debt-management/clear`, // 执行欠账清偿
+  DEBT_WRITE_OFF: `${API_PREFIX}/console/debt-management/clear`, // 核销（使用相同的清偿接口）
+  DEBT_BY_PRIZE: `${API_PREFIX}/console/debt-management/by-prize`, // 按奖品汇总
+  DEBT_BY_CREATOR: `${API_PREFIX}/console/debt-management/by-creator`, // 按责任人汇总
+  DEBT_TREND: `${API_PREFIX}/console/debt-management/trend`, // 欠账趋势
+  DEBT_LIMITS: `${API_PREFIX}/console/debt-management/limits`, // 欠账上限配置
 
   // 交易订单
-  TRADE_ORDERS_LIST: '/api/v4/console/trade-orders'
+  TRADE_ORDERS_LIST: `${API_PREFIX}/console/trade-orders`
 }
 
 // ========== API 调用方法 ==========

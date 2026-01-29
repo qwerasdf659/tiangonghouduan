@@ -8,7 +8,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { LOTTERY_ENDPOINTS } from '../../../api/lottery.js'
+import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
 import { buildURL } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/echarts-lazy.js'
 
@@ -57,7 +57,7 @@ export function useBudgetMethods() {
      */
     async loadBudgetData() {
       try {
-        console.log('📊 [Budget] loadBudgetData 开始执行')
+        logger.debug('📊 [Budget] loadBudgetData 开始执行')
         const params = new URLSearchParams()
         params.append('limit', 50)
         if (this.budgetFilters.status) {
@@ -71,11 +71,11 @@ export function useBudgetMethods() {
           { showLoading: false }
         )
 
-        console.log('📊 [Budget] API 返回数据:', response)
+        logger.debug('📊 [Budget] API 返回数据:', response)
 
         // 解包 withLoading 返回的结构
         const data = response?.success ? response.data : response
-        console.log('📊 [Budget] 解包后数据:', data)
+        logger.debug('📊 [Budget] 解包后数据:', data)
 
         if (data) {
           const { campaigns, summary } = data
@@ -97,11 +97,10 @@ export function useBudgetMethods() {
           }
 
           this.budgetCampaigns = filteredCampaigns
-          console.log('✅ [Budget] 数据加载完成, campaigns:', filteredCampaigns.length)
+          logger.debug('✅ [Budget] 数据加载完成, campaigns:', filteredCampaigns.length)
         }
       } catch (error) {
-        logger.error('加载预算数据失败:', error)
-        console.error('❌ [Budget] loadBudgetData 失败:', error)
+        logger.error('❌ [Budget] loadBudgetData 失败:', error)
         this.budgetCampaigns = []
       }
     },

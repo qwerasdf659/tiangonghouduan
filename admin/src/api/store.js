@@ -8,7 +8,7 @@
  */
 
 import { logger } from '../utils/logger.js'
-import { request, buildURL, buildQueryString } from './base.js'
+import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
 
 // ========== 类型定义 ==========
 
@@ -76,59 +76,59 @@ import { request, buildURL, buildQueryString } from './base.js'
 
 export const STORE_ENDPOINTS = {
   // 门店管理
-  LIST: '/api/v4/console/stores',
-  DETAIL: '/api/v4/console/stores/:store_id',
-  CREATE: '/api/v4/console/stores',
-  UPDATE: '/api/v4/console/stores/:store_id',
-  DELETE: '/api/v4/console/stores/:store_id',
+  LIST: `${API_PREFIX}/console/stores`,
+  DETAIL: `${API_PREFIX}/console/stores/:store_id`,
+  CREATE: `${API_PREFIX}/console/stores`,
+  UPDATE: `${API_PREFIX}/console/stores/:store_id`,
+  DELETE: `${API_PREFIX}/console/stores/:store_id`,
 
   // 商户积分
-  MERCHANT_POINTS_LIST: '/api/v4/console/merchant-points',
-  MERCHANT_POINTS_DETAIL: '/api/v4/console/merchant-points/:id',
-  MERCHANT_POINTS_BATCH: '/api/v4/console/merchant-points/batch',
-  MERCHANT_POINTS_APPROVE: '/api/v4/console/merchant-points/:id/approve',
-  MERCHANT_POINTS_REJECT: '/api/v4/console/merchant-points/:id/reject',
-  MERCHANT_POINTS_STATS: '/api/v4/console/merchant-points/stats/pending',
+  MERCHANT_POINTS_LIST: `${API_PREFIX}/console/merchant-points`,
+  MERCHANT_POINTS_DETAIL: `${API_PREFIX}/console/merchant-points/:id`,
+  MERCHANT_POINTS_BATCH: `${API_PREFIX}/console/merchant-points/batch`,
+  MERCHANT_POINTS_APPROVE: `${API_PREFIX}/console/merchant-points/:id/approve`,
+  MERCHANT_POINTS_REJECT: `${API_PREFIX}/console/merchant-points/:id/reject`,
+  MERCHANT_POINTS_STATS: `${API_PREFIX}/console/merchant-points/stats/pending`,
 
   // 消费记录
-  CONSUMPTION_RECORDS: '/api/v4/console/consumption/records',
-  CONSUMPTION_PENDING: '/api/v4/console/consumption/pending',
-  CONSUMPTION_APPROVE: '/api/v4/console/consumption/approve/:id',
-  CONSUMPTION_REJECT: '/api/v4/console/consumption/reject/:id',
+  CONSUMPTION_RECORDS: `${API_PREFIX}/console/consumption/records`,
+  CONSUMPTION_PENDING: `${API_PREFIX}/console/consumption/pending`,
+  CONSUMPTION_APPROVE: `${API_PREFIX}/console/consumption/approve/:id`,
+  CONSUMPTION_REJECT: `${API_PREFIX}/console/consumption/reject/:id`,
 
   // 门店统计
-  STATS: '/api/v4/console/stores/stats',
+  STATS: `${API_PREFIX}/console/stores/stats`,
 
   // 员工管理
-  STAFF_LIST: '/api/v4/console/staff',
-  STAFF_DETAIL: '/api/v4/console/staff/:store_staff_id',
-  STAFF_CREATE: '/api/v4/console/staff',
-  STAFF_UPDATE: '/api/v4/console/staff/:store_staff_id',
-  STAFF_DELETE: '/api/v4/console/staff/:store_staff_id',
+  STAFF_LIST: `${API_PREFIX}/console/staff`,
+  STAFF_DETAIL: `${API_PREFIX}/console/staff/:store_staff_id`,
+  STAFF_CREATE: `${API_PREFIX}/console/staff`,
+  STAFF_UPDATE: `${API_PREFIX}/console/staff/:store_staff_id`,
+  STAFF_DELETE: `${API_PREFIX}/console/staff/:store_staff_id`,
 
   // 消费记录扩展
-  CONSUMPTION_LIST: '/api/v4/console/consumption/records',
-  CONSUMPTION_DETAIL: '/api/v4/console/consumption/records/:id',
-  CONSUMPTION_STATS: '/api/v4/console/consumption/stats',
-  CONSUMPTION_AUDIT: '/api/v4/console/consumption/audit/:id',
+  CONSUMPTION_LIST: `${API_PREFIX}/console/consumption/records`,
+  CONSUMPTION_DETAIL: `${API_PREFIX}/console/consumption/records/:id`,
+  CONSUMPTION_STATS: `${API_PREFIX}/console/consumption/stats`,
+  CONSUMPTION_AUDIT: `${API_PREFIX}/console/consumption/audit/:id`,
 
   // 商户积分扩展
-  MERCHANT_POINTS_HISTORY: '/api/v4/console/merchant-points/:id/history',
+  MERCHANT_POINTS_HISTORY: `${API_PREFIX}/console/merchant-points/:id/history`,
 
   // 商户日志
-  MERCHANT_LOGS_LIST: '/api/v4/console/audit-logs',
-  MERCHANT_LOGS_EXPORT: '/api/v4/console/audit-logs/export',
+  MERCHANT_LOGS_LIST: `${API_PREFIX}/console/audit-logs`,
+  MERCHANT_LOGS_EXPORT: `${API_PREFIX}/console/audit-logs/export`,
   // 注：后端无通用stats接口，只有 /stats/store/:store_id 和 /stats/operator/:operator_id
-  MERCHANT_LOGS_STATS_BY_STORE: '/api/v4/console/audit-logs/stats/store',
-  MERCHANT_LOGS_STATS_BY_OPERATOR: '/api/v4/console/audit-logs/stats/operator',
+  MERCHANT_LOGS_STATS_BY_STORE: `${API_PREFIX}/console/audit-logs/stats/store`,
+  MERCHANT_LOGS_STATS_BY_OPERATOR: `${API_PREFIX}/console/audit-logs/stats/operator`,
 
   // 地区管理
-  REGION_PROVINCES: '/api/v4/console/regions/provinces',
-  REGION_CHILDREN: '/api/v4/console/regions/children/:parent_code',
-  REGION_SEARCH: '/api/v4/console/regions/search',
-  REGION_PATH: '/api/v4/console/regions/path/:region_code',
-  REGION_STATS: '/api/v4/console/regions/stats',
-  REGION_VALIDATE: '/api/v4/console/regions/validate'
+  REGION_PROVINCES: `${API_PREFIX}/console/regions/provinces`,
+  REGION_CHILDREN: `${API_PREFIX}/console/regions/children/:parent_code`,
+  REGION_SEARCH: `${API_PREFIX}/console/regions/search`,
+  REGION_PATH: `${API_PREFIX}/console/regions/path/:region_code`,
+  REGION_STATS: `${API_PREFIX}/console/regions/stats`,
+  REGION_VALIDATE: `${API_PREFIX}/console/regions/validate`
 }
 
 // ========== API 调用方法 ==========

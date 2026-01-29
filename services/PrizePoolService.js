@@ -130,28 +130,28 @@ class PrizePoolService {
       const sortOrder = prizeData.sort_order !== undefined ? prizeData.sort_order : nextSortOrder++
 
       // eslint-disable-next-line no-await-in-loop -- 需要在事务中顺序创建奖品，确保原子性和sort_order验证
+      // 2026-01-29 技术债务清理：去掉字段映射，直接使用后端字段名
       const prize = await LotteryPrize.create(
         {
           campaign_id: parseInt(campaign_id),
-          prize_name: prizeData.name, // 前端字段映射：name → prize_name
-          prize_type: prizeData.type, // 前端字段映射：type → prize_type
-          prize_value: prizeData.value || 0, // 前端字段映射：value → prize_value
+          prize_name: prizeData.prize_name,
+          prize_type: prizeData.prize_type,
+          prize_value: prizeData.prize_value || 0,
           /**
            * 双账户模型：内部预算成本（系统内部）
            * 语义：用于 remaining_budget_points 的筛奖与扣减
-           * 2026-01-26 技术债务清理：仅接受规范字段 prize_value_points
            */
           prize_value_points: parseInt(prizeData.prize_value_points ?? 0) || 0,
-          stock_quantity: parseInt(prizeData.quantity), // 前端字段映射：quantity → stock_quantity
-          win_probability: prizeData.win_probability || 0, // 中奖概率
-          prize_description: prizeData.description || '', // 前端字段映射：description → prize_description
-          image_id: prizeData.image_id || null, // 图片ID
-          angle: prizeData.angle || 0, // 转盘角度
-          color: prizeData.color || '#FF6B6B', // 转盘颜色
-          cost_points: prizeData.cost_points || 100, // 抽奖消耗积分
-          status: 'active', // 默认激活状态
-          sort_order: sortOrder, // 自动分配唯一的sort_order
-          max_daily_wins: prizeData.max_daily_wins || null // 每日最大中奖次数
+          stock_quantity: parseInt(prizeData.stock_quantity),
+          win_probability: prizeData.win_probability || 0,
+          prize_description: prizeData.prize_description || '',
+          image_id: prizeData.image_id || null,
+          angle: prizeData.angle || 0,
+          color: prizeData.color || '#FF6B6B',
+          cost_points: prizeData.cost_points || 100,
+          status: 'active',
+          sort_order: sortOrder,
+          max_daily_wins: prizeData.max_daily_wins || null
         },
         { transaction }
       )

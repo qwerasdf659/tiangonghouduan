@@ -34,6 +34,21 @@ export { useRedemptionState, useRedemptionMethods } from './redemption.js'
 // 用户抽奖档案模块
 export { useUserProfileState, useUserProfileMethods } from './user-profile.js'
 
+// 实时告警中心模块
+export { useAlertsState, useAlertsMethods } from './alerts.js'
+
+// 异常用户风控模块
+export { useRiskControlState, useRiskControlMethods } from './risk-control.js'
+
+// 活动复盘报告模块
+export { useReportState, useReportMethods } from './report.js'
+
+// 运营日报模块
+export { useDailyReportState, useDailyReportMethods } from './daily-report.js'
+
+// 批量操作模块
+export { useBatchOperationsState, useBatchOperationsMethods } from './batch-operations.js'
+
 /**
  * 组合所有状态
  * @returns {Object} 合并后的状态对象
@@ -48,7 +63,12 @@ export function useAllLotteryState() {
     ...usePricingState(),
     ...useMetricsState(),
     ...useRedemptionState(),
-    ...useUserProfileState()
+    ...useUserProfileState(),
+    ...useAlertsState(),
+    ...useRiskControlState(),
+    ...useReportState(),
+    ...useDailyReportState(),
+    ...useBatchOperationsState()
   }
 }
 
@@ -66,6 +86,11 @@ export function useAllLotteryMethods() {
     ...usePricingMethods(),
     ...useMetricsMethods(),
     ...useRedemptionMethods(),
-    ...useUserProfileMethods()
+    ...useUserProfileMethods(),
+    ...useAlertsMethods(),
+    ...useRiskControlMethods(),
+    ...useReportMethods(),
+    ...useDailyReportMethods(),
+    ...useBatchOperationsMethods()
   }
 }

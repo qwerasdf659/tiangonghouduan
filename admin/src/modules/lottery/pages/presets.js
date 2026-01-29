@@ -9,7 +9,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { LOTTERY_ENDPOINTS } from '../../../api/lottery.js'
+import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
 import { buildURL, request } from '../../../api/base.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
 import { Alpine, createCrudMixin } from '../../../alpine/index.js'
@@ -174,8 +174,7 @@ function presetsPage() {
      * @returns {Promise<void>}
      */
     async init() {
-      console.log('[PRESETS] 页面初始化开始')
-      logger.info('抽奖干预管理页面初始化 (Mixin v3.0)')
+      logger.info('[PRESETS] 抽奖干预管理页面初始化 (Mixin v3.0)')
 
       // 验证关键属性
       logger.debug('组件状态检查:', {
@@ -185,26 +184,23 @@ function presetsPage() {
       })
 
       // 使用 Mixin 的认证检查
-      console.log('[PRESETS] 执行认证检查...')
+      logger.debug('[PRESETS] 执行认证检查...')
       if (!this.checkAuth()) {
-        console.warn('[PRESETS] 认证检查未通过，跳过数据加载')
-        logger.warn('认证检查未通过，跳过数据加载')
+        logger.warn('[PRESETS] 认证检查未通过，跳过数据加载')
         return
       }
-      console.log('[PRESETS] 认证检查通过')
+      logger.debug('[PRESETS] 认证检查通过')
 
       // 加载数据
       try {
-        console.log('[PRESETS] 开始加载奖品和干预列表...')
+        logger.debug('[PRESETS] 开始加载奖品和干预列表...')
         await Promise.all([this.loadPrizes(), this.loadData()])
-        console.log('[PRESETS] 数据加载完成，奖品数量:', this.allPrizes.length)
-        logger.info('页面初始化完成', {
+        logger.info('[PRESETS] 页面初始化完成', {
           interventionsCount: this.interventions.length,
           prizesCount: this.allPrizes.length
         })
       } catch (error) {
-        console.error('[PRESETS] 页面初始化失败:', error)
-        logger.error('页面初始化失败:', error)
+        logger.error('[PRESETS] 页面初始化失败:', error)
       }
     },
 
@@ -222,8 +218,6 @@ function presetsPage() {
         logger.debug('开始加载奖品列表', { endpoint: LOTTERY_ENDPOINTS.PRIZE_LIST })
         const response = await apiRequest(LOTTERY_ENDPOINTS.PRIZE_LIST)
 
-        // 详细日志：打印完整响应用于调试
-        console.log('[DEBUG] 奖品列表API完整响应:', JSON.stringify(response, null, 2))
         logger.debug('奖品列表响应', {
           success: response?.success,
           dataKeys: Object.keys(response?.data || {}),
@@ -234,19 +228,14 @@ function presetsPage() {
           this.allPrizes = response.data?.prizes || []
           logger.info('奖品列表加载成功', { count: this.allPrizes.length })
 
-          // 调试：打印前3个奖品
-          if (this.allPrizes.length > 0) {
-            console.log('[DEBUG] 前3个奖品:', this.allPrizes.slice(0, 3))
-          } else {
-            console.warn('[DEBUG] 奖品列表为空！请检查后端数据')
+          if (this.allPrizes.length === 0) {
+            logger.warn('奖品列表为空，请检查后端数据')
           }
         } else {
           logger.warn('奖品列表响应失败', { response })
-          console.error('[DEBUG] API响应失败:', response)
         }
       } catch (error) {
         logger.error('加载奖品列表失败:', error)
-        console.error('[DEBUG] 加载奖品列表异常:', error)
         this.showError('加载奖品列表失败: ' + error.message)
       }
     },

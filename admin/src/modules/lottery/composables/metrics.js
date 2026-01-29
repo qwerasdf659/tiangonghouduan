@@ -8,7 +8,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { LOTTERY_ENDPOINTS } from '../../../api/lottery.js'
+import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
 import { loadECharts } from '../../../utils/echarts-lazy.js'
 
 /**
@@ -73,7 +73,17 @@ export function useMetricsState() {
     /** @type {boolean} 日报加载状态 */
     loadingDailyReport: false,
     /** @type {boolean} 显示日报模态框 */
-    showDailyReportModal: false
+    showDailyReportModal: false,
+
+    // ========== P1新增: 单次抽奖详情状态 ==========
+    /** @type {Object|null} 当前抽奖详情数据 */
+    drawDetails: null,
+    /** @type {boolean} 抽奖详情加载状态 */
+    loadingDrawDetails: false,
+    /** @type {boolean} 显示抽奖详情弹窗 */
+    showDrawDetailsModal: false,
+    /** @type {string} 当前查看的抽奖ID */
+    currentDrawId: ''
   }
 }
 
@@ -89,12 +99,12 @@ export function useMetricsMethods() {
      * 后端返回结构: { summary, trend, prize_distribution, recent_draws, prize_stats }
      */
     async loadLotteryMetrics() {
-      console.log('📊 [Metrics] loadLotteryMetrics 开始执行...')
+      logger.debug('📊 [Metrics] loadLotteryMetrics 开始执行...')
       try {
         // 调用综合统计接口，获取完整的监控数据
         // 使用 time_range: 'month' 统计最近30天数据
         const timeRange = this.monitoringFilters?.timeRange || 'month'
-        console.log(
+        logger.debug(
           '📊 [Metrics] 调用API:',
           LOTTERY_ENDPOINTS.MONITORING_STATS,
           '时间范围:',
@@ -105,11 +115,11 @@ export function useMetricsMethods() {
           {},
           { showLoading: false, showError: false }
         )
-        console.log('📊 [Metrics] API响应:', statsRes)
+        logger.debug('📊 [Metrics] API响应:', statsRes)
 
         if (statsRes?.success) {
           const data = statsRes.data || {}
-          console.log('📊 [Metrics] 解析数据:', {
+          logger.debug('📊 [Metrics] 解析数据:', {
             summary: data.summary,
             prizeDistributionLength: (data.prize_distribution || []).length,
             recentDrawsLength: (data.recent_draws || []).length
@@ -132,7 +142,7 @@ export function useMetricsMethods() {
           // prize_stats 奖品统计
           this.prizeStats = data.prize_stats || []
 
-          console.log('📊 [Metrics] 状态已更新:', {
+          logger.debug('📊 [Metrics] 状态已更新:', {
             lotteryMetrics: this.lotteryMetrics,
             prizeDistribution: this.prizeDistribution,
             recentDraws: this.recentDraws.length
@@ -142,13 +152,11 @@ export function useMetricsMethods() {
             prizeDistributionCount: this.prizeDistribution.length
           })
         } else {
-          console.warn('📊 [Metrics] API返回失败:', statsRes?.message)
-          logger.warn('加载抽奖指标接口返回失败:', statsRes?.message)
+          logger.warn('📊 [Metrics] API返回失败:', statsRes?.message)
           this._resetMetricsState()
         }
       } catch (error) {
-        console.error('📊 [Metrics] 加载失败:', error)
-        logger.error('加载抽奖指标失败:', error)
+        logger.error('📊 [Metrics] 加载失败:', error)
         this._resetMetricsState()
       }
     },
@@ -178,13 +186,13 @@ export function useMetricsMethods() {
             `指标数据已刷新，共 ${this.lotteryMetrics.totalDraws} 次抽奖`
           )
         }
-        console.log('✅ 指标数据已刷新')
+        logger.debug('✅ 指标数据已刷新')
       } catch (error) {
         // 使用 Alpine.store 显示错误通知
         if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
           Alpine.store('notification').error('刷新失败: ' + error.message)
         }
-        console.error('❌ 刷新失败:', error)
+        logger.error('❌ 刷新失败:', error)
       } finally {
         this.refreshingMetrics = false
       }
@@ -832,6 +840,150 @@ export function useMetricsMethods() {
       if (positive) return 'text-green-600'
       if (negative) return 'text-red-600'
       return 'text-gray-500'
+    },
+
+    // ========== P1新增: 单次抽奖详情方法 ==========
+
+    /**
+     * 打开抽奖详情弹窗
+     * @param {string} drawId - 抽奖记录ID
+     */
+    async openDrawDetailsModal(drawId) {
+      if (!drawId) {
+        logger.warn('[Metrics] 无效的抽奖ID')
+        return
+      }
+
+      this.currentDrawId = drawId
+      this.showDrawDetailsModal = true
+      await this.loadDrawDetails(drawId)
+    },
+
+    /**
+     * 加载单次抽奖详情
+     * @param {string} drawId - 抽奖记录ID
+     */
+    async loadDrawDetails(drawId) {
+      logger.info('[Metrics] 加载抽奖详情', { draw_id: drawId })
+      this.loadingDrawDetails = true
+      this.drawDetails = null
+
+      try {
+        const url = LOTTERY_ENDPOINTS.DRAW_DETAILS.replace(':draw_id', drawId)
+        const response = await this.apiGet(url, {}, { showLoading: false, showError: true })
+
+        if (response?.success) {
+          this.drawDetails = response.data
+          logger.info('[Metrics] 抽奖详情加载成功', {
+            draw_id: drawId,
+            pipeline_stages: this.drawDetails?.pipeline_execution?.length || 0
+          })
+        } else {
+          logger.warn('[Metrics] 抽奖详情加载失败:', response?.message)
+          this.drawDetails = null
+        }
+      } catch (error) {
+        logger.error('[Metrics] 加载抽奖详情失败:', error)
+        this.drawDetails = null
+      } finally {
+        this.loadingDrawDetails = false
+      }
+    },
+
+    /**
+     * 关闭抽奖详情弹窗
+     */
+    closeDrawDetailsModal() {
+      this.showDrawDetailsModal = false
+      this.drawDetails = null
+      this.currentDrawId = ''
+    },
+
+    /**
+     * 获取Pipeline阶段状态样式
+     * @param {string} status - 阶段状态（completed/skipped/failed）
+     * @returns {string} CSS 类名
+     */
+    getPipelineStageStyle(status) {
+      const styles = {
+        completed: 'bg-green-100 border-green-500 text-green-700',
+        skipped: 'bg-gray-100 border-gray-500 text-gray-500',
+        failed: 'bg-red-100 border-red-500 text-red-700',
+        running: 'bg-blue-100 border-blue-500 text-blue-700'
+      }
+      return styles[status] || styles.completed
+    },
+
+    /**
+     * 获取Pipeline阶段图标
+     * @param {string} status - 阶段状态
+     * @returns {string} 图标
+     */
+    getPipelineStageIcon(status) {
+      const icons = {
+        completed: '✅',
+        skipped: '⏭️',
+        failed: '❌',
+        running: '🔄'
+      }
+      return icons[status] || '❓'
+    },
+
+    /**
+     * 格式化Pipeline阶段名称
+     * @param {string} stage - 阶段标识
+     * @returns {string} 中文名称
+     */
+    formatPipelineStageName(stage) {
+      const stageNames = {
+        'init': '初始化',
+        'validation': '参数校验',
+        'quota_check': '配额检查',
+        'budget_check': '预算检查',
+        'strategy_load': '策略加载',
+        'random_generate': '随机数生成',
+        'tier_select': '档位选择',
+        'prize_pick': '奖品抽取',
+        'pity_check': 'Pity保底检查',
+        'state_update': '状态更新',
+        'result_save': '结果保存'
+      }
+      return stageNames[stage] || stage
+    },
+
+    /**
+     * 格式化毫秒时间
+     * @param {number} ms - 毫秒数
+     * @returns {string} 格式化后的字符串
+     */
+    formatDuration(ms) {
+      if (ms === null || ms === undefined) return '-'
+      if (ms < 1) return '<1ms'
+      if (ms < 1000) return `${ms}ms`
+      return `${(ms / 1000).toFixed(2)}s`
+    },
+
+    /**
+     * 格式化北京时间
+     * @param {string} isoString - ISO时间字符串
+     * @returns {string} 格式化后的时间
+     */
+    formatBeijingTime(isoString) {
+      if (!isoString) return '-'
+      try {
+        const date = new Date(isoString)
+        return date.toLocaleString('zh-CN', {
+          timeZone: 'Asia/Shanghai',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        })
+      } catch {
+        return isoString
+      }
     }
   }
 }

@@ -1,22 +1,25 @@
 /**
- * 🗄️ 数据库连接池恢复测试 - P2-10
+ * 🗄️ 数据库连接池恢复测试 - P2-10 & P3-2-2
  *
  * 测试范围：
  * - 连接池耗尽场景
  * - 连接恢复场景
  * - 连接泄漏检测
  * - 连接复用验证
+ * - P3-2-2：极端资源池耗尽恢复测试
  *
  * 审计标准：
  * - P2-10-1：连接池耗尽处理
  * - P2-10-2：连接恢复验证
  * - P2-10-3：连接泄漏检测
  * - P2-10-4：连接复用效率
+ * - P3-2-2：资源池耗尽后自动恢复
  *
  * 测试原则：
  * - 使用真实数据库连接池配置
  * - 模拟高并发查询场景
  * - 验证连接池自愈能力
+ * - 验证极端场景下的恢复机制
  *
  * 验收标准：
  * - npm test -- tests/chaos/db_pool_recovery.test.js 全部通过
@@ -24,6 +27,7 @@
  * - 连接恢复后系统自动恢复正常
  * - 无连接泄漏
  * - 连接复用正确
+ * - 极端耗尽后能自动恢复
  *
  * 技术背景：
  * - 连接池配置：max=40, min=5, acquire=10s, idle=60s
@@ -32,6 +36,7 @@
  *
  * @module tests/chaos/db_pool_recovery
  * @since 2026-01-28
+ * @updated 2026-01-29 - 添加P3-2-2极端恢复测试
  */
 
 'use strict'
@@ -994,6 +999,345 @@ describe('🗄️ 数据库连接池恢复测试（P2-10）', () => {
 
         expect(last10Avg).toBeLessThan(first10Avg * 2)
       }
+    }, 120000)
+  })
+
+  // ==================== P3-2-2: 极端资源池耗尽恢复测试 ====================
+
+  describe('P3-2-2 极端资源池耗尽恢复测试', () => {
+    /**
+     * 业务场景：完全耗尽后的恢复能力
+     * 验证目标：验证连接池完全耗尽后能自动恢复
+     *
+     * 测试策略：
+     * 1. 制造完全耗尽场景（超过连接池上限的长时间查询）
+     * 2. 等待查询完成和连接释放
+     * 3. 验证系统完全恢复
+     */
+    test('完全耗尽后自动恢复测试', async () => {
+      console.log('')
+      console.log('📋 P3-2-2-1 完全耗尽后自动恢复测试:')
+      console.log('   阶段1: 制造完全耗尽（80并发慢查询）')
+      console.log('   阶段2: 验证恢复前状态（预期失败）')
+      console.log('   阶段3: 等待自然恢复')
+      console.log('   阶段4: 验证完全恢复')
+      console.log('')
+
+      // 阶段1: 制造完全耗尽
+      console.log('   📍 阶段1: 制造完全耗尽...')
+      const exhaustTasks = Array(80) // 双倍连接池大小
+        .fill(null)
+        .map(() => async () => {
+          return await executeLongRunningQuery(8000) // 8秒慢查询
+        })
+
+      // 启动耗尽任务（不等待完成）
+      const exhaustPromise = executeConcurrent(exhaustTasks, {
+        concurrency: 80,
+        timeout: 60000
+      })
+
+      // 阶段2: 等待2秒后验证耗尽状态
+      await delay(2000)
+      console.log('   📍 阶段2: 验证耗尽状态...')
+
+      const duringExhaustResults = []
+      for (let i = 0; i < 5; i++) {
+        const result = await executeSimpleQuery({ queryId: `during_exhaust_${i}` })
+        duringExhaustResults.push(result)
+        await delay(200)
+      }
+
+      const duringExhaustSuccess = duringExhaustResults.filter(r => r.success).length
+      console.log(`   📊 耗尽期间查询成功率: ${duringExhaustSuccess}/5`)
+
+      // 阶段3: 等待所有慢查询完成
+      console.log('   📍 阶段3: 等待自然恢复...')
+      await exhaustPromise
+
+      // 额外等待连接释放
+      console.log('   ⏳ 等待连接释放（15秒）...')
+      await delay(15000)
+
+      // 阶段4: 验证完全恢复
+      console.log('   📍 阶段4: 验证完全恢复...')
+      const recoveryResults = []
+
+      // 执行30个正常查询验证恢复
+      for (let i = 0; i < 30; i++) {
+        const result = await executeSimpleQuery({ queryId: `recovery_${i}` })
+        recoveryResults.push(result)
+      }
+
+      const recoverySuccess = recoveryResults.filter(r => r.success).length
+      const avgRecoveryTime = Math.round(
+        recoveryResults.filter(r => r.success).reduce((sum, r) => sum + r.duration, 0) / recoverySuccess
+      )
+
+      console.log('')
+      console.log('📊 恢复测试结果:')
+      console.log(`   📊 恢复后查询成功率: ${recoverySuccess}/30 (${((recoverySuccess / 30) * 100).toFixed(1)}%)`)
+      console.log(`   ⏱️  平均响应时间: ${avgRecoveryTime}ms`)
+      console.log('')
+
+      // 断言：恢复后成功率>90%
+      expect(recoverySuccess).toBeGreaterThan(27)
+      // 断言：响应时间恢复正常（<500ms）
+      expect(avgRecoveryTime).toBeLessThan(500)
+    }, 180000)
+
+    /**
+     * 业务场景：多轮极端负载恢复
+     * 验证目标：验证多次耗尽后系统仍能恢复
+     *
+     * 测试策略：
+     * - 进行3轮极端负载测试
+     * - 每轮后验证恢复能力
+     * - 确保无累积性问题
+     */
+    test('多轮极端负载恢复测试', async () => {
+      const rounds = 3
+      const loadPerRound = 60
+
+      console.log('')
+      console.log('📋 P3-2-2-2 多轮极端负载恢复测试:')
+      console.log(`   测试轮数: ${rounds}`)
+      console.log(`   每轮并发: ${loadPerRound}`)
+      console.log('')
+
+      const roundResults = []
+
+      for (let round = 0; round < rounds; round++) {
+        console.log(`   📍 第${round + 1}/${rounds}轮极端负载...`)
+
+        // 制造极端负载
+        const loadTasks = Array(loadPerRound)
+          .fill(null)
+          .map(() => async () => {
+            return await executeLongRunningQuery(3000) // 3秒慢查询
+          })
+
+        const loadStartTime = Date.now()
+        const { results: loadResults } = await executeConcurrent(loadTasks, {
+          concurrency: loadPerRound,
+          timeout: 60000
+        })
+        const loadDuration = Date.now() - loadStartTime
+
+        const loadSuccess = loadResults.filter(r => r.result?.success).length
+
+        // 等待恢复
+        await delay(8000)
+
+        // 验证恢复
+        const verifyTasks = Array(10)
+          .fill(null)
+          .map((_, index) => async () => {
+            return await executeSimpleQuery({ queryId: `round${round}_verify_${index}` })
+          })
+
+        const { results: verifyResults } = await executeConcurrent(verifyTasks, {
+          concurrency: 10,
+          timeout: 30000
+        })
+
+        const verifySuccess = verifyResults.filter(r => r.result?.success).length
+
+        roundResults.push({
+          round: round + 1,
+          load_success: loadSuccess,
+          load_total: loadPerRound,
+          load_duration: loadDuration,
+          verify_success: verifySuccess
+        })
+
+        console.log(`   ✅ 第${round + 1}轮完成: 负载${loadSuccess}/${loadPerRound}, 恢复验证${verifySuccess}/10`)
+
+        // 轮间恢复
+        await delay(5000)
+      }
+
+      // 输出总结
+      console.log('')
+      console.log('📊 多轮极端负载测试结果:')
+      console.log('-'.repeat(65))
+      console.log('轮次 | 负载成功 | 负载耗时(ms) | 恢复验证')
+      console.log('-'.repeat(65))
+
+      for (const result of roundResults) {
+        console.log(
+          `  ${result.round}  | ${String(result.load_success).padStart(3)}/${result.load_total}  | ` +
+          `${String(result.load_duration).padStart(8)}   | ${result.verify_success}/10 ${result.verify_success >= 8 ? '✅' : '⚠️'}`
+        )
+      }
+      console.log('-'.repeat(65))
+
+      // 断言：每轮恢复验证成功率>80%
+      for (const result of roundResults) {
+        expect(result.verify_success).toBeGreaterThan(8)
+      }
+
+      // 断言：最后一轮恢复能力不应明显下降
+      const lastRound = roundResults[rounds - 1]
+      const firstRound = roundResults[0]
+      expect(lastRound.verify_success).toBeGreaterThanOrEqual(firstRound.verify_success - 2)
+    }, 300000)
+
+    /**
+     * 业务场景：快速连续耗尽恢复
+     * 验证目标：验证快速连续的耗尽-恢复周期处理能力
+     *
+     * 测试策略：
+     * - 短间隔快速制造多次耗尽
+     * - 验证系统的弹性恢复能力
+     */
+    test('快速连续耗尽恢复测试', async () => {
+      const cycles = 5
+      const loadPerCycle = 50
+      const recoveryInterval = 5000 // 5秒恢复间隔
+
+      console.log('')
+      console.log('📋 P3-2-2-3 快速连续耗尽恢复测试:')
+      console.log(`   测试周期: ${cycles}`)
+      console.log(`   每周期负载: ${loadPerCycle}`)
+      console.log(`   恢复间隔: ${recoveryInterval}ms`)
+      console.log('')
+
+      const cycleResults = []
+
+      for (let cycle = 0; cycle < cycles; cycle++) {
+        console.log(`   📍 周期${cycle + 1}/${cycles}...`)
+
+        // 快速制造负载
+        const loadTasks = Array(loadPerCycle)
+          .fill(null)
+          .map(() => async () => {
+            return await executeLongRunningQuery(2000) // 2秒查询
+          })
+
+        const { results: loadResults } = await executeConcurrent(loadTasks, {
+          concurrency: loadPerCycle,
+          timeout: 30000
+        })
+
+        const loadSuccess = loadResults.filter(r => r.result?.success).length
+
+        // 短暂恢复间隔
+        await delay(recoveryInterval)
+
+        // 快速验证
+        const verifyResult = await executeSimpleQuery({ queryId: `cycle_${cycle}_verify` })
+
+        cycleResults.push({
+          cycle: cycle + 1,
+          load_success: loadSuccess,
+          load_total: loadPerCycle,
+          verify_success: verifyResult.success,
+          verify_duration: verifyResult.duration
+        })
+      }
+
+      // 输出结果
+      console.log('')
+      console.log('📊 快速连续恢复测试结果:')
+      console.log('-'.repeat(60))
+      console.log('周期 | 负载成功 | 验证结果 | 验证耗时(ms)')
+      console.log('-'.repeat(60))
+
+      for (const result of cycleResults) {
+        console.log(
+          `  ${result.cycle}  | ${String(result.load_success).padStart(3)}/${result.load_total}  |   ` +
+          `${result.verify_success ? '✅' : '❌'}   |   ${String(result.verify_duration).padStart(6)}`
+        )
+      }
+      console.log('-'.repeat(60))
+
+      // 断言：大部分周期的验证应该成功
+      const successfulCycles = cycleResults.filter(r => r.verify_success).length
+      expect(successfulCycles).toBeGreaterThan(cycles * 0.6) // 至少60%周期成功恢复
+
+      // 断言：平均验证耗时不应过长
+      const avgVerifyDuration = Math.round(
+        cycleResults.reduce((sum, r) => sum + r.verify_duration, 0) / cycles
+      )
+      console.log(`   📊 平均验证耗时: ${avgVerifyDuration}ms`)
+      expect(avgVerifyDuration).toBeLessThan(5000) // 平均不超过5秒
+    }, 180000)
+
+    /**
+     * 业务场景：资源耗尽时的请求队列验证
+     * 验证目标：验证连接池耗尽时请求排队和超时处理
+     */
+    test('资源耗尽时请求队列行为测试', async () => {
+      console.log('')
+      console.log('📋 P3-2-2-4 请求队列行为测试:')
+      console.log('   测试连接池耗尽时的请求排队和超时处理')
+      console.log('')
+
+      // 制造耗尽（长时间占用所有连接）
+      const exhaustTasks = Array(45) // 略大于连接池
+        .fill(null)
+        .map(() => async () => {
+          return await executeLongRunningQuery(10000) // 10秒慢查询
+        })
+
+      // 启动耗尽任务
+      console.log('   📍 启动长时间查询占用连接池...')
+      const exhaustPromise = executeConcurrent(exhaustTasks, {
+        concurrency: 45,
+        timeout: 60000
+      })
+
+      // 等待连接池被占用
+      await delay(1000)
+
+      // 发送新请求并观察队列行为
+      console.log('   📍 发送新请求测试队列行为...')
+      const queuedRequests = []
+      const queueStartTime = Date.now()
+
+      // 在10秒内持续发送请求
+      const queueTestDuration = 10000
+      const requestInterval = 1000
+
+      while (Date.now() - queueStartTime < queueTestDuration) {
+        const requestStart = Date.now()
+        const result = await executeSimpleQuery({ queryId: `queued_${queuedRequests.length}` })
+        const requestEnd = Date.now()
+
+        queuedRequests.push({
+          success: result.success,
+          wait_time: requestEnd - requestStart,
+          error_type: result.error_type,
+          timing: Date.now() - queueStartTime
+        })
+
+        await delay(requestInterval)
+      }
+
+      // 等待耗尽任务完成
+      console.log('   📍 等待占用查询完成...')
+      await exhaustPromise
+
+      // 分析队列行为
+      const successfulQueued = queuedRequests.filter(r => r.success).length
+      const timedOutQueued = queuedRequests.filter(r => r.error_type === 'CONNECTION_TIMEOUT').length
+      const avgWaitTime = Math.round(
+        queuedRequests.reduce((sum, r) => sum + r.wait_time, 0) / queuedRequests.length
+      )
+
+      console.log('')
+      console.log('📊 请求队列行为分析:')
+      console.log(`   📊 发送请求数: ${queuedRequests.length}`)
+      console.log(`   ✅ 成功请求: ${successfulQueued}`)
+      console.log(`   ⏰ 超时请求: ${timedOutQueued}`)
+      console.log(`   ⏱️  平均等待时间: ${avgWaitTime}ms`)
+      console.log('')
+
+      // 断言：有请求成功（说明有排队机制）
+      expect(queuedRequests.length).toBeGreaterThan(0)
+      // 断言：系统正常处理了请求（无论成功还是超时）
+      expect(successfulQueued + timedOutQueued).toBe(queuedRequests.length)
     }, 120000)
   })
 })

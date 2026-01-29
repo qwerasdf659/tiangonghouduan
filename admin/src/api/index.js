@@ -2,13 +2,13 @@
  * API 模块统一入口（分散式架构 - ES Module 版本）
  *
  * @description 统一导出所有 API 模块，支持按需引入
- * @version 4.0.0 - 移除 @deprecated 兼容代码
- * @date 2026-01-24
+ * @version 4.2.0 - lottery.js/market.js 拆分为子目录（按功能分组）
+ * @date 2026-01-30
  *
  * @example
  * // 推荐：按需引入特定模块
  * import { UserAPI } from '@/api/user.js'
- * import { LotteryAPI } from '@/api/lottery.js'
+ * import { LotteryAPI } from '@/api/lottery/index.js'
  *
  * // 或者：从统一入口引入
  * import { UserAPI, LotteryAPI, USER_ENDPOINTS } from '@/api/index.js'
@@ -31,11 +31,11 @@ import {
 // ========== 业务模块导入 ==========
 import { AuthAPI, AUTH_ENDPOINTS } from './auth.js'
 import { UserAPI, USER_ENDPOINTS } from './user.js'
-import { LotteryAPI, LOTTERY_ENDPOINTS } from './lottery.js'
+import { LotteryAPI, LOTTERY_ENDPOINTS } from './lottery/index.js'
 import { AssetAPI, ASSET_ENDPOINTS } from './asset.js'
-import { MarketAPI, MARKET_ENDPOINTS } from './market.js'
+import { MarketAPI, MARKET_ENDPOINTS } from './market/index.js'
 import { StoreAPI, STORE_ENDPOINTS } from './store.js'
-import { SystemAPI, SYSTEM_ENDPOINTS } from './system.js'
+import { SystemAPI, SYSTEM_ENDPOINTS } from './system/index.js'
 import { AnalyticsAPI, ANALYTICS_ENDPOINTS } from './analytics.js'
 import { ContentAPI, CONTENT_ENDPOINTS } from './content.js'
 

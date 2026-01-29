@@ -42,11 +42,10 @@ function registerDictManagementComponents() {
      * 初始化
      */
     init() {
-      console.log('[DictManagement] 组件初始化开始')
-      logger.debug('[DictManagement] 字典管理页面初始化')
+      logger.debug('[DictManagement] 字典管理页面初始化开始')
 
       if (!this.checkAuth()) {
-        console.warn('[DictManagement] 认证检查失败')
+        logger.warn('[DictManagement] 认证检查失败')
         return
       }
 

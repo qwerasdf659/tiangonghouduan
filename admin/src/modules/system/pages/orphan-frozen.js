@@ -195,16 +195,16 @@ function orphanFrozenPage() {
      * @returns {void}
      */
     init() {
-      console.log('🚀 [orphanFrozenPage] init() 被调用')
+      logger.debug('🚀 [orphanFrozenPage] init() 被调用')
       logger.info('孤儿冻结清理页面初始化 (Mixin v3.0)')
 
       // 使用 Mixin 的认证检查
       if (!this.checkAuth()) {
-        console.warn('⚠️ [orphanFrozenPage] checkAuth() 返回 false，跳过加载')
+        logger.debug('⚠️ [orphanFrozenPage] checkAuth() 返回 false，跳过加载')
         return
       }
 
-      console.log('✅ [orphanFrozenPage] checkAuth() 通过，开始加载数据')
+      logger.debug('✅ [orphanFrozenPage] checkAuth() 通过，开始加载数据')
       // 加载数据
       this.loadData()
     },
@@ -219,7 +219,7 @@ function orphanFrozenPage() {
      * @returns {Promise<void>}
      */
     async loadData() {
-      console.log('📥 [orphanFrozenPage] loadData() 开始执行', { filters: this.filters })
+      logger.debug('📥 [orphanFrozenPage] loadData() 开始执行', { filters: this.filters })
 
       this.orphanList = []
       this.assets = []
@@ -238,7 +238,7 @@ function orphanFrozenPage() {
           (detectParams.toString() ? '?' + detectParams.toString() : '')
         const statsUrl = ASSET_ENDPOINTS.ORPHAN_FROZEN_STATS
 
-        console.log('📡 [orphanFrozenPage] 请求API', { detectUrl, statsUrl })
+        logger.debug('📡 [orphanFrozenPage] 请求API', { detectUrl, statsUrl })
 
         // 并行获取检测结果和统计数据
         const [detectResponse, statsResponse] = await Promise.all([
@@ -246,7 +246,7 @@ function orphanFrozenPage() {
           apiRequest(statsUrl)
         ])
 
-        console.log('📨 [orphanFrozenPage] API响应', {
+        logger.debug('📨 [orphanFrozenPage] API响应', {
           detectSuccess: detectResponse?.success,
           statsSuccess: statsResponse?.success,
           detectData: detectResponse?.data,
@@ -274,8 +274,8 @@ function orphanFrozenPage() {
             sample: this.orphanList[0] || null
           })
         } else {
-          console.warn('⚠️ [orphanFrozenPage] 检测API返回失败', detectResponse)
-          logger.warn('[孤儿冻结页面] 检测API返回失败', {
+          logger.warn('⚠️ [orphanFrozenPage] 检测API返回失败', {
+            detectResponse,
             response: detectResponse
           })
           // 设置空列表
@@ -313,14 +313,13 @@ function orphanFrozenPage() {
 
           logger.info('[孤儿冻结页面] 统计数据已更新', this.stats)
         } else {
-          console.warn('⚠️ [orphanFrozenPage] 统计API返回失败', statsResponse)
-          logger.warn('[孤儿冻结页面] 统计API返回失败', {
+          logger.warn('⚠️ [orphanFrozenPage] 统计API返回失败', {
             response: statsResponse
           })
         }
 
         // 加载完成提示
-        console.log('✅ [orphanFrozenPage] 数据加载完成', {
+        logger.debug('✅ [orphanFrozenPage] 数据加载完成', {
           orphanCount: this.orphanList.length,
           stats: this.stats
         })
@@ -333,14 +332,14 @@ function orphanFrozenPage() {
           this.showSuccess('加载完成，暂无孤儿冻结数据')
         }
       } catch (error) {
-        console.error('❌ [orphanFrozenPage] 加载数据失败', {
+        logger.error('❌ [orphanFrozenPage] 加载数据失败', {
           error: error.message,
           stack: error.stack
         })
         this.showError('加载数据失败: ' + error.message)
       } finally {
         this.loading = false
-        console.log('🏁 [orphanFrozenPage] loadData() 执行完毕, loading =', this.loading)
+        logger.debug('🏁 [orphanFrozenPage] loadData() 执行完毕, loading =', this.loading)
       }
     },
 
@@ -352,7 +351,7 @@ function orphanFrozenPage() {
      * @returns {Promise<void>}
      */
     async scanOrphans() {
-      console.log('🔎 [orphanFrozenPage] scanOrphans() 开始执行')
+      logger.debug('🔎 [orphanFrozenPage] scanOrphans() 开始执行')
       this.scanning = true
 
       try {
@@ -360,14 +359,14 @@ function orphanFrozenPage() {
           method: 'GET'
         })
 
-        console.log('📡 [orphanFrozenPage] scanOrphans 响应', response)
+        logger.debug('📡 [orphanFrozenPage] scanOrphans 响应', response)
 
         if (response && response.success) {
           const foundCount = response.data.orphan_count || 0
           this.showSuccess(`扫描完成，发现 ${foundCount} 条孤儿冻结数据`)
           await this.loadData()
         } else {
-          console.warn('⚠️ [orphanFrozenPage] 扫描API返回失败', response)
+          logger.warn('⚠️ [orphanFrozenPage] 扫描API返回失败', response)
           // 处理认证错误
           if (response?.code === 'UNAUTHORIZED' || response?.code === 'TOKEN_EXPIRED') {
             this.showError('登录已过期，请重新登录')
@@ -377,8 +376,7 @@ function orphanFrozenPage() {
           this.showError(response?.message || '扫描失败')
         }
       } catch (error) {
-        console.error('❌ [orphanFrozenPage] 扫描失败', error)
-        logger.error('扫描失败:', error)
+        logger.error('❌ [orphanFrozenPage] 扫描失败', error)
         this.showError('扫描失败：' + error.message)
       } finally {
         this.scanning = false
@@ -614,7 +612,7 @@ function orphanFrozenPage() {
      * @returns {Promise<void>}
      */
     async loadAssets() {
-      console.log('🔍 [orphanFrozenPage] loadAssets() 被点击调用')
+      logger.debug('🔍 [orphanFrozenPage] loadAssets() 被点击调用')
       await this.loadData()
     },
 
@@ -625,7 +623,7 @@ function orphanFrozenPage() {
      * @returns {Promise<void>}
      */
     async scanOrphanAssets() {
-      console.log('🔎 [orphanFrozenPage] scanOrphanAssets() 被点击调用')
+      logger.debug('🔎 [orphanFrozenPage] scanOrphanAssets() 被点击调用')
       await this.scanOrphans()
     },
 
@@ -703,7 +701,7 @@ function orphanFrozenPage() {
         setTimeout(() => toast.remove(), 300)
       }, duration)
 
-      console.log(`🔔 [Toast] ${type.toUpperCase()}: ${message}`)
+      logger.debug(`🔔 [Toast] ${type.toUpperCase()}: ${message}`)
     },
 
     /**

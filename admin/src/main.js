@@ -52,9 +52,15 @@ function syncTheme() {
 }
 
 /**
+ * 主题广播频道名称
+ * @constant {string}
+ */
+const THEME_CHANNEL_NAME = 'admin_theme_channel'
+
+/**
  * 监听主题变更
  * - 监听 localStorage 变更（多标签页同步）
- * - 使用 MutationObserver 监听 data-theme 属性变更
+ * - 使用 BroadcastChannel 实现 iframe 与父窗口的实时同步（替代轮询）
  * @returns {void}
  */
 function watchThemeChanges() {
@@ -66,21 +72,28 @@ function watchThemeChanges() {
     }
   })
 
-  // 如果是 iframe，定期检查父窗口主题（用于实时同步）
-  if (window.parent !== window) {
-    // 每秒检查一次父窗口主题（轻量级轮询）
-    setInterval(() => {
-      try {
-        const parentTheme = window.parent.document.documentElement.getAttribute('data-theme')
-        const currentTheme = document.documentElement.getAttribute('data-theme')
-        if (parentTheme && parentTheme !== currentTheme) {
-          document.documentElement.setAttribute('data-theme', parentTheme)
-          logger.debug(`[主题同步] iframe 主题更新: ${parentTheme}`)
+  // 使用 BroadcastChannel 实现 iframe 与父窗口的实时同步
+  // 比 setInterval 轮询更高效，仅在主题变更时触发
+  if (typeof BroadcastChannel !== 'undefined') {
+    try {
+      const themeChannel = new BroadcastChannel(THEME_CHANNEL_NAME)
+
+      themeChannel.onmessage = event => {
+        if (event.data?.type === 'theme_change' && event.data?.theme) {
+          const newTheme = event.data.theme
+          const currentTheme = document.documentElement.getAttribute('data-theme')
+
+          if (newTheme !== currentTheme) {
+            document.documentElement.setAttribute('data-theme', newTheme)
+            logger.debug(`[主题同步] BroadcastChannel 主题更新: ${newTheme}`)
+          }
         }
-      } catch (e) {
-        // 跨域情况忽略
       }
-    }, 500) // 500ms 轮询一次
+
+      logger.debug('[主题同步] BroadcastChannel 监听已启动')
+    } catch (e) {
+      logger.warn('[主题同步] BroadcastChannel 初始化失败，回退到 localStorage 同步')
+    }
   }
 }
 

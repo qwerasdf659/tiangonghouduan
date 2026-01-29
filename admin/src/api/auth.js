@@ -18,7 +18,7 @@
  */
 
 import { logger } from '../utils/logger.js'
-import { request, getToken, setToken, clearToken } from './base.js'
+import { API_PREFIX, request, getToken, setToken, clearToken } from './base.js'
 
 // ========== API 端点 ==========
 
@@ -37,21 +37,21 @@ import { request, getToken, setToken, clearToken } from './base.js'
  */
 export const AUTH_ENDPOINTS = {
   /** @type {string} [POST] 用户登录 */
-  LOGIN: '/api/v4/auth/login',
+  LOGIN: `${API_PREFIX}/auth/login`,
   /** @type {string} [POST] 用户注册 */
-  REGISTER: '/api/v4/auth/register',
+  REGISTER: `${API_PREFIX}/auth/register`,
   /** @type {string} [POST] 用户登出 */
-  LOGOUT: '/api/v4/auth/logout',
+  LOGOUT: `${API_PREFIX}/auth/logout`,
   /** @type {string} [GET] 验证 Token */
-  VERIFY: '/api/v4/auth/verify',
+  VERIFY: `${API_PREFIX}/auth/verify`,
   /** @type {string} [POST] 刷新 Token */
-  REFRESH: '/api/v4/auth/refresh',
+  REFRESH: `${API_PREFIX}/auth/refresh`,
 
   // 控制台认证
   /** @type {string} [POST] 控制台登录 */
-  CONSOLE_LOGIN: '/api/v4/console/auth/login',
+  CONSOLE_LOGIN: `${API_PREFIX}/console/auth/login`,
   /** @type {string} [POST] 控制台登出 */
-  CONSOLE_LOGOUT: '/api/v4/console/auth/logout'
+  CONSOLE_LOGOUT: `${API_PREFIX}/console/auth/logout`
 }
 
 // ========== 类型定义 ==========
@@ -473,7 +473,7 @@ export const AuthAPI = {
    * if (token) {
    *   fetch('/custom-api', {
    *     headers: {
-   *       'Authorization': `Bearer ${token}`
+   *         'Authorization': `Bearer ${token}`
    *     }
    *   })
    * }

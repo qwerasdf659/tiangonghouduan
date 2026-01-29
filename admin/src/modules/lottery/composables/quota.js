@@ -8,7 +8,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { LOTTERY_ENDPOINTS } from '../../../api/lottery.js'
+import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
 import { buildURL } from '../../../api/base.js'
 
 /**
@@ -67,7 +67,7 @@ export function useQuotaMethods() {
      */
     async loadQuotas() {
       try {
-        console.log('📊 [Quota] loadQuotas 开始执行')
+        logger.debug('[Quota] loadQuotas 开始执行')
         const params = new URLSearchParams()
         // 使用后端字段: rule_type, campaign_id, is_active
         if (this.quotaFilters?.ruleType) {
@@ -86,21 +86,19 @@ export function useQuotaMethods() {
           {},
           { showLoading: false }
         )
-        console.log('📊 [Quota] API 返回数据:', response)
+        logger.debug('[Quota] API 返回数据:', response)
 
         // 解包 withLoading 返回的结构
         const data = response?.success ? response.data : response
-        console.log('📊 [Quota] 解包后数据:', data)
+        logger.debug('[Quota] 解包后数据:', data)
 
         if (data) {
           this.quotas = data.rules || data.list || data || []
           this.quotaStats = this.generateQuotaStats(this.quotas)
-          logger.info(`加载配额规则成功，共 ${this.quotas.length} 条`)
-          console.log('✅ [Quota] 数据加载完成, quotas:', this.quotas.length)
+          logger.debug('[Quota] 数据加载完成, quotas:', this.quotas.length)
         }
       } catch (error) {
-        logger.error('加载配额失败:', error)
-        console.error('❌ [Quota] loadQuotas 失败:', error)
+        logger.error('[Quota] loadQuotas 失败:', error)
         this.quotas = []
         this.quotaStats = { totalRules: 0, activeRules: 0 }
       }

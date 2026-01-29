@@ -18,10 +18,11 @@
  * - LineChart (折线图) - dashboard, statistics, analytics, exchange-market
  * - BarChart (柱状图) - analytics, risk-alerts
  * - PieChart (饼图) - dashboard, statistics, analytics, exchange-market, risk-alerts
+ * - ScatterChart (散点图) - mini-chart组件
  *
  * @see https://echarts.apache.org/handbook/zh/basics/import
- * @version 2.0.0
- * @date 2026-01-24
+ * @version 2.1.0
+ * @date 2026-01-29
  */
 
 import { logger } from './logger.js'
@@ -49,6 +50,7 @@ async function initEChartsCore() {
   const { LineChart } = await import('echarts/charts')
   const { BarChart } = await import('echarts/charts')
   const { PieChart } = await import('echarts/charts')
+  const { ScatterChart } = await import('echarts/charts')
 
   // ========== 组件（按需） ==========
   const {
@@ -71,6 +73,7 @@ async function initEChartsCore() {
     LineChart,
     BarChart,
     PieChart,
+    ScatterChart,
     // 组件
     TitleComponent,
     TooltipComponent,

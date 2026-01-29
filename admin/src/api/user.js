@@ -7,7 +7,7 @@
  * @date 2026-01-23
  */
 
-import { request, buildURL, buildQueryString } from './base.js'
+import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
 
 // ========== 类型定义 ==========
 
@@ -188,165 +188,165 @@ import { request, buildURL, buildQueryString } from './base.js'
  */
 export const USER_ENDPOINTS = {
   /** @type {string} [GET] 获取用户列表 - Query: { page?, limit?, search?, role_filter? } */
-  LIST: '/api/v4/console/user-management/users',
+  LIST: `${API_PREFIX}/console/user-management/users`,
   /** @type {string} [GET] 获取用户详情 - Path: :user_id */
-  DETAIL: '/api/v4/console/user-management/users/:user_id',
+  DETAIL: `${API_PREFIX}/console/user-management/users/:user_id`,
   /** @type {string} [PUT] 更新用户角色 - Path: :user_id, Body: { role_name, reason? } */
-  UPDATE_ROLE: '/api/v4/console/user-management/users/:user_id/role',
+  UPDATE_ROLE: `${API_PREFIX}/console/user-management/users/:user_id/role`,
   /** @type {string} [PUT] 更新用户状态 - Path: :user_id, Body: { status, reason? } */
-  UPDATE_STATUS: '/api/v4/console/user-management/users/:user_id/status',
+  UPDATE_STATUS: `${API_PREFIX}/console/user-management/users/:user_id/status`,
   /** @type {string} [DELETE] 删除用户 - Path: :user_id */
-  DELETE: '/api/v4/console/user-management/users/:user_id',
+  DELETE: `${API_PREFIX}/console/user-management/users/:user_id`,
 
   // 角色管理 CRUD
   /** @type {string} [GET] 获取角色列表 */
-  ROLES: '/api/v4/console/user-management/roles',
+  ROLES: `${API_PREFIX}/console/user-management/roles`,
   /** @type {string} [POST] 创建角色 - Body: { role_name, description?, role_level, permissions? } */
-  ROLE_CREATE: '/api/v4/console/user-management/roles',
+  ROLE_CREATE: `${API_PREFIX}/console/user-management/roles`,
   /** @type {string} [PUT] 更新角色 - Path: :role_id, Body: { role_name?, description?, role_level?, permissions? } */
-  ROLE_UPDATE: '/api/v4/console/user-management/roles/:role_id',
+  ROLE_UPDATE: `${API_PREFIX}/console/user-management/roles/:role_id`,
   /** @type {string} [DELETE] 删除角色（软删除） - Path: :role_id */
-  ROLE_DELETE: '/api/v4/console/user-management/roles/:role_id',
+  ROLE_DELETE: `${API_PREFIX}/console/user-management/roles/:role_id`,
   /** @type {string} [GET] 获取权限资源列表（角色配置用） */
-  PERMISSION_RESOURCES: '/api/v4/console/user-management/permission-resources',
+  PERMISSION_RESOURCES: `${API_PREFIX}/console/user-management/permission-resources`,
 
   // 权限管理
   /** @type {string} [POST] 检查权限 - Body: { permission, resource? } */
-  PERMISSION_CHECK: '/api/v4/permissions/check',
+  PERMISSION_CHECK: `${API_PREFIX}/permissions/check`,
   /** @type {string} [GET] 获取用户权限 - Path: :userId */
-  USER_PERMISSIONS: '/api/v4/permissions/user/:userId',
+  USER_PERMISSIONS: `${API_PREFIX}/permissions/user/:userId`,
   /** @type {string} [GET] 获取当前用户权限 */
-  MY_PERMISSIONS: '/api/v4/permissions/me',
+  MY_PERMISSIONS: `${API_PREFIX}/permissions/me`,
   /** @type {string} [POST] 提升用户权限 - Body: { user_id, role } */
-  PROMOTE: '/api/v4/permissions/promote',
+  PROMOTE: `${API_PREFIX}/permissions/promote`,
   /** @type {string} [POST] 创建管理员 - Body: { user_id, ... } */
-  CREATE_ADMIN: '/api/v4/permissions/create-admin',
+  CREATE_ADMIN: `${API_PREFIX}/permissions/create-admin`,
 
   // 用户层级
   /** @type {string} [GET] 获取用户层级列表 - Query: { superior_user_id?, is_active?, role_level?, page?, page_size? } */
-  HIERARCHY_LIST: '/api/v4/console/user-hierarchy',
+  HIERARCHY_LIST: `${API_PREFIX}/console/user-hierarchy`,
   /** @type {string} [GET] 获取层级角色列表 */
-  HIERARCHY_ROLES: '/api/v4/console/user-hierarchy/roles',
+  HIERARCHY_ROLES: `${API_PREFIX}/console/user-hierarchy/roles`,
   /** @type {string} [GET] 获取层级详情 - Path: :id */
-  HIERARCHY_DETAIL: '/api/v4/console/user-hierarchy/:id',
+  HIERARCHY_DETAIL: `${API_PREFIX}/console/user-hierarchy/:id`,
   /** @type {string} [POST] 创建层级关系 - Body: { user_id, superior_user_id?, role_id, store_id? } */
-  HIERARCHY_CREATE: '/api/v4/console/user-hierarchy',
+  HIERARCHY_CREATE: `${API_PREFIX}/console/user-hierarchy`,
   /** @type {string} [GET] 获取下级用户 - Path: :user_id, Query: { include_inactive? } */
-  HIERARCHY_SUBORDINATES: '/api/v4/console/user-hierarchy/:user_id/subordinates',
+  HIERARCHY_SUBORDINATES: `${API_PREFIX}/console/user-hierarchy/:user_id/subordinates`,
   /** @type {string} [PUT] 更新层级状态 - Path: :id, Body: { status } */
-  HIERARCHY_UPDATE_STATUS: '/api/v4/console/user-hierarchy/:id/status',
+  HIERARCHY_UPDATE_STATUS: `${API_PREFIX}/console/user-hierarchy/:id/status`,
   /** @type {string} [POST] 停用层级 - Path: :user_id, Body: { reason, include_subordinates? } */
-  HIERARCHY_DEACTIVATE: '/api/v4/console/user-hierarchy/:user_id/deactivate',
+  HIERARCHY_DEACTIVATE: `${API_PREFIX}/console/user-hierarchy/:user_id/deactivate`,
   /** @type {string} [POST] 激活层级 - Path: :user_id, Body: { include_subordinates? } */
-  HIERARCHY_ACTIVATE: '/api/v4/console/user-hierarchy/:user_id/activate',
+  HIERARCHY_ACTIVATE: `${API_PREFIX}/console/user-hierarchy/:user_id/activate`,
 
   // 用户高级状态
   /** @type {string} [GET] 获取高级用户列表 - Query: { page?, page_size?, status? } */
-  PREMIUM_LIST: '/api/v4/console/user-premium',
+  PREMIUM_LIST: `${API_PREFIX}/console/user-premium`,
   /** @type {string} [GET] 获取高级状态详情 - Path: :user_id */
-  PREMIUM_DETAIL: '/api/v4/console/user-premium/:user_id',
+  PREMIUM_DETAIL: `${API_PREFIX}/console/user-premium/:user_id`,
   /** @type {string} [PUT] 更新高级状态 - Path: :user_id, Body: { premium_level, expires_at? } */
-  PREMIUM_UPDATE: '/api/v4/console/user-premium/:user_id',
+  PREMIUM_UPDATE: `${API_PREFIX}/console/user-premium/:user_id`,
   /** @type {string} [POST] 解锁高级功能 - Path: :user_id, Body: { feature } */
-  PREMIUM_UNLOCK: '/api/v4/console/user-premium/:user_id/unlock',
+  PREMIUM_UNLOCK: `${API_PREFIX}/console/user-premium/:user_id/unlock`,
 
   // 用户风控配置
   /** @type {string} [GET] 获取风控配置列表 - Query: { page?, page_size?, risk_level? } */
-  RISK_PROFILES_LIST: '/api/v4/console/risk-profiles',
+  RISK_PROFILES_LIST: `${API_PREFIX}/console/risk-profiles`,
   /** @type {string} [GET] 获取用户风控配置 - Path: :user_id */
-  RISK_PROFILES_USER: '/api/v4/console/risk-profiles/user/:user_id',
+  RISK_PROFILES_USER: `${API_PREFIX}/console/risk-profiles/user/:user_id`,
   /** @type {string} [PUT] 更新风控配置 - Path: :user_id, Body: { risk_level, limits, ... } */
-  RISK_PROFILES_UPDATE: '/api/v4/console/risk-profiles/user/:user_id',
+  RISK_PROFILES_UPDATE: `${API_PREFIX}/console/risk-profiles/user/:user_id`,
 
   // 会话管理
   /** @type {string} [GET] 获取会话列表 - Query: { page?, page_size?, user_id?, status? } */
-  SESSIONS_LIST: '/api/v4/console/sessions',
+  SESSIONS_LIST: `${API_PREFIX}/console/sessions`,
   /** @type {string} [GET] 获取会话统计 */
-  SESSIONS_STATS: '/api/v4/console/sessions/stats',
+  SESSIONS_STATS: `${API_PREFIX}/console/sessions/stats`,
   /** @type {string} [GET] 获取会话详情 - Path: :id */
-  SESSIONS_DETAIL: '/api/v4/console/sessions/:id',
+  SESSIONS_DETAIL: `${API_PREFIX}/console/sessions/:id`,
   /** @type {string} [POST] 停用会话 - Path: :id */
-  SESSIONS_DEACTIVATE: '/api/v4/console/sessions/:id/deactivate',
+  SESSIONS_DEACTIVATE: `${API_PREFIX}/console/sessions/:id/deactivate`,
   /** @type {string} [POST] 清理过期会话 */
-  SESSIONS_CLEANUP: '/api/v4/console/sessions/cleanup',
+  SESSIONS_CLEANUP: `${API_PREFIX}/console/sessions/cleanup`,
   /** @type {string} [GET] 获取在线用户 */
-  SESSIONS_ONLINE_USERS: '/api/v4/console/sessions/online-users',
+  SESSIONS_ONLINE_USERS: `${API_PREFIX}/console/sessions/online-users`,
   /** @type {string} [POST] 失效用户所有会话（强制下线） - Body: { user_type, user_id, reason? } */
-  SESSIONS_DEACTIVATE_USER: '/api/v4/console/sessions/deactivate-user',
+  SESSIONS_DEACTIVATE_USER: `${API_PREFIX}/console/sessions/deactivate-user`,
 
   // 用户统计（后端暂未实现）
-  // STATS: '/api/v4/console/user-management/stats',
+  // STATS: `${API_PREFIX}/console/user-management/stats`,
 
   // 概率调整
   /** @type {string} [POST] 调整用户中奖概率 - Path: :user_id, Body: { probability, reason } */
-  ADJUST_PROBABILITY: '/api/v4/console/lottery-management/users/:user_id/probability-adjust',
+  ADJUST_PROBABILITY: `${API_PREFIX}/console/lottery-management/users/:user_id/probability-adjust`,
 
   // 认证（使用后端 console/auth 路径）
   /** @type {string} [POST] 登录 - Body: { mobile, verification_code } */
-  AUTH_LOGIN: '/api/v4/console/auth/login',
+  AUTH_LOGIN: `${API_PREFIX}/console/auth/login`,
   /** @type {string} [POST] 登出 */
-  AUTH_LOGOUT: '/api/v4/console/auth/logout',
+  AUTH_LOGOUT: `${API_PREFIX}/console/auth/logout`,
 
   // 权限扩展（使用 /api/v4/permissions 独立模块）
   /** @type {string} [GET] 获取权限列表 */
-  PERMISSION_LIST: '/api/v4/permissions/me',
+  PERMISSION_LIST: `${API_PREFIX}/permissions/me`,
 
   // 角色扩展（使用 user-management 模块）
   /** @type {string} [GET] 获取角色列表 */
-  ROLE_LIST: '/api/v4/console/user-management/roles',
+  ROLE_LIST: `${API_PREFIX}/console/user-management/roles`,
   // 注意：后端没有角色权限CRUD的独立API，权限是嵌入在角色的 permissions JSON 字段中
 
   // 用户角色管理
   /** @type {string} [GET] 查询用户角色列表（只读，来自 system-data 模块） */
-  USER_ROLE_LIST: '/api/v4/console/system-data/user-roles',
+  USER_ROLE_LIST: `${API_PREFIX}/console/system-data/user-roles`,
   // 注意：后端没有 POST/DELETE 用户角色的 API
   // 用户角色变更应使用 UPDATE_ROLE (PUT /api/v4/console/user-management/users/:user_id/role)
 
   // 角色变更历史（来自 business-records 路由）
   /** @type {string} [GET] 获取角色变更历史 - Query: { user_id?, operator_id?, old_role?, new_role?, start_date?, end_date?, page?, page_size? } */
-  ROLE_CHANGE_HISTORY_LIST: '/api/v4/console/business-records/user-role-changes',
+  ROLE_CHANGE_HISTORY_LIST: `${API_PREFIX}/console/business-records/user-role-changes`,
   /** @type {string} [GET] 获取角色变更详情 - Path: :record_id */
-  ROLE_CHANGE_HISTORY_DETAIL: '/api/v4/console/business-records/user-role-changes/:record_id',
+  ROLE_CHANGE_HISTORY_DETAIL: `${API_PREFIX}/console/business-records/user-role-changes/:record_id`,
 
   // 状态变更历史（来自 business-records 路由）
   /** @type {string} [GET] 获取状态变更历史 - Query: { user_id?, operator_id?, old_status?, new_status?, start_date?, end_date?, page?, page_size? } */
-  STATUS_CHANGE_HISTORY_LIST: '/api/v4/console/business-records/user-status-changes',
+  STATUS_CHANGE_HISTORY_LIST: `${API_PREFIX}/console/business-records/user-status-changes`,
   /** @type {string} [GET] 获取状态变更详情 - Path: :record_id */
-  STATUS_CHANGE_HISTORY_DETAIL: '/api/v4/console/business-records/user-status-changes/:record_id',
+  STATUS_CHANGE_HISTORY_DETAIL: `${API_PREFIX}/console/business-records/user-status-changes/:record_id`,
 
   // 高级状态扩展
   /** @type {string} [GET] 获取高级状态统计 */
-  PREMIUM_STATUS_STATS: '/api/v4/console/user-premium/stats',
+  PREMIUM_STATUS_STATS: `${API_PREFIX}/console/user-premium/stats`,
   /** @type {string} [POST] 延长高级状态 - Path: :user_id, Body: { days } */
-  PREMIUM_STATUS_EXTEND: '/api/v4/console/user-premium/:user_id/extend',
+  PREMIUM_STATUS_EXTEND: `${API_PREFIX}/console/user-premium/:user_id/extend`,
   /** @type {string} [POST] 撤销高级状态 - Path: :user_id */
-  PREMIUM_STATUS_REVOKE: '/api/v4/console/user-premium/:user_id/revoke',
+  PREMIUM_STATUS_REVOKE: `${API_PREFIX}/console/user-premium/:user_id/revoke`,
 
   // 风控配置扩展（兼容别名）
   /** @type {string} [GET] 获取风控配置列表 */
-  RISK_PROFILE_LIST: '/api/v4/console/risk-profiles',
+  RISK_PROFILE_LIST: `${API_PREFIX}/console/risk-profiles`,
   /** @type {string} [POST] 创建风控配置 - Body: { user_id, risk_level, limits } */
-  RISK_PROFILE_CREATE: '/api/v4/console/risk-profiles',
+  RISK_PROFILE_CREATE: `${API_PREFIX}/console/risk-profiles`,
   /** @type {string} [PUT] 更新风控配置 - Path: :id */
-  RISK_PROFILE_UPDATE: '/api/v4/console/risk-profiles/:id',
+  RISK_PROFILE_UPDATE: `${API_PREFIX}/console/risk-profiles/:id`,
   /** @type {string} [POST] 冻结用户 - Path: :user_id */
-  RISK_PROFILE_FREEZE: '/api/v4/console/risk-profiles/:user_id/freeze',
+  RISK_PROFILE_FREEZE: `${API_PREFIX}/console/risk-profiles/:user_id/freeze`,
   /** @type {string} [POST] 解冻用户 - Path: :user_id */
-  RISK_PROFILE_UNFREEZE: '/api/v4/console/risk-profiles/:user_id/unfreeze',
+  RISK_PROFILE_UNFREEZE: `${API_PREFIX}/console/risk-profiles/:user_id/unfreeze`,
 
   // 用户层级扩展（兼容别名）
   /** @type {string} [POST] 激活用户层级 - Path: :user_id */
-  USER_HIERARCHY_ACTIVATE: '/api/v4/console/user-hierarchy/:user_id/activate',
+  USER_HIERARCHY_ACTIVATE: `${API_PREFIX}/console/user-hierarchy/:user_id/activate`,
   /** @type {string} [POST] 停用用户层级 - Path: :user_id */
-  USER_HIERARCHY_DEACTIVATE: '/api/v4/console/user-hierarchy/:user_id/deactivate',
+  USER_HIERARCHY_DEACTIVATE: `${API_PREFIX}/console/user-hierarchy/:user_id/deactivate`,
   /** @type {string} [POST] 创建层级关系 */
-  USER_HIERARCHY_CREATE: '/api/v4/console/user-hierarchy',
+  USER_HIERARCHY_CREATE: `${API_PREFIX}/console/user-hierarchy`,
   /** @type {string} [GET] 获取层级列表 */
-  USER_HIERARCHY_LIST: '/api/v4/console/user-hierarchy',
+  USER_HIERARCHY_LIST: `${API_PREFIX}/console/user-hierarchy`,
   /** @type {string} [GET] 获取层级角色 */
-  USER_HIERARCHY_ROLES: '/api/v4/console/user-hierarchy/roles',
+  USER_HIERARCHY_ROLES: `${API_PREFIX}/console/user-hierarchy/roles`,
   /** @type {string} [GET] 获取下级用户 - Path: :user_id */
-  USER_HIERARCHY_SUBORDINATES: '/api/v4/console/user-hierarchy/:user_id/subordinates'
+  USER_HIERARCHY_SUBORDINATES: `${API_PREFIX}/console/user-hierarchy/:user_id/subordinates`
 }
 
 // ========== API 调用方法 ==========

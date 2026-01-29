@@ -1,9 +1,9 @@
 /**
  * Alpine.js 初始化入口（ES Module 版本）
  *
- * @description 初始化 Alpine.js，注册全局组件和指令
- * @version 2.0.1
- * @date 2026-01-24
+ * @description 初始化 Alpine.js，注册全局组件和指令，包含全局错误边界
+ * @version 2.1.0
+ * @date 2026-01-29
  *
  * 使用方式：在 main.js 中导入
  * import { initAlpine } from '@/alpine/index.js'
@@ -65,6 +65,36 @@ import { resizableColumns } from './components/resizable-columns.js'
  * 初始化 Alpine.js
  */
 export function initAlpine() {
+  // ========== 全局错误边界 ==========
+  // 捕获 Alpine 组件中的所有未处理错误，防止页面崩溃
+  Alpine.onError = (error, component, expression) => {
+    // 记录错误日志
+    logger.error('[Alpine Error]', {
+      message: error.message,
+      stack: error.stack,
+      component: component?.$el?.tagName,
+      expression: expression
+    })
+
+    // 显示用户友好的错误提示（仅在开发环境显示详情）
+    const isDev = import.meta.env?.DEV || location.hostname === 'localhost'
+    const errorMessage = isDev
+      ? `组件错误: ${error.message}`
+      : '页面组件出现异常，请刷新重试'
+
+    // 使用 notification store 显示错误（如果已初始化）
+    setTimeout(() => {
+      if (Alpine.store('notification')) {
+        Alpine.store('notification').error(errorMessage, 5000)
+      }
+    }, 100)
+
+    // 阻止错误向上传播，防止页面崩溃
+    return false
+  }
+
+  logger.debug('[Alpine] 全局错误边界已启用')
+
   // 注册全局 Magic Properties
   // $toast - 使用 Alpine.store('notification') 统一实现
   Alpine.magic('toast', () => {

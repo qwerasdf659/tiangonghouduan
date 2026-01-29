@@ -8,7 +8,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { LOTTERY_ENDPOINTS } from '../../../api/lottery.js'
+import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
 import { buildURL } from '../../../api/base.js'
 
 /**
@@ -57,7 +57,7 @@ export function usePricingMethods() {
      * 避免 N+1 请求问题，消除控制台 404 错误
      */
     async loadPricingConfigs() {
-      console.log('🔄 [Pricing] loadPricingConfigs 开始加载...')
+      logger.debug('🔄 [Pricing] loadPricingConfigs 开始加载...')
       try {
         // 使用批量接口一次性获取所有定价配置
         const response = await this.apiGet(LOTTERY_ENDPOINTS.PRICING_CONFIGS_ALL)
@@ -78,7 +78,7 @@ export function usePricingMethods() {
             try {
               pricing_config = JSON.parse(pricing_config)
             } catch (e) {
-              console.warn(`[Pricing] 活动 ${config.campaign_code} pricing_config 解析失败`)
+              logger.warn(`[Pricing] 活动 ${config.campaign_code} pricing_config 解析失败`)
               pricing_config = {}
             }
           }
@@ -91,7 +91,7 @@ export function usePricingMethods() {
 
         this.pricingConfigs = pricingList
 
-        console.log('📊 [Pricing] 定价配置加载完成:', {
+        logger.debug('📊 [Pricing] 定价配置加载完成:', {
           count: this.pricingConfigs.length,
           configs: this.pricingConfigs.map(c => ({
             campaign_code: c.campaign_code,
@@ -100,8 +100,6 @@ export function usePricingMethods() {
             status: c.status
           }))
         })
-
-        logger.debug('[LotteryManagement] 定价配置数量:', this.pricingConfigs.length)
       } catch (error) {
         logger.error('加载定价配置失败:', error)
         this.pricingConfigs = []
@@ -121,13 +119,13 @@ export function usePricingMethods() {
             `定价配置已刷新，共 ${this.pricingConfigs.length} 条配置`
           )
         }
-        console.log('✅ 定价配置已刷新')
+        logger.debug('✅ 定价配置已刷新')
       } catch (error) {
         // 使用 Alpine.store 显示错误通知
         if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
           Alpine.store('notification').error('刷新失败: ' + error.message)
         }
-        console.error('❌ 刷新失败:', error)
+        logger.error('❌ 刷新失败:', error)
       } finally {
         this.refreshingPricing = false
       }
@@ -175,7 +173,7 @@ export function usePricingMethods() {
      * @param {Object} pricing - 定价配置对象
      */
     editPricing(pricing) {
-      console.log('✏️ [Pricing] editPricing 被调用', pricing)
+      logger.debug('✏️ [Pricing] editPricing 被调用', pricing)
       this.isEditPricing = true
       this.editingPricingId = pricing.config_id || pricing.pricing_id || pricing.id
 
@@ -185,9 +183,9 @@ export function usePricingMethods() {
       if (typeof pricingConfig === 'string') {
         try {
           pricingConfig = JSON.parse(pricingConfig)
-          console.log('📦 [Pricing] pricing_config 已从字符串解析:', pricingConfig)
+          logger.debug('📦 [Pricing] pricing_config 已从字符串解析:', pricingConfig)
         } catch (e) {
-          console.warn('⚠️ [Pricing] pricing_config 解析失败:', e.message)
+          logger.warn('⚠️ [Pricing] pricing_config 解析失败:', e.message)
           pricingConfig = {}
         }
       }
@@ -199,7 +197,7 @@ export function usePricingMethods() {
         pricing.base_cost ??
         pricing.price_per_draw ??
         0
-      console.log('💰 [Pricing] 提取的基础价格 base_cost:', baseCost)
+      logger.debug('💰 [Pricing] 提取的基础价格 base_cost:', baseCost)
 
       // 提取折扣率：从 draw_buttons 中的10连抽获取折扣，或使用默认值
       let discountRate = 1.0
@@ -219,7 +217,7 @@ export function usePricingMethods() {
         effective_from: pricing.effective_from || pricing.effective_at || '',
         effective_to: pricing.effective_to || pricing.expired_at || ''
       }
-      console.log('📝 [Pricing] 填充表单数据:', this.pricingForm)
+      logger.debug('📝 [Pricing] 填充表单数据:', this.pricingForm)
       this.showModal('pricingModal')
     },
 
@@ -270,7 +268,7 @@ export function usePricingMethods() {
           activate_immediately: true
         }
 
-        console.log('📤 [Pricing] 发送请求:', endpoint, requestData)
+        logger.debug('📤 [Pricing] 发送请求:', endpoint, requestData)
 
         // apiPost 成功时返回 response.data，失败时抛出错误
         await this.apiPost(endpoint, requestData)
@@ -280,7 +278,7 @@ export function usePricingMethods() {
         this.hideModal('pricingModal')
         await this.loadPricingConfigs()
       } catch (error) {
-        console.error('❌ [Pricing] 保存失败:', error)
+        logger.error('❌ [Pricing] 保存失败:', error)
         this.showError('保存定价配置失败: ' + (error.message || '未知错误'))
       } finally {
         this.saving = false
@@ -336,7 +334,7 @@ export function usePricingMethods() {
      * @param {Object} pricing - 定价配置对象
      */
     viewPricingVersions(pricing) {
-      console.log('📋 [Pricing] viewPricingVersions 被调用', pricing)
+      logger.debug('📋 [Pricing] viewPricingVersions 被调用', pricing)
       this.selectedPricingCampaign = pricing
       this.loadPricingVersions(pricing.campaign_code)
       this.showModal('pricingVersionsModal')
