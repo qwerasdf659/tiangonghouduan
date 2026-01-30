@@ -536,11 +536,13 @@
                       <tr>
                         <th class="border px-4 py-2 themed-bg-base text-sm" x-text="getBudgetTierName(bTier)"></th>
                         <template x-for="pTier in pressureTiers" :key="bTier + '-' + pTier">
-                          <td class="border px-4 py-2 text-center cursor-pointer hover:bg-blue-50" @click="editMatrixCell(bTier, pTier)">
+                          <td class="border px-2 py-2 text-center cursor-pointer hover:bg-blue-50" @click="editMatrixCell(bTier, pTier)">
                             <template x-if="getMatrixConfig(bTier, pTier)">
-                              <div class="text-xs">
-                                <div>Cap: <span x-text="getMatrixConfig(bTier, pTier).cap_multiplier"></span></div>
-                                <div>Empty: <span x-text="getMatrixConfig(bTier, pTier).empty_weight_multiplier"></span></div>
+                              <div class="text-xs space-y-0.5">
+                                <div class="flex justify-between"><span class="text-gray-500">H:</span><span x-text="getMatrixConfig(bTier, pTier).high_multiplier || 0"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">M:</span><span x-text="getMatrixConfig(bTier, pTier).mid_multiplier || 0"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">L:</span><span x-text="getMatrixConfig(bTier, pTier).low_multiplier || 0"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">FB:</span><span x-text="getMatrixConfig(bTier, pTier).fallback_multiplier || 1"></span></div>
                               </div>
                             </template>
                             <template x-if="!getMatrixConfig(bTier, pTier)">
@@ -1027,297 +1029,7 @@
         </div>
       </div>
 
-      <!-- ==================== 告警中心页 ==================== -->
-      <div x-show="current_page === 'lottery-alerts'" x-cloak x-init="$nextTick(() => loadAlerts())">
-        <!-- 告警统计卡片 -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div class="themed-card rounded-lg shadow p-6 text-center">
-            <div class="text-3xl themed-text-primary mb-2">📊</div>
-            <h6 class="themed-text-muted text-sm mb-1">告警总数</h6>
-            <h2 class="text-2xl font-bold themed-text-primary" x-text="alertsSummary.total">0</h2>
-          </div>
-          <div class="themed-card rounded-lg shadow p-6 text-center">
-            <div class="text-3xl text-red-500 mb-2">🔴</div>
-            <h6 class="themed-text-muted text-sm mb-1">紧急告警</h6>
-            <h2 class="text-2xl font-bold text-red-600" x-text="alertsSummary.danger">0</h2>
-          </div>
-          <div class="themed-card rounded-lg shadow p-6 text-center">
-            <div class="text-3xl text-yellow-500 mb-2">🟡</div>
-            <h6 class="themed-text-muted text-sm mb-1">警告</h6>
-            <h2 class="text-2xl font-bold text-yellow-600" x-text="alertsSummary.warning">0</h2>
-          </div>
-          <div class="themed-card rounded-lg shadow p-6 text-center">
-            <div class="text-3xl text-blue-500 mb-2">🔵</div>
-            <h6 class="themed-text-muted text-sm mb-1">信息</h6>
-            <h2 class="text-2xl font-bold text-blue-600" x-text="alertsSummary.info">0</h2>
-          </div>
-        </div>
-
-        <!-- 筛选工具栏 -->
-        <div class="themed-card rounded-lg shadow p-4 mb-6">
-          <div class="flex flex-wrap items-center gap-4">
-            <div class="flex-1 min-w-[200px]">
-              <label class="text-sm themed-text-muted mb-1 block">活动ID</label>
-              <input type="text" x-model="alertFilters.campaign_id" 
-                     class="w-full themed-input rounded px-3 py-2" 
-                     placeholder="输入活动ID">
-            </div>
-            <div class="flex-1 min-w-[150px]">
-              <label class="text-sm themed-text-muted mb-1 block">告警级别</label>
-              <select x-model="alertFilters.level" class="w-full themed-input rounded px-3 py-2">
-                <option value="">全部级别</option>
-                <option value="danger">紧急</option>
-                <option value="warning">警告</option>
-                <option value="info">信息</option>
-              </select>
-            </div>
-            <div class="flex-1 min-w-[150px]">
-              <label class="text-sm themed-text-muted mb-1 block">确认状态</label>
-              <select x-model="alertFilters.acknowledged" class="w-full themed-input rounded px-3 py-2">
-                <option value="">全部状态</option>
-                <option value="false">未确认</option>
-                <option value="true">已确认</option>
-              </select>
-            </div>
-            <div class="flex items-end gap-2 mt-auto">
-              <button @click="applyAlertFilters()" class="themed-btn-primary px-4 py-2 rounded">
-                🔍 筛选
-              </button>
-              <button @click="resetAlertFilters()" class="themed-btn-secondary px-4 py-2 rounded">
-                🔄 重置
-              </button>
-              <button @click="refreshAlerts()" class="themed-btn-success px-4 py-2 rounded">
-                ♻️ 刷新
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- 告警列表 -->
-        <div class="themed-card rounded-lg shadow">
-          <div class="p-4 border-b flex justify-between items-center">
-            <h5 class="font-semibold">🚨 实时告警列表</h5>
-            <span class="text-sm themed-text-muted" x-text="'共 ' + alertsPagination.total_count + ' 条告警'"></span>
-          </div>
-
-          <!-- 加载状态 -->
-          <div x-show="loadingAlerts" class="p-8 text-center">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-            <p class="themed-text-muted">加载中...</p>
-          </div>
-
-          <!-- 空状态 -->
-          <div x-show="!loadingAlerts && alerts.length === 0" class="p-8 text-center">
-            <div class="text-4xl mb-2">✅</div>
-            <p class="themed-text-muted">暂无告警，系统运行正常</p>
-          </div>
-
-          <!-- 告警列表内容 -->
-          <div x-show="!loadingAlerts && alerts.length > 0" class="divide-y">
-            <template x-for="alert in alerts" :key="alert.alert_id">
-              <div class="p-4" :class="getAlertLevelStyle(alert.level)">
-                <div class="flex items-start justify-between gap-4">
-                  <!-- 告警信息 -->
-                  <div class="flex-1">
-                    <div class="flex items-center gap-2 mb-2">
-                      <span x-text="getAlertIcon(alert.level)" class="text-lg"></span>
-                      <span class="font-semibold" x-text="getAlertTypeText(alert.alert_type)"></span>
-                      <span class="px-2 py-0.5 text-xs rounded" 
-                            :class="alert.acknowledged ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
-                            x-text="alert.acknowledged ? '已确认' : '待确认'"></span>
-                      <span class="px-2 py-0.5 text-xs rounded"
-                            :class="alert.resolved ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
-                            x-text="alert.resolved ? '已解决' : '待解决'"></span>
-                    </div>
-                    <p class="themed-text-muted text-sm mb-2" x-text="alert.message"></p>
-                    <div class="flex flex-wrap gap-4 text-xs themed-text-muted">
-                      <span>🎯 活动: <span x-text="alert.campaign_name || alert.campaign_id || '-'"></span></span>
-                      <span>⏰ 时间: <span x-text="formatAlertTime(alert.created_at)"></span></span>
-                      <span>📍 <span x-text="getRelativeTime(alert.created_at)"></span></span>
-                    </div>
-                  </div>
-                  <!-- 操作按钮 -->
-                  <div class="flex items-center gap-2">
-                    <button @click="viewAlertDetail(alert)" 
-                            class="px-3 py-1 text-sm rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
-                            title="查看详情">
-                      👁️ 详情
-                    </button>
-                    <button x-show="!alert.acknowledged"
-                            @click="acknowledgeAlert(alert)"
-                            :disabled="processingAlert"
-                            class="px-3 py-1 text-sm rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200 disabled:opacity-50"
-                            title="确认告警">
-                      ✅ 确认
-                    </button>
-                    <button x-show="!alert.resolved"
-                            @click="openResolveModal(alert)"
-                            :disabled="processingAlert"
-                            class="px-3 py-1 text-sm rounded bg-green-100 text-green-700 hover:bg-green-200 disabled:opacity-50"
-                            title="解决告警">
-                      🛠️ 解决
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </template>
-          </div>
-
-          <!-- 分页 -->
-          <div x-show="alertsPagination.total_pages > 1" class="p-4 border-t">
-            <div class="flex justify-center items-center gap-2">
-              <button @click="changeAlertsPage(1)" 
-                      :disabled="alertsPagination.current_page === 1"
-                      class="px-3 py-1 rounded themed-btn-secondary disabled:opacity-50">
-                首页
-              </button>
-              <button @click="changeAlertsPage(alertsPagination.current_page - 1)" 
-                      :disabled="alertsPagination.current_page === 1"
-                      class="px-3 py-1 rounded themed-btn-secondary disabled:opacity-50">
-                上一页
-              </button>
-              <span class="px-4 py-1 themed-text-muted">
-                第 <span x-text="alertsPagination.current_page"></span> / <span x-text="alertsPagination.total_pages"></span> 页
-              </span>
-              <button @click="changeAlertsPage(alertsPagination.current_page + 1)" 
-                      :disabled="alertsPagination.current_page >= alertsPagination.total_pages"
-                      class="px-3 py-1 rounded themed-btn-secondary disabled:opacity-50">
-                下一页
-              </button>
-              <button @click="changeAlertsPage(alertsPagination.total_pages)" 
-                      :disabled="alertsPagination.current_page >= alertsPagination.total_pages"
-                      class="px-3 py-1 rounded themed-btn-secondary disabled:opacity-50">
-                末页
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 告警详情弹窗 -->
-      <div x-show="showAlertDetailModal" 
-           class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-           x-cloak
-           @click.self="closeAlertDetailModal()">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-auto">
-          <div class="p-4 border-b flex justify-between items-center">
-            <h5 class="font-semibold">📋 告警详情</h5>
-            <button @click="closeAlertDetailModal()" class="text-gray-500 hover:text-gray-700">✕</button>
-          </div>
-          <div class="p-6">
-            <template x-if="selectedAlert">
-              <div class="space-y-4">
-                <div class="flex items-center gap-2">
-                  <span x-text="getAlertIcon(selectedAlert.level)" class="text-2xl"></span>
-                  <span class="text-lg font-semibold" x-text="getAlertTypeText(selectedAlert.alert_type)"></span>
-                </div>
-                <table class="w-full text-sm">
-                  <tr class="border-b">
-                    <th class="py-2 text-left w-1/3">告警ID</th>
-                    <td class="py-2" x-text="selectedAlert.alert_id"></td>
-                  </tr>
-                  <tr class="border-b">
-                    <th class="py-2 text-left">级别</th>
-                    <td class="py-2" x-text="getAlertLevelText(selectedAlert.level)"></td>
-                  </tr>
-                  <tr class="border-b">
-                    <th class="py-2 text-left">活动</th>
-                    <td class="py-2" x-text="selectedAlert.campaign_name || selectedAlert.campaign_id || '-'"></td>
-                  </tr>
-                  <tr class="border-b">
-                    <th class="py-2 text-left">告警信息</th>
-                    <td class="py-2" x-text="selectedAlert.message"></td>
-                  </tr>
-                  <tr class="border-b">
-                    <th class="py-2 text-left">创建时间</th>
-                    <td class="py-2" x-text="formatAlertTime(selectedAlert.created_at)"></td>
-                  </tr>
-                  <tr class="border-b">
-                    <th class="py-2 text-left">确认状态</th>
-                    <td class="py-2">
-                      <span class="px-2 py-0.5 text-xs rounded"
-                            :class="selectedAlert.acknowledged ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
-                            x-text="selectedAlert.acknowledged ? '已确认' : '待确认'"></span>
-                    </td>
-                  </tr>
-                  <tr class="border-b">
-                    <th class="py-2 text-left">确认时间</th>
-                    <td class="py-2" x-text="selectedAlert.acknowledged_at ? formatAlertTime(selectedAlert.acknowledged_at) : '-'"></td>
-                  </tr>
-                  <tr class="border-b">
-                    <th class="py-2 text-left">确认人</th>
-                    <td class="py-2" x-text="selectedAlert.acknowledged_by || '-'"></td>
-                  </tr>
-                  <tr class="border-b">
-                    <th class="py-2 text-left">解决状态</th>
-                    <td class="py-2">
-                      <span class="px-2 py-0.5 text-xs rounded"
-                            :class="selectedAlert.resolved ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
-                            x-text="selectedAlert.resolved ? '已解决' : '待解决'"></span>
-                    </td>
-                  </tr>
-                  <tr class="border-b">
-                    <th class="py-2 text-left">解决时间</th>
-                    <td class="py-2" x-text="selectedAlert.resolved_at ? formatAlertTime(selectedAlert.resolved_at) : '-'"></td>
-                  </tr>
-                  <tr class="border-b">
-                    <th class="py-2 text-left">解决备注</th>
-                    <td class="py-2" x-text="selectedAlert.resolve_notes || '-'"></td>
-                  </tr>
-                </table>
-              </div>
-            </template>
-          </div>
-          <div class="p-4 border-t flex justify-end gap-2">
-            <button @click="closeAlertDetailModal()" class="themed-btn-secondary px-4 py-2 rounded">
-              关闭
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 解决告警弹窗 -->
-      <div x-show="showResolveModal" 
-           class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-           x-cloak
-           @click.self="closeResolveModal()">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
-          <div class="p-4 border-b flex justify-between items-center">
-            <h5 class="font-semibold">🛠️ 解决告警</h5>
-            <button @click="closeResolveModal()" class="text-gray-500 hover:text-gray-700">✕</button>
-          </div>
-          <div class="p-6">
-            <template x-if="selectedAlert">
-              <div>
-                <div class="mb-4 p-3 bg-gray-50 rounded">
-                  <div class="flex items-center gap-2 mb-2">
-                    <span x-text="getAlertIcon(selectedAlert.level)"></span>
-                    <span class="font-semibold" x-text="getAlertTypeText(selectedAlert.alert_type)"></span>
-                  </div>
-                  <p class="text-sm themed-text-muted" x-text="selectedAlert.message"></p>
-                </div>
-                <div class="mb-4">
-                  <label class="block text-sm font-medium mb-2">解决备注</label>
-                  <textarea x-model="resolveNotes" 
-                            class="w-full themed-input rounded px-3 py-2 h-24"
-                            placeholder="请输入解决方案或备注（可选）"></textarea>
-                </div>
-              </div>
-            </template>
-          </div>
-          <div class="p-4 border-t flex justify-end gap-2">
-            <button @click="closeResolveModal()" class="themed-btn-secondary px-4 py-2 rounded">
-              取消
-            </button>
-            <button @click="resolveAlert()" 
-                    :disabled="processingAlert"
-                    class="themed-btn-success px-4 py-2 rounded disabled:opacity-50">
-              <span x-show="processingAlert">处理中...</span>
-              <span x-show="!processingAlert">✅ 确认解决</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      <!-- 告警中心已迁移至独立页面 /admin/lottery-alerts.html -->
 
       <!-- 单次抽奖详情弹窗 (P1) -->
       <div x-show="showDrawDetailsModal" 
@@ -3458,8 +3170,8 @@
   <!-- 矩阵编辑 Modal -->
   <div x-ref="matrixEditModal" x-show="isModalOpen('matrixEditModal')" class="fixed inset-0 z-50 flex items-center justify-center" x-cloak>
     <div class="fixed inset-0 bg-black bg-opacity-50" @click="hideModal('matrixEditModal')"></div>
-    <div class="relative themed-card rounded-lg shadow-xl max-w-md w-full mx-4">
-      <div class="p-4 border-b flex justify-between items-center">
+    <div class="relative themed-card rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card z-10">
         <h5 class="font-semibold">📊 编辑矩阵配置</h5>
         <button @click="hideModal('matrixEditModal')" class="text-gray-400 hover:themed-text-muted">&times;</button>
       </div>
@@ -3469,23 +3181,58 @@
             预算层级：<strong x-text="editingMatrixCell?.budget_tier"></strong>
             / 压力层级：<strong x-text="editingMatrixCell?.pressure_tier"></strong>
           </div>
-          <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">Cap值</label>
-            <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="editingMatrixCell.cap" min="0" step="0.01">
-            <small class="text-gray-400">中奖上限控制</small>
+          
+          <!-- 基础乘数配置 -->
+          <div class="border-b pb-3">
+            <h6 class="text-sm font-semibold themed-text-muted mb-3">📐 基础乘数配置</h6>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">Cap乘数</label>
+                <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="editingMatrixCell.cap_multiplier" min="0" step="0.01">
+                <small class="text-gray-400">中奖上限控制</small>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">空奖权重乘数</label>
+                <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="editingMatrixCell.empty_weight_multiplier" min="0" step="0.01">
+                <small class="text-gray-400">空奖权重调整</small>
+              </div>
+            </div>
           </div>
-          <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">Empty Weight</label>
-            <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="editingMatrixCell.empty_weight" min="0" step="0.01">
-            <small class="text-gray-400">空奖权重</small>
+          
+          <!-- 档位权重乘数配置（后端P0新增字段） -->
+          <div class="border-b pb-3">
+            <h6 class="text-sm font-semibold themed-text-muted mb-3">🎯 档位权重乘数</h6>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">高档位 (High)</label>
+                <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="editingMatrixCell.high_multiplier" min="0" step="0.01">
+                <small class="text-gray-400">高价值奖品权重</small>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">中档位 (Mid)</label>
+                <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="editingMatrixCell.mid_multiplier" min="0" step="0.01">
+                <small class="text-gray-400">中价值奖品权重</small>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">低档位 (Low)</label>
+                <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="editingMatrixCell.low_multiplier" min="0" step="0.01">
+                <small class="text-gray-400">低价值奖品权重</small>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">兜底档位 (Fallback)</label>
+                <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="editingMatrixCell.fallback_multiplier" min="0" step="0.01">
+                <small class="text-gray-400">兜底/谢谢参与权重</small>
+              </div>
+            </div>
           </div>
+          
+          <!-- 描述 -->
           <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">中奖概率调整</label>
-            <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="editingMatrixCell.win_probability" min="0" max="1" step="0.001">
-            <small class="text-gray-400">概率调整因子 (0-1)</small>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">配置说明</label>
+            <textarea class="w-full px-3 py-2 border rounded" x-model="editingMatrixCell.description" rows="2" placeholder="可选的配置说明"></textarea>
           </div>
         </div>
-        <div class="p-4 border-t flex justify-end space-x-2">
+        <div class="p-4 border-t flex justify-end space-x-2 sticky bottom-0 themed-card">
           <button type="button" class="px-4 py-2 border rounded themed-hover-bg" @click="hideModal('matrixEditModal')">取消</button>
           <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary" :disabled="saving">保存配置</button>
         </div>

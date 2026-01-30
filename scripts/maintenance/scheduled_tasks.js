@@ -23,8 +23,16 @@
  * 17. 商家审计日志180天清理（每天凌晨3点）- 2026-01-12新增（AC4.4 商家员工域权限体系升级）
  * 18. 图片资源数据质量检查（每天凌晨4点）- 2026-01-14新增（图片缩略图架构兼容残留核查报告 Phase 1）
  *
+ * ========== 2026-01-30 定时任务统一管理改进方案新增 ==========
+ * 25. 聊天限流记录清理（每10分钟）- 迁移自 ChatRateLimitService.initCleanup()
+ * 26. 认证会话清理（每30分钟）- 迁移自 AuthenticationSession.scheduleCleanup()，修复未调用bug
+ * 27. 抽奖引擎缓存清理（每10分钟）- 合并 CacheManager + ManagementStrategy
+ * 28. 业务缓存监控（每10分钟）- 激活 BusinessCacheHelper.startMonitor()
+ * 29. 管理员操作日志180天清理（每天凌晨3点）- admin_operation_logs 表清理
+ * 30. WebSocket启动日志180天清理（每天凌晨3:30）- websocket_startup_logs 表清理
+ *
  * 创建时间：2025-10-10
- * 更新时间：2026-01-14（新增图片资源数据质量检查任务 - 缩略图架构兼容清理）
+ * 更新时间：2026-01-30（定时任务统一管理改进方案 - 新增 Task 25-30，迁移散布的 setInterval）
  */
 
 const cron = require('node-cron')
@@ -85,12 +93,14 @@ class ScheduledTasks {
    * - notification → NotificationService
    * - trade_order → TradeOrderService
    * - management_strategy → ManagementStrategy
+   * - unified_lottery_engine → UnifiedLotteryEngine（2026-01-30 新增，Task 27 缓存清理）
    */
   static ExchangeService = null
   static AdminLotteryService = null
   static NotificationService = null
   static TradeOrderService = null
   static ManagementStrategy = null
+  static UnifiedLotteryEngine = null // 2026-01-30 新增：用于 Task 27 CacheManager 缓存清理
   static _servicesInitialized = false
 
   /**
@@ -114,12 +124,14 @@ class ScheduledTasks {
       /*
        * P1-9：使用 snake_case 服务键获取服务
        * exchange_market, admin_lottery, notification, trade_order, management_strategy
+       * 2026-01-30 新增：unified_lottery_engine（用于 Task 27 CacheManager 缓存清理）
        */
       this.ExchangeService = serviceManager.getService('exchange_market')
       this.AdminLotteryService = serviceManager.getService('admin_lottery')
       this.NotificationService = serviceManager.getService('notification')
       this.TradeOrderService = serviceManager.getService('trade_order')
       this.ManagementStrategy = serviceManager.getService('management_strategy')
+      this.UnifiedLotteryEngine = serviceManager.getService('unified_lottery_engine') // 2026-01-30 新增
 
       this._servicesInitialized = true
       logger.info('[ScheduledTasks] 服务依赖初始化完成（P1-9 snake_case key）', {
@@ -128,7 +140,8 @@ class ScheduledTasks {
           'admin_lottery',
           'notification',
           'trade_order',
-          'management_strategy'
+          'management_strategy',
+          'unified_lottery_engine' // 2026-01-30 新增
         ]
       })
     } catch (error) {
@@ -221,7 +234,27 @@ class ScheduledTasks {
     // 任务24: 每天凌晨1点执行抽奖指标日报聚合（2026-01-23新增 - 策略引擎监控方案）
     this.scheduleDailyLotteryMetricsAggregation()
 
-    logger.info('所有定时任务已初始化完成')
+    // ========== 2026-01-30 定时任务统一管理改进方案新增 ==========
+
+    // 任务25: 每10分钟清理聊天限流记录（内存级别，无需分布式锁）
+    this.scheduleRateLimitRecordCleanup()
+
+    // 任务26: 每30分钟清理过期认证会话（数据库级别，需要分布式锁）
+    this.scheduleAuthSessionCleanup()
+
+    // 任务27: 每10分钟清理抽奖引擎缓存（内存级别，无需分布式锁）
+    this.scheduleLotteryEngineCacheCleanup()
+
+    // 任务28: 每10分钟执行业务缓存监控（内存级别，无需分布式锁）
+    this.scheduleBusinessCacheMonitor()
+
+    // 任务29: 每天凌晨3:00清理超过180天的管理员操作日志（数据库级别，需要分布式锁）
+    this.scheduleDailyAdminOperationLogCleanup()
+
+    // 任务30: 每天凌晨3:30清理超过180天的WebSocket启动日志（数据库级别，需要分布式锁）
+    this.scheduleDailyWebSocketStartupLogCleanup()
+
+    logger.info('所有定时任务已初始化完成（包含2026-01-30新增的6个迁移任务）')
   }
 
   /**
@@ -2379,6 +2412,760 @@ class ScheduledTasks {
       logger.info('[手动触发] 抽奖指标日报聚合完成')
     } catch (error) {
       logger.error('[手动触发] 抽奖指标日报聚合失败', { error: error.message })
+      throw error
+    }
+  }
+
+  // ========== 2026-01-30 定时任务统一管理改进方案 - 新增任务 (Task 25-30) ==========
+
+  /**
+   * 定时任务25: 每10分钟清理聊天限流记录
+   * Cron表达式: 0,10,20,30,40,50 * * * * (每10分钟)
+   *
+   * 业务场景（定时任务统一管理改进 2026-01-30）：
+   * - 迁移自 ChatRateLimitService.initCleanup() 中的 setInterval
+   * - 清理内存中过期的用户消息时间戳、管理员消息时间戳、创建会话时间戳
+   * - 内存级别操作，无需分布式锁
+   * - 防止内存泄漏
+   *
+   * @returns {void}
+   *
+   * @since 2026-01-30
+   * @see docs/定时任务统一管理改进方案.md - Task 25
+   */
+  static scheduleRateLimitRecordCleanup() {
+    cron.schedule('*/10 * * * *', async () => {
+      try {
+        logger.debug('[定时任务] 开始执行聊天限流记录清理...')
+
+        // 获取 ChatRateLimitService 实例并执行清理
+        const ChatRateLimitService = require('../../services/ChatRateLimitService')
+        const report = ChatRateLimitService.performCleanup()
+
+        if (report.total_cleaned_entries > 0) {
+          logger.info('[定时任务] 聊天限流记录清理完成', {
+            user_messages_cleaned: report.user_messages_cleaned,
+            admin_messages_cleaned: report.admin_messages_cleaned,
+            create_session_cleaned: report.create_session_cleaned,
+            total_cleaned_entries: report.total_cleaned_entries
+          })
+        } else {
+          logger.debug('[定时任务] 聊天限流记录清理完成：无过期记录')
+        }
+      } catch (error) {
+        logger.error('[定时任务] 聊天限流记录清理失败', { error: error.message })
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 聊天限流记录清理（每10分钟执行，内存级别，Task 25）')
+  }
+
+  /**
+   * 手动触发聊天限流记录清理（用于测试）
+   *
+   * 业务场景：手动执行限流记录清理，用于开发调试和即时清理
+   *
+   * @returns {Promise<Object>} 清理报告对象
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * const report = await ScheduledTasks.manualRateLimitRecordCleanup()
+   * console.log('清理数量:', report.total_cleaned)
+   */
+  static async manualRateLimitRecordCleanup() {
+    try {
+      logger.info('[手动触发] 开始执行聊天限流记录清理...')
+
+      const ChatRateLimitService = require('../../services/ChatRateLimitService')
+      const report = ChatRateLimitService.performCleanup()
+
+      logger.info('[手动触发] 聊天限流记录清理完成', {
+        user_messages_cleaned: report.user_messages_cleaned,
+        admin_messages_cleaned: report.admin_messages_cleaned,
+        create_session_cleaned: report.create_session_cleaned,
+        total_cleaned_entries: report.total_cleaned_entries
+      })
+
+      return report
+    } catch (error) {
+      logger.error('[手动触发] 聊天限流记录清理失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务26: 每30分钟清理过期认证会话
+   * Cron表达式: 0,30 * * * * (每30分钟)
+   *
+   * 业务场景（定时任务统一管理改进 2026-01-30）：
+   * - 迁移自 AuthenticationSession.scheduleCleanup()
+   * - 修复原有bug：该方法定义了但从未被调用
+   * - 清理 expires_at < 当前时间 的过期会话
+   * - 数据库级别操作，需要分布式锁防止多实例重复执行
+   *
+   * @returns {void}
+   *
+   * @since 2026-01-30
+   * @see docs/定时任务统一管理改进方案.md - Task 26
+   */
+  static scheduleAuthSessionCleanup() {
+    cron.schedule('0,30 * * * *', async () => {
+      const lockKey = 'lock:auth_session_cleanup'
+      const lockValue = `${process.pid}_${Date.now()}`
+      let redisClient = null
+
+      try {
+        // 获取 Redis 客户端
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
+
+        // 尝试获取分布式锁（5分钟过期）
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 300, 'NX')
+
+        if (!acquired) {
+          logger.info('[定时任务] 其他实例正在执行认证会话清理，跳过')
+          return
+        }
+
+        logger.info('[定时任务] 获取分布式锁成功，开始执行认证会话清理...', {
+          lock_key: lockKey,
+          lock_value: lockValue
+        })
+
+        // 获取 AuthenticationSession 模型并执行清理
+        const { AuthenticationSession } = require('../../models')
+        const deletedCount = await AuthenticationSession.cleanupExpiredSessions()
+
+        if (deletedCount > 0) {
+          logger.info(`[定时任务] 认证会话清理完成：删除 ${deletedCount} 个过期会话`)
+        } else {
+          logger.info('[定时任务] 认证会话清理完成：无过期会话')
+        }
+
+        // 释放锁
+        await redisClient.del(lockKey)
+        logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
+      } catch (error) {
+        logger.error('[定时任务] 认证会话清理失败', { error: error.message })
+
+        // 确保释放锁
+        if (redisClient) {
+          try {
+            await redisClient.del(lockKey)
+          } catch (unlockError) {
+            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 认证会话清理（每30分钟执行，支持分布式锁，Task 26）')
+  }
+
+  /**
+   * 手动触发认证会话清理（用于测试）
+   *
+   * 业务场景：手动执行认证会话清理，用于开发调试和即时清理
+   *
+   * @returns {Promise<Object>} 清理报告对象
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * const report = await ScheduledTasks.manualAuthSessionCleanup()
+   * console.log('清理数量:', report.deleted_count)
+   */
+  static async manualAuthSessionCleanup() {
+    try {
+      logger.info('[手动触发] 开始执行认证会话清理...')
+
+      const { AuthenticationSession } = require('../../models')
+      const deletedCount = await AuthenticationSession.cleanupExpiredSessions()
+
+      logger.info('[手动触发] 认证会话清理完成', { deleted_count: deletedCount })
+
+      return { deleted_count: deletedCount, status: 'SUCCESS' }
+    } catch (error) {
+      logger.error('[手动触发] 认证会话清理失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务27: 每10分钟清理抽奖引擎缓存
+   * Cron表达式: 0,10,20,30,40,50 * * * * (每10分钟)
+   *
+   * 业务场景（定时任务统一管理改进 2026-01-30）：
+   * - 合并迁移自：
+   *   - CacheManager.js 的构造函数 setInterval（每10分钟清理过期缓存）
+   *   - ManagementStrategy.js 的 startCacheCleanup()（每30秒清理缓存）
+   * - 统一使用10分钟清理周期
+   * - 内存级别操作，无需分布式锁
+   *
+   * @returns {void}
+   *
+   * @since 2026-01-30
+   * @see docs/定时任务统一管理改进方案.md - Task 27
+   */
+  static scheduleLotteryEngineCacheCleanup() {
+    cron.schedule('*/10 * * * *', async () => {
+      try {
+        logger.debug('[定时任务] 开始执行抽奖引擎缓存清理...')
+
+        let cacheManagerCleaned = 0
+        let managementStrategyCleaned = 0
+
+        // P1-9：确保服务已初始化
+        await ScheduledTasks.initializeServices()
+
+        // 1. 清理 CacheManager 缓存
+        // 2026-01-30：通过 unified_lottery_engine 服务获取 cacheManager 实例
+        try {
+          const engine = ScheduledTasks.UnifiedLotteryEngine
+          if (engine && engine.cacheManager && typeof engine.cacheManager.cleanup === 'function') {
+            cacheManagerCleaned = engine.cacheManager.cleanup()
+          }
+        } catch (cmError) {
+          logger.warn('[定时任务] CacheManager 清理失败（非致命）', { error: cmError.message })
+        }
+
+        // 2. 清理 ManagementStrategy 内存缓存
+        try {
+
+          const managementStrategy = ScheduledTasks.ManagementStrategy
+          if (managementStrategy && typeof managementStrategy.cleanupMemoryCache === 'function') {
+            managementStrategyCleaned = managementStrategy.cleanupMemoryCache()
+          }
+        } catch (msError) {
+          logger.warn('[定时任务] ManagementStrategy 缓存清理失败（非致命）', {
+            error: msError.message
+          })
+        }
+
+        const totalCleaned = cacheManagerCleaned + managementStrategyCleaned
+
+        if (totalCleaned > 0) {
+          logger.info('[定时任务] 抽奖引擎缓存清理完成', {
+            cache_manager_cleaned: cacheManagerCleaned,
+            management_strategy_cleaned: managementStrategyCleaned,
+            total_cleaned: totalCleaned
+          })
+        } else {
+          logger.debug('[定时任务] 抽奖引擎缓存清理完成：无过期缓存')
+        }
+      } catch (error) {
+        logger.error('[定时任务] 抽奖引擎缓存清理失败', { error: error.message })
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 抽奖引擎缓存清理（每10分钟执行，内存级别，Task 27）')
+  }
+
+  /**
+   * 手动触发抽奖引擎缓存清理（用于测试）
+   *
+   * 业务场景：手动执行抽奖引擎缓存清理，用于开发调试和即时清理
+   *
+   * @returns {Promise<Object>} 清理报告对象
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * const report = await ScheduledTasks.manualLotteryEngineCacheCleanup()
+   * console.log('清理数量:', report.total_cleaned)
+   */
+  static async manualLotteryEngineCacheCleanup() {
+    try {
+      logger.info('[手动触发] 开始执行抽奖引擎缓存清理...')
+
+      // P1-9：确保服务已初始化
+      await ScheduledTasks.initializeServices()
+
+      let cacheManagerCleaned = 0
+      let managementStrategyCleaned = 0
+
+      // 1. 清理 CacheManager 缓存
+      // 2026-01-30：通过 unified_lottery_engine 服务获取 cacheManager 实例
+      try {
+        const engine = ScheduledTasks.UnifiedLotteryEngine
+        if (engine && engine.cacheManager && typeof engine.cacheManager.cleanup === 'function') {
+          cacheManagerCleaned = engine.cacheManager.cleanup()
+        }
+      } catch (cmError) {
+        logger.warn('[手动触发] CacheManager 清理失败', { error: cmError.message })
+      }
+
+      // 2. 清理 ManagementStrategy 内存缓存
+      try {
+        const managementStrategy = ScheduledTasks.ManagementStrategy
+        if (managementStrategy && typeof managementStrategy.cleanupMemoryCache === 'function') {
+          managementStrategyCleaned = managementStrategy.cleanupMemoryCache()
+        }
+      } catch (msError) {
+        logger.warn('[手动触发] ManagementStrategy 缓存清理失败', { error: msError.message })
+      }
+
+      const report = {
+        cache_manager_cleaned: cacheManagerCleaned,
+        management_strategy_cleaned: managementStrategyCleaned,
+        total_cleaned: cacheManagerCleaned + managementStrategyCleaned,
+        status: 'SUCCESS'
+      }
+
+      logger.info('[手动触发] 抽奖引擎缓存清理完成', report)
+      return report
+    } catch (error) {
+      logger.error('[手动触发] 抽奖引擎缓存清理失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务28: 每10分钟执行业务缓存监控
+   * Cron表达式: 5,15,25,35,45,55 * * * * (每10分钟，错开Task 25/27的整10分钟)
+   *
+   * 业务场景（定时任务统一管理改进 2026-01-30）：
+   * - 激活 BusinessCacheHelper.startMonitor()（原有方法定义但从未被调用）
+   * - 输出缓存命中率统计报告
+   * - 低命中率告警（<60%时发出警告）
+   * - 内存级别操作，无需分布式锁
+   *
+   * @returns {void}
+   *
+   * @since 2026-01-30
+   * @see docs/定时任务统一管理改进方案.md - Task 28
+   */
+  static scheduleBusinessCacheMonitor() {
+    cron.schedule('*/10 * * * *', async () => {
+      try {
+        logger.debug('[定时任务] 开始执行业务缓存监控...')
+
+        // 获取 BusinessCacheHelper 并执行监控
+        // 2026-01-30：使用解构导入获取 BusinessCacheHelper 类
+        const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
+
+        // 获取统计快照
+        const snapshot = BusinessCacheHelper.getStatsSnapshot()
+
+        // 记录监控日志
+        logger.info('📊 [业务缓存监控] 统计报告', snapshot)
+
+        // 检查告警条件（命中率低于60%且有足够样本）
+        let hasLowHitRate = false
+        Object.keys(snapshot).forEach(prefix => {
+          const stats = snapshot[prefix]
+          const hitRate = parseFloat(stats.hit_rate || '0')
+          const totalRequests = (stats.hits || 0) + (stats.misses || 0)
+
+          if (hitRate < 60 && totalRequests > 10) {
+            logger.warn(`⚠️ [业务缓存监控] ${prefix} 缓存命中率偏低: ${hitRate}%`, {
+              prefix,
+              hit_rate: hitRate,
+              total_requests: totalRequests
+            })
+            hasLowHitRate = true
+          }
+        })
+
+        if (!hasLowHitRate) {
+          logger.debug('[定时任务] 业务缓存监控完成：所有缓存命中率正常')
+        }
+      } catch (error) {
+        logger.error('[定时任务] 业务缓存监控失败', { error: error.message })
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 业务缓存监控（每10分钟执行，内存级别，Task 28）')
+  }
+
+  /**
+   * 手动触发业务缓存监控（用于测试）
+   *
+   * 业务场景：手动执行业务缓存监控，用于开发调试和即时检查
+   *
+   * @returns {Promise<Object>} 监控报告对象
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * const report = await ScheduledTasks.manualBusinessCacheMonitor()
+   * console.log('缓存统计:', report)
+   */
+  static async manualBusinessCacheMonitor() {
+    try {
+      logger.info('[手动触发] 开始执行业务缓存监控...')
+
+      // 2026-01-30：使用解构导入获取 BusinessCacheHelper 类
+      const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
+      const snapshot = BusinessCacheHelper.getStatsSnapshot()
+
+      logger.info('[手动触发] 业务缓存监控完成', { snapshot })
+
+      return {
+        snapshot,
+        status: 'SUCCESS',
+        timestamp: BeijingTimeHelper.now()
+      }
+    } catch (error) {
+      logger.error('[手动触发] 业务缓存监控失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务29: 每天凌晨3:00清理超过180天的管理员操作日志
+   * Cron表达式: 0 3 * * * (每天凌晨3点)
+   *
+   * 业务场景（定时任务统一管理改进 2026-01-30）：
+   * - 参照 Task 20（商家审计日志180天清理）的实现
+   * - admin_operation_logs 表与 merchant_operation_logs 保留策略一致
+   * - 数据库级别操作，需要分布式锁
+   * - 分批删除，避免长事务锁表
+   *
+   * @returns {void}
+   *
+   * @since 2026-01-30
+   * @see docs/定时任务统一管理改进方案.md - Task 29
+   */
+  static scheduleDailyAdminOperationLogCleanup() {
+    cron.schedule('0 3 * * *', async () => {
+      const lockKey = 'lock:admin_operation_log_cleanup'
+      const lockValue = `${process.pid}_${Date.now()}`
+      let redisClient = null
+
+      try {
+        // 获取 Redis 客户端
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
+
+        // 尝试获取分布式锁（10分钟过期）
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 600, 'NX')
+
+        if (!acquired) {
+          logger.info('[定时任务] 其他实例正在执行管理员操作日志清理，跳过')
+          return
+        }
+
+        logger.info('[定时任务] 获取分布式锁成功，开始执行管理员操作日志180天清理...', {
+          lock_key: lockKey,
+          lock_value: lockValue
+        })
+
+        // 执行清理
+        const report = await ScheduledTasks.cleanupAdminOperationLogs(180)
+
+        if (report.deleted_count > 0) {
+          logger.warn(
+            `[定时任务] 管理员操作日志清理完成：删除 ${report.deleted_count} 条超过180天的记录`,
+            {
+              deleted_count: report.deleted_count,
+              cutoff_date: report.cutoff_date,
+              duration_ms: report.duration_ms
+            }
+          )
+        } else {
+          logger.info('[定时任务] 管理员操作日志清理完成：无需清理')
+        }
+
+        // 释放锁
+        await redisClient.del(lockKey)
+        logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
+      } catch (error) {
+        logger.error('[定时任务] 管理员操作日志清理失败', { error: error.message })
+
+        // 确保释放锁
+        if (redisClient) {
+          try {
+            await redisClient.del(lockKey)
+          } catch (unlockError) {
+            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 管理员操作日志180天清理（每天凌晨3点执行，支持分布式锁，Task 29）')
+  }
+
+  /**
+   * 清理超过指定天数的管理员操作日志
+   *
+   * @param {number} retentionDays - 保留天数（默认180天）
+   * @returns {Promise<Object>} 清理报告
+   * @returns {number} return.deleted_count - 删除的记录数
+   * @returns {string} return.cutoff_date - 截止日期（北京时间）
+   * @returns {number} return.duration_ms - 执行耗时（毫秒）
+   *
+   * @example
+   * const report = await ScheduledTasks.cleanupAdminOperationLogs(180)
+   * console.log(`删除了 ${report.deleted_count} 条记录`)
+   */
+  static async cleanupAdminOperationLogs(retentionDays = 180) {
+    const startTime = Date.now()
+    const { AdminOperationLog } = require('../../models')
+
+    // 计算截止日期（180天前）
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - retentionDays)
+
+    logger.info('[管理员操作日志清理] 开始执行...', {
+      retention_days: retentionDays,
+      cutoff_date: BeijingTimeHelper.formatForAPI(cutoffDate).iso
+    })
+
+    try {
+      // 分批删除，每批最多10000条，避免长事务
+      const batchSize = 10000
+      let totalDeleted = 0
+      let hasMore = true
+
+      while (hasMore) {
+        // 使用 destroy 删除满足条件的记录
+        const deletedCount = await AdminOperationLog.destroy({
+          where: {
+            created_at: {
+              [Op.lt]: cutoffDate
+            }
+          },
+          limit: batchSize
+        })
+
+        totalDeleted += deletedCount
+
+        // 如果删除数量小于批次大小，说明没有更多记录了
+        if (deletedCount < batchSize) {
+          hasMore = false
+        } else {
+          // 等待一小段时间，避免对数据库造成过大压力
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+
+        logger.info('[管理员操作日志清理] 批次完成', {
+          batch_deleted: deletedCount,
+          total_deleted: totalDeleted
+        })
+      }
+
+      const duration = Date.now() - startTime
+
+      return {
+        deleted_count: totalDeleted,
+        cutoff_date: BeijingTimeHelper.formatForAPI(cutoffDate).iso,
+        duration_ms: duration,
+        status: 'SUCCESS'
+      }
+    } catch (error) {
+      logger.error('[管理员操作日志清理] 执行失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 手动触发管理员操作日志清理（用于测试）
+   *
+   * 业务场景：手动执行管理员操作日志清理，用于开发调试和即时清理
+   *
+   * @param {number} [retentionDays=180] - 保留天数
+   * @returns {Promise<Object>} 清理报告对象
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * const report = await ScheduledTasks.manualAdminOperationLogCleanup(180)
+   * console.log('删除数量:', report.deleted_count)
+   */
+  static async manualAdminOperationLogCleanup(retentionDays = 180) {
+    try {
+      logger.info('[手动触发] 开始执行管理员操作日志清理...', { retention_days: retentionDays })
+      const report = await ScheduledTasks.cleanupAdminOperationLogs(retentionDays)
+
+      logger.info('[手动触发] 管理员操作日志清理完成', {
+        deleted_count: report.deleted_count,
+        cutoff_date: report.cutoff_date,
+        duration_ms: report.duration_ms
+      })
+
+      return report
+    } catch (error) {
+      logger.error('[手动触发] 管理员操作日志清理失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 定时任务30: 每天凌晨3:30清理超过180天的WebSocket启动日志
+   * Cron表达式: 30 3 * * * (每天凌晨3:30)
+   *
+   * 业务场景（定时任务统一管理改进 2026-01-30）：
+   * - 与 Task 29（管理员操作日志）统一保留策略（180天）
+   * - websocket_startup_logs 表用于监控和审计
+   * - 数据库级别操作，需要分布式锁
+   * - 分批删除，避免长事务锁表
+   * - 错开 Task 29 的执行时间（3:00），避免资源竞争
+   *
+   * @returns {void}
+   *
+   * @since 2026-01-30
+   * @see docs/定时任务统一管理改进方案.md - Task 30
+   */
+  static scheduleDailyWebSocketStartupLogCleanup() {
+    cron.schedule('30 3 * * *', async () => {
+      const lockKey = 'lock:websocket_startup_log_cleanup'
+      const lockValue = `${process.pid}_${Date.now()}`
+      let redisClient = null
+
+      try {
+        // 获取 Redis 客户端
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
+
+        // 尝试获取分布式锁（10分钟过期）
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 600, 'NX')
+
+        if (!acquired) {
+          logger.info('[定时任务] 其他实例正在执行WebSocket启动日志清理，跳过')
+          return
+        }
+
+        logger.info('[定时任务] 获取分布式锁成功，开始执行WebSocket启动日志180天清理...', {
+          lock_key: lockKey,
+          lock_value: lockValue
+        })
+
+        // 执行清理
+        const report = await ScheduledTasks.cleanupWebSocketStartupLogs(180)
+
+        if (report.deleted_count > 0) {
+          logger.warn(
+            `[定时任务] WebSocket启动日志清理完成：删除 ${report.deleted_count} 条超过180天的记录`,
+            {
+              deleted_count: report.deleted_count,
+              cutoff_date: report.cutoff_date,
+              duration_ms: report.duration_ms
+            }
+          )
+        } else {
+          logger.info('[定时任务] WebSocket启动日志清理完成：无需清理')
+        }
+
+        // 释放锁
+        await redisClient.del(lockKey)
+        logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
+      } catch (error) {
+        logger.error('[定时任务] WebSocket启动日志清理失败', { error: error.message })
+
+        // 确保释放锁
+        if (redisClient) {
+          try {
+            await redisClient.del(lockKey)
+          } catch (unlockError) {
+            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
+      }
+    })
+
+    logger.info(
+      '✅ 定时任务已设置: WebSocket启动日志180天清理（每天凌晨3:30执行，支持分布式锁，Task 30）'
+    )
+  }
+
+  /**
+   * 清理超过指定天数的WebSocket启动日志
+   *
+   * @param {number} retentionDays - 保留天数（默认180天）
+   * @returns {Promise<Object>} 清理报告
+   * @returns {number} return.deleted_count - 删除的记录数
+   * @returns {string} return.cutoff_date - 截止日期（北京时间）
+   * @returns {number} return.duration_ms - 执行耗时（毫秒）
+   *
+   * @example
+   * const report = await ScheduledTasks.cleanupWebSocketStartupLogs(180)
+   * console.log(`删除了 ${report.deleted_count} 条记录`)
+   */
+  static async cleanupWebSocketStartupLogs(retentionDays = 180) {
+    const startTime = Date.now()
+    const { WebSocketStartupLog } = require('../../models')
+
+    // 计算截止日期（180天前）
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - retentionDays)
+
+    logger.info('[WebSocket启动日志清理] 开始执行...', {
+      retention_days: retentionDays,
+      cutoff_date: BeijingTimeHelper.formatForAPI(cutoffDate).iso
+    })
+
+    try {
+      // 分批删除，每批最多10000条，避免长事务
+      const batchSize = 10000
+      let totalDeleted = 0
+      let hasMore = true
+
+      while (hasMore) {
+        // 使用 destroy 删除满足条件的记录
+        const deletedCount = await WebSocketStartupLog.destroy({
+          where: {
+            created_at: {
+              [Op.lt]: cutoffDate
+            }
+          },
+          limit: batchSize
+        })
+
+        totalDeleted += deletedCount
+
+        // 如果删除数量小于批次大小，说明没有更多记录了
+        if (deletedCount < batchSize) {
+          hasMore = false
+        } else {
+          // 等待一小段时间，避免对数据库造成过大压力
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+
+        logger.info('[WebSocket启动日志清理] 批次完成', {
+          batch_deleted: deletedCount,
+          total_deleted: totalDeleted
+        })
+      }
+
+      const duration = Date.now() - startTime
+
+      return {
+        deleted_count: totalDeleted,
+        cutoff_date: BeijingTimeHelper.formatForAPI(cutoffDate).iso,
+        duration_ms: duration,
+        status: 'SUCCESS'
+      }
+    } catch (error) {
+      logger.error('[WebSocket启动日志清理] 执行失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 手动触发WebSocket启动日志清理（用于测试）
+   *
+   * 业务场景：手动执行WebSocket启动日志清理，用于开发调试和即时清理
+   *
+   * @param {number} [retentionDays=180] - 保留天数
+   * @returns {Promise<Object>} 清理报告对象
+   *
+   * @example
+   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
+   * const report = await ScheduledTasks.manualWebSocketStartupLogCleanup(180)
+   * console.log('删除数量:', report.deleted_count)
+   */
+  static async manualWebSocketStartupLogCleanup(retentionDays = 180) {
+    try {
+      logger.info('[手动触发] 开始执行WebSocket启动日志清理...', { retention_days: retentionDays })
+      const report = await ScheduledTasks.cleanupWebSocketStartupLogs(retentionDays)
+
+      logger.info('[手动触发] WebSocket启动日志清理完成', {
+        deleted_count: report.deleted_count,
+        cutoff_date: report.cutoff_date,
+        duration_ms: report.duration_ms
+      })
+
+      return report
+    } catch (error) {
+      logger.error('[手动触发] WebSocket启动日志清理失败', { error: error.message })
       throw error
     }
   }

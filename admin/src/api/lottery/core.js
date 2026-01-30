@@ -38,10 +38,10 @@ export const LOTTERY_CORE_ENDPOINTS = {
   CAMPAIGN_DETAIL: `${API_PREFIX}/console/system-data/lottery-campaigns/:campaign_id`,
 
   // 活动条件
-  CAMPAIGNS_LIST: `${API_PREFIX}/lottery/campaigns`,
-  CAMPAIGNS_DETAIL: `${API_PREFIX}/lottery/campaigns/:campaign_code`,
-  CAMPAIGNS_CONDITIONS: `${API_PREFIX}/activities/:code/conditions`,
-  CAMPAIGNS_CONFIGURE_CONDITIONS: `${API_PREFIX}/activities/:code/configure-conditions`
+  CAMPAIGN_LIST: `${API_PREFIX}/lottery/campaigns`,
+  CAMPAIGN_DETAIL: `${API_PREFIX}/lottery/campaigns/:campaign_code`,
+  CAMPAIGN_CONDITIONS: `${API_PREFIX}/activities/:code/conditions`,
+  CAMPAIGN_CONFIGURE_CONDITIONS: `${API_PREFIX}/activities/:code/configure-conditions`
 }
 
 // ========== API 调用方法 ==========
@@ -226,7 +226,7 @@ export const LotteryCoreAPI = {
    * @returns {Promise<Object>} 活动条件配置
    */
   async getActivityConditions(code) {
-    const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGNS_CONDITIONS, { code })
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGN_CONDITIONS, { code })
     return await request({ url, method: 'GET' })
   },
 
@@ -237,7 +237,7 @@ export const LotteryCoreAPI = {
    * @returns {Promise<Object>} 配置结果
    */
   async configureActivityConditions(code, data) {
-    const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGNS_CONFIGURE_CONDITIONS, { code })
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGN_CONFIGURE_CONDITIONS, { code })
     return await request({ url, method: 'POST', data })
   }
 }

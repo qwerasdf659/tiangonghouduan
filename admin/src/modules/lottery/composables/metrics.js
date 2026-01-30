@@ -272,7 +272,7 @@ export function useMetricsMethods() {
 
         // apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }
         const response = await this.apiGet(
-          `${LOTTERY_ENDPOINTS.MONITORING_USER_QUOTAS_LIST}?${params}`,
+          `${LOTTERY_ENDPOINTS.MONITORING_USER_QUOTA_LIST}?${params}`,
           {},
           { showLoading: false }
         )

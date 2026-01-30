@@ -82,7 +82,7 @@ export function useQuotaMethods() {
 
         // apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }
         const response = await this.apiGet(
-          `${LOTTERY_ENDPOINTS.QUOTA_RULES_LIST}?${params}`,
+          `${LOTTERY_ENDPOINTS.QUOTA_RULE_LIST}?${params}`,
           {},
           { showLoading: false }
         )
@@ -256,8 +256,8 @@ export function useQuotaMethods() {
         }
 
         const url = this.isEditQuota
-          ? buildURL(LOTTERY_ENDPOINTS.QUOTA_RULES_DETAIL, { id: this.editingQuotaId })
-          : LOTTERY_ENDPOINTS.QUOTA_RULES_CREATE
+          ? buildURL(LOTTERY_ENDPOINTS.QUOTA_RULE_DETAIL, { id: this.editingQuotaId })
+          : LOTTERY_ENDPOINTS.QUOTA_RULE_CREATE
 
         await this.apiCall(url, {
           method: this.isEditQuota ? 'PUT' : 'POST',
@@ -289,7 +289,7 @@ export function useQuotaMethods() {
         async () => {
           // apiCall 成功时返回 response.data，失败时抛出错误
           await this.apiCall(
-            buildURL(LOTTERY_ENDPOINTS.QUOTA_RULES_DISABLE, { id: quota.rule_id }),
+            buildURL(LOTTERY_ENDPOINTS.QUOTA_RULE_DISABLE, { id: quota.rule_id }),
             { method: 'PUT' }
           )
           // 如果没有抛出错误，则表示成功
@@ -306,7 +306,7 @@ export function useQuotaMethods() {
     async toggleQuotaStatus(quota) {
       try {
         // apiCall 成功时返回 response.data，失败时抛出错误
-        await this.apiCall(buildURL(LOTTERY_ENDPOINTS.QUOTA_RULES_DISABLE, { id: quota.rule_id }), {
+        await this.apiCall(buildURL(LOTTERY_ENDPOINTS.QUOTA_RULE_DISABLE, { id: quota.rule_id }), {
           method: 'PUT'
         })
         // 如果没有抛出错误，则表示成功

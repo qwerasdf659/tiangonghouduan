@@ -96,7 +96,12 @@ module.exports = (sequelize, DataTypes) => {
 
         matrix[bt][pt] = {
           cap_multiplier: parseFloat(config.cap_multiplier),
-          empty_weight_multiplier: parseFloat(config.empty_weight_multiplier)
+          empty_weight_multiplier: parseFloat(config.empty_weight_multiplier),
+          // 新增档位权重字段（P0修复 - 2026-01-30）
+          high_multiplier: parseFloat(config.high_multiplier),
+          mid_multiplier: parseFloat(config.mid_multiplier),
+          low_multiplier: parseFloat(config.low_multiplier),
+          fallback_multiplier: parseFloat(config.fallback_multiplier)
         }
       }
 
@@ -129,7 +134,12 @@ module.exports = (sequelize, DataTypes) => {
 
       return {
         cap_multiplier: parseFloat(config.cap_multiplier),
-        empty_weight_multiplier: parseFloat(config.empty_weight_multiplier)
+        empty_weight_multiplier: parseFloat(config.empty_weight_multiplier),
+        // 新增档位权重字段（P0修复 - 2026-01-30）
+        high_multiplier: parseFloat(config.high_multiplier),
+        mid_multiplier: parseFloat(config.mid_multiplier),
+        low_multiplier: parseFloat(config.low_multiplier),
+        fallback_multiplier: parseFloat(config.fallback_multiplier)
       }
     }
 
@@ -204,7 +214,12 @@ module.exports = (sequelize, DataTypes) => {
       for (const config of configs) {
         result[config.pressure_tier] = {
           cap_multiplier: parseFloat(config.cap_multiplier),
-          empty_weight_multiplier: parseFloat(config.empty_weight_multiplier)
+          empty_weight_multiplier: parseFloat(config.empty_weight_multiplier),
+          // 新增档位权重字段（P0修复 - 2026-01-30）
+          high_multiplier: parseFloat(config.high_multiplier),
+          mid_multiplier: parseFloat(config.mid_multiplier),
+          low_multiplier: parseFloat(config.low_multiplier),
+          fallback_multiplier: parseFloat(config.fallback_multiplier)
         }
       }
 
@@ -225,6 +240,11 @@ module.exports = (sequelize, DataTypes) => {
         pressure_tier: this.pressure_tier,
         cap_multiplier: parseFloat(this.cap_multiplier),
         empty_weight_multiplier: parseFloat(this.empty_weight_multiplier),
+        // 新增档位权重字段（P0修复 - 2026-01-30）
+        high_multiplier: parseFloat(this.high_multiplier),
+        mid_multiplier: parseFloat(this.mid_multiplier),
+        low_multiplier: parseFloat(this.low_multiplier),
+        fallback_multiplier: parseFloat(this.fallback_multiplier),
         description: this.description
       }
     }
@@ -311,6 +331,50 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 1.0,
         comment: '空奖权重乘数'
+      },
+
+      /**
+       * high档位权重乘数（P0修复新增 - 2026-01-30）
+       * 用于 TierMatrixCalculator 计算档位概率调整
+       * - 0: 不允许该档位
+       * - 1.0: 保持原权重
+       * - > 1.0: 提高该档位概率
+       */
+      high_multiplier: {
+        type: DataTypes.DECIMAL(5, 2),
+        allowNull: false,
+        defaultValue: 0.0,
+        comment: 'high档位权重乘数'
+      },
+
+      /**
+       * mid档位权重乘数（P0修复新增 - 2026-01-30）
+       */
+      mid_multiplier: {
+        type: DataTypes.DECIMAL(5, 2),
+        allowNull: false,
+        defaultValue: 0.0,
+        comment: 'mid档位权重乘数'
+      },
+
+      /**
+       * low档位权重乘数（P0修复新增 - 2026-01-30）
+       */
+      low_multiplier: {
+        type: DataTypes.DECIMAL(5, 2),
+        allowNull: false,
+        defaultValue: 0.0,
+        comment: 'low档位权重乘数'
+      },
+
+      /**
+       * fallback档位权重乘数（P0修复新增 - 2026-01-30）
+       */
+      fallback_multiplier: {
+        type: DataTypes.DECIMAL(5, 2),
+        allowNull: false,
+        defaultValue: 1.0,
+        comment: 'fallback档位权重乘数'
       },
 
       /**

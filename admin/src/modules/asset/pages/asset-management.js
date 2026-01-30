@@ -268,7 +268,7 @@ document.addEventListener('alpine:init', () => {
     async loadItemInstances() {
       try {
         // 使用物品模板接口获取列表
-        const response = await this.apiGet(ASSET_ENDPOINTS.ITEM_TEMPLATES_LIST, {
+        const response = await this.apiGet(ASSET_ENDPOINTS.ITEM_TEMPLATE_LIST, {
           item_type: this.itemInstanceFilters.template_code || undefined,
           is_enabled:
             this.itemInstanceFilters.status === 'enabled'

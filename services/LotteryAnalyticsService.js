@@ -2847,8 +2847,45 @@ class LotteryAnalyticsService {
     const userIds = new Set(draws.map(d => d.user_id))
     const activeUsers = userIds.size
 
-    // 新用户数（需要单独查询，这里简化处理）
-    const newUsers = 0 // TODO: 需要查询用户首次抽奖时间
+    /**
+     * 新用户统计查询（P0修复 - 2026-01-30）
+     * 业务定义：首次抽奖时间落在当前统计时间范围内的用户
+     * SQL逻辑：使用子查询找出每个用户的首次抽奖时间，
+     *          再筛选首次抽奖时间在统计范围内的用户数量
+     */
+    let newUsers = 0
+    try {
+      const { QueryTypes } = require('sequelize')
+      const [newUserResult] = await this.models.sequelize.query(
+        `SELECT COUNT(DISTINCT ld.user_id) as new_users
+         FROM lottery_draws ld
+         INNER JOIN (
+           SELECT user_id, MIN(created_at) as first_draw_time
+           FROM lottery_draws
+           GROUP BY user_id
+         ) first_draws ON ld.user_id = first_draws.user_id 
+                       AND ld.created_at = first_draws.first_draw_time
+         WHERE ld.created_at BETWEEN :startTime AND :endTime`,
+        {
+          replacements: { startTime, endTime },
+          type: QueryTypes.SELECT
+        }
+      )
+      newUsers = parseInt(newUserResult?.new_users || 0, 10)
+      this.logger.debug('新用户统计完成', {
+        startTime,
+        endTime,
+        newUsers,
+        campaignId
+      })
+    } catch (error) {
+      // 查询失败时记录日志，但不影响其他统计数据返回
+      this.logger.warn('新用户统计查询失败，使用默认值0', {
+        error: error.message,
+        startTime,
+        endTime
+      })
+    }
 
     return {
       total_draws: totalDraws,

@@ -1071,12 +1071,15 @@ describe('🗄️ 数据库连接池恢复测试（P2-10）', () => {
 
       const recoverySuccess = recoveryResults.filter(r => r.success).length
       const avgRecoveryTime = Math.round(
-        recoveryResults.filter(r => r.success).reduce((sum, r) => sum + r.duration, 0) / recoverySuccess
+        recoveryResults.filter(r => r.success).reduce((sum, r) => sum + r.duration, 0) /
+          recoverySuccess
       )
 
       console.log('')
       console.log('📊 恢复测试结果:')
-      console.log(`   📊 恢复后查询成功率: ${recoverySuccess}/30 (${((recoverySuccess / 30) * 100).toFixed(1)}%)`)
+      console.log(
+        `   📊 恢复后查询成功率: ${recoverySuccess}/30 (${((recoverySuccess / 30) * 100).toFixed(1)}%)`
+      )
       console.log(`   ⏱️  平均响应时间: ${avgRecoveryTime}ms`)
       console.log('')
 
@@ -1151,7 +1154,9 @@ describe('🗄️ 数据库连接池恢复测试（P2-10）', () => {
           verify_success: verifySuccess
         })
 
-        console.log(`   ✅ 第${round + 1}轮完成: 负载${loadSuccess}/${loadPerRound}, 恢复验证${verifySuccess}/10`)
+        console.log(
+          `   ✅ 第${round + 1}轮完成: 负载${loadSuccess}/${loadPerRound}, 恢复验证${verifySuccess}/10`
+        )
 
         // 轮间恢复
         await delay(5000)
@@ -1167,7 +1172,7 @@ describe('🗄️ 数据库连接池恢复测试（P2-10）', () => {
       for (const result of roundResults) {
         console.log(
           `  ${result.round}  | ${String(result.load_success).padStart(3)}/${result.load_total}  | ` +
-          `${String(result.load_duration).padStart(8)}   | ${result.verify_success}/10 ${result.verify_success >= 8 ? '✅' : '⚠️'}`
+            `${String(result.load_duration).padStart(8)}   | ${result.verify_success}/10 ${result.verify_success >= 8 ? '✅' : '⚠️'}`
         )
       }
       console.log('-'.repeat(65))
@@ -1247,7 +1252,7 @@ describe('🗄️ 数据库连接池恢复测试（P2-10）', () => {
       for (const result of cycleResults) {
         console.log(
           `  ${result.cycle}  | ${String(result.load_success).padStart(3)}/${result.load_total}  |   ` +
-          `${result.verify_success ? '✅' : '❌'}   |   ${String(result.verify_duration).padStart(6)}`
+            `${result.verify_success ? '✅' : '❌'}   |   ${String(result.verify_duration).padStart(6)}`
         )
       }
       console.log('-'.repeat(60))
@@ -1321,7 +1326,9 @@ describe('🗄️ 数据库连接池恢复测试（P2-10）', () => {
 
       // 分析队列行为
       const successfulQueued = queuedRequests.filter(r => r.success).length
-      const timedOutQueued = queuedRequests.filter(r => r.error_type === 'CONNECTION_TIMEOUT').length
+      const timedOutQueued = queuedRequests.filter(
+        r => r.error_type === 'CONNECTION_TIMEOUT'
+      ).length
       const avgWaitTime = Math.round(
         queuedRequests.reduce((sum, r) => sum + r.wait_time, 0) / queuedRequests.length
       )

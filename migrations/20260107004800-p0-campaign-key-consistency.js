@@ -137,7 +137,7 @@ module.exports = {
         DROP INDEX uk_account_asset_campaign_key ON account_asset_balances
       `
         )
-        .catch(() => {})
+        .catch(err => console.warn('[迁移回滚] 删除索引失败:', err.message))
 
       await queryInterface.sequelize.query(`
         ALTER TABLE account_asset_balances
@@ -167,7 +167,7 @@ module.exports = {
         ON account_asset_balances(account_id, asset_code, campaign_key)
       `
         )
-        .catch(() => {})
+        .catch(err => console.warn('[迁移回滚] 创建索引失败:', err.message))
 
       // INSERT 触发器
       await queryInterface.sequelize

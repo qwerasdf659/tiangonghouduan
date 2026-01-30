@@ -69,7 +69,7 @@ export function useMerchantLogsMethods() {
         if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
 
         const response = await this.apiGet(
-          `${STORE_ENDPOINTS.MERCHANT_LOGS_LIST}?${params}`,
+          `${STORE_ENDPOINTS.MERCHANT_LOG_LIST}?${params}`,
           {},
           { showLoading: false }
         )
@@ -156,7 +156,7 @@ export function useMerchantLogsMethods() {
         if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
 
         const response = await this.apiGet(
-          `${STORE_ENDPOINTS.MERCHANT_LOGS_EXPORT}?${params}`,
+          `${STORE_ENDPOINTS.MERCHANT_LOG_EXPORT}?${params}`,
           {},
           { showLoading: true, responseType: 'blob' }
         )

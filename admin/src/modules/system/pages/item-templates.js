@@ -184,7 +184,7 @@ document.addEventListener('alpine:init', () => {
      * @async
      * @description 根据筛选条件从后端获取物品模板列表
      * @returns {Promise<void>}
-     * @fires ASSET_ENDPOINTS.ITEM_TEMPLATES_LIST
+     * @fires ASSET_ENDPOINTS.ITEM_TEMPLATE_LIST
      */
     async loadTemplates() {
       this.loading = true
@@ -198,7 +198,7 @@ document.addEventListener('alpine:init', () => {
         if (this.filters.search) params.append('keyword', this.filters.search)
 
         const url =
-          ASSET_ENDPOINTS.ITEM_TEMPLATES_LIST + (params.toString() ? `?${params.toString()}` : '')
+          ASSET_ENDPOINTS.ITEM_TEMPLATE_LIST + (params.toString() ? `?${params.toString()}` : '')
         logger.info('请求物品模板列表:', url)
         const response = await apiRequest(url)
         logger.info('物品模板列表响应:', response)
@@ -286,14 +286,14 @@ document.addEventListener('alpine:init', () => {
      * @param {number|string} templateId - 模板ID
      * @description 获取模板详情并填充到表单中，然后显示编辑模态框
      * @returns {Promise<void>}
-     * @fires ASSET_ENDPOINTS.ITEM_TEMPLATES_DETAIL
+     * @fires ASSET_ENDPOINTS.ITEM_TEMPLATE_DETAIL
      */
     async editTemplate(templateId) {
       this.loading = true
       showLoading()
       try {
         const response = await apiRequest(
-          buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATES_DETAIL, { id: templateId })
+          buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATE_DETAIL, { id: templateId })
         )
         if (response && response.success) {
           const t = response.data
@@ -328,8 +328,8 @@ document.addEventListener('alpine:init', () => {
      * @description 验证表单数据并提交到后端，根据templateId判断是创建还是更新
      * @returns {Promise<void>}
      * @throws {Error} 当JSON格式错误或必填字段缺失时
-     * @fires ASSET_ENDPOINTS.ITEM_TEMPLATES_CREATE
-     * @fires ASSET_ENDPOINTS.ITEM_TEMPLATES_UPDATE
+     * @fires ASSET_ENDPOINTS.ITEM_TEMPLATE_CREATE
+     * @fires ASSET_ENDPOINTS.ITEM_TEMPLATE_UPDATE
      */
     async submitTemplate() {
       if (this.is_submitting) return
@@ -384,8 +384,8 @@ document.addEventListener('alpine:init', () => {
       showLoading()
       try {
         const url = this.form.template_id
-          ? buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATES_UPDATE, { id: this.form.template_id })
-          : ASSET_ENDPOINTS.ITEM_TEMPLATES_CREATE
+          ? buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATE_UPDATE, { id: this.form.template_id })
+          : ASSET_ENDPOINTS.ITEM_TEMPLATE_CREATE
         const method = this.form.template_id ? 'PUT' : 'POST'
 
         const response = await apiRequest(url, { method, data })
@@ -413,7 +413,7 @@ document.addEventListener('alpine:init', () => {
      * @param {number|string} templateId - 模板ID
      * @description 确认后删除指定的物品模板
      * @returns {Promise<void>}
-     * @fires ASSET_ENDPOINTS.ITEM_TEMPLATES_DELETE
+     * @fires ASSET_ENDPOINTS.ITEM_TEMPLATE_DELETE
      */
     async deleteTemplate(templateId) {
       if (!confirm('确定要删除此物品模板吗？此操作不可恢复！')) return
@@ -422,7 +422,7 @@ document.addEventListener('alpine:init', () => {
       showLoading()
       try {
         const response = await apiRequest(
-          buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATES_DELETE, { id: templateId }),
+          buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATE_DELETE, { id: templateId }),
           {
             method: 'DELETE'
           }

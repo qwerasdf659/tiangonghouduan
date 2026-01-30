@@ -260,8 +260,43 @@ function assetsPortfolioPage() {
      * 导出资产
      */
     async exportAssets() {
-      this.showInfo('导出功能开发中...')
-      // TODO: 实现导出功能
+      await this.withLoading(
+        async () => {
+          const { AssetAPI } = await import('../../../api/asset.js')
+
+          // 构建导出参数
+          const params = {
+            format: 'excel',
+            limit: 1000
+          }
+
+          // 如果有筛选条件，添加到参数
+          if (this.searchForm.asset_type) {
+            params.type = this.searchForm.asset_type
+          }
+          if (this.searchForm.user_id) {
+            params.user_id = this.searchForm.user_id
+          }
+
+          logger.info('[AssetsPortfolioPage] 导出资产', params)
+
+          // 调用导出API获取文件流
+          const blob = await AssetAPI.exportAssets(params)
+
+          // 创建下载链接
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `资产列表_${new Date().toISOString().slice(0, 10)}.xlsx`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
+
+          this.showSuccess('导出成功')
+        },
+        { errorMessage: '导出资产失败' }
+      )
     },
 
     /**

@@ -1087,6 +1087,71 @@ class MerchantRiskControlService {
   }
 
   /**
+   * 批量标记所有待处理告警为已读
+   *
+   * @param {number} reviewed_by - 复核人ID（管理员用户ID）
+   * @param {Object} [filters={}] - 可选筛选条件
+   * @param {string} [filters.alert_type] - 告警类型筛选
+   * @param {string} [filters.severity] - 严重程度筛选
+   * @returns {Promise<Object>} 更新结果 { updated_count, message }
+   *
+   * @since 2026-01-30 前端告警中心功能支持
+   */
+  static async markAllAsRead(reviewed_by, filters = {}) {
+    const models = MerchantRiskControlService._getModels()
+    const { RiskAlert, sequelize } = models
+
+    if (!RiskAlert) {
+      throw new Error('RiskAlert 模型不存在')
+    }
+
+    // 构建筛选条件：仅更新 pending 状态的告警
+    const where = { status: 'pending' }
+
+    if (filters.alert_type) {
+      where.alert_type = filters.alert_type
+    }
+    if (filters.severity) {
+      where.severity = filters.severity
+    }
+
+    const transaction = await sequelize.transaction()
+
+    try {
+      // 批量更新所有符合条件的待处理告警
+      const [updated_count] = await RiskAlert.update(
+        {
+          status: 'reviewed',
+          reviewed_by,
+          reviewed_at: new Date(),
+          review_notes: '批量标记已读'
+        },
+        {
+          where,
+          transaction
+        }
+      )
+
+      await transaction.commit()
+
+      logger.info('📝 批量标记风控告警已读', {
+        reviewed_by,
+        updated_count,
+        filters
+      })
+
+      return {
+        updated_count,
+        message: `成功标记 ${updated_count} 条告警为已读`
+      }
+    } catch (error) {
+      await transaction.rollback()
+      logger.error('❌ 批量标记告警已读失败', { reviewed_by, error: error.message })
+      throw error
+    }
+  }
+
+  /**
    * 获取风控告警统计摘要
    *
    * @param {Object} filters - 筛选条件（时间范围）

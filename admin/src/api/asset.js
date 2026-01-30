@@ -27,6 +27,7 @@ export const ASSET_ENDPOINTS = {
   STATS: `${API_PREFIX}/console/assets/stats`,
   TRANSACTIONS: `${API_PREFIX}/console/assets/transactions`,
   PORTFOLIO: `${API_PREFIX}/console/assets/portfolio`,
+  EXPORT: `${API_PREFIX}/console/assets/export`,
 
   // 资产调整
   ADJUSTMENT_ASSET_TYPES: `${API_PREFIX}/console/asset-adjustment/asset-types`,
@@ -54,20 +55,20 @@ export const ASSET_ENDPOINTS = {
   DIAMOND_ACCOUNTS: `${API_PREFIX}/console/diamond/accounts`,
 
   // 物品模板
-  ITEM_TEMPLATES_LIST: `${API_PREFIX}/console/item-templates`,
-  ITEM_TEMPLATES_DETAIL: `${API_PREFIX}/console/item-templates/:id`,
-  ITEM_TEMPLATES_CREATE: `${API_PREFIX}/console/item-templates`,
-  ITEM_TEMPLATES_UPDATE: `${API_PREFIX}/console/item-templates/:id`,
-  ITEM_TEMPLATES_DELETE: `${API_PREFIX}/console/item-templates/:id`,
-  ITEM_TEMPLATES_STATS: `${API_PREFIX}/console/item-templates/stats`,
+  ITEM_TEMPLATE_LIST: `${API_PREFIX}/console/item-templates`,
+  ITEM_TEMPLATE_DETAIL: `${API_PREFIX}/console/item-templates/:id`,
+  ITEM_TEMPLATE_CREATE: `${API_PREFIX}/console/item-templates`,
+  ITEM_TEMPLATE_UPDATE: `${API_PREFIX}/console/item-templates/:id`,
+  ITEM_TEMPLATE_DELETE: `${API_PREFIX}/console/item-templates/:id`,
+  ITEM_TEMPLATE_STATS: `${API_PREFIX}/console/item-templates/stats`,
 
   // 物品实例
-  ITEM_INSTANCES_LIST: `${API_PREFIX}/console/item-instances`,
-  ITEM_INSTANCES_DETAIL: `${API_PREFIX}/console/item-instances/:instance_id`,
-  ITEM_INSTANCES_USER: `${API_PREFIX}/console/item-instances/user/:user_id`,
-  ITEM_INSTANCES_TRANSFER: `${API_PREFIX}/console/item-instances/:instance_id/transfer`,
-  ITEM_INSTANCES_FREEZE: `${API_PREFIX}/console/item-instances/:instance_id/freeze`,
-  ITEM_INSTANCES_UNFREEZE: `${API_PREFIX}/console/item-instances/:instance_id/unfreeze`,
+  ITEM_INSTANCE_LIST: `${API_PREFIX}/console/item-instances`,
+  ITEM_INSTANCE_DETAIL: `${API_PREFIX}/console/item-instances/:instance_id`,
+  ITEM_INSTANCE_USER: `${API_PREFIX}/console/item-instances/user/:user_id`,
+  ITEM_INSTANCE_TRANSFER: `${API_PREFIX}/console/item-instances/:instance_id/transfer`,
+  ITEM_INSTANCE_FREEZE: `${API_PREFIX}/console/item-instances/:instance_id/freeze`,
+  ITEM_INSTANCE_UNFREEZE: `${API_PREFIX}/console/item-instances/:instance_id/unfreeze`,
 
   // 孤立冻结资产
   ORPHAN_FROZEN_DETECT: `${API_PREFIX}/console/orphan-frozen/detect`,
@@ -92,7 +93,7 @@ export const ASSET_ENDPOINTS = {
   DEBT_LIMITS: `${API_PREFIX}/console/debt-management/limits`, // 欠账上限配置
 
   // 交易订单
-  TRADE_ORDERS_LIST: `${API_PREFIX}/console/trade-orders`
+  TRADE_ORDER_LIST: `${API_PREFIX}/console/trade-orders`
 }
 
 // ========== API 调用方法 ==========
@@ -158,6 +159,47 @@ export const AssetAPI = {
   async getTransactions(params = {}) {
     const url = ASSET_ENDPOINTS.TRANSACTIONS + buildQueryString(params)
     return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 导出资产数据
+   *
+   * @description 导出用户资产余额数据为Excel或CSV文件
+   * @async
+   * @function exportAssets
+   *
+   * @param {Object} [params] - 导出参数
+   * @param {string} [params.type] - 资产类型筛选（如 'POINTS', 'DIAMOND'）
+   * @param {string} [params.format='excel'] - 导出格式（excel/csv）
+   * @param {number} [params.user_id] - 筛选指定用户
+   * @param {number} [params.limit=1000] - 导出数据条数限制（最大10000）
+   *
+   * @returns {Promise<Blob>} 文件流
+   *
+   * @example
+   * // 导出所有积分资产
+   * const blob = await AssetAPI.exportAssets({ type: 'POINTS', format: 'excel' })
+   *
+   * @see GET /api/v4/console/assets/export
+   */
+  async exportAssets(params = {}) {
+    const queryString = Object.keys(params).length > 0 ? buildQueryString(params) : ''
+    const url = ASSET_ENDPOINTS.EXPORT + queryString
+    const token = localStorage.getItem('admin_token')
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: '导出失败' }))
+      throw new Error(error.message || '导出失败')
+    }
+
+    return await response.blob()
   },
 
   /**
@@ -443,7 +485,7 @@ export const AssetAPI = {
    * @returns {Promise<Object>}
    */
   async getItemTemplates(params = {}) {
-    const url = ASSET_ENDPOINTS.ITEM_TEMPLATES_LIST + buildQueryString(params)
+    const url = ASSET_ENDPOINTS.ITEM_TEMPLATE_LIST + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -454,7 +496,7 @@ export const AssetAPI = {
    * @returns {Promise<Object>}
    */
   async getItemTemplateDetail(id) {
-    const url = buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATES_DETAIL, { id })
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATE_DETAIL, { id })
     return await request({ url, method: 'GET' })
   },
 
@@ -465,7 +507,7 @@ export const AssetAPI = {
    * @returns {Promise<Object>}
    */
   async createItemTemplate(data) {
-    return await request({ url: ASSET_ENDPOINTS.ITEM_TEMPLATES_CREATE, method: 'POST', data })
+    return await request({ url: ASSET_ENDPOINTS.ITEM_TEMPLATE_CREATE, method: 'POST', data })
   },
 
   /**
@@ -476,7 +518,7 @@ export const AssetAPI = {
    * @returns {Promise<Object>}
    */
   async updateItemTemplate(id, data) {
-    const url = buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATES_UPDATE, { id })
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATE_UPDATE, { id })
     return await request({ url, method: 'PUT', data })
   },
 
@@ -487,7 +529,7 @@ export const AssetAPI = {
    * @returns {Promise<Object>}
    */
   async deleteItemTemplate(id) {
-    const url = buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATES_DELETE, { id })
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATE_DELETE, { id })
     return await request({ url, method: 'DELETE' })
   },
 
@@ -500,7 +542,7 @@ export const AssetAPI = {
    * @returns {Promise<Object>}
    */
   async getItemInstances(params = {}) {
-    const url = ASSET_ENDPOINTS.ITEM_INSTANCES_LIST + buildQueryString(params)
+    const url = ASSET_ENDPOINTS.ITEM_INSTANCE_LIST + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -513,7 +555,7 @@ export const AssetAPI = {
    */
   async getUserItemInstances(userId, params = {}) {
     const url =
-      buildURL(ASSET_ENDPOINTS.ITEM_INSTANCES_USER, { user_id: userId }) + buildQueryString(params)
+      buildURL(ASSET_ENDPOINTS.ITEM_INSTANCE_USER, { user_id: userId }) + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -525,7 +567,7 @@ export const AssetAPI = {
    * @returns {Promise<Object>}
    */
   async transferItem(instanceId, data) {
-    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCES_TRANSFER, { instance_id: instanceId })
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCE_TRANSFER, { instance_id: instanceId })
     return await request({ url, method: 'POST', data })
   },
 
@@ -537,7 +579,7 @@ export const AssetAPI = {
    * @returns {Promise<Object>}
    */
   async freezeItem(instanceId, data) {
-    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCES_FREEZE, { instance_id: instanceId })
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCE_FREEZE, { instance_id: instanceId })
     return await request({ url, method: 'POST', data })
   },
 
@@ -548,7 +590,7 @@ export const AssetAPI = {
    * @returns {Promise<Object>}
    */
   async unfreezeItem(instanceId) {
-    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCES_UNFREEZE, { instance_id: instanceId })
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCE_UNFREEZE, { instance_id: instanceId })
     return await request({ url, method: 'POST' })
   }
 }

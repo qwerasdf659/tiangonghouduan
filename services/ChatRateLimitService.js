@@ -69,80 +69,125 @@ class ChatRateLimitService {
   static CLEANUP_THRESHOLD = 10 * 60 * 1000 // 10分钟
 
   /**
-   * 初始化定期清理机制
+   * 执行限流记录清理（统一清理方法）
    *
    * 业务场景：
    * - 防止内存泄漏
    * - 定期清理10分钟前的时间戳记录
+   * - 由 ScheduledTasks 统一调度，替代原有的三个独立 setInterval
+   *
+   * 清理逻辑：
+   * 1. 清理用户消息时间戳（userMessageTimestamps）
+   * 2. 清理管理员消息时间戳（adminMessageTimestamps）
+   * 3. 清理创建会话时间戳（createSessionTimestamps）
    *
    * @static
-   * @returns {void} 无返回值，启动三个 setInterval 定期清理内存中的时间戳记录
+   * @returns {Object} 清理结果统计
+   * @returns {number} return.user_cleaned - 用户消息记录清理数
+   * @returns {number} return.admin_cleaned - 管理员消息记录清理数
+   * @returns {number} return.session_cleaned - 创建会话记录清理数
+   * @returns {number} return.total_remaining - 剩余总记录数
+   *
+   * @example
+   * // ScheduledTasks 中调用
+   * const result = ChatRateLimitService.performCleanup()
+   * logger.info('聊天限流清理完成', result)
+   */
+  static performCleanup() {
+    const now = Date.now()
+    let userCleaned = 0
+    let adminCleaned = 0
+    let sessionCleaned = 0
+
+    // 1. 清理用户消息时间戳
+    ChatRateLimitService.userMessageTimestamps.forEach((timestamps, userId) => {
+      const recentTimestamps = timestamps.filter(
+        ts => now - ts < ChatRateLimitService.CLEANUP_THRESHOLD
+      )
+
+      if (recentTimestamps.length === 0) {
+        ChatRateLimitService.userMessageTimestamps.delete(userId)
+        userCleaned++
+      } else if (recentTimestamps.length < timestamps.length) {
+        ChatRateLimitService.userMessageTimestamps.set(userId, recentTimestamps)
+        userCleaned++
+      }
+    })
+
+    // 2. 清理管理员消息时间戳
+    ChatRateLimitService.adminMessageTimestamps.forEach((timestamps, adminId) => {
+      const recentTimestamps = timestamps.filter(
+        ts => now - ts < ChatRateLimitService.CLEANUP_THRESHOLD
+      )
+
+      if (recentTimestamps.length === 0) {
+        ChatRateLimitService.adminMessageTimestamps.delete(adminId)
+        adminCleaned++
+      } else if (recentTimestamps.length < timestamps.length) {
+        ChatRateLimitService.adminMessageTimestamps.set(adminId, recentTimestamps)
+        adminCleaned++
+      }
+    })
+
+    // 3. 清理创建会话时间戳
+    ChatRateLimitService.createSessionTimestamps.forEach((timestamps, userId) => {
+      const recentTimestamps = timestamps.filter(
+        ts => now - ts < ChatRateLimitService.CLEANUP_THRESHOLD
+      )
+
+      if (recentTimestamps.length === 0) {
+        ChatRateLimitService.createSessionTimestamps.delete(userId)
+        sessionCleaned++
+      } else if (recentTimestamps.length < timestamps.length) {
+        ChatRateLimitService.createSessionTimestamps.set(userId, recentTimestamps)
+        sessionCleaned++
+      }
+    })
+
+    // 计算总清理数
+    const totalCleaned = userCleaned + adminCleaned + sessionCleaned
+
+    // 返回清理统计（字段名与 scheduled_tasks.js 期望一致）
+    const result = {
+      user_messages_cleaned: userCleaned, // 用户消息记录清理数
+      admin_messages_cleaned: adminCleaned, // 管理员消息记录清理数
+      create_session_cleaned: sessionCleaned, // 创建会话记录清理数
+      total_cleaned: totalCleaned, // 总清理数
+      total_remaining:
+        ChatRateLimitService.userMessageTimestamps.size +
+        ChatRateLimitService.adminMessageTimestamps.size +
+        ChatRateLimitService.createSessionTimestamps.size
+    }
+
+    // 只有实际清理了数据时才输出 info 日志，否则只输出 debug 日志
+    if (totalCleaned > 0) {
+      logger.info('✅ ChatRateLimitService：限流记录清理完成', result)
+    } else {
+      logger.debug('✅ ChatRateLimitService：限流记录清理完成（无过期数据）', result)
+    }
+
+    return result
+  }
+
+  /**
+   * 初始化定期清理机制（已废弃）
+   *
+   * @deprecated 自 2026-01-30 起，清理任务已迁移至 ScheduledTasks 统一管理
+   *             请勿再调用此方法，改用 ScheduledTasks.scheduleChatRateLimitCleanup()
+   *
+   * 迁移说明：
+   * - 原有的三个独立 setInterval 已合并为 performCleanup() 方法
+   * - ScheduledTasks 每10分钟调用一次 performCleanup()
+   * - 使用 node-cron 替代 setInterval，支持更灵活的调度
+   *
+   * @static
+   * @returns {void} 仅打印警告日志，不再启动清理机制
    */
   static initCleanup() {
-    // 清理用户消息时间戳
-    setInterval(() => {
-      const now = Date.now()
-
-      ChatRateLimitService.userMessageTimestamps.forEach((timestamps, userId) => {
-        const recentTimestamps = timestamps.filter(
-          ts => now - ts < ChatRateLimitService.CLEANUP_THRESHOLD
-        )
-
-        if (recentTimestamps.length === 0) {
-          ChatRateLimitService.userMessageTimestamps.delete(userId)
-        } else {
-          ChatRateLimitService.userMessageTimestamps.set(userId, recentTimestamps)
-        }
-      })
-
-      logger.info(
-        `✅ 消息频率限制器：已清理过期记录，当前监控用户数: ${ChatRateLimitService.userMessageTimestamps.size}`
-      )
-    }, ChatRateLimitService.CLEANUP_INTERVAL)
-
-    // 清理管理员消息时间戳
-    setInterval(() => {
-      const now = Date.now()
-
-      ChatRateLimitService.adminMessageTimestamps.forEach((timestamps, adminId) => {
-        const recentTimestamps = timestamps.filter(
-          ts => now - ts < ChatRateLimitService.CLEANUP_THRESHOLD
-        )
-
-        if (recentTimestamps.length === 0) {
-          ChatRateLimitService.adminMessageTimestamps.delete(adminId)
-        } else {
-          ChatRateLimitService.adminMessageTimestamps.set(adminId, recentTimestamps)
-        }
-      })
-
-      logger.info(
-        `✅ 管理员消息频率限制器：已清理过期记录，当前监控管理员数: ${ChatRateLimitService.adminMessageTimestamps.size}`
-      )
-    }, ChatRateLimitService.CLEANUP_INTERVAL)
-
-    // 清理创建会话时间戳
-    setInterval(() => {
-      const now = Date.now()
-
-      ChatRateLimitService.createSessionTimestamps.forEach((timestamps, userId) => {
-        const recentTimestamps = timestamps.filter(
-          ts => now - ts < ChatRateLimitService.CLEANUP_THRESHOLD
-        )
-
-        if (recentTimestamps.length === 0) {
-          ChatRateLimitService.createSessionTimestamps.delete(userId)
-        } else {
-          ChatRateLimitService.createSessionTimestamps.set(userId, recentTimestamps)
-        }
-      })
-
-      logger.info(
-        `✅ 创建会话频率限制器：已清理过期记录，当前监控用户数: ${ChatRateLimitService.createSessionTimestamps.size}`
-      )
-    }, ChatRateLimitService.CLEANUP_INTERVAL)
-
-    logger.info('✅ ChatRateLimitService：定期清理机制已启动')
+    logger.warn(
+      '⚠️ ChatRateLimitService.initCleanup() 已废弃，清理任务已迁移至 ScheduledTasks 统一管理'
+    )
+    logger.info('💡 如需手动触发清理，请调用 ChatRateLimitService.performCleanup()')
   }
 
   /**
@@ -428,7 +473,16 @@ class ChatRateLimitService {
   }
 }
 
-// 服务加载时自动初始化清理机制
-ChatRateLimitService.initCleanup()
+// ============================================================
+// 重要变更说明（2026-01-30 定时任务统一管理改进方案）
+// ============================================================
+// 原代码：ChatRateLimitService.initCleanup() - 服务加载时自动启动3个setInterval
+// 问题：setInterval 分散管理，难以监控，多实例部署时无法协调
+// 解决方案：迁移至 ScheduledTasks 统一管理
+//   - 清理任务由 ScheduledTasks.scheduleChatRateLimitCleanup() 调度
+//   - 使用 node-cron ('*/10 * * * *') 每10分钟执行一次
+//   - 调用 ChatRateLimitService.performCleanup() 执行实际清理
+//   - 不需要分布式锁（内存级操作，各实例独立清理）
+// ============================================================
 
 module.exports = ChatRateLimitService

@@ -46,6 +46,11 @@ class ManagementStrategy {
    *
    * 业务场景：创建管理策略实例，初始化日志器和缓存系统
    *
+   * ⚠️ 2026-01-30 定时任务统一管理改进：
+   * - 原有的 startCacheCleanup() 中的 setInterval 已被移除
+   * - 缓存清理现在由 ScheduledTasks.scheduleLotteryEngineCacheCleanup() 统一管理
+   * - 详见 scripts/maintenance/scheduled_tasks.js (Task 27)
+   *
    * @example
    * const strategy = new ManagementStrategy()
    * // 创建实例后，可以使用forceWin、forceLose、adjustProbability等方法
@@ -57,8 +62,11 @@ class ManagementStrategy {
     this.cache = new Map()
     this.cacheTTL = 5 * 60 * 1000 // 5分钟
 
-    // 🔧 启动缓存清理定时器（每30秒执行一次）
-    this.startCacheCleanup()
+    /*
+     * 2026-01-30: setInterval 已移除
+     * 缓存清理现在由 ScheduledTasks (Task 27) 统一调度
+     * 如需手动清理，请调用 cleanupMemoryCache() 方法
+     */
   }
 
   /**
@@ -731,35 +739,61 @@ class ManagementStrategy {
   }
 
   /**
-   * 启动缓存清理定时器 - V4.1新增方法
+   * [已废弃] 启动缓存清理定时器
    *
-   * 业务场景：启动内存缓存的自动清理定时器，每30秒清理一次过期缓存
+   * ⚠️ 2026-01-30 定时任务统一管理改进：
+   * - 此方法中的 setInterval 已被移除
+   * - 缓存清理现在由 ScheduledTasks.scheduleLotteryEngineCacheCleanup() 统一管理
+   * - 详见 scripts/maintenance/scheduled_tasks.js (Task 27)
    *
-   * 注意：此方法在构造函数中自动调用，无需手动调用
-   *
+   * @deprecated 请使用 ScheduledTasks 中的 Task 27 替代
    * @private
-   * @returns {void} 无返回值，启动定时器定期清理内存缓存
+   * @returns {void} 无返回值
    */
   startCacheCleanup() {
-    setInterval(() => {
-      const now = Date.now()
-      let cleanedCount = 0
+    this.logger.warn(
+      'ManagementStrategy.startCacheCleanup() 已废弃，' +
+        '请使用 ScheduledTasks.scheduleLotteryEngineCacheCleanup() (Task 27) 替代'
+    )
+  }
 
-      for (const [key, value] of this.cache.entries()) {
-        if (now - value.timestamp > this.cacheTTL) {
-          this.cache.delete(key)
-          cleanedCount++
-        }
-      }
+  /**
+   * 清理内存缓存 - 供 ScheduledTasks 调用
+   *
+   * 业务场景：清理过期的内存缓存条目，由 ScheduledTasks (Task 27) 定时调度
+   *
+   * 清理逻辑：
+   * - 遍历所有缓存条目
+   * - 删除超过 TTL (5分钟) 的条目
+   * - 返回清理的条目数量
+   *
+   * @returns {number} 清理的缓存条目数量
+   *
+   * @example
+   * const strategy = new ManagementStrategy()
+   * const cleanedCount = strategy.cleanupMemoryCache()
+   * // 返回：5（清理了5个过期缓存条目）
+   */
+  cleanupMemoryCache() {
+    const now = Date.now()
+    let cleanedCount = 0
 
-      if (cleanedCount > 0) {
-        this.logger.debug('缓存自动清理', {
-          cleaned_count: cleanedCount,
-          remaining_count: this.cache.size,
-          timestamp: BeijingTimeHelper.now()
-        })
+    for (const [key, value] of this.cache.entries()) {
+      if (now - value.timestamp > this.cacheTTL) {
+        this.cache.delete(key)
+        cleanedCount++
       }
-    }, 30000) // 每30秒执行一次
+    }
+
+    if (cleanedCount > 0) {
+      this.logger.debug('ManagementStrategy 缓存清理完成', {
+        cleaned_count: cleanedCount,
+        remaining_count: this.cache.size,
+        timestamp: BeijingTimeHelper.now()
+      })
+    }
+
+    return cleanedCount
   }
 
   /**

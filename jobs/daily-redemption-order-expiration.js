@@ -45,11 +45,14 @@ class DailyRedemptionOrderExpiration {
        * 使用 TransactionManager 包装事务操作
        * RedemptionService.expireOrders() 需要事务上下文
        */
-      const expired_count = await TransactionManager.execute(async (transaction) => {
-        return await RedemptionService.expireOrders({ transaction })
-      }, {
-        operation: 'daily_redemption_order_expiration'
-      })
+      const expired_count = await TransactionManager.execute(
+        async transaction => {
+          return await RedemptionService.expireOrders({ transaction })
+        },
+        {
+          operation: 'daily_redemption_order_expiration'
+        }
+      )
 
       // 生成报告
       const duration_ms = Date.now() - start_time

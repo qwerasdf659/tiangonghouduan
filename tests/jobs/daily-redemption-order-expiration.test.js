@@ -192,7 +192,7 @@ describe('P3-2: DailyRedemptionOrderExpiration - 每日兑换订单过期任务'
 
       // 验证执行时间在合理范围内（小于30秒）
       expect(executionTime).toBeLessThan(30000)
-      
+
       // 验证报告返回
       expect(report).toBeDefined()
 

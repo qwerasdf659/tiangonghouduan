@@ -470,7 +470,7 @@ async function executeAction(action) {
   } finally {
     // 关闭数据库连接
     if (sequelize) {
-      await sequelize.close().catch(() => {})
+      await sequelize.close().catch(err => console.warn('数据库连接关闭失败:', err.message))
     }
   }
 }

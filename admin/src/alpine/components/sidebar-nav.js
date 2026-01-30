@@ -24,6 +24,8 @@ export function sidebarNav() {
     activeItemId: null,
     // 未处理的风控告警数量（动态获取）
     pendingAlertCount: 0,
+    // 未处理的抽奖告警数量（动态获取）
+    lotteryAlertCount: 0,
     // 用户权限等级（用于权限过滤）
     userRoleLevel: 0,
 
@@ -69,6 +71,12 @@ export function sidebarNav() {
             name: '实时监控',
             url: '/admin/lottery-management.html?page=lottery-metrics',
             badge: 'live'
+          },
+          {
+            id: 'lottery-alerts',
+            name: '抽奖告警',
+            url: '/admin/lottery-alerts.html',
+            badgeKey: 'lotteryAlertCount'
           },
           {
             id: 'lottery-campaigns',
@@ -197,8 +205,14 @@ export function sidebarNav() {
       // 获取未处理的风控告警数量
       this.fetchPendingAlertCount()
 
+      // 获取未处理的抽奖告警数量
+      this.fetchLotteryAlertCount()
+
       // 每5分钟刷新一次告警数量
-      setInterval(() => this.fetchPendingAlertCount(), 5 * 60 * 1000)
+      setInterval(() => {
+        this.fetchPendingAlertCount()
+        this.fetchLotteryAlertCount()
+      }, 5 * 60 * 1000)
     },
 
     /**
@@ -224,6 +238,34 @@ export function sidebarNav() {
         }
       } catch (error) {
         logger.warn('获取告警数量失败:', error.message)
+      }
+    },
+
+    /**
+     * 获取未处理的抽奖告警数量
+     */
+    async fetchLotteryAlertCount() {
+      try {
+        const token = localStorage.getItem('admin_token')
+        if (!token) return
+
+        const response = await fetch('/api/v4/console/lottery-monitoring/realtime-alerts?status=active&page_size=1', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.data) {
+            // 从 summary 获取 danger + warning 数量
+            const summary = data.data.summary || {}
+            this.lotteryAlertCount = (summary.danger || 0) + (summary.warning || 0)
+          }
+        }
+      } catch (error) {
+        logger.warn('获取抽奖告警数量失败:', error.message)
       }
     },
 

@@ -316,19 +316,22 @@ module.exports = sequelize => {
     }, {})
   }
 
-  // 定期清理任务（可以通过定时器调用）
+  /**
+   * 🗑️ [已废弃] 定期清理任务方法
+   *
+   * ⚠️ 2026-01-30 定时任务统一管理改进：
+   * - 此方法中的 setInterval 已被移除
+   * - 过期会话清理现在由 ScheduledTasks.scheduleAuthSessionCleanup() 统一管理
+   * - 详见 scripts/maintenance/scheduled_tasks.js (Task 26)
+   *
+   * @deprecated 请使用 ScheduledTasks 中的 Task 26 替代
+   * @returns {void} 无返回值
+   */
   AuthenticationSession.scheduleCleanup = function () {
-    // 每30分钟清理一次过期会话
-    const interval = 30 * 60 * 1000
-    setInterval(async () => {
-      try {
-        await this.cleanupExpiredSessions()
-      } catch (error) {
-        console.error('❌ 会话清理失败:', error)
-      }
-    }, interval)
-
-    console.log('⏰ 会话清理定时任务已启动，每30分钟执行一次')
+    console.warn(
+      '⚠️ AuthenticationSession.scheduleCleanup() 已废弃，' +
+        '请使用 ScheduledTasks.scheduleAuthSessionCleanup() (Task 26) 替代'
+    )
   }
 
   // 关联关系

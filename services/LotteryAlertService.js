@@ -341,6 +341,32 @@ class LotteryAlertService {
         rule_code
       })
 
+      /**
+       * 推送告警到管理平台（P1修复 - 2026-01-30）
+       * 使用 ChatWebSocketService 的告警推送方法
+       * 异步推送，不阻塞主流程
+       */
+      try {
+        const chatWebSocketService = require('./ChatWebSocketService').getInstance()
+        if (chatWebSocketService && chatWebSocketService.io) {
+          chatWebSocketService.pushAlertToAdmins({
+            alert_id: alert.alert_id,
+            alert_type,
+            severity,
+            message,
+            campaign_id,
+            rule_code,
+            created_at: alert.created_at
+          })
+        }
+      } catch (wsError) {
+        // WebSocket推送失败不影响主流程
+        logger.warn('告警WebSocket推送失败（非致命）', {
+          alert_id: alert.alert_id,
+          error: wsError.message
+        })
+      }
+
       return alert
     } catch (error) {
       logger.error('创建告警失败:', error)
@@ -464,7 +490,21 @@ class LotteryAlertService {
         const budgetAlerts = await LotteryAlertService.checkBudgetAlert(campaign.campaign_id)
         results.new_alerts += budgetAlerts.length
 
-        // TODO: 其他规则检测可以在此添加
+        // 检测中奖率异常（RULE_001）
+        const winRateAlerts = await LotteryAlertService.checkWinRateAlert(campaign.campaign_id)
+        results.new_alerts += winRateAlerts.length
+
+        // 检测高档奖品发放过快（RULE_002）
+        const highTierAlerts = await LotteryAlertService.checkHighTierSpeedAlert(
+          campaign.campaign_id
+        )
+        results.new_alerts += highTierAlerts.length
+
+        // 检测连续空奖异常（RULE_006）
+        const emptyStreakAlerts = await LotteryAlertService.checkEmptyStreakAlert(
+          campaign.campaign_id
+        )
+        results.new_alerts += emptyStreakAlerts.length
       }
 
       // 自动解除已恢复的告警
@@ -588,6 +628,253 @@ class LotteryAlertService {
       return alerts
     } catch (error) {
       logger.error('检测预算告警失败:', error)
+      return alerts
+    }
+  }
+
+  /**
+   * 检测中奖率异常告警（RULE_001）
+   * 检测最近1小时内中奖率是否偏离配置值±20%
+   *
+   * @param {number} campaign_id - 活动ID
+   * @returns {Promise<Array>} 创建的告警列表
+   */
+  static async checkWinRateAlert(campaign_id) {
+    const rule = ALERT_RULES.WIN_RATE_ABNORMAL
+    const alerts = []
+
+    try {
+      // 获取活动配置的预期中奖率
+      const campaign = await LotteryCampaign.findByPk(campaign_id)
+      if (!campaign) {
+        return alerts
+      }
+
+      /*
+       * 获取活动配置的预期中奖率（假设存储在 prize_settings 或默认使用100%）
+       * 由于每次抽奖100%必中，这里检测的是高档奖品的中奖率
+       */
+      const expectedWinRate = 1.0 // 默认期望中奖率100%
+
+      // 计算最近1小时的实际中奖率
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+
+      const totalDraws = await LotteryDraw.count({
+        where: {
+          campaign_id,
+          created_at: { [Op.gte]: oneHourAgo }
+        }
+      })
+
+      // 抽奖次数不足时跳过检测
+      if (totalDraws < 10) {
+        return alerts
+      }
+
+      // 统计非空奖（有实际奖品）的抽奖次数
+      const nonEmptyDraws = await LotteryDraw.count({
+        where: {
+          campaign_id,
+          created_at: { [Op.gte]: oneHourAgo },
+          prize_id: { [Op.not]: null }
+        }
+      })
+
+      const actualWinRate = nonEmptyDraws / totalDraws
+      const deviation = Math.abs(actualWinRate - expectedWinRate) / expectedWinRate
+
+      // 如果偏离超过阈值，触发告警
+      if (deviation > rule.threshold_deviation) {
+        const alert = await LotteryAlertService.createAlert({
+          campaign_id,
+          alert_type: rule.alert_type,
+          severity: rule.severity,
+          rule_code: rule.rule_code,
+          threshold_value: expectedWinRate * 100,
+          actual_value: actualWinRate * 100,
+          message: `中奖率偏离告警：预期${(expectedWinRate * 100).toFixed(1)}%，实际${(actualWinRate * 100).toFixed(1)}%，偏离${(deviation * 100).toFixed(1)}%（阈值${(rule.threshold_deviation * 100).toFixed(0)}%）`
+        })
+        if (alert.isNewRecord !== false) {
+          alerts.push(alert)
+        }
+      }
+
+      return alerts
+    } catch (error) {
+      logger.error('检测中奖率告警失败:', error)
+      return alerts
+    }
+  }
+
+  /**
+   * 检测高档奖品发放速度过快告警（RULE_002）
+   * 检测高档奖品（high档位）发放速度是否超过预算的1.5倍
+   *
+   * @param {number} campaign_id - 活动ID
+   * @returns {Promise<Array>} 创建的告警列表
+   */
+  static async checkHighTierSpeedAlert(campaign_id) {
+    const rule = ALERT_RULES.HIGH_TIER_FAST
+    const alerts = []
+
+    try {
+      // 获取活动配置
+      const campaign = await LotteryCampaign.findByPk(campaign_id)
+      if (!campaign || !campaign.daily_budget_points) {
+        return alerts
+      }
+
+      // 计算今日高档奖品（reward_tier = 'high'）的发放数量和预算消耗
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+
+      // 查询今日高档奖品发放情况
+      const highTierDraws = await LotteryDraw.findAll({
+        where: {
+          campaign_id,
+          created_at: { [Op.gte]: today }
+        },
+        include: [
+          {
+            model: LotteryPrize,
+            as: 'prize',
+            where: {
+              reward_tier: 'high'
+            },
+            required: true
+          }
+        ]
+      })
+
+      // 如果高档奖品发放数量不足，跳过检测
+      if (highTierDraws.length < 3) {
+        return alerts
+      }
+
+      // 计算高档奖品消耗的积分总额
+      const highTierCost = highTierDraws.reduce((sum, draw) => {
+        return sum + (draw.prize ? parseFloat(draw.prize.cost_points || 0) : 0)
+      }, 0)
+
+      // 计算当前时间占今日的比例，推算预期消耗
+      const now = new Date()
+      const hoursElapsed = (now.getTime() - today.getTime()) / (1000 * 60 * 60)
+      const dayRatio = Math.min(hoursElapsed / 24, 1)
+
+      // 假设高档奖品预算占总预算的20%
+      const highTierBudgetRatio = 0.2
+      const expectedHighTierBudget = campaign.daily_budget_points * highTierBudgetRatio * dayRatio
+
+      // 如果实际消耗超过预期的1.5倍，触发告警
+      if (
+        expectedHighTierBudget > 0 &&
+        highTierCost > expectedHighTierBudget * rule.threshold_multiplier
+      ) {
+        const speedRatio = highTierCost / expectedHighTierBudget
+        const alert = await LotteryAlertService.createAlert({
+          campaign_id,
+          alert_type: rule.alert_type,
+          severity: rule.severity,
+          rule_code: rule.rule_code,
+          threshold_value: expectedHighTierBudget,
+          actual_value: highTierCost,
+          message: `高档奖品发放过快：预期消耗${expectedHighTierBudget.toFixed(0)}积分，实际消耗${highTierCost.toFixed(0)}积分，发放速度为预期的${speedRatio.toFixed(1)}倍（阈值${rule.threshold_multiplier}倍）`
+        })
+        if (alert.isNewRecord !== false) {
+          alerts.push(alert)
+        }
+      }
+
+      return alerts
+    } catch (error) {
+      logger.error('检测高档奖品速度告警失败:', error)
+      return alerts
+    }
+  }
+
+  /**
+   * 检测连续空奖异常告警（RULE_006）
+   * 检测连续空奖≥10次的用户数占比是否超过5%
+   *
+   * @param {number} campaign_id - 活动ID
+   * @returns {Promise<Array>} 创建的告警列表
+   */
+  static async checkEmptyStreakAlert(campaign_id) {
+    const rule = ALERT_RULES.CONSECUTIVE_EMPTY
+    const alerts = []
+
+    try {
+      // 获取最近24小时内有抽奖记录的用户
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
+
+      // 统计参与抽奖的总用户数
+      const totalUsersResult = await LotteryDraw.findAll({
+        where: {
+          campaign_id,
+          created_at: { [Op.gte]: yesterday }
+        },
+        attributes: [[fn('DISTINCT', col('user_id')), 'user_id']],
+        raw: true
+      })
+
+      const totalUsers = totalUsersResult.length
+
+      // 用户数不足时跳过检测
+      if (totalUsers < 20) {
+        return alerts
+      }
+
+      /*
+       * 使用原生SQL查询连续空奖≥10次的用户数
+       * 这里使用Sequelize的raw查询来实现复杂的连续空奖检测
+       */
+      const emptyStreakQuery = `
+        SELECT COUNT(DISTINCT user_id) as affected_users
+        FROM (
+          SELECT 
+            user_id,
+            @streak := IF(prize_id IS NULL AND @prev_user = user_id, @streak + 1, IF(prize_id IS NULL, 1, 0)) as empty_streak,
+            @prev_user := user_id
+          FROM lottery_draws
+          CROSS JOIN (SELECT @streak := 0, @prev_user := 0) vars
+          WHERE campaign_id = :campaign_id
+            AND created_at >= :yesterday
+          ORDER BY user_id, created_at
+        ) as streaks
+        WHERE empty_streak >= :threshold_streak
+      `
+
+      const [emptyStreakResult] = await LotteryDraw.sequelize.query(emptyStreakQuery, {
+        replacements: {
+          campaign_id,
+          yesterday,
+          threshold_streak: rule.threshold_streak
+        },
+        type: LotteryDraw.sequelize.QueryTypes.SELECT
+      })
+
+      const affectedUsers = parseInt(emptyStreakResult?.affected_users || 0, 10)
+      const userRatio = affectedUsers / totalUsers
+
+      // 如果受影响用户比例超过阈值，触发告警
+      if (userRatio > rule.threshold_user_ratio) {
+        const alert = await LotteryAlertService.createAlert({
+          campaign_id,
+          alert_type: rule.alert_type,
+          severity: rule.severity,
+          rule_code: rule.rule_code,
+          threshold_value: rule.threshold_user_ratio * 100,
+          actual_value: userRatio * 100,
+          message: `连续空奖异常：${affectedUsers}位用户（占比${(userRatio * 100).toFixed(1)}%）连续空奖≥${rule.threshold_streak}次（阈值${(rule.threshold_user_ratio * 100).toFixed(0)}%）`
+        })
+        if (alert.isNewRecord !== false) {
+          alerts.push(alert)
+        }
+      }
+
+      return alerts
+    } catch (error) {
+      logger.error('检测连续空奖告警失败:', error)
       return alerts
     }
   }

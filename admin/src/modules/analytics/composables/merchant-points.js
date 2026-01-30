@@ -51,7 +51,7 @@ export function useMerchantPointsMethods() {
         if (this.merchantFilters.keyword) params.append('keyword', this.merchantFilters.keyword)
 
         const response = await this.apiGet(
-          `${STORE_ENDPOINTS.MERCHANT_POINTS_LIST}?${params}`,
+          `${STORE_ENDPOINTS.MERCHANT_POINT_LIST}?${params}`,
           {},
           { showLoading: false }
         )
@@ -75,7 +75,7 @@ export function useMerchantPointsMethods() {
     async loadMerchantStats() {
       try {
         const response = await this.apiGet(
-          STORE_ENDPOINTS.MERCHANT_POINTS_STATS,
+          STORE_ENDPOINTS.MERCHANT_POINT_STATS,
           {},
           { showLoading: false, showError: false }
         )
@@ -106,7 +106,7 @@ export function useMerchantPointsMethods() {
     async viewMerchantDetail(merchant) {
       try {
         const response = await this.apiGet(
-          buildURL(STORE_ENDPOINTS.MERCHANT_POINTS_DETAIL, {
+          buildURL(STORE_ENDPOINTS.MERCHANT_POINT_DETAIL, {
             id: merchant.merchant_id || merchant.id
           }),
           {},
@@ -129,7 +129,7 @@ export function useMerchantPointsMethods() {
     async viewMerchantHistory(merchant) {
       try {
         const response = await this.apiGet(
-          buildURL(STORE_ENDPOINTS.MERCHANT_POINTS_HISTORY, {
+          buildURL(STORE_ENDPOINTS.MERCHANT_POINT_HISTORY, {
             id: merchant.merchant_id || merchant.id
           }),
           {},

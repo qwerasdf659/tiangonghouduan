@@ -422,6 +422,117 @@ class ChatWebSocketService {
   }
 
   /**
+   * 推送告警到所有在线管理员（P1修复 - 2026-01-30）
+   *
+   * 专用于系统告警推送，支持静默窗口控制
+   *
+   * @param {Object} alert - 告警对象
+   * @param {number} alert.alert_id - 告警ID
+   * @param {string} alert.alert_type - 告警类型（win_rate/budget/inventory/user/system）
+   * @param {string} alert.severity - 严重程度（info/warning/danger）
+   * @param {string} alert.message - 告警消息
+   * @param {number} [alert.campaign_id] - 关联活动ID
+   * @param {string} [alert.rule_code] - 规则代码
+   * @param {Date|string} [alert.created_at] - 创建时间
+   * @returns {number} 成功推送的管理员数量
+   *
+   * @example
+   * // 推送告警示例
+   * chatWebSocketService.pushAlertToAdmins({
+   *   alert_id: 123,
+   *   alert_type: 'inventory',
+   *   severity: 'danger',
+   *   message: '奖品"iPhone 15"库存不足，剩余5件',
+   *   campaign_id: 1,
+   *   rule_code: 'RULE_005'
+   * })
+   */
+  pushAlertToAdmins(alert) {
+    let successCount = 0
+
+    // 构建告警推送数据
+    const alertData = {
+      alert_id: alert.alert_id,
+      alert_type: alert.alert_type,
+      severity: alert.severity,
+      message: alert.message,
+      campaign_id: alert.campaign_id || null,
+      rule_code: alert.rule_code || null,
+      created_at: alert.created_at || BeijingTimeHelper.now(),
+      timestamp: BeijingTimeHelper.now()
+    }
+
+    // 遍历所有在线管理员推送
+    for (const [admin_id, socketId] of this.connectedAdmins.entries()) {
+      try {
+        this.io.to(socketId).emit('new_alert', alertData)
+        successCount++
+      } catch (error) {
+        wsLogger.error('推送告警给管理员失败', {
+          admin_id,
+          alert_id: alert.alert_id,
+          error: error.message
+        })
+      }
+    }
+
+    wsLogger.info(`🚨 告警已推送给 ${successCount}/${this.connectedAdmins.size} 个在线管理员`, {
+      alert_id: alert.alert_id,
+      alert_type: alert.alert_type,
+      severity: alert.severity
+    })
+
+    return successCount
+  }
+
+  /**
+   * 推送未确认告警列表给新登录的管理员
+   *
+   * 管理员登录时调用，推送所有未处理的活跃告警
+   *
+   * @param {number} admin_id - 管理员ID
+   * @returns {Promise<number>} 推送的告警数量
+   */
+  async pushPendingAlertsToAdmin(admin_id) {
+    const socketId = this.connectedAdmins.get(admin_id)
+    if (!socketId) {
+      wsLogger.info(`⚠️ 管理员 ${admin_id} 不在线，无法推送待处理告警`)
+      return 0
+    }
+
+    try {
+      // 动态引入避免循环依赖
+      const LotteryAlertService = require('./LotteryAlertService')
+
+      // 获取所有活跃告警
+      const result = await LotteryAlertService.getAlertList({
+        status: 'active',
+        page: 1,
+        page_size: 100 // 最多推送100条
+      })
+
+      if (result.alerts && result.alerts.length > 0) {
+        this.io.to(socketId).emit('pending_alerts', {
+          alerts: result.alerts,
+          total: result.total,
+          timestamp: BeijingTimeHelper.now()
+        })
+
+        wsLogger.info(`📋 已推送 ${result.alerts.length} 条待处理告警给管理员 ${admin_id}`)
+        return result.alerts.length
+      }
+
+      return 0
+    } catch (error) {
+      wsLogger.error('推送待处理告警失败', {
+        admin_id,
+        error: error.message
+      })
+      return 0
+    }
+  }
+
+  /**
    * 获取WebSocket服务状态（异步方法 - 从数据库查询uptime）
    *
    * @returns {Promise<Object>} 状态信息对象（符合API文档规范）

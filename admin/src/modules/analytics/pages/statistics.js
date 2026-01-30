@@ -648,7 +648,7 @@ function statisticsPage() {
           params.append('end_date', this.filters.end_date)
         }
 
-        const response = await fetch(`${SYSTEM_ENDPOINTS.STATISTICS_EXPORT}?${params.toString()}`, {
+        const response = await fetch(`${SYSTEM_ENDPOINTS.STATISTIC_EXPORT}?${params.toString()}`, {
           headers: { Authorization: `Bearer ${getToken()}` }
         })
 
@@ -692,7 +692,7 @@ function statisticsPage() {
           params.append('end_date', this.filters.end_date)
         }
 
-        const response = await fetch(`${SYSTEM_ENDPOINTS.STATISTICS_EXPORT}?${params.toString()}`, {
+        const response = await fetch(`${SYSTEM_ENDPOINTS.STATISTIC_EXPORT}?${params.toString()}`, {
           headers: { Authorization: `Bearer ${getToken()}` }
         })
 

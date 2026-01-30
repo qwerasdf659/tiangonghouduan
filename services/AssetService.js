@@ -1043,6 +1043,79 @@ class AssetService {
   }
 
   /**
+   * 获取资产余额数据用于导出（管理后台导出功能）
+   *
+   * @description 查询所有用户资产余额数据，支持筛选条件，用于Excel/CSV导出
+   *
+   * @param {Object} params - 筛选参数
+   * @param {string} [params.asset_type] - 资产类型筛选（如 POINTS, DIAMOND）
+   * @param {string} [params.status] - 状态筛选（预留，暂不使用）
+   * @param {number} [params.user_id] - 指定用户ID筛选
+   * @param {number} [params.limit=1000] - 返回数据条数限制
+   * @param {Object} [options] - 可选配置
+   * @param {Object} [options.transaction] - Sequelize事务对象
+   * @returns {Promise<Array>} 资产余额数据列表（含用户信息）
+   *
+   * @example
+   * // 导出所有POINTS资产
+   * const data = await AssetService.getBalancesForExport({ asset_type: 'POINTS', limit: 5000 })
+   *
+   * @since 2026-01-30 P2任务：资产导出API实现
+   */
+  static async getBalancesForExport(params = {}, options = {}) {
+    const { asset_type, user_id, limit = 1000 } = params
+    const { transaction } = options
+
+    // 构建查询条件
+    const whereConditions = {}
+
+    if (asset_type) {
+      whereConditions.asset_code = asset_type
+    }
+
+    // 查询资产余额，关联账户和用户信息
+    const balances = await AccountAssetBalance.findAll({
+      where: whereConditions,
+      include: [
+        {
+          model: Account,
+          as: 'account',
+          required: true,
+          where: {
+            account_type: 'user', // 只导出用户账户资产
+            ...(user_id ? { user_id } : {})
+          },
+          include: [
+            {
+              model: User,
+              as: 'user',
+              attributes: ['user_id', 'nickname', 'mobile']
+            }
+          ]
+        }
+      ],
+      order: [
+        ['asset_code', 'ASC'],
+        ['account_id', 'ASC']
+      ],
+      limit: Math.min(limit, 10000), // 硬上限10000条
+      transaction
+    })
+
+    // 格式化返回数据
+    return balances.map(balance => ({
+      user_id: balance.account?.user?.user_id || balance.account?.user_id,
+      nickname: balance.account?.user?.nickname || null,
+      asset_code: balance.asset_code,
+      asset_name: balance.asset_code, // TODO: 可从 MaterialAssetType 获取显示名称
+      available_amount: balance.available_amount,
+      frozen_amount: balance.frozen_amount,
+      campaign_id: balance.campaign_id,
+      updated_at: balance.updated_at
+    }))
+  }
+
+  /**
    * 获取用户所有 BUDGET_POINTS 可用余额总和（跨所有活动）
    *
    * 业务场景：抽奖管线需要判断用户总预算积分是否充足

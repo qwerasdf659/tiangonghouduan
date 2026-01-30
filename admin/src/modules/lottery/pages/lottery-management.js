@@ -99,7 +99,7 @@ function registerLotteryManagementComponents() {
 
     subPages: [
       { id: 'lottery-metrics', title: '实时监控', icon: '📊', highlight: true },
-      { id: 'lottery-alerts', title: '告警中心', icon: '🚨', highlight: true },
+      // 告警中心已迁移至独立页面 /admin/lottery-alerts.html
       { id: 'lottery-risk-control', title: '风控面板', icon: '🛡️', highlight: true },
       { id: 'strategy-effectiveness', title: '策略效果分析', icon: '📈', highlight: true },
       { id: 'daily-report', title: '运营日报', icon: '📋', highlight: true },
@@ -329,10 +329,7 @@ function registerLotteryManagementComponents() {
                 await this.loadRedemptionCodes()
                 logger.debug('✅ [LotteryPage] 核销码数据加载完成')
                 break
-              case 'lottery-alerts':
-                logger.debug('🚨 [LotteryPage] 进入告警中心页面')
-                await this.loadAlerts()
-                break
+              // 告警中心已迁移至独立页面 /admin/lottery-alerts.html
               case 'lottery-risk-control':
                 logger.debug('🛡️ [LotteryPage] 进入风控面板页面')
                 await this.loadAbnormalUsers()

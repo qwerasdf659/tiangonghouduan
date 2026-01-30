@@ -237,10 +237,13 @@ describe('AnnouncementService - 公告通知服务测试', () => {
       it('创建公告时必填字段不能为空', async () => {
         // 由于 Sequelize 会校验必填字段，尝试创建空标题的公告应该失败
         await expect(
-          AnnouncementService.createAnnouncement({
-            title: '', // 空标题
-            content: '内容'
-          }, testUserId)
+          AnnouncementService.createAnnouncement(
+            {
+              title: '', // 空标题
+              content: '内容'
+            },
+            testUserId
+          )
         ).rejects.toThrow()
       })
     })
@@ -251,12 +254,15 @@ describe('AnnouncementService - 公告通知服务测试', () => {
       beforeEach(async () => {
         // 创建测试公告
         const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).substr(2, 4)}`
-        const announcement = await AnnouncementService.createAnnouncement({
-          title: `更新测试_${uniqueSuffix}`,
-          content: '原始内容',
-          type: 'notice',
-          priority: 'low'
-        }, testUserId)
+        const announcement = await AnnouncementService.createAnnouncement(
+          {
+            title: `更新测试_${uniqueSuffix}`,
+            content: '原始内容',
+            type: 'notice',
+            priority: 'low'
+          },
+          testUserId
+        )
         test_announcement_id = announcement.announcement_id
         created_announcement_ids.push(test_announcement_id)
       })
@@ -289,11 +295,14 @@ describe('AnnouncementService - 公告通知服务测试', () => {
       it('应该成功删除公告', async () => {
         // 准备：创建测试公告
         const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).substr(2, 4)}`
-        const announcement = await AnnouncementService.createAnnouncement({
-          title: `删除测试_${uniqueSuffix}`,
-          content: '待删除内容',
-          type: 'notice'
-        }, testUserId)
+        const announcement = await AnnouncementService.createAnnouncement(
+          {
+            title: `删除测试_${uniqueSuffix}`,
+            content: '待删除内容',
+            type: 'notice'
+          },
+          testUserId
+        )
 
         const announcement_id = announcement.announcement_id
 
@@ -323,10 +332,13 @@ describe('AnnouncementService - 公告通知服务测试', () => {
         const announcement_ids = []
         for (let i = 0; i < 2; i++) {
           const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).substr(2, 4)}`
-          const announcement = await AnnouncementService.createAnnouncement({
-            title: `批量停用测试_${i}_${uniqueSuffix}`,
-            content: '测试内容'
-          }, testUserId)
+          const announcement = await AnnouncementService.createAnnouncement(
+            {
+              title: `批量停用测试_${i}_${uniqueSuffix}`,
+              content: '测试内容'
+            },
+            testUserId
+          )
           announcement_ids.push(announcement.announcement_id)
           created_announcement_ids.push(announcement.announcement_id)
         }

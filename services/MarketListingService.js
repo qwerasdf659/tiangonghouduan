@@ -491,14 +491,17 @@ class MarketListingService {
     })
 
     if (existingListing) {
-      // 验证参数一致性
+      /*
+       * 幂等性参数一致性检查
+       * 统一使用 Number() 避免类型比较问题（数据库返回字符串，传入参数可能是数字）
+       */
       const parameterMismatch = []
-      if (existingListing.seller_user_id !== seller_user_id) {
+      if (Number(existingListing.seller_user_id) !== Number(seller_user_id)) {
         parameterMismatch.push(
           `seller_user_id: ${existingListing.seller_user_id} ≠ ${seller_user_id}`
         )
       }
-      if (existingListing.offer_item_instance_id !== item_instance_id) {
+      if (Number(existingListing.offer_item_instance_id) !== Number(item_instance_id)) {
         parameterMismatch.push(
           `item_instance_id: ${existingListing.offer_item_instance_id} ≠ ${item_instance_id}`
         )
@@ -1584,15 +1587,25 @@ class MarketListingService {
       throw error
     }
 
-    // ========== 6. 校验状态 ==========
-    if (listing.status !== 'on_sale') {
-      const error = new Error(`挂牌状态不可撤回: ${listing.status}，期望 on_sale`)
+    /*
+     * ========== 6. 校验状态 ==========
+     * 卖家可以撤回 on_sale（无买家订单）或 locked（有买家订单）状态的挂牌
+     * 已售出(sold)、已撤回(withdrawn)、已过期(expired)的挂牌不可再撤回
+     */
+    const withdrawableStatuses = ['on_sale', 'locked']
+    if (!withdrawableStatuses.includes(listing.status)) {
+      const error = new Error(
+        `挂牌状态不可撤回: ${listing.status}，期望 ${withdrawableStatuses.join(' 或 ')}`
+      )
       error.code = 'INVALID_LISTING_STATUS'
       error.statusCode = 400
       throw error
     }
 
-    // ========== 6.1 取消所有关联的买家订单并解冻资产（2026-01-30修复） ==========
+    /*
+     * ========== 6.1 取消所有关联的买家订单并解冻资产（2026-01-30修复） ==========
+     * 如果有买家订单（locked状态），先取消这些订单并解冻买家资产
+     */
     const cancelledOrders = await this._cancelBuyerOrdersForListing(listing_id, transaction)
 
     // ========== 7. 解冻卖家资产 ==========

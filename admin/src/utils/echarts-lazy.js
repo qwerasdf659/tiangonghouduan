@@ -179,7 +179,7 @@ export function preloadECharts() {
   } else {
     // 降级方案：延迟加载
     setTimeout(() => {
-      loadECharts().catch(() => {})
+      loadECharts().catch(err => console.warn('[ECharts] 延迟预加载失败:', err.message))
     }, 1000)
   }
 }

@@ -377,69 +377,64 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  *
  * 返回：活动详情 + ROI + 复购率 + 库存预警
  */
-router.get(
-  '/:campaign_id',
-  authenticateToken,
-  requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const campaignId = parseInt(req.params.campaign_id)
+router.get('/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const campaignId = parseInt(req.params.campaign_id)
 
-      if (!campaignId || isNaN(campaignId)) {
-        return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
-      }
-
-      // 获取 Service 实例
-      const analyticsService = getLotteryAnalyticsService(req)
-
-      // 通过 Service 访问 LotteryCampaign 模型
-      const LotteryCampaign = analyticsService.models.LotteryCampaign
-
-      // 查询活动详情
-      const campaign = await LotteryCampaign.findByPk(campaignId)
-      if (!campaign) {
-        return res.apiError('活动不存在', 'CAMPAIGN_NOT_FOUND', null, 404)
-      }
-
-      // 获取 Redis 客户端
-      const redis = await getRedis()
-
-      // 尝试从缓存获取 ROI 和复购率
-      let { roi, repeat_rate } = await getCachedROI(redis, campaignId)
-
-      // 缓存未命中，通过 Service 层实时计算
-      if (roi === null || repeat_rate === null) {
-        const calculated = await calculateROIviaService(analyticsService, campaignId)
-        roi = calculated.roi
-        repeat_rate = calculated.repeat_rate
-
-        // 缓存计算结果
-        await cacheROI(redis, campaignId, roi, repeat_rate)
-      }
-
-      // 计算库存预警
-      const stockWarning = await calculateStockWarning(analyticsService, campaignId)
-
-      const response = {
-        ...campaign.toJSON(),
-        roi,
-        repeat_rate,
-        stock_warning: stockWarning
-      }
-
-      logger.info('获取活动详情成功', {
-        admin_id: req.user.user_id,
-        campaign_id: campaignId,
-        roi,
-        repeat_rate
-      })
-
-      return res.apiSuccess(response, '获取活动详情成功')
-    } catch (error) {
-      logger.error('获取活动详情失败:', error)
-      return res.apiError(`查询失败：${error.message}`, 'GET_CAMPAIGN_DETAIL_FAILED', null, 500)
+    if (!campaignId || isNaN(campaignId)) {
+      return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
     }
+
+    // 获取 Service 实例
+    const analyticsService = getLotteryAnalyticsService(req)
+
+    // 通过 Service 访问 LotteryCampaign 模型
+    const LotteryCampaign = analyticsService.models.LotteryCampaign
+
+    // 查询活动详情
+    const campaign = await LotteryCampaign.findByPk(campaignId)
+    if (!campaign) {
+      return res.apiError('活动不存在', 'CAMPAIGN_NOT_FOUND', null, 404)
+    }
+
+    // 获取 Redis 客户端
+    const redis = await getRedis()
+
+    // 尝试从缓存获取 ROI 和复购率
+    let { roi, repeat_rate } = await getCachedROI(redis, campaignId)
+
+    // 缓存未命中，通过 Service 层实时计算
+    if (roi === null || repeat_rate === null) {
+      const calculated = await calculateROIviaService(analyticsService, campaignId)
+      roi = calculated.roi
+      repeat_rate = calculated.repeat_rate
+
+      // 缓存计算结果
+      await cacheROI(redis, campaignId, roi, repeat_rate)
+    }
+
+    // 计算库存预警
+    const stockWarning = await calculateStockWarning(analyticsService, campaignId)
+
+    const response = {
+      ...campaign.toJSON(),
+      roi,
+      repeat_rate,
+      stock_warning: stockWarning
+    }
+
+    logger.info('获取活动详情成功', {
+      admin_id: req.user.user_id,
+      campaign_id: campaignId,
+      roi,
+      repeat_rate
+    })
+
+    return res.apiSuccess(response, '获取活动详情成功')
+  } catch (error) {
+    logger.error('获取活动详情失败:', error)
+    return res.apiError(`查询失败：${error.message}`, 'GET_CAMPAIGN_DETAIL_FAILED', null, 500)
   }
-)
+})
 
 module.exports = router

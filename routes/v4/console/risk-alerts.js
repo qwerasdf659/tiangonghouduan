@@ -252,6 +252,33 @@ router.get('/types', authenticateToken, requireRoleLevel(100), async (req, res) 
 })
 
 /**
+ * POST /api/v4/console/risk-alerts/mark-all-read
+ * @desc 批量标记所有待处理告警为已读
+ * @access Admin only (role_level >= 100)
+ *
+ * @body {string} [alert_type] - 告警类型筛选（可选）
+ * @body {string} [severity] - 严重程度筛选（可选）
+ *
+ * @since 2026-01-30 前端告警中心功能支持
+ */
+router.post('/mark-all-read', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  const reviewed_by = req.user.user_id
+  const { alert_type, severity } = req.body
+
+  try {
+    const MerchantRiskControlService = getRiskControlService(req)
+    const result = await MerchantRiskControlService.markAllAsRead(reviewed_by, {
+      alert_type,
+      severity
+    })
+
+    return res.apiSuccess(result, result.message)
+  } catch (error) {
+    return handleServiceError(error, res, '批量标记告警已读')
+  }
+})
+
+/**
  * GET /api/v4/console/risk-alerts/:alert_id
  * @desc 获取风控告警详情
  * @access Admin only (role_level >= 100)

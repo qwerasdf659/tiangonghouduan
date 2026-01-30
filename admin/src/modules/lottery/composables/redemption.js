@@ -73,12 +73,12 @@ export function useRedemptionMethods() {
         logger.debug('[Redemption] 开始加载核销码统计...')
         logger.debug(
           '[Redemption] 统计API端点:',
-          LOTTERY_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_STATISTICS
+          LOTTERY_ENDPOINTS.BUSINESS_RECORD_REDEMPTION_STATISTICS
         )
 
         // apiGet 返回的是 { success, data } 格式
         const response = await this.apiGet(
-          LOTTERY_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_STATISTICS,
+          LOTTERY_ENDPOINTS.BUSINESS_RECORD_REDEMPTION_STATISTICS,
           {},
           { showLoading: false, showError: false }
         )
@@ -132,7 +132,7 @@ export function useRedemptionMethods() {
           params.append('redeemer_user_id', this.redemptionFilters.user_id)
         }
 
-        const url = `${LOTTERY_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_ORDERS}?${params}`
+        const url = `${LOTTERY_ENDPOINTS.BUSINESS_RECORD_REDEMPTION_ORDER}?${params}`
         logger.debug('[Redemption] 列表API URL:', url)
 
         // apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }
@@ -181,7 +181,7 @@ export function useRedemptionMethods() {
       try {
         // apiGet 返回的是 response.data，不是完整 response 对象
         const data = await this.apiGet(
-          buildURL(LOTTERY_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_DETAIL, { order_id: orderId }),
+          buildURL(LOTTERY_ENDPOINTS.BUSINESS_RECORD_REDEMPTION_DETAIL, { order_id: orderId }),
           {},
           { showLoading: true }
         )
@@ -224,7 +224,7 @@ export function useRedemptionMethods() {
       try {
         // apiCall 成功时返回 response.data，失败时抛出错误
         await this.apiCall(
-          buildURL(LOTTERY_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_REDEEM, {
+          buildURL(LOTTERY_ENDPOINTS.BUSINESS_RECORD_REDEMPTION_REDEEM, {
             order_id: this.redeemForm.order_id
           }),
           {
@@ -259,7 +259,7 @@ export function useRedemptionMethods() {
         async () => {
           // apiCall 成功时返回 response.data，失败时抛出错误
           await this.apiCall(
-            buildURL(LOTTERY_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_CANCEL, { order_id: orderId }),
+            buildURL(LOTTERY_ENDPOINTS.BUSINESS_RECORD_REDEMPTION_CANCEL, { order_id: orderId }),
             { method: 'POST' }
           )
           // 如果没有抛出错误，则表示成功
@@ -326,7 +326,7 @@ export function useRedemptionMethods() {
         async () => {
           logger.debug('[Redemption] 执行批量过期API调用...')
           // apiCall 成功时返回 response.data，失败时抛出错误
-          await this.apiCall(LOTTERY_ENDPOINTS.BUSINESS_RECORDS_BATCH_EXPIRE, {
+          await this.apiCall(LOTTERY_ENDPOINTS.BUSINESS_RECORD_BATCH_EXPIRE, {
             method: 'POST',
             data: { order_ids: this.redemptionSelectedIds }
           })
@@ -348,7 +348,7 @@ export function useRedemptionMethods() {
         if (this.redemptionFilters.status) params.append('status', this.redemptionFilters.status)
         params.append('format', 'csv')
 
-        const exportUrl = LOTTERY_ENDPOINTS.BUSINESS_RECORDS_EXPORT + '?' + params.toString()
+        const exportUrl = LOTTERY_ENDPOINTS.BUSINESS_RECORD_EXPORT + '?' + params.toString()
 
         // 获取Token
         const token = localStorage.getItem('admin_token')

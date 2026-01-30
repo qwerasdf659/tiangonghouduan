@@ -4,8 +4,8 @@
  * 🔧 Redis 模拟工具 - 熔断测试专用（完整版）
  *
  * @description 提供完整的 Redis 模拟功能，用于测试系统在 Redis 不可用时的降级行为
- * @version V4.7 - 完整 UnifiedRedisClient 兼容 + 事务/管道支持
- * @date 2026-01-28
+ * @version V4.8 - ioredis 特有方法支持（scanStream/defineCommand）
+ * @date 2026-01-30
  *
  * 核心功能：
  * 1. 模拟 Redis 连接状态（connected/disconnected/error/connecting/reconnecting）
@@ -14,6 +14,7 @@
  * 4. **完整兼容项目 UnifiedRedisClient 架构**（V4.7新增）
  * 5. **支持 multi/pipeline 事务和管道操作**（V4.7新增）
  * 6. **支持有序集合操作 zadd/zremrangebyscore/zcard/zcount**（V4.7新增）
+ * 7. **支持 ioredis 特有方法 scanStream/defineCommand/pttl**（V4.8新增）
  *
  * 使用场景：
  * - 测试 Redis 不可用时系统的降级行为（熔断测试）
@@ -22,6 +23,7 @@
  * - 测试 Redis 超时/连接错误处理
  * - 测试限流器、分布式锁等高级功能在 Redis 故障时的行为
  * - **通过 Jest Mock 替换真实 UnifiedRedisClient 进行集成测试**（V4.7新增）
+ * - **测试流式扫描和自定义命令场景**（V4.8新增）
  *
  * 设计原则：
  * - 不修改实际 Redis 连接，仅在测试层面进行模拟
@@ -29,6 +31,7 @@
  * - 提供丰富的故障注入场景（超时/间歇性故障/只读模式等）
  * - 自动清理，不影响其他测试
  * - **API 与 UnifiedRedisClient 保持一致，支持无缝替换**（V4.7新增）
+ * - **API 与 ioredis 原生方法保持一致**（V4.8新增）
  *
  * 模块结构：
  * - REDIS_STATUS：Redis 连接状态枚举
@@ -36,6 +39,7 @@
  * - MockRedisClient：模拟 ioredis 客户端（底层）
  * - MockMulti：模拟 Redis 事务（multi）
  * - MockPipeline：模拟 Redis 管道（pipeline）
+ * - MockScanStream：模拟 ioredis scanStream 返回的流（V4.8新增）
  * - MockUnifiedRedisClient：模拟项目 UnifiedRedisClient（高层封装）
  * - CircuitBreakerTestController：熔断测试控制器
  * - CIRCUIT_BREAKER_SCENARIOS：预定义测试场景
@@ -322,6 +326,157 @@ class MockPipeline {
       }
     }
     return results
+  }
+}
+
+// ==================== Mock Scan Stream (ioredis特有) ====================
+
+/**
+ * Mock ScanStream 类 - 模拟 ioredis 的 scanStream 返回的流对象
+ *
+ * @description 模拟 ioredis 的 scanStream 方法返回的 Readable Stream
+ * 支持 'data'、'end'、'error' 事件
+ *
+ * @example
+ * const stream = mockClient.scanStream({ match: 'user:*', count: 100 })
+ * stream.on('data', (keys) => {
+ *   console.log('Found keys:', keys)
+ * })
+ * stream.on('end', () => {
+ *   console.log('Scan completed')
+ * })
+ * stream.on('error', (err) => {
+ *   console.error('Scan error:', err)
+ * })
+ */
+class MockScanStream extends EventEmitter {
+  /**
+   * 创建 Mock ScanStream 实例
+   *
+   * @param {MockRedisClient} client - 父 Mock Redis 客户端
+   * @param {Object} options - 扫描配置选项
+   * @param {string} options.match - 匹配模式（默认 '*'）
+   * @param {number} options.count - 每次迭代返回的近似数量（默认 10）
+   * @param {boolean} options._should_error - 内部标志：是否应发出错误（测试用）
+   */
+  constructor(client, options = {}) {
+    super()
+    this._client = client
+    this._options = {
+      match: '*',
+      count: 10,
+      ...options
+    }
+    this._cursor = 0
+    this._finished = false
+    this._paused = false
+
+    // 延迟启动扫描，让调用者有时间绑定事件监听器
+    process.nextTick(() => this._startScan())
+  }
+
+  /**
+   * 开始扫描过程
+   * @private
+   */
+  async _startScan() {
+    // 检查是否应该发出错误（用于测试断开连接场景）
+    if (this._options._should_error) {
+      this.emit('error', new Error('Redis connection not available'))
+      return
+    }
+
+    try {
+      // 获取匹配的所有键
+      const { match, count } = this._options
+      const regex = new RegExp('^' + match.replace(/\*/g, '.*') + '$')
+      const allKeys = Array.from(this._client._store.keys()).filter(key => regex.test(key))
+
+      // 分批发出数据（模拟真实的SCAN行为）
+      const batchSize = count
+      for (let i = 0; i < allKeys.length; i += batchSize) {
+        // 检查是否暂停
+        if (this._paused) {
+          await this._waitForResume()
+        }
+
+        // 检查是否已结束
+        if (this._finished) {
+          return
+        }
+
+        const batch = allKeys.slice(i, i + batchSize)
+        if (batch.length > 0) {
+          this.emit('data', batch)
+        }
+
+        // 添加小延迟模拟真实IO（可选）
+        if (this._client._latency_ms > 0) {
+          await new Promise(resolve => setTimeout(resolve, Math.min(this._client._latency_ms, 10)))
+        }
+      }
+
+      // 扫描完成
+      this._finished = true
+      this.emit('end')
+    } catch (error) {
+      this.emit('error', error)
+    }
+  }
+
+  /**
+   * 等待恢复（用于暂停/恢复功能）
+   * @private
+   * @returns {Promise<void>}
+   */
+  _waitForResume() {
+    return new Promise(resolve => {
+      const checkResume = () => {
+        if (!this._paused || this._finished) {
+          resolve()
+        } else {
+          setTimeout(checkResume, 10)
+        }
+      }
+      checkResume()
+    })
+  }
+
+  /**
+   * 暂停流
+   * @returns {MockScanStream} 返回自身以支持链式调用
+   */
+  pause() {
+    this._paused = true
+    return this
+  }
+
+  /**
+   * 恢复流
+   * @returns {MockScanStream} 返回自身以支持链式调用
+   */
+  resume() {
+    this._paused = false
+    return this
+  }
+
+  /**
+   * 销毁流
+   * @returns {MockScanStream} 返回自身以支持链式调用
+   */
+  destroy() {
+    this._finished = true
+    this._paused = false
+    this.emit('close')
+    return this
+  }
+
+  /**
+   * 检查流是否已结束
+   * @returns {boolean} 是否已结束
+   */
+  get finished() {
+    return this._finished
   }
 }
 
@@ -887,6 +1042,161 @@ class MockRedisClient extends EventEmitter {
     return this._executeOperation('info', [section], () => {
       return `# Mock Redis Info\nredis_version:6.0.0-mock\nconnected_clients:1`
     })
+  }
+
+  // ==================== ioredis 特有方法（V4.8新增） ====================
+
+  /**
+   * PTTL 操作（毫秒级TTL）
+   *
+   * @description 返回键的剩余过期时间（毫秒）
+   * @param {string} key - 键名
+   * @returns {Promise<number>} 剩余过期时间（毫秒），键不存在返回-2，无过期时间返回-1
+   */
+  async pttl(key) {
+    return this._executeOperation('pttl', [key], () => {
+      // Mock实现：如果键存在则返回模拟的TTL（使用Map存储TTL信息）
+      if (!this._store.has(key)) {
+        return -2 // 键不存在
+      }
+      const ttlInfo = this._ttl_store ? this._ttl_store.get(key) : null
+      if (!ttlInfo) {
+        return -1 // 无过期时间
+      }
+      const remaining = ttlInfo.expires_at - Date.now()
+      return remaining > 0 ? remaining : -2
+    })
+  }
+
+  /**
+   * SCANSTREAM 操作 - ioredis 特有的流式扫描方法
+   *
+   * @description 返回一个 Readable Stream，用于遍历匹配的键
+   * ioredis 特有方法，用于高效遍历大量键
+   *
+   * @param {Object} options - 扫描配置选项
+   * @param {string} options.match - 匹配模式（如 'user:*'）
+   * @param {number} options.count - 每次迭代返回的近似数量
+   * @returns {MockScanStream} Mock Readable Stream 对象
+   *
+   * @example
+   * const stream = mockClient.scanStream({ match: 'user:*', count: 100 })
+   * stream.on('data', (keys) => {
+   *   console.log('Found keys:', keys)
+   * })
+   * stream.on('end', () => {
+   *   console.log('Scan completed')
+   * })
+   */
+  scanStream(options = {}) {
+    // 记录调用历史
+    this._stats.total_calls++
+    this._call_history.push({
+      operation: 'scanStream',
+      args: [options],
+      timestamp: Date.now()
+    })
+
+    // 检查连接状态
+    if (this._status !== REDIS_STATUS.CONNECTED) {
+      // 返回一个立即发出错误的流
+      const errorStream = new MockScanStream(this, { ...options, _should_error: true })
+      return errorStream
+    }
+
+    return new MockScanStream(this, options)
+  }
+
+  /**
+   * DEFINECOMMAND 方法 - ioredis 特有的自定义命令注册
+   *
+   * @description 注册自定义 Lua 脚本命令，使其可以像原生命令一样调用
+   * ioredis 特有方法，用于定义可复用的 Lua 脚本命令
+   *
+   * @param {string} name - 命令名称
+   * @param {Object} config - 命令配置
+   * @param {number} config.numberOfKeys - 脚本使用的键数量
+   * @param {string} config.lua - Lua 脚本内容
+   * @returns {void}
+   *
+   * @example
+   * mockClient.defineCommand('myCommand', {
+   *   numberOfKeys: 1,
+   *   lua: `return redis.call('get', KEYS[1])`
+   * })
+   *
+   * // 之后可以直接调用
+   * const result = await mockClient.myCommand('myKey')
+   */
+  defineCommand(name, config = {}) {
+    // 记录调用历史
+    this._stats.total_calls++
+    this._call_history.push({
+      operation: 'defineCommand',
+      args: [name, config],
+      timestamp: Date.now()
+    })
+
+    const { numberOfKeys = 0, lua = '' } = config
+
+    // 在 Mock 客户端上注册自定义命令
+    // 自定义命令作为实例方法动态添加
+    this[name] = async (...args) => {
+      return this._executeOperation(name, args, async () => {
+        // Mock 实现：根据脚本内容简单模拟
+        // 实际Lua脚本逻辑需要根据具体业务场景定制
+        const keys = args.slice(0, numberOfKeys)
+        const scriptArgs = args.slice(numberOfKeys)
+
+        // 简单的脚本模拟（支持常见的 GET/SET 操作）
+        if (lua.includes('redis.call') && lua.includes('get')) {
+          // 模拟 GET 类脚本
+          if (keys.length > 0) {
+            return this._store.get(keys[0]) || null
+          }
+        }
+
+        if (lua.includes('redis.call') && lua.includes('set')) {
+          // 模拟 SET 类脚本
+          if (keys.length > 0 && scriptArgs.length > 0) {
+            this._store.set(keys[0], scriptArgs[0])
+            return 'OK'
+          }
+        }
+
+        // 默认返回 null（复杂脚本需要具体场景定制）
+        return null
+      })
+    }
+
+    // 同时注册 Buffer 版本（ioredis 特性）
+    this[`${name}Buffer`] = async (...args) => {
+      const result = await this[name](...args)
+      // 将结果转换为 Buffer（Mock实现）
+      if (result === null) return null
+      if (typeof result === 'string') return Buffer.from(result)
+      return result
+    }
+
+    // 存储命令定义（用于测试验证）
+    if (!this._defined_commands) {
+      this._defined_commands = new Map()
+    }
+    this._defined_commands.set(name, { numberOfKeys, lua })
+
+    console.log(`[MockRedisClient] 已注册自定义命令: ${name}`)
+
+    // 返回 this 支持链式调用（与 ioredis API 一致）
+    return this
+  }
+
+  /**
+   * 获取已定义的自定义命令列表
+   *
+   * @returns {Map<string, Object>} 命令名称 -> 配置的映射
+   */
+  getDefinedCommands() {
+    return this._defined_commands || new Map()
   }
 
   /**
@@ -1554,6 +1864,44 @@ class MockUnifiedRedisClient {
     return await this._mockClient.scan(cursor, matchPattern, pattern, countKeyword, count)
   }
 
+  // ========== ioredis 特有方法（V4.8新增） ==========
+
+  /**
+   * PTTL 操作（毫秒级TTL）
+   * @param {string} key - 键名
+   * @returns {Promise<number>} 剩余过期时间（毫秒）
+   */
+  async pttl(key) {
+    return await this._mockClient.pttl(key)
+  }
+
+  /**
+   * SCANSTREAM 操作 - ioredis 特有的流式扫描方法
+   * @param {Object} options - 扫描配置选项
+   * @returns {MockScanStream} Mock Readable Stream 对象
+   */
+  scanStream(options = {}) {
+    return this._mockClient.scanStream(options)
+  }
+
+  /**
+   * DEFINECOMMAND 方法 - ioredis 特有的自定义命令注册
+   * @param {string} name - 命令名称
+   * @param {Object} config - 命令配置
+   * @returns {void}
+   */
+  defineCommand(name, config = {}) {
+    return this._mockClient.defineCommand(name, config)
+  }
+
+  /**
+   * 获取已定义的自定义命令列表
+   * @returns {Map<string, Object>} 命令名称 -> 配置的映射
+   */
+  getDefinedCommands() {
+    return this._mockClient.getDefinedCommands()
+  }
+
   async disconnect() {
     await this._mockClient.disconnect()
     this.isConnected = false
@@ -1718,6 +2066,7 @@ module.exports = {
   MockRedisClient,
   MockMulti,
   MockPipeline,
+  MockScanStream, // V4.8新增：ioredis scanStream 支持
   MockUnifiedRedisClient,
   CircuitBreakerTestController,
 

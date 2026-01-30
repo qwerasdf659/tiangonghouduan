@@ -75,8 +75,8 @@ export const CONTENT_ENDPOINTS = {
   FEEDBACK_STATUS: `${API_PREFIX}/console/system/feedbacks/:id/status`,
 
   // 活动管理
-  ACTIVITIES_LIST: `${API_PREFIX}/activities`,
-  ACTIVITIES_DETAIL: `${API_PREFIX}/activities/:id`
+  ACTIVITY_LIST: `${API_PREFIX}/activities`,
+  ACTIVITY_DETAIL: `${API_PREFIX}/activities/:id`
 }
 
 // ========== API 调用方法 ==========
@@ -342,7 +342,7 @@ export const ContentAPI = {
    * })
    */
   async getActivities(params = {}) {
-    const url = CONTENT_ENDPOINTS.ACTIVITIES_LIST + buildQueryString(params)
+    const url = CONTENT_ENDPOINTS.ACTIVITY_LIST + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -360,7 +360,7 @@ export const ContentAPI = {
    * logger.debug(result.data.name) // 活动名称
    */
   async getActivityDetail(id) {
-    const url = buildURL(CONTENT_ENDPOINTS.ACTIVITIES_DETAIL, { id })
+    const url = buildURL(CONTENT_ENDPOINTS.ACTIVITY_DETAIL, { id })
     return await request({ url, method: 'GET' })
   }
 }

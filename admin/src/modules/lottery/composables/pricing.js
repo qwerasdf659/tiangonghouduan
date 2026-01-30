@@ -60,7 +60,7 @@ export function usePricingMethods() {
       logger.debug('🔄 [Pricing] loadPricingConfigs 开始加载...')
       try {
         // 使用批量接口一次性获取所有定价配置
-        const response = await this.apiGet(LOTTERY_ENDPOINTS.PRICING_CONFIGS_ALL)
+        const response = await this.apiGet(LOTTERY_ENDPOINTS.PRICING_CONFIG_ALL)
 
         if (!response?.success) {
           logger.warn('[Pricing] 获取定价配置列表失败:', response?.message)

@@ -41,11 +41,16 @@ const TEST_TIMEOUT = 30000
 
 /**
  * 辅助函数：正确构造北京时间的日期边界
- * 注意：BeijingTimeHelper.todayStart()/todayEnd() 在服务器时区非北京时间时存在问题
- *       这里提供正确的北京时间边界构造方式
+ * 注意：使用 new Date() 获取真实的当前 UTC 时间，然后转换为北京时间
+ *       避免使用 createBeijingTime() 方法的时区问题
+ *
+ * 修复说明（2026-01-30）：
+ * - 原来使用 createBeijingTime() 会导致日期偏移问题
+ * - 现在直接使用 new Date() + toBeijingTime() 正确获取北京时间日期
  */
 function getCorrectBeijingDayBoundaries() {
-  const now = BeijingTimeHelper.createBeijingTime()
+  // 使用真实的当前时间（UTC），然后转换为北京时间字符串
+  const now = new Date()
   const beijingTimeStr = BeijingTimeHelper.toBeijingTime(now)
 
   // 解析北京时间字符串 "YYYY/MM/DD HH:mm:ss"

@@ -268,7 +268,7 @@ document.addEventListener('alpine:init', () => {
         Object.keys(params).forEach(k => !params[k] && delete params[k])
 
         const res = await request({
-          url: MARKET_ENDPOINTS.TRADE_ORDERS_LIST, // 使用正确的后端端点
+          url: MARKET_ENDPOINTS.TRADE_ORDER_LIST, // 使用正确的后端端点
           method: 'GET',
           params
         })
@@ -299,7 +299,7 @@ document.addEventListener('alpine:init', () => {
      */
     async loadTradeStats() {
       try {
-        const res = await request({ url: MARKET_ENDPOINTS.TRADE_ORDERS_STATS, method: 'GET' })
+        const res = await request({ url: MARKET_ENDPOINTS.TRADE_ORDER_STATS, method: 'GET' })
         if (res.success && res.data) {
           // 后端返回格式: { by_status: {...}, completed_summary: {...} }
           const byStatus = res.data.by_status || {}
@@ -385,7 +385,7 @@ document.addEventListener('alpine:init', () => {
     async loadMarketplaceSummary() {
       try {
         const res = await request({
-          url: MARKET_ENDPOINTS.C2C_MARKET_LISTINGS_SUMMARY,
+          url: MARKET_ENDPOINTS.C2C_MARKET_LISTING_SUMMARY,
           method: 'GET'
         })
         if (res.success && res.data) {
@@ -418,7 +418,7 @@ document.addEventListener('alpine:init', () => {
         if (params.status === 'all') delete params.status
 
         const res = await request({
-          url: MARKET_ENDPOINTS.C2C_MARKET_LISTINGS_USER_STATS,
+          url: MARKET_ENDPOINTS.C2C_MARKET_LISTING_USER_STATS,
           method: 'GET',
           params
         })
@@ -475,7 +475,7 @@ document.addEventListener('alpine:init', () => {
 
         // 使用正确的后端API路径
         const res = await request({
-          url: MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION,
+          url: MARKET_ENDPOINTS.BUSINESS_RECORD_REDEMPTION,
           method: 'GET',
           params
         })
@@ -523,7 +523,7 @@ document.addEventListener('alpine:init', () => {
 
     // 注意：后端 /api/v4/console/business-records/redemption-orders 是只读查询接口
     // 不支持审批/拒绝操作，管理员需通过核销操作处理订单
-    // 核销操作请使用 MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_REDEEM
+    // 核销操作请使用 MARKET_ENDPOINTS.BUSINESS_RECORD_REDEMPTION_REDEEM
 
     /**
      * 核销兑换订单
@@ -539,7 +539,7 @@ document.addEventListener('alpine:init', () => {
 
       try {
         const res = await request({
-          url: buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_REDEEM, {
+          url: buildURL(MARKET_ENDPOINTS.BUSINESS_RECORD_REDEMPTION_REDEEM, {
             order_id: order.order_id
           }),
           method: 'POST'
@@ -571,7 +571,7 @@ document.addEventListener('alpine:init', () => {
 
       try {
         const res = await request({
-          url: buildURL(MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_CANCEL, {
+          url: buildURL(MARKET_ENDPOINTS.BUSINESS_RECORD_REDEMPTION_CANCEL, {
             order_id: order.order_id
           }),
           method: 'POST'
@@ -734,7 +734,7 @@ document.addEventListener('alpine:init', () => {
       try {
         logger.info('[TradeManagement] 加载交易订单...', this.tradeFilters)
         // apiGet 返回 { success, data } 结构
-        const result = await this.apiGet(MARKET_ENDPOINTS.TRADE_ORDERS_LIST, {
+        const result = await this.apiGet(MARKET_ENDPOINTS.TRADE_ORDER_LIST, {
           ...this.tradeFilters,
           page: this.tradeCurrentPage,
           page_size: this.tradePageSize // 后端使用 snake_case
@@ -803,7 +803,7 @@ document.addEventListener('alpine:init', () => {
     async loadRedemptionOrders() {
       try {
         // apiGet 返回 { success, data } 结构
-        const result = await this.apiGet(MARKET_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION, {
+        const result = await this.apiGet(MARKET_ENDPOINTS.BUSINESS_RECORD_REDEMPTION, {
           ...this.redemptionFilters,
           page: this.redemptionCurrentPage,
           page_size: this.redemptionPageSize // 后端使用 snake_case

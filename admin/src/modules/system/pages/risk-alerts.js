@@ -36,6 +36,10 @@ import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { buildURL, request } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/index.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
+import { io } from 'socket.io-client'
+
+/** 获取认证Token */
+const getToken = () => localStorage.getItem('admin_token')
 
 // API请求封装
 const apiRequest = async (url, options = {}) => {
@@ -165,6 +169,15 @@ function riskAlertsPage() {
     /** ECharts 核心模块引用 */
     _echarts: null,
 
+    /** @type {Object|null} WebSocket连接实例 */
+    wsConnection: null,
+
+    /** @type {boolean} WebSocket连接状态 */
+    wsConnected: false,
+
+    /** @type {boolean} 浏览器通知权限状态 */
+    notificationEnabled: false,
+
     // ==================== 生命周期 ====================
 
     /**
@@ -214,6 +227,19 @@ function riskAlertsPage() {
         if (this.levelDistChart) this.levelDistChart.resize()
         if (this.typeDistChart) this.typeDistChart.resize()
       })
+
+      // 初始化WebSocket实时推送
+      this.initWebSocket()
+
+      // 请求浏览器通知权限
+      this.requestNotificationPermission()
+
+      // 页面卸载时断开WebSocket
+      window.addEventListener('beforeunload', () => {
+        if (this.wsConnection) {
+          this.wsConnection.disconnect()
+        }
+      })
     },
 
     /**
@@ -231,6 +257,219 @@ function riskAlertsPage() {
       }
       if (this.typeDistChart) {
         this.typeDistChart.dispose()
+      }
+      if (this.wsConnection) {
+        this.wsConnection.disconnect()
+      }
+    },
+
+    // ==================== WebSocket实时推送 ====================
+
+    /**
+     * 初始化WebSocket连接
+     * @method initWebSocket
+     * @description 连接WebSocket服务器并加入管理员房间以接收实时告警推送
+     * @returns {void}
+     */
+    initWebSocket() {
+      try {
+        const wsUrl = window.location.origin
+        logger.info('[RiskAlerts] 初始化WebSocket连接:', wsUrl)
+
+        this.wsConnection = io(wsUrl, {
+          auth: { token: getToken() },
+          transports: ['websocket', 'polling'],
+          path: '/socket.io'
+        })
+
+        this.wsConnection.on('connect', () => {
+          logger.info('[RiskAlerts] WebSocket连接成功')
+          this.wsConnected = true
+
+          // 加入管理员房间以接收告警推送
+          this.wsConnection.emit('join_admin_room')
+          logger.info('[RiskAlerts] 请求加入管理员房间')
+        })
+
+        // 监听加入房间确认（可选）
+        this.wsConnection.on('joined_admin_room', () => {
+          logger.info('[RiskAlerts] 已成功加入管理员房间')
+        })
+
+        // 监听新告警推送
+        this.wsConnection.on('new_alert', alert => {
+          logger.info('[RiskAlerts] 收到新告警:', alert)
+          this.handleNewAlert(alert)
+        })
+
+        // 监听未确认告警列表推送（管理员登录时）
+        this.wsConnection.on('pending_alerts', alerts => {
+          logger.info('[RiskAlerts] 收到未确认告警列表:', alerts?.length || 0)
+          if (alerts && alerts.length > 0) {
+            this.handlePendingAlerts(alerts)
+          }
+        })
+
+        this.wsConnection.on('disconnect', reason => {
+          logger.info('[RiskAlerts] WebSocket连接已断开:', reason)
+          this.wsConnected = false
+        })
+
+        this.wsConnection.on('connect_error', error => {
+          logger.warn('[RiskAlerts] WebSocket连接失败:', error.message)
+          this.wsConnected = false
+        })
+
+        this.wsConnection.on('error', error => {
+          logger.warn('[RiskAlerts] WebSocket错误:', error.message)
+        })
+      } catch (error) {
+        logger.error('[RiskAlerts] WebSocket初始化失败:', error)
+      }
+    },
+
+    /**
+     * 处理新告警推送
+     * @method handleNewAlert
+     * @param {Object} alert - 新告警对象
+     * @returns {void}
+     */
+    handleNewAlert(alert) {
+      // 添加到告警列表顶部
+      this.alerts.unshift(alert)
+
+      // 更新统计数据
+      if (alert.severity === 'critical' || alert.severity === 'high') {
+        this.stats.critical++
+      } else if (alert.severity === 'medium') {
+        this.stats.warning++
+      } else {
+        this.stats.info++
+      }
+
+      // 更新图表
+      this.updateCharts()
+
+      // 显示桌面通知
+      this.showAlertNotification(alert)
+
+      // 播放提示音
+      this.playAlertSound(alert.severity)
+
+      // 显示页面内通知
+      const severityText = this.getSeverityLabel(alert.severity)
+      this.showInfo(`新告警: ${severityText} - ${alert.message}`)
+    },
+
+    /**
+     * 处理未确认告警列表推送
+     * @method handlePendingAlerts
+     * @param {Array} alerts - 未确认告警列表
+     * @returns {void}
+     */
+    handlePendingAlerts(alerts) {
+      // 显示桌面通知提醒有未处理的告警
+      if (this.notificationEnabled && alerts.length > 0) {
+        new Notification('风控告警中心', {
+          body: `您有 ${alerts.length} 条未确认的告警需要处理`,
+          icon: '/admin/images/logo.png',
+          tag: 'pending-alerts'
+        })
+      }
+
+      // 如果当前告警列表为空，使用推送的数据
+      if (this.alerts.length === 0) {
+        this.alerts = alerts
+        this.updateCharts()
+      }
+    },
+
+    /**
+     * 请求浏览器通知权限
+     * @method requestNotificationPermission
+     * @returns {Promise<void>}
+     */
+    async requestNotificationPermission() {
+      if (!('Notification' in window)) {
+        logger.warn('[RiskAlerts] 浏览器不支持桌面通知')
+        return
+      }
+
+      if (Notification.permission === 'granted') {
+        this.notificationEnabled = true
+        logger.info('[RiskAlerts] 已有通知权限')
+      } else if (Notification.permission !== 'denied') {
+        try {
+          const permission = await Notification.requestPermission()
+          this.notificationEnabled = permission === 'granted'
+          logger.info('[RiskAlerts] 通知权限:', permission)
+        } catch (error) {
+          logger.warn('[RiskAlerts] 请求通知权限失败:', error)
+        }
+      }
+    },
+
+    /**
+     * 显示桌面通知
+     * @method showAlertNotification
+     * @param {Object} alert - 告警对象
+     * @returns {void}
+     */
+    showAlertNotification(alert) {
+      if (!this.notificationEnabled) return
+
+      try {
+        const severityText = this.getSeverityLabel(alert.severity)
+        const notification = new Notification(`风控告警 - ${severityText}`, {
+          body: alert.message || '新的风控告警需要处理',
+          icon: '/admin/images/logo.png',
+          tag: `alert-${alert.alert_id}`,
+          requireInteraction: alert.severity === 'critical' || alert.severity === 'high'
+        })
+
+        // 点击通知时聚焦窗口并查看详情
+        notification.onclick = () => {
+          window.focus()
+          this.viewAlertDetail(alert)
+          notification.close()
+        }
+      } catch (error) {
+        logger.warn('[RiskAlerts] 显示通知失败:', error)
+      }
+    },
+
+    /**
+     * 播放告警提示音
+     * @method playAlertSound
+     * @param {string} severity - 告警严重程度
+     * @returns {void}
+     */
+    playAlertSound(severity) {
+      try {
+        // 根据严重程度选择不同频率的提示音
+        const frequency = severity === 'critical' || severity === 'high' ? 800 : 500
+        const duration = severity === 'critical' || severity === 'high' ? 300 : 150
+
+        // 使用Web Audio API播放简单提示音
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+        const oscillator = audioContext.createOscillator()
+        const gainNode = audioContext.createGain()
+
+        oscillator.connect(gainNode)
+        gainNode.connect(audioContext.destination)
+
+        oscillator.frequency.value = frequency
+        oscillator.type = 'sine'
+        gainNode.gain.value = 0.3
+
+        oscillator.start()
+        setTimeout(() => {
+          oscillator.stop()
+          audioContext.close()
+        }, duration)
+      } catch (error) {
+        // 静默忽略音频播放失败
+        logger.debug('[RiskAlerts] 播放提示音失败:', error)
       }
     },
 

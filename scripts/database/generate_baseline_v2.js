@@ -432,7 +432,7 @@ ${tableNames
     }
   } catch (error) {
     console.error(`\n❌ 生成失败: ${error.message}`)
-    await sequelize.close().catch(() => {})
+    await sequelize.close().catch(err => console.warn('数据库连接关闭失败:', err.message))
     process.exit(1)
   }
 }

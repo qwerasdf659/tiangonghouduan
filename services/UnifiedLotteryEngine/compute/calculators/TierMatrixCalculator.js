@@ -304,20 +304,70 @@ class TierMatrixCalculator {
   /**
    * 从数据库加载矩阵配置
    *
-   * @param {number} campaign_id - 活动ID（可选，用于活动级配置）
+   * 实现逻辑（P0修复 - 2026-01-30）：
+   * 1. 调用 LotteryTierMatrixConfig.getFullMatrix() 获取数据库配置
+   * 2. 将数据库字段映射到计算器内部格式（high_multiplier → high）
+   * 3. 如果数据库无配置，回退到默认矩阵
+   *
+   * @param {number} campaign_id - 活动ID（可选，用于活动级配置，预留扩展）
    * @param {Object} _options - 额外选项（预留扩展）
    * @returns {Promise<Object>} 加载的矩阵配置
    */
   async loadFromDatabase(campaign_id = null, _options = {}) {
-    /*
-     * TODO: 实现从 lottery_tier_matrix_config 表加载配置
-     * 当前版本使用默认配置
-     */
-    this._log('debug', '从数据库加载矩阵配置（当前使用默认配置）', {
-      campaign_id
-    })
+    try {
+      // 动态引入模型（避免循环依赖）
+      const { LotteryTierMatrixConfig } = require('../../../../models')
 
-    return this.matrix
+      // 从数据库获取完整矩阵配置
+      const db_matrix = await LotteryTierMatrixConfig.getFullMatrix()
+
+      // 检查数据库是否有配置
+      if (!db_matrix || Object.keys(db_matrix).length === 0) {
+        this._log('warn', '数据库无矩阵配置，使用默认配置', { campaign_id })
+        return this.matrix
+      }
+
+      /*
+       * 将数据库配置映射到计算器内部格式
+       * 数据库字段：high_multiplier, mid_multiplier, low_multiplier, fallback_multiplier
+       * 内部格式：high, mid, low, fallback
+       */
+      for (const [budget_tier, pressure_configs] of Object.entries(db_matrix)) {
+        if (!this.matrix[budget_tier]) {
+          this.matrix[budget_tier] = {}
+        }
+
+        for (const [pressure_tier, db_values] of Object.entries(pressure_configs)) {
+          this.matrix[budget_tier][pressure_tier] = {
+            high: db_values.high_multiplier,
+            mid: db_values.mid_multiplier,
+            low: db_values.low_multiplier,
+            fallback: db_values.fallback_multiplier
+          }
+        }
+      }
+
+      // 统计加载的配置数量
+      const config_count = Object.values(db_matrix).reduce(
+        (sum, pressure_configs) => sum + Object.keys(pressure_configs).length,
+        0
+      )
+
+      this._log('info', '从数据库加载矩阵配置成功', {
+        campaign_id,
+        config_count,
+        budget_tiers: Object.keys(db_matrix)
+      })
+
+      return this.matrix
+    } catch (error) {
+      // 加载失败时回退到默认配置，不影响业务流程
+      this._log('error', '加载矩阵配置失败，使用默认配置', {
+        campaign_id,
+        error: error.message
+      })
+      return this.matrix
+    }
   }
 
   /**

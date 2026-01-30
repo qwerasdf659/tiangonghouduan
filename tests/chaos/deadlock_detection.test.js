@@ -221,7 +221,10 @@ describe('🔒 P3-2-3 死锁检测测试', () => {
   function analyzeTransactionError(error) {
     const msg = error.message.toLowerCase()
 
-    if (msg.includes('deadlock') || (msg.includes('lock wait timeout') && msg.includes('restarted'))) {
+    if (
+      msg.includes('deadlock') ||
+      (msg.includes('lock wait timeout') && msg.includes('restarted'))
+    ) {
       return 'DEADLOCK'
     }
     if (msg.includes('lock wait timeout') || msg.includes('innodb_lock_wait_timeout')) {
@@ -240,7 +243,10 @@ describe('🔒 P3-2-3 死锁检测测试', () => {
    * @returns {Promise<Object>} 执行结果
    */
   async function executeWithDeadlockRetry(transactionFn, options = {}) {
-    const { maxRetries = TEST_CONFIG.DEADLOCK_RETRY_COUNT, retryDelay = TEST_CONFIG.DEADLOCK_RETRY_DELAY } = options
+    const {
+      maxRetries = TEST_CONFIG.DEADLOCK_RETRY_COUNT,
+      retryDelay = TEST_CONFIG.DEADLOCK_RETRY_DELAY
+    } = options
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       const transaction = await sequelize.transaction({
@@ -296,7 +302,7 @@ describe('🔒 P3-2-3 死锁检测测试', () => {
    * @returns {Promise<Object>} 转账结果
    */
   async function executeTransfer(fromAccount, toAccount, amount) {
-    return await executeWithDeadlockRetry(async (transaction) => {
+    return await executeWithDeadlockRetry(async transaction => {
       // 锁定源账户
       const [fromRows] = await sequelize.query(
         `SELECT balance FROM ${testTableName} WHERE account_id = ? FOR UPDATE`,
@@ -653,7 +659,9 @@ describe('🔒 P3-2-3 死锁检测测试', () => {
 
       const result = await executeTransfer('account_A', 'account_B', largeTransferAmount)
 
-      console.log(`   📊 大额转账结果: ${result.success ? '成功' : '失败'} - ${result.error || 'OK'}`)
+      console.log(
+        `   📊 大额转账结果: ${result.success ? '成功' : '失败'} - ${result.error || 'OK'}`
+      )
 
       // 获取转账后状态
       const [afterRows] = await sequelize.query(
@@ -700,7 +708,7 @@ describe('🔒 P3-2-3 死锁检测测试', () => {
       const tasks = Array(updateCount)
         .fill(null)
         .map((_, index) => async () => {
-          return await executeWithDeadlockRetry(async (transaction) => {
+          return await executeWithDeadlockRetry(async transaction => {
             // 读取当前版本
             const [rows] = await sequelize.query(
               `SELECT balance, version FROM ${testTableName} WHERE account_id = 'account_A' FOR UPDATE`,
@@ -764,7 +772,9 @@ describe('🔒 P3-2-3 死锁检测测试', () => {
       console.log('='.repeat(80))
       console.log('📊 P3-2-3 死锁检测测试报告')
       console.log('='.repeat(80))
-      console.log(`📅 测试时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`)
+      console.log(
+        `📅 测试时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`
+      )
       console.log('')
       console.log('🧪 测试用例覆盖：')
       console.log('   P3-2-3-1 死锁场景模拟:')

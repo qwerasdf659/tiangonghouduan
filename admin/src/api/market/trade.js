@@ -17,12 +17,12 @@ export const TRADE_ENDPOINTS = {
   TRADE_ORDER_DETAIL: `${API_PREFIX}/console/marketplace/trade_orders/:order_id`,
 
   // 市场上架
-  LISTINGS_LIST: `${API_PREFIX}/console/marketplace/listings`,
-  LISTINGS_DETAIL: `${API_PREFIX}/console/marketplace/listings/:listing_id`,
-  LISTINGS_CREATE: `${API_PREFIX}/console/marketplace/listings`,
-  LISTINGS_UPDATE: `${API_PREFIX}/console/marketplace/listings/:listing_id`,
-  LISTINGS_DELETE: `${API_PREFIX}/console/marketplace/listings/:listing_id`,
-  LISTINGS_STATS: `${API_PREFIX}/console/marketplace/listing-stats`,
+  LISTING_LIST: `${API_PREFIX}/console/marketplace/listings`,
+  LISTING_DETAIL: `${API_PREFIX}/console/marketplace/listings/:listing_id`,
+  LISTING_CREATE: `${API_PREFIX}/console/marketplace/listings`,
+  LISTING_UPDATE: `${API_PREFIX}/console/marketplace/listings/:listing_id`,
+  LISTING_DELETE: `${API_PREFIX}/console/marketplace/listings/:listing_id`,
+  LISTING_STATS: `${API_PREFIX}/console/marketplace/listing-stats`,
 
   // 孤儿冻结检测
   ORPHAN_DETECT: `${API_PREFIX}/console/orphan-frozen/detect`,
@@ -31,9 +31,9 @@ export const TRADE_ENDPOINTS = {
 
   // C2C市场扩展
   C2C_MARKET_ORDERS: `${API_PREFIX}/console/c2c-market/orders`,
-  C2C_MARKET_ORDERS_STATS: `${API_PREFIX}/console/c2c-market/orders/stats`,
-  C2C_MARKET_LISTINGS_SUMMARY: `${API_PREFIX}/console/c2c-market/listings/summary`,
-  C2C_MARKET_LISTINGS_USER_STATS: `${API_PREFIX}/console/c2c-market/listings/user-stats`,
+  C2C_MARKET_ORDER_STATS: `${API_PREFIX}/console/c2c-market/orders/stats`,
+  C2C_MARKET_LISTING_SUMMARY: `${API_PREFIX}/console/c2c-market/listings/summary`,
+  C2C_MARKET_LISTING_USER_STATS: `${API_PREFIX}/console/c2c-market/listings/user-stats`,
 
   // 市场统计扩展
   MARKETPLACE_STATS_ITEM_STATS: `${API_PREFIX}/console/marketplace/stats/items`,
@@ -41,30 +41,30 @@ export const TRADE_ENDPOINTS = {
   MARKETPLACE_STATS: `${API_PREFIX}/console/marketplace/stats`,
 
   // 业务记录查询
-  BUSINESS_RECORDS_LOTTERY_CLEAR: `${API_PREFIX}/console/business-records/lottery-clear-settings`,
-  BUSINESS_RECORDS_LOTTERY_CLEAR_DETAIL: `${API_PREFIX}/console/business-records/lottery-clear-settings/:record_id`,
-  BUSINESS_RECORDS_REDEMPTION: `${API_PREFIX}/console/business-records/redemption-orders`,
-  BUSINESS_RECORDS_REDEMPTION_DETAIL: `${API_PREFIX}/console/business-records/redemption-orders/:order_id`,
-  BUSINESS_RECORDS_REDEMPTION_REDEEM: `${API_PREFIX}/console/business-records/redemption-orders/:order_id/redeem`,
-  BUSINESS_RECORDS_REDEMPTION_CANCEL: `${API_PREFIX}/console/business-records/redemption-orders/:order_id/cancel`,
-  BUSINESS_RECORDS_CONTENT_REVIEWS: `${API_PREFIX}/console/business-records/content-reviews`,
-  BUSINESS_RECORDS_CONTENT_REVIEWS_DETAIL: `${API_PREFIX}/console/business-records/content-reviews/:audit_id`,
-  BUSINESS_RECORDS_ROLE_CHANGES: `${API_PREFIX}/console/business-records/user-role-changes`,
-  BUSINESS_RECORDS_ROLE_CHANGES_DETAIL: `${API_PREFIX}/console/business-records/user-role-changes/:record_id`,
-  BUSINESS_RECORDS_STATUS_CHANGES: `${API_PREFIX}/console/business-records/user-status-changes`,
-  BUSINESS_RECORDS_STATUS_CHANGES_DETAIL: `${API_PREFIX}/console/business-records/user-status-changes/:record_id`,
-  BUSINESS_RECORDS_EXCHANGE: `${API_PREFIX}/console/business-records/exchange-records`,
-  BUSINESS_RECORDS_EXCHANGE_DETAIL: `${API_PREFIX}/console/business-records/exchange-records/:record_id`,
-  BUSINESS_RECORDS_CHAT: `${API_PREFIX}/console/business-records/chat-messages`,
-  BUSINESS_RECORDS_CHAT_DETAIL: `${API_PREFIX}/console/business-records/chat-messages/:message_id`,
-  BUSINESS_RECORDS_CHAT_STATS: `${API_PREFIX}/console/business-records/chat-messages/statistics/summary`,
+  BUSINESS_RECORD_LOTTERY_CLEAR: `${API_PREFIX}/console/business-records/lottery-clear-settings`,
+  BUSINESS_RECORD_LOTTERY_CLEAR_DETAIL: `${API_PREFIX}/console/business-records/lottery-clear-settings/:record_id`,
+  BUSINESS_RECORD_REDEMPTION: `${API_PREFIX}/console/business-records/redemption-orders`,
+  BUSINESS_RECORD_REDEMPTION_DETAIL: `${API_PREFIX}/console/business-records/redemption-orders/:order_id`,
+  BUSINESS_RECORD_REDEMPTION_REDEEM: `${API_PREFIX}/console/business-records/redemption-orders/:order_id/redeem`,
+  BUSINESS_RECORD_REDEMPTION_CANCEL: `${API_PREFIX}/console/business-records/redemption-orders/:order_id/cancel`,
+  BUSINESS_RECORD_CONTENT_REVIEW: `${API_PREFIX}/console/business-records/content-reviews`,
+  BUSINESS_RECORD_CONTENT_REVIEW_DETAIL: `${API_PREFIX}/console/business-records/content-reviews/:audit_id`,
+  BUSINESS_RECORD_ROLE_CHANGE: `${API_PREFIX}/console/business-records/user-role-changes`,
+  BUSINESS_RECORD_ROLE_CHANGE_DETAIL: `${API_PREFIX}/console/business-records/user-role-changes/:record_id`,
+  BUSINESS_RECORD_STATUS_CHANGE: `${API_PREFIX}/console/business-records/user-status-changes`,
+  BUSINESS_RECORD_STATUS_CHANGE_DETAIL: `${API_PREFIX}/console/business-records/user-status-changes/:record_id`,
+  BUSINESS_RECORD_EXCHANGE: `${API_PREFIX}/console/business-records/exchange-records`,
+  BUSINESS_RECORD_EXCHANGE_DETAIL: `${API_PREFIX}/console/business-records/exchange-records/:record_id`,
+  BUSINESS_RECORD_CHAT: `${API_PREFIX}/console/business-records/chat-messages`,
+  BUSINESS_RECORD_CHAT_DETAIL: `${API_PREFIX}/console/business-records/chat-messages/:message_id`,
+  BUSINESS_RECORD_CHAT_STATS: `${API_PREFIX}/console/business-records/chat-messages/statistics/summary`,
 
   // 交易订单扩展
-  TRADE_ORDERS_LIST: `${API_PREFIX}/console/trade-orders`,
-  TRADE_ORDERS_DETAIL: `${API_PREFIX}/console/trade-orders/:id`,
-  TRADE_ORDERS_STATS: `${API_PREFIX}/console/trade-orders/stats`,
-  TRADE_ORDERS_USER_STATS: `${API_PREFIX}/console/trade-orders/user/:user_id/stats`,
-  TRADE_ORDERS_BY_BUSINESS_ID: `${API_PREFIX}/console/trade-orders/by-business-id/:business_id`,
+  TRADE_ORDER_LIST: `${API_PREFIX}/console/trade-orders`,
+  TRADE_ORDER_DETAIL: `${API_PREFIX}/console/trade-orders/:id`,
+  TRADE_ORDER_STATS: `${API_PREFIX}/console/trade-orders/stats`,
+  TRADE_ORDER_USER_STATS: `${API_PREFIX}/console/trade-orders/user/:user_id/stats`,
+  TRADE_ORDER_BY_BUSINESS_ID: `${API_PREFIX}/console/trade-orders/by-business-id/:business_id`,
 
   // C2C市场扩展（补充）
   C2C_MARKET_LIST: `${API_PREFIX}/console/marketplace/listings`,
@@ -114,7 +114,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async getListings(params = {}) {
-    const url = TRADE_ENDPOINTS.LISTINGS_LIST + buildQueryString(params)
+    const url = TRADE_ENDPOINTS.LISTING_LIST + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -124,7 +124,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async getListingDetail(listingId) {
-    const url = buildURL(TRADE_ENDPOINTS.LISTINGS_DETAIL, { listing_id: listingId })
+    const url = buildURL(TRADE_ENDPOINTS.LISTING_DETAIL, { listing_id: listingId })
     return await request({ url, method: 'GET' })
   },
 
@@ -134,7 +134,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async createListing(data) {
-    return await request({ url: TRADE_ENDPOINTS.LISTINGS_CREATE, method: 'POST', data })
+    return await request({ url: TRADE_ENDPOINTS.LISTING_CREATE, method: 'POST', data })
   },
 
   /**
@@ -144,7 +144,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async updateListing(listingId, data) {
-    const url = buildURL(TRADE_ENDPOINTS.LISTINGS_UPDATE, { listing_id: listingId })
+    const url = buildURL(TRADE_ENDPOINTS.LISTING_UPDATE, { listing_id: listingId })
     return await request({ url, method: 'PUT', data })
   },
 
@@ -154,7 +154,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async deleteListing(listingId) {
-    const url = buildURL(TRADE_ENDPOINTS.LISTINGS_DELETE, { listing_id: listingId })
+    const url = buildURL(TRADE_ENDPOINTS.LISTING_DELETE, { listing_id: listingId })
     return await request({ url, method: 'DELETE' })
   },
 
@@ -163,7 +163,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async getListingStats() {
-    return await request({ url: TRADE_ENDPOINTS.LISTINGS_STATS, method: 'GET' })
+    return await request({ url: TRADE_ENDPOINTS.LISTING_STATS, method: 'GET' })
   },
 
   // ===== 孤儿冻结检测 =====
@@ -203,7 +203,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 记录列表
    */
   async getLotteryClearRecords(params = {}) {
-    const url = TRADE_ENDPOINTS.BUSINESS_RECORDS_LOTTERY_CLEAR + buildQueryString(params)
+    const url = TRADE_ENDPOINTS.BUSINESS_RECORD_LOTTERY_CLEAR + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -213,7 +213,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 记录详情
    */
   async getLotteryClearRecordDetail(recordId) {
-    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORDS_LOTTERY_CLEAR_DETAIL, {
+    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORD_LOTTERY_CLEAR_DETAIL, {
       record_id: recordId
     })
     return await request({ url, method: 'GET' })
@@ -225,7 +225,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 订单列表
    */
   async getRedemptionOrders(params = {}) {
-    const url = TRADE_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION + buildQueryString(params)
+    const url = TRADE_ENDPOINTS.BUSINESS_RECORD_REDEMPTION + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -235,7 +235,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 订单详情
    */
   async getRedemptionOrderDetail(orderId) {
-    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_DETAIL, { order_id: orderId })
+    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORD_REDEMPTION_DETAIL, { order_id: orderId })
     return await request({ url, method: 'GET' })
   },
 
@@ -246,7 +246,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 核销结果
    */
   async redeemOrder(orderId, data = {}) {
-    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_REDEEM, { order_id: orderId })
+    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORD_REDEMPTION_REDEEM, { order_id: orderId })
     return await request({ url, method: 'POST', data })
   },
 
@@ -257,7 +257,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 取消结果
    */
   async cancelRedemptionOrder(orderId, data = {}) {
-    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_CANCEL, { order_id: orderId })
+    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORD_REDEMPTION_CANCEL, { order_id: orderId })
     return await request({ url, method: 'POST', data })
   },
 
@@ -267,7 +267,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 记录列表
    */
   async getContentReviews(params = {}) {
-    const url = TRADE_ENDPOINTS.BUSINESS_RECORDS_CONTENT_REVIEWS + buildQueryString(params)
+    const url = TRADE_ENDPOINTS.BUSINESS_RECORD_CONTENT_REVIEW + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -277,7 +277,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 记录详情
    */
   async getContentReviewDetail(auditId) {
-    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORDS_CONTENT_REVIEWS_DETAIL, {
+    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORD_CONTENT_REVIEW_DETAIL, {
       audit_id: auditId
     })
     return await request({ url, method: 'GET' })
@@ -289,7 +289,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 记录列表
    */
   async getRoleChangeRecords(params = {}) {
-    const url = TRADE_ENDPOINTS.BUSINESS_RECORDS_ROLE_CHANGES + buildQueryString(params)
+    const url = TRADE_ENDPOINTS.BUSINESS_RECORD_ROLE_CHANGE + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -299,7 +299,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 记录详情
    */
   async getRoleChangeRecordDetail(recordId) {
-    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORDS_ROLE_CHANGES_DETAIL, {
+    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORD_ROLE_CHANGE_DETAIL, {
       record_id: recordId
     })
     return await request({ url, method: 'GET' })
@@ -311,7 +311,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 记录列表
    */
   async getStatusChangeRecords(params = {}) {
-    const url = TRADE_ENDPOINTS.BUSINESS_RECORDS_STATUS_CHANGES + buildQueryString(params)
+    const url = TRADE_ENDPOINTS.BUSINESS_RECORD_STATUS_CHANGE + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -321,7 +321,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 记录详情
    */
   async getStatusChangeRecordDetail(recordId) {
-    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORDS_STATUS_CHANGES_DETAIL, {
+    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORD_STATUS_CHANGE_DETAIL, {
       record_id: recordId
     })
     return await request({ url, method: 'GET' })
@@ -333,7 +333,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 记录列表
    */
   async getExchangeRecords(params = {}) {
-    const url = TRADE_ENDPOINTS.BUSINESS_RECORDS_EXCHANGE + buildQueryString(params)
+    const url = TRADE_ENDPOINTS.BUSINESS_RECORD_EXCHANGE + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -343,7 +343,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 记录详情
    */
   async getExchangeRecordDetail(recordId) {
-    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORDS_EXCHANGE_DETAIL, { record_id: recordId })
+    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORD_EXCHANGE_DETAIL, { record_id: recordId })
     return await request({ url, method: 'GET' })
   },
 
@@ -353,7 +353,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 记录列表
    */
   async getChatMessages(params = {}) {
-    const url = TRADE_ENDPOINTS.BUSINESS_RECORDS_CHAT + buildQueryString(params)
+    const url = TRADE_ENDPOINTS.BUSINESS_RECORD_CHAT + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -363,7 +363,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 消息详情
    */
   async getChatMessageDetail(messageId) {
-    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORDS_CHAT_DETAIL, { message_id: messageId })
+    const url = buildURL(TRADE_ENDPOINTS.BUSINESS_RECORD_CHAT_DETAIL, { message_id: messageId })
     return await request({ url, method: 'GET' })
   },
 
@@ -373,7 +373,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 统计汇总
    */
   async getChatMessageStats(params = {}) {
-    const url = TRADE_ENDPOINTS.BUSINESS_RECORDS_CHAT_STATS + buildQueryString(params)
+    const url = TRADE_ENDPOINTS.BUSINESS_RECORD_CHAT_STATS + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -385,7 +385,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 订单列表
    */
   async getTradeOrdersList(params = {}) {
-    const url = TRADE_ENDPOINTS.TRADE_ORDERS_LIST + buildQueryString(params)
+    const url = TRADE_ENDPOINTS.TRADE_ORDER_LIST + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -395,7 +395,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 订单详情
    */
   async getTradeOrderById(orderId) {
-    const url = buildURL(TRADE_ENDPOINTS.TRADE_ORDERS_DETAIL, { id: orderId })
+    const url = buildURL(TRADE_ENDPOINTS.TRADE_ORDER_DETAIL, { id: orderId })
     return await request({ url, method: 'GET' })
   },
 
@@ -405,7 +405,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 统计数据
    */
   async getTradeOrdersStats(params = {}) {
-    const url = TRADE_ENDPOINTS.TRADE_ORDERS_STATS + buildQueryString(params)
+    const url = TRADE_ENDPOINTS.TRADE_ORDER_STATS + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -417,7 +417,7 @@ export const TradeAPI = {
    */
   async getUserTradeOrdersStats(userId, params = {}) {
     const url =
-      buildURL(TRADE_ENDPOINTS.TRADE_ORDERS_USER_STATS, { user_id: userId }) +
+      buildURL(TRADE_ENDPOINTS.TRADE_ORDER_USER_STATS, { user_id: userId }) +
       buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
@@ -428,7 +428,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 订单信息
    */
   async getTradeOrderByBusinessId(businessId) {
-    const url = buildURL(TRADE_ENDPOINTS.TRADE_ORDERS_BY_BUSINESS_ID, { business_id: businessId })
+    const url = buildURL(TRADE_ENDPOINTS.TRADE_ORDER_BY_BUSINESS_ID, { business_id: businessId })
     return await request({ url, method: 'GET' })
   },
 

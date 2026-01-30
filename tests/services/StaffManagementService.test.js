@@ -291,9 +291,12 @@ describe('StaffManagementService - 员工管理服务测试', () => {
     it('入职缺少必要参数应该报错', async () => {
       // 执行：缺少必要参数
       await expect(
-        StaffManagementService.addStaffToStore({
-          // 缺少 user_id 和 store_id
-        }, { transaction: null })
+        StaffManagementService.addStaffToStore(
+          {
+            // 缺少 user_id 和 store_id
+          },
+          { transaction: null }
+        )
       ).rejects.toThrow()
     })
   })
@@ -303,11 +306,14 @@ describe('StaffManagementService - 员工管理服务测试', () => {
     it('禁用不存在的员工应该报错', async () => {
       // 执行：禁用不存在的员工
       await expect(
-        StaffManagementService.disableStaff({
-          user_id: 999999999,
-          store_id: 999999999,
-          reason: '测试禁用'
-        }, { transaction: null })
+        StaffManagementService.disableStaff(
+          {
+            user_id: 999999999,
+            store_id: 999999999,
+            reason: '测试禁用'
+          },
+          { transaction: null }
+        )
       ).rejects.toThrow()
     })
   })
@@ -317,11 +323,14 @@ describe('StaffManagementService - 员工管理服务测试', () => {
     it('更新不存在员工的角色应该报错', async () => {
       // 执行：更新不存在的员工
       await expect(
-        StaffManagementService.updateStaffRole({
-          user_id: 999999999,
-          store_id: 999999999,
-          new_role: 'manager'
-        }, { transaction: null })
+        StaffManagementService.updateStaffRole(
+          {
+            user_id: 999999999,
+            store_id: 999999999,
+            new_role: 'manager'
+          },
+          { transaction: null }
+        )
       ).rejects.toThrow()
     })
 
@@ -339,11 +348,14 @@ describe('StaffManagementService - 员工管理服务测试', () => {
 
       // 执行：使用无效角色
       await expect(
-        StaffManagementService.updateStaffRole({
-          user_id: staffRecord.user_id,
-          store_id: staffRecord.store_id,
-          new_role: 'invalid_role' // 无效角色
-        }, { transaction: null })
+        StaffManagementService.updateStaffRole(
+          {
+            user_id: staffRecord.user_id,
+            store_id: staffRecord.store_id,
+            new_role: 'invalid_role' // 无效角色
+          },
+          { transaction: null }
+        )
       ).rejects.toThrow()
     })
   })
@@ -353,9 +365,12 @@ describe('StaffManagementService - 员工管理服务测试', () => {
     it('调动缺少必要参数应该报错', async () => {
       // 执行：缺少必要参数
       await expect(
-        StaffManagementService.transferStaff({
-          // 缺少参数
-        }, { transaction: null })
+        StaffManagementService.transferStaff(
+          {
+            // 缺少参数
+          },
+          { transaction: null }
+        )
       ).rejects.toThrow()
     })
   })

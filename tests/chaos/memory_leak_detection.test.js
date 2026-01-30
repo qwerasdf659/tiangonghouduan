@@ -567,7 +567,9 @@ describe('🧪 P3-2-1 内存泄漏检测测试', () => {
           if (iterationCount % 120 === 0) {
             const elapsed = (Date.now() - startTime) / 1000 / 60
             const remaining = (testDuration - (Date.now() - startTime)) / 1000 / 60
-            console.log(`   ⏱️  进度: ${elapsed.toFixed(1)}分钟已过, ${remaining.toFixed(1)}分钟剩余`)
+            console.log(
+              `   ⏱️  进度: ${elapsed.toFixed(1)}分钟已过, ${remaining.toFixed(1)}分钟剩余`
+            )
           }
         }
 
@@ -845,7 +847,9 @@ describe('🧪 P3-2-1 内存泄漏检测测试', () => {
       const finalMemory = memorySampler.getCurrentMemory()
 
       console.log(`   📊 最终连接池状态:`, JSON.stringify(finalPool))
-      console.log(`   📊 内存变化: ${memorySampler.formatBytes(finalMemory.heap_used - initialMemory.heap_used)}`)
+      console.log(
+        `   📊 内存变化: ${memorySampler.formatBytes(finalMemory.heap_used - initialMemory.heap_used)}`
+      )
       console.log('')
 
       // 验证连接池正常（可以执行查询）
@@ -864,7 +868,9 @@ describe('🧪 P3-2-1 内存泄漏检测测试', () => {
       console.log('='.repeat(80))
       console.log('📊 P3-2-1 内存泄漏检测测试报告')
       console.log('='.repeat(80))
-      console.log(`📅 测试时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`)
+      console.log(
+        `📅 测试时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`
+      )
       console.log('')
       console.log('🧪 测试用例覆盖：')
       console.log('   P3-2-1-1 持续高压内存监控:')

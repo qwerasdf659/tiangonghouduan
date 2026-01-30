@@ -230,7 +230,7 @@ function sessionsPage() {
           params.append('user_id', this.filters.user_id)
         }
 
-        const url = USER_ENDPOINTS.SESSIONS_LIST + '?' + params.toString()
+        const url = USER_ENDPOINTS.SESSION_LIST + '?' + params.toString()
         logger.debug('[Sessions] 请求URL:', url)
 
         const response = await apiRequest(url)
@@ -266,7 +266,7 @@ function sessionsPage() {
     async loadStats() {
       try {
         logger.debug('[Sessions] 加载统计数据...')
-        const response = await apiRequest(USER_ENDPOINTS.SESSIONS_STATS)
+        const response = await apiRequest(USER_ENDPOINTS.SESSION_STATS)
 
         if (response && response.success) {
           const stats = response.data || {}
@@ -345,7 +345,7 @@ function sessionsPage() {
       this.globalLoading = true
 
       try {
-        const url = buildURL(USER_ENDPOINTS.SESSIONS_DEACTIVATE, { id: sessionId })
+        const url = buildURL(USER_ENDPOINTS.SESSION_DEACTIVATE, { id: sessionId })
         logger.debug('[Sessions] 撤销URL:', url)
 
         const response = await apiRequest(url, { method: 'POST' })
@@ -402,7 +402,7 @@ function sessionsPage() {
 
         for (const sessionId of selected) {
           try {
-            const url = buildURL(USER_ENDPOINTS.SESSIONS_DEACTIVATE, { id: sessionId })
+            const url = buildURL(USER_ENDPOINTS.SESSION_DEACTIVATE, { id: sessionId })
             logger.debug('[Sessions] 撤销会话:', sessionId)
             const response = await apiRequest(url, { method: 'POST' })
             if (response && response.success) {
@@ -456,7 +456,7 @@ function sessionsPage() {
 
       try {
         logger.debug('[Sessions] 发送清理请求...')
-        const response = await apiRequest(USER_ENDPOINTS.SESSIONS_CLEANUP, { method: 'POST' })
+        const response = await apiRequest(USER_ENDPOINTS.SESSION_CLEANUP, { method: 'POST' })
 
         if (response && response.success) {
           const count = response.data?.deleted_count || response.data?.count || 0
@@ -510,7 +510,7 @@ function sessionsPage() {
           is_admin: current_user.is_admin
         })
 
-        const response = await apiRequest(USER_ENDPOINTS.SESSIONS_DEACTIVATE_USER, {
+        const response = await apiRequest(USER_ENDPOINTS.SESSION_DEACTIVATE_USER, {
           method: 'POST',
           data: {
             user_type: current_user.is_admin ? 'admin' : 'user',

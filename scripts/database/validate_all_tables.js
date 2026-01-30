@@ -438,7 +438,7 @@ async function main() {
   } catch (error) {
     log(`\n❌ 校验失败: ${error.message}`, 'red')
     console.error(error.stack)
-    await sequelize.close().catch(() => {})
+    await sequelize.close().catch(err => console.warn('数据库连接关闭失败:', err.message))
     process.exit(1)
   }
 }

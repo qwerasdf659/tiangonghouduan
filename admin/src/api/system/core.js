@@ -19,23 +19,23 @@ export const SYSTEM_CORE_ENDPOINTS = {
   LOTTERY_TRENDS: `${API_PREFIX}/console/analytics/lottery/trends`,
   PERFORMANCE_REPORT: `${API_PREFIX}/console/analytics/performance/report`,
   TODAY_STATS: `${API_PREFIX}/console/analytics/stats/today`,
-  STATISTICS_EXPORT: `${API_PREFIX}/system/statistics/export`,
+  STATISTIC_EXPORT: `${API_PREFIX}/system/statistics/export`,
   HEALTH: '/health',
   VERSION: '/api/v4',
 
   // 系统设置
-  SETTINGS_LIST: `${API_PREFIX}/console/settings`,
-  SETTINGS_CATEGORY: `${API_PREFIX}/console/settings/:category`,
-  SETTINGS_UPDATE: `${API_PREFIX}/console/settings/:category`,
-  SETTINGS_GLOBAL: `${API_PREFIX}/console/settings/global`,
-  SETTINGS_LOTTERY: `${API_PREFIX}/console/settings/lottery`,
-  SETTINGS_SYSTEM: `${API_PREFIX}/console/settings/system`,
-  SETTINGS_PRIZE: `${API_PREFIX}/console/settings/prize`,
-  SETTINGS_SECURITY: `${API_PREFIX}/console/settings/security`,
-  SETTINGS_BASIC: `${API_PREFIX}/console/settings/basic`,
-  SETTINGS_POINTS: `${API_PREFIX}/console/settings/points`,
-  SETTINGS_NOTIFICATION: `${API_PREFIX}/console/settings/notification`,
-  SETTINGS_MARKETPLACE: `${API_PREFIX}/console/settings/marketplace`,
+  SETTING_LIST: `${API_PREFIX}/console/settings`,
+  SETTING_CATEGORY: `${API_PREFIX}/console/settings/:category`,
+  SETTING_UPDATE: `${API_PREFIX}/console/settings/:category`,
+  SETTING_GLOBAL: `${API_PREFIX}/console/settings/global`,
+  SETTING_LOTTERY: `${API_PREFIX}/console/settings/lottery`,
+  SETTING_SYSTEM: `${API_PREFIX}/console/settings/system`,
+  SETTING_PRIZE: `${API_PREFIX}/console/settings/prize`,
+  SETTING_SECURITY: `${API_PREFIX}/console/settings/security`,
+  SETTING_BASIC: `${API_PREFIX}/console/settings/basic`,
+  SETTING_POINTS: `${API_PREFIX}/console/settings/points`,
+  SETTING_NOTIFICATION: `${API_PREFIX}/console/settings/notification`,
+  SETTING_MARKETPLACE: `${API_PREFIX}/console/settings/marketplace`,
 
   // 缓存管理
   CACHE_CLEAR: `${API_PREFIX}/console/cache/clear`,
@@ -89,7 +89,7 @@ export const SystemCoreAPI = {
    * @returns {Promise<Object>} 设置概览响应
    */
   async getSettings() {
-    return await request({ url: SYSTEM_CORE_ENDPOINTS.SETTINGS_LIST, method: 'GET' })
+    return await request({ url: SYSTEM_CORE_ENDPOINTS.SETTING_LIST, method: 'GET' })
   },
 
   /**
@@ -98,7 +98,7 @@ export const SystemCoreAPI = {
    * @returns {Promise<Object>} 分类设置响应
    */
   async getSettingsByCategory(category) {
-    const url = buildURL(SYSTEM_CORE_ENDPOINTS.SETTINGS_CATEGORY, { category })
+    const url = buildURL(SYSTEM_CORE_ENDPOINTS.SETTING_CATEGORY, { category })
     return await request({ url, method: 'GET' })
   },
 
@@ -109,7 +109,7 @@ export const SystemCoreAPI = {
    * @returns {Promise<Object>} 更新结果响应
    */
   async updateSettings(category, data) {
-    const url = buildURL(SYSTEM_CORE_ENDPOINTS.SETTINGS_UPDATE, { category })
+    const url = buildURL(SYSTEM_CORE_ENDPOINTS.SETTING_UPDATE, { category })
     return await request({ url, method: 'PUT', data })
   },
 

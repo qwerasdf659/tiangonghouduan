@@ -35,6 +35,19 @@ class CacheManager {
    * @example
    * const cacheManager = new CacheManager()
    */
+  /**
+   * 构造函数
+   *
+   * 业务场景：初始化缓存管理器
+   *
+   * ⚠️ 2026-01-30 定时任务统一管理改进：
+   * - 原有的 setInterval 自动清理已被移除
+   * - 缓存清理现在由 ScheduledTasks.scheduleLotteryEngineCacheCleanup() 统一管理
+   * - 详见 scripts/maintenance/scheduled_tasks.js (Task 27)
+   *
+   * @example
+   * const cacheManager = new CacheManager()
+   */
   constructor() {
     this.cache = new Map()
     this.stats = {
@@ -45,13 +58,10 @@ class CacheManager {
     }
 
     /*
-     * 只在非测试环境启动自动清理
-     * 避免在Jest测试中导致超时问题
+     * 2026-01-30: setInterval 已移除
+     * 缓存清理现在由 ScheduledTasks (Task 27) 统一调度
+     * 如需手动清理，请调用 cleanup() 方法
      */
-    if (process.env.NODE_ENV !== 'test' && typeof jest === 'undefined') {
-      // 每10分钟清理一次过期缓存
-      this.cleanupInterval = setInterval(() => this.cleanup(), 10 * 60 * 1000)
-    }
   }
 
   /**

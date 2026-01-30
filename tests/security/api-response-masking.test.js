@@ -214,12 +214,14 @@ describe('🔐 API响应脱敏测试（P0-3）', () => {
      * P0-3-6 未认证请求被正确拒绝
      *
      * 确保没有Token的请求无法访问用户数据
+     * 📌 业务错误码：MISSING_TOKEN（缺少Token） vs UNAUTHORIZED（Token无效）
      */
     test('P0-3-6 未认证请求返回401', async () => {
       const response = await request(app).get('/api/v4/auth/profile').expect(401)
 
       expect(response.body.success).toBe(false)
-      expect(response.body.code).toBe('UNAUTHORIZED')
+      // 📌 缺少Token时返回 MISSING_TOKEN（语义更准确）
+      expect(response.body.code).toBe('MISSING_TOKEN')
     })
 
     /**

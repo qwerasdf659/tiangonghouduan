@@ -33,9 +33,11 @@ export function useStrategyState() {
       pressure_tier: '',
       cap_multiplier: 1.0,
       empty_weight_multiplier: 1.0,
-      win_probability: 0.1,
-      cap: 100,
-      empty_weight: 1.0,
+      // 档位权重乘数（后端P0新增字段）
+      high_multiplier: 0.0,
+      mid_multiplier: 0.0,
+      low_multiplier: 0.0,
+      fallback_multiplier: 1.0,
       description: ''
     },
 
@@ -156,6 +158,11 @@ export function useStrategyMethods() {
         pressure_tier: pressureTier,
         cap_multiplier: 1.0,
         empty_weight_multiplier: 1.0,
+        // 档位权重乘数默认值
+        high_multiplier: 0.0,
+        mid_multiplier: 0.0,
+        low_multiplier: 0.0,
+        fallback_multiplier: 1.0,
         description: ''
       }
       this.editingMatrixCell = { ...currentConfig }
@@ -182,6 +189,11 @@ export function useStrategyMethods() {
             pressure_tier: this.editingMatrixCell.pressure_tier,
             cap_multiplier: parseFloat(this.editingMatrixCell.cap_multiplier),
             empty_weight_multiplier: parseFloat(this.editingMatrixCell.empty_weight_multiplier),
+            // 档位权重乘数（后端P0新增字段）
+            high_multiplier: parseFloat(this.editingMatrixCell.high_multiplier) || 0,
+            mid_multiplier: parseFloat(this.editingMatrixCell.mid_multiplier) || 0,
+            low_multiplier: parseFloat(this.editingMatrixCell.low_multiplier) || 0,
+            fallback_multiplier: parseFloat(this.editingMatrixCell.fallback_multiplier) || 1,
             description: this.editingMatrixCell.description
           }
         })

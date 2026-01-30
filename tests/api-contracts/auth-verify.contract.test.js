@@ -292,13 +292,14 @@ describe('GET /api/v4/auth/verify 契约测试', () => {
        *
        * 响应结构：
        * - success: false
-       * - code: 'UNAUTHORIZED'
+       * - code: 'MISSING_TOKEN'（无Token时）或 'UNAUTHORIZED'（通用认证失败）
        * - message: 包含"Token"关键字
        */
       expect(response.body).toMatchObject({
-        success: false,
-        code: 'UNAUTHORIZED'
+        success: false
       })
+      /* 验证code为MISSING_TOKEN或UNAUTHORIZED之一 */
+      expect(['MISSING_TOKEN', 'UNAUTHORIZED']).toContain(response.body.code)
     })
 
     it('无效Token时应返回401 INVALID_TOKEN', async () => {

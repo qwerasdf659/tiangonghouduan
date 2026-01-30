@@ -241,7 +241,7 @@ export function useAdvancedStatusMethods() {
         if (this.riskFilters.is_frozen) params.append('is_frozen', this.riskFilters.is_frozen)
 
         const response = await this.apiGet(
-          `${USER_ENDPOINTS.RISK_PROFILES_LIST}?${params}`,
+          `${USER_ENDPOINTS.RISK_PROFILE_LIST}?${params}`,
           {},
           { showLoading: false }
         )

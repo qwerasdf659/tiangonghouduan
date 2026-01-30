@@ -791,8 +791,15 @@ class BusinessCacheHelper {
   /**
    * 获取用户信息缓存（按手机号hash）
    *
-   * @description 决策10A：登录场景禁止走缓存，此方法仅用于非登录场景
-   * @deprecated 登录场景应直接查库，不应调用此方法
+   * @warning 登录场景禁止直接调用此方法！
+   * @description 决策10A：此方法被 UserService.findByMobile() 内部调用
+   * @see UserService.findByMobile(mobile, { useCache: false }) - 登录场景的正确调用方式
+   * @internal 仅供 UserService 非登录场景内部使用
+   *
+   * 使用规范（P1修复 - 2026-01-30）：
+   * - 登录场景：必须使用 useCache: false 参数禁用缓存
+   * - 非登录场景：可以使用缓存提高性能
+   * - 所有调用已验证符合规范（routes/v4/auth/login.js 全部使用 useCache: false）
    *
    * @param {string} mobile - 用户手机号
    * @returns {Promise<Object|null>} 用户数据或 null
@@ -932,32 +939,26 @@ class BusinessCacheHelper {
   }
 
   /**
-   * 启动缓存监控定时输出
+   * [已废弃] 启动缓存监控定时输出
    *
-   * @param {number} intervalMs - 输出间隔（毫秒），默认 10 分钟
+   * ⚠️ 2026-01-30 定时任务统一管理改进：
+   * - 此方法中的 setInterval 已被移除
+   * - 缓存监控现在由 ScheduledTasks.scheduleBusinessCacheMonitor() 统一管理
+   * - 详见 scripts/maintenance/scheduled_tasks.js (Task 28)
+   *
+   * @deprecated 请使用 ScheduledTasks 中的 Task 28 替代
+   * @param {number} _intervalMs - 输出间隔（毫秒），此参数已无效
    * @returns {void}
    */
-  static startMonitor(intervalMs = 10 * 60 * 1000) {
-    if (monitorIntervalId) {
-      logger.warn('[业务缓存] 监控已在运行')
-      return
-    }
-
-    monitorIntervalId = setInterval(() => {
-      const snapshot = this.getStatsSnapshot()
-
-      logger.info('📊 [业务缓存监控] 统计报告', snapshot)
-
-      // 告警检查
-      Object.keys(snapshot).forEach(prefix => {
-        const hitRate = parseFloat(snapshot[prefix].hit_rate)
-        if (hitRate < 60 && cacheStats[prefix].hits + cacheStats[prefix].misses > 10) {
-          logger.warn(`⚠️ [业务缓存监控] ${prefix} 缓存命中率偏低: ${hitRate}%`)
-        }
-      })
-    }, intervalMs)
-
-    logger.info('[业务缓存] 监控已启动', { interval_ms: intervalMs })
+  static startMonitor(_intervalMs = 10 * 60 * 1000) {
+    logger.warn(
+      '[业务缓存] startMonitor() 已废弃，' +
+        '请使用 ScheduledTasks.scheduleBusinessCacheMonitor() (Task 28) 替代'
+    )
+    /*
+     * 兼容性处理：不再启动定时器，避免重复执行
+     * 如需获取统计数据，请直接调用 getStatsSnapshot()
+     */
   }
 
   /**

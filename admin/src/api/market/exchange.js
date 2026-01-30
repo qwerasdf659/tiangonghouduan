@@ -15,13 +15,13 @@ export const EXCHANGE_ENDPOINTS = {
   // 兑换市场物品
   EXCHANGE_ITEMS: `${API_PREFIX}/console/marketplace/exchange_market/items`,
   EXCHANGE_ITEM_DETAIL: `${API_PREFIX}/console/marketplace/exchange_market/items/:item_id`,
-  EXCHANGE_ITEMS_SIMPLE: `${API_PREFIX}/console/marketplace/exchange_market/items`,
+  EXCHANGE_ITEM_SIMPLE: `${API_PREFIX}/console/marketplace/exchange_market/items`,
 
   // 兑换订单
   EXCHANGE_ORDERS: `${API_PREFIX}/console/marketplace/exchange_market/orders`,
   EXCHANGE_ORDER_DETAIL: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no`,
   EXCHANGE_ORDER_STATUS: `${API_PREFIX}/shop/exchange/orders/:order_no/status`,
-  EXCHANGE_ORDERS_SIMPLE: `${API_PREFIX}/console/marketplace/exchange_market/orders`,
+  EXCHANGE_ORDER_SIMPLE: `${API_PREFIX}/console/marketplace/exchange_market/orders`,
   EXCHANGE_STATS: `${API_PREFIX}/console/marketplace/exchange_market/statistics`,
   EXCHANGE_FULL_STATS: `${API_PREFIX}/console/marketplace/exchange_market/statistics`,
   EXCHANGE_TREND: `${API_PREFIX}/console/marketplace/exchange_market/statistics/trend`,

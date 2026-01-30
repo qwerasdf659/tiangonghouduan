@@ -32,7 +32,8 @@ const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, proces
 })
 
 /**
- * 发送告警通知（示例实现，实际项目需要接入钉钉/邮件/短信）
+ * 发送告警通知
+ * 通过 LotteryAlertService 创建告警（内部自动触发 WebSocket 推送）
  *
  * @param {string} alert_type - 告警类型
  * @param {Object} data - 告警数据
@@ -41,13 +42,25 @@ async function send_alert(alert_type, data) {
   console.error(`\n🚨 [${alert_type}] 告警触发:`)
   console.error(JSON.stringify(data, null, 2))
 
-  // TODO: 实际项目中接入告警通道
-  // - 钉钉机器人 Webhook
-  // - 邮件通知
-  // - 短信通知
-  // - PagerDuty 等
+  // 通过 LotteryAlertService 创建告警（内部自动推送到管理后台）
+  try {
+    const LotteryAlertService = require('../../services/LotteryAlertService')
 
-  // 记录告警日志
+    // 创建告警记录并推送
+    const alert = await LotteryAlertService.createAlert({
+      campaign_id: data.campaign_id || null,
+      alert_type: 'system', // 对账脚本触发的是系统告警
+      severity: 'danger',
+      rule_code: `RECONCILIATION_${alert_type.toUpperCase()}`,
+      message: `对账脚本检测到异常: ${alert_type} - ${data.message || JSON.stringify(data)}`
+    })
+
+    console.log(`✅ 告警已推送至管理后台 (alert_id: ${alert.alert_id})`)
+  } catch (wsError) {
+    console.warn('⚠️ WebSocket推送失败（非致命）:', wsError.message)
+  }
+
+  // 记录告警日志（文件备份）
   const fs = require('fs')
   const path = require('path')
   const log_dir = path.join(__dirname, '../../logs/reconciliation')
@@ -64,7 +77,8 @@ async function send_alert(alert_type, data) {
 }
 
 /**
- * 冻结入口（示例实现）
+ * 冻结入口
+ * 通过 SystemConfigService 更新系统配置，禁用指定入口
  *
  * @param {string} entry_type - 入口类型
  * @param {Array} inconsistent_data - 不一致数据
@@ -72,11 +86,36 @@ async function send_alert(alert_type, data) {
 async function freeze_entry_on_inconsistency(entry_type, inconsistent_data) {
   console.log(`\n🔒 冻结入口: ${entry_type}`)
 
-  // TODO: 实际项目中更新系统配置或 Redis 标记
-  // await SystemConfig.update(
-  //   { config_value: 'false' },
-  //   { where: { config_key: `${entry_type}_enabled` } }
-  // )
+  // 通过 SystemConfigService 更新系统配置
+  try {
+    const SystemConfigService = require('../../services/SystemConfigService')
+
+    // 根据入口类型确定配置键名
+    const configKeyMap = {
+      lottery: 'lottery_entrance_enabled',
+      redeem: 'redeem_entrance_enabled',
+      marketplace: 'marketplace_entrance_enabled'
+    }
+    const configKey = configKeyMap[entry_type] || `${entry_type}_enabled`
+
+    await SystemConfigService.updateConfig(configKey, 'false', {
+      operator_id: 0, // 系统自动操作
+      reason: `对账脚本检测到 ${entry_type} 数据不一致，自动冻结入口`
+    })
+
+    console.log(`✅ 入口已冻结: ${configKey} = false`)
+  } catch (configError) {
+    console.error(`❌ 冻结入口失败: ${configError.message}`)
+    // 配置更新失败时，尝试通过Redis标记
+    try {
+      const { getRedisClient } = require('../../utils/UnifiedRedisClient')
+      const redisClient = await getRedisClient()
+      await redisClient.set(`freeze:${entry_type}`, 'true', 'EX', 3600) // 1小时过期
+      console.log(`✅ 已通过Redis标记冻结入口: freeze:${entry_type}`)
+    } catch (redisError) {
+      console.error(`❌ Redis标记失败: ${redisError.message}`)
+    }
+  }
 
   // 记录冻结日志
   const fs = require('fs')

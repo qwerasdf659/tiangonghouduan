@@ -175,7 +175,7 @@ export function useAlertsMethods() {
 
       this.processingAlert = true
       try {
-        const url = buildURL(LOTTERY_ENDPOINTS.REALTIME_ALERTS_ACKNOWLEDGE, { id: alert.alert_id })
+        const url = buildURL(LOTTERY_ENDPOINTS.REALTIME_ALERT_ACKNOWLEDGE, { id: alert.alert_id })
         const response = await this.apiPost(url, {}, { showLoading: true })
 
         if (response?.success) {
@@ -228,7 +228,7 @@ export function useAlertsMethods() {
 
       this.processingAlert = true
       try {
-        const url = buildURL(LOTTERY_ENDPOINTS.REALTIME_ALERTS_RESOLVE, {
+        const url = buildURL(LOTTERY_ENDPOINTS.REALTIME_ALERT_RESOLVE, {
           id: this.selectedAlert.alert_id
         })
         const response = await this.apiPost(
@@ -390,3 +390,5 @@ export function useAlertsMethods() {
 }
 
 export default { useAlertsState, useAlertsMethods }
+
+

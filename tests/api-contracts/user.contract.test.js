@@ -61,6 +61,7 @@ describe('API契约测试 - 用户模块 (/api/v4/auth, /api/v4/assets)', () => 
   describe('POST /auth/login - 用户登录', () => {
     /**
      * Case 1: 正常登录应该返回成功契约
+     * 注意：登录后更新accessToken，避免多设备登录检测导致后续测试失败
      */
     test('正常登录应该返回标准契约格式', async () => {
       const response = await request(app)
@@ -76,6 +77,9 @@ describe('API契约测试 - 用户模块 (/api/v4/auth, /api/v4/assets)', () => 
       expect(response.body.data).toHaveProperty('expires_in')
       expect(response.body.data.user).toHaveProperty('user_id')
       expect(response.body.data.user).toHaveProperty('mobile')
+
+      /* 更新accessToken，确保后续测试使用最新的有效Token */
+      accessToken = response.body.data.access_token
     })
 
     /**

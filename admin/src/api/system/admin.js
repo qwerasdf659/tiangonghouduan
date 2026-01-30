@@ -43,33 +43,30 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   IMAGE_DELETE: `${API_PREFIX}/console/images/:id`,
 
   // 风控告警
-  RISK_ALERTS_LIST: `${API_PREFIX}/console/risk-alerts`,
-  RISK_ALERTS_DETAIL: `${API_PREFIX}/console/risk-alerts/:id`,
-  RISK_ALERTS_PROCESS: `${API_PREFIX}/console/risk-alerts/:id/process`,
-  RISK_ALERTS_DISMISS: `${API_PREFIX}/console/risk-alerts/:id/dismiss`,
-  RISK_ALERTS_STATS: `${API_PREFIX}/console/risk-alerts/stats`,
   RISK_ALERT_LIST: `${API_PREFIX}/console/risk-alerts`,
+  RISK_ALERT_DETAIL: `${API_PREFIX}/console/risk-alerts/:id`,
   RISK_ALERT_REVIEW: `${API_PREFIX}/console/risk-alerts/:id/review`,
+  RISK_ALERT_STATS: `${API_PREFIX}/console/risk-alerts/stats/summary`,
   RISK_ALERT_MARK_ALL_READ: `${API_PREFIX}/console/risk-alerts/mark-all-read`,
+  RISK_ALERT_PENDING: `${API_PREFIX}/console/risk-alerts/pending`,
+  RISK_ALERT_TYPES: `${API_PREFIX}/console/risk-alerts/types`,
 
   // 审计日志
-  AUDIT_LOGS_LIST: `${API_PREFIX}/console/system/audit-logs`,
-  AUDIT_LOGS_STATISTICS: `${API_PREFIX}/console/system/audit-logs/statistics`,
-  AUDIT_LOGS_DETAIL: `${API_PREFIX}/console/system/audit-logs/:id`,
-  AUDIT_LOG_LIST: `${API_PREFIX}/console/audit-logs`,
-  AUDIT_LOG_DETAIL: `${API_PREFIX}/console/audit-logs/:id`,
+  AUDIT_LOG_LIST: `${API_PREFIX}/console/system/audit-logs`,
+  AUDIT_LOG_STATISTICS: `${API_PREFIX}/console/system/audit-logs/statistics`,
+  AUDIT_LOG_DETAIL: `${API_PREFIX}/console/system/audit-logs/:id`,
   AUDIT_LOG_EXPORT: `${API_PREFIX}/console/audit-logs/export`,
 
   // 会话管理
-  SESSIONS_LIST: `${API_PREFIX}/console/sessions`,
-  SESSIONS_DETAIL: `${API_PREFIX}/console/sessions/:session_id`,
-  SESSIONS_TERMINATE: `${API_PREFIX}/console/sessions/:session_id/terminate`,
-  SESSIONS_TERMINATE_ALL: `${API_PREFIX}/console/sessions/terminate-all`,
+  SESSION_LIST: `${API_PREFIX}/console/sessions`,
+  SESSION_DETAIL: `${API_PREFIX}/console/sessions/:session_id`,
+  SESSION_TERMINATE: `${API_PREFIX}/console/sessions/:session_id/terminate`,
+  SESSION_TERMINATE_ALL: `${API_PREFIX}/console/sessions/terminate-all`,
 
   // 配置工具
-  CONFIG_TOOLS_VALIDATE: `${API_PREFIX}/console/config-tools/validate`,
-  CONFIG_TOOLS_EXPORT: `${API_PREFIX}/console/config-tools/export`,
-  CONFIG_TOOLS_IMPORT: `${API_PREFIX}/console/config-tools/import`,
+  CONFIG_TOOL_VALIDATE: `${API_PREFIX}/console/config-tools/validate`,
+  CONFIG_TOOL_EXPORT: `${API_PREFIX}/console/config-tools/export`,
+  CONFIG_TOOL_IMPORT: `${API_PREFIX}/console/config-tools/import`,
 
   // 字典管理 - 类目
   DICT_CATEGORY_LIST: `${API_PREFIX}/console/dictionaries/categories`,
@@ -263,30 +260,51 @@ export const SystemAdminAPI = {
    * @returns {Promise<Object>} 告警列表响应
    */
   async getRiskAlerts(params = {}) {
-    const url = SYSTEM_ADMIN_ENDPOINTS.RISK_ALERTS_LIST + buildQueryString(params)
+    const url = SYSTEM_ADMIN_ENDPOINTS.RISK_ALERT_LIST + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
   /**
-   * 处理风控告警
+   * 复核风控告警（标记为已处理）
    * @param {number} id - 告警 ID
-   * @param {Object} data - 处理数据
+   * @param {Object} [data={}] - 处理数据（可含 review_notes）
    * @returns {Promise<Object>} 处理结果响应
    */
-  async processRiskAlert(id, data) {
-    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.RISK_ALERTS_PROCESS, { id })
-    return await request({ url, method: 'POST', data })
+  async processRiskAlert(id, data = {}) {
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.RISK_ALERT_REVIEW, { id })
+    return await request({
+      url,
+      method: 'POST',
+      data: { ...data, status: 'reviewed' }
+    })
   },
 
   /**
    * 忽略风控告警
    * @param {number} id - 告警 ID
-   * @param {Object} data - 忽略数据
+   * @param {Object} [data={}] - 忽略数据（可含 review_notes）
    * @returns {Promise<Object>} 操作结果响应
    */
-  async dismissRiskAlert(id, data) {
-    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.RISK_ALERTS_DISMISS, { id })
-    return await request({ url, method: 'POST', data })
+  async dismissRiskAlert(id, data = {}) {
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.RISK_ALERT_REVIEW, { id })
+    return await request({
+      url,
+      method: 'POST',
+      data: { ...data, status: 'ignored' }
+    })
+  },
+
+  /**
+   * 批量标记所有待处理告警为已读
+   * @param {Object} [filters={}] - 可选筛选条件
+   * @returns {Promise<Object>} 操作结果响应
+   */
+  async markAllRiskAlertsRead(filters = {}) {
+    return await request({
+      url: SYSTEM_ADMIN_ENDPOINTS.RISK_ALERT_MARK_ALL_READ,
+      method: 'POST',
+      data: filters
+    })
   },
 
   /**
@@ -294,7 +312,7 @@ export const SystemAdminAPI = {
    * @returns {Promise<Object>} 统计数据响应
    */
   async getRiskAlertStats() {
-    return await request({ url: SYSTEM_ADMIN_ENDPOINTS.RISK_ALERTS_STATS, method: 'GET' })
+    return await request({ url: SYSTEM_ADMIN_ENDPOINTS.RISK_ALERT_STATS, method: 'GET' })
   },
 
   // ===== 审计日志 =====
@@ -305,7 +323,7 @@ export const SystemAdminAPI = {
    * @returns {Promise<Object>} 日志列表响应
    */
   async getAuditLogs(params = {}) {
-    const url = SYSTEM_ADMIN_ENDPOINTS.AUDIT_LOGS_LIST + buildQueryString(params)
+    const url = SYSTEM_ADMIN_ENDPOINTS.AUDIT_LOG_LIST + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -314,7 +332,7 @@ export const SystemAdminAPI = {
    * @returns {Promise<Object>} 统计数据响应
    */
   async getAuditLogStats() {
-    return await request({ url: SYSTEM_ADMIN_ENDPOINTS.AUDIT_LOGS_STATISTICS, method: 'GET' })
+    return await request({ url: SYSTEM_ADMIN_ENDPOINTS.AUDIT_LOG_STATISTICS, method: 'GET' })
   },
 
   /**
@@ -323,7 +341,7 @@ export const SystemAdminAPI = {
    * @returns {Promise<Object>} 日志详情响应
    */
   async getAuditLogDetail(id) {
-    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.AUDIT_LOGS_DETAIL, { id })
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.AUDIT_LOG_DETAIL, { id })
     return await request({ url, method: 'GET' })
   },
 
@@ -335,7 +353,7 @@ export const SystemAdminAPI = {
    * @returns {Promise<Object>} 会话列表响应
    */
   async getSessions(params = {}) {
-    const url = SYSTEM_ADMIN_ENDPOINTS.SESSIONS_LIST + buildQueryString(params)
+    const url = SYSTEM_ADMIN_ENDPOINTS.SESSION_LIST + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -345,7 +363,7 @@ export const SystemAdminAPI = {
    * @returns {Promise<Object>} 操作结果响应
    */
   async terminateSession(sessionId) {
-    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.SESSIONS_TERMINATE, { session_id: sessionId })
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.SESSION_TERMINATE, { session_id: sessionId })
     return await request({ url, method: 'POST' })
   },
 
@@ -354,7 +372,7 @@ export const SystemAdminAPI = {
    * @returns {Promise<Object>} 操作结果响应
    */
   async terminateAllSessions() {
-    return await request({ url: SYSTEM_ADMIN_ENDPOINTS.SESSIONS_TERMINATE_ALL, method: 'POST' })
+    return await request({ url: SYSTEM_ADMIN_ENDPOINTS.SESSION_TERMINATE_ALL, method: 'POST' })
   },
 
   // ===== 字典管理 - 类目 =====

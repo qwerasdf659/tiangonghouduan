@@ -175,16 +175,16 @@ import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
  * @property {string} PREMIUM_UPDATE - [PUT] 更新高级状态 - Path: :user_id
  * @property {string} PREMIUM_UNLOCK - [POST] 解锁高级功能 - Path: :user_id
  *
- * @property {string} RISK_PROFILES_LIST - [GET] 获取风控配置列表
- * @property {string} RISK_PROFILES_USER - [GET] 获取用户风控配置 - Path: :user_id
- * @property {string} RISK_PROFILES_UPDATE - [PUT] 更新风控配置 - Path: :user_id
+ * @property {string} RISK_PROFILE_LIST - [GET] 获取风控配置列表
+ * @property {string} RISK_PROFILE_USER - [GET] 获取用户风控配置 - Path: :user_id
+ * @property {string} RISK_PROFILE_UPDATE - [PUT] 更新风控配置 - Path: :user_id
  *
- * @property {string} SESSIONS_LIST - [GET] 获取会话列表
- * @property {string} SESSIONS_STATS - [GET] 获取会话统计
- * @property {string} SESSIONS_DETAIL - [GET] 获取会话详情 - Path: :id
- * @property {string} SESSIONS_DEACTIVATE - [POST] 停用会话 - Path: :id
- * @property {string} SESSIONS_CLEANUP - [POST] 清理过期会话
- * @property {string} SESSIONS_ONLINE_USERS - [GET] 获取在线用户
+ * @property {string} SESSION_LIST - [GET] 获取会话列表
+ * @property {string} SESSION_STATS - [GET] 获取会话统计
+ * @property {string} SESSION_DETAIL - [GET] 获取会话详情 - Path: :id
+ * @property {string} SESSION_DEACTIVATE - [POST] 停用会话 - Path: :id
+ * @property {string} SESSION_CLEANUP - [POST] 清理过期会话
+ * @property {string} SESSION_ONLINE_USERS - [GET] 获取在线用户
  */
 export const USER_ENDPOINTS = {
   /** @type {string} [GET] 获取用户列表 - Query: { page?, limit?, search?, role_filter? } */
@@ -252,27 +252,27 @@ export const USER_ENDPOINTS = {
 
   // 用户风控配置
   /** @type {string} [GET] 获取风控配置列表 - Query: { page?, page_size?, risk_level? } */
-  RISK_PROFILES_LIST: `${API_PREFIX}/console/risk-profiles`,
+  RISK_PROFILE_LIST: `${API_PREFIX}/console/risk-profiles`,
   /** @type {string} [GET] 获取用户风控配置 - Path: :user_id */
-  RISK_PROFILES_USER: `${API_PREFIX}/console/risk-profiles/user/:user_id`,
+  RISK_PROFILE_USER: `${API_PREFIX}/console/risk-profiles/user/:user_id`,
   /** @type {string} [PUT] 更新风控配置 - Path: :user_id, Body: { risk_level, limits, ... } */
-  RISK_PROFILES_UPDATE: `${API_PREFIX}/console/risk-profiles/user/:user_id`,
+  RISK_PROFILE_UPDATE: `${API_PREFIX}/console/risk-profiles/user/:user_id`,
 
   // 会话管理
   /** @type {string} [GET] 获取会话列表 - Query: { page?, page_size?, user_id?, status? } */
-  SESSIONS_LIST: `${API_PREFIX}/console/sessions`,
+  SESSION_LIST: `${API_PREFIX}/console/sessions`,
   /** @type {string} [GET] 获取会话统计 */
-  SESSIONS_STATS: `${API_PREFIX}/console/sessions/stats`,
+  SESSION_STATS: `${API_PREFIX}/console/sessions/stats`,
   /** @type {string} [GET] 获取会话详情 - Path: :id */
-  SESSIONS_DETAIL: `${API_PREFIX}/console/sessions/:id`,
+  SESSION_DETAIL: `${API_PREFIX}/console/sessions/:id`,
   /** @type {string} [POST] 停用会话 - Path: :id */
-  SESSIONS_DEACTIVATE: `${API_PREFIX}/console/sessions/:id/deactivate`,
+  SESSION_DEACTIVATE: `${API_PREFIX}/console/sessions/:id/deactivate`,
   /** @type {string} [POST] 清理过期会话 */
-  SESSIONS_CLEANUP: `${API_PREFIX}/console/sessions/cleanup`,
+  SESSION_CLEANUP: `${API_PREFIX}/console/sessions/cleanup`,
   /** @type {string} [GET] 获取在线用户 */
-  SESSIONS_ONLINE_USERS: `${API_PREFIX}/console/sessions/online-users`,
+  SESSION_ONLINE_USERS: `${API_PREFIX}/console/sessions/online-users`,
   /** @type {string} [POST] 失效用户所有会话（强制下线） - Body: { user_type, user_id, reason? } */
-  SESSIONS_DEACTIVATE_USER: `${API_PREFIX}/console/sessions/deactivate-user`,
+  SESSION_DEACTIVATE_USER: `${API_PREFIX}/console/sessions/deactivate-user`,
 
   // 用户统计（后端暂未实现）
   // STATS: `${API_PREFIX}/console/user-management/stats`,
@@ -762,7 +762,7 @@ export const UserAPI = {
    * @returns {Promise<ApiResponse>} 风控配置列表响应
    */
   async getRiskProfiles(params = {}) {
-    const url = USER_ENDPOINTS.RISK_PROFILES_LIST + buildQueryString(params)
+    const url = USER_ENDPOINTS.RISK_PROFILE_LIST + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -773,7 +773,7 @@ export const UserAPI = {
    * @returns {Promise<ApiResponse>} 用户风控配置响应
    */
   async getUserRiskProfile(userId) {
-    const url = buildURL(USER_ENDPOINTS.RISK_PROFILES_USER, { user_id: userId })
+    const url = buildURL(USER_ENDPOINTS.RISK_PROFILE_USER, { user_id: userId })
     return await request({ url, method: 'GET' })
   },
 
@@ -787,7 +787,7 @@ export const UserAPI = {
    * @returns {Promise<ApiResponse>} 更新结果响应
    */
   async updateUserRiskProfile(userId, data) {
-    const url = buildURL(USER_ENDPOINTS.RISK_PROFILES_UPDATE, { user_id: userId })
+    const url = buildURL(USER_ENDPOINTS.RISK_PROFILE_UPDATE, { user_id: userId })
     return await request({ url, method: 'PUT', data })
   },
 

@@ -57,12 +57,12 @@ export const ANALYTICS_ENDPOINTS = {
 
   // 图表数据
   CHARTS: `${API_PREFIX}/system/statistics/charts`,
-  CHARTS_USER_GROWTH: `${API_PREFIX}/console/analytics/charts/user-growth`,
-  CHARTS_REVENUE: `${API_PREFIX}/console/analytics/charts/revenue`,
-  CHARTS_LOTTERY: `${API_PREFIX}/console/analytics/charts/lottery`,
+  CHART_USER_GROWTH: `${API_PREFIX}/console/analytics/charts/user-growth`,
+  CHART_REVENUE: `${API_PREFIX}/console/analytics/charts/revenue`,
+  CHART_LOTTERY: `${API_PREFIX}/console/analytics/charts/lottery`,
 
   // 统计导出
-  STATISTICS_EXPORT: `${API_PREFIX}/system/statistics/export`,
+  STATISTIC_EXPORT: `${API_PREFIX}/system/statistics/export`,
 
   // 财务管理
   FINANCE_OVERVIEW: `${API_PREFIX}/console/finance/overview`,
@@ -219,7 +219,7 @@ export const AnalyticsAPI = {
    * })
    */
   async getUserGrowthChart(params = {}) {
-    const url = ANALYTICS_ENDPOINTS.CHARTS_USER_GROWTH + buildQueryString(params)
+    const url = ANALYTICS_ENDPOINTS.CHART_USER_GROWTH + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -240,7 +240,7 @@ export const AnalyticsAPI = {
    * })
    */
   async getRevenueChart(params = {}) {
-    const url = ANALYTICS_ENDPOINTS.CHARTS_REVENUE + buildQueryString(params)
+    const url = ANALYTICS_ENDPOINTS.CHART_REVENUE + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -261,7 +261,7 @@ export const AnalyticsAPI = {
    * })
    */
   async getLotteryChart(params = {}) {
-    const url = ANALYTICS_ENDPOINTS.CHARTS_LOTTERY + buildQueryString(params)
+    const url = ANALYTICS_ENDPOINTS.CHART_LOTTERY + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -290,7 +290,7 @@ export const AnalyticsAPI = {
    * })
    */
   async exportStatistics(params = {}) {
-    const url = ANALYTICS_ENDPOINTS.STATISTICS_EXPORT + buildQueryString(params)
+    const url = ANALYTICS_ENDPOINTS.STATISTIC_EXPORT + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 

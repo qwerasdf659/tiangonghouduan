@@ -83,12 +83,12 @@ export const STORE_ENDPOINTS = {
   DELETE: `${API_PREFIX}/console/stores/:store_id`,
 
   // 商户积分
-  MERCHANT_POINTS_LIST: `${API_PREFIX}/console/merchant-points`,
-  MERCHANT_POINTS_DETAIL: `${API_PREFIX}/console/merchant-points/:id`,
-  MERCHANT_POINTS_BATCH: `${API_PREFIX}/console/merchant-points/batch`,
-  MERCHANT_POINTS_APPROVE: `${API_PREFIX}/console/merchant-points/:id/approve`,
-  MERCHANT_POINTS_REJECT: `${API_PREFIX}/console/merchant-points/:id/reject`,
-  MERCHANT_POINTS_STATS: `${API_PREFIX}/console/merchant-points/stats/pending`,
+  MERCHANT_POINT_LIST: `${API_PREFIX}/console/merchant-points`,
+  MERCHANT_POINT_DETAIL: `${API_PREFIX}/console/merchant-points/:id`,
+  MERCHANT_POINT_BATCH: `${API_PREFIX}/console/merchant-points/batch`,
+  MERCHANT_POINT_APPROVE: `${API_PREFIX}/console/merchant-points/:id/approve`,
+  MERCHANT_POINT_REJECT: `${API_PREFIX}/console/merchant-points/:id/reject`,
+  MERCHANT_POINT_STATS: `${API_PREFIX}/console/merchant-points/stats/pending`,
 
   // 消费记录
   CONSUMPTION_RECORDS: `${API_PREFIX}/console/consumption/records`,
@@ -113,14 +113,14 @@ export const STORE_ENDPOINTS = {
   CONSUMPTION_AUDIT: `${API_PREFIX}/console/consumption/audit/:id`,
 
   // 商户积分扩展
-  MERCHANT_POINTS_HISTORY: `${API_PREFIX}/console/merchant-points/:id/history`,
+  MERCHANT_POINT_HISTORY: `${API_PREFIX}/console/merchant-points/:id/history`,
 
   // 商户日志
-  MERCHANT_LOGS_LIST: `${API_PREFIX}/console/audit-logs`,
-  MERCHANT_LOGS_EXPORT: `${API_PREFIX}/console/audit-logs/export`,
+  MERCHANT_LOG_LIST: `${API_PREFIX}/console/audit-logs`,
+  MERCHANT_LOG_EXPORT: `${API_PREFIX}/console/audit-logs/export`,
   // 注：后端无通用stats接口，只有 /stats/store/:store_id 和 /stats/operator/:operator_id
-  MERCHANT_LOGS_STATS_BY_STORE: `${API_PREFIX}/console/audit-logs/stats/store`,
-  MERCHANT_LOGS_STATS_BY_OPERATOR: `${API_PREFIX}/console/audit-logs/stats/operator`,
+  MERCHANT_LOG_STATS_BY_STORE: `${API_PREFIX}/console/audit-logs/stats/store`,
+  MERCHANT_LOG_STATS_BY_OPERATOR: `${API_PREFIX}/console/audit-logs/stats/operator`,
 
   // 地区管理
   REGION_PROVINCES: `${API_PREFIX}/console/regions/provinces`,
@@ -284,7 +284,7 @@ export const StoreAPI = {
    * const result = await StoreAPI.getMerchantPoints({ store_id: 123 })
    */
   async getMerchantPoints(params = {}) {
-    const url = STORE_ENDPOINTS.MERCHANT_POINTS_LIST + buildQueryString(params)
+    const url = STORE_ENDPOINTS.MERCHANT_POINT_LIST + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -301,7 +301,7 @@ export const StoreAPI = {
    * const result = await StoreAPI.getMerchantPointsDetail(456)
    */
   async getMerchantPointsDetail(id) {
-    const url = buildURL(STORE_ENDPOINTS.MERCHANT_POINTS_DETAIL, { id })
+    const url = buildURL(STORE_ENDPOINTS.MERCHANT_POINT_DETAIL, { id })
     return await request({ url, method: 'GET' })
   },
 
@@ -329,7 +329,7 @@ export const StoreAPI = {
    * })
    */
   async batchMerchantPoints(data) {
-    return await request({ url: STORE_ENDPOINTS.MERCHANT_POINTS_BATCH, method: 'POST', data })
+    return await request({ url: STORE_ENDPOINTS.MERCHANT_POINT_BATCH, method: 'POST', data })
   },
 
   /**
@@ -351,7 +351,7 @@ export const StoreAPI = {
    * })
    */
   async approveMerchantPoints(id, data = {}) {
-    const url = buildURL(STORE_ENDPOINTS.MERCHANT_POINTS_APPROVE, { id })
+    const url = buildURL(STORE_ENDPOINTS.MERCHANT_POINT_APPROVE, { id })
     return await request({ url, method: 'POST', data })
   },
 
@@ -375,7 +375,7 @@ export const StoreAPI = {
    * })
    */
   async rejectMerchantPoints(id, data) {
-    const url = buildURL(STORE_ENDPOINTS.MERCHANT_POINTS_REJECT, { id })
+    const url = buildURL(STORE_ENDPOINTS.MERCHANT_POINT_REJECT, { id })
     return await request({ url, method: 'POST', data })
   },
 
@@ -391,7 +391,7 @@ export const StoreAPI = {
    * logger.debug(result.data.pending_count) // 待审核数量
    */
   async getMerchantPointsStats() {
-    return await request({ url: STORE_ENDPOINTS.MERCHANT_POINTS_STATS, method: 'GET' })
+    return await request({ url: STORE_ENDPOINTS.MERCHANT_POINT_STATS, method: 'GET' })
   },
 
   // ===== 消费记录 =====

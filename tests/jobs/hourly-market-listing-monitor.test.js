@@ -210,7 +210,7 @@ describe('P3-3: HourlyMarketListingMonitor - 每小时市场挂牌监控任务',
 
       // 验证执行时间在合理范围内（小于60秒）
       expect(executionTime).toBeLessThan(60000)
-      
+
       // 验证报告返回
       expect(report).toBeDefined()
 

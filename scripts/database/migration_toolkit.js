@@ -120,7 +120,35 @@ module.exports = {
         allowNull: false,
         comment: '主键ID'
       },
-      // TODO: 添加其他字段定义
+      /**
+       * 根据业务需求添加其他字段定义
+       * 常用字段类型示例：
+       *
+       * name: {
+       *   type: Sequelize.STRING(100),
+       *   allowNull: false,
+       *   comment: '名称'
+       * },
+       * status: {
+       *   type: Sequelize.ENUM('active', 'inactive', 'deleted'),
+       *   allowNull: false,
+       *   defaultValue: 'active',
+       *   comment: '状态'
+       * },
+       * amount: {
+       *   type: Sequelize.DECIMAL(12, 2),
+       *   allowNull: false,
+       *   defaultValue: 0.00,
+       *   comment: '金额'
+       * },
+       * user_id: {
+       *   type: Sequelize.INTEGER,
+       *   allowNull: false,
+       *   references: { model: 'users', key: 'user_id' },
+       *   onDelete: 'RESTRICT',
+       *   comment: '用户ID（外键）'
+       * },
+       */
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,
@@ -191,10 +219,18 @@ module.exports = {
   },
 
   down: async (queryInterface, Sequelize) => {
-    // TODO: 添加回滚逻辑
+    /**
+     * 回滚逻辑：将列恢复到修改前的定义
+     * 注意：需要根据实际的原始列定义修改以下内容
+     * - type: 原始数据类型
+     * - allowNull: 原始是否允许为空
+     * - defaultValue: 原始默认值（如有）
+     */
     await queryInterface.changeColumn('${data.target.split('.')[0]}', '${data.target.split('.')[1] || 'column_name'}', {
-      type: Sequelize.STRING(100),
-      allowNull: true
+      type: Sequelize.STRING(100), // 修改为原始数据类型
+      allowNull: true, // 修改为原始允许空值设置
+      // defaultValue: null, // 如有原始默认值，请取消注释并设置
+      comment: '回滚到修改前的列定义'
     })
   }
 }
@@ -236,11 +272,61 @@ module.exports = {
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    // TODO: 实现 ${data.action} 操作
+    /**
+     * 根据 ${data.action} 操作类型实现具体逻辑
+     * 
+     * 常用操作示例：
+     * 
+     * 1. 批量更新数据：
+     *    await queryInterface.sequelize.query(\`
+     *      UPDATE ${data.target} SET column = 'value' WHERE condition
+     *    \`)
+     * 
+     * 2. 添加索引：
+     *    await queryInterface.addIndex('table_name', ['column1', 'column2'], {
+     *      name: 'idx_table_columns',
+     *      unique: false
+     *    })
+     * 
+     * 3. 添加外键约束：
+     *    await queryInterface.addConstraint('table_name', {
+     *      fields: ['foreign_key_column'],
+     *      type: 'foreign key',
+     *      name: 'fk_table_column',
+     *      references: { table: 'referenced_table', field: 'primary_key' },
+     *      onDelete: 'RESTRICT',
+     *      onUpdate: 'CASCADE'
+     *    })
+     * 
+     * 4. 插入初始数据：
+     *    await queryInterface.bulkInsert('table_name', [
+     *      { column1: 'value1', column2: 'value2', created_at: new Date() }
+     *    ])
+     */
+    throw new Error('请实现 up 方法的具体逻辑')
   },
 
   down: async (queryInterface, Sequelize) => {
-    // TODO: 实现回滚逻辑
+    /**
+     * 回滚逻辑：撤销 up 方法中的操作
+     * 
+     * 注意事项：
+     * - 回滚操作应与 up 方法的操作相反
+     * - 删除索引、约束需要使用正确的名称
+     * - 批量更新可能需要记录原始值才能正确回滚
+     * 
+     * 常用回滚操作示例：
+     * 
+     * 1. 删除索引：
+     *    await queryInterface.removeIndex('table_name', 'idx_table_columns')
+     * 
+     * 2. 删除外键约束：
+     *    await queryInterface.removeConstraint('table_name', 'fk_table_column')
+     * 
+     * 3. 删除批量插入的数据：
+     *    await queryInterface.bulkDelete('table_name', { column: 'condition_value' })
+     */
+    throw new Error('请实现 down 方法的回滚逻辑')
   }
 }
 `
