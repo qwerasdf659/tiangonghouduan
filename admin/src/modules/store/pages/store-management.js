@@ -27,15 +27,15 @@
  *
  * <!-- 使用内容组件 -->
  * <div x-data="storePageContent()">
- *   <div x-show="currentPage === 'stores'">门店列表</div>
- *   <div x-show="currentPage === 'staff'">员工列表</div>
- *   <div x-show="currentPage === 'store-stats'">门店统计</div>
+ *   <div x-show="current_page === 'stores'">门店列表</div>
+ *   <div x-show="current_page === 'staff'">员工列表</div>
+ *   <div x-show="current_page === 'store-stats'">门店统计</div>
  * </div>
  */
 
 import { logger } from '../../../utils/logger.js'
 import { STORE_ENDPOINTS } from '../../../api/store.js'
-import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
+import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { buildURL } from '../../../api/base.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
 
@@ -64,13 +64,13 @@ function registerStoreManagementComponents() {
    * @description 管理门店管理子页面导航，支持URL参数持久化
    * @returns {Object} Alpine组件对象
    *
-   * @property {string} currentPage - 当前激活的页面ID
+   * @property {string} current_page - 当前激活的页面ID
    * @property {Array<{id: string, title: string, icon: string}>} subPages - 子页面配置列表
    */
   Alpine.data('storeNavigation', () => ({
     ...createPageMixin(),
     /** @type {string} 当前页面ID，默认为'stores' */
-    currentPage: 'stores',
+    current_page: 'stores',
     /**
      * 子页面配置列表
      * @type {Array<{id: string, title: string, icon: string}>}
@@ -90,8 +90,8 @@ function registerStoreManagementComponents() {
       logger.info('门店管理导航初始化')
       if (!this.checkAuth()) return
       const urlParams = new URLSearchParams(window.location.search)
-      this.currentPage = urlParams.get('page') || 'stores'
-      Alpine.store('storePage', this.currentPage)
+      this.current_page = urlParams.get('page') || 'stores'
+      Alpine.store('storePage', this.current_page)
     },
 
     /**
@@ -100,7 +100,7 @@ function registerStoreManagementComponents() {
      * @returns {void}
      */
     switchPage(pageId) {
-      this.currentPage = pageId
+      this.current_page = pageId
       Alpine.store('storePage', pageId)
       window.history.pushState({}, '', `?page=${pageId}`)
     }
@@ -173,8 +173,11 @@ function registerStoreManagementComponents() {
      * @type {{store_id: string, status: string, role: string, keyword: string}}
      */
     staffFilters: { store_id: '', status: '', role: '', keyword: '' },
-    /** @type {{total: number, totalPages: number}} 员工分页信息 */
-    staffPagination: { total: 0, totalPages: 1 },
+    /**
+     * 员工分页状态（单一对象 + Getter 模式）
+     * @type {{page: number, page_size: number, total: number, total_pages: number}}
+     */
+    pagination: { page: 1, page_size: 20, total: 0, total_pages: 1 },
     /**
      * 员工表单数据
      * @type {{name: string, phone: string, role: string, store_id: string, hire_date: string}}
@@ -193,17 +196,13 @@ function registerStoreManagementComponents() {
     /** @type {boolean} 编辑模式标志 */
     isEditMode: false,
 
-    // 分页状态
-    /** @type {number} 当前页码 */
-    page: 1,
-    /** @type {number} 每页数量 */
-    pageSize: 20,
+    // 分页状态已移至 pagination 对象中
 
     /**
      * 获取当前页面ID（从Alpine store读取）
      * @returns {string} 当前页面ID
      */
-    get currentPage() {
+    get current_page() {
       return Alpine.store('storePage')
     },
 
@@ -225,11 +224,11 @@ function registerStoreManagementComponents() {
     /**
      * 根据当前页面加载对应数据
      * @async
-     * @description 根据currentPage调用不同的数据加载方法
+     * @description 根据current_page调用不同的数据加载方法
      * @returns {Promise<void>}
      */
     async loadPageData() {
-      const page = this.currentPage
+      const page = this.current_page
       await this.withLoading(
         async () => {
           // 始终加载门店列表（供员工筛选使用）
@@ -713,8 +712,8 @@ function registerStoreManagementComponents() {
     async loadStaff() {
       try {
         const params = new URLSearchParams()
-        params.append('page', this.page || 1) // 使用分页变量 page，不是 currentPage（子页面ID）
-        params.append('page_size', this.pageSize || 20)
+        params.append('page', this.pagination.page || 1) // 使用 pagination 对象
+        params.append('page_size', this.pagination.page_size || 20)
         if (this.staffFilters.store_id) params.append('store_id', this.staffFilters.store_id)
         if (this.staffFilters.role) params.append('role', this.staffFilters.role)
         if (this.staffFilters.keyword) params.append('keyword', this.staffFilters.keyword)
@@ -735,19 +734,15 @@ function registerStoreManagementComponents() {
         if (response?.success) {
           // 后端可能返回 items 数组
           this.staffList = response.data?.items || response.data?.staff || response.data?.list || []
-          // 处理分页信息
+          // 处理分页信息 - 更新 pagination 对象
           if (response.data?.pagination) {
-            this.staffPagination = {
-              total: response.data.pagination.total || 0,
-              totalPages: response.data.pagination.total_pages || 1
-            }
+            this.pagination.total = response.data.pagination.total || 0
+            this.pagination.total_pages = response.data.pagination.total_pages || 1
           } else if (response.data?.total !== undefined) {
-            this.staffPagination = {
-              total: response.data.total || 0,
-              totalPages:
-                response.data.total_pages ||
-                Math.ceil((response.data.total || 0) / (this.pageSize || 20))
-            }
+            this.pagination.total = response.data.total || 0
+            this.pagination.total_pages =
+              response.data.total_pages ||
+              Math.ceil((response.data.total || 0) / (this.pagination.page_size || 20))
           }
         }
       } catch (error) {
@@ -967,8 +962,8 @@ function registerStoreManagementComponents() {
      * @returns {void}
      */
     changePage(newPage) {
-      if (newPage < 1 || newPage > this.staffPagination.totalPages) return
-      this.page = newPage
+      if (newPage < 1 || newPage > this.pagination.total_pages) return
+      this.pagination.page = newPage
       this.loadStaff()
     },
 

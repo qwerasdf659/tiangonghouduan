@@ -29,7 +29,7 @@
         <template x-for="page in subPages" :key="page.id">
           <button 
             @click="switchPage(page.id)"
-            :class="currentPage === page.id ? 'themed-bg-primary text-white' : 'themed-text-muted themed-hover-bg'"
+            :class="current_page === page.id ? 'themed-bg-primary text-white' : 'themed-text-muted themed-hover-bg'"
             class="px-4 py-2 rounded text-sm font-medium transition-colors"
           >
             <i :class="'bi ' + page.icon" class="mr-1"></i><span x-text="page.title"></span>
@@ -43,7 +43,7 @@
   <div class="container mx-auto px-4 py-6" x-data="storePageContent()" x-cloak>
     
     <!-- ==================== 门店列表 ==================== -->
-    <div x-show="currentPage === 'stores'" x-cloak>
+    <div x-show="current_page === 'stores'" x-cloak>
       <!-- 统计卡片 -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div class="themed-card rounded-lg shadow p-4 text-center">
@@ -127,7 +127,7 @@
     </div>
 
     <!-- ==================== 员工管理 ==================== -->
-    <div x-show="currentPage === 'staff'" x-cloak>
+    <div x-show="current_page === 'staff'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold text-lg">👥 员工管理</h5>
@@ -234,27 +234,27 @@
           </div>
 
           <!-- 分页 -->
-          <nav x-show="staffPagination.totalPages > 1" class="mt-4">
+          <nav x-show="pagination.total_pages > 1" class="mt-4">
             <div class="flex justify-center space-x-1">
               <button 
                 class="px-3 py-1 border rounded text-sm" 
-                :class="page <= 1 ? 'text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
-                :disabled="page <= 1"
-                @click="changePage(page - 1)"
+                :class="pagination.page <= 1 ? 'text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
+                :disabled="pagination.page <= 1"
+                @click="changePage(pagination.page - 1)"
               >上一页</button>
-              <template x-for="p in staffPagination.totalPages" :key="p">
+              <template x-for="p in pagination.total_pages" :key="p">
                 <button 
                   class="px-3 py-1 border rounded text-sm" 
-                  :class="p === page ? 'themed-bg-primary text-white' : 'themed-hover-bg'"
+                  :class="p === pagination.page ? 'themed-bg-primary text-white' : 'themed-hover-bg'"
                   @click="changePage(p)"
                   x-text="p"
                 ></button>
               </template>
               <button 
                 class="px-3 py-1 border rounded text-sm" 
-                :class="page >= staffPagination.totalPages ? 'text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
-                :disabled="page >= staffPagination.totalPages"
-                @click="changePage(page + 1)"
+                :class="pagination.page >= pagination.total_pages ? 'text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
+                :disabled="pagination.page >= pagination.total_pages"
+                @click="changePage(pagination.page + 1)"
               >下一页</button>
             </div>
           </nav>
@@ -263,7 +263,7 @@
     </div>
 
     <!-- ==================== 门店统计 ==================== -->
-    <div x-show="currentPage === 'store-stats'" x-cloak>
+    <div x-show="current_page === 'store-stats'" x-cloak>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div class="themed-card rounded-lg shadow">
           <div class="p-4 border-b">

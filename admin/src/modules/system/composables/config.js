@@ -8,7 +8,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
+import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { buildURL } from '../../../api/base.js'
 
 /**
@@ -322,14 +322,6 @@ export function useConfigMethods() {
       } finally {
         this.saving = false
       }
-    },
-
-    // 兼容旧方法名（过渡期使用）
-    async loadPricingConfigs() {
-      return this.loadPointsConfigs()
-    },
-    async savePricingConfigs() {
-      return this.savePointsConfigs()
     }
   }
 }

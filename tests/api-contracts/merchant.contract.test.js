@@ -182,5 +182,3 @@ describe('API契约测试 - 商户模块 (/api/v4/shop, /api/v4/console)', () =>
     })
   })
 })
-
-

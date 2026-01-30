@@ -39,7 +39,7 @@ export function useMetricsState() {
     /** @type {Array} 用户配额 */
     userQuotas: [],
     /** @type {Object} 监控筛选条件 */
-    monitoringFilters: { campaignId: '', userId: '', timeRange: 'month' },
+    monitoringFilters: { campaign_id: '', user_id: '', time_range: 'month' },
     /** @type {boolean} 是否正在刷新指标数据 */
     refreshingMetrics: false,
 
@@ -103,7 +103,7 @@ export function useMetricsMethods() {
       try {
         // 调用综合统计接口，获取完整的监控数据
         // 使用 time_range: 'month' 统计最近30天数据
-        const timeRange = this.monitoringFilters?.timeRange || 'month'
+        const timeRange = this.monitoringFilters?.time_range || 'month'
         logger.debug(
           '📊 [Metrics] 调用API:',
           LOTTERY_ENDPOINTS.MONITORING_STATS,
@@ -204,11 +204,11 @@ export function useMetricsMethods() {
     async loadUserExperienceStates() {
       try {
         const params = new URLSearchParams()
-        if (this.monitoringFilters.userId) {
-          params.append('user_id', this.monitoringFilters.userId)
+        if (this.monitoringFilters.user_id) {
+          params.append('user_id', this.monitoringFilters.user_id)
         }
-        if (this.monitoringFilters.campaignId) {
-          params.append('campaign_id', this.monitoringFilters.campaignId)
+        if (this.monitoringFilters.campaign_id) {
+          params.append('campaign_id', this.monitoringFilters.campaign_id)
         }
         params.append('limit', 50)
 
@@ -236,8 +236,8 @@ export function useMetricsMethods() {
     async loadUserGlobalStates() {
       try {
         const params = new URLSearchParams()
-        if (this.monitoringFilters.userId) {
-          params.append('user_id', this.monitoringFilters.userId)
+        if (this.monitoringFilters.user_id) {
+          params.append('user_id', this.monitoringFilters.user_id)
         }
         params.append('limit', 50)
 
@@ -265,8 +265,8 @@ export function useMetricsMethods() {
     async loadUserQuotaList() {
       try {
         const params = new URLSearchParams()
-        if (this.monitoringFilters.userId) {
-          params.append('user_id', this.monitoringFilters.userId)
+        if (this.monitoringFilters.user_id) {
+          params.append('user_id', this.monitoringFilters.user_id)
         }
         params.append('limit', 50)
 
@@ -441,12 +441,14 @@ export function useMetricsMethods() {
         }
 
         // 2. 检查是否有大量未中奖
-        const emptyCount = this.prizeDistribution.find(p => 
-          p.name === 'empty' || p.name === '未中奖' || p.name === '谢谢参与'
-        )?.value || 0
-        const emptyRate = this.lotteryMetrics.totalDraws > 0 
-          ? (emptyCount / this.lotteryMetrics.totalDraws * 100) 
-          : 0
+        const emptyCount =
+          this.prizeDistribution.find(
+            p => p.name === 'empty' || p.name === '未中奖' || p.name === '谢谢参与'
+          )?.value || 0
+        const emptyRate =
+          this.lotteryMetrics.totalDraws > 0
+            ? (emptyCount / this.lotteryMetrics.totalDraws) * 100
+            : 0
         if (emptyRate > 70) {
           alerts.push({
             level: 'info',
@@ -494,7 +496,7 @@ export function useMetricsMethods() {
      */
     async initMonitoringCharts() {
       // 延迟执行确保 DOM 已渲染
-      await this.$nextTick?.() || await new Promise(resolve => setTimeout(resolve, 100))
+      ;(await this.$nextTick?.()) || (await new Promise(resolve => setTimeout(resolve, 100)))
 
       try {
         // 使用懒加载方式加载 ECharts
@@ -590,7 +592,10 @@ export function useMetricsMethods() {
             areaStyle: {
               color: {
                 type: 'linear',
-                x: 0, y: 0, x2: 0, y2: 1,
+                x: 0,
+                y: 0,
+                x2: 0,
+                y2: 1,
                 colorStops: [
                   { offset: 0, color: 'rgba(59, 130, 246, 0.3)' },
                   { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
@@ -607,7 +612,10 @@ export function useMetricsMethods() {
             areaStyle: {
               color: {
                 type: 'linear',
-                x: 0, y: 0, x2: 0, y2: 1,
+                x: 0,
+                y: 0,
+                x2: 0,
+                y2: 1,
                 colorStops: [
                   { offset: 0, color: 'rgba(16, 185, 129, 0.3)' },
                   { offset: 1, color: 'rgba(16, 185, 129, 0.05)' }
@@ -685,7 +693,7 @@ export function useMetricsMethods() {
       try {
         // 先加载基础指标
         await this.loadLotteryMetrics()
-        
+
         // 然后处理图表数据
         await this.load24hTrend()
         this.calculateTierDistribution()
@@ -742,19 +750,19 @@ export function useMetricsMethods() {
     async loadDailyReport(date = null) {
       try {
         this.loadingDailyReport = true
-        
+
         // 默认昨天
         if (!date) {
           const yesterday = new Date()
           yesterday.setDate(yesterday.getDate() - 1)
           date = yesterday.toISOString().split('T')[0]
         }
-        
+
         this.dailyReportDate = date
         logger.info('[Metrics] 加载运营日报', { date })
 
         const params = new URLSearchParams({ report_date: date })
-        
+
         const response = await this.apiGet(
           `${LOTTERY_ENDPOINTS.ANALYTICS_DAILY_REPORT}?${params}`,
           {},
@@ -765,9 +773,9 @@ export function useMetricsMethods() {
 
         if (data) {
           this.dailyReportData = data
-          logger.info('[Metrics] 日报加载成功', { 
-            date: data.report_date, 
-            total_draws: data.summary?.total_draws 
+          logger.info('[Metrics] 日报加载成功', {
+            date: data.report_date,
+            total_draws: data.summary?.total_draws
           })
         }
       } catch (error) {
@@ -803,7 +811,7 @@ export function useMetricsMethods() {
 
       const currentDate = new Date(this.dailyReportDate)
       currentDate.setDate(currentDate.getDate() + offset)
-      
+
       // 不允许查看未来日期
       const today = new Date()
       today.setHours(0, 0, 0, 0)
@@ -936,17 +944,17 @@ export function useMetricsMethods() {
      */
     formatPipelineStageName(stage) {
       const stageNames = {
-        'init': '初始化',
-        'validation': '参数校验',
-        'quota_check': '配额检查',
-        'budget_check': '预算检查',
-        'strategy_load': '策略加载',
-        'random_generate': '随机数生成',
-        'tier_select': '档位选择',
-        'prize_pick': '奖品抽取',
-        'pity_check': 'Pity保底检查',
-        'state_update': '状态更新',
-        'result_save': '结果保存'
+        init: '初始化',
+        validation: '参数校验',
+        quota_check: '配额检查',
+        budget_check: '预算检查',
+        strategy_load: '策略加载',
+        random_generate: '随机数生成',
+        tier_select: '档位选择',
+        prize_pick: '奖品抽取',
+        pity_check: 'Pity保底检查',
+        state_update: '状态更新',
+        result_save: '结果保存'
       }
       return stageNames[stage] || stage
     },

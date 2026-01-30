@@ -23,13 +23,13 @@ export function useRedemptionState() {
     /** @type {Object} 核销码统计 */
     redemptionStats: { total: 0, pending: 0, fulfilled: 0, expired: 0 },
     /** @type {Object} 核销码筛选条件 */
-    redemptionFilters: { status: '', prizeType: '', code: '', userId: '' },
+    redemptionFilters: { status: '', prize_type: '', code: '', user_id: '' },
     /** @type {Array} 选中的核销码ID */
     redemptionSelectedIds: [],
     /** @type {Object|null} 核销码详情 */
     redemptionDetail: null,
     /** @type {Object} 核销表单 */
-    redeemForm: { orderId: '', codeDisplay: '', storeId: '', remark: '' },
+    redeemForm: { order_id: '', code_display: '', store_id: '', remark: '' },
     /** @type {Array} 门店列表 */
     stores: []
   }
@@ -71,7 +71,10 @@ export function useRedemptionMethods() {
     async loadRedemptionStats() {
       try {
         logger.debug('[Redemption] 开始加载核销码统计...')
-        logger.debug('[Redemption] 统计API端点:', LOTTERY_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_STATISTICS)
+        logger.debug(
+          '[Redemption] 统计API端点:',
+          LOTTERY_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_STATISTICS
+        )
 
         // apiGet 返回的是 { success, data } 格式
         const response = await this.apiGet(
@@ -114,19 +117,19 @@ export function useRedemptionMethods() {
 
         const params = new URLSearchParams()
         params.append('page', pageNum)
-        params.append('page_size', this.pageSize || 20)
+        params.append('page_size', this.page_size || 20)
         if (this.redemptionFilters?.status) {
           params.append('status', this.redemptionFilters.status)
         }
-        if (this.redemptionFilters?.prizeType) {
-          params.append('prize_type', this.redemptionFilters.prizeType)
+        if (this.redemptionFilters?.prize_type) {
+          params.append('prize_type', this.redemptionFilters.prize_type)
         }
         if (this.redemptionFilters?.code) {
           params.append('code', this.redemptionFilters.code)
         }
-        if (this.redemptionFilters?.userId) {
+        if (this.redemptionFilters?.user_id) {
           // 使用后端期望的参数名 redeemer_user_id（不是 user_id）
-          params.append('redeemer_user_id', this.redemptionFilters.userId)
+          params.append('redeemer_user_id', this.redemptionFilters.user_id)
         }
 
         const url = `${LOTTERY_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_ORDERS}?${params}`
@@ -143,10 +146,15 @@ export function useRedemptionMethods() {
         if (data) {
           this.redemptionCodes = data.orders || data.records || data.codes || []
           this.total = data.pagination?.total || this.redemptionCodes.length
-          this.totalPages =
-            data.pagination?.total_pages || Math.ceil(this.total / (this.pageSize || 20))
+          this.total_pages =
+            data.pagination?.total_pages || Math.ceil(this.total / (this.page_size || 20))
           logger.debug('[Redemption] 核销码列表已更新, 数量:', this.redemptionCodes.length)
-          logger.debug('[Redemption] 分页信息: total=', this.total, 'totalPages=', this.totalPages)
+          logger.debug(
+            '[Redemption] 分页信息: total=',
+            this.total,
+            'total_pages=',
+            this.total_pages
+          )
         } else {
           logger.warn('[Redemption] 列表API响应无效或为空')
           this.redemptionCodes = []
@@ -195,11 +203,11 @@ export function useRedemptionMethods() {
      * @param {string} orderId - 订单ID
      * @param {string} codeDisplay - 核销码显示文本
      */
-    openRedeemModal(orderId, codeDisplay) {
+    openRedeemModal(order_id, code_display) {
       this.redeemForm = {
-        orderId,
-        codeDisplay,
-        storeId: '',
+        order_id,
+        code_display,
+        store_id: '',
         remark: ''
       }
       this.showModal('redeemModal')
@@ -217,12 +225,12 @@ export function useRedemptionMethods() {
         // apiCall 成功时返回 response.data，失败时抛出错误
         await this.apiCall(
           buildURL(LOTTERY_ENDPOINTS.BUSINESS_RECORDS_REDEMPTION_REDEEM, {
-            order_id: this.redeemForm.orderId
+            order_id: this.redeemForm.order_id
           }),
           {
             method: 'POST',
             data: {
-              store_id: this.redeemForm.storeId ? parseInt(this.redeemForm.storeId) : null,
+              store_id: this.redeemForm.store_id ? parseInt(this.redeemForm.store_id) : null,
               remark: this.redeemForm.remark
             }
           }

@@ -122,7 +122,7 @@
             <button @click="closeSession()" class="w-full px-4 py-2 border themed-border rounded themed-hover-bg">
               关闭会话
             </button>
-            <button @click="viewUserProfile()" class="w-full px-4 py-2 border themed-border-primary themed-text-primary rounded hover:bg-blue-50">
+            <button @click="viewUserInfo()" class="w-full px-4 py-2 border themed-border-primary themed-text-primary rounded hover:bg-blue-50">
               查看用户资料
             </button>
           </div>
@@ -147,7 +147,7 @@
         <h5 class="font-semibold">🔄 转接会话</h5>
         <button @click="hideModal('transferModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
       </div>
-      <form @submit.prevent="confirmTransfer()">
+      <form @submit.prevent="submitTransfer()">
         <div class="p-6 space-y-4">
           <p class="themed-text-muted">将当前会话转接给其他客服人员</p>
           <div>
@@ -171,57 +171,57 @@
   </div>
 
   <!-- 2. 用户信息模态框 -->
-  <div x-ref="userInfoModal"
-       x-show="isModalOpen('userInfoModal')"
+  <div x-ref="user_info_modal"
+       x-show="isModalOpen('user_info_modal')"
        x-cloak
        class="fixed inset-0 z-50 flex items-center justify-center"
        style="display: none;">
-    <div class="fixed inset-0 bg-black/50" @click="hideModal('userInfoModal')"></div>
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('user_info_modal')"></div>
     <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
       <div class="p-4 border-b flex justify-between items-center">
         <h5 class="font-semibold">👤 用户详细资料</h5>
-        <button @click="hideModal('userInfoModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+        <button @click="hideModal('user_info_modal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
       </div>
-      <div class="p-6" x-show="userInfoData">
+      <div class="p-6" x-show="user_info_data">
         <div class="text-center mb-6">
           <div class="w-20 h-20 bg-pink-100 rounded-full mx-auto flex items-center justify-center text-3xl">
-            <span x-text="(userInfoData?.nickname || userInfoData?.user_id || '?').charAt(0)"></span>
+            <span x-text="(user_info_data?.nickname || user_info_data?.user_id || '?').charAt(0)"></span>
           </div>
-          <h4 class="font-semibold mt-3" x-text="userInfoData?.nickname || '用户' + userInfoData?.user_id"></h4>
+          <h4 class="font-semibold mt-3" x-text="user_info_data?.nickname || '用户' + user_info_data?.user_id"></h4>
         </div>
         <div class="space-y-3">
           <div class="flex justify-between border-b pb-2">
             <span class="themed-text-muted">用户ID</span>
-            <span class="font-mono" x-text="userInfoData?.user_id"></span>
+            <span class="font-mono" x-text="user_info_data?.user_id"></span>
           </div>
           <div class="flex justify-between border-b pb-2">
             <span class="themed-text-muted">手机号</span>
-            <span x-text="userInfoData?.phone || '-'"></span>
+            <span x-text="user_info_data?.phone || '-'"></span>
           </div>
           <div class="flex justify-between border-b pb-2">
             <span class="themed-text-muted">性别</span>
-            <span x-text="userInfoData?.gender === 1 ? '男' : userInfoData?.gender === 2 ? '女' : '未知'"></span>
+            <span x-text="user_info_data?.gender === 1 ? '男' : user_info_data?.gender === 2 ? '女' : '未知'"></span>
           </div>
           <div class="flex justify-between border-b pb-2">
             <span class="themed-text-muted">注册时间</span>
-            <span x-text="formatDate(userInfoData?.created_at)"></span>
+            <span x-text="formatDate(user_info_data?.created_at)"></span>
           </div>
           <div class="flex justify-between border-b pb-2">
             <span class="themed-text-muted">账户状态</span>
-            <span :class="userInfoData?.status === 'active' ? 'text-green-600' : 'text-red-600'" x-text="userInfoData?.status === 'active' ? '正常' : '禁用'"></span>
+            <span :class="user_info_data?.status === 'active' ? 'text-green-600' : 'text-red-600'" x-text="user_info_data?.status === 'active' ? '正常' : '禁用'"></span>
           </div>
           <div class="flex justify-between border-b pb-2">
             <span class="themed-text-muted">总抽奖次数</span>
-            <span x-text="userInfoData?.draw_count || 0"></span>
+            <span x-text="user_info_data?.draw_count || 0"></span>
           </div>
           <div class="flex justify-between border-b pb-2">
             <span class="themed-text-muted">中奖次数</span>
-            <span x-text="userInfoData?.win_count || 0"></span>
+            <span x-text="user_info_data?.win_count || 0"></span>
           </div>
         </div>
       </div>
       <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
-        <button @click="hideModal('userInfoModal')" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">关闭</button>
+        <button @click="hideModal('user_info_modal')" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">关闭</button>
       </div>
     </div>
   </div>

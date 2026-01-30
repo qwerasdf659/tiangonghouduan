@@ -76,7 +76,7 @@ document.addEventListener('alpine:init', () => {
    * @property {Object} filters - 筛选条件
    * @property {Object} stats - 统计数据
    * @property {Object} form - 表单数据
-   * @property {boolean} isSubmitting - 是否正在提交
+   * @property {boolean} is_submitting - 是否正在提交
    * @property {Object} typeIcons - 类型图标映射
    * @property {Object} rarityLabels - 稀有度标签映射
    */
@@ -101,18 +101,18 @@ document.addEventListener('alpine:init', () => {
       rarities: 0
     },
     form: {
-      templateId: '',
-      displayName: '',
-      templateCode: '',
-      itemType: 'voucher',
-      rarityCode: 'common',
-      isEnabled: true,
-      imageUrl: '',
-      referencePricePoints: 0,
+      template_id: '',
+      display_name: '',
+      template_code: '',
+      item_type: 'voucher',
+      rarity_code: 'common',
+      is_enabled: true,
+      image_url: '',
+      reference_price_points: 0,
       description: '',
       meta: ''
     },
-    isSubmitting: false,
+    is_submitting: false,
     typeIcons: {
       voucher: '🎫',
       coupon: '🎫',
@@ -265,14 +265,14 @@ document.addEventListener('alpine:init', () => {
     openCreateModal() {
       logger.info('[openCreateModal] 初始化表单')
       this.form = {
-        templateId: '',
-        displayName: '',
-        templateCode: '',
-        itemType: 'voucher',
-        rarityCode: 'common',
-        isEnabled: true,
-        imageUrl: '',
-        referencePricePoints: 0,
+        template_id: '',
+        display_name: '',
+        template_code: '',
+        item_type: 'voucher',
+        rarity_code: 'common',
+        is_enabled: true,
+        image_url: '',
+        reference_price_points: 0,
         description: '',
         meta: ''
       }
@@ -298,14 +298,14 @@ document.addEventListener('alpine:init', () => {
         if (response && response.success) {
           const t = response.data
           this.form = {
-            templateId: t.item_template_id,
-            displayName: t.display_name || '',
-            templateCode: t.template_code || '',
-            itemType: t.item_type || 'voucher',
-            rarityCode: t.rarity_code || 'common',
-            isEnabled: t.is_enabled,
-            imageUrl: t.image_url || '',
-            referencePricePoints: t.reference_price_points || 0,
+            template_id: t.item_template_id,
+            display_name: t.display_name || '',
+            template_code: t.template_code || '',
+            item_type: t.item_type || 'voucher',
+            rarity_code: t.rarity_code || 'common',
+            is_enabled: t.is_enabled,
+            image_url: t.image_url || '',
+            reference_price_points: t.reference_price_points || 0,
             description: t.description || '',
             meta: t.meta ? JSON.stringify(t.meta, null, 2) : ''
           }
@@ -332,7 +332,7 @@ document.addEventListener('alpine:init', () => {
      * @fires ASSET_ENDPOINTS.ITEM_TEMPLATES_UPDATE
      */
     async submitTemplate() {
-      if (this.isSubmitting) return
+      if (this.is_submitting) return
 
       // 🔍 调试日志：全面诊断表单状态
       logger.info('[submitTemplate] ========== 开始提交 ==========')
@@ -340,10 +340,10 @@ document.addEventListener('alpine:init', () => {
       logger.info('[submitTemplate] this.form 存在:', !!this.form)
       logger.info('[submitTemplate] this.form 类型:', typeof this.form)
       logger.info('[submitTemplate] this.form 完整内容:', JSON.stringify(this.form, null, 2))
-      logger.info('[submitTemplate] displayName 值:', this.form?.displayName)
-      logger.info('[submitTemplate] displayName 类型:', typeof this.form?.displayName)
-      logger.info('[submitTemplate] templateCode 值:', this.form?.templateCode)
-      logger.info('[submitTemplate] templateCode 类型:', typeof this.form?.templateCode)
+      logger.info('[submitTemplate] display_name 值:', this.form?.display_name)
+      logger.info('[submitTemplate] display_name 类型:', typeof this.form?.display_name)
+      logger.info('[submitTemplate] template_code 值:', this.form?.template_code)
+      logger.info('[submitTemplate] template_code 类型:', typeof this.form?.template_code)
       logger.info('[submitTemplate] form 所有键:', Object.keys(this.form || {}).join(', '))
 
       let meta = null
@@ -357,42 +357,42 @@ document.addEventListener('alpine:init', () => {
       }
 
       const data = {
-        display_name: this.form.displayName,
-        template_code: this.form.templateCode,
-        item_type: this.form.itemType,
-        rarity_code: this.form.rarityCode,
-        is_enabled: this.form.isEnabled,
-        image_url: this.form.imageUrl || null,
-        reference_price_points: this.form.referencePricePoints || 0,
+        display_name: this.form.display_name,
+        template_code: this.form.template_code,
+        item_type: this.form.item_type,
+        rarity_code: this.form.rarity_code,
+        is_enabled: this.form.is_enabled,
+        image_url: this.form.image_url || null,
+        reference_price_points: this.form.reference_price_points || 0,
         description: this.form.description || null,
         meta: meta
       }
 
       if (!data.display_name || !data.template_code) {
         logger.error(
-          '[submitTemplate] 验证失败 - displayName:',
+          '[submitTemplate] 验证失败 - display_name:',
           data.display_name,
-          'templateCode:',
+          'template_code:',
           data.template_code
         )
         this.showError('验证失败', '请填写模板名称和编码')
         return
       }
 
-      this.isSubmitting = true
+      this.is_submitting = true
       this.loading = true
       showLoading()
       try {
-        const url = this.form.templateId
-          ? buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATES_UPDATE, { id: this.form.templateId })
+        const url = this.form.template_id
+          ? buildURL(ASSET_ENDPOINTS.ITEM_TEMPLATES_UPDATE, { id: this.form.template_id })
           : ASSET_ENDPOINTS.ITEM_TEMPLATES_CREATE
-        const method = this.form.templateId ? 'PUT' : 'POST'
+        const method = this.form.template_id ? 'PUT' : 'POST'
 
         const response = await apiRequest(url, { method, data })
 
         if (response && response.success) {
           this.hideModal('templateModal')
-          this.showSuccess(`${this.form.templateId ? '更新' : '创建'}成功`)
+          this.showSuccess(`${this.form.template_id ? '更新' : '创建'}成功`)
           this.loadTemplates()
         } else {
           this.showError('保存失败', response?.message || '操作失败')
@@ -401,7 +401,7 @@ document.addEventListener('alpine:init', () => {
         logger.error('保存模板失败:', error)
         this.showError('保存失败', error.message)
       } finally {
-        this.isSubmitting = false
+        this.is_submitting = false
         this.loading = false
         hideLoading()
       }

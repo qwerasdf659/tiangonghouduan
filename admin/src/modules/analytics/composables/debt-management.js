@@ -57,8 +57,8 @@ export function useDebtManagementMethods() {
     async loadDebts() {
       try {
         const params = new URLSearchParams()
-        params.append('page', this.page)
-        params.append('page_size', this.pageSize)
+        params.append('page', this.financePagination?.page || 1)
+        params.append('page_size', this.financePagination?.page_size || 20)
         if (this.debtFilters.debt_type) params.append('debt_type', this.debtFilters.debt_type)
         if (this.debtFilters.campaign_id) params.append('campaign_id', this.debtFilters.campaign_id)
 
@@ -77,11 +77,10 @@ export function useDebtManagementMethods() {
             response.data?.rows ||
             []
           if (response.data?.pagination) {
-            this.total = response.data.pagination.total || 0
-            this.totalPages = response.data.pagination.total_pages || 1
+            // 只更新 total，total_pages 由 getter 计算
+            this.financePagination.total = response.data.pagination.total || 0
           } else if (response.data?.count !== undefined) {
-            this.total = response.data.count
-            this.totalPages = Math.ceil(response.data.count / this.pageSize) || 1
+            this.financePagination.total = response.data.count
           }
         }
       } catch (error) {
@@ -131,7 +130,7 @@ export function useDebtManagementMethods() {
      * 搜索债务记录
      */
     searchDebts() {
-      this.page = 1
+      this.financePagination.page = 1
       this.loadDebts()
     },
 
@@ -143,7 +142,7 @@ export function useDebtManagementMethods() {
         debt_type: '',
         campaign_id: ''
       }
-      this.page = 1
+      this.financePagination.page = 1
       this.loadDebts()
     },
 

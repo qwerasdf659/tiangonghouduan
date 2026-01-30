@@ -110,9 +110,6 @@ export function asyncDataMixin() {
     /** 表单提交状态（按钮禁用等） */
     submitting: false,
 
-    /** 表单提交状态别名（兼容旧代码） */
-    isSubmitting: false,
-
     /** 保存操作状态 */
     saving: false,
 
@@ -510,11 +507,11 @@ export function asyncDataMixin() {
         const params = new URLSearchParams()
 
         // 分页参数
-        if (typeof this.currentPage !== 'undefined') {
-          params.append('page', this.currentPage || 1)
+        if (typeof this.current_page !== 'undefined') {
+          params.append('page', this.current_page || 1)
         }
-        if (typeof this.pageSize !== 'undefined') {
-          params.append('page_size', this.pageSize || 20)
+        if (typeof this.page_size !== 'undefined') {
+          params.append('page_size', this.page_size || 20)
         }
 
         // 2. 添加筛选条件
@@ -629,9 +626,9 @@ export function asyncDataMixin() {
      * @param {Array} listData - 列表数据
      */
     _updatePaginationFromResponse(responseData, totalField, listData) {
-      if (typeof this.totalRecords !== 'undefined') {
+      if (typeof this.total_records !== 'undefined') {
         // 尝试从多种可能的字段获取总数
-        this.totalRecords =
+        this.total_records =
           responseData.pagination?.total ||
           responseData[totalField] ||
           responseData.count ||
@@ -651,8 +648,8 @@ export function asyncDataMixin() {
       }
 
       // 更新总页数（如果使用 paginationMixin）
-      if (typeof this.totalPages !== 'undefined' && responseData.pagination?.total_pages) {
-        this.totalPages = responseData.pagination.total_pages
+      if (typeof this.total_pages !== 'undefined' && responseData.pagination?.total_pages) {
+        this.total_pages = responseData.pagination.total_pages
       }
     },
 
@@ -695,8 +692,8 @@ export function asyncDataMixin() {
      */
     async searchData(overrideOptions = {}) {
       // 重置到第一页
-      if (typeof this.currentPage !== 'undefined') {
-        this.currentPage = 1
+      if (typeof this.current_page !== 'undefined') {
+        this.current_page = 1
       }
       if (typeof this.resetPagination === 'function') {
         this.resetPagination()

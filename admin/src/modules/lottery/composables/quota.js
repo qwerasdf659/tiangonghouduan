@@ -40,7 +40,7 @@ export function useQuotaState() {
     /** @type {boolean} 是否编辑模式 */
     isEditQuota: false,
     /** @type {Object} 配额筛选条件 */
-    quotaFilters: { ruleType: '', status: '', campaignId: '' },
+    quotaFilters: { rule_type: '', status: '', campaign_id: '' },
     /** @type {Object} 配额统计 */
     quotaStats: { totalRules: 0, activeRules: 0 },
     /** @type {Array} 配额使用情况 */
@@ -71,13 +71,13 @@ export function useQuotaMethods() {
         const params = new URLSearchParams()
         // 使用后端字段: rule_type, campaign_id, is_active
         if (this.quotaFilters?.ruleType) {
-          params.append('rule_type', this.quotaFilters.ruleType)
+          params.append('rule_type', this.quotaFilters.rule_type)
         }
         if (this.quotaFilters?.status) {
           params.append('is_active', this.quotaFilters.status === 'active' ? 'true' : 'false')
         }
         if (this.quotaFilters?.campaignId) {
-          params.append('campaign_id', this.quotaFilters.campaignId)
+          params.append('campaign_id', this.quotaFilters.campaign_id)
         }
 
         // apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }
@@ -345,24 +345,6 @@ export function useQuotaMethods() {
         total: '永久'
       }
       return map[type] || type || '-'
-    },
-
-    /**
-     * 获取配额类型文本（兼容旧代码）
-     * @param {string} type - 配额类型代码
-     * @returns {string} 配额类型文本
-     */
-    getQuotaTypeText(type) {
-      return this.getScopeTypeText(type)
-    },
-
-    /**
-     * 获取周期类型文本（兼容旧代码）
-     * @param {string} type - 周期类型代码
-     * @returns {string} 周期类型文本
-     */
-    getPeriodTypeText(type) {
-      return this.getWindowTypeText(type)
     },
 
     /**

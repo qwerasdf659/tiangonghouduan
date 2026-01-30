@@ -25,9 +25,9 @@ const apiRequest = async (url, options = {}) => {
 }
 /**
  * @typedef {Object} HierarchyFilters
- * @property {string} roleLevel - 角色等级筛选
+ * @property {string} role_level - 角色等级筛选
  * @property {string} status - 状态筛选（active/inactive）
- * @property {string} superiorId - 上级用户ID筛选
+ * @property {string} superior_id - 上级用户ID筛选
  */
 
 /**
@@ -40,18 +40,18 @@ const apiRequest = async (url, options = {}) => {
 
 /**
  * @typedef {Object} HierarchyForm
- * @property {string} userId - 用户ID
- * @property {string} roleId - 角色ID
- * @property {string} superiorId - 上级用户ID
- * @property {string} storeId - 门店ID
+ * @property {string} user_id - 用户ID
+ * @property {string} role_id - 角色ID
+ * @property {string} superior_id - 上级用户ID
+ * @property {string} store_id - 门店ID
  */
 
 /**
  * @typedef {Object} DeactivateForm
- * @property {number|null} userId - 要停用的用户ID
- * @property {string} userInfo - 用户信息描述
+ * @property {number|null} user_id - 要停用的用户ID
+ * @property {string} user_info - 用户信息描述
  * @property {string} reason - 停用原因
- * @property {boolean} includeSubordinates - 是否同时停用下级
+ * @property {boolean} include_subordinates - 是否同时停用下级
  */
 
 /**
@@ -101,7 +101,7 @@ document.addEventListener('alpine:init', () => {
    */
   Alpine.data('userHierarchyPage', () => ({
     // ==================== Mixin 组合 ====================
-    ...createCrudMixin({ pageSize: 20 }),
+    ...createCrudMixin({ page_size: 20 }),
 
     // ==================== 页面特有状态 ====================
 
@@ -122,9 +122,9 @@ document.addEventListener('alpine:init', () => {
      * @type {HierarchyFilters}
      */
     filters: {
-      roleLevel: '',
+      role_level: '',
       status: '',
-      superiorId: ''
+      superior_id: ''
     },
 
     /**
@@ -143,10 +143,10 @@ document.addEventListener('alpine:init', () => {
      * @type {HierarchyForm}
      */
     form: {
-      userId: '',
-      roleId: '',
-      superiorId: '',
-      storeId: ''
+      user_id: '',
+      role_id: '',
+      superior_id: '',
+      store_id: ''
     },
 
     /**
@@ -154,10 +154,10 @@ document.addEventListener('alpine:init', () => {
      * @type {DeactivateForm}
      */
     deactivateForm: {
-      userId: null,
-      userInfo: '',
+      user_id: null,
+      user_info: '',
       reason: '',
-      includeSubordinates: false
+      include_subordinates: false
     },
 
     /**
@@ -202,11 +202,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {Promise<void>} 无返回值
      */
     async loadRoles() {
-      const result = await this.apiGet(
-        USER_ENDPOINTS.USER_HIERARCHY_ROLES,
-        {},
-        { showError: false }
-      )
+      const result = await this.apiGet(USER_ENDPOINTS.HIERARCHY_ROLES, {}, { showError: false })
       if (result.success) {
         this.rolesList = result.data || []
       }
@@ -228,12 +224,12 @@ document.addEventListener('alpine:init', () => {
           ...this.buildPaginationParams()
         }
 
-        if (this.filters.roleLevel) params.role_level = this.filters.roleLevel
+        if (this.filters.role_level) params.role_level = this.filters.role_level
         if (this.filters.status) params.is_active = this.filters.status
-        if (this.filters.superiorId) params.superior_user_id = this.filters.superiorId
+        if (this.filters.superior_id) params.superior_user_id = this.filters.superior_id
 
         const response = await apiRequest(
-          `${USER_ENDPOINTS.USER_HIERARCHY_LIST}?${new URLSearchParams(params)}`
+          `${USER_ENDPOINTS.HIERARCHY_LIST}?${new URLSearchParams(params)}`
         )
 
         if (response && response.success) {
@@ -247,14 +243,14 @@ document.addEventListener('alpine:init', () => {
         this.hierarchyList = result.data.rows || []
 
         // 更新分页信息
-        this.totalRecords = result.data.count || 0
+        this.total_records = result.data.count || 0
         if (result.data.pagination?.total_pages) {
           // 后端直接提供了总页数
         }
 
         this._updateStatistics(result.data)
         logger.info('[UserHierarchy] 层级列表加载完成', {
-          count: this.totalRecords,
+          count: this.total_records,
           rows: this.hierarchyList.length
         })
       } else {
@@ -319,9 +315,9 @@ document.addEventListener('alpine:init', () => {
      */
     resetFilters() {
       this.filters = {
-        roleLevel: '',
+        role_level: '',
         status: '',
-        superiorId: ''
+        superior_id: ''
       }
       this.resetPagination()
       this.loadData()
@@ -354,7 +350,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     openCreateModal() {
-      this.form = { userId: '', roleId: '', superiorId: '', storeId: '' }
+      this.form = { user_id: '', role_id: '', superior_id: '', store_id: '' }
       this.showModal('hierarchyModal')
     },
 
@@ -367,18 +363,18 @@ document.addEventListener('alpine:init', () => {
      * @throws {Error} 当必填字段为空时提示警告
      */
     async saveHierarchy() {
-      if (!this.form.userId || !this.form.roleId) {
+      if (!this.form.user_id || !this.form.role_id) {
         this.showWarning('请填写必填字段')
         return
       }
 
       const result = await this.apiPost(
-        USER_ENDPOINTS.USER_HIERARCHY_CREATE,
+        USER_ENDPOINTS.HIERARCHY_CREATE,
         {
-          user_id: parseInt(this.form.userId),
-          role_id: parseInt(this.form.roleId),
-          superior_user_id: this.form.superiorId ? parseInt(this.form.superiorId) : null,
-          store_id: this.form.storeId ? parseInt(this.form.storeId) : null
+          user_id: parseInt(this.form.user_id),
+          role_id: parseInt(this.form.role_id),
+          superior_user_id: this.form.superior_id ? parseInt(this.form.superior_id) : null,
+          store_id: this.form.store_id ? parseInt(this.form.store_id) : null
         },
         { showSuccess: true, successMessage: '创建层级关系成功' }
       )
@@ -405,7 +401,7 @@ document.addEventListener('alpine:init', () => {
       const result = await this.withLoading(
         async () => {
           const response = await apiRequest(
-            buildURL(USER_ENDPOINTS.USER_HIERARCHY_SUBORDINATES, { user_id: userId })
+            buildURL(USER_ENDPOINTS.HIERARCHY_SUBORDINATES, { user_id: userId })
           )
           if (response.success) {
             return response.data.subordinates || []
@@ -426,26 +422,26 @@ document.addEventListener('alpine:init', () => {
      * 打开停用用户模态框
      *
      * @description 初始化停用表单并显示停用确认模态框
-     * @param {number} userId - 要停用的用户ID
-     * @param {string} userInfo - 用户信息描述（如昵称）
+     * @param {number} user_id - 要停用的用户ID
+     * @param {string} user_info - 用户信息描述（如昵称）
      * @returns {void}
      */
-    openDeactivateModal(userId, userInfo) {
+    openDeactivateModal(user_id, user_info) {
       // 检查是否尝试停用自己
-      const currentUser = this.getCurrentUser()
-      const currentUserId = currentUser?.user_id || currentUser?.userId
+      const current_user = this.getCurrentUser()
+      const current_userId = current_user?.user_id
 
-      if (currentUserId && parseInt(userId) === parseInt(currentUserId)) {
+      if (current_userId && parseInt(user_id) === parseInt(current_userId)) {
         this.showWarning('不能停用自己的权限')
-        logger.warn('[UserHierarchy] 阻止停用自己的权限', { userId, currentUserId })
+        logger.warn('[UserHierarchy] 阻止停用自己的权限', { user_id, current_userId })
         return
       }
 
       this.deactivateForm = {
-        userId,
-        userInfo: `${userInfo} (ID: ${userId})`,
+        user_id,
+        user_info: `${user_info} (ID: ${user_id})`,
         reason: '',
-        includeSubordinates: false
+        include_subordinates: false
       }
       this.showModal('deactivateModal')
     },
@@ -465,21 +461,21 @@ document.addEventListener('alpine:init', () => {
       }
 
       // 双重检查：防止停用自己
-      const currentUser = this.getCurrentUser()
-      const currentUserId = currentUser?.user_id || currentUser?.userId
-      if (currentUserId && parseInt(this.deactivateForm.userId) === parseInt(currentUserId)) {
+      const current_user = this.getCurrentUser()
+      const current_userId = current_user?.user_id
+      if (current_userId && parseInt(this.deactivateForm.user_id) === parseInt(current_userId)) {
         this.showWarning('不能停用自己的权限')
         this.hideModal('deactivateModal')
         return
       }
 
       const result = await this.apiPost(
-        buildURL(USER_ENDPOINTS.USER_HIERARCHY_DEACTIVATE, {
-          user_id: this.deactivateForm.userId
+        buildURL(USER_ENDPOINTS.HIERARCHY_DEACTIVATE, {
+          user_id: this.deactivateForm.user_id
         }),
         {
           reason: this.deactivateForm.reason,
-          include_subordinates: this.deactivateForm.includeSubordinates
+          include_subordinates: this.deactivateForm.include_subordinates
         },
         { global: true }
       )
@@ -512,7 +508,7 @@ document.addEventListener('alpine:init', () => {
         '确定要激活该用户的层级权限吗？',
         async () => {
           const response = await apiRequest(
-            buildURL(USER_ENDPOINTS.USER_HIERARCHY_ACTIVATE, { user_id: userId }),
+            buildURL(USER_ENDPOINTS.HIERARCHY_ACTIVATE, { user_id: userId }),
             {
               method: 'POST',
               body: JSON.stringify({ include_subordinates: false })

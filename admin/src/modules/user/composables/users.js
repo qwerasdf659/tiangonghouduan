@@ -38,9 +38,14 @@ export function useUsersState() {
     /** @type {boolean} 是否编辑模式 */
     isEditUser: false,
 
-    // ==================== HTML模板需要的变量 ====================
-    /** @type {Object} 分页对象 - HTML模板使用 pagination.xxx */
-    pagination: { page: 1, total: 0, totalPages: 1 },
+    // ==================== 分页状态（单一数据源）====================
+    /** @type {Object} 分页对象 - 唯一数据源，HTML模板使用 pagination.xxx */
+    pagination: { page: 1, page_size: 20, total: 0 },
+
+    // Getter: 计算总页数
+    get total_pages() {
+      return Math.ceil(this.pagination.total / this.pagination.page_size) || 1
+    },
     /** @type {Object|null} 选中的用户 - HTML模板使用 selectedUser */
     selectedUser: null,
     /** @type {Object} 编辑用户表单 - HTML模板使用 editUserForm */
@@ -57,12 +62,12 @@ export function useUsersState() {
     probabilityPreviewHtml: '',
     /** @type {Object} 概率弹窗状态 */
     probabilityModal: {
-      userId: '',
-      userNickname: '',
+      user_id: '',
+      user_nickname: '',
       mode: 'global',
       multiplier: 1.0,
-      targetPrizeId: '',
-      customProbability: 0,
+      target_prize_id: '',
+      custom_probability: 0,
       duration: 60,
       reason: ''
     },
@@ -83,9 +88,10 @@ export function useUsersMethods() {
     async loadUsers() {
       try {
         const params = new URLSearchParams()
-        params.append('page', this.page)
+        // 使用 pagination 对象作为唯一数据源
+        params.append('page', this.pagination.page)
         // 后端用户管理API使用 limit 而非 page_size
-        params.append('limit', this.pageSize)
+        params.append('limit', this.pagination.page_size)
         // 后端支持 search 字段进行模糊搜索（支持 mobile 和 nickname）
         if (this.userFilters.user_id) params.append('search', this.userFilters.user_id)
         if (this.userFilters.nickname) params.append('search', this.userFilters.nickname)
@@ -101,12 +107,9 @@ export function useUsersMethods() {
         if (response?.success) {
           this.users = response.data?.users || response.data?.list || []
           if (response.data?.pagination) {
-            this.total = response.data.pagination.total || 0
-            this.totalPages = response.data.pagination.total_pages || 1
-            // 同步更新 pagination 对象（HTML模板使用）
-            this.pagination.total = this.total
-            this.pagination.totalPages = this.totalPages
-            this.pagination.page = this.page
+            // 只更新 pagination 对象（单一数据源）
+            this.pagination.total = response.data.pagination.total || 0
+            // total_pages 由 getter 自动计算
           }
         }
       } catch (error) {
@@ -155,7 +158,7 @@ export function useUsersMethods() {
         }
 
         this.userStats = {
-          totalUsers: this.total || this.users.length,
+          totalUsers: this.pagination.total || this.users.length,
           activeUsers: this.users.filter(u => u.status === 'active').length,
           totalRoles: this.roles?.length || 0,
           totalPermissions: permissionSet.size
@@ -165,7 +168,7 @@ export function useUsersMethods() {
       } catch (error) {
         logger.error('加载用户统计失败:', error)
         this.userStats = {
-          totalUsers: this.total || 0,
+          totalUsers: this.pagination.total || 0,
           activeUsers: 0,
           totalRoles: 0,
           totalPermissions: 0
@@ -177,7 +180,7 @@ export function useUsersMethods() {
      * 搜索用户
      */
     searchUsers() {
-      this.page = 1
+      this.pagination.page = 1
       this.loadUsers()
     },
 
@@ -186,7 +189,7 @@ export function useUsersMethods() {
      */
     resetUserFilters() {
       this.userFilters = { user_id: '', nickname: '', status: '' }
-      this.page = 1
+      this.pagination.page = 1
       this.loadUsers()
     },
 
@@ -398,12 +401,12 @@ export function useUsersMethods() {
      */
     openProbabilityModal(user) {
       this.probabilityModal = {
-        userId: user.user_id || '',
-        userNickname: user.nickname || user.user_id || '',
+        user_id: user.user_id || '',
+        user_nickname: user.nickname || user.user_id || '',
         mode: 'global',
         multiplier: 1.0,
-        targetPrizeId: '',
-        customProbability: 0,
+        target_prize_id: '',
+        custom_probability: 0,
         duration: 60,
         reason: ''
       }
@@ -424,9 +427,8 @@ export function useUsersMethods() {
      * 上一页
      */
     prevPage() {
-      if (this.page > 1) {
-        this.page--
-        this.pagination.page = this.page
+      if (this.pagination.page > 1) {
+        this.pagination.page--
         this.loadUsers()
       }
     },
@@ -435,9 +437,10 @@ export function useUsersMethods() {
      * 下一页
      */
     nextPage() {
-      if (this.page < this.totalPages) {
-        this.page++
-        this.pagination.page = this.page
+      // total_pages getter: Math.ceil(total / page_size)
+      const total_pages = Math.ceil(this.pagination.total / this.pagination.page_size) || 1
+      if (this.pagination.page < total_pages) {
+        this.pagination.page++
         this.loadUsers()
       }
     },

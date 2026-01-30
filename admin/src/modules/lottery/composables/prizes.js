@@ -46,7 +46,7 @@ export function usePrizesState() {
     /** @type {number|string|null} 当前编辑的奖品ID */
     editingPrizeId: null,
     /** @type {Object} 库存补充表单 */
-    stockForm: { prizeId: null, prizeName: '', quantity: 1 },
+    stockForm: { prize_id: null, prize_name: '', quantity: 1 },
 
     // ========== 批量添加奖品 ==========
     /** @type {number|null} 批量添加奖品的目标活动ID */
@@ -59,10 +59,10 @@ export function usePrizesState() {
     // ========== P2新增: 奖品发放统计 ==========
     /** @type {Object} 奖品发放统计汇总 */
     prizeIssuedStats: {
-      totalIssued: 0,         // 总发放数量
-      totalValue: 0,          // 总发放价值
-      todayIssued: 0,         // 今日发放数量
-      lowStockCount: 0        // 低库存奖品数量
+      totalIssued: 0, // 总发放数量
+      totalValue: 0, // 总发放价值
+      todayIssued: 0, // 今日发放数量
+      lowStockCount: 0 // 低库存奖品数量
     },
     /** @type {Array} 按奖品的发放明细 */
     prizeDistributionDetail: []
@@ -84,7 +84,7 @@ export function usePrizesMethods() {
       try {
         const params = new URLSearchParams()
         params.append('page', this.page)
-        params.append('page_size', this.pageSize)
+        params.append('page_size', this.page_size)
         // 使用后端字段名
         if (this.prizeFilters.prize_type) {
           params.append('prize_type', this.prizeFilters.prize_type)
@@ -112,7 +112,7 @@ export function usePrizesMethods() {
           this.prizes = data.prizes || data.list || []
           // 更新分页信息
           if (data.pagination) {
-            this.totalPages = data.pagination.total_pages || 1
+            this.total_pages = data.pagination.total_pages || 1
             this.totalCount = data.pagination.total || 0
           }
           logger.debug('[Prizes] 数据加载完成, prizes:', this.prizes.length)
@@ -265,7 +265,9 @@ export function usePrizesMethods() {
           if (winProbability !== 1.0) {
             // 单个添加时强制设置为1.0，避免验证失败
             // 用户可以后续通过编辑功能调整概率
-            logger.warn('[Prizes] 单个添加奖品时概率自动设置为100%，请添加多个奖品后编辑调整概率分配')
+            logger.warn(
+              '[Prizes] 单个添加奖品时概率自动设置为100%，请添加多个奖品后编辑调整概率分配'
+            )
             winProbability = 1.0
           }
 
@@ -339,7 +341,7 @@ export function usePrizesMethods() {
      * 提交奖品补货
      */
     async submitAddStock() {
-      if (!this.stockForm.prizeId) {
+      if (!this.stockForm.prize_id) {
         this.showError('奖品信息无效')
         return
       }
@@ -353,7 +355,7 @@ export function usePrizesMethods() {
         // apiCall 成功时返回 response.data，失败时抛出错误
         await this.apiCall(
           buildURL(LOTTERY_ENDPOINTS.PRIZE_ADD_STOCK, {
-            prize_id: this.stockForm.prizeId
+            prize_id: this.stockForm.prize_id
           }),
           {
             method: 'POST',
@@ -390,7 +392,7 @@ export function usePrizesMethods() {
     async loadPrizeIssuedStats() {
       try {
         logger.info('[Prizes] 加载奖品发放统计')
-        
+
         // 使用监控统计 API 获取 prize_stats
         const response = await this.apiGet(
           `${LOTTERY_ENDPOINTS.MONITORING_STATS}?time_range=today`,
@@ -399,13 +401,13 @@ export function usePrizesMethods() {
         )
 
         const data = response?.success ? response.data : response
-        
+
         if (data) {
           // 从 prize_stats 计算汇总
           const prizeStats = data.prize_stats || []
-          
+
           this.prizeDistributionDetail = prizeStats
-          
+
           // 计算汇总数据
           let totalIssued = 0
           let totalValue = 0
@@ -447,7 +449,7 @@ export function usePrizesMethods() {
     getPrizeIssuedPercentage(stat) {
       const total = this.prizeIssuedStats.totalIssued
       if (total === 0) return 0
-      return ((stat.issued_count || stat.count || 0) / total * 100).toFixed(1)
+      return (((stat.issued_count || stat.count || 0) / total) * 100).toFixed(1)
     },
 
     // ========== 批量添加奖品方法 ==========
@@ -459,10 +461,34 @@ export function usePrizesMethods() {
       this.batchCampaignId = this.campaigns?.[0]?.campaign_id || null
       // 初始化一个包含多个奖品槽位的模板（直接使用后端字段名）
       this.batchPrizes = [
-        { prize_name: '一等奖', prize_type: 'physical', win_probability: 0.05, stock_quantity: 10, prize_description: '' },
-        { prize_name: '二等奖', prize_type: 'virtual', win_probability: 0.15, stock_quantity: 50, prize_description: '' },
-        { prize_name: '三等奖', prize_type: 'points', win_probability: 0.30, stock_quantity: 200, prize_description: '' },
-        { prize_name: '谢谢参与', prize_type: 'empty', win_probability: 0.50, stock_quantity: 999999, prize_description: '' }
+        {
+          prize_name: '一等奖',
+          prize_type: 'physical',
+          win_probability: 0.05,
+          stock_quantity: 10,
+          prize_description: ''
+        },
+        {
+          prize_name: '二等奖',
+          prize_type: 'virtual',
+          win_probability: 0.15,
+          stock_quantity: 50,
+          prize_description: ''
+        },
+        {
+          prize_name: '三等奖',
+          prize_type: 'points',
+          win_probability: 0.3,
+          stock_quantity: 200,
+          prize_description: ''
+        },
+        {
+          prize_name: '谢谢参与',
+          prize_type: 'empty',
+          win_probability: 0.5,
+          stock_quantity: 999999,
+          prize_description: ''
+        }
       ]
       this.updateBatchProbabilitySum()
       this.showModal('batchPrizeModal')
@@ -562,7 +588,8 @@ export function usePrizesMethods() {
           prize_name: prize.prize_name.trim(),
           prize_type: prize.prize_type,
           win_probability: parseFloat(prize.win_probability) || 0,
-          stock_quantity: prize.stock_quantity === -1 ? 999999 : parseInt(prize.stock_quantity) || 100,
+          stock_quantity:
+            prize.stock_quantity === -1 ? 999999 : parseInt(prize.stock_quantity) || 100,
           prize_description: prize.prize_description || ''
         }))
 

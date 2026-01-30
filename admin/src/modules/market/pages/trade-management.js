@@ -20,9 +20,9 @@
  *
  * <!-- 使用主组件 -->
  * <div x-data="tradeManagementPage()">
- *   <div x-show="currentPage === 'trade-orders'">C2C交易订单</div>
- *   <div x-show="currentPage === 'marketplace-stats'">上架统计</div>
- *   <div x-show="currentPage === 'redemption-orders'">兑换订单</div>
+ *   <div x-show="current_page === 'trade-orders'">C2C交易订单</div>
+ *   <div x-show="current_page === 'marketplace-stats'">上架统计</div>
+ *   <div x-show="current_page === 'redemption-orders'">兑换订单</div>
  * </div>
  */
 
@@ -44,14 +44,14 @@ document.addEventListener('alpine:init', () => {
    * @description 管理交易管理子页面导航，支持URL参数持久化
    * @returns {Object} Alpine组件对象
    *
-   * @property {string} currentPage - 当前激活的页面ID
+   * @property {string} current_page - 当前激活的页面ID
    * @property {Array<{id: string, title: string, icon: string}>} subPages - 子页面配置列表
    */
   Alpine.data('tradeNavigation', () => ({
     ...createPageMixin(),
 
     /** @type {string} 当前页面ID，默认为'trade-orders' */
-    currentPage: 'trade-orders',
+    current_page: 'trade-orders',
 
     /**
      * 子页面配置列表
@@ -72,10 +72,10 @@ document.addEventListener('alpine:init', () => {
       const urlParams = new URLSearchParams(window.location.search)
       const page = urlParams.get('page')
       if (page && this.subPages.some(p => p.id === page)) {
-        this.currentPage = page
+        this.current_page = page
       }
-      Alpine.store('tradePage', this.currentPage)
-      logger.info('[TradeNavigation] 当前页面:', this.currentPage)
+      Alpine.store('tradePage', this.current_page)
+      logger.info('[TradeNavigation] 当前页面:', this.current_page)
     },
 
     /**
@@ -86,7 +86,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     switchPage(pageId) {
-      this.currentPage = pageId
+      this.current_page = pageId
       Alpine.store('tradePage', pageId)
 
       // 更新 URL
@@ -144,8 +144,8 @@ document.addEventListener('alpine:init', () => {
     tradeCurrentPage: 1,
     /** @type {number} 交易订单每页数量 */
     tradePageSize: 20,
-    /** @type {{totalPages: number, total: number}} 交易订单分页信息 */
-    tradePagination: { totalPages: 1, total: 0 },
+    /** @type {{total_pages: number, total: number}} 交易订单分页信息 */
+    tradePagination: { total_pages: 1, total: 0 },
 
     // ========== 上架统计数据 ==========
     /** @type {Array<Object>} 用户上架统计列表 */
@@ -170,8 +170,8 @@ document.addEventListener('alpine:init', () => {
     marketplaceCurrentPage: 1,
     /** @type {number} 上架统计每页数量 */
     marketplacePageSize: 20,
-    /** @type {{totalPages: number, total: number}} 上架统计分页信息 */
-    marketplacePagination: { totalPages: 1, total: 0 },
+    /** @type {{total_pages: number, total: number}} 上架统计分页信息 */
+    marketplacePagination: { total_pages: 1, total: 0 },
     /** @type {number} 最大上架数限制 */
     maxListings: 10,
 
@@ -189,8 +189,8 @@ document.addEventListener('alpine:init', () => {
     redemptionCurrentPage: 1,
     /** @type {number} 兑换订单每页数量 */
     redemptionPageSize: 20,
-    /** @type {{totalPages: number, total: number}} 兑换订单分页信息 */
-    redemptionPagination: { totalPages: 1, total: 0 },
+    /** @type {{total_pages: number, total: number}} 兑换订单分页信息 */
+    redemptionPagination: { total_pages: 1, total: 0 },
 
     // ========== 通用状态 ==========
     /** @type {boolean} 保存操作进行中标志 */
@@ -200,7 +200,7 @@ document.addEventListener('alpine:init', () => {
      * 获取当前页面ID（从Alpine store读取）
      * @returns {string} 当前页面ID
      */
-    get currentPage() {
+    get current_page() {
       return Alpine.store('tradePage')
     },
 
@@ -225,11 +225,11 @@ document.addEventListener('alpine:init', () => {
     /**
      * 根据当前页面加载对应数据
      * @async
-     * @description 根据currentPage调用不同的数据加载方法
+     * @description 根据current_page调用不同的数据加载方法
      * @returns {Promise<void>}
      */
     async loadPageData() {
-      const page = this.currentPage
+      const page = this.current_page
       logger.info('[TradePageContent] 加载数据:', page)
 
       switch (page) {
@@ -279,7 +279,7 @@ document.addEventListener('alpine:init', () => {
           // 后端使用 snake_case: total_count, total_pages
           const pagination = res.data?.pagination || {}
           this.tradePagination = {
-            totalPages: pagination.total_pages || pagination.totalPages || 1,
+            total_pages: pagination.total_pages || pagination.total_pages || 1,
             total: pagination.total_count || pagination.total || this.tradeOrders.length
           }
         }
@@ -323,7 +323,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     changeTradePage(page) {
-      if (page < 1 || page > this.tradePagination.totalPages) return
+      if (page < 1 || page > this.tradePagination.total_pages) return
       this.tradeCurrentPage = page
       this.loadTradeOrders()
     },
@@ -411,7 +411,7 @@ document.addEventListener('alpine:init', () => {
         this.loading = true
         const params = {
           page: this.marketplaceCurrentPage,
-          pageSize: this.marketplacePageSize,
+          page_size: this.marketplacePageSize,
           status: this.marketplaceFilters.status
         }
 
@@ -426,7 +426,7 @@ document.addEventListener('alpine:init', () => {
         if (res.success) {
           this.marketplaceStats = res.data?.list || res.data || []
           this.marketplacePagination = {
-            totalPages: res.data?.pagination?.totalPages || 1,
+            total_pages: res.data?.pagination?.total_pages || 1,
             total: res.data?.pagination?.total || this.marketplaceStats.length
           }
 
@@ -449,7 +449,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     changeMarketplacePage(page) {
-      if (page < 1 || page > this.marketplacePagination.totalPages) return
+      if (page < 1 || page > this.marketplacePagination.total_pages) return
       this.marketplaceCurrentPage = page
       this.loadMarketplaceStats()
     },
@@ -467,7 +467,7 @@ document.addEventListener('alpine:init', () => {
         this.loading = true
         const params = {
           page: this.redemptionCurrentPage,
-          pageSize: this.redemptionPageSize,
+          page_size: this.redemptionPageSize,
           ...this.redemptionFilters
         }
 
@@ -483,7 +483,7 @@ document.addEventListener('alpine:init', () => {
         if (res.success) {
           this.redemptionOrders = res.data?.list || res.data || []
           this.redemptionPagination = {
-            totalPages: res.data?.pagination?.totalPages || 1,
+            total_pages: res.data?.pagination?.total_pages || 1,
             total: res.data?.pagination?.total || this.redemptionOrders.length
           }
         }
@@ -501,7 +501,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     changeRedemptionPage(page) {
-      if (page < 1 || page > this.redemptionPagination.totalPages) return
+      if (page < 1 || page > this.redemptionPagination.total_pages) return
       this.redemptionCurrentPage = page
       this.loadRedemptionOrders()
     },
@@ -598,7 +598,7 @@ document.addEventListener('alpine:init', () => {
    * @description 整合C2C交易订单、上架统计、兑换订单的完整页面组件
    * @returns {Object} Alpine组件对象
    *
-   * @property {string} currentPage - 当前子页面 ('trade-orders' | 'marketplace-stats' | 'redemption-orders')
+   * @property {string} current_page - 当前子页面 ('trade-orders' | 'marketplace-stats' | 'redemption-orders')
    * @property {Array} tradeOrders - C2C交易订单列表
    * @property {Array} marketplaceStats - 上架统计数据
    * @property {Array} redemptionOrders - 兑换订单列表
@@ -610,7 +610,7 @@ document.addEventListener('alpine:init', () => {
    *       <button @click="switchPage(page.id)" x-text="page.name"></button>
    *     </template>
    *   </nav>
-   *   <div x-show="currentPage === 'trade-orders'">
+   *   <div x-show="current_page === 'trade-orders'">
    *     <!-- C2C交易订单列表 -->
    *   </div>
    * </div>
@@ -620,7 +620,7 @@ document.addEventListener('alpine:init', () => {
 
     // 子页面导航
     /** @type {string} 当前页面ID */
-    currentPage: 'trade-orders',
+    current_page: 'trade-orders',
     /**
      * 子页面配置列表
      * @type {Array<{id: string, name: string, icon: string}>}
@@ -635,8 +635,6 @@ document.addEventListener('alpine:init', () => {
     tradeOrders: [],
     /** @type {Object|null} 当前选中的交易订单 */
     selectedTradeOrder: null,
-    /** @type {Object|null} 旧版兼容：选中的交易（用于旧版模态框） */
-    selectedTrade: null,
     /** @type {{total: number, created: number, frozen: number, completed: number}} 交易统计 */
     tradeStats: { total: 0, created: 0, frozen: 0, completed: 0 },
     /** @type {{totalTrades: number, completedTrades: number, pendingTrades: number, totalVolume: number}} HTML 统计卡片使用 */
@@ -647,8 +645,8 @@ document.addEventListener('alpine:init', () => {
     tradeCurrentPage: 1,
     /** @type {number} 交易订单每页数量 */
     tradePageSize: 20,
-    /** @type {{totalPages: number, total: number}} 交易订单分页信息 */
-    tradePagination: { totalPages: 1, total: 0 },
+    /** @type {{total_pages: number, total: number}} 交易订单分页信息 */
+    tradePagination: { total_pages: 1, total: 0 },
 
     // 上架统计
     /** @type {Array<Object>} 用户上架统计列表 */
@@ -661,8 +659,8 @@ document.addEventListener('alpine:init', () => {
     marketplaceCurrentPage: 1,
     /** @type {number} 上架统计每页数量 */
     marketplacePageSize: 20,
-    /** @type {{totalPages: number, total: number}} 上架统计分页信息 */
-    marketplacePagination: { totalPages: 1, total: 0 },
+    /** @type {{total_pages: number, total: number}} 上架统计分页信息 */
+    marketplacePagination: { total_pages: 1, total: 0 },
     /** @type {number} 最大上架数限制 */
     maxListings: 10,
 
@@ -675,8 +673,8 @@ document.addEventListener('alpine:init', () => {
     redemptionCurrentPage: 1,
     /** @type {number} 兑换订单每页数量 */
     redemptionPageSize: 20,
-    /** @type {{totalPages: number, total: number}} 兑换订单分页信息 */
-    redemptionPagination: { totalPages: 1, total: 0 },
+    /** @type {{total_pages: number, total: number}} 兑换订单分页信息 */
+    redemptionPagination: { total_pages: 1, total: 0 },
 
     // 通用状态
     /** @type {boolean} 保存操作进行中标志 */
@@ -691,7 +689,7 @@ document.addEventListener('alpine:init', () => {
       logger.info('交易管理页面初始化 (合并组件)')
       if (!this.checkAuth()) return
       const urlParams = new URLSearchParams(window.location.search)
-      this.currentPage = urlParams.get('page') || 'trade-orders'
+      this.current_page = urlParams.get('page') || 'trade-orders'
       this.loadPageData()
     },
 
@@ -701,7 +699,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     switchPage(pageId) {
-      this.currentPage = pageId
+      this.current_page = pageId
       window.history.pushState({}, '', `?page=${pageId}`)
       this.loadPageData()
     },
@@ -713,7 +711,7 @@ document.addEventListener('alpine:init', () => {
      */
     async loadPageData() {
       await this.withLoading(async () => {
-        switch (this.currentPage) {
+        switch (this.current_page) {
           case 'trade-orders':
             await this.loadTradeOrders()
             break
@@ -752,7 +750,7 @@ document.addEventListener('alpine:init', () => {
           // 后端使用 snake_case: total_count, total_pages
           const pagination = data.pagination || {}
           this.tradePagination = {
-            totalPages: pagination.total_pages || pagination.totalPages || 1,
+            total_pages: pagination.total_pages || pagination.total_pages || 1,
             total: pagination.total_count || pagination.total || this.tradeOrders.length
           }
           this.tradeStats = { total: this.tradeOrders.length, created: 0, frozen: 0, completed: 0 }
@@ -816,7 +814,7 @@ document.addEventListener('alpine:init', () => {
           this.redemptionOrders = Array.isArray(redemptionData) ? redemptionData : []
           const pagination = data.pagination || {}
           this.redemptionPagination = {
-            totalPages: pagination.total_pages || pagination.totalPages || 1,
+            total_pages: pagination.total_pages || pagination.total_pages || 1,
             total: pagination.total_count || pagination.total || this.redemptionOrders.length
           }
         }
@@ -939,7 +937,6 @@ document.addEventListener('alpine:init', () => {
      */
     viewTradeOrderDetail(trade) {
       this.selectedTradeOrder = trade
-      this.selectedTrade = trade // 兼容旧版模态框
       this.showModal('tradeDetailModal')
     },
 
@@ -949,7 +946,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     changeTradePage(page) {
-      if (page < 1 || page > (this.tradePagination?.totalPages || 1)) return
+      if (page < 1 || page > (this.tradePagination?.total_pages || 1)) return
       this.tradeCurrentPage = page
       this.loadTradeOrders()
     },

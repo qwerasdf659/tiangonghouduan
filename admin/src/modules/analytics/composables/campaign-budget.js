@@ -43,7 +43,7 @@ export function useCampaignBudgetState() {
       // HTML模板需要的字段
       type: 'daily',
       amount: 0,
-      alertThreshold: 80
+      alert_threshold: 80
     },
     /** @type {boolean} 预算编辑模式 */
     budgetEditMode: false
@@ -63,7 +63,7 @@ export function useCampaignBudgetMethods() {
     async loadBudgets() {
       try {
         const params = new URLSearchParams()
-        params.append('limit', this.pageSize || 50)
+        params.append('limit', this.financePagination?.page_size || 50)
         if (this.budgetFilters.campaign_id) {
           params.append('campaign_ids', this.budgetFilters.campaign_id)
         }
@@ -110,8 +110,8 @@ export function useCampaignBudgetMethods() {
             return true
           })
 
-          this.total = this.budgets.length
-          this.totalPages = Math.ceil(this.budgets.length / (this.pageSize || 20))
+          // 只更新 total，total_pages 由 getter 计算
+          this.financePagination.total = this.budgets.length
 
           // 使用后端返回的 summary 或从数据计算统计
           if (response.data.summary) {
@@ -200,7 +200,7 @@ export function useCampaignBudgetMethods() {
      * 搜索预算
      */
     searchBudgets() {
-      this.page = 1
+      this.financePagination.page = 1
       this.loadBudgets()
     },
 
@@ -219,13 +219,6 @@ export function useCampaignBudgetMethods() {
       this.selectedBudget = budget
       this.budgetEditMode = true
       this.showModal('budgetFormModal')
-    },
-
-    /**
-     * 提交预算（别名，供HTML模板使用）
-     */
-    async submitBudget() {
-      return this.saveBudget()
     },
 
     /**

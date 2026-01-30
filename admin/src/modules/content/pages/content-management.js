@@ -27,7 +27,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { buildURL, request, getToken } from '../../../api/base.js'
-import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
+import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 document.addEventListener('alpine:init', () => {
   logger.info('[ContentManagement] 注册 Alpine 组件...')
@@ -37,7 +37,7 @@ document.addEventListener('alpine:init', () => {
    *
    * @description 整合公告、轮播图、图片资源管理的综合页面组件
    *
-   * @property {string} currentPage - 当前激活的子页面ID
+   * @property {string} current_page - 当前激活的子页面ID
    * @property {Array<Object>} subPages - 子页面导航配置
    * @property {Array<Object>} announcements - 公告列表数据
    * @property {Object} announcementForm - 公告表单数据
@@ -65,7 +65,7 @@ document.addEventListener('alpine:init', () => {
      * 当前激活的子页面ID
      * @type {string}
      */
-    currentPage: 'announcements',
+    current_page: 'announcements',
 
     /**
      * 子页面导航配置
@@ -194,7 +194,7 @@ document.addEventListener('alpine:init', () => {
       logger.info('内容管理页面初始化')
       if (!this.checkAuth()) return
       const urlParams = new URLSearchParams(window.location.search)
-      this.currentPage = urlParams.get('page') || 'announcements'
+      this.current_page = urlParams.get('page') || 'announcements'
       this.loadPageData()
     },
 
@@ -205,7 +205,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     switchPage(pageId) {
-      this.currentPage = pageId
+      this.current_page = pageId
       const url = new URL(window.location)
       url.searchParams.set('page', pageId)
       window.history.pushState({}, '', url)
@@ -219,8 +219,8 @@ document.addEventListener('alpine:init', () => {
      * @returns {Promise<void>}
      */
     async loadPageData() {
-      logger.info('[ContentManagement] 加载页面数据:', this.currentPage)
-      switch (this.currentPage) {
+      logger.info('[ContentManagement] 加载页面数据:', this.current_page)
+      switch (this.current_page) {
         case 'announcements':
           await this.loadAnnouncements()
           break
@@ -979,26 +979,6 @@ document.addEventListener('alpine:init', () => {
     },
 
     // ==================== 辅助方法 ====================
-
-    /**
-     * 格式化日期
-     * @param {string} dateStr - 日期字符串
-     * @returns {string} 格式化后的中文日期字符串
-     */
-    formatDate(dateStr) {
-      if (!dateStr) return '-'
-      try {
-        return new Date(dateStr).toLocaleString('zh-CN', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit'
-        })
-      } catch {
-        return dateStr
-      }
-    },
 
     /**
      * 格式化文件大小

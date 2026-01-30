@@ -11,15 +11,15 @@
  * // 保存页面状态
  * Alpine.store('pageState').save('users', {
  *   filters: this.filters,
- *   currentPage: this.currentPage,
- *   pageSize: this.pageSize
+ *   current_page: this.current_page,
+ *   page_size: this.page_size
  * })
  *
  * // 恢复页面状态
  * const state = Alpine.store('pageState').restore('users')
  * if (state) {
  *   this.filters = state.filters
- *   this.currentPage = state.currentPage
+ *   this.current_page = state.current_page
  * }
  */
 

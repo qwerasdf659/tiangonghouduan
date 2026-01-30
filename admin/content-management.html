@@ -27,7 +27,7 @@
         <template x-for="page in subPages" :key="page.id">
           <button 
             @click="switchPage(page.id)"
-            :class="currentPage === page.id ? 'border-b-2 themed-border-primary themed-text-primary themed-bg-primary-light' : 'themed-text-muted themed-hover-bg'"
+            :class="current_page === page.id ? 'border-b-2 themed-border-primary themed-text-primary themed-bg-primary-light' : 'themed-text-muted themed-hover-bg'"
             class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
             x-text="page.icon + ' ' + page.name"
           ></button>
@@ -36,7 +36,7 @@
     </div>
 
     <!-- 公告管理 -->
-    <div x-show="currentPage === 'announcements'" x-cloak>
+    <div x-show="current_page === 'announcements'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold">公告管理</h5>
@@ -80,7 +80,7 @@
                       x-text="ann.is_active ? '已发布' : '草稿'"
                     ></span>
                   </td>
-                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(ann.created_at)"></td>
+                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(ann.created_at)"></td>
                   <td class="px-4 py-3">
                     <div class="flex space-x-2">
                       <button @click="editAnnouncement(ann)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
@@ -102,7 +102,7 @@
     -->
 
     <!-- 轮播图管理 -->
-    <div x-show="currentPage === 'popup-banners'" x-cloak>
+    <div x-show="current_page === 'popup-banners'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold">轮播图管理</h5>
@@ -144,7 +144,7 @@
     </div>
 
     <!-- 图片资源管理 -->
-    <div x-show="currentPage === 'image-resources'" x-cloak>
+    <div x-show="current_page === 'image-resources'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold">图片资源</h5>

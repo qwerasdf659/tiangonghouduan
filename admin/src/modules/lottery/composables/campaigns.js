@@ -81,7 +81,7 @@ export function useCampaignsMethods(context) {
         logger.debug('📋 [Campaigns] loadCampaigns 开始执行')
         const params = new URLSearchParams()
         params.append('page', this.page)
-        params.append('page_size', this.pageSize)
+        params.append('page_size', this.page_size)
         if (this.campaignFilters.status) {
           params.append('status', this.campaignFilters.status)
         }
@@ -105,7 +105,7 @@ export function useCampaignsMethods(context) {
           this.campaigns = data.campaigns || data.list || []
           // 更新分页信息
           if (data.pagination) {
-            this.totalPages = data.pagination.total_pages || 1
+            this.total_pages = data.pagination.total_pages || 1
             this.totalCount = data.pagination.total || 0
           }
           logger.debug(
@@ -375,13 +375,12 @@ export function useCampaignsMethods(context) {
       try {
         logger.info('[Campaigns] 加载活动ROI分析', { campaign_id: campaignId })
 
-        const url = `${LOTTERY_ENDPOINTS.MONITORING_CAMPAIGN_ROI}`.replace(':campaign_id', campaignId)
-        
-        const response = await this.apiGet(
-          url,
-          {},
-          { showLoading: false }
+        const url = `${LOTTERY_ENDPOINTS.MONITORING_CAMPAIGN_ROI}`.replace(
+          ':campaign_id',
+          campaignId
         )
+
+        const response = await this.apiGet(url, {}, { showLoading: false })
 
         const data = response?.success ? response.data : response
 
@@ -389,7 +388,8 @@ export function useCampaignsMethods(context) {
           this.campaignRoiData = {
             ...data,
             campaign_id: campaignId,
-            campaign_name: this.campaigns.find(c => c.campaign_id === campaignId)?.campaign_name || '未知活动'
+            campaign_name:
+              this.campaigns.find(c => c.campaign_id === campaignId)?.campaign_name || '未知活动'
           }
           logger.info('[Campaigns] ROI分析数据加载成功')
         }

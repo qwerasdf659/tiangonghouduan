@@ -42,24 +42,17 @@ export const TRADE_ENDPOINTS = {
 
   // 业务记录查询
   BUSINESS_RECORDS_LOTTERY_CLEAR: `${API_PREFIX}/console/business-records/lottery-clear-settings`,
-  BUSINESS_RECORDS_LOTTERY_CLEAR_DETAIL:
-    `${API_PREFIX}/console/business-records/lottery-clear-settings/:record_id`,
+  BUSINESS_RECORDS_LOTTERY_CLEAR_DETAIL: `${API_PREFIX}/console/business-records/lottery-clear-settings/:record_id`,
   BUSINESS_RECORDS_REDEMPTION: `${API_PREFIX}/console/business-records/redemption-orders`,
-  BUSINESS_RECORDS_REDEMPTION_DETAIL:
-    `${API_PREFIX}/console/business-records/redemption-orders/:order_id`,
-  BUSINESS_RECORDS_REDEMPTION_REDEEM:
-    `${API_PREFIX}/console/business-records/redemption-orders/:order_id/redeem`,
-  BUSINESS_RECORDS_REDEMPTION_CANCEL:
-    `${API_PREFIX}/console/business-records/redemption-orders/:order_id/cancel`,
+  BUSINESS_RECORDS_REDEMPTION_DETAIL: `${API_PREFIX}/console/business-records/redemption-orders/:order_id`,
+  BUSINESS_RECORDS_REDEMPTION_REDEEM: `${API_PREFIX}/console/business-records/redemption-orders/:order_id/redeem`,
+  BUSINESS_RECORDS_REDEMPTION_CANCEL: `${API_PREFIX}/console/business-records/redemption-orders/:order_id/cancel`,
   BUSINESS_RECORDS_CONTENT_REVIEWS: `${API_PREFIX}/console/business-records/content-reviews`,
-  BUSINESS_RECORDS_CONTENT_REVIEWS_DETAIL:
-    `${API_PREFIX}/console/business-records/content-reviews/:audit_id`,
+  BUSINESS_RECORDS_CONTENT_REVIEWS_DETAIL: `${API_PREFIX}/console/business-records/content-reviews/:audit_id`,
   BUSINESS_RECORDS_ROLE_CHANGES: `${API_PREFIX}/console/business-records/user-role-changes`,
-  BUSINESS_RECORDS_ROLE_CHANGES_DETAIL:
-    `${API_PREFIX}/console/business-records/user-role-changes/:record_id`,
+  BUSINESS_RECORDS_ROLE_CHANGES_DETAIL: `${API_PREFIX}/console/business-records/user-role-changes/:record_id`,
   BUSINESS_RECORDS_STATUS_CHANGES: `${API_PREFIX}/console/business-records/user-status-changes`,
-  BUSINESS_RECORDS_STATUS_CHANGES_DETAIL:
-    `${API_PREFIX}/console/business-records/user-status-changes/:record_id`,
+  BUSINESS_RECORDS_STATUS_CHANGES_DETAIL: `${API_PREFIX}/console/business-records/user-status-changes/:record_id`,
   BUSINESS_RECORDS_EXCHANGE: `${API_PREFIX}/console/business-records/exchange-records`,
   BUSINESS_RECORDS_EXCHANGE_DETAIL: `${API_PREFIX}/console/business-records/exchange-records/:record_id`,
   BUSINESS_RECORDS_CHAT: `${API_PREFIX}/console/business-records/chat-messages`,
@@ -452,7 +445,7 @@ export const TradeAPI = {
   },
 
   /**
-   * 获取C2C市场列表（别名）
+   * 获取C2C市场列表
    * @param {Object} [params={}] - 查询参数
    * @returns {Promise<Object>} 市场列表
    */
@@ -483,4 +476,3 @@ export const TradeAPI = {
 }
 
 export default TradeAPI
-

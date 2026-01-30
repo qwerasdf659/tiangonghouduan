@@ -124,7 +124,7 @@ export function useBatchOperationsMethods() {
      */
     async executeBatchQuotaGrant() {
       const form = this.batchQuotaGrantForm
-      
+
       // 验证
       if (!form.campaign_id) {
         this.showError('请选择活动')
@@ -161,16 +161,22 @@ export function useBatchOperationsMethods() {
 
       this.executingBatchOperation = true
       try {
-        const response = await this.apiPost(LOTTERY_ENDPOINTS.BATCH_QUOTA_GRANT, {
-          campaign_id: parseInt(form.campaign_id),
-          user_ids: userIds,
-          bonus_count: parseInt(form.bonus_count),
-          reason: form.reason.trim()
-        }, { showLoading: true })
+        const response = await this.apiPost(
+          LOTTERY_ENDPOINTS.BATCH_QUOTA_GRANT,
+          {
+            campaign_id: parseInt(form.campaign_id),
+            user_ids: userIds,
+            bonus_count: parseInt(form.bonus_count),
+            reason: form.reason.trim()
+          },
+          { showLoading: true }
+        )
 
         if (response?.success) {
           this.batchOperationResult = response.data
-          this.showSuccess(`批量赠送完成：成功 ${response.data.success_count}/${response.data.total_count}`)
+          this.showSuccess(
+            `批量赠送完成：成功 ${response.data.success_count}/${response.data.total_count}`
+          )
           logger.info('[BatchOps] 批量赠送成功', response.data)
         } else {
           this.showError('批量赠送失败: ' + (response?.message || '未知错误'))
@@ -188,7 +194,7 @@ export function useBatchOperationsMethods() {
      */
     async executeBatchCampaignStatus() {
       const form = this.batchCampaignStatusForm
-      
+
       if (!form.campaign_ids || form.campaign_ids.length === 0) {
         this.showError('请选择至少一个活动')
         return
@@ -204,15 +210,21 @@ export function useBatchOperationsMethods() {
 
       this.executingBatchOperation = true
       try {
-        const response = await this.apiPost(LOTTERY_ENDPOINTS.BATCH_CAMPAIGN_STATUS, {
-          campaign_ids: form.campaign_ids.map(id => parseInt(id)),
-          target_status: form.target_status,
-          reason: form.reason.trim()
-        }, { showLoading: true })
+        const response = await this.apiPost(
+          LOTTERY_ENDPOINTS.BATCH_CAMPAIGN_STATUS,
+          {
+            campaign_ids: form.campaign_ids.map(id => parseInt(id)),
+            target_status: form.target_status,
+            reason: form.reason.trim()
+          },
+          { showLoading: true }
+        )
 
         if (response?.success) {
           this.batchOperationResult = response.data
-          this.showSuccess(`批量状态切换完成：成功 ${response.data.success_count}/${response.data.total_count}`)
+          this.showSuccess(
+            `批量状态切换完成：成功 ${response.data.success_count}/${response.data.total_count}`
+          )
           logger.info('[BatchOps] 批量状态切换成功', response.data)
           // 刷新活动列表
           await this.loadCampaigns?.()
@@ -232,7 +244,7 @@ export function useBatchOperationsMethods() {
      */
     async executeBatchBudgetAdjust() {
       const form = this.batchBudgetAdjustForm
-      
+
       if (!form.campaign_ids || form.campaign_ids.length === 0) {
         this.showError('请选择至少一个活动')
         return
@@ -252,16 +264,22 @@ export function useBatchOperationsMethods() {
 
       this.executingBatchOperation = true
       try {
-        const response = await this.apiPost(LOTTERY_ENDPOINTS.BATCH_BUDGET_ADJUST, {
-          campaign_ids: form.campaign_ids.map(id => parseInt(id)),
-          adjust_type: form.adjust_type,
-          amount: parseFloat(form.amount),
-          reason: form.reason.trim()
-        }, { showLoading: true })
+        const response = await this.apiPost(
+          LOTTERY_ENDPOINTS.BATCH_BUDGET_ADJUST,
+          {
+            campaign_ids: form.campaign_ids.map(id => parseInt(id)),
+            adjust_type: form.adjust_type,
+            amount: parseFloat(form.amount),
+            reason: form.reason.trim()
+          },
+          { showLoading: true }
+        )
 
         if (response?.success) {
           this.batchOperationResult = response.data
-          this.showSuccess(`批量预算调整完成：成功 ${response.data.success_count}/${response.data.total_count}`)
+          this.showSuccess(
+            `批量预算调整完成：成功 ${response.data.success_count}/${response.data.total_count}`
+          )
           logger.info('[BatchOps] 批量预算调整成功', response.data)
         } else {
           this.showError('批量预算调整失败: ' + (response?.message || '未知错误'))
@@ -399,6 +417,3 @@ export function useBatchOperationsMethods() {
 }
 
 export default { useBatchOperationsState, useBatchOperationsMethods }
-
-
-

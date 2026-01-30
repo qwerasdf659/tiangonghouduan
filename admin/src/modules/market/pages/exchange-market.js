@@ -45,7 +45,7 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('exchangeNavigation', () => ({
     ...createPageMixin(),
 
-    currentPage: 'items',
+    current_page: 'items',
     subPages: SUB_PAGES,
 
     init() {
@@ -53,14 +53,14 @@ document.addEventListener('alpine:init', () => {
       const urlParams = new URLSearchParams(window.location.search)
       const page = urlParams.get('page')
       if (page && this.subPages.some(p => p.id === page)) {
-        this.currentPage = page
+        this.current_page = page
       }
-      Alpine.store('exchangePage', this.currentPage)
-      logger.info('[ExchangeNavigation] 当前页面:', this.currentPage)
+      Alpine.store('exchangePage', this.current_page)
+      logger.info('[ExchangeNavigation] 当前页面:', this.current_page)
     },
 
     switchPage(pageId) {
-      this.currentPage = pageId
+      this.current_page = pageId
       Alpine.store('exchangePage', pageId)
 
       // 更新URL参数
@@ -74,7 +74,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     isActive(pageId) {
-      return this.currentPage === pageId
+      return this.current_page === pageId
     }
   }))
 
@@ -92,15 +92,15 @@ document.addEventListener('alpine:init', () => {
       ...pageMixin,
 
       subPages: SUB_PAGES,
-      currentPage: 'items',
+      current_page: 'items',
       saving: false,
 
       ...useExchangeItemsState(),
       ...useExchangeOrdersState(),
       ...useExchangeStatsState(),
 
-      // ========== HTML 模板兼容属性 ==========
-      /** 市场统计（HTML 模板使用） */
+      // ========== 市场统计 ==========
+      /** 市场统计数据 */
       marketStats: {
         totalItems: 0,
         todayOrders: 0,
@@ -120,12 +120,12 @@ document.addEventListener('alpine:init', () => {
       },
 
       switchPage(pageId) {
-        this.currentPage = pageId
+        this.current_page = pageId
         this.loadPageData()
       },
 
       async loadPageData() {
-        switch (this.currentPage) {
+        switch (this.current_page) {
           case 'items':
             await Promise.all([this.loadItems(), this.loadItemStats()])
             this._updateMarketStats()
@@ -143,7 +143,8 @@ document.addEventListener('alpine:init', () => {
       },
 
       /**
-       * 更新 marketStats（HTML 模板兼容）
+       * 更新市场统计数据
+       * @private
        */
       _updateMarketStats() {
         this.marketStats = {
@@ -166,36 +167,15 @@ document.addEventListener('alpine:init', () => {
         return amount != null ? Number(amount).toLocaleString('zh-CN') : '0'
       },
 
-      /**
-       * 格式化日期（HTML 模板使用）
-       */
-      formatDate(dateStr) {
-        if (!dateStr) return '-'
-        try {
-          return new Date(dateStr).toLocaleString('zh-CN')
-        } catch {
-          return dateStr
-        }
-      },
-
-      formatDateTime(dateStr) {
-        if (!dateStr) return '-'
-        try {
-          return new Date(dateStr).toLocaleString('zh-CN')
-        } catch {
-          return dateStr
-        }
-      },
-
       getAssetTypeName(code) {
         const type = this.assetTypes.find(t => t.asset_code === code)
         return type?.asset_name || code || '-'
       },
 
-      // ========== HTML 模板兼容方法 ==========
+      // ========== 商品操作方法 ==========
 
       /**
-       * 删除商品（兼容 HTML 模板传入 item 对象）
+       * 删除商品
        * @param {Object|number} itemOrId - 商品对象或商品ID
        */
       async deleteItem(itemOrId) {

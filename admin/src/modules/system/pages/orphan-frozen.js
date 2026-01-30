@@ -35,7 +35,7 @@
 import { logger } from '../../../utils/logger.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 // 注意：使用本地 apiRequest 函数而非 request，以便更好地处理错误
-import { Alpine, createBatchOperationMixin } from '../../../alpine/index.js'
+import { Alpine, createBatchOperationMixin, createPageMixin } from '../../../alpine/index.js'
 
 // API请求辅助函数
 async function apiRequest(url, options = {}) {
@@ -71,15 +71,13 @@ async function apiRequest(url, options = {}) {
  */
 
 /**
- * 统计数据对象类型
+ * 统计数据对象类型（使用 snake_case 命名）
  * @typedef {Object} OrphanStats
- * @property {number} total_orphan_count - 孤儿冻结总数
- * @property {number} total_orphan_amount - 孤儿冻结总金额
- * @property {number} affected_user_count - 受影响用户数
- * @property {number} orphanCount - 孤儿冻结数（HTML模板兼容）
- * @property {number} frozenCount - 冻结记录数（HTML模板兼容）
- * @property {number} totalValue - 总价值（HTML模板兼容）
- * @property {number} processedCount - 已处理数（HTML模板兼容）
+ * @property {number} total_orphan_count - 孤儿冻结总数（后端字段）
+ * @property {number} total_orphan_amount - 孤儿冻结总金额（后端字段）
+ * @property {number} affected_user_count - 受影响用户数（后端字段）
+ * @property {number} frozen_count - 冻结记录数（前端补充）
+ * @property {number} processed_count - 已处理数（前端补充）
  */
 
 /**
@@ -90,8 +88,9 @@ async function apiRequest(url, options = {}) {
 function orphanFrozenPage() {
   return {
     // ==================== Mixin 组合 ====================
+    ...createPageMixin(),
     ...createBatchOperationMixin({
-      pageSize: 20,
+      page_size: 20,
       primaryKey: 'account_id'
     }),
 
@@ -107,25 +106,20 @@ function orphanFrozenPage() {
     globalLoading: false,
 
     /**
-     * 统计数据（兼容 HTML 模板字段名）
+     * 统计数据（使用后端字段名 - snake_case）
      * @type {OrphanStats}
      */
     stats: {
       total_orphan_count: 0,
       total_orphan_amount: 0,
       affected_user_count: 0,
-      // HTML 模板使用的字段
-      orphanCount: 0,
-      frozenCount: 0,
-      totalValue: 0,
-      processedCount: 0
+      // 后端未返回但前端需要显示的字段（snake_case）
+      frozen_count: 0,
+      processed_count: 0
     },
 
     /** @type {OrphanItem[]} 孤儿冻结项目列表 */
     orphanList: [],
-
-    /** @type {OrphanItem[]} HTML模板使用的assets别名 */
-    assets: [],
 
     /**
      * 筛选条件
@@ -136,7 +130,7 @@ function orphanFrozenPage() {
      */
     filters: {
       type: '', // 类型：orphan/frozen（当前后端只支持orphan）
-      assetType: '', // 资产代码筛选
+      asset_type: '', // 资产代码筛选
       status: '' // 状态筛选
     },
 
@@ -149,11 +143,8 @@ function orphanFrozenPage() {
     /** @type {boolean} 清理确认复选框状态 */
     confirmCleanChecked: false,
 
-    /** @type {OrphanItem|null} 当前选中查看详情的资产 (HTML模板兼容) */
+    /** @type {OrphanItem|null} 当前选中查看详情的资产 */
     selectedAsset: null,
-
-    /** @type {OrphanItem|null} 当前资产 */
-    currentAsset: null,
 
     // ==================== 计算属性 ====================
 
@@ -163,8 +154,8 @@ function orphanFrozenPage() {
      * @returns {OrphanItem[]} 当前页的孤儿冻结项目数组
      */
     get paginatedList() {
-      const startIndex = (this.currentPage - 1) * this.pageSize
-      const endIndex = startIndex + this.pageSize
+      const startIndex = (this.current_page - 1) * this.page_size
+      const endIndex = startIndex + this.page_size
       return this.orphanList.slice(startIndex, endIndex)
     },
 
@@ -222,15 +213,14 @@ function orphanFrozenPage() {
       logger.debug('📥 [orphanFrozenPage] loadData() 开始执行', { filters: this.filters })
 
       this.orphanList = []
-      this.assets = []
       this.selectedItems = []
       this.loading = true
 
       try {
         // 构建查询参数
         const detectParams = new URLSearchParams()
-        if (this.filters.assetType) {
-          detectParams.append('asset_code', this.filters.assetType)
+        if (this.filters.asset_type) {
+          detectParams.append('asset_code', this.filters.asset_type)
         }
 
         const detectUrl =
@@ -266,7 +256,6 @@ function orphanFrozenPage() {
             status: 'pending', // 后端无此字段，默认待处理
             discovered_at: generatedAt // 使用顶层的检测时间
           }))
-          this.assets = this.orphanList // HTML 模板别名
           this.total = this.orphanList.length
 
           logger.info('[孤儿冻结页面] 加载数据完成', {
@@ -280,7 +269,6 @@ function orphanFrozenPage() {
           })
           // 设置空列表
           this.orphanList = []
-          this.assets = []
           this.total = 0
 
           // 显示错误信息给用户
@@ -293,22 +281,18 @@ function orphanFrozenPage() {
           }
         }
 
-        // 处理统计数据 - 直接使用后端字段名
+        // 处理统计数据 - 直接使用后端字段名（snake_case）
         if (statsResponse && statsResponse.success) {
           const data = statsResponse.data
-          const orphanCount = data.total_orphan_count || 0
-          const totalAmount = data.total_orphan_amount || 0
 
           this.stats = {
             // 后端原始字段
-            total_orphan_count: orphanCount,
-            total_orphan_amount: totalAmount,
+            total_orphan_count: data.total_orphan_count || 0,
+            total_orphan_amount: data.total_orphan_amount || 0,
             affected_user_count: data.affected_user_count || 0,
-            // HTML 模板使用的字段（与后端保持一致的语义）
-            orphanCount: orphanCount,
-            frozenCount: 0, // 当前只检测孤儿冻结，此值为0
-            totalValue: totalAmount,
-            processedCount: 0 // 需后端支持，暂设为0
+            // 后端未返回但前端需要显示的字段
+            frozen_count: 0, // 当前只检测孤儿冻结，此值为0
+            processed_count: 0 // 需后端支持，暂设为0
           }
 
           logger.info('[孤儿冻结页面] 统计数据已更新', this.stats)
@@ -474,7 +458,7 @@ function orphanFrozenPage() {
           body: JSON.stringify({
             dry_run: false,
             reason: this.cleanReason.trim(),
-            operator_name: this.userInfo?.nickname || '管理员'
+            operator_name: this.current_user?.nickname || '管理员'
           })
         })
 
@@ -527,7 +511,7 @@ function orphanFrozenPage() {
             user_id: item.user_id,
             asset_code: item.asset_code,
             reason: '管理员手动清理单条孤儿冻结',
-            operator_name: this.userInfo?.nickname || '管理员'
+            operator_name: this.current_user?.nickname || '管理员'
           })
         })
 
@@ -606,28 +590,6 @@ function orphanFrozenPage() {
     },
 
     /**
-     * 加载资产列表（HTML模板兼容别名）
-     * @async
-     * @method loadAssets
-     * @returns {Promise<void>}
-     */
-    async loadAssets() {
-      logger.debug('🔍 [orphanFrozenPage] loadAssets() 被点击调用')
-      await this.loadData()
-    },
-
-    /**
-     * 扫描孤儿资产（HTML模板兼容别名）
-     * @async
-     * @method scanOrphanAssets
-     * @returns {Promise<void>}
-     */
-    async scanOrphanAssets() {
-      logger.debug('🔎 [orphanFrozenPage] scanOrphanAssets() 被点击调用')
-      await this.scanOrphans()
-    },
-
-    /**
      * 格式化数字为本地化显示格式
      * @method formatNumber
      * @param {number|null|undefined} num - 要格式化的数字
@@ -636,17 +598,6 @@ function orphanFrozenPage() {
     formatNumber(num) {
       if (num === null || num === undefined) return '0'
       return Number(num).toLocaleString('zh-CN')
-    },
-
-    /**
-     * 格式化日期为中文显示格式
-     * @method formatDate
-     * @param {string|null} dateStr - ISO日期字符串
-     * @returns {string} 格式化后的日期字符串
-     */
-    formatDate(dateStr) {
-      if (!dateStr) return '-'
-      return new Date(dateStr).toLocaleString('zh-CN')
     },
 
     // ==================== Tailwind Toast 实现 ====================
@@ -753,18 +704,6 @@ function orphanFrozenPage() {
      */
     viewAssetDetail(asset) {
       this.selectedAsset = asset
-      this.currentAsset = asset
-    },
-
-    /**
-     * 处理资产（HTML模板兼容别名）
-     * @async
-     * @method processAsset
-     * @param {OrphanItem} asset - 要处理的资产项目
-     * @returns {Promise<void>}
-     */
-    async processAsset(asset) {
-      await this.cleanSingleItem(asset)
     },
 
     /**

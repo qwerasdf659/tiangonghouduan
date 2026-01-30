@@ -46,7 +46,7 @@ function registerSystemSettingsComponents() {
   Alpine.data('systemNavigation', () => ({
     ...createPageMixin(),
 
-    currentPage: 'system-config',
+    current_page: 'system-config',
 
     // 方案A: 字典管理/定价配置/功能开关已分离为独立页面
     subPages: [
@@ -59,12 +59,12 @@ function registerSystemSettingsComponents() {
       if (!this.checkAuth()) return
 
       const urlParams = new URLSearchParams(window.location.search)
-      this.currentPage = urlParams.get('page') || 'system-config'
-      Alpine.store('systemPage', this.currentPage)
+      this.current_page = urlParams.get('page') || 'system-config'
+      Alpine.store('systemPage', this.current_page)
     },
 
     switchPage(pageId) {
-      this.currentPage = pageId
+      this.current_page = pageId
       Alpine.store('systemPage', pageId)
       window.history.pushState({}, '', `?page=${pageId}`)
     }
@@ -83,7 +83,7 @@ function registerSystemSettingsComponents() {
     ...useAuditLogsState(),
 
     // ==================== 导航状态 ====================
-    currentPage: 'system-config',
+    current_page: 'system-config',
 
     // 子页面配置（方案A：只保留系统配置和审计日志）
     subPages: [
@@ -93,8 +93,8 @@ function registerSystemSettingsComponents() {
 
     // ==================== 通用状态 ====================
     page: 1,
-    pageSize: 20,
-    totalPages: 1,
+    page_size: 20,
+    total_pages: 1,
     total: 0,
     saving: false,
 
@@ -110,9 +110,9 @@ function registerSystemSettingsComponents() {
 
       // 从 URL 参数读取当前页面
       const urlParams = new URLSearchParams(window.location.search)
-      this.currentPage = urlParams.get('page') || 'system-config'
+      this.current_page = urlParams.get('page') || 'system-config'
 
-      logger.debug('[SystemSettings] 当前子页面:', this.currentPage)
+      logger.debug('[SystemSettings] 当前子页面:', this.current_page)
 
       // 立即加载数据
       this.loadPageData()
@@ -123,13 +123,13 @@ function registerSystemSettingsComponents() {
 
     switchPage(pageId) {
       logger.debug('[SystemSettings] 切换到子页面:', pageId)
-      this.currentPage = pageId
+      this.current_page = pageId
       window.history.pushState({}, '', `?page=${pageId}`)
       this.loadPageData()
     },
 
     async loadPageData() {
-      const page = this.currentPage
+      const page = this.current_page
       await this.withLoading(
         async () => {
           switch (page) {

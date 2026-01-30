@@ -83,11 +83,11 @@ export function useUserProfileMethods() {
 
           // 设置用户基本信息
           this.userProfile = {
-            userId: data.user_id || userId,
+            user_id: data.user_id || userId,
             nickname: data.user?.nickname || data.nickname || `用户${userId}`,
             phone: data.user?.phone || data.phone || '-',
-            registerTime: data.user?.created_at || data.register_time || '-',
-            userType: data.user?.user_type || data.user_type || '-'
+            register_time: data.user?.created_at || data.register_time || '-',
+            user_type: data.user?.user_type || data.user_type || '-'
           }
 
           // 设置抽奖统计
@@ -265,5 +265,3 @@ export function useUserProfileMethods() {
 }
 
 export default { useUserProfileState, useUserProfileMethods }
-
-

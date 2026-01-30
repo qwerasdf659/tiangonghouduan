@@ -30,7 +30,7 @@ export function useExchangeOrdersState() {
     /** @type {number} 订单每页数量 */
     orderPageSize: 20,
     /** @type {Object} 订单分页信息 */
-    orderPagination: { totalPages: 1, total: 0 }
+    orderPagination: { total_pages: 1, total: 0 }
   }
 }
 
@@ -48,7 +48,7 @@ export function useExchangeOrdersMethods() {
         this.loading = true
         const params = {
           page: this.orderCurrentPage,
-          pageSize: this.orderPageSize,
+          page_size: this.orderPageSize,
           ...this.orderFilters
         }
         Object.keys(params).forEach(k => !params[k] && delete params[k])
@@ -63,7 +63,7 @@ export function useExchangeOrdersMethods() {
           // 后端返回 { orders: [...], pagination: {...} }
           this.orders = res.data?.orders || []
           this.orderPagination = {
-            totalPages: res.data?.pagination?.total_pages || 1,
+            total_pages: res.data?.pagination?.total_pages || 1,
             total: res.data?.pagination?.total || this.orders.length
           }
         }
@@ -100,7 +100,7 @@ export function useExchangeOrdersMethods() {
      * @param {number} page - 目标页码
      */
     changeOrderPage(page) {
-      if (page < 1 || page > this.orderPagination.totalPages) return
+      if (page < 1 || page > this.orderPagination.total_pages) return
       this.orderCurrentPage = page
       this.loadOrders()
     },

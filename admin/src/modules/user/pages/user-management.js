@@ -43,7 +43,7 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('userNavigation', () => ({
     ...createPageMixin(),
 
-    currentPage: 'user-list',
+    current_page: 'user-list',
 
     subPages: [
       { id: 'user-list', title: '用户列表', icon: 'bi-people' },
@@ -62,12 +62,12 @@ document.addEventListener('alpine:init', () => {
       if (!this.checkAuth()) return
 
       const urlParams = new URLSearchParams(window.location.search)
-      this.currentPage = urlParams.get('page') || 'user-list'
-      Alpine.store('userPage', this.currentPage)
+      this.current_page = urlParams.get('page') || 'user-list'
+      Alpine.store('userPage', this.current_page)
     },
 
     switchPage(pageId) {
-      this.currentPage = pageId
+      this.current_page = pageId
       Alpine.store('userPage', pageId)
       window.history.pushState({}, '', `?page=${pageId}`)
     }
@@ -80,7 +80,7 @@ document.addEventListener('alpine:init', () => {
    */
   Alpine.data('userPageContent', () => ({
     // 基础混入
-    ...createPageMixin({ pagination: { pageSize: 20 } }),
+    ...createPageMixin({ pagination: { page_size: 20 } }),
 
     // ==================== 备用默认值（防止展开失败）====================
     // 放在 composables 之前，会被 composables 的值覆盖
@@ -95,14 +95,31 @@ document.addEventListener('alpine:init', () => {
     ...useAdvancedStatusState(),
 
     // ==================== 通用状态 ====================
-    page: 1,
-    pageSize: 20,
-    totalPages: 1,
-    total: 0,
+    // 用户列表分页由 useUsersState() 的 pagination 对象统一管理
     saving: false,
 
-    get currentPage() {
+    get current_page() {
       return Alpine.store('userPage')
+    },
+
+    // ==================== 分页 Getter - 单一对象模式 ====================
+    /** 高级状态总页数 */
+    get premiumTotalPages() {
+      return Math.ceil(this.premiumPagination.total / this.premiumPagination.page_size) || 1
+    },
+    /** 风控配置总页数 */
+    get riskTotalPages() {
+      return Math.ceil(this.riskPagination.total / this.riskPagination.page_size) || 1
+    },
+    /** 角色历史总页数 */
+    get roleHistoryTotalPages() {
+      return Math.ceil(this.roleHistoryPagination.total / this.roleHistoryPagination.page_size) || 1
+    },
+    /** 状态历史总页数 */
+    get statusHistoryTotalPages() {
+      return (
+        Math.ceil(this.statusHistoryPagination.total / this.statusHistoryPagination.page_size) || 1
+      )
     },
 
     // ==================== 初始化和数据加载 ====================
@@ -114,7 +131,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     async loadAllData() {
-      const page = this.currentPage
+      const page = this.current_page
       await this.withLoading(
         async () => {
           switch (page) {
@@ -164,46 +181,31 @@ document.addEventListener('alpine:init', () => {
 
     // ==================== 工具方法 ====================
 
-    formatDate(dateString) {
-      if (!dateString) return '-'
-      try {
-        const date = new Date(dateString)
-        return date.toLocaleString('zh-CN', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit'
-        })
-      } catch {
-        return dateString
-      }
-    },
-
     // ==================== 分页方法 ====================
 
     goToPage(pageNum) {
-      this.page = pageNum
+      // 使用 pagination 对象作为唯一数据源
+      this.pagination.page = pageNum
       this.loadAllData()
     },
 
     goToPremiumPage(pageNum) {
-      this.premiumPage = pageNum
+      this.premiumPagination.page = pageNum
       this.loadPremiumUsers()
     },
 
     goToRiskPage(pageNum) {
-      this.riskPage = pageNum
+      this.riskPagination.page = pageNum
       this.loadRiskProfiles()
     },
 
     goToRoleHistoryPage(pageNum) {
-      this.roleHistoryPage = pageNum
+      this.roleHistoryPagination.page = pageNum
       this.loadRoleChangeHistory()
     },
 
     goToStatusHistoryPage(pageNum) {
-      this.statusHistoryPage = pageNum
+      this.statusHistoryPagination.page = pageNum
       this.loadStatusChangeHistory()
     }
   }))

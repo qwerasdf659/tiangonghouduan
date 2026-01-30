@@ -62,17 +62,11 @@ function assetAdjustmentPage() {
   // 使用 createCrudMixin 获取标准功能
   const baseMixin =
     typeof createCrudMixin === 'function'
-      ? createCrudMixin({ pageSize: 20, enableFormValidation: true })
+      ? createCrudMixin({ page_size: 20, enableFormValidation: true })
       : {}
 
   return {
     ...baseMixin,
-
-    /**
-     * 当前登录用户信息
-     * @type {Object}
-     */
-    userInfo: {},
 
     // ==================== 加载状态 ====================
 
@@ -114,7 +108,7 @@ function assetAdjustmentPage() {
      * 当前查看的用户对象
      * @type {Object|null}
      */
-    currentUser: null,
+    current_user: null,
 
     /**
      * 用户资产余额列表
@@ -176,7 +170,7 @@ function assetAdjustmentPage() {
     },
 
     /**
-     * 调账记录列表（HTML模板别名）
+     * 调账记录列表
      * @type {Array}
      */
     records: [],
@@ -185,10 +179,10 @@ function assetAdjustmentPage() {
      * 总记录数
      * @type {number}
      */
-    totalRecords: 0,
+    total_records: 0,
 
     /**
-     * 材料类型列表（HTML模板别名）
+     * 材料类型列表（从 assetTypes 过滤和映射得到）
      * @type {Array}
      */
     materialTypes: [],
@@ -199,13 +193,13 @@ function assetAdjustmentPage() {
      * 当前页码
      * @type {number}
      */
-    currentPage: 1,
+    current_page: 1,
 
     /**
      * 每页大小
      * @type {number}
      */
-    pageSize: 20,
+    page_size: 20,
 
     /**
      * 分页信息
@@ -244,11 +238,11 @@ function assetAdjustmentPage() {
      * @type {AdjustForm}
      */
     adjustForm: {
-      assetCode: '',
-      adjustType: 'increase',
+      asset_code: '',
+      adjust_type: 'increase',
       amount: '',
       reason: '',
-      campaignId: ''
+      campaign_id: ''
     },
 
     /**
@@ -291,34 +285,7 @@ function assetAdjustmentPage() {
       logger.info('资产调整页面初始化完成')
     },
 
-    /**
-     * 加载当前登录用户信息
-     * @description 从localStorage加载用户信息
-     * @returns {void}
-     */
-    loadUserInfo() {
-      try {
-        const stored = localStorage.getItem('userInfo')
-        if (stored) {
-          this.userInfo = JSON.parse(stored)
-        }
-      } catch (e) {
-        logger.error('加载用户信息失败:', e)
-      }
-    },
-
-    /**
-     * 退出登录
-     * @description 清除认证信息并跳转到登录页
-     * @returns {void}
-     */
-    logout() {
-      if (confirm('确定要退出登录吗？')) {
-        localStorage.removeItem('token')
-        localStorage.removeItem('userInfo')
-        window.location.href = '/admin/login.html'
-      }
-    },
+    // 注意：用户信息和 logout() 方法由 authGuardMixin 提供（current_user 属性）
 
     // ==================== 数据加载 ====================
 
@@ -406,11 +373,11 @@ function assetAdjustmentPage() {
       logger.debug('🔄 [loadRecords] 刷新按钮被点击，开始加载记录...')
 
       // 如果没有用户ID，直接返回空记录（API要求user_id必填）
-      if (!this.currentUser?.user_id && !this.form?.user_id) {
+      if (!this.current_user?.user_id && !this.form?.user_id) {
         logger.info('未选择用户，跳过加载调账记录')
         this.records = []
         this.transactions = []
-        this.totalRecords = 0
+        this.total_records = 0
         this.updateStats()
         return
       }
@@ -419,12 +386,12 @@ function assetAdjustmentPage() {
 
       try {
         const token = localStorage.getItem('admin_token')
-        const userId = this.currentUser?.user_id || this.form?.user_id
+        const userId = this.current_user?.user_id || this.form?.user_id
 
         const params = new URLSearchParams({
           user_id: userId,
-          page: this.currentPage,
-          page_size: this.pageSize
+          page: this.current_page,
+          page_size: this.page_size
         })
 
         if (this.filters.status) {
@@ -441,7 +408,7 @@ function assetAdjustmentPage() {
             this.records = result.data?.transactions || result.data?.records || []
             this.transactions = this.records
             this.pagination = result.data?.pagination || null
-            this.totalRecords = result.data?.pagination?.total || this.records.length
+            this.total_records = result.data?.pagination?.total || this.records.length
 
             // 更新统计数据
             this.updateStats()
@@ -449,14 +416,14 @@ function assetAdjustmentPage() {
             logger.info(`📊 加载调账记录: ${this.records.length} 条`)
 
             // 显示刷新成功提示
-            logger.debug(`✅ [loadRecords] 刷新完成，共 ${this.totalRecords} 条记录`)
-            this.showSuccess(`已刷新，共 ${this.totalRecords} 条记录`)
+            logger.debug(`✅ [loadRecords] 刷新完成，共 ${this.total_records} 条记录`)
+            this.showSuccess(`已刷新，共 ${this.total_records} 条记录`)
           }
         }
       } catch (error) {
         logger.error('加载调账记录失败:', error)
         this.records = []
-        this.totalRecords = 0
+        this.total_records = 0
       } finally {
         this.loadingRecords = false
       }
@@ -467,7 +434,7 @@ function assetAdjustmentPage() {
      * @description 根据当前记录计算统计信息
      */
     updateStats() {
-      this.stats.totalAdjustments = this.totalRecords
+      this.stats.totalAdjustments = this.total_records
 
       // 计算增加/减少总额
       // API返回的amount字段：正数表示增加，负数表示减少
@@ -589,21 +556,21 @@ function assetAdjustmentPage() {
         logger.info('响应数据:', result)
 
         if (result.success) {
-          this.currentUser = result.data.user
+          this.current_user = result.data.user
           this.balances = result.data.balances || []
 
           // 🔴 关键：设置 form.user_id，提交时需要用到
-          this.form.user_id = String(this.currentUser?.user_id || userId)
+          this.form.user_id = String(this.current_user?.user_id || userId)
 
           // 同步到 form 以便在HTML模板中显示用户信息
-          this.form.user_info = `✅ 已加载用户: ${this.currentUser?.nickname || '未知'} (ID: ${this.form.user_id})`
+          this.form.user_info = `✅ 已加载用户: ${this.current_user?.nickname || '未知'} (ID: ${this.form.user_id})`
 
           logger.info(
             `✅ 加载用户资产完成: ${this.balances.length} 种, form.user_id=${this.form.user_id}`
           )
 
           // 加载调整记录
-          this.currentPage = 1
+          this.current_page = 1
           await this.loadRecords()
         } else {
           this.showError(result.message || '查询失败')
@@ -647,16 +614,16 @@ function assetAdjustmentPage() {
      * @returns {Promise<void>}
      */
     async loadAdjustmentRecords() {
-      if (!this.currentUser) return
+      if (!this.current_user) return
 
       this.loadingRecords = true
 
       try {
         const token = localStorage.getItem('admin_token')
         const params = new URLSearchParams({
-          user_id: this.currentUser.user_id,
-          page: this.currentPage,
-          page_size: this.pageSize
+          user_id: this.current_user.user_id,
+          page: this.current_page,
+          page_size: this.page_size
         })
 
         if (this.filterAssetCode) {
@@ -693,7 +660,7 @@ function assetAdjustmentPage() {
 
       const pages = []
       const total = this.pagination.total_pages
-      const current = this.currentPage
+      const current = this.current_page
 
       for (let i = 1; i <= total; i++) {
         if (i === 1 || i === total || (i >= current - 2 && i <= current + 2)) {
@@ -713,7 +680,7 @@ function assetAdjustmentPage() {
      */
     goToPage(page) {
       if (page < 1 || page > this.pagination?.total_pages) return
-      this.currentPage = page
+      this.current_page = page
       this.loadAdjustmentRecords()
     },
 
@@ -742,12 +709,12 @@ function assetAdjustmentPage() {
      * @returns {Promise<void>}
      */
     async submitAdjust() {
-      if (!this.adjustForm.assetCode || !this.adjustForm.amount || !this.adjustForm.reason) {
+      if (!this.adjustForm.asset_code || !this.adjustForm.amount || !this.adjustForm.reason) {
         this.showError('请填写完整的调整信息')
         return
       }
 
-      if (this.adjustForm.assetCode === 'BUDGET_POINTS' && !this.adjustForm.campaignId) {
+      if (this.adjustForm.asset_code === 'BUDGET_POINTS' && !this.adjustForm.campaign_id) {
         this.showError('调整预算积分必须选择活动')
         return
       }
@@ -757,20 +724,20 @@ function assetAdjustmentPage() {
       try {
         const token = localStorage.getItem('admin_token')
         const amount =
-          this.adjustForm.adjustType === 'decrease'
+          this.adjustForm.adjust_type === 'decrease'
             ? -Math.abs(this.adjustForm.amount)
             : Math.abs(this.adjustForm.amount)
 
         const data = {
-          user_id: this.currentUser.user_id,
-          asset_code: this.adjustForm.assetCode,
+          user_id: this.current_user.user_id,
+          asset_code: this.adjustForm.asset_code,
           amount: amount,
           reason: this.adjustForm.reason,
-          idempotency_key: `asset_adjust_${this.currentUser.user_id}_${this.adjustForm.assetCode}_${Date.now()}`
+          idempotency_key: `asset_adjust_${this.current_user.user_id}_${this.adjustForm.asset_code}_${Date.now()}`
         }
 
-        if (this.adjustForm.assetCode === 'BUDGET_POINTS') {
-          data.campaign_id = parseInt(this.adjustForm.campaignId)
+        if (this.adjustForm.asset_code === 'BUDGET_POINTS') {
+          data.campaign_id = parseInt(this.adjustForm.campaign_id)
         }
 
         const response = await fetch(`${API_BASE_URL}/console/asset-adjustment/adjust`, {
@@ -789,7 +756,7 @@ function assetAdjustmentPage() {
           this.hideModal('adjustModal')
 
           // 重新加载用户资产
-          await this.loadUserAssets(this.currentUser.user_id)
+          await this.loadUserAssets(this.current_user.user_id)
         } else {
           this.showError(result.message || '调整失败')
         }
@@ -859,36 +826,6 @@ function assetAdjustmentPage() {
     },
 
     /**
-     * 格式化日期时间
-     * @param {string} dateStr - 日期字符串
-     * @returns {string} 格式化后的中文日期时间
-     */
-    formatDateTime(dateStr) {
-      if (!dateStr) return '-'
-      try {
-        const date = new Date(dateStr)
-        return date.toLocaleString('zh-CN', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit'
-        })
-      } catch {
-        return dateStr
-      }
-    },
-
-    /**
-     * 格式化日期（HTML模板别名）
-     * @param {string} dateStr - 日期字符串
-     * @returns {string} 格式化后的中文日期时间
-     */
-    formatDate(dateStr) {
-      return this.formatDateTime(dateStr)
-    },
-
-    /**
      * 查看记录详情
      * @param {Object} record - 记录对象
      * @returns {void}
@@ -953,9 +890,9 @@ function assetAdjustmentPage() {
     },
 
     /**
-     * 搜索用户（HTML模板别名）
+     * 搜索用户
      * @async
-     * @description handleSearch的别名方法，用于HTML模板调用
+     * @description 根据用户ID搜索用户，包含输入验证和状态同步逻辑
      * @returns {Promise<void>}
      */
     async searchUser() {
@@ -969,10 +906,10 @@ function assetAdjustmentPage() {
       if (!inputUserId) {
         // 清空搜索状态和当前用户
         this.searchUserId = ''
-        this.currentUser = null
+        this.current_user = null
         this.balances = []
         this.records = []
-        this.totalRecords = 0
+        this.total_records = 0
         this.form.user_info = ''
         this.updateStats()
         this.showError('请输入用户ID')
@@ -1026,7 +963,7 @@ function assetAdjustmentPage() {
      * @returns {boolean}
      */
     get hasPrevPage() {
-      return this.currentPage > 1
+      return this.current_page > 1
     },
 
     /**
@@ -1035,7 +972,7 @@ function assetAdjustmentPage() {
      */
     get hasNextPage() {
       if (!this.pagination) return false
-      return this.currentPage < (this.pagination.total_pages || 1)
+      return this.current_page < (this.pagination.total_pages || 1)
     },
 
     /**
@@ -1044,9 +981,9 @@ function assetAdjustmentPage() {
      */
     get paginationInfo() {
       if (!this.pagination) {
-        return `第 ${this.currentPage} 页`
+        return `第 ${this.current_page} 页`
       }
-      return `第 ${this.currentPage}/${this.pagination.total_pages || 1} 页`
+      return `第 ${this.current_page}/${this.pagination.total_pages || 1} 页`
     },
 
     /**
@@ -1054,7 +991,7 @@ function assetAdjustmentPage() {
      */
     prevPage() {
       if (this.hasPrevPage) {
-        this.currentPage--
+        this.current_page--
         this.loadRecords()
       }
     },
@@ -1064,7 +1001,7 @@ function assetAdjustmentPage() {
      */
     nextPage() {
       if (this.hasNextPage) {
-        this.currentPage++
+        this.current_page++
         this.loadRecords()
       }
     },
@@ -1217,7 +1154,7 @@ function assetAdjustmentPage() {
           asset_code: assetCode,
           amount: amount,
           reason: `[${this.form.reason_type}] ${this.form.reason}`,
-          idempotency_key: `admin_adjust_${this.userInfo?.user_id || 0}_${this.form.user_id}_${assetCode}_${Date.now()}`
+          idempotency_key: `admin_adjust_${this.current_user?.user_id || 0}_${this.form.user_id}_${assetCode}_${Date.now()}`
         }
 
         // 🔴 新增：预算积分需要添加 campaign_id
@@ -1239,12 +1176,12 @@ function assetAdjustmentPage() {
         if (result.success) {
           this.showSuccess('调账成功')
           // 保存当前用户信息
-          const currentUserId = this.form.user_id
-          const currentUserInfo = this.form.user_info
+          const current_userId = this.form.user_id
+          const current_userInfo = this.form.user_info
           // 重置表单（保留用户信息以便连续调账）
           this.form = {
-            user_id: currentUserId,
-            user_info: currentUserInfo,
+            user_id: current_userId,
+            user_info: current_userInfo,
             asset_type: '',
             material_code: '',
             campaign_id: '', // 🔴 重置活动ID
@@ -1254,7 +1191,7 @@ function assetAdjustmentPage() {
             reason: ''
           }
           // 刷新用户资产和记录
-          await this.loadUserAssets(currentUserId)
+          await this.loadUserAssets(current_userId)
           await this.loadRecords()
         } else {
           this.showError(result.message || '调账失败')

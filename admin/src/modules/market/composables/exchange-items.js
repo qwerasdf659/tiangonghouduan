@@ -31,7 +31,7 @@ export function useExchangeItemsState() {
     /** @type {number} 商品每页数量 */
     itemPageSize: 20,
     /** @type {Object} 商品分页信息 */
-    itemPagination: { totalPages: 1, total: 0 },
+    itemPagination: { total_pages: 1, total: 0 },
     /** @type {Object} 商品表单数据 - 直接使用后端字段名 */
     itemForm: {
       item_name: '',
@@ -77,7 +77,7 @@ export function useExchangeItemsMethods() {
         this.loading = true
         const params = {
           page: this.itemCurrentPage,
-          pageSize: this.itemPageSize,
+          page_size: this.itemPageSize,
           ...this.itemFilters
         }
         Object.keys(params).forEach(k => !params[k] && delete params[k])
@@ -93,7 +93,8 @@ export function useExchangeItemsMethods() {
           const newItems = res.data?.items || res.data?.list || []
           this.items = Array.isArray(newItems) ? [...newItems] : []
           this.itemPagination = {
-            totalPages: res.data?.pagination?.total_pages || res.data?.pagination?.totalPages || 1,
+            total_pages:
+              res.data?.pagination?.total_pages || res.data?.pagination?.total_pages || 1,
             total: res.data?.pagination?.total || this.items.length
           }
         }
@@ -132,7 +133,7 @@ export function useExchangeItemsMethods() {
      * @param {number} page - 目标页码
      */
     changeItemPage(page) {
-      if (page < 1 || page > this.itemPagination.totalPages) return
+      if (page < 1 || page > this.itemPagination.total_pages) return
       this.itemCurrentPage = page
       this.loadItems()
     },

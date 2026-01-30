@@ -32,7 +32,7 @@
 
 // ES Module 导入
 import { logger } from '../../../utils/logger.js'
-import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
+import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { buildURL, request } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/index.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
@@ -83,7 +83,7 @@ const apiRequest = async (url, options = {}) => {
 function riskAlertsPage() {
   return {
     // ==================== Mixin 组合 ====================
-    ...createPageMixin({ pagination: { pageSize: 20 } }),
+    ...createPageMixin({ pagination: { page_size: 20 } }),
 
     // ==================== 页面特有状态 ====================
 
@@ -100,16 +100,16 @@ function riskAlertsPage() {
     selectedAlerts: [],
 
     /** @type {number} 当前页码 */
-    currentPage: 1,
+    current_page: 1,
 
     /** @type {number} 每页条数 */
-    pageSize: 20,
+    page_size: 20,
 
     /** @type {number} 总条数 */
     totalCount: 0,
 
     /** @type {number} 总页数 */
-    totalPages: 0,
+    total_pages: 0,
 
     /** @type {boolean} 是否开启自动刷新 */
     autoRefresh: true,
@@ -441,8 +441,8 @@ function riskAlertsPage() {
           }
         }
 
-        params.append('page', this.currentPage)
-        params.append('page_size', this.pageSize)
+        params.append('page', this.current_page)
+        params.append('page_size', this.page_size)
 
         const url =
           SYSTEM_ENDPOINTS.RISK_ALERT_LIST + (params.toString() ? `?${params.toString()}` : '')
@@ -461,7 +461,7 @@ function riskAlertsPage() {
         }
         // 更新分页信息
         this.totalCount = result.data.total || result.data.totalCount || this.alerts.length
-        this.totalPages = Math.ceil(this.totalCount / this.pageSize) || 1
+        this.total_pages = Math.ceil(this.totalCount / this.page_size) || 1
 
         this.updateStats(result.data.stats || this.calculateStatsFromAlerts())
         this.updateCharts()
@@ -529,8 +529,8 @@ function riskAlertsPage() {
      * @returns {void}
      */
     prevPage() {
-      if (this.currentPage > 1) {
-        this.currentPage--
+      if (this.current_page > 1) {
+        this.current_page--
         this.loadAlerts()
       }
     },
@@ -542,8 +542,8 @@ function riskAlertsPage() {
      * @returns {void}
      */
     nextPage() {
-      if (this.currentPage < this.totalPages) {
-        this.currentPage++
+      if (this.current_page < this.total_pages) {
+        this.current_page++
         this.loadAlerts()
       }
     },
@@ -638,7 +638,7 @@ function riskAlertsPage() {
     },
 
     /**
-     * 选择告警（兼容别名方法）
+     * 根据ID选择告警并加载时间线
      * @async
      * @method selectAlert
      * @param {number} alertId - 告警ID
@@ -853,7 +853,7 @@ function riskAlertsPage() {
       }
     },
 
-    // ==================== 原有辅助方法（向后兼容） ====================
+    // ==================== 辅助方法（CSS类和图标） ====================
 
     /**
      * 将severity映射为CSS类名使用的级别
@@ -914,16 +914,6 @@ function riskAlertsPage() {
     },
 
     /**
-     * 获取告警类型标签（兼容别名）
-     * @method getAlertTypeLabel
-     * @param {string} alertType - 告警类型代码
-     * @returns {string} 类型标签文本
-     */
-    getAlertTypeLabel(alertType) {
-      return this.getTypeText(alertType)
-    },
-
-    /**
      * 获取严重程度对应的Bootstrap徽章CSS类
      * @method getSeverityBadgeClass
      * @param {string} severity - 严重程度代码
@@ -977,16 +967,6 @@ function riskAlertsPage() {
     },
 
     /**
-     * 获取状态标签文本（兼容别名）
-     * @method getStatusLabel
-     * @param {string} status - 状态代码
-     * @returns {string} 状态标签文本
-     */
-    getStatusLabel(status) {
-      return this.getStatusText(status)
-    },
-
-    /**
      * 截断文本并添加省略号
      * @method truncateText
      * @param {string|null} text - 要截断的文本
@@ -1027,16 +1007,6 @@ function riskAlertsPage() {
       if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前'
       if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前'
       return date.toLocaleDateString('zh-CN')
-    },
-
-    /**
-     * 格式化日期时间（兼容别名）
-     * @method formatDateTime
-     * @param {string|Object|null} dateValue - ISO日期字符串或时间对象
-     * @returns {string} 格式化后的日期时间字符串
-     */
-    formatDateTime(dateValue) {
-      return this.formatDate(dateValue)
     },
 
     /**

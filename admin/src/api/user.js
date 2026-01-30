@@ -322,9 +322,7 @@ export const USER_ENDPOINTS = {
   /** @type {string} [POST] 撤销高级状态 - Path: :user_id */
   PREMIUM_STATUS_REVOKE: `${API_PREFIX}/console/user-premium/:user_id/revoke`,
 
-  // 风控配置扩展（兼容别名）
-  /** @type {string} [GET] 获取风控配置列表 */
-  RISK_PROFILE_LIST: `${API_PREFIX}/console/risk-profiles`,
+  // 风控配置扩展
   /** @type {string} [POST] 创建风控配置 - Body: { user_id, risk_level, limits } */
   RISK_PROFILE_CREATE: `${API_PREFIX}/console/risk-profiles`,
   /** @type {string} [PUT] 更新风控配置 - Path: :id */
@@ -332,21 +330,7 @@ export const USER_ENDPOINTS = {
   /** @type {string} [POST] 冻结用户 - Path: :user_id */
   RISK_PROFILE_FREEZE: `${API_PREFIX}/console/risk-profiles/:user_id/freeze`,
   /** @type {string} [POST] 解冻用户 - Path: :user_id */
-  RISK_PROFILE_UNFREEZE: `${API_PREFIX}/console/risk-profiles/:user_id/unfreeze`,
-
-  // 用户层级扩展（兼容别名）
-  /** @type {string} [POST] 激活用户层级 - Path: :user_id */
-  USER_HIERARCHY_ACTIVATE: `${API_PREFIX}/console/user-hierarchy/:user_id/activate`,
-  /** @type {string} [POST] 停用用户层级 - Path: :user_id */
-  USER_HIERARCHY_DEACTIVATE: `${API_PREFIX}/console/user-hierarchy/:user_id/deactivate`,
-  /** @type {string} [POST] 创建层级关系 */
-  USER_HIERARCHY_CREATE: `${API_PREFIX}/console/user-hierarchy`,
-  /** @type {string} [GET] 获取层级列表 */
-  USER_HIERARCHY_LIST: `${API_PREFIX}/console/user-hierarchy`,
-  /** @type {string} [GET] 获取层级角色 */
-  USER_HIERARCHY_ROLES: `${API_PREFIX}/console/user-hierarchy/roles`,
-  /** @type {string} [GET] 获取下级用户 - Path: :user_id */
-  USER_HIERARCHY_SUBORDINATES: `${API_PREFIX}/console/user-hierarchy/:user_id/subordinates`
+  RISK_PROFILE_UNFREEZE: `${API_PREFIX}/console/risk-profiles/:user_id/unfreeze`
 }
 
 // ========== API 调用方法 ==========

@@ -78,9 +78,7 @@ export function initAlpine() {
 
     // 显示用户友好的错误提示（仅在开发环境显示详情）
     const isDev = import.meta.env?.DEV || location.hostname === 'localhost'
-    const errorMessage = isDev
-      ? `组件错误: ${error.message}`
-      : '页面组件出现异常，请刷新重试'
+    const errorMessage = isDev ? `组件错误: ${error.message}` : '页面组件出现异常，请刷新重试'
 
     // 使用 notification store 显示错误（如果已初始化）
     setTimeout(() => {
@@ -145,19 +143,6 @@ export function initAlpine() {
           return Alpine.store('notification').info(message, duration)
         }
         logger.info(`[INFO] ${message}`)
-      },
-
-      /**
-       * 通用显示方法（兼容旧代码）
-       * @param {string} message - 消息内容
-       * @param {string} type - 消息类型
-       * @param {number} duration - 显示时长（毫秒）
-       */
-      show(message, type = 'info', duration = 3000) {
-        if (Alpine.store('notification')) {
-          return Alpine.store('notification').showToast(message, type, duration)
-        }
-        logger.info(`[${type.toUpperCase()}] ${message}`)
       }
     }
   })
@@ -288,13 +273,13 @@ export function initAlpine() {
 
   // 注册认证状态 store
   Alpine.store('auth', {
-    userInfo: null,
+    user_info: null,
 
     init() {
       try {
-        const userInfo = localStorage.getItem('admin_user_info')
-        if (userInfo) {
-          this.userInfo = JSON.parse(userInfo)
+        const stored_info = localStorage.getItem('admin_user_info')
+        if (stored_info) {
+          this.user_info = JSON.parse(stored_info)
         }
       } catch (e) {
         logger.warn('无法恢复管理员信息')
@@ -302,7 +287,7 @@ export function initAlpine() {
     },
 
     setUserInfo(info) {
-      this.userInfo = info
+      this.user_info = info
       if (info) {
         localStorage.setItem('admin_user_info', JSON.stringify(info))
       } else {

@@ -41,6 +41,7 @@ const {
   AssetGroupDef,
   User,
   UserRiskProfile,
+  TradeOrder,
   sequelize
 } = require('../models')
 const { Op } = sequelize.Sequelize
@@ -747,6 +748,12 @@ class MarketListingService {
       throw error
     }
 
+    /*
+     * 5.1 ⚠️ 关键修复（2026-01-30）：取消所有关联的买家订单并解冻资产
+     * 预防"孤儿冻结"问题：挂牌撤回后，买家订单的冻结资产无法追溯
+     */
+    const cancelledOrders = await this._cancelBuyerOrdersForListing(listing_id, transaction)
+
     // 6. 更新挂牌状态
     await listing.update({ status: 'withdrawn' }, { transaction })
 
@@ -772,13 +779,123 @@ class MarketListingService {
 
     logger.info(`[MarketListingService] 挂牌撤回成功: ${listing_id}`, {
       seller_user_id,
-      item_instance_id: listing.offer_item_instance_id
+      item_instance_id: listing.offer_item_instance_id,
+      cancelled_orders_count: cancelledOrders.length
     })
 
     return {
       listing,
-      item
+      item,
+      cancelled_orders: cancelledOrders
     }
+  }
+
+  /**
+   * ⚠️ 关键方法：取消挂牌关联的所有买家订单并解冻资产
+   *
+   * 解决问题：挂牌撤回时，买家已冻结的资产没有解冻，导致"孤儿冻结"
+   *
+   * 调用场景：
+   * - withdrawListing（卖家撤回挂牌）
+   * - withdrawFungibleAssetListing（卖家撤回可叠加资产挂牌）
+   *
+   * @param {number} listing_id - 挂牌ID
+   * @param {Object} transaction - Sequelize事务对象
+   * @returns {Promise<Array>} 已取消的订单列表
+   * @since 2026-01-30 预防孤儿冻结修复
+   * @private
+   */
+  static async _cancelBuyerOrdersForListing(listing_id, transaction) {
+    // 1. 查找该挂牌下所有 'frozen' 或 'created' 状态的买家订单
+    const pendingOrders = await TradeOrder.findAll({
+      where: {
+        listing_id,
+        status: { [Op.in]: ['frozen', 'created'] }
+      },
+      transaction
+    })
+
+    if (pendingOrders.length === 0) {
+      logger.info(`[MarketListingService] 挂牌 ${listing_id} 无待处理的买家订单`)
+      return []
+    }
+
+    logger.info(
+      `[MarketListingService] 挂牌 ${listing_id} 发现 ${pendingOrders.length} 个待取消的买家订单`
+    )
+
+    const cancelledOrders = []
+
+    // 2. 逐个取消订单并解冻买家资产
+    for (const order of pendingOrders) {
+      try {
+        // 仅对 'frozen' 状态的订单解冻资产
+        if (order.status === 'frozen') {
+          // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
+          await AssetService.unfreeze(
+            {
+              idempotency_key: `${order.idempotency_key}:withdraw_unfreeze`,
+              business_type: 'listing_withdrawn_unfreeze',
+              user_id: order.buyer_user_id,
+              asset_code: order.asset_code,
+              amount: order.gross_amount,
+              meta: {
+                order_action: 'withdraw_unfreeze',
+                order_id: order.order_id,
+                listing_id,
+                unfreeze_reason: `挂牌 ${listing_id} 被卖家撤回，自动解冻买家资产`
+              }
+            },
+            { transaction }
+          )
+
+          logger.info(
+            `[MarketListingService] 解冻买家资产: 订单 ${order.order_id}, 用户 ${order.buyer_user_id}, ${order.asset_code} ${order.gross_amount}`
+          )
+        }
+
+        // 3. 更新订单状态为已取消
+        await order.update(
+          {
+            status: 'cancelled',
+            cancelled_at: new Date(),
+            meta: {
+              ...order.meta,
+              cancel_reason: '挂牌被卖家撤回',
+              cancelled_by: 'listing_withdrawal'
+            }
+          },
+          { transaction }
+        )
+
+        cancelledOrders.push({
+          order_id: order.order_id,
+          buyer_user_id: order.buyer_user_id,
+          asset_code: order.asset_code,
+          amount: order.gross_amount,
+          original_status: order.status
+        })
+      } catch (orderError) {
+        // 单个订单取消失败不应阻断整个撤回流程，但需要记录错误
+        logger.error(
+          `[MarketListingService] 取消订单 ${order.order_id} 失败: ${orderError.message}`,
+          {
+            order_id: order.order_id,
+            listing_id,
+            error: orderError.message
+          }
+        )
+        // 继续处理其他订单，但将错误记录到返回结果
+        cancelledOrders.push({
+          order_id: order.order_id,
+          buyer_user_id: order.buyer_user_id,
+          status: 'failed',
+          error: orderError.message
+        })
+      }
+    }
+
+    return cancelledOrders
   }
 
   /**
@@ -1475,6 +1592,9 @@ class MarketListingService {
       throw error
     }
 
+    // ========== 6.1 取消所有关联的买家订单并解冻资产（2026-01-30修复） ==========
+    const cancelledOrders = await this._cancelBuyerOrdersForListing(listing_id, transaction)
+
     // ========== 7. 解冻卖家资产 ==========
     let unfreezeResult = null
     if (listing.seller_offer_frozen && listing.offer_asset_code && listing.offer_amount > 0) {
@@ -1529,12 +1649,14 @@ class MarketListingService {
       seller_user_id,
       offer_asset_code: listing.offer_asset_code,
       offer_amount: listing.offer_amount,
-      unfreeze_transaction_id: unfreezeResult?.transaction_record?.transaction_id
+      unfreeze_transaction_id: unfreezeResult?.transaction_record?.transaction_id,
+      cancelled_orders_count: cancelledOrders.length
     })
 
     return {
       listing,
-      unfreeze_result: unfreezeResult
+      unfreeze_result: unfreezeResult,
+      cancelled_orders: cancelledOrders
     }
   }
 

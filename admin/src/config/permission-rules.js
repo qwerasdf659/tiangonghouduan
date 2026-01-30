@@ -18,6 +18,8 @@
  * import { PERMISSION_RULES, hasMenuAccess } from '@/config/permission-rules.js'
  */
 
+import { logger } from '../utils/logger.js'
+
 // ========== 权限等级阈值（与后端 PERMISSION_LEVELS 对齐） ==========
 
 /**
@@ -171,7 +173,7 @@ export function getUserRoleLevel() {
 
     return 0
   } catch (e) {
-    console.warn('[Permission] 获取用户权限等级失败:', e)
+    logger.warn('[Permission] 获取用户权限等级失败:', e)
     return 0
   }
 }
@@ -237,7 +239,7 @@ export function checkCurrentPageAccess(options = {}) {
   const hasAccess = hasPageAccess(path)
 
   if (!hasAccess) {
-    console.warn(`[Permission] 无权限访问: ${path}，用户等级: ${getUserRoleLevel()}`)
+    logger.warn(`[Permission] 无权限访问: ${path}，用户等级: ${getUserRoleLevel()}`)
 
     if (showAlert) {
       // 使用 Alpine store 的 toast（如果可用）

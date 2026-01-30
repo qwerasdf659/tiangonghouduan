@@ -19,13 +19,13 @@
 import { LotteryCoreAPI, LOTTERY_CORE_ENDPOINTS } from './core.js'
 import { LotteryAdvancedAPI, LOTTERY_ADVANCED_ENDPOINTS } from './advanced.js'
 
-// 合并端点常量（保持向后兼容）
+// 合并端点常量
 export const LOTTERY_ENDPOINTS = {
   ...LOTTERY_CORE_ENDPOINTS,
   ...LOTTERY_ADVANCED_ENDPOINTS
 }
 
-// 合并 API 对象（保持向后兼容）
+// 合并 API 对象
 export const LotteryAPI = {
   ...LotteryCoreAPI,
   ...LotteryAdvancedAPI
@@ -36,4 +36,3 @@ export { LotteryCoreAPI, LOTTERY_CORE_ENDPOINTS }
 export { LotteryAdvancedAPI, LOTTERY_ADVANCED_ENDPOINTS }
 
 export default LotteryAPI
-

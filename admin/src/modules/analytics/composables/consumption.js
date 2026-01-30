@@ -22,11 +22,10 @@ export function useConsumptionState() {
     /** @type {Object} 消费记录筛选条件 */
     consumptionFilters: {
       user_id: '',
-      userId: '', // 兼容HTML模板
       status: '',
       payment_method: '',
-      startDate: '',
-      endDate: ''
+      start_date: '',
+      end_date: ''
     },
     /** @type {Object} 消费统计 */
     consumptionStats: { total: 0, totalAmount: 0, pendingCount: 0, todayCount: 0 },
@@ -46,13 +45,6 @@ export function useConsumptionState() {
 export function useConsumptionMethods() {
   return {
     /**
-     * 加载消费记录（兼容HTML中的loadConsumption调用）
-     */
-    async loadConsumption() {
-      return this.loadConsumptions()
-    },
-
-    /**
      * 加载消费记录
      * 后端接口: GET /api/v4/console/consumption/records
      * 返回: { records: [...], pagination: {...}, statistics: {...} }
@@ -60,17 +52,18 @@ export function useConsumptionMethods() {
     async loadConsumptions() {
       try {
         const params = new URLSearchParams()
-        params.append('page', this.page || 1)
-        params.append('page_size', this.pageSize || 20)
-        // 支持两种筛选条件命名（HTML 用 userId，后端用 user_id）
-        const userId = this.consumptionFilters.userId || this.consumptionFilters.user_id
-        if (userId) params.append('search', userId) // 后端使用 search 参数
-        if (this.consumptionFilters.status) params.append('status', this.consumptionFilters.status)
-        if (this.consumptionFilters.startDate) {
-          params.append('start_date', this.consumptionFilters.startDate)
+        params.append('page', this.financePagination?.page || 1)
+        params.append('page_size', this.financePagination?.page_size || 20)
+        // 使用后端字段名 user_id
+        if (this.consumptionFilters.user_id) {
+          params.append('search', this.consumptionFilters.user_id) // 后端使用 search 参数
         }
-        if (this.consumptionFilters.endDate) {
-          params.append('end_date', this.consumptionFilters.endDate)
+        if (this.consumptionFilters.status) params.append('status', this.consumptionFilters.status)
+        if (this.consumptionFilters.start_date) {
+          params.append('start_date', this.consumptionFilters.start_date)
+        }
+        if (this.consumptionFilters.end_date) {
+          params.append('end_date', this.consumptionFilters.end_date)
         }
 
         const response = await this.apiGet(
@@ -91,13 +84,13 @@ export function useConsumptionMethods() {
             store_name: r.merchant?.nickname || r.merchant?.mobile || `商户${r.merchant_id || '-'}`
           }))
           if (response.data?.pagination) {
-            this.total = response.data.pagination.total || 0
-            this.totalPages = response.data.pagination.total_pages || 1
+            // 只更新 total，total_pages 由 getter 计算
+            this.financePagination.total = response.data.pagination.total || 0
           }
           // 同时获取统计数据（后端在同一接口返回）
           if (response.data?.statistics) {
             this.consumptionStats = {
-              total: this.total,
+              total: this.financePagination.total,
               totalAmount: 0,
               pendingCount: response.data.statistics.pending ?? 0,
               todayCount: response.data.statistics.today ?? 0
@@ -122,7 +115,7 @@ export function useConsumptionMethods() {
      * 搜索消费记录
      */
     searchConsumptions() {
-      this.page = 1
+      this.financePagination.page = 1
       this.loadConsumptions()
     },
 
@@ -134,10 +127,10 @@ export function useConsumptionMethods() {
         user_id: '',
         status: '',
         payment_method: '',
-        startDate: '',
-        endDate: ''
+        start_date: '',
+        end_date: ''
       }
-      this.page = 1
+      this.financePagination.page = 1
       this.loadConsumptions()
     },
 

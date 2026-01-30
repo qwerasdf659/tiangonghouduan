@@ -95,7 +95,7 @@ function registerLotteryManagementComponents() {
   Alpine.data('lotteryNavigation', () => ({
     ...createPageMixin(),
 
-    currentPage: 'lottery-metrics',
+    current_page: 'lottery-metrics',
 
     subPages: [
       { id: 'lottery-metrics', title: '实时监控', icon: '📊', highlight: true },
@@ -120,14 +120,14 @@ function registerLotteryManagementComponents() {
         return
       }
       const urlParams = new URLSearchParams(window.location.search)
-      this.currentPage = urlParams.get('page') || 'lottery-metrics'
-      logger.debug('📍 [LotteryNavigation] 设置当前页面:', this.currentPage)
-      Alpine.store('lotteryPage', this.currentPage)
+      this.current_page = urlParams.get('page') || 'lottery-metrics'
+      logger.debug('📍 [LotteryNavigation] 设置当前页面:', this.current_page)
+      Alpine.store('lotteryPage', this.current_page)
       logger.debug('✅ [LotteryNavigation] init() 完成，store 已更新')
     },
 
     switchPage(pageId) {
-      this.currentPage = pageId
+      this.current_page = pageId
       Alpine.store('lotteryPage', pageId)
       window.history.pushState({}, '', `?page=${pageId}`)
     }
@@ -208,14 +208,14 @@ function registerLotteryManagementComponents() {
 
       // ==================== 通用状态 ====================
       page: 1,
-      pageSize: 20,
-      totalPages: 1,
+      page_size: 20,
+      total_pages: 1,
       total: 0,
       saving: false,
       isEditMode: false,
       submitting: false,
 
-      get currentPage() {
+      get current_page() {
         return Alpine.store('lotteryPage')
       },
 
@@ -233,7 +233,7 @@ function registerLotteryManagementComponents() {
 
       init() {
         logger.debug('✅ [LotteryPageContent] init() 开始执行')
-        logger.debug('📍 [LotteryPageContent] 当前页面:', this.currentPage)
+        logger.debug('📍 [LotteryPageContent] 当前页面:', this.current_page)
         // 关键诊断：检查 openCreateQuotaModal 是否存在
         logger.debug(
           '🔴 [CRITICAL] openCreateQuotaModal 存在:',
@@ -259,7 +259,7 @@ function registerLotteryManagementComponents() {
       },
 
       async loadPageData() {
-        const page = this.currentPage
+        const page = this.current_page
         logger.debug('📂 [LotteryPage] loadPageData 被调用, page =', page)
         await this.withLoading(
           async () => {
@@ -395,41 +395,9 @@ function registerLotteryManagementComponents() {
         }
       },
 
-      formatDate(dateString) {
-        if (!dateString) return '-'
-        try {
-          const date = new Date(dateString)
-          return date.toLocaleString('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-          })
-        } catch {
-          return dateString
-        }
-      },
-
       formatCurrency(value) {
         if (value === undefined || value === null) return '¥0.00'
         return `¥${parseFloat(value).toFixed(2)}`
-      },
-
-      /**
-       * 安全格式化日期显示
-       * @param {string} dateStr - ISO日期字符串
-       * @returns {string} 本地化日期字符串
-       */
-      formatDateSafe(dateStr) {
-        if (!dateStr) return '-'
-        try {
-          const date = new Date(dateStr)
-          if (isNaN(date.getTime())) return dateStr
-          return date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' })
-        } catch {
-          return dateStr
-        }
       }
     }
   })

@@ -65,8 +65,7 @@ export function useDiamondAccountsMethods() {
         this.diamondAccounts = []
         this.diamondSearched = false
         this.diamondSearchTip = '请输入用户ID查询钻石账户'
-        this.total = 0
-        this.totalPages = 0
+        this.financePagination.total = 0
         logger.debug('[DiamondAccounts] 未提供用户ID，等待用户搜索')
         return
       }
@@ -102,12 +101,10 @@ export function useDiamondAccountsMethods() {
               has_diamond: !!diamondBalance
             }
           ]
-          this.total = 1
-          this.totalPages = 1
+          this.financePagination.total = 1
         } else {
           this.diamondAccounts = []
-          this.total = 0
-          this.totalPages = 0
+          this.financePagination.total = 0
           this.diamondSearchTip = balanceResponse?.message || '用户不存在'
         }
 
@@ -116,8 +113,7 @@ export function useDiamondAccountsMethods() {
       } catch (error) {
         logger.error('[DiamondAccounts] 加载失败:', error)
         this.diamondAccounts = []
-        this.total = 0
-        this.totalPages = 0
+        this.financePagination.total = 0
         if (error.message?.includes('不存在') || error.message?.includes('404')) {
           this.diamondSearchTip = '用户不存在'
         } else {
@@ -171,7 +167,7 @@ export function useDiamondAccountsMethods() {
         this.showError('请输入用户ID')
         return
       }
-      this.page = 1
+      this.financePagination.page = 1
       this.loadDiamondAccounts()
     },
 
@@ -183,8 +179,7 @@ export function useDiamondAccountsMethods() {
       this.diamondAccounts = []
       this.diamondSearched = false
       this.diamondSearchTip = '请输入用户ID查询钻石账户'
-      this.total = 0
-      this.totalPages = 0
+      this.financePagination.total = 0
     },
 
     /**

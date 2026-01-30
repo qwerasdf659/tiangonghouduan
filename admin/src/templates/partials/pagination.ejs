@@ -12,8 +12,8 @@
   <span class="text-sm text-gray-500">共 <span x-text="<%= pVar %>.total"></span> 条记录</span>
   <div class="flex space-x-2">
     <button @click="<%= prevFn %>" :disabled="<%= pVar %>.page <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-    <span class="px-3 py-1">第 <span x-text="<%= pVar %>.page"></span> / <span x-text="<%= pVar %>.totalPages"></span> 页</span>
-    <button @click="<%= nextFn %>" :disabled="<%= pVar %>.page >= <%= pVar %>.totalPages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+    <span class="px-3 py-1">第 <span x-text="<%= pVar %>.page"></span> / <span x-text="<%= pVar %>.total_pages"></span> 页</span>
+    <button @click="<%= nextFn %>" :disabled="<%= pVar %>.page >= <%= pVar %>.total_pages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
   </div>
 </div>
 

@@ -15,7 +15,7 @@
         <span class="text-lg font-semibold">👥 用户层级管理</span>
       </div>
       <div class="flex items-center space-x-4">
-        <span x-data x-text="Alpine.store('auth')?.userInfo?.nickname ? `欢迎，${Alpine.store('auth').userInfo.nickname}` : '欢迎，管理员'"></span>
+        <span x-data x-text="Alpine.store('auth')?.user_info?.nickname ? `欢迎，${Alpine.store('auth').user_info.nickname}` : '欢迎，管理员'"></span>
       </div>
     </div>
   </nav>
@@ -65,7 +65,7 @@
       <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
         <div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">角色级别</label>
-          <select class="w-full border rounded-lg px-3 py-2" x-model="filters.roleLevel" @change="loadData()">
+          <select class="w-full border rounded-lg px-3 py-2" x-model="filters.role_level" @change="loadData()">
             <option value="">全部级别</option>
             <option value="80">区域负责人 (80)</option>
             <option value="60">业务经理 (60)</option>
@@ -82,7 +82,7 @@
         </div>
         <div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">上级用户ID</label>
-          <input type="number" class="w-full border rounded-lg px-3 py-2" x-model="filters.superiorId" placeholder="输入上级ID" @keypress.enter="loadData()">
+          <input type="number" class="w-full border rounded-lg px-3 py-2" x-model="filters.superior_user_id" placeholder="输入上级ID" @keypress.enter="loadData()">
         </div>
         <div>
           <button class="w-full px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary disabled:opacity-50" 
@@ -109,7 +109,7 @@
     <div class="themed-card rounded-lg shadow">
       <div class="p-4 border-b flex justify-between items-center">
         <h5 class="font-semibold">📊 用户层级列表</h5>
-        <span class="themed-text-muted" x-text="`共 ${totalRecords || 0} 条记录`">加载中...</span>
+        <span class="themed-text-muted" x-text="`共 ${total_records || 0} 条记录`">加载中...</span>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full">
@@ -195,23 +195,23 @@
         <div class="flex space-x-2">
           <button 
             class="px-4 py-2 border rounded-lg" 
-            :class="currentPage <= 1 ? 'themed-bg-subtle text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
-            :disabled="currentPage <= 1"
-            @click="goToPage(currentPage - 1)"
+            :class="current_page <= 1 ? 'themed-bg-subtle text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
+            :disabled="current_page <= 1"
+            @click="goToPage(current_page - 1)"
           >上一页</button>
-          <template x-for="page in paginationPages" :key="page">
+          <template x-for="page in visiblePages" :key="page">
             <button 
               class="px-4 py-2 border rounded-lg"
-              :class="page === currentPage ? 'themed-bg-primary text-white' : (page === '...' ? 'cursor-default' : 'themed-hover-bg')"
+              :class="page === current_page ? 'themed-bg-primary text-white' : (page === '...' ? 'cursor-default' : 'themed-hover-bg')"
               @click="page !== '...' && goToPage(page)"
               x-text="page"
             ></button>
           </template>
           <button 
             class="px-4 py-2 border rounded-lg"
-            :class="currentPage >= totalPages ? 'themed-bg-subtle text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
-            :disabled="currentPage >= totalPages"
-            @click="goToPage(currentPage + 1)"
+            :class="current_page >= total_pages ? 'themed-bg-subtle text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
+            :disabled="current_page >= total_pages"
+            @click="goToPage(current_page + 1)"
           >下一页</button>
         </div>
       </div>
@@ -230,12 +230,12 @@
             <div class="p-6 space-y-4">
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">用户ID <span class="text-red-500">*</span></label>
-                <input type="number" class="w-full border rounded-lg px-3 py-2" x-model.number="form.userId" required>
+                <input type="number" class="w-full border rounded-lg px-3 py-2" x-model.number="form.user_id" required>
                 <small class="themed-text-muted">输入要建立层级关系的用户ID</small>
               </div>
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">角色 <span class="text-red-500">*</span></label>
-                <select class="w-full border rounded-lg px-3 py-2" x-model="form.roleId" required>
+                <select class="w-full border rounded-lg px-3 py-2" x-model="form.role_id" required>
                   <option value="">请选择角色</option>
                   <template x-for="role in rolesList" :key="role.role_id">
                     <option :value="role.role_id" x-text="`${role.role_name} (${role.level_name})`"></option>
@@ -244,12 +244,12 @@
               </div>
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">上级用户ID</label>
-                <input type="number" class="w-full border rounded-lg px-3 py-2" x-model.number="form.superiorId">
+                <input type="number" class="w-full border rounded-lg px-3 py-2" x-model.number="form.superior_user_id">
                 <small class="themed-text-muted">区域负责人可不填；业务经理需填写区域负责人ID；业务员需填写业务经理ID</small>
               </div>
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">关联门店ID</label>
-                <input type="number" class="w-full border rounded-lg px-3 py-2" x-model.number="form.storeId">
+                <input type="number" class="w-full border rounded-lg px-3 py-2" x-model.number="form.store_id">
                 <small class="themed-text-muted">仅业务员需要关联门店</small>
               </div>
             </div>
@@ -273,14 +273,14 @@
           </div>
           <form @submit.prevent="confirmDeactivate">
             <div class="p-6 space-y-4">
-              <p>您正在停用用户 <strong x-text="deactivateForm.userInfo"></strong> 的层级权限。</p>
+              <p>您正在停用用户 <strong x-text="deactivateForm.user_info"></strong> 的层级权限。</p>
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">停用原因 <span class="text-red-500">*</span></label>
                 <textarea class="w-full border rounded-lg px-3 py-2" x-model="deactivateForm.reason" rows="3" placeholder="请输入停用原因" required></textarea>
               </div>
               <div class="flex items-start">
-                <input type="checkbox" class="mt-1 mr-2" x-model="deactivateForm.includeSubordinates" id="includeSubordinates">
-                <label class="text-red-600 text-sm" for="includeSubordinates">
+                <input type="checkbox" class="mt-1 mr-2" x-model="deactivateForm.include_subordinates" id="include_subordinates">
+                <label class="text-red-600 text-sm" for="include_subordinates">
                   <strong>同时停用所有下级用户</strong>（谨慎选择，将级联停用该用户管理的所有下级）
                 </label>
               </div>

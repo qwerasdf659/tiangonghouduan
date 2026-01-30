@@ -27,7 +27,7 @@
         <template x-for="page in subPages" :key="page.id">
           <button 
             @click="switchPage(page.id)"
-            :class="currentPage === page.id ? 'border-b-2 border-yellow-500 text-yellow-600 bg-yellow-50' : 'themed-text-muted themed-hover-bg'"
+            :class="current_page === page.id ? 'border-b-2 border-yellow-500 text-yellow-600 bg-yellow-50' : 'themed-text-muted themed-hover-bg'"
             class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
             x-text="page.icon + ' ' + page.name"
           ></button>
@@ -36,7 +36,7 @@
     </div>
 
     <!-- 系统配置 -->
-    <div x-show="currentPage === 'system-config'" x-cloak>
+    <div x-show="current_page === 'system-config'" x-cloak>
       <div class="themed-card rounded-lg shadow p-6">
         <h5 class="font-semibold mb-4">系统配置</h5>
         <div class="space-y-6">
@@ -61,7 +61,7 @@
     </div>
 
     <!-- 审计日志 -->
-    <div x-show="currentPage === 'audit-logs'" x-cloak>
+    <div x-show="current_page === 'audit-logs'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">审计日志</h5>
@@ -75,7 +75,7 @@
               <option value="update">更新</option>
               <option value="delete">删除</option>
             </select>
-            <input type="date" x-model="logFilters.startDate" class="px-3 py-2 border rounded">
+            <input type="date" x-model="logFilters.start_date" class="px-3 py-2 border rounded">
             <button @click="loadAuditLogs()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
           </div>
         </div>

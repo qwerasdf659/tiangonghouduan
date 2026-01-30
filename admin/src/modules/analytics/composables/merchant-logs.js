@@ -25,8 +25,8 @@ export function useMerchantLogsState() {
       merchant_id: '',
       action_type: '',
       operator_id: '',
-      startDate: '',
-      endDate: ''
+      start_date: '',
+      end_date: ''
     },
     /** @type {Object} 日志统计 */
     logStats: { totalLogs: 0, todayLogs: 0, warningLogs: 0, errorLogs: 0 },
@@ -60,13 +60,13 @@ export function useMerchantLogsMethods() {
     async loadMerchantLogs() {
       try {
         const params = new URLSearchParams()
-        params.append('page', this.page)
-        params.append('page_size', this.pageSize)
+        params.append('page', this.financePagination?.page || 1)
+        params.append('page_size', this.financePagination?.page_size || 20)
         if (this.logFilters.merchant_id) params.append('merchant_id', this.logFilters.merchant_id)
         if (this.logFilters.action_type) params.append('action_type', this.logFilters.action_type)
         if (this.logFilters.operator_id) params.append('operator_id', this.logFilters.operator_id)
-        if (this.logFilters.startDate) params.append('start_date', this.logFilters.startDate)
-        if (this.logFilters.endDate) params.append('end_date', this.logFilters.endDate)
+        if (this.logFilters.start_date) params.append('start_date', this.logFilters.start_date)
+        if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
 
         const response = await this.apiGet(
           `${STORE_ENDPOINTS.MERCHANT_LOGS_LIST}?${params}`,
@@ -79,8 +79,8 @@ export function useMerchantLogsMethods() {
           this.merchantLogs =
             response.data?.items || response.data?.logs || response.data?.list || []
           if (response.data?.pagination) {
-            this.total = response.data.pagination.total || 0
-            this.totalPages = response.data.pagination.total_pages || 1
+            // 只更新 total，total_pages 由 getter 计算
+            this.financePagination.total = response.data.pagination.total || 0
             // 从分页信息更新统计
             this.updateStatsFromList(response.data.pagination)
           }
@@ -116,7 +116,7 @@ export function useMerchantLogsMethods() {
      * 搜索日志
      */
     searchLogs() {
-      this.page = 1
+      this.financePagination.page = 1
       this.loadMerchantLogs()
     },
 
@@ -128,10 +128,10 @@ export function useMerchantLogsMethods() {
         merchant_id: '',
         action_type: '',
         operator_id: '',
-        startDate: '',
-        endDate: ''
+        start_date: '',
+        end_date: ''
       }
-      this.page = 1
+      this.financePagination.page = 1
       this.loadMerchantLogs()
     },
 
@@ -152,8 +152,8 @@ export function useMerchantLogsMethods() {
         const params = new URLSearchParams()
         if (this.logFilters.merchant_id) params.append('merchant_id', this.logFilters.merchant_id)
         if (this.logFilters.action_type) params.append('action_type', this.logFilters.action_type)
-        if (this.logFilters.startDate) params.append('start_date', this.logFilters.startDate)
-        if (this.logFilters.endDate) params.append('end_date', this.logFilters.endDate)
+        if (this.logFilters.start_date) params.append('start_date', this.logFilters.start_date)
+        if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
 
         const response = await this.apiGet(
           `${STORE_ENDPOINTS.MERCHANT_LOGS_EXPORT}?${params}`,

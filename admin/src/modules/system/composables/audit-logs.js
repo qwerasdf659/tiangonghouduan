@@ -8,7 +8,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
+import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { buildURL } from '../../../api/base.js'
 
 /**
@@ -24,15 +24,15 @@ export function useAuditLogsState() {
       operator_id: '',
       action: '',
       target: '',
-      startDate: '',
-      endDate: ''
+      start_date: '',
+      end_date: ''
     },
     /** @type {number} 审计日志页码 */
     logPage: 1,
     /** @type {number} 审计日志每页数量 */
     logPageSize: 20,
     /** @type {Object} 审计日志分页 */
-    logPagination: { total: 0, totalPages: 1 },
+    logPagination: { total: 0, total_pages: 1 },
     /** @type {Object|null} 选中的日志详情 */
     selectedLog: null,
     /** @type {Array} 操作类型选项 */
@@ -63,8 +63,8 @@ export function useAuditLogsMethods() {
         if (this.logFilters.operator_id) params.append('operator_id', this.logFilters.operator_id)
         if (this.logFilters.action) params.append('action', this.logFilters.action)
         if (this.logFilters.target) params.append('target', this.logFilters.target)
-        if (this.logFilters.startDate) params.append('start_date', this.logFilters.startDate)
-        if (this.logFilters.endDate) params.append('end_date', this.logFilters.endDate)
+        if (this.logFilters.start_date) params.append('start_date', this.logFilters.start_date)
+        if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
 
         const response = await this.apiGet(
           `${SYSTEM_ENDPOINTS.AUDIT_LOG_LIST}?${params}`,
@@ -78,7 +78,7 @@ export function useAuditLogsMethods() {
           logger.debug('[AuditLogs] 加载到日志数量:', this.auditLogs.length)
           if (response.data?.pagination) {
             this.logPagination.total = response.data.pagination.total || 0
-            this.logPagination.totalPages = response.data.pagination.total_pages || 1
+            this.logPagination.total_pages = response.data.pagination.total_pages || 1
           }
         }
       } catch (error) {
@@ -103,8 +103,8 @@ export function useAuditLogsMethods() {
         operator_id: '',
         action: '',
         target: '',
-        startDate: '',
-        endDate: ''
+        start_date: '',
+        end_date: ''
       }
       this.logPage = 1
       this.loadAuditLogs()
@@ -139,8 +139,8 @@ export function useAuditLogsMethods() {
       if (this.logFilters.operator_id) params.append('operator_id', this.logFilters.operator_id)
       if (this.logFilters.action) params.append('action', this.logFilters.action)
       if (this.logFilters.target) params.append('target', this.logFilters.target)
-      if (this.logFilters.startDate) params.append('start_date', this.logFilters.startDate)
-      if (this.logFilters.endDate) params.append('end_date', this.logFilters.endDate)
+      if (this.logFilters.start_date) params.append('start_date', this.logFilters.start_date)
+      if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
       params.append('format', 'csv')
 
       const exportUrl = SYSTEM_ENDPOINTS.AUDIT_LOG_EXPORT + '?' + params.toString()

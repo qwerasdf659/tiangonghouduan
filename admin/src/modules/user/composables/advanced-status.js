@@ -22,12 +22,12 @@ export function useAdvancedStatusState() {
     premiumUsers: [],
     /** @type {Object} 高级状态筛选条件 */
     premiumFilters: { user_id: '', is_valid: '', unlock_method: '' },
-    /** @type {number} 高级状态页码 */
-    premiumPage: 1,
-    /** @type {number} 高级状态每页数量 */
-    premiumPageSize: 20,
-    /** @type {Object} 高级状态分页 */
-    premiumPagination: { total: 0, totalPages: 1 },
+    /** @type {Object} 高级状态分页 - 单一对象模式 */
+    premiumPagination: {
+      page: 1,
+      page_size: 20,
+      total: 0
+    },
     /** @type {Object} 高级状态统计 */
     premiumStats: { total: 0, active: 0, expired: 0, expiring_soon: 0 },
     /** @type {Object|null} 选中的高级状态用户 */
@@ -38,12 +38,12 @@ export function useAdvancedStatusState() {
     riskProfiles: [],
     /** @type {Object} 风控筛选条件 */
     riskFilters: { config_type: '', user_level: '', is_frozen: '' },
-    /** @type {number} 风控页码 */
-    riskPage: 1,
-    /** @type {number} 风控每页数量 */
-    riskPageSize: 20,
-    /** @type {Object} 风控分页 */
-    riskPagination: { total: 0, totalPages: 1 },
+    /** @type {Object} 风控分页 - 单一对象模式 */
+    riskPagination: {
+      page: 1,
+      page_size: 20,
+      total: 0
+    },
     /** @type {Array} 冻结用户列表 */
     frozenUsers: [],
     /** @type {Array} 风控等级配置 */
@@ -63,33 +63,33 @@ export function useAdvancedStatusState() {
     /** @type {Array} 角色变更历史 */
     roleChangeHistory: [],
     /** @type {Object} 角色历史筛选条件 */
-    roleHistoryFilters: { user_id: '', operator_id: '', startDate: '', endDate: '' },
-    /** @type {number} 角色历史页码 */
-    roleHistoryPage: 1,
-    /** @type {number} 角色历史每页数量 */
-    roleHistoryPageSize: 20,
-    /** @type {Object} 角色历史分页 */
-    roleHistoryPagination: { total: 0, totalPages: 1 },
+    roleHistoryFilters: { user_id: '', operator_id: '', start_date: '', end_date: '' },
+    /** @type {Object} 角色历史分页 - 单一对象模式 */
+    roleHistoryPagination: {
+      page: 1,
+      page_size: 20,
+      total: 0
+    },
     /** @type {Array} 状态变更历史 */
     statusChangeHistory: [],
     /** @type {Object} 状态历史筛选条件 */
-    statusHistoryFilters: { user_id: '', operator_id: '', startDate: '', endDate: '' },
-    /** @type {number} 状态历史页码 */
-    statusHistoryPage: 1,
-    /** @type {number} 状态历史每页数量 */
-    statusHistoryPageSize: 20,
-    /** @type {Object} 状态历史分页 */
-    statusHistoryPagination: { total: 0, totalPages: 1 },
+    statusHistoryFilters: { user_id: '', operator_id: '', start_date: '', end_date: '' },
+    /** @type {Object} 状态历史分页 - 单一对象模式 */
+    statusHistoryPagination: {
+      page: 1,
+      page_size: 20,
+      total: 0
+    },
 
     // ==================== 概率调整 ====================
     /** @type {Object} 概率调整模态框数据 */
     probabilityModal: {
-      userId: null,
-      userNickname: '',
+      user_id: null,
+      user_nickname: '',
       mode: 'global',
       multiplier: 1,
-      targetPrizeId: '',
-      customProbability: 0,
+      target_prize_id: '',
+      custom_probability: 0,
       duration: 60,
       reason: ''
     }
@@ -110,8 +110,8 @@ export function useAdvancedStatusMethods() {
     async loadPremiumUsers() {
       try {
         const params = new URLSearchParams()
-        params.append('page', this.premiumPage)
-        params.append('page_size', this.premiumPageSize)
+        params.append('page', this.premiumPagination.page)
+        params.append('page_size', this.premiumPagination.page_size)
         if (this.premiumFilters.user_id) params.append('user_id', this.premiumFilters.user_id)
         if (this.premiumFilters.is_valid) params.append('is_valid', this.premiumFilters.is_valid)
         if (this.premiumFilters.unlock_method)
@@ -127,9 +127,8 @@ export function useAdvancedStatusMethods() {
           // 后端返回 statuses 数组，直接使用后端字段名
           this.premiumUsers = response.data?.statuses || []
           if (response.data?.pagination) {
-            // 后端返回 total_count，适配后端字段
+            // 后端返回 total_count，适配后端字段（只更新 total，total_pages 由 getter 计算）
             this.premiumPagination.total = response.data.pagination.total_count || 0
-            this.premiumPagination.totalPages = response.data.pagination.total_pages || 1
           }
         }
       } catch (error) {
@@ -143,8 +142,10 @@ export function useAdvancedStatusMethods() {
      * @param {number} page - 目标页码
      */
     changePremiumPage(page) {
-      if (page < 1 || page > this.premiumPagination.totalPages) return
-      this.premiumPage = page
+      const totalPages =
+        Math.ceil(this.premiumPagination.total / this.premiumPagination.page_size) || 1
+      if (page < 1 || page > totalPages) return
+      this.premiumPagination.page = page
       this.loadPremiumUsers()
     },
 
@@ -233,14 +234,14 @@ export function useAdvancedStatusMethods() {
     async loadRiskProfiles() {
       try {
         const params = new URLSearchParams()
-        params.append('page', this.riskPage)
-        params.append('page_size', this.riskPageSize)
+        params.append('page', this.riskPagination.page)
+        params.append('page_size', this.riskPagination.page_size)
         if (this.riskFilters.config_type) params.append('config_type', this.riskFilters.config_type)
         if (this.riskFilters.user_level) params.append('user_level', this.riskFilters.user_level)
         if (this.riskFilters.is_frozen) params.append('is_frozen', this.riskFilters.is_frozen)
 
         const response = await this.apiGet(
-          `${USER_ENDPOINTS.RISK_PROFILE_LIST}?${params}`,
+          `${USER_ENDPOINTS.RISK_PROFILES_LIST}?${params}`,
           {},
           { showLoading: false }
         )
@@ -251,9 +252,9 @@ export function useAdvancedStatusMethods() {
           // 过滤掉可能的无效数据
           this.riskProfiles = list.filter(item => item && (item.risk_profile_id || item.user_id))
           if (response.data?.pagination) {
+            // 只更新 total，total_pages 由 getter 计算
             this.riskPagination.total =
               response.data.pagination.total_count || response.data.pagination.total || 0
-            this.riskPagination.totalPages = response.data.pagination.total_pages || 1
           }
         }
       } catch (error) {
@@ -267,8 +268,9 @@ export function useAdvancedStatusMethods() {
      * @param {number} page - 目标页码
      */
     changeRiskPage(page) {
-      if (page < 1 || page > this.riskPagination.totalPages) return
-      this.riskPage = page
+      const totalPages = Math.ceil(this.riskPagination.total / this.riskPagination.page_size) || 1
+      if (page < 1 || page > totalPages) return
+      this.riskPagination.page = page
       this.loadRiskProfiles()
     },
 
@@ -302,14 +304,6 @@ export function useAdvancedStatusMethods() {
         this.selectedRiskProfile = null
       }
       this.showModal('riskProfileModal')
-    },
-
-    /**
-     * 打开编辑风控配置模态框（别名）
-     * @param {Object} profile - 风控配置对象
-     */
-    openEditRiskModal(profile) {
-      this.openRiskModal(profile)
     },
 
     /**
@@ -417,21 +411,21 @@ export function useAdvancedStatusMethods() {
       logger.info('[DEBUG] loadRoleChangeHistory 被调用，筛选条件:', {
         user_id: this.roleHistoryFilters.user_id,
         operator_id: this.roleHistoryFilters.operator_id,
-        page: this.roleHistoryPage
+        page: this.roleHistoryPagination.page
       })
 
       try {
         const params = new URLSearchParams()
-        params.append('page', this.roleHistoryPage)
-        params.append('page_size', this.roleHistoryPageSize)
+        params.append('page', this.roleHistoryPagination.page)
+        params.append('page_size', this.roleHistoryPagination.page_size)
         if (this.roleHistoryFilters.user_id)
           params.append('user_id', this.roleHistoryFilters.user_id)
         if (this.roleHistoryFilters.operator_id)
           params.append('operator_id', this.roleHistoryFilters.operator_id)
-        if (this.roleHistoryFilters.startDate)
-          params.append('start_date', this.roleHistoryFilters.startDate)
-        if (this.roleHistoryFilters.endDate)
-          params.append('end_date', this.roleHistoryFilters.endDate)
+        if (this.roleHistoryFilters.start_date)
+          params.append('start_date', this.roleHistoryFilters.start_date)
+        if (this.roleHistoryFilters.end_date)
+          params.append('end_date', this.roleHistoryFilters.end_date)
 
         const url = `${USER_ENDPOINTS.ROLE_CHANGE_HISTORY_LIST}?${params}`
         // [DEBUG] 调试日志 - 待删除
@@ -446,9 +440,9 @@ export function useAdvancedStatusMethods() {
           this.roleChangeHistory =
             response.data?.history || response.data?.list || response.data?.records || []
           if (response.data?.pagination) {
+            // 只更新 total，total_pages 由 getter 计算
             this.roleHistoryPagination.total =
               response.data.pagination.total || response.data.pagination.total_count || 0
-            this.roleHistoryPagination.totalPages = response.data.pagination.total_pages || 1
           }
           logger.info('[DEBUG] 加载完成，记录数:', this.roleChangeHistory.length)
           // 显示刷新成功提示
@@ -470,8 +464,10 @@ export function useAdvancedStatusMethods() {
      * @param {number} page - 目标页码
      */
     changeRoleHistoryPage(page) {
-      if (page < 1 || page > this.roleHistoryPagination.totalPages) return
-      this.roleHistoryPage = page
+      const totalPages =
+        Math.ceil(this.roleHistoryPagination.total / this.roleHistoryPagination.page_size) || 1
+      if (page < 1 || page > totalPages) return
+      this.roleHistoryPagination.page = page
       this.loadRoleChangeHistory()
     },
 
@@ -483,21 +479,21 @@ export function useAdvancedStatusMethods() {
       logger.info('[DEBUG] loadStatusChangeHistory 被调用，筛选条件:', {
         user_id: this.statusHistoryFilters.user_id,
         operator_id: this.statusHistoryFilters.operator_id,
-        page: this.statusHistoryPage
+        page: this.statusHistoryPagination.page
       })
 
       try {
         const params = new URLSearchParams()
-        params.append('page', this.statusHistoryPage)
-        params.append('page_size', this.statusHistoryPageSize)
+        params.append('page', this.statusHistoryPagination.page)
+        params.append('page_size', this.statusHistoryPagination.page_size)
         if (this.statusHistoryFilters.user_id)
           params.append('user_id', this.statusHistoryFilters.user_id)
         if (this.statusHistoryFilters.operator_id)
           params.append('operator_id', this.statusHistoryFilters.operator_id)
-        if (this.statusHistoryFilters.startDate)
-          params.append('start_date', this.statusHistoryFilters.startDate)
-        if (this.statusHistoryFilters.endDate)
-          params.append('end_date', this.statusHistoryFilters.endDate)
+        if (this.statusHistoryFilters.start_date)
+          params.append('start_date', this.statusHistoryFilters.start_date)
+        if (this.statusHistoryFilters.end_date)
+          params.append('end_date', this.statusHistoryFilters.end_date)
 
         const url = `${USER_ENDPOINTS.STATUS_CHANGE_HISTORY_LIST}?${params}`
         // [DEBUG] 调试日志 - 待删除
@@ -512,9 +508,9 @@ export function useAdvancedStatusMethods() {
           this.statusChangeHistory =
             response.data?.history || response.data?.list || response.data?.records || []
           if (response.data?.pagination) {
+            // 只更新 total，total_pages 由 getter 计算
             this.statusHistoryPagination.total =
               response.data.pagination.total || response.data.pagination.total_count || 0
-            this.statusHistoryPagination.totalPages = response.data.pagination.total_pages || 1
           }
           logger.info('[DEBUG] 加载完成，记录数:', this.statusChangeHistory.length)
         } else {
@@ -533,8 +529,10 @@ export function useAdvancedStatusMethods() {
      * @param {number} page - 目标页码
      */
     changeStatusHistoryPage(page) {
-      if (page < 1 || page > this.statusHistoryPagination.totalPages) return
-      this.statusHistoryPage = page
+      const totalPages =
+        Math.ceil(this.statusHistoryPagination.total / this.statusHistoryPagination.page_size) || 1
+      if (page < 1 || page > totalPages) return
+      this.statusHistoryPagination.page = page
       this.loadStatusChangeHistory()
     },
 
@@ -546,12 +544,12 @@ export function useAdvancedStatusMethods() {
      */
     openProbabilityModal(user) {
       this.probabilityModal = {
-        userId: user.user_id || user.id,
-        userNickname: user.nickname || `用户${user.user_id}`,
+        user_id: user.user_id || user.id,
+        user_nickname: user.nickname || `用户${user.user_id}`,
         mode: 'global',
         multiplier: 1,
-        targetPrizeId: '',
-        customProbability: 0,
+        target_prize_id: '',
+        custom_probability: 0,
         duration: 60,
         reason: ''
       }
@@ -562,7 +560,7 @@ export function useAdvancedStatusMethods() {
      * 提交概率调整
      */
     async submitProbabilityAdjustment() {
-      if (!this.probabilityModal.userId) {
+      if (!this.probabilityModal.user_id) {
         this.showError('用户信息无效')
         return
       }
@@ -571,15 +569,15 @@ export function useAdvancedStatusMethods() {
         this.saving = true
         const response = await this.apiCall(
           buildURL(USER_ENDPOINTS.ADJUST_PROBABILITY, {
-            user_id: this.probabilityModal.userId
+            user_id: this.probabilityModal.user_id
           }),
           {
             method: 'POST',
             data: {
               mode: this.probabilityModal.mode,
               multiplier: this.probabilityModal.multiplier,
-              target_prize_id: this.probabilityModal.targetPrizeId || null,
-              custom_probability: this.probabilityModal.customProbability || null,
+              target_prize_id: this.probabilityModal.target_prize_id || null,
+              custom_probability: this.probabilityModal.custom_probability || null,
               duration_minutes: this.probabilityModal.duration,
               reason: this.probabilityModal.reason
             }

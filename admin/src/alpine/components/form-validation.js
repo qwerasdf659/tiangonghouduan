@@ -126,7 +126,7 @@ function formValidation(config = {}) {
     // 触摸过的字段（用于延迟显示错误）
     touched: {},
     // 是否正在提交
-    isSubmitting: false,
+    is_submitting: false,
     // 配置选项
     validateOnBlur: config.validateOnBlur !== false,
     validateOnInput: config.validateOnInput === true,
@@ -262,7 +262,7 @@ function formValidation(config = {}) {
       }
 
       // 设置提交状态
-      this.isSubmitting = true
+      this.is_submitting = true
 
       try {
         if (this.onSubmit && typeof this.onSubmit === 'function') {
@@ -273,7 +273,7 @@ function formValidation(config = {}) {
         logger.error('[FormValidation] 提交失败', error)
         throw error
       } finally {
-        this.isSubmitting = false
+        this.is_submitting = false
       }
     },
 
@@ -291,7 +291,7 @@ function formValidation(config = {}) {
         this.touched[field] = false
       })
 
-      this.isSubmitting = false
+      this.is_submitting = false
     },
 
     /**

@@ -79,7 +79,7 @@ const apiRequest = async (url, options = {}) => {
 function presetsPage() {
   return {
     // ==================== Mixin 组合 ====================
-    ...createCrudMixin({ pageSize: 10 }),
+    ...createCrudMixin({ page_size: 10 }),
 
     // ==================== 页面特有状态 ====================
 
@@ -101,8 +101,8 @@ function presetsPage() {
      */
     filters: {
       status: '',
-      userSearch: '',
-      prizeType: ''
+      user_search: '',
+      prize_type: ''
     },
 
     /**
@@ -180,7 +180,7 @@ function presetsPage() {
       logger.debug('组件状态检查:', {
         hasInterventions: Array.isArray(this.interventions),
         hasFilters: !!this.filters,
-        hasTotalRecords: typeof this.totalRecords !== 'undefined'
+        hasTotalRecords: typeof this.total_records !== 'undefined'
       })
 
       // 使用 Mixin 的认证检查
@@ -250,25 +250,25 @@ function presetsPage() {
     async loadData() {
       await this.withLoading(async () => {
         const params = new URLSearchParams({
-          page: this.currentPage,
-          page_size: this.pageSize
+          page: this.current_page,
+          page_size: this.page_size
         })
 
         if (this.filters.status) params.append('status', this.filters.status)
-        if (this.filters.userSearch.trim())
-          params.append('user_search', this.filters.userSearch.trim())
-        if (this.filters.prizeType) params.append('setting_type', this.filters.prizeType)
+        if (this.filters.user_search.trim())
+          params.append('user_search', this.filters.user_search.trim())
+        if (this.filters.prize_type) params.append('setting_type', this.filters.prize_type)
 
         const response = await apiRequest(`${LOTTERY_ENDPOINTS.INTERVENTION_LIST}?${params}`)
 
         if (response && response.success) {
           this.interventions = response.data?.interventions || []
           const paginationData = response.data?.pagination || {}
-          // 使用 paginationMixin 提供的 totalRecords 字段
-          this.totalRecords = paginationData.total || this.interventions.length
+          // 使用 paginationMixin 提供的 total_records 字段
+          this.total_records = paginationData.total || this.interventions.length
           logger.debug('干预规则加载成功', {
             count: this.interventions.length,
-            total: this.totalRecords
+            total: this.total_records
           })
         } else {
           logger.warn('干预规则加载响应异常', response)
@@ -536,7 +536,7 @@ function presetsPage() {
 
       const typeName = typeShort[item.setting_type] || '规则'
       const userName = item.user_info?.nickname || '用户' + item.user_id
-      const actualIndex = index + (this.currentPage - 1) * this.pageSize
+      const actualIndex = index + (this.current_page - 1) * this.page_size
 
       return `#${actualIndex + 1} ${typeName} - ${userName}`
     },
@@ -590,17 +590,6 @@ function presetsPage() {
     },
 
     /**
-     * 格式化日期为本地化字符串
-     *
-     * @param {string|Date} dateStr - 日期字符串或Date对象
-     * @returns {string} 格式化后的日期字符串，无效日期返回'-'
-     */
-    formatDate(dateStr) {
-      if (!dateStr) return '-'
-      return new Date(dateStr).toLocaleString('zh-CN')
-    },
-
-    /**
      * 显示危险操作确认对话框
      *
      * @description 使用全局确认Store或浏览器原生confirm显示确认对话框
@@ -636,17 +625,6 @@ function presetsPage() {
         pending: '待生效'
       }
       return map[status] || status || '-'
-    },
-
-    /**
-     * 加载干预规则列表（HTML模板别名方法）
-     *
-     * @description 为HTML模板提供的loadData方法别名
-     * @async
-     * @returns {Promise<void>}
-     */
-    async loadInterventions() {
-      await this.loadData()
     }
   }
 }

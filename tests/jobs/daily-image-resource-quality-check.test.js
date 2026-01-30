@@ -305,5 +305,3 @@ describe('P3-6f: DailyImageResourceQualityCheck - 每日图片资源质量检查
     })
   })
 })
-
-

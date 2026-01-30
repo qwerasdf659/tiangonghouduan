@@ -26,12 +26,12 @@
     <div class="themed-card rounded-lg shadow p-4 mb-6">
       <div class="flex items-center space-x-4">
         <span class="themed-text-muted">时间范围：</span>
-        <button @click="setDateRange('today')" :class="filters.timeRange === '1' ? 'themed-btn-primary' : 'themed-bg-subtle'" class="px-4 py-2 rounded">今日</button>
-        <button @click="setDateRange('week')" :class="filters.timeRange === '7' ? 'themed-btn-primary' : 'themed-bg-subtle'" class="px-4 py-2 rounded">本周</button>
-        <button @click="setDateRange('month')" :class="filters.timeRange === '30' ? 'themed-btn-primary' : 'themed-bg-subtle'" class="px-4 py-2 rounded">本月</button>
-        <input type="date" x-model="filters.startDate" class="px-3 py-2 border rounded">
+        <button @click="setDateRange('today')" :class="filters.time_range === '1' ? 'themed-btn-primary' : 'themed-bg-subtle'" class="px-4 py-2 rounded">今日</button>
+        <button @click="setDateRange('week')" :class="filters.time_range === '7' ? 'themed-btn-primary' : 'themed-bg-subtle'" class="px-4 py-2 rounded">本周</button>
+        <button @click="setDateRange('month')" :class="filters.time_range === '30' ? 'themed-btn-primary' : 'themed-bg-subtle'" class="px-4 py-2 rounded">本月</button>
+        <input type="date" x-model="filters.start_date" class="px-3 py-2 border rounded">
         <span>至</span>
-        <input type="date" x-model="filters.endDate" class="px-3 py-2 border rounded">
+        <input type="date" x-model="filters.end_date" class="px-3 py-2 border rounded">
         <button @click="loadAllData()" class="px-4 py-2 themed-btn-primary rounded">查询</button>
       </div>
     </div>

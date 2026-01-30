@@ -14,7 +14,7 @@
  *
  * function userPage() {
  *   return createPageMixin({
- *     pagination: { pageSize: 20 },
+ *     pagination: { page_size: 20 },
  *     modal: true,
  *     tableSelection: 'user_id'
  *   }, {
@@ -71,7 +71,7 @@ import {
  * @example
  * function userManagementPage() {
  *   return createPageMixin({
- *     pagination: { pageSize: 20 },
+ *     pagination: { page_size: 20 },
  *     modal: true,
  *     tableSelection: 'user_id',
  *     authGuard: true
@@ -280,7 +280,7 @@ export function createCrudPageMixin(config, customProps = {}) {
        * 搜索
        */
       search() {
-        this.currentPage = 1
+        this.current_page = 1
         this.loadData()
       },
 
@@ -389,16 +389,16 @@ export function createCrudPageMixin(config, customProps = {}) {
  * 适用于标准的增删改查页面
  *
  * @param {Object} options - 配置选项
- * @param {number} [options.pageSize=20] - 分页大小
+ * @param {number} [options.page_size=20] - 分页大小
  * @param {boolean} [options.enableFormValidation=false] - 是否启用表单验证
  * @param {boolean} [options.enablePagination=true] - 是否启用分页
  * @returns {Object} Mixin 对象
  */
 export function createCrudMixin(options = {}) {
-  const { pageSize = 20, enableFormValidation = false, enablePagination = true } = options
+  const { page_size = 20, enableFormValidation = false, enablePagination = true } = options
 
   return createPageMixin({
-    pagination: enablePagination ? { pageSize } : false,
+    pagination: enablePagination ? { page_size } : false,
     asyncData: true,
     modal: true,
     tableSelection: true,
@@ -412,15 +412,15 @@ export function createCrudMixin(options = {}) {
  * 适用于需要批量选择和操作的页面
  *
  * @param {Object} options - 配置选项
- * @param {number} [options.pageSize=20] - 分页大小
+ * @param {number} [options.page_size=20] - 分页大小
  * @param {string} [options.primaryKey='id'] - 主键字段名
  * @returns {Object} Mixin 对象
  */
 export function createBatchOperationMixin(options = {}) {
-  const { pageSize = 20, primaryKey = 'id' } = options
+  const { page_size = 20, primaryKey = 'id' } = options
 
   return createPageMixin({
-    pagination: { pageSize },
+    pagination: { page_size },
     asyncData: true,
     modal: true,
     tableSelection: primaryKey,
@@ -451,14 +451,14 @@ export function createDashboardMixin() {
  * 适用于只读列表展示页面
  *
  * @param {Object} options - 配置选项
- * @param {number} [options.pageSize=20] - 分页大小
+ * @param {number} [options.page_size=20] - 分页大小
  * @returns {Object} Mixin 对象
  */
 export function createSimpleListMixin(options = {}) {
-  const { pageSize = 20 } = options
+  const { page_size = 20 } = options
 
   return createPageMixin({
-    pagination: { pageSize },
+    pagination: { page_size },
     asyncData: true,
     modal: false,
     tableSelection: false,

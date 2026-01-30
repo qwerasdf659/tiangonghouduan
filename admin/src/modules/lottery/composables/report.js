@@ -105,18 +105,18 @@ export function useReportMethods() {
         // 使用浏览器打印功能导出PDF
         const printContent = this.generatePrintableReport()
         const printWindow = window.open('', '_blank')
-        
+
         if (printWindow) {
           printWindow.document.write(printContent)
           printWindow.document.close()
           printWindow.focus()
-          
+
           // 延迟执行打印以确保内容加载完成
           setTimeout(() => {
             printWindow.print()
             printWindow.close()
           }, 500)
-          
+
           if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
             Alpine.store('notification').success('报告已准备导出')
           }
@@ -279,6 +279,3 @@ export function useReportMethods() {
 }
 
 export default { useReportState, useReportMethods }
-
-
-

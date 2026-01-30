@@ -19,13 +19,13 @@
 import { ExchangeAPI, EXCHANGE_ENDPOINTS } from './exchange.js'
 import { TradeAPI, TRADE_ENDPOINTS } from './trade.js'
 
-// 合并端点常量（保持向后兼容）
+// 合并端点常量
 export const MARKET_ENDPOINTS = {
   ...EXCHANGE_ENDPOINTS,
   ...TRADE_ENDPOINTS
 }
 
-// 合并 API 对象（保持向后兼容）
+// 合并 API 对象
 export const MarketAPI = {
   ...ExchangeAPI,
   ...TradeAPI
@@ -36,4 +36,3 @@ export { ExchangeAPI, EXCHANGE_ENDPOINTS }
 export { TradeAPI, TRADE_ENDPOINTS }
 
 export default MarketAPI
-

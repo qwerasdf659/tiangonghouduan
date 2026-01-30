@@ -27,7 +27,7 @@
         <template x-for="page in subPages" :key="page.id">
           <button 
             @click="switchPage(page.id)"
-            :class="currentPage === page.id ? 'border-b-2 border-green-500 text-green-600 bg-green-50' : 'themed-text-muted themed-hover-bg'"
+            :class="current_page === page.id ? 'border-b-2 border-green-500 text-green-600 bg-green-50' : 'themed-text-muted themed-hover-bg'"
             class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
             x-text="page.icon + ' ' + page.name"
           ></button>
@@ -36,7 +36,7 @@
     </div>
 
     <!-- 商品列表 -->
-    <div x-show="currentPage === 'items'" x-cloak>
+    <div x-show="current_page === 'items'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold">兑换商品列表</h5>
@@ -86,7 +86,7 @@
     </div>
 
     <!-- 订单管理 -->
-    <div x-show="currentPage === 'orders'" x-cloak>
+    <div x-show="current_page === 'orders'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">兑换订单</h5>
@@ -157,7 +157,7 @@
     </div>
 
     <!-- 统计分析 -->
-    <div x-show="currentPage === 'stats'" x-cloak>
+    <div x-show="current_page === 'stats'" x-cloak>
       <!-- 统计卡片 -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
         <div class="themed-card rounded-lg shadow p-6 text-center">

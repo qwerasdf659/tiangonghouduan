@@ -44,8 +44,8 @@ export function useMerchantPointsMethods() {
     async loadMerchantPoints() {
       try {
         const params = new URLSearchParams()
-        params.append('page', this.page)
-        params.append('page_size', this.pageSize)
+        params.append('page', this.financePagination?.page || 1)
+        params.append('page_size', this.financePagination?.page_size || 20)
         if (this.merchantFilters.merchant_id)
           params.append('merchant_id', this.merchantFilters.merchant_id)
         if (this.merchantFilters.keyword) params.append('keyword', this.merchantFilters.keyword)
@@ -59,8 +59,8 @@ export function useMerchantPointsMethods() {
         if (response?.success) {
           this.merchantPoints = response.data?.merchants || response.data?.list || []
           if (response.data?.pagination) {
-            this.total = response.data.pagination.total || 0
-            this.totalPages = response.data.pagination.total_pages || 1
+            // 只更新 total，total_pages 由 getter 计算
+            this.financePagination.total = response.data.pagination.total || 0
           }
         }
       } catch (error) {
@@ -95,7 +95,7 @@ export function useMerchantPointsMethods() {
      * 搜索商户
      */
     searchMerchants() {
-      this.page = 1
+      this.financePagination.page = 1
       this.loadMerchantPoints()
     },
 

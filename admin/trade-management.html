@@ -16,7 +16,7 @@
         <span class="text-lg font-semibold">💱 交易管理</span>
       </div>
       <div class="flex items-center space-x-4">
-        <span x-text="'欢迎，' + (userInfo?.nickname || '管理员')"></span>
+        <span x-text="'欢迎，' + (current_user?.nickname || '管理员')"></span>
         <button @click="logout()" class="px-3 py-1 border border-white/50 rounded hover:bg-white/10">退出登录</button>
       </div>
     </div>
@@ -140,8 +140,8 @@
         <span class="text-sm themed-text-muted" x-text="'共 ' + (tradePagination?.total || 0) + ' 条记录'"></span>
         <div class="flex space-x-2">
           <button @click="changeTradePage(tradeCurrentPage - 1)" :disabled="tradeCurrentPage <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-          <span class="px-3 py-1" x-text="tradeCurrentPage + ' / ' + (tradePagination?.totalPages || 1)"></span>
-          <button @click="changeTradePage(tradeCurrentPage + 1)" :disabled="tradeCurrentPage >= (tradePagination?.totalPages || 1)" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+          <span class="px-3 py-1" x-text="tradeCurrentPage + ' / ' + (tradePagination?.total_pages || 1)"></span>
+          <button @click="changeTradePage(tradeCurrentPage + 1)" :disabled="tradeCurrentPage >= (tradePagination?.total_pages || 1)" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
         </div>
       </div>
     </div>

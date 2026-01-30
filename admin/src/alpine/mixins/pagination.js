@@ -10,7 +10,7 @@
  *
  * function myPage() {
  *   return {
- *     ...paginationMixin({ pageSize: 20 }),
+ *     ...paginationMixin({ page_size: 20 }),
  *     data: [],
  *     async loadData() {
  *       const params = this.buildPaginationParams()
@@ -22,20 +22,20 @@
  * }
  */
 export function paginationMixin(options = {}) {
-  const pageSize = options.pageSize || 20
+  const page_size = options.page_size || 20
   const maxVisiblePages = options.maxVisiblePages || 7
 
   return {
     // ========== 分页状态 ==========
 
     /** 当前页码 */
-    currentPage: 1,
+    current_page: 1,
 
     /** 每页条数 */
-    pageSize: pageSize,
+    page_size: page_size,
 
     /** 总记录数 */
-    totalRecords: 0,
+    total_records: 0,
 
     // ========== 计算属性 ==========
 
@@ -43,8 +43,8 @@ export function paginationMixin(options = {}) {
      * 总页数
      * @returns {number} 总页数
      */
-    get totalPages() {
-      return Math.ceil(this.totalRecords / this.pageSize) || 1
+    get total_pages() {
+      return Math.ceil(this.total_records / this.page_size) || 1
     },
 
     /**
@@ -52,7 +52,7 @@ export function paginationMixin(options = {}) {
      * @returns {boolean}
      */
     get hasPrevPage() {
-      return this.currentPage > 1
+      return this.current_page > 1
     },
 
     /**
@@ -60,7 +60,7 @@ export function paginationMixin(options = {}) {
      * @returns {boolean}
      */
     get hasNextPage() {
-      return this.currentPage < this.totalPages
+      return this.current_page < this.total_pages
     },
 
     /**
@@ -68,11 +68,11 @@ export function paginationMixin(options = {}) {
      * @returns {Array<number|string>} 页码数组，包含省略号
      */
     get visiblePages() {
-      if (this.totalPages <= 1) return []
+      if (this.total_pages <= 1) return []
 
       const pages = []
-      let start = Math.max(1, this.currentPage - Math.floor(maxVisiblePages / 2))
-      let end = Math.min(this.totalPages, start + maxVisiblePages - 1)
+      let start = Math.max(1, this.current_page - Math.floor(maxVisiblePages / 2))
+      let end = Math.min(this.total_pages, start + maxVisiblePages - 1)
 
       // 调整起始位置
       if (end - start < maxVisiblePages - 1) {
@@ -91,9 +91,9 @@ export function paginationMixin(options = {}) {
       }
 
       // 末页
-      if (end < this.totalPages) {
-        if (end < this.totalPages - 1) pages.push('...')
-        if (!pages.includes(this.totalPages)) pages.push(this.totalPages)
+      if (end < this.total_pages) {
+        if (end < this.total_pages - 1) pages.push('...')
+        if (!pages.includes(this.total_pages)) pages.push(this.total_pages)
       }
 
       return pages
@@ -104,18 +104,10 @@ export function paginationMixin(options = {}) {
      * @returns {string} 如 "显示 1-20，共 100 条"
      */
     get paginationInfo() {
-      if (this.totalRecords === 0) return '暂无数据'
-      const start = (this.currentPage - 1) * this.pageSize + 1
-      const end = Math.min(this.currentPage * this.pageSize, this.totalRecords)
-      return `显示 ${start}-${end}，共 ${this.totalRecords} 条`
-    },
-
-    /**
-     * 兼容旧版本的 paginationPages（别名）
-     * @returns {Array<number|string>}
-     */
-    get paginationPages() {
-      return this.visiblePages
+      if (this.total_records === 0) return '暂无数据'
+      const start = (this.current_page - 1) * this.page_size + 1
+      const end = Math.min(this.current_page * this.page_size, this.total_records)
+      return `显示 ${start}-${end}，共 ${this.total_records} 条`
     },
 
     // ========== 方法 ==========
@@ -125,11 +117,11 @@ export function paginationMixin(options = {}) {
      * @param {number|string} page - 页码
      */
     goToPage(page) {
-      if (page === '...' || page < 1 || page > this.totalPages || page === this.currentPage) {
+      if (page === '...' || page < 1 || page > this.total_pages || page === this.current_page) {
         return
       }
 
-      this.currentPage = page
+      this.current_page = page
 
       // 滚动到顶部
       window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -141,19 +133,11 @@ export function paginationMixin(options = {}) {
     },
 
     /**
-     * 兼容旧版本的 changePage（别名）
-     * @param {number|string} page - 页码
-     */
-    changePage(page) {
-      this.goToPage(page)
-    },
-
-    /**
      * 上一页
      */
     prevPage() {
       if (this.hasPrevPage) {
-        this.goToPage(this.currentPage - 1)
+        this.goToPage(this.current_page - 1)
       }
     },
 
@@ -162,7 +146,7 @@ export function paginationMixin(options = {}) {
      */
     nextPage() {
       if (this.hasNextPage) {
-        this.goToPage(this.currentPage + 1)
+        this.goToPage(this.current_page + 1)
       }
     },
 
@@ -177,15 +161,15 @@ export function paginationMixin(options = {}) {
      * 末页
      */
     lastPage() {
-      this.goToPage(this.totalPages)
+      this.goToPage(this.total_pages)
     },
 
     /**
      * 重置分页
      */
     resetPagination() {
-      this.currentPage = 1
-      this.totalRecords = 0
+      this.current_page = 1
+      this.total_records = 0
     },
 
     /**
@@ -197,18 +181,18 @@ export function paginationMixin(options = {}) {
     updatePagination(response) {
       // 格式1: { pagination: { total: 100 } }
       if (response.pagination) {
-        this.totalRecords = response.pagination.total || 0
+        this.total_records = response.pagination.total || 0
         if (response.pagination.page) {
-          this.currentPage = response.pagination.page
+          this.current_page = response.pagination.page
         }
       }
       // 格式2: { total: 100 }
       else if (response.total !== undefined) {
-        this.totalRecords = response.total
+        this.total_records = response.total
       }
       // 格式3: { count: 100 }
       else if (response.count !== undefined) {
-        this.totalRecords = response.count
+        this.total_records = response.count
       }
     },
 
@@ -218,9 +202,9 @@ export function paginationMixin(options = {}) {
      */
     buildPaginationParams() {
       return {
-        page: this.currentPage,
-        page_size: this.pageSize,
-        limit: this.pageSize
+        page: this.current_page,
+        page_size: this.page_size,
+        limit: this.page_size
       }
     },
 
@@ -229,8 +213,8 @@ export function paginationMixin(options = {}) {
      * @param {number} size - 每页条数
      */
     setPageSize(size) {
-      this.pageSize = size
-      this.currentPage = 1
+      this.page_size = size
+      this.current_page = 1
       if (typeof this.loadData === 'function') {
         this.loadData()
       }

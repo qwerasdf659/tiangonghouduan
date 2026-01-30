@@ -348,16 +348,6 @@ export function useRolesPermissionsMethods() {
     },
 
     /**
-     * 检查是否有某个权限（别名方法）
-     * @param {string} resourceCode - 资源代码
-     * @param {string} action - 操作类型
-     * @returns {boolean}
-     */
-    hasPermission(resourceCode, action) {
-      return this.isPermissionSelected(resourceCode, action)
-    },
-
-    /**
      * 切换资源的所有操作权限
      * @param {string} resourceCode - 资源代码
      * @param {Array} allActions - 该资源的所有可用操作
@@ -489,7 +479,7 @@ export function useRolesPermissionsMethods() {
       try {
         const params = new URLSearchParams()
         params.append('page', this.page || 1)
-        params.append('page_size', this.pageSize || 20)
+        params.append('page_size', this.page_size || 20)
         if (this.userRoleFilters.user_id) params.append('user_id', this.userRoleFilters.user_id)
         if (this.userRoleFilters.role_name)
           params.append('role_name', this.userRoleFilters.role_name)
@@ -503,7 +493,7 @@ export function useRolesPermissionsMethods() {
           this.userRoles = response.data?.user_roles || response.data?.list || []
           if (response.data?.pagination) {
             this.total = response.data.pagination.total || 0
-            this.totalPages = response.data.pagination.total_pages || 1
+            this.total_pages = response.data.pagination.total_pages || 1
           }
         }
       } catch (error) {

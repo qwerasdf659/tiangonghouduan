@@ -400,49 +400,6 @@ export const AssetAPI = {
   },
 
   /**
-   * 调整用户材料资产（敏感操作）
-   *
-   * @description 调整指定用户的材料资产余额
-   *
-   * ⚠️ 架构说明（2026-01-23）：
-   * - 后端已将材料调整统一到 /api/v4/console/asset-adjustment/adjust 端点
-   * - 推荐使用 adjustAsset() 方法，传入材料的 asset_code（如 'red_shard'）
-   * - 本方法保留用于兼容性，内部可能需要适配
-   *
-   * @async
-   * @function adjustUserMaterial
-   * @deprecated 推荐使用 adjustAsset() 统一入口
-   *
-   * @param {number|string} userId - 用户ID（必填）
-   * @param {Object} data - 调整参数
-   * @param {string} data.asset_code - 材料资产代码（必填，如 'red_shard', 'blue_crystal'）
-   * @param {number} data.amount - 调整数量（必填，正数=增加，负数=扣减）
-   * @param {string} data.reason - 调整原因（必填）
-   * @param {string} data.idempotency_key - 幂等键（必填）
-   *
-   * @returns {Promise<Object>} 响应对象
-   * @returns {boolean} return.success - 请求是否成功
-   * @returns {Object} return.data - 调整结果
-   *
-   * @example
-   * // 推荐：使用 adjustAsset 统一入口
-   * const result = await AssetAPI.adjustAsset({
-   *   user_id: 123,
-   *   asset_code: 'red_shard',
-   *   amount: 10,
-   *   reason: '活动奖励',
-   *   idempotency_key: `admin_adjust_1_123_red_shard_${Date.now()}`
-   * })
-   *
-   * @see adjustAsset - 推荐使用的统一资产调整方法
-   * @see POST /api/v4/console/asset-adjustment/adjust - 后端统一调整端点
-   */
-  async adjustUserMaterial(userId, data) {
-    const url = buildURL(ASSET_ENDPOINTS.MATERIAL_USER_ADJUST, { user_id: userId })
-    return await request({ url, method: 'POST', data })
-  },
-
-  /**
    * 获取材料交易记录
    * @param {Object} params - 查询参数
    * @async
@@ -475,60 +432,6 @@ export const AssetAPI = {
   async getDiamondDetail(userId) {
     const url = buildURL(ASSET_ENDPOINTS.DIAMOND_DETAIL, { user_id: userId })
     return await request({ url, method: 'GET' })
-  },
-
-  /**
-   * 调整用户钻石余额（敏感操作）
-   *
-   * @description 调整指定用户的钻石余额
-   *
-   * ⚠️ 架构说明（2026-01-23）：
-   * - 后端已将钻石调整统一到 /api/v4/console/asset-adjustment/adjust 端点
-   * - 推荐使用 adjustAsset() 方法，传入 asset_code: 'DIAMOND'
-   * - 本方法保留用于兼容性，实际调用可能需要适配到统一端点
-   *
-   * @async
-   * @function adjustDiamond
-   * @deprecated 推荐使用 adjustAsset({ asset_code: 'DIAMOND', ... }) 统一入口
-   *
-   * @param {Object} data - 调整参数
-   * @param {number} data.user_id - 目标用户ID（必填）
-   * @param {number} data.amount - 调整数量（必填，正数=增加，负数=扣减）
-   * @param {string} data.reason - 调整原因（必填）
-   * @param {string} data.idempotency_key - 幂等键（必填）
-   *
-   * @returns {Promise<Object>} 响应对象
-   * @returns {boolean} return.success - 请求是否成功
-   * @returns {Object} return.data - 调整结果
-   * @returns {number} return.data.balance_before - 调整前余额
-   * @returns {number} return.data.balance_after - 调整后余额
-   * @returns {number} return.data.transaction_id - 交易流水ID
-   *
-   * @throws {Error} 余额不足时返回 INSUFFICIENT_BALANCE 错误
-   *
-   * @example
-   * // 推荐：使用 adjustAsset 统一入口
-   * const result = await AssetAPI.adjustAsset({
-   *   user_id: 123,
-   *   asset_code: 'DIAMOND',
-   *   amount: 100,
-   *   reason: '充值奖励',
-   *   idempotency_key: `admin_adjust_1_123_DIAMOND_${Date.now()}`
-   * })
-   *
-   * // 兼容：使用本方法
-   * const result2 = await AssetAPI.adjustDiamond({
-   *   user_id: 123,
-   *   amount: 100,
-   *   reason: '充值奖励',
-   *   idempotency_key: `admin_adjust_1_123_DIAMOND_${Date.now()}`
-   * })
-   *
-   * @see adjustAsset - 推荐使用的统一资产调整方法
-   * @see POST /api/v4/console/asset-adjustment/adjust - 后端统一调整端点
-   */
-  async adjustDiamond(data) {
-    return await request({ url: ASSET_ENDPOINTS.DIAMOND_ADJUST, method: 'POST', data })
   },
 
   // ===== 物品模板 =====

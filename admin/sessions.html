@@ -15,7 +15,7 @@
         <span class="text-lg font-semibold">🔐 会话管理</span>
       </div>
       <div class="flex items-center space-x-4">
-        <span x-data x-text="Alpine.store('auth')?.userInfo?.nickname ? `欢迎，${Alpine.store('auth').userInfo.nickname}` : '欢迎，管理员'"></span>
+        <span x-data x-text="Alpine.store('auth')?.user_info?.nickname ? `欢迎，${Alpine.store('auth').user_info.nickname}` : '欢迎，管理员'"></span>
       </div>
     </div>
   </nav>
@@ -59,7 +59,7 @@
         </div>
         <div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">用户类型</label>
-          <select class="w-full border rounded-lg px-3 py-2" x-model="filters.userType">
+          <select class="w-full border rounded-lg px-3 py-2" x-model="filters.user_type">
             <option value="">全部类型</option>
             <option value="user">普通用户</option>
             <option value="admin">管理员</option>
@@ -67,11 +67,11 @@
         </div>
         <div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">用户ID</label>
-          <input type="number" class="w-full border rounded-lg px-3 py-2" x-model="filters.userId" placeholder="输入用户ID...">
+          <input type="number" class="w-full border rounded-lg px-3 py-2" x-model="filters.user_id" placeholder="输入用户ID...">
         </div>
         <div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">排序方式</label>
-          <select class="w-full border rounded-lg px-3 py-2" x-model="filters.sortBy">
+          <select class="w-full border rounded-lg px-3 py-2" x-model="filters.sort_by">
             <option value="last_activity">最后活动时间</option>
             <option value="created_at">创建时间</option>
             <option value="expires_at">过期时间</option>
@@ -191,27 +191,27 @@
     </div>
 
     <!-- 分页 -->
-    <nav class="mt-6 flex justify-center" x-show="totalPages > 1">
+    <nav class="mt-6 flex justify-center" x-show="total_pages > 1">
       <div class="flex space-x-2">
         <button 
           class="px-4 py-2 border rounded-lg" 
-          :class="currentPage === 1 ? 'themed-bg-subtle text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
-          :disabled="currentPage === 1"
-          @click="loadData(currentPage - 1)"
+          :class="current_page === 1 ? 'themed-bg-subtle text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
+          :disabled="current_page === 1"
+          @click="loadData(current_page - 1)"
         >上一页</button>
-        <template x-for="page in getPaginationPages()" :key="page">
+        <template x-for="page in visiblePages" :key="page">
           <button 
             class="px-4 py-2 border rounded-lg"
-            :class="page === currentPage ? 'themed-bg-primary text-white' : 'themed-hover-bg'"
+            :class="page === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'"
             @click="page !== '...' && loadData(page)"
             x-text="page"
           ></button>
         </template>
         <button 
           class="px-4 py-2 border rounded-lg"
-          :class="currentPage === totalPages ? 'themed-bg-subtle text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
-          :disabled="currentPage === totalPages"
-          @click="loadData(currentPage + 1)"
+          :class="current_page === total_pages ? 'themed-bg-subtle text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
+          :disabled="current_page === total_pages"
+          @click="loadData(current_page + 1)"
         >下一页</button>
       </div>
     </nav>

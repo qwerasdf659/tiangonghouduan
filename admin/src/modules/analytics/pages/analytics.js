@@ -81,12 +81,12 @@ function analyticsPage() {
 
     /**
      * 筛选条件
-     * @type {{timeRange: string, startDate: string, endDate: string}}
+     * @type {{time_range: string, start_date: string, end_date: string}}
      */
     filters: {
-      timeRange: '30',
-      startDate: '',
-      endDate: ''
+      time_range: '30',
+      start_date: '',
+      end_date: ''
     },
 
     /**
@@ -102,7 +102,7 @@ function analyticsPage() {
       pointsSpent: 0,
       exchangeOrders: 0,
       newItems: 0,
-      // HTML 模板使用的别名
+      // HTML 模板展示用统计数据（从后端 overview 映射）
       totalDraws: 0,
       totalWins: 0,
       pointsConsumed: 0
@@ -455,7 +455,7 @@ function analyticsPage() {
      * @returns {Promise<void>}
      */
     async loadDecisionAnalytics() {
-      const days = this.filters.timeRange
+      const days = this.filters.time_range
 
       try {
         const response = await apiRequest(`${ANALYTICS_ENDPOINTS.DECISIONS}?days=${days}`)
@@ -509,7 +509,7 @@ function analyticsPage() {
       try {
         // 使用默认活动ID 1 获取策略统计概览
         const response = await apiRequest(
-          buildURL(LOTTERY_ENDPOINTS.STRATEGY_STATS_OVERVIEW, { campaign_id: 1 })
+          buildURL(LOTTERY_ENDPOINTS.STRATEGY_STATS_REALTIME, { campaign_id: 1 })
         )
 
         if (response && response.success) {
@@ -708,8 +708,8 @@ function analyticsPage() {
         week: '7',
         month: '30'
       }
-      this.filters.timeRange = rangeMapping[range] || '30'
-      logger.info('[Analytics] 设置日期范围', { range, timeRange: this.filters.timeRange })
+      this.filters.time_range = rangeMapping[range] || '30'
+      logger.info('[Analytics] 设置日期范围', { range, time_range: this.filters.time_range })
       this.loadAllData()
     },
 
@@ -719,7 +719,7 @@ function analyticsPage() {
      * @returns {void}
      */
     handleTimeRangeChange() {
-      if (this.filters.timeRange !== 'custom') {
+      if (this.filters.time_range !== 'custom') {
         this.loadAllData()
       }
     },

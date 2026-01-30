@@ -41,13 +41,11 @@ export const LOTTERY_ADVANCED_ENDPOINTS = {
   INTERVENTION_CANCEL: `${API_PREFIX}/console/lottery-management/interventions/:id/cancel`,
 
   // 策略统计
-  STRATEGY_STATS_OVERVIEW: `${API_PREFIX}/console/lottery-strategy-stats/realtime/:campaign_id`,
   STRATEGY_STATS_REALTIME: `${API_PREFIX}/console/lottery-strategy-stats/realtime/:campaign_id`,
   STRATEGY_STATS_HOURLY: `${API_PREFIX}/console/lottery-strategy-stats/hourly/:campaign_id`,
   STRATEGY_STATS_DAILY: `${API_PREFIX}/console/lottery-strategy-stats/daily/:campaign_id`,
   STRATEGY_STATS_TIER: `${API_PREFIX}/console/lottery-strategy-stats/tier-distribution/:campaign_id`,
-  STRATEGY_STATS_EXPERIENCE:
-    `${API_PREFIX}/console/lottery-strategy-stats/experience-triggers/:campaign_id`,
+  STRATEGY_STATS_EXPERIENCE: `${API_PREFIX}/console/lottery-strategy-stats/experience-triggers/:campaign_id`,
   STRATEGY_STATS_BUDGET: `${API_PREFIX}/console/lottery-strategy-stats/budget-consumption/:campaign_id`,
 
   // 抽奖配额
@@ -78,18 +76,15 @@ export const LOTTERY_ADVANCED_ENDPOINTS = {
   MONITORING_STATS: `${API_PREFIX}/console/lottery-monitoring/stats`,
   MONITORING_HOURLY_LIST: `${API_PREFIX}/console/lottery-monitoring/hourly-metrics`,
   MONITORING_HOURLY_DETAIL: `${API_PREFIX}/console/lottery-monitoring/hourly-metrics/:id`,
-  MONITORING_HOURLY_SUMMARY:
-    `${API_PREFIX}/console/lottery-monitoring/hourly-metrics/summary/:campaign_id`,
+  MONITORING_HOURLY_SUMMARY: `${API_PREFIX}/console/lottery-monitoring/hourly-metrics/summary/:campaign_id`,
   MONITORING_USER_EXPERIENCE_LIST: `${API_PREFIX}/console/lottery-monitoring/user-experience-states`,
-  MONITORING_USER_EXPERIENCE_DETAIL:
-    `${API_PREFIX}/console/lottery-monitoring/user-experience-states/:user_id/:campaign_id`,
+  MONITORING_USER_EXPERIENCE_DETAIL: `${API_PREFIX}/console/lottery-monitoring/user-experience-states/:user_id/:campaign_id`,
   MONITORING_USER_GLOBAL_LIST: `${API_PREFIX}/console/lottery-monitoring/user-global-states`,
   MONITORING_USER_GLOBAL_DETAIL: `${API_PREFIX}/console/lottery-monitoring/user-global-states/:user_id`,
   MONITORING_QUOTA_GRANTS_LIST: `${API_PREFIX}/console/lottery-monitoring/quota-grants`,
   MONITORING_QUOTA_GRANTS_DETAIL: `${API_PREFIX}/console/lottery-monitoring/quota-grants/:id`,
   MONITORING_USER_QUOTAS_LIST: `${API_PREFIX}/console/lottery-monitoring/user-quotas`,
-  MONITORING_USER_QUOTAS_DETAIL:
-    `${API_PREFIX}/console/lottery-monitoring/user-quotas/:user_id/:campaign_id`,
+  MONITORING_USER_QUOTAS_DETAIL: `${API_PREFIX}/console/lottery-monitoring/user-quotas/:user_id/:campaign_id`,
   MONITORING_USER_QUOTAS_STATS: `${API_PREFIX}/console/lottery-monitoring/user-quotas/stats/:campaign_id`,
 
   // 用户抽奖档案/活动ROI/日报
@@ -110,14 +105,10 @@ export const LOTTERY_ADVANCED_ENDPOINTS = {
 
   // 核销订单
   BUSINESS_RECORDS_REDEMPTION_ORDERS: `${API_PREFIX}/console/business-records/redemption-orders`,
-  BUSINESS_RECORDS_REDEMPTION_STATISTICS:
-    `${API_PREFIX}/console/business-records/redemption-orders/statistics`,
-  BUSINESS_RECORDS_REDEMPTION_DETAIL:
-    `${API_PREFIX}/console/business-records/redemption-orders/:order_id`,
-  BUSINESS_RECORDS_REDEMPTION_REDEEM:
-    `${API_PREFIX}/console/business-records/redemption-orders/:order_id/redeem`,
-  BUSINESS_RECORDS_REDEMPTION_CANCEL:
-    `${API_PREFIX}/console/business-records/redemption-orders/:order_id/cancel`,
+  BUSINESS_RECORDS_REDEMPTION_STATISTICS: `${API_PREFIX}/console/business-records/redemption-orders/statistics`,
+  BUSINESS_RECORDS_REDEMPTION_DETAIL: `${API_PREFIX}/console/business-records/redemption-orders/:order_id`,
+  BUSINESS_RECORDS_REDEMPTION_REDEEM: `${API_PREFIX}/console/business-records/redemption-orders/:order_id/redeem`,
+  BUSINESS_RECORDS_REDEMPTION_CANCEL: `${API_PREFIX}/console/business-records/redemption-orders/:order_id/cancel`,
   BUSINESS_RECORDS_BATCH_EXPIRE: `${API_PREFIX}/console/business-records/redemption-orders/batch-expire`,
   BUSINESS_RECORDS_EXPORT: `${API_PREFIX}/console/business-records/redemption-orders/export`,
 
@@ -128,8 +119,7 @@ export const LOTTERY_ADVANCED_ENDPOINTS = {
   CAMPAIGN_BUDGET_STATUS: `${API_PREFIX}/console/campaign-budget/campaigns/:campaign_id/budget-status`,
   CAMPAIGN_BUDGET_POOL_ADD: `${API_PREFIX}/console/campaign-budget/campaigns/:campaign_id/pool/add`,
   CAMPAIGN_BUDGET_VALIDATE: `${API_PREFIX}/console/campaign-budget/campaigns/:campaign_id/validate`,
-  CAMPAIGN_BUDGET_VALIDATE_LAUNCH:
-    `${API_PREFIX}/console/campaign-budget/campaigns/:campaign_id/validate-for-launch`,
+  CAMPAIGN_BUDGET_VALIDATE_LAUNCH: `${API_PREFIX}/console/campaign-budget/campaigns/:campaign_id/validate-for-launch`,
   CAMPAIGN_BUDGET_USER: `${API_PREFIX}/console/campaign-budget/users/:user_id`,
 
   // 批量操作API
@@ -249,4 +239,3 @@ export const LotteryAdvancedAPI = {
 }
 
 export default LotteryAdvancedAPI
-

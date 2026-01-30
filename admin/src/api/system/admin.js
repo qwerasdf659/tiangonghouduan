@@ -95,13 +95,6 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   // 字典管理 - 全量获取
   DICT_ALL: `${API_PREFIX}/console/dictionaries/all`,
 
-  // 字典管理 - 兼容别名
-  DICT_LIST: `${API_PREFIX}/console/dictionaries/categories`,
-  DICT_DETAIL: `${API_PREFIX}/console/dictionaries/categories/:code`,
-  DICT_CREATE: `${API_PREFIX}/console/dictionaries/categories`,
-  DICT_UPDATE: `${API_PREFIX}/console/dictionaries/categories/:code`,
-  DICT_DELETE: `${API_PREFIX}/console/dictionaries/categories/:code`,
-
   // 功能开关
   FEATURE_FLAG_LIST: `${API_PREFIX}/console/feature-flags`,
   FEATURE_FLAG_DETAIL: `${API_PREFIX}/console/feature-flags/:flagKey`,
@@ -496,7 +489,11 @@ export const SystemAdminAPI = {
    * @returns {Promise<Object>} 创建结果响应
    */
   async createAssetGroup(data) {
-    return await request({ url: SYSTEM_ADMIN_ENDPOINTS.DICT_ASSET_GROUP_CREATE, method: 'POST', data })
+    return await request({
+      url: SYSTEM_ADMIN_ENDPOINTS.DICT_ASSET_GROUP_CREATE,
+      method: 'POST',
+      data
+    })
   },
 
   /**
@@ -647,4 +644,3 @@ export const SystemAdminAPI = {
 }
 
 export default SystemAdminAPI
-

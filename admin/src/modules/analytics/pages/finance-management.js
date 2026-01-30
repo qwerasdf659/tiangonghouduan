@@ -63,7 +63,7 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('financeNavigation', () => ({
     subPages: SUB_PAGES,
 
-    get currentPage() {
+    get current_page() {
       return Alpine.store('financePage')
     },
 
@@ -80,7 +80,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     isActive(pageId) {
-      return this.currentPage === pageId
+      return this.current_page === pageId
     }
   }))
 
@@ -92,7 +92,7 @@ document.addEventListener('alpine:init', () => {
     const pageMixin = createPageMixin({
       pageTitle: '财务管理',
       loadDataOnInit: false,
-      pagination: { pageSize: 20 } // 启用分页功能，为各子模块提供 page/pageSize
+      pagination: { page_size: 20 } // 启用分页功能，为各子模块提供 page/page_size
     })
 
     return {
@@ -102,11 +102,12 @@ document.addEventListener('alpine:init', () => {
       subPages: SUB_PAGES,
       saving: false,
 
-      // ========== 分页状态（为 composables 提供直接属性） ==========
-      page: 1,
-      pageSize: 20,
-      total: 0,
-      totalPages: 1,
+      // ========== 分页状态 - 单一对象模式 ==========
+      financePagination: {
+        page: 1,
+        page_size: 20,
+        total: 0
+      },
 
       // ========== 财务统计 ==========
       financeStats: {
@@ -138,7 +139,7 @@ document.addEventListener('alpine:init', () => {
       budgetForm: {
         type: 'daily',
         amount: 0,
-        alertThreshold: 80,
+        alert_threshold: 80,
         campaign_id: '',
         budget_mode: 'UNLIMITED',
         pool_budget_remaining: 0
@@ -146,11 +147,10 @@ document.addEventListener('alpine:init', () => {
 
       // ========== 消费筛选（fallback，composable 会覆盖） ==========
       consumptionFilters: {
-        userId: '',
         user_id: '',
         status: '',
-        startDate: '',
-        endDate: ''
+        start_date: '',
+        end_date: ''
       },
 
       // ========== 选中项 ==========
@@ -168,8 +168,12 @@ document.addEventListener('alpine:init', () => {
       ...useMerchantLogsState(),
 
       // ========== 计算属性 ==========
-      get currentPage() {
+      get current_page() {
         return Alpine.store('financePage')
+      },
+      /** 总页数 - 单一对象模式 Getter */
+      get financeTotalPages() {
+        return Math.ceil(this.financePagination.total / this.financePagination.page_size) || 1
       },
 
       // ========== 生命周期 ==========
@@ -181,9 +185,9 @@ document.addEventListener('alpine:init', () => {
         }
 
         // 监听页面切换
-        this.$watch('currentPage', async newPage => {
+        this.$watch('current_page', async newPage => {
           logger.debug('[FinanceContent] 页面切换:', newPage)
-          this.page = 1
+          this.financePagination.page = 1
           await this.loadCurrentPageData()
         })
 
@@ -195,7 +199,7 @@ document.addEventListener('alpine:init', () => {
        * 根据当前页面加载数据
        */
       async loadCurrentPageData() {
-        const page = this.currentPage
+        const page = this.current_page
         logger.debug('[FinanceContent] 加载页面数据:', page)
 
         try {
@@ -231,12 +235,12 @@ document.addEventListener('alpine:init', () => {
       },
 
       isActive(pageId) {
-        return this.currentPage === pageId
+        return this.current_page === pageId
       },
 
       // ========== 分页处理 ==========
       async changePage(newPage) {
-        this.page = newPage
+        this.financePagination.page = newPage
         await this.loadCurrentPageData()
       },
 
@@ -263,42 +267,6 @@ document.addEventListener('alpine:init', () => {
             .toFixed(2)
             .replace(/\B(?=(\d{3})+(?!\d))/g, ',')
         )
-      },
-
-      /**
-       * 格式化日期时间
-       * @param {string} dateStr - 日期字符串
-       * @returns {string} 格式化后的日期
-       */
-      formatDateTime(dateStr) {
-        if (!dateStr) return '-'
-        try {
-          const date = new Date(dateStr)
-          return date.toLocaleString('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-          })
-        } catch {
-          return dateStr
-        }
-      },
-
-      /**
-       * 格式化日期
-       * @param {string} dateStr - 日期字符串
-       * @returns {string} 格式化后的日期
-       */
-      formatDate(dateStr) {
-        if (!dateStr) return '-'
-        try {
-          const date = new Date(dateStr)
-          return date.toLocaleDateString('zh-CN')
-        } catch {
-          return dateStr
-        }
       },
 
       /**

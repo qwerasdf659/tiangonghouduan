@@ -2,7 +2,7 @@
  * 系统 API 模块统一导出入口
  *
  * @module api/system
- * @description 合并导出 core.js 和 admin.js 的所有 API，保持向后兼容
+ * @description 合并导出 core.js 和 admin.js 的所有 API
  * @version 2.0.0
  * @date 2026-01-29
  *
@@ -17,13 +17,13 @@
 import { SYSTEM_CORE_ENDPOINTS, SystemCoreAPI } from './core.js'
 import { SYSTEM_ADMIN_ENDPOINTS, SystemAdminAPI } from './admin.js'
 
-// ========== 合并导出端点（向后兼容） ==========
+// ========== 合并导出端点 ==========
 export const SYSTEM_ENDPOINTS = {
   ...SYSTEM_CORE_ENDPOINTS,
   ...SYSTEM_ADMIN_ENDPOINTS
 }
 
-// ========== 合并导出 API（向后兼容） ==========
+// ========== 合并导出 API ==========
 export const SystemAPI = {
   ...SystemCoreAPI,
   ...SystemAdminAPI
@@ -35,4 +35,3 @@ export { SYSTEM_ADMIN_ENDPOINTS, SystemAdminAPI } from './admin.js'
 
 // ========== 默认导出 ==========
 export default SystemAPI
-

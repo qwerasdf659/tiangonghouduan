@@ -27,7 +27,7 @@
         <template x-for="page in subPages" :key="page.id">
           <button 
             @click="switchPage(page.id)"
-            :class="currentPage === page.id ? 'border-b-2 themed-border-primary themed-text-primary themed-bg-primary-light' : 'themed-text-muted themed-hover-bg'"
+            :class="current_page === page.id ? 'border-b-2 themed-border-primary themed-text-primary themed-bg-primary-light' : 'themed-text-muted themed-hover-bg'"
             class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
             x-text="page.icon + ' ' + page.name"
           ></button>
@@ -36,7 +36,7 @@
     </div>
 
     <!-- 资产类型管理 -->
-    <div x-show="currentPage === 'material-types'" x-cloak>
+    <div x-show="current_page === 'material-types'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold">资产类型列表</h5>
@@ -108,15 +108,15 @@
     </div>
 
     <!-- 用户资产查询 -->
-    <div x-show="currentPage === 'material-accounts'" x-cloak>
+    <div x-show="current_page === 'material-accounts'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">用户资产查询</h5>
         </div>
         <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input type="text" x-model="materialAccountFilters.userId" placeholder="用户ID" class="px-3 py-2 border rounded">
-            <select x-model="materialAccountFilters.assetCode" class="px-3 py-2 border rounded">
+            <input type="text" x-model="materialAccountFilters.user_id" placeholder="用户ID" class="px-3 py-2 border rounded">
+            <select x-model="materialAccountFilters.asset_code" class="px-3 py-2 border rounded">
               <option value="">全部资产类型</option>
               <template x-for="asset in materialTypes" :key="asset.asset_code">
                 <option :value="asset.asset_code" x-text="asset.display_name"></option>
@@ -153,9 +153,9 @@
               <tr x-show="!loading && materialAccounts.length === 0">
                 <td colspan="5" class="px-4 py-12">
                   <div class="flex flex-col items-center justify-center text-center">
-                    <div class="text-5xl mb-4" x-text="!materialAccountFilters.userId ? '🔍' : '📭'"></div>
-                    <h3 class="text-lg font-medium themed-text mb-2" x-text="!materialAccountFilters.userId ? '请输入用户ID' : '暂无数据'"></h3>
-                    <p class="themed-text-muted text-sm" x-text="!materialAccountFilters.userId ? '输入用户ID后点击搜索查看资产信息' : '该用户暂无资产记录'"></p>
+                    <div class="text-5xl mb-4" x-text="!materialAccountFilters.user_id ? '🔍' : '📭'"></div>
+                    <h3 class="text-lg font-medium themed-text mb-2" x-text="!materialAccountFilters.user_id ? '请输入用户ID' : '暂无数据'"></h3>
+                    <p class="themed-text-muted text-sm" x-text="!materialAccountFilters.user_id ? '输入用户ID后点击搜索查看资产信息' : '该用户暂无资产记录'"></p>
                   </div>
                 </td>
               </tr>
@@ -178,21 +178,21 @@
     </div>
 
     <!-- 资产流水 -->
-    <div x-show="currentPage === 'material-transactions'" x-cloak>
+    <div x-show="current_page === 'material-transactions'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">资产流水记录</h5>
         </div>
         <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <input type="text" x-model="logFilters.userId" placeholder="用户ID" class="px-3 py-2 border rounded">
-            <select x-model="logFilters.assetCode" class="px-3 py-2 border rounded">
+            <input type="text" x-model="logFilters.user_id" placeholder="用户ID" class="px-3 py-2 border rounded">
+            <select x-model="logFilters.asset_code" class="px-3 py-2 border rounded">
               <option value="">全部资产类型</option>
               <template x-for="asset in materialTypes" :key="asset.asset_code">
                 <option :value="asset.asset_code" x-text="asset.display_name"></option>
               </template>
             </select>
-            <input type="date" x-model="logFilters.startDate" class="px-3 py-2 border rounded">
+            <input type="date" x-model="logFilters.start_date" class="px-3 py-2 border rounded">
             <button @click="loadMaterialTransactions()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
           </div>
         </div>
@@ -212,8 +212,8 @@
             <tbody class="divide-y">
               <tr x-show="materialTransactions.length === 0">
                 <td colspan="7" class="px-4 py-8 text-center themed-text-muted">
-                  <div x-show="!logFilters.userId">💡 请输入用户ID后点击搜索</div>
-                  <div x-show="logFilters.userId">暂无数据</div>
+                  <div x-show="!logFilters.user_id">💡 请输入用户ID后点击搜索</div>
+                  <div x-show="logFilters.user_id">暂无数据</div>
                 </td>
               </tr>
               <template x-for="log in materialTransactions" :key="log.transaction_id">
@@ -234,14 +234,14 @@
     </div>
 
     <!-- 物品实例 -->
-    <div x-show="currentPage === 'item-instances'" x-cloak>
+    <div x-show="current_page === 'item-instances'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">🎁 物品模板管理</h5>
         </div>
         <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <select x-model="itemInstanceFilters.templateCode" class="px-3 py-2 border rounded">
+            <select x-model="itemInstanceFilters.template_code" class="px-3 py-2 border rounded">
               <option value="">全部物品类型</option>
               <option value="voucher">优惠券</option>
               <option value="physical">实物商品</option>
@@ -294,15 +294,15 @@
     </div>
 
     <!-- 虚拟账户 -->
-    <div x-show="currentPage === 'virtual-accounts'" x-cloak>
+    <div x-show="current_page === 'virtual-accounts'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">💎 虚拟账户查询</h5>
         </div>
         <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input type="text" x-model="virtualAccountFilters.userId" placeholder="用户ID" class="px-3 py-2 border rounded">
-            <select x-model="virtualAccountFilters.accountType" class="px-3 py-2 border rounded">
+            <input type="text" x-model="virtualAccountFilters.user_id" placeholder="用户ID" class="px-3 py-2 border rounded">
+            <select x-model="virtualAccountFilters.account_type" class="px-3 py-2 border rounded">
               <option value="">全部账户类型</option>
               <option value="DIAMOND">钻石</option>
               <option value="POINTS">积分</option>
@@ -325,13 +325,13 @@
             <tbody class="divide-y">
               <tr x-show="virtualAccounts.length === 0">
                 <td colspan="5" class="px-4 py-8 text-center themed-text-muted">
-                  <div x-show="!virtualAccountFilters.userId">💡 请输入用户ID后点击搜索</div>
-                  <div x-show="virtualAccountFilters.userId">暂无数据</div>
+                  <div x-show="!virtualAccountFilters.user_id">💡 请输入用户ID后点击搜索</div>
+                  <div x-show="virtualAccountFilters.user_id">暂无数据</div>
                 </td>
               </tr>
               <template x-for="va in virtualAccounts" :key="va.asset_code">
                 <tr class="themed-hover-bg">
-                  <td class="px-4 py-3 text-sm" x-text="virtualAccountFilters.userId"></td>
+                  <td class="px-4 py-3 text-sm" x-text="virtualAccountFilters.user_id"></td>
                   <td class="px-4 py-3 text-sm" x-text="va.asset_code"></td>
                   <td class="px-4 py-3 text-sm font-mono text-green-600" x-text="va.available_amount"></td>
                   <td class="px-4 py-3 text-sm font-mono text-orange-600" x-text="va.frozen_amount"></td>
@@ -345,15 +345,15 @@
     </div>
 
     <!-- 虚拟交易 -->
-    <div x-show="currentPage === 'virtual-transactions'" x-cloak>
+    <div x-show="current_page === 'virtual-transactions'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">📊 虚拟交易记录</h5>
         </div>
         <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <input type="text" x-model="virtualTxFilters.userId" placeholder="用户ID（必填）" class="px-3 py-2 border rounded">
-            <select x-model="virtualTxFilters.accountType" class="px-3 py-2 border rounded">
+            <input type="text" x-model="virtualTxFilters.user_id" placeholder="用户ID（必填）" class="px-3 py-2 border rounded">
+            <select x-model="virtualTxFilters.account_type" class="px-3 py-2 border rounded">
               <option value="">全部账户类型</option>
               <option value="DIAMOND">钻石</option>
               <option value="POINTS">积分</option>
@@ -382,8 +382,8 @@
             <tbody class="divide-y">
               <tr x-show="virtualTransactions.length === 0">
                 <td colspan="6" class="px-4 py-8 text-center themed-text-muted">
-                  <div x-show="!virtualTxFilters.userId">💡 请输入用户ID后点击搜索</div>
-                  <div x-show="virtualTxFilters.userId">暂无数据</div>
+                  <div x-show="!virtualTxFilters.user_id">💡 请输入用户ID后点击搜索</div>
+                  <div x-show="virtualTxFilters.user_id">暂无数据</div>
                 </td>
               </tr>
               <template x-for="tx in virtualTransactions" :key="tx.transaction_id">
@@ -403,7 +403,7 @@
     </div>
 
     <!-- 资产统计 -->
-    <div x-show="currentPage === 'asset-stats'" x-cloak>
+    <div x-show="current_page === 'asset-stats'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">📈 资产统计概览</h5>

@@ -30,7 +30,7 @@
         <template x-for="page in subPages" :key="page.id">
           <button 
             @click="switchPage(page.id)"
-            :class="currentPage === page.id ? 'border-b-2 themed-border-primary themed-text-primary themed-bg-primary-light' : 'themed-text-muted themed-hover-bg'"
+            :class="current_page === page.id ? 'border-b-2 themed-border-primary themed-text-primary themed-bg-primary-light' : 'themed-text-muted themed-hover-bg'"
             class="px-6 py-3 font-medium whitespace-nowrap transition-colors flex items-center gap-2"
           >
             <i :class="page.icon"></i>
@@ -44,7 +44,7 @@
     <div x-data="userPageContent()" x-init="init()">
       
       <!-- 用户列表页 -->
-      <div x-show="currentPage === 'user-list'" x-cloak>
+      <div x-show="current_page === 'user-list'" x-cloak>
         <div class="themed-card rounded-lg shadow">
           <div class="p-4 border-b flex justify-between items-center">
             <h5 class="font-semibold">用户列表</h5>
@@ -123,7 +123,7 @@
                         x-text="getUserStatusText(user.status)"
                       ></span>
                     </td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(user.created_at)"></td>
+                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(user.created_at)"></td>
                     <td class="px-4 py-3">
                       <div class="flex space-x-2">
                         <button @click="viewUserDetail(user)" class="themed-text-primary hover:text-blue-700 text-sm">查看</button>
@@ -144,15 +144,15 @@
             <span class="text-sm themed-text-muted">共 <span x-text="pagination.total"></span> 条记录</span>
             <div class="flex space-x-2">
               <button @click="prevPage()" :disabled="pagination.page <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-              <span class="px-3 py-1">第 <span x-text="pagination.page"></span> / <span x-text="pagination.totalPages"></span> 页</span>
-              <button @click="nextPage()" :disabled="pagination.page >= pagination.totalPages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+              <span class="px-3 py-1">第 <span x-text="pagination.page"></span> / <span x-text="total_pages"></span> 页</span>
+              <button @click="nextPage()" :disabled="pagination.page >= total_pages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
             </div>
           </div>
         </div>
       </div>
 
       <!-- 角色管理页 -->
-      <div x-show="currentPage === 'role-list'" x-cloak>
+      <div x-show="current_page === 'role-list'" x-cloak>
         <div class="themed-card rounded-lg shadow">
           <div class="p-4 border-b flex justify-between items-center">
             <h5 class="font-semibold">角色管理</h5>
@@ -229,7 +229,7 @@
       </div>
 
       <!-- 权限管理页（只读展示 - 权限嵌入在角色中） -->
-      <div x-show="currentPage === 'permission-list'" x-cloak>
+      <div x-show="current_page === 'permission-list'" x-cloak>
         <div class="themed-card rounded-lg shadow">
           <div class="p-4 border-b">
             <div class="flex justify-between items-center">
@@ -277,7 +277,7 @@
       </div>
 
       <!-- 用户角色分配页 -->
-      <div x-show="currentPage === 'user-roles'" x-cloak>
+      <div x-show="current_page === 'user-roles'" x-cloak>
         <div class="themed-card rounded-lg shadow">
           <div class="p-4 border-b flex justify-between items-center">
             <h5 class="font-semibold">用户角色分配</h5>
@@ -308,7 +308,7 @@
                             :class="ur.role?.role_level >= 100 ? 'bg-red-100 text-red-700' : ur.role?.role_level >= 50 ? 'themed-bg-primary-light themed-text-primary' : 'themed-bg-subtle themed-text-secondary'"
                             x-text="ur.role?.role_name || ur.role_name || '-'"></span>
                     </td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(ur.assigned_at || ur.created_at)"></td>
+                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(ur.assigned_at || ur.created_at)"></td>
                     <td class="px-4 py-3">
                       <select @change="changeUserRole(ur, $event.target.value); $event.target.value=''" 
                               class="text-sm border rounded px-2 py-1">
@@ -333,7 +333,7 @@
       </div>
 
       <!-- 高级状态页 -->
-      <div x-show="currentPage === 'premium-status'" x-cloak>
+      <div x-show="current_page === 'premium-status'" x-cloak>
         <div class="themed-card rounded-lg shadow">
           <!-- 统计卡片 -->
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border-b">
@@ -417,8 +417,8 @@
                       ></span>
                     </td>
                     <td class="px-4 py-3 text-sm" x-text="getUnlockMethodText(user.unlock_method)"></td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(user.unlock_time || user.created_at)"></td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="user.expires_at ? formatDate(user.expires_at) : '永久'"></td>
+                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(user.unlock_time || user.created_at)"></td>
+                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="user.expires_at ? formatDateTimeShort(user.expires_at) : '永久'"></td>
                     <td class="px-4 py-3">
                       <button @click="viewPremiumDetail(user)" class="themed-text-primary hover:text-blue-700 text-sm">查看详情</button>
                     </td>
@@ -432,16 +432,16 @@
           <div class="p-4 border-t flex justify-between items-center">
             <span class="text-sm themed-text-muted">共 <span x-text="premiumPagination.total"></span> 条记录</span>
             <div class="flex space-x-2">
-              <button @click="changePremiumPage(premiumPage - 1)" :disabled="premiumPage <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-              <span class="px-3 py-1">第 <span x-text="premiumPage"></span> / <span x-text="premiumPagination.totalPages"></span> 页</span>
-              <button @click="changePremiumPage(premiumPage + 1)" :disabled="premiumPage >= premiumPagination.totalPages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+              <button @click="changePremiumPage(premiumPagination.page - 1)" :disabled="premiumPagination.page <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
+              <span class="px-3 py-1">第 <span x-text="premiumPagination.page"></span> / <span x-text="premiumTotalPages"></span> 页</span>
+              <button @click="changePremiumPage(premiumPagination.page + 1)" :disabled="premiumPagination.page >= premiumTotalPages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
             </div>
           </div>
         </div>
       </div>
 
       <!-- 风控配置页 -->
-      <div x-show="currentPage === 'risk-profiles'" x-cloak>
+      <div x-show="current_page === 'risk-profiles'" x-cloak>
         <div class="themed-card rounded-lg shadow">
           <div class="p-4 border-b flex justify-between items-center">
             <h5 class="font-semibold">🛡️ 风控配置管理</h5>
@@ -540,7 +540,7 @@
                     </td>
                     <td class="px-4 py-3">
                       <div class="flex space-x-2">
-                        <button @click="openEditRiskModal(profile)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                        <button @click="openRiskModal(profile)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
                         <template x-if="profile.user_id">
                           <button 
                             @click="profile.is_frozen ? unfreezeUser(profile) : freezeUser(profile)" 
@@ -561,16 +561,16 @@
           <div class="p-4 border-t flex justify-between items-center">
             <span class="text-sm themed-text-muted">共 <span x-text="riskPagination.total"></span> 条记录</span>
             <div class="flex space-x-2">
-              <button @click="changeRiskPage(riskPage - 1)" :disabled="riskPage <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-              <span class="px-3 py-1">第 <span x-text="riskPage"></span> / <span x-text="riskPagination.totalPages"></span> 页</span>
-              <button @click="changeRiskPage(riskPage + 1)" :disabled="riskPage >= riskPagination.totalPages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+              <button @click="changeRiskPage(riskPagination.page - 1)" :disabled="riskPagination.page <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
+              <span class="px-3 py-1">第 <span x-text="riskPagination.page"></span> / <span x-text="riskTotalPages"></span> 页</span>
+              <button @click="changeRiskPage(riskPagination.page + 1)" :disabled="riskPagination.page >= riskTotalPages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
             </div>
           </div>
         </div>
       </div>
 
       <!-- 角色变更历史页 -->
-      <div x-show="currentPage === 'role-history'" x-cloak>
+      <div x-show="current_page === 'role-history'" x-cloak>
         <div class="themed-card rounded-lg shadow">
           <div class="p-4 border-b flex justify-between items-center">
             <h5 class="font-semibold">📜 角色变更历史</h5>
@@ -587,8 +587,8 @@
             <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
               <input type="text" x-model="roleHistoryFilters.user_id" placeholder="用户ID" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
               <input type="text" x-model="roleHistoryFilters.operator_id" placeholder="操作人ID" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-              <input type="date" x-model="roleHistoryFilters.startDate" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-              <input type="date" x-model="roleHistoryFilters.endDate" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="date" x-model="roleHistoryFilters.start_date" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="date" x-model="roleHistoryFilters.end_date" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
               <button @click="loadRoleChangeHistory()" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary transition-colors">
                 🔍 搜索
               </button>
@@ -624,7 +624,7 @@
                     </td>
                     <td class="px-4 py-3 text-sm themed-text-muted" x-text="record.reason || record.change_reason || '-'"></td>
                     <td class="px-4 py-3 text-sm" x-text="record.operator?.nickname || record.operator_id || '-'"></td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(record.created_at || record.change_time)"></td>
+                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(record.created_at || record.change_time)"></td>
                   </tr>
                 </template>
               </tbody>
@@ -635,16 +635,16 @@
           <div class="p-4 border-t flex justify-between items-center">
             <span class="text-sm themed-text-muted">共 <span x-text="roleHistoryPagination.total || 0"></span> 条记录</span>
             <div class="flex space-x-2">
-              <button @click="goToRoleHistoryPage(roleHistoryPage - 1)" :disabled="roleHistoryPage <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-              <span class="px-3 py-1">第 <span x-text="roleHistoryPage"></span> / <span x-text="roleHistoryPagination.totalPages || 1"></span> 页</span>
-              <button @click="goToRoleHistoryPage(roleHistoryPage + 1)" :disabled="roleHistoryPage >= (roleHistoryPagination.totalPages || 1)" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+              <button @click="goToRoleHistoryPage(roleHistoryPagination.page - 1)" :disabled="roleHistoryPagination.page <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
+              <span class="px-3 py-1">第 <span x-text="roleHistoryPagination.page"></span> / <span x-text="roleHistoryTotalPages"></span> 页</span>
+              <button @click="goToRoleHistoryPage(roleHistoryPagination.page + 1)" :disabled="roleHistoryPagination.page >= roleHistoryTotalPages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
             </div>
           </div>
         </div>
       </div>
 
       <!-- 状态变更历史页 -->
-      <div x-show="currentPage === 'status-history'" x-cloak>
+      <div x-show="current_page === 'status-history'" x-cloak>
         <div class="themed-card rounded-lg shadow">
           <div class="p-4 border-b flex justify-between items-center">
             <h5 class="font-semibold">📋 状态变更历史</h5>
@@ -661,8 +661,8 @@
             <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
               <input type="text" x-model="statusHistoryFilters.user_id" placeholder="用户ID" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
               <input type="text" x-model="statusHistoryFilters.operator_id" placeholder="操作人ID" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-              <input type="date" x-model="statusHistoryFilters.startDate" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-              <input type="date" x-model="statusHistoryFilters.endDate" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="date" x-model="statusHistoryFilters.start_date" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="date" x-model="statusHistoryFilters.end_date" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
               <button @click="loadStatusChangeHistory()" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary transition-colors">
                 🔍 搜索
               </button>
@@ -702,7 +702,7 @@
                     </td>
                     <td class="px-4 py-3 text-sm themed-text-muted" x-text="record.reason || record.change_reason || '-'"></td>
                     <td class="px-4 py-3 text-sm" x-text="record.operator?.nickname || record.operator_id || '-'"></td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(record.created_at || record.change_time)"></td>
+                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(record.created_at || record.change_time)"></td>
                   </tr>
                 </template>
               </tbody>
@@ -713,16 +713,16 @@
           <div class="p-4 border-t flex justify-between items-center">
             <span class="text-sm themed-text-muted">共 <span x-text="statusHistoryPagination.total || 0"></span> 条记录</span>
             <div class="flex space-x-2">
-              <button @click="goToStatusHistoryPage(statusHistoryPage - 1)" :disabled="statusHistoryPage <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-              <span class="px-3 py-1">第 <span x-text="statusHistoryPage"></span> / <span x-text="statusHistoryPagination.totalPages || 1"></span> 页</span>
-              <button @click="goToStatusHistoryPage(statusHistoryPage + 1)" :disabled="statusHistoryPage >= (statusHistoryPagination.totalPages || 1)" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+              <button @click="goToStatusHistoryPage(statusHistoryPagination.page - 1)" :disabled="statusHistoryPagination.page <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
+              <span class="px-3 py-1">第 <span x-text="statusHistoryPagination.page"></span> / <span x-text="statusHistoryTotalPages"></span> 页</span>
+              <button @click="goToStatusHistoryPage(statusHistoryPagination.page + 1)" :disabled="statusHistoryPagination.page >= statusHistoryTotalPages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
             </div>
           </div>
         </div>
       </div>
 
       <!-- 用户统计页 -->
-      <div x-show="currentPage === 'user-stats'" x-cloak>
+      <div x-show="current_page === 'user-stats'" x-cloak>
         <!-- 统计卡片 -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <div class="themed-card rounded-lg shadow p-6 text-center">
@@ -899,11 +899,11 @@
                   </div>
                   <div>
                     <label class="text-sm themed-text-muted">注册时间</label>
-                    <p class="font-medium" x-text="formatDate(selectedUser.created_at)"></p>
+                    <p class="font-medium" x-text="formatDateTimeShort(selectedUser.created_at)"></p>
                   </div>
                   <div>
                     <label class="text-sm themed-text-muted">最后登录</label>
-                    <p class="font-medium" x-text="selectedUser.last_login ? formatDate(selectedUser.last_login) : '从未登录'"></p>
+                    <p class="font-medium" x-text="selectedUser.last_login ? formatDateTimeShort(selectedUser.last_login) : '从未登录'"></p>
                   </div>
                 </div>
               </div>
@@ -1103,11 +1103,11 @@
                   </div>
                   <div>
                     <label class="text-sm themed-text-muted">解锁时间</label>
-                    <p class="font-medium" x-text="formatDate(selectedPremiumUser.unlocked_at || selectedPremiumUser.created_at)"></p>
+                    <p class="font-medium" x-text="formatDateTimeShort(selectedPremiumUser.unlocked_at || selectedPremiumUser.created_at)"></p>
                   </div>
                   <div>
                     <label class="text-sm themed-text-muted">过期时间</label>
-                    <p class="font-medium" x-text="selectedPremiumUser.expires_at ? formatDate(selectedPremiumUser.expires_at) : '永久有效'"></p>
+                    <p class="font-medium" x-text="selectedPremiumUser.expires_at ? formatDateTimeShort(selectedPremiumUser.expires_at) : '永久有效'"></p>
                   </div>
                 </div>
                 <!-- 权益信息 -->
@@ -1404,8 +1404,8 @@
               <!-- 用户信息 -->
               <div class="p-3 themed-bg-primary-light rounded-lg">
                 <p class="themed-text-primary">
-                  用户：<strong x-text="probabilityModal.userNickname"></strong>
-                  (<span x-text="probabilityModal.userId"></span>)
+                  用户：<strong x-text="probabilityModal.user_nickname"></strong>
+                  (<span x-text="probabilityModal.user_id"></span>)
                 </p>
               </div>
 
@@ -1443,7 +1443,7 @@
               <div x-show="probabilityModal.mode === 'specific'" class="space-y-4">
                 <div>
                   <label class="block text-sm font-medium themed-text-secondary mb-1">选择奖品</label>
-                  <select x-model="probabilityModal.targetPrizeId" 
+                  <select x-model="probabilityModal.target_prize_id" 
                           class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
                           @change="updateProbabilityPreview()">
                     <option value="">请选择奖品</option>
@@ -1454,7 +1454,7 @@
                 </div>
                 <div>
                   <label class="block text-sm font-medium themed-text-secondary mb-1">自定义概率 (%)</label>
-                  <input type="number" x-model.number="probabilityModal.customProbability" 
+                  <input type="number" x-model.number="probabilityModal.custom_probability" 
                          step="1" min="1" max="100"
                          class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
                          placeholder="如 50 表示 50% 概率"

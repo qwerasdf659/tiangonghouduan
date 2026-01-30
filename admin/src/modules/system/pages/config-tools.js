@@ -33,7 +33,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
+import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { buildURL, request } from '../../../api/base.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
 
@@ -42,7 +42,7 @@ const apiRequest = async (url, options = {}) => {
   return await request({ url, ...options })
 }
 
-// 全局loading函数（兼容性）
+// 全局loading函数
 const showLoading = () => {
   if (typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('loading')) {
     Alpine.store('loading').show()
@@ -128,7 +128,7 @@ document.addEventListener('alpine:init', () => {
     maintenanceForm: {
       enabled: false,
       message: '系统正在升级维护中，预计30分钟后恢复，给您带来不便敬请谅解。',
-      endTime: ''
+      end_time: ''
     },
     /** @type {Object} 新建配置项的表单数据 */
     newConfig: { key: '', value: '', description: '', type: 'string' },
@@ -390,7 +390,7 @@ document.addEventListener('alpine:init', () => {
 
           if (maintenanceEndTime?.parsed_value) {
             const endTime = new Date(maintenanceEndTime.parsed_value)
-            this.maintenanceForm.endTime = endTime.toISOString().slice(0, 16)
+            this.maintenanceForm.end_time = endTime.toISOString().slice(0, 16)
           }
         }
       } catch (error) {
@@ -414,8 +414,8 @@ document.addEventListener('alpine:init', () => {
           maintenance_message: this.maintenanceForm.message
         }
 
-        if (this.maintenanceForm.endTime) {
-          settings.maintenance_end_time = new Date(this.maintenanceForm.endTime).toISOString()
+        if (this.maintenanceForm.end_time) {
+          settings.maintenance_end_time = new Date(this.maintenanceForm.end_time).toISOString()
         }
 
         const response = await apiRequest(SYSTEM_ENDPOINTS.SETTINGS_BASIC, {
@@ -817,10 +817,8 @@ document.addEventListener('alpine:init', () => {
           maintenance_message: this.maintenanceForm.message
         }
 
-        if (this.maintenanceForm.estimatedEndTime) {
-          settings.maintenance_end_time = new Date(
-            this.maintenanceForm.estimatedEndTime
-          ).toISOString()
+        if (this.maintenanceForm.end_time) {
+          settings.maintenance_end_time = new Date(this.maintenanceForm.end_time).toISOString()
         }
 
         const response = await apiRequest(SYSTEM_ENDPOINTS.SETTINGS_BASIC, {
@@ -904,29 +902,6 @@ document.addEventListener('alpine:init', () => {
         this.showError('添加失败：' + error.message)
       } finally {
         hideLoading()
-      }
-    },
-
-    /**
-     * 格式化日期
-     * @param {string} dateStr - 日期字符串
-     * @returns {string} 格式化后的日期
-     */
-    formatDate(dateStr) {
-      if (!dateStr) return '-'
-      try {
-        const date = new Date(dateStr)
-        return date.toLocaleString('zh-CN', {
-          timeZone: 'Asia/Shanghai',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit'
-        })
-      } catch {
-        return dateStr
       }
     },
 

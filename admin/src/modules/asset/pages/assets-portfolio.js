@@ -190,8 +190,8 @@ function assetsPortfolioPage() {
         if (!this.searchForm.user_id) {
           logger.debug('[AssetsPortfolioPage] 未指定用户ID，显示空列表')
           this.assets = []
-          this.totalRecords = 0
-          this.totalPages = 0
+          this.total_records = 0
+          this.total_pages = 0
           return
         }
 
@@ -229,8 +229,8 @@ function assetsPortfolioPage() {
           })
 
           // 资产余额无分页，直接使用数组长度
-          this.totalRecords = this.assets.length
-          this.totalPages = 1
+          this.total_records = this.assets.length
+          this.total_pages = 1
 
           logger.debug('[AssetsPortfolioPage] 资产列表加载成功:', this.assets.length, '条记录')
         }
@@ -247,7 +247,7 @@ function assetsPortfolioPage() {
      * 搜索资产
      */
     async searchAssets() {
-      this.currentPage = 1
+      this.current_page = 1
       await this.withLoading(
         async () => {
           await this.loadAssets()
@@ -347,8 +347,8 @@ function assetsPortfolioPage() {
      * 上一页
      */
     async prevPage() {
-      if (this.currentPage > 1) {
-        this.currentPage--
+      if (this.current_page > 1) {
+        this.current_page--
         await this.loadAssets()
       }
     },
@@ -357,8 +357,8 @@ function assetsPortfolioPage() {
      * 下一页
      */
     async nextPage() {
-      if (this.currentPage < this.totalPages) {
-        this.currentPage++
+      if (this.current_page < this.total_pages) {
+        this.current_page++
         await this.loadAssets()
       }
     },

@@ -140,14 +140,6 @@ function customerServicePage() {
     /** 当前选中的会话对象 (用于模板访问) */
     selectedSession: null,
 
-    /** HTML模板兼容：sessions 和 messages 别名 */
-    get sessions() {
-      return this.allSessions
-    },
-    get messages() {
-      return this.currentMessages
-    },
-
     /** 提交状态 */
     submitting: false,
 
@@ -159,7 +151,7 @@ function customerServicePage() {
     messageInput: '',
 
     /** 模态框数据 */
-    userInfoData: null,
+    user_info_data: null,
     transferTargetId: '',
     adminList: [],
 
@@ -619,8 +611,8 @@ function customerServicePage() {
         const response = await apiRequest(url)
 
         if (response && response.success) {
-          this.userInfoData = response.data.user || response.data
-          this.showModal('userInfoModal')
+          this.user_info_data = response.data.user || response.data
+          this.showModal('user_info_modal')
         } else {
           this.showError(response?.message || '获取用户信息失败')
         }
@@ -715,10 +707,10 @@ function customerServicePage() {
       }
     },
 
-    // ==================== HTML模板兼容方法 ====================
+    // ==================== HTML模板辅助方法 ====================
 
     /**
-     * 选择会话（HTML模板别名）
+     * 选择会话（参数适配）
      * @param {Object} session - 会话对象
      */
     selectSession(session) {
@@ -745,28 +737,14 @@ function customerServicePage() {
       } catch {
         return dateStr
       }
-    },
-
-    /**
-     * 查看用户资料（HTML模板别名）
-     */
-    viewUserProfile() {
-      this.viewUserInfo()
-    },
-
-    /**
-     * 确认转接（HTML模板需要）
-     */
-    async confirmTransfer() {
-      await this.submitTransfer()
     }
   }
 }
 
-// ========== Alpine.js CSP 兼容注册 ==========
+// ========== Alpine.js 组件注册 ==========
 document.addEventListener('alpine:init', () => {
   Alpine.data('customerServicePage', customerServicePage)
-  // 添加别名（HTML 使用 customerService()）
+  // 注册简短组件名（HTML 使用 customerService()）
   Alpine.data('customerService', customerServicePage)
   logger.info('[CustomerServicePage] Alpine 组件已注册 (Mixin v3.0)')
 })

@@ -7,7 +7,7 @@
  * @date 2026-01-22
  *
  * 使用方式：
- * <div x-data="pagination({ total: 100, pageSize: 20 })" x-init="onChange = (page) => loadData(page)">
+ * <div x-data="pagination({ total: 100, page_size: 20 })" x-init="onChange = (page) => loadData(page)">
  *   <template x-for="page in pages">...</template>
  * </div>
  */
@@ -17,21 +17,21 @@ import { logger } from '../../utils/logger.js'
  * Pagination 组件数据
  * @param {Object} config - 配置选项
  * @param {number} config.total - 总条数
- * @param {number} config.pageSize - 每页条数
+ * @param {number} config.page_size - 每页条数
  * @param {number} config.current - 当前页码
  * @param {number} config.maxPages - 最大显示页码数
  */
 function pagination(config = {}) {
   return {
     total: config.total || 0,
-    pageSize: config.pageSize || 20,
+    page_size: config.page_size || 20,
     current: config.current || 1,
     maxPages: config.maxPages || 5,
     onChange: config.onChange || null,
 
     // 计算属性：总页数
-    get totalPages() {
-      return Math.ceil(this.total / this.pageSize) || 1
+    get total_pages() {
+      return Math.ceil(this.total / this.page_size) || 1
     },
 
     // 计算属性：是否有上一页
@@ -41,13 +41,13 @@ function pagination(config = {}) {
 
     // 计算属性：是否有下一页
     get hasNext() {
-      return this.current < this.totalPages
+      return this.current < this.total_pages
     },
 
     // 计算属性：页码列表
     get pages() {
       const pages = []
-      const total = this.totalPages
+      const total = this.total_pages
       const current = this.current
       const max = this.maxPages
 
@@ -94,14 +94,14 @@ function pagination(config = {}) {
 
     // 计算属性：显示范围文本
     get rangeText() {
-      const start = (this.current - 1) * this.pageSize + 1
-      const end = Math.min(this.current * this.pageSize, this.total)
+      const start = (this.current - 1) * this.page_size + 1
+      const end = Math.min(this.current * this.page_size, this.total)
       return `显示 ${start}-${end} 条，共 ${this.total} 条`
     },
 
     // 跳转到指定页
     goTo(page) {
-      if (page < 1 || page > this.totalPages || page === this.current) {
+      if (page < 1 || page > this.total_pages || page === this.current) {
         return
       }
       this.current = page
@@ -127,12 +127,12 @@ function pagination(config = {}) {
     // 更新分页数据
     update(options = {}) {
       if (options.total !== undefined) this.total = options.total
-      if (options.pageSize !== undefined) this.pageSize = options.pageSize
+      if (options.page_size !== undefined) this.page_size = options.page_size
       if (options.current !== undefined) this.current = options.current
 
       // 确保当前页不超过总页数
-      if (this.current > this.totalPages) {
-        this.current = this.totalPages
+      if (this.current > this.total_pages) {
+        this.current = this.total_pages
       }
     },
 

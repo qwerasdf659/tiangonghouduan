@@ -61,7 +61,7 @@ document.addEventListener('alpine:init', () => {
     ...createPageMixin(),
 
     // 子页面导航
-    currentPage: 'material-types',
+    current_page: 'material-types',
     subPages: [
       { id: 'material-types', name: '材料资产类型', icon: '📦' },
       { id: 'material-accounts', name: '材料账户', icon: '💰' },
@@ -101,41 +101,41 @@ document.addEventListener('alpine:init', () => {
 
     // 材料账户
     materialAccounts: [],
-    materialAccountFilters: { userId: '', assetCode: '' },
-    materialAccountPagination: { total: 0, totalPages: 1, currentPage: 1 },
+    materialAccountFilters: { user_id: '', asset_code: '' },
+    materialAccountPagination: { total: 0, total_pages: 1, current_page: 1 },
 
     // 材料交易
     materialTransactions: [],
-    materialTxFilters: { userId: '', assetCode: '', type: '' },
-    materialTxPagination: { total: 0, totalPages: 1, currentPage: 1 },
+    materialTxFilters: { user_id: '', asset_code: '', type: '' },
+    materialTxPagination: { total: 0, total_pages: 1, current_page: 1 },
 
     // 物品实例
     itemInstances: [],
-    itemInstanceFilters: { userId: '', templateCode: '', status: '' },
-    itemInstancePagination: { total: 0, totalPages: 1, currentPage: 1 },
+    itemInstanceFilters: { user_id: '', template_code: '', status: '' },
+    itemInstancePagination: { total: 0, total_pages: 1, current_page: 1 },
     instanceDetail: null,
 
     // 虚拟账户
     virtualAccounts: [],
-    virtualAccountFilters: { userId: '', accountType: '' },
-    virtualAccountPagination: { total: 0, totalPages: 1, currentPage: 1 },
+    virtualAccountFilters: { user_id: '', account_type: '' },
+    virtualAccountPagination: { total: 0, total_pages: 1, current_page: 1 },
 
     // 虚拟交易
     virtualTransactions: [],
-    virtualTxFilters: { userId: '', accountType: '', direction: '' },
-    virtualTxPagination: { total: 0, totalPages: 1, currentPage: 1 },
+    virtualTxFilters: { user_id: '', account_type: '', direction: '' },
+    virtualTxPagination: { total: 0, total_pages: 1, current_page: 1 },
 
     // 资产统计
     assetStats: { totalMaterialValue: 0, totalVirtualValue: 0, totalItemCount: 0 },
 
     // 资产日志相关
-    logFilters: { userId: '', assetCode: '', startDate: '' },
+    logFilters: { user_id: '', asset_code: '', start_date: '' },
     assetLogs: [],
     assetTypes: [],
     userAssets: [],
 
     // 用户资产筛选条件
-    userAssetFilters: { userId: '', assetCode: '' },
+    userAssetFilters: { user_id: '', asset_code: '' },
 
     // 通用状态
     saving: false,
@@ -144,19 +144,19 @@ document.addEventListener('alpine:init', () => {
       logger.info('资产管理页面初始化 (合并组件)')
       if (!this.checkAuth()) return
       const urlParams = new URLSearchParams(window.location.search)
-      this.currentPage = urlParams.get('page') || 'material-types'
+      this.current_page = urlParams.get('page') || 'material-types'
       this.loadPageData()
     },
 
     switchPage(pageId) {
-      this.currentPage = pageId
+      this.current_page = pageId
       window.history.pushState({}, '', `?page=${pageId}`)
       this.loadPageData()
     },
 
     async loadPageData() {
       await this.withLoading(async () => {
-        switch (this.currentPage) {
+        switch (this.current_page) {
           case 'material-types':
             await this.loadMaterialTypes()
             break
@@ -206,15 +206,15 @@ document.addEventListener('alpine:init', () => {
     async loadMaterialAccounts() {
       try {
         // 检查是否有 user_id，后端 API 需要 user_id 参数
-        if (!this.materialAccountFilters.userId) {
+        if (!this.materialAccountFilters.user_id) {
           this.materialAccounts = []
           logger.info('[AssetManagement] 请输入用户ID查询资产')
           return
         }
         // 使用正确的资产组合接口，转换参数名为后端格式
         const response = await this.apiGet(ASSET_ENDPOINTS.PORTFOLIO, {
-          user_id: this.materialAccountFilters.userId,
-          asset_code: this.materialAccountFilters.assetCode || undefined
+          user_id: this.materialAccountFilters.user_id,
+          asset_code: this.materialAccountFilters.asset_code || undefined
         })
         logger.debug('[AssetManagement] loadMaterialAccounts response:', response)
         if (response.success && response.data) {
@@ -227,7 +227,7 @@ document.addEventListener('alpine:init', () => {
           this.materialAccounts = Array.isArray(matAcctData)
             ? matAcctData.map(item => ({
                 ...item,
-                user_id: response.data?.user_id || this.materialAccountFilters.userId,
+                user_id: response.data?.user_id || this.materialAccountFilters.user_id,
                 balance: item.available_amount || item.balance || 0,
                 updated_at: item.updated_at || new Date().toISOString()
               }))
@@ -243,14 +243,14 @@ document.addEventListener('alpine:init', () => {
     async loadMaterialTransactions() {
       try {
         // 后端 API 要求 user_id 是必填参数，没有时显示提示
-        if (!this.logFilters.userId) {
+        if (!this.logFilters.user_id) {
           this.materialTransactions = []
           logger.info('请输入用户ID进行查询')
           return
         }
         const response = await this.apiGet(ASSET_ENDPOINTS.TRANSACTIONS, {
-          user_id: this.logFilters.userId,
-          asset_code: this.logFilters.assetCode
+          user_id: this.logFilters.user_id,
+          asset_code: this.logFilters.asset_code
         })
         logger.debug('[AssetManagement] loadMaterialTransactions response:', response)
         if (response.success && response.data) {
@@ -269,7 +269,7 @@ document.addEventListener('alpine:init', () => {
       try {
         // 使用物品模板接口获取列表
         const response = await this.apiGet(ASSET_ENDPOINTS.ITEM_TEMPLATES_LIST, {
-          item_type: this.itemInstanceFilters.templateCode || undefined,
+          item_type: this.itemInstanceFilters.template_code || undefined,
           is_enabled:
             this.itemInstanceFilters.status === 'enabled'
               ? true
@@ -293,14 +293,14 @@ document.addEventListener('alpine:init', () => {
     async loadVirtualAccounts() {
       try {
         // 后端 API 要求 user_id 是必填参数，没有时显示提示
-        if (!this.virtualAccountFilters.userId) {
+        if (!this.virtualAccountFilters.user_id) {
           this.virtualAccounts = []
           logger.info('请输入用户ID进行查询')
           return
         }
         // 使用 ASSET_ENDPOINTS.ADJUSTMENT_USER_BALANCES 端点
         const url = buildURL(ASSET_ENDPOINTS.ADJUSTMENT_USER_BALANCES, {
-          user_id: this.virtualAccountFilters.userId
+          user_id: this.virtualAccountFilters.user_id
         })
         const response = await this.apiGet(url)
         if (response.success && response.data) {
@@ -319,14 +319,14 @@ document.addEventListener('alpine:init', () => {
     async loadVirtualTransactions() {
       try {
         // 后端 API 要求 user_id 是必填参数，没有时显示提示
-        if (!this.virtualTxFilters.userId) {
+        if (!this.virtualTxFilters.user_id) {
           this.virtualTransactions = []
           logger.info('请输入用户ID进行查询')
           return
         }
         const response = await this.apiGet(ASSET_ENDPOINTS.TRANSACTIONS, {
-          user_id: this.virtualTxFilters.userId,
-          account_type: this.virtualTxFilters.accountType,
+          user_id: this.virtualTxFilters.user_id,
+          account_type: this.virtualTxFilters.account_type,
           type: 'virtual'
         })
         if (response.success && response.data) {
@@ -433,11 +433,6 @@ document.addEventListener('alpine:init', () => {
         pending: '待处理'
       }
       return map[status] || status || '-'
-    },
-
-    formatDate(dateStr) {
-      if (!dateStr) return '-'
-      return new Date(dateStr).toLocaleString('zh-CN')
     }
   }))
 

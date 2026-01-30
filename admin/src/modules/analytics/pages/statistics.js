@@ -28,7 +28,7 @@
 
 // ES Module 导入
 import { logger } from '../../../utils/logger.js'
-import { SYSTEM_ENDPOINTS } from '../../../api/system.js'
+import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { request, getToken } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/index.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
@@ -85,8 +85,8 @@ function statisticsPage() {
      */
     filters: {
       period: 'week',
-      startDate: '',
-      endDate: ''
+      start_date: '',
+      end_date: ''
     },
 
     /**
@@ -360,11 +360,11 @@ function statisticsPage() {
         const params = new URLSearchParams({ days })
 
         if (this.filters.period === 'custom') {
-          if (!this.filters.startDate || !this.filters.endDate) {
+          if (!this.filters.start_date || !this.filters.end_date) {
             throw new Error('请选择开始和结束日期')
           }
-          params.append('start_date', this.filters.startDate)
-          params.append('end_date', this.filters.endDate)
+          params.append('start_date', this.filters.start_date)
+          params.append('end_date', this.filters.end_date)
         }
 
         const response = await request({ url: `${SYSTEM_ENDPOINTS.CHARTS}?${params.toString()}` })
@@ -644,8 +644,8 @@ function statisticsPage() {
         const params = new URLSearchParams({ days, format: 'excel' })
 
         if (this.filters.period === 'custom') {
-          params.append('start_date', this.filters.startDate)
-          params.append('end_date', this.filters.endDate)
+          params.append('start_date', this.filters.start_date)
+          params.append('end_date', this.filters.end_date)
         }
 
         const response = await fetch(`${SYSTEM_ENDPOINTS.STATISTICS_EXPORT}?${params.toString()}`, {
@@ -688,8 +688,8 @@ function statisticsPage() {
         const params = new URLSearchParams({ days, format: 'pdf' })
 
         if (this.filters.period === 'custom') {
-          params.append('start_date', this.filters.startDate)
-          params.append('end_date', this.filters.endDate)
+          params.append('start_date', this.filters.start_date)
+          params.append('end_date', this.filters.end_date)
         }
 
         const response = await fetch(`${SYSTEM_ENDPOINTS.STATISTICS_EXPORT}?${params.toString()}`, {

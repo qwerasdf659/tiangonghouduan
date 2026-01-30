@@ -27,7 +27,7 @@
         <template x-for="page in subPages" :key="page.id">
           <button 
             @click="switchPage(page.id)"
-            :class="currentPage === page.id ? 'border-b-2 border-gray-800 themed-text themed-bg-base' : 'themed-text-muted themed-hover-bg'"
+            :class="current_page === page.id ? 'border-b-2 border-gray-800 themed-text themed-bg-base' : 'themed-text-muted themed-hover-bg'"
             class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
           >
             <i :class="page.icon" class="mr-1"></i>
@@ -41,22 +41,22 @@
     <div x-data="financePageContent()" x-init="init()">
 
     <!-- 消费记录审核 -->
-    <div x-show="currentPage === 'consumption'" x-cloak>
+    <div x-show="current_page === 'consumption'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">消费记录审核</h5>
         </div>
         <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <input type="text" x-model="consumptionFilters.userId" placeholder="用户ID" class="px-3 py-2 border rounded">
+            <input type="text" x-model="consumptionFilters.user_id" placeholder="用户ID" class="px-3 py-2 border rounded">
             <select x-model="consumptionFilters.status" class="px-3 py-2 border rounded">
               <option value="">全部状态</option>
               <option value="pending">待审核</option>
               <option value="approved">已通过</option>
               <option value="rejected">已拒绝</option>
             </select>
-            <input type="date" x-model="consumptionFilters.startDate" class="px-3 py-2 border rounded">
-            <button @click="loadConsumption()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
+            <input type="date" x-model="consumptionFilters.start_date" class="px-3 py-2 border rounded">
+            <button @click="loadConsumptions()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
           </div>
         </div>
         <div class="overflow-x-auto">
@@ -90,7 +90,7 @@
                       x-text="record.status === 'pending' ? '待审核' : record.status === 'approved' ? '已通过' : '已拒绝'"
                     ></span>
                   </td>
-                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(record.created_at)"></td>
+                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateOnly(record.created_at)"></td>
                   <td class="px-4 py-3">
                     <template x-if="record.status === 'pending'">
                       <div class="flex space-x-2">
@@ -111,7 +111,7 @@
     </div>
 
     <!-- 钻石账户 -->
-    <div x-show="currentPage === 'diamond-accounts'" x-cloak>
+    <div x-show="current_page === 'diamond-accounts'" x-cloak>
       <!-- 统计卡片 -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div class="themed-card rounded-lg shadow p-4 text-center">
@@ -235,7 +235,7 @@
     </div>
 
     <!-- 商户积分 -->
-    <div x-show="currentPage === 'merchant-points'" x-cloak>
+    <div x-show="current_page === 'merchant-points'" x-cloak>
       <!-- 统计卡片 -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div class="themed-card rounded-lg shadow p-4 text-center">
@@ -294,7 +294,7 @@
                       x-text="item.status === 'pending' ? '待审核' : item.status === 'approved' ? '已通过' : '已拒绝'"
                     ></span>
                   </td>
-                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTime(item.created_at)"></td>
+                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(item.created_at)"></td>
                   <td class="px-4 py-3">
                     <div class="flex space-x-2">
                       <button @click="viewMerchantDetail(item)" class="themed-text-primary hover:text-blue-700 text-sm">详情</button>
@@ -320,16 +320,16 @@
         <div class="p-4 border-t themed-bg-base flex justify-between items-center" x-show="merchantPoints.length > 0">
           <span class="text-sm themed-text-muted">共 <span x-text="total"></span> 条记录</span>
           <div class="flex space-x-1">
-            <button @click="changePage(page - 1)" :disabled="page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
-            <span class="px-3 py-1 text-sm">第 <span x-text="page"></span> / <span x-text="totalPages"></span> 页</span>
-            <button @click="changePage(page + 1)" :disabled="page >= totalPages" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">下一页</button>
+            <button @click="changePage(financePagination.page - 1)" :disabled="financePagination.page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
+            <span class="px-3 py-1 text-sm">第 <span x-text="financePagination.page"></span> / <span x-text="financeTotalPages"></span> 页</span>
+            <button @click="changePage(financePagination.page + 1)" :disabled="financePagination.page >= financeTotalPages" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">下一页</button>
           </div>
         </div>
       </div>
     </div>
 
     <!-- 欠账管理 - 适配后端 debt-management API -->
-    <div x-show="currentPage === 'debt-management'" x-cloak>
+    <div x-show="current_page === 'debt-management'" x-cloak>
       <!-- 统计卡片 -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div class="themed-card rounded-lg shadow p-4 text-center">
@@ -395,7 +395,7 @@
                     <div class="text-gray-400 text-xs" x-text="'ID: ' + (debt.campaign_id || debt.prize_id || '-')"></div>
                   </td>
                   <td class="px-4 py-3 text-sm font-mono text-red-600" x-text="debt.owed_quantity || debt.owed_amount || 0"></td>
-                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTime(debt.created_at)"></td>
+                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(debt.created_at)"></td>
                   <td class="px-4 py-3">
                     <div class="flex space-x-2">
                       <button @click="viewDebtDetail(debt)" class="themed-text-primary hover:text-blue-700 text-sm">详情</button>
@@ -416,16 +416,16 @@
         <div class="p-4 border-t themed-bg-base flex justify-between items-center" x-show="debts.length > 0">
           <span class="text-sm themed-text-muted">共 <span x-text="total"></span> 条记录</span>
           <div class="flex space-x-1">
-            <button @click="changePage(page - 1)" :disabled="page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
-            <span class="px-3 py-1 text-sm">第 <span x-text="page"></span> / <span x-text="totalPages"></span> 页</span>
-            <button @click="changePage(page + 1)" :disabled="page >= totalPages" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">下一页</button>
+            <button @click="changePage(financePagination.page - 1)" :disabled="financePagination.page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
+            <span class="px-3 py-1 text-sm">第 <span x-text="financePagination.page"></span> / <span x-text="financeTotalPages"></span> 页</span>
+            <button @click="changePage(financePagination.page + 1)" :disabled="financePagination.page >= financeTotalPages" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">下一页</button>
           </div>
         </div>
       </div>
     </div>
 
     <!-- 活动预算管理 -->
-    <div x-show="currentPage === 'campaign-budget'" x-cloak>
+    <div x-show="current_page === 'campaign-budget'" x-cloak>
       <!-- 预算统计卡片 -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div class="themed-card rounded-lg shadow p-4 text-center">
@@ -515,16 +515,16 @@
         <div class="p-4 border-t themed-bg-base flex justify-between items-center" x-show="budgets.length > 0">
           <span class="text-sm themed-text-muted">共 <span x-text="total"></span> 条记录</span>
           <div class="flex space-x-1">
-            <button @click="changePage(page - 1)" :disabled="page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
-            <span class="px-3 py-1 text-sm">第 <span x-text="page"></span> / <span x-text="totalPages"></span> 页</span>
-            <button @click="changePage(page + 1)" :disabled="page >= totalPages" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">下一页</button>
+            <button @click="changePage(financePagination.page - 1)" :disabled="financePagination.page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
+            <span class="px-3 py-1 text-sm">第 <span x-text="financePagination.page"></span> / <span x-text="financeTotalPages"></span> 页</span>
+            <button @click="changePage(financePagination.page + 1)" :disabled="financePagination.page >= financeTotalPages" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">下一页</button>
           </div>
         </div>
       </div>
     </div>
 
     <!-- 商户日志 -->
-    <div x-show="currentPage === 'merchant-logs'" x-cloak>
+    <div x-show="current_page === 'merchant-logs'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">📋 商户操作日志</h5>
@@ -540,7 +540,7 @@
               <option value="points">积分</option>
               <option value="settlement">结算</option>
             </select>
-            <input type="date" x-model="logFilters.startDate" class="px-3 py-2 border rounded">
+            <input type="date" x-model="logFilters.start_date" class="px-3 py-2 border rounded">
             <button @click="searchLogs()" class="px-4 py-2 themed-btn-primary rounded">🔍 搜索</button>
           </div>
         </div>
@@ -581,9 +581,9 @@
         <div class="p-4 border-t themed-bg-base flex justify-between items-center" x-show="merchantLogs.length > 0">
           <span class="text-sm themed-text-muted">共 <span x-text="total"></span> 条记录</span>
           <div class="flex space-x-1">
-            <button @click="changePage(page - 1)" :disabled="page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
-            <span class="px-3 py-1 text-sm">第 <span x-text="page"></span> / <span x-text="totalPages"></span> 页</span>
-            <button @click="changePage(page + 1)" :disabled="page >= totalPages" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">下一页</button>
+            <button @click="changePage(financePagination.page - 1)" :disabled="financePagination.page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
+            <span class="px-3 py-1 text-sm">第 <span x-text="financePagination.page"></span> / <span x-text="financeTotalPages"></span> 页</span>
+            <button @click="changePage(financePagination.page + 1)" :disabled="financePagination.page >= financeTotalPages" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">下一页</button>
           </div>
         </div>
       </div>
@@ -627,7 +627,7 @@
             </div>
             <div class="flex justify-between border-b pb-2">
               <span class="themed-text-muted">提交时间</span>
-              <span x-text="formatDate(selectedConsumption?.created_at)"></span>
+              <span x-text="formatDateOnly(selectedConsumption?.created_at)"></span>
             </div>
             <div x-show="selectedConsumption?.remark">
               <span class="themed-text-muted block mb-1">备注</span>
@@ -715,7 +715,7 @@
             </div>
             <div class="flex justify-between border-b pb-2">
               <span class="themed-text-muted">创建时间</span>
-              <span x-text="formatDateTime(selectedDebt?.created_at)"></span>
+              <span x-text="formatDateTimeShort(selectedDebt?.created_at)"></span>
             </div>
           </div>
           <div class="mt-6" x-show="selectedDebt?.clear_records?.length > 0">
@@ -725,7 +725,7 @@
                 <div class="themed-bg-base rounded p-3 flex justify-between items-center">
                   <div>
                     <span class="font-mono text-green-600" x-text="'¥' + (payment.amount / 100).toFixed(2)"></span>
-                    <span class="themed-text-muted text-sm ml-2" x-text="formatDate(payment.created_at)"></span>
+                    <span class="themed-text-muted text-sm ml-2" x-text="formatDateOnly(payment.created_at)"></span>
                   </div>
                   <span class="text-gray-400 text-sm" x-text="payment.remark || ''"></span>
                 </div>
@@ -931,7 +931,7 @@
                     <tbody class="divide-y">
                       <template x-for="tx in selectedDiamondAccount.transactions" :key="tx.transaction_id">
                         <tr class="themed-hover-bg">
-                          <td class="px-3 py-2 themed-text-muted" x-text="formatDateTime(tx.created_at)"></td>
+                          <td class="px-3 py-2 themed-text-muted" x-text="formatDateTimeShort(tx.created_at)"></td>
                           <td class="px-3 py-2" x-text="tx.tx_type || '-'"></td>
                           <td class="px-3 py-2 text-right font-mono" 
                               :class="tx.amount > 0 ? 'text-green-600' : 'text-red-600'"
@@ -1007,7 +1007,7 @@
           <h5 class="font-semibold">📊 预算设置</h5>
           <button @click="hideModal('budgetModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
         </div>
-        <form @submit.prevent="submitBudget()">
+        <form @submit.prevent="saveBudget()">
           <div class="p-6 space-y-4">
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">预算类型</label>
@@ -1023,7 +1023,7 @@
             </div>
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">预警阈值 (%)</label>
-              <input type="number" x-model.number="budgetForm.alertThreshold" min="0" max="100" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-gray-500" placeholder="80">
+              <input type="number" x-model.number="budgetForm.alert_threshold" min="0" max="100" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-gray-500" placeholder="80">
               <p class="text-xs themed-text-muted mt-1">达到此比例时发送预警</p>
             </div>
           </div>

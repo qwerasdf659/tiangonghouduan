@@ -29,7 +29,7 @@ import { logger } from '../../utils/logger.js'
  * @param {Array} config.columns - 表格列配置
  * @param {Array} config.filters - 筛选器配置
  * @param {Array} config.stats - 统计卡片配置
- * @param {number} config.pageSize - 每页条数
+ * @param {number} config.page_size - 每页条数
  */
 function adminPage(config = {}) {
   return {
@@ -56,9 +56,9 @@ function adminPage(config = {}) {
 
     // ========== 分页配置 ==========
     pagination: config.pagination !== false,
-    pageSize: config.pageSize || 20,
-    currentPage: 1,
-    totalPages: 1,
+    page_size: config.page_size || 20,
+    current_page: 1,
+    total_pages: 1,
     total: 0,
 
     // ========== 数据状态 ==========
@@ -108,8 +108,8 @@ function adminPage(config = {}) {
         const params = new URLSearchParams()
 
         if (this.pagination) {
-          params.append('page', this.currentPage)
-          params.append('page_size', this.pageSize)
+          params.append('page', this.current_page)
+          params.append('page_size', this.page_size)
         }
 
         // 添加筛选参数
@@ -129,11 +129,11 @@ function adminPage(config = {}) {
 
           // 更新分页信息
           if (response.data.pagination) {
-            this.totalPages = response.data.pagination.total_pages || 1
+            this.total_pages = response.data.pagination.total_pages || 1
             this.total = response.data.pagination.total || this.data.length
           } else {
             this.total = this.data.length
-            this.totalPages = Math.ceil(this.total / this.pageSize) || 1
+            this.total_pages = Math.ceil(this.total / this.page_size) || 1
           }
 
           // 加载统计数据
@@ -211,42 +211,42 @@ function adminPage(config = {}) {
 
     // ========== 筛选操作 ==========
     handleSearch() {
-      this.currentPage = 1
+      this.current_page = 1
       this.loadData()
     },
 
     resetFilters() {
       this.initFilterValues()
-      this.currentPage = 1
+      this.current_page = 1
       this.loadData()
     },
 
     // ========== 分页操作 ==========
     goToPage(page) {
-      if (page < 1 || page > this.totalPages || page === this.currentPage) {
+      if (page < 1 || page > this.total_pages || page === this.current_page) {
         return
       }
-      this.currentPage = page
+      this.current_page = page
       this.loadData()
     },
 
     prevPage() {
-      if (this.currentPage > 1) {
-        this.goToPage(this.currentPage - 1)
+      if (this.current_page > 1) {
+        this.goToPage(this.current_page - 1)
       }
     },
 
     nextPage() {
-      if (this.currentPage < this.totalPages) {
-        this.goToPage(this.currentPage + 1)
+      if (this.current_page < this.total_pages) {
+        this.goToPage(this.current_page + 1)
       }
     },
 
     // 获取页码列表
     get pageList() {
       const pages = []
-      const total = this.totalPages
-      const current = this.currentPage
+      const total = this.total_pages
+      const current = this.current_page
       const maxPages = 5
 
       if (total <= maxPages) {
@@ -340,26 +340,6 @@ function adminPage(config = {}) {
     },
 
     // ========== 工具方法 ==========
-    formatDate(dateStr) {
-      if (!dateStr) return '-'
-      const date = new Date(dateStr)
-      if (isNaN(date.getTime())) return dateStr
-      return date.toLocaleDateString('zh-CN')
-    },
-
-    formatDateTime(dateStr) {
-      if (!dateStr) return '-'
-      const date = new Date(dateStr)
-      if (isNaN(date.getTime())) return dateStr
-      return date.toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
-    },
-
     escapeHtml(text) {
       if (!text) return ''
       const div = document.createElement('div')

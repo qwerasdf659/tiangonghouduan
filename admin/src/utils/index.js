@@ -120,13 +120,13 @@ export function formatDate(dateValue, options = {}) {
 
     return date.toLocaleString(BEIJING_TIMEZONE_CONFIG.locale, formatOptions)
   } catch (e) {
-    console.warn('[formatDate] 日期格式化失败:', dateValue, e)
+    logger.warn('[formatDate] 日期格式化失败:', dateValue, e)
     return '-'
   }
 }
 
 /**
- * 格式化日期时间为北京时间（formatDate 别名）
+ * 格式化日期时间为北京时间（包含秒）
  * @param {string|Date|Object} dateValue - 日期值
  * @returns {string} 格式化后的北京时间字符串
  */

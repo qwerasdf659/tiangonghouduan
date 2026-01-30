@@ -23,7 +23,7 @@ export function useBudgetState() {
     /** @type {Object} 预算汇总 */
     budgetSummary: { total_budget: 0, total_used: 0, total_remaining: 0, total_campaigns: 0 },
     /** @type {Object} 预算筛选条件 */
-    budgetFilters: { status: '', budgetType: '' },
+    budgetFilters: { status: '', budget_type: '' },
     /** @type {Object} 预算表单 */
     budgetForm: {
       campaign_id: '',
@@ -34,7 +34,7 @@ export function useBudgetState() {
     },
     /** @type {number|string|null} 当前编辑的预算活动ID */
     editingBudgetCampaignId: null,
-    
+
     // ========== P1新增: 消耗趋势图相关状态 ==========
     /** @type {Array} 7天预算消耗趋势数据 */
     budgetTrendData: [],
@@ -90,9 +90,9 @@ export function useBudgetMethods() {
 
           // 仅前端筛选 budget_mode（活动状态已由后端 API 筛选）
           let filteredCampaigns = campaigns || []
-          if (this.budgetFilters.budgetType) {
+          if (this.budgetFilters.budget_type) {
             filteredCampaigns = filteredCampaigns.filter(
-              c => c.budget_mode === this.budgetFilters.budgetType
+              c => c.budget_mode === this.budgetFilters.budget_type
             )
           }
 
@@ -242,9 +242,7 @@ export function useBudgetMethods() {
      */
     calculateDailyBudgetTrend(campaignId) {
       // 查找活动预算配置
-      const campaign = this.budgetCampaigns.find(
-        c => (c.campaign_id || c.id) === campaignId
-      )
+      const campaign = this.budgetCampaigns.find(c => (c.campaign_id || c.id) === campaignId)
 
       if (!campaign) {
         return this.generateMockTrendData()
@@ -273,7 +271,10 @@ export function useBudgetMethods() {
         // 计算累计消耗（模拟递增）
         const factor = (days - i) / days
         const cumulativeUsed = Math.round(usedBudget * factor)
-        const dailyUsed = i === 0 ? usedBudget - (trend[trend.length - 1]?.cumulative || 0) : Math.round(dailyAvg * (0.8 + Math.random() * 0.4))
+        const dailyUsed =
+          i === 0
+            ? usedBudget - (trend[trend.length - 1]?.cumulative || 0)
+            : Math.round(dailyAvg * (0.8 + Math.random() * 0.4))
 
         trend.push({
           date: dateStr,
@@ -457,7 +458,7 @@ export function useBudgetMethods() {
       await this.loadBudgetTrendData(campaignId)
 
       // 初始化或更新图表
-      await this.$nextTick?.() || await new Promise(resolve => setTimeout(resolve, 100))
+      ;(await this.$nextTick?.()) || (await new Promise(resolve => setTimeout(resolve, 100)))
       this.initBudgetTrendChart()
 
       // 显示趋势模态框

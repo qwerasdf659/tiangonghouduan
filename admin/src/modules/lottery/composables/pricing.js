@@ -22,7 +22,7 @@ export function usePricingState() {
     /** @type {Array} 定价版本列表 */
     pricingVersions: [],
     /** @type {Object} 定价筛选条件 */
-    pricingFilters: { campaignCode: '', status: '' },
+    pricingFilters: { campaign_code: '', status: '' },
     /** @type {Object} 定价表单 */
     pricingForm: {
       campaign_code: '',
@@ -351,7 +351,7 @@ export function usePricingMethods() {
      * 重置定价筛选条件
      */
     resetPricingFilters() {
-      this.pricingFilters = { campaignCode: '', status: '' }
+      this.pricingFilters = { campaign_code: '', status: '' }
       this.loadPricingConfigs()
     },
 

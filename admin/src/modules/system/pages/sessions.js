@@ -33,7 +33,7 @@
 import { logger } from '../../../utils/logger.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
 import { buildURL, request } from '../../../api/base.js'
-import { createBatchOperationMixin } from '../../../alpine/mixins/index.js'
+import { createBatchOperationMixin, createPageMixin } from '../../../alpine/mixins/index.js'
 
 /**
  * API请求封装 - 带错误处理
@@ -84,8 +84,9 @@ const apiRequest = async (url, options = {}) => {
 function sessionsPage() {
   return {
     // ==================== Mixin 组合 ====================
+    ...createPageMixin(),
     ...createBatchOperationMixin({
-      pageSize: 20,
+      page_size: 20,
       primaryKey: 'user_session_id'
     }),
 
@@ -116,15 +117,15 @@ function sessionsPage() {
      * 筛选条件
      * @type {Object}
      * @property {string} status - 状态筛选 ('active'|'expired'|'')
-     * @property {string} userType - 用户类型筛选 ('user'|'admin'|'')
-     * @property {string} userId - 用户ID筛选
-     * @property {string} sortBy - 排序字段
+     * @property {string} user_type - 用户类型筛选 ('user'|'admin'|'')
+     * @property {string} user_id - 用户ID筛选
+     * @property {string} sort_by - 排序字段
      */
     filters: {
       status: '',
-      userType: '',
-      userId: '',
-      sortBy: 'last_activity'
+      user_type: '',
+      user_id: '',
+      sort_by: 'last_activity'
     },
 
     /**
@@ -176,13 +177,13 @@ function sessionsPage() {
       }
 
       // 确保用户信息已加载
-      if (!this.userInfo) {
+      if (!this.current_user) {
         this._loadUserInfo?.()
       }
 
       logger.info('[Sessions] 用户信息:', {
-        user_id: this.userInfo?.user_id,
-        is_admin: this.userInfo?.is_admin
+        user_id: this.current_user?.user_id,
+        is_admin: this.current_user?.is_admin
       })
 
       // 加载会话列表
@@ -200,19 +201,19 @@ function sessionsPage() {
      * @returns {Promise<void>}
      */
     async loadData(page = null) {
-      logger.info('[Sessions] loadData 开始', { page, currentPage: this.currentPage })
+      logger.info('[Sessions] loadData 开始', { page, current_page: this.current_page })
 
       if (page !== null) {
-        this.currentPage = page
+        this.current_page = page
       }
       this.selectedSessions = []
       this.loading = true
 
       try {
         const params = new URLSearchParams()
-        params.append('page', this.currentPage || 1)
-        params.append('page_size', this.pageSize || 20)
-        params.append('sort_by', this.filters.sortBy || 'last_activity')
+        params.append('page', this.current_page || 1)
+        params.append('page_size', this.page_size || 20)
+        params.append('sort_by', this.filters.sort_by || 'last_activity')
         params.append('sort_order', 'desc')
 
         if (this.filters.status === 'active') {
@@ -221,12 +222,12 @@ function sessionsPage() {
           params.append('is_active', 'false')
         }
 
-        if (this.filters.userType) {
-          params.append('user_type', this.filters.userType)
+        if (this.filters.user_type) {
+          params.append('user_type', this.filters.user_type)
         }
 
-        if (this.filters.userId) {
-          params.append('user_id', this.filters.userId)
+        if (this.filters.user_id) {
+          params.append('user_id', this.filters.user_id)
         }
 
         const url = USER_ENDPOINTS.SESSIONS_LIST + '?' + params.toString()
@@ -483,7 +484,7 @@ function sessionsPage() {
      * @returns {Promise<void>}
      */
     async revokeAllExceptCurrent() {
-      logger.info('[Sessions] revokeAllExceptCurrent 开始', { userInfo: this.userInfo })
+      logger.info('[Sessions] revokeAllExceptCurrent 开始', { current_user: this.current_user })
 
       const confirmed = await this.confirmDanger(
         '确定要强制下线所有其他设备吗？其他设备上的会话将被立即终止。'
@@ -494,8 +495,8 @@ function sessionsPage() {
       }
 
       // 获取用户信息
-      const userInfo = this.userInfo || this.currentUser
-      if (!userInfo || !userInfo.user_id) {
+      const current_user = this.current_user
+      if (!current_user || !current_user.user_id) {
         logger.error('[Sessions] 无法获取当前用户信息')
         this.showError('无法获取当前用户信息，请刷新页面后重试')
         return
@@ -505,15 +506,15 @@ function sessionsPage() {
 
       try {
         logger.debug('[Sessions] 发送强制下线请求...', {
-          user_id: userInfo.user_id,
-          is_admin: userInfo.is_admin
+          user_id: current_user.user_id,
+          is_admin: current_user.is_admin
         })
 
         const response = await apiRequest(USER_ENDPOINTS.SESSIONS_DEACTIVATE_USER, {
           method: 'POST',
           data: {
-            user_type: userInfo.is_admin ? 'admin' : 'user',
-            user_id: userInfo.user_id,
+            user_type: current_user.is_admin ? 'admin' : 'user',
+            user_id: current_user.user_id,
             reason: '用户主动下线其他设备'
           }
         })
@@ -592,17 +593,6 @@ function sessionsPage() {
         revoked: '已撤销'
       }
       return labels[status] || status
-    },
-
-    /**
-     * 格式化日期时间为中文显示格式
-     * @method formatDateTime
-     * @param {string|null} dateStr - ISO日期字符串
-     * @returns {string} 格式化后的日期时间字符串
-     */
-    formatDateTime(dateStr) {
-      if (!dateStr) return '-'
-      return new Date(dateStr).toLocaleString('zh-CN')
     },
 
     /**
@@ -691,18 +681,9 @@ function sessionsPage() {
           alert(errorMsg)
         }
       }
-    },
-
-    /**
-     * 获取分页页码数组（HTML模板兼容方法）
-     * @method getPaginationPages
-     * @description 将 getter 包装为方法供 HTML 模板中 x-for 调用
-     * @returns {Array<number|string>} 可见页码数组
-     */
-    getPaginationPages() {
-      // 使用 mixin 中的 visiblePages getter
-      return this.visiblePages || this.paginationPages || []
     }
+
+    // 分页使用 paginationMixin 提供的 visiblePages getter
   }
 }
 

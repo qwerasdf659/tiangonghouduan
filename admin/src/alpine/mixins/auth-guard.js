@@ -33,10 +33,7 @@ export function authGuardMixin() {
     // ========== 用户状态 ==========
 
     /** 当前用户信息 */
-    currentUser: null,
-
-    /** 用户信息（向后兼容别名） */
-    userInfo: null,
+    current_user: null,
 
     /** 是否已认证 */
     isAuthenticated: false,
@@ -68,15 +65,14 @@ export function authGuardMixin() {
     },
 
     /**
-     * 内部方法：加载用户信息到 currentUser 和 userInfo
+     * 内部方法：加载用户信息到 current_user
      */
     _loadUserInfo() {
       try {
         const userInfoStr = localStorage.getItem('user_info') || localStorage.getItem('admin_user')
         if (userInfoStr) {
           const user = JSON.parse(userInfoStr)
-          this.currentUser = user
-          this.userInfo = user // 向后兼容
+          this.current_user = user
         }
       } catch (error) {
         logger.error('[AuthGuard] 加载用户信息失败:', error)
@@ -90,15 +86,15 @@ export function authGuardMixin() {
      * @returns {Object|null} 用户信息
      */
     getCurrentUser() {
-      if (this.currentUser) {
-        return this.currentUser
+      if (this.current_user) {
+        return this.current_user
       }
 
       try {
         const userInfo = localStorage.getItem('user_info')
         if (userInfo) {
-          this.currentUser = JSON.parse(userInfo)
-          return this.currentUser
+          this.current_user = JSON.parse(userInfo)
+          return this.current_user
         }
       } catch (error) {
         logger.error('[AuthGuard] 解析用户信息失败:', error)
@@ -215,7 +211,7 @@ export function authGuardMixin() {
     logout() {
       clearToken()
       localStorage.removeItem('user_info')
-      this.currentUser = null
+      this.current_user = null
       this.isAuthenticated = false
       window.location.href = '/admin/login.html'
     },
@@ -226,7 +222,7 @@ export function authGuardMixin() {
      * @param {Object} userInfo - 用户信息
      */
     setCurrentUser(userInfo) {
-      this.currentUser = userInfo
+      this.current_user = userInfo
       localStorage.setItem('user_info', JSON.stringify(userInfo))
     },
 

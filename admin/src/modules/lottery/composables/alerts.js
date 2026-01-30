@@ -72,7 +72,7 @@ export function useAlertsMethods() {
 
       try {
         const params = new URLSearchParams()
-        
+
         if (this.alertFilters.campaign_id) {
           params.append('campaign_id', this.alertFilters.campaign_id)
         }
@@ -228,10 +228,16 @@ export function useAlertsMethods() {
 
       this.processingAlert = true
       try {
-        const url = buildURL(LOTTERY_ENDPOINTS.REALTIME_ALERTS_RESOLVE, { id: this.selectedAlert.alert_id })
-        const response = await this.apiPost(url, {
-          resolve_notes: this.resolveNotes
-        }, { showLoading: true })
+        const url = buildURL(LOTTERY_ENDPOINTS.REALTIME_ALERTS_RESOLVE, {
+          id: this.selectedAlert.alert_id
+        })
+        const response = await this.apiPost(
+          url,
+          {
+            resolve_notes: this.resolveNotes
+          },
+          { showLoading: true }
+        )
 
         if (response?.success) {
           logger.info('[Alerts] 告警已解决', { alert_id: this.selectedAlert.alert_id })
@@ -384,6 +390,3 @@ export function useAlertsMethods() {
 }
 
 export default { useAlertsState, useAlertsMethods }
-
-
-

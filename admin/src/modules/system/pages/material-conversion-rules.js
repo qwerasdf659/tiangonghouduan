@@ -422,17 +422,6 @@ function materialConversionRulesPage() {
     },
 
     /**
-     * 格式化日期为中文显示格式
-     * @method formatDate
-     * @param {string|null} dateStr - ISO日期字符串
-     * @returns {string} 格式化后的日期字符串，如 '2026/1/23 14:30:00'
-     */
-    formatDate(dateStr) {
-      if (!dateStr) return '-'
-      return new Date(dateStr).toLocaleString('zh-CN')
-    },
-
-    /**
      * 格式化日期时间为HTML datetime-local输入框格式
      * @private
      * @method _formatDateTimeLocal

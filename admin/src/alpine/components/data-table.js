@@ -196,26 +196,6 @@ function dataTable(config = {}) {
       return path.split('.').reduce((current, key) => current?.[key], obj)
     },
 
-    formatDate(dateStr) {
-      if (!dateStr) return '-'
-      const date = new Date(dateStr)
-      if (isNaN(date.getTime())) return dateStr
-      return date.toLocaleDateString('zh-CN')
-    },
-
-    formatDateTime(dateStr) {
-      if (!dateStr) return '-'
-      const date = new Date(dateStr)
-      if (isNaN(date.getTime())) return dateStr
-      return date.toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
-    },
-
     escapeHtml(text) {
       if (!text) return ''
       const div = document.createElement('div')
