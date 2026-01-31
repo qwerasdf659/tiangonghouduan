@@ -123,25 +123,25 @@ class ScheduledTasks {
 
       /*
        * P1-9：使用 snake_case 服务键获取服务
-       * exchange_market, admin_lottery, notification, trade_order, management_strategy
+       * V4.7.0 大文件拆分：exchange_market → exchange_core, admin_lottery → admin_lottery_core
        * 2026-01-30 新增：unified_lottery_engine（用于 Task 27 CacheManager 缓存清理）
        */
-      this.ExchangeService = serviceManager.getService('exchange_market')
-      this.AdminLotteryService = serviceManager.getService('admin_lottery')
+      this.ExchangeService = serviceManager.getService('exchange_core') // V4.7.0 拆分后使用 exchange_core
+      this.AdminLotteryService = serviceManager.getService('admin_lottery_core') // V4.7.0 拆分后使用 admin_lottery_core
       this.NotificationService = serviceManager.getService('notification')
       this.TradeOrderService = serviceManager.getService('trade_order')
       this.ManagementStrategy = serviceManager.getService('management_strategy')
       this.UnifiedLotteryEngine = serviceManager.getService('unified_lottery_engine') // 2026-01-30 新增
 
       this._servicesInitialized = true
-      logger.info('[ScheduledTasks] 服务依赖初始化完成（P1-9 snake_case key）', {
+      logger.info('[ScheduledTasks] 服务依赖初始化完成（V4.7.0 拆分后服务键）', {
         services: [
-          'exchange_market',
-          'admin_lottery',
+          'exchange_core',
+          'admin_lottery_core',
           'notification',
           'trade_order',
           'management_strategy',
-          'unified_lottery_engine' // 2026-01-30 新增
+          'unified_lottery_engine'
         ]
       })
     } catch (error) {

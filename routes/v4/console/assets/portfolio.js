@@ -82,9 +82,9 @@ router.get('/portfolio', authenticateToken, requireRoleLevel(30), async (req, re
 
     logger.info('📦 获取用户资产总览', { user_id, include_items })
 
-    // 通过 ServiceManager 获取 AssetService（路由层规范）
-    const AssetService = req.app.locals.services.getService('asset')
-    const portfolio = await AssetService.getAssetPortfolio({ user_id }, { include_items })
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 QueryService（2026-01-31）
+    const QueryService = req.app.locals.services.getService('asset_query')
+    const portfolio = await QueryService.getAssetPortfolio({ user_id }, { include_items })
 
     return res.apiSuccess(portfolio, '获取资产总览成功')
   } catch (error) {
@@ -117,10 +117,10 @@ router.get('/portfolio/items', authenticateToken, requireRoleLevel(30), async (r
     const item_type = req.query.item_type || null
     const status = req.query.status || null
 
-    // 通过 ServiceManager 获取 AssetService（路由层规范）
-    const AssetService = req.app.locals.services.getService('asset')
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 ItemService（2026-01-31）
+    const ItemService = req.app.locals.services.getService('asset_item')
 
-    const result = await AssetService.getUserItemInstances(
+    const result = await ItemService.getUserItemInstances(
       { user_id },
       { item_type, status, page, page_size }
     )
@@ -154,10 +154,10 @@ router.get(
         return res.apiError('无效的物品ID', 400)
       }
 
-      // 通过 ServiceManager 获取 AssetService（路由层规范）
-      const AssetService = req.app.locals.services.getService('asset')
+      // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 ItemService（2026-01-31）
+      const ItemService = req.app.locals.services.getService('asset_item')
 
-      const result = await AssetService.getItemInstanceDetail(
+      const result = await ItemService.getItemInstanceDetail(
         { user_id, item_instance_id },
         { event_limit: 10 }
       )
@@ -214,10 +214,10 @@ router.get('/item-events', authenticateToken, requireRoleLevel(30), async (req, 
 
     logger.info('📜 获取物品事件历史', { user_id, item_instance_id, event_types, page, limit })
 
-    // 通过 ServiceManager 获取 AssetService（路由层规范）
-    const AssetService = req.app.locals.services.getService('asset')
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 ItemService（2026-01-31）
+    const ItemService = req.app.locals.services.getService('asset_item')
 
-    const result = await AssetService.getItemEvents({
+    const result = await ItemService.getItemEvents({
       user_id,
       item_instance_id,
       event_types,

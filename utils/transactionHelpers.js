@@ -10,10 +10,10 @@
  * ```javascript
  * const { requireTransaction } = require('../utils/transactionHelpers')
  *
- * class AssetService {
+ * class BalanceService {
  *   static async changeBalance(params, options = {}) {
  *     const transaction = options.transaction || TransactionContext.getTransaction()
- *     requireTransaction(transaction, 'AssetService.changeBalance')
+ *     requireTransaction(transaction, 'BalanceService.changeBalance')
  *     // ... 业务逻辑 ...
  *   }
  * }

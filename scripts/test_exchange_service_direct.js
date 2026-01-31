@@ -30,9 +30,10 @@ async function main() {
     await sequelize.authenticate()
     console.log('✅ 数据库连接成功')
 
-    // 加载服务
-    ExchangeService = require('../services/ExchangeService')
-    console.log('✅ ExchangeService 加载成功')
+    // 加载拆分后的服务（V4.7.0）
+    const ExchangeAdminService = require('../services/exchange/AdminService')
+    ExchangeService = new ExchangeAdminService(models)
+    console.log('✅ ExchangeAdminService 加载成功')
 
     // 测试数据（使用 item_name，验证兼容性）
     const testItemWithOldFieldNames = {

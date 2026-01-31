@@ -274,7 +274,7 @@ router.post(
        * - 通知失败不影响抽奖结果返回（非关键路径）
        */
       try {
-        const NotificationService = require('../../../services/NotificationService')
+        const NotificationService = req.app.locals.services.getService('notification')
 
         // 并行发送所有奖品的通知（支持单抽和连抽）
         const notificationPromises = sanitizedResult.prizes.map(prize =>

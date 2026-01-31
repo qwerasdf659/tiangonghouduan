@@ -79,7 +79,7 @@ const ECONOMIC_BALANCE_CONFIG = {
 
 /**
  * 积分业务类型定义
- * 与 AssetService 中的 business_type 保持一致
+ * 与 BalanceService 中的 business_type 保持一致
  */
 const POINTS_BUSINESS_TYPES = {
   /** 产出类型 */

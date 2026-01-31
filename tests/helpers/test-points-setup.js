@@ -57,7 +57,8 @@ async function ensureTestUserHasPoints(requiredPoints = 1500000, options = {}) {
 
   // 延迟加载，避免循环依赖
   const { sequelize } = require('../../config/database')
-  const AssetService = require('../../services/AssetService')
+  // V4.7.0 AssetService 拆分：使用 BalanceService（2026-01-31）
+  const BalanceService = require('../../services/asset/BalanceService')
 
   // 确保测试数据已初始化
   await initRealTestData()
@@ -79,7 +80,7 @@ async function ensureTestUserHasPoints(requiredPoints = 1500000, options = {}) {
      * 1. 查询当前余额
      * 🔴 修复：getBalance 返回对象 { available_amount, frozen_amount, ... }
      */
-    const currentBalanceResult = await AssetService.getBalance(
+    const currentBalanceResult = await BalanceService.getBalance(
       { user_id, asset_code: 'POINTS' },
       { transaction }
     )
@@ -109,7 +110,7 @@ async function ensureTestUserHasPoints(requiredPoints = 1500000, options = {}) {
     const idempotency_key = `test_topup_${user_id}_${testName}_${today}_${uuidv4().slice(0, 8)}`
 
     // 4. 执行充值
-    await AssetService.changeBalance(
+    await BalanceService.changeBalance(
       {
         user_id,
         asset_code: 'POINTS',
@@ -162,7 +163,8 @@ async function ensureTestUserHasPoints(requiredPoints = 1500000, options = {}) {
  * const balance2 = await getTestUserPointsBalance(31)
  */
 async function getTestUserPointsBalance(userId = null) {
-  const AssetService = require('../../services/AssetService')
+  // V4.7.0 AssetService 拆分：使用 BalanceService（2026-01-31）
+  const BalanceService = require('../../services/asset/BalanceService')
 
   let user_id = userId
 
@@ -176,7 +178,7 @@ async function getTestUserPointsBalance(userId = null) {
   }
 
   // 获取积分余额
-  const balanceResult = await AssetService.getBalance({ user_id, asset_code: 'POINTS' })
+  const balanceResult = await BalanceService.getBalance({ user_id, asset_code: 'POINTS' })
 
   // 直接返回数字余额（方便测试中进行数学计算）
   return Number(balanceResult?.available_amount) || 0

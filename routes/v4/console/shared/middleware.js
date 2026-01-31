@@ -130,7 +130,7 @@ const sharedComponents = {
 async function getSimpleSystemStats(serviceManager) {
   try {
     // ✅ 通过ServiceManager获取ReportingService（P2-C架构重构：已合并AdminAnalyticsService、StatisticsService、UserDashboardService）
-    const ReportingService = serviceManager.getService('reporting')
+    const ReportingService = serviceManager.getService('reporting_stats')
 
     // ✅ 调用Service方法，不再直连models
     return await ReportingService.getSimpleSystemStats()

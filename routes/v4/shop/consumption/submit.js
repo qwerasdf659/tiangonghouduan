@@ -88,7 +88,7 @@ router.post(
   async (req, res) => {
     // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
     const IdempotencyService = req.app.locals.services.getService('idempotency')
-    const ConsumptionService = req.app.locals.services.getService('consumption')
+    const ConsumptionService = req.app.locals.services.getService('consumption_core')
 
     // 【业界标准形态】强制从 Header 获取幂等键，不接受 body，不服务端生成
     const idempotency_key = req.headers['idempotency-key']

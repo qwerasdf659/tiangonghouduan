@@ -79,7 +79,7 @@ router.get('/listing-stats', authenticateToken, requireRoleLevel(100), async (re
     })
 
     // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
-    const ExchangeService = req.app.locals.services.getService('exchange_market')
+    const ExchangeService = req.app.locals.services.getService('exchange_admin')
 
     // 🎯 调用服务层方法获取用户上架统计
     const result = await ExchangeService.getUserListingStats({
@@ -153,7 +153,7 @@ router.get('/exchange_market/items', authenticateToken, requireRoleLevel(100), a
     })
 
     // 🎯 通过 ServiceManager 获取 ExchangeService
-    const ExchangeService = req.app.locals.services.getService('exchange_market')
+    const ExchangeService = req.app.locals.services.getService('exchange_admin')
 
     // 调用服务层方法获取商品列表（管理后台查看所有状态）
     const result = await ExchangeService.getAdminMarketItems({
@@ -210,7 +210,7 @@ router.get(
       logger.info('管理员查询兑换市场统计', { admin_id })
 
       // 🎯 通过 ServiceManager 获取 ExchangeService
-      const ExchangeService = req.app.locals.services.getService('exchange_market')
+      const ExchangeService = req.app.locals.services.getService('exchange_admin')
 
       // 调用服务层方法获取统计数据
       const statistics = await ExchangeService.getMarketItemStatistics()
@@ -269,7 +269,7 @@ router.get(
       }
 
       // 🎯 通过 ServiceManager 获取 ExchangeService
-      const ExchangeService = req.app.locals.services.getService('exchange_market')
+      const ExchangeService = req.app.locals.services.getService('exchange_admin')
 
       // 调用服务层方法获取商品详情
       const result = await ExchangeService.getItemDetail(itemId)
@@ -353,7 +353,7 @@ router.post(
     })
 
     // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
-    const ExchangeService = req.app.locals.services.getService('exchange_market')
+    const ExchangeService = req.app.locals.services.getService('exchange_admin')
 
     // 🎯 2026-01-08 图片存储架构修复：使用 TransactionManager 包装事务
     const transactionResult = await TransactionManager.execute(async transaction => {
@@ -473,7 +473,7 @@ router.put(
       }
 
       // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
-      const ExchangeService = req.app.locals.services.getService('exchange_market')
+      const ExchangeService = req.app.locals.services.getService('exchange_admin')
 
       // 🎯 2026-01-08：使用事务包装更新操作（含图片处理）
       const result = await TransactionManager.execute(
@@ -568,7 +568,7 @@ router.delete(
       }
 
       // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
-      const ExchangeService = req.app.locals.services.getService('exchange_market')
+      const ExchangeService = req.app.locals.services.getService('exchange_admin')
 
       // 🎯 2026-01-08：使用事务包装删除操作（含图片删除）
       const result = await TransactionManager.execute(
@@ -828,7 +828,7 @@ router.post(
       }
 
       // 🎯 P1-9：通过 ServiceManager 获取 MarketListingService（snake_case key）
-      const MarketListingService = req.app.locals.services.getService('market_listing')
+      const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
       const result = await TransactionManager.execute(
         async transaction => {
@@ -951,7 +951,7 @@ router.get(
       })
 
       // 🎯 通过 ServiceManager 获取 ExchangeService
-      const ExchangeService = req.app.locals.services.getService('exchange_market')
+      const ExchangeService = req.app.locals.services.getService('exchange_admin')
 
       // 调用服务层方法获取订单列表
       const result = await ExchangeService.getAdminOrders({
@@ -1013,7 +1013,7 @@ router.get(
       })
 
       // 🎯 通过 ServiceManager 获取 ExchangeService
-      const ExchangeService = req.app.locals.services.getService('exchange_market')
+      const ExchangeService = req.app.locals.services.getService('exchange_admin')
 
       // 调用服务层方法获取订单详情
       const result = await ExchangeService.getAdminOrderDetail(order_no)

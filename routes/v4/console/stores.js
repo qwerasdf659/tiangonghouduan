@@ -35,9 +35,17 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
-const StoreService = require('../../../services/StoreService')
 const logger = require('../../../utils/logger').logger
 const TransactionManager = require('../../../utils/TransactionManager')
+
+/**
+ * 获取门店管理服务（通过 ServiceManager 统一入口）
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} StoreService 实例
+ */
+function getStoreService(req) {
+  return req.app.locals.services.getService('store')
+}
 
 /**
  * 处理服务层错误
@@ -117,6 +125,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
     // 验证分页参数
     const validatedPageSize = Math.min(parseInt(page_size, 10) || 20, 100)
 
+    const StoreService = getStoreService(req)
     const result = await StoreService.getStoreList({
       page,
       page_size: validatedPageSize,
@@ -145,6 +154,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  */
 router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
+    const StoreService = getStoreService(req)
     const stats = await StoreService.getStoreStats()
 
     return res.apiSuccess(stats, '获取门店统计成功')
@@ -168,6 +178,7 @@ router.get('/:store_id', authenticateToken, requireRoleLevel(100), async (req, r
       return res.apiError('门店ID无效', 'INVALID_STORE_ID', null, 400)
     }
 
+    const StoreService = getStoreService(req)
     const store = await StoreService.getStoreById(parseInt(store_id, 10))
 
     if (!store) {
@@ -232,6 +243,7 @@ router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
       )
     }
 
+    const StoreService = getStoreService(req)
     const result = await TransactionManager.execute(async transaction => {
       return await StoreService.createStore(storeData, {
         operator_id,
@@ -286,6 +298,7 @@ router.post('/batch-import', authenticateToken, requireRoleLevel(100), async (re
       failed: []
     }
 
+    const StoreService = getStoreService(req)
     // 逐条处理，记录成功和失败（每条记录独立事务，需要按顺序处理）
     for (let i = 0; i < stores.length; i++) {
       const storeData = stores[i]
@@ -376,6 +389,7 @@ router.put('/:store_id', authenticateToken, requireRoleLevel(100), async (req, r
       return res.apiError('门店ID无效', 'INVALID_STORE_ID', null, 400)
     }
 
+    const StoreService = getStoreService(req)
     const result = await TransactionManager.execute(async transaction => {
       return await StoreService.updateStore(parseInt(store_id, 10), updateData, {
         operator_id,
@@ -415,6 +429,7 @@ router.delete('/:store_id', authenticateToken, requireRoleLevel(100), async (req
       return res.apiError('门店ID无效', 'INVALID_STORE_ID', null, 400)
     }
 
+    const StoreService = getStoreService(req)
     const result = await TransactionManager.execute(async transaction => {
       return await StoreService.deleteStore(parseInt(store_id, 10), {
         operator_id,
@@ -451,6 +466,7 @@ router.post('/:store_id/activate', authenticateToken, requireRoleLevel(100), asy
       return res.apiError('门店ID无效', 'INVALID_STORE_ID', null, 400)
     }
 
+    const StoreService = getStoreService(req)
     const result = await TransactionManager.execute(async transaction => {
       return await StoreService.updateStore(
         parseInt(store_id, 10),
@@ -481,6 +497,7 @@ router.post('/:store_id/deactivate', authenticateToken, requireRoleLevel(100), a
       return res.apiError('门店ID无效', 'INVALID_STORE_ID', null, 400)
     }
 
+    const StoreService = getStoreService(req)
     const result = await TransactionManager.execute(async transaction => {
       return await StoreService.updateStore(
         parseInt(store_id, 10),

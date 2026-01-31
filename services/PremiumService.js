@@ -30,7 +30,8 @@
 const { Op, fn, col } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { User, UserPremiumStatus } = require('../models')
-const AssetService = require('./AssetService')
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+const BalanceService = require('./asset/BalanceService')
 const logger = require('../utils/logger')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
@@ -114,8 +115,8 @@ class PremiumService {
       throw error
     }
 
-    // 通过 AssetService 获取积分余额
-    const pointsBalance = await AssetService.getBalance(
+    // 通过 BalanceService 获取积分余额
+    const pointsBalance = await BalanceService.getBalance(
       { user_id, asset_code: 'POINTS' },
       { transaction }
     )
@@ -172,10 +173,10 @@ class PremiumService {
 
     /*
      * ========================================
-     * 步骤5: 扣除100积分（通过AssetService统一处理）
+     * 步骤5: 扣除100积分（通过 BalanceService 统一处理）
      * ========================================
-     * ✅ 架构规范：所有积分操作必须通过AssetService，不得直接操作账户表
-     * - AssetService.changeBalance()自动处理账户更新、交易记录创建、审计日志
+     * ✅ 架构规范：所有积分操作必须通过 BalanceService，不得直接操作账户表
+     * - BalanceService.changeBalance()自动处理账户更新、交易记录创建、审计日志
      * - 支持幂等性控制（通过idempotency_key）
      * - 支持事务传递（transaction）
      */
@@ -183,7 +184,7 @@ class PremiumService {
     const idempotency_key = `premium_unlock_${user_id}_${BeijingTimeHelper.generateIdTimestamp()}`
 
     // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
-    const consumeResult = await AssetService.changeBalance(
+    const consumeResult = await BalanceService.changeBalance(
       {
         user_id,
         asset_code: 'POINTS',
@@ -293,8 +294,8 @@ class PremiumService {
         throw error
       }
 
-      // 通过 AssetService 获取积分余额
-      const pointsBalance = await AssetService.getBalance({ user_id, asset_code: 'POINTS' })
+      // 通过 BalanceService 获取积分余额
+      const pointsBalance = await BalanceService.getBalance({ user_id, asset_code: 'POINTS' })
 
       const historyPoints = user.history_total_points || 0
       const availablePoints = Number(pointsBalance.available_amount) || 0

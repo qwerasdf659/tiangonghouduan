@@ -23,7 +23,8 @@
 
 'use strict'
 
-const { sequelize, ExchangeItem, ExchangeRecord, User } = require('../../models')
+const models = require('../../models')
+const { sequelize, ExchangeItem, ExchangeRecord, User } = models
 const TransactionManager = require('../../utils/TransactionManager')
 
 /**
@@ -60,13 +61,38 @@ describe('ExchangeService - 兑换市场服务测试', () => {
     await sequelize.authenticate()
     console.log('✅ 数据库连接成功')
 
-    // 尝试获取 ServiceManager 注册的服务（键为 exchange_market）
-    try {
-      ExchangeService = global.getTestService('exchange_market')
-    } catch (e) {
-      // 兜底：直接 require（ExchangeService 使用静态方法）
-      ExchangeService = require('../../services/ExchangeService')
+    /*
+     * V4.7.0 大文件拆分：ExchangeService 已拆分为多个子服务
+     * - QueryService: 查询方法 (getMarketItems, getItemDetail, getUserOrders, getAdminOrders)
+     * - AdminService: 管理方法 (createExchangeItem, updateExchangeItem, deleteExchangeItem)
+     * - CoreService: 核心方法 (executeExchange)
+     * 测试需要同时使用这些服务的方法，创建组合对象
+     */
+    const ExchangeQueryService = require('../../services/exchange/QueryService')
+    const ExchangeAdminService = require('../../services/exchange/AdminService')
+
+    const queryService = new ExchangeQueryService(models)
+    const adminService = new ExchangeAdminService(models)
+
+    // 创建组合服务对象，包含所有需要的方法
+    ExchangeService = {
+      // 查询方法（QueryService）
+      getMarketItems: queryService.getMarketItems.bind(queryService),
+      getItemDetail: queryService.getItemDetail.bind(queryService),
+      getUserOrders: queryService.getUserOrders.bind(queryService),
+      getOrderDetail: queryService.getOrderDetail.bind(queryService),
+      getAdminOrders: queryService.getAdminOrders.bind(queryService),
+      getAdminOrderDetail: queryService.getAdminOrderDetail.bind(queryService),
+      getMarketStatistics: queryService.getMarketStatistics.bind(queryService),
+      // 管理方法（AdminService）
+      createExchangeItem: adminService.createExchangeItem.bind(adminService),
+      updateExchangeItem: adminService.updateExchangeItem.bind(adminService),
+      deleteExchangeItem: adminService.deleteExchangeItem.bind(adminService),
+      getAdminMarketItems: adminService.getAdminMarketItems.bind(adminService),
+      getMarketItemStatistics: adminService.getMarketItemStatistics.bind(adminService),
+      checkTimeoutAndAlert: adminService.checkTimeoutAndAlert.bind(adminService)
     }
+    console.log('✅ ExchangeService 拆分子服务加载成功（QueryService + AdminService）')
 
     if (!ExchangeService) {
       throw new Error('ExchangeService 加载失败')

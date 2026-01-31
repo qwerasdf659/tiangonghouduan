@@ -34,9 +34,17 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
-const StaffManagementService = require('../../../services/StaffManagementService')
 const logger = require('../../../utils/logger').logger
 const TransactionManager = require('../../../utils/TransactionManager')
+
+/**
+ * 获取员工管理服务（通过 ServiceManager 统一入口）
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} StaffManagementService 实例
+ */
+function getStaffManagementService(req) {
+  return req.app.locals.services.getService('staff_management')
+}
 
 /**
  * 处理服务层错误
@@ -114,7 +122,7 @@ router.get('/', authenticateToken, requireRoleLevel(30), async (req, res) => {
     // 验证分页参数
     const validatedPageSize = Math.min(parseInt(page_size, 10) || 20, 100)
 
-    const result = await StaffManagementService.getStaffList({
+    const result = await getStaffManagementService(req).getStaffList({
       page: parseInt(page, 10) || 1,
       page_size: validatedPageSize,
       store_id: store_id ? parseInt(store_id, 10) : undefined,
@@ -153,7 +161,7 @@ router.get('/stats', authenticateToken, requireRoleLevel(30), async (req, res) =
       return res.apiError('门店ID格式不正确', 'INVALID_STORE_ID', null, 400)
     }
 
-    const stats = await StaffManagementService.getStoreStaffStats(storeId)
+    const stats = await getStaffManagementService(req).getStoreStaffStats(storeId)
 
     return res.apiSuccess(
       {
@@ -182,7 +190,7 @@ router.get('/by-user/:user_id', authenticateToken, requireRoleLevel(30), async (
       return res.apiError('用户ID无效', 'INVALID_USER_ID', null, 400)
     }
 
-    const stores = await StaffManagementService.getUserStores(parseInt(user_id, 10))
+    const stores = await getStaffManagementService(req).getUserStores(parseInt(user_id, 10))
 
     return res.apiSuccess(
       {
@@ -212,7 +220,7 @@ router.get('/:store_staff_id', authenticateToken, requireRoleLevel(30), async (r
       return res.apiError('员工记录ID无效', 'INVALID_STORE_STAFF_ID', null, 400)
     }
 
-    const staff = await StaffManagementService.getStaffDetail(parseInt(store_staff_id, 10))
+    const staff = await getStaffManagementService(req).getStaffDetail(parseInt(store_staff_id, 10))
 
     if (!staff) {
       return res.apiError('员工记录不存在', 'STAFF_NOT_FOUND', null, 404)
@@ -262,7 +270,7 @@ router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
     }
 
     const result = await TransactionManager.execute(async transaction => {
-      return await StaffManagementService.addStaffToStore(
+      return await getStaffManagementService(req).addStaffToStore(
         {
           user_id: parseInt(user_id, 10),
           store_id: parseInt(store_id, 10),
@@ -333,7 +341,7 @@ router.post('/transfer', authenticateToken, requireRoleLevel(100), async (req, r
     }
 
     const result = await TransactionManager.execute(async transaction => {
-      return await StaffManagementService.transferStaff(
+      return await getStaffManagementService(req).transferStaff(
         {
           user_id: parseInt(user_id, 10),
           from_store_id: parseInt(from_store_id, 10),
@@ -390,7 +398,9 @@ router.post('/disable/:user_id', authenticateToken, requireRoleLevel(100), async
     const userId = parseInt(user_id, 10)
 
     const result = await TransactionManager.execute(async transaction => {
-      return await StaffManagementService.disableStaff(userId, operator_id, reason, { transaction })
+      return await getStaffManagementService(req).disableStaff(userId, operator_id, reason, {
+        transaction
+      })
     })
 
     logger.info('✅ 员工禁用成功', {
@@ -437,7 +447,7 @@ router.post('/enable', authenticateToken, requireRoleLevel(100), async (req, res
     }
 
     const result = await TransactionManager.execute(async transaction => {
-      return await StaffManagementService.enableStaff(
+      return await getStaffManagementService(req).enableStaff(
         parseInt(user_id, 10),
         parseInt(store_id, 10),
         operator_id,
@@ -498,7 +508,9 @@ router.put('/:store_staff_id/role', authenticateToken, requireRoleLevel(100), as
     }
 
     // 先获取员工记录以获取 user_id 和 store_id
-    const staffDetail = await StaffManagementService.getStaffDetail(parseInt(store_staff_id, 10))
+    const staffDetail = await getStaffManagementService(req).getStaffDetail(
+      parseInt(store_staff_id, 10)
+    )
 
     if (!staffDetail) {
       return res.apiError('员工记录不存在', 'STAFF_NOT_FOUND', null, 404)
@@ -506,7 +518,7 @@ router.put('/:store_staff_id/role', authenticateToken, requireRoleLevel(100), as
 
     // 执行角色变更事务（结果用于确认事务成功，响应使用 staffDetail 构建）
     await TransactionManager.execute(async transaction => {
-      return await StaffManagementService.updateStaffRole(
+      return await getStaffManagementService(req).updateStaffRole(
         {
           user_id: staffDetail.user_id,
           store_id: staffDetail.store_id,
@@ -578,7 +590,7 @@ router.delete('/:store_staff_id', authenticateToken, requireRoleLevel(100), asyn
     const storeStaffId = parseInt(store_staff_id, 10)
 
     // 获取员工记录
-    const staffDetail = await StaffManagementService.getStaffDetail(storeStaffId)
+    const staffDetail = await getStaffManagementService(req).getStaffDetail(storeStaffId)
 
     if (!staffDetail) {
       return res.apiError('员工记录不存在', 'STAFF_NOT_FOUND', null, 404)
@@ -594,7 +606,7 @@ router.delete('/:store_staff_id', authenticateToken, requireRoleLevel(100), asyn
         if (isForce) {
           // 强制删除在职员工
           result = await TransactionManager.execute(async transaction => {
-            return await StaffManagementService.permanentDeleteStaff(
+            return await getStaffManagementService(req).permanentDeleteStaff(
               {
                 store_staff_id: storeStaffId,
                 operator_id,
@@ -615,7 +627,7 @@ router.delete('/:store_staff_id', authenticateToken, requireRoleLevel(100), asyn
         } else {
           // 正常离职操作
           result = await TransactionManager.execute(async transaction => {
-            return await StaffManagementService.removeStaffFromStore(
+            return await getStaffManagementService(req).removeStaffFromStore(
               {
                 user_id: staffDetail.user_id,
                 store_id: staffDetail.store_id,
@@ -639,7 +651,7 @@ router.delete('/:store_staff_id', authenticateToken, requireRoleLevel(100), asyn
       case 'inactive':
         // 删除离职员工记录
         result = await TransactionManager.execute(async transaction => {
-          return await StaffManagementService.permanentDeleteStaff(
+          return await getStaffManagementService(req).permanentDeleteStaff(
             {
               store_staff_id: storeStaffId,
               operator_id,

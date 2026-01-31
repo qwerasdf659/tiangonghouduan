@@ -14,13 +14,14 @@ const { UnifiedLotteryEngine } = require('./UnifiedLotteryEngine/UnifiedLotteryE
 
 /**
  * V4 领域服务
- * 积分操作统一使用 AssetService
+ * 积分操作统一使用 BalanceService、ItemService、QueryService
+ * V4.7.0 大文件拆分（2026-01-31）- 原始大文件已删除，使用拆分后的子服务
  */
-const ExchangeService = require('./ExchangeService')
+// [已删除] ExchangeService.js → 拆分为 exchange/CoreService, exchange/QueryService, exchange/AdminService
 const ContentAuditEngine = require('./ContentAuditEngine')
 const AnnouncementService = require('./AnnouncementService')
 const NotificationService = require('./NotificationService')
-const ConsumptionService = require('./ConsumptionService')
+// [已删除] ConsumptionService.js → 拆分为 consumption/CoreService, consumption/QueryService, consumption/MerchantService
 const CustomerServiceSessionService = require('./CustomerServiceSessionService')
 const HierarchyManagementService = require('./HierarchyManagementService')
 const UserRoleService = require('./UserRoleService')
@@ -33,7 +34,7 @@ const ChatRateLimitService = require('./ChatRateLimitService') // 聊天频率�
 // V4 管理后台服务
 const FeedbackService = require('./FeedbackService') // 反馈管理服务
 const AdminSystemService = require('./AdminSystemService') // 管理后台系统服务（已合并SystemSettingsService）
-const AdminLotteryService = require('./AdminLotteryService') // 管理后台抽奖管理服务
+// [已删除] AdminLotteryService.js → 拆分为 admin-lottery/CoreService, admin-lottery/CampaignService, admin-lottery/QueryService
 const AdminCustomerServiceService = require('./AdminCustomerServiceService') // 管理后台客服管理服务
 const MaterialManagementService = require('./MaterialManagementService') // 材料系统运营管理服务（V4.5.0）
 const PopupBannerService = require('./PopupBannerService') // 弹窗Banner管理服务（2025-12-22）
@@ -44,12 +45,87 @@ const LotteryPresetService = require('./LotteryPresetService') // 抽奖预设�
 const ActivityService = require('./ActivityService') // 活动管理服务
 const AuditLogService = require('./AuditLogService') // 审计日志服务
 
-// V4 P2-C架构重构：服务合并优化（2025-12-11）
-const ReportingService = require('./ReportingService') // 统一报表服务（合并AdminAnalyticsService、StatisticsService、UserDashboardService）
+/*
+ * V4 P2-C架构重构：服务合并优化（2025-12-11）
+ * [已删除] ReportingService.js → 拆分为 reporting/AnalyticsService, reporting/ChartsService, reporting/StatsService
+ */
 
 // V4.5.0 材料系统服务（2025-12-15）
-const AssetService = require('./AssetService') // 统一资产服务（账户体系 + 冻结模型）
 const AssetConversionService = require('./AssetConversionService') // 资产转换服务（材料转钻石）
+
+/*
+ * V4.7.0 AssetService 拆分子服务（2026-01-31 大文件拆分方案）
+ * 原 AssetService.js 已拆分为 BalanceService、ItemService、QueryService
+ */
+const BalanceService = require('./asset/BalanceService') // 资产余额服务（8个方法）
+const ItemService = require('./asset/ItemService') // 资产物品服务（9个方法）
+const QueryService = require('./asset/QueryService') // 资产查询服务（7个方法）
+
+/*
+ * V4.7.0 LotteryAnalyticsService 拆分子服务（2026-01-31 大文件拆分方案 Phase 2）
+ * 原 LotteryAnalyticsService.js (4744行) 已拆分为5个子服务
+ */
+const {
+  RealtimeService: LotteryRealtimeService, // 实时监控服务（~800行）
+  StatisticsService: LotteryStatisticsService, // 统计趋势服务（~900行）
+  ReportService: LotteryReportService, // 报表生成服务（~700行）
+  UserAnalysisService: LotteryUserAnalysisService, // 用户维度分析服务（~800行）
+  CampaignAnalysisService: LotteryCampaignAnalysisService // 活动维度分析服务（~1000行）
+} = require('./lottery-analytics')
+
+/*
+ * V4.7.0 MarketListingService 拆分子服务（2026-01-31 大文件拆分方案 Phase 2）
+ * 原 MarketListingService.js (2295行) 已拆分为3个子服务
+ */
+const {
+  CoreService: MarketListingCoreService, // 核心挂牌操作（~800行）
+  QueryService: MarketListingQueryService, // 查询/搜索/筛选（~500行）
+  AdminService: MarketListingAdminService // 管理控制/止损（~400行）
+} = require('./market-listing')
+
+/*
+ * V4.7.0 ExchangeService 拆分子服务（2026-01-31 大文件拆分方案 Phase 3）
+ * 原 ExchangeService.js (1873行) 已拆分为3个子服务
+ */
+const {
+  CoreService: ExchangeCoreService, // 核心兑换操作（~450行）
+  QueryService: ExchangeQueryService, // 查询服务（~550行）
+  AdminService: ExchangeAdminService // 管理后台操作（~700行）
+} = require('./exchange')
+
+/*
+ * V4.7.0 ConsumptionService 拆分子服务（2026-01-31 大文件拆分方案 Phase 4）
+ * 原 ConsumptionService.js (1826行) 已拆分为3个子服务
+ */
+const {
+  CoreService: ConsumptionCoreService, // 核心操作（提交/审核/删除/恢复）
+  QueryService: ConsumptionQueryService, // 查询服务（用户/管理员/待审核列表）
+  MerchantService: ConsumptionMerchantService // 商家侧服务（商家员工专用查询）
+} = require('./consumption')
+
+/*
+ * V4.7.0 ReportingService 拆分子服务（2026-01-31 大文件拆分方案 Phase 5）
+ * 原 ReportingService.js (1820行) 已拆分为3个子服务
+ */
+const {
+  AnalyticsService: ReportingAnalyticsService, // 决策分析/趋势分析（~400行）
+  ChartsService: ReportingChartsService, // 图表数据生成（~600行）
+  StatsService: ReportingStatsService // 统计/概览/画像（~700行）
+} = require('./reporting')
+
+/*
+ * V4.7.0 AdminLotteryService 拆分子服务（2026-01-31 大文件拆分方案 Phase 6）
+ * 原 AdminLotteryService.js (1781行) 已拆分为3个子服务
+ */
+const {
+  CoreService: AdminLotteryCoreService, // 核心干预操作（~600行）
+  CampaignService: AdminLotteryCampaignService, // 活动管理操作（~450行）
+  QueryService: AdminLotteryQueryService, // 干预规则查询（~300行）
+  CRUDService: LotteryCampaignCRUDService // 活动 CRUD 操作（2026-01-31 路由层合规治理）
+} = require('./admin-lottery')
+
+// P2 路由层合规治理 - 会话管理服务（2026-01-31）
+const SessionManagementService = require('./SessionManagementService')
 
 // V4.6.0 业界标准幂等架构服务（2025-12-26 方案B）
 const IdempotencyService = require('./IdempotencyService') // 入口幂等服务（重试返回首次结果）
@@ -60,7 +136,7 @@ const BackpackService = require('./BackpackService') // 背包双轨查询服务
 
 // V4.2 交易市场服务（2025-12-21 暴力重构）
 const TradeOrderService = require('./TradeOrderService') // 交易订单服务（市场交易核心）
-const MarketListingService = require('./MarketListingService') // 市场挂牌服务（决策5B/0C：统一收口）
+// [已删除] MarketListingService.js → 拆分为 market-listing/CoreService, market-listing/QueryService, market-listing/AdminService
 
 // P0-2 孤儿冻结清理服务（2026-01-09）
 const OrphanFrozenCleanupService = require('./OrphanFrozenCleanupService') // 孤儿冻结清理唯一入口
@@ -82,9 +158,13 @@ const ItemTemplateService = require('./ItemTemplateService') // 物品模板管�
 const UserRiskProfileService = require('./UserRiskProfileService') // 用户风控配置管理服务（2026-01-21 API覆盖率补齐）
 const LotteryTierRuleService = require('./LotteryTierRuleService') // 抽奖档位规则管理服务（2026-01-21 API覆盖率补齐）
 
-// P2 API覆盖率补齐 - 监控查询服务（2026-01-21）
-const LotteryAnalyticsService = require('./LotteryAnalyticsService') // 抽奖分析服务（监控+统计）
+/*
+ * P2 API覆盖率补齐 - 监控查询服务（2026-01-21）
+ * [已删除] LotteryAnalyticsService.js → 拆分为 lottery-analytics/* 5个子服务
+ */
 const LotteryAlertService = require('./LotteryAlertService') // 抽奖告警服务（B1 实时告警列表API）
+const DisplayNameService = require('./DisplayNameService') // 显示名称翻译服务（系统字典）
+const FeatureFlagService = require('./FeatureFlagService') // 功能开关服务
 
 // 阶段C 批量操作基础设施服务（2026-01-30）
 const SystemConfigService = require('./SystemConfigService') // 系统配置服务（动态限流配置）
@@ -151,7 +231,7 @@ const models = require('../models')
  * // 推荐方式（B1-Injected）：通过 req.app.locals.services 获取
  * router.post('/create', authenticateToken, async (req, res) => {
  *   const services = req.app.locals.services
- *   const MarketListingService = services.getService('market_listing')
+ *   const MarketListingService = services.getService('market_listing_core') // V4.7.0 拆分后使用子服务键
  *   // ...
  * })
  *
@@ -242,11 +322,30 @@ class ServiceManager {
 
       // ========== 领域服务（静态类，使用 snake_case key） ==========
 
-      this._services.set('exchange_market', ExchangeService)
+      /*
+       * V4.7.0 ExchangeService 拆分子服务（2026-01-31 大文件拆分方案 Phase 4）
+       * 原 ExchangeService.js (1873行) 已拆分为3个子服务
+       * 服务键命名规范：业务域前缀_功能_snake_case
+       */
+      this._services.set('exchange_core', new ExchangeCoreService(this.models)) // 核心兑换操作（需实例化）
+      this._services.set('exchange_query', new ExchangeQueryService(this.models)) // 查询服务（需实例化）
+      this._services.set('exchange_admin', new ExchangeAdminService(this.models)) // 管理后台操作（需实例化）
+
+      // [已移除] exchange_market 向后兼容别名 - 请使用 exchange_core/exchange_query/exchange_admin
       this._services.set('content_audit', ContentAuditEngine)
       this._services.set('announcement', AnnouncementService)
       this._services.set('notification', NotificationService)
-      this._services.set('consumption', ConsumptionService)
+
+      /*
+       * V4.7.0 ConsumptionService 拆分子服务（2026-01-31 大文件拆分方案 Phase 4）
+       * 原 ConsumptionService.js (1826行) 已拆分为3个子服务
+       * 服务键命名规范：业务域前缀_功能_snake_case
+       */
+      this._services.set('consumption_core', ConsumptionCoreService) // 核心操作（静态类）
+      this._services.set('consumption_query', ConsumptionQueryService) // 查询服务（静态类）
+      this._services.set('consumption_merchant', ConsumptionMerchantService) // 商家侧服务（静态类）
+
+      // [已移除] consumption 向后兼容别名 - 请使用 consumption_core/consumption_query/consumption_merchant
       this._services.set('customer_service_session', CustomerServiceSessionService)
       this._services.set('hierarchy_management', HierarchyManagementService)
       this._services.set('user_role', UserRoleService)
@@ -260,7 +359,22 @@ class ServiceManager {
       this._services.set('premium', PremiumService)
       this._services.set('feedback', FeedbackService)
       this._services.set('admin_system', AdminSystemService)
-      this._services.set('admin_lottery', AdminLotteryService)
+
+      /*
+       * V4.7.0 AdminLotteryService 拆分子服务（2026-01-31 大文件拆分方案 Phase 6）
+       * 原 AdminLotteryService.js (1781行) 已拆分为3个子服务
+       * 服务键命名规范：业务域前缀_功能_snake_case
+       */
+      this._services.set('admin_lottery_core', AdminLotteryCoreService) // 核心干预操作（静态类）
+      this._services.set('admin_lottery_campaign', AdminLotteryCampaignService) // 活动管理操作（静态类）
+      this._services.set('admin_lottery_query', AdminLotteryQueryService) // 干预规则查询（静态类）
+      this._services.set('lottery_campaign_crud', LotteryCampaignCRUDService) // 活动 CRUD 操作（静态类，2026-01-31 路由层合规治理）
+
+      // [已移除] admin_lottery 向后兼容别名 - 请使用 admin_lottery_core/admin_lottery_campaign/admin_lottery_query
+
+      // ========== P2 路由层合规治理服务（2026-01-31） ==========
+
+      this._services.set('session_management', SessionManagementService) // 会话管理服务（静态类）
       this._services.set('admin_customer_service', AdminCustomerServiceService)
       this._services.set('material_management', MaterialManagementService)
       this._services.set('popup_banner', PopupBannerService)
@@ -271,12 +385,29 @@ class ServiceManager {
       this._services.set('lottery_preset', LotteryPresetService)
       this._services.set('activity', ActivityService)
       this._services.set('audit_log', AuditLogService)
-      this._services.set('lottery_management', AdminLotteryService) // 抽奖管理服务（别名）
-      this._services.set('reporting', ReportingService)
+      // [已移除] lottery_management 别名 - 请使用 admin_lottery_core/admin_lottery_campaign/admin_lottery_query
 
-      // ========== 材料系统服务（使用 snake_case key） ==========
+      /*
+       * V4.7.0 ReportingService 拆分子服务（2026-01-31 大文件拆分方案 Phase 5）
+       * 原 ReportingService.js (1820行) 已拆分为3个子服务
+       * 服务键命名规范：业务域前缀_功能_snake_case
+       */
+      this._services.set('reporting_analytics', ReportingAnalyticsService) // 决策分析/趋势分析（静态类）
+      this._services.set('reporting_charts', ReportingChartsService) // 图表数据生成（静态类）
+      this._services.set('reporting_stats', ReportingStatsService) // 统计/概览/画像（静态类）
 
-      this._services.set('asset', AssetService)
+      // [已移除] reporting 向后兼容别名 - 请使用 reporting_analytics/reporting_charts/reporting_stats
+
+      /*
+       * ========== 材料系统服务（使用 snake_case key） ==========
+       * V4.7.0 AssetService 拆分子服务（2026-01-31 大文件拆分方案 Phase 1）
+       * 原 AssetService.js 已拆分，服务键命名规范：业务域前缀_snake_case
+       * 所有子服务均为静态类（保持与原 AssetService 一致的调用方式）
+       */
+      this._services.set('asset_balance', BalanceService) // 资产余额服务（8个方法，静态类）
+      this._services.set('asset_item', ItemService) // 资产物品服务（9个方法，静态类）
+      this._services.set('asset_query', QueryService) // 资产查询服务（7个方法，静态类）
+
       this._services.set('asset_conversion', AssetConversionService)
 
       // ========== 幂等架构服务（使用 snake_case key） ==========
@@ -291,7 +422,17 @@ class ServiceManager {
       // ========== 交易市场服务（使用 snake_case key） ==========
 
       this._services.set('trade_order', TradeOrderService)
-      this._services.set('market_listing', MarketListingService)
+
+      /*
+       * V4.7.0 MarketListingService 拆分子服务（2026-01-31 大文件拆分方案 Phase 2）
+       * 原 MarketListingService.js (2295行) 已拆分为3个子服务
+       * 服务键命名规范：业务域前缀_功能_snake_case
+       */
+      this._services.set('market_listing_core', MarketListingCoreService) // 核心挂牌操作（静态类）
+      this._services.set('market_listing_query', MarketListingQueryService) // 查询/搜索/筛选（静态类）
+      this._services.set('market_listing_admin', MarketListingAdminService) // 管理控制/止损（静态类）
+
+      // [已移除] market_listing 向后兼容别名 - 请使用 market_listing_core/market_listing_query/market_listing_admin
 
       // ========== 清理服务（使用 snake_case key） ==========
 
@@ -332,19 +473,29 @@ class ServiceManager {
 
       // ========== P2 API覆盖率补齐 - 监控查询服务（2026-01-21） ==========
 
-      this._services.set('lottery_analytics', new LotteryAnalyticsService(this.models)) // 抽奖分析服务（监控+统计合并）
-      this._services.set('lottery_alert', LotteryAlertService) // 抽奖告警服务（B1 实时告警列表API，2026-01-29，静态类）
       /*
-       * 已合并的服务（2026-01-21）：
-       * - lottery_monitoring + lottery_strategy_stats → LotteryAnalyticsService
-       * - trade_order_query → TradeOrderService（静态方法直接调用，无需注册）
-       * - user_premium_query → PremiumService（静态方法直接调用，无需注册）
+       * V4.7.0 LotteryAnalyticsService 拆分子服务（2026-01-31 大文件拆分方案 Phase 2）
+       * 原 LotteryAnalyticsService.js (4744行) 已拆分为5个子服务
+       * 服务键命名规范：业务域前缀_功能_snake_case
        */
+      this._services.set('lottery_analytics_realtime', new LotteryRealtimeService(this.models)) // 实时监控服务（~800行，需实例化）
+      this._services.set('lottery_analytics_statistics', new LotteryStatisticsService(this.models)) // 统计趋势服务（~900行，需实例化）
+      this._services.set('lottery_analytics_report', new LotteryReportService(this.models)) // 报表生成服务（~700行，需实例化）
+      this._services.set('lottery_analytics_user', new LotteryUserAnalysisService(this.models)) // 用户维度分析服务（~800行，需实例化）
+      this._services.set(
+        'lottery_analytics_campaign',
+        new LotteryCampaignAnalysisService(this.models)
+      ) // 活动维度分析服务（~1000行，需实例化）
+      this._services.set('lottery_alert', LotteryAlertService) // 抽奖告警服务（B1 实时告警列表API，2026-01-29，静态类）
+
+      // [已移除] lottery_analytics 向后兼容代理 - 请使用 lottery_analytics_realtime/statistics/report/user/campaign
 
       // ========== 阶段C 批量操作基础设施服务（2026-01-30） ==========
 
       this._services.set('system_config', SystemConfigService) // 系统配置服务（动态限流配置，静态类）
       this._services.set('batch_operation', BatchOperationService) // 批量操作服务（幂等性+状态管理，静态类）
+      this._services.set('display_name', DisplayNameService) // 显示名称翻译服务（系统字典，静态类）
+      this._services.set('feature_flag', FeatureFlagService) // 功能开关服务（静态类）
 
       /**
        * V4.6 管线编排器
@@ -365,9 +516,7 @@ class ServiceManager {
       if (typeof AdminCustomerServiceService.initialize === 'function') {
         AdminCustomerServiceService.initialize(this)
       }
-      if (typeof AdminLotteryService.initialize === 'function') {
-        AdminLotteryService.initialize(this)
-      }
+      // [已移除] AdminLotteryService.initialize - 原文件已拆分
 
       logger.info('✅ Service依赖注入完成')
 
@@ -394,7 +543,7 @@ class ServiceManager {
    * @throws {Error} 当服务不存在时抛出错误
    *
    * @example
-   * const MarketListingService = services.getService('market_listing')
+   * const MarketListingService = services.getService('market_listing_core') // V4.7.0 拆分后使用子服务键
    */
   getService(serviceName) {
     if (!this._initialized) {
@@ -409,6 +558,11 @@ class ServiceManager {
 
     return service
   }
+
+  /*
+   * [已移除] _createLotteryAnalyticsProxy 方法 - 原 LotteryAnalyticsService 已拆分，不再需要向后兼容代理
+   * 请直接使用: lottery_analytics_realtime/statistics/report/user/campaign
+   */
 
   /**
    * 检查服务是否存在

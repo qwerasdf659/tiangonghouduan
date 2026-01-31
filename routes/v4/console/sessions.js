@@ -27,6 +27,7 @@ const { authenticateToken, requireRoleLevel } = require('../../../middleware/aut
 const { AuthenticationSession, User } = require('../../../models')
 const logger = require('../../../utils/logger').logger
 const BeijingTimeHelper = require('../../../utils/timeHelper')
+const SessionManagementService = require('../../../services/SessionManagementService')
 /**
  * GET /api/v4/console/sessions - 会话列表（分页、筛选）
  *
@@ -349,29 +350,28 @@ router.post('/:id/deactivate', authenticateToken, requireRoleLevel(100), async (
     if (isNaN(sessionId) || sessionId <= 0) {
       return res.apiError('无效的会话ID', 'INVALID_SESSION_ID', null, 400)
     }
-    const session = await AuthenticationSession.findByPk(sessionId)
-    if (!session) {
-      return res.apiError('会话不存在', 'SESSION_NOT_FOUND', null, 404)
-    }
-    if (!session.is_active) {
-      return res.apiError('会话已经失效', 'SESSION_ALREADY_INACTIVE', null, 400)
-    }
-    // 失效会话
-    await session.deactivate(reason || `管理员手动登出 (operator: ${req.user.user_id})`)
-    logger.info(
-      `🔐 [Sessions] 管理员失效会话: session_id=${sessionId}, user_id=${session.user_id}, operator=${req.user.user_id}`
-    )
+    // 通过服务层执行失效操作
+    const result = await SessionManagementService.deactivateSession(sessionId, {
+      operator_user_id: req.user.user_id,
+      reason
+    })
+
     return res.apiSuccess(
       {
-        session_id: sessionId,
-        user_id: session.user_id,
-        deactivated_at: BeijingTimeHelper.apiTimestamp()
+        session_id: result.session_id,
+        user_id: result.user_id,
+        already_inactive: result.already_inactive || false,
+        deactivated_at: result.deactivated_at
       },
-      '会话已失效',
+      result.already_inactive ? '会话已经失效（幂等返回）' : '会话已失效',
       'SESSION_DEACTIVATED'
     )
   } catch (error) {
     logger.error(`❌ [Sessions] 失效会话失败: ${error.message}`)
+    // 处理服务层抛出的业务错误
+    if (error.message === '会话不存在') {
+      return res.apiError('会话不存在', 'SESSION_NOT_FOUND', null, 404)
+    }
     return res.apiError('失效会话失败', 'SESSION_DEACTIVATE_FAILED', { error: error.message }, 500)
   }
 })
@@ -394,32 +394,31 @@ router.post('/deactivate-user', authenticateToken, requireRoleLevel(100), async 
     if (isNaN(userIdNum) || userIdNum <= 0) {
       return res.apiError('无效的用户ID', 'INVALID_USER_ID', null, 400)
     }
-    // 防止管理员踢出自己
-    if (user_type === 'admin' && userIdNum === req.user.user_id) {
-      return res.apiError('不能踢出自己的会话', 'CANNOT_DEACTIVATE_SELF', null, 400)
-    }
-    // 失效用户所有会话
-    const deactivateReason = reason || `管理员强制登出 (operator: ${req.user.user_id})`
-    const affectedCount = await AuthenticationSession.deactivateUserSessions(
-      user_type,
-      userIdNum,
-      null // 不排除任何会话
+    // 通过服务层执行批量失效操作
+    const result = await SessionManagementService.deactivateUserSessions(
+      { user_type, user_id: userIdNum },
+      {
+        operator_user_id: req.user.user_id,
+        reason
+      }
     )
-    logger.info(
-      `🔐 [Sessions] 管理员失效用户所有会话: user_type=${user_type}, user_id=${userIdNum}, affected=${affectedCount}, operator=${req.user.user_id}`
-    )
+
     return res.apiSuccess(
       {
-        user_type,
-        user_id: userIdNum,
-        affected_count: affectedCount,
-        reason: deactivateReason
+        user_type: result.user_type,
+        user_id: result.user_id,
+        affected_count: result.affected_count,
+        reason: result.reason
       },
-      `已失效该用户的 ${affectedCount} 个会话`,
+      `已失效该用户的 ${result.affected_count} 个会话`,
       'USER_SESSIONS_DEACTIVATED'
     )
   } catch (error) {
     logger.error(`❌ [Sessions] 失效用户会话失败: ${error.message}`)
+    // 处理服务层抛出的业务错误
+    if (error.message === '不能踢出自己的所有会话') {
+      return res.apiError('不能踢出自己的会话', 'CANNOT_DEACTIVATE_SELF', null, 400)
+    }
     return res.apiError(
       '失效用户会话失败',
       'USER_SESSIONS_DEACTIVATE_FAILED',
@@ -435,16 +434,17 @@ router.post('/deactivate-user', authenticateToken, requireRoleLevel(100), async 
  */
 router.post('/cleanup', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const deletedCount = await AuthenticationSession.cleanupExpiredSessions()
-    logger.info(
-      `🗑️ [Sessions] 管理员清理过期会话: deleted=${deletedCount}, operator=${req.user.user_id}`
-    )
+    // 通过服务层执行清理操作
+    const result = await SessionManagementService.cleanupExpiredSessions({
+      operator_user_id: req.user.user_id
+    })
+
     return res.apiSuccess(
       {
-        deleted_count: deletedCount,
-        cleanup_at: BeijingTimeHelper.apiTimestamp()
+        deleted_count: result.deleted_count,
+        cleanup_at: result.cleanup_at
       },
-      `已清理 ${deletedCount} 个过期会话`,
+      `已清理 ${result.deleted_count} 个过期会话`,
       'CLEANUP_COMPLETED'
     )
   } catch (error) {

@@ -51,7 +51,7 @@ jest.setTimeout(90000)
 describe('🔴 孤儿冻结问题回归测试 - 2026-01-30', () => {
   // 服务引用
   let MarketListingService
-  let AssetService
+  let BalanceService
   let _TradeOrderService
 
   // 测试数据
@@ -83,8 +83,8 @@ describe('🔴 孤儿冻结问题回归测试 - 2026-01-30', () => {
 
     // 获取服务引用
     try {
-      MarketListingService = global.getTestService('market_listing')
-      AssetService = global.getTestService('asset')
+      MarketListingService = global.getTestService('market_listing_core')
+      BalanceService = global.getTestService('asset_balance')
       _TradeOrderService = global.getTestService('trade_order')
 
       console.log('✅ 核心服务已加载: market_listing, asset, trade_order')
@@ -286,21 +286,21 @@ describe('🔴 孤儿冻结问题回归测试 - 2026-01-30', () => {
    */
   describe('资产解冻能力验证', () => {
     /**
-     * 测试用例：AssetService.unfreeze 方法存在
+     * 测试用例：BalanceService.unfreeze 方法存在
      *
      * 业务场景：验证资产解冻方法存在
      *
      * 验收标准：
-     * - AssetService.unfreeze 方法存在
+     * - BalanceService.unfreeze 方法存在
      * - 方法为函数类型
      */
-    test('BUG-6: AssetService.unfreeze 方法应存在', async () => {
-      console.log('📋 BUG-6: 验证 AssetService.unfreeze 方法存在...')
+    test('BUG-6: BalanceService.unfreeze 方法应存在', async () => {
+      console.log('📋 BUG-6: 验证 BalanceService.unfreeze 方法存在...')
 
-      expect(AssetService).toBeTruthy()
-      expect(typeof AssetService.unfreeze).toBe('function')
+      expect(BalanceService).toBeTruthy()
+      expect(typeof BalanceService.unfreeze).toBe('function')
 
-      console.log('   ✅ AssetService.unfreeze 方法存在')
+      console.log('   ✅ BalanceService.unfreeze 方法存在')
     })
 
     /**
@@ -510,7 +510,7 @@ describe('🔴 孤儿冻结问题回归测试 - 2026-01-30', () => {
       console.log('✅ 验收标准:')
       console.log('   ✓ _cancelBuyerOrdersForListing 方法存在')
       console.log('   ✓ withdrawListing 方法存在')
-      console.log('   ✓ AssetService.unfreeze 方法存在')
+      console.log('   ✓ BalanceService.unfreeze 方法存在')
       console.log('   ✓ 余额记录包含 frozen_amount 字段')
       console.log('   ✓ 系统中孤儿冻结订单数量可控')
       console.log('')

@@ -43,7 +43,7 @@ const BeijingTimeHelper = require('../../../utils/timeHelper')
  * @returns {Object} LotteryAnalyticsService 实例
  */
 function getLotteryAnalyticsService(req) {
-  return req.app.locals.services.getService('lottery_analytics')
+  return req.app.locals.services.getService('lottery_analytics_statistics')
 }
 
 /**

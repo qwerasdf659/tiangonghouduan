@@ -31,7 +31,15 @@ const { authenticateToken, requireMerchantPermission } = require('../../../../mi
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const TransactionManager = require('../../../../utils/TransactionManager')
-const StaffManagementService = require('../../../../services/StaffManagementService')
+
+/**
+ * 获取员工管理服务（通过 ServiceManager 统一入口）
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} StaffManagementService 实例
+ */
+function getStaffManagementService(req) {
+  return req.app.locals.services.getService('staff_management')
+}
 
 /**
  * 获取商家操作审计日志服务（通过 ServiceManager 统一入口）
@@ -91,6 +99,7 @@ router.get(
       if (resolved_store_id) filters.store_id = resolved_store_id
       if (status) filters.status = status
 
+      const StaffManagementService = getStaffManagementService(req)
       const result = await StaffManagementService.getStaffList(filters, {
         page: parseInt(page, 10),
         page_size: parseInt(page_size, 10)
@@ -129,6 +138,9 @@ router.post(
       if (!user_id || !store_id) {
         return res.apiError('用户ID和门店ID为必填', 'BAD_REQUEST', null, 400)
       }
+
+      // 通过 ServiceManager 获取服务
+      const StaffManagementService = getStaffManagementService(req)
 
       // 使用事务管理器
       const result = await TransactionManager.execute(async transaction => {
@@ -205,6 +217,9 @@ router.post(
         return res.apiError('原门店和目标门店不能相同', 'BAD_REQUEST', null, 400)
       }
 
+      // 通过 ServiceManager 获取服务
+      const StaffManagementService = getStaffManagementService(req)
+
       const result = await TransactionManager.execute(async transaction => {
         return await StaffManagementService.transferStaff(
           {
@@ -277,6 +292,9 @@ router.post(
         return res.apiError('用户ID为必填', 'BAD_REQUEST', null, 400)
       }
 
+      // 通过 ServiceManager 获取服务
+      const StaffManagementService = getStaffManagementService(req)
+
       const result = await TransactionManager.execute(async transaction => {
         return await StaffManagementService.disableStaff(
           parseInt(user_id, 10),
@@ -340,6 +358,9 @@ router.post(
       if (!user_id || !store_id) {
         return res.apiError('用户ID和门店ID为必填', 'BAD_REQUEST', null, 400)
       }
+
+      // 通过 ServiceManager 获取服务
+      const StaffManagementService = getStaffManagementService(req)
 
       const result = await TransactionManager.execute(async transaction => {
         return await StaffManagementService.enableStaff(

@@ -16,7 +16,8 @@ const logger = require('../utils/logger').logger
  */
 
 const { User, Role } = require('../models')
-const AssetService = require('./AssetService')
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+const BalanceService = require('./asset/BalanceService')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 /**
@@ -170,11 +171,11 @@ class ActivityConditionValidator {
       throw new Error(`用户不存在: ${userId}`)
     }
 
-    // 查询用户积分 - 使用 AssetService 统一账户体系
+    // 查询用户积分 - 使用 BalanceService 统一账户体系（V4.7.0 AssetService 拆分）
     let pointsBalance = null
     try {
-      const account = await AssetService.getOrCreateAccount({ user_id: userId })
-      const balance = await AssetService.getOrCreateBalance(account.account_id, 'POINTS')
+      const account = await BalanceService.getOrCreateAccount({ user_id: userId })
+      const balance = await BalanceService.getOrCreateBalance(account.account_id, 'POINTS')
       pointsBalance = {
         available_points: Number(balance.available_amount) || 0,
         is_active: account.status === 'active'

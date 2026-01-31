@@ -43,7 +43,8 @@ const TransactionManager = require('../../utils/TransactionManager')
  * 注意：在 beforeAll 中获取服务，确保 ServiceManager 已初始化
  */
 let AssetConversionService
-let AssetService
+// V4.7.0 AssetService 拆分：使用 BalanceService（2026-01-31）
+let BalanceService
 
 // 测试超时配置（30秒）
 jest.setTimeout(30000)
@@ -75,7 +76,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
 
     // 🔴 通过 ServiceManager 获取服务实例（snake_case key）
     AssetConversionService = global.getTestService('asset_conversion')
-    AssetService = global.getTestService('asset')
+    // V4.7.0 AssetService 拆分：使用 BalanceService（2026-01-31）
+    BalanceService = global.getTestService('asset_balance')
 
     if (!AssetConversionService) {
       // 直接 require（兜底方案）
@@ -83,9 +85,10 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       console.log('⚠️ AssetConversionService 未注册到 ServiceManager，使用直接 require')
     }
 
-    if (!AssetService) {
-      AssetService = require('../../services/AssetService')
-      console.log('⚠️ AssetService 未注册到 ServiceManager，使用直接 require')
+    // V4.7.0 AssetService 拆分：使用 BalanceService（2026-01-31）
+    if (!BalanceService) {
+      BalanceService = require('../../services/asset/BalanceService')
+      console.log('⚠️ BalanceService 未注册到 ServiceManager，使用直接 require')
     }
 
     // 获取测试用户 ID（从 global.testData 动态获取）
@@ -156,7 +159,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       // 获取初始余额（只是记录，不做修改）
       try {
         const redShardBalance = await TransactionManager.execute(async transaction => {
-          return await AssetService.getBalance(
+          return await BalanceService.getBalance(
             { user_id: test_user_id, asset_code: 'red_shard' },
             { transaction }
           )
@@ -164,7 +167,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         initial_red_shard_balance = redShardBalance?.available_amount || 0
 
         const diamondBalance = await TransactionManager.execute(async transaction => {
-          return await AssetService.getBalance(
+          return await BalanceService.getBalance(
             { user_id: test_user_id, asset_code: 'DIAMOND' },
             { transaction }
           )
@@ -194,7 +197,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const prepare_key = generateIdempotencyKey('convert_prepare')
 
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: 'red_shard',
@@ -255,7 +258,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const prepare_key = generateIdempotencyKey('convert_prepare')
 
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: 'red_shard',
@@ -329,7 +332,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const prepare_key = generateIdempotencyKey('convert_prepare')
 
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: 'red_shard',
@@ -397,7 +400,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const prepare_key = generateIdempotencyKey('convert_prepare')
 
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: 'red_shard',
@@ -678,7 +681,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const prepare_key = generateIdempotencyKey('convert_prepare')
 
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: 'red_shard',
@@ -745,7 +748,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const prepare_key = generateIdempotencyKey('convert_prepare')
 
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: 'red_shard',
@@ -792,7 +795,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const prepare_key = generateIdempotencyKey('convert_prepare')
 
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: 'red_shard',
@@ -868,7 +871,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const prepare_key = generateIdempotencyKey('convert_prepare')
 
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: 'red_shard',
@@ -912,7 +915,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const prepare_key = generateIdempotencyKey('convert_prepare')
 
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: 'red_shard',
@@ -1024,7 +1027,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
 
       // 获取当前余额
       const balanceResult = await TransactionManager.execute(async transaction => {
-        return await AssetService.getBalance(
+        return await BalanceService.getBalance(
           { user_id: test_user_id, asset_code: 'red_shard' },
           { transaction }
         )
@@ -1064,7 +1067,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
 
       // 增加精确数量的红晶片
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: 'red_shard',
@@ -1079,7 +1082,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
 
       // 获取增加后的余额
       const balanceResult = await TransactionManager.execute(async transaction => {
-        return await AssetService.getBalance(
+        return await BalanceService.getBalance(
           { user_id: test_user_id, asset_code: 'red_shard' },
           { transaction }
         )
@@ -1166,13 +1169,13 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
 
         // 记录初始余额
         const initial_shard_result = await TransactionManager.execute(async transaction => {
-          return await AssetService.getBalance(
+          return await BalanceService.getBalance(
             { user_id: test_user_id, asset_code: 'red_shard' },
             { transaction }
           )
         })
         const initial_diamond_result = await TransactionManager.execute(async transaction => {
-          return await AssetService.getBalance(
+          return await BalanceService.getBalance(
             { user_id: test_user_id, asset_code: 'DIAMOND' },
             { transaction }
           )
@@ -1185,7 +1188,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         try {
           await TransactionManager.execute(async transaction => {
             // 先增加一些红晶片
-            await AssetService.changeBalance(
+            await BalanceService.changeBalance(
               {
                 user_id: test_user_id,
                 asset_code: 'red_shard',
@@ -1213,13 +1216,13 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
 
         // 验证：余额应与初始状态一致（所有变更已回滚）
         const after_shard_result = await TransactionManager.execute(async transaction => {
-          return await AssetService.getBalance(
+          return await BalanceService.getBalance(
             { user_id: test_user_id, asset_code: 'red_shard' },
             { transaction }
           )
         })
         const after_diamond_result = await TransactionManager.execute(async transaction => {
-          return await AssetService.getBalance(
+          return await BalanceService.getBalance(
             { user_id: test_user_id, asset_code: 'DIAMOND' },
             { transaction }
           )
@@ -1240,13 +1243,13 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
 
         // 记录初始余额
         const initial_shard_result = await TransactionManager.execute(async transaction => {
-          return await AssetService.getBalance(
+          return await BalanceService.getBalance(
             { user_id: test_user_id, asset_code: 'red_shard' },
             { transaction }
           )
         })
         const initial_diamond_result = await TransactionManager.execute(async transaction => {
-          return await AssetService.getBalance(
+          return await BalanceService.getBalance(
             { user_id: test_user_id, asset_code: 'DIAMOND' },
             { transaction }
           )
@@ -1258,7 +1261,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         // 准备余额
         const prepare_amount = 50
         await TransactionManager.execute(async transaction => {
-          await AssetService.changeBalance(
+          await BalanceService.changeBalance(
             {
               user_id: test_user_id,
               asset_code: 'red_shard',
@@ -1292,13 +1295,13 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
 
         // 验证：事务已提交，余额已变更
         const after_shard_result = await TransactionManager.execute(async transaction => {
-          return await AssetService.getBalance(
+          return await BalanceService.getBalance(
             { user_id: test_user_id, asset_code: 'red_shard' },
             { transaction }
           )
         })
         const after_diamond_result = await TransactionManager.execute(async transaction => {
-          return await AssetService.getBalance(
+          return await BalanceService.getBalance(
             { user_id: test_user_id, asset_code: 'DIAMOND' },
             { transaction }
           )

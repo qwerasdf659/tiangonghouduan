@@ -67,7 +67,15 @@ module.exports = sequelize => {
       original_price: {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: true,
-        comment: '原价（显示用）'
+        comment: '原价（显示用）',
+        /**
+         * 获取原价，将DECIMAL转换为浮点数
+         * @returns {number|null} 原价（元）或null
+         */
+        get() {
+          const value = this.getDataValue('original_price')
+          return value ? parseFloat(value) : null
+        }
       },
       discount: {
         type: DataTypes.INTEGER,
@@ -130,7 +138,15 @@ module.exports = sequelize => {
       rating: {
         type: DataTypes.DECIMAL(3, 2),
         allowNull: true,
-        comment: '评分'
+        comment: '评分',
+        /**
+         * 获取评分，将DECIMAL转换为浮点数
+         * @returns {number|null} 评分或null
+         */
+        get() {
+          const value = this.getDataValue('rating')
+          return value ? parseFloat(value) : null
+        }
       },
       warranty: {
         type: DataTypes.STRING(200),

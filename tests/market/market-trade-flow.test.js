@@ -36,7 +36,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
   // 服务引用（通过 ServiceManager 获取）
   let MarketListingService
   let TradeOrderService
-  let AssetService
+  let BalanceService
 
   // 测试用户和数据
   let test_seller
@@ -52,12 +52,28 @@ describe('市场交易流程测试（阶段四：P2）', () => {
     await sequelize.authenticate()
     console.log('✅ 数据库连接成功')
 
-    // 通过 ServiceManager 获取服务实例（snake_case key）
-    MarketListingService = global.getTestService('market_listing')
-    TradeOrderService = global.getTestService('trade_order')
-    AssetService = global.getTestService('asset')
+    /**
+     * V4.7.0 大文件拆分适配：
+     * MarketListingService 已拆分，测试需要组合多个子服务的方法
+     */
+    const coreService = global.getTestService('market_listing_core')
+    const queryService = global.getTestService('market_listing_query')
 
-    console.log('✅ 服务获取成功')
+    // 创建组合服务对象，包含所有需要的方法
+    MarketListingService = {
+      // 核心操作方法（CoreService）
+      createListing: coreService.createListing.bind(coreService),
+      createFungibleAssetListing: coreService.createFungibleAssetListing.bind(coreService),
+      withdrawListing: coreService.withdrawListing.bind(coreService),
+      withdrawFungibleAssetListing: coreService.withdrawFungibleAssetListing.bind(coreService),
+      // 查询方法（QueryService - 静态方法）
+      getListingById: queryService.getListingById
+    }
+
+    TradeOrderService = global.getTestService('trade_order')
+    BalanceService = global.getTestService('asset_balance')
+
+    console.log('✅ 服务获取成功（组合CoreService + QueryService）')
 
     // 获取测试物品模板（用于创建物品实例时关联）
     test_item_template = await ItemTemplate.findOne()
@@ -345,14 +361,14 @@ describe('市场交易流程测试（阶段四：P2）', () => {
     describe('可叠加资产挂牌（fungible_asset）', () => {
       it('应成功创建可叠加资产挂牌', async () => {
         // 1. 确保卖家有足够的 red_shard 资产
-        const balance = await AssetService.getBalance({
+        const balance = await BalanceService.getBalance({
           user_id: test_seller.user_id,
           asset_code: 'red_shard'
         })
 
         if (Number(balance?.available_amount || 0) < 10) {
           // 添加测试资产
-          await AssetService.changeBalance({
+          await BalanceService.changeBalance({
             user_id: test_seller.user_id,
             asset_code: 'red_shard',
             delta_amount: 100,
@@ -406,7 +422,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
 
       it('余额不足不能挂牌', async () => {
         // 1. 获取当前余额
-        const balance = await AssetService.getBalance({
+        const balance = await BalanceService.getBalance({
           user_id: test_seller.user_id,
           asset_code: 'red_shard'
         })
@@ -654,7 +670,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
         // 1. 确保卖家有资产（需要在事务中执行）
         const grant_tx = await sequelize.transaction()
         try {
-          await AssetService.changeBalance(
+          await BalanceService.changeBalance(
             {
               user_id: test_seller.user_id,
               asset_code: 'red_shard',
@@ -696,7 +712,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
         }
 
         // 3. 验证资产已冻结
-        const balance_after_listing = await AssetService.getBalance({
+        const balance_after_listing = await BalanceService.getBalance({
           user_id: test_seller.user_id,
           asset_code: 'red_shard'
         })

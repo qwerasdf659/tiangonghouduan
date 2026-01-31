@@ -5,12 +5,12 @@
  * 业务场景：
  * - 用户通过抽奖、转换等途径获得材料资产（碎红水晶、完整红水晶等）
  * - 材料资产存入统一账本（Account + AccountAssetBalance）
- * - 用户使用材料资产兑换商品（通过 AssetService.changeBalance() 扣减）
+ * - 用户使用材料资产兑换商品（通过 BalanceService.changeBalance() 扣减）
  *
  * 支付方式说明（V4.5.0唯一方式）：
  * - cost_asset_code：兑换商品需要的材料资产类型（如 red_shard）
  * - cost_amount：兑换单件商品需要的材料数量
- * - 所有兑换操作通过 AssetService.changeBalance() 扣减材料资产
+ * - 所有兑换操作通过 BalanceService.changeBalance() 扣减材料资产
  *
  * 业务规则（强制）：
  * - ✅ 兑换只能使用材料资产支付
@@ -76,7 +76,15 @@ module.exports = sequelize => {
       cost_price: {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
-        comment: '实际成本（人民币）'
+        comment: '实际成本（人民币）',
+        /**
+         * 获取成本价格，将DECIMAL转换为浮点数
+         * @returns {number} 成本价格（元）
+         */
+        get() {
+          const value = this.getDataValue('cost_price')
+          return value ? parseFloat(value) : 0
+        }
       },
       stock: {
         type: DataTypes.INTEGER,

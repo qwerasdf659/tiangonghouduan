@@ -38,13 +38,14 @@ const transactionsRoutes = require('./transactions')
  * @access Admin
  * @returns {Object} 各资产类型的流通量、持有用户数、冻结量等统计
  *
- * @since 2026-01-18 路由层合规性治理：移除直接 sequelize 访问，使用 AssetService.getSystemStats()
+ * @since 2026-01-18 路由层合规性治理：移除直接 sequelize 访问，使用 QueryService.getSystemStats()
+ * @since 2026-01-31 V4.7.0 AssetService 拆分：使用 QueryService
  */
 router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    // 通过 ServiceManager 获取 AssetService
-    const AssetService = req.app.locals.services.getService('asset')
-    const result = await AssetService.getSystemStats()
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 QueryService（2026-01-31）
+    const QueryService = req.app.locals.services.getService('asset_query')
+    const result = await QueryService.getSystemStats()
 
     return res.apiSuccess(result)
   } catch (error) {
@@ -90,11 +91,11 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
       limit: exportLimit
     })
 
-    // 通过 ServiceManager 获取 AssetService
-    const AssetService = req.app.locals.services.getService('asset')
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 QueryService（2026-01-31）
+    const QueryService = req.app.locals.services.getService('asset_query')
 
     // 获取资产余额数据
-    const balancesData = await AssetService.getBalancesForExport({
+    const balancesData = await QueryService.getBalancesForExport({
       asset_type,
       status,
       user_id: user_id ? parseInt(user_id) : null,

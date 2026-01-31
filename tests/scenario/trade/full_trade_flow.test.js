@@ -18,7 +18,7 @@
  * 依赖服务：
  * - MarketListingService：挂牌服务
  * - TradeOrderService：订单服务
- * - AssetService：资产服务
+ * - BalanceService：资产余额服务（V4.7.0 从 AssetService 拆分）
  *
  * @file tests/integration/full_trade_flow.test.js
  * @version V4.6 - 完整交易流程测试
@@ -35,9 +35,11 @@ const {
   ItemInstance,
   AccountAssetBalance
 } = require('../../../models')
-const MarketListingService = require('../../../services/MarketListingService')
+// V4.7.0 拆分：使用 market-listing/CoreService
+const MarketListingService = require('../../../services/market-listing/CoreService')
 const TradeOrderService = require('../../../services/TradeOrderService')
-const AssetService = require('../../../services/AssetService')
+// V4.7.0 AssetService 拆分：使用 BalanceService（2026-01-31）
+const BalanceService = require('../../../services/asset/BalanceService')
 const { v4: uuidv4 } = require('uuid')
 
 const { initRealTestData, getRealTestUserId, TestConfig } = require('../../helpers/test-setup')
@@ -625,7 +627,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
 async function getBalance(userId, assetCode) {
   const transaction = await sequelize.transaction()
   try {
-    const balance = await AssetService.getBalance(
+    const balance = await BalanceService.getBalance(
       { user_id: userId, asset_code: assetCode },
       { transaction }
     )
@@ -643,7 +645,7 @@ async function getBalance(userId, assetCode) {
 async function getBalanceDetails(userId, assetCode) {
   const transaction = await sequelize.transaction()
   try {
-    const balance = await AssetService.getBalance(
+    const balance = await BalanceService.getBalance(
       { user_id: userId, asset_code: assetCode },
       { transaction }
     )
@@ -669,7 +671,7 @@ async function ensureBalance(userId, assetCode, minBalance) {
 
     const transaction = await sequelize.transaction()
     try {
-      await AssetService.changeBalance(
+      await BalanceService.changeBalance(
         {
           user_id: userId,
           asset_code: assetCode,

@@ -25,7 +25,8 @@
 'use strict'
 
 const { MarketListing, sequelize, Op } = require('../models')
-const AssetService = require('../services/AssetService')
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+const BalanceService = require('../services/asset/BalanceService')
 const NotificationService = require('../services/NotificationService')
 const AdminSystemService = require('../services/AdminSystemService')
 const logger = require('../utils/logger')
@@ -173,7 +174,7 @@ class HourlyExpireFungibleAssetListings {
         ) {
           const unfreezeIdempotencyKey = `listing_expire_unfreeze_${lockedListing.listing_id}_${Date.now()}`
 
-          unfreezeResult = await AssetService.unfreeze(
+          unfreezeResult = await BalanceService.unfreeze(
             {
               user_id: lockedListing.seller_user_id,
               asset_code: lockedListing.offer_asset_code,

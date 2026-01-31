@@ -40,7 +40,7 @@ const logger = require('../../../../utils/logger').logger
 router.get('/me', authenticateToken, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-    const ConsumptionService = req.app.locals.services.getService('consumption')
+    const ConsumptionService = req.app.locals.services.getService('consumption_query')
 
     // 从token获取用户ID（用户只能查询自己的记录）
     const userId = req.user.user_id
@@ -92,7 +92,7 @@ router.get('/me', authenticateToken, async (req, res) => {
 router.get('/detail/:id', authenticateToken, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-    const ConsumptionService = req.app.locals.services.getService('consumption')
+    const ConsumptionService = req.app.locals.services.getService('consumption_query')
 
     const recordId = parseInt(req.params.id, 10)
 
@@ -150,7 +150,7 @@ router.get('/detail/:id', authenticateToken, async (req, res) => {
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-    const ConsumptionService = req.app.locals.services.getService('consumption')
+    const ConsumptionService = req.app.locals.services.getService('consumption_query')
 
     const userId = req.user.user_id
     const recordId = parseInt(req.params.id, 10)
@@ -213,7 +213,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 router.post('/:id/restore', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-    const ConsumptionService = req.app.locals.services.getService('consumption')
+    const ConsumptionService = req.app.locals.services.getService('consumption_query')
 
     const recordId = parseInt(req.params.id, 10)
     const adminId = req.user.user_id

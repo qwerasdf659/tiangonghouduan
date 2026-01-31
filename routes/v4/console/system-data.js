@@ -31,6 +31,7 @@ const { authenticateToken, requireRoleLevel } = require('../../../middleware/aut
 const { PERMISSION_LEVELS } = require('../../../shared/permission-constants')
 const logger = require('../../../utils/logger').logger
 const { Op } = require('sequelize')
+const LotteryCampaignCRUDService = require('../../../services/admin-lottery/CRUDService')
 
 /**
  * 处理服务层错误
@@ -549,63 +550,38 @@ router.post(
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
-      const {
-        campaign_name,
-        campaign_code,
-        campaign_type,
-        description,
-        start_time,
-        end_time,
-        status,
-        rules_text,
-        budget_mode,
-        cost_per_draw,
-        max_draws_per_user_daily,
-        max_draws_per_user_total,
-        total_prize_pool,
-        remaining_prize_pool,
-        prize_distribution_config
-      } = req.body
+      const campaignData = req.body
 
-      // 验证必填字段
-      if (!campaign_name) {
+      // 验证必填字段（路由层基础校验）
+      if (!campaignData.campaign_name) {
         return res.apiError('活动名称不能为空', 'VALIDATION_ERROR', null, 400)
       }
-      if (!campaign_code) {
+      if (!campaignData.campaign_code) {
         return res.apiError('活动代码不能为空', 'VALIDATION_ERROR', null, 400)
       }
-      if (!campaign_type) {
+      if (!campaignData.campaign_type) {
         return res.apiError('活动类型不能为空', 'VALIDATION_ERROR', null, 400)
       }
 
-      const { LotteryCampaign } = require('../../../models')
+      const { sequelize } = require('../../../models')
 
-      const campaign = await LotteryCampaign.create({
-        campaign_name,
-        campaign_code,
-        campaign_type,
-        description: description || '',
-        start_time: start_time ? new Date(start_time) : null,
-        end_time: end_time ? new Date(end_time) : null,
-        status: status || 'draft',
-        rules_text: rules_text || '',
-        budget_mode: budget_mode || 'user',
-        cost_per_draw: cost_per_draw || 10,
-        max_draws_per_user_daily: max_draws_per_user_daily || 3,
-        max_draws_per_user_total: max_draws_per_user_total || null,
-        total_prize_pool: total_prize_pool || 0,
-        remaining_prize_pool: remaining_prize_pool || 0,
-        prize_distribution_config: prize_distribution_config || { tiers: [] },
-        created_by: req.user.user_id
-      })
+      // 开启事务（入口层管理事务边界）
+      const transaction = await sequelize.transaction()
 
-      logger.info('创建抽奖活动成功', {
-        admin_id: req.user.user_id,
-        campaign_id: campaign.campaign_id,
-        campaign_name
-      })
+      try {
+        // 通过服务层执行创建操作
+        const campaign = await LotteryCampaignCRUDService.createCampaign(campaignData, {
+          transaction,
+          operator_user_id: req.user.user_id
+        })
 
-      return res.apiSuccess(campaign, '创建抽奖活动成功')
+        await transaction.commit()
+
+        return res.apiSuccess(campaign, '创建抽奖活动成功')
+      } catch (error) {
+        await transaction.rollback()
+        throw error
+      }
     } catch (error) {
       return handleServiceError(error, res, '创建抽奖活动')
     }
@@ -641,20 +617,15 @@ router.put(
         prize_distribution_config
       } = req.body
 
-      const { LotteryCampaign } = require('../../../models')
+      const { sequelize } = require('../../../models')
 
-      const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id))
-      if (!campaign) {
-        return res.apiError('活动不存在', 'NOT_FOUND', null, 404)
-      }
-
-      // 更新字段（campaign_code 不可修改）
+      // 构建更新数据（campaign_code 不可修改）
       const updateData = {}
       if (campaign_name !== undefined) updateData.campaign_name = campaign_name
       if (campaign_type !== undefined) updateData.campaign_type = campaign_type
       if (description !== undefined) updateData.description = description
-      if (start_time !== undefined) updateData.start_time = start_time ? new Date(start_time) : null
-      if (end_time !== undefined) updateData.end_time = end_time ? new Date(end_time) : null
+      if (start_time !== undefined) updateData.start_time = start_time
+      if (end_time !== undefined) updateData.end_time = end_time
       if (status !== undefined) updateData.status = status
       if (rules_text !== undefined) updateData.rules_text = rules_text
       if (budget_mode !== undefined) updateData.budget_mode = budget_mode
@@ -671,15 +642,24 @@ router.put(
         updateData.prize_distribution_config = prize_distribution_config
       }
 
-      await campaign.update(updateData)
+      // 开启事务（入口层管理事务边界）
+      const transaction = await sequelize.transaction()
 
-      logger.info('更新抽奖活动成功', {
-        admin_id: req.user.user_id,
-        campaign_id: parseInt(campaign_id),
-        updated_fields: Object.keys(updateData)
-      })
+      try {
+        // 通过服务层执行更新操作
+        const campaign = await LotteryCampaignCRUDService.updateCampaign(
+          parseInt(campaign_id),
+          updateData,
+          { transaction, operator_user_id: req.user.user_id }
+        )
 
-      return res.apiSuccess(campaign, '更新抽奖活动成功')
+        await transaction.commit()
+
+        return res.apiSuccess(campaign, '更新抽奖活动成功')
+      } catch (error) {
+        await transaction.rollback()
+        throw error
+      }
     } catch (error) {
       return handleServiceError(error, res, '更新抽奖活动')
     }
@@ -704,23 +684,26 @@ router.put(
         return res.apiError('无效的状态值', 'VALIDATION_ERROR', null, 400)
       }
 
-      const { LotteryCampaign } = require('../../../models')
+      const { sequelize } = require('../../../models')
 
-      const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id))
-      if (!campaign) {
-        return res.apiError('活动不存在', 'NOT_FOUND', null, 404)
+      // 开启事务（入口层管理事务边界）
+      const transaction = await sequelize.transaction()
+
+      try {
+        // 通过服务层执行状态更新操作
+        const campaign = await LotteryCampaignCRUDService.updateCampaignStatus(
+          parseInt(campaign_id),
+          status,
+          { transaction, operator_user_id: req.user.user_id }
+        )
+
+        await transaction.commit()
+
+        return res.apiSuccess(campaign, '更新活动状态成功')
+      } catch (error) {
+        await transaction.rollback()
+        throw error
       }
-
-      await campaign.update({ status })
-
-      logger.info('更新抽奖活动状态成功', {
-        admin_id: req.user.user_id,
-        campaign_id: parseInt(campaign_id),
-        old_status: campaign.status,
-        new_status: status
-      })
-
-      return res.apiSuccess(campaign, '更新活动状态成功')
     } catch (error) {
       return handleServiceError(error, res, '更新抽奖活动状态')
     }
@@ -739,35 +722,32 @@ router.delete(
   async (req, res) => {
     try {
       const { campaign_id } = req.params
+      const { sequelize } = require('../../../models')
 
-      const { LotteryCampaign, LotteryPrize } = require('../../../models')
+      // 开启事务（入口层管理事务边界）
+      const transaction = await sequelize.transaction()
 
-      const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id))
-      if (!campaign) {
-        return res.apiError('活动不存在', 'NOT_FOUND', null, 404)
-      }
+      try {
+        // 通过服务层执行删除操作
+        const result = await LotteryCampaignCRUDService.deleteCampaign(parseInt(campaign_id), {
+          transaction,
+          operator_user_id: req.user.user_id
+        })
 
-      // 检查是否有关联的奖品
-      const prizeCount = await LotteryPrize.count({ where: { campaign_id: parseInt(campaign_id) } })
-      if (prizeCount > 0) {
-        return res.apiError(
-          '活动下存在奖品，无法删除',
-          'HAS_RELATED_DATA',
-          { prize_count: prizeCount },
-          400
+        await transaction.commit()
+
+        return res.apiSuccess(
+          {
+            campaign_id: result.campaign_id,
+            campaign_name: result.campaign_name,
+            deleted: result.deleted
+          },
+          '删除抽奖活动成功'
         )
+      } catch (error) {
+        await transaction.rollback()
+        throw error
       }
-
-      // 软删除或硬删除（根据业务需求）
-      await campaign.destroy()
-
-      logger.info('删除抽奖活动成功', {
-        admin_id: req.user.user_id,
-        campaign_id: parseInt(campaign_id),
-        campaign_name: campaign.campaign_name
-      })
-
-      return res.apiSuccess(null, '删除抽奖活动成功')
     } catch (error) {
       return handleServiceError(error, res, '删除抽奖活动')
     }

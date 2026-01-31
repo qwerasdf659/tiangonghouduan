@@ -13,7 +13,7 @@
  * 技术验证点：
  * 1. IdempotencyService 在并发场景下的锁机制
  * 2. LotteryQuotaService 配额扣减的原子性
- * 3. AssetService 积分扣减的原子性
+ * 3. BalanceService 积分扣减的原子性（V4.7.0 从 AssetService 拆分）
  * 4. 事务隔离性和数据一致性
  *
  * 测试数据：
@@ -42,7 +42,7 @@ describe('🎲 并发抽奖竞态测试', () => {
   let UnifiedLotteryEngine
   let IdempotencyService
   let LotteryQuotaService
-  let _AssetService // 预留用于后续积分测试扩展
+  let _BalanceService // 预留用于后续积分测试扩展
 
   // 测试数据
   let testUserId
@@ -55,7 +55,7 @@ describe('🎲 并发抽奖竞态测试', () => {
     UnifiedLotteryEngine = getTestService('unified_lottery_engine')
     IdempotencyService = getTestService('idempotency')
     LotteryQuotaService = getTestService('lottery_quota')
-    _AssetService = getTestService('asset')
+    _BalanceService = getTestService('asset_balance')
 
     // 获取测试数据
     testUserId = getTestUserId()

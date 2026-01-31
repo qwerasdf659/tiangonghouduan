@@ -83,13 +83,16 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
       }
     }
 
-    // 验证关键服务可用性
+    /*
+     * 验证关键服务可用性
+     * V4.7.0 AssetService 拆分：使用 asset_balance（2026-01-31）
+     */
     try {
-      const AssetService = global.getTestService('asset')
-      const MarketListingService = global.getTestService('market_listing')
+      const BalanceService = global.getTestService('asset_balance')
+      const MarketListingService = global.getTestService('market_listing_core')
 
-      if (AssetService && MarketListingService) {
-        console.log('✅ 核心服务已加载: asset, market_listing')
+      if (BalanceService && MarketListingService) {
+        console.log('✅ 核心服务已加载: asset_balance, market_listing')
       }
     } catch (error) {
       console.warn('⚠️ 服务加载警告:', error.message)
@@ -298,32 +301,33 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
    */
   describe('P0-3: 资产服务核心流程', () => {
     /**
-     * 测试用例：AssetService可用性
+     * 测试用例：BalanceService可用性（V4.7.0 AssetService 拆分）
      *
-     * 业务场景：验证资产服务核心功能
+     * 业务场景：验证资产余额服务核心功能
      *
      * 验收标准：
      * - 服务可通过ServiceManager获取
      * - 核心方法（getBalance/changeBalance/freeze/unfreeze）存在
      */
-    test('P0-3-1: AssetService应正常可用', async () => {
-      console.log('📋 P0-3-1: 验证AssetService可用性...')
+    test('P0-3-1: BalanceService应正常可用', async () => {
+      console.log('📋 P0-3-1: 验证BalanceService可用性（V4.7.0 拆分）...')
 
       try {
-        const AssetService = global.getTestService('asset')
+        // V4.7.0 AssetService 拆分：使用 asset_balance（2026-01-31）
+        const BalanceService = global.getTestService('asset_balance')
 
-        expect(AssetService).toBeTruthy()
+        expect(BalanceService).toBeTruthy()
 
         // 验证核心方法存在
         const coreMethods = ['getBalance', 'changeBalance', 'freeze', 'unfreeze']
         coreMethods.forEach(method => {
-          expect(typeof AssetService[method]).toBe('function')
+          expect(typeof BalanceService[method]).toBe('function')
         })
 
-        console.log('   ✅ AssetService 核心方法验证通过')
+        console.log('   ✅ BalanceService 核心方法验证通过')
         console.log(`   📦 可用方法: ${coreMethods.join(', ')}`)
       } catch (error) {
-        console.error(`   ❌ AssetService 加载失败: ${error.message}`)
+        console.error(`   ❌ BalanceService 加载失败: ${error.message}`)
         throw error
       }
     })
@@ -347,9 +351,10 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
       }
 
       try {
-        const AssetService = global.getTestService('asset')
+        // V4.7.0 AssetService 拆分：使用 asset_balance（2026-01-31）
+        const BalanceService = global.getTestService('asset_balance')
 
-        const balance = await AssetService.getBalance({
+        const balance = await BalanceService.getBalance({
           user_id: testUserId,
           asset_code: 'DIAMOND'
         })
@@ -389,7 +394,7 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
       console.log('📋 P0-4-1: 验证MarketListingService可用性...')
 
       try {
-        const MarketListingService = global.getTestService('market_listing')
+        const MarketListingService = global.getTestService('market_listing_core')
 
         expect(MarketListingService).toBeTruthy()
 
@@ -472,7 +477,7 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
       console.log('📋 P0-4-3: 验证孤儿冻结预防机制...')
 
       try {
-        const MarketListingService = global.getTestService('market_listing')
+        const MarketListingService = global.getTestService('market_listing_core')
 
         // 验证关键方法存在
         expect(typeof MarketListingService.withdrawListing).toBe('function')

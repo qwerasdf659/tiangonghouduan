@@ -15,7 +15,7 @@
  * - 预算积分分配
  *
  * 架构原则：
- * - 路由层不直连 models（通过 ServiceManager 获取 AssetService）
+ * - 路由层不直连 models（通过 ServiceManager 获取 BalanceService）
  * - 所有调整操作记录审计日志
  * - 支持幂等性控制（idempotency_key）
  *
@@ -106,8 +106,8 @@ router.post(
       )
     }
 
-    // 通过 ServiceManager 获取 AssetService
-    const AssetService = req.app.locals.services.getService('asset')
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 BalanceService（2026-01-31）
+    const BalanceService = req.app.locals.services.getService('asset_balance')
     const AuditLogService = req.app.locals.services.getService('audit_log')
 
     try {
@@ -118,7 +118,7 @@ router.post(
       const result = await TransactionManager.execute(
         async transaction => {
           // 1. 执行资产调整
-          const changeResult = await AssetService.changeBalance(
+          const changeResult = await BalanceService.changeBalance(
             {
               user_id,
               asset_code,
@@ -248,7 +248,8 @@ router.post(
       )
     }
 
-    const AssetService = req.app.locals.services.getService('asset')
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 BalanceService（2026-01-31）
+    const BalanceService = req.app.locals.services.getService('asset_balance')
     const results = []
     const errors = []
 
@@ -276,7 +277,7 @@ router.post(
         // eslint-disable-next-line no-await-in-loop -- 批量调整需要逐笔事务处理，确保单笔失败不影响其他
         const result = await TransactionManager.execute(
           async transaction => {
-            const changeResult = await AssetService.changeBalance(
+            const changeResult = await BalanceService.changeBalance(
               {
                 user_id,
                 asset_code,
@@ -453,9 +454,9 @@ router.get(
       throw error
     }
 
-    // 2. 获取资产余额
-    const AssetService = req.app.locals.services.getService('asset')
-    const balances = await AssetService.getAllBalances({ user_id: Number(user_id) })
+    // 2. 获取资产余额（V4.7.0 AssetService 拆分：使用 BalanceService）
+    const BalanceService = req.app.locals.services.getService('asset_balance')
+    const balances = await BalanceService.getAllBalances({ user_id: Number(user_id) })
 
     return res.apiSuccess({
       user: {

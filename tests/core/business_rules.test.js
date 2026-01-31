@@ -579,7 +579,7 @@ describe('🧮 核心业务逻辑测试', () => {
        * - idempotency_key: string - 幂等键（必填）
        *
        * 验证场景：提交无效参数应返回验证错误
-       * 注：原 /api/v4/shop/points/admin/adjust 已迁移到 AssetService
+       * 注：原 /api/v4/shop/points/admin/adjust 已迁移到 BalanceService
        */
       const invalidData = {
         campaign_id: -1, // 无效的活动ID

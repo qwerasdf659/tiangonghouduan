@@ -292,10 +292,10 @@ class RedemptionService {
       { transaction }
     )
 
-    // 6. 使用 AssetService.consumeItem() 消耗物品实例（自动记录事件）
+    // 6. 使用 ItemService.consumeItem() 消耗物品实例（自动记录事件）
     if (order.item_instance) {
-      const AssetService = require('./AssetService')
-      await AssetService.consumeItem(
+      const ItemService = require('./asset/ItemService')
+      await ItemService.consumeItem(
         {
           item_instance_id: order.item_instance.item_instance_id,
           operator_user_id: redeemer_user_id,
@@ -528,6 +528,324 @@ class RedemptionService {
     })
 
     return order
+  }
+
+  /**
+   * 管理员直接核销订单（通过 order_id，无需核销码）
+   *
+   * 业务场景：
+   * - 管理员在后台直接核销用户的兑换订单
+   * - 无需用户提供核销码，通过订单ID直接操作
+   *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
+   * @param {string|number} order_id - 订单ID（UUID 或数字）
+   * @param {Object} options - 事务和业务选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
+   * @param {number} options.admin_user_id - 管理员用户ID（必填）
+   * @param {number} [options.store_id] - 核销门店ID（可选）
+   * @param {string} [options.remark] - 备注（可选）
+   * @returns {Promise<RedemptionOrder>} 核销后的订单对象
+   * @throws {Error} 订单不存在、订单已核销/已取消/已过期等
+   *
+   * @example
+   * const order = await RedemptionService.adminFulfillOrderById(123, {
+   *   transaction,
+   *   admin_user_id: 456,
+   *   store_id: 1,
+   *   remark: '管理员手动核销'
+   * })
+   */
+  static async adminFulfillOrderById(order_id, options = {}) {
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'RedemptionService.adminFulfillOrderById')
+    const { admin_user_id, store_id, remark } = options
+
+    if (!admin_user_id) {
+      throw new Error('admin_user_id 是必填参数')
+    }
+
+    logger.info('管理员开始核销订单', {
+      order_id,
+      admin_user_id,
+      store_id,
+      remark
+    })
+
+    // 1. 查找订单并锁定（防止并发操作）
+    const order = await RedemptionOrder.findByPk(order_id, {
+      include: [
+        {
+          model: ItemInstance,
+          as: 'item_instance'
+        }
+      ],
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
+
+    if (!order) {
+      throw new Error('订单不存在')
+    }
+
+    // 2. 检查订单状态
+    if (order.status === 'fulfilled') {
+      throw new Error('订单已核销')
+    }
+
+    if (order.status === 'cancelled') {
+      throw new Error('订单已取消')
+    }
+
+    if (order.status === 'expired') {
+      throw new Error('订单已过期')
+    }
+
+    // 3. 检查是否超过有效期
+    if (order.isExpired()) {
+      // 自动标记为过期
+      await order.update({ status: 'expired' }, { transaction })
+      throw new Error('订单已超过有效期')
+    }
+
+    // 4. 执行核销
+    await order.update(
+      {
+        status: 'fulfilled',
+        redeemer_user_id: admin_user_id,
+        fulfilled_at: new Date()
+      },
+      { transaction }
+    )
+
+    // 5. 使用 ItemService.consumeItem() 消耗物品实例（自动记录事件）
+    if (order.item_instance) {
+      const ItemService = require('./asset/ItemService')
+      await ItemService.consumeItem(
+        {
+          item_instance_id: order.item_instance.item_instance_id,
+          operator_user_id: admin_user_id,
+          business_type: 'admin_redemption_fulfill',
+          idempotency_key: `admin_fulfill_${order.order_id}`,
+          meta: {
+            order_id: order.order_id,
+            admin_user_id,
+            store_id,
+            remark,
+            name: order.item_instance.meta?.name
+          }
+        },
+        { transaction }
+      )
+    }
+
+    logger.info('管理员核销订单成功', {
+      order_id: order.order_id,
+      admin_user_id,
+      store_id,
+      remark
+    })
+
+    return order
+  }
+
+  /**
+   * 管理员取消订单（通过 order_id）
+   *
+   * 业务场景：
+   * - 管理员在后台取消用户的兑换订单
+   * - 释放关联的物品锁定，恢复物品可用状态
+   *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
+   * @param {string|number} order_id - 订单ID（UUID 或数字）
+   * @param {Object} options - 事务和业务选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
+   * @param {number} options.admin_user_id - 管理员用户ID（必填）
+   * @param {string} [options.reason] - 取消原因（可选）
+   * @returns {Promise<RedemptionOrder>} 取消后的订单对象
+   * @throws {Error} 订单不存在、订单已核销等
+   *
+   * @example
+   * const order = await RedemptionService.adminCancelOrderById(123, {
+   *   transaction,
+   *   admin_user_id: 456,
+   *   reason: '用户申请取消'
+   * })
+   */
+  static async adminCancelOrderById(order_id, options = {}) {
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'RedemptionService.adminCancelOrderById')
+    const { admin_user_id, reason } = options
+
+    if (!admin_user_id) {
+      throw new Error('admin_user_id 是必填参数')
+    }
+
+    logger.info('管理员开始取消订单', { order_id, admin_user_id, reason })
+
+    // 1. 查找订单并锁定
+    const order = await RedemptionOrder.findByPk(order_id, {
+      include: [
+        {
+          model: ItemInstance,
+          as: 'item_instance'
+        }
+      ],
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
+
+    if (!order) {
+      throw new Error('订单不存在')
+    }
+
+    // 2. 检查订单状态
+    if (order.status === 'fulfilled') {
+      throw new Error('订单已核销，不能取消')
+    }
+
+    if (order.status === 'cancelled') {
+      // 幂等：已取消的订单再次取消，直接返回
+      logger.info('订单已取消，幂等返回', { order_id, admin_user_id })
+      return order
+    }
+
+    // 3. 更新订单状态为 cancelled
+    await order.update({ status: 'cancelled' }, { transaction })
+
+    // 4. 释放物品锁定（如果物品被该订单锁定）
+    if (order.item_instance) {
+      const existingLock = order.item_instance.getLockById(order_id)
+      if (existingLock && existingLock.lock_type === 'redemption') {
+        await order.item_instance.unlock(order_id, 'redemption', { transaction })
+        logger.info('物品锁定已释放', {
+          item_instance_id: order.item_instance_id,
+          order_id,
+          lock_type: 'redemption',
+          admin_user_id
+        })
+      }
+    }
+
+    logger.info('管理员取消订单成功', {
+      order_id: order.order_id,
+      admin_user_id,
+      reason,
+      item_unlocked: true
+    })
+
+    return order
+  }
+
+  /**
+   * 批量过期核销订单（管理员操作）
+   *
+   * 业务场景：
+   * - 管理员主动将指定的 pending 状态订单批量设为过期
+   * - 释放关联的物品锁定
+   *
+   * 事务边界治理（2026-01-05 决策）：
+   * - 强制要求外部事务传入（options.transaction）
+   * - 未提供事务时直接报错，由入口层统一管理事务
+   *
+   * @param {Array<string|number>} order_ids - 订单ID数组
+   * @param {Object} options - 事务和业务选项
+   * @param {Object} options.transaction - Sequelize事务对象（必填）
+   * @param {number} options.admin_user_id - 管理员用户ID（必填）
+   * @param {string} [options.reason] - 过期原因（可选）
+   * @returns {Promise<Object>} 操作结果 { expired_count, unlocked_count, failed_orders }
+   *
+   * @example
+   * const result = await RedemptionService.adminBatchExpireOrders([1, 2, 3], {
+   *   transaction,
+   *   admin_user_id: 456,
+   *   reason: '管理员手动过期'
+   * })
+   */
+  static async adminBatchExpireOrders(order_ids, options = {}) {
+    // 强制要求事务边界 - 2026-01-05 治理决策
+    const transaction = assertAndGetTransaction(options, 'RedemptionService.adminBatchExpireOrders')
+    const { admin_user_id, reason } = options
+
+    if (!admin_user_id) {
+      throw new Error('admin_user_id 是必填参数')
+    }
+
+    if (!Array.isArray(order_ids) || order_ids.length === 0) {
+      throw new Error('order_ids 必须是非空数组')
+    }
+
+    logger.info('管理员开始批量过期订单', {
+      order_count: order_ids.length,
+      admin_user_id,
+      reason
+    })
+
+    // 1. 查找所有符合条件的 pending 订单
+    const orders = await RedemptionOrder.findAll({
+      where: {
+        order_id: order_ids,
+        status: 'pending'
+      },
+      include: [
+        {
+          model: ItemInstance,
+          as: 'item_instance',
+          required: false
+        }
+      ],
+      transaction
+    })
+
+    if (orders.length === 0) {
+      logger.info('无符合条件的订单需要过期', { order_ids, admin_user_id })
+      return { expired_count: 0, unlocked_count: 0, failed_orders: [] }
+    }
+
+    // 2. 批量更新订单状态为 expired
+    const validOrderIds = orders.map(order => order.order_id)
+    await RedemptionOrder.update(
+      { status: 'expired' },
+      {
+        where: { order_id: validOrderIds },
+        transaction
+      }
+    )
+
+    // 3. 释放被这些订单锁定的物品
+    let unlockedCount = 0
+    for (const order of orders) {
+      if (order.item_instance) {
+        const existingLock = order.item_instance.getLockById(order.order_id)
+        if (existingLock && existingLock.lock_type === 'redemption') {
+          // eslint-disable-next-line no-await-in-loop -- 批量解锁需要在事务内串行执行
+          await order.item_instance.unlock(order.order_id, 'redemption', { transaction })
+          unlockedCount++
+        }
+      }
+    }
+
+    // 4. 计算失败的订单（在 order_ids 中但不在 validOrderIds 中）
+    const failedOrders = order_ids.filter(id => !validOrderIds.includes(id))
+
+    logger.info('管理员批量过期订单完成', {
+      expired_count: orders.length,
+      unlocked_count: unlockedCount,
+      failed_count: failedOrders.length,
+      admin_user_id,
+      reason
+    })
+
+    return {
+      expired_count: orders.length,
+      unlocked_count: unlockedCount,
+      failed_orders: failedOrders
+    }
   }
 }
 

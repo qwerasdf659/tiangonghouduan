@@ -25,7 +25,7 @@
  *
  * 技术验证点：
  * 1. MarketListingService 挂牌全生命周期管理
- * 2. AssetService 资产冻结/解冻（可叠加资产挂牌）
+ * 2. BalanceService 资产冻结/解冻（可叠加资产挂牌）
  * 3. ItemInstance 物品状态联动
  * 4. 幂等性保证（idempotency_key）
  *
@@ -54,7 +54,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
   // 服务实例
   let MarketListingService
   let TradeOrderService
-  let AssetService
+  let BalanceService
 
   // 测试数据
   let testSeller
@@ -105,7 +105,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
   async function grantTestAsset(user_id, asset_code = 'DIAMOND', amount = 200) {
     const grant_tx = await sequelize.transaction()
     try {
-      await AssetService.changeBalance(
+      await BalanceService.changeBalance(
         {
           user_id,
           asset_code,
@@ -137,9 +137,9 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
     })
 
     // 获取服务实例
-    MarketListingService = getTestService('market_listing')
+    MarketListingService = getTestService('market_listing_core')
     TradeOrderService = getTestService('trade_order')
-    AssetService = getTestService('asset')
+    BalanceService = getTestService('asset_balance')
 
     console.log('✅ 服务获取成功')
 

@@ -24,7 +24,7 @@
  * ```javascript
  * const result = await TransactionManager.execute(
  *   async (transaction) => {
- *     await AssetService.changeBalance({...}, { transaction })
+ *     await BalanceService.changeBalance({...}, { transaction })
  *     await LotteryQuotaService.deductQuota({...}, { transaction })
  *     return result
  *   },

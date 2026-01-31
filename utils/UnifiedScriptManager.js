@@ -221,7 +221,7 @@ class UnifiedScriptManager {
    * @example
    * const userService = scriptManager.getService('user')
    * const prizePoolService = scriptManager.getService('prize_pool')
-   * const adminLotteryService = scriptManager.getService('admin_lottery')
+   * const adminLotteryService = scriptManager.getService('admin_lottery_core')
    *
    * @param {string} serviceName - 服务名称（snake_case 格式）
    * @returns {Object} 服务实例

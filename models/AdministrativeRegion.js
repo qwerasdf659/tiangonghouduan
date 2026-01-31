@@ -115,7 +115,15 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(10, 7),
         allowNull: true,
         defaultValue: null,
-        comment: '经度（可选，用于地图展示）'
+        comment: '经度（可选，用于地图展示）',
+        /**
+         * 获取经度值，将DECIMAL转换为浮点数
+         * @returns {number|null} 经度值或null
+         */
+        get() {
+          const value = this.getDataValue('longitude')
+          return value ? parseFloat(value) : null
+        }
       },
 
       /**
@@ -125,7 +133,15 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(10, 7),
         allowNull: true,
         defaultValue: null,
-        comment: '纬度（可选）'
+        comment: '纬度（可选）',
+        /**
+         * 获取纬度值，将DECIMAL转换为浮点数
+         * @returns {number|null} 纬度值或null
+         */
+        get() {
+          const value = this.getDataValue('latitude')
+          return value ? parseFloat(value) : null
+        }
       },
 
       /**

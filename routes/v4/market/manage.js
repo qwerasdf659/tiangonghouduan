@@ -60,7 +60,7 @@ router.post(
   validatePositiveInteger('listing_id', 'params'),
   async (req, res) => {
     // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
-    const MarketListingService = req.app.locals.services.getService('market_listing')
+    const MarketListingService = req.app.locals.services.getService('market_listing_core')
 
     try {
       const listingId = req.validated.listing_id
@@ -146,7 +146,7 @@ router.post(
   validatePositiveInteger('listing_id', 'params'),
   async (req, res) => {
     // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
-    const MarketListingService = req.app.locals.services.getService('market_listing')
+    const MarketListingService = req.app.locals.services.getService('market_listing_core')
 
     try {
       const listingId = req.validated.listing_id

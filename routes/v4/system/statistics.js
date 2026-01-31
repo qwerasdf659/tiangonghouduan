@@ -20,7 +20,7 @@ const logger = require('../../../utils/logger').logger
  * 架构规范：
  * - 路由层不直接操作 models，所有数据库操作通过 ReportingService
  * - 路由层只做：鉴权 → 参数校验 → 调用Service → 统一响应
- * - 通过 req.app.locals.services.getService('reporting') 获取统一报表服务
+ * - 通过 req.app.locals.services.getService('reporting_stats') 获取统一报表服务
  */
 
 const express = require('express')
@@ -53,7 +53,7 @@ const { handleServiceError } = require('../../../middleware/validation')
 router.get('/charts', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 1. 通过 ServiceManager 获取 ReportingService（P2-C架构重构：合并StatisticsService）
-    const ReportingService = req.app.locals.services.getService('reporting')
+    const ReportingService = req.app.locals.services.getService('reporting_stats')
 
     // 2. 参数验证
     const days = parseInt(req.query.days) || 30
@@ -87,7 +87,7 @@ router.get('/charts', authenticateToken, requireRoleLevel(100), async (req, res)
 router.get('/report', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 1. 通过 ServiceManager 获取 ReportingService（P2-C架构重构）
-    const ReportingService = req.app.locals.services.getService('reporting')
+    const ReportingService = req.app.locals.services.getService('reporting_stats')
 
     // 2. 参数验证
     const { period = 'week' } = req.query
@@ -131,7 +131,7 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
     const XLSX = require('xlsx')
 
     // 1. 通过 ServiceManager 获取 ReportingService（P2-C架构重构）
-    const ReportingService = req.app.locals.services.getService('reporting')
+    const ReportingService = req.app.locals.services.getService('reporting_stats')
 
     // 2. 参数验证
     const days = parseInt(req.query.days) || 30

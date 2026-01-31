@@ -26,8 +26,16 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
-const AuditLogService = require('../../../services/AuditLogService')
 const logger = require('../../../utils/logger').logger
+
+/**
+ * 获取审计日志服务（通过 ServiceManager 统一入口）
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} AuditLogService 实例
+ */
+function getAuditLogService(req) {
+  return req.app.locals.services.getService('audit_log')
+}
 
 /**
  * 处理服务层错误
@@ -100,7 +108,7 @@ router.get('/', authenticateToken, requireRoleLevel(30), async (req, res) => {
       page_size
     })
 
-    const result = await AuditLogService.getAdminAuditLogs({
+    const result = await getAuditLogService(req).getAdminAuditLogs({
       operator_id: operator_id ? parseInt(operator_id) : null,
       operation_type: operation_type || null,
       target_type: target_type || null,
@@ -145,7 +153,7 @@ router.get('/:log_id', authenticateToken, requireRoleLevel(30), async (req, res)
       log_id: parseInt(log_id)
     })
 
-    const logDetail = await AuditLogService.getById(parseInt(log_id))
+    const logDetail = await getAuditLogService(req).getById(parseInt(log_id))
 
     if (!logDetail) {
       return res.apiError('审计日志不存在', 'LOG_NOT_FOUND', null, 404)
@@ -181,7 +189,7 @@ router.get('/statistics/summary', authenticateToken, requireRoleLevel(30), async
       end_date
     })
 
-    const statistics = await AuditLogService.getAuditStatistics({
+    const statistics = await getAuditLogService(req).getAuditStatistics({
       start_date: start_date || null,
       end_date: end_date || null
     })

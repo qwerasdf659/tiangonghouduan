@@ -349,33 +349,97 @@ class ServiceTestSuite {
   }
 
   /**
-   * 测试AssetService（项目特定）
+   * 测试资产子服务（V4.7.0 AssetService 拆分）
    *
    * 验证内容：
-   * - 服务方法完整
-   * - 幂等性保护存在
-   * - 事务支持正确
+   * - BalanceService: 余额操作方法完整
+   * - ItemService: 物品操作方法完整
+   * - QueryService: 查询统计方法完整
    *
-   * @param {Object} AssetService - 资产服务实例
+   * @param {Object} BalanceService - 余额服务实例
+   * @param {Object} ItemService - 物品服务实例
+   * @param {Object} QueryService - 查询服务实例
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果验证失败
    */
-  static async testAssetService(AssetService) {
-    console.log('💰 测试AssetService...')
+  static async testAssetSubServices(BalanceService, ItemService, QueryService) {
+    console.log('💰 测试资产子服务（V4.7.0 拆分架构）...')
 
-    // 验证核心方法（资产域统一架构）
-    const requiredMethods = [
-      'getBalance',
-      'getAllBalances',
-      'getTransactions',
+    const results = {
+      balance: null,
+      item: null,
+      query: null
+    }
+
+    // 1. 测试 BalanceService（8个方法）
+    const balanceMethods = [
+      'getOrCreateAccount',
+      'getOrCreateBalance',
       'changeBalance',
       'freeze',
-      'unfreeze'
+      'unfreeze',
+      'settleFromFrozen',
+      'getBalance',
+      'getAllBalances'
     ]
+    await ServiceTestSuite.testServiceHealth(BalanceService, balanceMethods)
+    results.balance = { success: true, methods: balanceMethods }
+    console.log('  ✅ BalanceService 验证通过')
+
+    // 2. 测试 ItemService（9个方法）
+    const itemMethods = [
+      'createItemInstance',
+      'updateItemOwner',
+      'getItemInstance',
+      'getItemInstancesByOwner',
+      'redeemItem',
+      'consumeItem',
+      'getItemStats',
+      'migrateInventoryToAssetDomain',
+      'syncItemInstancesFromExistingData'
+    ]
+    await ServiceTestSuite.testServiceHealth(ItemService, itemMethods)
+    results.item = { success: true, methods: itemMethods }
+    console.log('  ✅ ItemService 验证通过')
+
+    // 3. 测试 QueryService（7个方法）
+    const queryMethods = [
+      'getTransactions',
+      'getTransactionStats',
+      'getAssetSummary',
+      'getUserPortfolio',
+      'queryBalanceHistory',
+      'getAssetDistribution',
+      'exportTransactionReport'
+    ]
+    await ServiceTestSuite.testServiceHealth(QueryService, queryMethods)
+    results.query = { success: true, methods: queryMethods }
+    console.log('  ✅ QueryService 验证通过')
+
+    console.log('✅ 资产子服务全部验证通过')
+
+    return {
+      success: true,
+      results
+    }
+  }
+
+  /**
+   * 测试单个资产子服务（向后兼容旧调用方式）
+   *
+   * @deprecated 使用 testAssetSubServices 替代
+   * @param {Object} AssetService - 实际传入的是 BalanceService
+   * @returns {Promise<Object>} 测试结果
+   */
+  static async testAssetService(AssetService) {
+    console.log('💰 测试 BalanceService（兼容旧 testAssetService 调用）...')
+
+    // V4.7.0: AssetService 已拆分，这里实际测试的是 BalanceService
+    const requiredMethods = ['getBalance', 'getAllBalances', 'changeBalance', 'freeze', 'unfreeze']
 
     await ServiceTestSuite.testServiceHealth(AssetService, requiredMethods)
 
-    console.log('✅ AssetService验证通过')
+    console.log('✅ BalanceService 验证通过')
 
     return {
       success: true,

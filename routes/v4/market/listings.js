@@ -62,7 +62,7 @@ const logger = require('../../../utils/logger').logger
 router.get('/listings', authenticateToken, async (req, res) => {
   try {
     // P1-9：通过 ServiceManager 获取服务（snake_case key）
-    const MarketListingService = req.app.locals.services.getService('market_listing')
+    const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
     const {
       page = 1,
@@ -148,7 +148,7 @@ router.get('/listings', authenticateToken, async (req, res) => {
 router.get('/listings/facets', authenticateToken, async (req, res) => {
   try {
     // P1-9：通过 ServiceManager 获取服务（snake_case key）
-    const MarketListingService = req.app.locals.services.getService('market_listing')
+    const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
     // 获取筛选维度配置（仅返回已启用的选项）
     const facets = await MarketListingService.getFilterFacets({
@@ -203,7 +203,7 @@ router.get(
   async (req, res) => {
     try {
       // P1-9：通过 ServiceManager 获取服务（snake_case key）
-      const MarketListingService = req.app.locals.services.getService('market_listing')
+      const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
       const listingId = req.validated.listing_id
 
@@ -285,7 +285,7 @@ router.get(
 router.get('/listing-status', authenticateToken, async (req, res) => {
   try {
     // P1-9：通过 ServiceManager 获取服务（snake_case key）
-    const MarketListingService = req.app.locals.services.getService('market_listing')
+    const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
     const userId = req.user.user_id
 

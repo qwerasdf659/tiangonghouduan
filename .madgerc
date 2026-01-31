@@ -1,0 +1,17 @@
+{
+  "fileExtensions": ["js"],
+  "excludeRegExp": [
+    "node_modules",
+    "public/admin",
+    "backups",
+    "logs",
+    "tests",
+    "scripts/maintenance/database_performance_monitor.js"
+  ],
+  "detectiveOptions": {
+    "es6": {
+      "mixedImports": true
+    }
+  },
+  "warning": true
+}

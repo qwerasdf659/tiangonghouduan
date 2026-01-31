@@ -18,7 +18,7 @@
  *    - 初始状态：created
  * 2. 冻结资产
  *    - 锁定挂牌：market_listings.status=on_sale → locked
- *    - 冻结买家 DIAMOND：通过 AssetService 冻结 gross_amount
+ *    - 冻结买家 DIAMOND：通过 BalanceService 冻结 gross_amount
  *    - 更新订单状态：created → frozen
  * 3. 成交结算
  *    - 多分录写入：买家扣减、卖家入账、平台手续费
@@ -46,7 +46,7 @@
  * - seller_user_id（users.user_id，卖家用户）
  *
  * 集成服务：
- * - AssetService：资产冻结/解冻/结算
+ * - BalanceService：资产冻结/解冻/结算
  * - MarketListing：挂牌状态更新
  * - ItemInstance：物品所有权转移
  *

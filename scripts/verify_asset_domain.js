@@ -290,124 +290,76 @@ async function verifyDatabaseLayer() {
 }
 
 /**
- * P1-9：初始化 ServiceManager 并获取 AssetService
- * @returns {Promise<Object>} AssetService 实例
+ * V4.7.0：初始化 ServiceManager 并获取资产子服务（AssetService 拆分）
+ * @returns {Promise<Object>} 包含 BalanceService、ItemService、QueryService 的对象
  */
-async function initializeAssetService() {
+async function initializeAssetSubServices() {
   try {
     const serviceManager = require('../services/index')
     if (!serviceManager._initialized) {
       await serviceManager.initialize()
     }
-    const AssetService = serviceManager.getService('asset')
-    console.log('  ✅ AssetService 加载成功（P1-9 ServiceManager）')
-    return AssetService
+    const BalanceService = serviceManager.getService('asset_balance')
+    const ItemService = serviceManager.getService('asset_item')
+    const QueryService = serviceManager.getService('asset_query')
+    console.log('  ✅ 资产子服务加载成功（V4.7.0 AssetService 拆分）')
+    return { BalanceService, ItemService, QueryService }
   } catch (error) {
-    console.log(`  ❌ AssetService 加载失败: ${error.message}`)
+    console.log(`  ❌ 资产子服务加载失败: ${error.message}`)
     throw error
   }
 }
 
 /**
- * 验证服务层
+ * 验证服务层（V4.7.0 AssetService 拆分后的子服务验证）
  */
 async function verifyServiceLayer() {
   console.log('\n==========================================')
-  console.log('🔧 服务层验证')
+  console.log('🔧 服务层验证（V4.7.0 AssetService 拆分）')
   console.log('==========================================\n')
 
-  // 检查 AssetService 方法
+  // 检查资产子服务方法
   try {
-    // P1-9：通过 ServiceManager 获取 AssetService
-    const AssetService = await initializeAssetService()
+    // V4.7.0：通过 ServiceManager 获取资产子服务
+    const { BalanceService, ItemService, QueryService } = await initializeAssetSubServices()
 
-    console.log('【检查1】AssetService 核心方法')
+    console.log('【检查1】BalanceService 核心方法（余额操作）')
 
-    // getAssetPortfolio
-    if (typeof AssetService.getAssetPortfolio === 'function') {
-      pass('AssetService.getAssetPortfolio() 方法存在')
-    } else {
-      fail('AssetService.getAssetPortfolio() 方法不存在')
-    }
+    // BalanceService 方法
+    const balanceMethods = ['getOrCreateAccount', 'getOrCreateBalance', 'changeBalance', 'freeze', 'unfreeze', 'settleFromFrozen', 'getBalance', 'getAllBalances']
+    balanceMethods.forEach(method => {
+      if (typeof BalanceService[method] === 'function') {
+        pass(`BalanceService.${method}() 方法存在`)
+      } else {
+        fail(`BalanceService.${method}() 方法不存在`)
+      }
+    })
 
-    // mintItem
-    if (typeof AssetService.mintItem === 'function') {
-      pass('AssetService.mintItem() 方法存在')
-    } else {
-      fail('AssetService.mintItem() 方法不存在')
-    }
+    console.log('\n【检查2】ItemService 核心方法（物品操作）')
 
-    // lockItem
-    if (typeof AssetService.lockItem === 'function') {
-      pass('AssetService.lockItem() 方法存在')
-    } else {
-      fail('AssetService.lockItem() 方法不存在')
-    }
+    // ItemService 方法
+    const itemMethods = ['createItemInstance', 'updateItemOwner', 'getItemInstance', 'getItemInstancesByOwner', 'redeemItem', 'consumeItem', 'getItemStats']
+    itemMethods.forEach(method => {
+      if (typeof ItemService[method] === 'function') {
+        pass(`ItemService.${method}() 方法存在`)
+      } else {
+        fail(`ItemService.${method}() 方法不存在`)
+      }
+    })
 
-    // unlockItem
-    if (typeof AssetService.unlockItem === 'function') {
-      pass('AssetService.unlockItem() 方法存在')
-    } else {
-      fail('AssetService.unlockItem() 方法不存在')
-    }
+    console.log('\n【检查3】QueryService 核心方法（查询统计）')
 
-    // transferItem
-    if (typeof AssetService.transferItem === 'function') {
-      pass('AssetService.transferItem() 方法存在')
-    } else {
-      fail('AssetService.transferItem() 方法不存在')
-    }
-
-    // consumeItem
-    if (typeof AssetService.consumeItem === 'function') {
-      pass('AssetService.consumeItem() 方法存在')
-    } else {
-      fail('AssetService.consumeItem() 方法不存在')
-    }
-
-    // recordItemEvent
-    if (typeof AssetService.recordItemEvent === 'function') {
-      pass('AssetService.recordItemEvent() 方法存在')
-    } else {
-      fail('AssetService.recordItemEvent() 方法不存在')
-    }
-
-    // getItemEvents
-    if (typeof AssetService.getItemEvents === 'function') {
-      pass('AssetService.getItemEvents() 方法存在')
-    } else {
-      fail('AssetService.getItemEvents() 方法不存在')
-    }
-
-    // changeBalance (应该支持 campaign_id)
-    if (typeof AssetService.changeBalance === 'function') {
-      pass('AssetService.changeBalance() 方法存在')
-    } else {
-      fail('AssetService.changeBalance() 方法不存在')
-    }
-
-    // freeze
-    if (typeof AssetService.freeze === 'function') {
-      pass('AssetService.freeze() 方法存在')
-    } else {
-      fail('AssetService.freeze() 方法不存在')
-    }
-
-    // unfreeze
-    if (typeof AssetService.unfreeze === 'function') {
-      pass('AssetService.unfreeze() 方法存在')
-    } else {
-      fail('AssetService.unfreeze() 方法不存在')
-    }
-
-    // settleFromFrozen
-    if (typeof AssetService.settleFromFrozen === 'function') {
-      pass('AssetService.settleFromFrozen() 方法存在')
-    } else {
-      fail('AssetService.settleFromFrozen() 方法不存在')
-    }
+    // QueryService 方法
+    const queryMethods = ['getTransactions', 'getTransactionStats', 'getAssetSummary', 'getUserPortfolio', 'queryBalanceHistory', 'getAssetDistribution']
+    queryMethods.forEach(method => {
+      if (typeof QueryService[method] === 'function') {
+        pass(`QueryService.${method}() 方法存在`)
+      } else {
+        fail(`QueryService.${method}() 方法不存在`)
+      }
+    })
   } catch (err) {
-    fail('加载 AssetService 失败', err.message)
+    fail('加载资产子服务失败', err.message)
   }
 
   // 检查 PointsService 是否已删除（应该删除）
@@ -423,14 +375,14 @@ async function verifyServiceLayer() {
     }
   }
 
-  // 检查 BackpackService 是否并入 AssetService
+  // 检查 BackpackService 状态（V4.7.0：BackpackService 独立存在，依赖 BalanceService/ItemService）
   console.log('\n【检查3】BackpackService 归属状态')
   try {
     const BackpackService = require('../services/BackpackService')
-    warn('BackpackService 仍独立存在（文档要求并入 AssetService）')
+    pass('BackpackService 独立存在（正确：作为聚合查询层，调用 BalanceService/ItemService）')
   } catch (err) {
     if (err.code === 'MODULE_NOT_FOUND') {
-      pass('BackpackService 已并入 AssetService')
+      warn('BackpackService 缺失（需要背包聚合查询功能）')
     } else {
       fail('检查 BackpackService 状态失败', err.message)
     }
@@ -550,11 +502,11 @@ async function verifyBusinessLayer() {
   const path = require('path')
 
   /**
-   * V4.6 Phase 5 迁移：检查 Pipeline 管线是否使用 AssetService
+   * V4.7.0：检查 Pipeline 管线是否使用资产子服务（AssetService 已拆分）
    *
-   * 原 BasicGuaranteeStrategy 已移除，改为检查 SettleStage.js
+   * 检查 SettleStage.js 等是否使用 BalanceService 和 ItemService
    */
-  console.log('【检查1】抽奖管线改造状态（V4.6 Pipeline 架构）')
+  console.log('【检查1】抽奖管线改造状态（V4.7.0 资产子服务）')
   try {
     const settleStages = [
       path.join(__dirname, '..', 'services', 'UnifiedLotteryEngine', 'pipeline', 'stages', 'SettleStage.js'),
@@ -568,26 +520,27 @@ async function verifyBusinessLayer() {
         const content = fs.readFileSync(stagePath, 'utf-8')
         const stageName = path.basename(stagePath)
 
-        if (content.includes('AssetService.changeBalance') || content.includes('AssetService.mintItem')) {
-          pass(`${stageName} 已使用 AssetService`)
+        // V4.7.0：检查是否使用 BalanceService 或 ItemService
+        if (content.includes('BalanceService.changeBalance') || content.includes('ItemService.createItemInstance')) {
+          pass(`${stageName} 已使用资产子服务（V4.7.0）`)
           pipelineCheckPassed = true
         } else if (content.includes('ItemInstance.create')) {
           fail(`${stageName} 仍直接使用 ItemInstance.create()`)
         } else {
-          warn(`${stageName} 未发现 AssetService 调用`)
+          warn(`${stageName} 未发现资产子服务调用`)
         }
       }
     }
 
     if (pipelineCheckPassed) {
-      pass('V4.6 Pipeline 管线已正确使用 AssetService')
+      pass('V4.7.0 Pipeline 管线已正确使用资产子服务')
     }
   } catch (err) {
     fail('检查抽奖管线改造状态失败', err.message)
   }
 
-  // 检查交易服务是否使用 AssetService.transferItem
-  console.log('\n【检查2】交易服务改造状态')
+  // V4.7.0：检查交易服务是否使用 ItemService.updateItemOwner
+  console.log('\n【检查2】交易服务改造状态（V4.7.0）')
   try {
     const tradeServicePath = path.join(__dirname, '..', 'services', 'TradeOrderService.js')
 
@@ -595,14 +548,14 @@ async function verifyBusinessLayer() {
       const content = fs.readFileSync(tradeServicePath, 'utf-8')
 
       if (
-        content.includes('AssetService.transferItem') ||
-        content.includes('assetService.transferItem')
+        content.includes('ItemService.updateItemOwner') ||
+        content.includes('itemService.updateItemOwner')
       ) {
-        pass('交易服务已使用 AssetService.transferItem()')
+        pass('交易服务已使用 ItemService.updateItemOwner()（V4.7.0）')
       } else if (content.includes('.update(') && content.includes('owner_user_id')) {
         fail('交易服务仍直接操作 ItemInstance')
       } else {
-        warn('交易服务未发现 transferItem 调用')
+        warn('交易服务未发现 updateItemOwner 调用')
       }
     } else {
       warn('TradeOrderService.js 文件不存在')
@@ -611,8 +564,8 @@ async function verifyBusinessLayer() {
     fail('检查交易服务改造状态失败', err.message)
   }
 
-  // 检查核销服务是否使用 AssetService.consumeItem
-  console.log('\n【检查3】核销服务改造状态')
+  // V4.7.0：检查核销服务是否使用 ItemService.consumeItem
+  console.log('\n【检查3】核销服务改造状态（V4.7.0）')
   try {
     const redemptionServicePath = path.join(__dirname, '..', 'services', 'RedemptionService.js')
 
@@ -620,10 +573,10 @@ async function verifyBusinessLayer() {
       const content = fs.readFileSync(redemptionServicePath, 'utf-8')
 
       if (
-        content.includes('AssetService.consumeItem') ||
-        content.includes('assetService.consumeItem')
+        content.includes('ItemService.consumeItem') ||
+        content.includes('itemService.consumeItem')
       ) {
-        pass('核销服务已使用 AssetService.consumeItem()')
+        pass('核销服务已使用 ItemService.consumeItem()（V4.7.0）')
       } else if (content.includes('markAsUsed')) {
         fail('核销服务仍直接调用 markAsUsed()')
       } else {

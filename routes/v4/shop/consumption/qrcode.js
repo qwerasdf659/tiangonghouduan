@@ -184,7 +184,7 @@ router.get(
   async (req, res) => {
     try {
       // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-      const ConsumptionService = req.app.locals.services.getService('consumption')
+      const ConsumptionService = req.app.locals.services.getService('consumption_core')
 
       const { qr_code } = req.query
 

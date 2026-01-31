@@ -151,7 +151,7 @@ class ImageService {
       large: getImageUrl(thumbnailKeys.large)
     }
 
-    console.log('✅ ImageService: 图片上传成功（含预生成缩略图）', {
+    _logger.info('✅ ImageService: 图片上传成功（含预生成缩略图）', {
       image_id: imageRecord.image_id,
       object_key: originalKey,
       thumbnail_keys: thumbnailKeys,
@@ -244,7 +244,7 @@ class ImageService {
     const imageRecord = await ImageResources.findByPk(imageId)
 
     if (!imageRecord) {
-      console.warn(`⚠️ ImageService: 尝试删除不存在的图片 image_id=${imageId}`)
+      _logger.warn(`⚠️ ImageService: 尝试删除不存在的图片 image_id=${imageId}`)
       return false
     }
 
@@ -255,9 +255,9 @@ class ImageService {
         imageRecord.file_path,
         imageRecord.thumbnail_paths
       )
-      console.log(`✅ ImageService: Sealos 对象已物理删除 image_id=${imageId}`)
+      _logger.info(`✅ ImageService: Sealos 对象已物理删除 image_id=${imageId}`)
     } catch (error) {
-      console.error(
+      _logger.error(
         `❌ ImageService: Sealos 对象删除失败 image_id=${imageId}, error=${error.message}`
       )
       // 即使对象存储删除失败，也尝试删除数据库记录，避免数据不一致
@@ -270,7 +270,7 @@ class ImageService {
     })
 
     if (affectedCount > 0) {
-      console.log(`✅ ImageService: 数据库记录已物理删除 image_id=${imageId}`)
+      _logger.info(`✅ ImageService: 数据库记录已物理删除 image_id=${imageId}`)
     }
 
     return affectedCount > 0
@@ -375,7 +375,7 @@ class ImageService {
     // 计算清理阈值时间（当前时间 - hours 小时）
     const threshold = new Date(Date.now() - hours * 60 * 60 * 1000)
 
-    console.log(
+    _logger.info(
       `🔍 ImageService: 开始清理未绑定图片（context_id=0 且 created_at < ${threshold.toISOString()}）`
     )
 
@@ -392,7 +392,7 @@ class ImageService {
         order: [['created_at', 'ASC']]
       })
 
-      console.log(`📊 ImageService: 发现 ${unboundImages.length} 个待清理的未绑定图片`)
+      _logger.info(`📊 ImageService: 发现 ${unboundImages.length} 个待清理的未绑定图片`)
 
       if (unboundImages.length === 0) {
         return {
@@ -428,7 +428,7 @@ class ImageService {
             success: true
           })
 
-          console.log(
+          _logger.info(
             `🗑️ ImageService: 已清理 image_id=${image.image_id}, file_path=${image.file_path}`
           )
         } catch (error) {
@@ -440,7 +440,7 @@ class ImageService {
             error: error.message
           })
 
-          console.error(
+          _logger.error(
             `❌ ImageService: 清理失败 image_id=${image.image_id}, error=${error.message}`
           )
         }
@@ -456,7 +456,7 @@ class ImageService {
         duration_ms: duration
       }
 
-      console.log('✅ ImageService: 未绑定图片清理完成', {
+      _logger.info('✅ ImageService: 未绑定图片清理完成', {
         cleaned: cleanedCount,
         failed: failedCount,
         duration: `${duration}ms`
@@ -464,7 +464,7 @@ class ImageService {
 
       return result
     } catch (error) {
-      console.error('❌ ImageService: 未绑定图片清理执行异常', { error: error.message })
+      _logger.error('❌ ImageService: 未绑定图片清理执行异常', { error: error.message })
       throw error
     }
   }
@@ -495,7 +495,7 @@ class ImageService {
       }
     } else {
       // 缩略图缺失时：记录 ERROR 日志 + 返回占位图（生产安全兜底）
-      console.error(
+      _logger.error(
         '❌ ImageService: 图片 ' +
           imageRecord.image_id +
           ' 缺少预生成缩略图。' +

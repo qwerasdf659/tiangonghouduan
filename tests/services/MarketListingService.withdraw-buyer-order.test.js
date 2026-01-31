@@ -25,9 +25,14 @@ const {
   Account
 } = require('../../models')
 
+/**
+ * V4.7.0 大文件拆分：MarketListingService 已拆分为子服务
+ * 本测试使用核心操作方法（createFungibleAssetListing, withdrawFungibleAssetListing）
+ * 都在 CoreService 中
+ */
 let MarketListingService
 let TradeOrderService
-let AssetService
+let BalanceService
 
 // 测试超时设置
 jest.setTimeout(60000)
@@ -39,10 +44,13 @@ describe('MarketListingService - 撤回挂牌时买家订单处理', () => {
   beforeAll(async () => {
     await sequelize.authenticate()
 
-    // 获取服务
-    MarketListingService = global.getTestService('market_listing')
+    /**
+     * V4.7.0 大文件拆分适配：
+     * 使用 CoreService（静态类）获取核心挂牌操作方法
+     */
+    MarketListingService = global.getTestService('market_listing_core')
     TradeOrderService = global.getTestService('trade_order')
-    AssetService = global.getTestService('asset')
+    BalanceService = global.getTestService('asset_balance')
 
     // 获取测试用户
     test_seller = await User.findOne({ where: { mobile: '13612227930' } })
@@ -94,7 +102,7 @@ describe('MarketListingService - 撤回挂牌时买家订单处理', () => {
       const prep_tx = await sequelize.transaction()
       try {
         // 卖家需要有挂牌资产
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_seller.user_id,
             asset_code: test_asset_code,
@@ -106,7 +114,7 @@ describe('MarketListingService - 撤回挂牌时买家订单处理', () => {
         )
 
         // 买家需要有购买资产
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_buyer.user_id,
             asset_code: test_asset_code,
@@ -236,7 +244,7 @@ describe('MarketListingService - 撤回挂牌时买家订单处理', () => {
       // 1. 准备卖家资产
       const prep_tx = await sequelize.transaction()
       try {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_seller.user_id,
             asset_code: test_asset_code,

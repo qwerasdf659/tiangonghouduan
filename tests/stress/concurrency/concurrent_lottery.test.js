@@ -607,7 +607,7 @@ describe('【P0】并发抽奖测试 - 多用户/多设备并发场景', () => {
       console.log('')
       console.log('   - 如测试失败，需检查：')
       console.log('     1. 幂等性实现（IdempotencyService）')
-      console.log('     2. 积分扣减事务（AssetService）')
+      console.log('     2. 积分扣减事务（BalanceService）')
       console.log('     3. 数据库锁机制（悲观锁/乐观锁）')
       console.log('     4. Redis分布式锁')
       console.log('='.repeat(80))

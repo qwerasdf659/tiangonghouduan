@@ -19,11 +19,14 @@
  *
  * // 获取服务（使用 snake_case key，与路由层保持一致）
  * const BackpackService = getTestService('backpack')
- * const AssetService = getTestService('asset')
+ * // V4.7.0 AssetService 拆分（2026-01-31）：使用子服务
+ * const BalanceService = getTestService('asset_balance')  // 余额操作
+ * const ItemService = getTestService('asset_item')        // 物品操作
+ * const QueryService = getTestService('asset_query')      // 查询统计
  *
  * // 或者获取 ServiceManager 实例（用于更复杂的场景）
  * const serviceManager = getTestServiceManager()
- * const service = serviceManager.getService('market_listing')
+ * const service = serviceManager.getService('market_listing_query')
  * ```
  *
  * 创建时间：2026-01-09
@@ -161,7 +164,7 @@ function getTestService(serviceName) {
  * }
  *
  * // 在路由处理函数中使用
- * const MarketListingService = mockRequest.app.locals.services.getService('market_listing')
+ * const MarketListingService = mockRequest.app.locals.services.getService('market_listing_query')
  */
 function createMockAppServices() {
   const manager = getTestServiceManager()

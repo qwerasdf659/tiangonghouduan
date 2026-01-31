@@ -203,7 +203,15 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(5, 4),
         allowNull: false,
         defaultValue: 0.0,
-        comment: '手续费费率（Fee Rate）：如 0.05 = 5%，基于产出 to_amount 计算手续费'
+        comment: '手续费费率（Fee Rate）：如 0.05 = 5%，基于产出 to_amount 计算手续费',
+        /**
+         * 获取手续费费率，将DECIMAL转换为浮点数
+         * @returns {number} 手续费费率（如0.05表示5%）
+         */
+        get() {
+          const value = this.getDataValue('fee_rate')
+          return value ? parseFloat(value) : 0.0
+        }
       },
 
       fee_min_amount: {

@@ -661,9 +661,9 @@ class LotteryComputeEngine {
         }
       }
 
-      // 使用 AssetService.getBudgetPointsByCampaigns 正确获取预算
-      const AssetService = require('../../AssetService')
-      const user_budget = await AssetService.getBudgetPointsByCampaigns(
+      // 使用 QueryService.getBudgetPointsByCampaigns 正确获取预算
+      const QueryService = require('../../asset/QueryService')
+      const user_budget = await QueryService.getBudgetPointsByCampaigns(
         { user_id, campaign_ids: allowed_ids },
         { transaction }
       )
@@ -702,8 +702,8 @@ class LotteryComputeEngine {
       let user_wallet_available = false
 
       if (allowed_ids && allowed_ids.length > 0) {
-        const AssetService = require('../../AssetService')
-        user_budget = await AssetService.getBudgetPointsByCampaigns(
+        const QueryService = require('../../asset/QueryService')
+        user_budget = await QueryService.getBudgetPointsByCampaigns(
           { user_id, campaign_ids: allowed_ids },
           { transaction }
         )

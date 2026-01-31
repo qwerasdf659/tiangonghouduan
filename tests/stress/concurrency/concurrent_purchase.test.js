@@ -46,7 +46,7 @@ describe('🛒 并发购买竞态测试', () => {
   // 服务实例
   let MarketListingService
   let TradeOrderService
-  let AssetService
+  let BalanceService
 
   // 测试数据
   let testSeller
@@ -113,7 +113,7 @@ describe('🛒 并发购买竞态测试', () => {
   async function grantTestAsset(userId, amount = 200) {
     const transaction = await sequelize.transaction()
     try {
-      await AssetService.changeBalance(
+      await BalanceService.changeBalance(
         {
           user_id: userId,
           asset_code: 'DIAMOND',
@@ -148,9 +148,9 @@ describe('🛒 并发购买竞态测试', () => {
     })
 
     // 获取服务实例
-    MarketListingService = getTestService('market_listing')
+    MarketListingService = getTestService('market_listing_core')
     TradeOrderService = getTestService('trade_order')
-    AssetService = getTestService('asset')
+    BalanceService = getTestService('asset_balance')
 
     console.log('✅ 服务获取成功')
 

@@ -21,14 +21,14 @@
  *
  * // 测试资产操作幂等性
  * await IdempotencyTestSuite.testBusinessIdIdempotency(
- *   () => AssetService.changeBalance(params),
+ *   () => BalanceService.changeBalance(params),
  *   'lottery_reward_12345'
  * )
  * ```
  *
  * 创建时间：2025-11-14
  * 符合规范：01-核心开发质量标准.mdc
- * 最后更新：2025-12-30（迁移到AssetService）
+ * 最后更新：2025-12-30（迁移到BalanceService）
  * 使用模型：Claude 4 Sonnet
  */
 
@@ -225,19 +225,19 @@ class IdempotencyTestSuite {
    * @param {number} userId - 用户ID
    * @param {number} amount - 资产数量
    * @param {string} idempotencyKey - 幂等性键
-   * @param {Object} AssetService - 资产服务实例
+   * @param {Object} BalanceService - 资产服务实例
    * @returns {Promise<Object>} 测试结果
    * @throws {Error} 如果幂等性保护失效
    */
-  static async testAssetServiceIdempotency(userId, amount, idempotencyKey, AssetService) {
+  static async testBalanceServiceIdempotency(userId, amount, idempotencyKey, BalanceService) {
     console.log(`💰 测试资产服务幂等性: user_id=${userId}, idempotency_key=${idempotencyKey}`)
 
     // 获取初始余额
-    const balanceBefore = await AssetService.getBalance({ user_id: userId, asset_code: 'POINTS' })
+    const balanceBefore = await BalanceService.getBalance({ user_id: userId, asset_code: 'POINTS' })
     const availableBefore = Number(balanceBefore.available_amount)
 
     // 第一次添加资产
-    await AssetService.changeBalance({
+    await BalanceService.changeBalance({
       user_id: userId,
       asset_code: 'POINTS',
       delta_amount: amount,
@@ -246,7 +246,7 @@ class IdempotencyTestSuite {
     })
 
     // 验证余额变更
-    const balanceAfterFirst = await AssetService.getBalance({
+    const balanceAfterFirst = await BalanceService.getBalance({
       user_id: userId,
       asset_code: 'POINTS'
     })
@@ -257,7 +257,7 @@ class IdempotencyTestSuite {
     }
 
     // 第二次添加资产（相同idempotency_key）
-    await AssetService.changeBalance({
+    await BalanceService.changeBalance({
       user_id: userId,
       asset_code: 'POINTS',
       delta_amount: amount,
@@ -266,7 +266,7 @@ class IdempotencyTestSuite {
     })
 
     // 验证余额未再次变更
-    const balanceAfterSecond = await AssetService.getBalance({
+    const balanceAfterSecond = await BalanceService.getBalance({
       user_id: userId,
       asset_code: 'POINTS'
     })

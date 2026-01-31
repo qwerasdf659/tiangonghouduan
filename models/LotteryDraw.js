@@ -374,7 +374,15 @@ module.exports = sequelize => {
       stop_angle: {
         type: DataTypes.DECIMAL(5, 2),
         allowNull: true,
-        comment: '转盘停止角度'
+        comment: '转盘停止角度',
+        /**
+         * 获取转盘停止角度，将DECIMAL转换为浮点数
+         * @returns {number|null} 停止角度或null
+         */
+        get() {
+          const value = this.getDataValue('stop_angle')
+          return value ? parseFloat(value) : null
+        }
       },
       draw_config: {
         type: DataTypes.JSON,

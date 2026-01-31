@@ -174,7 +174,7 @@ describe('P3-6b: HourlyUnlockTimeoutTradeOrders - 每小时超时交易订单解
   })
 
   describe('买家资产解冻验证', () => {
-    test('应调用 AssetService.unfreeze 解冻买家资产', async () => {
+    test('应调用 BalanceService.unfreeze 解冻买家资产', async () => {
       // 执行解锁任务
       const report = await HourlyUnlockTimeoutTradeOrders.execute()
 

@@ -45,7 +45,7 @@ const logger = require('../../../../utils/logger').logger
 router.get('/items', authenticateToken, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ExchangeService（符合TR-005规范）
-    const ExchangeService = req.app.locals.services.getService('exchange_market')
+    const ExchangeService = req.app.locals.services.getService('exchange_query')
 
     const {
       status = 'active',
@@ -147,7 +147,7 @@ router.get('/items', authenticateToken, async (req, res) => {
 router.get('/items/:item_id', authenticateToken, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ExchangeService（符合TR-005规范）
-    const ExchangeService = req.app.locals.services.getService('exchange_market')
+    const ExchangeService = req.app.locals.services.getService('exchange_query')
 
     const { item_id } = req.params
     const user_id = req.user.user_id

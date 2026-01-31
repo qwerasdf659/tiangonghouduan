@@ -1,5 +1,6 @@
 // 测试预算系数动态配置功能
-const ConsumptionService = require('./services/ConsumptionService')
+// V4.7.0 拆分：使用 consumption/CoreService
+const ConsumptionCoreService = require('../services/consumption/CoreService')
 
 async function testBudgetRatio() {
   try {
@@ -8,7 +9,7 @@ async function testBudgetRatio() {
 
     // 测试1: 读取当前配置
     console.log('\n📖 测试1: 读取当前预算系数配置')
-    const ratio = await ConsumptionService.getBudgetRatio()
+    const ratio = await ConsumptionCoreService.getBudgetRatio()
     console.log(`✅ 当前预算系数: ${ratio}`)
 
     // 测试2: 模拟计算

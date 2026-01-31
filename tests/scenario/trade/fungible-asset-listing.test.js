@@ -20,7 +20,7 @@ const TransactionManager = require('../../../utils/TransactionManager')
 
 // 🔴 P1-9 J2-RepoWide：通过 global.getTestService 获取服务（snake_case key）
 let MarketListingService
-let AssetService
+let BalanceService
 
 // 测试数据库配置
 jest.setTimeout(30000)
@@ -35,8 +35,8 @@ describe('C2C 材料交易功能集成测试', () => {
   beforeAll(async () => {
     try {
       // 🔴 P1-9：通过 ServiceManager 获取服务实例
-      MarketListingService = global.getTestService('market_listing')
-      AssetService = global.getTestService('asset')
+      MarketListingService = global.getTestService('market_listing_core')
+      BalanceService = global.getTestService('asset_balance')
 
       // 连接测试数据库（由全局 jest.setup.js 处理，此处仅验证）
       await sequelize.authenticate()
@@ -262,7 +262,7 @@ describe('C2C 材料交易功能集成测试', () => {
       }
 
       // 1. 确保用户有足够的资产余额
-      const initialBalance = await AssetService.getBalance({
+      const initialBalance = await BalanceService.getBalance({
         user_id: testUser.user_id,
         asset_code: testAssetCode
       })
@@ -311,7 +311,7 @@ describe('C2C 材料交易功能集成测试', () => {
       expect(result.freeze_result).toBeDefined()
 
       // 5. 验证余额变化
-      const afterBalance = await AssetService.getBalance({
+      const afterBalance = await BalanceService.getBalance({
         user_id: testUser.user_id,
         asset_code: testAssetCode
       })
@@ -334,7 +334,7 @@ describe('C2C 材料交易功能集成测试', () => {
       }
 
       // 1. 确保用户有足够的资产余额
-      const initialBalance = await AssetService.getBalance({
+      const initialBalance = await BalanceService.getBalance({
         user_id: testUser.user_id,
         asset_code: testAssetCode
       })
@@ -402,7 +402,7 @@ describe('C2C 材料交易功能集成测试', () => {
       }
 
       // 🔴 修复：先查询实际余额，使用比实际余额更大的数量来触发错误
-      const currentBalance = await AssetService.getBalance({
+      const currentBalance = await BalanceService.getBalance({
         user_id: testUser.user_id,
         asset_code: testAssetCode
       })
@@ -448,7 +448,7 @@ describe('C2C 材料交易功能集成测试', () => {
       }
 
       // 1. 确保用户有足够的资产余额
-      const initialBalance = await AssetService.getBalance({
+      const initialBalance = await BalanceService.getBalance({
         user_id: testUser.user_id,
         asset_code: testAssetCode
       })
@@ -482,7 +482,7 @@ describe('C2C 材料交易功能集成测试', () => {
       createdListingIds.push(listingId)
 
       // 3. 记录创建后的余额
-      const balanceAfterCreate = await AssetService.getBalance({
+      const balanceAfterCreate = await BalanceService.getBalance({
         user_id: testUser.user_id,
         asset_code: testAssetCode
       })
@@ -510,7 +510,7 @@ describe('C2C 材料交易功能集成测试', () => {
       expect(withdrawResult.unfreeze_result).toBeDefined()
 
       // 7. 验证余额恢复
-      const balanceAfterWithdraw = await AssetService.getBalance({
+      const balanceAfterWithdraw = await BalanceService.getBalance({
         user_id: testUser.user_id,
         asset_code: testAssetCode
       })
@@ -537,7 +537,7 @@ describe('C2C 材料交易功能集成测试', () => {
       }
 
       // 1. 确保用户有足够的资产余额
-      const initialBalance = await AssetService.getBalance({
+      const initialBalance = await BalanceService.getBalance({
         user_id: testUser.user_id,
         asset_code: testAssetCode
       })
@@ -657,7 +657,7 @@ describe('C2C 材料交易功能集成测试', () => {
       }
 
       // 1. 确保用户有足够的 red_shard 余额
-      const initialBalance = await AssetService.getBalance({
+      const initialBalance = await BalanceService.getBalance({
         user_id: testUser.user_id,
         asset_code: testAssetCode
       })
@@ -719,7 +719,7 @@ describe('C2C 材料交易功能集成测试', () => {
       }
 
       // 1. 确保用户有足够的余额
-      const initialBalance = await AssetService.getBalance({
+      const initialBalance = await BalanceService.getBalance({
         user_id: testUser.user_id,
         asset_code: testAssetCode
       })
@@ -768,7 +768,7 @@ describe('C2C 材料交易功能集成测试', () => {
       }
 
       // 1. 确保用户有足够的余额
-      const initialBalance = await AssetService.getBalance({
+      const initialBalance = await BalanceService.getBalance({
         user_id: testUser.user_id,
         asset_code: testAssetCode
       })
@@ -817,7 +817,7 @@ describe('C2C 材料交易功能集成测试', () => {
       }
 
       // 1. 确保用户有足够的余额
-      const initialBalance = await AssetService.getBalance({
+      const initialBalance = await BalanceService.getBalance({
         user_id: testUser.user_id,
         asset_code: testAssetCode
       })

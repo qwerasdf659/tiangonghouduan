@@ -30,7 +30,8 @@
 const { Op } = require('sequelize')
 const { sequelize } = require('../models')
 const { Account, AccountAssetBalance, MarketListing, TradeOrder } = require('../models')
-const AssetService = require('./AssetService')
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+const BalanceService = require('./asset/BalanceService')
 const AuditLogService = require('./AuditLogService')
 const logger = require('../utils/logger')
 const UnifiedDistributedLock = require('../utils/UnifiedDistributedLock')
@@ -340,7 +341,7 @@ class OrphanFrozenCleanupService {
                 const idempotencyKey = `orphan_cleanup_service_${orphan.account_id}_${orphan.asset_code}_${Date.now()}`
 
                 // eslint-disable-next-line no-await-in-loop, no-restricted-syntax -- 事务内串行执行，已传递 transaction
-                await AssetService.unfreeze(
+                await BalanceService.unfreeze(
                   {
                     user_id: orphan.user_id,
                     asset_code: orphan.asset_code,
@@ -787,7 +788,7 @@ class OrphanFrozenCleanupService {
                 const idempotencyKey = `buyer_orphan_cleanup_${orphan.account_id}_${orphan.asset_code}_${Date.now()}`
 
                 // eslint-disable-next-line no-await-in-loop, no-restricted-syntax -- 事务内串行执行
-                await AssetService.unfreeze(
+                await BalanceService.unfreeze(
                   {
                     user_id: orphan.user_id,
                     asset_code: orphan.asset_code,

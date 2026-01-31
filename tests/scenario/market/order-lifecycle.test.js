@@ -23,7 +23,7 @@
  *
  * 技术验证点：
  * 1. TradeOrderService 订单全生命周期管理
- * 2. AssetService 资产冻结/解冻/结算
+ * 2. BalanceService 资产冻结/解冻/结算
  * 3. MarketListing 状态联动
  * 4. 幂等性保证（idempotency_key）
  *
@@ -52,7 +52,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
   // 服务实例
   let MarketListingService
   let TradeOrderService
-  let AssetService
+  let BalanceService
 
   // 测试数据
   let testSeller
@@ -138,7 +138,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
   async function grantTestAsset(user_id, amount = 200) {
     const grant_tx = await sequelize.transaction()
     try {
-      await AssetService.changeBalance(
+      await BalanceService.changeBalance(
         {
           user_id,
           asset_code: 'DIAMOND',
@@ -170,9 +170,9 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
     })
 
     // 获取服务实例
-    MarketListingService = getTestService('market_listing')
+    MarketListingService = getTestService('market_listing_core')
     TradeOrderService = getTestService('trade_order')
-    AssetService = getTestService('asset')
+    BalanceService = getTestService('asset_balance')
 
     console.log('✅ 服务获取成功')
 
@@ -274,7 +274,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         await grantTestAsset(testBuyer.user_id, 100)
 
         // 3. 记录冻结前的资产状态
-        const balance_before = await AssetService.getBalance({
+        const balance_before = await BalanceService.getBalance({
           user_id: testBuyer.user_id,
           asset_code: 'DIAMOND'
         })
@@ -306,7 +306,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         expect(order.seller_user_id).toBe(testSeller.user_id)
 
         // 6. 验证资产已冻结
-        const balance_after = await AssetService.getBalance({
+        const balance_after = await BalanceService.getBalance({
           user_id: testBuyer.user_id,
           asset_code: 'DIAMOND'
         })
@@ -361,7 +361,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         expect(frozen_order.status).toBe('frozen')
 
         // 3. 记录卖家资产（用于验证结算）
-        const seller_balance_before = await AssetService.getBalance({
+        const seller_balance_before = await BalanceService.getBalance({
           user_id: testSeller.user_id,
           asset_code: 'DIAMOND'
         })
@@ -399,7 +399,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         expect(transferred_item.status).toBe('transferred')
 
         // 8. 验证卖家收到款项
-        const seller_balance_after = await AssetService.getBalance({
+        const seller_balance_after = await BalanceService.getBalance({
           user_id: testSeller.user_id,
           asset_code: 'DIAMOND'
         })
@@ -453,7 +453,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         expect(frozen_order.status).toBe('frozen')
 
         // 3. 记录冻结金额
-        const balance_before_cancel = await AssetService.getBalance({
+        const balance_before_cancel = await BalanceService.getBalance({
           user_id: testBuyer.user_id,
           asset_code: 'DIAMOND'
         })
@@ -487,7 +487,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         expect(restored_listing.locked_by_order_id).toBeNull()
 
         // 7. 验证买家资产解冻
-        const balance_after_cancel = await AssetService.getBalance({
+        const balance_after_cancel = await BalanceService.getBalance({
           user_id: testBuyer.user_id,
           asset_code: 'DIAMOND'
         })
@@ -579,7 +579,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         }
 
         // 1. 查询买家当前余额
-        const balance_before = await AssetService.getBalance({
+        const balance_before = await BalanceService.getBalance({
           user_id: testBuyer.user_id,
           asset_code: 'DIAMOND'
         })

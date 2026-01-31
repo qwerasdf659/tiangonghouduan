@@ -1,12 +1,12 @@
 /**
- * 物品系统 AssetService 测试 - P2优先级
+ * 物品系统 ItemService 测试 - P2优先级
  *
  * 测试目标：覆盖 阶段五：物品系统测试 的4个具体任务
  *
  * 功能覆盖：
- * 1. 6.1 物品发放 - 测试中奖后 item_instances 创建（AssetService.mintItem）
- * 2. 6.2 物品使用 - 测试 voucher 类型物品核销（AssetService.consumeItem）
- * 3. 6.3 物品转移 - 测试用户间物品转让（AssetService.transferItem）
+ * 1. 6.1 物品发放 - 测试中奖后 item_instances 创建（ItemService.mintItem）
+ * 2. 6.2 物品使用 - 测试 voucher 类型物品核销（ItemService.consumeItem）
+ * 3. 6.3 物品转移 - 测试用户间物品转让（ItemService.transferItem）
  * 4. 6.4 库存扣减 - 测试奖品池库存同步（PrizePoolService）
  *
  * 相关模型：
@@ -16,10 +16,11 @@
  * - LotteryPrize: 奖品池（库存管理）
  *
  * 相关服务：
- * - AssetService: 资产服务（物品铸造/转移/消耗）
+ * - ItemService: 物品服务（物品铸造/转移/消耗）- V4.7.0 从 AssetService 拆分
  * - PrizePoolService: 奖品池服务（库存管理）
  *
  * 创建时间：2026-01-28
+ * 更新时间：2026-01-31（V4.7.0 AssetService 拆分）
  * P2优先级：物品系统模块
  */
 
@@ -42,10 +43,11 @@ const { TEST_DATA } = require('../../helpers/test-data')
 let test_user_id = null
 let test_user_id_2 = null // 第二个测试用户（用于转移测试）
 let test_item_template = null
-let AssetService = null
+// V4.7.0 AssetService 拆分：使用 ItemService（2026-01-31）
+let ItemService = null
 let _PrizePoolService = null // 前缀 _ 表示可能未使用
 
-describe('物品系统 AssetService 测试 - P2优先级', () => {
+describe('物品系统 ItemService 测试 - P2优先级', () => {
   /*
    * ===== 测试准备（Before All Tests） =====
    */
@@ -53,13 +55,13 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
     // 1. 初始化 ServiceManager
     await initializeTestServiceManager()
 
-    // 2. 获取服务
+    // 2. 获取服务（V4.7.0 AssetService 拆分：使用 ItemService）
     try {
-      AssetService = getTestService('asset')
+      ItemService = getTestService('asset_item')
     } catch (_err) {
-      console.log('⚠️ AssetService 未注册，将直接使用模型层测试')
+      console.log('⚠️ ItemService 未注册，将直接使用模型层测试')
       // 如果服务未注册，直接引入服务类
-      AssetService = require('../../../services/AssetService')
+      ItemService = require('../../../services/asset/ItemService')
     }
 
     try {
@@ -143,7 +145,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
   describe('6.1 物品发放 - 测试中奖后 item_instances 创建', () => {
     let minted_item_instance = null
 
-    test('应该能通过 AssetService.mintItem 发放物品', async () => {
+    test('应该能通过 ItemService.mintItem 发放物品', async () => {
       const transaction = await sequelize.transaction()
 
       try {
@@ -162,7 +164,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
           }
         }
 
-        const result = await AssetService.mintItem(mint_params, { transaction })
+        const result = await ItemService.mintItem(mint_params, { transaction })
 
         expect(result).toBeDefined()
         expect(result.item_instance).toBeDefined()
@@ -198,11 +200,11 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
         }
 
         // 第一次发放
-        const result1 = await AssetService.mintItem(mint_params, { transaction })
+        const result1 = await ItemService.mintItem(mint_params, { transaction })
         expect(result1.is_duplicate).toBe(false)
 
         // 第二次发放（相同参数，同一事务内）
-        const result2 = await AssetService.mintItem(mint_params, { transaction })
+        const result2 = await ItemService.mintItem(mint_params, { transaction })
         expect(result2.is_duplicate).toBe(true)
 
         // 两次应该返回相同的物品实例（使用 toEqual 处理类型差异）
@@ -242,7 +244,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
       try {
         // 缺少 user_id
         await expect(
-          AssetService.mintItem(
+          ItemService.mintItem(
             { item_type: 'voucher', source_type: 'test', source_id: 'test' },
             { transaction }
           )
@@ -250,7 +252,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
 
         // 缺少 item_type
         await expect(
-          AssetService.mintItem(
+          ItemService.mintItem(
             { user_id: test_user_id, source_type: 'test', source_id: 'test' },
             { transaction }
           )
@@ -258,7 +260,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
 
         // 缺少 source_type 或 source_id
         await expect(
-          AssetService.mintItem({ user_id: test_user_id, item_type: 'voucher' }, { transaction })
+          ItemService.mintItem({ user_id: test_user_id, item_type: 'voucher' }, { transaction })
         ).rejects.toThrow()
 
         await transaction.rollback()
@@ -277,7 +279,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
       // 创建一个用于核销测试的物品
       const transaction = await sequelize.transaction()
       try {
-        const result = await AssetService.mintItem(
+        const result = await ItemService.mintItem(
           {
             user_id: test_user_id,
             item_type: 'voucher',
@@ -296,7 +298,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
       }
     })
 
-    test('应该能通过 AssetService.consumeItem 核销物品', async () => {
+    test('应该能通过 ItemService.consumeItem 核销物品', async () => {
       if (!consumable_item) {
         console.log('跳过测试：之前未成功创建可核销物品')
         return
@@ -313,7 +315,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
           meta: { redeemed_at: new Date().toISOString() }
         }
 
-        const result = await AssetService.consumeItem(consume_params, { transaction })
+        const result = await ItemService.consumeItem(consume_params, { transaction })
 
         expect(result).toBeDefined()
         expect(result.item_instance).toBeDefined()
@@ -332,7 +334,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
       const transaction = await sequelize.transaction()
 
       try {
-        const mint_result = await AssetService.mintItem(
+        const mint_result = await ItemService.mintItem(
           {
             user_id: test_user_id,
             item_type: 'voucher',
@@ -346,7 +348,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
         const fixed_idempotency_key = `idempotency_consume_${mint_result.item_instance.item_instance_id}`
 
         // 第一次核销
-        const result1 = await AssetService.consumeItem(
+        const result1 = await ItemService.consumeItem(
           {
             item_instance_id: mint_result.item_instance.item_instance_id,
             operator_user_id: test_user_id,
@@ -360,7 +362,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
         expect(result1.is_duplicate).toBe(false)
 
         // 第二次核销（相同幂等键）
-        const result2 = await AssetService.consumeItem(
+        const result2 = await ItemService.consumeItem(
           {
             item_instance_id: mint_result.item_instance.item_instance_id,
             operator_user_id: test_user_id,
@@ -395,7 +397,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
 
       try {
         await expect(
-          AssetService.consumeItem(
+          ItemService.consumeItem(
             {
               item_instance_id: used_item.item_instance_id,
               operator_user_id: test_user_id,
@@ -422,7 +424,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
       const transaction = await sequelize.transaction()
 
       try {
-        const mint_result = await AssetService.mintItem(
+        const mint_result = await ItemService.mintItem(
           {
             user_id: test_user_id,
             item_type: 'voucher',
@@ -433,7 +435,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
           { transaction }
         )
 
-        await AssetService.consumeItem(
+        await ItemService.consumeItem(
           {
             item_instance_id: mint_result.item_instance.item_instance_id,
             operator_user_id: test_user_id,
@@ -477,7 +479,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
       // 创建一个用于转移测试的物品
       const transaction = await sequelize.transaction()
       try {
-        const result = await AssetService.mintItem(
+        const result = await ItemService.mintItem(
           {
             user_id: test_user_id,
             item_type: 'tradable_item',
@@ -496,7 +498,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
       }
     })
 
-    test('应该能通过 AssetService.transferItem 转移物品', async () => {
+    test('应该能通过 ItemService.transferItem 转移物品', async () => {
       if (!test_user_id_2) {
         console.log('跳过测试：缺少第二个测试用户')
         return
@@ -506,7 +508,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
       const transaction = await sequelize.transaction()
 
       try {
-        const mint_result = await AssetService.mintItem(
+        const mint_result = await ItemService.mintItem(
           {
             user_id: test_user_id,
             item_type: 'tradable_item',
@@ -525,7 +527,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
           meta: { reason: '测试转让' }
         }
 
-        const result = await AssetService.transferItem(transfer_params, { transaction })
+        const result = await ItemService.transferItem(transfer_params, { transaction })
 
         expect(result).toBeDefined()
         expect(result.item_instance).toBeDefined()
@@ -550,7 +552,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
 
       try {
         // 创建新物品
-        const mint_result = await AssetService.mintItem(
+        const mint_result = await ItemService.mintItem(
           {
             user_id: test_user_id,
             item_type: 'tradable_item',
@@ -564,7 +566,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
         const fixed_idempotency_key = `idempotency_transfer_${mint_result.item_instance.item_instance_id}`
 
         // 第一次转移
-        const result1 = await AssetService.transferItem(
+        const result1 = await ItemService.transferItem(
           {
             item_instance_id: mint_result.item_instance.item_instance_id,
             new_owner_id: test_user_id_2,
@@ -578,7 +580,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
         expect(result1.is_duplicate).toBe(false)
 
         // 第二次转移（相同幂等键）
-        const result2 = await AssetService.transferItem(
+        const result2 = await ItemService.transferItem(
           {
             item_instance_id: mint_result.item_instance.item_instance_id,
             new_owner_id: test_user_id_2,
@@ -618,7 +620,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
 
       try {
         await expect(
-          AssetService.transferItem(
+          ItemService.transferItem(
             {
               item_instance_id: used_item.item_instance_id,
               new_owner_id: test_user_id_2,
@@ -650,7 +652,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
 
       try {
         // 创建并转移物品
-        const mint_result = await AssetService.mintItem(
+        const mint_result = await ItemService.mintItem(
           {
             user_id: test_user_id,
             item_type: 'tradable_item',
@@ -661,7 +663,7 @@ describe('物品系统 AssetService 测试 - P2优先级', () => {
           { transaction }
         )
 
-        await AssetService.transferItem(
+        await ItemService.transferItem(
           {
             item_instance_id: mint_result.item_instance.item_instance_id,
             new_owner_id: test_user_id_2,

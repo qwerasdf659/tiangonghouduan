@@ -69,7 +69,7 @@ router.get(
   requireMerchantPermission('consumption:read'),
   async (req, res) => {
     try {
-      const ConsumptionService = getService(req, 'consumption')
+      const ConsumptionService = getService(req, 'consumption_merchant')
       const StaffManagementService = getService(req, 'staff_management')
 
       const userId = req.user.user_id
@@ -149,7 +149,7 @@ router.get(
   requireMerchantPermission('consumption:read'),
   async (req, res) => {
     try {
-      const ConsumptionService = getService(req, 'consumption')
+      const ConsumptionService = getService(req, 'consumption_merchant')
       const StaffManagementService = getService(req, 'staff_management')
 
       const userId = req.user.user_id
@@ -223,7 +223,7 @@ router.get(
   requireMerchantPermission('consumption:read'),
   async (req, res) => {
     try {
-      const ConsumptionService = getService(req, 'consumption')
+      const ConsumptionService = getService(req, 'consumption_merchant')
       const StaffManagementService = getService(req, 'staff_management')
 
       const userId = req.user.user_id

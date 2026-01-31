@@ -6,7 +6,7 @@
  * 职责：
  * 1. 从用户 BUDGET_POINTS 资产中扣减预算
  * 2. 支持 allowed_campaign_ids 桶限制
- * 3. 与 AssetService 集成进行资产操作
+ * 3. 与 BalanceService/QueryService 集成进行资产操作
  *
  * 适用场景：
  * - budget_mode = 'user' 的活动
@@ -18,7 +18,9 @@
  */
 
 const BudgetProvider = require('./BudgetProvider')
-const AssetService = require('../../../AssetService')
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+const BalanceService = require('../../../asset/BalanceService')
+const QueryService = require('../../../asset/QueryService')
 
 /**
  * 用户预算提供者
@@ -74,7 +76,7 @@ class UserBudgetProvider extends BudgetProvider {
       }
 
       // 🔧 修复：使用 getBudgetPointsByCampaigns 从 allowed_campaign_ids 指定的桶汇总余额
-      const available_amount = await AssetService.getBudgetPointsByCampaigns(
+      const available_amount = await QueryService.getBudgetPointsByCampaigns(
         {
           user_id,
           campaign_ids: this.allowed_campaign_ids
@@ -166,7 +168,7 @@ class UserBudgetProvider extends BudgetProvider {
 
       // 执行扣减（使用 changeBalance，负数表示扣减）
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction（见下方 options 参数）
-      const deduct_result = await AssetService.changeBalance(
+      const deduct_result = await BalanceService.changeBalance(
         {
           user_id,
           asset_code: 'BUDGET_POINTS',
@@ -241,7 +243,7 @@ class UserBudgetProvider extends BudgetProvider {
 
       // 执行回滚（使用 changeBalance，正数表示增加）
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction（见下方 options 参数）
-      const refund_result = await AssetService.changeBalance(
+      const refund_result = await BalanceService.changeBalance(
         {
           user_id,
           asset_code: 'BUDGET_POINTS',

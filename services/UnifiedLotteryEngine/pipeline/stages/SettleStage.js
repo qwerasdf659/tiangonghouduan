@@ -44,7 +44,9 @@ const {
   sequelize
 } = require('../../../../models')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
-const AssetService = require('../../../AssetService')
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+const BalanceService = require('../../../asset/BalanceService')
+const ItemService = require('../../../asset/ItemService')
 const { getInstance: getLotteryMetricsCollector } = require('../../../LotteryMetricsCollector') // 🆕 实时Redis指标采集
 
 // 体验状态管理器 - 用于更新用户抽奖体验计数器（Pity/AntiEmpty/AntiHigh）
@@ -167,7 +169,7 @@ class SettleStage extends BaseStage {
         const consume_idempotency_key = `${idempotency_key}:consume`
 
         // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
-        const asset_result = await AssetService.changeBalance(
+        const asset_result = await BalanceService.changeBalance(
           {
             user_id,
             asset_code: 'POINTS',
@@ -506,7 +508,7 @@ class SettleStage extends BaseStage {
         case 'points':
           // 积分奖品：增加用户积分
           // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
-          await AssetService.changeBalance(
+          await BalanceService.changeBalance(
             {
               user_id,
               asset_code: 'POINTS',
@@ -527,7 +529,7 @@ class SettleStage extends BaseStage {
         case 'coupon':
         case 'physical':
           // 优惠券/实物：写入 item_instances
-          await AssetService.mintItem(
+          await ItemService.mintItem(
             {
               user_id,
               item_type: prize.prize_type === 'coupon' ? 'voucher' : 'product',
@@ -550,7 +552,7 @@ class SettleStage extends BaseStage {
           // 虚拟资产：写入材料余额
           if (prize.material_asset_code && prize.material_amount) {
             // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
-            await AssetService.changeBalance(
+            await BalanceService.changeBalance(
               {
                 user_id,
                 asset_code: prize.material_asset_code,
@@ -643,7 +645,7 @@ class SettleStage extends BaseStage {
 
     /*
      * asset_transaction_id 处理策略：
-     * - 有积分扣减时：使用 AssetService 返回的流水 ID
+     * - 有积分扣减时：使用 BalanceService 返回的流水 ID
      * - 免费抽奖时（per_draw_cost=0）：使用 0 表示无流水记录
      * - 连抽子请求跳过扣减时：使用 0 表示由批量扣减统一处理
      */

@@ -23,8 +23,16 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
-const MerchantOperationLogService = require('../../../services/MerchantOperationLogService')
 const logger = require('../../../utils/logger').logger
+
+/**
+ * 获取商家操作日志服务（通过 ServiceManager 统一入口）
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} MerchantOperationLogService 实例
+ */
+function getMerchantOperationLogService(req) {
+  return req.app.locals.services.getService('merchant_operation_log')
+}
 
 /**
  * 处理服务层错误
@@ -79,7 +87,7 @@ function handleServiceError(error, res, operation) {
  */
 router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const result = await MerchantOperationLogService.queryLogs(req.query)
+    const result = await getMerchantOperationLogService(req).queryLogs(req.query)
     return res.apiSuccess(result, '获取商家操作审计日志列表成功')
   } catch (error) {
     return handleServiceError(error, res, '查询商家操作审计日志列表')
@@ -101,7 +109,9 @@ router.get('/:merchant_log_id', authenticateToken, requireRoleLevel(100), async 
   }
 
   try {
-    const logDetail = await MerchantOperationLogService.getLogDetail(parseInt(merchant_log_id))
+    const logDetail = await getMerchantOperationLogService(req).getLogDetail(
+      parseInt(merchant_log_id)
+    )
 
     if (!logDetail) {
       return res.apiError('审计日志不存在', 'LOG_NOT_FOUND', null, 404)
@@ -131,7 +141,7 @@ router.get('/stats/store/:store_id', authenticateToken, requireRoleLevel(100), a
   }
 
   try {
-    const stats = await MerchantOperationLogService.getStoreStats(parseInt(store_id), {
+    const stats = await getMerchantOperationLogService(req).getStoreStats(parseInt(store_id), {
       start_time,
       end_time
     })
@@ -164,10 +174,13 @@ router.get(
     }
 
     try {
-      const stats = await MerchantOperationLogService.getOperatorStats(parseInt(operator_id), {
-        start_time,
-        end_time
-      })
+      const stats = await getMerchantOperationLogService(req).getOperatorStats(
+        parseInt(operator_id),
+        {
+          start_time,
+          end_time
+        }
+      )
 
       return res.apiSuccess(stats, '获取操作员审计日志统计成功')
     } catch (error) {
@@ -193,7 +206,7 @@ router.post('/cleanup', authenticateToken, requireRoleLevel(100), async (req, re
   }
 
   try {
-    const result = await MerchantOperationLogService.cleanupExpiredLogs({
+    const result = await getMerchantOperationLogService(req).cleanupExpiredLogs({
       retention_days: parseInt(retention_days),
       dry_run: Boolean(dry_run)
     })

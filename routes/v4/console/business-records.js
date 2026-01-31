@@ -468,69 +468,20 @@ router.post(
       const { store_id, remark } = req.body
       const adminUserId = req.user.user_id
 
-      const { RedemptionOrder, ItemInstance, User, sequelize } = require('../../../models')
-      const BeijingTimeHelper = require('../../../utils/timeHelper')
+      const { sequelize } = require('../../../models')
+      const RedemptionService = require('../../../services/RedemptionService')
 
-      // 开启事务
+      // 开启事务（入口层管理事务边界）
       const transaction = await sequelize.transaction()
 
       try {
-        // 查找订单并锁定
-        const order = await RedemptionOrder.findByPk(order_id, {
-          include: [{ model: ItemInstance, as: 'item_instance' }],
-          lock: transaction.LOCK.UPDATE,
-          transaction
+        // 通过服务层执行核销
+        const order = await RedemptionService.adminFulfillOrderById(order_id, {
+          transaction,
+          admin_user_id: adminUserId,
+          store_id,
+          remark
         })
-
-        if (!order) {
-          await transaction.rollback()
-          return res.apiError('订单不存在', 'NOT_FOUND', null, 404)
-        }
-
-        // 检查订单状态
-        if (order.status === 'fulfilled') {
-          await transaction.rollback()
-          return res.apiError('订单已核销', 'ALREADY_FULFILLED', null, 409)
-        }
-
-        if (order.status === 'cancelled') {
-          await transaction.rollback()
-          return res.apiError('订单已取消', 'CANCELLED', null, 409)
-        }
-
-        if (order.status === 'expired') {
-          await transaction.rollback()
-          return res.apiError('订单已过期', 'EXPIRED', null, 400)
-        }
-
-        // 检查是否过期
-        if (order.expires_at && new Date(order.expires_at) < new Date()) {
-          // 更新状态为过期
-          await order.update({ status: 'expired' }, { transaction })
-          await transaction.commit()
-          return res.apiError('订单已过期', 'EXPIRED', null, 400)
-        }
-
-        // 执行核销
-        const fulfilledAt = BeijingTimeHelper.createDatabaseTime()
-        await order.update(
-          {
-            status: 'fulfilled',
-            redeemer_user_id: adminUserId,
-            fulfilled_at: fulfilledAt
-          },
-          { transaction }
-        )
-
-        // 更新物品实例状态
-        if (order.item_instance) {
-          await order.item_instance.update(
-            {
-              status: 'used'
-            },
-            { transaction }
-          )
-        }
 
         await transaction.commit()
 
@@ -541,15 +492,14 @@ router.post(
           remark
         })
 
-        // 重新查询完整数据
-        const updatedOrder = await RedemptionOrder.findByPk(order_id, {
-          include: [
-            { model: User, as: 'redeemer', attributes: ['user_id', 'nickname', 'mobile'] },
-            { model: ItemInstance, as: 'item_instance' }
-          ]
-        })
-
-        return res.apiSuccess(updatedOrder, '核销成功')
+        return res.apiSuccess(
+          {
+            order_id: order.order_id,
+            status: order.status,
+            fulfilled_at: order.fulfilled_at
+          },
+          '核销成功'
+        )
       } catch (error) {
         await transaction.rollback()
         throw error
@@ -577,47 +527,19 @@ router.post(
       const { reason } = req.body
       const adminUserId = req.user.user_id
 
-      const { RedemptionOrder, ItemInstance, User, sequelize } = require('../../../models')
+      const { sequelize } = require('../../../models')
+      const RedemptionService = require('../../../services/RedemptionService')
 
-      // 开启事务
+      // 开启事务（入口层管理事务边界）
       const transaction = await sequelize.transaction()
 
       try {
-        // 查找订单并锁定
-        const order = await RedemptionOrder.findByPk(order_id, {
-          include: [{ model: ItemInstance, as: 'item_instance' }],
-          lock: transaction.LOCK.UPDATE,
-          transaction
+        // 通过服务层执行取消
+        const order = await RedemptionService.adminCancelOrderById(order_id, {
+          transaction,
+          admin_user_id: adminUserId,
+          reason
         })
-
-        if (!order) {
-          await transaction.rollback()
-          return res.apiError('订单不存在', 'NOT_FOUND', null, 404)
-        }
-
-        // 检查订单状态
-        if (order.status !== 'pending') {
-          await transaction.rollback()
-          return res.apiError(`订单状态为 ${order.status}，无法取消`, 'INVALID_STATUS', null, 400)
-        }
-
-        // 执行取消
-        await order.update(
-          {
-            status: 'cancelled'
-          },
-          { transaction }
-        )
-
-        // 恢复物品实例状态（如果需要）
-        if (order.item_instance && order.item_instance.status === 'pending_redeem') {
-          await order.item_instance.update(
-            {
-              status: 'available'
-            },
-            { transaction }
-          )
-        }
 
         await transaction.commit()
 
@@ -627,15 +549,13 @@ router.post(
           reason
         })
 
-        // 重新查询完整数据
-        const updatedOrder = await RedemptionOrder.findByPk(order_id, {
-          include: [
-            { model: User, as: 'redeemer', attributes: ['user_id', 'nickname', 'mobile'] },
-            { model: ItemInstance, as: 'item_instance' }
-          ]
-        })
-
-        return res.apiSuccess(updatedOrder, '取消成功')
+        return res.apiSuccess(
+          {
+            order_id: order.order_id,
+            status: order.status
+          },
+          '取消成功'
+        )
       } catch (error) {
         await transaction.rollback()
         throw error
@@ -666,38 +586,35 @@ router.post(
         return res.apiError('请提供要处理的订单ID列表', 'INVALID_PARAMS', null, 400)
       }
 
-      const { RedemptionOrder, sequelize, Op } = require('../../../models')
+      const { sequelize } = require('../../../models')
+      const RedemptionService = require('../../../services/RedemptionService')
 
-      // 开启事务
+      // 开启事务（入口层管理事务边界）
       const transaction = await sequelize.transaction()
 
       try {
-        // 只更新状态为 pending 的订单
-        const [updatedCount] = await RedemptionOrder.update(
-          { status: 'expired' },
-          {
-            where: {
-              order_id: { [Op.in]: order_ids },
-              status: 'pending' // 只处理待核销的订单
-            },
-            transaction
-          }
-        )
+        // 通过服务层执行批量过期
+        const result = await RedemptionService.adminBatchExpireOrders(order_ids, {
+          transaction,
+          admin_user_id: adminUserId,
+          reason: '管理员手动过期'
+        })
 
         await transaction.commit()
 
         logger.info('批量过期核销码成功', {
           admin_id: adminUserId,
           requested_count: order_ids.length,
-          updated_count: updatedCount
+          expired_count: result.expired_count,
+          unlocked_count: result.unlocked_count
         })
 
         return res.apiSuccess(
           {
             requested_count: order_ids.length,
-            updated_count: updatedCount
+            updated_count: result.expired_count
           },
-          `成功将 ${updatedCount} 个核销码设为过期`
+          `成功将 ${result.expired_count} 个核销码设为过期`
         )
       } catch (error) {
         await transaction.rollback()

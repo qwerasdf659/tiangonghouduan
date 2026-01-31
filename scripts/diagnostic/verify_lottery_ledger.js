@@ -152,7 +152,7 @@ async function verifyLotteryLedger() {
       console.log('   - 事务边界正确')
     } else {
       console.log('❌ 验证失败: 抽奖流水未写入')
-      console.log('   - 需要检查 AssetService.changeBalance 调用')
+      console.log('   - 需要检查 BalanceService.changeBalance 调用')
     }
     console.log('='.repeat(60))
   } catch (error) {

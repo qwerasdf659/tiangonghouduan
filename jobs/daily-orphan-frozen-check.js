@@ -282,11 +282,12 @@ class DailyOrphanFrozenCheck {
     )
 
     try {
-      const MarketListingService = require('../services/MarketListingService')
+      // V4.7.0 拆分：使用 market-listing/AdminService
+      const MarketListingAdminService = require('../services/market-listing/AdminService')
 
       // 并行执行所有资产的止损操作
       const stopLossPromises = dto.affected_asset_codes.map(assetCode =>
-        MarketListingService.pauseListingForAsset(assetCode, {
+        MarketListingAdminService.pauseListingForAsset(assetCode, {
           reason: `孤儿冻结P0止损：检测到${dto.orphan_count}条孤儿冻结，总额${dto.total_orphan_amount}`,
           duration_hours: stopLossDuration,
           operator_id: parseInt(process.env.SYSTEM_DAILY_JOB_USER_ID || '0', 10)

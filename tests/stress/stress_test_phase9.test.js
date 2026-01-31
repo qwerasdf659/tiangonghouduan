@@ -108,7 +108,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
   let campaign_code
   let cost_per_draw = 100 // 默认值，后续从活动配置获取
   let auth_token
-  let AssetService
+  let BalanceService
   let MarketListingService
   let TradeOrderService
 
@@ -150,8 +150,8 @@ describe('阶段九：压力测试与高并发（P1）', () => {
     }
 
     // 通过 ServiceManager 获取服务
-    AssetService = global.getTestService('asset')
-    MarketListingService = global.getTestService('market_listing')
+    BalanceService = global.getTestService('asset_balance')
+    MarketListingService = global.getTestService('market_listing_core')
     TradeOrderService = global.getTestService('trade_order')
 
     // 登录获取token
@@ -191,7 +191,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
       campaign_code,
       cost_per_draw,
       services_loaded: {
-        AssetService: !!AssetService,
+        BalanceService: !!BalanceService,
         MarketListingService: !!MarketListingService,
         TradeOrderService: !!TradeOrderService
       }
@@ -359,7 +359,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
     it(
       '多人同时抢购同一商品，只有1人成功',
       async () => {
-        if (!test_user_id || !AssetService || !MarketListingService) {
+        if (!test_user_id || !BalanceService || !MarketListingService) {
           console.warn('⚠️ 跳过测试：缺少必要服务')
           return
         }
@@ -374,13 +374,13 @@ describe('阶段九：压力测试与高并发（P1）', () => {
 
         try {
           // 1. 创建测试商品（卖家是测试用户）
-          const seller_account = await AssetService.getOrCreateAccount(
+          const seller_account = await BalanceService.getOrCreateAccount(
             { user_id: test_user_id },
             { transaction }
           )
 
           // 铸造一个测试物品
-          const mint_result = await AssetService.mintItem(
+          const mint_result = await BalanceService.mintItem(
             {
               user_id: test_user_id,
               item_type: 'voucher',
@@ -429,7 +429,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
           for (const buyer of buyers) {
             if (buyer.user_id !== test_user_id) {
               try {
-                await AssetService.changeBalance({
+                await BalanceService.changeBalance({
                   user_id: buyer.user_id,
                   asset_code: 'DIAMOND',
                   delta_amount: 100,
@@ -521,7 +521,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
     it(
       '同一用户并发扣费，余额计算正确',
       async () => {
-        if (!test_user_id || !AssetService) {
+        if (!test_user_id || !BalanceService) {
           console.warn('⚠️ 跳过测试：缺少必要数据')
           return
         }
@@ -541,7 +541,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
           action: async () => {
             const idempotency_key = generateIdempotencyKey('asset_deduct')
             try {
-              await AssetService.changeBalance({
+              await BalanceService.changeBalance({
                 user_id: test_user_id,
                 asset_code: 'POINTS',
                 delta_amount: -DEDUCT_AMOUNT,

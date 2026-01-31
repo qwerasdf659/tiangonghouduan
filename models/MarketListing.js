@@ -17,7 +17,7 @@
  *    - 可叠加资产：冻结卖家资产（seller_offer_frozen=true），写入 offer_asset_code + offer_amount
  * 2. 购买挂牌
  *    - 锁定挂牌：status=on_sale → locked，记录 locked_by_order_id + locked_at
- *    - 冻结买家 DIAMOND：通过 AssetService 冻结 gross_amount
+ *    - 冻结买家 DIAMOND：通过 BalanceService 冻结 gross_amount
  *    - 成交结算：多分录（买家扣减、卖家入账、平台手续费）
  *    - 转移所有权：物品实例转移或资产交付
  *    - 完成订单：status=locked → sold
@@ -46,7 +46,7 @@
  * - locked_by_order_id（trade_orders.order_id，锁定订单）
  *
  * 集成服务：
- * - AssetService：冻结/解冻卖家标的资产（可叠加资产挂牌）
+ * - BalanceService：冻结/解冻卖家标的资产（可叠加资产挂牌）
  * - TradeOrderService：订单创建和状态管理
  * - InventoryService：物品实例状态更新
  *
@@ -329,6 +329,19 @@ module.exports = sequelize => {
         targetKey: 'group_code',
         as: 'offerAssetGroup',
         comment: '资产分组关联（筛选维度）- 关联挂牌资产的分组'
+      })
+    }
+
+    /**
+     * V4.7.0 修复：添加可叠加资产类型关联（fungible_asset 类型挂牌使用）
+     * QueryService.getMarketListings 需要此关联来展示资产详情
+     */
+    if (models.MaterialAssetType) {
+      MarketListing.belongsTo(models.MaterialAssetType, {
+        foreignKey: 'offer_asset_code',
+        targetKey: 'asset_code',
+        as: 'offerMaterialAsset',
+        comment: '可叠加资产类型关联（Offer Material Asset Association）- 关联挂牌的资产类型定义'
       })
     }
 

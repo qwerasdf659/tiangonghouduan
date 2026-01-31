@@ -21,7 +21,7 @@ const { Op } = require('sequelize')
 const TransactionManager = require('../../../utils/TransactionManager')
 
 // 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
-let AssetService
+let BalanceService
 let AssetConversionService
 
 describe('Phase 3迁移测试：统一账本域', () => {
@@ -29,7 +29,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
 
   beforeAll(async () => {
     // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
-    AssetService = global.getTestService('asset')
+    BalanceService = global.getTestService('asset_balance')
     AssetConversionService = global.getTestService('asset_conversion')
     // 查找或创建测试用户
     const [user, created] = await User.findOrCreate({
@@ -76,7 +76,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
 
       // 给测试用户添加red_shard余额（使用事务包裹）
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: testUser.user_id,
             asset_code: 'red_shard',
@@ -94,11 +94,11 @@ describe('Phase 3迁移测试：统一账本域', () => {
       const idempotency_key = `test_phase3_convert_${Date.now()}`
 
       // 记录转换前的余额
-      const before_red_shard = await AssetService.getBalance(
+      const before_red_shard = await BalanceService.getBalance(
         { user_id: testUser.user_id, asset_code: 'red_shard' },
         {}
       )
-      const before_diamond = await AssetService.getBalance(
+      const before_diamond = await BalanceService.getBalance(
         { user_id: testUser.user_id, asset_code: 'DIAMOND' },
         {}
       )
@@ -147,11 +147,11 @@ describe('Phase 3迁移测试：统一账本域', () => {
       expect(Number(credit_tx.delta_amount)).toBe(200) // 增加200个DIAMOND
 
       // 验证余额变化（基于转换前余额）
-      const after_red_shard = await AssetService.getBalance(
+      const after_red_shard = await BalanceService.getBalance(
         { user_id: testUser.user_id, asset_code: 'red_shard' },
         {}
       )
-      const after_diamond = await AssetService.getBalance(
+      const after_diamond = await BalanceService.getBalance(
         { user_id: testUser.user_id, asset_code: 'DIAMOND' },
         {}
       )
@@ -166,7 +166,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
       const idempotency_key = `test_phase3_convert_idempotent_${Date.now()}`
 
       // 记录转换前的余额
-      const before_balance = await AssetService.getBalance(
+      const before_balance = await BalanceService.getBalance(
         { user_id: testUser.user_id, asset_code: 'red_shard' },
         {}
       )
@@ -202,7 +202,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
       expect(Number(result2.to_tx_id)).toBe(Number(result1.to_tx_id))
 
       // 验证余额只扣减一次（基于转换前余额）
-      const after_balance = await AssetService.getBalance(
+      const after_balance = await BalanceService.getBalance(
         { user_id: testUser.user_id, asset_code: 'red_shard' },
         {}
       )
@@ -271,7 +271,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
 
       // 添加red_shard余额（使用事务包裹）
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: testUser.user_id,
             asset_code: 'red_shard',
@@ -329,7 +329,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
 
       // 添加red_shard余额（使用事务包裹）
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: testUser.user_id,
             asset_code: 'red_shard',

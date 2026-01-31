@@ -25,7 +25,15 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
-const TradeOrderService = require('../../../services/TradeOrderService')
+
+/**
+ * 获取交易订单服务（通过 ServiceManager 统一入口）
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} TradeOrderService 实例
+ */
+function getTradeOrderService(req) {
+  return req.app.locals.services.getService('trade_order')
+}
 
 /**
  * GET / - 查询交易订单列表
@@ -45,6 +53,7 @@ const TradeOrderService = require('../../../services/TradeOrderService')
  */
 router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
+    const TradeOrderService = getTradeOrderService(req)
     const {
       buyer_user_id,
       seller_user_id,
@@ -95,6 +104,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  */
 router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
+    const TradeOrderService = getTradeOrderService(req)
     const { start_time, end_time, seller_user_id, buyer_user_id } = req.query
 
     const stats = await TradeOrderService.getOrderStats({
@@ -126,6 +136,7 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
  */
 router.get('/user/:user_id/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
+    const TradeOrderService = getTradeOrderService(req)
     const user_id = parseInt(req.params.user_id)
 
     const stats = await TradeOrderService.getUserTradeStats(user_id)
@@ -156,6 +167,7 @@ router.get(
   requireRoleLevel(100),
   async (req, res) => {
     try {
+      const TradeOrderService = getTradeOrderService(req)
       const { business_id } = req.params
 
       const order = await TradeOrderService.getOrderByBusinessId(business_id)
@@ -187,6 +199,7 @@ router.get(
  */
 router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
+    const TradeOrderService = getTradeOrderService(req)
     const order_id = parseInt(req.params.id)
 
     const order = await TradeOrderService.getOrderById(order_id)

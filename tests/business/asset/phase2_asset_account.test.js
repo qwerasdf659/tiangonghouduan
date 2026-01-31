@@ -9,14 +9,15 @@
  * - 3.5 资产交易记录：测试 asset_transactions 流水完整性
  *
  * 创建时间：2026-01-28
- * 版本：1.0.0
+ * 更新时间：2026-01-31（V4.7.0 BalanceService 拆分）
+ * 版本：1.1.0
  *
  * 技术规范：
  * - 通过 global.getTestService() 获取服务（J2-RepoWide 统一）
  * - 使用 snake_case service key（E2-Strict 强制）
  * - 使用 TransactionManager 进行事务管理
  * - 测试数据通过 global.testData 获取（P0-1 动态加载）
- * - 所有资产操作通过 AssetService 进行
+ * - 所有资产余额操作通过 BalanceService 进行（V4.7.0 拆分）
  */
 
 'use strict'
@@ -25,8 +26,11 @@ const { AssetTransaction, Account } = require('../../../models')
 const { Op } = require('sequelize')
 const TransactionManager = require('../../../utils/TransactionManager')
 
-// 🔴 服务引用（通过 ServiceManager 延迟获取）
-let AssetService
+/*
+ * 🔴 服务引用（通过 ServiceManager 延迟获取）
+ * V4.7.0 BalanceService 拆分：使用 BalanceService（2026-01-31）
+ */
+let BalanceService
 
 /**
  * 测试用户上下文
@@ -50,8 +54,11 @@ describe('Phase 2 资产账户测试（P1）', () => {
   const TEST_PREFIX = 'test_phase2_asset'
 
   beforeAll(async () => {
-    // 🔴 通过 ServiceManager 获取服务实例（snake_case key）
-    AssetService = global.getTestService('asset')
+    /*
+     * 🔴 通过 ServiceManager 获取服务实例（snake_case key）
+     * V4.7.0 BalanceService 拆分：使用 asset_balance key（2026-01-31）
+     */
+    BalanceService = global.getTestService('asset_balance')
 
     // 使用 global.testData 中的测试用户（动态加载）
     const testUserId = global.testData?.testUser?.user_id
@@ -106,7 +113,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       // 为测试用户添加初始余额
       await TransactionManager.execute(async transaction => {
         // 添加 POINTS 余额
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'POINTS',
@@ -119,7 +126,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         )
 
         // 添加 red_shard 余额
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'red_shard',
@@ -138,14 +145,14 @@ describe('Phase 2 资产账户测试（P1）', () => {
       const deductAmount = 100 // 扣除 100 积分
 
       // 记录扣费前余额
-      const beforeBalance = await AssetService.getBalance(
+      const beforeBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
 
       // 执行扣费操作
       const result = await TransactionManager.execute(async transaction => {
-        return await AssetService.changeBalance(
+        return await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'POINTS',
@@ -160,7 +167,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       /*
        * 验证返回结果
-       * AssetService.changeBalance 返回结构：{ balance, transaction_record, is_duplicate }
+       * BalanceService.changeBalance 返回结构：{ balance, transaction_record, is_duplicate }
        */
       expect(result).toBeDefined()
       expect(result.transaction_record).toBeDefined()
@@ -169,7 +176,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       expect(result.is_duplicate).toBe(false)
 
       // 验证余额变化
-      const afterBalance = await AssetService.getBalance(
+      const afterBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
@@ -186,14 +193,14 @@ describe('Phase 2 资产账户测试（P1）', () => {
       const deductAmount = 10 // 扣除 10 个红碎片
 
       // 记录扣费前余额
-      const beforeBalance = await AssetService.getBalance(
+      const beforeBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'red_shard' },
         {}
       )
 
       // 执行扣费操作
       const result = await TransactionManager.execute(async transaction => {
-        return await AssetService.changeBalance(
+        return await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'red_shard',
@@ -208,7 +215,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       /*
        * 验证返回结果
-       * AssetService.changeBalance 返回结构：{ balance, transaction_record, is_duplicate }
+       * BalanceService.changeBalance 返回结构：{ balance, transaction_record, is_duplicate }
        */
       expect(result).toBeDefined()
       expect(result.transaction_record).toBeDefined()
@@ -216,7 +223,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       expect(Number(result.transaction_record.delta_amount)).toBe(-deductAmount)
 
       // 验证余额变化
-      const afterBalance = await AssetService.getBalance(
+      const afterBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'red_shard' },
         {}
       )
@@ -233,14 +240,14 @@ describe('Phase 2 资产账户测试（P1）', () => {
       const deductAmount = 50
 
       // 记录初始余额
-      const initialBalance = await AssetService.getBalance(
+      const initialBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
 
       // 第一次扣费
       const result1 = await TransactionManager.execute(async transaction => {
-        return await AssetService.changeBalance(
+        return await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'POINTS',
@@ -257,7 +264,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 第二次扣费（相同参数）
       const result2 = await TransactionManager.execute(async transaction => {
-        return await AssetService.changeBalance(
+        return await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'POINTS',
@@ -277,7 +284,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       )
 
       // 验证余额只扣减一次
-      const finalBalance = await AssetService.getBalance(
+      const finalBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
@@ -308,14 +315,14 @@ describe('Phase 2 资产账户测试（P1）', () => {
       const rewardAmount = 500 // 奖励 500 积分
 
       // 记录发放前余额
-      const beforeBalance = await AssetService.getBalance(
+      const beforeBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
 
       // 执行奖励发放
       const result = await TransactionManager.execute(async transaction => {
-        return await AssetService.changeBalance(
+        return await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'POINTS',
@@ -334,7 +341,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       /*
        * 验证返回结果
-       * AssetService.changeBalance 返回结构：{ balance, transaction_record, is_duplicate }
+       * BalanceService.changeBalance 返回结构：{ balance, transaction_record, is_duplicate }
        */
       expect(result).toBeDefined()
       expect(result.transaction_record).toBeDefined()
@@ -343,7 +350,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       expect(result.is_duplicate).toBe(false)
 
       // 验证余额变化
-      const afterBalance = await AssetService.getBalance(
+      const afterBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
@@ -360,14 +367,14 @@ describe('Phase 2 资产账户测试（P1）', () => {
       const rewardAmount = 100 // 奖励 100 钻石
 
       // 记录发放前余额
-      const beforeBalance = await AssetService.getBalance(
+      const beforeBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'DIAMOND' },
         {}
       )
 
       // 执行奖励发放
       const result = await TransactionManager.execute(async transaction => {
-        return await AssetService.changeBalance(
+        return await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'DIAMOND',
@@ -385,14 +392,14 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       /*
        * 验证返回结果
-       * AssetService.changeBalance 返回结构：{ balance, transaction_record, is_duplicate }
+       * BalanceService.changeBalance 返回结构：{ balance, transaction_record, is_duplicate }
        */
       expect(result).toBeDefined()
       expect(result.transaction_record).toBeDefined()
       expect(Number(result.transaction_record.delta_amount)).toBe(rewardAmount)
 
       // 验证余额变化
-      const afterBalance = await AssetService.getBalance(
+      const afterBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'DIAMOND' },
         {}
       )
@@ -406,14 +413,14 @@ describe('Phase 2 资产账户测试（P1）', () => {
       const rewardAmount = 20 // 奖励 20 个红碎片
 
       // 记录发放前余额
-      const beforeBalance = await AssetService.getBalance(
+      const beforeBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'red_shard' },
         {}
       )
 
       // 执行奖励发放
       await TransactionManager.execute(async transaction => {
-        return await AssetService.changeBalance(
+        return await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'red_shard',
@@ -427,7 +434,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       })
 
       // 验证余额变化
-      const afterBalance = await AssetService.getBalance(
+      const afterBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'red_shard' },
         {}
       )
@@ -448,7 +455,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       const idempotencyKey = `${TEST_PREFIX}_insufficient_${Date.now()}`
 
       // 获取当前余额
-      const currentBalance = await AssetService.getBalance(
+      const currentBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
@@ -459,7 +466,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       // 验证扣费被拒绝并抛出错误
       await expect(
         TransactionManager.execute(async transaction => {
-          return await AssetService.changeBalance(
+          return await BalanceService.changeBalance(
             {
               user_id: testUserContext.user_id,
               asset_code: 'POINTS',
@@ -474,7 +481,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       ).rejects.toThrow(/余额不足|insufficient/i)
 
       // 验证余额未变化
-      const afterBalance = await AssetService.getBalance(
+      const afterBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
@@ -492,7 +499,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       // 先添加已知金额的余额
       const knownAmount = 123
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'POINTS',
@@ -506,7 +513,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       })
 
       // 获取当前余额
-      const currentBalance = await AssetService.getBalance(
+      const currentBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
@@ -515,7 +522,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       const exactAmount = currentBalance.available_amount
 
       const result = await TransactionManager.execute(async transaction => {
-        return await AssetService.changeBalance(
+        return await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'POINTS',
@@ -533,7 +540,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       expect(Number(result.transaction_record.delta_amount)).toBe(-exactAmount)
 
       // 验证余额为0
-      const afterBalance = await AssetService.getBalance(
+      const afterBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
@@ -548,7 +555,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       const idempotencyKey = `${TEST_PREFIX}_zero_balance_${Date.now()}`
 
       // 获取该资产的余额（应该为0或不存在）
-      const currentBalance = await AssetService.getBalance(
+      const currentBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: testAssetCode },
         {}
       )
@@ -556,7 +563,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       // 如果余额不为0，先扣除到0
       if (currentBalance.available_amount > 0) {
         await TransactionManager.execute(async transaction => {
-          await AssetService.changeBalance(
+          await BalanceService.changeBalance(
             {
               user_id: testUserContext.user_id,
               asset_code: testAssetCode,
@@ -573,7 +580,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       // 尝试从零余额扣费
       await expect(
         TransactionManager.execute(async transaction => {
-          return await AssetService.changeBalance(
+          return await BalanceService.changeBalance(
             {
               user_id: testUserContext.user_id,
               asset_code: testAssetCode,
@@ -604,7 +611,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 添加初始余额用于测试
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'POINTS',
@@ -618,7 +625,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       })
 
       // 记录事务开始前的余额
-      const beforeBalance = await AssetService.getBalance(
+      const beforeBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
@@ -627,7 +634,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       try {
         await TransactionManager.execute(async transaction => {
           // 步骤1：扣费（成功）
-          await AssetService.changeBalance(
+          await BalanceService.changeBalance(
             {
               user_id: testUserContext.user_id,
               asset_code: 'POINTS',
@@ -647,7 +654,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       }
 
       // 验证余额回滚到事务前状态
-      const afterBalance = await AssetService.getBalance(
+      const afterBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
@@ -671,7 +678,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 添加初始余额用于测试
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'POINTS',
@@ -685,11 +692,11 @@ describe('Phase 2 资产账户测试（P1）', () => {
       })
 
       // 记录事务开始前的余额
-      const beforePointsBalance = await AssetService.getBalance(
+      const beforePointsBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
-      const beforeDiamondBalance = await AssetService.getBalance(
+      const beforeDiamondBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'DIAMOND' },
         {}
       )
@@ -697,7 +704,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       // 执行事务：扣费 + 奖励发放（同时成功）
       await TransactionManager.execute(async transaction => {
         // 步骤1：扣费
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'POINTS',
@@ -711,7 +718,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         )
 
         // 步骤2：奖励发放
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'DIAMOND',
@@ -726,14 +733,14 @@ describe('Phase 2 资产账户测试（P1）', () => {
       })
 
       // 验证扣费生效
-      const afterPointsBalance = await AssetService.getBalance(
+      const afterPointsBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
       expect(afterPointsBalance.available_amount).toBe(beforePointsBalance.available_amount - 200)
 
       // 验证奖励生效
-      const afterDiamondBalance = await AssetService.getBalance(
+      const afterDiamondBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'DIAMOND' },
         {}
       )
@@ -754,12 +761,12 @@ describe('Phase 2 资产账户测试（P1）', () => {
     })
 
     test('3.4.3 跨表事务必须显式传递 transaction 参数', async () => {
-      // 验证 AssetService 在没有 transaction 时拒绝写操作
+      // 验证 BalanceService 在没有 transaction 时拒绝写操作
       const idempotencyKey = `${TEST_PREFIX}_no_tx_${Date.now()}`
 
       // 尝试不传递 transaction 调用 changeBalance（应抛出错误）
       await expect(
-        AssetService.changeBalance(
+        BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'POINTS',
@@ -789,7 +796,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 添加余额用于扣费
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'POINTS',
@@ -803,14 +810,14 @@ describe('Phase 2 资产账户测试（P1）', () => {
       })
 
       // 记录扣费前余额
-      const beforeBalance = await AssetService.getBalance(
+      const beforeBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
 
       // 执行扣费
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'POINTS',
@@ -863,14 +870,14 @@ describe('Phase 2 资产账户测试（P1）', () => {
       const rewardAmount = 300
 
       // 记录发放前余额
-      const beforeBalance = await AssetService.getBalance(
+      const beforeBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'DIAMOND' },
         {}
       )
 
       // 执行奖励发放
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'DIAMOND',
@@ -915,7 +922,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 添加余额用于扣费
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'POINTS',
@@ -931,7 +938,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       // 执行同一 lottery_session_id 的扣费和奖励
       await TransactionManager.execute(async transaction => {
         // 扣费
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'POINTS',
@@ -945,7 +952,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         )
 
         // 奖励
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'DIAMOND',
@@ -990,7 +997,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 添加初始余额
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
             asset_code: 'POINTS',
@@ -1013,7 +1020,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       for (const op of operations) {
         await TransactionManager.execute(async transaction => {
-          await AssetService.changeBalance(
+          await BalanceService.changeBalance(
             {
               user_id: testUserContext.user_id,
               asset_code: 'POINTS',

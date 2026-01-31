@@ -41,8 +41,6 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
-const BatchOperationService = require('../../../services/BatchOperationService')
-const SystemConfigService = require('../../../services/SystemConfigService')
 const { BatchOperationLog } = require('../../../models')
 const { sequelize } = require('../../../models')
 
@@ -55,6 +53,24 @@ const { sequelize } = require('../../../models')
  */
 function getLotteryQuotaService(req) {
   return req.app.locals.services.getService('lottery_quota')
+}
+
+/**
+ * 获取 BatchOperationService
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} BatchOperationService
+ */
+function getBatchOperationService(req) {
+  return req.app.locals.services.getService('batch_operation')
+}
+
+/**
+ * 获取 SystemConfigService
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} SystemConfigService
+ */
+function getSystemConfigService(req) {
+  return req.app.locals.services.getService('system_config')
 }
 
 /**
@@ -142,7 +158,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
     }
 
     // ========== 预检查 ==========
-    const preCheckResult = await BatchOperationService.preCheck({
+    const preCheckResult = await getBatchOperationService(req).preCheck({
       operation_type,
       operator_id,
       operation_params: { campaign_id, user_ids, bonus_count, reason },
@@ -177,7 +193,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
     }
 
     // ========== 创建批量操作日志 ==========
-    const batchLog = await BatchOperationService.createOperationLog({
+    const batchLog = await getBatchOperationService(req).createOperationLog({
       operation_type,
       operator_id,
       total_count: user_ids.length,
@@ -229,7 +245,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
     }
 
     // ========== 更新批量操作日志 ==========
-    await BatchOperationService.updateProgress(batchLog.batch_log_id, {
+    await getBatchOperationService(req).updateProgress(batchLog.batch_log_id, {
       success_count: successItems.length,
       fail_count: failedItems.length,
       result_summary: {
@@ -242,7 +258,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
     })
 
     // 重新获取更新后的日志
-    const finalLog = await BatchOperationService.getOperationDetail(batchLog.batch_log_id)
+    const finalLog = await getBatchOperationService(req).getOperationDetail(batchLog.batch_log_id)
 
     logger.info('批量赠送抽奖次数完成', {
       batch_log_id: batchLog.batch_log_id,
@@ -324,7 +340,7 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
     }
 
     // ========== 预检查 ==========
-    const preCheckResult = await BatchOperationService.preCheck({
+    const preCheckResult = await getBatchOperationService(req).preCheck({
       operation_type,
       operator_id,
       operation_params: { campaign_ids, target_status, reason },
@@ -352,7 +368,7 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
     }
 
     // ========== 创建批量操作日志 ==========
-    const batchLog = await BatchOperationService.createOperationLog({
+    const batchLog = await getBatchOperationService(req).createOperationLog({
       operation_type,
       operator_id,
       total_count: campaign_ids.length,
@@ -399,7 +415,7 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
     }
 
     // ========== 更新批量操作日志 ==========
-    await BatchOperationService.updateProgress(batchLog.batch_log_id, {
+    await getBatchOperationService(req).updateProgress(batchLog.batch_log_id, {
       success_count: successItems.length,
       fail_count: failedItems.length,
       result_summary: {
@@ -410,7 +426,7 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
       }
     })
 
-    const finalLog = await BatchOperationService.getOperationDetail(batchLog.batch_log_id)
+    const finalLog = await getBatchOperationService(req).getOperationDetail(batchLog.batch_log_id)
 
     logger.info('批量活动状态切换完成', {
       batch_log_id: batchLog.batch_log_id,
@@ -505,7 +521,7 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
     }
 
     // ========== 预检查 ==========
-    const preCheckResult = await BatchOperationService.preCheck({
+    const preCheckResult = await getBatchOperationService(req).preCheck({
       operation_type,
       operator_id,
       operation_params: { rules, reason },
@@ -533,7 +549,7 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
     }
 
     // ========== 创建批量操作日志 ==========
-    const batchLog = await BatchOperationService.createOperationLog({
+    const batchLog = await getBatchOperationService(req).createOperationLog({
       operation_type,
       operator_id,
       total_count: rules.length,
@@ -592,7 +608,7 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
     }
 
     // ========== 更新批量操作日志 ==========
-    await BatchOperationService.updateProgress(batchLog.batch_log_id, {
+    await getBatchOperationService(req).updateProgress(batchLog.batch_log_id, {
       success_count: successItems.length,
       fail_count: failedItems.length,
       result_summary: {
@@ -602,7 +618,7 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
       }
     })
 
-    const finalLog = await BatchOperationService.getOperationDetail(batchLog.batch_log_id)
+    const finalLog = await getBatchOperationService(req).getOperationDetail(batchLog.batch_log_id)
 
     logger.info('批量设置干预规则完成', {
       batch_log_id: batchLog.batch_log_id,
@@ -672,7 +688,7 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
     }
 
     // ========== 预检查 ==========
-    const preCheckResult = await BatchOperationService.preCheck({
+    const preCheckResult = await getBatchOperationService(req).preCheck({
       operation_type,
       operator_id,
       operation_params: { order_ids, reason },
@@ -700,7 +716,7 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
     }
 
     // ========== 创建批量操作日志 ==========
-    const batchLog = await BatchOperationService.createOperationLog({
+    const batchLog = await getBatchOperationService(req).createOperationLog({
       operation_type,
       operator_id,
       total_count: order_ids.length,
@@ -747,7 +763,7 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
     }
 
     // ========== 更新批量操作日志 ==========
-    await BatchOperationService.updateProgress(batchLog.batch_log_id, {
+    await getBatchOperationService(req).updateProgress(batchLog.batch_log_id, {
       success_count: successItems.length,
       fail_count: failedItems.length,
       result_summary: {
@@ -757,7 +773,7 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
       }
     })
 
-    const finalLog = await BatchOperationService.getOperationDetail(batchLog.batch_log_id)
+    const finalLog = await getBatchOperationService(req).getOperationDetail(batchLog.batch_log_id)
 
     logger.info('批量核销确认完成', {
       batch_log_id: batchLog.batch_log_id,
@@ -858,7 +874,7 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
     }
 
     // ========== 预检查 ==========
-    const preCheckResult = await BatchOperationService.preCheck({
+    const preCheckResult = await getBatchOperationService(req).preCheck({
       operation_type,
       operator_id,
       operation_params: { adjustments, reason },
@@ -886,7 +902,7 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
     }
 
     // ========== 创建批量操作日志 ==========
-    const batchLog = await BatchOperationService.createOperationLog({
+    const batchLog = await getBatchOperationService(req).createOperationLog({
       operation_type,
       operator_id,
       total_count: adjustments.length,
@@ -945,7 +961,7 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
     }
 
     // ========== 更新批量操作日志 ==========
-    await BatchOperationService.updateProgress(batchLog.batch_log_id, {
+    await getBatchOperationService(req).updateProgress(batchLog.batch_log_id, {
       success_count: successItems.length,
       fail_count: failedItems.length,
       result_summary: {
@@ -955,7 +971,7 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
       }
     })
 
-    const finalLog = await BatchOperationService.getOperationDetail(batchLog.batch_log_id)
+    const finalLog = await getBatchOperationService(req).getOperationDetail(batchLog.batch_log_id)
 
     logger.info('批量预算调整完成', {
       batch_log_id: batchLog.batch_log_id,
@@ -1013,7 +1029,7 @@ router.get('/logs', authenticateToken, requireRoleLevel(100), async (req, res) =
   try {
     const { operator_id, operation_type, status, page = 1, page_size = 20 } = req.query
 
-    const result = await BatchOperationService.queryOperationLogs({
+    const result = await getBatchOperationService(req).queryOperationLogs({
       operator_id,
       operation_type,
       status,
@@ -1051,7 +1067,7 @@ router.get('/logs/:id', authenticateToken, requireRoleLevel(100), async (req, re
       return res.apiError('无效的日志ID', 'INVALID_LOG_ID', null, 400)
     }
 
-    const detail = await BatchOperationService.getOperationDetail(batch_log_id)
+    const detail = await getBatchOperationService(req).getOperationDetail(batch_log_id)
 
     if (!detail) {
       return res.apiError('批量操作日志不存在', 'LOG_NOT_FOUND', null, 404)
@@ -1070,7 +1086,7 @@ router.get('/logs/:id', authenticateToken, requireRoleLevel(100), async (req, re
  */
 router.get('/config', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const configs = await SystemConfigService.getAllBatchConfigs()
+    const configs = await getSystemConfigService(req).getAllBatchConfigs()
 
     return res.apiSuccess(
       {

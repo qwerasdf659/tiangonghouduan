@@ -44,7 +44,12 @@ const itemTemplatesRoutes = require('./item-templates') // 🆕 物品模板管�
 const riskProfilesRoutes = require('./risk-profiles') // 🆕 用户风控配置管理（2026-01-21 API覆盖率补齐）
 const lotteryTierRulesRoutes = require('./lottery-tier-rules') // 🆕 抽奖档位规则管理（2026-01-21 API覆盖率补齐）
 const lotteryPresetsRoutes = require('./lottery-presets') // 🆕 抽奖预设管理（2026-01-21 API覆盖率补齐）
-const lotteryMonitoringRoutes = require('./lottery-monitoring') // 🆕 抽奖监控数据查询（2026-01-21 P2 API覆盖率补齐）
+// 🔄 2026-01-31 大文件拆分方案 Phase 2: lottery-monitoring 拆分为5个子路由
+const lotteryRealtimeRoutes = require('./lottery-realtime') // 实时监控和告警
+const lotteryStatisticsRoutes = require('./lottery-statistics') // 统计趋势
+const lotteryReportRoutes = require('./lottery-report') // 报表生成
+const lotteryUserAnalysisRoutes = require('./lottery-user-analysis') // 用户分析
+const lotteryCampaignAnalysisRoutes = require('./lottery-campaign-analysis') // 活动分析
 const tradeOrdersRoutes = require('./trade-orders') // 🆕 交易订单查询（2026-01-21 P2 API覆盖率补齐）
 const userPremiumRoutes = require('./user-premium') // 🆕 用户高级空间状态查询（2026-01-21 P2 API覆盖率补齐）
 const adminAuditLogsRoutes = require('./admin-audit-logs') // 🆕 管理员操作审计日志（2026-01-22 P1 API覆盖率补齐）
@@ -54,7 +59,7 @@ const featureFlagsRoutes = require('./feature-flags') // 🆕 功能开关管理
 const lotteryStrategyStatsRoutes = require('./lottery-strategy-stats') // 🆕 抽奖策略统计（2026-01-22 策略引擎监控方案）
 const sessionsRoutes = require('./sessions') // 🆕 会话管理（2026-01-21 会话管理功能补齐）
 const lotteryCampaignsRoutes = require('./lottery-campaigns') // 🆕 抽奖活动列表管理（2026-01-28 P1 运营后台 ROI/复购率/库存预警）
-const lotteryAnalyticsRoutes = require('./lottery-analytics') // 🆕 抽奖分析（2026-01-28 P2 运营日报聚合）
+// [已删除] const lotteryAnalyticsRoutes = require('./lottery-analytics') // 已拆分到 lottery-report.js
 const batchOperationsRoutes = require('./batch-operations') // 🆕 批量操作（2026-01-30 阶段C 批量操作API）
 
 // 挂载子模块路由
@@ -91,7 +96,12 @@ router.use('/item-templates', itemTemplatesRoutes) // 🆕 物品模板管理路
 router.use('/risk-profiles', riskProfilesRoutes) // 🆕 用户风控配置管理路由（2026-01-21 API覆盖率补齐）
 router.use('/lottery-tier-rules', lotteryTierRulesRoutes) // 🆕 抽奖档位规则管理路由（2026-01-21 API覆盖率补齐）
 router.use('/lottery-presets', lotteryPresetsRoutes) // 🆕 抽奖预设管理路由（2026-01-21 API覆盖率补齐）
-router.use('/lottery-monitoring', lotteryMonitoringRoutes) // 🆕 抽奖监控数据查询路由（2026-01-21 P2 API覆盖率补齐）
+// 🔄 2026-01-31 大文件拆分方案 Phase 2: 新URL结构（原lottery-monitoring拆分）
+router.use('/lottery-realtime', lotteryRealtimeRoutes) // 实时监控和告警（原 /lottery-monitoring/stats 和 /realtime-alerts）
+router.use('/lottery-statistics', lotteryStatisticsRoutes) // 统计趋势（原 /lottery-monitoring/hourly-metrics）
+router.use('/lottery-report', lotteryReportRoutes) // 报表生成（原 /lottery-analytics/daily-report）
+router.use('/lottery-user-analysis', lotteryUserAnalysisRoutes) // 用户分析（原 /lottery-monitoring/user-*）
+router.use('/lottery-campaign-analysis', lotteryCampaignAnalysisRoutes) // 活动分析（原 /lottery-monitoring/campaign-*）
 router.use('/trade-orders', tradeOrdersRoutes) // 🆕 交易订单查询路由（2026-01-21 P2 API覆盖率补齐）
 router.use('/user-premium', userPremiumRoutes) // 🆕 用户高级空间状态查询路由（2026-01-21 P2 API覆盖率补齐）
 router.use('/admin-audit-logs', adminAuditLogsRoutes) // 🆕 管理员操作审计日志路由（2026-01-22 P1 API覆盖率补齐）
@@ -101,7 +111,7 @@ router.use('/feature-flags', featureFlagsRoutes) // 🆕 功能开关管理路�
 router.use('/lottery-strategy-stats', lotteryStrategyStatsRoutes) // 🆕 抽奖策略统计路由（2026-01-22 策略引擎监控方案）
 router.use('/sessions', sessionsRoutes) // 🆕 会话管理路由（2026-01-21 会话管理功能补齐）
 router.use('/lottery-campaigns', lotteryCampaignsRoutes) // 🆕 抽奖活动列表管理路由（2026-01-28 P1 运营后台 ROI/复购率/库存预警）
-router.use('/lottery-analytics', lotteryAnalyticsRoutes) // 🆕 抽奖分析路由（2026-01-28 P2 运营日报聚合）
+// [已删除] router.use('/lottery-analytics', lotteryAnalyticsRoutes) // 已迁移到 /lottery-report
 router.use('/batch-operations', batchOperationsRoutes) // 🆕 批量操作路由（2026-01-30 阶段C 批量赠送/核销/状态切换/预算调整）
 
 /**

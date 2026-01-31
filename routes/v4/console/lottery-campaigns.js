@@ -57,16 +57,16 @@ function getLotteryAnalyticsService(req) {
   }
 
   // 通过 app.locals.services 获取（项目标准模式）
-  const service = req.app.locals.services?.getService('lottery_analytics')
+  const service = req.app.locals.services?.getService('lottery_analytics_report')
   if (service) {
     return service
   }
 
-  // 兜底：直接实例化（带模型注入）
-  logger.warn('通过 app.locals.services 获取 LotteryAnalyticsService 失败，使用直接实例化')
-  const LotteryAnalyticsService = require('../../../services/LotteryAnalyticsService')
+  // 兜底：直接实例化拆分后的 ReportService（带模型注入）
+  logger.warn('通过 app.locals.services 获取 lottery_analytics_report 失败，使用直接实例化')
+  const LotteryReportService = require('../../../services/lottery-analytics/ReportService')
   const models = req.models || require('../../../models')
-  return new LotteryAnalyticsService(models)
+  return new LotteryReportService(models)
 }
 
 /**

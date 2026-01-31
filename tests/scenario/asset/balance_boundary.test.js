@@ -9,12 +9,12 @@
  *
  * 技术规范：
  * - 使用真实数据库数据（禁止mock）
- * - 所有资产操作通过 AssetService 统一进行
+ * - 所有资产操作通过 BalanceService 统一进行（V4.7.0 AssetService 拆分）
  * - 使用 snake_case 命名约定
  * - 测试数据通过 TestDataCleaner 自动清理
  *
  * 业务背景：
- * - AssetService 使用 BIGINT 存储余额（避免浮点精度问题）
+ * - BalanceService 使用 BIGINT 存储余额（避免浮点精度问题）
  * - 余额不允许为负数，扣减时必须验证余额充足
  * - 所有变动必须支持幂等性控制（idempotency_key）
  * - 所有写操作必须在事务中执行
@@ -26,7 +26,8 @@
 'use strict'
 
 const { sequelize } = require('../../../models')
-const AssetService = require('../../../services/AssetService')
+// V4.7.0 AssetService 拆分：使用 BalanceService（2026-01-31）
+const BalanceService = require('../../../services/asset/BalanceService')
 const { cleanupAfterEach } = require('../../helpers/TestDataCleaner')
 
 /**
@@ -86,13 +87,13 @@ describe('P1-1 余额边界测试', () => {
 
       try {
         // 1. 创建/获取账户
-        await AssetService.getOrCreateAccount({ user_id: test_user_id }, { transaction })
+        await BalanceService.getOrCreateAccount({ user_id: test_user_id }, { transaction })
 
         // 2. 先充值一个精确金额
         const exact_amount = 1000
         const charge_key = generateIdempotencyKey('charge_exact')
 
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: TEST_ASSET_CODE,
@@ -104,7 +105,7 @@ describe('P1-1 余额边界测试', () => {
         )
 
         // 3. 获取充值后余额
-        const balance_after_charge = await AssetService.getBalance(
+        const balance_after_charge = await BalanceService.getBalance(
           { user_id: test_user_id, asset_code: TEST_ASSET_CODE },
           { transaction }
         )
@@ -113,7 +114,7 @@ describe('P1-1 余额边界测试', () => {
 
         // 4. 扣减恰好等于余额的金额
         const deduct_key = generateIdempotencyKey('deduct_exact')
-        const deduct_result = await AssetService.changeBalance(
+        const deduct_result = await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: TEST_ASSET_CODE,
@@ -159,10 +160,10 @@ describe('P1-1 余额边界测试', () => {
 
       try {
         // 1. 获取或创建账户
-        await AssetService.getOrCreateAccount({ user_id: test_user_id }, { transaction })
+        await BalanceService.getOrCreateAccount({ user_id: test_user_id }, { transaction })
 
         // 2. 获取当前余额
-        const initial_balance = await AssetService.getBalance(
+        const initial_balance = await BalanceService.getBalance(
           { user_id: test_user_id, asset_code: TEST_ASSET_CODE },
           { transaction }
         )
@@ -170,7 +171,7 @@ describe('P1-1 余额边界测试', () => {
         // 3. 如果有余额，先扣减到0
         if (initial_balance.available_amount > 0) {
           const clear_key = generateIdempotencyKey('clear_balance')
-          await AssetService.changeBalance(
+          await BalanceService.changeBalance(
             {
               user_id: test_user_id,
               asset_code: TEST_ASSET_CODE,
@@ -183,7 +184,7 @@ describe('P1-1 余额边界测试', () => {
         }
 
         // 4. 确认余额已为0
-        const zero_balance = await AssetService.getBalance(
+        const zero_balance = await BalanceService.getBalance(
           { user_id: test_user_id, asset_code: TEST_ASSET_CODE },
           { transaction }
         )
@@ -194,7 +195,7 @@ describe('P1-1 余额边界测试', () => {
         const deduct_key = generateIdempotencyKey('deduct_zero')
 
         await expect(
-          AssetService.changeBalance(
+          BalanceService.changeBalance(
             {
               user_id: test_user_id,
               asset_code: TEST_ASSET_CODE,
@@ -240,7 +241,7 @@ describe('P1-1 余额边界测试', () => {
         const add_amount = 500
         const add_key = generateIdempotencyKey('add_from_zero')
 
-        const add_result = await AssetService.changeBalance(
+        const add_result = await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: TEST_ASSET_CODE,
@@ -291,13 +292,13 @@ describe('P1-1 余额边界测试', () => {
         const add_key = generateIdempotencyKey('add_large')
 
         // 2. 获取初始余额
-        const initial_balance = await AssetService.getBalance(
+        const initial_balance = await BalanceService.getBalance(
           { user_id: test_user_id, asset_code: TEST_ASSET_CODE },
           { transaction }
         )
 
         // 3. 增加1亿
-        const add_result = await AssetService.changeBalance(
+        const add_result = await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: TEST_ASSET_CODE,
@@ -345,7 +346,7 @@ describe('P1-1 余额边界测试', () => {
         const large_amount = 100000000 // 1亿
         const charge_key = generateIdempotencyKey('charge_large')
 
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: TEST_ASSET_CODE,
@@ -357,14 +358,14 @@ describe('P1-1 余额边界测试', () => {
         )
 
         // 2. 获取充值后余额
-        const balance_after_charge = await AssetService.getBalance(
+        const balance_after_charge = await BalanceService.getBalance(
           { user_id: test_user_id, asset_code: TEST_ASSET_CODE },
           { transaction }
         )
 
         // 3. 扣减1亿
         const deduct_key = generateIdempotencyKey('deduct_large')
-        const deduct_result = await AssetService.changeBalance(
+        const deduct_result = await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: TEST_ASSET_CODE,
@@ -413,7 +414,7 @@ describe('P1-1 余额边界测试', () => {
         const safe_large = 1000000000 // 10亿
         const add_key = generateIdempotencyKey('add_bigint')
 
-        const add_result = await AssetService.changeBalance(
+        const add_result = await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: TEST_ASSET_CODE,
@@ -429,7 +430,7 @@ describe('P1-1 余额边界测试', () => {
 
         // 3. 测试连续大额操作的精度
         const deduct_key = generateIdempotencyKey('deduct_bigint')
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: TEST_ASSET_CODE,
@@ -470,7 +471,7 @@ describe('P1-1 余额边界测试', () => {
 
       try {
         // 1. 获取初始余额
-        const initial_balance = await AssetService.getBalance(
+        const initial_balance = await BalanceService.getBalance(
           { user_id: test_user_id, asset_code: TEST_ASSET_CODE },
           { transaction }
         )
@@ -481,7 +482,7 @@ describe('P1-1 余额边界测试', () => {
 
         for (let i = 0; i < 10; i++) {
           const key = generateIdempotencyKey(`consecutive_${i}`)
-          await AssetService.changeBalance(
+          await BalanceService.changeBalance(
             {
               user_id: test_user_id,
               asset_code: TEST_ASSET_CODE,
@@ -495,7 +496,7 @@ describe('P1-1 余额边界测试', () => {
         }
 
         // 3. 验证最终余额
-        const final_balance = await AssetService.getBalance(
+        const final_balance = await BalanceService.getBalance(
           { user_id: test_user_id, asset_code: TEST_ASSET_CODE },
           { transaction }
         )
@@ -540,7 +541,7 @@ describe('P1-1 余额边界测试', () => {
         const charge_amount = 1000
         const charge_key = generateIdempotencyKey('charge_for_overdraft')
 
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: TEST_ASSET_CODE,
@@ -552,7 +553,7 @@ describe('P1-1 余额边界测试', () => {
         )
 
         // 2. 获取当前余额
-        const current_balance = await AssetService.getBalance(
+        const current_balance = await BalanceService.getBalance(
           { user_id: test_user_id, asset_code: TEST_ASSET_CODE },
           { transaction }
         )
@@ -562,7 +563,7 @@ describe('P1-1 余额边界测试', () => {
         const deduct_key = generateIdempotencyKey('overdraft_deduct')
 
         await expect(
-          AssetService.changeBalance(
+          BalanceService.changeBalance(
             {
               user_id: test_user_id,
               asset_code: TEST_ASSET_CODE,
@@ -611,7 +612,7 @@ describe('P1-1 余额边界测试', () => {
         const charge_amount = 2000
         const charge_key = generateIdempotencyKey('charge_for_negative')
 
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: TEST_ASSET_CODE,
@@ -623,7 +624,7 @@ describe('P1-1 余额边界测试', () => {
         )
 
         // 2. 获取充值后余额
-        const balance_after_charge = await AssetService.getBalance(
+        const balance_after_charge = await BalanceService.getBalance(
           { user_id: test_user_id, asset_code: TEST_ASSET_CODE },
           { transaction }
         )
@@ -632,7 +633,7 @@ describe('P1-1 余额边界测试', () => {
         const negative_delta = -500
         const negative_key = generateIdempotencyKey('negative_delta')
 
-        const result = await AssetService.changeBalance(
+        const result = await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: TEST_ASSET_CODE,
@@ -688,7 +689,7 @@ describe('P1-1 余额边界测试', () => {
           const key = generateIdempotencyKey(`balance_check_${op.type}`)
 
           try {
-            const result = await AssetService.changeBalance(
+            const result = await BalanceService.changeBalance(
               {
                 user_id: test_user_id,
                 asset_code: TEST_ASSET_CODE,
@@ -712,7 +713,7 @@ describe('P1-1 余额边界测试', () => {
         }
 
         // 最终验证
-        const final_balance = await AssetService.getBalance(
+        const final_balance = await BalanceService.getBalance(
           { user_id: test_user_id, asset_code: TEST_ASSET_CODE },
           { transaction }
         )
@@ -734,7 +735,7 @@ describe('P1-1 余额边界测试', () => {
      * 测试场景 4.4：delta_amount 为0时应拒绝
      *
      * 业务规则：
-     * - AssetService 不允许 delta_amount 为 0
+     * - BalanceService 不允许 delta_amount 为 0
      * - 0变动没有业务意义，应该拒绝
      */
     it('delta_amount为0时应抛出错误', async () => {
@@ -749,7 +750,7 @@ describe('P1-1 余额边界测试', () => {
         const zero_key = generateIdempotencyKey('zero_delta')
 
         await expect(
-          AssetService.changeBalance(
+          BalanceService.changeBalance(
             {
               user_id: test_user_id,
               asset_code: TEST_ASSET_CODE,
@@ -782,7 +783,7 @@ describe('P1-1 余额边界测试', () => {
      * 测试场景 5.1：整数存储精度验证
      *
      * 业务背景：
-     * - AssetService 使用 BIGINT 存储，所有金额为整数
+     * - BalanceService 使用 BIGINT 存储，所有金额为整数
      * - 如果传入小数，应该被正确处理（截断或拒绝）
      *
      * 注意：当前系统使用整数存储，小数会被自动截断
@@ -801,7 +802,7 @@ describe('P1-1 余额边界测试', () => {
         let running_total = 0
 
         // 获取初始余额
-        const initial_balance = await AssetService.getBalance(
+        const initial_balance = await BalanceService.getBalance(
           { user_id: test_user_id, asset_code: TEST_ASSET_CODE },
           { transaction }
         )
@@ -809,7 +810,7 @@ describe('P1-1 余额边界测试', () => {
 
         for (const amount of test_amounts) {
           const key = generateIdempotencyKey(`integer_${amount}`)
-          const result = await AssetService.changeBalance(
+          const result = await BalanceService.changeBalance(
             {
               user_id: test_user_id,
               asset_code: TEST_ASSET_CODE,
@@ -825,7 +826,7 @@ describe('P1-1 余额边界测试', () => {
         }
 
         // 最终验证
-        const final_balance = await AssetService.getBalance(
+        const final_balance = await BalanceService.getBalance(
           { user_id: test_user_id, asset_code: TEST_ASSET_CODE },
           { transaction }
         )
@@ -865,7 +866,7 @@ describe('P1-1 余额边界测试', () => {
 
       try {
         // 获取初始余额
-        const initial_balance = await AssetService.getBalance(
+        const initial_balance = await BalanceService.getBalance(
           { user_id: test_user_id, asset_code: TEST_ASSET_CODE },
           { transaction }
         )
@@ -874,7 +875,7 @@ describe('P1-1 余额边界测试', () => {
         const decimal_amount = 100.99
         const key = generateIdempotencyKey('decimal_test')
 
-        const result = await AssetService.changeBalance(
+        const result = await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: TEST_ASSET_CODE,
@@ -926,7 +927,7 @@ describe('P1-1 余额边界测试', () => {
 
       try {
         // 获取初始余额
-        const initial_balance = await AssetService.getBalance(
+        const initial_balance = await BalanceService.getBalance(
           { user_id: test_user_id, asset_code: TEST_ASSET_CODE },
           { transaction }
         )
@@ -945,7 +946,7 @@ describe('P1-1 余额边界测试', () => {
           const key = generateIdempotencyKey(`precision_${Math.abs(op.delta)}`)
 
           try {
-            const result = await AssetService.changeBalance(
+            const result = await BalanceService.changeBalance(
               {
                 user_id: test_user_id,
                 asset_code: TEST_ASSET_CODE,
@@ -1000,7 +1001,7 @@ describe('P1-1 余额边界测试', () => {
         const delta = 12345
         const key = generateIdempotencyKey('flow_precision')
 
-        const result = await AssetService.changeBalance(
+        const result = await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: TEST_ASSET_CODE,
@@ -1055,7 +1056,7 @@ describe('P1-1 余额边界测试', () => {
 
       try {
         // 获取初始余额
-        const initial_balance = await AssetService.getBalance(
+        const initial_balance = await BalanceService.getBalance(
           { user_id: test_user_id, asset_code: TEST_ASSET_CODE },
           { transaction }
         )
@@ -1065,7 +1066,7 @@ describe('P1-1 余额边界测试', () => {
         const amount = 500
 
         // 第一次操作
-        const first_result = await AssetService.changeBalance(
+        const first_result = await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: TEST_ASSET_CODE,
@@ -1080,7 +1081,7 @@ describe('P1-1 余额边界测试', () => {
         const first_balance = Number(first_result.balance.available_amount)
 
         // 第二次操作（相同幂等键）
-        const second_result = await AssetService.changeBalance(
+        const second_result = await BalanceService.changeBalance(
           {
             user_id: test_user_id,
             asset_code: TEST_ASSET_CODE,

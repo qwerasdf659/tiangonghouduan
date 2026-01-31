@@ -10,7 +10,7 @@
  * - 分页参数验证
  *
  * 依赖服务：
- * - AssetService: 资产服务
+ * - BalanceService/ItemService/QueryService: 资产子服务（V4.7.0 拆分）
  * - middleware/validation: 参数验证中间件
  *
  * 测试策略：
@@ -257,7 +257,7 @@ describe('P1-3.2: 资产API参数验证单元测试', () => {
   })
 
   describe('4. 交易类型参数验证 (transaction_type)', () => {
-    // 资产交易类型枚举值（基于 AssetService 定义）
+    // 资产交易类型枚举值（基于 BalanceService 定义）
     const TRANSACTION_TYPES = [
       'credit', // 充值/增加
       'debit', // 扣减/消费

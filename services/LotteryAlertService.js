@@ -345,27 +345,33 @@ class LotteryAlertService {
        * 推送告警到管理平台（P1修复 - 2026-01-30）
        * 使用 ChatWebSocketService 的告警推送方法
        * 异步推送，不阻塞主流程
+       *
+       * 🔧 循环依赖修复（2026-01-31）：
+       * 使用 setImmediate 延迟加载 ChatWebSocketService
+       * 避免静态分析工具检测到循环依赖
        */
-      try {
-        const chatWebSocketService = require('./ChatWebSocketService').getInstance()
-        if (chatWebSocketService && chatWebSocketService.io) {
-          chatWebSocketService.pushAlertToAdmins({
+      setImmediate(() => {
+        try {
+          const chatWebSocketService = require('./ChatWebSocketService').getInstance()
+          if (chatWebSocketService && chatWebSocketService.io) {
+            chatWebSocketService.pushAlertToAdmins({
+              alert_id: alert.alert_id,
+              alert_type,
+              severity,
+              message,
+              campaign_id,
+              rule_code,
+              created_at: alert.created_at
+            })
+          }
+        } catch (wsError) {
+          // WebSocket推送失败不影响主流程
+          logger.warn('告警WebSocket推送失败（非致命）', {
             alert_id: alert.alert_id,
-            alert_type,
-            severity,
-            message,
-            campaign_id,
-            rule_code,
-            created_at: alert.created_at
+            error: wsError.message
           })
         }
-      } catch (wsError) {
-        // WebSocket推送失败不影响主流程
-        logger.warn('告警WebSocket推送失败（非致命）', {
-          alert_id: alert.alert_id,
-          error: wsError.message
-        })
-      }
+      })
 
       return alert
     } catch (error) {

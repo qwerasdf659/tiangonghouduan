@@ -1,5 +1,7 @@
 'use strict'
 
+const { logger } = require('../../../../utils/logger')
+
 /**
  * StrategyConfig - 抽奖策略引擎配置
  *
@@ -710,7 +712,7 @@ class DynamicConfigLoader {
       const { LotteryStrategyConfig } = require('../../../../models')
 
       if (!LotteryStrategyConfig) {
-        console.warn('[StrategyConfig] LotteryStrategyConfig 模型未就绪，使用默认配置')
+        logger.warn('[StrategyConfig] LotteryStrategyConfig 模型未就绪，使用默认配置')
         return null
       }
 
@@ -724,10 +726,10 @@ class DynamicConfigLoader {
       cache.data = merged_config
       cache.loaded_at = Date.now()
 
-      console.log('[StrategyConfig] 动态配置加载成功，已缓存')
+      logger.info('[StrategyConfig] 动态配置加载成功，已缓存')
       return merged_config
     } catch (error) {
-      console.error('[StrategyConfig] 动态配置加载失败:', error.message)
+      logger.error('[StrategyConfig] 动态配置加载失败:', error.message)
       return null
     } finally {
       cache.loading = false
@@ -755,7 +757,7 @@ class DynamicConfigLoader {
       const { LotteryTierMatrixConfig } = require('../../../../models')
 
       if (!LotteryTierMatrixConfig) {
-        console.warn('[StrategyConfig] LotteryTierMatrixConfig 模型未就绪，使用默认矩阵')
+        logger.warn('[StrategyConfig] LotteryTierMatrixConfig 模型未就绪，使用默认矩阵')
         return null
       }
 
@@ -769,10 +771,10 @@ class DynamicConfigLoader {
       // 4. 更新缓存（使用局部变量避免竞态）
       cache.matrix = db_matrix
 
-      console.log('[StrategyConfig] 矩阵配置加载成功')
+      logger.info('[StrategyConfig] 矩阵配置加载成功')
       return db_matrix
     } catch (error) {
-      console.error('[StrategyConfig] 矩阵配置加载失败:', error.message)
+      logger.error('[StrategyConfig] 矩阵配置加载失败:', error.message)
       return null
     }
   }
@@ -873,7 +875,7 @@ class DynamicConfigLoader {
     _dynamicConfigCache.data = null
     _dynamicConfigCache.matrix = null
     _dynamicConfigCache.loaded_at = null
-    console.log('[StrategyConfig] 配置缓存已清除')
+    logger.info('[StrategyConfig] 配置缓存已清除')
   }
 
   /**

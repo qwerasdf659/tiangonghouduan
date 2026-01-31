@@ -16,7 +16,7 @@
  *
  * 业务规则（V4.5.0强制）：
  * - ✅ 兑换只能使用材料资产支付（cost_asset_code + cost_amount）
- * - ✅ 支付资产扣减通过AssetService.changeBalance()执行
+ * - ✅ 支付资产扣减通过BalanceService.changeBalance()执行（V4.7.0 AssetService 拆分）
  * - ✅ 订单记录pay_asset_code和pay_amount字段（必填）
  * - ✅ 支持幂等性控制（Header Idempotency-Key 必填）
  * - ❌ 禁止积分支付和虚拟价值支付（已彻底移除）

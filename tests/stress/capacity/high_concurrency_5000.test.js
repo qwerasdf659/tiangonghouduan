@@ -48,7 +48,7 @@ jest.setTimeout(600000)
 
 describe('🚀 5000并发压力测试（P2-3）', () => {
   // 服务引用
-  let AssetService
+  let BalanceService
   let IdempotencyService
 
   // 测试数据
@@ -85,7 +85,7 @@ describe('🚀 5000并发压力测试（P2-3）', () => {
     }
 
     // 获取服务实例
-    AssetService = getTestService('asset')
+    BalanceService = getTestService('asset_balance')
     IdempotencyService = getTestService('idempotency')
     console.log('✅ 服务获取成功')
 
@@ -303,8 +303,8 @@ describe('🚀 5000并发压力测试（P2-3）', () => {
      * 安全要求：无超扣、无漏扣
      */
     test('5000并发积分扣减 - 数据一致性验证', async () => {
-      if (!AssetService) {
-        console.warn('⚠️ 跳过测试：AssetService未初始化')
+      if (!BalanceService) {
+        console.warn('⚠️ 跳过测试：BalanceService未初始化')
         return
       }
 

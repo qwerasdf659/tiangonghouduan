@@ -248,7 +248,7 @@ class DataSanitizer {
 
     /**
      * 积分账户结构：points_account
-     * - 由调用方通过 AssetService.getBalance() 获取后传入
+     * - 由调用方通过 BalanceService.getBalance() 获取后传入
      * - 如果 user 对象包含 points_account 属性，则直接使用
      * - 否则返回默认的 0 值结构（表示未初始化或无账户）
      */

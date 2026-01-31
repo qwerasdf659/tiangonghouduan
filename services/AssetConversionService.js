@@ -1,7 +1,7 @@
 /**
  * 餐厅积分抽奖系统 V4.5.0材料系统架构 - 资产转换服务（AssetConversionService）
  *
- * 核心职责：基于统一账本（AssetService）进行材料资产转换
+ * 核心职责：基于统一账本（BalanceService）进行材料资产转换
  * 支持规则驱动 + 手续费三方记账
  *
  * 业务场景：提供材料资产的显式转换功能（规则驱动，支持任意资产对）
@@ -57,7 +57,7 @@
  *
  * 设计原则：
  * - **规则驱动**：转换规则来自数据库配置表，运营可调整无需代码变更
- * - **统一账本**：所有资产变动通过AssetService统一管理（Single Source of Truth）
+ * - **统一账本**：所有资产变动通过BalanceService统一管理（Single Source of Truth）
  * - **三方记账**：用户扣减 + 用户入账 + 系统手续费入账
  * - **事务原子性**：所有分录在同一事务中完成，要么全成功要么全失败
  * - **幂等性保证**：通过idempotency_key防止重复转换，参数不同返回409
@@ -87,7 +87,9 @@
 'use strict'
 
 const { sequelize } = require('../config/database')
-const AssetService = require('./AssetService') // Phase 3: 使用统一账本服务
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+const BalanceService = require('./asset/BalanceService')
+const QueryService = require('./asset/QueryService')
 // 🔴 从 models/index.js 获取已初始化的 Sequelize Model（避免直接 require 模型定义文件导致未初始化）
 const { MaterialConversionRule } = require('../models')
 // const MaterialAssetType = require('../models/MaterialAssetType') // P1-3: 材料类型配置（预留未来使用）
@@ -248,7 +250,7 @@ class AssetConversionService {
 
     // 🔴 2026-01-13 优化：幂等检查从"扫描"改为"点查"
     const debit_idempotency_key = `${idempotency_key}:debit`
-    const existing_record = await AssetService.getTransactionByIdempotencyKey(
+    const existing_record = await QueryService.getTransactionByIdempotencyKey(
       debit_idempotency_key,
       { transaction }
     )
@@ -287,7 +289,7 @@ class AssetConversionService {
 
       // 查询对应的目标资产入账记录和手续费记录
       const credit_idempotency_key = `${idempotency_key}:credit`
-      const existing_credit = await AssetService.getTransactionByIdempotencyKey(
+      const existing_credit = await QueryService.getTransactionByIdempotencyKey(
         credit_idempotency_key,
         { transaction }
       )
@@ -295,17 +297,17 @@ class AssetConversionService {
       let existing_fee = null
       if (fee_amount > 0) {
         const fee_idempotency_key = `${idempotency_key}:fee`
-        existing_fee = await AssetService.getTransactionByIdempotencyKey(fee_idempotency_key, {
+        existing_fee = await QueryService.getTransactionByIdempotencyKey(fee_idempotency_key, {
           transaction
         })
       }
 
       // 获取当前余额
-      const from_balance_obj = await AssetService.getBalance(
+      const from_balance_obj = await BalanceService.getBalance(
         { user_id, asset_code: from_asset_code },
         { transaction }
       )
-      const to_balance_obj = await AssetService.getBalance(
+      const to_balance_obj = await BalanceService.getBalance(
         { user_id, asset_code: to_asset_code },
         { transaction }
       )
@@ -334,11 +336,11 @@ class AssetConversionService {
     }
 
     /*
-     * 步骤1：扣减源材料（使用统一账本AssetService）
+     * 步骤1：扣减源材料（使用统一账本 BalanceService）
      * business_type: material_convert_debit
      */
     // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
-    const from_result = await AssetService.changeBalance(
+    const from_result = await BalanceService.changeBalance(
       {
         user_id,
         asset_code: from_asset_code,
@@ -355,12 +357,12 @@ class AssetConversionService {
     )
 
     /*
-     * 步骤2：增加目标资产（使用统一账本AssetService）
+     * 步骤2：增加目标资产（使用统一账本 BalanceService）
      * business_type: material_convert_credit
      * 注意：入账金额为 net_to_amount（已扣除手续费）
      */
     // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
-    const to_result = await AssetService.changeBalance(
+    const to_result = await BalanceService.changeBalance(
       {
         user_id,
         asset_code: to_asset_code,
@@ -384,7 +386,7 @@ class AssetConversionService {
     let fee_result = null
     if (fee_amount > 0) {
       // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
-      fee_result = await AssetService.changeBalance(
+      fee_result = await BalanceService.changeBalance(
         {
           system_code: 'SYSTEM_PLATFORM_FEE', // 系统账户
           asset_code: fee_asset_code,

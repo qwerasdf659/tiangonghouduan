@@ -13,7 +13,7 @@
  *
  * 支付方式：
  * - 使用材料资产支付（cost_asset_code + cost_amount）
- * - 材料扣减通过 AssetService 执行
+ * - 材料扣减通过 BalanceService 执行（V4.7.0 AssetService 拆分）
  * - 订单记录 pay_asset_code 和 pay_amount 字段
  *
  * 幂等性保证：
@@ -46,7 +46,7 @@ const TransactionManager = require('../../../../utils/TransactionManager')
 router.post('/', authenticateToken, async (req, res) => {
   // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
   const IdempotencyService = req.app.locals.services.getService('idempotency')
-  const ExchangeService = req.app.locals.services.getService('exchange_market')
+  const ExchangeService = req.app.locals.services.getService('exchange_core')
 
   // 【业界标准形态】强制从 Header 获取幂等键，不接受 body
   const idempotency_key = req.headers['idempotency-key']

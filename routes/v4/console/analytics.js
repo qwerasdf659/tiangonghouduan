@@ -30,7 +30,7 @@ router.get(
       const { days = 7, user_filter } = req.query
 
       // 获取统一报表服务（P2-C架构重构：合并AdminAnalyticsService、StatisticsService、UserDashboardService）
-      const ReportingService = req.app.locals.services.getService('reporting')
+      const ReportingService = req.app.locals.services.getService('reporting_analytics')
 
       // 调用服务层方法获取决策分析数据
       const analyticsData = await ReportingService.getDecisionAnalytics(
@@ -68,7 +68,7 @@ router.get(
       const { period = 'week', granularity = 'daily' } = req.query
 
       // 获取统一报表服务
-      const ReportingService = req.app.locals.services.getService('reporting')
+      const ReportingService = req.app.locals.services.getService('reporting_analytics')
 
       // 调用服务层方法获取趋势分析数据
       const trendsData = await ReportingService.getLotteryTrends(period, granularity)
@@ -94,7 +94,7 @@ router.get(
   asyncHandler(async (req, res) => {
     try {
       // 获取统一报表服务
-      const ReportingService = req.app.locals.services.getService('reporting')
+      const ReportingService = req.app.locals.services.getService('reporting_analytics')
 
       // 调用服务层方法获取性能报告
       const performanceReport = await ReportingService.getPerformanceReport(
@@ -127,7 +127,7 @@ router.get(
       })
 
       // 获取统一报表服务
-      const ReportingService = req.app.locals.services.getService('reporting')
+      const ReportingService = req.app.locals.services.getService('reporting_analytics')
 
       // 调用服务层方法获取今日统计数据
       const todayStats = await ReportingService.getTodayStats()

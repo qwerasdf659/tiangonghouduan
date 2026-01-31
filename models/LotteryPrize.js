@@ -556,7 +556,15 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
         defaultValue: 0.0,
-        comment: '奖品价值（积分数或金额）'
+        comment: '奖品价值（积分数或金额）',
+        /**
+         * 获取奖品价值，将DECIMAL转换为浮点数
+         * @returns {number} 奖品价值
+         */
+        get() {
+          const value = this.getDataValue('prize_value')
+          return value ? parseFloat(value) : 0
+        }
       },
       angle: {
         type: DataTypes.INTEGER,
@@ -600,7 +608,15 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(8, 6),
         allowNull: false,
         defaultValue: 0.1,
-        comment: '中奖概率（0-1之间）'
+        comment: '中奖概率（0-1之间）',
+        /**
+         * 获取中奖概率，将DECIMAL转换为浮点数
+         * @returns {number} 中奖概率（0-1之间）
+         */
+        get() {
+          const value = this.getDataValue('win_probability')
+          return value ? parseFloat(value) : 0
+        }
       },
       stock_quantity: {
         type: DataTypes.INTEGER,

@@ -35,7 +35,7 @@ describe('ConsumptionService - 消费服务层单元测试', () => {
 
   beforeAll(async () => {
     // 通过 ServiceManager 获取服务实例（snake_case key）
-    ConsumptionService = global.getTestService('consumption')
+    ConsumptionService = global.getTestService('consumption_core')
 
     // 获取测试用户（既是用户也是管理员）
     testUser = await User.findOne({

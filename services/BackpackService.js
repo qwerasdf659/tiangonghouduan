@@ -9,7 +9,7 @@
  * 1. assets（可叠加资产）：
  *    - 来源：account_asset_balances 表（账本资产）
  *    - 包含：材料、碎片、积分等可累加的虚拟资产
- *    - 服务：AssetService
+ *    - 服务：BalanceService
  * 2. items（不可叠加物品）：
  *    - 来源：item_instances 表（物品实例）
  *    - 包含：优惠券、实物商品等唯一物品
@@ -20,7 +20,8 @@
  */
 
 const { ItemInstance, MaterialAssetType, sequelize } = require('../models')
-const AssetService = require('./AssetService')
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+const BalanceService = require('./asset/BalanceService')
 const { attachDisplayNames } = require('../utils/displayNameHelper')
 
 const logger = require('../utils/logger').logger
@@ -130,10 +131,10 @@ class BackpackService {
     try {
       /*
        * 1. 查询所有资产余额（包括冻结余额）
-       * AssetService.getAllBalances 返回 AccountAssetBalance 模型实例数组
+       * BalanceService.getAllBalances 返回 AccountAssetBalance 模型实例数组
        * 字段：available_amount（可用余额）、frozen_amount（冻结余额）
        */
-      const assetAccounts = await AssetService.getAllBalances(
+      const assetAccounts = await BalanceService.getAllBalances(
         { user_id },
         {
           transaction

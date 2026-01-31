@@ -29,7 +29,7 @@ const {
 // 延迟加载服务，通过 global.getTestService 获取
 let MarketListingService
 let TradeOrderService
-let AssetService
+let BalanceService
 
 // 定时任务模块
 const HourlyUnlockTimeoutTradeOrders = require('../../../jobs/hourly-unlock-timeout-trade-orders')
@@ -68,11 +68,11 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
     console.log('✅ 数据库连接成功')
 
     // 获取服务（通过 ServiceManager）
-    MarketListingService = global.getTestService('market_listing')
+    MarketListingService = global.getTestService('market_listing_core')
     TradeOrderService = global.getTestService('trade_order')
-    AssetService = global.getTestService('asset')
+    BalanceService = global.getTestService('asset_balance')
 
-    if (!MarketListingService || !TradeOrderService || !AssetService) {
+    if (!MarketListingService || !TradeOrderService || !BalanceService) {
       throw new Error('服务获取失败：请检查 ServiceManager 配置')
     }
 
@@ -156,7 +156,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
   async function prepareUserBalance(user_id, asset_code, amount, transaction = null) {
     const options = transaction ? { transaction } : {}
 
-    await AssetService.changeBalance(
+    await BalanceService.changeBalance(
       {
         user_id,
         asset_code,

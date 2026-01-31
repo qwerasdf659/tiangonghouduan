@@ -7,7 +7,7 @@
  * - 记录用户通过商家扫码提交的消费记录
  * - 支持待审核→已通过/已拒绝/已过期的状态流转
  * - 与content_review_records表配合实现审核功能
- * - 审核通过后自动奖励积分（通过AssetService）
+ * - 审核通过后自动奖励积分（通过 BalanceService）
  *
  * 业务流程：
  * 1. 用户出示V2动态身份码（QRV2_{base64_payload}_{signature}，5分钟有效）
@@ -388,6 +388,14 @@ module.exports = sequelize => {
         validate: {
           min: 0.01,
           max: 99999.99
+        },
+        /**
+         * 获取消费金额，将DECIMAL转换为浮点数
+         * @returns {number} 消费金额（元）
+         */
+        get() {
+          const value = this.getDataValue('consumption_amount')
+          return value ? parseFloat(value) : 0
         }
       },
 

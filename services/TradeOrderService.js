@@ -4,7 +4,7 @@
  * 职责：
  * - 订单域（Order Domain）核心服务
  * - 统一管理交易订单的创建、取消、完成
- * - 协调资产冻结/解冻/结算（调用 AssetService）
+ * - 协调资产冻结/解冻/结算（调用 BalanceService/ItemService）
  * - 协调物品所有权变更（调用 ItemInstance）
  * - 提供强幂等性保证（idempotency_key）
  * - 管理后台订单查询（合并自 TradeOrderQueryService）
@@ -12,14 +12,14 @@
  * 业务流程：
  * 1. 创建订单（createOrder）：
  *    - 锁定挂牌（MarketListing.status = locked）
- *    - 冻结买家资产（AssetService.freeze）
+ *    - 冻结买家资产（BalanceService.freeze）
  *    - 创建订单记录（TradeOrder.status = frozen）
  * 2. 完成订单（completeOrder）：
- *    - 从冻结资产结算（AssetService.settleFromFrozen）
+ *    - 从冻结资产结算（BalanceService.settleFromFrozen）
  *    - 转移物品所有权（ItemInstance.owner_user_id）
  *    - 更新订单状态（TradeOrder.status = completed）
  * 3. 取消订单（cancelOrder）：
- *    - 解冻买家资产（AssetService.unfreeze）
+ *    - 解冻买家资产（BalanceService.unfreeze）
  *    - 解锁挂牌（MarketListing.status = on_sale）
  *    - 更新订单状态（TradeOrder.status = cancelled）
  *
@@ -34,7 +34,9 @@
 const { Op, fn, col } = require('sequelize')
 const { sequelize, TradeOrder, MarketListing, ItemInstance, User } = require('../models')
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
-const AssetService = require('./AssetService')
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+const BalanceService = require('./asset/BalanceService')
+const ItemService = require('./asset/ItemService')
 const AdminSystemService = require('./AdminSystemService')
 const logger = require('../utils/logger')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
@@ -95,7 +97,7 @@ class TradeOrderService {
    * 1. 幂等性检查（idempotency_key）
    * 2. 验证挂牌状态（on_sale）
    * 3. 锁定挂牌（status = locked）
-   * 4. 冻结买家资产（AssetService.freeze）
+   * 4. 冻结买家资产（BalanceService.freeze）
    * 5. 创建订单记录（status = frozen）
    *
    * 幂等性规则：
@@ -424,7 +426,7 @@ class TradeOrderService {
 
     // 3.6 冻结买家资产（幂等键派生规则：${root_idempotency_key}:freeze_buyer）
     // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
-    const freezeResult = await AssetService.freeze(
+    const freezeResult = await BalanceService.freeze(
       {
         idempotency_key: `${idempotency_key}:freeze_buyer`, // 派生幂等键（文档规范：统一以根幂等键派生）
         business_type: 'order_freeze_buyer', // 通过 business_type 区分冻结分录
@@ -470,7 +472,7 @@ class TradeOrderService {
    *
    * 业务流程：
    * 1. 验证订单状态（frozen）
-   * 2. 从冻结资产结算（AssetService.settleFromFrozen）
+   * 2. 从冻结资产结算（BalanceService.settleFromFrozen）
    * 3. 转移物品所有权（ItemInstance.owner_user_id）
    * 4. 更新订单状态（completed）
    * 5. 更新挂牌状态（sold）
@@ -523,7 +525,7 @@ class TradeOrderService {
 
     // 2.1 买家从冻结资产扣减
     // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
-    await AssetService.settleFromFrozen(
+    await BalanceService.settleFromFrozen(
       {
         idempotency_key: `${idempotency_key}:settle_buyer`, // 派生子幂等键
         business_type: 'order_settle_buyer_debit',
@@ -544,7 +546,7 @@ class TradeOrderService {
     // 2.2 卖家入账（实收金额）
     if (order.net_amount > 0) {
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
-      await AssetService.changeBalance(
+      await BalanceService.changeBalance(
         {
           idempotency_key: `${idempotency_key}:credit_seller`, // 派生子幂等键
           business_type: 'order_settle_seller_credit',
@@ -567,7 +569,7 @@ class TradeOrderService {
     // 2.3 平台手续费入账（如果手续费>0）
     if (order.fee_amount > 0) {
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
-      await AssetService.changeBalance(
+      await BalanceService.changeBalance(
         {
           idempotency_key: `${idempotency_key}:credit_platform_fee`, // 派生子幂等键
           business_type: 'order_settle_platform_fee_credit',
@@ -589,7 +591,7 @@ class TradeOrderService {
 
     // 3. 转移物品所有权或交付可叠加资产
     if (listing.listing_kind === 'item_instance' && listing.offer_item_instance_id) {
-      // 统一资产域架构：使用 AssetService.transferItem() 转移物品所有权
+      // 统一资产域架构：使用 ItemService.transferItem() 转移物品所有权
       const { ItemInstance } = require('../models')
       const itemInstance = await ItemInstance.findOne({
         where: { item_instance_id: listing.offer_item_instance_id },
@@ -606,10 +608,9 @@ class TradeOrderService {
         throw new Error('物品所有权异常：物品不属于卖家，禁止成交转移')
       }
 
-      // 使用 AssetService.transferItem() 转移所有权（自动记录事件）
-      const AssetService = require('./AssetService')
+      // 使用 ItemService.transferItem() 转移所有权（自动记录事件）
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
-      await AssetService.transferItem(
+      await ItemService.transferItem(
         {
           item_instance_id: itemInstance.item_instance_id,
           new_owner_id: order.buyer_user_id,
@@ -627,7 +628,7 @@ class TradeOrderService {
         { transaction }
       )
 
-      logger.info('[TradeOrderService] 物品所有权已转移（通过 AssetService.transferItem）', {
+      logger.info('[TradeOrderService] 物品所有权已转移（通过 ItemService.transferItem）', {
         item_instance_id: itemInstance.item_instance_id,
         from: order.seller_user_id,
         to: order.buyer_user_id
@@ -643,7 +644,7 @@ class TradeOrderService {
 
       // 3.2.1 卖家：从冻结扣减标的资产
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
-      await AssetService.settleFromFrozen(
+      await BalanceService.settleFromFrozen(
         {
           idempotency_key: `${idempotency_key}:settle_seller_offer`, // 派生子幂等键
           business_type: 'listing_settle_seller_offer_debit',
@@ -671,7 +672,7 @@ class TradeOrderService {
 
       // 3.2.2 买家：收到标的资产入账
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
-      await AssetService.changeBalance(
+      await BalanceService.changeBalance(
         {
           idempotency_key: `${idempotency_key}:credit_buyer_offer`, // 派生子幂等键
           business_type: 'listing_transfer_buyer_offer_credit',
@@ -772,7 +773,7 @@ class TradeOrderService {
    *
    * 业务流程：
    * 1. 验证订单状态（frozen）
-   * 2. 解冻买家资产（AssetService.unfreeze）
+   * 2. 解冻买家资产（BalanceService.unfreeze）
    * 3. 解锁挂牌（status = on_sale）
    * 4. 更新订单状态（cancelled）
    *
@@ -822,7 +823,7 @@ class TradeOrderService {
 
     // 2. 解冻买家资产
     // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
-    const unfreezeResult = await AssetService.unfreeze(
+    const unfreezeResult = await BalanceService.unfreeze(
       {
         idempotency_key: `${idempotency_key}:unfreeze_buyer`, // 派生子幂等键
         business_type: 'order_unfreeze_buyer', // 通过 business_type 区分解冻分录

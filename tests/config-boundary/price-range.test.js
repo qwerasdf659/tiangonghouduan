@@ -16,7 +16,8 @@
 
 'use strict'
 
-const MarketListingService = require('../../services/MarketListingService')
+// V4.7.0 拆分：使用 market-listing/CoreService
+const MarketListingService = require('../../services/market-listing/CoreService')
 const AdminSystemService = require('../../services/AdminSystemService')
 
 /**

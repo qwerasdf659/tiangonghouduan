@@ -154,7 +154,7 @@ describe('【P2-2】混合负载压力测试', () => {
     // 获取服务实例
     IdempotencyService = getTestService('idempotency')
     LotteryEngine = getTestService('unified_lottery_engine')
-    MarketListingService = getTestService('market_listing')
+    MarketListingService = getTestService('market_listing_core')
     console.log('✅ 服务获取成功')
 
     // 检查 Redis 可用性
@@ -486,7 +486,7 @@ describe('【P2-2】混合负载压力测试', () => {
   /**
    * 模拟市场购买操作
    *
-   * @description 模拟 POST /api/v4/market/buy 请求
+   * @description 模拟 POST /api/v4/market/listings/:id/purchase 请求
    * @param {string} idempotencyKey - 幂等键
    * @returns {Object} 购买结果
    */
@@ -498,7 +498,7 @@ describe('【P2-2】混合负载压力测试', () => {
 
       // 通过幂等服务模拟购买请求
       const result = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
-        api_path: '/api/v4/market/buy',
+        api_path: '/api/v4/market/listings/:id/purchase',
         http_method: 'POST',
         request_params: { listing_id: Math.floor(Math.random() * 100) + 1 },
         user_id: testUserId
@@ -525,18 +525,22 @@ describe('【P2-2】混合负载压力测试', () => {
    */
   async function simulatePointsQuery() {
     try {
-      const AssetService = getTestService('asset')
+      // V4.7.0 AssetService 拆分：使用 asset_balance（2026-01-31）
+      const BalanceService = getTestService('asset_balance')
 
-      if (!testUserId || !AssetService) {
+      if (!testUserId || !BalanceService) {
         return { success: false, error: 'test_data_not_initialized' }
       }
 
       // 查询用户积分余额
-      const balance = await AssetService.getBalance(testUserId, 'POINTS')
+      const balanceResult = await BalanceService.getBalance({
+        user_id: testUserId,
+        asset_code: 'POINTS'
+      })
 
       return {
         success: true,
-        balance: balance || 0
+        balance: balanceResult?.available_amount || 0
       }
     } catch (error) {
       return { success: false, error: error.message }

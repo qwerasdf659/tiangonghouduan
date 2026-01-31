@@ -154,7 +154,9 @@ async function unfreezeOrdersBeforeDelete() {
   }
 
   // 3. 加载资产服务进行解冻
-  const AssetService = require('../../services/AssetService')
+  // V4.7.0 AssetService 拆分：使用 BalanceService（2026-01-31）
+  const BalanceService = require('../../services/asset/BalanceService')
+  const TransactionManager = require('../../utils/TransactionManager')
 
   let unfrozen_count = 0
   let failed_count = 0
@@ -162,30 +164,19 @@ async function unfreezeOrdersBeforeDelete() {
 
   for (const [, record] of userAssetMap) {
     try {
-      // 获取用户账户
-      const [accountResult] = await sequelize.query(
-        `SELECT account_id FROM accounts WHERE user_id = :user_id AND account_type = 'user' LIMIT 1`,
-        {
-          replacements: { user_id: record.user_id },
-          type: sequelize.QueryTypes.SELECT
-        }
-      )
-
-      if (!accountResult) {
-        console.log(`    ⚠️  用户 ${record.user_id} 无账户，跳过`)
-        continue
-      }
-
-      const account_id = accountResult.account_id
-
-      // 解冻资产
-      await AssetService.unfreezeAsset({
-        account_id: account_id,
-        asset_code: record.asset_code,
-        amount: record.total_amount,
-        business_type: 'historical_data_cleanup_unfreeze',
-        idempotency_key: `cleanup_unfreeze_${account_id}_${record.asset_code}_${Date.now()}`,
-        reason: `历史数据清理脚本：删除${record.order_count}个冻结订单前解冻`
+      // 解冻资产（使用 TransactionManager 包装事务）
+      await TransactionManager.execute(async transaction => {
+        await BalanceService.unfreeze(
+          {
+            user_id: record.user_id,
+            asset_code: record.asset_code,
+            amount: record.total_amount,
+            business_type: 'historical_data_cleanup_unfreeze',
+            idempotency_key: `cleanup_unfreeze_${record.user_id}_${record.asset_code}_${Date.now()}`,
+            meta: { reason: `历史数据清理脚本：删除${record.order_count}个冻结订单前解冻` }
+          },
+          { transaction }
+        )
       })
 
       console.log(`    ✅ 解冻成功: 用户${record.user_id} ${record.asset_code} ${record.total_amount}`)

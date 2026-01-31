@@ -47,7 +47,7 @@ const TransactionManager = require('../../../utils/TransactionManager')
 router.get('/pending', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-    const ConsumptionService = req.app.locals.services.getService('consumption')
+    const ConsumptionService = req.app.locals.services.getService('consumption_query')
 
     const { page = 1, page_size = 20 } = req.query
 
@@ -94,7 +94,7 @@ router.get('/pending', authenticateToken, requireRoleLevel(100), async (req, res
 router.get('/records', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-    const ConsumptionService = req.app.locals.services.getService('consumption')
+    const ConsumptionService = req.app.locals.services.getService('consumption_query')
 
     const { page = 1, page_size = 20, status = 'all', search = '', store_id } = req.query
 
@@ -150,7 +150,7 @@ router.get('/records', authenticateToken, requireRoleLevel(100), async (req, res
 router.post('/approve/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-    const ConsumptionService = req.app.locals.services.getService('consumption')
+    const ConsumptionService = req.app.locals.services.getService('consumption_query')
 
     const record_id = parseInt(req.params.id, 10)
     const { admin_notes } = req.body
@@ -222,7 +222,7 @@ router.post('/approve/:id', authenticateToken, requireRoleLevel(100), async (req
 router.post('/reject/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-    const ConsumptionService = req.app.locals.services.getService('consumption')
+    const ConsumptionService = req.app.locals.services.getService('consumption_query')
 
     const record_id = parseInt(req.params.id, 10)
     const { admin_notes } = req.body

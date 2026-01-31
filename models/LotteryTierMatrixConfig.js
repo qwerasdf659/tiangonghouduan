@@ -317,7 +317,15 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DECIMAL(5, 2),
         allowNull: false,
         defaultValue: 1.0,
-        comment: '预算上限乘数（0=强制空奖）'
+        comment: '预算上限乘数（0=强制空奖）',
+        /**
+         * 获取预算上限乘数，将DECIMAL转换为浮点数
+         * @returns {number} 预算上限乘数
+         */
+        get() {
+          const value = this.getDataValue('cap_multiplier')
+          return value ? parseFloat(value) : 1.0
+        }
       },
 
       /**
@@ -330,7 +338,15 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DECIMAL(5, 2),
         allowNull: false,
         defaultValue: 1.0,
-        comment: '空奖权重乘数'
+        comment: '空奖权重乘数',
+        /**
+         * 获取空奖权重乘数，将DECIMAL转换为浮点数
+         * @returns {number} 空奖权重乘数
+         */
+        get() {
+          const value = this.getDataValue('empty_weight_multiplier')
+          return value ? parseFloat(value) : 1.0
+        }
       },
 
       /**
@@ -344,7 +360,15 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DECIMAL(5, 2),
         allowNull: false,
         defaultValue: 0.0,
-        comment: 'high档位权重乘数'
+        comment: 'high档位权重乘数',
+        /**
+         * 获取high档位权重乘数，将DECIMAL转换为浮点数
+         * @returns {number} high档位权重乘数
+         */
+        get() {
+          const value = this.getDataValue('high_multiplier')
+          return value ? parseFloat(value) : 0.0
+        }
       },
 
       /**
@@ -354,7 +378,15 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DECIMAL(5, 2),
         allowNull: false,
         defaultValue: 0.0,
-        comment: 'mid档位权重乘数'
+        comment: 'mid档位权重乘数',
+        /**
+         * 获取mid档位权重乘数，将DECIMAL转换为浮点数
+         * @returns {number} mid档位权重乘数
+         */
+        get() {
+          const value = this.getDataValue('mid_multiplier')
+          return value ? parseFloat(value) : 0.0
+        }
       },
 
       /**
@@ -364,7 +396,15 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DECIMAL(5, 2),
         allowNull: false,
         defaultValue: 0.0,
-        comment: 'low档位权重乘数'
+        comment: 'low档位权重乘数',
+        /**
+         * 获取low档位权重乘数，将DECIMAL转换为浮点数
+         * @returns {number} low档位权重乘数
+         */
+        get() {
+          const value = this.getDataValue('low_multiplier')
+          return value ? parseFloat(value) : 0.0
+        }
       },
 
       /**
@@ -374,7 +414,15 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DECIMAL(5, 2),
         allowNull: false,
         defaultValue: 1.0,
-        comment: 'fallback档位权重乘数'
+        comment: 'fallback档位权重乘数',
+        /**
+         * 获取fallback档位权重乘数，将DECIMAL转换为浮点数
+         * @returns {number} fallback档位权重乘数
+         */
+        get() {
+          const value = this.getDataValue('fallback_multiplier')
+          return value ? parseFloat(value) : 1.0
+        }
       },
 
       /**

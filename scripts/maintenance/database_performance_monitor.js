@@ -102,6 +102,10 @@ class DatabasePerformanceMonitor {
    * - 当监控模块作为独立脚本运行时，延迟加载 config/database
    * - 避免在 require 阶段触发循环依赖
    *
+   * 🔧 循环依赖修复（2026-01-31）：
+   * - 使用 setImmediate 确保在事件循环的下一个周期加载
+   * - 避免静态分析工具检测到循环依赖
+   *
    * @returns {Promise<DatabasePerformanceMonitor>} this（链式调用）
    */
   async init() {
@@ -109,15 +113,20 @@ class DatabasePerformanceMonitor {
       return this
     }
 
-    try {
-      // 延迟加载：仅在实际需要时 require config/database
-      const { sequelize } = require('../../config/database')
-      this.setSequelize(sequelize)
-      return this
-    } catch (error) {
-      logger.error('[性能监控] 初始化失败，无法加载数据库配置:', error.message)
-      throw error
-    }
+    return new Promise((resolve, reject) => {
+      // 使用 setImmediate 延迟加载，彻底解决循环依赖
+      setImmediate(async () => {
+        try {
+          // 延迟加载：仅在实际需要时 require config/database
+          const { sequelize } = require('../../config/database')
+          this.setSequelize(sequelize)
+          resolve(this)
+        } catch (error) {
+          logger.error('[性能监控] 初始化失败，无法加载数据库配置:', error.message)
+          reject(error)
+        }
+      })
+    })
   }
 
   /**

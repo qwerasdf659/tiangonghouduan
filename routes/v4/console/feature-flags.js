@@ -21,8 +21,18 @@
 
 const express = require('express')
 const router = express.Router()
-const FeatureFlagService = require('../../../services/FeatureFlagService')
 const { logger } = require('../../../utils/logger')
+
+// ==================== 服务获取器 ====================
+
+/**
+ * 获取功能开关服务（通过 ServiceManager 统一入口）
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} FeatureFlagService 实例
+ */
+function getFeatureFlagService(req) {
+  return req.app.locals.services.getService('feature_flag')
+}
 
 // ==================== 辅助函数 ====================
 
@@ -62,6 +72,7 @@ function isValidFlagKey(flagKey) {
  */
 router.get('/', async (req, res) => {
   try {
+    const FeatureFlagService = getFeatureFlagService(req)
     const filters = {}
 
     if (req.query.is_enabled !== undefined) {
@@ -87,6 +98,7 @@ router.get('/', async (req, res) => {
  */
 router.get('/:flagKey', async (req, res) => {
   try {
+    const FeatureFlagService = getFeatureFlagService(req)
     const { flagKey } = req.params
 
     const flag = await FeatureFlagService.getFlagByKey(flagKey, { skipCache: true })
@@ -126,6 +138,7 @@ router.get('/:flagKey', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
+    const FeatureFlagService = getFeatureFlagService(req)
     const {
       flag_key,
       flag_name,
@@ -197,6 +210,7 @@ router.post('/', async (req, res) => {
  */
 router.put('/:flagKey', async (req, res) => {
   try {
+    const FeatureFlagService = getFeatureFlagService(req)
     const { flagKey } = req.params
     const updateData = req.body
 
@@ -230,6 +244,7 @@ router.put('/:flagKey', async (req, res) => {
  */
 router.patch('/:flagKey/toggle', async (req, res) => {
   try {
+    const FeatureFlagService = getFeatureFlagService(req)
     const { flagKey } = req.params
     const { enabled } = req.body
 
@@ -258,6 +273,7 @@ router.patch('/:flagKey/toggle', async (req, res) => {
  */
 router.delete('/:flagKey', async (req, res) => {
   try {
+    const FeatureFlagService = getFeatureFlagService(req)
     const { flagKey } = req.params
     const operator = getOperator(req)
 
@@ -284,6 +300,7 @@ router.delete('/:flagKey', async (req, res) => {
  */
 router.post('/:flagKey/whitelist', async (req, res) => {
   try {
+    const FeatureFlagService = getFeatureFlagService(req)
     const { flagKey } = req.params
     const { user_ids } = req.body
 
@@ -315,6 +332,7 @@ router.post('/:flagKey/whitelist', async (req, res) => {
  */
 router.delete('/:flagKey/whitelist', async (req, res) => {
   try {
+    const FeatureFlagService = getFeatureFlagService(req)
     const { flagKey } = req.params
     const { user_ids } = req.body
 
@@ -346,6 +364,7 @@ router.delete('/:flagKey/whitelist', async (req, res) => {
  */
 router.post('/:flagKey/blacklist', async (req, res) => {
   try {
+    const FeatureFlagService = getFeatureFlagService(req)
     const { flagKey } = req.params
     const { user_ids } = req.body
 
@@ -377,6 +396,7 @@ router.post('/:flagKey/blacklist', async (req, res) => {
  */
 router.delete('/:flagKey/blacklist', async (req, res) => {
   try {
+    const FeatureFlagService = getFeatureFlagService(req)
     const { flagKey } = req.params
     const { user_ids } = req.body
 
@@ -407,6 +427,7 @@ router.delete('/:flagKey/blacklist', async (req, res) => {
  */
 router.get('/:flagKey/check/:userId', async (req, res) => {
   try {
+    const FeatureFlagService = getFeatureFlagService(req)
     const { flagKey, userId } = req.params
 
     const result = await FeatureFlagService.isEnabled(flagKey, parseInt(userId), {
@@ -434,6 +455,7 @@ router.get('/:flagKey/check/:userId', async (req, res) => {
  */
 router.post('/batch-check', async (req, res) => {
   try {
+    const FeatureFlagService = getFeatureFlagService(req)
     const { flag_keys, user_id } = req.body
 
     if (!Array.isArray(flag_keys) || flag_keys.length === 0) {

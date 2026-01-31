@@ -7,10 +7,11 @@
  * - 查询资产流水记录
  *
  * 架构原则：
- * - 路由层不直连 models（通过 ServiceManager 获取 AssetService）
+ * - 路由层不直连 models（通过 ServiceManager 获取 QueryService）
  * - 路由层不开启事务（事务管理在 Service 层）
  *
  * 创建时间：2025-12-29
+ * 更新时间：2026-01-31（V4.7.0 AssetService 拆分）
  */
 
 'use strict'
@@ -48,10 +49,10 @@ router.get(
     const user_id = req.user.user_id
     const { asset_code, business_type, page = 1, page_size = 20 } = req.query
 
-    // 通过 ServiceManager 获取 AssetService
-    const AssetService = req.app.locals.services.getService('asset')
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 QueryService（2026-01-31）
+    const QueryService = req.app.locals.services.getService('asset_query')
 
-    const result = await AssetService.getTransactions(
+    const result = await QueryService.getTransactions(
       { user_id },
       { asset_code, business_type, page: parseInt(page), page_size: parseInt(page_size) }
     )

@@ -9,13 +9,13 @@
  *
  * 业务场景：
  * - 用户选择商品并使用材料资产支付（B2C官方兑换）
- * - 通过 AssetService.changeBalance() 扣除材料资产
+ * - 通过 BalanceService.changeBalance() 扣除材料资产
  * - 创建兑换订单（记录 pay_asset_code + pay_amount）
  * - 发货和订单状态管理
  *
  * 业务规则（强制）：
  * - ✅ 只支持材料资产支付（pay_asset_code + pay_amount）
- * - ✅ 材料扣减通过 AssetService 统一账本执行
+ * - ✅ 材料扣减通过 BalanceService 统一账本执行
  * - ✅ 支持幂等性控制（business_id 唯一约束）
  * - ❌ 禁止积分支付和虚拟奖品价值支付（已彻底移除）
  *
@@ -74,7 +74,15 @@ module.exports = sequelize => {
       actual_cost: {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: true,
-        comment: '实际成本'
+        comment: '实际成本',
+        /**
+         * 获取实际成本，将DECIMAL转换为浮点数
+         * @returns {number|null} 实际成本（元）或null
+         */
+        get() {
+          const value = this.getDataValue('actual_cost')
+          return value ? parseFloat(value) : null
+        }
       },
 
       // 订单信息
@@ -136,7 +144,15 @@ module.exports = sequelize => {
       total_cost: {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: true,
-        comment: '总成本（管理员可见，= cost_price * quantity）'
+        comment: '总成本（管理员可见，= cost_price * quantity）',
+        /**
+         * 获取总成本，将DECIMAL转换为浮点数
+         * @returns {number|null} 总成本（元）或null
+         */
+        get() {
+          const value = this.getDataValue('total_cost')
+          return value ? parseFloat(value) : null
+        }
       },
       status: {
         type: DataTypes.ENUM('pending', 'completed', 'shipped', 'cancelled'),

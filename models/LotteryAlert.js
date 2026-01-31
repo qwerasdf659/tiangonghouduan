@@ -206,13 +206,29 @@ LotteryAlert.initModel = sequelize => {
       threshold_value: {
         type: DataTypes.DECIMAL(10, 4),
         allowNull: true,
-        comment: '阈值（规则定义的期望值）'
+        comment: '阈值（规则定义的期望值）',
+        /**
+         * 获取阈值，将DECIMAL转换为浮点数
+         * @returns {number|null} 阈值或null
+         */
+        get() {
+          const value = this.getDataValue('threshold_value')
+          return value ? parseFloat(value) : null
+        }
       },
 
       actual_value: {
         type: DataTypes.DECIMAL(10, 4),
         allowNull: true,
-        comment: '实际值（触发告警时的实际数值）'
+        comment: '实际值（触发告警时的实际数值）',
+        /**
+         * 获取实际值，将DECIMAL转换为浮点数
+         * @returns {number|null} 实际值或null
+         */
+        get() {
+          const value = this.getDataValue('actual_value')
+          return value ? parseFloat(value) : null
+        }
       },
 
       message: {

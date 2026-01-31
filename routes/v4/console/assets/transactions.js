@@ -74,12 +74,12 @@ router.get(
     const pageNum = Math.max(1, parseInt(page) || 1)
     const pageSizeNum = Math.min(100, Math.max(1, parseInt(page_size) || 20))
 
-    // 通过 ServiceManager 获取 AssetService（路由层规范）
-    const AssetService = req.app.locals.services.getService('asset')
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 QueryService（2026-01-31）
+    const QueryService = req.app.locals.services.getService('asset_query')
 
     try {
       // 调用 Service 层方法获取用户资产流水
-      const result = await AssetService.getTransactions(
+      const result = await QueryService.getTransactions(
         { user_id: Number(user_id) },
         {
           asset_code,

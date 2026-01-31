@@ -11,7 +11,7 @@
  * 设计原则：
  * - **事务安全保障**：所有写操作支持外部事务传入，确保原子性
  * - **业务规则集中**：用户注册流程的所有步骤集中在Service层
- * - **依赖服务协调**：协调 AssetService、UserRoleService 等服务
+ * - **依赖服务协调**：协调 BalanceService、UserRoleService 等服务
  *
  * 事务边界治理（2026-01-05 决策）：
  * - 所有写操作 **强制要求** 外部事务传入（options.transaction）
@@ -23,7 +23,8 @@
  */
 
 const { User, Role, UserRole } = require('../models')
-const AssetService = require('./AssetService')
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+const BalanceService = require('./asset/BalanceService')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const logger = require('../utils/logger')
 const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
@@ -89,8 +90,8 @@ class UserService {
       mobile: mobile.substring(0, 3) + '****' + mobile.substring(7)
     })
 
-    // 步骤3: 创建资产账户（AssetService 会自动创建关联的余额记录）
-    await AssetService.getOrCreateAccount({ user_id: user.user_id }, { transaction })
+    // 步骤3: 创建资产账户（BalanceService 会自动创建关联的余额记录）
+    await BalanceService.getOrCreateAccount({ user_id: user.user_id }, { transaction })
 
     logger.info('用户资产账户创建成功', { user_id: user.user_id })
 
@@ -622,18 +623,23 @@ class UserService {
        */
       let pointsAccount = null
       if (checkPointsAccount) {
-        const AssetService = require('./AssetService')
+        // V4.7.0 AssetService 拆分：使用顶部引入的 BalanceService（2026-01-31）
         try {
           // 获取或创建用户资产账户（决策G：自动创建）
-          const account = await AssetService.getOrCreateAccount(
+          const account = await BalanceService.getOrCreateAccount(
             { user_id: userId },
             { transaction }
           )
 
           // 获取或创建 POINTS 余额记录（决策G：自动创建）
-          const balance = await AssetService.getOrCreateBalance(account.account_id, 'POINTS', {
-            transaction
-          })
+          const balance = await BalanceService.getOrCreateBalance(
+            account.account_id,
+            'POINTS',
+            null,
+            {
+              transaction
+            }
+          )
 
           // 决策H：账户冻结时返回 403
           if (account.status !== 'active') {

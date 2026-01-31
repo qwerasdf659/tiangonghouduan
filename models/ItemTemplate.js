@@ -213,7 +213,15 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: true,
         defaultValue: 0.0,
-        comment: '参考价格（积分）：用于估值和建议定价'
+        comment: '参考价格（积分）：用于估值和建议定价',
+        /**
+         * 获取参考价格，将DECIMAL转换为浮点数
+         * @returns {number} 参考价格（积分）
+         */
+        get() {
+          const value = this.getDataValue('reference_price_points')
+          return value ? parseFloat(value) : 0
+        }
       },
 
       // 是否允许交易上架

@@ -7,7 +7,7 @@
  * - 通过 DrawOrchestrator 编排抽奖流程
  *
  * 验证抽奖积分消费和奖励的数据完整性：
- * 1. 积分消费记录完整性（通过 AssetService 查询）
+ * 1. 积分消费记录完整性（通过 BalanceService 查询）
  * 2. 积分奖励记录完整性
  * 3. 资产流水记录正确性
  *
@@ -27,7 +27,7 @@ const {
 /**
  * V4.6: 通过 ServiceManager 获取服务
  */
-let AssetService
+let BalanceService
 let UnifiedLotteryEngine
 
 describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
@@ -40,7 +40,7 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
    * 辅助函数：获取用户 POINTS 余额（使用资产系统）
    */
   async function getPointsBalance(userId) {
-    const result = await AssetService.getBalance({ user_id: userId, asset_code: 'POINTS' })
+    const result = await BalanceService.getBalance({ user_id: userId, asset_code: 'POINTS' })
     return result ? Number(result.available_amount) : 0
   }
 
@@ -48,7 +48,7 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
     console.log('🔍 初始化抽奖积分集成测试环境（V4.6 Pipeline 架构）...')
 
     // 通过 ServiceManager 获取服务
-    AssetService = global.getTestService('asset')
+    BalanceService = global.getTestService('asset_balance')
 
     /**
      * V4.6: 使用 UnifiedLotteryEngine 替代 BasicGuaranteeStrategy

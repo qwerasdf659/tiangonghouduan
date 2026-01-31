@@ -13,7 +13,7 @@
  * - 11.8: 边界条件场景 - POINTS刚好够1次(cost_points=10)→抽完余额为0→再抽被拦截
  *
  * 技术验证点：
- * 1. 跨服务事务一致性（AssetService + MarketListingService + TradeOrderService）
+ * 1. 跨服务事务一致性（BalanceService + MarketListingService + TradeOrderService）
  * 2. 抽奖引擎核心流程（UnifiedLotteryEngine）
  * 3. 资产转移完整性（DIAMOND/POINTS/red_shard）
  * 4. 幂等性保护机制
@@ -66,7 +66,7 @@ async function sleep(ms) {
 
 describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
   /* 服务实例 */
-  let AssetService
+  let BalanceService
   let MarketListingService
   let TradeOrderService
   let ExchangeService
@@ -91,12 +91,12 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
     console.log('✅ 数据库连接成功')
 
     /* 获取服务实例 */
-    AssetService = getTestService('asset')
-    MarketListingService = getTestService('market_listing')
+    BalanceService = getTestService('asset_balance')
+    MarketListingService = getTestService('market_listing_core')
     TradeOrderService = getTestService('trade_order')
 
     try {
-      ExchangeService = getTestService('exchange')
+      ExchangeService = getTestService('exchange_core')
     } catch (error) {
       console.warn('⚠️ ExchangeService 未注册，部分测试将跳过')
     }
@@ -195,10 +195,10 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
   async function ensureAssetBalance(userId, assetCode, minAmount) {
     return await TransactionManager.execute(async transaction => {
       /* 获取或创建账户 - 注意：参数为 { user_id }, { transaction } */
-      const account = await AssetService.getOrCreateAccount({ user_id: userId }, { transaction })
+      const account = await BalanceService.getOrCreateAccount({ user_id: userId }, { transaction })
 
       /* 获取或创建资产余额 - 位置参数：(account_id, asset_code, { transaction }) */
-      const balance = await AssetService.getOrCreateBalance(account.account_id, assetCode, {
+      const balance = await BalanceService.getOrCreateBalance(account.account_id, assetCode, {
         transaction
       })
 
@@ -208,7 +208,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
         const topUpAmount = minAmount - currentBalance + 100 // 多充100作为缓冲
 
         /* 增加余额 - 注意：params 和 options 分开传递 */
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: userId,
             asset_code: assetCode,
@@ -422,10 +422,10 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       const shardBefore = await getAssetBalance(userId, 'red_shard')
       console.log('📊 初始 red_shard 余额:', shardBefore)
 
-      /* Step 2: 模拟消耗 red_shard（通过 AssetService.changeBalance） */
+      /* Step 2: 模拟消耗 red_shard（通过 BalanceService.changeBalance） */
       const consumeAmount = 10
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: userId,
             asset_code: 'red_shard',
@@ -1024,14 +1024,14 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       /*
        * 业务流程说明：
        * 1. 商户通过 MerchantPointsService 申请发放积分给用户
-       * 2. 审核通过后，AssetService 自动为用户增加 POINTS
+       * 2. 审核通过后，BalanceService 自动为用户增加 POINTS
        * 3. 用户使用 POINTS 进行抽奖
        *
        * 由于商户积分发放需要审核流程，这里直接模拟步骤2-3
        */
 
       /* Step 1: 模拟商户已发放积分给用户 */
-      console.log('📝 Step 1: 模拟商户发放积分（通过AssetService直接增加）')
+      console.log('📝 Step 1: 模拟商户发放积分（通过BalanceService直接增加）')
 
       const pointsAmount = 100 // 发放100积分
 
@@ -1041,7 +1041,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
 
       /* 增加积分（模拟商户发放） - 注意：params 和 options 分开传递 */
       await TransactionManager.execute(async transaction => {
-        await AssetService.changeBalance(
+        await BalanceService.changeBalance(
           {
             user_id: userId,
             asset_code: 'POINTS',
@@ -1192,8 +1192,8 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
         console.log('✅ 余额不足拦截验证通过')
       }
 
-      /* Step 3: 验证 AssetService 的余额不足异常处理 */
-      console.log('📝 Step 3: 验证AssetService余额不足异常')
+      /* Step 3: 验证 BalanceService 的余额不足异常处理 */
+      console.log('📝 Step 3: 验证BalanceService余额不足异常')
 
       try {
         await TransactionManager.execute(async transaction => {
@@ -1201,7 +1201,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
           const currentBalance = parseFloat(pointsBalance.available_amount) || 0
           const excessiveAmount = currentBalance + 999999
 
-          await AssetService.changeBalance(
+          await BalanceService.changeBalance(
             {
               user_id: userId,
               asset_code: 'POINTS',

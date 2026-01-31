@@ -21,6 +21,8 @@
     "test:coverage": "jest --coverage",
     "lint": "eslint . --ext .js",
     "lint:fix": "eslint . --ext .js --fix",
+    "check:circular": "node scripts/check-circular-deps.js",
+    "check:code": "eslint . --ext .js && node scripts/check-circular-deps.js",
     "monitor:db": "node scripts/validation/check_db_connections.js",
     "_comment_monitoring": "=== 系统监控工具命令（2025-11-24新增）===",
     "monitor:pool": "node scripts/monitoring/pool_monitor.js",

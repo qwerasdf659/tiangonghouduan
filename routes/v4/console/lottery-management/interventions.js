@@ -48,7 +48,7 @@ router.get(
       const { page = 1, page_size = 20, status, user_search, setting_type } = req.query
 
       // 通过 ServiceManager 获取 AdminLotteryService（路由层规范）
-      const AdminLotteryService = req.app.locals.services.getService('admin_lottery')
+      const AdminLotteryService = req.app.locals.services.getService('admin_lottery_core')
 
       // 调用 Service 层方法获取干预规则列表
       const result = await AdminLotteryService.getInterventionList({
@@ -86,7 +86,7 @@ router.get(
       const { id } = req.params
 
       // 通过 ServiceManager 获取 AdminLotteryService（路由层规范）
-      const AdminLotteryService = req.app.locals.services.getService('admin_lottery')
+      const AdminLotteryService = req.app.locals.services.getService('admin_lottery_core')
 
       /*
        * 调用 Service 层方法获取干预规则详情
@@ -125,7 +125,7 @@ router.post(
       const { reason = '管理员手动取消' } = req.body
 
       // 通过 ServiceManager 获取 AdminLotteryService（路由层规范）
-      const AdminLotteryService = req.app.locals.services.getService('admin_lottery')
+      const AdminLotteryService = req.app.locals.services.getService('admin_lottery_core')
 
       /*
        * 使用 TransactionManager 统一管理事务（事务边界治理）

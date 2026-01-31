@@ -250,7 +250,7 @@ class ItemInstance extends Model {
 
   /**
    * 锁定物品（用于订单下单）
-   * 注意：推荐使用 AssetService.lockItem()，此方法仅用于内部调用
+   * 注意：推荐使用 ItemService.lockItem()，此方法仅用于内部调用
    *
    * @param {string} lockId - 锁ID（订单ID）
    * @param {string} lockType - 锁类型（trade/redemption/security）
@@ -308,7 +308,7 @@ class ItemInstance extends Model {
 
   /**
    * 解锁物品（用于订单取消/超时）
-   * 注意：推荐使用 AssetService.unlockItem()，此方法仅用于内部调用
+   * 注意：推荐使用 ItemService.unlockItem()，此方法仅用于内部调用
    *
    * @param {string} lockId - 锁ID
    * @param {string} lockType - 锁类型

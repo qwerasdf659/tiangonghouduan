@@ -48,7 +48,7 @@ jest.setTimeout(180000) // 3分钟
 
 describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
   // 服务引用（通过 ServiceManager 获取）
-  let AssetService
+  let BalanceService
   let IdempotencyService
 
   // 测试数据
@@ -97,7 +97,7 @@ describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
     }
 
     // 获取服务实例（通过 ServiceManager）
-    AssetService = getTestService('asset')
+    BalanceService = getTestService('asset_balance')
     IdempotencyService = getTestService('idempotency')
 
     console.log('✅ 服务获取成功')
@@ -429,7 +429,7 @@ describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
       // 获取初始余额
       let initialBalance
       try {
-        initialBalance = await AssetService.getBalance({
+        initialBalance = await BalanceService.getBalance({
           user_id: testUserId,
           asset_code: testAssetCode
         })
@@ -453,7 +453,7 @@ describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
           const idempotencyKey = generateIdempotencyKey(`deduct_${index}`)
 
           try {
-            const result = await AssetService.changeBalance({
+            const result = await BalanceService.changeBalance({
               user_id: testUserId,
               asset_code: testAssetCode,
               delta_amount: -deductAmount,
@@ -500,7 +500,7 @@ describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
       console.log(`   📊 吞吐量: ${metrics.throughput} 请求/秒`)
 
       // 获取最终余额
-      const finalBalance = await AssetService.getBalance({
+      const finalBalance = await BalanceService.getBalance({
         user_id: testUserId,
         asset_code: testAssetCode
       })

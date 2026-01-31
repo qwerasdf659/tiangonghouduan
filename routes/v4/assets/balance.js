@@ -8,10 +8,11 @@
  * - 查询所有资产余额
  *
  * 架构原则：
- * - 路由层不直连 models（通过 ServiceManager 获取 AssetService）
+ * - 路由层不直连 models（通过 ServiceManager 获取 BalanceService）
  * - 路由层不开启事务（事务管理在 Service 层）
  *
  * 创建时间：2025-12-29
+ * 更新时间：2026-01-31（V4.7.0 AssetService 拆分）
  */
 
 'use strict'
@@ -50,12 +51,12 @@ router.get(
       return res.apiError('asset_code 是必填参数', 'BAD_REQUEST', null, 400)
     }
 
-    // 通过 ServiceManager 获取 AssetService
-    const AssetService = req.app.locals.services.getService('asset')
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 BalanceService（2026-01-31）
+    const BalanceService = req.app.locals.services.getService('asset_balance')
 
-    const balance = await AssetService.getBalance({ user_id, asset_code })
+    const balance = await BalanceService.getBalance({ user_id, asset_code })
 
-    // 返回字段命名与 AssetService.getBalance() 保持一致（全链路统一）
+    // 返回字段命名与 BalanceService.getBalance() 保持一致（全链路统一）
     return res.apiSuccess({
       asset_code,
       available_amount: Number(balance.available_amount),
@@ -77,12 +78,12 @@ router.get(
   asyncHandler(async (req, res) => {
     const user_id = req.user.user_id
 
-    // 通过 ServiceManager 获取 AssetService
-    const AssetService = req.app.locals.services.getService('asset')
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 BalanceService（2026-01-31）
+    const BalanceService = req.app.locals.services.getService('asset_balance')
 
-    const balances = await AssetService.getAllBalances({ user_id })
+    const balances = await BalanceService.getAllBalances({ user_id })
 
-    // 返回字段命名与 AssetService.getBalance() 保持一致（全链路统一）
+    // 返回字段命名与 BalanceService.getBalance() 保持一致（全链路统一）
     return res.apiSuccess({
       balances: balances.map(b => ({
         asset_code: b.asset_code,

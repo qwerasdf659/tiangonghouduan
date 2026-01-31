@@ -21,9 +21,14 @@
 const { sequelize, User, Store } = require('../../models')
 const BusinessError = require('../../utils/BusinessError')
 
-/*
- * 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
- * 注意：在 beforeAll 中获取服务，确保 ServiceManager 已初始化
+/**
+ * V4.7.0 大文件拆分：ConsumptionService 已拆分为子服务
+ * - consumption_core: 核心消费操作（merchantSubmitConsumption）
+ * - consumption_query: 消费记录查询
+ * - consumption_merchant: 商户相关操作
+ *
+ * 本测试使用核心操作方法（merchantSubmitConsumption）
+ * 在 CoreService 中
  */
 let ConsumptionService
 
@@ -40,8 +45,11 @@ describe('ConsumptionService - 消费记录服务', () => {
     // 连接测试数据库
     await sequelize.authenticate()
 
-    // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
-    ConsumptionService = global.getTestService('consumption')
+    /**
+     * V4.7.0 大文件拆分适配：
+     * 使用 CoreService（静态类）获取核心消费操作方法
+     */
+    ConsumptionService = global.getTestService('consumption_core')
 
     // 获取一个可用的测试门店（用于创建记录的测试）
     const store = await Store.findOne({

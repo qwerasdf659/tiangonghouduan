@@ -44,7 +44,7 @@ describe('阶段八：跨模块集成测试', () => {
   // 测试数据
   let test_user_id
   let test_campaign_id
-  let AssetService
+  let BalanceService
   let MarketListingService
   let TradeOrderService
   let NotificationService
@@ -70,8 +70,8 @@ describe('阶段八：跨模块集成测试', () => {
     }
 
     // 通过 ServiceManager 获取服务
-    AssetService = global.getTestService('asset')
-    MarketListingService = global.getTestService('market_listing')
+    BalanceService = global.getTestService('asset_balance')
+    MarketListingService = global.getTestService('market_listing_core')
     TradeOrderService = global.getTestService('trade_order')
     NotificationService = global.getTestService('notification')
     ChatWebSocketService = global.getTestService('chat_web_socket')
@@ -80,7 +80,7 @@ describe('阶段八：跨模块集成测试', () => {
       test_user_id,
       test_campaign_id,
       services_loaded: {
-        AssetService: !!AssetService,
+        BalanceService: !!BalanceService,
         MarketListingService: !!MarketListingService,
         TradeOrderService: !!TradeOrderService,
         NotificationService: !!NotificationService,
@@ -106,8 +106,8 @@ describe('阶段八：跨模块集成测试', () => {
    * - 验证奖品（物品实例）正确发放到用户背包
    *
    * 跨模块链路：
-   * UnifiedLotteryEngine → AssetService.changeBalance (扣费)
-   *                     → AssetService.mintItem (发放物品)
+   * UnifiedLotteryEngine → BalanceService.changeBalance (扣费)
+   *                     → BalanceService.mintItem (发放物品)
    *                     → ItemInstance 表写入
    */
   describe('9.1 抽奖→资产→物品', () => {
@@ -121,11 +121,11 @@ describe('阶段八：跨模块集成测试', () => {
 
       try {
         // 1. 获取用户初始积分余额
-        const initial_account = await AssetService.getOrCreateAccount(
+        const initial_account = await BalanceService.getOrCreateAccount(
           { user_id: test_user_id },
           { transaction }
         )
-        const initial_balance = await AssetService.getOrCreateBalance(
+        const initial_balance = await BalanceService.getOrCreateBalance(
           initial_account.account_id,
           'POINTS',
           { transaction }
@@ -151,7 +151,7 @@ describe('阶段八：跨模块集成测试', () => {
         // 4. 如果积分不足，先充值（测试环境模拟）
         if (initial_points < cost_per_draw) {
           const recharge_amount = cost_per_draw * 2
-          await AssetService.changeBalance(
+          await BalanceService.changeBalance(
             {
               user_id: test_user_id,
               asset_code: 'POINTS',
@@ -166,7 +166,7 @@ describe('阶段八：跨模块集成测试', () => {
         }
 
         // 5. 获取充值后余额
-        const recharged_balance = await AssetService.getOrCreateBalance(
+        const recharged_balance = await BalanceService.getOrCreateBalance(
           initial_account.account_id,
           'POINTS',
           { transaction }
@@ -205,7 +205,7 @@ describe('阶段八：跨模块集成测试', () => {
         expect(draw_result.prizes).toHaveLength(1)
 
         // 8. 验证积分变化（考虑奖品可能是积分类型）
-        const final_balance = await AssetService.getOrCreateBalance(
+        const final_balance = await BalanceService.getOrCreateBalance(
           initial_account.account_id,
           'POINTS',
           { transaction }
@@ -419,7 +419,7 @@ describe('阶段八：跨模块集成测试', () => {
       try {
         // 1. 创建测试物品实例
         const mint_idempotency_key = generateIdempotencyKey('mint_item')
-        const mint_result = await AssetService.mintItem(
+        const mint_result = await BalanceService.mintItem(
           {
             user_id: seller_user_id,
             item_type: 'voucher',
@@ -474,11 +474,11 @@ describe('阶段八：跨模块集成测试', () => {
         })
 
         // 3. 确保买家有足够的钻石
-        const buyer_account = await AssetService.getOrCreateAccount(
+        const buyer_account = await BalanceService.getOrCreateAccount(
           { user_id: buyer_user_id },
           { transaction }
         )
-        const buyer_balance = await AssetService.getOrCreateBalance(
+        const buyer_balance = await BalanceService.getOrCreateBalance(
           buyer_account.account_id,
           'DIAMOND',
           { transaction }
@@ -487,7 +487,7 @@ describe('阶段八：跨模块集成测试', () => {
 
         if (buyer_diamonds < 50) {
           // 模拟买家充值
-          await AssetService.changeBalance(
+          await BalanceService.changeBalance(
             {
               user_id: buyer_user_id,
               asset_code: 'DIAMOND',
@@ -537,11 +537,11 @@ describe('阶段八：跨模块集成测试', () => {
          * 6. 验证资产结算
          * 6.1 验证卖家收到款项（扣除手续费后）
          */
-        const seller_account = await AssetService.getOrCreateAccount(
+        const seller_account = await BalanceService.getOrCreateAccount(
           { user_id: seller_user_id },
           { transaction }
         )
-        const seller_final_balance = await AssetService.getOrCreateBalance(
+        const seller_final_balance = await BalanceService.getOrCreateBalance(
           seller_account.account_id,
           'DIAMOND',
           { transaction }

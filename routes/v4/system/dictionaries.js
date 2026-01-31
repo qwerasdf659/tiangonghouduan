@@ -22,11 +22,17 @@ const router = express.Router()
 // 中间件
 const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 
-// 服务
-const DisplayNameService = require('../../../services/DisplayNameService')
-
 // 日志
 const { logger } = require('../../../utils/logger')
+
+/**
+ * 获取显示名称翻译服务（通过 ServiceManager 统一入口）
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} DisplayNameService 实例
+ */
+function getDisplayNameService(req) {
+  return req.app.locals.services.getService('display_name')
+}
 
 // ==================== 公开接口（无需登录） ====================
 
@@ -43,6 +49,7 @@ const { logger } = require('../../../utils/logger')
  */
 router.get('/types', async (req, res) => {
   try {
+    const DisplayNameService = getDisplayNameService(req)
     const types = await DisplayNameService.getAllTypes()
 
     return res.apiSuccess(
@@ -81,6 +88,7 @@ router.get('/types', async (req, res) => {
  */
 router.get('/type/:dictType', async (req, res) => {
   try {
+    const DisplayNameService = getDisplayNameService(req)
     const { dictType } = req.params
 
     if (!dictType) {
@@ -129,6 +137,7 @@ router.get('/type/:dictType', async (req, res) => {
  */
 router.get('/lookup', async (req, res) => {
   try {
+    const DisplayNameService = getDisplayNameService(req)
     const { dict_type: dictType, dict_code: dictCode } = req.query
 
     if (!dictType || !dictCode) {
@@ -170,6 +179,7 @@ router.get('/lookup', async (req, res) => {
  */
 router.get('/cache/stats', async (req, res) => {
   try {
+    const DisplayNameService = getDisplayNameService(req)
     const stats = await DisplayNameService.getCacheStats()
 
     return res.apiSuccess(stats, '获取缓存统计成功', 'CACHE_STATS_SUCCESS')
@@ -187,6 +197,7 @@ router.get('/cache/stats', async (req, res) => {
  */
 router.get('/:dictId', authenticateToken, requireRoleLevel(30), async (req, res) => {
   try {
+    const DisplayNameService = getDisplayNameService(req)
     const { dictId } = req.params
     const { SystemDictionary } = require('../../../models')
 
@@ -250,6 +261,7 @@ router.get('/:dictId', authenticateToken, requireRoleLevel(30), async (req, res)
  */
 router.put('/:dictId', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
+    const DisplayNameService = getDisplayNameService(req)
     const { dictId } = req.params
     const { dict_name: dictName, dict_color: dictColor, reason } = req.body
     const operatorId = req.user.user_id
@@ -322,6 +334,7 @@ router.put('/:dictId', authenticateToken, requireRoleLevel(100), async (req, res
  */
 router.post('/:dictId/rollback', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
+    const DisplayNameService = getDisplayNameService(req)
     const { dictId } = req.params
     const { target_version: targetVersion } = req.body
     const operatorId = req.user.user_id
@@ -375,6 +388,7 @@ router.post('/:dictId/rollback', authenticateToken, requireRoleLevel(100), async
  */
 router.post('/cache/refresh', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
+    const DisplayNameService = getDisplayNameService(req)
     const operatorId = req.user.user_id
 
     const result = await DisplayNameService.refreshCache()
@@ -406,6 +420,7 @@ router.post('/cache/refresh', authenticateToken, requireRoleLevel(100), async (r
  */
 router.get('/history/:dictId', authenticateToken, requireRoleLevel(30), async (req, res) => {
   try {
+    const DisplayNameService = getDisplayNameService(req)
     const { dictId } = req.params
 
     const history = await DisplayNameService.getVersionHistory(parseInt(dictId, 10))

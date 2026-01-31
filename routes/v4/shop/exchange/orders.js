@@ -43,7 +43,7 @@ const logger = require('../../../../utils/logger').logger
 router.get('/orders', authenticateToken, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ExchangeService（符合TR-005规范）
-    const ExchangeService = req.app.locals.services.getService('exchange_market')
+    const ExchangeService = req.app.locals.services.getService('exchange_query')
 
     const { status, page = 1, page_size = 20 } = req.query
     const user_id = req.user.user_id
@@ -121,7 +121,7 @@ router.get('/orders', authenticateToken, async (req, res) => {
 router.get('/orders/:order_no', authenticateToken, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ExchangeService（符合TR-005规范）
-    const ExchangeService = req.app.locals.services.getService('exchange_market')
+    const ExchangeService = req.app.locals.services.getService('exchange_query')
 
     const { order_no } = req.params
     const user_id = req.user.user_id
@@ -182,7 +182,7 @@ router.post(
   async (req, res) => {
     try {
       // 🔄 通过 ServiceManager 获取 ExchangeService（符合TR-005规范）
-      const ExchangeService = req.app.locals.services.getService('exchange_market')
+      const ExchangeService = req.app.locals.services.getService('exchange_query')
 
       const { order_no } = req.params
       const { status, remark = '' } = req.body

@@ -39,10 +39,11 @@ const TransactionManager = require('../../../utils/TransactionManager')
  */
 function getServices(req) {
   return {
-    AdminLotteryService: req.app.locals.services.getService('admin_lottery'),
+    AdminLotteryService: req.app.locals.services.getService('admin_lottery_core'),
     ActivityService: req.app.locals.services.getService('activity'),
     UserService: req.app.locals.services.getService('user'),
-    AssetService: req.app.locals.services.getService('asset')
+    // V4.7.0 AssetService 拆分：使用 BalanceService（2026-01-31）
+    BalanceService: req.app.locals.services.getService('asset_balance')
   }
 }
 
@@ -400,7 +401,8 @@ router.get(
 
       // 通过 ServiceManager 获取服务（P1-9 snake_case key）
       const UserService = req.app.locals.services.getService('user')
-      const AssetService = req.app.locals.services.getService('asset')
+      // V4.7.0 AssetService 拆分：使用 BalanceService（2026-01-31）
+      const BalanceService = req.app.locals.services.getService('asset_balance')
 
       // 通过 Service 层验证用户存在（符合路由层规范）
       let user
@@ -414,7 +416,7 @@ router.get(
       }
 
       // 通过 Service 层获取用户所有余额（符合路由层规范）
-      const allBalances = await AssetService.getAllBalances({ user_id: validUserId })
+      const allBalances = await BalanceService.getAllBalances({ user_id: validUserId })
 
       // 过滤出 BUDGET_POINTS 余额
       const budgetBalances = allBalances.filter(b => b.asset_code === 'BUDGET_POINTS')
@@ -489,7 +491,7 @@ router.post(
       }
 
       // 通过 ServiceManager 获取服务（P1-9 snake_case key）
-      const AdminLotteryService = req.app.locals.services.getService('admin_lottery')
+      const AdminLotteryService = req.app.locals.services.getService('admin_lottery_core')
 
       /*
        * ✅ 事务边界治理：通过 TransactionManager.execute() 统一创建事务

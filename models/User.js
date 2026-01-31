@@ -66,6 +66,14 @@ module.exports = sequelize => {
         comment: '用户昵称'
       },
 
+      // 用户头像URL - 可选，中优先级（V4.7.0 新增）
+      avatar_url: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+        defaultValue: null,
+        comment: '用户头像URL（微信头像或自定义头像）'
+      },
+
       // 🔧 保留的业务辅助字段
       status: {
         type: DataTypes.ENUM('active', 'inactive', 'banned'),

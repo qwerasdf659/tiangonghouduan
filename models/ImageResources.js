@@ -5,6 +5,7 @@
 
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { DataTypes } = require('sequelize')
+const { logger } = require('../utils/logger')
 
 module.exports = sequelize => {
   const ImageResources = sequelize.define(
@@ -194,11 +195,13 @@ module.exports = sequelize => {
       }
     } else {
       // 缩略图缺失时：记录 ERROR 日志 + 返回占位图（生产安全兜底）
-      console.error(
-        `❌ ImageResources.toSafeJSON: 图片 ${values.image_id} 缺少预生成缩略图。` +
-          `file_path: ${values.file_path}, business_type: ${values.business_type}, ` +
-          `category: ${values.category}, context_id: ${values.context_id}`
-      )
+      logger.error('❌ ImageResources.toSafeJSON: 图片缺少预生成缩略图', {
+        image_id: values.image_id,
+        file_path: values.file_path,
+        business_type: values.business_type,
+        category: values.category,
+        context_id: values.context_id
+      })
 
       // 使用占位图作为降级方案（生产安全兜底）
       const placeholderUrl = getPlaceholderImageUrl(values.business_type, values.category)

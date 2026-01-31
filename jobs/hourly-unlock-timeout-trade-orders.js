@@ -31,7 +31,8 @@ const {
   Op,
   sequelize
 } = require('../models')
-const AssetService = require('../services/AssetService')
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+const BalanceService = require('../services/asset/BalanceService')
 const logger = require('../utils/logger')
 
 /**
@@ -255,7 +256,7 @@ class HourlyUnlockTimeoutTradeOrders {
            * 便于通过根幂等键串联订单的所有关联流水记录。
            */
           // eslint-disable-next-line no-await-in-loop
-          await AssetService.unfreeze(
+          await BalanceService.unfreeze(
             {
               user_id: order.buyer_user_id,
               asset_code: order.asset_code,

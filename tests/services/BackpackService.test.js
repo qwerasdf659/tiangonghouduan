@@ -24,7 +24,7 @@ const { sequelize, ItemInstance, User } = require('../../models')
  * 注意：在 beforeAll 中获取服务，确保 ServiceManager 已初始化
  */
 let BackpackService
-let AssetService
+let BalanceService
 
 // 测试数据库配置
 jest.setTimeout(30000)
@@ -39,7 +39,7 @@ describe('BackpackService - 背包服务', () => {
 
     // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
     BackpackService = global.getTestService('backpack')
-    AssetService = global.getTestService('asset')
+    BalanceService = global.getTestService('asset_balance')
   })
 
   // 每个测试前创建测试数据
@@ -199,12 +199,12 @@ describe('BackpackService - 背包服务', () => {
       }
     })
 
-    it.skip('应该验证用户ID的有效性（需要AssetService支持不存在的用户）', async () => {
+    it.skip('应该验证用户ID的有效性（需要BalanceService支持不存在的用户）', async () => {
       const invalid_user_id = 999999999
 
       /*
        * 尝试查询不存在的用户（应该返回空背包）
-       * 当前AssetService会自动创建用户账户，所以这个测试会通过
+       * 当前BalanceService会自动创建用户账户，所以这个测试会通过
        */
       const result = await BackpackService.getUserBackpack(invalid_user_id, {
         viewer_user_id: test_user.user_id
@@ -357,7 +357,7 @@ describe('BackpackService - 背包服务', () => {
 
       try {
         // 给用户增加资产
-        await AssetService.changeBalance({
+        await BalanceService.changeBalance({
           user_id: new_user.user_id,
           asset_code: 'MATERIAL_001',
           delta_amount: 100,

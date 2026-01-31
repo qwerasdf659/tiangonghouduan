@@ -37,7 +37,7 @@ router.get(
       const validatedUserId = validators.validateUserId(user_id)
 
       // 通过 ServiceManager 获取 AdminLotteryService
-      const AdminLotteryService = req.app.locals.services.getService('admin_lottery')
+      const AdminLotteryService = req.app.locals.services.getService('admin_lottery_core')
 
       // 🔧 V4.3修复：调用正确的服务层方法名 getUserManagementStatus
       const result = await AdminLotteryService.getUserManagementStatus(validatedUserId)
@@ -71,7 +71,7 @@ router.delete(
       const validatedUserId = validators.validateUserId(user_id)
 
       // 通过 ServiceManager 获取 AdminLotteryService
-      const AdminLotteryService = req.app.locals.services.getService('admin_lottery')
+      const AdminLotteryService = req.app.locals.services.getService('admin_lottery_core')
 
       // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
       const result = await TransactionManager.execute(

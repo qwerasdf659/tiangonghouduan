@@ -28,7 +28,7 @@
  *
  * P1-9 J2-RepoWide 改造说明：
  * - ExchangeService 通过 ServiceManager 获取（snake_case: exchange_market）
- * - AssetService 通过 ServiceManager 获取（snake_case: asset）
+ * - BalanceService 通过 ServiceManager 获取（snake_case: asset）
  * - 模型直接引用用于测试数据准备/验证（业务测试场景合理）
  */
 
@@ -47,7 +47,7 @@ const TransactionManager = require('../../../utils/TransactionManager')
 
 // 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
 let ExchangeService
-let AssetService
+let BalanceService
 
 describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材料资产支付)', () => {
   let app
@@ -66,7 +66,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
   beforeAll(async () => {
     // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
     ExchangeService = global.getTestService('exchange_market')
-    AssetService = global.getTestService('asset')
+    BalanceService = global.getTestService('asset_balance')
 
     // 初始化Express应用
     app = require('../../../app')
@@ -178,10 +178,10 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
     if (currentBalance < 1000) {
       console.log(`⚠️ 材料资产不足(${currentBalance} < 1000)，充值到1000`)
 
-      // 事务边界治理：使用 TransactionManager 包裹 AssetService 调用
+      // 事务边界治理：使用 TransactionManager 包裹 BalanceService 调用
       await TransactionManager.execute(
         async transaction => {
-          await AssetService.changeBalance(
+          await BalanceService.changeBalance(
             {
               user_id: testUser.user_id,
               asset_code: 'red_shard',

@@ -17,7 +17,7 @@
  * 业务规则：
  * - 总余额 = available_amount + frozen_amount
  * - available_amount 和 frozen_amount 都不可为负数
- * - 所有变更必须通过 AssetService 统一操作
+ * - 所有变更必须通过 BalanceService 统一操作（V4.7.0 从 AssetService 拆分）
  * - 每个 (account_id, asset_code) 只有一条记录（唯一约束）
  *
  * 数据库表名：account_asset_balances

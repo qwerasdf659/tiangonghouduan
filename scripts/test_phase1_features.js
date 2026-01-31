@@ -18,28 +18,28 @@ const { Account, AccountAssetBalance, AssetTransaction, User } = require('../mod
 const { sequelize } = require('../config/database')
 
 /*
- * P1-9：AssetService 通过 ServiceManager 获取
- * 服务键：'asset'（snake_case）
+ * V4.7.0 BalanceService 拆分：通过 ServiceManager 获取 BalanceService
+ * 服务键：'asset_balance'（snake_case）
  * 注意：在测试开始时通过 ServiceManager 初始化获取
  */
-let AssetService = null
+let BalanceService = null
 
 /**
- * P1-9：初始化 ServiceManager 并获取 AssetService
- * @returns {Promise<Object>} AssetService 实例
+ * V4.7.0：初始化 ServiceManager 并获取 BalanceService（原 BalanceService 拆分）
+ * @returns {Promise<Object>} BalanceService 实例
  */
-async function initializeAssetService() {
-  if (AssetService) return AssetService
+async function initializeBalanceService() {
+  if (BalanceService) return BalanceService
   try {
     const serviceManager = require('../services/index')
     if (!serviceManager._initialized) {
       await serviceManager.initialize()
     }
-    AssetService = serviceManager.getService('asset')
-    console.log('  ✅ AssetService 加载成功（P1-9 ServiceManager）')
-    return AssetService
+    BalanceService = serviceManager.getService('asset_balance')
+    console.log('  ✅ BalanceService 加载成功（V4.7.0 BalanceService 拆分）')
+    return BalanceService
   } catch (error) {
-    console.log(`  ❌ AssetService 加载失败: ${error.message}`)
+    console.log(`  ❌ BalanceService 加载失败: ${error.message}`)
     throw error
   }
 }
@@ -82,14 +82,14 @@ async function testAccountCreation() {
     }
 
     // 测试用户账户创建
-    const userAccount = await AssetService.getOrCreateAccount({ user_id: testUser.user_id })
+    const userAccount = await BalanceService.getOrCreateAccount({ user_id: testUser.user_id })
     assert(userAccount !== null, '用户账户创建成功')
     assert(userAccount.account_type === 'user', '账户类型为user')
     assert(userAccount.user_id === testUser.user_id, 'user_id匹配')
     assert(userAccount.status === 'active', '账户状态为active')
 
     // 测试系统账户获取
-    const systemAccount = await AssetService.getOrCreateAccount({
+    const systemAccount = await BalanceService.getOrCreateAccount({
       system_code: 'SYSTEM_PLATFORM_FEE'
     })
     assert(systemAccount !== null, '系统账户获取成功')
@@ -119,7 +119,7 @@ async function testBalanceOperations() {
     }
 
     // 测试增加余额
-    const result1 = await AssetService.changeBalance(
+    const result1 = await BalanceService.changeBalance(
       {
         user_id: testUser.user_id,
         asset_code: 'DIAMOND',
@@ -139,7 +139,7 @@ async function testBalanceOperations() {
     )
 
     // 测试幂等性
-    const result2 = await AssetService.changeBalance(
+    const result2 = await BalanceService.changeBalance(
       {
         user_id: testUser.user_id,
         asset_code: 'DIAMOND',
@@ -153,7 +153,7 @@ async function testBalanceOperations() {
     assert(result2.is_duplicate === true, '重复操作返回is_duplicate=true')
 
     // 测试扣减余额
-    const result3 = await AssetService.changeBalance(
+    const result3 = await BalanceService.changeBalance(
       {
         user_id: testUser.user_id,
         asset_code: 'DIAMOND',
@@ -198,7 +198,7 @@ async function testFreezeUnfreeze() {
     }
 
     // 先增加余额
-    await AssetService.changeBalance(
+    await BalanceService.changeBalance(
       {
         user_id: testUser.user_id,
         asset_code: 'DIAMOND',
@@ -210,7 +210,7 @@ async function testFreezeUnfreeze() {
     )
 
     // 测试冻结
-    const freezeResult = await AssetService.freeze(
+    const freezeResult = await BalanceService.freeze(
       {
         user_id: testUser.user_id,
         asset_code: 'DIAMOND',
@@ -226,7 +226,7 @@ async function testFreezeUnfreeze() {
     assert(freezeResult.transaction_record.meta.freeze_amount === 500, 'meta中记录了freeze_amount')
 
     // 测试解冻
-    const unfreezeResult = await AssetService.unfreeze(
+    const unfreezeResult = await BalanceService.unfreeze(
       {
         user_id: testUser.user_id,
         asset_code: 'DIAMOND',
@@ -270,7 +270,7 @@ async function testSettleFromFrozen() {
     }
 
     // 先增加余额并冻结
-    await AssetService.changeBalance(
+    await BalanceService.changeBalance(
       {
         user_id: testUser.user_id,
         asset_code: 'DIAMOND',
@@ -281,7 +281,7 @@ async function testSettleFromFrozen() {
       { transaction }
     )
 
-    await AssetService.freeze(
+    await BalanceService.freeze(
       {
         user_id: testUser.user_id,
         asset_code: 'DIAMOND',
@@ -293,13 +293,13 @@ async function testSettleFromFrozen() {
     )
 
     // 获取冻结前的可用余额
-    const balanceBefore = await AssetService.getBalance(
+    const balanceBefore = await BalanceService.getBalance(
       { user_id: testUser.user_id, asset_code: 'DIAMOND' },
       { transaction }
     )
 
     // 测试从冻结余额结算
-    const settleResult = await AssetService.settleFromFrozen(
+    const settleResult = await BalanceService.settleFromFrozen(
       {
         user_id: testUser.user_id,
         asset_code: 'DIAMOND',
@@ -319,7 +319,7 @@ async function testSettleFromFrozen() {
     )
 
     // 验证可用余额未变化
-    const balanceAfter = await AssetService.getBalance(
+    const balanceAfter = await BalanceService.getBalance(
       { user_id: testUser.user_id, asset_code: 'DIAMOND' },
       { transaction }
     )
@@ -346,7 +346,7 @@ async function testSystemAccountOperations() {
 
   try {
     // 测试系统账户增加余额
-    const result = await AssetService.changeBalance(
+    const result = await BalanceService.changeBalance(
       {
         system_code: 'SYSTEM_PLATFORM_FEE',
         asset_code: 'DIAMOND',
@@ -380,8 +380,8 @@ async function runTests() {
   console.log('='.repeat(60))
 
   try {
-    // P1-9：初始化 AssetService
-    await initializeAssetService()
+    // P1-9：初始化 BalanceService
+    await initializeBalanceService()
 
     await testAccountCreation()
     await testBalanceOperations()

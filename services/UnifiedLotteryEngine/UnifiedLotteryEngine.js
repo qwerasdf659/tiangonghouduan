@@ -974,12 +974,15 @@ class UnifiedLotteryEngine {
       }
 
       // 🔧 V4.3修复：使用新的资产系统获取用户积分信息
-      const AssetService = require('../AssetService')
-      const userAccountEntity = await AssetService.getOrCreateAccount({ user_id }, { transaction })
+      const BalanceService = require('../asset/BalanceService')
+      const userAccountEntity = await BalanceService.getOrCreateAccount(
+        { user_id },
+        { transaction }
+      )
       if (!userAccountEntity || userAccountEntity.status !== 'active') {
         throw new Error('用户账户不存在或已冻结')
       }
-      const userPointsBalance = await AssetService.getOrCreateBalance(
+      const userPointsBalance = await BalanceService.getOrCreateBalance(
         userAccountEntity.account_id,
         'POINTS',
         { transaction }
@@ -1105,7 +1108,7 @@ class UnifiedLotteryEngine {
        * - 确保事务一致性：统一扣除 + 循环抽奖 + 发放奖品
        */
       /*
-       * 🔧 V4.3修复：使用AssetService替代PointsService
+       * 🔧 V4.3修复：使用BalanceService替代PointsService
        * 方案B：使用派生幂等键（从请求幂等键派生消费幂等键）
        */
       const consumeIdempotencyKey = deriveTransactionIdempotencyKey(
@@ -1115,7 +1118,7 @@ class UnifiedLotteryEngine {
 
       // 步骤1：统一扣除折扣后的总积分（在事务中执行）
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction（见下方 options 参数）
-      const assetChangeResult = await AssetService.changeBalance(
+      const assetChangeResult = await BalanceService.changeBalance(
         {
           user_id,
           asset_code: 'POINTS',
@@ -1265,8 +1268,8 @@ class UnifiedLotteryEngine {
        * 🆕 事务提交后重新查询实际积分余额（确保数据准确）
        * 🔧 V4.3修复：使用新的资产系统查询余额
        */
-      const updatedAccountEntity = await AssetService.getOrCreateAccount({ user_id })
-      const updatedPointsBalance = await AssetService.getOrCreateBalance(
+      const updatedAccountEntity = await BalanceService.getOrCreateAccount({ user_id })
+      const updatedPointsBalance = await BalanceService.getOrCreateBalance(
         updatedAccountEntity.account_id,
         'POINTS'
       )

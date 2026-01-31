@@ -181,7 +181,15 @@ module.exports = sequelize => {
       consumption_amount: {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: true,
-        comment: '消费金额（仅提交消费记录时有值）'
+        comment: '消费金额（仅提交消费记录时有值）',
+        /**
+         * 获取消费金额，将DECIMAL转换为浮点数
+         * @returns {number|null} 消费金额（元）或null
+         */
+        get() {
+          const value = this.getDataValue('consumption_amount')
+          return value ? parseFloat(value) : null
+        }
       },
 
       // 操作结果

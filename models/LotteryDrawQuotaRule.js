@@ -296,14 +296,23 @@ module.exports = sequelize => {
        * 1. DB system_settings.daily_lottery_limit（全局配置）
        * 2. 代码默认值 50（兜底降级）
        *
+       * 🔧 循环依赖修复（2026-01-31）：
+       * 使用延迟加载模式，避免 models/index.js -> LotteryDrawQuotaRule -> AdminSystemService -> models 循环依赖
+       *
        * @see docs/配置管理三层分离与校验统一方案.md
        */
       const AdminSystemService = require('../services/AdminSystemService')
-      const fallbackLimit = await AdminSystemService.getSettingValue(
-        'points',
-        'daily_lottery_limit',
-        50
-      )
+      let fallbackLimit = 50 // 代码兜底默认值
+      try {
+        fallbackLimit = await AdminSystemService.getSettingValue(
+          'points',
+          'daily_lottery_limit',
+          50
+        )
+      } catch (error) {
+        // 服务初始化阶段可能无法获取，使用代码默认值
+        console.warn('⚠️ 获取系统配置失败，使用代码默认值:', error.message)
+      }
 
       return {
         limit_value: fallbackLimit,

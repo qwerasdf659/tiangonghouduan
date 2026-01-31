@@ -142,7 +142,7 @@ describe('🔗 级联故障测试（P2-5.1）', () => {
 
       // 模拟资产服务（依赖数据库）
       const assetService = {
-        name: 'AssetService',
+        name: 'BalanceService',
 
         async getBalance(userId) {
           try {
@@ -191,12 +191,12 @@ describe('🔗 级联故障测试（P2-5.1）', () => {
 
       expect(faultAssetResult.success).toBe(false)
       expect(faultAssetResult.origin).toBe('database')
-      expect(faultAssetResult.service).toBe('AssetService')
+      expect(faultAssetResult.service).toBe('BalanceService')
 
       console.log('   ✅ 故障传播：所有依赖服务正确感知数据库故障')
       console.log(`      - UserService: ${faultUserResult.errorCode}`)
       console.log(`      - OrderService: ${faultOrderResult.errorCode}`)
-      console.log(`      - AssetService: ${faultAssetResult.errorCode}`)
+      console.log(`      - BalanceService: ${faultAssetResult.errorCode}`)
 
       // 4. 恢复并验证
       console.log('   📊 第3阶段：恢复验证')

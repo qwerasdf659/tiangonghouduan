@@ -58,7 +58,7 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
     }
 
     // 🔄 通过 ServiceManager 获取 ReportingService（P2-C架构重构）
-    const ReportingService = req.app.locals.services.getService('reporting')
+    const ReportingService = req.app.locals.services.getService('reporting_stats')
 
     // ✅ 使用 ReportingService 获取用户统计数据
     const statistics = await ReportingService.getUserStatistics(user_id, hasAdminAccess)
@@ -102,7 +102,7 @@ router.get('/admin/overview', authenticateToken, dataAccessControl, async (req, 
     }
 
     // 🔄 通过 ServiceManager 获取 ReportingService（P2-C架构重构）
-    const ReportingService = req.app.locals.services.getService('reporting')
+    const ReportingService = req.app.locals.services.getService('reporting_stats')
 
     // ✅ 使用 ReportingService 获取系统概览
     const overview = await ReportingService.getSystemOverview()

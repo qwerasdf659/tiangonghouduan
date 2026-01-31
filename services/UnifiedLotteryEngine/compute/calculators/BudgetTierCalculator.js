@@ -186,8 +186,8 @@ class BudgetTierCalculator {
       return Infinity
     }
 
-    // 延迟加载 AssetService 和 LotteryCampaign 避免循环依赖
-    const AssetService = require('../../../AssetService')
+    // V4.7.0 AssetService 拆分：延迟加载 QueryService 和 LotteryCampaign 避免循环依赖（2026-01-31）
+    const QueryService = require('../../../asset/QueryService')
     const { LotteryCampaign } = require('../../../../models')
 
     let user_budget = 0
@@ -214,7 +214,7 @@ class BudgetTierCalculator {
           user_budget = 0
         } else {
           // 从指定的预算来源桶聚合 BUDGET_POINTS
-          user_budget = await AssetService.getBudgetPointsByCampaigns(
+          user_budget = await QueryService.getBudgetPointsByCampaigns(
             { user_id, campaign_ids: allowed_campaign_ids },
             { transaction }
           )

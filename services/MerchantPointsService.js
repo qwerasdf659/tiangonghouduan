@@ -4,7 +4,7 @@
  * 功能说明：
  * - 处理商家积分申请的业务逻辑
  * - 集成统一审核引擎（ContentAuditEngine）进行审核流程管理
- * - 审核通过后通过 AssetService 发放积分
+ * - 审核通过后通过 BalanceService 发放积分（V4.7.0 AssetService 拆分）
  * - 记录审计日志到 AuditLogService
  *
  * 设计模式：
@@ -23,7 +23,8 @@
  */
 
 const { ContentReviewRecord, User } = require('../models')
-const AssetService = require('./AssetService')
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+const BalanceService = require('./asset/BalanceService')
 const AuditLogService = require('./AuditLogService')
 const ContentAuditEngine = require('./ContentAuditEngine')
 const BeijingTimeHelper = require('../utils/timeHelper')
@@ -159,7 +160,7 @@ class MerchantPointsService {
 
     // 4. 发放积分
     // eslint-disable-next-line no-restricted-syntax
-    await AssetService.changeBalance(
+    await BalanceService.changeBalance(
       {
         user_id: userId,
         asset_code: 'POINTS',

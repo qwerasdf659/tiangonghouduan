@@ -27,6 +27,15 @@ const dataAccessControl = require('../../../middleware/dataAccessControl')
 const { handleServiceError } = require('../../../middleware/validation')
 
 /**
+ * 获取抽奖定价服务（通过 ServiceManager 统一入口）
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} LotteryPricingService 实例
+ */
+function getLotteryPricingService(req) {
+  return req.app.locals.services.getService('lottery_pricing')
+}
+
+/**
  * 验证活动代码（业务码）格式
  *
  * @description 配置实体使用业务码作为标识符
@@ -145,7 +154,7 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
      * @see services/lottery/LotteryPricingService.js - 统一定价服务
      * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md 方案C
      */
-    const LotteryPricingService = require('../../../services/lottery/LotteryPricingService')
+    const LotteryPricingService = getLotteryPricingService(req)
 
     /**
      * 🔴 2026-01-26 技术债务清理：移除数组→对象格式转换兼容

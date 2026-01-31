@@ -12,14 +12,14 @@
  * 业务流程：
  * 1. 创建订单（createOrder）：
  *    - 锁定挂牌（MarketListing.status = locked）
- *    - 冻结买家资产（AssetService.freeze）
+ *    - 冻结买家资产（BalanceService.freeze）
  *    - 创建订单记录（TradeOrder.status = frozen）
  * 2. 完成订单（completeOrder）：
- *    - 从冻结资产结算（AssetService.settleFromFrozen）
+ *    - 从冻结资产结算（BalanceService.settleFromFrozen）
  *    - 转移物品所有权（ItemInstance.owner_user_id）
  *    - 更新订单状态（TradeOrder.status = completed）
  * 3. 取消订单（cancelOrder）：
- *    - 解冻买家资产（AssetService.unfreeze）
+ *    - 解冻买家资产（BalanceService.unfreeze）
  *    - 解锁挂牌（MarketListing.status = on_sale）
  *    - 更新订单状态（TradeOrder.status = cancelled）
  *
@@ -40,7 +40,7 @@ const { initRealTestData, getRealTestUserId } = require('../../helpers/test-setu
  * 在 beforeAll 中获取，确保 ServiceManager 已初始化
  */
 let TradeOrderService
-let AssetService
+let BalanceService
 
 // 测试超时设置（交易订单涉及多步骤，需要较长超时）
 jest.setTimeout(60000)
@@ -75,15 +75,15 @@ describe('TradeOrderService - 交易订单服务', () => {
 
     // 通过 global.getTestService() 获取服务实例（jest.setup.js 初始化）
     TradeOrderService = global.getTestService('trade_order')
-    AssetService = global.getTestService('asset')
+    BalanceService = global.getTestService('asset_balance')
 
     if (!TradeOrderService) {
       throw new Error(
         'TradeOrderService 未在 ServiceManager 中注册（使用 snake_case key: trade_order）'
       )
     }
-    if (!AssetService) {
-      throw new Error('AssetService 未在 ServiceManager 中注册（使用 snake_case key: asset）')
+    if (!BalanceService) {
+      throw new Error('BalanceService 未在 ServiceManager 中注册（使用 snake_case key: asset）')
     }
 
     // 获取测试用户（买家）
@@ -302,8 +302,8 @@ describe('TradeOrderService - 交易订单服务', () => {
         return
       }
 
-      // 确保买家有足够余额（使用 AssetService.getBalance）
-      const buyer_balance = await AssetService.getBalance({
+      // 确保买家有足够余额（使用 BalanceService.getBalance）
+      const buyer_balance = await BalanceService.getBalance({
         user_id: test_buyer.user_id,
         asset_code: 'DIAMOND'
       })
@@ -375,8 +375,8 @@ describe('TradeOrderService - 交易订单服务', () => {
         return
       }
 
-      // 确保买家有足够余额（使用 AssetService.getBalance）
-      const buyer_balance = await AssetService.getBalance({
+      // 确保买家有足够余额（使用 BalanceService.getBalance）
+      const buyer_balance = await BalanceService.getBalance({
         user_id: test_buyer.user_id,
         asset_code: 'DIAMOND'
       })
