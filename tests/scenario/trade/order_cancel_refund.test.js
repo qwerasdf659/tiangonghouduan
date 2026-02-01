@@ -182,9 +182,9 @@ async function cleanupActiveListings(userId) {
         const transaction = await sequelize.transaction()
         try {
           const withdrawParams = {
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             seller_user_id: listing.seller_user_id,
-            idempotency_key: `cleanup_order_cancel_${listing.listing_id}_${Date.now()}`
+            idempotency_key: `cleanup_order_cancel_${listing.market_listing_id}_${Date.now()}`
           }
 
           if (listing.listing_kind === 'fungible_asset') {
@@ -194,12 +194,12 @@ async function cleanupActiveListings(userId) {
           }
 
           await transaction.commit()
-          console.log(`✅ 撤回挂牌 ${listing.listing_id}`)
+          console.log(`✅ 撤回挂牌 ${listing.market_listing_id}`)
         } catch (e) {
           if (!transaction.finished) {
             await transaction.rollback()
           }
-          console.warn(`⚠️ 撤回挂牌 ${listing.listing_id} 失败: ${e.message}`)
+          console.warn(`⚠️ 撤回挂牌 ${listing.market_listing_id} 失败: ${e.message}`)
         }
       }
     }
@@ -269,7 +269,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
           try {
             await MarketListingService.withdrawFungibleAssetListing(
               {
-                listing_id: listingId,
+                market_listing_id: listingId,
                 seller_user_id: listing.seller_user_id,
                 idempotency_key: `cleanup_${listingId}_${Date.now()}`
               },
@@ -293,7 +293,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
           try {
             await TradeOrderService.cancelOrder(
               {
-                order_id: orderId,
+                trade_order_id: orderId,
                 idempotency_key: `cleanup_cancel_${orderId}_${Date.now()}`
               },
               { transaction }
@@ -341,7 +341,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
           { transaction: transaction1 }
         )
         await transaction1.commit()
-        testListingId = listingResult.listing?.listing_id
+        testListingId = listingResult.listing?.market_listing_id
         createdListingIds.push(testListingId)
       } catch (error) {
         await transaction1.rollback()
@@ -355,7 +355,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
       try {
         const orderResult = await TradeOrderService.createOrder(
           {
-            listing_id: testListingId,
+            market_listing_id: testListingId,
             buyer_id: buyerUserId,
             idempotency_key: orderIdempotencyKey
           },
@@ -377,7 +377,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
       const listing = await MarketListing.findByPk(testListingId)
       expect(listing.status).toBe('locked')
 
-      console.log(`📦 创建测试数据: listing_id=${testListingId}, order_id=${testOrderId}`)
+      console.log(`📦 创建测试数据: market_listing_id=${testListingId}, order_id=${testOrderId}`)
     }, 30000)
 
     test('步骤2：记录取消前的资产状态', async () => {
@@ -412,7 +412,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
       try {
         const result = await TradeOrderService.cancelOrder(
           {
-            order_id: testOrderId,
+            trade_order_id: testOrderId,
             idempotency_key: cancelIdempotencyKey
           },
           { transaction }
@@ -487,7 +487,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
           { transaction: transaction1 }
         )
         await transaction1.commit()
-        testListingId = listingResult.listing?.listing_id
+        testListingId = listingResult.listing?.market_listing_id
         createdListingIds.push(testListingId)
       } catch (error) {
         await transaction1.rollback()
@@ -501,7 +501,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
       try {
         const orderResult = await TradeOrderService.createOrder(
           {
-            listing_id: testListingId,
+            market_listing_id: testListingId,
             buyer_id: buyerUserId,
             idempotency_key: orderIdempotencyKey
           },
@@ -530,7 +530,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
       try {
         firstResult = await TradeOrderService.cancelOrder(
           {
-            order_id: testOrderId,
+            trade_order_id: testOrderId,
             idempotency_key: cancelIdempotencyKey
           },
           { transaction: transaction1 }
@@ -553,7 +553,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
       try {
         duplicateResult = await TradeOrderService.cancelOrder(
           {
-            order_id: testOrderId,
+            trade_order_id: testOrderId,
             idempotency_key: cancelIdempotencyKey
           },
           { transaction: transaction2 }
@@ -587,7 +587,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
       try {
         await TradeOrderService.cancelOrder(
           {
-            order_id: testOrderId,
+            trade_order_id: testOrderId,
             idempotency_key: firstCancelKey
           },
           { transaction: transaction1 }
@@ -605,7 +605,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
       try {
         await TradeOrderService.cancelOrder(
           {
-            order_id: testOrderId,
+            trade_order_id: testOrderId,
             idempotency_key: secondCancelKey
           },
           { transaction: transaction2 }
@@ -653,7 +653,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
           { transaction: transaction1 }
         )
         await transaction1.commit()
-        testListingId = listingResult.listing?.listing_id
+        testListingId = listingResult.listing?.market_listing_id
         createdListingIds.push(testListingId)
       } catch (error) {
         await transaction1.rollback()
@@ -667,7 +667,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
       try {
         const orderResult = await TradeOrderService.createOrder(
           {
-            listing_id: testListingId,
+            market_listing_id: testListingId,
             buyer_id: buyerUserId,
             idempotency_key: orderIdempotencyKey
           },
@@ -704,7 +704,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
           try {
             const result = await TradeOrderService.cancelOrder(
               {
-                order_id: testOrderId,
+                trade_order_id: testOrderId,
                 idempotency_key: cancelIdempotencyKey
               },
               { transaction }
@@ -775,7 +775,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
           { transaction }
         )
         await transaction.commit()
-        testListingId = listingResult.listing?.listing_id
+        testListingId = listingResult.listing?.market_listing_id
         createdListingIds.push(testListingId)
       } catch (error) {
         await transaction.rollback()
@@ -797,7 +797,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
       try {
         const orderResult = await TradeOrderService.createOrder(
           {
-            listing_id: testListingId,
+            market_listing_id: testListingId,
             buyer_id: buyerUserId,
             idempotency_key: orderKey1
           },
@@ -818,7 +818,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
       try {
         await TradeOrderService.cancelOrder(
           {
-            order_id: firstOrderId,
+            trade_order_id: firstOrderId,
             idempotency_key: cancelKey
           },
           { transaction: transaction2 }
@@ -841,7 +841,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
       try {
         const orderResult = await TradeOrderService.createOrder(
           {
-            listing_id: testListingId,
+            market_listing_id: testListingId,
             buyer_id: buyerUserId,
             idempotency_key: orderKey2
           },
@@ -906,7 +906,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
           { transaction: transaction1 }
         )
         await transaction1.commit()
-        testListingId = listingResult.listing?.listing_id
+        testListingId = listingResult.listing?.market_listing_id
         createdListingIds.push(testListingId)
       } catch (error) {
         await transaction1.rollback()
@@ -921,7 +921,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
       try {
         const orderResult = await TradeOrderService.createOrder(
           {
-            listing_id: testListingId,
+            market_listing_id: testListingId,
             buyer_id: buyerUserId,
             idempotency_key: orderIdempotencyKey
           },
@@ -942,7 +942,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
       try {
         await TradeOrderService.completeOrder(
           {
-            order_id: testOrderId,
+            trade_order_id: testOrderId,
             idempotency_key: completeIdempotencyKey
           },
           { transaction: transaction3 }
@@ -964,7 +964,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
       try {
         await TradeOrderService.cancelOrder(
           {
-            order_id: testOrderId,
+            trade_order_id: testOrderId,
             idempotency_key: cancelIdempotencyKey
           },
           { transaction: transaction4 }
@@ -987,7 +987,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
       try {
         await TradeOrderService.cancelOrder(
           {
-            order_id: fakeOrderId,
+            trade_order_id: fakeOrderId,
             idempotency_key: cancelIdempotencyKey
           },
           { transaction }

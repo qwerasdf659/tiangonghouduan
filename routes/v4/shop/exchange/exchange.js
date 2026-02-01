@@ -53,7 +53,10 @@ router.post('/', authenticateToken, async (req, res) => {
 
   // 缺失幂等键直接返回 400
   if (!idempotency_key) {
-    logger.warn('缺少幂等键', { user_id: req.user?.user_id, item_id: req.body?.item_id })
+    logger.warn('缺少幂等键', {
+      user_id: req.user?.user_id,
+      exchange_item_id: req.body?.exchange_item_id
+    })
     return res.apiError(
       '缺少必需的幂等键：请在 Header 中提供 Idempotency-Key。' +
         '重试时必须复用同一幂等键以防止重复下单。',
@@ -67,22 +70,22 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 
   try {
-    const { item_id, quantity = 1 } = req.body
+    const { exchange_item_id, quantity = 1 } = req.body
     const user_id = req.user.user_id
 
     logger.info('用户兑换商品请求', {
       user_id,
-      item_id,
+      exchange_item_id,
       quantity,
       idempotency_key
     })
 
     // 参数验证：商品ID必填
-    if (!item_id || item_id === undefined) {
+    if (!exchange_item_id || exchange_item_id === undefined) {
       return res.apiError('商品ID不能为空', 'BAD_REQUEST', null, 400)
     }
 
-    const itemId = parseInt(item_id)
+    const itemId = parseInt(exchange_item_id)
     const exchangeQuantity = parseInt(quantity)
 
     if (isNaN(itemId) || itemId <= 0) {
@@ -101,7 +104,7 @@ router.post('/', authenticateToken, async (req, res) => {
     const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
       api_path: '/api/v4/shop/exchange',
       http_method: 'POST',
-      request_params: { item_id: itemId, quantity: exchangeQuantity },
+      request_params: { exchange_item_id: itemId, quantity: exchangeQuantity },
       user_id
     })
 
@@ -110,7 +113,7 @@ router.post('/', authenticateToken, async (req, res) => {
       logger.info('🔄 入口幂等拦截：重复请求，返回首次结果', {
         idempotency_key,
         user_id,
-        item_id: itemId
+        exchange_item_id: itemId
       })
       const duplicateResponse = {
         ...idempotencyResult.response,
@@ -177,7 +180,7 @@ router.post('/', authenticateToken, async (req, res) => {
       logger.warn('数据库死锁（并发竞争），建议重试', {
         idempotency_key,
         user_id: req.user?.user_id,
-        item_id: req.body?.item_id
+        exchange_item_id: req.body?.exchange_item_id
       })
       return res.apiError('服务繁忙，请稍后重试', 'CONCURRENT_CONFLICT', { retry_after: 1 }, 409)
     }
@@ -195,7 +198,7 @@ router.post('/', authenticateToken, async (req, res) => {
     logger.error('兑换商品失败', {
       error: error.message,
       user_id: req.user?.user_id,
-      item_id: req.body?.item_id,
+      exchange_item_id: req.body?.exchange_item_id,
       idempotency_key
     })
     return handleServiceError(error, res, '兑换失败')

@@ -165,7 +165,7 @@ describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
             const result = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
               api_path: '/api/v4/lottery/draw',
               http_method: 'POST',
-              request_params: { campaign_id: testCampaignId, draw_count: 1 },
+              request_params: { lottery_campaign_id: testCampaignId, draw_count: 1 },
               user_id: testUserId
             })
 
@@ -237,7 +237,7 @@ describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
           const result = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
             api_path: '/api/v4/lottery/draw',
             http_method: 'POST',
-            request_params: { campaign_id: testCampaignId, draw_count: 1, index },
+            request_params: { lottery_campaign_id: testCampaignId, draw_count: 1, index },
             user_id: testUserId
           })
 
@@ -558,7 +558,7 @@ describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
                 empty_streak: streak,
                 tier_weights: { high: 10, mid: 30, low: 40, fallback: 20 },
                 user_id: testUserId,
-                campaign_id: testCampaignId
+                lottery_campaign_id: testCampaignId
               })
 
               return {
@@ -863,7 +863,7 @@ describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
             const result = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
               api_path: '/api/v4/lottery/draw',
               http_method: 'POST',
-              request_params: { campaign_id: testCampaignId },
+              request_params: { lottery_campaign_id: testCampaignId },
               user_id: testUserId
             })
 
@@ -888,7 +888,7 @@ describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
             // 查询市场挂单（不限制状态，以确保有数据）
             const listings = await MarketListing.findAll({
               limit: 10,
-              attributes: ['listing_id', 'status', 'created_at']
+              attributes: ['market_listing_id', 'status', 'created_at']
             })
 
             // 即使没有数据，查询执行成功也算成功
@@ -910,7 +910,7 @@ describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
 
             // 执行活动查询
             const campaign = await LotteryCampaign.findByPk(testCampaignId, {
-              attributes: ['campaign_id', 'campaign_name', 'status']
+              attributes: ['lottery_campaign_id', 'campaign_name', 'status']
             })
 
             return {

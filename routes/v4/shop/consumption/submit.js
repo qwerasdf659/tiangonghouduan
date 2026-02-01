@@ -59,7 +59,7 @@ const QRCodeValidator = require('../../../../utils/QRCodeValidator')
  * @body {string} merchant_notes - 商家备注（可选，最大500字符）
  *
  * @returns {Object} 创建的消费记录信息
- * @returns {number} data.record_id - 消费记录ID
+ * @returns {number} data.consumption_record_id - 消费记录ID
  * @returns {number} data.user_id - 用户ID
  * @returns {number} data.store_id - 门店ID
  * @returns {number} data.consumption_amount - 消费金额
@@ -308,7 +308,7 @@ router.post(
 
       // 构建响应数据
       const responseData = {
-        record_id: record.record_id,
+        record_id: record.consumption_record_id,
         user_id: record.user_id,
         store_id: record.store_id, // 门店ID
         consumption_amount: parseFloat(record.consumption_amount),
@@ -324,12 +324,12 @@ router.post(
        */
       await IdempotencyService.markAsCompleted(
         idempotency_key,
-        record.record_id, // 业务事件ID = 消费记录ID
+        record.consumption_record_id, // 业务事件ID = 消费记录ID
         responseData
       )
 
       logger.info('✅ 消费记录创建成功', {
-        record_id: record.record_id,
+        record_id: record.consumption_record_id,
         user_id: record.user_id,
         idempotency_key: sanitize.idempotency_key(idempotency_key),
         is_duplicate: isDuplicate
@@ -346,7 +346,7 @@ router.post(
             operation_type: 'submit_consumption',
             action: 'create',
             target_user_id: record.user_id,
-            related_record_id: record.record_id,
+            related_record_id: record.consumption_record_id,
             consumption_amount: parseFloat(consumption_amount),
             request_id: req.id || null,
             ip_address: req.ip,
@@ -358,7 +358,7 @@ router.post(
               risk_alerts: riskCheckResult.hasAlerts ? riskCheckResult.alerts.map(a => a.type) : []
             }
           })
-          logger.debug('📝 商家审计日志已记录', { record_id: record.record_id })
+          logger.debug('📝 商家审计日志已记录', { record_id: record.consumption_record_id })
         } catch (logError) {
           // 审计日志失败不应影响主流程
           logger.error('⚠️ 商家审计日志记录失败（非阻断）', { error: logError.message })

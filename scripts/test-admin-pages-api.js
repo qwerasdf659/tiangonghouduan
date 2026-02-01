@@ -129,10 +129,10 @@ async function testLotteryStatsAPI() {
   console.log('=' .repeat(50))
   
   const tests = [
-    // 这些 API 需要 campaign_id 参数
+    // 这些 API 需要 lottery_campaign_id 参数
     { name: '抽奖策略统计概览(不存在)', endpoint: '/api/v4/console/lottery-strategy-stats/overview' },
-    { name: '抽奖实时数据(需要campaign_id)', endpoint: '/api/v4/console/lottery-strategy-stats/realtime/1' },
-    { name: '抽奖小时趋势(需要campaign_id)', endpoint: '/api/v4/console/lottery-strategy-stats/hourly/1' },
+    { name: '抽奖实时数据(需要lottery_campaign_id)', endpoint: '/api/v4/console/lottery-strategy-stats/realtime/1' },
+    { name: '抽奖小时趋势(需要lottery_campaign_id)', endpoint: '/api/v4/console/lottery-strategy-stats/hourly/1' },
     // 替代方案：使用 lottery-monitoring
     { name: '抽奖监控-小时指标', endpoint: '/api/v4/console/lottery-monitoring/hourly-metrics' },
     // 活动列表
@@ -218,7 +218,7 @@ function generateReport(results) {
   console.log(`
 问题分析:
 1. /api/v4/console/lottery-strategy-stats/overview - 该端点不存在
-   → 后端只有 /realtime/:campaign_id 等需要 campaign_id 的端点
+   → 后端只有 /realtime/:lottery_campaign_id 等需要 lottery_campaign_id 的端点
    → 前端应使用 /lottery-monitoring/hourly-metrics 代替
 
 2. /api/v4/console/stores/ranking - 该端点不存在

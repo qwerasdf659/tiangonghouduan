@@ -108,37 +108,37 @@ class StatisticsService {
    * 获取小时趋势数据
    * 使用双轨查询策略
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} options - 查询选项
    * @param {Date|string} options.start_time - 开始时间
    * @param {Date|string} options.end_time - 结束时间
    * @returns {Promise<Object>} 小时趋势数据
    */
-  async getHourlyTrend(campaign_id, options = {}) {
+  async getHourlyTrend(lottery_campaign_id, options = {}) {
     const start_time = options.start_time
       ? new Date(options.start_time)
       : new Date(Date.now() - 24 * 60 * 60 * 1000)
     const end_time = options.end_time ? new Date(options.end_time) : new Date()
 
     const strategy = this._determineQueryStrategy(start_time, end_time)
-    this.logger.info('获取小时趋势数据', { campaign_id, strategy, start_time, end_time })
+    this.logger.info('获取小时趋势数据', { lottery_campaign_id, strategy, start_time, end_time })
 
     if (strategy === TIME_RANGE_TYPE.REALTIME) {
-      return await this._getHourlyFromDraws(campaign_id, start_time, end_time)
+      return await this._getHourlyFromDraws(lottery_campaign_id, start_time, end_time)
     } else {
-      return await this._getHourlyFromMetrics(campaign_id, start_time, end_time)
+      return await this._getHourlyFromMetrics(lottery_campaign_id, start_time, end_time)
     }
   }
 
   /**
    * 从lottery_draws表聚合小时数据
    * @private
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Date} start_time - 开始时间
    * @param {Date} end_time - 结束时间
    * @returns {Promise<Object>} 小时聚合数据
    */
-  async _getHourlyFromDraws(campaign_id, start_time, end_time) {
+  async _getHourlyFromDraws(lottery_campaign_id, start_time, end_time) {
     const LotteryDraw = this.models.LotteryDraw
 
     /*
@@ -150,7 +150,7 @@ class StatisticsService {
     const hourly_data = await LotteryDraw.findAll({
       attributes: [
         [fn('DATE_FORMAT', col('created_at'), '%Y-%m-%d %H:00:00'), 'hour_bucket'],
-        [fn('COUNT', col('draw_id')), 'total_draws'],
+        [fn('COUNT', col('lottery_draw_id')), 'total_draws'],
         [fn('COUNT', fn('DISTINCT', col('user_id'))), 'unique_users'],
         // 保底奖品次数（正常保底机制）
         [
@@ -167,7 +167,7 @@ class StatisticsService {
         ]
       ],
       where: {
-        campaign_id,
+        lottery_campaign_id,
         created_at: {
           [Op.gte]: start_time,
           [Op.lte]: end_time
@@ -199,17 +199,17 @@ class StatisticsService {
   /**
    * 从lottery_hourly_metrics表查询
    * @private
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Date} start_time - 开始时间
    * @param {Date} end_time - 结束时间
    * @returns {Promise<Object>} 小时指标数据
    */
-  async _getHourlyFromMetrics(campaign_id, start_time, end_time) {
+  async _getHourlyFromMetrics(lottery_campaign_id, start_time, end_time) {
     const LotteryHourlyMetrics = this.models.LotteryHourlyMetrics
 
     const metrics = await LotteryHourlyMetrics.findAll({
       where: {
-        campaign_id,
+        lottery_campaign_id,
         hour_bucket: {
           [Op.gte]: start_time,
           [Op.lte]: end_time
@@ -239,27 +239,27 @@ class StatisticsService {
   /**
    * 获取日报趋势数据
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} options - 查询选项
    * @param {Date|string} options.start_date - 开始日期
    * @param {Date|string} options.end_date - 结束日期
    * @param {number} options.days - 查询天数（默认30）
    * @returns {Promise<Object>} 日报趋势数据
    */
-  async getDailyTrend(campaign_id, options = {}) {
+  async getDailyTrend(lottery_campaign_id, options = {}) {
     const days = options.days || 30
     const end_date = options.end_date ? new Date(options.end_date) : new Date()
     const start_date = options.start_date
       ? new Date(options.start_date)
       : new Date(end_date.getTime() - days * 24 * 60 * 60 * 1000)
 
-    this.logger.info('获取日报趋势数据', { campaign_id, start_date, end_date })
+    this.logger.info('获取日报趋势数据', { lottery_campaign_id, start_date, end_date })
 
     const LotteryDailyMetrics = this.models.LotteryDailyMetrics
 
     const metrics = await LotteryDailyMetrics.findAll({
       where: {
-        campaign_id,
+        lottery_campaign_id,
         metric_date: {
           [Op.gte]: start_date.toISOString().slice(0, 10),
           [Op.lte]: end_date.toISOString().slice(0, 10)
@@ -291,43 +291,43 @@ class StatisticsService {
   /**
    * 获取Budget Tier分布统计
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} options - 查询选项
    * @param {Date|string} options.start_time - 开始时间
    * @param {Date|string} options.end_time - 结束时间
    * @returns {Promise<Object>} Budget Tier分布数据
    */
-  async getTierDistribution(campaign_id, options = {}) {
+  async getTierDistribution(lottery_campaign_id, options = {}) {
     const start_time = options.start_time
       ? new Date(options.start_time)
       : this._getTodayRange().start
     const end_time = options.end_time ? new Date(options.end_time) : new Date()
 
     const strategy = this._determineQueryStrategy(start_time, end_time)
-    this.logger.info('获取Budget Tier分布', { campaign_id, strategy })
+    this.logger.info('获取Budget Tier分布', { lottery_campaign_id, strategy })
 
     if (strategy === TIME_RANGE_TYPE.REALTIME) {
-      return await this._getTierDistributionFromDecisions(campaign_id, start_time, end_time)
+      return await this._getTierDistributionFromDecisions(lottery_campaign_id, start_time, end_time)
     } else if (strategy === TIME_RANGE_TYPE.HOURLY) {
-      return await this._getTierDistributionFromHourly(campaign_id, start_time, end_time)
+      return await this._getTierDistributionFromHourly(lottery_campaign_id, start_time, end_time)
     } else {
-      return await this._getTierDistributionFromDaily(campaign_id, start_time, end_time)
+      return await this._getTierDistributionFromDaily(lottery_campaign_id, start_time, end_time)
     }
   }
 
   /**
    * 从lottery_draw_decisions表获取Budget Tier分布
    * @private
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Date} start_time - 开始时间
    * @param {Date} end_time - 结束时间
    * @returns {Promise<Object>} Budget Tier分布数据
    */
-  async _getTierDistributionFromDecisions(campaign_id, start_time, end_time) {
+  async _getTierDistributionFromDecisions(lottery_campaign_id, start_time, end_time) {
     const LotteryDrawDecision = this.models.LotteryDrawDecision
     const LotteryDraw = this.models.LotteryDraw
 
-    // 通过 draw_id 关联 LotteryDraw 表来过滤 campaign_id
+    // 通过 lottery_draw_id 关联 LotteryDraw 表来过滤 lottery_campaign_id
     const distribution = await LotteryDrawDecision.findAll({
       attributes: ['budget_tier', [fn('COUNT', col('LotteryDrawDecision.decision_id')), 'count']],
       include: [
@@ -336,7 +336,7 @@ class StatisticsService {
           as: 'draw',
           attributes: [],
           where: {
-            campaign_id,
+            lottery_campaign_id,
             created_at: {
               [Op.gte]: start_time,
               [Op.lte]: end_time
@@ -377,12 +377,12 @@ class StatisticsService {
   /**
    * 从lottery_hourly_metrics表聚合Budget Tier分布
    * @private
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Date} start_time - 开始时间
    * @param {Date} end_time - 结束时间
    * @returns {Promise<Object>} Budget Tier分布数据
    */
-  async _getTierDistributionFromHourly(campaign_id, start_time, end_time) {
+  async _getTierDistributionFromHourly(lottery_campaign_id, start_time, end_time) {
     const LotteryHourlyMetrics = this.models.LotteryHourlyMetrics
 
     const metrics = await LotteryHourlyMetrics.findAll({
@@ -394,7 +394,7 @@ class StatisticsService {
         [fn('SUM', col('total_draws')), 'total']
       ],
       where: {
-        campaign_id,
+        lottery_campaign_id,
         hour_bucket: {
           [Op.gte]: start_time,
           [Op.lte]: end_time
@@ -430,12 +430,12 @@ class StatisticsService {
   /**
    * 从lottery_daily_metrics表聚合Budget Tier分布
    * @private
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Date} start_time - 开始时间
    * @param {Date} end_time - 结束时间
    * @returns {Promise<Object>} Budget Tier分布数据
    */
-  async _getTierDistributionFromDaily(campaign_id, start_time, end_time) {
+  async _getTierDistributionFromDaily(lottery_campaign_id, start_time, end_time) {
     const LotteryDailyMetrics = this.models.LotteryDailyMetrics
 
     const metrics = await LotteryDailyMetrics.findAll({
@@ -447,7 +447,7 @@ class StatisticsService {
         [fn('SUM', col('total_draws')), 'total']
       ],
       where: {
-        campaign_id,
+        lottery_campaign_id,
         metric_date: {
           [Op.gte]: start_time.toISOString().slice(0, 10),
           [Op.lte]: end_time.toISOString().slice(0, 10)
@@ -483,43 +483,47 @@ class StatisticsService {
   /**
    * 获取体验机制触发统计
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} options - 查询选项
    * @param {Date|string} options.start_time - 开始时间
    * @param {Date|string} options.end_time - 结束时间
    * @returns {Promise<Object>} 体验机制触发统计
    */
-  async getExperienceTriggers(campaign_id, options = {}) {
+  async getExperienceTriggers(lottery_campaign_id, options = {}) {
     const start_time = options.start_time
       ? new Date(options.start_time)
       : this._getTodayRange().start
     const end_time = options.end_time ? new Date(options.end_time) : new Date()
 
     const strategy = this._determineQueryStrategy(start_time, end_time)
-    this.logger.info('获取体验机制触发统计', { campaign_id, strategy })
+    this.logger.info('获取体验机制触发统计', { lottery_campaign_id, strategy })
 
     if (strategy === TIME_RANGE_TYPE.REALTIME) {
-      return await this._getExperienceTriggersFromDecisions(campaign_id, start_time, end_time)
+      return await this._getExperienceTriggersFromDecisions(
+        lottery_campaign_id,
+        start_time,
+        end_time
+      )
     } else if (strategy === TIME_RANGE_TYPE.HOURLY) {
-      return await this._getExperienceTriggersFromHourly(campaign_id, start_time, end_time)
+      return await this._getExperienceTriggersFromHourly(lottery_campaign_id, start_time, end_time)
     } else {
-      return await this._getExperienceTriggersFromDaily(campaign_id, start_time, end_time)
+      return await this._getExperienceTriggersFromDaily(lottery_campaign_id, start_time, end_time)
     }
   }
 
   /**
    * 从lottery_draw_decisions表获取体验机制触发统计
    * @private
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Date} start_time - 开始时间
    * @param {Date} end_time - 结束时间
    * @returns {Promise<Object>} 体验机制触发统计数据
    */
-  async _getExperienceTriggersFromDecisions(campaign_id, start_time, end_time) {
+  async _getExperienceTriggersFromDecisions(lottery_campaign_id, start_time, end_time) {
     const LotteryDrawDecision = this.models.LotteryDrawDecision
     const LotteryDraw = this.models.LotteryDraw
 
-    // 修正：通过关联 LotteryDraw 来过滤 campaign_id
+    // 修正：通过关联 LotteryDraw 来过滤 lottery_campaign_id
     const [total_count, triggers] = await Promise.all([
       LotteryDrawDecision.count({
         include: [
@@ -528,7 +532,7 @@ class StatisticsService {
             as: 'draw',
             attributes: [],
             where: {
-              campaign_id,
+              lottery_campaign_id,
               created_at: { [Op.gte]: start_time, [Op.lte]: end_time }
             },
             required: true
@@ -595,7 +599,7 @@ class StatisticsService {
             as: 'draw',
             attributes: [],
             where: {
-              campaign_id,
+              lottery_campaign_id,
               created_at: { [Op.gte]: start_time, [Op.lte]: end_time }
             },
             required: true
@@ -644,12 +648,12 @@ class StatisticsService {
   /**
    * 从lottery_hourly_metrics表获取体验机制触发统计
    * @private
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Date} start_time - 开始时间
    * @param {Date} end_time - 结束时间
    * @returns {Promise<Object>} 体验机制触发统计数据
    */
-  async _getExperienceTriggersFromHourly(campaign_id, start_time, end_time) {
+  async _getExperienceTriggersFromHourly(lottery_campaign_id, start_time, end_time) {
     const LotteryHourlyMetrics = this.models.LotteryHourlyMetrics
 
     const metrics = await LotteryHourlyMetrics.findAll({
@@ -662,7 +666,7 @@ class StatisticsService {
         [fn('SUM', col('total_draws')), 'total']
       ],
       where: {
-        campaign_id,
+        lottery_campaign_id,
         hour_bucket: { [Op.gte]: start_time, [Op.lte]: end_time }
       },
       raw: true
@@ -703,12 +707,12 @@ class StatisticsService {
   /**
    * 从lottery_daily_metrics表获取体验机制触发统计
    * @private
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Date} start_time - 开始时间
    * @param {Date} end_time - 结束时间
    * @returns {Promise<Object>} 体验机制触发统计数据
    */
-  async _getExperienceTriggersFromDaily(campaign_id, start_time, end_time) {
+  async _getExperienceTriggersFromDaily(lottery_campaign_id, start_time, end_time) {
     const LotteryDailyMetrics = this.models.LotteryDailyMetrics
 
     const metrics = await LotteryDailyMetrics.findAll({
@@ -720,7 +724,7 @@ class StatisticsService {
         [fn('SUM', col('total_draws')), 'total']
       ],
       where: {
-        campaign_id,
+        lottery_campaign_id,
         metric_date: {
           [Op.gte]: start_time.toISOString().slice(0, 10),
           [Op.lte]: end_time.toISOString().slice(0, 10)
@@ -768,47 +772,47 @@ class StatisticsService {
   /**
    * 获取预算消耗统计
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} options - 查询选项
    * @param {Date|string} options.start_time - 开始时间
    * @param {Date|string} options.end_time - 结束时间
    * @returns {Promise<Object>} 预算消耗统计
    */
-  async getBudgetConsumption(campaign_id, options = {}) {
+  async getBudgetConsumption(lottery_campaign_id, options = {}) {
     const start_time = options.start_time
       ? new Date(options.start_time)
       : this._getTodayRange().start
     const end_time = options.end_time ? new Date(options.end_time) : new Date()
 
     const strategy = this._determineQueryStrategy(start_time, end_time)
-    this.logger.info('获取预算消耗统计', { campaign_id, strategy })
+    this.logger.info('获取预算消耗统计', { lottery_campaign_id, strategy })
 
     if (strategy === TIME_RANGE_TYPE.HOURLY) {
-      return await this._getBudgetConsumptionFromHourly(campaign_id, start_time, end_time)
+      return await this._getBudgetConsumptionFromHourly(lottery_campaign_id, start_time, end_time)
     } else if (strategy === TIME_RANGE_TYPE.DAILY) {
-      return await this._getBudgetConsumptionFromDaily(campaign_id, start_time, end_time)
+      return await this._getBudgetConsumptionFromDaily(lottery_campaign_id, start_time, end_time)
     } else {
       // 实时查询从draws表
-      return await this._getBudgetConsumptionFromDraws(campaign_id, start_time, end_time)
+      return await this._getBudgetConsumptionFromDraws(lottery_campaign_id, start_time, end_time)
     }
   }
 
   /**
    * 从lottery_draws获取预算消耗
    * @private
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Date} start_time - 开始时间
    * @param {Date} end_time - 结束时间
    * @returns {Promise<Object>} 预算消耗统计数据
    */
-  async _getBudgetConsumptionFromDraws(campaign_id, start_time, end_time) {
+  async _getBudgetConsumptionFromDraws(lottery_campaign_id, start_time, end_time) {
     const LotteryDraw = this.models.LotteryDraw
     const LotteryDrawDecision = this.models.LotteryDrawDecision
 
     const draws = await LotteryDraw.findAll({
-      attributes: ['draw_id', 'prize_value_points'],
+      attributes: ['lottery_draw_id', 'prize_value_points'],
       where: {
-        campaign_id,
+        lottery_campaign_id,
         created_at: { [Op.gte]: start_time, [Op.lte]: end_time }
       },
       include: [
@@ -850,12 +854,12 @@ class StatisticsService {
   /**
    * 从lottery_hourly_metrics获取预算消耗
    * @private
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Date} start_time - 开始时间
    * @param {Date} end_time - 结束时间
    * @returns {Promise<Object>} 预算消耗统计数据
    */
-  async _getBudgetConsumptionFromHourly(campaign_id, start_time, end_time) {
+  async _getBudgetConsumptionFromHourly(lottery_campaign_id, start_time, end_time) {
     const LotteryHourlyMetrics = this.models.LotteryHourlyMetrics
 
     const metrics = await LotteryHourlyMetrics.findAll({
@@ -865,7 +869,7 @@ class StatisticsService {
         [fn('SUM', col('total_draws')), 'total_draws']
       ],
       where: {
-        campaign_id,
+        lottery_campaign_id,
         hour_bucket: { [Op.gte]: start_time, [Op.lte]: end_time }
       },
       raw: true
@@ -894,12 +898,12 @@ class StatisticsService {
   /**
    * 从lottery_daily_metrics获取预算消耗
    * @private
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Date} start_time - 开始时间
    * @param {Date} end_time - 结束时间
    * @returns {Promise<Object>} 预算消耗统计数据
    */
-  async _getBudgetConsumptionFromDaily(campaign_id, start_time, end_time) {
+  async _getBudgetConsumptionFromDaily(lottery_campaign_id, start_time, end_time) {
     const LotteryDailyMetrics = this.models.LotteryDailyMetrics
 
     const metrics = await LotteryDailyMetrics.findAll({
@@ -909,7 +913,7 @@ class StatisticsService {
         [fn('SUM', col('total_draws')), 'total_draws']
       ],
       where: {
-        campaign_id,
+        lottery_campaign_id,
         metric_date: {
           [Op.gte]: start_time.toISOString().slice(0, 10),
           [Op.lte]: end_time.toISOString().slice(0, 10)
@@ -942,7 +946,7 @@ class StatisticsService {
    * 查询抽奖小时统计指标列表
    *
    * @param {Object} options - 查询参数
-   * @param {number} [options.campaign_id] - 活动ID（可选，不传则查询所有活动）
+   * @param {number} [options.lottery_campaign_id] - 活动ID（可选，不传则查询所有活动）
    * @param {string} [options.start_time] - 开始时间（ISO8601格式，北京时间）
    * @param {string} [options.end_time] - 结束时间（ISO8601格式，北京时间）
    * @param {number} [options.page=1] - 页码
@@ -950,13 +954,13 @@ class StatisticsService {
    * @returns {Promise<Object>} 统计指标列表和分页信息
    */
   async getHourlyMetrics(options = {}) {
-    const { campaign_id, start_time, end_time, page = 1, page_size = 24 } = options
+    const { lottery_campaign_id, start_time, end_time, page = 1, page_size = 24 } = options
 
     const where = {}
 
     // 活动ID过滤
-    if (campaign_id) {
-      where.campaign_id = campaign_id
+    if (lottery_campaign_id) {
+      where.lottery_campaign_id = lottery_campaign_id
     }
 
     // 时间范围过滤
@@ -978,7 +982,7 @@ class StatisticsService {
         {
           model: this.models.LotteryCampaign,
           as: 'campaign',
-          attributes: ['campaign_id', 'campaign_name', 'status']
+          attributes: ['lottery_campaign_id', 'campaign_name', 'status']
         }
       ],
       order: [['hour_bucket', 'DESC']],
@@ -1009,7 +1013,7 @@ class StatisticsService {
         {
           model: this.models.LotteryCampaign,
           as: 'campaign',
-          attributes: ['campaign_id', 'campaign_name', 'status', 'budget_type']
+          attributes: ['lottery_campaign_id', 'campaign_name', 'status', 'budget_type']
         }
       ]
     })
@@ -1020,13 +1024,13 @@ class StatisticsService {
   /**
    * 获取活动的统计汇总数据
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {string} [start_time] - 开始时间
    * @param {string} [end_time] - 结束时间
    * @returns {Promise<Object>} 汇总统计数据
    */
-  async getHourlyMetricsSummary(campaign_id, start_time, end_time) {
-    const where = { campaign_id }
+  async getHourlyMetricsSummary(lottery_campaign_id, start_time, end_time) {
+    const where = { lottery_campaign_id }
     if (start_time || end_time) {
       where.hour_bucket = {}
       if (start_time) where.hour_bucket[Op.gte] = new Date(start_time)
@@ -1052,7 +1056,7 @@ class StatisticsService {
     })
 
     return {
-      campaign_id,
+      lottery_campaign_id,
       period: { start_time, end_time },
       summary: {
         total_draws: parseInt(summary.total_draws) || 0,

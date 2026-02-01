@@ -92,7 +92,7 @@ module.exports = sequelize => {
     'MerchantOperationLog',
     {
       // 主键
-      merchant_log_id: {
+      merchant_operation_log_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
@@ -165,13 +165,13 @@ module.exports = sequelize => {
       },
 
       // 关联的消费记录
-      related_record_id: {
+      consumption_record_id: {
         type: DataTypes.BIGINT,
         allowNull: true,
         comment: '关联的消费记录ID（如适用）',
         references: {
           model: 'consumption_records',
-          key: 'record_id'
+          key: 'consumption_record_id'
         },
         onUpdate: 'CASCADE',
         onDelete: 'SET NULL'
@@ -440,7 +440,7 @@ module.exports = sequelize => {
    */
   MerchantOperationLog.prototype.toAPIResponse = function () {
     return {
-      id: this.merchant_log_id,
+      id: this.merchant_operation_log_id,
       operator_id: this.operator_id,
       store_id: this.store_id,
       operation_type: this.operation_type,
@@ -492,7 +492,7 @@ module.exports = sequelize => {
 
     // 关联消费记录
     MerchantOperationLog.belongsTo(models.ConsumptionRecord, {
-      foreignKey: 'related_record_id',
+      foreignKey: 'consumption_record_id',
       as: 'consumptionRecord',
       onUpdate: 'CASCADE',
       onDelete: 'SET NULL'

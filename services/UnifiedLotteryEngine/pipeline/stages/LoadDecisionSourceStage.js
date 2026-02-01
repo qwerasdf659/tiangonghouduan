@@ -58,13 +58,13 @@ class LoadDecisionSourceStage extends BaseStage {
    *
    * @param {Object} context - 执行上下文
    * @param {number} context.user_id - 用户ID
-   * @param {number} context.campaign_id - 活动ID
+   * @param {number} context.lottery_campaign_id - 活动ID
    * @returns {Promise<Object>} Stage 执行结果
    */
   async execute(context) {
-    const { user_id, campaign_id } = context
+    const { user_id, lottery_campaign_id } = context
 
-    this.log('info', '开始判断决策来源', { user_id, campaign_id })
+    this.log('info', '开始判断决策来源', { user_id, lottery_campaign_id })
 
     try {
       // 获取活动配置
@@ -77,12 +77,12 @@ class LoadDecisionSourceStage extends BaseStage {
        */
 
       // 1. 检查预设（最高优先级）
-      const preset = await this._checkPreset(user_id, campaign_id)
+      const preset = await this._checkPreset(user_id, lottery_campaign_id)
       if (preset) {
         this.log('info', '命中预设决策', {
           user_id,
-          preset_id: preset.preset_id,
-          prize_id: preset.prize_id
+          lottery_preset_id: preset.lottery_preset_id,
+          lottery_prize_id: preset.lottery_prize_id
         })
         return this.success({
           decision_source: DECISION_SOURCES.PRESET,
@@ -93,7 +93,7 @@ class LoadDecisionSourceStage extends BaseStage {
       }
 
       // 2. 检查管理干预（次高优先级）
-      const override = await this._checkOverride(user_id, campaign_id)
+      const override = await this._checkOverride(user_id, lottery_campaign_id)
       if (override) {
         this.log('info', '命中管理干预', {
           user_id,
@@ -109,7 +109,7 @@ class LoadDecisionSourceStage extends BaseStage {
       }
 
       // 3. 检查保底触发（第三优先级）
-      const guarantee = await this._checkGuarantee(user_id, campaign_id, campaign)
+      const guarantee = await this._checkGuarantee(user_id, lottery_campaign_id, campaign)
       if (guarantee.triggered) {
         this.log('info', '触发保底机制', {
           user_id,
@@ -125,7 +125,7 @@ class LoadDecisionSourceStage extends BaseStage {
       }
 
       // 4. 正常抽奖（最低优先级）
-      this.log('info', '使用正常抽奖决策', { user_id, campaign_id })
+      this.log('info', '使用正常抽奖决策', { user_id, lottery_campaign_id })
       return this.success({
         decision_source: DECISION_SOURCES.NORMAL,
         preset: null,
@@ -135,7 +135,7 @@ class LoadDecisionSourceStage extends BaseStage {
     } catch (error) {
       this.log('error', '判断决策来源失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       throw error
@@ -146,16 +146,16 @@ class LoadDecisionSourceStage extends BaseStage {
    * 检查是否有待使用的预设
    *
    * @param {number} user_id - 用户ID
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @returns {Promise<Object|null>} 预设记录或 null
    * @private
    */
-  async _checkPreset(user_id, campaign_id) {
+  async _checkPreset(user_id, lottery_campaign_id) {
     try {
       const preset = await LotteryPreset.findOne({
         where: {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           status: 'pending',
           approval_status: 'approved'
         },
@@ -173,7 +173,7 @@ class LoadDecisionSourceStage extends BaseStage {
     } catch (error) {
       this.log('warn', '检查预设失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       return null
@@ -184,14 +184,14 @@ class LoadDecisionSourceStage extends BaseStage {
    * 检查是否有管理干预设置
    *
    * @param {number} user_id - 用户ID
-   * @param {number} _campaign_id - 活动ID（当前未使用，表中没有此字段）
+   * @param {number} _lottery_campaign_id - 活动ID（当前未使用，表中没有此字段）
    * @returns {Promise<Object|null>} 干预设置或 null
    * @private
    */
-  async _checkOverride(user_id, _campaign_id) {
+  async _checkOverride(user_id, _lottery_campaign_id) {
     try {
       /*
-       * 注意：LotteryManagementSetting 表当前没有 campaign_id 字段
+       * 注意：LotteryManagementSetting 表当前没有 lottery_campaign_id 字段
        * 管理干预设置是针对用户的，不区分活动
        */
       const override = await LotteryManagementSetting.findOne({
@@ -221,12 +221,12 @@ class LoadDecisionSourceStage extends BaseStage {
    * - 默认阈值为 10 次
    *
    * @param {number} user_id - 用户ID
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} campaign - 活动配置
    * @returns {Promise<Object>} 保底检查结果
    * @private
    */
-  async _checkGuarantee(user_id, campaign_id, campaign) {
+  async _checkGuarantee(user_id, lottery_campaign_id, campaign) {
     try {
       // 获取活动保底配置
       const prize_distribution_config = campaign.prize_distribution_config || {}
@@ -242,7 +242,7 @@ class LoadDecisionSourceStage extends BaseStage {
       const draw_count = await LotteryDraw.count({
         where: {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           created_at: {
             [Op.gte]: this._getGuaranteePeriodStart(guarantee_config)
           }
@@ -266,7 +266,7 @@ class LoadDecisionSourceStage extends BaseStage {
     } catch (error) {
       this.log('warn', '检查保底失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       return { triggered: false, reason: 'check_failed' }

@@ -227,8 +227,8 @@ describe('IdempotencyService - 幂等服务单元测试', () => {
       created_idempotency_keys.push(idempotency_key)
 
       const request_params = {
-        campaign_id: 1,
-        prize_id: 100,
+        lottery_campaign_id: 1,
+        lottery_prize_id: 100,
         timestamp: Date.now()
       }
 

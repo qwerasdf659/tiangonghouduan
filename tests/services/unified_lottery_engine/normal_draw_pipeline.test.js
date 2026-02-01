@@ -76,7 +76,7 @@ describe('NormalDrawPipeline 管线测试（任务2.2）', () => {
 
     return {
       user_id: real_test_user.user_id,
-      campaign_id: test_campaign.campaign_id,
+      lottery_campaign_id: test_campaign.lottery_campaign_id,
       idempotency_key: `test_pipeline_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`,
       lottery_session_id: `session_${Date.now()}`,
       request_id: `req_${Date.now()}`,
@@ -122,7 +122,7 @@ describe('NormalDrawPipeline 管线测试（任务2.2）', () => {
         // 遍历活动，找到有完整档位奖品配置的活动
         for (const campaign of active_campaigns) {
           const prizes = await LotteryPrize.findAll({
-            where: { campaign_id: campaign.campaign_id, status: 'active' }
+            where: { lottery_campaign_id: campaign.lottery_campaign_id, status: 'active' }
           })
 
           // 检查是否有 high/mid/low 三档奖品
@@ -133,7 +133,7 @@ describe('NormalDrawPipeline 管线测试（任务2.2）', () => {
             test_campaign = campaign
             test_prizes = prizes
             console.log(
-              `📊 选择活动 ${campaign.campaign_id} (有完整档位配置): ${prizes.length} 个奖品`
+              `📊 选择活动 ${campaign.lottery_campaign_id} (有完整档位配置): ${prizes.length} 个奖品`
             )
             break
           }
@@ -143,10 +143,10 @@ describe('NormalDrawPipeline 管线测试（任务2.2）', () => {
         if (!test_campaign && active_campaigns.length > 0) {
           test_campaign = active_campaigns[0]
           test_prizes = await LotteryPrize.findAll({
-            where: { campaign_id: test_campaign.campaign_id }
+            where: { lottery_campaign_id: test_campaign.lottery_campaign_id }
           })
           console.log(
-            `📊 使用活动 ${test_campaign.campaign_id} (档位不完整): ${test_prizes.length} 个奖品`
+            `📊 使用活动 ${test_campaign.lottery_campaign_id} (档位不完整): ${test_prizes.length} 个奖品`
           )
         }
       }
@@ -313,7 +313,7 @@ describe('NormalDrawPipeline 管线测试（任务2.2）', () => {
         if (prize_pick_data) {
           expect(prize_pick_data.selected_prize).toBeDefined()
           console.log(
-            `  ✅ PrizePickStage: 选中奖品 ${prize_pick_data.selected_prize?.prize_id || 'N/A'}`
+            `  ✅ PrizePickStage: 选中奖品 ${prize_pick_data.selected_prize?.lottery_prize_id || 'N/A'}`
           )
         }
 
@@ -349,13 +349,13 @@ describe('NormalDrawPipeline 管线测试（任务2.2）', () => {
       expect(result.data.prizes).toBeDefined()
       expect(Array.isArray(result.data.prizes)).toBe(true)
 
-      console.log(`✅ LoadCampaignStage: 加载活动 ${result.data.campaign.campaign_id}`)
+      console.log(`✅ LoadCampaignStage: 加载活动 ${result.data.campaign.lottery_campaign_id}`)
       console.log(`📊 奖品数量: ${result.data.prizes.length}`)
     })
 
     test('无效活动ID应该返回错误', async () => {
       const context = create_pipeline_context({
-        campaign_id: 999999 // 不存在的活动ID
+        lottery_campaign_id: 999999 // 不存在的活动ID
       })
 
       if (!context) {
@@ -543,7 +543,7 @@ describe('NormalDrawPipeline 管线测试（任务2.2）', () => {
       expect(result.data.selected_prize).toBeDefined()
 
       console.log(
-        `✅ PrizePickStage: 选中奖品 ${result.data.selected_prize?.name || result.data.selected_prize?.prize_id}`
+        `✅ PrizePickStage: 选中奖品 ${result.data.selected_prize?.name || result.data.selected_prize?.lottery_prize_id}`
       )
     })
   })
@@ -555,7 +555,7 @@ describe('NormalDrawPipeline 管线测试（任务2.2）', () => {
       // 创建一个无效的上下文来触发必需Stage失败
       const invalid_context = {
         user_id: 999999, // 不存在的用户
-        campaign_id: 999999, // 不存在的活动
+        lottery_campaign_id: 999999, // 不存在的活动
         idempotency_key: `test_fail_${Date.now()}`,
         lottery_session_id: `session_fail_${Date.now()}`,
         stage_results: {}

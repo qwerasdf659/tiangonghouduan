@@ -18,8 +18,8 @@
  * - 每日凌晨00:00（北京时间）生成新配额行
  *
  * 数据库表名：lottery_user_daily_draw_quota
- * 主键：quota_id（BIGINT，自增）
- * 唯一索引：user_id + campaign_id + quota_date
+ * 主键：lottery_user_daily_draw_quota_id（BIGINT，自增）
+ * 唯一索引：user_id + lottery_campaign_id + quota_date
  *
  * 创建时间：2025-12-23
  */
@@ -37,7 +37,7 @@ module.exports = sequelize => {
     'LotteryUserDailyDrawQuota',
     {
       // 配额记录主键ID
-      quota_id: {
+      lottery_user_daily_draw_quota_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
@@ -56,7 +56,7 @@ module.exports = sequelize => {
       },
 
       // 活动ID
-      campaign_id: {
+      lottery_campaign_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
         validate: {
@@ -150,11 +150,11 @@ module.exports = sequelize => {
         {
           name: 'idx_user_campaign_date_unique',
           unique: true,
-          fields: ['user_id', 'campaign_id', 'quota_date']
+          fields: ['user_id', 'lottery_campaign_id', 'quota_date']
         },
         {
           name: 'idx_date_campaign',
-          fields: ['quota_date', 'campaign_id']
+          fields: ['quota_date', 'lottery_campaign_id']
         },
         {
           name: 'idx_user_id',
@@ -220,8 +220,8 @@ module.exports = sequelize => {
   /**
    * 查询作用域：指定活动
    */
-  LotteryUserDailyDrawQuota.addScope('forCampaign', campaign_id => ({
-    where: { campaign_id }
+  LotteryUserDailyDrawQuota.addScope('forCampaign', lottery_campaign_id => ({
+    where: { lottery_campaign_id }
   }))
 
   /*
@@ -241,13 +241,13 @@ module.exports = sequelize => {
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 抽奖活动ID
    * @param {Array<string>} [params.role_uuids] - 用户角色UUID列表（可选）
    * @param {Object} options - 选项 { transaction }
    * @returns {Promise<Object>} 配额行对象
    */
   LotteryUserDailyDrawQuota.ensureDailyQuota = async function (params, options = {}) {
-    const { user_id, campaign_id, role_uuids = [] } = params
+    const { user_id, lottery_campaign_id, role_uuids = [] } = params
     const { transaction } = options
 
     // 获取今日日期（北京时间）
@@ -257,7 +257,7 @@ module.exports = sequelize => {
     let quota = await this.findOne({
       where: {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         quota_date: todayDate
       },
       transaction,
@@ -272,7 +272,7 @@ module.exports = sequelize => {
     const LotteryDrawQuotaRule = sequelize.models.LotteryDrawQuotaRule
     const { limit_value, matched_rule } = await LotteryDrawQuotaRule.getEffectiveDailyLimit({
       user_id,
-      campaign_id,
+      lottery_campaign_id,
       role_uuids
     })
 
@@ -280,7 +280,7 @@ module.exports = sequelize => {
     const [_createdQuota] = await this.upsert(
       {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         quota_date: todayDate,
         limit_value,
         used_draw_count: 0,
@@ -294,7 +294,7 @@ module.exports = sequelize => {
     quota = await this.findOne({
       where: {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         quota_date: todayDate
       },
       transaction
@@ -319,13 +319,13 @@ module.exports = sequelize => {
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 抽奖活动ID
    * @param {number} params.draw_count - 本次抽奖次数（连抽场景 >1）
    * @param {Object} options - 选项 { transaction }（必需）
    * @returns {Promise<Object>} { success, remaining, limit, used, message }
    */
   LotteryUserDailyDrawQuota.tryDeductQuota = async function (params, options = {}) {
-    const { user_id, campaign_id, draw_count = 1 } = params
+    const { user_id, lottery_campaign_id, draw_count = 1 } = params
     const { transaction } = options
 
     if (!transaction) {
@@ -342,13 +342,13 @@ module.exports = sequelize => {
            last_draw_at = NOW(),
            updated_at = NOW()
        WHERE user_id = :user_id
-         AND campaign_id = :campaign_id
+         AND lottery_campaign_id = :lottery_campaign_id
          AND quota_date = :quota_date
          AND used_draw_count + :draw_count <= limit_value + bonus_draw_count`,
       {
         replacements: {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           quota_date: todayDate,
           draw_count
         },
@@ -361,7 +361,7 @@ module.exports = sequelize => {
     const quota = await this.findOne({
       where: {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         quota_date: todayDate
       },
       transaction
@@ -411,12 +411,12 @@ module.exports = sequelize => {
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 抽奖活动ID
    * @param {Object} options - 选项 { transaction }
    * @returns {Promise<Object|null>} 配额状态对象或null
    */
   LotteryUserDailyDrawQuota.getDailyQuotaStatus = async function (params, options = {}) {
-    const { user_id, campaign_id } = params
+    const { user_id, lottery_campaign_id } = params
     const { transaction } = options
 
     const todayDate = BeijingTimeHelper.todayStart().toISOString().split('T')[0]
@@ -424,7 +424,7 @@ module.exports = sequelize => {
     const quota = await this.findOne({
       where: {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         quota_date: todayDate
       },
       transaction
@@ -435,9 +435,9 @@ module.exports = sequelize => {
     }
 
     return {
-      quota_id: quota.quota_id,
+      lottery_user_daily_draw_quota_id: quota.lottery_user_daily_draw_quota_id,
       user_id: quota.user_id,
-      campaign_id: quota.campaign_id,
+      lottery_campaign_id: quota.lottery_campaign_id,
       quota_date: quota.quota_date,
       limit_value: quota.limit_value,
       used_draw_count: quota.used_draw_count,
@@ -455,20 +455,20 @@ module.exports = sequelize => {
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 抽奖活动ID
    * @param {number} params.bonus_count - 补偿次数
    * @param {string} [params.reason] - 补偿原因
    * @param {Object} options - 选项 { transaction, admin_id }
    * @returns {Promise<Object>} 更新后的配额状态
    */
   LotteryUserDailyDrawQuota.addBonusDrawCount = async function (params, options = {}) {
-    const { user_id, campaign_id, bonus_count, reason: _reason } = params
+    const { user_id, lottery_campaign_id, bonus_count, reason: _reason } = params
     const { transaction } = options
 
     const todayDate = BeijingTimeHelper.todayStart().toISOString().split('T')[0]
 
     // 确保配额行存在
-    await this.ensureDailyQuota({ user_id, campaign_id }, { transaction })
+    await this.ensureDailyQuota({ user_id, lottery_campaign_id }, { transaction })
 
     // 更新补偿次数
     await this.update(
@@ -478,7 +478,7 @@ module.exports = sequelize => {
       {
         where: {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           quota_date: todayDate
         },
         transaction
@@ -486,7 +486,7 @@ module.exports = sequelize => {
     )
 
     // 返回更新后的状态
-    return this.getDailyQuotaStatus({ user_id, campaign_id }, { transaction })
+    return this.getDailyQuotaStatus({ user_id, lottery_campaign_id }, { transaction })
   }
 
   return LotteryUserDailyDrawQuota

@@ -44,7 +44,7 @@ class LotteryHourlyMetrics extends Model {
   static associate(models) {
     // 关联活动表
     LotteryHourlyMetrics.belongsTo(models.LotteryCampaign, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'campaign',
       onDelete: 'CASCADE',
       onUpdate: 'CASCADE'
@@ -54,20 +54,20 @@ class LotteryHourlyMetrics extends Model {
   /**
    * 查找或创建某小时的指标记录
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 抽奖活动ID
    * @param {Date} hour_bucket - 小时时间（会自动截断到整点）
    * @param {Object} options - 可选参数（如 transaction）
    * @returns {Promise<LotteryHourlyMetrics>} 指标记录
    */
-  static async findOrCreateMetrics(campaign_id, hour_bucket, options = {}) {
+  static async findOrCreateMetrics(lottery_campaign_id, hour_bucket, options = {}) {
     // 截断到整点
     const normalized_hour = new Date(hour_bucket)
     normalized_hour.setMinutes(0, 0, 0)
 
     const [metrics, _created] = await this.findOrCreate({
-      where: { campaign_id, hour_bucket: normalized_hour },
+      where: { lottery_campaign_id, hour_bucket: normalized_hour },
       defaults: {
-        campaign_id,
+        lottery_campaign_id,
         hour_bucket: normalized_hour,
         total_draws: 0,
         unique_users: 0,
@@ -100,16 +100,16 @@ class LotteryHourlyMetrics extends Model {
   /**
    * 获取活动的时间范围内指标
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 抽奖活动ID
    * @param {Date} start_time - 开始时间
    * @param {Date} end_time - 结束时间
    * @param {Object} options - 可选参数
    * @returns {Promise<Array<LotteryHourlyMetrics>>} 指标记录列表
    */
-  static async getMetricsInRange(campaign_id, start_time, end_time, options = {}) {
+  static async getMetricsInRange(lottery_campaign_id, start_time, end_time, options = {}) {
     return this.findAll({
       where: {
-        campaign_id,
+        lottery_campaign_id,
         hour_bucket: {
           [Op.gte]: start_time,
           [Op.lte]: end_time
@@ -123,18 +123,18 @@ class LotteryHourlyMetrics extends Model {
   /**
    * 获取最新的 N 小时指标
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 抽奖活动ID
    * @param {number} hours - 小时数
    * @param {Object} options - 可选参数
    * @returns {Promise<Array<LotteryHourlyMetrics>>} 指标记录列表
    */
-  static async getRecentMetrics(campaign_id, hours = 24, options = {}) {
+  static async getRecentMetrics(lottery_campaign_id, hours = 24, options = {}) {
     const start_time = new Date()
     start_time.setHours(start_time.getHours() - hours)
 
     return this.findAll({
       where: {
-        campaign_id,
+        lottery_campaign_id,
         hour_bucket: {
           [Op.gte]: start_time
         }
@@ -302,7 +302,7 @@ function initModel(sequelize) {
       /**
        * 指标ID - 主键（自增）
        */
-      metric_id: {
+      lottery_hourly_metric_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
@@ -312,13 +312,13 @@ function initModel(sequelize) {
       /**
        * 活动ID
        */
-      campaign_id: {
+      lottery_campaign_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        comment: '活动ID（外键关联lottery_campaigns.campaign_id）',
+        comment: '抽奖活动ID（外键关联lottery_campaigns.lottery_campaign_id）',
         references: {
           model: 'lottery_campaigns',
-          key: 'campaign_id'
+          key: 'lottery_campaign_id'
         }
       },
 
@@ -565,7 +565,7 @@ function initModel(sequelize) {
       indexes: [
         {
           unique: true,
-          fields: ['campaign_id', 'hour_bucket'],
+          fields: ['lottery_campaign_id', 'hour_bucket'],
           name: 'uk_campaign_hour'
         },
         {
@@ -573,7 +573,7 @@ function initModel(sequelize) {
           name: 'idx_hourly_metrics_hour'
         },
         {
-          fields: ['campaign_id'],
+          fields: ['lottery_campaign_id'],
           name: 'idx_hourly_metrics_campaign'
         },
         {

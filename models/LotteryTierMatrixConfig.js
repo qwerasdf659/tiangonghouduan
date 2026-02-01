@@ -235,7 +235,7 @@ module.exports = (sequelize, DataTypes) => {
      */
     getFormattedConfig() {
       return {
-        matrix_config_id: this.matrix_config_id, // 添加主键ID，用于前端更新
+        lottery_tier_matrix_config_id: this.lottery_tier_matrix_config_id, // 添加主键ID，用于前端更新
         budget_tier: this.budget_tier,
         pressure_tier: this.pressure_tier,
         cap_multiplier: parseFloat(this.cap_multiplier),
@@ -275,7 +275,7 @@ module.exports = (sequelize, DataTypes) => {
       /**
        * 矩阵配置ID（自增主键）
        */
-      matrix_config_id: {
+      lottery_tier_matrix_config_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,

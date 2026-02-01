@@ -106,7 +106,7 @@ router.get('/campaigns', authenticateToken, async (req, res) => {
  * @desc 获取抽奖策略引擎运行指标（监控面板使用）
  * @access Private（需要管理员权限）
  *
- * @query {number} campaign_id - 活动ID（必填）
+ * @query {number} lottery_campaign_id - 活动ID（必填）
  * @query {number} hours - 查询最近N小时数据（默认24，最大168=7天）
  *
  * @returns {Object} 策略指标数据
@@ -128,7 +128,7 @@ router.get('/campaigns', authenticateToken, async (req, res) => {
  */
 router.get('/metrics', authenticateToken, async (req, res) => {
   try {
-    const { campaign_id, hours = 24 } = req.query
+    const { lottery_campaign_id, hours = 24 } = req.query
 
     // 1. 权限验证：仅管理员可访问
     const currentUserRoles = await getUserRoles(req.user.user_id)
@@ -137,13 +137,13 @@ router.get('/metrics', authenticateToken, async (req, res) => {
     }
 
     // 2. 参数验证
-    if (!campaign_id) {
-      return res.apiError('campaign_id 参数必填', 'MISSING_CAMPAIGN_ID', {}, 400)
+    if (!lottery_campaign_id) {
+      return res.apiError('lottery_campaign_id 参数必填', 'MISSING_CAMPAIGN_ID', {}, 400)
     }
 
-    const campaignIdInt = parseInt(campaign_id)
+    const campaignIdInt = parseInt(lottery_campaign_id)
     if (isNaN(campaignIdInt) || campaignIdInt <= 0) {
-      return res.apiError('campaign_id 必须为正整数', 'INVALID_CAMPAIGN_ID', {}, 400)
+      return res.apiError('lottery_campaign_id 必须为正整数', 'INVALID_CAMPAIGN_ID', {}, 400)
     }
 
     const hoursInt = Math.min(Math.max(parseInt(hours) || 24, 1), 168) // 限制 1-168 小时
@@ -159,7 +159,7 @@ router.get('/metrics', authenticateToken, async (req, res) => {
     // 5. 返回指标数据
     return res.apiSuccess(
       {
-        campaign_id: campaignIdInt,
+        lottery_campaign_id: campaignIdInt,
         time_range: {
           hours: hoursInt,
           start_time: _getStartTime(hoursInt),
@@ -179,7 +179,7 @@ router.get('/metrics', authenticateToken, async (req, res) => {
     logger.error('获取策略指标失败:', {
       error_message: error.message,
       error_stack: error.stack,
-      campaign_id: req.query.campaign_id,
+      lottery_campaign_id: req.query.lottery_campaign_id,
       hours: req.query.hours,
       timestamp: BeijingTimeHelper.now()
     })

@@ -96,20 +96,24 @@ class QueryService {
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID
-   * @param {Array<string|number>} params.campaign_ids - 允许的活动ID列表
+   * @param {Array<string|number>} params.lottery_campaign_ids - 允许的活动ID列表
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象（可选）
    * @returns {Promise<number>} BUDGET_POINTS 可用余额总和
    */
   static async getBudgetPointsByCampaigns(params, options = {}) {
-    const { user_id, campaign_ids } = params
+    const { user_id, lottery_campaign_ids } = params
     const { transaction } = options
 
     if (!user_id) {
       throw new Error('getBudgetPointsByCampaigns: user_id 参数必填')
     }
 
-    if (!campaign_ids || !Array.isArray(campaign_ids) || campaign_ids.length === 0) {
+    if (
+      !lottery_campaign_ids ||
+      !Array.isArray(lottery_campaign_ids) ||
+      lottery_campaign_ids.length === 0
+    ) {
       return 0
     }
 
@@ -124,15 +128,15 @@ class QueryService {
       return 0
     }
 
-    // 将 campaign_ids 转为字符串数组（campaign_id 在表中为字符串类型）
-    const campaignIdStrings = campaign_ids.map(id => String(id))
+    // 将 lottery_campaign_ids 转为字符串数组（lottery_campaign_id 在表中为字符串类型）
+    const campaignIdStrings = lottery_campaign_ids.map(id => String(id))
 
     // 汇总指定活动的 BUDGET_POINTS 可用余额
     const result = await AccountAssetBalance.sum('available_amount', {
       where: {
         account_id: account.account_id,
         asset_code: 'BUDGET_POINTS',
-        campaign_id: { [Op.in]: campaignIdStrings }
+        lottery_campaign_id: { [Op.in]: campaignIdStrings }
       },
       transaction
     })
@@ -332,7 +336,7 @@ class QueryService {
           available_amount: Number(balance.available_amount),
           frozen_amount: Number(balance.frozen_amount),
           total_amount: Number(balance.available_amount) + Number(balance.frozen_amount),
-          campaign_id: balance.campaign_id || null // 仅 BUDGET_POINTS 有值
+          lottery_campaign_id: balance.lottery_campaign_id || null // 仅 BUDGET_POINTS 有值
         })
       }
     }
@@ -479,7 +483,7 @@ class QueryService {
       asset_name: balance.asset_code, // TODO: 可从 MaterialAssetType 获取显示名称
       available_amount: balance.available_amount,
       frozen_amount: balance.frozen_amount,
-      campaign_id: balance.campaign_id,
+      lottery_campaign_id: balance.lottery_campaign_id,
       updated_at: balance.updated_at
     }))
   }

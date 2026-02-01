@@ -104,7 +104,7 @@ function generateIdempotencyKey(prefix = 'stress_test') {
 describe('阶段九：压力测试与高并发（P1）', () => {
   // 测试数据
   let test_user_id
-  let test_campaign_id
+  let test_lottery_campaign_id
   let campaign_code
   let cost_per_draw = 100 // 默认值，后续从活动配置获取
   let auth_token
@@ -123,14 +123,14 @@ describe('阶段九：压力测试与高并发（P1）', () => {
     // 从全局测试数据获取测试用户和活动
     if (global.testData && global.testData._initialized) {
       test_user_id = global.testData.testUser.user_id
-      test_campaign_id = global.testData.testCampaign.campaign_id
+      test_lottery_campaign_id = global.testData.testCampaign.lottery_campaign_id
       // campaign_code 从 TestConfig.realData 获取（包含完整信息）
       campaign_code = TestConfig.realData.testCampaign?.campaign_code
     }
 
     // 如果 campaign_code 仍为空，从数据库查询
-    if (!campaign_code && test_campaign_id) {
-      const campaign = await LotteryCampaign.findByPk(test_campaign_id, {
+    if (!campaign_code && test_lottery_campaign_id) {
+      const campaign = await LotteryCampaign.findByPk(test_lottery_campaign_id, {
         attributes: ['campaign_code', 'cost_per_draw']
       })
       campaign_code = campaign?.campaign_code
@@ -138,13 +138,13 @@ describe('阶段九：压力测试与高并发（P1）', () => {
     }
 
     // 如果有 campaign_code，获取 cost_per_draw
-    if (campaign_code && !test_campaign_id) {
+    if (campaign_code && !test_lottery_campaign_id) {
       const campaign = await LotteryCampaign.findOne({
         where: { campaign_code },
-        attributes: ['campaign_id', 'cost_per_draw']
+        attributes: ['lottery_campaign_id', 'cost_per_draw']
       })
       if (campaign) {
-        test_campaign_id = campaign.campaign_id
+        test_lottery_campaign_id = campaign.lottery_campaign_id
         cost_per_draw = parseFloat(campaign.cost_per_draw) || 100
       }
     }
@@ -187,7 +187,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
 
     console.log('✅ 压力测试初始化完成', {
       test_user_id,
-      test_campaign_id,
+      test_lottery_campaign_id,
       campaign_code,
       cost_per_draw,
       services_loaded: {
@@ -225,7 +225,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
 
         // 记录测试前状态
         const before_draw_count = await LotteryDraw.count({
-          where: { user_id: test_user_id, campaign_id: test_campaign_id }
+          where: { user_id: test_user_id, lottery_campaign_id: test_lottery_campaign_id }
         })
         const before_balance = await getTestUserPointsBalance(test_user_id)
 
@@ -264,7 +264,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
 
         // 记录测试后状态
         const after_draw_count = await LotteryDraw.count({
-          where: { user_id: test_user_id, campaign_id: test_campaign_id }
+          where: { user_id: test_user_id, lottery_campaign_id: test_lottery_campaign_id }
         })
         const after_balance = await getTestUserPointsBalance(test_user_id)
 
@@ -409,10 +409,10 @@ describe('阶段九：压力测试与高并发（P1）', () => {
             { transaction }
           )
 
-          test_listing_id = listing_result.listing.listing_id
+          test_listing_id = listing_result.listing.market_listing_id
           await transaction.commit()
 
-          console.log(`📦 测试商品已上架: listing_id=${test_listing_id}`)
+          console.log(`📦 测试商品已上架: market_listing_id=${test_listing_id}`)
 
           // 2. 获取多个买家（使用真实用户）
           const buyers = await User.findAll({
@@ -447,23 +447,23 @@ describe('阶段九：压力测试与高并发（P1）', () => {
             try {
               const order_result = await TradeOrderService.createOrder({
                 idempotency_key: generateIdempotencyKey(`order_${i}`),
-                listing_id: test_listing_id,
+                market_listing_id: test_listing_id,
                 buyer_id: buyer.user_id
               })
 
-              if (order_result && order_result.order_id) {
+              if (order_result && order_result.trade_order_id) {
                 // 尝试完成订单
                 const complete_result = await TradeOrderService.completeOrder({
-                  order_id: order_result.order_id,
+                  trade_order_id: order_result.trade_order_id,
                   buyer_id: buyer.user_id
                 })
                 return {
                   success: true,
-                  order_id: order_result.order_id,
+                  trade_order_id: order_result.trade_order_id,
                   completed: !!complete_result
                 }
               }
-              return { success: false, reason: 'no_order_id' }
+              return { success: false, reason: 'no_trade_order_id' }
             } catch (error) {
               return { success: false, reason: error.message }
             }
@@ -614,7 +614,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
 
         // 记录测试前的抽奖次数
         const before_draw_count = await LotteryDraw.count({
-          where: { user_id: test_user_id, campaign_id: test_campaign_id }
+          where: { user_id: test_user_id, lottery_campaign_id: test_lottery_campaign_id }
         })
 
         // 创建并发抽奖任务
@@ -648,14 +648,14 @@ describe('阶段九：压力测试与高并发（P1）', () => {
 
         // 记录测试后的抽奖次数
         const after_draw_count = await LotteryDraw.count({
-          where: { user_id: test_user_id, campaign_id: test_campaign_id }
+          where: { user_id: test_user_id, lottery_campaign_id: test_lottery_campaign_id }
         })
 
         // 查询保底触发情况
         const guarantee_triggered_count = await LotteryDraw.count({
           where: {
             user_id: test_user_id,
-            campaign_id: test_campaign_id,
+            lottery_campaign_id: test_lottery_campaign_id,
             guarantee_triggered: true
           }
         })
@@ -697,7 +697,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
 
         // 验证：每个抽奖记录都应该有正确的保底计数
         const recent_draws = await LotteryDraw.findAll({
-          where: { user_id: test_user_id, campaign_id: test_campaign_id },
+          where: { user_id: test_user_id, lottery_campaign_id: test_lottery_campaign_id },
           order: [['created_at', 'DESC']],
           limit: successful_draws
         })
@@ -831,8 +831,8 @@ describe('阶段九：压力测试与高并发（P1）', () => {
           // 聚合查询
           async () =>
             await LotteryDraw.findAll({
-              attributes: [[sequelize.fn('COUNT', sequelize.col('draw_id')), 'count']],
-              where: { campaign_id: test_campaign_id },
+              attributes: [[sequelize.fn('COUNT', sequelize.col('lottery_draw_id')), 'count']],
+              where: { lottery_campaign_id: test_lottery_campaign_id },
               group: ['reward_tier']
             })
         ]

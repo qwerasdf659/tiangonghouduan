@@ -99,7 +99,7 @@ describe('🛒 并发购买竞态测试', () => {
         { transaction }
       )
       await transaction.commit()
-      createdListings.push(result.listing.listing_id)
+      createdListings.push(result.listing.market_listing_id)
       return result.listing
     } catch (error) {
       await transaction.rollback()
@@ -189,7 +189,7 @@ describe('🛒 并发购买竞态测试', () => {
     // 清理测试订单
     for (const orderId of createdOrders) {
       try {
-        await TradeOrder.destroy({ where: { order_id: orderId }, force: true })
+        await TradeOrder.destroy({ where: { trade_order_id: orderId }, force: true })
       } catch (error) {
         console.log(`清理订单 ${orderId} 失败:`, error.message)
       }
@@ -199,7 +199,7 @@ describe('🛒 并发购买竞态测试', () => {
     // 清理测试挂牌
     for (const listingId of createdListings) {
       try {
-        await MarketListing.destroy({ where: { listing_id: listingId }, force: true })
+        await MarketListing.destroy({ where: { market_listing_id: listingId }, force: true })
       } catch (error) {
         console.log(`清理挂牌 ${listingId} 失败:`, error.message)
       }
@@ -240,7 +240,7 @@ describe('🛒 并发购买竞态测试', () => {
       // 1. 创建测试物品和挂牌
       const testItem = await createTestItem(testSeller.user_id)
       const testListing = await createTestListing(testSeller.user_id, testItem.item_instance_id, 30)
-      console.log(`✅ 挂牌创建成功: ${testListing.listing_id}`)
+      console.log(`✅ 挂牌创建成功: ${testListing.market_listing_id}`)
 
       // 2. 为所有买家准备资产
       for (const buyer of testBuyers) {
@@ -263,7 +263,7 @@ describe('🛒 并发购买竞态测试', () => {
           const result = await TradeOrderService.createOrder(
             {
               idempotency_key: idempotencyKey,
-              listing_id: testListing.listing_id,
+              market_listing_id: testListing.market_listing_id,
               buyer_id: buyer.user_id
             },
             { transaction }
@@ -271,15 +271,15 @@ describe('🛒 并发购买竞态测试', () => {
 
           await transaction.commit()
 
-          if (result.order_id) {
-            createdOrders.push(result.order_id)
+          if (result.trade_order_id) {
+            createdOrders.push(result.trade_order_id)
           }
 
           return {
             buyer_id: buyer.user_id,
             index,
             success: true,
-            order_id: result.order_id
+            trade_order_id: result.trade_order_id
           }
         } catch (error) {
           await transaction.rollback()
@@ -306,7 +306,7 @@ describe('🛒 并发购买竞态测试', () => {
 
       if (successResults.length > 0) {
         console.log(
-          `   成功买家: user_id=${successResults[0].buyer_id}, order_id=${successResults[0].order_id}`
+          `   成功买家: user_id=${successResults[0].buyer_id}, trade_order_id=${successResults[0].trade_order_id}`
         )
       }
 
@@ -324,10 +324,12 @@ describe('🛒 并发购买竞态测试', () => {
       })
 
       // 7. 验证挂牌状态
-      const updatedListing = await MarketListing.findByPk(testListing.listing_id)
+      const updatedListing = await MarketListing.findByPk(testListing.market_listing_id)
       expect(updatedListing.status).toBe('locked')
       // 注意：数据库字段可能返回字符串类型
-      expect(Number(updatedListing.locked_by_order_id)).toBe(Number(successResults[0].order_id))
+      expect(Number(updatedListing.locked_by_order_id)).toBe(
+        Number(successResults[0].trade_order_id)
+      )
 
       // 8. 验证订单状态
       const order = await TradeOrder.findByPk(successResults[0].order_id)
@@ -356,7 +358,9 @@ describe('🛒 并发购买竞态测试', () => {
       await grantTestAsset(testBuyer.user_id, 100)
 
       // 3. 使用相同幂等键购买两次（包含listing_id确保唯一性）
-      const idempotencyKey = generateIdempotencyKey(`idempotent_buy_${testListing.listing_id}`)
+      const idempotencyKey = generateIdempotencyKey(
+        `idempotent_buy_${testListing.market_listing_id}`
+      )
 
       // 第一次购买
       const tx1 = await sequelize.transaction()
@@ -365,7 +369,7 @@ describe('🛒 并发购买竞态测试', () => {
         firstResult = await TradeOrderService.createOrder(
           {
             idempotency_key: idempotencyKey,
-            listing_id: testListing.listing_id,
+            market_listing_id: testListing.market_listing_id,
             buyer_id: testBuyer.user_id
           },
           { transaction: tx1 }
@@ -387,7 +391,7 @@ describe('🛒 并发购买竞态测试', () => {
         secondResult = await TradeOrderService.createOrder(
           {
             idempotency_key: idempotencyKey,
-            listing_id: testListing.listing_id,
+            market_listing_id: testListing.market_listing_id,
             buyer_id: testBuyer.user_id
           },
           { transaction: tx2 }
@@ -449,7 +453,7 @@ describe('🛒 并发购买竞态测试', () => {
         const buyers = testBuyers.slice(0, 2)
         for (const buyer of buyers) {
           tasks.push({
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             buyer_id: buyer.user_id
           })
         }
@@ -465,9 +469,9 @@ describe('🛒 并发购买竞态测试', () => {
             const result = await TradeOrderService.createOrder(
               {
                 idempotency_key: generateIdempotencyKey(
-                  `stress_${task.listing_id}_${task.buyer_id}`
+                  `stress_${task.market_listing_id}_${task.buyer_id}`
                 ),
-                listing_id: task.listing_id,
+                market_listing_id: task.market_listing_id,
                 buyer_id: task.buyer_id
               },
               { transaction }
@@ -501,7 +505,7 @@ describe('🛒 并发购买竞态测试', () => {
       // 每个挂牌最多只能有一个成功的订单
       const ordersByListing = {}
       successfulOrders.forEach(r => {
-        ordersByListing[r.listing_id] = (ordersByListing[r.listing_id] || 0) + 1
+        ordersByListing[r.market_listing_id] = (ordersByListing[r.market_listing_id] || 0) + 1
       })
 
       console.log('\n📊 高并发测试结果:')
@@ -552,7 +556,7 @@ describe('🛒 并发购买竞态测试', () => {
         const result = await TradeOrderService.createOrder(
           {
             idempotency_key: generateIdempotencyKey('first_buy'),
-            listing_id: testListing.listing_id,
+            market_listing_id: testListing.market_listing_id,
             buyer_id: buyer1.user_id
           },
           { transaction: tx1 }
@@ -571,7 +575,7 @@ describe('🛒 并发购买竞态测试', () => {
         await TradeOrderService.createOrder(
           {
             idempotency_key: generateIdempotencyKey('second_buy'),
-            listing_id: testListing.listing_id,
+            market_listing_id: testListing.market_listing_id,
             buyer_id: buyer2.user_id
           },
           { transaction: tx2 }
@@ -615,7 +619,7 @@ describe('🛒 并发购买竞态测试', () => {
         const result = await TradeOrderService.createOrder(
           {
             idempotency_key: generateIdempotencyKey('complete_buy'),
-            listing_id: testListing.listing_id,
+            market_listing_id: testListing.market_listing_id,
             buyer_id: buyer1.user_id
           },
           { transaction: orderTx }
@@ -651,7 +655,7 @@ describe('🛒 并发购买竞态测试', () => {
         await TradeOrderService.createOrder(
           {
             idempotency_key: generateIdempotencyKey('buy_sold'),
-            listing_id: testListing.listing_id,
+            market_listing_id: testListing.market_listing_id,
             buyer_id: buyer2.user_id
           },
           { transaction: failTx }

@@ -121,7 +121,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
             if (listing.listing_kind === 'fungible_asset') {
               await MarketListingService.withdrawFungibleAssetListing(
                 {
-                  listing_id: listingId,
+                  market_listing_id: listingId,
                   seller_user_id: listing.seller_user_id,
                   idempotency_key: `cleanup_withdraw_${listingId}_${Date.now()}`
                 },
@@ -130,7 +130,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
             } else {
               await MarketListingService.withdrawListing(
                 {
-                  listing_id: listingId,
+                  market_listing_id: listingId,
                   seller_user_id: listing.seller_user_id,
                   idempotency_key: `cleanup_withdraw_${listingId}_${Date.now()}`
                 },
@@ -184,13 +184,13 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
         await transaction.commit()
 
         // 服务返回结构：{ listing, freeze_result, is_duplicate }
-        listingId = result.listing?.listing_id
+        listingId = result.listing?.market_listing_id
         createdListingIds.push(listingId)
 
-        console.log(`✅ 创建挂牌成功: listing_id=${listingId}`)
+        console.log(`✅ 创建挂牌成功: market_listing_id=${listingId}`)
 
         expect(result.listing).toBeDefined()
-        expect(result.listing.listing_id).toBeDefined()
+        expect(result.listing.market_listing_id).toBeDefined()
         expect(result.is_duplicate).toBeFalsy()
       } catch (error) {
         // 只有事务未完成时才回滚
@@ -239,7 +239,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
       try {
         const result = await TradeOrderService.createOrder(
           {
-            listing_id: listingId,
+            market_listing_id: listingId,
             buyer_id: buyerUserId,
             idempotency_key: idempotencyKey
           },
@@ -276,7 +276,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
       const order = await TradeOrder.findByPk(orderId)
       expect(order.status).toBe('frozen')
       expect(Number(order.buyer_user_id)).toBe(buyerUserId)
-      expect(Number(order.listing_id)).toBe(listingId)
+      expect(Number(order.market_listing_id)).toBe(listingId)
 
       // 验证挂牌状态变为 locked
       const listing = await MarketListing.findByPk(listingId)
@@ -303,7 +303,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
       try {
         const result = await TradeOrderService.completeOrder(
           {
-            order_id: orderId,
+            trade_order_id: orderId,
             idempotency_key: idempotencyKey
           },
           { transaction }
@@ -372,7 +372,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
       expect(order.status).toBe('completed')
       expect(order.buyer_user_id).toBeDefined()
       expect(order.seller_user_id).toBeDefined()
-      expect(order.listing_id).toBeDefined()
+      expect(order.market_listing_id).toBeDefined()
       expect(order.gross_amount).toBeDefined()
       expect(order.net_amount).toBeDefined()
       expect(order.fee_amount).toBeDefined() // 修复：使用正确的字段名
@@ -416,7 +416,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
           { transaction: transaction1 }
         )
         await transaction1.commit()
-        testListingId = firstResult.listing_id
+        testListingId = firstResult.market_listing_id
         createdListingIds.push(testListingId)
       } catch (error) {
         await transaction1.rollback()
@@ -447,10 +447,10 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
       }
 
       // 验证幂等返回
-      expect(duplicateResult.listing_id).toBe(firstResult.listing_id)
+      expect(duplicateResult.market_listing_id).toBe(firstResult.market_listing_id)
       expect(duplicateResult.is_duplicate).toBe(true)
 
-      console.log(`✅ 挂牌幂等性验证通过: listing_id=${testListingId}`)
+      console.log(`✅ 挂牌幂等性验证通过: market_listing_id=${testListingId}`)
     }, 30000)
 
     test('创建订单幂等性：重复请求返回相同结果', async () => {
@@ -467,7 +467,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
       try {
         firstResult = await TradeOrderService.createOrder(
           {
-            listing_id: testListingId,
+            market_listing_id: testListingId,
             buyer_id: buyerUserId,
             idempotency_key: idempotencyKey
           },
@@ -488,7 +488,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
       try {
         duplicateResult = await TradeOrderService.createOrder(
           {
-            listing_id: testListingId,
+            market_listing_id: testListingId,
             buyer_id: buyerUserId,
             idempotency_key: idempotencyKey
           },
@@ -566,7 +566,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
           { transaction: transaction1 }
         )
         await transaction1.commit()
-        testListingId = result.listing?.listing_id
+        testListingId = result.listing?.market_listing_id
         createdListingIds.push(testListingId)
       } catch (error) {
         if (!transaction1.finished) {
@@ -582,7 +582,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
       try {
         await TradeOrderService.createOrder(
           {
-            listing_id: testListingId,
+            market_listing_id: testListingId,
             buyer_id: buyerUserId,
             idempotency_key: idempotencyKey2
           },
@@ -601,7 +601,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
       try {
         await TradeOrderService.createOrder(
           {
-            listing_id: testListingId,
+            market_listing_id: testListingId,
             buyer_id: buyerUserId,
             idempotency_key: idempotencyKey3
           },
@@ -754,9 +754,9 @@ async function cleanupActiveListings(userId) {
         const transaction = await sequelize.transaction()
         try {
           const withdrawParams = {
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             seller_user_id: listing.seller_user_id,
-            idempotency_key: `cleanup_active_${listing.listing_id}_${Date.now()}`
+            idempotency_key: `cleanup_active_${listing.market_listing_id}_${Date.now()}`
           }
 
           if (listing.listing_kind === 'fungible_asset') {
@@ -766,12 +766,12 @@ async function cleanupActiveListings(userId) {
           }
 
           await transaction.commit()
-          console.log(`✅ 撤回挂牌 ${listing.listing_id} (${listing.listing_kind})`)
+          console.log(`✅ 撤回挂牌 ${listing.market_listing_id} (${listing.listing_kind})`)
         } catch (e) {
           if (!transaction.finished) {
             await transaction.rollback()
           }
-          console.warn(`⚠️ 撤回挂牌 ${listing.listing_id} 失败: ${e.message}`)
+          console.warn(`⚠️ 撤回挂牌 ${listing.market_listing_id} 失败: ${e.message}`)
         }
       }
     }

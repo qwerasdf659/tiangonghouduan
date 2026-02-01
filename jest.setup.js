@@ -111,7 +111,7 @@ global.beforeAll(async () => {
       },
       // 测试活动（从数据库动态获取活跃活动）
       testCampaign: {
-        campaign_id: testData.testCampaign.campaign_id,
+        lottery_campaign_id: testData.testCampaign.lottery_campaign_id,
         campaign_name: testData.testCampaign.campaignName
       },
       // 🔴 P0-2新增：测试门店（从数据库动态获取活跃门店）
@@ -127,7 +127,7 @@ global.beforeAll(async () => {
     if (!global.testData.testUser.user_id) {
       console.warn('⚠️ [Jest Setup] 测试用户未找到，某些测试可能失败')
     }
-    if (!global.testData.testCampaign.campaign_id) {
+    if (!global.testData.testCampaign.lottery_campaign_id) {
       console.warn('⚠️ [Jest Setup] 活跃活动未找到，抽奖相关测试可能失败')
     }
     if (!global.testData.testStore.store_id) {
@@ -135,7 +135,7 @@ global.beforeAll(async () => {
     }
 
     console.log(
-      `✅ [Jest Setup] 测试数据初始化完成: user_id=${global.testData.testUser.user_id}, campaign_id=${global.testData.testCampaign.campaign_id}, store_id=${global.testData.testStore.store_id}`
+      `✅ [Jest Setup] 测试数据初始化完成: user_id=${global.testData.testUser.user_id}, lottery_campaign_id=${global.testData.testCampaign.lottery_campaign_id}, store_id=${global.testData.testStore.store_id}`
     )
   } catch (error) {
     console.error('❌ [Jest Setup] 初始化失败:', error.message)
@@ -143,7 +143,7 @@ global.beforeAll(async () => {
     global.testData = {
       testUser: { user_id: null, mobile: '13612227930' },
       adminUser: { user_id: null, mobile: '13612227930' },
-      testCampaign: { campaign_id: null, campaign_name: null },
+      testCampaign: { lottery_campaign_id: null, campaign_name: null },
       testStore: { store_id: null, store_name: null },
       _initialized: false
     }

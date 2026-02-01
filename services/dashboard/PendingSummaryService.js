@@ -144,7 +144,7 @@ class PendingSummaryService {
 
       // 使用 scope 查询待审核记录
       const records = await ConsumptionRecord.scope('pending').findAll({
-        attributes: ['record_id', 'created_at'],
+        attributes: ['consumption_record_id', 'created_at'],
         order: [['created_at', 'ASC']]
       })
 

@@ -11,14 +11,14 @@ module.exports = sequelize => {
   const ChatMessage = sequelize.define(
     'ChatMessage',
     {
-      message_id: {
+      chat_message_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
         comment: '主键ID'
       },
 
-      session_id: {
+      customer_service_session_id: {
         type: DataTypes.BIGINT,
         allowNull: false,
         comment: '会话ID(外键关联customer_sessions)'
@@ -87,10 +87,12 @@ module.exports = sequelize => {
       indexes: [
         {
           unique: true,
-          fields: ['message_id']
+          fields: ['chat_message_id'],
+          name: 'uk_chat_message_id'
         },
         {
-          fields: ['session_id']
+          fields: ['customer_service_session_id'],
+          name: 'idx_chat_messages_session_id'
         },
         {
           fields: ['sender_id']
@@ -119,7 +121,7 @@ module.exports = sequelize => {
 
     // 消息属于会话 - 标准外键关联
     ChatMessage.belongsTo(models.CustomerServiceSession, {
-      foreignKey: 'session_id',
+      foreignKey: 'customer_service_session_id',
       as: 'session'
     })
 
@@ -165,12 +167,15 @@ module.exports = sequelize => {
     return this.update({ status: 'read' })
   }
 
-  // 类方法
+  /*
+   * 类方法 - 聊天消息查询和操作
+   * 2026-02-01 主键规范化：session_id → customer_service_session_id
+   */
   ChatMessage.findBySessionId = function (sessionId, limit = 20, beforeMessageId = null) {
-    const where = { session_id: sessionId }
+    const where = { customer_service_session_id: sessionId }
 
     if (beforeMessageId) {
-      where.id = { [sequelize.Op.lt]: beforeMessageId }
+      where.chat_message_id = { [sequelize.Op.lt]: beforeMessageId }
     }
 
     return this.findAll({
@@ -189,7 +194,7 @@ module.exports = sequelize => {
 
   ChatMessage.getUnreadCount = function (sessionId, senderType = null) {
     const where = {
-      session_id: sessionId,
+      customer_service_session_id: sessionId,
       status: ['sent', 'delivered']
     }
 
@@ -202,7 +207,7 @@ module.exports = sequelize => {
 
   ChatMessage.markSessionMessagesAsRead = function (sessionId, receiverType) {
     const where = {
-      session_id: sessionId,
+      customer_service_session_id: sessionId,
       sender_type: receiverType === 'user' ? 'admin' : 'user',
       status: ['sent', 'delivered']
     }

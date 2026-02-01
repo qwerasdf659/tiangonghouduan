@@ -54,14 +54,14 @@ class EligibilityStage extends BaseStage {
    *
    * @param {Object} context - 执行上下文
    * @param {number} context.user_id - 用户ID
-   * @param {number} context.campaign_id - 活动ID
+   * @param {number} context.lottery_campaign_id - 活动ID
    * @param {Object} context.stage_results - 前置Stage的执行结果
    * @returns {Promise<Object>} Stage 执行结果
    */
   async execute(context) {
-    const { user_id, campaign_id, draw_count = 1 } = context
+    const { user_id, lottery_campaign_id, draw_count = 1 } = context
 
-    this.log('info', '开始检查抽奖资格', { user_id, campaign_id, draw_count })
+    this.log('info', '开始检查抽奖资格', { user_id, lottery_campaign_id, draw_count })
 
     try {
       // 获取活动配置（从 LoadCampaignStage 的结果中）
@@ -77,13 +77,13 @@ class EligibilityStage extends BaseStage {
       const campaign = campaign_data.campaign
 
       // 1. 检查用户是否被禁止抽奖（黑名单检查）
-      const ban_check = await this._checkUserBan(user_id, campaign_id)
+      const ban_check = await this._checkUserBan(user_id, lottery_campaign_id)
       if (!ban_check.is_eligible) {
-        return this.failure(ban_check.reason, 'USER_BANNED', { user_id, campaign_id })
+        return this.failure(ban_check.reason, 'USER_BANNED', { user_id, lottery_campaign_id })
       }
 
       // 2. 获取用户的活动配额（可选，用于特殊配额控制）
-      const user_quota = await this._getUserQuota(user_id, campaign_id)
+      const user_quota = await this._getUserQuota(user_id, lottery_campaign_id)
 
       /*
        * 3. 使用 LotteryQuotaService 检查配额（单一真相源）
@@ -96,7 +96,7 @@ class EligibilityStage extends BaseStage {
        */
       const quota_check = await LotteryQuotaService.checkQuotaSufficient({
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         draw_count
       })
 
@@ -111,7 +111,7 @@ class EligibilityStage extends BaseStage {
 
         this.log('info', '用户不满足抽奖资格', {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           draw_count,
           reason,
           quota_sufficient: quota_check.sufficient,
@@ -121,7 +121,7 @@ class EligibilityStage extends BaseStage {
 
         return this.failure(reason, 'ELIGIBILITY_CHECK_FAILED', {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           draw_count,
           daily_draws: quota_check.used,
           max_daily_draws: quota_check.limit,
@@ -164,7 +164,7 @@ class EligibilityStage extends BaseStage {
 
       this.log('info', '抽奖资格检查通过', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         draw_count,
         daily_draws: quota_check.used,
         remaining_draws: quota_check.remaining
@@ -174,7 +174,7 @@ class EligibilityStage extends BaseStage {
     } catch (error) {
       this.log('error', '抽奖资格检查失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         draw_count,
         error: error.message
       })
@@ -186,17 +186,17 @@ class EligibilityStage extends BaseStage {
    * 检查用户是否被禁止抽奖
    *
    * @param {number} user_id - 用户ID
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @returns {Promise<Object>} 检查结果 { is_eligible, reason }
    * @private
    */
-  async _checkUserBan(user_id, campaign_id) {
+  async _checkUserBan(user_id, lottery_campaign_id) {
     try {
       // 检查活动级别的用户黑名单（通过 user_quota 表的 status 字段）
       const banned_quota = await LotteryCampaignUserQuota.findOne({
         where: {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           status: 'suspended'
         }
       })
@@ -212,7 +212,7 @@ class EligibilityStage extends BaseStage {
     } catch (error) {
       this.log('warn', '检查用户黑名单失败，默认允许抽奖', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       return { is_eligible: true, reason: null }
@@ -223,23 +223,23 @@ class EligibilityStage extends BaseStage {
    * 获取用户的活动配额
    *
    * @param {number} user_id - 用户ID
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @returns {Promise<Object|null>} 用户配额记录
    * @private
    */
-  async _getUserQuota(user_id, campaign_id) {
+  async _getUserQuota(user_id, lottery_campaign_id) {
     try {
       return await LotteryCampaignUserQuota.findOne({
         where: {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           status: 'active'
         }
       })
     } catch (error) {
       this.log('warn', '获取用户配额失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       return null

@@ -30,7 +30,7 @@ class LotteryCampaignQuotaGrant extends Model {
   static associate(models) {
     // 多对一：赠送记录属于某个活动
     LotteryCampaignQuotaGrant.belongsTo(models.LotteryCampaign, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'campaign',
       onDelete: 'CASCADE',
       comment: '所属活动'
@@ -74,9 +74,9 @@ class LotteryCampaignQuotaGrant extends Model {
    */
   toSummary() {
     return {
-      grant_id: this.grant_id,
+      lottery_campaign_quota_grant_id: this.lottery_campaign_quota_grant_id,
       quota_id: this.quota_id,
-      campaign_id: this.campaign_id,
+      lottery_campaign_id: this.lottery_campaign_id,
       user_id: this.user_id,
       grant_source: this.grant_source,
       grant_source_name: this.getGrantSourceName(),
@@ -100,7 +100,7 @@ class LotteryCampaignQuotaGrant extends Model {
 
     const {
       quota_id,
-      campaign_id,
+      lottery_campaign_id,
       user_id,
       grant_source,
       grant_amount,
@@ -110,7 +110,7 @@ class LotteryCampaignQuotaGrant extends Model {
       balance_after
     } = grantData
 
-    if (!user_id || !campaign_id || !grant_source || !grant_amount) {
+    if (!user_id || !lottery_campaign_id || !grant_source || !grant_amount) {
       throw new Error('缺少必要的赠送参数')
     }
 
@@ -121,7 +121,7 @@ class LotteryCampaignQuotaGrant extends Model {
     const grant = await this.create(
       {
         quota_id: quota_id || null,
-        campaign_id,
+        lottery_campaign_id,
         user_id,
         grant_source,
         grant_amount,
@@ -148,7 +148,7 @@ class LotteryCampaignQuotaGrant extends Model {
 
     return this.findAll({
       where: {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         user_id: userId
       },
       order: [['created_at', 'DESC']],
@@ -174,7 +174,7 @@ class LotteryCampaignQuotaGrant extends Model {
         [fn('COUNT', col('grant_id')), 'grant_count'],
         [fn('SUM', col('grant_amount')), 'total_amount']
       ],
-      where: { campaign_id: campaignId },
+      where: { lottery_campaign_id: campaignId },
       group: ['grant_source'],
       transaction
     })
@@ -196,7 +196,7 @@ class LotteryCampaignQuotaGrant extends Model {
         [fn('SUM', col('grant_amount')), 'total_amount'],
         [fn('COUNT', fn('DISTINCT', col('user_id'))), 'unique_users']
       ],
-      where: { campaign_id: campaignId },
+      where: { lottery_campaign_id: campaignId },
       raw: true,
       transaction
     })
@@ -222,7 +222,7 @@ class LotteryCampaignQuotaGrant extends Model {
 
     return this.findAll({
       where: {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         created_at: {
           [Op.between]: [startDate, endDate]
         }
@@ -246,7 +246,7 @@ module.exports = sequelize => {
       /**
        * 赠送记录ID - 主键
        */
-      grant_id: {
+      lottery_campaign_quota_grant_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
@@ -274,10 +274,10 @@ module.exports = sequelize => {
       /**
        * 活动ID
        */
-      campaign_id: {
+      lottery_campaign_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        comment: '活动ID（外键关联lottery_campaigns.campaign_id）'
+        comment: '抽奖活动ID（外键关联lottery_campaigns.lottery_campaign_id）'
       },
 
       /**
@@ -355,12 +355,12 @@ module.exports = sequelize => {
       indexes: [
         // 查询索引：按活动和用户查询赠送历史
         {
-          fields: ['campaign_id', 'user_id', 'created_at'],
+          fields: ['lottery_campaign_id', 'user_id', 'created_at'],
           name: 'idx_quota_grants_campaign_user_time'
         },
         // 查询索引：按赠送来源查询
         {
-          fields: ['campaign_id', 'grant_source'],
+          fields: ['lottery_campaign_id', 'grant_source'],
           name: 'idx_quota_grants_campaign_source'
         },
         // 查询索引：按来源引用ID查询

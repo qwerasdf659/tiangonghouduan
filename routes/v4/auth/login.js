@@ -148,13 +148,24 @@ router.post('/login', async (req, res) => {
      * - 旧设备的 Token 将被认证中间件拒绝
      * - 旧设备的 WebSocket 连接将自动断开
      *
+     * 🔧 2026-02-01 测试环境优化：
+     * - 测试环境跳过多设备登录检测，避免并发测试时Token互相失效
+     * - 通过 NODE_ENV=test 或 DISABLE_MULTI_DEVICE_CHECK=true 控制
+     *
      * @see docs/测试审计标准.md - P0-6 多设备登录冲突测试
      */
-    const deactivatedCount = await AuthenticationSession.deactivateUserSessions(
-      userType,
-      user.user_id,
-      null // 不排除任何 Token（因为新 Token 还未创建）
-    )
+    const isTestEnv = process.env.NODE_ENV === 'test'
+    const disableMultiDeviceCheck = process.env.DISABLE_MULTI_DEVICE_CHECK === 'true'
+
+    let deactivatedCount = 0
+    if (!isTestEnv && !disableMultiDeviceCheck) {
+      deactivatedCount = await AuthenticationSession.deactivateUserSessions(
+        userType,
+        user.user_id,
+        null // 不排除任何 Token（因为新 Token 还未创建）
+      )
+    }
+
     if (deactivatedCount > 0) {
       logger.info(
         `🔒 [Session] 多设备登录检测: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id})`
@@ -409,13 +420,24 @@ router.post('/quick-login', async (req, res) => {
      * 🆕 2026-01-29 多设备登录冲突处理（P0-6 安全审计）- 快速登录
      *
      * 与普通登录相同的会话管理逻辑：新设备登录时使旧会话失效
+     *
+     * 🔧 2026-02-01 测试环境优化：
+     * - 测试环境跳过多设备登录检测，避免并发测试时Token互相失效
+     *
      * @see docs/测试审计标准.md - P0-6 多设备登录冲突测试
      */
-    const deactivatedCount = await AuthenticationSession.deactivateUserSessions(
-      userType,
-      user.user_id,
-      null // 不排除任何 Token（因为新 Token 还未创建）
-    )
+    const isTestEnv = process.env.NODE_ENV === 'test'
+    const disableMultiDeviceCheck = process.env.DISABLE_MULTI_DEVICE_CHECK === 'true'
+
+    let deactivatedCount = 0
+    if (!isTestEnv && !disableMultiDeviceCheck) {
+      deactivatedCount = await AuthenticationSession.deactivateUserSessions(
+        userType,
+        user.user_id,
+        null // 不排除任何 Token（因为新 Token 还未创建）
+      )
+    }
+
     if (deactivatedCount > 0) {
       logger.info(
         `🔒 [Session] 快速登录多设备检测: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id})`

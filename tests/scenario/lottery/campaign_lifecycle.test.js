@@ -94,7 +94,7 @@ describe('📊 任务11.2：活动全生命周期测试', () => {
     adminToken = userToken
 
     // 3. 获取测试活动信息
-    testCampaignId = global.testData?.testCampaign?.campaign_id
+    testCampaignId = global.testData?.testCampaign?.lottery_campaign_id
     testCampaignCode = TestConfig.realData?.testCampaign?.campaign_code || 'BASIC_LOTTERY'
     testCampaignName = global.testData?.testCampaign?.campaign_name || '测试活动'
 
@@ -168,8 +168,8 @@ describe('📊 任务11.2：活动全生命周期测试', () => {
         console.log(`   📌 预算剩余: ${campaign.pool_budget?.remaining || 0}`)
 
         // 存储活动信息供后续测试使用
-        if (campaign.campaign_id) {
-          testCampaignId = campaign.campaign_id
+        if (campaign.lottery_campaign_id) {
+          testCampaignId = campaign.lottery_campaign_id
           testCampaignCode = campaign.campaign_code
         }
 
@@ -288,7 +288,7 @@ describe('📊 任务11.2：活动全生命周期测试', () => {
           const testActivity = activities.find(
             a =>
               a.campaign_code === testCampaignCode ||
-              a.campaign_id === testCampaignId ||
+              a.lottery_campaign_id === testCampaignId ||
               a.campaign_name === testCampaignName
           )
 
@@ -300,14 +300,14 @@ describe('📊 任务11.2：活动全生命周期测试', () => {
 
             // 更新活动代码
             testCampaignCode = testActivity.campaign_code
-            testCampaignId = testActivity.campaign_id
+            testCampaignId = testActivity.lottery_campaign_id
 
             console.log('   ✅ 活动状态验证通过')
           } else {
             console.log('   ⚠️ 未找到测试活动，将使用第一个可用活动')
             if (activities.length > 0) {
               testCampaignCode = activities[0].campaign_code
-              testCampaignId = activities[0].campaign_id
+              testCampaignId = activities[0].lottery_campaign_id
             }
           }
         } else {
@@ -461,7 +461,7 @@ describe('📊 任务11.2：活动全生命周期测试', () => {
         .get('/api/v4/console/business-records/lottery')
         .set('Authorization', `Bearer ${adminToken}`)
         .query({
-          campaign_id: testCampaignId,
+          lottery_campaign_id: testCampaignId,
           limit: 10
         })
 

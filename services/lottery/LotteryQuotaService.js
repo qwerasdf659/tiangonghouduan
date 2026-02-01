@@ -41,14 +41,14 @@ const BeijingTimeHelper = require('../../utils/timeHelper')
  * // 获取用户生效的每日配额上限
  * const { limit_value, matched_rule } = await LotteryQuotaService.getEffectiveDailyLimit({
  *   user_id: 10001,
- *   campaign_id: 1
+ *   lottery_campaign_id: 1
  * })
  *
  * // 在事务内原子扣减配额
  * const transaction = await sequelize.transaction()
  * const result = await LotteryQuotaService.tryDeductQuota({
  *   user_id: 10001,
- *   campaign_id: 1,
+ *   lottery_campaign_id: 1,
  *   draw_count: 10  // 10连抽
  * }, { transaction })
  *
@@ -79,10 +79,10 @@ class LotteryQuotaService {
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 抽奖活动ID
    * @returns {Promise<Object>} { limit_value, matched_rule, priority, debug }
    */
-  static async getEffectiveDailyLimit({ user_id, campaign_id }) {
+  static async getEffectiveDailyLimit({ user_id, lottery_campaign_id }) {
     try {
       const { LotteryDrawQuotaRule, UserRole, Role } = require('../../models')
 
@@ -110,13 +110,13 @@ class LotteryQuotaService {
       // 调用模型静态方法获取生效配额
       const result = await LotteryDrawQuotaRule.getEffectiveDailyLimit({
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         role_uuids
       })
 
       logger.debug('获取用户生效配额:', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         limit_value: result.limit_value,
         matched_rule: result.matched_rule
       })
@@ -138,11 +138,11 @@ class LotteryQuotaService {
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 抽奖活动ID
    * @param {Object} options - 选项 { transaction }
    * @returns {Promise<Object>} 配额行对象
    */
-  static async ensureDailyQuota({ user_id, campaign_id }, options = {}) {
+  static async ensureDailyQuota({ user_id, lottery_campaign_id }, options = {}) {
     try {
       const { LotteryUserDailyDrawQuota, UserRole, Role } = require('../../models')
 
@@ -171,7 +171,7 @@ class LotteryQuotaService {
       const quota = await LotteryUserDailyDrawQuota.ensureDailyQuota(
         {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           role_uuids
         },
         options
@@ -179,8 +179,8 @@ class LotteryQuotaService {
 
       logger.debug('确保用户配额行存在:', {
         user_id,
-        campaign_id,
-        quota_id: quota?.quota_id,
+        lottery_campaign_id,
+        quota_id: quota?.lottery_user_daily_draw_quota_id,
         limit_value: quota?.limit_value
       })
 
@@ -207,12 +207,12 @@ class LotteryQuotaService {
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 抽奖活动ID
    * @param {number} params.draw_count - 本次抽奖次数（连抽场景 >1）
    * @param {Object} options - 选项 { transaction }（必需）
    * @returns {Promise<Object>} { success, remaining, limit, used, message }
    */
-  static async tryDeductQuota({ user_id, campaign_id, draw_count = 1 }, options = {}) {
+  static async tryDeductQuota({ user_id, lottery_campaign_id, draw_count = 1 }, options = {}) {
     const { transaction } = options
 
     if (!transaction) {
@@ -223,13 +223,13 @@ class LotteryQuotaService {
       const { LotteryUserDailyDrawQuota } = require('../../models')
 
       // 确保配额行存在
-      await this.ensureDailyQuota({ user_id, campaign_id }, { transaction })
+      await this.ensureDailyQuota({ user_id, lottery_campaign_id }, { transaction })
 
       // 调用模型静态方法进行原子扣减
       const result = await LotteryUserDailyDrawQuota.tryDeductQuota(
         {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           draw_count
         },
         { transaction }
@@ -238,7 +238,7 @@ class LotteryQuotaService {
       if (result.success) {
         logger.info('配额扣减成功:', {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           draw_count,
           remaining: result.remaining,
           used: result.used
@@ -246,7 +246,7 @@ class LotteryQuotaService {
       } else {
         logger.warn('配额扣减失败（配额不足）:', {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           draw_count,
           remaining: result.remaining,
           limit: result.limit,
@@ -266,18 +266,18 @@ class LotteryQuotaService {
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 抽奖活动ID
    * @param {Object} options - 选项 { transaction }
    * @returns {Promise<Object|null>} 配额状态对象或null
    */
-  static async getDailyQuotaStatus({ user_id, campaign_id }, options = {}) {
+  static async getDailyQuotaStatus({ user_id, lottery_campaign_id }, options = {}) {
     try {
       const { LotteryUserDailyDrawQuota } = require('../../models')
 
       const status = await LotteryUserDailyDrawQuota.getDailyQuotaStatus(
         {
           user_id,
-          campaign_id
+          lottery_campaign_id
         },
         options
       )
@@ -294,20 +294,23 @@ class LotteryQuotaService {
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 抽奖活动ID
    * @param {number} params.bonus_count - 补偿次数
    * @param {string} [params.reason] - 补偿原因
    * @param {Object} options - 选项 { transaction, admin_id }
    * @returns {Promise<Object>} 更新后的配额状态
    */
-  static async addBonusDrawCount({ user_id, campaign_id, bonus_count, reason }, options = {}) {
+  static async addBonusDrawCount(
+    { user_id, lottery_campaign_id, bonus_count, reason },
+    options = {}
+  ) {
     try {
       const { LotteryUserDailyDrawQuota } = require('../../models')
 
       const result = await LotteryUserDailyDrawQuota.addBonusDrawCount(
         {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           bonus_count,
           reason
         },
@@ -316,7 +319,7 @@ class LotteryQuotaService {
 
       logger.info('添加临时补偿次数成功:', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         bonus_count,
         reason,
         new_total_available: result?.total_available
@@ -339,13 +342,13 @@ class LotteryQuotaService {
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 抽奖活动ID
    * @returns {Promise<Object>} 配额状态对象
    */
-  static async getOrInitQuotaStatus({ user_id, campaign_id }) {
+  static async getOrInitQuotaStatus({ user_id, lottery_campaign_id }) {
     try {
       // 先尝试获取现有配额状态
-      const status = await this.getDailyQuotaStatus({ user_id, campaign_id })
+      const status = await this.getDailyQuotaStatus({ user_id, lottery_campaign_id })
 
       if (status) {
         return status
@@ -354,7 +357,7 @@ class LotteryQuotaService {
       // 如果不存在，计算生效配额上限
       const { limit_value, matched_rule } = await this.getEffectiveDailyLimit({
         user_id,
-        campaign_id
+        lottery_campaign_id
       })
 
       const todayDate = BeijingTimeHelper.todayStart().toISOString().split('T')[0]
@@ -362,7 +365,7 @@ class LotteryQuotaService {
       return {
         quota_id: null,
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         quota_date: todayDate,
         limit_value,
         used_draw_count: 0,
@@ -385,13 +388,13 @@ class LotteryQuotaService {
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 抽奖活动ID
    * @param {number} params.draw_count - 本次抽奖次数
    * @returns {Promise<Object>} { sufficient, remaining, limit, message }
    */
-  static async checkQuotaSufficient({ user_id, campaign_id, draw_count = 1 }) {
+  static async checkQuotaSufficient({ user_id, lottery_campaign_id, draw_count = 1 }) {
     try {
-      const status = await this.getOrInitQuotaStatus({ user_id, campaign_id })
+      const status = await this.getOrInitQuotaStatus({ user_id, lottery_campaign_id })
 
       const sufficient = status.remaining >= draw_count
 
@@ -420,13 +423,19 @@ class LotteryQuotaService {
    *
    * @param {Object} params - 查询参数
    * @param {string} params.rule_type - 规则类型（global/campaign/role/user，可选）
-   * @param {number} params.campaign_id - 活动ID（可选）
+   * @param {number} params.lottery_campaign_id - 抽奖活动ID（可选）
    * @param {boolean} params.is_active - 是否激活（可选）
    * @param {number} params.page - 页码（默认1）
    * @param {number} params.page_size - 每页数量（默认20）
    * @returns {Promise<Object>} { rules, pagination }
    */
-  static async getRulesList({ rule_type, campaign_id, is_active, page = 1, page_size = 20 }) {
+  static async getRulesList({
+    rule_type,
+    lottery_campaign_id,
+    is_active,
+    page = 1,
+    page_size = 20
+  }) {
     const { LotteryDrawQuotaRule } = require('../../models')
 
     // 构建查询条件
@@ -436,11 +445,11 @@ class LotteryQuotaService {
       whereClause.scope_type = rule_type
     }
 
-    if (campaign_id) {
-      // 当前表结构仅对 campaign 维度存储 campaign_id（scope_id）
+    if (lottery_campaign_id) {
+      // 当前表结构仅对 campaign 维度存储 lottery_campaign_id（scope_id）
       if (!rule_type || rule_type === 'campaign') {
         whereClause.scope_type = 'campaign'
-        whereClause.scope_id = String(parseInt(campaign_id))
+        whereClause.scope_id = String(parseInt(lottery_campaign_id))
       }
     }
 
@@ -462,7 +471,7 @@ class LotteryQuotaService {
     })
 
     logger.info('查询配额规则列表', {
-      filters: { rule_type, campaign_id, is_active },
+      filters: { rule_type, lottery_campaign_id, is_active },
       total: count
     })
 
@@ -517,7 +526,7 @@ class LotteryQuotaService {
    *
    * @param {Object} params - 规则参数
    * @param {string} params.rule_type - 规则类型（global/campaign/role/user）
-   * @param {number} params.campaign_id - 活动ID（campaign类型必填）
+   * @param {number} params.lottery_campaign_id - 抽奖活动ID（campaign类型必填）
    * @param {string} params.role_uuid - 角色UUID（role类型必填）
    * @param {number} params.target_user_id - 目标用户ID（user类型必填）
    * @param {number} params.limit_value - 每日抽奖次数上限
@@ -529,7 +538,7 @@ class LotteryQuotaService {
    */
   static async createRule({
     rule_type,
-    campaign_id,
+    lottery_campaign_id,
     role_uuid,
     target_user_id,
     limit_value,
@@ -551,7 +560,7 @@ class LotteryQuotaService {
     // 计算 scope_id（当前表结构以 scope_type + scope_id 表达四维度规则）
     let scope_id = 'global'
     if (rule_type === 'campaign') {
-      scope_id = String(parseInt(campaign_id))
+      scope_id = String(parseInt(lottery_campaign_id))
     } else if (rule_type === 'role') {
       scope_id = role_uuid
     } else if (rule_type === 'user') {
@@ -630,18 +639,18 @@ class LotteryQuotaService {
    * @description 返回配额规则和用户配额的汇总统计数据
    *
    * @param {Object} params - 参数
-   * @param {number} [params.campaign_id] - 活动ID（可选，不传则返回全局统计）
+   * @param {number} [params.lottery_campaign_id] - 抽奖活动ID（可选，不传则返回全局统计）
    * @returns {Promise<Object>} 统计数据对象
    *
    * @example
-   * const stats = await LotteryQuotaService.getStatistics({ campaign_id: 1 })
+   * const stats = await LotteryQuotaService.getStatistics({ lottery_campaign_id: 1 })
    * // 返回：
    * // {
    * //   rules: { total: 5, active: 3, by_type: { global: 1, campaign: 2, role: 1, user: 1 } },
    * //   quotas: { total_users: 100, today_used: 500, today_remaining: 1500, today_total: 2000 }
    * // }
    */
-  static async getStatistics({ campaign_id } = {}) {
+  static async getStatistics({ lottery_campaign_id } = {}) {
     const { LotteryDrawQuotaRule, LotteryUserDailyDrawQuota, sequelize } = require('../../models')
 
     // 获取当日日期（北京时间，格式：YYYY-MM-DD）
@@ -683,8 +692,8 @@ class LotteryQuotaService {
     const quotaStats = {}
 
     const quotaWhere = { quota_date: today }
-    if (campaign_id) {
-      quotaWhere.campaign_id = parseInt(campaign_id)
+    if (lottery_campaign_id) {
+      quotaWhere.lottery_campaign_id = parseInt(lottery_campaign_id)
     }
 
     // 今日有配额记录的用户数
@@ -714,7 +723,7 @@ class LotteryQuotaService {
     )
 
     logger.info('获取配额统计数据成功', {
-      campaign_id: campaign_id || 'global',
+      lottery_campaign_id: lottery_campaign_id || 'global',
       rules_total: ruleStats.total,
       quotas_users: quotaStats.total_users,
       today_used: quotaStats.today_used
@@ -724,7 +733,7 @@ class LotteryQuotaService {
       rules: ruleStats,
       quotas: quotaStats,
       query_date: today,
-      campaign_id: campaign_id ? parseInt(campaign_id) : null
+      lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : null
     }
   }
 }

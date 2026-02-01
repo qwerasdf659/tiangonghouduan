@@ -63,7 +63,7 @@ module.exports = (sequelize, DataTypes) => {
        * - 主键：唯一，不允许重复
        * - 自动生成：无需手动赋值
        */
-      preset_id: {
+      lottery_preset_id: {
         type: DataTypes.STRING(50),
         primaryKey: true,
         defaultValue: () =>
@@ -113,12 +113,12 @@ module.exports = (sequelize, DataTypes) => {
        *
        * 示例：prize_id = 1（预设奖品为一等奖）
        */
-      prize_id: {
+      lottery_prize_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
           model: 'lottery_prizes',
-          key: 'prize_id'
+          key: 'lottery_prize_id'
         },
         comment: '预设的奖品ID'
       },
@@ -134,7 +134,7 @@ module.exports = (sequelize, DataTypes) => {
        * - 使用后标记为used状态，下次抽奖使用下一个预设
        *
        * 使用流程：
-       * 1. 运营人员创建预设队列：[{prize_id: 1, queue_order: 1}, {prize_id: 2, queue_order: 2}]
+       * 1. 运营人员创建预设队列：[{lottery_prize_id: 1, queue_order: 1}, {lottery_prize_id: 2, queue_order: 2}]
        * 2. 用户第1次抽奖：使用queue_order=1的预设（获得奖品1）
        * 3. 用户第2次抽奖：使用queue_order=2的预设（获得奖品2）
        * 4. 用户第3次抽奖：无预设，执行正常抽奖逻辑
@@ -206,23 +206,23 @@ module.exports = (sequelize, DataTypes) => {
       // 🔴 统一抽奖架构新增字段（2026-01-18 - DR-16二次审批流程）
 
       /**
-       * campaign_id - 关联的抽奖活动ID（2026-01-18新增）
+       * lottery_campaign_id - 关联的抽奖活动ID（2026-01-18新增）
        *
        * 业务含义：预设关联到具体的抽奖活动，支持活动级别的预设管理
        *
        * 业务规则：
        * - 可选字段（允许为空，向后兼容旧预设）
        * - 新预设建议关联活动（便于按活动管理预设）
-       * - 外键约束：引用lottery_campaigns.campaign_id
+       * - 外键约束：引用lottery_campaigns.lottery_campaign_id
        *
-       * 示例：campaign_id = 1（关联到活动1的预设）
+       * 示例：lottery_campaign_id = 1（关联到活动1的预设）
        */
-      campaign_id: {
+      lottery_campaign_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
         references: {
           model: 'lottery_campaigns',
-          key: 'campaign_id'
+          key: 'lottery_campaign_id'
         },
         comment: '关联的抽奖活动ID（可选，用于按活动管理预设）'
       },
@@ -415,7 +415,7 @@ module.exports = (sequelize, DataTypes) => {
 
     // 关联奖品表
     LotteryPreset.belongsTo(models.LotteryPrize, {
-      foreignKey: 'prize_id',
+      foreignKey: 'lottery_prize_id',
       as: 'prize'
     })
 
@@ -429,7 +429,7 @@ module.exports = (sequelize, DataTypes) => {
 
     // 关联抽奖活动
     LotteryPreset.belongsTo(models.LotteryCampaign, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'campaign',
       onDelete: 'SET NULL',
       comment: '关联的抽奖活动'
@@ -444,8 +444,8 @@ module.exports = (sequelize, DataTypes) => {
 
     // 一对多：预设产生的库存欠账
     LotteryPreset.hasMany(models.PresetInventoryDebt, {
-      foreignKey: 'preset_id',
-      sourceKey: 'preset_id',
+      foreignKey: 'lottery_preset_id',
+      sourceKey: 'lottery_preset_id',
       as: 'inventoryDebts',
       onDelete: 'SET NULL',
       comment: '预设产生的库存欠账'
@@ -453,8 +453,8 @@ module.exports = (sequelize, DataTypes) => {
 
     // 一对多：预设产生的预算欠账
     LotteryPreset.hasMany(models.PresetBudgetDebt, {
-      foreignKey: 'preset_id',
-      sourceKey: 'preset_id',
+      foreignKey: 'lottery_preset_id',
+      sourceKey: 'lottery_preset_id',
       as: 'budgetDebts',
       onDelete: 'SET NULL',
       comment: '预设产生的预算欠账'
@@ -462,8 +462,8 @@ module.exports = (sequelize, DataTypes) => {
 
     // 一对多：预设关联的决策快照
     LotteryPreset.hasMany(models.LotteryDrawDecision, {
-      foreignKey: 'preset_id',
-      sourceKey: 'preset_id',
+      foreignKey: 'lottery_preset_id',
+      sourceKey: 'lottery_preset_id',
       as: 'decisions',
       onDelete: 'SET NULL',
       comment: '预设关联的决策快照'
@@ -595,7 +595,7 @@ module.exports = (sequelize, DataTypes) => {
           model: sequelize.models.LotteryPrize,
           as: 'prize',
           attributes: [
-            'prize_id',
+            'lottery_prize_id',
             'prize_name',
             'prize_type',
             'prize_value',
@@ -615,7 +615,7 @@ module.exports = (sequelize, DataTypes) => {
    *
    * 业务流程：
    * 1. 运营人员在管理后台选择目标用户
-   * 2. 配置预设队列：[{prize_id: 1, queue_order: 1}, {prize_id: 2, queue_order: 2}]
+   * 2. 配置预设队列：[{lottery_prize_id: 1, queue_order: 1}, {lottery_prize_id: 2, queue_order: 2}]
    * 3. 调用createPresetQueue创建预设记录
    * 4. 系统批量创建预设记录（在事务中执行，确保原子性）
    * 5. 用户抽奖时，系统按队列顺序返回预设奖品
@@ -633,33 +633,33 @@ module.exports = (sequelize, DataTypes) => {
    *
    * 事务回滚：
    * - 任一预设创建失败，所有预设回滚（避免部分创建）
-   * - 外键约束失败（user_id或prize_id无效），事务回滚
+   * - 外键约束失败（user_id或lottery_prize_id无效），事务回滚
    *
    * @param {number} user_id - 用户ID（必填，预设奖品的目标用户）
    * @param {Array<Object>} presets - 预设配置数组（必填）
-   * @param {number} presets[].prize_id - 奖品ID（必填）
+   * @param {number} presets[].lottery_prize_id - 奖品ID（必填）
    * @param {number} presets[].queue_order - 队列顺序（必填，从1开始递增）
    * @param {number} adminId - 管理员ID（可选，用于审计追溯）
    * @returns {Promise<Array<LotteryPreset>>} 创建的预设记录数组
    *
    * @throws {Error} 如果user_id无效（外键约束失败）
-   * @throws {Error} 如果prize_id无效（外键约束失败）
+   * @throws {Error} 如果lottery_prize_id无效（外键约束失败）
    * @throws {Error} 如果presets数组为空
    * @throws {Error} 如果queue_order重复（数据库唯一索引冲突）
    *
    * @example
    * // 运营人员为用户创建预设队列
    * const presets = [
-   *   { prize_id: 1, queue_order: 1 },  // 第1次抽奖获得奖品1
-   *   { prize_id: 2, queue_order: 2 },  // 第2次抽奖获得奖品2
-   *   { prize_id: 3, queue_order: 3 }   // 第3次抽奖获得奖品3
+   *   { lottery_prize_id: 1, queue_order: 1 },  // 第1次抽奖获得奖品1
+   *   { lottery_prize_id: 2, queue_order: 2 },  // 第2次抽奖获得奖品2
+   *   { lottery_prize_id: 3, queue_order: 3 }   // 第3次抽奖获得奖品3
    * ]
    * const createdPresets = await LotteryPreset.createPresetQueue(10001, presets, 1)
    * console.log('成功创建预设队列:', createdPresets.length, '条')
    *
    * // 为VIP用户设置保底奖品（第5次必中一等奖）
    * const vipPresets = [
-   *   { prize_id: 1, queue_order: 5 }  // 第5次抽奖必中一等奖
+   *   { lottery_prize_id: 1, queue_order: 5 }  // 第5次抽奖必中一等奖
    * ]
    * await LotteryPreset.createPresetQueue(vipUserId, vipPresets, adminId)
    */
@@ -674,7 +674,7 @@ module.exports = (sequelize, DataTypes) => {
         const newPreset = await LotteryPreset.create(
           {
             user_id,
-            prize_id: preset.prize_id,
+            lottery_prize_id: preset.lottery_prize_id,
             queue_order: preset.queue_order,
             created_by: adminId
           },
@@ -776,8 +776,8 @@ module.exports = (sequelize, DataTypes) => {
    * // 重新规划用户预设
    * await LotteryPreset.clearUserPresets(10001)  // 先清除旧预设
    * const newPresets = [
-   *   { prize_id: 5, queue_order: 1 },
-   *   { prize_id: 6, queue_order: 2 }
+   *   { lottery_prize_id: 5, queue_order: 1 },
+   *   { lottery_prize_id: 6, queue_order: 2 }
    * ]
    * await LotteryPreset.createPresetQueue(10001, newPresets, adminId)  // 创建新预设
    */

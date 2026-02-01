@@ -125,7 +125,7 @@ class NormalDrawPipeline extends PipelineRunner {
    *
    * @param {Object} context - 抽奖上下文
    * @param {number} context.user_id - 用户ID
-   * @param {number} context.campaign_id - 活动ID
+   * @param {number} context.lottery_campaign_id - 活动ID
    * @param {string} context.idempotency_key - 幂等键
    * @param {Object} context.transaction - 数据库事务（可选）
    * @returns {Promise<Object>} 抽奖结果

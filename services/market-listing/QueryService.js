@@ -28,14 +28,14 @@ class MarketListingQueryService {
   /**
    * 查询挂牌详情
    *
-   * @param {number} listing_id - 挂牌ID
+   * @param {number} market_listing_id - 挂牌ID（数据库主键）
    * @param {Object} [options] - 查询选项
    * @param {Object} [options.transaction] - Sequelize事务对象
    * @returns {Promise<Object|null>} 挂牌详情或 null
    */
-  static async getListingById(listing_id, options = {}) {
+  static async getListingById(market_listing_id, options = {}) {
     const listing = await MarketListing.findOne({
-      where: { listing_id },
+      where: { market_listing_id },
       include: [
         {
           model: ItemInstance,
@@ -125,14 +125,25 @@ class MarketListingQueryService {
       sort = 'newest'
     } = params
 
-    // 构建缓存键
-    const cacheKey = `market_listings:${page}:${page_size}:${listing_kind || 'all'}:${asset_code || 'all'}:${item_category_code || 'all'}:${asset_group_code || 'all'}:${rarity_code || 'all'}:${min_price || 0}:${max_price || 'max'}:${sort}`
+    // 构建缓存参数对象（BusinessCacheHelper 使用对象来构建缓存键）
+    const cacheParams = {
+      page,
+      page_size,
+      listing_kind: listing_kind || 'all',
+      asset_code: asset_code || 'all',
+      item_category_code: item_category_code || 'all',
+      asset_group_code: asset_group_code || 'all',
+      rarity_code: rarity_code || 'all',
+      min_price: min_price || 0,
+      max_price: max_price || 0,
+      sort
+    }
 
     // 尝试从缓存读取
     try {
-      const cached = await BusinessCacheHelper.getMarketListings(cacheKey)
+      const cached = await BusinessCacheHelper.getMarketListings(cacheParams)
       if (cached) {
-        logger.debug('[MarketListingQueryService] 缓存命中', { cacheKey })
+        logger.debug('[MarketListingQueryService] 缓存命中', { cacheParams })
         return cached
       }
     } catch (cacheError) {
@@ -231,7 +242,7 @@ class MarketListingQueryService {
 
       // 基础信息
       const product = {
-        listing_id: plain.listing_id,
+        market_listing_id: plain.market_listing_id,
         listing_kind: plain.listing_kind,
         seller_user_id: plain.seller_user_id,
         seller_nickname: plain.seller?.nickname || `用户${plain.seller_user_id}`,
@@ -279,7 +290,7 @@ class MarketListingQueryService {
 
     // 写入缓存
     try {
-      await BusinessCacheHelper.setMarketListings(cacheKey, result)
+      await BusinessCacheHelper.setMarketListings(cacheParams, result)
     } catch (cacheError) {
       logger.warn('[MarketListingQueryService] 缓存写入失败', { error: cacheError.message })
     }

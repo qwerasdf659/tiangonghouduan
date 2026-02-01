@@ -38,10 +38,10 @@
  * - completed/cancelled/failed 为终态，不可逆转
  *
  * 数据库表名：trade_orders
- * 主键：order_id（BIGINT，自增）
+ * 主键：trade_order_id（BIGINT，自增）
  * 唯一键：business_id（全局唯一，幂等性保证）
  * 外键：
- * - listing_id（market_listings.listing_id，关联挂牌）
+ * - market_listing_id（market_listings.market_listing_id，关联挂牌）
  * - buyer_user_id（users.user_id，买家用户）
  * - seller_user_id（users.user_id，卖家用户）
  *
@@ -62,7 +62,7 @@ module.exports = sequelize => {
     'TradeOrder',
     {
       // 主键
-      order_id: {
+      trade_order_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
@@ -85,7 +85,7 @@ module.exports = sequelize => {
        * - idempotency_key：请求级幂等（防止同一请求重复提交）
        * - business_id：业务级幂等（防止同一业务操作从不同请求重复执行）
        *
-       * 格式：trade_order_{buyer_id}_{listing_id}_{timestamp}
+       * 格式：trade_order_{buyer_id}_{market_listing_id}_{timestamp}
        *
        * @see docs/事务边界治理现状核查报告.md 建议9.1
        */
@@ -93,17 +93,18 @@ module.exports = sequelize => {
         type: DataTypes.STRING(150),
         allowNull: false, // 业务唯一键必填（历史数据已回填完成 - 2026-01-05）
         unique: true,
-        comment: '业务唯一键（格式：trade_order_{buyer_id}_{listing_id}_{timestamp}）- 必填'
+        comment: '业务唯一键（格式：trade_order_{buyer_id}_{market_listing_id}_{timestamp}）- 必填'
       },
 
       // 关联挂牌
-      listing_id: {
+      market_listing_id: {
         type: DataTypes.BIGINT,
         allowNull: false,
-        comment: '挂牌ID（Listing ID）：关联的市场挂牌，外键关联 market_listings.listing_id',
+        comment:
+          '挂牌ID（Market Listing ID）：关联的市场挂牌，外键关联 market_listings.market_listing_id',
         references: {
           model: 'market_listings',
-          key: 'listing_id'
+          key: 'market_listing_id'
         }
       },
 
@@ -209,7 +210,8 @@ module.exports = sequelize => {
           name: 'uk_trade_orders_business_id'
         },
         {
-          fields: ['listing_id']
+          fields: ['market_listing_id'],
+          name: 'idx_trade_orders_market_listing_id'
         },
         {
           fields: ['buyer_user_id']
@@ -235,7 +237,7 @@ module.exports = sequelize => {
   TradeOrder.associate = function (models) {
     // 关联挂牌
     TradeOrder.belongsTo(models.MarketListing, {
-      foreignKey: 'listing_id',
+      foreignKey: 'market_listing_id',
       as: 'listing',
       comment: '挂牌关联（Listing Association）- 关联订单的市场挂牌'
     })

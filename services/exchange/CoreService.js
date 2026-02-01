@@ -45,14 +45,14 @@ class CoreService {
    * 支付方式：使用BalanceService扣减材料资产（cost_asset_code + cost_amount）
    *
    * @param {number} user_id - 用户ID
-   * @param {number} item_id - 商品ID
+   * @param {number} exchange_item_id - 兑换商品ID（主键命名规范化）
    * @param {number} quantity - 兑换数量
    * @param {Object} options - 选项
    * @param {string} options.idempotency_key - 幂等键（必填，用于幂等性）
    * @param {Transaction} options.transaction - 外部事务对象（必填）
    * @returns {Promise<Object>} 兑换结果和订单信息
    */
-  async exchangeItem(user_id, item_id, quantity = 1, options = {}) {
+  async exchangeItem(user_id, exchange_item_id, quantity = 1, options = {}) {
     const { idempotency_key } = options
 
     // 🔥 必填参数校验
@@ -76,21 +76,21 @@ class CoreService {
       logger.info('[兑换市场] ⚠️ 幂等性检查：idempotency_key已存在，验证参数一致性', {
         idempotency_key,
         order_no: existingOrder.order_no,
-        existing_item_id: existingOrder.item_id,
+        existing_exchange_item_id: existingOrder.exchange_item_id,
         existing_quantity: existingOrder.quantity,
-        request_item_id: item_id,
+        request_exchange_item_id: exchange_item_id,
         request_quantity: quantity
       })
 
       // 🔴 P1-1冲突保护：验证请求参数是否一致（确保类型一致）
       if (
-        Number(existingOrder.item_id) !== Number(item_id) ||
+        Number(existingOrder.exchange_item_id) !== Number(exchange_item_id) ||
         Number(existingOrder.quantity) !== Number(quantity)
       ) {
         const conflictError = new Error(
           `幂等键冲突：idempotency_key="${idempotency_key}" 已被使用于不同参数的订单。` +
-            `原订单：商品ID=${existingOrder.item_id}, 数量=${existingOrder.quantity}；` +
-            `当前请求：商品ID=${item_id}, 数量=${quantity}。` +
+            `原订单：商品ID=${existingOrder.exchange_item_id}, 数量=${existingOrder.quantity}；` +
+            `当前请求：商品ID=${exchange_item_id}, 数量=${quantity}。` +
             '请使用不同的幂等键或确认请求参数正确。'
         )
         conflictError.statusCode = 409
@@ -108,7 +108,7 @@ class CoreService {
        */
       const BalanceService = require('../asset/BalanceService')
       const currentItem = await this.ExchangeItem.findOne({
-        where: { item_id },
+        where: { exchange_item_id },
         transaction
       })
       if (!currentItem) {
@@ -148,7 +148,7 @@ class CoreService {
         message: '兑换订单已存在',
         order: {
           order_no: existingOrder.order_no,
-          record_id: existingOrder.record_id,
+          record_id: existingOrder.exchange_record_id,
           name: existingOrder.item_snapshot?.name || '未知商品',
           quantity: existingOrder.quantity,
           pay_asset_code: existingOrder.pay_asset_code,
@@ -164,12 +164,12 @@ class CoreService {
     }
 
     logger.info(
-      `[兑换市场] 用户${user_id}兑换商品${item_id}，数量${quantity}，idempotency_key=${idempotency_key}`
+      `[兑换市场] 用户${user_id}兑换商品${exchange_item_id}，数量${quantity}，idempotency_key=${idempotency_key}`
     )
 
     // 1. 获取商品信息（加锁防止超卖）
     const item = await this.ExchangeItem.findOne({
-      where: { item_id },
+      where: { exchange_item_id },
       lock: transaction.LOCK.UPDATE,
       transaction
     })
@@ -224,7 +224,7 @@ class CoreService {
         business_type: 'exchange_debit',
         meta: {
           idempotency_key,
-          item_id,
+          exchange_item_id,
           item_name: item.item_name,
           quantity,
           cost_amount: item.cost_amount,
@@ -281,7 +281,7 @@ class CoreService {
      */
     let record
     try {
-      const business_id = `exchange_${user_id}_${item_id}_${Date.now()}`
+      const business_id = `exchange_${user_id}_${exchange_item_id}_${Date.now()}`
 
       record = await this.ExchangeRecord.create(
         {
@@ -290,9 +290,9 @@ class CoreService {
           business_id,
           debit_transaction_id,
           user_id,
-          item_id,
+          exchange_item_id,
           item_snapshot: {
-            item_id: item.item_id,
+            exchange_item_id: item.exchange_item_id,
             item_name: item.item_name,
             description: item.description,
             cost_asset_code: item.cost_asset_code,
@@ -348,7 +348,7 @@ class CoreService {
       message: '兑换成功',
       order: {
         order_no,
-        record_id: record.record_id,
+        record_id: record.exchange_record_id,
         item_name: item.item_name,
         quantity,
         pay_asset_code: item.cost_asset_code,

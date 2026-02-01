@@ -4,7 +4,7 @@
  *
  * URL重命名方案（2026-01-31 大文件拆分方案 Phase 2）：
  * - /console/lottery-analytics/daily-report → /console/lottery-report/daily
- * - /console/lottery-monitoring/campaign-report/:campaign_id → /console/lottery-report/campaign/:campaign_id
+ * - /console/lottery-monitoring/campaign-report/:lottery_campaign_id → /console/lottery-report/campaign/:lottery_campaign_id
  *
  * 对应服务：lottery_analytics_report (ReportService)
  *
@@ -39,7 +39,7 @@ function getReportService(req) {
  *
  * Query参数：
  * - date: 报表日期（YYYY-MM-DD格式，默认昨天）
- * - campaign_id: 活动ID（可选，不传则汇总所有活动）
+ * - lottery_campaign_id: 活动ID（可选，不传则汇总所有活动）
  *
  * 返回数据：
  * - report_date: 报表日期
@@ -50,19 +50,19 @@ function getReportService(req) {
  */
 router.get('/daily', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { date, campaign_id } = req.query
+    const { date, lottery_campaign_id } = req.query
 
     const reportService = getReportService(req)
 
     const report = await reportService.getDailyReport({
       date,
-      campaign_id: campaign_id ? parseInt(campaign_id) : undefined
+      lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined
     })
 
     logger.info('获取每日报表成功', {
       admin_id: req.user.user_id,
       report_date: report.report_date,
-      campaign_id: campaign_id || 'all'
+      lottery_campaign_id: lottery_campaign_id || 'all'
     })
 
     return res.apiSuccess(report, '获取每日报表成功')
@@ -74,15 +74,15 @@ router.get('/daily', authenticateToken, requireRoleLevel(100), async (req, res) 
 
 /*
  * ==========================================
- * 2. 活动报表 - /campaign/:campaign_id
+ * 2. 活动报表 - /campaign/:lottery_campaign_id
  * ==========================================
  */
 
 /**
- * GET /campaign/:campaign_id - 获取活动专属报表
+ * GET /campaign/:lottery_campaign_id - 获取活动专属报表
  *
  * 路径参数：
- * - campaign_id: 活动ID
+ * - lottery_campaign_id: 活动ID
  *
  * Query参数：
  * - start_date: 开始日期（YYYY-MM-DD，可选）
@@ -96,34 +96,39 @@ router.get('/daily', authenticateToken, requireRoleLevel(100), async (req, res) 
  * - tier_distribution: 档位分布
  * - user_participation: 用户参与度
  */
-router.get('/campaign/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const campaign_id = parseInt(req.params.campaign_id)
-    const { start_date, end_date } = req.query
+router.get(
+  '/campaign/:lottery_campaign_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
+      const { start_date, end_date } = req.query
 
-    if (!campaign_id || isNaN(campaign_id)) {
-      return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
+      if (!lottery_campaign_id || isNaN(lottery_campaign_id)) {
+        return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
+      }
+
+      const reportService = getReportService(req)
+
+      const report = await reportService.getCampaignReport(lottery_campaign_id, {
+        start_date,
+        end_date
+      })
+
+      logger.info('获取活动报表成功', {
+        admin_id: req.user.user_id,
+        lottery_campaign_id,
+        start_date,
+        end_date
+      })
+
+      return res.apiSuccess(report, '获取活动报表成功')
+    } catch (error) {
+      logger.error('获取活动报表失败:', error)
+      return res.apiError(`查询失败：${error.message}`, 'GET_CAMPAIGN_REPORT_FAILED', null, 500)
     }
-
-    const reportService = getReportService(req)
-
-    const report = await reportService.getCampaignReport(campaign_id, {
-      start_date,
-      end_date
-    })
-
-    logger.info('获取活动报表成功', {
-      admin_id: req.user.user_id,
-      campaign_id,
-      start_date,
-      end_date
-    })
-
-    return res.apiSuccess(report, '获取活动报表成功')
-  } catch (error) {
-    logger.error('获取活动报表失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'GET_CAMPAIGN_REPORT_FAILED', null, 500)
   }
-})
+)
 
 module.exports = router

@@ -241,7 +241,7 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
         return
       }
 
-      const campaignId = global.testData?.testCampaign?.campaign_id
+      const campaignId = global.testData?.testCampaign?.lottery_campaign_id
 
       if (!campaignId) {
         console.warn('   ⚠️ 无有效活动ID，跳过测试')
@@ -252,7 +252,7 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
       const response = await request(app)
         .post('/api/v4/lottery/draw')
         .set('Authorization', `Bearer ${authToken}`)
-        .send({ campaign_id: campaignId })
+        .send({ lottery_campaign_id: campaignId })
 
       // 可能返回200（成功）、400（业务限制）、429（频率限制）、403（权限不足）、401（认证失效）
       expect([200, 400, 429, 403, 401]).toContain(response.status)

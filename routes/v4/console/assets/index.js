@@ -117,7 +117,7 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
       可用余额: parseFloat(item.available_amount) || 0,
       冻结余额: parseFloat(item.frozen_amount) || 0,
       总余额: (parseFloat(item.available_amount) || 0) + (parseFloat(item.frozen_amount) || 0),
-      活动ID: item.campaign_id || '-',
+      活动ID: item.lottery_campaign_id || '-',
       更新时间: item.updated_at ? BeijingTimeHelper.format(item.updated_at) : '-'
     }))
 

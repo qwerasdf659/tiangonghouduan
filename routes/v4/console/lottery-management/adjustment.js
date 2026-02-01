@@ -63,7 +63,7 @@ router.post(
         }
 
         adjustmentData = {
-          prize_id: validatedPrizeId,
+          lottery_prize_id: validatedPrizeId,
           custom_probability: probability,
           adjustment_type: 'specific_prize',
           reason

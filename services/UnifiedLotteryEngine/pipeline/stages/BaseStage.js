@@ -72,8 +72,8 @@ class BaseStage {
       errors.push('context.user_id is required')
     }
 
-    if (!context.campaign_id) {
-      errors.push('context.campaign_id is required')
+    if (!context.lottery_campaign_id) {
+      errors.push('context.lottery_campaign_id is required')
     }
 
     return {

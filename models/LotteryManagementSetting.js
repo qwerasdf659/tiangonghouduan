@@ -115,7 +115,7 @@ module.exports = sequelize => {
   LotteryManagementSetting.init(
     {
       // 主键：设置唯一标识
-      setting_id: {
+      lottery_management_setting_id: {
         type: DataTypes.STRING(50),
         primaryKey: true,
         defaultValue: () =>

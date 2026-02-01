@@ -113,23 +113,23 @@ function runMiddleware(middleware, req, res) {
 }
 
 describe('P1-3.1: 市场API参数验证单元测试', () => {
-  describe('1. 市场列表ID验证 (listing_id)', () => {
-    const validator = validateNumericId('listing_id', 'params')
+  describe('1. 市场列表ID验证 (market_listing_id)', () => {
+    const validator = validateNumericId('market_listing_id', 'params')
 
-    test('有效的正整数 listing_id 应通过验证', async () => {
+    test('有效的正整数 market_listing_id 应通过验证', async () => {
       const validIds = [1, 10, 100, 999999]
 
       for (const id of validIds) {
-        const req = createMockRequest({ params: { listing_id: String(id) } })
+        const req = createMockRequest({ params: { market_listing_id: String(id) } })
         const res = createMockResponse()
         const result = await runMiddleware(validator, req, res)
 
         expect(result.passed).toBe(true)
-        expect(req.validated.listing_id).toBe(id)
+        expect(req.validated.market_listing_id).toBe(id)
       }
     })
 
-    test('无效的 listing_id 应被拒绝', async () => {
+    test('无效的 market_listing_id 应被拒绝', async () => {
       /*
        * validateNumericId 对于不同类型的无效值返回不同的错误码
        * - 空字符串: BAD_REQUEST（参数不能为空）
@@ -145,7 +145,7 @@ describe('P1-3.1: 市场API参数验证单元测试', () => {
       ]
 
       for (const { value, description: _description, expectedCode } of invalidIds) {
-        const req = createMockRequest({ params: { listing_id: value } })
+        const req = createMockRequest({ params: { market_listing_id: value } })
         const res = createMockResponse()
         const result = await runMiddleware(validator, req, res)
 
@@ -155,7 +155,7 @@ describe('P1-3.1: 市场API参数验证单元测试', () => {
       }
     })
 
-    test('缺少 listing_id 参数应被拒绝', async () => {
+    test('缺少 market_listing_id 参数应被拒绝', async () => {
       const req = createMockRequest({ params: {} })
       const res = createMockResponse()
       const result = await runMiddleware(validator, req, res)
@@ -453,19 +453,19 @@ describe('P1-3.1: 市场API参数验证单元测试', () => {
   })
 
   describe('9. 边界值测试', () => {
-    test('listing_id 最大值边界测试', async () => {
-      const validator = validateNumericId('listing_id', 'params')
+    test('market_listing_id 最大值边界测试', async () => {
+      const validator = validateNumericId('market_listing_id', 'params')
 
       // 测试大整数
       const largeIds = [999999999, 2147483647] // int 最大值
 
       for (const id of largeIds) {
-        const req = createMockRequest({ params: { listing_id: String(id) } })
+        const req = createMockRequest({ params: { market_listing_id: String(id) } })
         const res = createMockResponse()
         const result = await runMiddleware(validator, req, res)
 
         expect(result.passed).toBe(true)
-        expect(req.validated.listing_id).toBe(id)
+        expect(req.validated.market_listing_id).toBe(id)
       }
     })
 

@@ -140,7 +140,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
     console.log('✅ 测试数据初始化完成', {
       user_a_id: testUserA.user_id,
       user_b_id: testUserB?.user_id || '未找到',
-      campaign_id: testCampaign?.campaign_id || '未找到'
+      lottery_campaign_id: testCampaign?.lottery_campaign_id || '未找到'
     })
   })
 
@@ -150,7 +150,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
     /* 清理测试订单 */
     for (const orderId of createdOrders) {
       try {
-        await TradeOrder.destroy({ where: { order_id: orderId }, force: true })
+        await TradeOrder.destroy({ where: { trade_order_id: orderId }, force: true })
       } catch (error) {
         console.log(`清理订单 ${orderId} 失败:`, error.message)
       }
@@ -159,7 +159,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
     /* 清理测试挂牌 */
     for (const listingId of createdListings) {
       try {
-        await MarketListing.destroy({ where: { listing_id: listingId }, force: true })
+        await MarketListing.destroy({ where: { market_listing_id: listingId }, force: true })
       } catch (error) {
         console.log(`清理挂牌 ${listingId} 失败:`, error.message)
       }
@@ -177,7 +177,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
     /* 清理测试抽奖记录 */
     for (const drawId of createdDraws) {
       try {
-        await LotteryDraw.destroy({ where: { draw_id: drawId }, force: true })
+        await LotteryDraw.destroy({ where: { lottery_draw_id: drawId }, force: true })
       } catch (error) {
         console.log(`清理抽奖记录 ${drawId} 失败:`, error.message)
       }
@@ -326,9 +326,9 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
           )
         })
 
-        createdListings.push(listing.listing_id)
+        createdListings.push(listing.market_listing_id)
         console.log('✅ 挂牌创建成功:', {
-          listing_id: listing.listing_id,
+          market_listing_id: listing.market_listing_id,
           status: listing.status
         })
       } catch (error) {
@@ -350,7 +350,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
         order = await TransactionManager.execute(async transaction => {
           const createdOrder = await TradeOrderService.createOrder(
             {
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_user_id: buyerUserId,
               idempotency_key: orderIdempotencyKey
             },
@@ -362,7 +362,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
 
             /* 完成订单 */
             await TradeOrderService.completeOrder(
-              { order_id: createdOrder.order_id },
+              { trade_order_id: createdOrder.trade_order_id },
               { transaction }
             )
           }
@@ -371,7 +371,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
         })
 
         console.log('✅ 订单创建并完成:', {
-          order_id: order?.order_id
+          trade_order_id: order?.trade_order_id
         })
       } catch (error) {
         console.log('⚠️ 订单处理失败:', error.message)
@@ -501,9 +501,9 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
         /* createFungibleAssetListing 返回 { listing, freeze_result, is_duplicate } */
         listing = result.listing
 
-        createdListings.push(listing.listing_id)
+        createdListings.push(listing.market_listing_id)
         console.log('✅ 可叠加资产挂牌创建成功:', {
-          listing_id: listing.listing_id,
+          market_listing_id: listing.market_listing_id,
           listing_kind: listing.listing_kind,
           offer_asset_code: listing.offer_asset_code,
           offer_amount: listing.offer_amount,
@@ -543,7 +543,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
         order = await TransactionManager.execute(async transaction => {
           const createdOrder = await TradeOrderService.createOrder(
             {
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: buyerUserId, // 注意：TradeOrderService 使用 buyer_id 而不是 buyer_user_id
               idempotency_key: orderIdempotencyKey
             },
@@ -555,7 +555,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
 
             /* 完成订单 - 结算资产 */
             await TradeOrderService.completeOrder(
-              { order_id: createdOrder.order_id },
+              { trade_order_id: createdOrder.trade_order_id },
               { transaction }
             )
           }
@@ -564,7 +564,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
         })
 
         console.log('✅ 订单创建并完成:', {
-          order_id: order?.order_id
+          trade_order_id: order?.trade_order_id
         })
       } catch (error) {
         console.log('⚠️ 订单处理失败:', error.message)
@@ -645,7 +645,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       if (fallbackDraws.length > 0) {
         const sample = fallbackDraws[0]
         console.log('📝 示例fallback记录:', {
-          draw_id: sample.draw_id,
+          lottery_draw_id: sample.lottery_draw_id,
           original_tier: sample.original_tier,
           final_tier: sample.final_tier,
           downgrade_count: sample.downgrade_count,
@@ -668,7 +668,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
         console.log(
           '📝 降级记录示例:',
           downgradeDraws.slice(0, 3).map(d => ({
-            draw_id: d.draw_id,
+            lottery_draw_id: d.lottery_draw_id,
             original_tier: d.original_tier,
             final_tier: d.final_tier,
             downgrade_count: d.downgrade_count
@@ -768,9 +768,9 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
         /* createFungibleAssetListing 返回 { listing, freeze_result, is_duplicate } */
         listing = result.listing
 
-        createdListings.push(listing.listing_id)
+        createdListings.push(listing.market_listing_id)
         console.log('✅ 用户A挂牌成功:', {
-          listing_id: listing.listing_id,
+          market_listing_id: listing.market_listing_id,
           listing_kind: listing.listing_kind,
           offer_asset_code: listing.offer_asset_code,
           offer_amount: listing.offer_amount,
@@ -797,7 +797,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
         order = await TransactionManager.execute(async transaction => {
           const createdOrder = await TradeOrderService.createOrder(
             {
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: userBId, // 注意：TradeOrderService 使用 buyer_id 而不是 buyer_user_id
               idempotency_key: generateIdempotencyKey('multi_user_fungible_order')
             },
@@ -809,7 +809,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
 
             /* 完成订单 */
             await TradeOrderService.completeOrder(
-              { order_id: createdOrder.order_id },
+              { trade_order_id: createdOrder.trade_order_id },
               { transaction }
             )
           }
@@ -817,7 +817,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
           return createdOrder
         })
 
-        console.log('✅ 用户B购买成功:', { order_id: order?.order_id })
+        console.log('✅ 用户B购买成功:', { trade_order_id: order?.trade_order_id })
       } catch (error) {
         console.log('⚠️ 购买失败:', error.message)
         throw error
@@ -872,7 +872,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       }
 
       console.log('📝 找到可兑换商品:', {
-        item_id: exchangeItem.item_id,
+        exchange_item_id: exchangeItem.exchange_item_id,
         name: exchangeItem.name,
         cost_asset_code: exchangeItem.cost_asset_code,
         cost_amount: exchangeItem.cost_amount
@@ -891,7 +891,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
         const exchangeResult = await TransactionManager.execute(async transaction => {
           return await ExchangeService.exchangeItem(
             userBId,
-            exchangeItem.item_id,
+            exchangeItem.exchange_item_id,
             1, // 兑换数量
             {
               idempotency_key: generateIdempotencyKey('multi_user_exchange'),
@@ -1095,7 +1095,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       if (recentDraws.length > 0) {
         const sample = recentDraws[0]
         console.log('📝 示例抽奖记录:', {
-          draw_id: sample.draw_id,
+          lottery_draw_id: sample.lottery_draw_id,
           cost_points: sample.cost_points,
           reward_tier: sample.reward_tier,
           prize_name: sample.prize_name

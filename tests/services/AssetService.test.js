@@ -19,7 +19,7 @@
  * - 测试完成后清理测试产生的数据
  *
  * 返回结构说明：
- * - getBalance 返回: { available_amount, frozen_amount, total_amount, campaign_id }
+ * - getBalance 返回: { available_amount, frozen_amount, total_amount, lottery_campaign_id }
  * - changeBalance 返回: { account, balance, transaction_record, is_duplicate }
  */
 

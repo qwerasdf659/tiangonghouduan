@@ -5,7 +5,7 @@
  * URL重命名方案（2026-01-31 大文件拆分方案 Phase 2）：
  * - /console/lottery-monitoring/stats → /console/lottery-realtime/stats
  * - /console/lottery-monitoring/realtime-alerts → /console/lottery-realtime/alerts
- * - /console/lottery-monitoring/draw-details/:draw_id → /console/lottery-realtime/draw-details/:draw_id
+ * - /console/lottery-monitoring/draw-details/:lottery_draw_id → /console/lottery-realtime/draw-details/:lottery_draw_id
  *
  * 对应服务：lottery_analytics_realtime (RealtimeService)
  *
@@ -48,7 +48,7 @@ function getLotteryAlertService(req) {
  * GET /stats - 获取抽奖综合监控统计数据
  *
  * Query参数：
- * - campaign_id: 活动ID（可选）
+ * - lottery_campaign_id: 活动ID（可选）
  * - time_range: 时间范围（today/yesterday/7d/30d/custom，默认today）
  * - start_date: 自定义开始日期（YYYY-MM-DD，当time_range=custom时使用）
  * - end_date: 自定义结束日期（YYYY-MM-DD，当time_range=custom时使用）
@@ -57,10 +57,10 @@ function getLotteryAlertService(req) {
  */
 router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { campaign_id, time_range = 'today', start_date, end_date } = req.query
+    const { lottery_campaign_id, time_range = 'today', start_date, end_date } = req.query
 
     const stats = await getRealtimeService(req).getMonitoringStats({
-      campaign_id: campaign_id ? parseInt(campaign_id) : undefined,
+      lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
       time_range,
       start_date,
       end_date
@@ -68,7 +68,7 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
 
     logger.info('获取抽奖监控统计', {
       admin_id: req.user.user_id,
-      campaign_id,
+      lottery_campaign_id,
       time_range,
       total_draws: stats?.total_draws || 0
     })
@@ -90,7 +90,7 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
  * GET /alerts - 获取实时告警列表
  *
  * Query参数：
- * - campaign_id: 活动ID（可选）
+ * - lottery_campaign_id: 活动ID（可选）
  * - level: 告警级别过滤（danger/warning/info，可选）
  * - acknowledged: 是否已确认（true/false，可选）
  * - page: 页码（默认1）
@@ -102,12 +102,12 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
  */
 router.get('/alerts', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { campaign_id, level, acknowledged, page = 1, page_size = 20 } = req.query
+    const { lottery_campaign_id, level, acknowledged, page = 1, page_size = 20 } = req.query
 
     const realtimeService = getRealtimeService(req)
 
     const result = await realtimeService.getRealtimeAlerts({
-      campaign_id: campaign_id ? parseInt(campaign_id) : undefined,
+      lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
       level,
       acknowledged: acknowledged !== undefined ? acknowledged === 'true' : undefined,
       page: parseInt(page),
@@ -116,7 +116,7 @@ router.get('/alerts', authenticateToken, requireRoleLevel(100), async (req, res)
 
     logger.info('获取实时告警列表', {
       admin_id: req.user.user_id,
-      campaign_id: campaign_id || 'all',
+      lottery_campaign_id: lottery_campaign_id || 'all',
       total_alerts: result.summary.total,
       danger_count: result.summary.danger
     })
@@ -211,19 +211,19 @@ router.post('/alerts/:id/resolve', authenticateToken, requireRoleLevel(100), asy
 
 /*
  * ==========================================
- * 3. 单次抽奖Pipeline详情 - /draw-details/:draw_id
+ * 3. 单次抽奖Pipeline详情 - /draw-details/:lottery_draw_id
  * ==========================================
  */
 
 /**
- * GET /draw-details/:draw_id - 获取单次抽奖Pipeline详情
+ * GET /draw-details/:lottery_draw_id - 获取单次抽奖Pipeline详情
  *
  * 运营场景：
  * - 用户投诉"为什么这次没中"时，展示完整决策过程
  * - 审计和合规需求，解释系统决策逻辑
  *
  * 路径参数：
- * - draw_id: 抽奖记录ID（字符串）
+ * - lottery_draw_id: 抽奖记录ID（字符串）
  *
  * 返回数据：
  * - basic_info: 基础信息
@@ -231,34 +231,39 @@ router.post('/alerts/:id/resolve', authenticateToken, requireRoleLevel(100), asy
  * - decision_snapshot: 决策快照
  * - user_state_before: 用户抽奖前状态
  */
-router.get('/draw-details/:draw_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { draw_id } = req.params
+router.get(
+  '/draw-details/:lottery_draw_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { lottery_draw_id } = req.params
 
-    if (!draw_id) {
-      return res.apiError('缺少抽奖记录ID', 'MISSING_DRAW_ID', null, 400)
+      if (!lottery_draw_id) {
+        return res.apiError('缺少抽奖记录ID', 'MISSING_DRAW_ID', null, 400)
+      }
+
+      const realtimeService = getRealtimeService(req)
+
+      const details = await realtimeService.getDrawDetails(lottery_draw_id)
+
+      if (!details) {
+        return res.apiError('抽奖记录不存在', 'DRAW_NOT_FOUND', null, 404)
+      }
+
+      logger.info('获取单次抽奖详情成功', {
+        admin_id: req.user.user_id,
+        lottery_draw_id,
+        user_id: details.basic_info.user_id,
+        lottery_campaign_id: details.basic_info.lottery_campaign_id
+      })
+
+      return res.apiSuccess(details, '获取单次抽奖详情成功')
+    } catch (error) {
+      logger.error('获取单次抽奖详情失败:', error)
+      return res.apiError(`查询失败：${error.message}`, 'GET_DRAW_DETAILS_FAILED', null, 500)
     }
-
-    const realtimeService = getRealtimeService(req)
-
-    const details = await realtimeService.getDrawDetails(draw_id)
-
-    if (!details) {
-      return res.apiError('抽奖记录不存在', 'DRAW_NOT_FOUND', null, 404)
-    }
-
-    logger.info('获取单次抽奖详情成功', {
-      admin_id: req.user.user_id,
-      draw_id,
-      user_id: details.basic_info.user_id,
-      campaign_id: details.basic_info.campaign_id
-    })
-
-    return res.apiSuccess(details, '获取单次抽奖详情成功')
-  } catch (error) {
-    logger.error('获取单次抽奖详情失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'GET_DRAW_DETAILS_FAILED', null, 500)
   }
-})
+)
 
 module.exports = router

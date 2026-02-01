@@ -90,7 +90,7 @@ class AnalyticsService {
           where: whereClause,
           attributes: [
             [fn('DATE', col('created_at')), 'date'],
-            [fn('COUNT', col('draw_id')), 'draws'],
+            [fn('COUNT', col('lottery_draw_id')), 'draws'],
             // V4.0语义更新：统计高档奖励次数
             [
               fn('SUM', literal("CASE WHEN reward_tier = 'high' THEN 1 ELSE 0 END")),
@@ -107,7 +107,7 @@ class AnalyticsService {
           where: whereClause,
           attributes: [
             'user_id',
-            [fn('COUNT', col('draw_id')), 'draws'],
+            [fn('COUNT', col('lottery_draw_id')), 'draws'],
             // V4.0语义更新：统计高档奖励次数
             [
               fn('SUM', literal("CASE WHEN reward_tier = 'high' THEN 1 ELSE 0 END")),
@@ -115,7 +115,7 @@ class AnalyticsService {
             ]
           ],
           group: ['user_id'],
-          order: [[fn('COUNT', col('draw_id')), 'DESC']],
+          order: [[fn('COUNT', col('lottery_draw_id')), 'DESC']],
           limit: 20,
           raw: true
         })
@@ -245,7 +245,7 @@ class AnalyticsService {
           },
           attributes: [
             [fn('DATE_FORMAT', col('created_at'), dateFormat), 'period'],
-            [fn('COUNT', col('draw_id')), 'total_draws'],
+            [fn('COUNT', col('lottery_draw_id')), 'total_draws'],
             // V4.0语义更新：统计高档奖励次数
             [
               fn('SUM', literal("CASE WHEN reward_tier = 'high' THEN 1 ELSE 0 END")),
@@ -286,7 +286,7 @@ class AnalyticsService {
               },
               attributes: [
                 [fn('DATE_FORMAT', col('created_at'), dateFormat), 'period'],
-                [fn('COUNT', col('prize_id')), 'prizes_added'],
+                [fn('COUNT', col('lottery_prize_id')), 'prizes_added'],
                 [fn('SUM', col('stock_quantity')), 'total_quantity']
               ],
               group: [fn('DATE_FORMAT', col('created_at'), dateFormat)],

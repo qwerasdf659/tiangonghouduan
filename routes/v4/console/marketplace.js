@@ -236,11 +236,11 @@ router.get(
 
 /**
  * 管理员获取单个兑换商品详情（Admin Only）
- * GET /api/v4/console/marketplace/exchange_market/items/:item_id
+ * GET /api/v4/console/marketplace/exchange_market/items/:exchange_item_id
  *
  * @description 管理员查看单个商品详情，返回完整字段
  *
- * @param {number} item_id - 商品ID
+ * @param {number} exchange_item_id - 商品ID
  *
  * @returns {Object} 商品详情
  *
@@ -249,21 +249,21 @@ router.get(
  * @created 2026-01-09（web管理平台功能完善）
  */
 router.get(
-  '/exchange_market/items/:item_id',
+  '/exchange_market/items/:exchange_item_id',
   authenticateToken,
   requireRoleLevel(100),
   async (req, res) => {
     try {
-      const { item_id } = req.params
+      const { exchange_item_id } = req.params
       const admin_id = req.user.user_id
 
       logger.info('管理员查询兑换商品详情', {
         admin_id,
-        item_id
+        exchange_item_id
       })
 
       // 参数验证
-      const itemId = parseInt(item_id)
+      const itemId = parseInt(exchange_item_id)
       if (isNaN(itemId) || itemId <= 0) {
         return res.apiError('无效的商品ID', 'BAD_REQUEST', null, 400)
       }
@@ -276,7 +276,7 @@ router.get(
 
       logger.info('管理员查询兑换商品详情成功', {
         admin_id,
-        item_id: itemId,
+        exchange_item_id: itemId,
         name: result.item?.name
       })
 
@@ -286,7 +286,7 @@ router.get(
         error: error.message,
         stack: error.stack,
         admin_id: req.user?.user_id,
-        item_id: req.params.item_id
+        exchange_item_id: req.params.exchange_item_id
       })
 
       // 业务错误处理
@@ -321,7 +321,7 @@ router.get(
  * @body {number} stock - 初始库存（必填，>=0）
  * @body {number} sort_order - 排序号（必填，默认100）
  * @body {string} status - 商品状态（必填：active/inactive）
- * @body {number} primary_image_id - 主图片ID（可选，关联 image_resources.image_id）
+ * @body {number} primary_image_id - 主图片ID（可选，关联 image_resources.image_resource_id）
  */
 router.post(
   '/exchange_market/items',
@@ -337,7 +337,7 @@ router.post(
       stock,
       sort_order = 100,
       status = 'active',
-      // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_id）
+      // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_resource_id）
       primary_image_id
     } = req.body
 
@@ -404,7 +404,7 @@ router.post(
     // 直接使用 transactionResult（已包含 item, bound_image, timestamp）
     logger.info('兑换商品创建成功（材料资产支付）', {
       admin_id,
-      item_id: transactionResult.item?.item_id,
+      exchange_item_id: transactionResult.item?.exchange_item_id,
       name: transactionResult.item?.name,
       cost_asset_code: transactionResult.item?.cost_asset_code,
       cost_amount: transactionResult.item?.cost_amount,
@@ -423,7 +423,7 @@ router.post(
 
 /**
  * 更新兑换商品（管理员操作）
- * PUT /api/v4/console/marketplace/exchange_market/items/:item_id
+ * PUT /api/v4/console/marketplace/exchange_market/items/:exchange_item_id
  *
  * V4.5.0 材料资产支付版本
  *
@@ -434,15 +434,15 @@ router.post(
  * 2026-01-20 技术债务清理：
  * - 字段名统一为 name/description（与数据库模型一致）
  *
- * @param {number} item_id - 商品ID
+ * @param {number} exchange_item_id - 商品ID
  */
 router.put(
-  '/exchange_market/items/:item_id',
+  '/exchange_market/items/:exchange_item_id',
   authenticateToken,
   requireRoleLevel(100),
   async (req, res) => {
     try {
-      const { item_id } = req.params
+      const { exchange_item_id } = req.params
       const {
         name,
         description,
@@ -452,7 +452,7 @@ router.put(
         stock,
         sort_order,
         status,
-        // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_id）
+        // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_resource_id）
         primary_image_id
       } = req.body
 
@@ -460,14 +460,14 @@ router.put(
 
       logger.info('管理员更新兑换商品（材料资产支付）', {
         admin_id,
-        item_id,
+        exchange_item_id,
         cost_asset_code,
         primary_image_id,
         cost_amount
       })
 
       // 参数验证
-      const itemId = parseInt(item_id)
+      const itemId = parseInt(exchange_item_id)
       if (isNaN(itemId) || itemId <= 0) {
         return res.apiError('无效的商品ID', 'BAD_REQUEST', null, 400)
       }
@@ -495,14 +495,14 @@ router.put(
           )
         },
         {
-          description: `更新兑换商品 item_id=${itemId}`,
+          description: `更新兑换商品 exchange_item_id=${itemId}`,
           maxRetries: 1
         }
       )
 
       logger.info('兑换商品更新成功（材料资产支付）', {
         admin_id,
-        item_id: itemId,
+        exchange_item_id: itemId,
         item_name: result.item.item_name,
         cost_asset_code: result.item.cost_asset_code,
         cost_amount: result.item.cost_amount,
@@ -515,7 +515,7 @@ router.put(
         error: error.message,
         stack: error.stack,
         admin_id: req.user?.user_id,
-        item_id: req.params.item_id
+        exchange_item_id: req.params.exchange_item_id
       })
 
       // 业务错误处理
@@ -539,30 +539,30 @@ router.put(
 
 /**
  * 删除兑换商品（管理员操作）
- * DELETE /api/v4/console/marketplace/exchange_market/items/:item_id
+ * DELETE /api/v4/console/marketplace/exchange_market/items/:exchange_item_id
  *
  * 🎯 2026-01-08 图片存储架构核查修复：
  * - 使用 TransactionManager 包装事务
  * - 删除商品时联动删除关联图片（DB + 对象存储）
  *
- * @param {number} item_id - 商品ID
+ * @param {number} exchange_item_id - 商品ID
  */
 router.delete(
-  '/exchange_market/items/:item_id',
+  '/exchange_market/items/:exchange_item_id',
   authenticateToken,
   requireRoleLevel(100),
   async (req, res) => {
     try {
-      const { item_id } = req.params
+      const { exchange_item_id } = req.params
       const admin_id = req.user.user_id
 
       logger.info('管理员删除兑换商品', {
         admin_id,
-        item_id
+        exchange_item_id
       })
 
       // 参数验证
-      const itemId = parseInt(item_id)
+      const itemId = parseInt(exchange_item_id)
       if (isNaN(itemId) || itemId <= 0) {
         return res.apiError('无效的商品ID', 'BAD_REQUEST', null, 400)
       }
@@ -576,17 +576,18 @@ router.delete(
           return await ExchangeService.deleteExchangeItem(itemId, { transaction })
         },
         {
-          description: `删除兑换商品 item_id=${itemId}`,
+          description: `删除兑换商品 exchange_item_id=${itemId}`,
           maxRetries: 1
         }
       )
 
       logger.info('兑换商品删除操作完成', {
         admin_id,
-        item_id: itemId,
+        exchange_item_id: itemId,
         action: result.action,
         message: result.message,
-        deleted_image_id: result.deleted_image_id
+        // 2026-02-01 主键命名规范化：使用完整前缀 image_resource_id
+        deleted_image_resource_id: result.deleted_image_resource_id
       })
 
       // 根据操作结果返回不同响应
@@ -605,7 +606,7 @@ router.delete(
         error: error.message,
         stack: error.stack,
         admin_id: req.user?.user_id,
-        item_id: req.params.item_id
+        exchange_item_id: req.params.exchange_item_id
       })
 
       // 业务错误处理
@@ -636,7 +637,7 @@ router.delete(
  * @query {string} status - 订单状态筛选（created/frozen/completed/cancelled）
  * @query {number} buyer_user_id - 买家ID筛选（可选）
  * @query {number} seller_user_id - 卖家ID筛选（可选）
- * @query {number} listing_id - 挂牌ID筛选（可选）
+ * @query {number} market_listing_id - 挂牌ID筛选（可选）
  * @query {number} page - 页码（默认1）
  * @query {number} page_size - 每页数量（默认20）
  *
@@ -653,7 +654,7 @@ router.get('/trade_orders', authenticateToken, requireRoleLevel(100), async (req
       status,
       buyer_user_id,
       seller_user_id,
-      listing_id,
+      market_listing_id,
       page = 1,
       page_size = 20
     } = req.query
@@ -664,7 +665,7 @@ router.get('/trade_orders', authenticateToken, requireRoleLevel(100), async (req
       status,
       buyer_user_id,
       seller_user_id,
-      listing_id,
+      market_listing_id,
       page,
       page_size
     })
@@ -677,7 +678,7 @@ router.get('/trade_orders', authenticateToken, requireRoleLevel(100), async (req
       status,
       buyer_user_id: buyer_user_id ? parseInt(buyer_user_id) : undefined,
       seller_user_id: seller_user_id ? parseInt(seller_user_id) : undefined,
-      listing_id: listing_id ? parseInt(listing_id) : undefined,
+      market_listing_id: market_listing_id ? parseInt(market_listing_id) : undefined,
       page: parseInt(page),
       page_size: parseInt(page_size)
     })
@@ -773,14 +774,14 @@ router.get(
 
 /**
  * 客服强制撤回挂牌（管理员操作）
- * POST /api/v4/console/marketplace/listings/:listing_id/force-withdraw
+ * POST /api/v4/console/marketplace/listings/:market_listing_id/force-withdraw
  *
  * 业务场景：
  * - 客服人员可强制撤回任意用户的挂牌
  * - 必须提供撤回原因用于审计追踪
  * - 撤回操作会记录到管理员操作日志
  *
- * @param {number} listing_id - 挂牌ID
+ * @param {number} market_listing_id - 挂牌ID（数据库主键字段名）
  * @body {string} withdraw_reason - 撤回原因（必填，审计需要）
  *
  * @returns {Object} 撤回结果
@@ -793,12 +794,12 @@ router.get(
  * @created 2026-01-08（C2C材料交易 Phase 2）
  */
 router.post(
-  '/listings/:listing_id/force-withdraw',
+  '/listings/:market_listing_id/force-withdraw',
   authenticateToken,
   requireRoleLevel(100),
   async (req, res) => {
     try {
-      const { listing_id } = req.params
+      const { market_listing_id } = req.params
       const { withdraw_reason } = req.body
       const admin_id = req.user.user_id
       const ip_address = req.ip || req.connection.remoteAddress
@@ -806,13 +807,13 @@ router.post(
 
       logger.info('客服强制撤回挂牌请求', {
         admin_id,
-        listing_id,
+        market_listing_id,
         withdraw_reason,
         ip_address
       })
 
-      // 参数验证：listing_id
-      const listingId = parseInt(listing_id)
+      // 参数验证：market_listing_id
+      const listingId = parseInt(market_listing_id)
       if (isNaN(listingId) || listingId <= 0) {
         return res.apiError('无效的挂牌ID', 'BAD_REQUEST', null, 400)
       }
@@ -834,9 +835,9 @@ router.post(
         async transaction => {
           return await MarketListingService.adminForceWithdrawListing(
             {
-              listing_id: listingId,
-              admin_id,
-              withdraw_reason: withdraw_reason.trim(),
+              market_listing_id: listingId,
+              operator_id: admin_id,
+              reason: withdraw_reason.trim(),
               ip_address,
               user_agent
             },
@@ -844,14 +845,14 @@ router.post(
           )
         },
         {
-          description: `客服强制撤回挂牌 - listing_id: ${listingId}`,
+          description: `客服强制撤回挂牌 - market_listing_id: ${listingId}`,
           maxRetries: 1
         }
       )
 
       logger.info('客服强制撤回挂牌成功', {
         admin_id,
-        listing_id: listingId,
+        market_listing_id: listingId,
         seller_user_id: result.listing?.seller_user_id,
         listing_kind: result.listing?.listing_kind
       })
@@ -870,7 +871,7 @@ router.post(
         code: error.code,
         stack: error.stack,
         admin_id: req.user?.user_id,
-        listing_id: req.params.listing_id
+        market_listing_id: req.params.market_listing_id
       })
 
       // 业务错误处理
@@ -909,7 +910,7 @@ router.post(
  *
  * @query {string} status - 订单状态筛选（pending/completed/shipped/cancelled）
  * @query {number} user_id - 用户ID筛选（可选）
- * @query {number} item_id - 商品ID筛选（可选）
+ * @query {number} exchange_item_id - 商品ID筛选（可选）
  * @query {string} order_no - 订单号模糊搜索（可选）
  * @query {number} page - 页码（默认1）
  * @query {number} page_size - 每页数量（默认20）
@@ -931,7 +932,7 @@ router.get(
       const {
         status,
         user_id,
-        item_id,
+        exchange_item_id,
         order_no,
         page = 1,
         page_size = 20,
@@ -944,7 +945,7 @@ router.get(
         admin_id,
         status,
         user_id,
-        item_id,
+        exchange_item_id,
         order_no,
         page,
         page_size
@@ -957,7 +958,7 @@ router.get(
       const result = await ExchangeService.getAdminOrders({
         status,
         user_id: user_id ? parseInt(user_id) : null,
-        item_id: item_id ? parseInt(item_id) : null,
+        exchange_item_id: exchange_item_id ? parseInt(exchange_item_id) : null,
         order_no,
         page: parseInt(page),
         page_size: parseInt(page_size),

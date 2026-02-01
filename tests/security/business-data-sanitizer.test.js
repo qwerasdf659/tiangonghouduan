@@ -46,7 +46,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
   describe('B-5-1 奖品数据脱敏（sanitizePrizes）', () => {
     const mockPrizes = [
       {
-        prize_id: 1,
+        lottery_prize_id: 1,
         prize_name: '一等奖',
         prize_type: 'physical',
         win_probability: 0.001,
@@ -59,7 +59,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
         sort_order: 1
       },
       {
-        prize_id: 2,
+        lottery_prize_id: 2,
         prize_name: '二等奖',
         prize_type: 'voucher',
         win_probability: 0.05,
@@ -125,8 +125,8 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       const result = DataSanitizer.sanitizePrizes(mockPrizes, 'public')
 
       result.forEach((prize, index) => {
-        expect(prize.id).toBe(mockPrizes[index].prize_id)
-        expect(prize).not.toHaveProperty('prize_id')
+        expect(prize.id).toBe(mockPrizes[index].lottery_prize_id)
+        expect(prize).not.toHaveProperty('lottery_prize_id')
       })
     })
   })
@@ -519,7 +519,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
   describe('B-5-9 兑换商品数据脱敏（sanitizeExchangeMarketItems）', () => {
     const mockItems = [
       {
-        item_id: 1,
+        exchange_item_id: 1,
         name: '测试商品',
         description: '商品描述',
         cost_asset_code: 'points',
@@ -551,7 +551,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       const result = DataSanitizer.sanitizeExchangeMarketItems(mockItems, 'public')
 
       expect(result[0].id).toBe(1)
-      expect(result[0]).not.toHaveProperty('item_id')
+      expect(result[0]).not.toHaveProperty('exchange_item_id')
     })
 
     test('B-5-9-4 管理员（full）可见 cost_price 和 sold_count', () => {
@@ -578,7 +578,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
     })
 
     test('B-5-10-2 preset_type 在日志中脱敏', () => {
-      const logData = 'draw info: preset_type: guaranteed, draw_id: 123'
+      const logData = 'draw info: preset_type: guaranteed, lottery_draw_id: 123'
       const result = DataSanitizer.sanitizeLogs(logData)
 
       expect(result).toContain('preset_type: [HIDDEN]')
@@ -586,7 +586,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
     })
 
     test('B-5-10-3 cost_points 在日志中脱敏', () => {
-      const logData = 'prize cost: cost_points: 500, prize_id: 1'
+      const logData = 'prize cost: cost_points: 500, lottery_prize_id: 1'
       const result = DataSanitizer.sanitizeLogs(logData)
 
       expect(result).toContain('cost_points: [HIDDEN]')

@@ -29,7 +29,7 @@ module.exports = sequelize => {
       /**
        * 功能开关ID（自增主键）
        */
-      flag_id: {
+      feature_flag_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,

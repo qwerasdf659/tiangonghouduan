@@ -47,6 +47,12 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
 
     if (login_response.body.success) {
       access_token = login_response.body.data.access_token
+    } else {
+      console.warn(
+        '⚠️ [Market Test] 登录失败:',
+        login_response.body.code,
+        login_response.body.message
+      )
     }
   })
 
@@ -176,9 +182,9 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
       })
     })
 
-    // -------------------- GET /listings/:listing_id - 查询挂牌详情 --------------------
+    // -------------------- GET /listings/:market_listing_id - 查询挂牌详情 --------------------
 
-    describe('GET /listings/:listing_id - 查询挂牌详情', () => {
+    describe('GET /listings/:market_listing_id - 查询挂牌详情', () => {
       /**
        * Case 1: 未认证用户应返回401
        */
@@ -439,9 +445,9 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
       })
     })
 
-    // -------------------- POST /listings/:listing_id/withdraw - 撤回物品挂牌 --------------------
+    // -------------------- POST /listings/:market_listing_id/withdraw - 撤回物品挂牌 --------------------
 
-    describe('POST /listings/:listing_id/withdraw - 撤回物品挂牌', () => {
+    describe('POST /listings/:market_listing_id/withdraw - 撤回物品挂牌', () => {
       /**
        * Case 1: 不存在的listing_id应返回404
        */
@@ -481,9 +487,9 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
       })
     })
 
-    // -------------------- POST /fungible-assets/:listing_id/withdraw - 撤回资产挂牌 --------------------
+    // -------------------- POST /fungible-assets/:market_listing_id/withdraw - 撤回资产挂牌 --------------------
 
-    describe('POST /fungible-assets/:listing_id/withdraw - 撤回资产挂牌', () => {
+    describe('POST /fungible-assets/:market_listing_id/withdraw - 撤回资产挂牌', () => {
       /**
        * Case 1: 不存在的listing_id应返回404
        */
@@ -514,9 +520,9 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
   // ==================== P0-1.2: 市场交易API契约测试 ====================
 
   describe('P0-1.2 市场交易API契约测试', () => {
-    // -------------------- POST /listings/:listing_id/purchase - 购买商品 --------------------
+    // -------------------- POST /listings/:market_listing_id/purchase - 购买商品 --------------------
 
-    describe('POST /listings/:listing_id/purchase - 购买商品', () => {
+    describe('POST /listings/:market_listing_id/purchase - 购买商品', () => {
       /**
        * Case 1: 不存在的listing_id应返回404
        */

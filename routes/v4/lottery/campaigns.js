@@ -140,8 +140,8 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
     const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
     const campaign = await lottery_engine.getCampaignByCode(campaign_code)
 
-    // 使用 campaign.campaign_id 获取完整配置（内部仍用 ID）
-    const fullConfig = await lottery_engine.get_campaign_config(campaign.campaign_id)
+    // 使用 campaign.lottery_campaign_id 获取完整配置（内部仍用 ID）
+    const fullConfig = await lottery_engine.get_campaign_config(campaign.lottery_campaign_id)
 
     /*
      * 使用 LotteryPricingService 统一定价服务获取定价配置
@@ -164,7 +164,7 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
     let isConfigMissing = false
 
     try {
-      const pricings = await LotteryPricingService.getAllDrawPricings(campaign.campaign_id)
+      const pricings = await LotteryPricingService.getAllDrawPricings(campaign.lottery_campaign_id)
 
       if (pricings && pricings.length > 0) {
         // 直接返回数组格式，包含所有定价按钮
@@ -186,7 +186,7 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
       logger.error(`[CONFIG_ERROR] 读取活动 ${campaign_code} 定价配置失败`, {
         error: err.message,
         code: err.code,
-        campaign_id: campaign.campaign_id
+        lottery_campaign_id: campaign.lottery_campaign_id
       })
       // 配置缺失时抛出错误（严格模式）
       if (err.code === 'MISSING_PRICING_CONFIG' || err.code === 'MISSING_BASE_COST_CONFIG') {
@@ -202,7 +202,7 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
     }
 
     if (req.dataLevel === 'full') {
-      // 管理员获取完整配置（返回 campaign_code 而不是 campaign_id）
+      // 管理员获取完整配置（返回 campaign_code 而不是 lottery_campaign_id）
       const adminConfig = {
         ...fullConfig,
         campaign_code: campaign.campaign_code,

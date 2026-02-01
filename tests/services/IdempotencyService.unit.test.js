@@ -178,8 +178,8 @@ describe('IdempotencyService - 单元测试（核心逻辑验证）', () => {
      */
     it('纯业务字段的请求体应完整保留', () => {
       const body = {
-        campaign_id: 1,
-        prize_id: 100,
+        lottery_campaign_id: 1,
+        lottery_prize_id: 100,
         draw_count: 1
       }
 

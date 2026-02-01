@@ -201,14 +201,14 @@ class CoreService {
     )
 
     logger.info(
-      `✅ 消费记录创建成功 (ID: ${consumptionRecord.record_id}, idempotency_key: ${idempotency_key})`
+      `✅ 消费记录创建成功 (ID: ${consumptionRecord.consumption_record_id}, idempotency_key: ${idempotency_key})`
     )
 
     // 步骤9：创建审核记录
     await ContentReviewRecord.create(
       {
         auditable_type: 'consumption',
-        auditable_id: consumptionRecord.record_id,
+        auditable_id: consumptionRecord.consumption_record_id,
         audit_status: 'pending',
         auditor_id: null,
         audit_reason: null,
@@ -223,7 +223,7 @@ class CoreService {
     logger.info('🎉 消费记录处理完成，等待入口层提交事务')
 
     logger.info(
-      `✅ 消费记录完整创建: record_id=${consumptionRecord.record_id}, user_id=${userId}, amount=${data.consumption_amount}元, pending_points=${pointsToAward}分`
+      `✅ 消费记录完整创建: consumption_record_id=${consumptionRecord.consumption_record_id}, user_id=${userId}, amount=${data.consumption_amount}元, pending_points=${pointsToAward}分`
     )
 
     return consumptionRecord
@@ -348,7 +348,7 @@ class CoreService {
           delta_amount: budgetPointsToAllocate,
           business_type: 'consumption_budget_allocation',
           idempotency_key: `consumption_budget:approve:${recordId}`,
-          campaign_id: 'CONSUMPTION_DEFAULT',
+          lottery_campaign_id: 'CONSUMPTION_DEFAULT',
           meta: {
             reference_type: 'consumption',
             reference_id: recordId,
@@ -361,7 +361,7 @@ class CoreService {
       )
 
       logger.info(
-        `💰 预算分配成功: user_id=${record.user_id}, 预算积分=${budgetPointsToAllocate}, campaign_id=CONSUMPTION_DEFAULT, 幂等=${budgetResult.is_duplicate ? '重复' : '新增'}`
+        `💰 预算分配成功: user_id=${record.user_id}, 预算积分=${budgetPointsToAllocate}, lottery_campaign_id=CONSUMPTION_DEFAULT, 幂等=${budgetResult.is_duplicate ? '重复' : '新增'}`
       )
     }
 
@@ -563,13 +563,13 @@ class CoreService {
     )
 
     logger.info('软删除消费记录成功', {
-      record_id: recordId,
+      consumption_record_id: recordId,
       user_id: userId,
       deleted_at: BeijingTimeHelper.formatForAPI(deletedAt)
     })
 
     return {
-      record_id: recordId,
+      consumption_record_id: recordId,
       is_deleted: 1,
       deleted_at: BeijingTimeHelper.formatForAPI(deletedAt),
       record_type: 'consumption',
@@ -617,13 +617,13 @@ class CoreService {
     )
 
     logger.info('管理员恢复消费记录成功', {
-      record_id: recordId,
+      consumption_record_id: recordId,
       admin_id: adminId,
       original_user_id: record.user_id
     })
 
     return {
-      record_id: recordId,
+      consumption_record_id: recordId,
       is_deleted: 0,
       user_id: record.user_id,
       note: '消费记录已恢复，用户端将重新显示该记录'

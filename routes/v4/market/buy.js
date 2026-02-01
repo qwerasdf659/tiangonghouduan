@@ -5,7 +5,7 @@
  * @description 用户购买交易市场中的商品
  *
  * API列表：
- * - POST /listings/:listing_id/purchase - 购买市场商品
+ * - POST /listings/:market_listing_id/purchase - 购买市场商品
  *
  * 业务场景：
  * - 用户购买交易市场中的商品
@@ -41,17 +41,17 @@ const {
 const marketRiskMiddleware = getMarketRiskControlMiddleware()
 
 /**
- * @route POST /api/v4/market/listings/:listing_id/purchase
+ * @route POST /api/v4/market/listings/:market_listing_id/purchase
  * @desc 购买市场商品
  * @access Private (需要登录)
  *
- * @param {number} listing_id - 挂牌ID
+ * @param {number} market_listing_id - 挂牌ID
  * @header {string} Idempotency-Key - 幂等键（必填，不接受body参数）
  * @body {string} purchase_note - 购买备注（可选）
  *
  * @returns {Object} 购买结果
  * @returns {string} data.order_id - 订单ID
- * @returns {number} data.listing_id - 挂牌ID
+ * @returns {number} data.market_listing_id - 挂牌ID
  * @returns {number} data.seller_id - 卖家用户ID
  * @returns {string} data.asset_code - 支付资产类型
  * @returns {number} data.gross_amount - 总金额
@@ -68,15 +68,15 @@ const marketRiskMiddleware = getMarketRiskControlMiddleware()
  * - 处理中重复请求 → 409 REQUEST_PROCESSING
  */
 router.post(
-  '/listings/:listing_id/purchase',
+  '/listings/:market_listing_id/purchase',
   authenticateToken,
   requireValidSession, // 🔐 市场购买属于敏感操作，需验证会话（2026-01-21 会话管理功能）
   marketRiskMiddleware.createBuyRiskMiddleware(),
-  validatePositiveInteger('listing_id', 'params'),
+  validatePositiveInteger('market_listing_id', 'params'),
   async (req, res) => {
     // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
     const IdempotencyService = req.app.locals.services.getService('idempotency')
-    const MarketListingService = req.app.locals.services.getService('market_listing_core')
+    const MarketListingQueryService = req.app.locals.services.getService('market_listing_query')
     const TradeOrderService = req.app.locals.services.getService('trade_order')
 
     // 【业界标准形态】强制从 Header 获取幂等键，不接受 body
@@ -97,7 +97,7 @@ router.post(
     }
 
     try {
-      const listing_id = req.validated.listing_id
+      const market_listing_id = req.validated.market_listing_id
       const buyer_id = req.user.user_id
       const { purchase_note } = req.body
 
@@ -106,9 +106,9 @@ router.post(
        * 统一使用 IdempotencyService 进行请求级幂等控制
        */
       const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
-        api_path: '/api/v4/market/listings/:id/purchase',
+        api_path: '/api/v4/market/listings/:market_listing_id/purchase',
         http_method: 'POST',
-        request_params: { listing_id, purchase_note },
+        request_params: { market_listing_id, purchase_note },
         user_id: buyer_id
       })
 
@@ -117,7 +117,7 @@ router.post(
         logger.info('🔄 入口幂等拦截：重复请求，返回首次结果', {
           idempotency_key,
           buyer_id,
-          listing_id
+          market_listing_id
         })
         const duplicateResponse = {
           ...idempotencyResult.response,
@@ -127,7 +127,7 @@ router.post(
       }
 
       // 查询挂牌信息（通过 Service 层访问，符合路由层规范）
-      const listing = await MarketListingService.getListingById(listing_id)
+      const listing = await MarketListingQueryService.getListingById(market_listing_id)
 
       if (!listing) {
         // 标记幂等请求失败，允许重试
@@ -158,7 +158,7 @@ router.post(
             {
               buyer_id,
               seller_id: listing.seller_user_id,
-              listing_id,
+              market_listing_id,
               item_instance_id: listing.offer_item_instance_id,
               price_amount: listing.price_amount,
               price_asset_code: listing.price_asset_code, // 2026-01-20：sell.js 已强制必填，无需默认值
@@ -182,8 +182,8 @@ router.post(
 
       // 构建响应数据
       const responseData = {
-        order_id: orderResult.order_id,
-        listing_id,
+        trade_order_id: orderResult.trade_order_id,
+        market_listing_id,
         seller_id: listing.seller_user_id,
         asset_code: listing.price_asset_code, // 2026-01-20：无需默认值
         gross_amount: listing.price_amount,
@@ -198,18 +198,18 @@ router.post(
        */
       await IdempotencyService.markAsCompleted(
         idempotency_key,
-        orderResult.order_id, // 业务事件ID = 订单ID
+        orderResult.trade_order_id, // 业务事件ID = 订单ID
         responseData
       )
 
       // 缓存失效已在 TradeOrderService.completeOrder 中处理（决策5B：Service层统一收口）
 
       logger.info('市场商品购买成功', {
-        listing_id,
+        market_listing_id,
         buyer_id,
         seller_id: listing.seller_user_id,
         price_amount: listing.price_amount,
-        order_id: orderResult.order_id,
+        trade_order_id: orderResult.trade_order_id,
         idempotency_key
       })
 
@@ -245,7 +245,7 @@ router.post(
 
       logger.error('购买市场商品失败', {
         error: error.message,
-        listing_id: req.validated.listing_id,
+        market_listing_id: req.validated.market_listing_id,
         buyer_id: req.user?.user_id,
         idempotency_key
       })

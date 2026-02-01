@@ -50,14 +50,14 @@ class DecisionSnapshotStage extends BaseStage {
    *
    * @param {Object} context - 执行上下文
    * @param {number} context.user_id - 用户ID
-   * @param {number} context.campaign_id - 活动ID
+   * @param {number} context.lottery_campaign_id - 活动ID
    * @param {Object} context.stage_results - 前置Stage的执行结果
    * @returns {Promise<Object>} Stage 执行结果
    */
   async execute(context) {
-    const { user_id, campaign_id, idempotency_key, lottery_session_id } = context
+    const { user_id, lottery_campaign_id, idempotency_key, lottery_session_id } = context
 
-    this.log('info', '开始构建决策快照', { user_id, campaign_id })
+    this.log('info', '开始构建决策快照', { user_id, lottery_campaign_id })
 
     try {
       // 1. 收集各 Stage 的决策数据
@@ -105,14 +105,14 @@ class DecisionSnapshotStage extends BaseStage {
       const decision_snapshot = {
         // 基础信息
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         idempotency_key,
         lottery_session_id,
         decision_time: BeijingTimeHelper.now(),
 
         // 活动配置快照
         campaign_snapshot: {
-          campaign_id: campaign_data.campaign?.campaign_id,
+          lottery_campaign_id: campaign_data.campaign?.lottery_campaign_id,
           campaign_name: campaign_data.campaign?.campaign_name,
           pick_method: campaign_data.pick_method,
           budget_mode: campaign_data.budget_mode,
@@ -216,7 +216,7 @@ class DecisionSnapshotStage extends BaseStage {
           tier_total_weight: prize_pick_data.tier_total_weight,
           random_value: prize_pick_data.prize_random_value,
           hit_range: prize_pick_data.prize_hit_range,
-          selected_prize_id: prize_pick_data.selected_prize?.prize_id
+          selected_prize_id: prize_pick_data.selected_prize?.lottery_prize_id
         },
 
         // 保底机制
@@ -224,13 +224,13 @@ class DecisionSnapshotStage extends BaseStage {
           guarantee_triggered,
           user_draw_count: guarantee_data.user_draw_count,
           guarantee_threshold: guarantee_data.guarantee_threshold,
-          guarantee_prize_id: guarantee_data.guarantee_prize?.prize_id,
+          guarantee_prize_id: guarantee_data.guarantee_prize?.lottery_prize_id,
           guarantee_reason: guarantee_data.guarantee_reason
         },
 
         // 最终结果
         final_result: {
-          prize_id: final_prize.prize_id,
+          lottery_prize_id: final_prize.lottery_prize_id,
           prize_name: final_prize.prize_name,
           prize_type: final_prize.prize_type,
           prize_value: final_prize.prize_value,
@@ -254,8 +254,8 @@ class DecisionSnapshotStage extends BaseStage {
 
       this.log('info', '决策快照构建完成', {
         user_id,
-        campaign_id,
-        final_prize_id: final_prize.prize_id,
+        lottery_campaign_id,
+        final_prize_id: final_prize.lottery_prize_id,
         final_prize_name: final_prize.prize_name,
         final_tier,
         guarantee_triggered,
@@ -266,7 +266,7 @@ class DecisionSnapshotStage extends BaseStage {
     } catch (error) {
       this.log('error', '决策快照构建失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       throw error

@@ -74,7 +74,7 @@ class SettleStage extends BaseStage {
    *
    * @param {Object} context - 执行上下文
    * @param {number} context.user_id - 用户ID
-   * @param {number} context.campaign_id - 活动ID
+   * @param {number} context.lottery_campaign_id - 活动ID
    * @param {string} context.idempotency_key - 幂等键
    * @param {string} context.lottery_session_id - 抽奖会话ID
    * @param {Object} context.transaction - 外部事务（可选）
@@ -87,23 +87,23 @@ class SettleStage extends BaseStage {
   async execute(context) {
     const {
       user_id,
-      campaign_id,
+      lottery_campaign_id,
       idempotency_key,
       lottery_session_id,
       draw_count = 1, // 🆕 支持连抽次数
       batch_id = null // 🆕 Phase 2：连抽批次ID（由外层生成）
     } = context
 
-    this.log('info', '开始结算阶段', { user_id, campaign_id, idempotency_key, draw_count })
+    this.log('info', '开始结算阶段', { user_id, lottery_campaign_id, idempotency_key, draw_count })
 
     // 幂等性检查
     const existing_draw = await this._checkIdempotency(idempotency_key)
     if (existing_draw) {
       this.log('info', '幂等检查：抽奖记录已存在，返回已有结果', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         idempotency_key,
-        draw_id: existing_draw.draw_id
+        lottery_draw_id: existing_draw.lottery_draw_id
       })
 
       return this.success({
@@ -151,7 +151,7 @@ class SettleStage extends BaseStage {
 
     try {
       // 1. 生成唯一的抽奖ID
-      const draw_id = this._generateDrawId(user_id)
+      const lottery_draw_id = this._generateDrawId(user_id)
 
       /*
        * ========== 🆕 Phase 2 增强：扣减用户积分 ==========
@@ -218,8 +218,8 @@ class SettleStage extends BaseStage {
           final_prize.prize_value_points,
           {
             user_id,
-            campaign_id,
-            prize_id: final_prize.prize_id,
+            lottery_campaign_id,
+            lottery_prize_id: final_prize.lottery_prize_id,
             idempotency_key,
             transaction
           }
@@ -241,9 +241,9 @@ class SettleStage extends BaseStage {
 
       // 5. 创建抽奖记录（使用单次抽奖成本 per_draw_cost）
       const draw_record = await this._createDrawRecord({
-        draw_id,
+        lottery_draw_id,
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         final_prize,
         final_tier,
         guarantee_triggered,
@@ -261,16 +261,16 @@ class SettleStage extends BaseStage {
 
       // 6. 记录决策快照
       const decision_record = await this._createDecisionRecord({
-        draw_id,
+        lottery_draw_id,
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         idempotency_key, // 🆕 传递幂等键（必填字段）
         decision_snapshot,
         transaction
       })
 
       // 7. 更新用户配额（如果有）
-      await this._updateUserQuota(user_id, campaign_id, transaction)
+      await this._updateUserQuota(user_id, lottery_campaign_id, transaction)
 
       /*
        * ========== Phase 9-16 增强：更新用户体验状态 ==========
@@ -283,7 +283,7 @@ class SettleStage extends BaseStage {
        */
       await this._updateExperienceState({
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         final_tier,
         final_prize,
         transaction
@@ -294,7 +294,7 @@ class SettleStage extends BaseStage {
        * 按小时聚合监控数据，用于活动健康度监控和策略效果评估
        */
       await this._recordHourlyMetrics({
-        campaign_id,
+        lottery_campaign_id,
         draw_tier: final_tier,
         prize_value: final_prize.prize_value_points || 0,
         budget_tier: budget_data?.budget_tier || null,
@@ -305,7 +305,7 @@ class SettleStage extends BaseStage {
       // 提交事务（如果是内部创建的事务）
       if (!use_external_transaction) {
         await transaction.commit()
-        this.log('info', '结算事务已提交', { user_id, campaign_id, draw_id })
+        this.log('info', '结算事务已提交', { user_id, lottery_campaign_id, lottery_draw_id })
       }
 
       /*
@@ -316,7 +316,7 @@ class SettleStage extends BaseStage {
        * - 数据流：Redis 实时层 → 小时聚合任务 → MySQL lottery_hourly_metrics
        */
       this._recordRealtimeMetrics({
-        campaign_id,
+        lottery_campaign_id,
         user_id,
         draw_tier: final_tier,
         prize_value: final_prize.prize_value_points || 0,
@@ -325,7 +325,7 @@ class SettleStage extends BaseStage {
       }).catch(redis_error => {
         // Redis 记录失败不影响主业务，仅记录日志
         this.log('warn', 'Redis 实时指标记录失败（非致命）', {
-          campaign_id,
+          lottery_campaign_id,
           error: redis_error.message
         })
       })
@@ -336,8 +336,8 @@ class SettleStage extends BaseStage {
         decision_record: decision_record.toJSON(),
         is_duplicate: false,
         settle_result: {
-          draw_id,
-          prize_id: final_prize.prize_id,
+          lottery_draw_id,
+          lottery_prize_id: final_prize.lottery_prize_id,
           prize_name: final_prize.prize_name,
           prize_value_points: final_prize.prize_value_points,
           reward_tier: final_tier,
@@ -353,9 +353,9 @@ class SettleStage extends BaseStage {
 
       this.log('info', '结算阶段完成', {
         user_id,
-        campaign_id,
-        draw_id,
-        prize_id: final_prize.prize_id,
+        lottery_campaign_id,
+        lottery_draw_id,
+        lottery_prize_id: final_prize.lottery_prize_id,
         prize_name: final_prize.prize_name,
         budget_deducted,
         draw_cost, // 🆕 增加日志
@@ -370,7 +370,7 @@ class SettleStage extends BaseStage {
           await transaction.rollback()
           this.log('error', '结算事务已回滚', {
             user_id,
-            campaign_id,
+            lottery_campaign_id,
             error: error.message
           })
         } catch (rollback_error) {
@@ -382,7 +382,7 @@ class SettleStage extends BaseStage {
 
       this.log('error', '结算阶段失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       throw error
@@ -433,7 +433,7 @@ class SettleStage extends BaseStage {
   async _deductPrizeStock(prize, transaction) {
     // 无限库存不扣减
     if (prize.stock_quantity === null) {
-      this.log('debug', '奖品为无限库存，跳过扣减', { prize_id: prize.prize_id })
+      this.log('debug', '奖品为无限库存，跳过扣减', { lottery_prize_id: prize.lottery_prize_id })
       return
     }
 
@@ -441,9 +441,9 @@ class SettleStage extends BaseStage {
     const [affected_rows] = await sequelize.query(
       `UPDATE lottery_prizes 
        SET stock_quantity = stock_quantity - 1, daily_win_count = daily_win_count + 1
-       WHERE prize_id = ? AND stock_quantity >= 1`,
+       WHERE lottery_prize_id = ? AND stock_quantity >= 1`,
       {
-        replacements: [prize.prize_id],
+        replacements: [prize.lottery_prize_id],
         transaction,
         type: sequelize.QueryTypes.UPDATE
       }
@@ -454,7 +454,7 @@ class SettleStage extends BaseStage {
     }
 
     this.log('debug', '奖品库存扣减成功', {
-      prize_id: prize.prize_id,
+      lottery_prize_id: prize.lottery_prize_id,
       prize_name: prize.prize_name
     })
   }
@@ -470,13 +470,14 @@ class SettleStage extends BaseStage {
    */
   async _deductBudget(budget_provider, amount, options) {
     try {
-      const { user_id, campaign_id, prize_id, idempotency_key, transaction } = options
+      const { user_id, lottery_campaign_id, lottery_prize_id, idempotency_key, transaction } =
+        options
       const result = await budget_provider.deductBudget(
         {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           amount,
-          reason: `抽奖扣减预算 prize_id=${prize_id}`,
+          reason: `抽奖扣减预算 lottery_prize_id=${lottery_prize_id}`,
           reference_id: idempotency_key
         },
         { transaction }
@@ -539,7 +540,7 @@ class SettleStage extends BaseStage {
                 name: prize.prize_name,
                 description: prize.prize_description || `抽奖获得：${prize.prize_name}`,
                 value: Math.round(parseFloat(prize.prize_value) || 0),
-                prize_id: prize.prize_id,
+                lottery_prize_id: prize.lottery_prize_id,
                 prize_type: prize.prize_type,
                 acquisition_method: 'lottery'
               }
@@ -560,7 +561,7 @@ class SettleStage extends BaseStage {
                 idempotency_key: `${idempotency_key}:material`,
                 business_type: 'lottery_reward_material',
                 meta: {
-                  prize_id: prize.prize_id,
+                  lottery_prize_id: prize.lottery_prize_id,
                   prize_name: prize.prize_name
                 }
               },
@@ -571,20 +572,20 @@ class SettleStage extends BaseStage {
 
         default:
           this.log('warn', '未知奖品类型，跳过发放', {
-            prize_id: prize.prize_id,
+            lottery_prize_id: prize.lottery_prize_id,
             prize_type: prize.prize_type
           })
       }
 
       this.log('debug', '奖品发放完成', {
         user_id,
-        prize_id: prize.prize_id,
+        lottery_prize_id: prize.lottery_prize_id,
         prize_type: prize.prize_type
       })
     } catch (error) {
       this.log('error', '奖品发放失败', {
         user_id,
-        prize_id: prize.prize_id,
+        lottery_prize_id: prize.lottery_prize_id,
         error: error.message
       })
       throw error
@@ -595,9 +596,9 @@ class SettleStage extends BaseStage {
    * 创建抽奖记录
    *
    * @param {Object} params - 参数
-   * @param {string} params.draw_id - 抽奖ID
+   * @param {string} params.lottery_draw_id - 抽奖ID
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {Object} params.final_prize - 中奖奖品
    * @param {string} params.final_tier - 最终档位
    * @param {boolean} params.guarantee_triggered - 是否触发保底
@@ -615,9 +616,9 @@ class SettleStage extends BaseStage {
    */
   async _createDrawRecord(params) {
     const {
-      draw_id,
+      lottery_draw_id,
       user_id,
-      campaign_id,
+      lottery_campaign_id,
       final_prize,
       final_tier,
       guarantee_triggered,
@@ -634,7 +635,7 @@ class SettleStage extends BaseStage {
     } = params
 
     // 生成业务唯一键
-    const business_id = `lottery_draw_${user_id}_${lottery_session_id || 'no_session'}_${draw_id}`
+    const business_id = `lottery_draw_${user_id}_${lottery_session_id || 'no_session'}_${lottery_draw_id}`
 
     /*
      * 🆕 Phase 2 增强：
@@ -653,17 +654,17 @@ class SettleStage extends BaseStage {
 
     return await LotteryDraw.create(
       {
-        draw_id,
+        lottery_draw_id,
         business_id,
         idempotency_key,
         lottery_session_id,
         user_id,
-        lottery_id: campaign_id,
-        campaign_id,
+        lottery_id: lottery_campaign_id,
+        lottery_campaign_id,
         draw_type, // 🆕 动态确定（single/multi）
         batch_id, // 🆕 Phase 2：连抽批次ID（null 表示单抽）
         asset_transaction_id: final_asset_transaction_id, // 🆕 关联资产流水ID（必填字段）
-        prize_id: final_prize.prize_id,
+        lottery_prize_id: final_prize.lottery_prize_id,
         prize_name: final_prize.prize_name,
         prize_type: final_prize.prize_type,
         prize_value: final_prize.prize_value,
@@ -698,8 +699,14 @@ class SettleStage extends BaseStage {
    * @private
    */
   async _createDecisionRecord(params) {
-    const { draw_id, user_id, campaign_id, idempotency_key, decision_snapshot, transaction } =
-      params
+    const {
+      lottery_draw_id,
+      user_id,
+      lottery_campaign_id,
+      idempotency_key,
+      decision_snapshot,
+      transaction
+    } = params
 
     // 提取预算快照数据
     const budget_snapshot = decision_snapshot.budget_snapshot || {}
@@ -757,9 +764,9 @@ class SettleStage extends BaseStage {
 
     return await LotteryDrawDecision.create(
       {
-        draw_id,
+        lottery_draw_id,
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         idempotency_key, // 幂等键（必填字段，与lottery_draws.idempotency_key对应）
         pipeline_type: 'normal',
         segment_key: decision_snapshot.tier_decision?.user_segment || 'default',
@@ -891,12 +898,12 @@ class SettleStage extends BaseStage {
    * 更新用户配额
    *
    * @param {number} user_id - 用户ID
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} transaction - 事务对象
    * @returns {Promise<void>} 无返回值
    * @private
    */
-  async _updateUserQuota(user_id, campaign_id, transaction) {
+  async _updateUserQuota(user_id, lottery_campaign_id, transaction) {
     try {
       // 使用原子操作更新配额（字段名: quota_used, quota_remaining）
       const [affected_rows] = await sequelize.query(
@@ -905,22 +912,22 @@ class SettleStage extends BaseStage {
              quota_remaining = GREATEST(quota_remaining - 1, 0),
              last_used_at = NOW(),
              updated_at = NOW()
-         WHERE user_id = ? AND campaign_id = ? AND status = 'active'`,
+         WHERE user_id = ? AND lottery_campaign_id = ? AND status = 'active'`,
         {
-          replacements: [user_id, campaign_id],
+          replacements: [user_id, lottery_campaign_id],
           transaction,
           type: sequelize.QueryTypes.UPDATE
         }
       )
 
       if (affected_rows > 0) {
-        this.log('debug', '用户配额已更新', { user_id, campaign_id })
+        this.log('debug', '用户配额已更新', { user_id, lottery_campaign_id })
       }
     } catch (error) {
       // 配额更新失败不应该阻断结算
       this.log('warn', '用户配额更新失败（非致命）', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
     }
@@ -933,7 +940,7 @@ class SettleStage extends BaseStage {
    *
    * @param {Object} params - 参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {string} params.final_tier - 最终奖品档位
    * @param {Object} params.final_prize - 中奖奖品对象
    * @param {Object} params.transaction - 事务对象
@@ -941,7 +948,7 @@ class SettleStage extends BaseStage {
    * @private
    */
   async _updateExperienceState(params) {
-    const { user_id, campaign_id, final_tier, final_prize, transaction } = params
+    const { user_id, lottery_campaign_id, final_tier, final_prize, transaction } = params
 
     try {
       /*
@@ -954,7 +961,7 @@ class SettleStage extends BaseStage {
       await experience_manager.updateState(
         {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           draw_tier: final_tier, // 传递实际档位而非 is_high 布尔值
           is_empty
         },
@@ -963,7 +970,7 @@ class SettleStage extends BaseStage {
 
       this.log('debug', '活动体验状态已更新', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         draw_tier: final_tier,
         is_empty
       })
@@ -975,14 +982,14 @@ class SettleStage extends BaseStage {
 
       // 检查是否是该活动的首次抽奖（用于增加 participated_campaigns 计数）
       const is_first_draw = await global_manager.isFirstParticipation(
-        { user_id, campaign_id },
+        { user_id, lottery_campaign_id },
         { transaction }
       )
 
       await global_manager.updateState(
         {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           draw_tier: final_tier,
           is_first_draw_in_campaign: is_first_draw
         },
@@ -991,7 +998,7 @@ class SettleStage extends BaseStage {
 
       this.log('debug', '全局体验状态已更新', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         draw_tier: final_tier,
         is_first_draw
       })
@@ -1002,7 +1009,7 @@ class SettleStage extends BaseStage {
        */
       this.log('warn', '体验状态更新失败（非致命）', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
     }
@@ -1017,7 +1024,7 @@ class SettleStage extends BaseStage {
    * 3. 预算分布分析（B0-B3 用户分布）
    *
    * @param {Object} params - 参数
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {string} params.draw_tier - 抽奖档位（high/mid/low/fallback/empty）
    * @param {number} params.prize_value - 奖品价值（积分）
    * @param {string} params.budget_tier - 预算分层（B0/B1/B2/B3）
@@ -1027,13 +1034,18 @@ class SettleStage extends BaseStage {
    * @private
    */
   async _recordHourlyMetrics(params) {
-    const { campaign_id, draw_tier, prize_value, budget_tier, mechanisms, transaction } = params
+    const { lottery_campaign_id, draw_tier, prize_value, budget_tier, mechanisms, transaction } =
+      params
 
     try {
       // 获取或创建当前小时的指标记录
-      const metrics = await LotteryHourlyMetrics.findOrCreateMetrics(campaign_id, new Date(), {
-        transaction
-      })
+      const metrics = await LotteryHourlyMetrics.findOrCreateMetrics(
+        lottery_campaign_id,
+        new Date(),
+        {
+          transaction
+        }
+      )
 
       // 解析机制触发情况
       const mechanism_flags = {
@@ -1059,7 +1071,7 @@ class SettleStage extends BaseStage {
       )
 
       this.log('debug', '监控指标已记录', {
-        campaign_id,
+        lottery_campaign_id,
         draw_tier,
         prize_value,
         budget_tier,
@@ -1071,7 +1083,7 @@ class SettleStage extends BaseStage {
        * 记录错误日志，但继续执行
        */
       this.log('warn', '监控指标记录失败（非致命）', {
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
     }
@@ -1086,7 +1098,7 @@ class SettleStage extends BaseStage {
    * - 数据保留 25 小时（比小时聚合周期多 1 小时容错）
    *
    * @param {Object} params - 参数对象
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {number} params.user_id - 用户ID
    * @param {string} params.draw_tier - 抽奖档位 (high/mid/low/fallback)
    * @param {number} params.prize_value - 奖品价值（积分）
@@ -1096,7 +1108,7 @@ class SettleStage extends BaseStage {
    * @private
    */
   async _recordRealtimeMetrics(params) {
-    const { campaign_id, user_id, draw_tier, prize_value, budget_tier, mechanisms } = params
+    const { lottery_campaign_id, user_id, draw_tier, prize_value, budget_tier, mechanisms } = params
 
     const metrics_collector = getLotteryMetricsCollector()
 
@@ -1115,7 +1127,7 @@ class SettleStage extends BaseStage {
      * 🔴 修正参数名：LotteryMetricsCollector 期望 selected_tier 和 triggers
      */
     await metrics_collector.recordDraw({
-      campaign_id,
+      lottery_campaign_id,
       user_id,
       selected_tier: draw_tier, // 映射 draw_tier → selected_tier
       prize_value,
@@ -1124,7 +1136,7 @@ class SettleStage extends BaseStage {
     })
 
     this.log('debug', 'Redis 实时指标已记录', {
-      campaign_id,
+      lottery_campaign_id,
       user_id,
       selected_tier: draw_tier
     })

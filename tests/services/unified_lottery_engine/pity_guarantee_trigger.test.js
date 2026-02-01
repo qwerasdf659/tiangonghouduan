@@ -112,14 +112,14 @@ describe('保底触发完整流程测试（任务8.4）', () => {
       if (test_campaign) {
         test_prizes = await LotteryPrize.findAll({
           where: {
-            campaign_id: test_campaign.campaign_id,
+            lottery_campaign_id: test_campaign.lottery_campaign_id,
             status: 'active'
           }
         })
       }
 
       console.log(
-        `✅ 测试数据加载: user=${test_user?.user_id}, campaign=${test_campaign?.campaign_id}, prizes=${test_prizes.length}`
+        `✅ 测试数据加载: user=${test_user?.user_id}, campaign=${test_campaign?.lottery_campaign_id}, prizes=${test_prizes.length}`
       )
     } catch (error) {
       console.log('⚠️ 加载真实数据失败:', error.message)
@@ -134,7 +134,7 @@ describe('保底触发完整流程测试（任务8.4）', () => {
       try {
         await experience_state_manager.resetState({
           user_id: test_user.user_id,
-          campaign_id: test_campaign.campaign_id
+          lottery_campaign_id: test_campaign.lottery_campaign_id
         })
       } catch (error) {
         // 忽略重置失败
@@ -429,21 +429,21 @@ describe('保底触发完整流程测试（任务8.4）', () => {
     test('应优先选择目标档位奖品', () => {
       const mock_prizes = [
         {
-          prize_id: 1,
+          lottery_prize_id: 1,
           name: 'high_1',
           reward_tier: 'high',
           prize_value_points: 1000,
           status: 'active'
         },
         {
-          prize_id: 2,
+          lottery_prize_id: 2,
           name: 'mid_1',
           reward_tier: 'mid',
           prize_value_points: 500,
           status: 'active'
         },
         {
-          prize_id: 3,
+          lottery_prize_id: 3,
           name: 'low_1',
           reward_tier: 'low',
           prize_value_points: 100,
@@ -466,14 +466,14 @@ describe('保底触发完整流程测试（任务8.4）', () => {
     test('目标档位无奖品时应降级选择', () => {
       const mock_prizes = [
         {
-          prize_id: 1,
+          lottery_prize_id: 1,
           name: 'mid_1',
           reward_tier: 'mid',
           prize_value_points: 500,
           status: 'active'
         },
         {
-          prize_id: 2,
+          lottery_prize_id: 2,
           name: 'low_1',
           reward_tier: 'low',
           prize_value_points: 100,
@@ -496,21 +496,21 @@ describe('保底触发完整流程测试（任务8.4）', () => {
     test('预算不足时应选择可负担的奖品', () => {
       const mock_prizes = [
         {
-          prize_id: 1,
+          lottery_prize_id: 1,
           name: 'high_1',
           reward_tier: 'high',
           prize_value_points: 1000,
           status: 'active'
         },
         {
-          prize_id: 2,
+          lottery_prize_id: 2,
           name: 'mid_1',
           reward_tier: 'mid',
           prize_value_points: 500,
           status: 'active'
         },
         {
-          prize_id: 3,
+          lottery_prize_id: 3,
           name: 'low_1',
           reward_tier: 'low',
           prize_value_points: 100,
@@ -563,7 +563,7 @@ describe('保底触发完整流程测试（任务8.4）', () => {
        */
       const context = {
         user_id: test_user?.user_id || 1,
-        campaign_id: test_campaign?.campaign_id || 1,
+        lottery_campaign_id: test_campaign?.lottery_campaign_id || 1,
         empty_streak: 5, // 连续5次空奖，触发 threshold_2
         tier_weights: { high: 100000, mid: 200000, low: 300000, fallback: 400000 }
       }
@@ -589,7 +589,7 @@ describe('保底触发完整流程测试（任务8.4）', () => {
       const tier_weights = { high: 100000, mid: 200000, low: 300000, fallback: 400000 }
       const context = {
         user_id: test_user?.user_id || 1,
-        campaign_id: test_campaign?.campaign_id || 1,
+        lottery_campaign_id: test_campaign?.lottery_campaign_id || 1,
         empty_streak: 7, // 7次空奖，触发 threshold_3
         tier_weights
       }
@@ -619,7 +619,7 @@ describe('保底触发完整流程测试（任务8.4）', () => {
     test('未达到空奖阈值不应触发 Pity', async () => {
       const context = {
         user_id: test_user?.user_id || 1,
-        campaign_id: test_campaign?.campaign_id || 1,
+        lottery_campaign_id: test_campaign?.lottery_campaign_id || 1,
         empty_streak: 2, // 只有2次空奖
         last_tier: 'fallback'
       }
@@ -648,12 +648,12 @@ describe('保底触发完整流程测试（任务8.4）', () => {
 
       const state = await experience_state_manager.getState({
         user_id: test_user.user_id,
-        campaign_id: test_campaign.campaign_id
+        lottery_campaign_id: test_campaign.lottery_campaign_id
       })
 
       console.log('📊 用户体验状态:')
       console.log(`   user_id: ${test_user.user_id}`)
-      console.log(`   campaign_id: ${test_campaign.campaign_id}`)
+      console.log(`   lottery_campaign_id: ${test_campaign.lottery_campaign_id}`)
       console.log(`   state: ${JSON.stringify(state)}`)
 
       expect(state).toBeDefined()
@@ -672,13 +672,13 @@ describe('保底触发完整流程测试（任务8.4）', () => {
       // 先重置状态，确保测试从干净状态开始
       await experience_state_manager.resetState({
         user_id: test_user.user_id,
-        campaign_id: test_campaign.campaign_id
+        lottery_campaign_id: test_campaign.lottery_campaign_id
       })
 
       // 获取初始状态
       const initial_state = await experience_state_manager.getState({
         user_id: test_user.user_id,
-        campaign_id: test_campaign.campaign_id
+        lottery_campaign_id: test_campaign.lottery_campaign_id
       })
       const initial_draw_count = initial_state.total_draw_count || 0
 
@@ -689,7 +689,7 @@ describe('保底触发完整流程测试（任务8.4）', () => {
       for (let i = 0; i < 3; i++) {
         await experience_state_manager.updateState({
           user_id: test_user.user_id,
-          campaign_id: test_campaign.campaign_id,
+          lottery_campaign_id: test_campaign.lottery_campaign_id,
           draw_tier: 'fallback',
           is_empty: true
         })
@@ -698,7 +698,7 @@ describe('保底触发完整流程测试（任务8.4）', () => {
       // 获取更新后的状态
       const updated_state = await experience_state_manager.getState({
         user_id: test_user.user_id,
-        campaign_id: test_campaign.campaign_id
+        lottery_campaign_id: test_campaign.lottery_campaign_id
       })
 
       console.log('📊 更新后的体验状态:')
@@ -721,7 +721,7 @@ describe('保底触发完整流程测试（任务8.4）', () => {
       // 先设置一些状态
       await experience_state_manager.updateState({
         user_id: test_user.user_id,
-        campaign_id: test_campaign.campaign_id,
+        lottery_campaign_id: test_campaign.lottery_campaign_id,
         empty_streak: 5,
         total_draw_count: 20
       })
@@ -729,7 +729,7 @@ describe('保底触发完整流程测试（任务8.4）', () => {
       // 重置状态
       const reset_result = await experience_state_manager.resetState({
         user_id: test_user.user_id,
-        campaign_id: test_campaign.campaign_id
+        lottery_campaign_id: test_campaign.lottery_campaign_id
       })
 
       console.log('📊 重置结果:')
@@ -738,7 +738,7 @@ describe('保底触发完整流程测试（任务8.4）', () => {
       // 验证状态已重置
       const new_state = await experience_state_manager.getState({
         user_id: test_user.user_id,
-        campaign_id: test_campaign.campaign_id
+        lottery_campaign_id: test_campaign.lottery_campaign_id
       })
 
       expect(new_state.empty_streak).toBe(0)
@@ -800,7 +800,7 @@ describe('保底触发完整流程测试（任务8.4）', () => {
       // 模拟用户状态
       const user_state = {
         user_id: test_user?.user_id || 1,
-        campaign_id: test_campaign?.campaign_id || 1,
+        lottery_campaign_id: test_campaign?.lottery_campaign_id || 1,
         total_draw_count: 0,
         last_high_tier_draw: 0,
         empty_streak: 0,
@@ -884,13 +884,13 @@ describe('保底触发完整流程测试（任务8.4）', () => {
 
       console.log('📊 真实引擎保底测试:')
       console.log(`   user_id: ${test_user.user_id}`)
-      console.log(`   campaign_id: ${test_campaign.campaign_id}`)
+      console.log(`   lottery_campaign_id: ${test_campaign.lottery_campaign_id}`)
 
       // 执行一次抽奖测试
       try {
         const result = await unified_lottery_engine.execute_draw({
           user_id: test_user.user_id,
-          campaign_id: test_campaign.campaign_id,
+          lottery_campaign_id: test_campaign.lottery_campaign_id,
           draw_count: 1
         })
 

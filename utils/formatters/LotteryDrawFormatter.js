@@ -74,10 +74,10 @@ class LotteryDrawFormatter {
    */
   static formatToSummary(lotteryDraw) {
     return {
-      draw_id: lotteryDraw.draw_id,
+      lottery_draw_id: lotteryDraw.lottery_draw_id,
       user_id: lotteryDraw.user_id,
-      campaign_id: lotteryDraw.campaign_id,
-      prize_id: lotteryDraw.prize_id,
+      lottery_campaign_id: lotteryDraw.lottery_campaign_id,
+      lottery_prize_id: lotteryDraw.lottery_prize_id,
       // V4.0：使用 reward_tier 替代 is_winner
       reward_tier: lotteryDraw.reward_tier,
       reward_tier_text: this.getRewardTierText(lotteryDraw.reward_tier),

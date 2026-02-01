@@ -80,8 +80,8 @@ router.get('/conversion-rules', authenticateToken, async (req, res) => {
       const autoDescription = `${rule.from_amount} ${rule.from_asset_code} → ${rule.to_amount} ${rule.to_asset_code}`
 
       return {
-        // 基础信息
-        rule_id: rule.rule_id,
+        // 基础信息（主键统一命名规范：material_conversion_rule_id）
+        rule_id: rule.material_conversion_rule_id,
         from_asset_code: rule.from_asset_code,
         to_asset_code: rule.to_asset_code,
         from_amount: rule.from_amount,

@@ -478,7 +478,7 @@ function isFeatureEnabled(feature) {
  * @param {string} feature - 特性名称（pity/luck_debt/anti_empty/anti_high）
  * @param {Object} context - 上下文信息
  * @param {number} context.user_id - 用户ID（用于灰度 hash 计算）
- * @param {number} context.campaign_id - 活动ID（用于活动白名单检查）
+ * @param {number} context.lottery_campaign_id - 活动ID（用于活动白名单检查）
  * @returns {Object} 启用状态详情
  *
  * @example
@@ -491,7 +491,7 @@ function isFeatureEnabled(feature) {
  * }
  */
 function isFeatureEnabledForContext(feature, context = {}) {
-  const { user_id, campaign_id } = context
+  const { user_id, lottery_campaign_id } = context
 
   // 1. 全局开关检查
   if (!isFeatureEnabled(feature)) {
@@ -526,7 +526,7 @@ function isFeatureEnabledForContext(feature, context = {}) {
   }
 
   // 4. 活动白名单检查
-  if (campaign_id && grayscale.campaign_whitelist.includes(campaign_id)) {
+  if (lottery_campaign_id && grayscale.campaign_whitelist.includes(lottery_campaign_id)) {
     return {
       enabled: true,
       reason: 'campaign_whitelist',

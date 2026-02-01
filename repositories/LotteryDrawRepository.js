@@ -231,7 +231,7 @@ class LotteryDrawRepository {
 
     // 构建查询条件
     if (userId) where.user_id = userId
-    if (campaignId) where.campaign_id = campaignId
+    if (campaignId) where.lottery_campaign_id = campaignId
     // V4.0：根据奖励档位过滤
     if (rewardTier !== null) where.reward_tier = rewardTier
     if (prizeType) where.prize_type = prizeType
@@ -312,7 +312,7 @@ class LotteryDrawRepository {
     const { startDate = null, endDate = null, campaignId = null } = options
 
     const where = {}
-    if (campaignId) where.campaign_id = campaignId
+    if (campaignId) where.lottery_campaign_id = campaignId
 
     if (startDate || endDate) {
       where.created_at = {}

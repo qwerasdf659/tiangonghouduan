@@ -1,38 +1,33 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>提醒规则配置 - 管理后台</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <%- include('partials/head', { 
+    title: '提醒规则配置', 
+    pageStyle: '[x-cloak] { display: none !important; } .rule-card { transition: all 0.2s ease; } .rule-card:hover { background-color: #f8fafc; }' 
+  }) %>
+</head>
+<body class="themed-bg-base min-h-screen">
   <style>
-    [x-cloak] { display: none !important; }
-    
-    /* 自定义滚动条 */
-    .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
-    .scrollbar-thin::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
-    .scrollbar-thin::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
-    .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
-    
-    /* 规则卡片 */
-    .rule-card { transition: all 0.2s ease; }
-    .rule-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateY(-2px); }
-    
-    /* 状态开关 */
-    .toggle-switch { position: relative; width: 44px; height: 24px; }
+    /* 切换开关样式 */
+    .toggle-switch { position: relative; width: 44px; height: 24px; display: inline-block; }
     .toggle-switch input { opacity: 0; width: 0; height: 0; }
-    .toggle-slider { position: absolute; cursor: pointer; inset: 0; background-color: #cbd5e1; transition: .3s; border-radius: 24px; }
-    .toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+    .toggle-slider { 
+      position: absolute; cursor: pointer; 
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #cbd5e1; border-radius: 24px;
+      transition: 0.3s;
+    }
+    .toggle-slider:before {
+      position: absolute; content: "";
+      height: 18px; width: 18px;
+      left: 3px; bottom: 3px;
+      background-color: white; border-radius: 50%;
+      transition: 0.3s;
+    }
     input:checked + .toggle-slider { background-color: #3b82f6; }
     input:checked + .toggle-slider:before { transform: translateX(20px); }
-    
-    /* 优先级标签 */
-    .priority-high { background-color: #fee2e2; color: #dc2626; }
-    .priority-medium { background-color: #fef3c7; color: #d97706; }
-    .priority-low { background-color: #d1fae5; color: #059669; }
+    input:disabled + .toggle-slider { opacity: 0.5; cursor: not-allowed; }
   </style>
-</head>
-<body class="bg-gray-50 min-h-screen">
   <div x-data="reminderRulesPage()" x-init="init()" x-cloak class="p-6">
     <!-- 页面标题 -->
     <div class="flex items-center justify-between mb-6">
@@ -73,7 +68,6 @@
           <span class="text-sm text-gray-500">类型:</span>
           <select 
             x-model="filter.rule_type"
-            @change="loadRules()"
             class="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
           >
             <option value="">全部类型</option>
@@ -91,7 +85,6 @@
           <span class="text-sm text-gray-500">状态:</span>
           <select 
             x-model="filter.is_enabled"
-            @change="loadRules()"
             class="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
           >
             <option value="">全部状态</option>
@@ -99,39 +92,11 @@
             <option value="false">已禁用</option>
           </select>
         </div>
-        
-        <!-- 系统规则筛选 -->
-        <div class="flex items-center gap-2">
-          <span class="text-sm text-gray-500">来源:</span>
-          <select 
-            x-model="filter.is_system"
-            @change="loadRules()"
-            class="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">全部来源</option>
-            <option value="true">系统规则</option>
-            <option value="false">自定义规则</option>
-          </select>
-        </div>
-        
-        <!-- 搜索框 -->
-        <div class="flex-1 min-w-[200px]">
-          <div class="relative">
-            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
-            <input 
-              type="text"
-              x-model="filter.keyword"
-              @input.debounce.300ms="loadRules()"
-              placeholder="搜索规则名称..."
-              class="w-full pl-10 pr-4 py-2 bg-gray-100 border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
       </div>
     </div>
     
     <!-- 统计卡片 -->
-    <div class="grid grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <div class="flex items-center justify-between">
           <div>
@@ -163,7 +128,7 @@
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm text-gray-500">今日触发</p>
-            <p class="text-2xl font-bold text-orange-600" x-text="stats.triggered_today">0</p>
+            <p class="text-2xl font-bold text-orange-600">0</p>
           </div>
           <div class="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-2xl">🔔</div>
         </div>
@@ -209,7 +174,7 @@
               <td class="px-6 py-4">
                 <div class="flex items-start gap-3">
                   <div>
-                    <p class="font-medium text-gray-800" x-text="rule.name || rule.rule_name"></p>
+                    <p class="font-medium text-gray-800" x-text="rule.rule_name || rule.name"></p>
                     <p class="text-sm text-gray-500 mt-1 max-w-md truncate" x-text="rule.description || '-'"></p>
                     <div class="flex items-center gap-2 mt-2">
                       <span 
@@ -234,7 +199,7 @@
               <!-- 优先级 -->
               <td class="px-6 py-4">
                 <span 
-                  class="px-2 py-1 text-xs rounded-full"
+                  class="text-sm"
                   :class="getPriorityClass(rule.priority)"
                   x-text="getPriorityName(rule.priority)"
                 ></span>
@@ -308,15 +273,15 @@
         <div class="flex items-center gap-2">
           <button 
             @click="prevPage()"
-            :disabled="pagination.page <= 1"
+            :disabled="!hasPrevPage"
             class="px-3 py-1 border rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >上一页</button>
           <span class="px-3 py-1 text-sm">
-            <span x-text="pagination.page"></span> / <span x-text="Math.ceil(pagination.total / pagination.page_size) || 1"></span>
+            <span x-text="pagination.page"></span> / <span x-text="totalPages"></span>
           </span>
           <button 
             @click="nextPage()"
-            :disabled="pagination.page >= Math.ceil(pagination.total / pagination.page_size)"
+            :disabled="!hasNextPage"
             class="px-3 py-1 border rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >下一页</button>
         </div>
@@ -334,7 +299,7 @@
       <div class="relative bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
         <!-- 弹窗头部 -->
         <div class="sticky top-0 bg-white px-6 py-4 border-b flex items-center justify-between z-10">
-          <h3 class="text-lg font-semibold text-gray-800" x-text="editingRule ? '编辑规则' : '新建规则'"></h3>
+          <h3 class="text-lg font-semibold text-gray-800" x-text="editMode ? '编辑规则' : '新建规则'"></h3>
           <button @click="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
         
@@ -345,7 +310,7 @@
             <label class="block text-sm font-medium text-gray-700 mb-1">规则名称 <span class="text-red-500">*</span></label>
             <input 
               type="text"
-              x-model="form.name"
+              x-model="form.rule_name"
               placeholder="如：预算余额不足提醒"
               class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
@@ -359,12 +324,9 @@
               class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">请选择类型</option>
-              <option value="budget">预算提醒</option>
-              <option value="inventory">库存提醒</option>
-              <option value="performance">性能提醒</option>
-              <option value="security">安全提醒</option>
-              <option value="business">业务提醒</option>
-              <option value="system">系统提醒</option>
+              <template x-for="type in ruleTypes" :key="type.value">
+                <option :value="type.value" x-text="type.label"></option>
+              </template>
             </select>
           </div>
           
@@ -404,28 +366,13 @@
             </div>
           </div>
           
-          <!-- 触发条件 -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">触发条件（JSON）</label>
-            <textarea 
-              x-model="form.trigger_conditions"
-              rows="3"
-              placeholder='{"threshold": 10, "operator": "<=", "field": "remaining_budget"}'
-              class="w-full px-4 py-2 border border-gray-200 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            ></textarea>
-            <p class="text-xs text-gray-500 mt-1">定义规则触发的条件，使用 JSON 格式</p>
-          </div>
-          
-          <!-- 通知模板 -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">通知模板</label>
-            <textarea 
-              x-model="form.notification_template"
-              rows="2"
-              placeholder="预算余额不足：当前余额 {remaining_budget} 元，请及时充值"
-              class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            ></textarea>
-            <p class="text-xs text-gray-500 mt-1">支持使用 {field_name} 占位符引用数据字段</p>
+          <!-- 启用状态 -->
+          <div class="flex items-center gap-2">
+            <label class="toggle-switch">
+              <input type="checkbox" x-model="form.is_enabled">
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="text-sm text-gray-600">启用规则</span>
           </div>
         </div>
         
@@ -448,407 +395,7 @@
     </div>
   </div>
   
-  <!-- 引入 Alpine.js -->
-  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  
-  <script>
-    // 提醒规则配置页面组件
-    function reminderRulesPage() {
-      return {
-        loading: false,
-        saving: false,
-        showModal: false,
-        editingRule: null,
-        
-        // 规则列表
-        rules: [],
-        
-        // 统计数据
-        stats: {
-          total: 0,
-          enabled: 0,
-          disabled: 0,
-          triggered_today: 0
-        },
-        
-        // 筛选条件
-        filter: {
-          rule_type: '',
-          is_enabled: '',
-          is_system: '',
-          keyword: ''
-        },
-        
-        // 分页
-        pagination: {
-          page: 1,
-          page_size: 20,
-          total: 0
-        },
-        
-        // 表单数据
-        form: {
-          name: '',
-          rule_type: '',
-          description: '',
-          priority: 50,
-          check_interval: 60,
-          trigger_conditions: '',
-          notification_template: ''
-        },
-        
-        async init() {
-          console.log('[ReminderRules] 初始化提醒规则配置页面')
-          await this.loadRules()
-        },
-        
-        // 加载规则列表
-        async loadRules() {
-          this.loading = true
-          try {
-            const token = localStorage.getItem('admin_token')
-            if (!token) {
-              console.error('[ReminderRules] 未登录')
-              return
-            }
-            
-            const params = new URLSearchParams({
-              page: this.pagination.page,
-              page_size: this.pagination.page_size
-            })
-            
-            if (this.filter.rule_type) params.append('rule_type', this.filter.rule_type)
-            if (this.filter.is_enabled) params.append('is_enabled', this.filter.is_enabled)
-            if (this.filter.is_system) params.append('is_system', this.filter.is_system)
-            
-            const response = await fetch(`/api/v4/console/reminder-rules?${params}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            })
-            
-            const result = await response.json()
-            
-            if (result.success) {
-              this.rules = result.data.list || result.data.items || result.data || []
-              this.pagination.total = result.data.total || this.rules.length
-              
-              // 更新统计
-              this.updateStats()
-              
-              console.log('[ReminderRules] 加载规则成功:', this.rules.length)
-            } else {
-              console.error('[ReminderRules] 加载规则失败:', result.message)
-            }
-          } catch (error) {
-            console.error('[ReminderRules] 加载规则异常:', error)
-          } finally {
-            this.loading = false
-          }
-        },
-        
-        // 更新统计数据
-        updateStats() {
-          this.stats.total = this.pagination.total
-          this.stats.enabled = this.rules.filter(r => r.is_enabled).length
-          this.stats.disabled = this.rules.filter(r => !r.is_enabled).length
-        },
-        
-        // 打开新建弹窗
-        openCreateModal() {
-          this.editingRule = null
-          this.form = {
-            name: '',
-            rule_type: '',
-            description: '',
-            priority: 50,
-            check_interval: 60,
-            trigger_conditions: '',
-            notification_template: ''
-          }
-          this.showModal = true
-        },
-        
-        // 打开编辑弹窗
-        openEditModal(rule) {
-          if (rule.is_system) {
-            alert('系统规则不可编辑')
-            return
-          }
-          
-          this.editingRule = rule
-          this.form = {
-            name: rule.name || rule.rule_name || '',
-            rule_type: rule.rule_type || '',
-            description: rule.description || '',
-            priority: rule.priority || 50,
-            check_interval: rule.check_interval || 60,
-            trigger_conditions: typeof rule.trigger_conditions === 'object' 
-              ? JSON.stringify(rule.trigger_conditions, null, 2) 
-              : rule.trigger_conditions || '',
-            notification_template: rule.notification_template || ''
-          }
-          this.showModal = true
-        },
-        
-        // 关闭弹窗
-        closeModal() {
-          this.showModal = false
-          this.editingRule = null
-        },
-        
-        // 保存规则
-        async saveRule() {
-          if (!this.form.name || !this.form.rule_type) {
-            alert('请填写规则名称和类型')
-            return
-          }
-          
-          this.saving = true
-          try {
-            const token = localStorage.getItem('admin_token')
-            
-            // 解析触发条件 JSON
-            let trigger_conditions = null
-            if (this.form.trigger_conditions) {
-              try {
-                trigger_conditions = JSON.parse(this.form.trigger_conditions)
-              } catch (e) {
-                alert('触发条件 JSON 格式错误')
-                this.saving = false
-                return
-              }
-            }
-            
-            const data = {
-              name: this.form.name,
-              rule_type: this.form.rule_type,
-              description: this.form.description,
-              priority: this.form.priority,
-              check_interval: this.form.check_interval,
-              trigger_conditions: trigger_conditions,
-              notification_template: this.form.notification_template
-            }
-            
-            const url = this.editingRule 
-              ? `/api/v4/console/reminder-rules/${this.editingRule.reminder_rule_id}`
-              : '/api/v4/console/reminder-rules'
-            
-            const response = await fetch(url, {
-              method: this.editingRule ? 'PUT' : 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(data)
-            })
-            
-            const result = await response.json()
-            
-            if (result.success) {
-              this.closeModal()
-              await this.loadRules()
-              console.log('[ReminderRules] 保存规则成功')
-            } else {
-              alert('保存失败: ' + result.message)
-            }
-          } catch (error) {
-            console.error('[ReminderRules] 保存规则异常:', error)
-            alert('保存失败: ' + error.message)
-          } finally {
-            this.saving = false
-          }
-        },
-        
-        // 切换规则状态
-        async toggleRule(rule) {
-          try {
-            const token = localStorage.getItem('admin_token')
-            const newStatus = !rule.is_enabled
-            
-            const response = await fetch(`/api/v4/console/reminder-rules/${rule.reminder_rule_id}/toggle`, {
-              method: 'PUT',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ is_enabled: newStatus })
-            })
-            
-            const result = await response.json()
-            
-            if (result.success) {
-              rule.is_enabled = newStatus
-              this.updateStats()
-              console.log('[ReminderRules] 切换状态成功:', rule.reminder_rule_id, newStatus)
-            } else {
-              alert('操作失败: ' + result.message)
-              // 恢复原状态
-              rule.is_enabled = !newStatus
-            }
-          } catch (error) {
-            console.error('[ReminderRules] 切换状态异常:', error)
-          }
-        },
-        
-        // 测试规则
-        async testRule(rule) {
-          try {
-            const token = localStorage.getItem('admin_token')
-            
-            const response = await fetch(`/api/v4/console/reminder-rules/${rule.reminder_rule_id}/test`, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${token}` }
-            })
-            
-            const result = await response.json()
-            
-            if (result.success) {
-              const data = result.data
-              const msg = data.would_trigger 
-                ? `✅ 规则会触发\n匹配用户数: ${data.matched_users}`
-                : '❌ 规则不会触发（条件不满足）'
-              alert(msg)
-            } else {
-              alert('测试失败: ' + result.message)
-            }
-          } catch (error) {
-            console.error('[ReminderRules] 测试规则异常:', error)
-            alert('测试失败: ' + error.message)
-          }
-        },
-        
-        // 执行规则
-        async executeRule(rule) {
-          if (!confirm(`确定要立即执行规则"${rule.name || rule.rule_name}"吗？这将实际发送通知。`)) {
-            return
-          }
-          
-          try {
-            const token = localStorage.getItem('admin_token')
-            
-            const response = await fetch(`/api/v4/console/reminder-rules/${rule.reminder_rule_id}/execute`, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${token}` }
-            })
-            
-            const result = await response.json()
-            
-            if (result.success) {
-              alert('规则执行完成')
-            } else {
-              alert('执行失败: ' + result.message)
-            }
-          } catch (error) {
-            console.error('[ReminderRules] 执行规则异常:', error)
-            alert('执行失败: ' + error.message)
-          }
-        },
-        
-        // 删除规则
-        async deleteRule(rule) {
-          if (rule.is_system) {
-            alert('系统规则不可删除')
-            return
-          }
-          
-          if (!confirm(`确定要删除规则"${rule.name || rule.rule_name}"吗？此操作不可撤销。`)) {
-            return
-          }
-          
-          try {
-            const token = localStorage.getItem('admin_token')
-            
-            const response = await fetch(`/api/v4/console/reminder-rules/${rule.reminder_rule_id}`, {
-              method: 'DELETE',
-              headers: { 'Authorization': `Bearer ${token}` }
-            })
-            
-            const result = await response.json()
-            
-            if (result.success) {
-              await this.loadRules()
-              console.log('[ReminderRules] 删除规则成功')
-            } else {
-              alert('删除失败: ' + result.message)
-            }
-          } catch (error) {
-            console.error('[ReminderRules] 删除规则异常:', error)
-            alert('删除失败: ' + error.message)
-          }
-        },
-        
-        // 分页
-        prevPage() {
-          if (this.pagination.page > 1) {
-            this.pagination.page--
-            this.loadRules()
-          }
-        },
-        
-        nextPage() {
-          const totalPages = Math.ceil(this.pagination.total / this.pagination.page_size)
-          if (this.pagination.page < totalPages) {
-            this.pagination.page++
-            this.loadRules()
-          }
-        },
-        
-        // 工具方法
-        formatDate(dateStr) {
-          if (!dateStr) return '-'
-          const date = new Date(dateStr)
-          return date.toLocaleString('zh-CN', { 
-            timeZone: 'Asia/Shanghai',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit'
-          })
-        },
-        
-        formatInterval(minutes) {
-          if (!minutes) return '-'
-          if (minutes < 60) return `${minutes} 分钟`
-          if (minutes < 1440) return `${Math.floor(minutes / 60)} 小时`
-          return `${Math.floor(minutes / 1440)} 天`
-        },
-        
-        getRuleTypeName(type) {
-          const types = {
-            budget: '预算提醒',
-            inventory: '库存提醒',
-            performance: '性能提醒',
-            security: '安全提醒',
-            business: '业务提醒',
-            system: '系统提醒'
-          }
-          return types[type] || type || '未知'
-        },
-        
-        getRuleTypeClass(type) {
-          const classes = {
-            budget: 'bg-green-100 text-green-700',
-            inventory: 'bg-yellow-100 text-yellow-700',
-            performance: 'bg-blue-100 text-blue-700',
-            security: 'bg-red-100 text-red-700',
-            business: 'bg-purple-100 text-purple-700',
-            system: 'bg-gray-100 text-gray-700'
-          }
-          return classes[type] || 'bg-gray-100 text-gray-700'
-        },
-        
-        getPriorityName(priority) {
-          if (priority >= 70) return '高'
-          if (priority >= 40) return '中'
-          return '低'
-        },
-        
-        getPriorityClass(priority) {
-          if (priority >= 70) return 'priority-high'
-          if (priority >= 40) return 'priority-medium'
-          return 'priority-low'
-        }
-      }
-    }
-  </script>
+  <!-- 页面模块引入 -->
+  <script type="module" src="./src/pages/reminder-rules.js"></script>
 </body>
 </html>
-

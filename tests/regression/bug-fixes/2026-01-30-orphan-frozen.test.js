@@ -224,7 +224,7 @@ describe('🔴 孤儿冻结问题回归测试 - 2026-01-30', () => {
       const frozenOrders = await TradeOrder.findAll({
         where: { status: 'frozen' },
         limit: 5,
-        attributes: ['order_id', 'listing_id', 'buyer_user_id', 'status', 'gross_amount']
+        attributes: ['order_id', 'market_listing_id', 'buyer_user_id', 'status', 'gross_amount']
       })
 
       console.log(`   📊 当前 frozen 状态订单数量: ${frozenOrders.length}`)
@@ -233,7 +233,7 @@ describe('🔴 孤儿冻结问题回归测试 - 2026-01-30', () => {
         console.log('   📋 frozen 订单示例:')
         frozenOrders.slice(0, 3).forEach(order => {
           console.log(
-            `      - order_id=${order.order_id}, listing_id=${order.listing_id}, amount=${order.gross_amount}`
+            `      - order_id=${order.order_id}, market_listing_id=${order.market_listing_id}, amount=${order.gross_amount}`
           )
         })
       }
@@ -244,20 +244,20 @@ describe('🔴 孤儿冻结问题回归测试 - 2026-01-30', () => {
     })
 
     /**
-     * 测试用例：可按 listing_id 查询关联订单
+     * 测试用例：可按 market_listing_id 查询关联订单
      *
-     * 业务场景：验证系统能够按 listing_id 查询关联的订单
+     * 业务场景：验证系统能够按 market_listing_id 查询关联的订单
      *
      * 验收标准：
-     * - TradeOrder 模型支持按 listing_id 查询
+     * - TradeOrder 模型支持按 market_listing_id 查询
      */
-    test('BUG-5: 应能按 listing_id 查询关联订单', async () => {
-      console.log('📋 BUG-5: 验证按 listing_id 查询关联订单能力...')
+    test('BUG-5: 应能按 market_listing_id 查询关联订单', async () => {
+      console.log('📋 BUG-5: 验证按 market_listing_id 查询关联订单能力...')
 
-      // 获取一个有效的 listing_id
+      // 获取一个有效的 market_listing_id
       const existingListing = await MarketListing.findOne({
         where: { status: 'on_sale' },
-        attributes: ['listing_id']
+        attributes: ['market_listing_id']
       })
 
       if (!existingListing) {
@@ -266,16 +266,16 @@ describe('🔴 孤儿冻结问题回归测试 - 2026-01-30', () => {
         return
       }
 
-      const listingId = existingListing.listing_id
+      const listingId = existingListing.market_listing_id
 
       // 查询该挂牌关联的订单
       const relatedOrders = await TradeOrder.findAll({
-        where: { listing_id: listingId },
+        where: { market_listing_id: listingId },
         attributes: ['order_id', 'status', 'buyer_user_id']
       })
 
-      console.log(`   📊 listing_id=${listingId} 关联订单数量: ${relatedOrders.length}`)
-      console.log('   ✅ 按 listing_id 查询功能正常')
+      console.log(`   📊 market_listing_id=${listingId} 关联订单数量: ${relatedOrders.length}`)
+      console.log('   ✅ 按 market_listing_id 查询功能正常')
     })
   })
 
@@ -371,7 +371,7 @@ describe('🔴 孤儿冻结问题回归测试 - 2026-01-30', () => {
           }
         ],
         limit: 10,
-        attributes: ['order_id', 'listing_id', 'buyer_user_id', 'status', 'gross_amount']
+        attributes: ['order_id', 'market_listing_id', 'buyer_user_id', 'status', 'gross_amount']
       })
 
       console.log(`   📊 孤儿冻结订单数量: ${orphanFrozenOrders.length}`)
@@ -380,7 +380,7 @@ describe('🔴 孤儿冻结问题回归测试 - 2026-01-30', () => {
         console.warn('   ⚠️ 发现孤儿冻结订单:')
         orphanFrozenOrders.forEach(order => {
           console.warn(
-            `      - order_id=${order.order_id}, listing_id=${order.listing_id}, amount=${order.gross_amount}`
+            `      - order_id=${order.order_id}, market_listing_id=${order.market_listing_id}, amount=${order.gross_amount}`
           )
         })
         console.warn('   ❗ 建议运行 OrphanFrozenCleanupService 清理')
@@ -418,7 +418,7 @@ describe('🔴 孤儿冻结问题回归测试 - 2026-01-30', () => {
           }
         ],
         limit: 10,
-        attributes: ['order_id', 'listing_id', 'buyer_user_id', 'status']
+        attributes: ['order_id', 'market_listing_id', 'buyer_user_id', 'status']
       })
 
       console.log(`   📊 无效状态订单数量: ${invalidOrders.length}`)
@@ -426,7 +426,9 @@ describe('🔴 孤儿冻结问题回归测试 - 2026-01-30', () => {
       if (invalidOrders.length > 0) {
         console.warn('   ⚠️ 发现无效状态订单（created 但挂牌已撤回）:')
         invalidOrders.forEach(order => {
-          console.warn(`      - order_id=${order.order_id}, listing_id=${order.listing_id}`)
+          console.warn(
+            `      - order_id=${order.order_id}, market_listing_id=${order.market_listing_id}`
+          )
         })
       } else {
         console.log('   ✅ created 状态订单的挂牌均为有效状态')

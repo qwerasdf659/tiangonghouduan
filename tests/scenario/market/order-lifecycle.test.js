@@ -121,7 +121,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
       )
       await listing_tx.commit()
       listing = listing_result.listing
-      createdListings.push(listing.listing_id)
+      createdListings.push(listing.market_listing_id)
     } catch (error) {
       await listing_tx.rollback()
       throw error
@@ -225,11 +225,11 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
     createdOrders = []
 
     // 清理测试挂牌
-    for (const listing_id of createdListings) {
+    for (const market_listing_id of createdListings) {
       try {
-        await MarketListing.destroy({ where: { listing_id }, force: true })
+        await MarketListing.destroy({ where: { market_listing_id }, force: true })
       } catch (error) {
-        console.log(`清理挂牌 ${listing_id} 失败:`, error.message)
+        console.log(`清理挂牌 ${market_listing_id} 失败:`, error.message)
       }
     }
     createdListings = []
@@ -268,7 +268,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
 
         // 1. 准备挂牌
         const { listing } = await createTestListing({ price_amount: 60 })
-        console.log(`✅ 挂牌创建成功: listing_id=${listing.listing_id}`)
+        console.log(`✅ 挂牌创建成功: market_listing_id=${listing.market_listing_id}`)
 
         // 2. 为买家准备资产
         await grantTestAsset(testBuyer.user_id, 100)
@@ -287,20 +287,20 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           order_result = await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey('order'),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: testBuyer.user_id
             },
             { transaction: order_tx }
           )
           await order_tx.commit()
-          createdOrders.push(order_result.order_id)
+          createdOrders.push(order_result.trade_order_id)
         } catch (error) {
           await order_tx.rollback()
           throw error
         }
 
         // 5. 验证订单状态为 frozen（不是 created）
-        const order = await TradeOrder.findByPk(order_result.order_id)
+        const order = await TradeOrder.findByPk(order_result.trade_order_id)
         expect(order.status).toBe('frozen')
         expect(order.buyer_user_id).toBe(testBuyer.user_id)
         expect(order.seller_user_id).toBe(testSeller.user_id)
@@ -314,9 +314,9 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         expect(frozen_after).toBeGreaterThan(frozen_before)
 
         // 7. 验证挂牌状态为 locked
-        const updated_listing = await MarketListing.findByPk(listing.listing_id)
+        const updated_listing = await MarketListing.findByPk(listing.market_listing_id)
         expect(updated_listing.status).toBe('locked')
-        expect(Number(updated_listing.locked_by_order_id)).toBe(Number(order_result.order_id))
+        expect(Number(updated_listing.locked_by_order_id)).toBe(Number(order_result.trade_order_id))
 
         console.log('✅ 订单创建 → frozen 状态转换验证通过')
       })
@@ -343,13 +343,13 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           const order_result = await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey('order'),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: testBuyer.user_id
             },
             { transaction: order_tx }
           )
           await order_tx.commit()
-          order_id = order_result.order_id
+          order_id = order_result.trade_order_id
           createdOrders.push(order_id)
         } catch (error) {
           await order_tx.rollback()
@@ -373,7 +373,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         try {
           complete_result = await TradeOrderService.completeOrder(
             {
-              order_id,
+              trade_order_id: order_id,
               buyer_id: testBuyer.user_id
             },
             { transaction: complete_tx }
@@ -390,7 +390,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         expect(completed_order.completed_at).not.toBeNull()
 
         // 6. 验证挂牌状态为 sold
-        const sold_listing = await MarketListing.findByPk(listing.listing_id)
+        const sold_listing = await MarketListing.findByPk(listing.market_listing_id)
         expect(sold_listing.status).toBe('sold')
 
         // 7. 验证物品所有权转移
@@ -435,13 +435,13 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           const order_result = await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey('order'),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: testBuyer.user_id
             },
             { transaction: order_tx }
           )
           await order_tx.commit()
-          order_id = order_result.order_id
+          order_id = order_result.trade_order_id
           createdOrders.push(order_id)
         } catch (error) {
           await order_tx.rollback()
@@ -464,7 +464,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         try {
           await TradeOrderService.cancelOrder(
             {
-              order_id,
+              trade_order_id: order_id,
               cancel_reason: '生命周期测试取消'
             },
             { transaction: cancel_tx }
@@ -482,7 +482,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         expect(cancelled_order.meta?.cancel_reason).toBe('生命周期测试取消')
 
         // 6. 验证挂牌状态恢复为 on_sale
-        const restored_listing = await MarketListing.findByPk(listing.listing_id)
+        const restored_listing = await MarketListing.findByPk(listing.market_listing_id)
         expect(restored_listing.status).toBe('on_sale')
         expect(restored_listing.locked_by_order_id).toBeNull()
 
@@ -521,13 +521,13 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           first_result = await TradeOrderService.createOrder(
             {
               idempotency_key,
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: testBuyer.user_id
             },
             { transaction: tx1 }
           )
           await tx1.commit()
-          createdOrders.push(first_result.order_id)
+          createdOrders.push(first_result.trade_order_id)
         } catch (error) {
           await tx1.rollback()
           throw error
@@ -542,7 +542,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           second_result = await TradeOrderService.createOrder(
             {
               idempotency_key,
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: testBuyer.user_id
             },
             { transaction: tx2 }
@@ -555,7 +555,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
 
         // 4. 验证幂等性
         expect(second_result.is_duplicate).toBe(true)
-        expect(String(second_result.order_id)).toBe(String(first_result.order_id))
+        expect(String(second_result.trade_order_id)).toBe(String(first_result.trade_order_id))
 
         console.log('✅ 订单幂等性验证通过')
       })
@@ -601,7 +601,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey('insufficient'),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: testBuyer.user_id
             },
             { transaction: order_tx }
@@ -663,13 +663,13 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           const result = await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey('first_buyer'),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: testBuyer.user_id
             },
             { transaction: tx1 }
           )
           await tx1.commit()
-          createdOrders.push(result.order_id)
+          createdOrders.push(result.trade_order_id)
           console.log('✅ 第一个买家订单创建成功')
         } catch (error) {
           await tx1.rollback()
@@ -677,7 +677,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         }
 
         // 4. 验证挂牌已被锁定
-        const locked_listing = await MarketListing.findByPk(listing.listing_id)
+        const locked_listing = await MarketListing.findByPk(listing.market_listing_id)
         expect(locked_listing.status).toBe('locked')
 
         // 5. 第二个买家尝试购买（应失败）
@@ -686,7 +686,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey('second_buyer'),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: second_buyer.user_id
             },
             { transaction: tx2 }
@@ -741,13 +741,13 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           const result = await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey('sold_order'),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: testBuyer.user_id
             },
             { transaction: order_tx }
           )
           await order_tx.commit()
-          order_id = result.order_id
+          order_id = result.trade_order_id
           createdOrders.push(order_id)
         } catch (error) {
           await order_tx.rollback()
@@ -757,7 +757,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         const complete_tx = await sequelize.transaction()
         try {
           await TradeOrderService.completeOrder(
-            { order_id, buyer_id: testBuyer.user_id },
+            { trade_order_id: order_id, buyer_id: testBuyer.user_id },
             { transaction: complete_tx }
           )
           await complete_tx.commit()
@@ -768,7 +768,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         }
 
         // 4. 验证挂牌已售出
-        const sold_listing = await MarketListing.findByPk(listing.listing_id)
+        const sold_listing = await MarketListing.findByPk(listing.market_listing_id)
         expect(sold_listing.status).toBe('sold')
 
         // 5. 第二个买家尝试购买（应失败）
@@ -777,7 +777,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey('second_attempt'),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: second_buyer.user_id
             },
             { transaction: tx2 }
@@ -810,7 +810,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey('self_buy'),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: testSeller.user_id // 卖家自己购买
             },
             { transaction: order_tx }
@@ -848,13 +848,13 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           const result = await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey('to_cancel'),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: testBuyer.user_id
             },
             { transaction: order_tx }
           )
           await order_tx.commit()
-          order_id = result.order_id
+          order_id = result.trade_order_id
           createdOrders.push(order_id)
         } catch (error) {
           await order_tx.rollback()
@@ -865,7 +865,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         const cancel_tx = await sequelize.transaction()
         try {
           await TradeOrderService.cancelOrder(
-            { order_id, cancel_reason: '测试取消' },
+            { trade_order_id: order_id, cancel_reason: '测试取消' },
             { transaction: cancel_tx }
           )
           await cancel_tx.commit()
@@ -878,7 +878,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         const complete_tx = await sequelize.transaction()
         try {
           await TradeOrderService.completeOrder(
-            { order_id, buyer_id: testBuyer.user_id },
+            { trade_order_id: order_id, buyer_id: testBuyer.user_id },
             { transaction: complete_tx }
           )
           await complete_tx.rollback()
@@ -914,13 +914,13 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           const result = await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey('to_complete'),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: testBuyer.user_id
             },
             { transaction: order_tx }
           )
           await order_tx.commit()
-          order_id = result.order_id
+          order_id = result.trade_order_id
           createdOrders.push(order_id)
         } catch (error) {
           await order_tx.rollback()
@@ -931,7 +931,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         const complete_tx = await sequelize.transaction()
         try {
           await TradeOrderService.completeOrder(
-            { order_id, buyer_id: testBuyer.user_id },
+            { trade_order_id: order_id, buyer_id: testBuyer.user_id },
             { transaction: complete_tx }
           )
           await complete_tx.commit()
@@ -944,7 +944,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         const cancel_tx = await sequelize.transaction()
         try {
           await TradeOrderService.cancelOrder(
-            { order_id, cancel_reason: '测试取消' },
+            { trade_order_id: order_id, cancel_reason: '测试取消' },
             { transaction: cancel_tx }
           )
           await cancel_tx.rollback()
@@ -971,7 +971,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         const complete_tx = await sequelize.transaction()
         try {
           await TradeOrderService.completeOrder(
-            { order_id: fake_order_id, buyer_id: testSeller.user_id },
+            { trade_order_id: fake_order_id, buyer_id: testSeller.user_id },
             { transaction: complete_tx }
           )
           await complete_tx.rollback()
@@ -1004,7 +1004,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
 
       // Step 1: 创建挂牌
       const { listing, item } = await createTestListing({ price_amount: 70 })
-      console.log(`Step 1: 挂牌创建 listing_id=${listing.listing_id}`)
+      console.log(`Step 1: 挂牌创建 market_listing_id=${listing.market_listing_id}`)
 
       // Step 2: 准备买家资产
       await grantTestAsset(testBuyer.user_id, 200)
@@ -1017,13 +1017,13 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         const result = await TradeOrderService.createOrder(
           {
             idempotency_key: generateIdempotencyKey('e2e'),
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             buyer_id: testBuyer.user_id
           },
           { transaction: order_tx }
         )
         await order_tx.commit()
-        order_id = result.order_id
+        order_id = result.trade_order_id
         createdOrders.push(order_id)
       } catch (error) {
         await order_tx.rollback()
@@ -1035,7 +1035,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
       console.log(`Step 3: 订单创建 order_id=${order_id}, status=frozen`)
 
       // Step 4: 验证挂牌锁定
-      const locked_listing = await MarketListing.findByPk(listing.listing_id)
+      const locked_listing = await MarketListing.findByPk(listing.market_listing_id)
       expect(locked_listing.status).toBe('locked')
       console.log('Step 4: 挂牌已锁定')
 
@@ -1043,7 +1043,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
       const complete_tx = await sequelize.transaction()
       try {
         await TradeOrderService.completeOrder(
-          { order_id, buyer_id: testBuyer.user_id },
+          { trade_order_id: order_id, buyer_id: testBuyer.user_id },
           { transaction: complete_tx }
         )
         await complete_tx.commit()
@@ -1054,7 +1054,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
 
       // Step 6: 最终状态验证
       const final_order = await TradeOrder.findByPk(order_id)
-      const final_listing = await MarketListing.findByPk(listing.listing_id)
+      const final_listing = await MarketListing.findByPk(listing.market_listing_id)
       const final_item = await ItemInstance.findByPk(item.item_instance_id)
 
       expect(final_order.status).toBe('completed')

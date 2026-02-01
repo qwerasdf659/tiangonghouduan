@@ -743,11 +743,11 @@ describe('物品系统 ItemService 测试 - P2优先级', () => {
       }
 
       // 获取奖品所在活动的统计
-      const campaign_id = test_prize.campaign_id
+      const lottery_campaign_id = test_prize.lottery_campaign_id
 
       // 查询活动的所有奖品
       const prizes = await LotteryPrize.findAll({
-        where: { campaign_id }
+        where: { lottery_campaign_id }
       })
 
       // 计算统计信息
@@ -761,7 +761,7 @@ describe('物品系统 ItemService 测试 - P2优先级', () => {
       expect(total_used).toBeLessThanOrEqual(total_stock)
 
       console.log(
-        `📊 活动${campaign_id}库存统计: 总库存=${total_stock}, 已使用=${total_used}, 剩余=${remaining_stock}`
+        `📊 活动${lottery_campaign_id}库存统计: 总库存=${total_stock}, 已使用=${total_used}, 剩余=${remaining_stock}`
       )
     })
 

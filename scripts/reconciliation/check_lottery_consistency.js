@@ -48,7 +48,7 @@ async function send_alert(alert_type, data) {
 
     // 创建告警记录并推送
     const alert = await LotteryAlertService.createAlert({
-      campaign_id: data.campaign_id || null,
+      lottery_campaign_id: data.lottery_campaign_id || null,
       alert_type: 'system', // 对账脚本触发的是系统告警
       severity: 'danger',
       rule_code: `RECONCILIATION_${alert_type.toUpperCase()}`,
@@ -158,7 +158,7 @@ async function check_lottery_consistency() {
     // 1. 检查是否有 lottery_session_id 为 NULL 的记录（分界线后）
     const [null_session_records] = await sequelize.query(
       `
-      SELECT draw_id, user_id, cost_points, created_at
+      SELECT lottery_draw_id, user_id, cost_points, created_at
       FROM lottery_draws
       WHERE created_at >= ?
         AND (lottery_session_id IS NULL OR lottery_session_id = '')
@@ -171,7 +171,7 @@ async function check_lottery_consistency() {
       console.log(`\n⚠️ 发现 ${null_session_records.length} 条缺失 lottery_session_id 的记录:`)
       null_session_records.forEach(r => {
         console.log(
-          `   - draw_id: ${r.draw_id}, user_id: ${r.user_id}, cost_points: ${r.cost_points}`
+          `   - lottery_draw_id: ${r.lottery_draw_id}, user_id: ${r.user_id}, cost_points: ${r.cost_points}`
         )
       })
 
@@ -220,7 +220,7 @@ async function check_lottery_consistency() {
       LEFT JOIN lottery_draws ld ON ld.lottery_session_id = atx.lottery_session_id
       WHERE atx.business_type = 'lottery_consume'
         AND atx.created_at >= ?
-        AND ld.draw_id IS NULL
+        AND ld.lottery_draw_id IS NULL
         AND atx.lottery_session_id NOT LIKE '%test_%'
         AND atx.idempotency_key NOT LIKE '%test_%'
       LIMIT 20

@@ -205,7 +205,7 @@ describe('🚀 容量基准压力测试（P1-2）', () => {
             const result = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
               api_path: '/api/v4/lottery/draw',
               http_method: 'POST',
-              request_params: { campaign_id: testCampaignId, draw_count: 1 },
+              request_params: { lottery_campaign_id: testCampaignId, draw_count: 1 },
               user_id: testUserId + index // 模拟不同用户
             })
 
@@ -338,7 +338,7 @@ describe('🚀 容量基准压力测试（P1-2）', () => {
             const result = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
               api_path: '/api/v4/lottery/draw',
               http_method: 'POST',
-              request_params: { campaign_id: testCampaignId, draw_count: 1 },
+              request_params: { lottery_campaign_id: testCampaignId, draw_count: 1 },
               user_id: testUserId
             })
 
@@ -475,7 +475,7 @@ describe('🚀 容量基准压力测试（P1-2）', () => {
             await IdempotencyService.getOrCreateRequest(idempotencyKey, {
               api_path: '/api/v4/market/listings/:id/purchase',
               http_method: 'POST',
-              request_params: { listing_id: 1, buyer_index: index },
+              request_params: { market_listing_id: 1, buyer_index: index },
               user_id: testUserId + index
             })
 
@@ -795,7 +795,7 @@ describe('🚀 容量基准压力测试（P1-2）', () => {
             await IdempotencyService.getOrCreateRequest(idempotencyKey, {
               api_path: '/api/v4/lottery/draw',
               http_method: 'POST',
-              request_params: { campaign_id: testCampaignId, draw_count: 1 },
+              request_params: { lottery_campaign_id: testCampaignId, draw_count: 1 },
               user_id: testUserId
             })
 
@@ -819,7 +819,7 @@ describe('🚀 容量基准压力测试（P1-2）', () => {
             await IdempotencyService.getOrCreateRequest(idempotencyKey, {
               api_path: '/api/v4/market/listings/:id/purchase',
               http_method: 'POST',
-              request_params: { listing_id: (index % 10) + 1 },
+              request_params: { market_listing_id: (index % 10) + 1 },
               user_id: testUserId
             })
 
@@ -845,7 +845,7 @@ describe('🚀 容量基准压力测试（P1-2）', () => {
                 attributes: ['user_id', 'mobile', 'nickname']
               }),
               LotteryCampaign.findByPk(testCampaignId, {
-                attributes: ['campaign_id', 'campaign_name', 'status']
+                attributes: ['lottery_campaign_id', 'campaign_name', 'status']
               })
             ])
 
@@ -1060,7 +1060,7 @@ describe('🚀 容量基准压力测试（P1-2）', () => {
               await IdempotencyService.getOrCreateRequest(idempotencyKey, {
                 api_path: '/api/v4/lottery/draw',
                 http_method: 'POST',
-                request_params: { campaign_id: testCampaignId },
+                request_params: { lottery_campaign_id: testCampaignId },
                 user_id: testUserId
               })
 

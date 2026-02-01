@@ -29,7 +29,7 @@ module.exports = sequelize => {
     'ExchangeRecord',
     {
       // 主键
-      record_id: {
+      exchange_record_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
@@ -46,13 +46,13 @@ module.exports = sequelize => {
           key: 'user_id'
         }
       },
-      item_id: {
+      exchange_item_id: {
         type: DataTypes.BIGINT,
         allowNull: false,
         comment: '兑换商品ID',
         references: {
           model: 'exchange_items',
-          key: 'item_id'
+          key: 'exchange_item_id'
         }
       },
 
@@ -107,7 +107,7 @@ module.exports = sequelize => {
        * - idempotency_key：请求级幂等（防止同一请求重复提交）
        * - business_id：业务级幂等（防止同一业务操作从不同请求重复执行）
        *
-       * 格式：exchange_{user_id}_{item_id}_{timestamp}
+       * 格式：exchange_{user_id}_{exchange_item_id}_{timestamp}
        *
        * @see docs/事务边界治理现状核查报告.md 建议9.1
        */
@@ -115,7 +115,7 @@ module.exports = sequelize => {
         type: DataTypes.STRING(150),
         allowNull: false, // 业务唯一键必填（历史数据已回填完成 - 2026-01-05）
         unique: true,
-        comment: '业务唯一键（格式：exchange_{user_id}_{item_id}_{timestamp}）- 必填'
+        comment: '业务唯一键（格式：exchange_{user_id}_{exchange_item_id}_{timestamp}）- 必填'
       },
       /**
        * 关联扣减流水ID（逻辑外键，用于对账）
@@ -208,7 +208,7 @@ module.exports = sequelize => {
 
     // 属于商品
     ExchangeRecord.belongsTo(models.ExchangeItem, {
-      foreignKey: 'item_id',
+      foreignKey: 'exchange_item_id',
       as: 'item'
     })
   }

@@ -72,12 +72,12 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
     }
 
     // 🔴 P0-1修复：从 global.testData 动态获取活动ID，不再硬编码
-    campaignId = global.testData?.testCampaign?.campaign_id
+    campaignId = global.testData?.testCampaign?.lottery_campaign_id
     if (!campaignId) {
       // 备用：从数据库查询第一个活跃活动
       const { LotteryCampaign } = require('../../models')
       const campaign = await LotteryCampaign.findOne({ where: { status: 'active' } })
-      campaignId = campaign?.campaign_id
+      campaignId = campaign?.lottery_campaign_id
     }
 
     if (!campaignId) {
@@ -115,12 +115,12 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
       try {
         const result = await UnifiedLotteryEngine.executeLottery({
           user_id: testUserId,
-          campaign_id: campaignId
+          lottery_campaign_id: campaignId
         })
 
         console.log('\n🎲 抽奖结果（Pipeline 架构）：', {
           success: result.success,
-          prize_id: result.prize_id,
+          lottery_prize_id: result.lottery_prize_id,
           execution_time: result.execution_time
         })
 
@@ -176,7 +176,7 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
       // 获取积分奖品
       const pointsPrize = await LotteryPrize.findOne({
         where: {
-          campaign_id: campaignId,
+          lottery_campaign_id: campaignId,
           prize_type: 'points',
           status: 'active'
         }
@@ -204,7 +204,7 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
         try {
           const result = await UnifiedLotteryEngine.executeLottery({
             user_id: testUserId,
-            campaign_id: campaignId
+            lottery_campaign_id: campaignId
           })
 
           attempts++

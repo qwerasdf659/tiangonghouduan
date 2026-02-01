@@ -83,7 +83,7 @@ class AdminLotteryCampaignService {
           start_time: { [Op.lte]: now },
           end_time: { [Op.gte]: now }
         },
-        attributes: ['campaign_id'],
+        attributes: ['lottery_campaign_id'],
         raw: true
       })
 
@@ -92,7 +92,7 @@ class AdminLotteryCampaignService {
           status: 'active',
           end_time: { [Op.lt]: now }
         },
-        attributes: ['campaign_id'],
+        attributes: ['lottery_campaign_id'],
         raw: true
       })
 
@@ -125,13 +125,16 @@ class AdminLotteryCampaignService {
         try {
           // eslint-disable-next-line no-await-in-loop
           await BusinessCacheHelper.invalidateLotteryCampaign(
-            campaign.campaign_id,
+            campaign.lottery_campaign_id,
             'status_sync_started'
           )
-          invalidatedCampaigns.push({ campaign_id: campaign.campaign_id, action: 'started' })
+          invalidatedCampaigns.push({
+            lottery_campaign_id: campaign.lottery_campaign_id,
+            action: 'started'
+          })
         } catch (cacheError) {
           logger.warn('[缓存] 活动缓存失效失败（非致命）', {
-            campaign_id: campaign.campaign_id,
+            lottery_campaign_id: campaign.lottery_campaign_id,
             error: cacheError.message
           })
         }
@@ -140,13 +143,16 @@ class AdminLotteryCampaignService {
         try {
           // eslint-disable-next-line no-await-in-loop
           await BusinessCacheHelper.invalidateLotteryCampaign(
-            campaign.campaign_id,
+            campaign.lottery_campaign_id,
             'status_sync_ended'
           )
-          invalidatedCampaigns.push({ campaign_id: campaign.campaign_id, action: 'ended' })
+          invalidatedCampaigns.push({
+            lottery_campaign_id: campaign.lottery_campaign_id,
+            action: 'ended'
+          })
         } catch (cacheError) {
           logger.warn('[缓存] 活动缓存失效失败（非致命）', {
-            campaign_id: campaign.campaign_id,
+            lottery_campaign_id: campaign.lottery_campaign_id,
             error: cacheError.message
           })
         }
@@ -232,14 +238,14 @@ class AdminLotteryCampaignService {
   /**
    * 更新活动预算配置
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} updateData - 更新数据
    * @param {Object} [options] - 选项
    * @param {number} [options.operated_by] - 操作者ID
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 更新结果
    */
-  static async updateCampaignBudget(campaign_id, updateData, options = {}) {
+  static async updateCampaignBudget(lottery_campaign_id, updateData, options = {}) {
     const { operated_by } = options
     const transaction = assertAndGetTransaction(
       options,
@@ -283,7 +289,7 @@ class AdminLotteryCampaignService {
     }
 
     // 获取活动
-    const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id), { transaction })
+    const campaign = await LotteryCampaign.findByPk(parseInt(lottery_campaign_id), { transaction })
     if (!campaign) {
       const error = new Error('活动不存在')
       error.code = 'CAMPAIGN_NOT_FOUND'
@@ -296,7 +302,7 @@ class AdminLotteryCampaignService {
     const {
       budget_mode,
       pool_budget_total,
-      allowed_campaign_ids,
+      allowed_lottery_campaign_ids,
       preset_debt_enabled,
       preset_budget_policy
     } = updateData
@@ -326,14 +332,14 @@ class AdminLotteryCampaignService {
       fieldsToUpdate.pool_budget_remaining = Math.max(0, pool_budget_total - usedBudget)
     }
 
-    if (allowed_campaign_ids !== undefined) {
-      if (allowed_campaign_ids !== null && !Array.isArray(allowed_campaign_ids)) {
-        const error = new Error('allowed_campaign_ids 必须是数组或 null')
+    if (allowed_lottery_campaign_ids !== undefined) {
+      if (allowed_lottery_campaign_ids !== null && !Array.isArray(allowed_lottery_campaign_ids)) {
+        const error = new Error('allowed_lottery_campaign_ids 必须是数组或 null')
         error.code = 'INVALID_ALLOWED_CAMPAIGNS'
         error.statusCode = 400
         throw error
       }
-      fieldsToUpdate.allowed_campaign_ids = allowed_campaign_ids
+      fieldsToUpdate.allowed_lottery_campaign_ids = allowed_lottery_campaign_ids
     }
 
     if (preset_debt_enabled !== undefined) {
@@ -357,22 +363,22 @@ class AdminLotteryCampaignService {
     // 失效缓存
     try {
       await BusinessCacheHelper.invalidateLotteryCampaign(
-        parseInt(campaign_id),
+        parseInt(lottery_campaign_id),
         'campaign_budget_updated'
       )
       logger.info('[缓存] 活动配置缓存已失效', {
-        campaign_id: parseInt(campaign_id),
+        lottery_campaign_id: parseInt(lottery_campaign_id),
         operated_by
       })
     } catch (cacheError) {
       logger.warn('[缓存] 活动配置缓存失效失败（非致命）', {
         error: cacheError.message,
-        campaign_id
+        lottery_campaign_id
       })
     }
 
     logger.info('活动预算配置更新成功', {
-      campaign_id,
+      lottery_campaign_id,
       updated_fields: Object.keys(fieldsToUpdate),
       operated_by
     })
@@ -386,14 +392,14 @@ class AdminLotteryCampaignService {
   /**
    * 补充活动池预算
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {number} amount - 补充金额
    * @param {Object} [options] - 选项
    * @param {number} [options.operated_by] - 操作者ID
    * @param {Object} [options.transaction] - Sequelize事务对象
    * @returns {Promise<Object>} 补充结果
    */
-  static async supplementCampaignBudget(campaign_id, amount, options = {}) {
+  static async supplementCampaignBudget(lottery_campaign_id, amount, options = {}) {
     const { operated_by } = options
     const transaction = assertAndGetTransaction(
       options,
@@ -410,7 +416,7 @@ class AdminLotteryCampaignService {
     }
 
     // 获取活动
-    const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id), { transaction })
+    const campaign = await LotteryCampaign.findByPk(parseInt(lottery_campaign_id), { transaction })
     if (!campaign) {
       const error = new Error('活动不存在')
       error.code = 'CAMPAIGN_NOT_FOUND'
@@ -444,23 +450,23 @@ class AdminLotteryCampaignService {
     // 失效缓存
     try {
       await BusinessCacheHelper.invalidateLotteryCampaign(
-        parseInt(campaign_id),
+        parseInt(lottery_campaign_id),
         'campaign_budget_supplemented'
       )
       logger.info('[缓存] 活动配置缓存已失效', {
-        campaign_id: parseInt(campaign_id),
+        lottery_campaign_id: parseInt(lottery_campaign_id),
         reason: 'budget_supplement',
         operated_by
       })
     } catch (cacheError) {
       logger.warn('[缓存] 活动配置缓存失效失败（非致命）', {
         error: cacheError.message,
-        campaign_id
+        lottery_campaign_id
       })
     }
 
     logger.info('活动池预算补充成功', {
-      campaign_id,
+      lottery_campaign_id,
       amount,
       new_remaining: newRemaining,
       new_total: newTotal,

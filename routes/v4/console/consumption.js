@@ -135,7 +135,7 @@ router.get('/records', authenticateToken, requireRoleLevel(100), async (req, res
  * @body {string} admin_notes - 审核备注（可选）
  *
  * @returns {Object} 审核结果
- * @returns {number} data.record_id - 消费记录ID
+ * @returns {number} data.consumption_record_id - 消费记录ID
  * @returns {string} data.status - 新状态（approved）
  * @returns {number} data.points_awarded - 奖励的积分数
  * @returns {number} data.new_balance - 用户新的积分余额
@@ -149,8 +149,8 @@ router.get('/records', authenticateToken, requireRoleLevel(100), async (req, res
  */
 router.post('/approve/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-    const ConsumptionService = req.app.locals.services.getService('consumption_query')
+    // 🔄 通过 ServiceManager 获取 ConsumptionCoreService（审核操作需要核心服务）
+    const ConsumptionService = req.app.locals.services.getService('consumption_core')
 
     const record_id = parseInt(req.params.id, 10)
     const { admin_notes } = req.body
@@ -178,7 +178,7 @@ router.post('/approve/:id', authenticateToken, requireRoleLevel(100), async (req
 
     return res.apiSuccess(
       {
-        record_id: result.consumption_record.record_id,
+        record_id: result.consumption_record.consumption_record_id,
         status: result.consumption_record.status,
         points_awarded: result.points_awarded,
         new_balance: result.new_balance,
@@ -189,7 +189,7 @@ router.post('/approve/:id', authenticateToken, requireRoleLevel(100), async (req
   } catch (error) {
     logger.error('审核通过失败', {
       error: error.message,
-      record_id: req.params.record_id,
+      record_id: req.params.id,
       reviewer_id: req.user.user_id
     })
     return handleServiceError(error, res, '审核通过失败')
@@ -284,7 +284,7 @@ router.post('/batch-review', authenticateToken, requireRoleLevel(100), async (re
  * @body {string} admin_notes - 拒绝原因（必填，5-500字符）
  *
  * @returns {Object} 审核结果
- * @returns {number} data.record_id - 消费记录ID
+ * @returns {number} data.consumption_record_id - 消费记录ID
  * @returns {string} data.status - 新状态（rejected）
  * @returns {string} data.reject_reason - 拒绝原因
  * @returns {string} data.reviewed_at - 审核时间（北京时间）
@@ -297,8 +297,8 @@ router.post('/batch-review', authenticateToken, requireRoleLevel(100), async (re
  */
 router.post('/reject/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-    const ConsumptionService = req.app.locals.services.getService('consumption_query')
+    // 🔄 通过 ServiceManager 获取 ConsumptionCoreService（审核操作需要核心服务）
+    const ConsumptionService = req.app.locals.services.getService('consumption_core')
 
     const record_id = parseInt(req.params.id, 10)
     const { admin_notes } = req.body
@@ -335,7 +335,7 @@ router.post('/reject/:id', authenticateToken, requireRoleLevel(100), async (req,
 
     return res.apiSuccess(
       {
-        record_id: result.consumption_record.record_id,
+        record_id: result.consumption_record.consumption_record_id,
         status: result.consumption_record.status,
         reject_reason: result.reject_reason,
         reviewed_at: BeijingTimeHelper.formatForAPI(result.consumption_record.reviewed_at)

@@ -3,7 +3,7 @@
  * @description 提供抽奖系统活动维度分析相关的API接口
  *
  * URL重命名方案（2026-01-31 大文件拆分方案 Phase 2）：
- * - /console/lottery-monitoring/campaign-roi/:campaign_id → /console/lottery-campaign-analysis/roi/:campaign_id
+ * - /console/lottery-monitoring/campaign-roi/:lottery_campaign_id → /console/lottery-campaign-analysis/roi/:lottery_campaign_id
  * - /console/lottery-monitoring/strategy-effectiveness → /console/lottery-campaign-analysis/strategy-effectiveness
  *
  * 对应服务：lottery_analytics_campaign (CampaignAnalysisService)
@@ -30,12 +30,12 @@ function getCampaignAnalysisService(req) {
 
 /*
  * ==========================================
- * 1. 活动 ROI 聚合 - /roi/:campaign_id
+ * 1. 活动 ROI 聚合 - /roi/:lottery_campaign_id
  * ==========================================
  */
 
 /**
- * GET /roi/:campaign_id - 获取活动 ROI 聚合数据
+ * GET /roi/:lottery_campaign_id - 获取活动 ROI 聚合数据
  *
  * P1 优先级 API：为运营后台提供活动投入产出分析
  *
@@ -44,7 +44,7 @@ function getCampaignAnalysisService(req) {
  * - 总成本：发放的奖品成本总额（lottery_prizes.cost_points）
  *
  * 路径参数：
- * - campaign_id: 活动ID（数字）
+ * - lottery_campaign_id: 活动ID（数字）
  *
  * Query参数：
  * - start_time: 统计开始时间（ISO8601，可选）
@@ -57,35 +57,40 @@ function getCampaignAnalysisService(req) {
  * - tier_analysis: 档位分析
  * - trend: 日趋势数据
  */
-router.get('/roi/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const campaign_id = parseInt(req.params.campaign_id)
-    const { start_time, end_time } = req.query
+router.get(
+  '/roi/:lottery_campaign_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
+      const { start_time, end_time } = req.query
 
-    if (!campaign_id || isNaN(campaign_id)) {
-      return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
+      if (!lottery_campaign_id || isNaN(lottery_campaign_id)) {
+        return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
+      }
+
+      const campaignService = getCampaignAnalysisService(req)
+
+      const roi = await campaignService.getCampaignROI(lottery_campaign_id, {
+        start_time,
+        end_time
+      })
+
+      logger.info('获取活动ROI成功', {
+        admin_id: req.user.user_id,
+        lottery_campaign_id,
+        roi_percentage: roi.financial.roi_percentage,
+        total_draws: roi.participation.total_draws
+      })
+
+      return res.apiSuccess(roi, '获取活动ROI成功')
+    } catch (error) {
+      logger.error('获取活动ROI失败:', error)
+      return res.apiError(`查询失败：${error.message}`, 'GET_CAMPAIGN_ROI_FAILED', null, 500)
     }
-
-    const campaignService = getCampaignAnalysisService(req)
-
-    const roi = await campaignService.getCampaignROI(campaign_id, {
-      start_time,
-      end_time
-    })
-
-    logger.info('获取活动ROI成功', {
-      admin_id: req.user.user_id,
-      campaign_id,
-      roi_percentage: roi.financial.roi_percentage,
-      total_draws: roi.participation.total_draws
-    })
-
-    return res.apiSuccess(roi, '获取活动ROI成功')
-  } catch (error) {
-    logger.error('获取活动ROI失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'GET_CAMPAIGN_ROI_FAILED', null, 500)
   }
-})
+)
 
 /*
  * ==========================================
@@ -99,7 +104,7 @@ router.get('/roi/:campaign_id', authenticateToken, requireRoleLevel(100), async 
  * 分析抽奖策略（Pity/AntiEmpty/AntiHigh等）的实际效果
  *
  * Query参数：
- * - campaign_id: 活动ID（可选，不传则汇总所有活动）
+ * - lottery_campaign_id: 活动ID（可选，不传则汇总所有活动）
  * - time_range: 时间范围（7d/30d/90d，默认30d）
  * - start_date: 自定义开始日期（YYYY-MM-DD）
  * - end_date: 自定义结束日期（YYYY-MM-DD）
@@ -118,12 +123,12 @@ router.get(
   requireRoleLevel(100),
   async (req, res) => {
     try {
-      const { campaign_id, time_range = '30d', start_date, end_date } = req.query
+      const { lottery_campaign_id, time_range = '30d', start_date, end_date } = req.query
 
       const campaignService = getCampaignAnalysisService(req)
 
       const result = await campaignService.getStrategyEffectiveness({
-        campaign_id: campaign_id ? parseInt(campaign_id) : undefined,
+        lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
         time_range,
         start_date,
         end_date
@@ -131,7 +136,7 @@ router.get(
 
       logger.info('获取策略效果分析成功', {
         admin_id: req.user.user_id,
-        campaign_id: campaign_id || 'all',
+        lottery_campaign_id: lottery_campaign_id || 'all',
         time_range,
         strategies_count: Object.keys(result.strategies).length
       })

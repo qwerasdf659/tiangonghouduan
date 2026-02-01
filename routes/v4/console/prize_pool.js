@@ -40,11 +40,11 @@ router.post(
   '/batch-add',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { campaign_id, prizes } = req.body
+    const { lottery_campaign_id, prizes } = req.body
 
     try {
       // 参数验证
-      if (!campaign_id) {
+      if (!lottery_campaign_id) {
         return res.apiError('活动ID不能为空', 'MISSING_CAMPAIGN_ID')
       }
 
@@ -61,7 +61,7 @@ router.post(
       // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
       const result = await TransactionManager.execute(
         async transaction => {
-          return await PrizePoolService.batchAddPrizes(campaign_id, prizes, {
+          return await PrizePoolService.batchAddPrizes(lottery_campaign_id, prizes, {
             created_by: req.user?.user_id,
             transaction
           })
@@ -70,7 +70,7 @@ router.post(
       )
 
       sharedComponents.logger.info('批量添加奖品成功', {
-        campaign_id,
+        lottery_campaign_id,
         prize_count: result.added_prizes,
         created_by: req.user?.id
       })
@@ -85,10 +85,10 @@ router.post(
       ) {
         sharedComponents.logger.warn('奖品排序冲突', {
           error: error.message,
-          campaign_id: req.body.campaign_id
+          lottery_campaign_id: req.body.lottery_campaign_id
         })
         return res.apiError(error.message, 'SORT_ORDER_DUPLICATE', {
-          campaign_id: req.body.campaign_id,
+          lottery_campaign_id: req.body.lottery_campaign_id,
           suggestion: '请检查sort_order字段，确保每个奖品在活动内有唯一的排序值'
         })
       }
@@ -106,7 +106,7 @@ router.post(
  * @description 获取所有奖品的列表，支持按活动和状态筛选
  * @route GET /api/v4/prizes/list
  * @access Private (需要管理员权限)
- * @query campaign_id - 可选，筛选指定活动
+ * @query lottery_campaign_id - 可选，筛选指定活动
  * @query status - 可选，筛选状态
  *
  * 🔴 注意：必须在 /:code 之前定义，否则会被参数化路由捕获
@@ -116,10 +116,10 @@ router.get(
   adminOpsAuthMiddleware, // P1只读API：允许admin和ops角色访问
   asyncHandler(async (req, res) => {
     try {
-      const { campaign_id, status } = req.query
+      const { lottery_campaign_id, status } = req.query
 
       const filters = {}
-      if (campaign_id) filters.campaign_id = parseInt(campaign_id)
+      if (lottery_campaign_id) filters.lottery_campaign_id = parseInt(lottery_campaign_id)
       if (status) filters.status = status
 
       // 通过 ServiceManager 获取 PrizePoolService
@@ -287,7 +287,7 @@ router.post(
       )
 
       sharedComponents.logger.info('库存补充成功', {
-        prize_id: prizeId,
+        lottery_prize_id: prizeId,
         old_quantity: result.old_quantity,
         add_quantity: quantity,
         new_quantity: result.new_quantity,
@@ -338,7 +338,7 @@ router.delete(
       )
 
       sharedComponents.logger.info('奖品删除成功', {
-        prize_id: prizeId,
+        lottery_prize_id: prizeId,
         deleted_by: req.user?.id
       })
 

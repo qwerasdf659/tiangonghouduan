@@ -152,13 +152,15 @@ describe('P3-5: HourlyPricingConfigScheduler - 每小时定价配置调度任务
       }
 
       // 验证关联正确
-      expect(configWithCampaign.campaign_id).toBeDefined()
+      expect(configWithCampaign.lottery_campaign_id).toBeDefined()
       expect(configWithCampaign.campaign).toBeDefined()
-      expect(configWithCampaign.campaign.campaign_id).toBe(configWithCampaign.campaign_id)
+      expect(configWithCampaign.campaign.lottery_campaign_id).toBe(
+        configWithCampaign.lottery_campaign_id
+      )
 
       console.log('[P3-5] 定价配置关联活动:', {
         config_id: configWithCampaign.pricing_config_id,
-        campaign_id: configWithCampaign.campaign_id,
+        lottery_campaign_id: configWithCampaign.lottery_campaign_id,
         campaign_name: configWithCampaign.campaign.campaign_name
       })
     })
@@ -213,9 +215,9 @@ describe('P3-5: HourlyPricingConfigScheduler - 每小时定价配置调度任务
         return
       }
 
-      // 验证必要字段（模型字段：config_id, campaign_id, status, effective_at）
+      // 验证必要字段（模型字段：config_id, lottery_campaign_id, status, effective_at）
       expect(config.config_id).toBeDefined()
-      expect(config.campaign_id).toBeDefined()
+      expect(config.lottery_campaign_id).toBeDefined()
       expect(config.status).toBeDefined()
 
       // 验证状态值在有效范围内

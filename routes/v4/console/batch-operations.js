@@ -113,7 +113,7 @@ function getActivityService(req) {
  *
  * 请求体：
  * {
- *   campaign_id: number,      // 必填：活动ID
+ *   lottery_campaign_id: number,      // 必填：活动ID
  *   user_ids: number[],       // 必填：用户ID列表（最多100个）
  *   bonus_count: number,      // 必填：每人赠送次数
  *   reason: string            // 必填：赠送原因（用于审计）
@@ -138,11 +138,16 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
   const operation_type = BatchOperationLog.OPERATION_TYPES.QUOTA_GRANT_BATCH
 
   try {
-    const { campaign_id, user_ids, bonus_count, reason } = req.body
+    const { lottery_campaign_id, user_ids, bonus_count, reason } = req.body
 
     // ========== 参数验证 ==========
-    if (!campaign_id || isNaN(parseInt(campaign_id))) {
-      return res.apiError('campaign_id 必须为有效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
+    if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
+      return res.apiError(
+        'lottery_campaign_id 必须为有效的活动ID',
+        'INVALID_CAMPAIGN_ID',
+        null,
+        400
+      )
     }
 
     if (!Array.isArray(user_ids) || user_ids.length === 0) {
@@ -161,7 +166,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
     const preCheckResult = await getBatchOperationService(req).preCheck({
       operation_type,
       operator_id,
-      operation_params: { campaign_id, user_ids, bonus_count, reason },
+      operation_params: { lottery_campaign_id, user_ids, bonus_count, reason },
       items_count: user_ids.length
     })
 
@@ -197,7 +202,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
       operation_type,
       operator_id,
       total_count: user_ids.length,
-      operation_params: { campaign_id, user_ids, bonus_count, reason },
+      operation_params: { lottery_campaign_id, user_ids, bonus_count, reason },
       idempotency_key: preCheckResult.idempotency_key
     })
 
@@ -213,7 +218,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
         const result = await LotteryQuotaService.addBonusDrawCount(
           {
             user_id: parseInt(user_id),
-            campaign_id: parseInt(campaign_id),
+            lottery_campaign_id: parseInt(lottery_campaign_id),
             bonus_count: parseInt(bonus_count),
             reason: `[批量赠送] ${reason.trim()}`
           },
@@ -251,7 +256,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
       result_summary: {
         success_items: successItems,
         failed_items: failedItems,
-        campaign_id,
+        lottery_campaign_id,
         bonus_count,
         reason
       }
@@ -263,7 +268,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
     logger.info('批量赠送抽奖次数完成', {
       batch_log_id: batchLog.batch_log_id,
       operator_id,
-      campaign_id,
+      lottery_campaign_id,
       total_count: user_ids.length,
       success_count: successItems.length,
       fail_count: failedItems.length
@@ -308,7 +313,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
  *
  * 请求体：
  * {
- *   campaign_ids: number[],   // 必填：活动ID列表（最多20个）
+ *   lottery_campaign_ids: number[],   // 必填：活动ID列表（最多20个）
  *   target_status: string,    // 必填：目标状态（active/paused/ended）
  *   reason: string            // 必填：切换原因
  * }
@@ -318,11 +323,11 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
   const operation_type = BatchOperationLog.OPERATION_TYPES.CAMPAIGN_STATUS_BATCH
 
   try {
-    const { campaign_ids, target_status, reason } = req.body
+    const { lottery_campaign_ids, target_status, reason } = req.body
 
     // ========== 参数验证 ==========
-    if (!Array.isArray(campaign_ids) || campaign_ids.length === 0) {
-      return res.apiError('campaign_ids 必须为非空数组', 'INVALID_CAMPAIGN_IDS', null, 400)
+    if (!Array.isArray(lottery_campaign_ids) || lottery_campaign_ids.length === 0) {
+      return res.apiError('lottery_campaign_ids 必须为非空数组', 'INVALID_CAMPAIGN_IDS', null, 400)
     }
 
     const validStatuses = ['active', 'paused', 'ended']
@@ -343,8 +348,8 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
     const preCheckResult = await getBatchOperationService(req).preCheck({
       operation_type,
       operator_id,
-      operation_params: { campaign_ids, target_status, reason },
-      items_count: campaign_ids.length
+      operation_params: { lottery_campaign_ids, target_status, reason },
+      items_count: lottery_campaign_ids.length
     })
 
     if (!preCheckResult.passed) {
@@ -371,8 +376,8 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
     const batchLog = await getBatchOperationService(req).createOperationLog({
       operation_type,
       operator_id,
-      total_count: campaign_ids.length,
-      operation_params: { campaign_ids, target_status, reason },
+      total_count: lottery_campaign_ids.length,
+      operation_params: { lottery_campaign_ids, target_status, reason },
       idempotency_key: preCheckResult.idempotency_key
     })
 
@@ -381,10 +386,10 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
     const failedItems = []
     const ActivityService = getActivityService(req)
 
-    for (const campaign_id of campaign_ids) {
+    for (const lottery_campaign_id of lottery_campaign_ids) {
       const transaction = await sequelize.transaction()
       try {
-        await ActivityService.updateCampaignStatus(parseInt(campaign_id), target_status, {
+        await ActivityService.updateCampaignStatus(parseInt(lottery_campaign_id), target_status, {
           reason: `[批量切换] ${reason.trim()}`,
           operator_id,
           transaction
@@ -393,7 +398,7 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
         await transaction.commit()
 
         successItems.push({
-          campaign_id: parseInt(campaign_id),
+          lottery_campaign_id: parseInt(lottery_campaign_id),
           new_status: target_status,
           message: '状态切换成功'
         })
@@ -401,14 +406,14 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
         await transaction.rollback()
 
         failedItems.push({
-          campaign_id: parseInt(campaign_id),
+          lottery_campaign_id: parseInt(lottery_campaign_id),
           error_code: error.code || 'STATUS_CHANGE_FAILED',
           error_message: error.message || '状态切换失败'
         })
 
         logger.warn('批量切换单活动状态失败', {
           batch_log_id: batchLog.batch_log_id,
-          campaign_id,
+          lottery_campaign_id,
           error: error.message
         })
       }
@@ -432,7 +437,7 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
       batch_log_id: batchLog.batch_log_id,
       operator_id,
       target_status,
-      total_count: campaign_ids.length,
+      total_count: lottery_campaign_ids.length,
       success_count: successItems.length,
       fail_count: failedItems.length
     })
@@ -483,8 +488,8 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
  * {
  *   rules: Array<{
  *     user_id: number,        // 必填：目标用户ID
- *     campaign_id: number,    // 必填：活动ID
- *     prize_id: number,       // 必填：预设奖品ID
+ *     lottery_campaign_id: number,    // 必填：活动ID
+ *     lottery_prize_id: number,       // 必填：预设奖品ID
  *     trigger_type: string,   // 必填：触发类型（first_draw/nth_draw/time_based）
  *     trigger_value: number   // 可选：触发值（如第N次）
  *   }>,
@@ -510,9 +515,9 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
     // 验证每条规则的必填字段
     for (let i = 0; i < rules.length; i++) {
       const rule = rules[i]
-      if (!rule.user_id || !rule.campaign_id || !rule.prize_id) {
+      if (!rule.user_id || !rule.lottery_campaign_id || !rule.lottery_prize_id) {
         return res.apiError(
-          `规则[${i}]缺少必填字段：user_id、campaign_id、prize_id`,
+          `规则[${i}]缺少必填字段：user_id、lottery_campaign_id、prize_id`,
           'INVALID_RULE_PARAMS',
           null,
           400
@@ -569,8 +574,8 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
         const preset = await LotteryPresetService.createPreset(
           {
             user_id: parseInt(rule.user_id),
-            campaign_id: parseInt(rule.campaign_id),
-            prize_id: parseInt(rule.prize_id),
+            lottery_campaign_id: parseInt(rule.lottery_campaign_id),
+            lottery_prize_id: parseInt(rule.lottery_prize_id),
             trigger_type: rule.trigger_type || 'first_draw',
             trigger_value: rule.trigger_value || 1,
             reason: `[批量设置] ${reason.trim()}`,
@@ -584,8 +589,8 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
         successItems.push({
           index: i,
           user_id: rule.user_id,
-          campaign_id: rule.campaign_id,
-          preset_id: preset?.preset_id,
+          lottery_campaign_id: rule.lottery_campaign_id,
+          lottery_preset_id: preset?.lottery_preset_id,
           message: '规则创建成功'
         })
       } catch (error) {
@@ -594,7 +599,7 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
         failedItems.push({
           index: i,
           user_id: rule.user_id,
-          campaign_id: rule.campaign_id,
+          lottery_campaign_id: rule.lottery_campaign_id,
           error_code: error.code || 'PRESET_CREATE_FAILED',
           error_message: error.message || '规则创建失败'
         })
@@ -828,7 +833,7 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
  * 请求体：
  * {
  *   adjustments: Array<{
- *     campaign_id: number,    // 必填：活动ID
+ *     lottery_campaign_id: number,    // 必填：活动ID
  *     adjustment_type: string,// 必填：调整类型（increase/decrease/set）
  *     amount: number          // 必填：调整金额或目标值
  *   }>,
@@ -855,9 +860,9 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
     const validAdjustmentTypes = ['increase', 'decrease', 'set']
     for (let i = 0; i < adjustments.length; i++) {
       const adj = adjustments[i]
-      if (!adj.campaign_id || !adj.adjustment_type || adj.amount === undefined) {
+      if (!adj.lottery_campaign_id || !adj.adjustment_type || adj.amount === undefined) {
         return res.apiError(
-          `调整项[${i}]缺少必填字段：campaign_id、adjustment_type、amount`,
+          `调整项[${i}]缺少必填字段：lottery_campaign_id、adjustment_type、amount`,
           'INVALID_ADJUSTMENT_PARAMS',
           null,
           400
@@ -920,7 +925,7 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
       const transaction = await sequelize.transaction()
       try {
         const result = await ActivityService.adjustCampaignBudget(
-          parseInt(adj.campaign_id),
+          parseInt(adj.lottery_campaign_id),
           adj.adjustment_type,
           parseFloat(adj.amount),
           {
@@ -934,7 +939,7 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
 
         successItems.push({
           index: i,
-          campaign_id: adj.campaign_id,
+          lottery_campaign_id: adj.lottery_campaign_id,
           adjustment_type: adj.adjustment_type,
           amount: adj.amount,
           new_budget: result?.new_budget,
@@ -945,7 +950,7 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
 
         failedItems.push({
           index: i,
-          campaign_id: adj.campaign_id,
+          lottery_campaign_id: adj.lottery_campaign_id,
           adjustment_type: adj.adjustment_type,
           amount: adj.amount,
           error_code: error.code || 'BUDGET_ADJUST_FAILED',
@@ -954,7 +959,7 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
 
         logger.warn('批量调整单活动预算失败', {
           batch_log_id: batchLog.batch_log_id,
-          campaign_id: adj.campaign_id,
+          lottery_campaign_id: adj.lottery_campaign_id,
           error: error.message
         })
       }

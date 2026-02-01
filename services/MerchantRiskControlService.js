@@ -711,7 +711,7 @@ class MerchantRiskControlService {
           {
             model: ConsumptionRecord,
             as: 'relatedRecord',
-            attributes: ['record_id', 'consumption_amount', 'status', 'created_at']
+            attributes: ['consumption_record_id', 'consumption_amount', 'status', 'created_at']
           }
         ]
       })
@@ -751,7 +751,7 @@ class MerchantRiskControlService {
           : null,
         related_record: alert.relatedRecord
           ? {
-              record_id: alert.relatedRecord.record_id,
+              record_id: alert.relatedRecord.consumption_record_id,
               consumption_amount: parseFloat(alert.relatedRecord.consumption_amount),
               status: alert.relatedRecord.status,
               created_at: BeijingTimeHelper.formatForAPI(alert.relatedRecord.created_at)

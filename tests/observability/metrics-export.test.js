@@ -19,7 +19,7 @@
  *
  * 业务规则：
  * - 所有指标使用Redis原子操作保证准确性
- * - 指标Key格式：lottery:metrics:{campaign_id}:{metric_type}:{hour_bucket}
+ * - 指标Key格式：lottery:metrics:{lottery_campaign_id}:{metric_type}:{hour_bucket}
  * - TTL：25小时（保留至下一小时聚合完成）
  * - 独立用户使用HyperLogLog统计
  *
@@ -46,7 +46,7 @@ describe('P2-3.3: 指标导出测试', () => {
   let _redisClient // eslint允许以_开头的未使用变量（用于保持Redis连接引用）
   let redisAvailable = false
 
-  // 测试用的campaign_id（使用一个不会与生产数据冲突的ID）
+  // 测试用的lottery_campaign_id（使用一个不会与生产数据冲突的ID）
   const TEST_CAMPAIGN_ID = 999999
 
   beforeAll(async () => {
@@ -210,7 +210,7 @@ describe('P2-3.3: 指标导出测试', () => {
         return
       }
 
-      // 缺少campaign_id
+      // 缺少lottery_campaign_id
       const result1 = await collector.recordDraw({
         user_id: 1,
         selected_tier: 'mid'
@@ -220,7 +220,7 @@ describe('P2-3.3: 指标导出测试', () => {
 
       // 缺少user_id
       const result2 = await collector.recordDraw({
-        campaign_id: TEST_CAMPAIGN_ID,
+        lottery_campaign_id: TEST_CAMPAIGN_ID,
         selected_tier: 'mid'
       })
       expect(result2.success).toBe(false)
@@ -236,7 +236,7 @@ describe('P2-3.3: 指标导出测试', () => {
       }
 
       const drawData = {
-        campaign_id: TEST_CAMPAIGN_ID,
+        lottery_campaign_id: TEST_CAMPAIGN_ID,
         user_id: 12345,
         selected_tier: 'mid',
         budget_tier: 'B2',
@@ -271,7 +271,7 @@ describe('P2-3.3: 指标导出测试', () => {
       // 记录3次抽奖
       for (let i = 0; i < 3; i++) {
         await collector.recordDraw({
-          campaign_id: TEST_CAMPAIGN_ID,
+          lottery_campaign_id: TEST_CAMPAIGN_ID,
           user_id: 10000 + i,
           selected_tier: 'low'
         })
@@ -297,7 +297,7 @@ describe('P2-3.3: 指标导出测试', () => {
 
       for (let i = 0; i < budgetTiers.length; i++) {
         await collector.recordDraw({
-          campaign_id: TEST_CAMPAIGN_ID,
+          lottery_campaign_id: TEST_CAMPAIGN_ID,
           user_id: 20000 + i,
           selected_tier: 'mid',
           budget_tier: budgetTiers[i]
@@ -332,7 +332,7 @@ describe('P2-3.3: 指标导出测试', () => {
 
       for (let i = 0; i < tiers.length; i++) {
         await collector.recordDraw({
-          campaign_id: TEST_CAMPAIGN_ID,
+          lottery_campaign_id: TEST_CAMPAIGN_ID,
           user_id: 30000 + i,
           selected_tier: tiers[i]
         })
@@ -363,7 +363,7 @@ describe('P2-3.3: 指标导出测试', () => {
 
       // 记录带体验机制触发的抽奖
       await collector.recordDraw({
-        campaign_id: TEST_CAMPAIGN_ID,
+        lottery_campaign_id: TEST_CAMPAIGN_ID,
         user_id: 40001,
         selected_tier: 'mid',
         triggers: {
@@ -375,7 +375,7 @@ describe('P2-3.3: 指标导出测试', () => {
       })
 
       await collector.recordDraw({
-        campaign_id: TEST_CAMPAIGN_ID,
+        lottery_campaign_id: TEST_CAMPAIGN_ID,
         user_id: 40002,
         selected_tier: 'low',
         triggers: {
@@ -387,7 +387,7 @@ describe('P2-3.3: 指标导出测试', () => {
       })
 
       await collector.recordDraw({
-        campaign_id: TEST_CAMPAIGN_ID,
+        lottery_campaign_id: TEST_CAMPAIGN_ID,
         user_id: 40003,
         selected_tier: 'high',
         triggers: {
@@ -423,7 +423,7 @@ describe('P2-3.3: 指标导出测试', () => {
 
       // 记录多次抽奖，累计预算和价值
       await collector.recordDraw({
-        campaign_id: TEST_CAMPAIGN_ID,
+        lottery_campaign_id: TEST_CAMPAIGN_ID,
         user_id: 50001,
         selected_tier: 'mid',
         prize_value: 50,
@@ -431,7 +431,7 @@ describe('P2-3.3: 指标导出测试', () => {
       })
 
       await collector.recordDraw({
-        campaign_id: TEST_CAMPAIGN_ID,
+        lottery_campaign_id: TEST_CAMPAIGN_ID,
         user_id: 50002,
         selected_tier: 'high',
         prize_value: 100,
@@ -439,7 +439,7 @@ describe('P2-3.3: 指标导出测试', () => {
       })
 
       await collector.recordDraw({
-        campaign_id: TEST_CAMPAIGN_ID,
+        lottery_campaign_id: TEST_CAMPAIGN_ID,
         user_id: 50003,
         selected_tier: 'low',
         prize_value: 25.5,
@@ -498,7 +498,7 @@ describe('P2-3.3: 指标导出测试', () => {
         return
       }
 
-      // 使用一个肯定不存在数据的campaign_id
+      // 使用一个肯定不存在数据的lottery_campaign_id
       const emptyMetrics = await collector.getHourMetrics(888888, '9999999999')
 
       // 所有指标应为0
@@ -536,7 +536,7 @@ describe('P2-3.3: 指标导出测试', () => {
       // 记录5个不同用户的抽奖
       for (let i = 0; i < 5; i++) {
         await collector.recordDraw({
-          campaign_id: TEST_CAMPAIGN_ID,
+          lottery_campaign_id: TEST_CAMPAIGN_ID,
           user_id: 60000 + i, // 不同用户ID
           selected_tier: 'mid'
         })
@@ -545,7 +545,7 @@ describe('P2-3.3: 指标导出测试', () => {
       // 记录同一用户的重复抽奖
       for (let i = 0; i < 3; i++) {
         await collector.recordDraw({
-          campaign_id: TEST_CAMPAIGN_ID,
+          lottery_campaign_id: TEST_CAMPAIGN_ID,
           user_id: 60001, // 同一用户ID
           selected_tier: 'low'
         })
@@ -571,7 +571,7 @@ describe('P2-3.3: 指标导出测试', () => {
 
       // 先记录一些数据
       await collector.recordDraw({
-        campaign_id: TEST_CAMPAIGN_ID,
+        lottery_campaign_id: TEST_CAMPAIGN_ID,
         user_id: 70001,
         selected_tier: 'mid'
       })
@@ -614,7 +614,7 @@ describe('P2-3.3: 指标导出测试', () => {
       }
 
       await collector.recordDraw({
-        campaign_id: TEST_CAMPAIGN_ID,
+        lottery_campaign_id: TEST_CAMPAIGN_ID,
         user_id: 80001,
         selected_tier: 'mid',
         budget_tier: 'B2'
@@ -638,7 +638,7 @@ describe('P2-3.3: 指标导出测试', () => {
       }
 
       await collector.recordDraw({
-        campaign_id: TEST_CAMPAIGN_ID,
+        lottery_campaign_id: TEST_CAMPAIGN_ID,
         user_id: 80002,
         selected_tier: 'high',
         prize_value: 99.99,
@@ -664,7 +664,7 @@ describe('P2-3.3: 指标导出测试', () => {
 
       // 即使Redis不可用，也不应抛出错误
       const result = await silentCollector.recordDraw({
-        campaign_id: TEST_CAMPAIGN_ID,
+        lottery_campaign_id: TEST_CAMPAIGN_ID,
         user_id: 90001,
         selected_tier: 'mid'
       })
@@ -689,7 +689,7 @@ describe('P2-3.3: 指标导出测试', () => {
 
       for (let i = 0; i < drawCount; i++) {
         await collector.recordDraw({
-          campaign_id: TEST_CAMPAIGN_ID,
+          lottery_campaign_id: TEST_CAMPAIGN_ID,
           user_id: 100000 + i,
           selected_tier: ['high', 'mid', 'low'][i % 3],
           budget_tier: ['B0', 'B1', 'B2', 'B3'][i % 4],
@@ -726,14 +726,14 @@ describe('P2-3.3: 指标导出测试', () => {
 
       // 记录fallback（正常保底）
       await collector.recordDraw({
-        campaign_id: TEST_CAMPAIGN_ID,
+        lottery_campaign_id: TEST_CAMPAIGN_ID,
         user_id: 110001,
         selected_tier: 'fallback'
       })
 
       // 记录empty（真正空奖 - 异常情况）
       await collector.recordDraw({
-        campaign_id: TEST_CAMPAIGN_ID,
+        lottery_campaign_id: TEST_CAMPAIGN_ID,
         user_id: 110002,
         selected_tier: 'empty'
       })

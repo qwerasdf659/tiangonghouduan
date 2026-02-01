@@ -274,9 +274,9 @@ class HourlyUnlockTimeoutTradeOrders {
           total_unfrozen_amount += Number(order.gross_amount)
 
           // 解锁挂牌（更新为新的 JSON 格式）
-          if (order.listing_id) {
+          if (order.market_listing_id) {
             // eslint-disable-next-line no-await-in-loop
-            const listing = await MarketListing.findByPk(order.listing_id, { transaction })
+            const listing = await MarketListing.findByPk(order.market_listing_id, { transaction })
             if (listing) {
               // 清除挂牌的锁定状态
               // eslint-disable-next-line no-await-in-loop

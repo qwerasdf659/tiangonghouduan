@@ -941,7 +941,7 @@ router.get(
  * @access Admin only (role_level >= 100)
  *
  * @query {number} [user_id] - 用户ID
- * @query {number} [item_id] - 商品ID
+ * @query {number} [exchange_item_id] - 商品ID
  * @query {string} [status] - 订单状态（pending/completed/shipped/cancelled）
  * @query {string} [order_no] - 订单号（模糊搜索）
  * @query {string} [start_date] - 开始日期
@@ -951,7 +951,7 @@ router.get(
  */
 router.get('/exchange-records', authenticateToken, requireRoleLevel(30), async (req, res) => {
   try {
-    const { user_id, item_id, status, order_no, start_date, end_date } = req.query
+    const { user_id, exchange_item_id, status, order_no, start_date, end_date } = req.query
     const pagination = buildPaginationOptions(req.query)
 
     const { ExchangeRecord, User, ExchangeItem } = require('../../../models')
@@ -959,7 +959,7 @@ router.get('/exchange-records', authenticateToken, requireRoleLevel(30), async (
     // 构建查询条件
     const where = {}
     if (user_id) where.user_id = parseInt(user_id)
-    if (item_id) where.item_id = parseInt(item_id)
+    if (exchange_item_id) where.exchange_item_id = parseInt(exchange_item_id)
     if (status) where.status = status
     if (order_no) where.order_no = { [Op.like]: `%${order_no}%` }
     if (start_date || end_date) {
@@ -975,7 +975,7 @@ router.get('/exchange-records', authenticateToken, requireRoleLevel(30), async (
         {
           model: ExchangeItem,
           as: 'item',
-          attributes: ['item_id', 'name', 'cost_asset_code', 'cost_amount']
+          attributes: ['exchange_item_id', 'item_name', 'cost_asset_code', 'cost_amount']
         }
       ],
       ...pagination
@@ -1078,7 +1078,7 @@ router.get('/chat-messages', authenticateToken, requireRoleLevel(30), async (req
 
     // 构建查询条件
     const where = {}
-    if (session_id) where.session_id = parseInt(session_id)
+    if (session_id) where.customer_service_session_id = parseInt(session_id)
     if (sender_id) where.sender_id = parseInt(sender_id)
     if (sender_type) where.sender_type = sender_type
     if (message_type) where.message_type = message_type

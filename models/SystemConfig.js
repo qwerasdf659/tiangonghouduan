@@ -336,7 +336,7 @@ SystemConfig.initModel = sequelize => {
   SystemConfig.init(
     {
       // ==================== 主键 ====================
-      config_id: {
+      system_config_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,

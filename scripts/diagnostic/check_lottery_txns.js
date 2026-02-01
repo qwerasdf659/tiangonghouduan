@@ -52,7 +52,7 @@ async function check() {
     }
 
     // 恢复活动状态
-    await sequelize.query(`UPDATE lottery_campaigns SET status = 'ended' WHERE campaign_id = 1`)
+    await sequelize.query(`UPDATE lottery_campaigns SET status = 'ended' WHERE lottery_campaign_id = 1`)
     console.log('\n✅ 活动状态已恢复为 ended')
 
     await sequelize.close()

@@ -110,7 +110,7 @@ describe('🎲 并发抽奖竞态测试', () => {
               api_path: '/api/v4/lottery/draw',
               http_method: 'POST',
               request_params: {
-                campaign_id: testCampaignId,
+                lottery_campaign_id: testCampaignId,
                 draw_count: 1
               },
               user_id: testUserId
@@ -192,7 +192,7 @@ describe('🎲 并发抽奖竞态测试', () => {
       const firstRequest = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
         api_path: '/api/v4/lottery/draw',
         http_method: 'POST',
-        request_params: { campaign_id: testCampaignId },
+        request_params: { lottery_campaign_id: testCampaignId },
         user_id: testUserId
       })
 
@@ -213,7 +213,7 @@ describe('🎲 并发抽奖竞态测试', () => {
       const secondRequest = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
         api_path: '/api/v4/lottery/draw',
         http_method: 'POST',
-        request_params: { campaign_id: testCampaignId },
+        request_params: { lottery_campaign_id: testCampaignId },
         user_id: testUserId
       })
 
@@ -251,7 +251,7 @@ describe('🎲 并发抽奖竞态测试', () => {
       try {
         initialQuota = await LotteryQuotaService.getOrInitQuotaStatus({
           user_id: testUserId,
-          campaign_id: testCampaignId
+          lottery_campaign_id: testCampaignId
         })
         console.log(
           `   初始配额: limit=${initialQuota.limit_value}, used=${initialQuota.used_draw_count}, remaining=${initialQuota.remaining}`
@@ -279,7 +279,7 @@ describe('🎲 并发抽奖竞态测试', () => {
             const result = await LotteryQuotaService.tryDeductQuota(
               {
                 user_id: testUserId,
-                campaign_id: testCampaignId,
+                lottery_campaign_id: testCampaignId,
                 draw_count: 1
               },
               { transaction }
@@ -317,7 +317,7 @@ describe('🎲 并发抽奖竞态测试', () => {
       // 验证配额状态一致性（由于回滚，配额应该恢复）
       const finalQuota = await LotteryQuotaService.getOrInitQuotaStatus({
         user_id: testUserId,
-        campaign_id: testCampaignId
+        lottery_campaign_id: testCampaignId
       })
       console.log(`   最终配额: remaining=${finalQuota.remaining}`)
 
@@ -353,7 +353,7 @@ describe('🎲 并发抽奖竞态测试', () => {
       try {
         quotaStatus = await LotteryQuotaService.checkQuotaSufficient({
           user_id: testUserId,
-          campaign_id: testCampaignId,
+          lottery_campaign_id: testCampaignId,
           draw_count: 2
         })
 
@@ -374,7 +374,7 @@ describe('🎲 并发抽奖竞态测试', () => {
         try {
           const result = await UnifiedLotteryEngine.execute_draw({
             user_id: testUserId,
-            campaign_id: testCampaignId,
+            lottery_campaign_id: testCampaignId,
             draw_count: 1,
             idempotency_key: idempotencyKey,
             transaction
@@ -453,7 +453,7 @@ describe('🎲 并发抽奖竞态测试', () => {
             const result = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
               api_path: '/api/v4/lottery/draw',
               http_method: 'POST',
-              request_params: { campaign_id: testCampaignId, index },
+              request_params: { lottery_campaign_id: testCampaignId, index },
               user_id: testUserId
             })
 

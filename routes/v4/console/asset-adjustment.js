@@ -61,7 +61,7 @@ function asyncHandler(fn) {
  * @body {string} asset_code - 资产代码（必填，如 POINTS, BUDGET_POINTS, DIAMOND）
  * @body {number} amount - 调整数量（必填，正数=增加，负数=扣减）
  * @body {string} reason - 调整原因（必填）
- * @body {number} [campaign_id] - 活动ID（BUDGET_POINTS 必填）
+ * @body {number} [lottery_campaign_id] - 活动ID（BUDGET_POINTS 必填）
  * @body {string} [idempotency_key] - 幂等键（可选，未提供则自动生成）
  * @access Admin
  */
@@ -71,7 +71,7 @@ router.post(
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const admin_id = req.user.user_id
-    const { user_id, asset_code, amount, reason, campaign_id, idempotency_key } = req.body
+    const { user_id, asset_code, amount, reason, lottery_campaign_id, idempotency_key } = req.body
 
     // 参数验证
     if (!user_id) {
@@ -87,9 +87,9 @@ router.post(
       return res.apiError('reason 是必填参数', 'BAD_REQUEST', null, 400)
     }
 
-    // BUDGET_POINTS 必须提供 campaign_id
-    if (asset_code === 'BUDGET_POINTS' && !campaign_id) {
-      return res.apiError('调整预算积分必须提供 campaign_id', 'BAD_REQUEST', null, 400)
+    // BUDGET_POINTS 必须提供 lottery_campaign_id
+    if (asset_code === 'BUDGET_POINTS' && !lottery_campaign_id) {
+      return res.apiError('调整预算积分必须提供 lottery_campaign_id', 'BAD_REQUEST', null, 400)
     }
 
     /*
@@ -125,7 +125,7 @@ router.post(
               delta_amount: Number(amount),
               business_type: 'admin_adjustment',
               idempotency_key,
-              campaign_id: campaign_id || null,
+              lottery_campaign_id: lottery_campaign_id || null,
               meta: {
                 admin_id,
                 reason,
@@ -255,7 +255,7 @@ router.post(
 
     for (let index = 0; index < adjustments.length; index++) {
       const adj = adjustments[index]
-      const { user_id, asset_code, amount, campaign_id } = adj
+      const { user_id, asset_code, amount, lottery_campaign_id } = adj
 
       if (!user_id || !asset_code || !amount) {
         errors.push({ user_id, error: '参数不完整' })
@@ -284,7 +284,7 @@ router.post(
                 delta_amount: Number(amount),
                 business_type: 'admin_adjustment',
                 idempotency_key: idempotencyKey,
-                campaign_id: campaign_id || null,
+                lottery_campaign_id: lottery_campaign_id || null,
                 meta: {
                   admin_id,
                   reason: batch_reason,
@@ -470,7 +470,7 @@ router.get(
         available_amount: Number(b.available_amount),
         frozen_amount: Number(b.frozen_amount),
         total: Number(b.available_amount) + Number(b.frozen_amount),
-        campaign_id: b.campaign_id || null
+        lottery_campaign_id: b.lottery_campaign_id || null
       }))
     })
   })

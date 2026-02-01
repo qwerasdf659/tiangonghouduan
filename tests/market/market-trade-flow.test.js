@@ -112,11 +112,11 @@ describe('市场交易流程测试（阶段四：P2）', () => {
 
   afterEach(async () => {
     // 清理本测试创建的挂牌数据
-    for (const listing_id of created_listings) {
+    for (const market_listing_id of created_listings) {
       try {
-        await MarketListing.destroy({ where: { listing_id }, force: true })
+        await MarketListing.destroy({ where: { market_listing_id }, force: true })
       } catch (error) {
-        console.log(`清理挂牌 ${listing_id} 失败:`, error.message)
+        console.log(`清理挂牌 ${market_listing_id} 失败:`, error.message)
       }
     }
     created_listings = []
@@ -199,11 +199,11 @@ describe('市场交易流程测试（阶段四：P2）', () => {
           await transaction.commit()
 
           // 记录挂牌ID便于清理
-          created_listings.push(result.listing.listing_id)
+          created_listings.push(result.listing.market_listing_id)
 
           // 4. 验证挂牌结果
           expect(result).toHaveProperty('listing')
-          expect(result.listing).toHaveProperty('listing_id')
+          expect(result.listing).toHaveProperty('market_listing_id')
           expect(result.listing.listing_kind).toBe('item_instance')
           expect(result.listing.status).toBe('on_sale')
           expect(result.listing.seller_user_id).toBe(test_seller.user_id)
@@ -214,7 +214,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
           const updated_item = await ItemInstance.findByPk(test_item.item_instance_id)
           expect(updated_item.status).toBe('locked')
 
-          console.log('✅ 物品实例挂牌创建成功:', result.listing.listing_id)
+          console.log('✅ 物品实例挂牌创建成功:', result.listing.market_listing_id)
         } catch (error) {
           await transaction.rollback()
           throw error
@@ -248,7 +248,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
             transaction: transaction1
           })
           await transaction1.commit()
-          created_listings.push(first_result.listing.listing_id)
+          created_listings.push(first_result.listing.market_listing_id)
         } catch (error) {
           await transaction1.rollback()
           throw error
@@ -284,9 +284,9 @@ describe('市场交易流程测试（阶段四：P2）', () => {
           throw error
         }
 
-        // 5. 验证幂等性：返回相同的 listing_id
-        expect(String(second_result.listing.listing_id)).toBe(
-          String(first_result.listing.listing_id)
+        // 5. 验证幂等性：返回相同的 market_listing_id
+        expect(String(second_result.listing.market_listing_id)).toBe(
+          String(first_result.listing.market_listing_id)
         )
         expect(second_result.is_duplicate).toBe(true)
 
@@ -399,7 +399,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
           await transaction.commit()
 
           // 记录挂牌ID便于清理
-          created_listings.push(result.listing.listing_id)
+          created_listings.push(result.listing.market_listing_id)
 
           // 4. 验证挂牌结果
           expect(result).toHaveProperty('listing')
@@ -413,7 +413,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
           // 5. 验证资产已冻结
           expect(result).toHaveProperty('freeze_result')
 
-          console.log('✅ 可叠加资产挂牌创建成功:', result.listing.listing_id)
+          console.log('✅ 可叠加资产挂牌创建成功:', result.listing.market_listing_id)
         } catch (error) {
           await transaction.rollback()
           throw error
@@ -481,7 +481,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
         )
         await listing_tx.commit()
         test_listing = result.listing
-        created_listings.push(test_listing.listing_id)
+        created_listings.push(test_listing.market_listing_id)
       } catch (error) {
         await listing_tx.rollback()
         throw error
@@ -495,7 +495,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
         await TradeOrderService.createOrder(
           {
             buyer_id: test_seller.user_id, // 卖家自己购买
-            listing_id: test_listing.listing_id,
+            market_listing_id: test_listing.market_listing_id,
             idempotency_key: order_idempotency_key
           },
           { transaction: order_tx }
@@ -536,18 +536,20 @@ describe('市场交易流程测试（阶段四：P2）', () => {
         )
         await listing_tx.commit()
         test_listing = result.listing
-        created_listings.push(test_listing.listing_id)
+        created_listings.push(test_listing.market_listing_id)
       } catch (error) {
         await listing_tx.rollback()
         throw error
       }
 
       // 2. 查询挂牌详情
-      const listing_detail = await MarketListingService.getListingById(test_listing.listing_id)
+      const listing_detail = await MarketListingService.getListingById(
+        test_listing.market_listing_id
+      )
 
-      // 3. 验证返回的字段（注意：listing_id 可能是字符串或数字）
+      // 3. 验证返回的字段（注意：market_listing_id 可能是字符串或数字）
       expect(listing_detail).toBeTruthy()
-      expect(String(listing_detail.listing_id)).toBe(String(test_listing.listing_id))
+      expect(String(listing_detail.market_listing_id)).toBe(String(test_listing.market_listing_id))
       expect(listing_detail.status).toBe('on_sale')
       expect(Number(listing_detail.price_amount)).toBe(150)
 
@@ -580,7 +582,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
           )
           await listing_tx.commit()
           test_listing = result.listing
-          created_listings.push(test_listing.listing_id)
+          created_listings.push(test_listing.market_listing_id)
         } catch (error) {
           await listing_tx.rollback()
           throw error
@@ -591,7 +593,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
         try {
           const result = await MarketListingService.withdrawListing(
             {
-              listing_id: test_listing.listing_id,
+              market_listing_id: test_listing.market_listing_id,
               seller_user_id: test_seller.user_id
             },
             { transaction: withdraw_tx }
@@ -639,7 +641,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
           )
           await listing_tx.commit()
           test_listing = result.listing
-          created_listings.push(test_listing.listing_id)
+          created_listings.push(test_listing.market_listing_id)
         } catch (error) {
           await listing_tx.rollback()
           throw error
@@ -650,7 +652,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
         try {
           await MarketListingService.withdrawListing(
             {
-              listing_id: test_listing.listing_id,
+              market_listing_id: test_listing.market_listing_id,
               seller_user_id: test_buyer.user_id // 非卖家
             },
             { transaction: withdraw_tx }
@@ -705,7 +707,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
           )
           await listing_tx.commit()
           test_listing = result.listing
-          created_listings.push(test_listing.listing_id)
+          created_listings.push(test_listing.market_listing_id)
         } catch (error) {
           await listing_tx.rollback()
           throw error
@@ -723,7 +725,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
         try {
           const result = await MarketListingService.withdrawFungibleAssetListing(
             {
-              listing_id: test_listing.listing_id,
+              market_listing_id: test_listing.market_listing_id,
               seller_user_id: test_seller.user_id
             },
             { transaction: withdraw_tx }

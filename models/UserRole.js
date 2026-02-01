@@ -11,10 +11,17 @@ module.exports = sequelize => {
   const UserRole = sequelize.define(
     'UserRole',
     {
-      // 用户ID（联合主键之一）
-      user_id: {
+      // 主键（符合 {table_name}_id 规范）
+      user_role_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
+        autoIncrement: true,
+        comment: '用户角色关联ID'
+      },
+
+      // 用户ID（外键）
+      user_id: {
+        type: DataTypes.INTEGER,
         allowNull: false,
         references: {
           model: 'users',
@@ -23,10 +30,9 @@ module.exports = sequelize => {
         comment: '用户ID'
       },
 
-      // 角色ID（联合主键之一）
+      // 角色ID（外键）
       role_id: {
         type: DataTypes.INTEGER,
-        primaryKey: true,
         allowNull: false,
         references: {
           model: 'roles',

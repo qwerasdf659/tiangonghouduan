@@ -30,7 +30,7 @@ class LotteryCampaignUserQuota extends Model {
   static associate(models) {
     // 多对一：配额属于某个活动
     LotteryCampaignUserQuota.belongsTo(models.LotteryCampaign, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'campaign',
       onDelete: 'CASCADE',
       comment: '所属活动'
@@ -105,8 +105,8 @@ class LotteryCampaignUserQuota extends Model {
    */
   toSummary() {
     return {
-      quota_id: this.quota_id,
-      campaign_id: this.campaign_id,
+      lottery_campaign_user_quota_id: this.lottery_campaign_user_quota_id,
+      lottery_campaign_id: this.lottery_campaign_id,
       user_id: this.user_id,
       quota_remaining: this.quota_remaining,
       quota_total: this.quota_total,
@@ -129,11 +129,11 @@ class LotteryCampaignUserQuota extends Model {
 
     const [quota, created] = await this.findOrCreate({
       where: {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         user_id: userId
       },
       defaults: {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         user_id: userId,
         quota_remaining: initialQuota,
         quota_total: initialQuota,
@@ -201,7 +201,7 @@ class LotteryCampaignUserQuota extends Model {
         [fn('SUM', col('quota_used')), 'total_used'],
         [fn('SUM', col('quota_remaining')), 'total_remaining']
       ],
-      where: { campaign_id: campaignId },
+      where: { lottery_campaign_id: campaignId },
       raw: true,
       transaction
     })
@@ -209,7 +209,7 @@ class LotteryCampaignUserQuota extends Model {
     // 统计有配额的用户数
     const usersWithQuota = await this.count({
       where: {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         quota_remaining: { [Op.gt]: 0 }
       },
       transaction
@@ -236,7 +236,7 @@ class LotteryCampaignUserQuota extends Model {
 
     return this.findAll({
       where: {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         quota_remaining: { [Op.gt]: 0 }
       },
       order: [['quota_remaining', 'DESC']],
@@ -258,7 +258,7 @@ module.exports = sequelize => {
       /**
        * 配额记录ID - 主键
        */
-      quota_id: {
+      lottery_campaign_user_quota_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
@@ -268,10 +268,10 @@ module.exports = sequelize => {
       /**
        * 活动ID
        */
-      campaign_id: {
+      lottery_campaign_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        comment: '活动ID（外键关联lottery_campaigns.campaign_id）'
+        comment: '抽奖活动ID（外键关联lottery_campaigns.lottery_campaign_id）'
       },
 
       /**
@@ -373,7 +373,7 @@ module.exports = sequelize => {
       indexes: [
         // 唯一索引：一个用户在一个活动中只有一条配额记录
         {
-          fields: ['campaign_id', 'user_id'],
+          fields: ['lottery_campaign_id', 'user_id'],
           unique: true,
           name: 'uk_user_quota_campaign_user'
         },
@@ -384,7 +384,7 @@ module.exports = sequelize => {
         },
         // 查询索引：按活动查询有配额的用户
         {
-          fields: ['campaign_id', 'quota_remaining'],
+          fields: ['lottery_campaign_id', 'quota_remaining'],
           name: 'idx_user_quota_campaign_remaining'
         }
       ]

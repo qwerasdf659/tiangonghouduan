@@ -92,7 +92,7 @@ async function getUserExperienceState(userId, campaignId) {
     return await LotteryUserExperienceState.findOne({
       where: {
         user_id: userId,
-        campaign_id: campaignId
+        lottery_campaign_id: campaignId
       }
     })
   } catch (error) {
@@ -129,7 +129,7 @@ async function resetUserExperienceState(userId, campaignId) {
     await LotteryUserExperienceState.destroy({
       where: {
         user_id: userId,
-        campaign_id: campaignId
+        lottery_campaign_id: campaignId
       }
     })
     console.log(`   ✅ 已重置用户 ${userId} 在活动 ${campaignId} 的体验状态`)
@@ -176,7 +176,7 @@ describe('【P0】保底机制测试 - Pity/Anti-Empty/Anti-High', () => {
     console.log(`✅ 登录成功，用户ID: ${testUserId}`)
 
     // 获取活动信息（直接从 TestConfig.realData 获取，已在 initRealTestData 中查询数据库）
-    campaignId = TestConfig.realData.testCampaign?.campaign_id || 1
+    campaignId = TestConfig.realData.testCampaign?.lottery_campaign_id || 1
     campaignCode = TestConfig.realData.testCampaign?.campaign_code || 'BASIC_LOTTERY'
     console.log(`📋 活动ID: ${campaignId}, 活动代码: ${campaignCode}`)
 
@@ -214,7 +214,7 @@ describe('【P0】保底机制测试 - Pity/Anti-Empty/Anti-High', () => {
 
       // 验证模型有必要的字段
       const attributes = LotteryUserExperienceState.rawAttributes || {}
-      const requiredFields = ['user_id', 'campaign_id', 'empty_streak']
+      const requiredFields = ['user_id', 'lottery_campaign_id', 'empty_streak']
 
       for (const field of requiredFields) {
         if (attributes[field]) {
@@ -291,7 +291,7 @@ describe('【P0】保底机制测试 - Pity/Anti-Empty/Anti-High', () => {
 
         const result = await engine.applyExperienceSmoothing({
           user_id: testUserId,
-          campaign_id: campaignId,
+          lottery_campaign_id: campaignId,
           selected_tier: 'low',
           tier_weights: mockTierWeights,
           experience_state: mockExperienceState
@@ -347,7 +347,7 @@ describe('【P0】保底机制测试 - Pity/Anti-Empty/Anti-High', () => {
 
         const result = await engine.applyExperienceSmoothing({
           user_id: testUserId,
-          campaign_id: campaignId,
+          lottery_campaign_id: campaignId,
           selected_tier: 'high', // 假设选中了高档位
           tier_weights: mockTierWeights,
           experience_state: mockExperienceState

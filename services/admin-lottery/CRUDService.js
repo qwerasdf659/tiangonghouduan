@@ -145,7 +145,7 @@ class LotteryCampaignCRUDService {
     )
 
     logger.info('创建抽奖活动成功', {
-      campaign_id: campaign.campaign_id,
+      lottery_campaign_id: campaign.lottery_campaign_id,
       campaign_name,
       campaign_code,
       operator_user_id
@@ -161,7 +161,7 @@ class LotteryCampaignCRUDService {
    * - 管理员修改抽奖活动的基本信息
    * - 注意：campaign_code 不可修改
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} updateData - 更新数据（不包括 campaign_code）
    * @param {Object} options - 操作选项
    * @param {Object} options.transaction - Sequelize事务对象（必填）
@@ -176,7 +176,7 @@ class LotteryCampaignCRUDService {
    *   { transaction, operator_user_id: 456 }
    * )
    */
-  static async updateCampaign(campaign_id, updateData, options = {}) {
+  static async updateCampaign(lottery_campaign_id, updateData, options = {}) {
     const transaction = assertAndGetTransaction(
       options,
       'LotteryCampaignCRUDService.updateCampaign'
@@ -188,13 +188,13 @@ class LotteryCampaignCRUDService {
     }
 
     logger.info('开始更新抽奖活动', {
-      campaign_id,
+      lottery_campaign_id,
       update_fields: Object.keys(updateData),
       operator_user_id
     })
 
     // 查找活动
-    const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id), { transaction })
+    const campaign = await LotteryCampaign.findByPk(parseInt(lottery_campaign_id), { transaction })
     if (!campaign) {
       const error = new Error('活动不存在')
       error.code = 'NOT_FOUND'
@@ -233,7 +233,7 @@ class LotteryCampaignCRUDService {
     }
 
     if (Object.keys(filteredData).length === 0) {
-      logger.warn('更新抽奖活动：无有效更新字段', { campaign_id, operator_user_id })
+      logger.warn('更新抽奖活动：无有效更新字段', { lottery_campaign_id, operator_user_id })
       return campaign
     }
 
@@ -242,16 +242,19 @@ class LotteryCampaignCRUDService {
 
     // 失效缓存
     try {
-      await BusinessCacheHelper.invalidateLotteryCampaign(parseInt(campaign_id), 'campaign_updated')
+      await BusinessCacheHelper.invalidateLotteryCampaign(
+        parseInt(lottery_campaign_id),
+        'campaign_updated'
+      )
     } catch (cacheError) {
       logger.warn('[缓存] 活动缓存失效失败（非致命）', {
         error: cacheError.message,
-        campaign_id
+        lottery_campaign_id
       })
     }
 
     logger.info('更新抽奖活动成功', {
-      campaign_id,
+      lottery_campaign_id,
       updated_fields: Object.keys(filteredData),
       operator_user_id
     })
@@ -266,7 +269,7 @@ class LotteryCampaignCRUDService {
    * - 管理员单独更新活动状态（上线、暂停、结束等）
    * - 状态流转：draft → active → paused/ended
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {string} status - 新状态（draft/active/paused/ended）
    * @param {Object} options - 操作选项
    * @param {Object} options.transaction - Sequelize事务对象（必填）
@@ -281,7 +284,7 @@ class LotteryCampaignCRUDService {
    *   { transaction, operator_user_id: 456 }
    * )
    */
-  static async updateCampaignStatus(campaign_id, status, options = {}) {
+  static async updateCampaignStatus(lottery_campaign_id, status, options = {}) {
     const transaction = assertAndGetTransaction(
       options,
       'LotteryCampaignCRUDService.updateCampaignStatus'
@@ -302,13 +305,13 @@ class LotteryCampaignCRUDService {
     }
 
     logger.info('开始更新抽奖活动状态', {
-      campaign_id,
+      lottery_campaign_id,
       new_status: status,
       operator_user_id
     })
 
     // 查找活动
-    const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id), { transaction })
+    const campaign = await LotteryCampaign.findByPk(parseInt(lottery_campaign_id), { transaction })
     if (!campaign) {
       const error = new Error('活动不存在')
       error.code = 'NOT_FOUND'
@@ -324,18 +327,18 @@ class LotteryCampaignCRUDService {
     // 失效缓存
     try {
       await BusinessCacheHelper.invalidateLotteryCampaign(
-        parseInt(campaign_id),
+        parseInt(lottery_campaign_id),
         `status_change_${oldStatus}_to_${status}`
       )
     } catch (cacheError) {
       logger.warn('[缓存] 活动缓存失效失败（非致命）', {
         error: cacheError.message,
-        campaign_id
+        lottery_campaign_id
       })
     }
 
     logger.info('更新抽奖活动状态成功', {
-      campaign_id,
+      lottery_campaign_id,
       old_status: oldStatus,
       new_status: status,
       operator_user_id
@@ -351,11 +354,11 @@ class LotteryCampaignCRUDService {
    * - 管理员删除不再使用的抽奖活动
    * - 如果活动下存在奖品，则不允许删除（数据完整性保护）
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} options - 操作选项
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @param {number} options.operator_user_id - 操作者用户ID（必填）
-   * @returns {Promise<Object>} 删除结果 { campaign_id, campaign_name, deleted: true }
+   * @returns {Promise<Object>} 删除结果 { lottery_campaign_id, campaign_name, deleted: true }
    * @throws {Error} 活动不存在、存在关联数据等
    *
    * @example
@@ -364,7 +367,7 @@ class LotteryCampaignCRUDService {
    *   { transaction, operator_user_id: 456 }
    * )
    */
-  static async deleteCampaign(campaign_id, options = {}) {
+  static async deleteCampaign(lottery_campaign_id, options = {}) {
     const transaction = assertAndGetTransaction(
       options,
       'LotteryCampaignCRUDService.deleteCampaign'
@@ -375,10 +378,10 @@ class LotteryCampaignCRUDService {
       throw new Error('operator_user_id 是必填参数')
     }
 
-    logger.info('开始删除抽奖活动', { campaign_id, operator_user_id })
+    logger.info('开始删除抽奖活动', { lottery_campaign_id, operator_user_id })
 
     // 查找活动
-    const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id), { transaction })
+    const campaign = await LotteryCampaign.findByPk(parseInt(lottery_campaign_id), { transaction })
     if (!campaign) {
       const error = new Error('活动不存在')
       error.code = 'NOT_FOUND'
@@ -388,7 +391,7 @@ class LotteryCampaignCRUDService {
 
     // 检查是否有关联的奖品
     const prizeCount = await LotteryPrize.count({
-      where: { campaign_id: parseInt(campaign_id) },
+      where: { lottery_campaign_id: parseInt(lottery_campaign_id) },
       transaction
     })
 
@@ -407,22 +410,25 @@ class LotteryCampaignCRUDService {
 
     // 失效缓存
     try {
-      await BusinessCacheHelper.invalidateLotteryCampaign(parseInt(campaign_id), 'campaign_deleted')
+      await BusinessCacheHelper.invalidateLotteryCampaign(
+        parseInt(lottery_campaign_id),
+        'campaign_deleted'
+      )
     } catch (cacheError) {
       logger.warn('[缓存] 活动缓存失效失败（非致命）', {
         error: cacheError.message,
-        campaign_id
+        lottery_campaign_id
       })
     }
 
     logger.info('删除抽奖活动成功', {
-      campaign_id,
+      lottery_campaign_id,
       campaign_name: campaignName,
       operator_user_id
     })
 
     return {
-      campaign_id: parseInt(campaign_id),
+      lottery_campaign_id: parseInt(lottery_campaign_id),
       campaign_name: campaignName,
       deleted: true
     }

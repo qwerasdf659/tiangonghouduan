@@ -32,6 +32,6 @@ router.use('/', forceControlRoutes) // 包含 /force-win, /force-lose
 router.use('/', adjustmentRoutes) // 包含 /probability-adjust, /user-specific-queue
 router.use('/', userStatusRoutes) // 包含 /user-status/:user_id, /clear-user-settings/:user_id
 router.use('/', interventionsRoutes) // 包含 /interventions, /interventions/:id, /interventions/:id/cancel
-router.use('/', pricingConfigRoutes) // 包含 /campaigns/:campaign_id/pricing 系列端点
+router.use('/', pricingConfigRoutes) // 包含 /campaigns/:lottery_campaign_id/pricing 系列端点
 
 module.exports = router

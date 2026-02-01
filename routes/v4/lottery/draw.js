@@ -179,15 +179,20 @@ router.post(
       const drawResult = await TransactionManager.execute(
         async transaction => {
           // 传递幂等键和事务到抽奖引擎
-          return await lottery_engine.execute_draw(user_id, campaign.campaign_id, draw_count, {
-            idempotency_key, // 请求级幂等键，用于派生事务级幂等键
-            request_source: 'api_v4_lottery_draw', // 请求来源标识
-            transaction // 🔒 关键：传递事务对象
-          })
+          return await lottery_engine.execute_draw(
+            user_id,
+            campaign.lottery_campaign_id,
+            draw_count,
+            {
+              idempotency_key, // 请求级幂等键，用于派生事务级幂等键
+              request_source: 'api_v4_lottery_draw', // 请求来源标识
+              transaction // 🔒 关键：传递事务对象
+            }
+          )
         },
         {
           timeout: 30000,
-          description: `抽奖执行 user_id=${user_id} campaign_id=${campaign.campaign_id} draw_count=${draw_count}`
+          description: `抽奖执行 user_id=${user_id} lottery_campaign_id=${campaign.lottery_campaign_id} draw_count=${draw_count}`
         }
       )
 
@@ -279,7 +284,7 @@ router.post(
         // 并行发送所有奖品的通知（支持单抽和连抽）
         const notificationPromises = sanitizedResult.prizes.map(prize =>
           NotificationService.notifyLotteryWin(user_id, {
-            draw_id: sanitizedResult.lottery_session_id,
+            lottery_draw_id: sanitizedResult.lottery_session_id,
             prize_name: prize.name,
             prize_type: prize.type,
             prize_value: prize.display_points,

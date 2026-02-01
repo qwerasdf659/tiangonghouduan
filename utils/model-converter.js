@@ -40,7 +40,7 @@ class ModelConverter {
    *
    * // 字段过滤
    * const filtered = ModelConverter.toPlainObject(prizeModel, {
-   *   fields: ['prize_id', 'prize_name', 'win_probability']
+   *   fields: ['lottery_prize_id', 'prize_name', 'win_probability']
    * })
    */
   static toPlainObject(model, options = {}) {
@@ -98,7 +98,7 @@ class ModelConverter {
    *
    * @example
    * const plains = ModelConverter.bulkConvert(prizes, {
-   *   fields: ['prize_id', 'prize_name'],
+   *   fields: ['lottery_prize_id', 'prize_name'],
    *   removeInternalFields: true
    * })
    */

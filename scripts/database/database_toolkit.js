@@ -95,9 +95,9 @@ function getForeignKeyFixes() {
     },
     {
       table: 'lottery_draws',
-      column: 'campaign_id',
+      column: 'lottery_campaign_id',
       referenced_table: 'lottery_campaigns',
-      referenced_column: 'campaign_id',
+      referenced_column: 'lottery_campaign_id',
       current: { delete: 'CASCADE', update: 'CASCADE' },
       recommended: { delete: 'RESTRICT', update: 'CASCADE' },
       reason: '有抽奖记录的活动不能删除（业务保护）'

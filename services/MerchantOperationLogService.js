@@ -306,7 +306,7 @@ class MerchantOperationLogService {
           {
             model: ConsumptionRecord,
             as: 'consumptionRecord',
-            attributes: ['record_id', 'consumption_amount', 'points_earned', 'status']
+            attributes: ['consumption_record_id', 'consumption_amount', 'points_earned', 'status']
           }
         ]
       })
@@ -343,7 +343,7 @@ class MerchantOperationLogService {
           : null,
         consumption_record_info: log.consumptionRecord
           ? {
-              record_id: log.consumptionRecord.record_id,
+              record_id: log.consumptionRecord.consumption_record_id,
               consumption_amount: parseFloat(log.consumptionRecord.consumption_amount),
               points_earned: log.consumptionRecord.points_earned,
               status: log.consumptionRecord.status

@@ -30,8 +30,8 @@ class LotteryDrawDecision extends Model {
   static associate(models) {
     // 一对一：决策快照属于某次抽奖
     LotteryDrawDecision.belongsTo(models.LotteryDraw, {
-      foreignKey: 'draw_id',
-      targetKey: 'draw_id',
+      foreignKey: 'lottery_draw_id',
+      targetKey: 'lottery_draw_id',
       as: 'draw',
       onDelete: 'CASCADE',
       comment: '关联的抽奖记录'
@@ -39,8 +39,8 @@ class LotteryDrawDecision extends Model {
 
     // 多对一：关联的预设（如果是预设发放）
     LotteryDrawDecision.belongsTo(models.LotteryPreset, {
-      foreignKey: 'preset_id',
-      targetKey: 'preset_id',
+      foreignKey: 'lottery_preset_id',
+      targetKey: 'lottery_preset_id',
       as: 'preset',
       onDelete: 'SET NULL',
       comment: '使用的预设（如果是预设发放）'
@@ -119,8 +119,8 @@ class LotteryDrawDecision extends Model {
    */
   toSummary() {
     return {
-      decision_id: this.decision_id,
-      draw_id: this.draw_id,
+      lottery_draw_decision_id: this.lottery_draw_decision_id,
+      lottery_draw_id: this.lottery_draw_id,
       pipeline_type: this.pipeline_type,
       pipeline_type_name: this.getPipelineTypeName(),
       segment_key: this.segment_key,
@@ -204,7 +204,7 @@ module.exports = sequelize => {
       /**
        * 决策ID - 主键
        */
-      decision_id: {
+      lottery_draw_decision_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
@@ -214,11 +214,11 @@ module.exports = sequelize => {
       /**
        * 关联的抽奖记录ID
        */
-      draw_id: {
+      lottery_draw_id: {
         type: DataTypes.STRING(50),
         allowNull: false,
         unique: true,
-        comment: '关联的抽奖记录ID（外键关联lottery_draws.draw_id）'
+        comment: '关联的抽奖记录ID（外键关联lottery_draws.lottery_draw_id）'
       },
 
       /**
@@ -560,9 +560,9 @@ module.exports = sequelize => {
       indexes: [
         // 唯一索引：一次抽奖一条决策记录
         {
-          fields: ['draw_id'],
+          fields: ['lottery_draw_id'],
           unique: true,
-          name: 'uk_decisions_draw_id'
+          name: 'uk_decisions_lottery_draw_id'
         },
         // 查询索引：按幂等键查询
         {

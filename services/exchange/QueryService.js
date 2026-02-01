@@ -34,7 +34,7 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
    * 市场商品列表视图（用户浏览）
    */
   marketItemView: [
-    'item_id',
+    'exchange_item_id',
     'item_name',
     'description',
     'cost_asset_code',
@@ -50,7 +50,7 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
    * 商品详情视图
    */
   marketItemDetailView: [
-    'item_id',
+    'exchange_item_id',
     'item_name',
     'description',
     'cost_asset_code',
@@ -68,10 +68,10 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
    * 用户订单视图
    */
   marketOrderView: [
-    'record_id',
+    'exchange_record_id',
     'order_no',
     'user_id',
-    'item_id',
+    'exchange_item_id',
     'item_snapshot',
     'quantity',
     'pay_asset_code',
@@ -87,10 +87,10 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
    * 管理员订单视图（包含敏感字段）
    */
   adminMarketOrderView: [
-    'record_id',
+    'exchange_record_id',
     'order_no',
     'user_id',
-    'item_id',
+    'exchange_item_id',
     'item_snapshot',
     'quantity',
     'pay_asset_code',
@@ -184,7 +184,7 @@ class QueryService {
           {
             model: this.ImageResources,
             as: 'primaryImage',
-            attributes: ['image_id', 'file_path', 'mime_type', 'thumbnail_paths'],
+            attributes: ['image_resource_id', 'file_path', 'mime_type', 'thumbnail_paths'],
             required: false
           }
         ],
@@ -238,7 +238,7 @@ class QueryService {
           {
             model: this.ImageResources,
             as: 'primaryImage',
-            attributes: ['image_id', 'file_path', 'mime_type', 'thumbnail_paths'],
+            attributes: ['image_resource_id', 'file_path', 'mime_type', 'thumbnail_paths'],
             required: false
           }
         ]
@@ -361,7 +361,7 @@ class QueryService {
    * @param {Object} options - 查询选项
    * @param {string} [options.status] - 订单状态筛选
    * @param {number} [options.user_id] - 用户ID筛选
-   * @param {number} [options.item_id] - 商品ID筛选
+   * @param {number} [options.exchange_item_id] - 商品ID筛选
    * @param {string} [options.order_no] - 订单号模糊搜索
    * @param {number} [options.page=1] - 页码
    * @param {number} [options.page_size=20] - 每页数量
@@ -373,7 +373,7 @@ class QueryService {
     const {
       status = null,
       user_id = null,
-      item_id = null,
+      exchange_item_id = null,
       order_no = null,
       page = 1,
       page_size = 20,
@@ -385,7 +385,7 @@ class QueryService {
       logger.info('[兑换市场] 管理员查询全量订单列表', {
         status,
         user_id,
-        item_id,
+        exchange_item_id,
         order_no,
         page,
         page_size
@@ -394,7 +394,7 @@ class QueryService {
       const where = {}
       if (status) where.status = status
       if (user_id) where.user_id = user_id
-      if (item_id) where.item_id = item_id
+      if (exchange_item_id) where.exchange_item_id = exchange_item_id
       if (order_no) {
         where.order_no = { [Op.like]: `%${order_no}%` }
       }
@@ -432,7 +432,7 @@ class QueryService {
         filters: {
           status,
           user_id,
-          item_id,
+          exchange_item_id,
           order_no
         },
         timestamp: BeijingTimeHelper.now()
@@ -514,7 +514,7 @@ class QueryService {
       const itemStats = await this.ExchangeItem.findAll({
         attributes: [
           'status',
-          [this.sequelize.fn('COUNT', this.sequelize.col('item_id')), 'count'],
+          [this.sequelize.fn('COUNT', this.sequelize.col('exchange_item_id')), 'count'],
           [this.sequelize.fn('SUM', this.sequelize.col('stock')), 'total_stock']
         ],
         group: ['status']

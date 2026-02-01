@@ -99,9 +99,9 @@ module.exports = sequelize => {
 
   // 定义关联关系
   Role.associate = function (models) {
-    // 角色与用户的多对多关系
+    // 角色与用户的多对多关系（使用 UserRole 模型）
     Role.belongsToMany(models.User, {
-      through: 'user_roles',
+      through: models.UserRole,
       foreignKey: 'role_id',
       otherKey: 'user_id',
       as: 'users'

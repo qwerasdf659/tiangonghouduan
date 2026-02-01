@@ -95,7 +95,7 @@ module.exports = (sequelize, _DataTypes) => {
   UserStatusChangeRecord.init(
     {
       // 变更记录ID（主键，作为审计日志的 target_id）
-      record_id: {
+      user_status_change_record_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,

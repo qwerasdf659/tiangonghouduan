@@ -42,20 +42,20 @@ class PoolBudgetProvider extends BudgetProvider {
    *
    * @param {Object} params - 查询参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {Object} options - 额外选项
    * @returns {Promise<Object>} 预算信息
    */
   async getAvailableBudget(params, options = {}) {
-    const { user_id, campaign_id } = params
+    const { user_id, lottery_campaign_id } = params
     const { transaction } = options
 
     try {
       // 加载活动配置
-      const campaign = await LotteryCampaign.findByPk(campaign_id, { transaction })
+      const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
 
       if (!campaign) {
-        this._log('warn', '活动不存在', { campaign_id })
+        this._log('warn', '活动不存在', { lottery_campaign_id })
         return {
           available: 0,
           details: { reason: 'campaign_not_found' }
@@ -68,7 +68,7 @@ class PoolBudgetProvider extends BudgetProvider {
       // 计算可用预算
       let available = 0
       const details = {
-        campaign_id,
+        lottery_campaign_id,
         user_id,
         is_whitelist
       }
@@ -98,7 +98,7 @@ class PoolBudgetProvider extends BudgetProvider {
 
       this._log('debug', '获取活动池预算', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         available,
         is_whitelist
       })
@@ -110,7 +110,7 @@ class PoolBudgetProvider extends BudgetProvider {
     } catch (error) {
       this._log('error', '获取活动池预算失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       throw error
@@ -122,16 +122,16 @@ class PoolBudgetProvider extends BudgetProvider {
    *
    * @param {Object} params - 扣减参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {number} params.amount - 扣减金额
    * @param {string} params.reason - 扣减原因
-   * @param {string} params.reference_id - 关联ID（如 draw_id）
+   * @param {string} params.reference_id - 关联ID（如 lottery_draw_id）
    * @param {Object} options - 额外选项
    * @param {Object} options.transaction - 数据库事务
    * @returns {Promise<Object>} 扣减结果
    */
   async deductBudget(params, options = {}) {
-    const { user_id, campaign_id, amount, reference_id } = params
+    const { user_id, lottery_campaign_id, amount, reference_id } = params
     const { transaction } = options
 
     try {
@@ -141,7 +141,7 @@ class PoolBudgetProvider extends BudgetProvider {
       if (!budget_check.sufficient) {
         this._log('warn', '活动池预算不足', {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           required: amount,
           available: budget_check.available
         })
@@ -156,13 +156,13 @@ class PoolBudgetProvider extends BudgetProvider {
       }
 
       // 加载活动（带锁，防止并发）
-      const campaign = await LotteryCampaign.findByPk(campaign_id, {
+      const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, {
         transaction,
         lock: transaction ? transaction.LOCK.UPDATE : false
       })
 
       if (!campaign) {
-        throw new Error(`活动不存在: ${campaign_id}`)
+        throw new Error(`活动不存在: ${lottery_campaign_id}`)
       }
 
       // 检查用户是否在白名单中
@@ -222,7 +222,7 @@ class PoolBudgetProvider extends BudgetProvider {
 
       this._log('info', '活动池预算扣减成功', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         deducted: amount,
         remaining: new_remaining,
         reference_id,
@@ -238,7 +238,7 @@ class PoolBudgetProvider extends BudgetProvider {
     } catch (error) {
       this._log('error', '活动池预算扣减失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         amount,
         error: error.message
       })
@@ -251,7 +251,7 @@ class PoolBudgetProvider extends BudgetProvider {
    *
    * @param {Object} params - 回滚参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {number} params.amount - 回滚金额
    * @param {string} params.original_reference_id - 原扣减的关联ID
    * @param {Object} options - 额外选项
@@ -259,18 +259,18 @@ class PoolBudgetProvider extends BudgetProvider {
    * @returns {Promise<Object>} 回滚结果
    */
   async rollbackBudget(params, options = {}) {
-    const { campaign_id, amount, original_reference_id } = params
+    const { lottery_campaign_id, amount, original_reference_id } = params
     const { transaction } = options
 
     try {
       // 加载活动（带锁）
-      const campaign = await LotteryCampaign.findByPk(campaign_id, {
+      const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, {
         transaction,
         lock: transaction ? transaction.LOCK.UPDATE : false
       })
 
       if (!campaign) {
-        throw new Error(`活动不存在: ${campaign_id}`)
+        throw new Error(`活动不存在: ${lottery_campaign_id}`)
       }
 
       // 回滚到公共池（简化处理，不区分预留池）
@@ -289,7 +289,7 @@ class PoolBudgetProvider extends BudgetProvider {
         parseFloat(campaign.reserved_pool_remaining || 0)
 
       this._log('info', '活动池预算回滚成功', {
-        campaign_id,
+        lottery_campaign_id,
         refunded: amount,
         new_remaining,
         original_reference_id
@@ -302,7 +302,7 @@ class PoolBudgetProvider extends BudgetProvider {
       }
     } catch (error) {
       this._log('error', '活动池预算回滚失败', {
-        campaign_id,
+        lottery_campaign_id,
         amount,
         error: error.message
       })

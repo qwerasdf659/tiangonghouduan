@@ -118,20 +118,20 @@ class AdminLotteryQueryService {
         typeof item.setting_data === 'string'
           ? JSON.parse(item.setting_data)
           : item.setting_data || {}
-      if (settingData.prize_id) {
-        prizeIds.add(settingData.prize_id)
+      if (settingData.lottery_prize_id) {
+        prizeIds.add(settingData.lottery_prize_id)
       }
     })
 
     const prizeMap = new Map()
     if (prizeIds.size > 0) {
       const prizes = await models.LotteryPrize.findAll({
-        where: { prize_id: { [Op.in]: Array.from(prizeIds) } },
-        attributes: ['prize_id', 'prize_name', 'prize_value']
+        where: { lottery_prize_id: { [Op.in]: Array.from(prizeIds) } },
+        attributes: ['lottery_prize_id', 'prize_name', 'prize_value']
       })
       prizes.forEach(prize => {
-        prizeMap.set(prize.prize_id, {
-          prize_id: prize.prize_id,
+        prizeMap.set(prize.lottery_prize_id, {
+          lottery_prize_id: prize.lottery_prize_id,
           prize_name: prize.prize_name,
           prize_value: prize.prize_value
         })
@@ -220,23 +220,23 @@ class AdminLotteryQueryService {
 
     // 获取奖品信息
     let prizeInfo = null
-    if (settingData.prize_id) {
-      const dbPrize = prizeMap.get(settingData.prize_id)
+    if (settingData.lottery_prize_id) {
+      const dbPrize = prizeMap.get(settingData.lottery_prize_id)
       if (dbPrize) {
         prizeInfo = {
-          prize_id: settingData.prize_id,
+          lottery_prize_id: settingData.lottery_prize_id,
           prize_name: dbPrize.prize_name || settingData.prize_name,
           prize_value: dbPrize.prize_value ?? null
         }
       } else if (settingData.prize_name) {
         prizeInfo = {
-          prize_id: settingData.prize_id,
+          lottery_prize_id: settingData.lottery_prize_id,
           prize_name: settingData.prize_name,
           prize_value: settingData.prize_value ?? null
         }
       } else {
         prizeInfo = {
-          prize_id: settingData.prize_id,
+          lottery_prize_id: settingData.lottery_prize_id,
           prize_name: null,
           prize_value: null
         }
@@ -253,7 +253,7 @@ class AdminLotteryQueryService {
           }
         : null,
       setting_type: item.setting_type,
-      prize_id: settingData.prize_id || null,
+      lottery_prize_id: settingData.lottery_prize_id || null,
       prize_info: prizeInfo,
       reason: settingData.reason || null,
       status: displayStatus,
@@ -297,7 +297,7 @@ class AdminLotteryQueryService {
         : null,
       setting_type: setting.setting_type,
       setting_data: settingData,
-      prize_id: settingData.prize_id || null,
+      lottery_prize_id: settingData.lottery_prize_id || null,
       prize_name: settingData.prize_name || null,
       reason: settingData.reason || null,
       status: displayStatus,

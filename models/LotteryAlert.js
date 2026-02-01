@@ -9,7 +9,7 @@
  *
  * 设计决策（来源：决策6）：
  * - 独立于商家风控的 risk_alerts 表
- * - 专用于抽奖系统，包含 campaign_id、阈值偏差等专用字段
+ * - 专用于抽奖系统，包含 lottery_campaign_id、阈值偏差等专用字段
  * - 职责分离，便于独立演进
  */
 
@@ -30,8 +30,8 @@ class LotteryAlert extends Model {
   static associate(models) {
     // 多对一：告警属于某个活动
     LotteryAlert.belongsTo(models.LotteryCampaign, {
-      foreignKey: 'campaign_id',
-      targetKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
+      targetKey: 'lottery_campaign_id',
       as: 'campaign',
       onDelete: 'CASCADE',
       comment: '关联的抽奖活动'
@@ -156,7 +156,7 @@ LotteryAlert.initModel = sequelize => {
   LotteryAlert.init(
     {
       // ==================== 主键 ====================
-      alert_id: {
+      lottery_alert_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
@@ -164,13 +164,13 @@ LotteryAlert.initModel = sequelize => {
       },
 
       // ==================== 业务关联 ====================
-      campaign_id: {
+      lottery_campaign_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
         comment: '关联的抽奖活动ID（外键）',
         references: {
           model: 'lottery_campaigns',
-          key: 'campaign_id'
+          key: 'lottery_campaign_id'
         },
         onDelete: 'CASCADE'
       },
@@ -289,7 +289,7 @@ LotteryAlert.initModel = sequelize => {
       indexes: [
         {
           name: 'idx_campaign_status',
-          fields: ['campaign_id', 'status'],
+          fields: ['lottery_campaign_id', 'status'],
           comment: '按活动和状态查询告警'
         },
         {
@@ -325,12 +325,12 @@ LotteryAlert.initModel = sequelize => {
         },
         /**
          * 指定活动的告警范围
-         * @param {number} campaign_id - 活动ID
+         * @param {number} lottery_campaign_id - 抽奖活动ID
          * @returns {Object} Sequelize查询条件
          */
-        byCampaign(campaign_id) {
+        byCampaign(lottery_campaign_id) {
           return {
-            where: { campaign_id }
+            where: { lottery_campaign_id }
           }
         },
         /**

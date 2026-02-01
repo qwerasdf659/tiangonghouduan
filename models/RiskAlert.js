@@ -70,7 +70,7 @@ module.exports = sequelize => {
   const RiskAlert = sequelize.define(
     'RiskAlert',
     {
-      alert_id: {
+      risk_alert_id: {
         type: DataTypes.INTEGER,
         autoIncrement: true,
         primaryKey: true,

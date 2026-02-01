@@ -65,14 +65,14 @@ class ImageService {
    * @param {number} options.fileSize - 文件大小（字节）
    * @param {string} options.businessType - 业务类型：lottery|exchange|trade|uploads
    * @param {string} [options.category] - 资源分类（如 prizes/products/banners）
-   * @param {number|null} options.contextId - 关联的业务上下文 ID（如 prize_id、user_id）
+   * @param {number|null} options.contextId - 关联的业务上下文 ID（如 lottery_prize_id、user_id）
    * @param {number} [options.userId] - 关联用户 ID（上传者）
    * @param {string} [options.sourceModule='admin'] - 来源模块：system/lottery/exchange/admin
    * @param {string} [options.ipAddress] - 客户端 IP 地址
    * @param {Object} [options.transaction] - Sequelize 事务对象
    *
    * @returns {Promise<Object>} 上传结果
-   * @returns {number} result.image_id - 图片资源 ID
+   * @returns {number} result.image_resource_id - 图片资源 ID
    * @returns {string} result.object_key - 原图对象存储 key
    * @returns {string} result.public_url - 原图公网访问 URL
    * @returns {Object} result.thumbnails - 缩略图 URL 对象（small/medium/large）
@@ -152,7 +152,7 @@ class ImageService {
     }
 
     _logger.info('✅ ImageService: 图片上传成功（含预生成缩略图）', {
-      image_id: imageRecord.image_id,
+      image_resource_id: imageRecord.image_resource_id,
       object_key: originalKey,
       thumbnail_keys: thumbnailKeys,
       business_type: businessType,
@@ -161,7 +161,7 @@ class ImageService {
     })
 
     return {
-      image_id: imageRecord.image_id,
+      image_resource_id: imageRecord.image_resource_id,
       object_key: originalKey,
       public_url: publicUrl, // 🔴 重命名：cdn_url → public_url（架构决策：不使用 CDN）
       thumbnails,
@@ -192,7 +192,7 @@ class ImageService {
    * 根据业务类型和上下文 ID 获取关联图片列表
    *
    * @param {string} businessType - 业务类型：lottery|exchange|trade|uploads
-   * @param {number} contextId - 业务上下文 ID（如 prize_id、product_id）
+   * @param {number} contextId - 业务上下文 ID（如 lottery_prize_id、exchange_item_id）
    * @returns {Promise<Array>} 图片列表
    */
   static async getImagesByBusiness(businessType, contextId) {
@@ -220,8 +220,9 @@ class ImageService {
   static async updateImageContextId(imageId, contextId, transaction = null) {
     const { ImageResources } = require('../models')
     const [affectedCount] = await ImageResources.update(
-      { context_id: contextId }, // 🔴 修复：business_id → context_id
-      { where: { image_id: imageId }, transaction }
+      { context_id: contextId },
+      // 2026-02-01 主键命名规范化：使用正确的主键字段名 image_resource_id
+      { where: { image_resource_id: imageId }, transaction }
     )
     return affectedCount > 0
   }
@@ -263,14 +264,17 @@ class ImageService {
       // 即使对象存储删除失败，也尝试删除数据库记录，避免数据不一致
     }
 
-    // 2. 物理删除数据库记录（非软删除）
+    /*
+     * 2. 物理删除数据库记录（非软删除）
+     * 2026-02-01 主键命名规范化：使用正确的主键字段名 image_resource_id
+     */
     const affectedCount = await ImageResources.destroy({
-      where: { image_id: imageId },
+      where: { image_resource_id: imageId },
       transaction
     })
 
     if (affectedCount > 0) {
-      _logger.info(`✅ ImageService: 数据库记录已物理删除 image_id=${imageId}`)
+      _logger.info(`✅ ImageService: 数据库记录已物理删除 image_resource_id=${imageId}`)
     }
 
     return affectedCount > 0
@@ -417,31 +421,31 @@ class ImageService {
           // 物理删除数据库记录
           // eslint-disable-next-line no-await-in-loop -- 批量清理需要逐个删除
           await ImageResources.destroy({
-            where: { image_id: image.image_id }
+            where: { image_resource_id: image.image_resource_id }
           })
 
           cleanedCount++
           details.push({
-            image_id: image.image_id,
+            image_resource_id: image.image_resource_id,
             file_path: image.file_path,
             created_at: image.created_at,
             success: true
           })
 
           _logger.info(
-            `🗑️ ImageService: 已清理 image_id=${image.image_id}, file_path=${image.file_path}`
+            `🗑️ ImageService: 已清理 image_resource_id=${image.image_resource_id}, file_path=${image.file_path}`
           )
         } catch (error) {
           failedCount++
           details.push({
-            image_id: image.image_id,
+            image_resource_id: image.image_resource_id,
             file_path: image.file_path,
             success: false,
             error: error.message
           })
 
           _logger.error(
-            `❌ ImageService: 清理失败 image_id=${image.image_id}, error=${error.message}`
+            `❌ ImageService: 清理失败 image_resource_id=${image.image_resource_id}, error=${error.message}`
           )
         }
       }
@@ -497,7 +501,7 @@ class ImageService {
       // 缩略图缺失时：记录 ERROR 日志 + 返回占位图（生产安全兜底）
       _logger.error(
         '❌ ImageService: 图片 ' +
-          imageRecord.image_id +
+          imageRecord.image_resource_id +
           ' 缺少预生成缩略图。' +
           'file_path: ' +
           imageRecord.file_path +
@@ -519,7 +523,7 @@ class ImageService {
     }
 
     return {
-      image_id: imageRecord.image_id,
+      image_resource_id: imageRecord.image_resource_id,
       object_key: objectKey,
       public_url: getImageUrl(objectKey),
       thumbnails,
@@ -582,7 +586,7 @@ class ImageService {
 
     // 格式化图片数据
     const images = rows.map(img => ({
-      image_id: img.image_id,
+      image_resource_id: img.image_resource_id,
       url: getImageUrl(img.file_path),
       original_filename: img.original_filename,
       file_size: img.file_size,
@@ -597,7 +601,7 @@ class ImageService {
     // 计算统计数据
     const [statsResult] = await ImageResources.findAll({
       attributes: [
-        [fn('COUNT', col('image_id')), 'total'],
+        [fn('COUNT', col('image_resource_id')), 'total'],
         [fn('SUM', col('file_size')), 'total_size']
       ],
       where: { status: 'active' },

@@ -129,7 +129,7 @@ module.exports = sequelize => {
       /**
        * 行为详情数据
        * @type {Object|null}
-       * @example { prize_id: 1, points_spent: 100 }
+       * @example { lottery_prize_id: 1, points_spent: 100 }
        */
       behavior_data: {
         type: DataTypes.JSON,

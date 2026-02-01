@@ -1028,24 +1028,24 @@ class ScheduledTasks {
               {
                 maxRetries: 2,
                 timeout: 10000,
-                description: `锁超时解锁（无订单）listing_id=${listing.listing_id}`
+                description: `锁超时解锁（无订单）market_listing_id=${listing.market_listing_id}`
               }
             )
 
             unlocked_count++
             details.push({
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               order_id: null,
               action: 'unlocked_without_order',
               success: true
             })
 
-            logger.info(`[锁超时解锁] 挂牌${listing.listing_id}已解锁（无关联订单）`)
+            logger.info(`[锁超时解锁] 挂牌${listing.market_listing_id}已解锁（无关联订单）`)
             continue
           }
 
           // 有关联订单，取消订单并解冻资产（使用事务包裹）
-          const business_id = `timeout_unlock_${order.order_id}_${Date.now()}`
+          const business_id = `timeout_unlock_${order.trade_order_id}_${Date.now()}`
 
           // P1-9：通过 ServiceManager 获取 TradeOrderService
           // 2026-01-31修复：传递事务参数，满足 cancelOrder 的事务边界要求
@@ -1053,7 +1053,7 @@ class ScheduledTasks {
             async (transaction) => {
               await ScheduledTasks.TradeOrderService.cancelOrder(
                 {
-                  order_id: order.order_id,
+                  trade_order_id: order.trade_order_id,
                   business_id,
                   cancel_reason: '订单超时自动取消（锁定超过15分钟）'
                 },
@@ -1063,30 +1063,30 @@ class ScheduledTasks {
             {
               maxRetries: 2,
               timeout: 30000, // 取消订单涉及资产解冻，给更多时间
-              description: `锁超时取消订单 order_id=${order.order_id}`
+              description: `锁超时取消订单 trade_order_id=${order.trade_order_id}`
             }
           )
 
           unlocked_count++
           details.push({
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             order_id: order.order_id,
             action: 'cancelled_and_unlocked',
             success: true
           })
 
-          logger.info(`[锁超时解锁] 订单${order.order_id}已取消，挂牌${listing.listing_id}已解锁`)
+          logger.info(`[锁超时解锁] 订单${order.order_id}已取消，挂牌${listing.market_listing_id}已解锁`)
         } catch (error) {
           failed_count++
           details.push({
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             order_id: listing.locked_by_order_id,
             action: 'failed',
             success: false,
             error: error.message
           })
 
-          logger.error(`[锁超时解锁] 处理挂牌${listing.listing_id}失败`, {
+          logger.error(`[锁超时解锁] 处理挂牌${listing.market_listing_id}失败`, {
             error: error.message,
             stack: error.stack
           })

@@ -33,7 +33,7 @@ module.exports = sequelize => {
     'ItemInstanceEvent',
     {
       // ==================== 主键 ====================
-      event_id: {
+      item_instance_event_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,

@@ -34,7 +34,7 @@ class PresetInventoryDebt extends Model {
   static associate(models) {
     // 多对一：欠账属于某个活动
     PresetInventoryDebt.belongsTo(models.LotteryCampaign, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'campaign',
       onDelete: 'RESTRICT',
       comment: '所属活动（禁止删除有欠账的活动）'
@@ -42,16 +42,19 @@ class PresetInventoryDebt extends Model {
 
     // 多对一：欠账关联某个奖品
     PresetInventoryDebt.belongsTo(models.LotteryPrize, {
-      foreignKey: 'prize_id',
+      foreignKey: 'lottery_prize_id',
       as: 'prize',
       onDelete: 'RESTRICT',
       comment: '欠账的奖品（禁止删除有欠账的奖品）'
     })
 
-    // 多对一：欠账由某次抽奖产生
+    /**
+     * 多对一：欠账由某次抽奖产生
+     * 外键：lottery_draw_id → lottery_draws.lottery_draw_id
+     */
     PresetInventoryDebt.belongsTo(models.LotteryDraw, {
-      foreignKey: 'draw_id',
-      targetKey: 'draw_id',
+      foreignKey: 'lottery_draw_id',
+      targetKey: 'lottery_draw_id',
       as: 'draw',
       onDelete: 'SET NULL',
       comment: '产生欠账的抽奖记录'
@@ -59,8 +62,8 @@ class PresetInventoryDebt extends Model {
 
     // 多对一：欠账由某个预设产生
     PresetInventoryDebt.belongsTo(models.LotteryPreset, {
-      foreignKey: 'preset_id',
-      targetKey: 'preset_id',
+      foreignKey: 'lottery_preset_id',
+      targetKey: 'lottery_preset_id',
       as: 'preset',
       onDelete: 'SET NULL',
       comment: '产生欠账的预设'
@@ -193,9 +196,9 @@ class PresetInventoryDebt extends Model {
    */
   toSummary() {
     return {
-      debt_id: this.debt_id,
-      campaign_id: this.campaign_id,
-      prize_id: this.prize_id,
+      preset_inventory_debt_id: this.preset_inventory_debt_id,
+      lottery_campaign_id: this.lottery_campaign_id,
+      lottery_prize_id: this.lottery_prize_id,
       user_id: this.user_id,
       debt_quantity: this.debt_quantity,
       cleared_quantity: this.cleared_quantity,
@@ -222,12 +225,12 @@ class PresetInventoryDebt extends Model {
 
     const result = await this.findOne({
       attributes: [
-        [fn('COUNT', col('debt_id')), 'total_debts'],
+        [fn('COUNT', col('preset_inventory_debt_id')), 'total_debts'],
         [fn('SUM', col('debt_quantity')), 'total_debt_quantity'],
         [fn('SUM', col('cleared_quantity')), 'total_cleared_quantity']
       ],
       where: {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         status: 'pending'
       },
       raw: true,
@@ -256,11 +259,11 @@ class PresetInventoryDebt extends Model {
     }
 
     if (campaignId) {
-      where.campaign_id = campaignId
+      where.lottery_campaign_id = campaignId
     }
 
     if (prizeId) {
-      where.prize_id = prizeId
+      where.lottery_prize_id = prizeId
     }
 
     return this.findAll({
@@ -283,16 +286,16 @@ class PresetInventoryDebt extends Model {
 
     return this.findAll({
       attributes: [
-        'prize_id',
+        'lottery_prize_id',
         [fn('SUM', col('debt_quantity')), 'total_debt'],
         [fn('SUM', col('cleared_quantity')), 'total_cleared'],
-        [fn('COUNT', col('debt_id')), 'debt_count']
+        [fn('COUNT', col('preset_inventory_debt_id')), 'debt_count']
       ],
       where: {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         status: 'pending'
       },
-      group: ['prize_id'],
+      group: ['lottery_prize_id'],
       transaction
     })
   }
@@ -309,7 +312,7 @@ module.exports = sequelize => {
       /**
        * 欠账记录ID - 主键
        */
-      debt_id: {
+      preset_inventory_debt_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
@@ -319,28 +322,28 @@ module.exports = sequelize => {
       /**
        * 关联的预设ID
        */
-      preset_id: {
+      lottery_preset_id: {
         type: DataTypes.STRING(50),
         allowNull: false,
         comment: '关联的预设ID（外键关联lottery_presets.preset_id）'
       },
 
       /**
-       * 关联的抽奖记录ID
+       * 关联的抽奖记录ID（外键）
        */
-      draw_id: {
+      lottery_draw_id: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        comment: '关联的抽奖记录ID（外键关联lottery_draws.draw_id）'
+        comment: '关联的抽奖记录ID（外键关联 lottery_draws.lottery_draw_id）'
       },
 
       /**
        * 奖品ID
        */
-      prize_id: {
+      lottery_prize_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        comment: '欠账奖品ID（外键关联lottery_prizes.prize_id）'
+        comment: '欠账奖品ID（外键关联lottery_prizes.lottery_prize_id）'
       },
 
       /**
@@ -355,7 +358,7 @@ module.exports = sequelize => {
       /**
        * 活动ID
        */
-      campaign_id: {
+      lottery_campaign_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
         comment: '活动ID'
@@ -465,17 +468,17 @@ module.exports = sequelize => {
       indexes: [
         // 预设ID索引
         {
-          fields: ['preset_id'],
+          fields: ['lottery_preset_id'],
           name: 'idx_inv_debt_preset'
         },
         // 奖品+状态联合索引
         {
-          fields: ['prize_id', 'status'],
+          fields: ['lottery_prize_id', 'status'],
           name: 'idx_inv_debt_prize_status'
         },
         // 活动+状态联合索引
         {
-          fields: ['campaign_id', 'status'],
+          fields: ['lottery_campaign_id', 'status'],
           name: 'idx_inv_debt_campaign_status'
         },
         // 状态+创建时间索引（用于查询待处理欠账）

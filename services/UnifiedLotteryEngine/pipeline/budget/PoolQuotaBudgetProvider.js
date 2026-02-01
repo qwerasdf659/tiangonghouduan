@@ -54,23 +54,23 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
    *
    * @param {Object} params - 查询参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {Object} options - 额外选项
    * @returns {Promise<Object>} 预算信息
    */
   async getAvailableBudget(params, options = {}) {
-    const { user_id, campaign_id } = params
+    const { user_id, lottery_campaign_id } = params
     const { transaction } = options
 
     try {
       // 1. 获取用户配额
-      const quota = await this._getOrCreateQuota(user_id, campaign_id, { transaction })
+      const quota = await this._getOrCreateQuota(user_id, lottery_campaign_id, { transaction })
 
       // 2. 获取活动池预算
-      const campaign = await LotteryCampaign.findByPk(campaign_id, { transaction })
+      const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
 
       if (!campaign) {
-        this._log('warn', '活动不存在', { campaign_id })
+        this._log('warn', '活动不存在', { lottery_campaign_id })
         return {
           available: 0,
           details: { reason: 'campaign_not_found' }
@@ -84,7 +84,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
 
       this._log('debug', '获取池+配额预算', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         quota_remaining,
         pool_remaining,
         total_available
@@ -103,7 +103,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
     } catch (error) {
       this._log('error', '获取池+配额预算失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       throw error
@@ -115,16 +115,16 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
    *
    * @param {Object} params - 扣减参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {number} params.amount - 扣减金额
    * @param {string} params.reason - 扣减原因
-   * @param {string} params.reference_id - 关联ID（如 draw_id）
+   * @param {string} params.reference_id - 关联ID（如 lottery_draw_id）
    * @param {Object} options - 额外选项
    * @param {Object} options.transaction - 数据库事务
    * @returns {Promise<Object>} 扣减结果
    */
   async deductBudget(params, options = {}) {
-    const { user_id, campaign_id, amount, reference_id } = params
+    const { user_id, lottery_campaign_id, amount, reference_id } = params
     const { transaction } = options
 
     try {
@@ -134,7 +134,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
       if (!budget_check.sufficient) {
         this._log('warn', '池+配额预算不足', {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           required: amount,
           available: budget_check.available
         })
@@ -149,19 +149,19 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
       }
 
       // 获取用户配额（带锁）
-      const quota = await this._getOrCreateQuota(user_id, campaign_id, {
+      const quota = await this._getOrCreateQuota(user_id, lottery_campaign_id, {
         transaction,
         lock: true
       })
 
       // 获取活动（带锁）
-      const campaign = await LotteryCampaign.findByPk(campaign_id, {
+      const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, {
         transaction,
         lock: transaction ? transaction.LOCK.UPDATE : false
       })
 
       if (!campaign) {
-        throw new Error(`活动不存在: ${campaign_id}`)
+        throw new Error(`活动不存在: ${lottery_campaign_id}`)
       }
 
       // 执行双层扣减
@@ -227,7 +227,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
 
       this._log('info', '池+配额预算扣减成功', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         deducted: amount,
         remaining: new_total_remaining,
         reference_id,
@@ -247,7 +247,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
     } catch (error) {
       this._log('error', '池+配额预算扣减失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         amount,
         error: error.message
       })
@@ -260,7 +260,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
    *
    * @param {Object} params - 回滚参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {number} params.amount - 回滚金额
    * @param {Object} params.original_details - 原扣减详情（包含 from_quota 和 from_pool）
    * @param {string} params.original_reference_id - 原扣减的关联ID
@@ -269,25 +269,25 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
    * @returns {Promise<Object>} 回滚结果
    */
   async rollbackBudget(params, options = {}) {
-    const { user_id, campaign_id, amount, original_details, original_reference_id } = params
+    const { user_id, lottery_campaign_id, amount, original_details, original_reference_id } = params
     const { transaction } = options
 
     try {
       // 获取用户配额（带锁）
       const quota = await LotteryCampaignUserQuota.findOne({
-        where: { user_id, campaign_id },
+        where: { user_id, lottery_campaign_id },
         transaction,
         lock: transaction ? transaction.LOCK.UPDATE : false
       })
 
       // 获取活动（带锁）
-      const campaign = await LotteryCampaign.findByPk(campaign_id, {
+      const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, {
         transaction,
         lock: transaction ? transaction.LOCK.UPDATE : false
       })
 
       if (!campaign) {
-        throw new Error(`活动不存在: ${campaign_id}`)
+        throw new Error(`活动不存在: ${lottery_campaign_id}`)
       }
 
       const refund_details = {
@@ -336,7 +336,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
 
       this._log('info', '池+配额预算回滚成功', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         refunded: amount,
         new_total,
         original_reference_id,
@@ -352,7 +352,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
     } catch (error) {
       this._log('error', '池+配额预算回滚失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         amount,
         error: error.message
       })
@@ -364,19 +364,19 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
    * 获取或创建用户配额
    *
    * @param {number} user_id - 用户ID
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} options - 额外选项
    * @param {Object} options.transaction - 数据库事务
    * @param {boolean} options.lock - 是否加锁
    * @returns {Promise<Object>} 配额记录
    * @private
    */
-  async _getOrCreateQuota(user_id, campaign_id, options = {}) {
+  async _getOrCreateQuota(user_id, lottery_campaign_id, options = {}) {
     const { transaction, lock } = options
 
     // 查找现有配额
     let quota = await LotteryCampaignUserQuota.findOne({
-      where: { user_id, campaign_id },
+      where: { user_id, lottery_campaign_id },
       transaction,
       lock: lock && transaction ? transaction.LOCK.UPDATE : false
     })
@@ -384,7 +384,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
     // 如果不存在且是按需初始化模式，创建新配额
     if (!quota && this.quota_init_mode === QUOTA_INIT_MODES.ON_DEMAND) {
       // 获取活动的默认配额
-      const campaign = await LotteryCampaign.findByPk(campaign_id, { transaction })
+      const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
       const default_quota = campaign
         ? parseFloat(campaign.default_quota || this.default_quota)
         : this.default_quota
@@ -393,7 +393,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
         quota = await LotteryCampaignUserQuota.create(
           {
             user_id,
-            campaign_id,
+            lottery_campaign_id,
             quota_total: default_quota,
             quota_used: 0,
             quota_remaining: default_quota,
@@ -407,7 +407,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
           {
             quota_id: quota.quota_id,
             user_id,
-            campaign_id,
+            lottery_campaign_id,
             grant_amount: default_quota,
             grant_source: 'initial',
             grant_reason: '首次参与自动初始化配额',
@@ -418,7 +418,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
 
         this._log('info', '创建用户配额', {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           quota_total: default_quota
         })
       }
@@ -431,7 +431,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
    * 手动为用户分配配额
    *
    * @param {number} user_id - 用户ID
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {number} amount - 配额金额
    * @param {Object} options - 额外选项
    * @param {string} options.source - 配额来源（initial/topup/refund/compensation/admin）
@@ -440,13 +440,13 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
    * @param {Object} options.transaction - 数据库事务
    * @returns {Promise<Object>} 分配结果
    */
-  async grantQuota(user_id, campaign_id, amount, options = {}) {
+  async grantQuota(user_id, lottery_campaign_id, amount, options = {}) {
     const { source = 'admin', reason, granted_by, transaction } = options
 
     try {
       // 获取或创建配额记录
       let quota = await LotteryCampaignUserQuota.findOne({
-        where: { user_id, campaign_id },
+        where: { user_id, lottery_campaign_id },
         transaction,
         lock: transaction ? transaction.LOCK.UPDATE : false
       })
@@ -455,7 +455,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
         quota = await LotteryCampaignUserQuota.create(
           {
             user_id,
-            campaign_id,
+            lottery_campaign_id,
             quota_total: amount,
             quota_used: 0,
             quota_remaining: amount,
@@ -481,7 +481,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
         {
           quota_id: quota.quota_id,
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           grant_amount: amount,
           grant_source: source,
           grant_reason: reason,
@@ -493,7 +493,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
 
       this._log('info', '分配用户配额', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         amount,
         source,
         new_total: quota.quota_total,
@@ -509,7 +509,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
     } catch (error) {
       this._log('error', '分配用户配额失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         amount,
         error: error.message
       })

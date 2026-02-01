@@ -41,7 +41,7 @@ async function analyzeLotteryCampaigns() {
 
   const campaigns = await runQuery(`
     SELECT 
-      campaign_id,
+      lottery_campaign_id,
       campaign_code,
       campaign_name,
       status,
@@ -62,7 +62,7 @@ async function analyzeLotteryCampaigns() {
   console.log(`\n📌 活动总数: ${campaigns.length} 条记录`)
   
   for (const campaign of campaigns) {
-    console.log(`\n  [${campaign.campaign_id}] ${campaign.campaign_name}`)
+    console.log(`\n  [${campaign.lottery_campaign_id}] ${campaign.campaign_name}`)
     console.log(`      代码: ${campaign.campaign_code}`)
     console.log(`      状态: ${campaign.status}`)
     console.log(`      预算模式: ${campaign.budget_mode}`)
@@ -95,7 +95,7 @@ async function analyzePrizes() {
   // 按档位统计奖品
   const tierStats = await runQuery(`
     SELECT 
-      campaign_id,
+      lottery_campaign_id,
       reward_tier,
       COUNT(*) as prize_count,
       SUM(win_weight) as total_weight,
@@ -104,8 +104,8 @@ async function analyzePrizes() {
       MAX(prize_value_points) as max_value
     FROM lottery_prizes
     WHERE status = 'active'
-    GROUP BY campaign_id, reward_tier
-    ORDER BY campaign_id, 
+    GROUP BY lottery_campaign_id, reward_tier
+    ORDER BY lottery_campaign_id, 
       CASE reward_tier 
         WHEN 'high' THEN 1 
         WHEN 'mid' THEN 2 
@@ -118,9 +118,9 @@ async function analyzePrizes() {
   console.log('\n📌 按活动和档位统计奖品:')
   let currentCampaign = null
   for (const stat of tierStats) {
-    if (stat.campaign_id !== currentCampaign) {
-      currentCampaign = stat.campaign_id
-      console.log(`\n  活动 #${stat.campaign_id}:`)
+    if (stat.lottery_campaign_id !== currentCampaign) {
+      currentCampaign = stat.lottery_campaign_id
+      console.log(`\n  活动 #${stat.lottery_campaign_id}:`)
     }
     console.log(`    ${stat.reward_tier.padEnd(10)} | 奖品数: ${String(stat.prize_count).padStart(3)} | 权重总和: ${String(stat.total_weight || 0).padStart(10)} | 价值: ${Math.round(stat.avg_value || 0)}(${stat.min_value || 0}-${stat.max_value || 0})`)
   }
@@ -129,7 +129,7 @@ async function analyzePrizes() {
   const samplePrizes = await runQuery(`
     SELECT 
       prize_id,
-      campaign_id,
+      lottery_campaign_id,
       prize_name,
       prize_type,
       reward_tier,
@@ -139,13 +139,13 @@ async function analyzePrizes() {
       daily_win_count
     FROM lottery_prizes
     WHERE status = 'active'
-    ORDER BY campaign_id, win_weight DESC
+    ORDER BY lottery_campaign_id, win_weight DESC
     LIMIT 20
   `)
 
   console.log('\n📋 奖品配置示例 (前20个):')
   for (const prize of samplePrizes) {
-    console.log(`  [${prize.prize_id}] ${prize.prize_name.substring(0, 15).padEnd(15)} | ${prize.reward_tier.padEnd(8)} | 权重: ${String(prize.win_weight).padStart(8)} | 价值: ${String(prize.prize_value_points || 0).padStart(6)} | 库存: ${prize.stock_quantity ?? '∞'}`)
+    console.log(`  [${prize.lottery_prize_id}] ${prize.prize_name.substring(0, 15).padEnd(15)} | ${prize.reward_tier.padEnd(8)} | 权重: ${String(prize.win_weight).padStart(8)} | 价值: ${String(prize.prize_value_points || 0).padStart(6)} | 库存: ${prize.stock_quantity ?? '∞'}`)
   }
 
   return tierStats
@@ -161,7 +161,7 @@ async function analyzeTierRules() {
 
   const tierRules = await runQuery(`
     SELECT 
-      campaign_id,
+      lottery_campaign_id,
       segment_key,
       tier_name,
       tier_weight,
@@ -169,7 +169,7 @@ async function analyzeTierRules() {
       status
     FROM lottery_tier_rules
     WHERE status = 'active'
-    ORDER BY campaign_id, segment_key, priority DESC
+    ORDER BY lottery_campaign_id, segment_key, priority DESC
   `)
 
   console.log(`\n📌 档位规则总数: ${tierRules.length} 条`)
@@ -177,10 +177,10 @@ async function analyzeTierRules() {
   // 按活动和分群组织
   const grouped = {}
   for (const rule of tierRules) {
-    const key = `${rule.campaign_id}_${rule.segment_key}`
+    const key = `${rule.lottery_campaign_id}_${rule.segment_key}`
     if (!grouped[key]) {
       grouped[key] = {
-        campaign_id: rule.campaign_id,
+        lottery_campaign_id: rule.lottery_campaign_id,
         segment_key: rule.segment_key,
         rules: []
       }
@@ -189,7 +189,7 @@ async function analyzeTierRules() {
   }
 
   for (const [key, group] of Object.entries(grouped)) {
-    console.log(`\n  活动 #${group.campaign_id} - 分群: ${group.segment_key}`)
+    console.log(`\n  活动 #${group.lottery_campaign_id} - 分群: ${group.segment_key}`)
     let totalWeight = 0
     for (const rule of group.rules) {
       totalWeight += rule.tier_weight
@@ -213,7 +213,7 @@ async function analyzePricingConfig() {
   const pricingConfigs = await runQuery(`
     SELECT 
       config_id,
-      campaign_id,
+      lottery_campaign_id,
       version,
       single_draw_cost,
       multi_draw_10_cost,
@@ -223,13 +223,13 @@ async function analyzePricingConfig() {
       created_at
     FROM lottery_campaign_pricing_config
     WHERE status = 'active'
-    ORDER BY campaign_id, version DESC
+    ORDER BY lottery_campaign_id, version DESC
   `)
 
   console.log(`\n📌 定价配置总数: ${pricingConfigs.length} 条`)
 
   for (const config of pricingConfigs) {
-    console.log(`\n  活动 #${config.campaign_id} (版本 ${config.version}):`)
+    console.log(`\n  活动 #${config.lottery_campaign_id} (版本 ${config.version}):`)
     console.log(`    单抽成本: ${config.single_draw_cost} 积分`)
     console.log(`    10连抽成本: ${config.multi_draw_10_cost} 积分`)
     console.log(`    10连抽折扣: ${config.multi_draw_10_discount || 0}%`)
@@ -251,7 +251,7 @@ async function analyzeQuotaRules() {
     SELECT 
       rule_id,
       rule_type,
-      campaign_id,
+      lottery_campaign_id,
       role_name,
       user_id,
       daily_draw_limit,
@@ -280,7 +280,7 @@ async function analyzeQuotaRules() {
     console.log(`\n  规则类型: ${type}`)
     for (const rule of rules.slice(0, 5)) {
       let target = ''
-      if (rule.campaign_id) target = `活动#${rule.campaign_id}`
+      if (rule.lottery_campaign_id) target = `活动#${rule.lottery_campaign_id}`
       if (rule.role_name) target = `角色:${rule.role_name}`
       if (rule.user_id) target = `用户#${rule.user_id}`
       console.log(`    [${rule.rule_id}] ${target || '全局'} | 每日限制: ${rule.daily_draw_limit} 次 | 优先级: ${rule.priority}`)
@@ -383,7 +383,7 @@ async function analyzeDrawRecords() {
     SELECT 
       COUNT(*) as total_draws,
       COUNT(DISTINCT user_id) as unique_users,
-      COUNT(DISTINCT campaign_id) as active_campaigns,
+      COUNT(DISTINCT lottery_campaign_id) as active_campaigns,
       SUM(CASE WHEN guarantee_triggered = 1 THEN 1 ELSE 0 END) as guarantee_count,
       SUM(cost_points) as total_cost,
       SUM(prize_value_points) as total_prize_value
@@ -448,20 +448,20 @@ async function analyzeExperienceStates() {
   // 活动级体验状态统计
   const experienceStats = await runQuery(`
     SELECT 
-      campaign_id,
+      lottery_campaign_id,
       COUNT(*) as user_count,
       AVG(empty_streak_count) as avg_empty_streak,
       MAX(empty_streak_count) as max_empty_streak,
       AVG(recent_high_count) as avg_high_count,
       SUM(pity_triggered_count) as total_pity_triggers
     FROM lottery_user_experience_state
-    GROUP BY campaign_id
+    GROUP BY lottery_campaign_id
     LIMIT 10
   `)
 
   console.log('\n📌 活动级体验状态统计:')
   for (const stat of experienceStats) {
-    console.log(`\n  活动 #${stat.campaign_id}:`)
+    console.log(`\n  活动 #${stat.lottery_campaign_id}:`)
     console.log(`    用户数: ${stat.user_count}`)
     console.log(`    平均空奖连击: ${(stat.avg_empty_streak || 0).toFixed(2)}`)
     console.log(`    最大空奖连击: ${stat.max_empty_streak || 0}`)
@@ -544,7 +544,7 @@ async function analyzeMetrics() {
   // 小时级指标
   const hourlyMetrics = await runQuery(`
     SELECT 
-      campaign_id,
+      lottery_campaign_id,
       DATE(hour_bucket) as metric_date,
       SUM(total_draws) as total_draws,
       SUM(tier_high_count) as high_count,
@@ -556,14 +556,14 @@ async function analyzeMetrics() {
       SUM(anti_high_trigger_count) as anti_high_triggers
     FROM lottery_hourly_metrics
     WHERE hour_bucket >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-    GROUP BY campaign_id, DATE(hour_bucket)
+    GROUP BY lottery_campaign_id, DATE(hour_bucket)
     ORDER BY metric_date DESC
     LIMIT 20
   `)
 
   console.log('\n📌 最近7天监控指标:')
   for (const metric of hourlyMetrics) {
-    console.log(`\n  活动 #${metric.campaign_id} - ${metric.metric_date}:`)
+    console.log(`\n  活动 #${metric.lottery_campaign_id} - ${metric.metric_date}:`)
     console.log(`    总抽奖: ${metric.total_draws} 次`)
     console.log(`    档位分布: high=${metric.high_count}, mid=${metric.mid_count}, low=${metric.low_count}, fallback=${metric.fallback_count}`)
     console.log(`    机制触发: Pity=${metric.pity_triggers}, AntiEmpty=${metric.anti_empty_triggers}, AntiHigh=${metric.anti_high_triggers}`)

@@ -106,7 +106,7 @@ class AntiEmptyStreakHandler {
    * @param {number} context.effective_budget - 用户有效预算
    * @param {Array} context.prizes_by_tier - 按档位分组的奖品
    * @param {number} context.user_id - 用户ID（用于日志）
-   * @param {number} context.campaign_id - 活动ID（用于日志）
+   * @param {number} context.lottery_campaign_id - 活动ID（用于日志）
    * @returns {Object} 处理结果
    *
    * @example
@@ -131,12 +131,12 @@ class AntiEmptyStreakHandler {
       effective_budget = 0,
       prizes_by_tier = {},
       user_id,
-      campaign_id
+      lottery_campaign_id
     } = context
 
     this._log('debug', '开始处理防连续空奖', {
       user_id,
-      campaign_id,
+      lottery_campaign_id,
       empty_streak,
       selected_tier
     })
@@ -158,7 +158,7 @@ class AntiEmptyStreakHandler {
     if (selected_tier && selected_tier !== 'fallback' && selected_tier !== 'empty') {
       this._log('debug', '当前已选中非空奖档位，无需干预', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         selected_tier
       })
       result.result_type = ANTI_EMPTY_RESULT.ALREADY_NON_EMPTY
@@ -172,7 +172,7 @@ class AntiEmptyStreakHandler {
     ) {
       this._log('warn', '⚠️ 用户连续空奖次数较高', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         empty_streak,
         warning_threshold: this.config.warning_threshold,
         remaining_until_force: this.config.force_threshold - empty_streak
@@ -183,7 +183,7 @@ class AntiEmptyStreakHandler {
     if (empty_streak < this.config.force_threshold) {
       this._log('debug', '未达到强制阈值，不干预', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         empty_streak,
         force_threshold: this.config.force_threshold
       })
@@ -193,7 +193,7 @@ class AntiEmptyStreakHandler {
     // 达到强制阈值，尝试强制选择非空奖
     this._log('info', '🛡️ 达到防连续空奖阈值，尝试强制干预', {
       user_id,
-      campaign_id,
+      lottery_campaign_id,
       empty_streak,
       force_threshold: this.config.force_threshold
     })
@@ -214,7 +214,7 @@ class AntiEmptyStreakHandler {
 
       this._log('info', '🎯 强制干预成功', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         original_tier: selected_tier,
         forced_tier,
         empty_streak
@@ -228,7 +228,7 @@ class AntiEmptyStreakHandler {
       if (this.config.graceful_budget_fallback) {
         this._log('warn', '🚨 预算不足，无法强制发放非空奖', {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           empty_streak,
           effective_budget,
           attempted_tiers: result.attempted_tiers
@@ -236,7 +236,7 @@ class AntiEmptyStreakHandler {
       } else {
         this._log('error', '🚨 预算不足导致防连续空奖失败', {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           empty_streak,
           effective_budget
         })

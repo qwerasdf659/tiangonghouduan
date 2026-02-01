@@ -137,7 +137,7 @@ describe('🧮 核心业务逻辑测试', () => {
       }
 
       const campaign = campaignsResponse.data.data[0]
-      const campaign_id = campaign.campaign_id
+      const lottery_campaign_id = campaign.lottery_campaign_id
 
       // 获取今日抽奖记录
       const historyResponse = await tester.make_authenticated_request(
@@ -169,7 +169,7 @@ describe('🧮 核心业务逻辑测试', () => {
         const drawResponse = await tester.make_authenticated_request(
           'POST',
           '/api/v4/lottery/draw',
-          { campaign_id, draw_type: 'single' },
+          { lottery_campaign_id, draw_type: 'single' },
           'regular'
         )
 
@@ -256,7 +256,7 @@ describe('🧮 核心业务逻辑测试', () => {
       const drawResponse = await tester.make_authenticated_request(
         'POST',
         '/api/v4/lottery/draw',
-        { campaign_id: campaign.campaign_id, draw_type: 'single' },
+        { lottery_campaign_id: campaign.lottery_campaign_id, draw_type: 'single' },
         'regular'
       )
 
@@ -288,13 +288,13 @@ describe('🧮 核心业务逻辑测试', () => {
         if (historyResponse.status === 200 && historyResponse.data.data.length > 0) {
           const latestRecord = historyResponse.data.data[0]
           expect(latestRecord).toBeDefined()
-          expect(latestRecord.campaign_id).toBe(campaign.campaign_id)
+          expect(latestRecord.lottery_campaign_id).toBe(campaign.lottery_campaign_id)
           console.log('📝 抽奖记录验证通过')
         }
 
         // 如果中奖，验证奖品发放
-        if (drawResponse.data.data?.prize_id) {
-          const prize_id = drawResponse.data.data.prize_id
+        if (drawResponse.data.data?.lottery_prize_id) {
+          const prize_id = drawResponse.data.data.lottery_prize_id
           console.log(`🎁 中奖奖品ID: ${prize_id}`)
 
           // 验证用户库存增加
@@ -322,7 +322,7 @@ describe('🧮 核心业务逻辑测试', () => {
         /**
          * ✅ 修复：使用正确的抽奖API
          * - 路由: POST /api/v4/lottery/draw（不是 /execute）
-         * - 参数: campaign_code + draw_count（不是 campaign_id + strategy）
+         * - 参数: campaign_code + draw_count（不是 lottery_campaign_id + strategy）
          * - 2025-12-22 更新
          */
         const drawResponse = await tester.make_authenticated_request(
@@ -387,7 +387,7 @@ describe('🧮 核心业务逻辑测试', () => {
 
           for (const record of records) {
             // ✅ V4.0业务规则：每次抽奖必有奖品（100%中奖）
-            expect(record.prize_id || record.prize).toBeDefined()
+            expect(record.lottery_prize_id || record.prize).toBeDefined()
             expect(record.prize_name || record.prize?.name).toBeDefined()
             console.log(`✅ 奖品记录验证通过: ${record.prize_name || record.prize?.name}`)
 
@@ -552,7 +552,7 @@ describe('🧮 核心业务逻辑测试', () => {
       }
 
       // 快速连续发送两个抽奖请求
-      const drawData = { campaign_id: campaign.campaign_id, draw_type: 'single' }
+      const drawData = { lottery_campaign_id: campaign.lottery_campaign_id, draw_type: 'single' }
 
       const [response1, response2] = await Promise.all([
         tester.make_authenticated_request('POST', '/api/v4/lottery/draw', drawData, 'regular'),
@@ -574,7 +574,7 @@ describe('🧮 核心业务逻辑测试', () => {
 
       /**
        * API参数规范：POST /api/v4/lottery/draw
-       * - campaign_id: number - 活动ID（必填）
+       * - lottery_campaign_id: number - 活动ID（必填）
        * - draws_count: number - 抽奖次数（必填，正整数）
        * - idempotency_key: string - 幂等键（必填）
        *
@@ -582,7 +582,7 @@ describe('🧮 核心业务逻辑测试', () => {
        * 注：原 /api/v4/shop/points/admin/adjust 已迁移到 BalanceService
        */
       const invalidData = {
-        campaign_id: -1, // 无效的活动ID
+        lottery_campaign_id: -1, // 无效的活动ID
         draws_count: -999, // 无效的抽奖次数
         idempotency_key: `invalid_test_${Date.now()}`
       }

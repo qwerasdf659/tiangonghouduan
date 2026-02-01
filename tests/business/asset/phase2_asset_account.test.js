@@ -826,7 +826,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
             business_type: 'lottery_consume',
             lottery_session_id: 'test_session_3.5.1',
             meta: {
-              campaign_id: 1,
+              lottery_campaign_id: 1,
               store_id: 1,
               reason: '3.5.1 交易记录完整性测试'
             }
@@ -886,7 +886,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
             business_type: 'lottery_reward',
             lottery_session_id: 'test_session_3.5.2',
             meta: {
-              prize_id: 999,
+              lottery_prize_id: 999,
               prize_name: '测试钻石奖励',
               reason: '3.5.2 奖励交易记录测试'
             }

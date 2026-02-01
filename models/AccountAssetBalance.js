@@ -37,7 +37,7 @@ module.exports = sequelize => {
     'AccountAssetBalance',
     {
       // ==================== 主键 ====================
-      balance_id: {
+      account_asset_balance_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
@@ -164,7 +164,7 @@ module.exports = sequelize => {
 
     if (created) {
       console.log(
-        `✅ 创建资产余额记录：account_id=${account_id}, asset_code=${asset_code}, balance_id=${balance.balance_id}`
+        `✅ 创建资产余额记录：account_id=${account_id}, asset_code=${asset_code}, balance_id=${balance.account_asset_balance_id}`
       )
     }
 

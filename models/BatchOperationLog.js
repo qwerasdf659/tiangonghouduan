@@ -330,7 +330,7 @@ BatchOperationLog.initModel = sequelize => {
   BatchOperationLog.init(
     {
       // ==================== 主键 ====================
-      batch_log_id: {
+      batch_operation_log_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,

@@ -303,8 +303,8 @@ class ConsumptionRecord extends Model {
   toAPIResponse() {
     // 基础响应数据
     const response = {
-      id: parseInt(this.record_id), // 通用id字段（数据脱敏）
-      record_id: parseInt(this.record_id), // 保留业务字段（确保返回数字类型）
+      id: parseInt(this.consumption_record_id), // 通用id字段（数据脱敏）
+      record_id: parseInt(this.consumption_record_id), // 保留业务字段（确保返回数字类型）
       user_id: this.user_id,
       merchant_id: this.merchant_id,
       store_id: this.store_id, // 门店ID（商家员工域权限体系升级 - 2026-01-12）
@@ -361,7 +361,7 @@ class ConsumptionRecord extends Model {
    */
   toSimpleAPIResponse() {
     return {
-      id: this.record_id,
+      id: this.consumption_record_id,
       consumption_amount: parseFloat(this.consumption_amount),
       points_to_award: this.points_to_award,
       status: this.status,
@@ -385,7 +385,7 @@ module.exports = sequelize => {
        * 主键
        * ========================================
        */
-      record_id: {
+      consumption_record_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,

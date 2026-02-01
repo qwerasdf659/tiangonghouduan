@@ -586,7 +586,7 @@ class AssetConversionService {
       where: whereCondition,
       order: [
         ['effective_at', 'DESC'],
-        ['rule_id', 'DESC']
+        ['material_conversion_rule_id', 'DESC']
       ],
       transaction,
       raw: true

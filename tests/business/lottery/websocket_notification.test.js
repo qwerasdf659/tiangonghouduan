@@ -194,7 +194,7 @@ describe('WebSocket实时通知测试（阶段六：P3）', () => {
 
       if (testCampaign) {
         await expect(
-          ActivityService.updateCampaignStatus(testCampaign.campaign_id, 'active', {})
+          ActivityService.updateCampaignStatus(testCampaign.lottery_campaign_id, 'active', {})
         ).rejects.toThrow(/状态变更不允许/)
         console.log('✅ 无效状态转换被正确拒绝')
       } else {

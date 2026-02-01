@@ -134,9 +134,9 @@ describe('ExchangeService - 兑换市场服务测试', () => {
     created_records.length = 0
 
     // 清理商品记录
-    for (const item_id of created_items) {
+    for (const exchange_item_id of created_items) {
       try {
-        await ExchangeItem.destroy({ where: { item_id }, force: true })
+        await ExchangeItem.destroy({ where: { exchange_item_id }, force: true })
       } catch (error) {
         // 忽略清理错误
       }
@@ -236,15 +236,15 @@ describe('ExchangeService - 兑换市场服务测试', () => {
         return
       }
 
-      const item_id = listResult.items[0].item_id
+      const exchange_item_id = listResult.items[0].exchange_item_id
 
       // 执行：获取商品详情
-      const result = await ExchangeService.getItemDetail(item_id)
+      const result = await ExchangeService.getItemDetail(exchange_item_id)
 
       // 验证：详情包含必要字段
       expect(result.success).toBe(true)
       expect(result.item).toBeDefined()
-      expect(result.item.item_id).toBe(item_id)
+      expect(result.item.exchange_item_id).toBe(exchange_item_id)
       expect(result.item.cost_asset_code).toBeDefined()
       expect(result.item.cost_amount).toBeDefined()
       expect(result.item.stock).toBeDefined()
@@ -320,14 +320,14 @@ describe('ExchangeService - 兑换市场服务测试', () => {
         // 验证：商品创建成功
         expect(result.success).toBe(true)
         expect(result.item).toBeDefined()
-        expect(result.item.item_id).toBeDefined()
+        expect(result.item.exchange_item_id).toBeDefined()
         expect(result.item.item_name).toContain('测试商品') // 🔧 2026-01-29 修复：与数据库模型字段名一致
         expect(result.item.cost_asset_code).toBe('red_shard')
         expect(result.item.cost_amount).toBe(10)
         expect(result.item.stock).toBe(100)
 
         // 记录用于清理
-        created_items.push(result.item.item_id)
+        created_items.push(result.item.exchange_item_id)
       })
 
       it('创建商品时缺少必填字段应该报错', async () => {
@@ -387,7 +387,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
             test_user_id,
             { transaction }
           )
-          test_item_id = result.item.item_id
+          test_item_id = result.item.exchange_item_id
           created_items.push(test_item_id)
         })
 
@@ -438,7 +438,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
             test_user_id,
             { transaction }
           )
-          test_item_id = result.item.item_id
+          test_item_id = result.item.exchange_item_id
         })
 
         // 执行：删除商品

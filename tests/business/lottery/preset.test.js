@@ -199,7 +199,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       // 清理测试创建的预设
       if (created_preset_ids.length > 0) {
         await models.LotteryPreset.destroy({
-          where: { preset_id: created_preset_ids },
+          where: { lottery_preset_id: created_preset_ids },
           force: true
         })
         console.log(`🧹 清理 ${created_preset_ids.length} 个测试预设`)
@@ -211,7 +211,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       // 先获取一个可用的奖品ID
       const prize = await models.LotteryPrize.findOne({
         where: { status: 'active' },
-        attributes: ['prize_id']
+        attributes: ['lottery_prize_id']
       })
 
       if (!prize) {
@@ -221,7 +221,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
 
       const create_data = {
         user_id: test_user_id,
-        presets: [{ prize_id: prize.prize_id, queue_order: 1 }]
+        presets: [{ lottery_prize_id: prize.lottery_prize_id, queue_order: 1 }]
       }
 
       const response = await tester.make_authenticated_request(
@@ -239,9 +239,9 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       expect(response.data.data.created_presets.length).toBe(1)
 
       // 保存预设ID用于清理
-      created_preset_ids = response.data.data.created_presets.map(p => p.preset_id)
+      created_preset_ids = response.data.data.created_presets.map(p => p.lottery_preset_id)
 
-      console.log('✅ 创建预设成功:', response.data.data.created_presets[0].preset_id)
+      console.log('✅ 创建预设成功:', response.data.data.created_presets[0].lottery_preset_id)
     })
 
     test('✅ 应该成功创建多个预设（队列）', async () => {
@@ -249,7 +249,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       const prizes = await models.LotteryPrize.findAll({
         where: { status: 'active' },
         limit: 3,
-        attributes: ['prize_id']
+        attributes: ['lottery_prize_id']
       })
 
       if (prizes.length < 2) {
@@ -260,7 +260,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       const create_data = {
         user_id: test_user_id,
         presets: prizes.map((prize, index) => ({
-          prize_id: prize.prize_id,
+          lottery_prize_id: prize.lottery_prize_id,
           queue_order: index + 1
         }))
       }
@@ -282,7 +282,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
         expect(preset.queue_order).toBe(index + 1)
       })
 
-      created_preset_ids = response.data.data.created_presets.map(p => p.preset_id)
+      created_preset_ids = response.data.data.created_presets.map(p => p.lottery_preset_id)
 
       console.log(`✅ 创建${prizes.length}个预设成功，队列顺序: 1-${prizes.length}`)
     })
@@ -319,7 +319,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
           '/api/v4/lottery/preset/create',
           {
             user_id: test_user_id,
-            presets: [{ prize_id: prize.prize_id, queue_order: 1 }]
+            presets: [{ lottery_prize_id: prize.lottery_prize_id, queue_order: 1 }]
           },
           'regular'
         )
@@ -346,8 +346,8 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       const create_data = {
         user_id: test_user_id,
         presets: [
-          { prize_id: prize.prize_id, queue_order: 1 },
-          { prize_id: prize.prize_id, queue_order: 1 } // 重复的queue_order
+          { lottery_prize_id: prize.lottery_prize_id, queue_order: 1 },
+          { lottery_prize_id: prize.lottery_prize_id, queue_order: 1 } // 重复的queue_order
         ]
       }
 
@@ -380,7 +380,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       // 创建超过20条的预设
       const presets = []
       for (let i = 1; i <= 21; i++) {
-        presets.push({ prize_id: prize.prize_id, queue_order: i })
+        presets.push({ lottery_prize_id: prize.lottery_prize_id, queue_order: i })
       }
 
       const create_data = {
@@ -418,7 +418,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       // 测试queue_order为0
       const create_data_zero = {
         user_id: test_user_id,
-        presets: [{ prize_id: prize.prize_id, queue_order: 0 }]
+        presets: [{ lottery_prize_id: prize.lottery_prize_id, queue_order: 0 }]
       }
 
       const response_zero = await tester.make_authenticated_request(
@@ -436,7 +436,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       // 测试queue_order为负数
       const create_data_negative = {
         user_id: test_user_id,
-        presets: [{ prize_id: prize.prize_id, queue_order: -1 }]
+        presets: [{ lottery_prize_id: prize.lottery_prize_id, queue_order: -1 }]
       }
 
       const response_negative = await tester.make_authenticated_request(
@@ -504,8 +504,8 @@ describe('抽奖预设系统API测试（V4架构）', () => {
 
       if (presets.length > 0) {
         const preset = presets[0]
-        expect(preset).toHaveProperty('preset_id')
-        expect(preset).toHaveProperty('prize_id')
+        expect(preset).toHaveProperty('lottery_preset_id')
+        expect(preset).toHaveProperty('lottery_prize_id')
         expect(preset).toHaveProperty('queue_order')
         expect(preset).toHaveProperty('status')
         expect(preset).toHaveProperty('prize') // 关联的奖品信息
@@ -566,12 +566,12 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       if (prize) {
         const preset = await models.LotteryPreset.create({
           user_id: temp_user_id,
-          prize_id: prize.prize_id,
+          lottery_prize_id: prize.lottery_prize_id,
           queue_order: 1,
           status: 'pending',
           created_by: test_user_id
         })
-        temp_preset_ids.push(preset.preset_id)
+        temp_preset_ids.push(preset.lottery_preset_id)
       }
     })
 
@@ -579,7 +579,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       // 清理临时数据
       if (temp_preset_ids.length > 0) {
         await models.LotteryPreset.destroy({
-          where: { preset_id: temp_preset_ids },
+          where: { lottery_preset_id: temp_preset_ids },
           force: true
         })
       }
@@ -680,7 +680,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
   describe('业务逻辑验证', () => {
     test('✅ 预设状态应符合业务规则（pending/used）', async () => {
       const presets = await models.LotteryPreset.findAll({
-        attributes: ['preset_id', 'status'],
+        attributes: ['lottery_preset_id', 'status'],
         limit: 100
       })
 
@@ -704,14 +704,14 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       presets.forEach(preset => {
         // 验证外键存在
         expect(preset.user_id).toBeDefined()
-        expect(preset.prize_id).toBeDefined()
+        expect(preset.lottery_prize_id).toBeDefined()
 
         // 验证关联数据加载成功
         if (preset.targetUser) {
           expect(preset.targetUser.user_id).toBe(preset.user_id)
         }
         if (preset.prize) {
-          expect(preset.prize.prize_id).toBe(preset.prize_id)
+          expect(preset.prize.lottery_prize_id).toBe(preset.lottery_prize_id)
         }
       })
 

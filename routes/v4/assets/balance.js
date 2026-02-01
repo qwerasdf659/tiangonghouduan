@@ -56,6 +56,16 @@ router.get(
 
     const balance = await BalanceService.getBalance({ user_id, asset_code })
 
+    // 处理不存在的资产类型：返回0余额（用户从未持有该资产）
+    if (!balance) {
+      return res.apiSuccess({
+        asset_code,
+        available_amount: 0,
+        frozen_amount: 0,
+        total_amount: 0
+      })
+    }
+
     // 返回字段命名与 BalanceService.getBalance() 保持一致（全链路统一）
     return res.apiSuccess({
       asset_code,

@@ -95,7 +95,7 @@ module.exports = (sequelize, _DataTypes) => {
   LotteryClearSettingRecord.init(
     {
       // 清除记录ID（主键，作为审计日志的 target_id）
-      record_id: {
+      lottery_clear_setting_record_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,

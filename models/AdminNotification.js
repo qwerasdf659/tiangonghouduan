@@ -48,7 +48,7 @@ module.exports = sequelize => {
        * @type {number}
        * 命名规范：{table_name}_id
        */
-      notification_id: {
+      admin_notification_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
@@ -330,7 +330,7 @@ module.exports = sequelize => {
     const where = { admin_id: adminId, is_read: false }
 
     if (notificationIds && notificationIds.length > 0) {
-      where.notification_id = { [Op.in]: notificationIds }
+      where.admin_notification_id = { [Op.in]: notificationIds }
     }
 
     const [affectedCount] = await this.update(

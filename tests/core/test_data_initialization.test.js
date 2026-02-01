@@ -7,7 +7,7 @@
  * **技术规范**：
  *   - 测试数据通过数据库查询获取，而非硬编码
  *   - 测试用户通过 mobile 查询真实 user_id
- *   - 测试活动通过 status='active' 查询真实 campaign_id
+ *   - 测试活动通过 status='active' 查询真实 lottery_campaign_id
  *
  * 创建时间：2026-01-09
  * 版本：V4.0.0
@@ -28,7 +28,7 @@ describe('测试数据初始化功能 (P0-1)', () => {
     TestConfig.realData._initialized = false
     TestConfig.realData.testUser.user_id = null
     TestConfig.realData.adminUser.user_id = null
-    TestConfig.realData.testCampaign.campaign_id = null
+    TestConfig.realData.testCampaign.lottery_campaign_id = null
     TestConfig.realData.testCampaign.campaignName = null
   })
 
@@ -54,9 +54,9 @@ describe('测试数据初始化功能 (P0-1)', () => {
       expect(result.testCampaign).toBeDefined()
 
       // 如果找到了活跃活动，验证数据格式
-      if (result.testCampaign.campaign_id !== null) {
-        expect(typeof result.testCampaign.campaign_id).toBe('number')
-        expect(result.testCampaign.campaign_id).toBeGreaterThan(0)
+      if (result.testCampaign.lottery_campaign_id !== null) {
+        expect(typeof result.testCampaign.lottery_campaign_id).toBe('number')
+        expect(result.testCampaign.lottery_campaign_id).toBeGreaterThan(0)
         expect(typeof result.testCampaign.campaignName).toBe('string')
         expect(result.testCampaign.campaignName.length).toBeGreaterThan(0)
       }
@@ -176,7 +176,7 @@ describe('测试数据初始化功能 (P0-1)', () => {
       // 验证初始状态没有硬编码值
       expect(TestConfig.realData.testUser.user_id).toBeNull()
       expect(TestConfig.realData.adminUser.user_id).toBeNull()
-      expect(TestConfig.realData.testCampaign.campaign_id).toBeNull()
+      expect(TestConfig.realData.testCampaign.lottery_campaign_id).toBeNull()
     })
 
     test('只有 mobile 是预设的查询key', () => {

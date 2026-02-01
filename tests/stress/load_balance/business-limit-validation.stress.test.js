@@ -310,7 +310,7 @@ describe('【P1-1.4】业务限制边界测试', () => {
             // 超出限制，回滚计数
             await redisClient.decr(testKey)
             return {
-              draw_id: drawId,
+              lottery_draw_id: drawId,
               success: false,
               reason: 'exceeded_limit',
               count_at_attempt: currentCount
@@ -318,7 +318,7 @@ describe('【P1-1.4】业务限制边界测试', () => {
           }
 
           return {
-            draw_id: drawId,
+            lottery_draw_id: drawId,
             success: true,
             count_at_attempt: currentCount
           }

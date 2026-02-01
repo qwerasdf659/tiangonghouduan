@@ -163,7 +163,7 @@ describe('MarketListingService - 撤回挂牌时买家订单处理', () => {
         const result = await TradeOrderService.createOrder(
           {
             idempotency_key: `withdraw_test_order_${Date.now()}`,
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             buyer_id: test_buyer.user_id
           },
           { transaction: order_tx }
@@ -198,7 +198,7 @@ describe('MarketListingService - 撤回挂牌时买家订单处理', () => {
       try {
         withdraw_result = await MarketListingService.withdrawFungibleAssetListing(
           {
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             seller_user_id: test_seller.user_id
           },
           { transaction: withdraw_tx }
@@ -288,7 +288,7 @@ describe('MarketListingService - 撤回挂牌时买家订单处理', () => {
       try {
         withdraw_result = await MarketListingService.withdrawFungibleAssetListing(
           {
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             seller_user_id: test_seller.user_id
           },
           { transaction: withdraw_tx }

@@ -156,12 +156,12 @@ async function testGetActivities() {
       if (activities.length > 0) {
         log('\n活动列表:', 'cyan')
         activities.slice(0, 5).forEach(act => {
-          log(`  - ID: ${act.activity_id || act.campaign_id}, 名称: ${act.name}`, 'reset')
+          log(`  - ID: ${act.lottery_campaign_id || act.activity_id}, 名称: ${act.campaign_name || act.name}`, 'reset')
         })
       }
 
       // 返回第一个活动ID供后续测试使用
-      return activities[0]?.activity_id || activities[0]?.campaign_id || null
+      return activities[0]?.lottery_campaign_id || activities[0]?.activity_id || null
     } else {
       log(`错误信息: ${res.data?.message || '未知错误'}`, 'red')
       return null
@@ -370,7 +370,7 @@ function generateFieldMappingReport() {
     `
   {
     rule_type: string,      // 规则类型（必填）：global/campaign/role/user
-    campaign_id: number,    // 活动ID（campaign类型必填）
+    lottery_campaign_id: number,    // 活动ID（campaign类型必填）
     role_uuid: string,      // 角色UUID（role类型必填）
     target_user_id: number, // 用户ID（user类型必填）
     limit_value: number,    // 每日上限（必填）
@@ -389,7 +389,7 @@ function generateFieldMappingReport() {
   2. 规则ID：使用 rule_id 而不是 id
   3. 创建规则：发送 rule_type 参数
   4. 状态显示：status = 'active' 或 'inactive'
-  5. 活动列表：使用 activity_id 或 campaign_id
+  5. 活动列表：使用 activity_id 或 lottery_campaign_id
 `,
     'reset'
   )

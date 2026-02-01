@@ -96,7 +96,7 @@ class ManagementStrategy {
    * @returns {boolean} return.success - 操作是否成功
    * @returns {string} return.setting_id - 设置记录ID
    * @returns {string} return.result - 操作结果标识（'force_win'）
-   * @returns {number} return.prize_id - 奖品ID
+   * @returns {number} return.lottery_prize_id - 奖品ID
    * @returns {number} return.user_id - 目标用户ID
    * @returns {number} return.admin_id - 管理员ID
    * @returns {string} return.reason - 操作原因
@@ -108,7 +108,7 @@ class ManagementStrategy {
    * @example
    * const strategy = new ManagementStrategy()
    * const result = await strategy.forceWin(10001, 20001, 30001, '测试补偿')
-   * // 返回：{ success: true, setting_id: 'setting_...', result: 'force_win', prize_id: 30001, user_id: 20001, admin_id: 10001, reason: '测试补偿', timestamp: '2025-11-08 12:00:00' }
+   * // 返回：{ success: true, setting_id: 'setting_...', result: 'force_win', lottery_prize_id: 30001, user_id: 20001, admin_id: 10001, reason: '测试补偿', timestamp: '2025-11-08 12:00:00' }
    */
   async forceWin(adminId, targetUserId, prizeId, reason = '管理员操作', expiresAt = null) {
     try {
@@ -137,7 +137,7 @@ class ManagementStrategy {
         user_id: targetUserId,
         setting_type: 'force_win',
         setting_data: {
-          prize_id: prizeId,
+          lottery_prize_id: prizeId,
           prize_name: prizeName, // 保存奖品名称用于显示
           reason
         },
@@ -167,7 +167,7 @@ class ManagementStrategy {
         success: true,
         setting_id: setting.setting_id,
         result: 'force_win',
-        prize_id: prizeId,
+        lottery_prize_id: prizeId,
         user_id: targetUserId,
         admin_id: adminId,
         reason,
@@ -1050,7 +1050,7 @@ class ManagementStrategy {
    * @param {number} adminId - 管理员用户ID（执行操作的管理员）
    * @param {Array<Object>} operations - 操作列表
    * @param {number} operations[].user_id - 目标用户ID
-   * @param {number} operations[].prize_id - 奖品ID
+   * @param {number} operations[].lottery_prize_id - 奖品ID
    * @param {string} [operations[].reason='批量操作'] - 操作原因（可选）
    * @returns {Promise<Object>} 批量操作结果对象
    * @returns {Array} return.success - 成功的操作列表
@@ -1064,8 +1064,8 @@ class ManagementStrategy {
    * @example
    * const strategy = new ManagementStrategy()
    * const result = await strategy.batchForceWin(10001, [
-   *   { user_id: 20001, prize_id: 30001, reason: '补偿1' },
-   *   { user_id: 20002, prize_id: 30002, reason: '补偿2' }
+   *   { user_id: 20001, lottery_prize_id: 30001, reason: '补偿1' },
+   *   { user_id: 20002, lottery_prize_id: 30002, reason: '补偿2' }
    * ])
    * // 返回：{ success: [{...}, {...}], failed: [], total: 2, success_count: 2, failed_count: 0 }
    */
@@ -1092,7 +1092,7 @@ class ManagementStrategy {
           const result = await this.forceWin(
             adminId,
             operation.user_id,
-            operation.prize_id,
+            operation.lottery_prize_id,
             operation.reason || '批量操作'
           )
           results.success.push(result)
@@ -1100,7 +1100,7 @@ class ManagementStrategy {
         } catch (error) {
           results.failed.push({
             user_id: operation.user_id,
-            prize_id: operation.prize_id,
+            lottery_prize_id: operation.lottery_prize_id,
             error: error.message
           })
           results.failed_count++

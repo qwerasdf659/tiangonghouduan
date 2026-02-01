@@ -53,7 +53,7 @@ module.exports = sequelize => {
     'ContentReviewRecord',
     {
       // 主键
-      audit_id: {
+      content_review_record_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,

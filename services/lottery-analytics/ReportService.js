@@ -46,7 +46,7 @@ class ReportService {
    * @returns {Promise<Object>} 运营日报数据
    */
   async generateDailyReport(reportDate, campaignId = null) {
-    this.logger.info('生成运营日报', { report_date: reportDate, campaign_id: campaignId })
+    this.logger.info('生成运营日报', { report_date: reportDate, lottery_campaign_id: campaignId })
 
     try {
       // 1. 解析报告日期（北京时间）
@@ -104,7 +104,7 @@ class ReportService {
 
       this.logger.info('生成运营日报成功', {
         report_date: displayDate,
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         total_draws: summary.total_draws,
         alerts_count: alerts.length
       })
@@ -113,7 +113,7 @@ class ReportService {
     } catch (error) {
       this.logger.error('生成运营日报失败', {
         report_date: reportDate,
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         error: error.message
       })
       throw error
@@ -183,7 +183,7 @@ class ReportService {
     const whereClause = {
       created_at: { [Op.between]: [startTime, endTime] }
     }
-    if (campaignId) whereClause.campaign_id = campaignId
+    if (campaignId) whereClause.lottery_campaign_id = campaignId
 
     // 查询抽奖记录
     const draws = await this.models.LotteryDraw.findAll({
@@ -196,7 +196,7 @@ class ReportService {
           required: false
         }
       ],
-      attributes: ['draw_id', 'user_id', 'cost_points', 'prize_id', 'reward_tier'],
+      attributes: ['lottery_draw_id', 'user_id', 'cost_points', 'lottery_prize_id', 'reward_tier'],
       raw: false,
       nest: true
     })
@@ -209,7 +209,7 @@ class ReportService {
     // 计算成本和收入
     let totalCost = 0
     draws.forEach(d => {
-      if (d.prize_id && d.prize?.cost_points) {
+      if (d.lottery_prize_id && d.prize?.cost_points) {
         totalCost += parseFloat(d.prize.cost_points)
       }
     })
@@ -293,12 +293,12 @@ class ReportService {
     const whereClause = {
       created_at: { [Op.between]: [startTime, endTime] }
     }
-    if (campaignId) whereClause.campaign_id = campaignId
+    if (campaignId) whereClause.lottery_campaign_id = campaignId
 
     const hourlyData = await this.models.LotteryDraw.findAll({
       attributes: [
         [literal("HOUR(CONVERT_TZ(created_at, '+00:00', '+08:00'))"), 'hour'],
-        [fn('COUNT', col('draw_id')), 'draws'],
+        [fn('COUNT', col('lottery_draw_id')), 'draws'],
         [
           fn('SUM', literal("CASE WHEN reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END")),
           'wins'
@@ -345,12 +345,12 @@ class ReportService {
     const whereClause = {
       created_at: { [Op.between]: [startTime, endTime] }
     }
-    if (campaignId) whereClause.campaign_id = campaignId
+    if (campaignId) whereClause.lottery_campaign_id = campaignId
 
     const tierData = await this.models.LotteryDraw.findAll({
       attributes: [
         'reward_tier',
-        [fn('COUNT', col('draw_id')), 'count'],
+        [fn('COUNT', col('lottery_draw_id')), 'count'],
         [fn('SUM', col('cost_points')), 'cost']
       ],
       where: whereClause,
@@ -376,13 +376,13 @@ class ReportService {
   async _getDailyReportTopPrizes(startTime, endTime, limit = 10) {
     const prizeData = await this.models.LotteryDraw.findAll({
       attributes: [
-        'prize_id',
-        [fn('COUNT', col('draw_id')), 'win_count'],
+        'lottery_prize_id',
+        [fn('COUNT', col('lottery_draw_id')), 'win_count'],
         [fn('SUM', col('prize_value_points')), 'total_value']
       ],
       where: {
         created_at: { [Op.between]: [startTime, endTime] },
-        prize_id: { [Op.ne]: null }
+        lottery_prize_id: { [Op.ne]: null }
       },
       include: [
         {
@@ -391,14 +391,14 @@ class ReportService {
           attributes: ['prize_name', 'reward_tier', 'cost_points']
         }
       ],
-      group: ['prize_id'],
+      group: ['lottery_prize_id'],
       order: [[literal('win_count'), 'DESC']],
       limit,
       raw: false
     })
 
     return prizeData.map(p => ({
-      prize_id: p.prize_id,
+      lottery_prize_id: p.lottery_prize_id,
       prize_name: p.prize?.prize_name || '未知奖品',
       reward_tier: p.prize?.reward_tier || 'unknown',
       win_count: parseInt(p.dataValues.win_count || 0),
@@ -417,8 +417,8 @@ class ReportService {
   async _getDailyReportCampaignsBreakdown(startTime, endTime) {
     const campaignData = await this.models.LotteryDraw.findAll({
       attributes: [
-        'campaign_id',
-        [fn('COUNT', col('draw_id')), 'draws'],
+        'lottery_campaign_id',
+        [fn('COUNT', col('lottery_draw_id')), 'draws'],
         [fn('COUNT', fn('DISTINCT', col('user_id'))), 'users'],
         [
           fn('SUM', literal("CASE WHEN reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END")),
@@ -435,13 +435,13 @@ class ReportService {
           attributes: ['campaign_name', 'status']
         }
       ],
-      group: ['campaign_id'],
+      group: ['lottery_campaign_id'],
       order: [[literal('draws'), 'DESC']],
       raw: false
     })
 
     return campaignData.map(c => ({
-      campaign_id: c.campaign_id,
+      lottery_campaign_id: c.lottery_campaign_id,
       campaign_name: c.campaign?.campaign_name || '未知活动',
       status: c.campaign?.status || 'unknown',
       draws: parseInt(c.dataValues.draws || 0),
@@ -522,11 +522,11 @@ class ReportService {
    */
   async _checkLowStockPrizes(campaignId) {
     const whereClause = { status: 'active' }
-    if (campaignId) whereClause.campaign_id = campaignId
+    if (campaignId) whereClause.lottery_campaign_id = campaignId
 
     const prizes = await this.models.LotteryPrize.findAll({
       where: whereClause,
-      attributes: ['prize_id', 'prize_name', 'stock_quantity', 'total_win_count']
+      attributes: ['lottery_prize_id', 'prize_name', 'stock_quantity', 'total_win_count']
     })
 
     const lowStockPrizes = []
@@ -534,7 +534,7 @@ class ReportService {
       const remaining = (prize.stock_quantity || 0) - (prize.total_win_count || 0)
       if (remaining < 10) {
         lowStockPrizes.push({
-          prize_id: prize.prize_id,
+          lottery_prize_id: prize.lottery_prize_id,
           prize_name: prize.prize_name,
           remaining
         })
@@ -551,22 +551,22 @@ class ReportService {
    * - 总收入：用户消耗的积分总额（lottery_draws.cost_points）
    * - 总成本：发放的奖品成本总额（lottery_prizes.cost_points）
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} options - 查询选项
    * @param {string} [options.start_time] - 开始时间（ISO8601）
    * @param {string} [options.end_time] - 结束时间（ISO8601）
    * @returns {Promise<Object>} 活动 ROI 聚合数据
    */
-  async getCampaignROI(campaign_id, options = {}) {
+  async getCampaignROI(lottery_campaign_id, options = {}) {
     const { start_time, end_time } = options
 
-    this.logger.info('获取活动ROI数据', { campaign_id, start_time, end_time })
+    this.logger.info('获取活动ROI数据', { lottery_campaign_id, start_time, end_time })
 
     try {
       // 获取活动信息
-      const campaign = await this.models.LotteryCampaign.findByPk(campaign_id, {
+      const campaign = await this.models.LotteryCampaign.findByPk(lottery_campaign_id, {
         attributes: [
-          'campaign_id',
+          'lottery_campaign_id',
           'campaign_name',
           'status',
           'start_time',
@@ -580,7 +580,7 @@ class ReportService {
       }
 
       // 构建查询条件
-      const whereClause = { campaign_id }
+      const whereClause = { lottery_campaign_id }
       if (start_time || end_time) {
         whereClause.created_at = {}
         if (start_time) {
@@ -599,7 +599,7 @@ class ReportService {
             model: this.models.LotteryPrize,
             as: 'prize',
             attributes: [
-              'prize_id',
+              'lottery_prize_id',
               'prize_name',
               'cost_points',
               'prize_value_points',
@@ -618,7 +618,7 @@ class ReportService {
         const tier = d.reward_tier || 'fallback'
         const costValue = d.prize?.cost_points || 0
 
-        if (d.prize_id && costValue > 0) {
+        if (d.lottery_prize_id && costValue > 0) {
           totalCost += costValue
 
           if (Object.prototype.hasOwnProperty.call(tierCostBreakdown, tier)) {
@@ -647,7 +647,7 @@ class ReportService {
 
       // 组装响应数据
       const roiData = {
-        campaign_id,
+        lottery_campaign_id,
         campaign_name: campaign.campaign_name,
         time_range: {
           start_time: start_time || campaign.start_time,
@@ -666,7 +666,7 @@ class ReportService {
       }
 
       this.logger.info('获取活动ROI数据成功', {
-        campaign_id,
+        lottery_campaign_id,
         roi: roiData.roi,
         unique_users: uniqueUsers,
         total_draws: draws.length
@@ -674,7 +674,7 @@ class ReportService {
 
       return roiData
     } catch (error) {
-      this.logger.error('获取活动ROI数据失败', { campaign_id, error: error.message })
+      this.logger.error('获取活动ROI数据失败', { lottery_campaign_id, error: error.message })
       throw error
     }
   }

@@ -169,7 +169,7 @@ describe('P3-6e: HourlyLotteryMetricsAggregation - 每小时抽奖指标聚合�
       console.log(`[P3-6e] 最近小时指标记录数: ${recentMetrics.length}`)
 
       for (const metrics of recentMetrics) {
-        expect(metrics.campaign_id).toBeDefined()
+        expect(metrics.lottery_campaign_id).toBeDefined()
         expect(metrics.hour_bucket).toBeDefined()
         expect(metrics.total_draws).toBeDefined()
       }
@@ -292,7 +292,7 @@ describe('P3-6e: HourlyLotteryMetricsAggregation - 每小时抽奖指标聚合�
 
       // 验证必要字段（字段名是 metric_id 不是 metrics_id）
       expect(hourlyMetrics.metric_id).toBeDefined()
-      expect(hourlyMetrics.campaign_id).toBeDefined()
+      expect(hourlyMetrics.lottery_campaign_id).toBeDefined()
       expect(hourlyMetrics.hour_bucket).toBeDefined()
       expect(hourlyMetrics.total_draws).toBeDefined()
       expect(hourlyMetrics.unique_users).toBeDefined()

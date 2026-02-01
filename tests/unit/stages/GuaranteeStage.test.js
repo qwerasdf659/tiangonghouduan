@@ -13,7 +13,7 @@
  * - 累计抽奖次数达到阈值（默认10次）时触发保底
  * - 保底触发时强制发放高档奖品（或指定的保底奖品）
  * - 使用取模运算判断触发条件（next_draw_number % threshold === 0）
- * - 每个活动的保底计数独立（通过 campaign_id 隔离）
+ * - 每个活动的保底计数独立（通过 lottery_campaign_id 隔离）
  *
  * @file tests/unit/stages/GuaranteeStage.test.js
  * @author 保底机制专项测试
@@ -195,7 +195,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
       // 模拟奖品池
       const mockPrizes = [
         {
-          prize_id: 1,
+          lottery_prize_id: 1,
           prize_name: '特等奖',
           reward_tier: 'high',
           status: 'active',
@@ -203,7 +203,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
           sort_order: 1
         },
         {
-          prize_id: 2,
+          lottery_prize_id: 2,
           prize_name: '一等奖',
           reward_tier: 'high',
           status: 'active',
@@ -211,7 +211,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
           sort_order: 2
         },
         {
-          prize_id: 3,
+          lottery_prize_id: 3,
           prize_name: '二等奖',
           reward_tier: 'mid',
           status: 'active',
@@ -219,7 +219,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
           sort_order: 3
         },
         {
-          prize_id: 4,
+          lottery_prize_id: 4,
           prize_name: '三等奖',
           reward_tier: 'low',
           status: 'active',
@@ -234,11 +234,11 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
         .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 
       expect(highTierPrizes.length).toBeGreaterThan(0)
-      expect(highTierPrizes[0].prize_id).toBe(1) // 特等奖
+      expect(highTierPrizes[0].lottery_prize_id).toBe(1) // 特等奖
       expect(highTierPrizes[0].reward_tier).toBe('high')
 
       console.log(
-        `   ✅ 保底奖品选择: ${highTierPrizes[0].prize_name} (ID: ${highTierPrizes[0].prize_id})`
+        `   ✅ 保底奖品选择: ${highTierPrizes[0].prize_name} (ID: ${highTierPrizes[0].lottery_prize_id})`
       )
       console.log(`   奖品档位: ${highTierPrizes[0].reward_tier}`)
     })
@@ -249,7 +249,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
       // 模拟无高档奖品的情况
       const mockPrizesNoHigh = [
         {
-          prize_id: 3,
+          lottery_prize_id: 3,
           prize_name: '二等奖',
           reward_tier: 'mid',
           status: 'active',
@@ -257,7 +257,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
           sort_order: 1
         },
         {
-          prize_id: 4,
+          lottery_prize_id: 4,
           prize_name: '三等奖',
           reward_tier: 'low',
           status: 'active',
@@ -276,7 +276,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
         .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 
       expect(midTierPrizes.length).toBeGreaterThan(0)
-      expect(midTierPrizes[0].prize_id).toBe(3)
+      expect(midTierPrizes[0].lottery_prize_id).toBe(3)
       expect(midTierPrizes[0].reward_tier).toBe('mid')
 
       console.log(
@@ -406,7 +406,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
 
       /*
        * 业务规则（GuaranteeStage._getUserDrawCount）：
-       * - 使用 LotteryDraw.count({ where: { user_id, campaign_id } })
+       * - 使用 LotteryDraw.count({ where: { user_id, lottery_campaign_id: lottery_campaign_id } })
        * - 每个活动的抽奖次数独立计算
        * - 用户在活动A的保底进度不影响活动B
        */
@@ -423,12 +423,14 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
       }
 
       // 验证每个活动的保底进度独立
-      Object.entries(activity_records).forEach(([campaign_id, record]) => {
+      Object.entries(activity_records).forEach(([lottery_campaign_id, record]) => {
         const next_draw = record.draw_count + 1
         const is_trigger = next_draw % record.threshold === 0
         const remaining = is_trigger ? 0 : record.threshold - (next_draw % record.threshold)
 
-        console.log(`   ${campaign_id}: 已抽${record.draw_count}次，距保底还需${remaining}次`)
+        console.log(
+          `   ${lottery_campaign_id}: 已抽${record.draw_count}次，距保底还需${remaining}次`
+        )
 
         // 验证隔离性
         expect(typeof record.draw_count).toBe('number')
@@ -477,7 +479,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
        * const count = await LotteryDraw.count({
        *   where: {
        *     user_id,         // 用户维度隔离
-       *     campaign_id      // 活动维度隔离
+       *     lottery_campaign_id      // 活动维度隔离
        *   }
        * })
        *
@@ -488,19 +490,21 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
 
       // 模拟查询条件
       const queryConditions = [
-        { user_id: 1, campaign_id: 1, expected_isolation: '用户1活动1' },
-        { user_id: 1, campaign_id: 2, expected_isolation: '用户1活动2' },
-        { user_id: 2, campaign_id: 1, expected_isolation: '用户2活动1' }
+        { user_id: 1, lottery_campaign_id: 1, expected_isolation: '用户1活动1' },
+        { user_id: 1, lottery_campaign_id: 2, expected_isolation: '用户1活动2' },
+        { user_id: 2, lottery_campaign_id: 1, expected_isolation: '用户2活动1' }
       ]
 
       // 验证每个条件都是独立的
-      const uniqueConditions = new Set(queryConditions.map(c => `${c.user_id}_${c.campaign_id}`))
+      const uniqueConditions = new Set(
+        queryConditions.map(c => `${c.user_id}_${c.lottery_campaign_id}`)
+      )
 
       expect(uniqueConditions.size).toBe(queryConditions.length)
 
       queryConditions.forEach(condition => {
         console.log(
-          `   ${condition.expected_isolation}: user_id=${condition.user_id}, campaign_id=${condition.campaign_id}`
+          `   ${condition.expected_isolation}: user_id=${condition.user_id}, lottery_campaign_id=${condition.lottery_campaign_id}`
         )
       })
 
@@ -571,7 +575,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
        */
 
       const mockCampaign = {
-        campaign_id: 1,
+        lottery_campaign_id: 1,
         guarantee_enabled: false,
         guarantee_threshold: 10
       }
@@ -608,7 +612,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
       console.log('   - 默认阈值：10次抽奖触发保底')
       console.log('   - 触发条件：next_draw_number % threshold === 0')
       console.log('   - 奖品选择：优先高档(high)，降级中档(mid)')
-      console.log('   - 数据隔离：user_id + campaign_id 双维度隔离')
+      console.log('   - 数据隔离：user_id + lottery_campaign_id 双维度隔离')
       console.log('   - 计数方式：基于 LotteryDraw.count()，无需维护计数器')
       console.log('='.repeat(80))
 

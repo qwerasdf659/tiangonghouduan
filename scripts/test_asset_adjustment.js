@@ -3,9 +3,9 @@
  * 资产调整功能测试脚本
  *
  * @description 测试管理后台的资产调整API，验证：
- *   1. BUDGET_POINTS调整缺少campaign_id会被拒绝
- *   2. BUDGET_POINTS调整带campaign_id可以成功
- *   3. POINTS调整不需要campaign_id
+ *   1. BUDGET_POINTS调整缺少lottery_campaign_id会被拒绝
+ *   2. BUDGET_POINTS调整带lottery_campaign_id可以成功
+ *   3. POINTS调整不需要lottery_campaign_id
  *
  * @usage
  *   # 方式1：传入管理员token
@@ -204,7 +204,7 @@ async function runValidationTests() {
       expectMessage: 'reason'
     },
     {
-      name: '测试4: BUDGET_POINTS缺少campaign_id（核心测试）',
+      name: '测试4: BUDGET_POINTS缺少lottery_campaign_id（核心测试）',
       params: {
         user_id: 31,
         asset_code: 'BUDGET_POINTS',
@@ -213,7 +213,7 @@ async function runValidationTests() {
         idempotency_key: `test_${timestamp}_4`
       },
       expectStatus: 400,
-      expectMessage: 'campaign_id'
+      expectMessage: 'lottery_campaign_id'
     },
     {
       name: '测试5: 缺少idempotency_key',
@@ -263,7 +263,7 @@ async function runAuthenticatedTests() {
   if (campaignResponse.status === 200 && campaignResponse.data.success) {
     const campaigns = campaignResponse.data.data.campaigns || []
     if (campaigns.length > 0) {
-      campaignId = campaigns[0].campaign_id
+      campaignId = campaigns[0].lottery_campaign_id
       log(`✅ 找到活动: ID=${campaignId}, 名称=${campaigns[0].campaign_name}`, 'green')
     }
   }
@@ -286,13 +286,13 @@ async function runAuthenticatedTests() {
   // 如果有活动ID，添加BUDGET_POINTS正向测试
   if (campaignId) {
     testCases.push({
-      name: `测试B: BUDGET_POINTS调整带campaign_id（应该成功）`,
+      name: `测试B: BUDGET_POINTS调整带lottery_campaign_id（应该成功）`,
       params: {
         user_id: 31,
         asset_code: 'BUDGET_POINTS',
         amount: 50,
         reason: '测试脚本-预算积分调整验证',
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         idempotency_key: `auth_test_budget_${timestamp}`
       },
       expectStatus: 200
@@ -318,8 +318,8 @@ async function main() {
   log('║           资产调整API测试脚本                               ║', 'cyan')
   log('║                                                            ║', 'cyan')
   log('║  验证前端修复后：                                          ║', 'cyan')
-  log('║  - BUDGET_POINTS必须提供campaign_id才能调整                ║', 'cyan')
-  log('║  - POINTS等其他资产不需要campaign_id                       ║', 'cyan')
+  log('║  - BUDGET_POINTS必须提供lottery_campaign_id才能调整                ║', 'cyan')
+  log('║  - POINTS等其他资产不需要lottery_campaign_id                       ║', 'cyan')
   log('╚════════════════════════════════════════════════════════════╝', 'cyan')
 
   try {
@@ -364,11 +364,11 @@ async function main() {
     log('                     核心验证结论                              ', 'cyan')
     log('══════════════════════════════════════════════════════════════', 'cyan')
 
-    const budgetTest = allResults.find(r => r.name.includes('BUDGET_POINTS缺少campaign_id'))
+    const budgetTest = allResults.find(r => r.name.includes('BUDGET_POINTS缺少lottery_campaign_id'))
     if (budgetTest && budgetTest.success) {
-      log('✅ 后端正确验证：BUDGET_POINTS必须提供campaign_id', 'green')
+      log('✅ 后端正确验证：BUDGET_POINTS必须提供lottery_campaign_id', 'green')
       log('✅ 前端已修复：调整预算积分时会显示活动选择框', 'green')
-      log('✅ 问题根因：前端未传递campaign_id参数（已修复）', 'green')
+      log('✅ 问题根因：前端未传递lottery_campaign_id参数（已修复）', 'green')
     } else {
       log('⚠️ 请检查后端API验证逻辑', 'yellow')
     }

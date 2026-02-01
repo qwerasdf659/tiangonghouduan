@@ -79,7 +79,7 @@ class GlobalStateManager {
    *   global_low_count: 40,         // 全局低价值次数
    *   participated_campaigns: 3,    // 参与活动数量
    *   last_draw_at: Date,           // 最后抽奖时间
-   *   last_campaign_id: 456         // 最后参与活动ID
+   *   last_lottery_campaign_id: 456         // 最后参与活动ID
    * }
    */
   async getState(params, options = {}) {
@@ -121,7 +121,7 @@ class GlobalStateManager {
    *
    * @param {Object} params - 参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {string} params.draw_tier - 本次抽奖档位
    * @param {boolean} params.is_first_draw_in_campaign - 是否是该活动的首次抽奖
    * @param {Object} options - 选项
@@ -129,12 +129,12 @@ class GlobalStateManager {
    * @returns {Promise<Object>} 更新后的状态
    */
   async updateState(params, options = {}) {
-    const { user_id, campaign_id, draw_tier, is_first_draw_in_campaign = false } = params
+    const { user_id, lottery_campaign_id, draw_tier, is_first_draw_in_campaign = false } = params
     const { transaction } = options
 
     this._log('debug', '更新用户全局状态', {
       user_id,
-      campaign_id,
+      lottery_campaign_id,
       draw_tier,
       is_first_draw_in_campaign
     })
@@ -146,7 +146,7 @@ class GlobalStateManager {
       const state = await Model.findOrCreateState(user_id, { transaction })
 
       // 记录本次抽奖结果
-      await state.recordDraw(draw_tier, campaign_id, { transaction })
+      await state.recordDraw(draw_tier, lottery_campaign_id, { transaction })
 
       // 如果是该活动的首次抽奖，增加参与活动数量
       if (is_first_draw_in_campaign) {
@@ -256,12 +256,12 @@ class GlobalStateManager {
    *
    * @param {Object} params - 参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {Object} options - 选项
    * @returns {Promise<boolean>} 是否是首次参与
    */
   async isFirstParticipation(params, options = {}) {
-    const { user_id, campaign_id } = params
+    const { user_id, lottery_campaign_id } = params
     const { transaction } = options
 
     try {
@@ -269,7 +269,7 @@ class GlobalStateManager {
       const { LotteryUserExperienceState } = require('../../../../models')
 
       const experience_state = await LotteryUserExperienceState.findOne({
-        where: { user_id, campaign_id },
+        where: { user_id, lottery_campaign_id },
         transaction
       })
 
@@ -278,7 +278,7 @@ class GlobalStateManager {
     } catch (error) {
       this._log('warn', '检查首次参与失败，默认返回 false', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       return false
@@ -308,7 +308,7 @@ class GlobalStateManager {
       global_low_count: state.global_low_count || 0,
       participated_campaigns: state.participated_campaigns || 0,
       last_draw_at: state.last_draw_at,
-      last_campaign_id: state.last_campaign_id
+      last_lottery_campaign_id: state.last_lottery_campaign_id
     }
   }
 

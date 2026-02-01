@@ -36,7 +36,7 @@
  * - **数据转换标准**：DECIMAL字段统一转换为数字类型
  *
  * 关键方法列表：
- * - batchAddPrizes(campaign_id, prizes, options) - 批量添加奖品
+ * - batchAddPrizes(lottery_campaign_id, prizes, options) - 批量添加奖品
  * - getPrizesByCampaign(campaign_code) - 获取指定活动的奖品池
  * - getAllPrizes(filters) - 获取所有奖品列表
  * - updatePrize(prize_id, updateData, options) - 更新奖品信息
@@ -44,7 +44,7 @@
  * - deletePrize(prize_id, options) - 删除奖品
  *
  * 数据模型关联：
- * - LotteryPrize：奖品表（核心数据：prize_id、campaign_id、prize_name、win_probability）
+ * - LotteryPrize：奖品表（核心数据：prize_id、lottery_campaign_id、prize_name、win_probability）
  * - LotteryCampaign：活动表（关联查询：campaign_code、campaign_name、status）
  *
  * 事务支持：
@@ -77,23 +77,23 @@ class PrizePoolService {
    * - 强制要求外部事务传入（options.transaction）
    * - 未提供事务时直接报错，由入口层统一管理事务
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Array<Object>} prizes - 奖品列表
    * @param {Object} options - 选项
    * @param {Object} options.transaction - 事务对象（必填）
    * @param {number} options.created_by - 创建者ID（可选）
    * @returns {Promise<Object>} 添加结果
-   * @returns {number} return.campaign_id - 活动ID
+   * @returns {number} return.lottery_campaign_id - 活动ID
    * @returns {number} return.added_prizes - 添加的奖品数量
    * @returns {Array<Object>} return.prizes - 添加的奖品列表
    */
-  static async batchAddPrizes(campaign_id, prizes, options = {}) {
+  static async batchAddPrizes(lottery_campaign_id, prizes, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'PrizePoolService.batchAddPrizes')
     const { created_by } = options
 
     logger.info('开始批量添加奖品', {
-      campaign_id,
+      lottery_campaign_id,
       prize_count: prizes.length,
       created_by
     })
@@ -109,7 +109,7 @@ class PrizePoolService {
     }
 
     // 2. 查找活动
-    const campaign = await LotteryCampaign.findByPk(campaign_id, {
+    const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, {
       transaction
     })
     if (!campaign) {
@@ -118,7 +118,7 @@ class PrizePoolService {
 
     // 3. 获取活动现有奖品的最大sort_order（避免重复）
     const maxSortOrder = await LotteryPrize.max('sort_order', {
-      where: { campaign_id: parseInt(campaign_id) },
+      where: { lottery_campaign_id: parseInt(lottery_campaign_id) },
       transaction
     })
     let nextSortOrder = (maxSortOrder || 0) + 1
@@ -133,7 +133,7 @@ class PrizePoolService {
       // 2026-01-29 技术债务清理：去掉字段映射，直接使用后端字段名
       const prize = await LotteryPrize.create(
         {
-          campaign_id: parseInt(campaign_id),
+          lottery_campaign_id: parseInt(lottery_campaign_id),
           prize_name: prizeData.prize_name,
           prize_type: prizeData.prize_type,
           prize_value: prizeData.prize_value || 0,
@@ -145,7 +145,7 @@ class PrizePoolService {
           stock_quantity: parseInt(prizeData.stock_quantity),
           win_probability: prizeData.win_probability || 0,
           prize_description: prizeData.prize_description || '',
-          image_id: prizeData.image_id || null,
+          image_resource_id: prizeData.image_resource_id || null,
           angle: prizeData.angle || 0,
           color: prizeData.color || '#FF6B6B',
           cost_points: prizeData.cost_points || 100,
@@ -159,20 +159,24 @@ class PrizePoolService {
       createdPrizes.push(prize)
 
       // 🎯 2026-01-08 图片存储架构修复：绑定图片 context_id（避免被24h定时清理误删）
-      if (prizeData.image_id) {
+      if (prizeData.image_resource_id) {
         try {
           const ImageService = require('./ImageService')
           // eslint-disable-next-line no-await-in-loop -- 需要在事务中顺序绑定图片
-          await ImageService.updateImageContextId(prizeData.image_id, prize.prize_id, transaction)
+          await ImageService.updateImageContextId(
+            prizeData.image_resource_id,
+            prize.lottery_prize_id,
+            transaction
+          )
           logger.info('[奖品池] 奖品图片绑定成功', {
-            prize_id: prize.prize_id,
-            image_id: prizeData.image_id
+            lottery_prize_id: prize.lottery_prize_id,
+            image_resource_id: prizeData.image_resource_id
           })
         } catch (bindError) {
           // 绑定失败记录警告但不阻塞创建
           logger.warn('[奖品池] 奖品图片绑定失败（非致命）', {
-            prize_id: prize.prize_id,
-            image_id: prizeData.image_id,
+            lottery_prize_id: prize.lottery_prize_id,
+            image_resource_id: prizeData.image_resource_id,
             error: bindError.message
           })
         }
@@ -183,31 +187,31 @@ class PrizePoolService {
      * 5. 记录审计日志（批量添加奖品）
      * 【决策5/6/7】：
      * - 决策5：prize_create 是关键操作，失败阻断业务
-     * - 决策6：幂等键由 campaign_id + 奖品IDs 派生，确保同一批奖品不会重复记录
+     * - 决策6：幂等键由 lottery_campaign_id + 奖品IDs 派生，确保同一批奖品不会重复记录
      * - 决策7：同一事务内
      */
-    const prizeIdsStr = createdPrizes.map(p => p.prize_id).join('_')
+    const prizeIdsStr = createdPrizes.map(p => p.lottery_prize_id).join('_')
     await AuditLogService.logOperation({
       operator_id: created_by || 1, // 操作员ID（如果没有传入，使用系统用户1）
       operation_type: 'prize_create', // 操作类型：奖品创建
       target_type: 'LotteryCampaign', // 目标对象类型（活动）
-      target_id: parseInt(campaign_id), // 目标对象ID（活动ID）
+      target_id: parseInt(lottery_campaign_id), // 目标对象ID（活动ID）
       action: 'batch_create', // 操作动作：批量创建
       before_data: {
         prize_count: 0
       },
       after_data: {
         prize_count: createdPrizes.length,
-        prize_ids: createdPrizes.map(p => p.prize_id)
+        prize_ids: createdPrizes.map(p => p.lottery_prize_id)
       },
-      reason: `批量添加${createdPrizes.length}个奖品到活动${campaign_id}`,
-      idempotency_key: `prize_batch_create_${campaign_id}_prizes_${prizeIdsStr}`, // 决策6：业务主键派生
+      reason: `批量添加${createdPrizes.length}个奖品到活动${lottery_campaign_id}`,
+      idempotency_key: `prize_batch_create_${lottery_campaign_id}_prizes_${prizeIdsStr}`, // 决策6：业务主键派生
       is_critical_operation: true, // 决策5：关键操作
       transaction // 事务对象
     })
 
     logger.info('批量添加奖品成功', {
-      campaign_id,
+      lottery_campaign_id,
       prize_count: createdPrizes.length,
       created_by
     })
@@ -218,20 +222,20 @@ class PrizePoolService {
     // 7. 缓存失效：奖品池变更后立即失效活动配置缓存
     try {
       await BusinessCacheHelper.invalidateLotteryCampaign(
-        parseInt(campaign_id),
+        parseInt(lottery_campaign_id),
         'prizes_batch_added'
       )
-      logger.info('[缓存] 活动配置缓存已失效（奖品批量添加）', { campaign_id })
+      logger.info('[缓存] 活动配置缓存已失效（奖品批量添加）', { lottery_campaign_id })
     } catch (cacheError) {
       // 缓存失效失败不阻塞主流程，依赖 TTL 过期
       logger.warn('[缓存] 活动配置缓存失效失败（非致命）', {
         error: cacheError.message,
-        campaign_id
+        lottery_campaign_id
       })
     }
 
     return {
-      campaign_id: parseInt(campaign_id),
+      lottery_campaign_id: parseInt(lottery_campaign_id),
       added_prizes: createdPrizes.length,
       prizes: convertedPrizes
     }
@@ -261,11 +265,11 @@ class PrizePoolService {
 
       // 2. 获取奖品列表
       const prizes = await LotteryPrize.findAll({
-        where: { campaign_id: campaign.campaign_id },
+        where: { lottery_campaign_id: campaign.lottery_campaign_id },
         order: [['created_at', 'DESC']],
         attributes: [
-          'prize_id',
-          'campaign_id',
+          'lottery_prize_id',
+          'lottery_campaign_id',
           'prize_name',
           'prize_type',
           'prize_value',
@@ -274,7 +278,7 @@ class PrizePoolService {
           'stock_quantity',
           'win_probability',
           'prize_description',
-          'image_id',
+          'image_resource_id',
           'angle',
           'color',
           'cost_points',
@@ -299,8 +303,8 @@ class PrizePoolService {
 
       // 4. 格式化奖品数据（virtual_amount 和 category 已移除）
       const formattedPrizes = prizes.map(prize => ({
-        prize_id: prize.prize_id,
-        campaign_id: prize.campaign_id,
+        lottery_prize_id: prize.lottery_prize_id,
+        lottery_campaign_id: prize.lottery_campaign_id,
         prize_name: prize.prize_name,
         prize_type: prize.prize_type,
         prize_value: prize.prize_value,
@@ -309,7 +313,7 @@ class PrizePoolService {
         remaining_quantity: Math.max(0, (prize.stock_quantity || 0) - (prize.total_win_count || 0)),
         win_probability: prize.win_probability,
         prize_description: prize.prize_description,
-        image_id: prize.image_id,
+        image_resource_id: prize.image_resource_id,
         angle: prize.angle,
         color: prize.color,
         cost_points: prize.cost_points,
@@ -358,19 +362,19 @@ class PrizePoolService {
    * 获取所有奖品列表（支持过滤）
    *
    * @param {Object} filters - 过滤条件
-   * @param {number} filters.campaign_id - 活动ID（可选）
+   * @param {number} filters.lottery_campaign_id - 活动ID（可选）
    * @param {string} filters.status - 状态（可选）
    * @returns {Promise<Object>} 奖品列表和统计信息
    */
   static async getAllPrizes(filters = {}) {
     try {
-      const { campaign_id, status } = filters
+      const { lottery_campaign_id, status } = filters
 
       logger.info('获取奖品列表', { filters })
 
       // 1. 构建查询条件
       const where = {}
-      if (campaign_id) where.campaign_id = parseInt(campaign_id)
+      if (lottery_campaign_id) where.lottery_campaign_id = parseInt(lottery_campaign_id)
       if (status) where.status = status
 
       // 2. 查询奖品列表
@@ -380,13 +384,13 @@ class PrizePoolService {
           {
             model: LotteryCampaign,
             as: 'campaign',
-            attributes: ['campaign_id', 'campaign_code', 'campaign_name', 'status']
+            attributes: ['lottery_campaign_id', 'campaign_code', 'campaign_name', 'status']
           }
         ],
         order: [['created_at', 'DESC']],
         attributes: [
-          'prize_id',
-          'campaign_id',
+          'lottery_prize_id',
+          'lottery_campaign_id',
           'prize_name',
           'prize_type',
           'prize_value',
@@ -398,7 +402,7 @@ class PrizePoolService {
           'max_daily_wins',
           'win_probability',
           'prize_description',
-          'image_id',
+          'image_resource_id',
           'angle',
           'color',
           'cost_points',
@@ -427,8 +431,8 @@ class PrizePoolService {
 
       // 4. 格式化奖品数据（virtual_amount 和 category 已移除）
       const formattedPrizes = prizes.map(prize => ({
-        prize_id: prize.prize_id,
-        campaign_id: prize.campaign_id,
+        lottery_prize_id: prize.lottery_prize_id,
+        lottery_campaign_id: prize.lottery_campaign_id,
         campaign_name: prize.campaign?.campaign_name || '未关联活动',
         campaign_code: prize.campaign?.campaign_code,
         prize_name: prize.prize_name,
@@ -442,7 +446,7 @@ class PrizePoolService {
         max_daily_wins: prize.max_daily_wins,
         win_probability: prize.win_probability,
         prize_description: prize.prize_description,
-        image_id: prize.image_id,
+        image_resource_id: prize.image_resource_id,
         angle: prize.angle,
         color: prize.color,
         cost_points: prize.cost_points,
@@ -509,12 +513,13 @@ class PrizePoolService {
       win_probability: prize.win_probability,
       probability: prize.probability,
       status: prize.status,
-      image_id: prize.image_id // 记录旧的图片ID
+      image_resource_id: prize.image_resource_id // 记录旧的图片ID
     }
 
     /*
      * 2. 字段映射（前端字段 → 数据库字段）
      * 2026-01-26 技术债务清理：移除旧字段兼容（value_points、budget_cost_points、probability）
+     * 2026-02-01 主键命名规范化：image_id → image_resource_id
      */
     const allowedFields = {
       name: 'prize_name',
@@ -529,7 +534,7 @@ class PrizePoolService {
       win_probability: 'win_probability', // 中奖概率
       description: 'prize_description',
       prize_description: 'prize_description',
-      image_id: 'image_id',
+      image_resource_id: 'image_resource_id', // 符合主键命名规范：{table_name}_id
       angle: 'angle',
       color: 'color',
       cost_points: 'cost_points',
@@ -560,10 +565,14 @@ class PrizePoolService {
       }
     }
 
-    // 🎯 2026-01-08 图片存储架构：处理图片更换逻辑
-    const oldImageId = beforeData.image_id
-    const newImageId = filteredUpdateData.image_id
-    const isImageChanging = filteredUpdateData.image_id !== undefined && newImageId !== oldImageId
+    /*
+     * 🎯 2026-01-08 图片存储架构：处理图片更换逻辑
+     * 2026-02-01 主键命名规范化：image_id → image_resource_id
+     */
+    const oldImageId = beforeData.image_resource_id
+    const newImageId = filteredUpdateData.image_resource_id
+    const isImageChanging =
+      filteredUpdateData.image_resource_id !== undefined && newImageId !== oldImageId
 
     // 4. 更新奖品
     await prize.update(filteredUpdateData, { transaction })
@@ -583,19 +592,19 @@ class PrizePoolService {
           if (bindSuccess) {
             logger.info('[图片存储] 新图片已绑定到奖品', {
               prize_id,
-              new_image_id: newImageId
+              new_image_resource_id: newImageId
             })
           } else {
             logger.warn('[图片存储] 新图片绑定失败（图片可能不存在）', {
               prize_id,
-              new_image_id: newImageId
+              new_image_resource_id: newImageId
             })
           }
         } catch (bindError) {
           logger.warn('[图片存储] 新图片绑定异常（非致命）', {
             error: bindError.message,
             prize_id,
-            new_image_id: newImageId
+            new_image_resource_id: newImageId
           })
         }
       }
@@ -607,7 +616,7 @@ class PrizePoolService {
           if (deleted) {
             logger.info('[图片存储] 奖品旧图片已物理删除', {
               prize_id,
-              old_image_id: oldImageId
+              old_image_resource_id: oldImageId
             })
           }
         } catch (imageError) {
@@ -615,7 +624,7 @@ class PrizePoolService {
           logger.warn('[图片存储] 删除奖品旧图片异常（非致命）', {
             error: imageError.message,
             prize_id,
-            old_image_id: oldImageId
+            old_image_resource_id: oldImageId
           })
         }
       }
@@ -679,8 +688,8 @@ class PrizePoolService {
 
     // 7. 格式化奖品数据
     const updatedPrizeData = {
-      prize_id: updatedPrize.prize_id,
-      campaign_id: updatedPrize.campaign_id,
+      lottery_prize_id: updatedPrize.lottery_prize_id,
+      lottery_campaign_id: updatedPrize.lottery_campaign_id,
       prize_name: updatedPrize.prize_name,
       prize_type: updatedPrize.prize_type,
       prize_value: updatedPrize.prize_value,
@@ -693,7 +702,7 @@ class PrizePoolService {
       ),
       win_probability: updatedPrize.win_probability,
       prize_description: updatedPrize.prize_description,
-      image_id: updatedPrize.image_id,
+      image_resource_id: updatedPrize.image_resource_id,
       angle: updatedPrize.angle,
       color: updatedPrize.color,
       cost_points: updatedPrize.cost_points,
@@ -711,22 +720,25 @@ class PrizePoolService {
 
     // 9. 缓存失效：奖品配置变更后立即失效活动配置缓存
     try {
-      await BusinessCacheHelper.invalidateLotteryCampaign(prize.campaign_id, 'prize_updated')
+      await BusinessCacheHelper.invalidateLotteryCampaign(
+        prize.lottery_campaign_id,
+        'prize_updated'
+      )
       logger.info('[缓存] 活动配置缓存已失效（奖品更新）', {
         prize_id,
-        campaign_id: prize.campaign_id
+        lottery_campaign_id: prize.lottery_campaign_id
       })
     } catch (cacheError) {
       // 缓存失效失败不阻塞主流程，依赖 TTL 过期
       logger.warn('[缓存] 活动配置缓存失效失败（非致命）', {
         error: cacheError.message,
         prize_id,
-        campaign_id: prize.campaign_id
+        lottery_campaign_id: prize.lottery_campaign_id
       })
     }
 
     return {
-      prize_id: updatedPrize.prize_id,
+      lottery_prize_id: updatedPrize.lottery_prize_id,
       updated_fields: Object.keys(filteredUpdateData),
       prize: convertedPrizeData
     }
@@ -812,17 +824,20 @@ class PrizePoolService {
 
     // 6. 缓存失效：库存变更后立即失效活动配置缓存
     try {
-      await BusinessCacheHelper.invalidateLotteryCampaign(prize.campaign_id, 'prize_stock_added')
+      await BusinessCacheHelper.invalidateLotteryCampaign(
+        prize.lottery_campaign_id,
+        'prize_stock_added'
+      )
       logger.info('[缓存] 活动配置缓存已失效（库存补充）', {
         prize_id,
-        campaign_id: prize.campaign_id
+        lottery_campaign_id: prize.lottery_campaign_id
       })
     } catch (cacheError) {
       // 缓存失效失败不阻塞主流程，依赖 TTL 过期
       logger.warn('[缓存] 活动配置缓存失效失败（非致命）', {
         error: cacheError.message,
         prize_id,
-        campaign_id: prize.campaign_id
+        lottery_campaign_id: prize.lottery_campaign_id
       })
     }
 
@@ -892,7 +907,7 @@ class PrizePoolService {
         stock_quantity: prize.stock_quantity,
         win_probability: prize.win_probability,
         status: prize.status,
-        image_id: prize.image_id // 记录关联的图片ID
+        image_resource_id: prize.image_resource_id // 记录关联的图片ID
       },
       after_data: null, // 删除操作后数据为空
       reason: `删除奖品：${prize.prize_name}（ID: ${prize_id}）`,
@@ -902,8 +917,8 @@ class PrizePoolService {
     })
 
     // 4. 保存关联的活动ID和图片ID（删除前，用于缓存失效和图片清理）
-    const campaignIdForCache = prize.campaign_id
-    const imageIdToDelete = prize.image_id
+    const campaignIdForCache = prize.lottery_campaign_id
+    const imageIdToDelete = prize.image_resource_id
 
     // 5. 删除奖品
     await prize.destroy({ transaction })
@@ -911,7 +926,7 @@ class PrizePoolService {
     logger.info('奖品删除成功', {
       prize_id,
       prize_name: prize.prize_name,
-      image_id: imageIdToDelete,
+      image_resource_id: imageIdToDelete,
       deleted_by
     })
 
@@ -923,12 +938,12 @@ class PrizePoolService {
         if (deleted) {
           logger.info('[图片存储] 奖品关联图片已物理删除', {
             prize_id,
-            image_id: imageIdToDelete
+            image_resource_id: imageIdToDelete
           })
         } else {
           logger.warn('[图片存储] 奖品关联图片删除失败或不存在', {
             prize_id,
-            image_id: imageIdToDelete
+            image_resource_id: imageIdToDelete
           })
         }
       } catch (imageError) {
@@ -936,7 +951,7 @@ class PrizePoolService {
         logger.warn('[图片存储] 删除奖品图片异常（非致命）', {
           error: imageError.message,
           prize_id,
-          image_id: imageIdToDelete
+          image_resource_id: imageIdToDelete
         })
       }
     }
@@ -946,20 +961,20 @@ class PrizePoolService {
       await BusinessCacheHelper.invalidateLotteryCampaign(campaignIdForCache, 'prize_deleted')
       logger.info('[缓存] 活动配置缓存已失效（奖品删除）', {
         prize_id,
-        campaign_id: campaignIdForCache
+        lottery_campaign_id: campaignIdForCache
       })
     } catch (cacheError) {
       // 缓存失效失败不阻塞主流程，依赖 TTL 过期
       logger.warn('[缓存] 活动配置缓存失效失败（非致命）', {
         error: cacheError.message,
         prize_id,
-        campaign_id: campaignIdForCache
+        lottery_campaign_id: campaignIdForCache
       })
     }
 
     return {
       prize_id,
-      deleted_image_id: imageIdToDelete || null
+      deleted_image_resource_id: imageIdToDelete || null
     }
   }
 

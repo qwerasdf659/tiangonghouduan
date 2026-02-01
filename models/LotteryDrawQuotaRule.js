@@ -37,7 +37,7 @@ module.exports = sequelize => {
     'LotteryDrawQuotaRule',
     {
       // 规则主键ID
-      rule_id: {
+      lottery_draw_quota_rule_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
@@ -58,7 +58,7 @@ module.exports = sequelize => {
         comment: '作用域类型：global-全局默认, campaign-活动级, role-角色/人群级, user-用户级'
       },
 
-      // 作用域ID：global固定为"global"，campaign存campaign_id，role存role_uuid，user存user_id
+      // 作用域ID：global固定为"global"，campaign存lottery_campaign_id，role存role_uuid，user存user_id
       scope_id: {
         type: DataTypes.STRING(100),
         allowNull: false,
@@ -66,7 +66,7 @@ module.exports = sequelize => {
           notEmpty: { msg: '作用域ID不能为空' }
         },
         comment:
-          '作用域ID：global固定为"global"，campaign存campaign_id，role存role_uuid，user存user_id'
+          '作用域ID：global固定为"global"，campaign存lottery_campaign_id，role存role_uuid，user存user_id'
       },
 
       // 统计窗口类型：daily-每日重置, campaign_total-活动期间累计
@@ -239,13 +239,13 @@ module.exports = sequelize => {
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 抽奖活动ID
    * @param {Array<string>} [params.role_uuids] - 用户角色UUID列表（可选）
    * @returns {Promise<Object>} { limit_value, matched_rule, priority, debug }
    */
   LotteryDrawQuotaRule.getEffectiveDailyLimit = async function ({
     user_id,
-    campaign_id,
+    lottery_campaign_id,
     role_uuids = []
   }) {
     const now = BeijingTimeHelper.now()
@@ -279,7 +279,7 @@ module.exports = sequelize => {
             ? [{ scope_type: 'role', scope_id: { [Op.in]: role_uuids } }]
             : []),
           // 活动级规则
-          { scope_type: 'campaign', scope_id: String(campaign_id) },
+          { scope_type: 'campaign', scope_id: String(lottery_campaign_id) },
           // 全局规则
           { scope_type: 'global', scope_id: 'global' }
         ]
@@ -334,7 +334,7 @@ module.exports = sequelize => {
     return {
       limit_value: matchedRule.limit_value,
       matched_rule: {
-        rule_id: matchedRule.rule_id,
+        rule_id: matchedRule.lottery_draw_quota_rule_id,
         scope_type: matchedRule.scope_type,
         scope_id: matchedRule.scope_id,
         reason: matchedRule.reason
@@ -343,7 +343,7 @@ module.exports = sequelize => {
       debug: {
         total_rules_found: rules.length,
         all_rules: rules.map(r => ({
-          rule_id: r.rule_id,
+          rule_id: r.lottery_draw_quota_rule_id,
           scope_type: r.scope_type,
           scope_id: r.scope_id,
           limit_value: r.limit_value,

@@ -36,7 +36,7 @@ module.exports = sequelize => {
     'SystemAnnouncement',
     {
       // 基础信息
-      announcement_id: {
+      system_announcement_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,

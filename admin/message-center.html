@@ -3,23 +3,7 @@
 <head>
   <%- include('partials/head', { 
     title: '消息中心', 
-    pageStyle: `
-      /* 自定义滚动条 */
-      .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
-      .scrollbar-thin::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
-      .scrollbar-thin::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
-      .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
-      
-      /* 消息项悬停 */
-      .message-item { transition: all 0.2s ease; }
-      .message-item:hover { background-color: #f8fafc; transform: translateX(2px); }
-      
-      /* 未读消息高亮 */
-      .unread { background-color: rgba(59, 130, 246, 0.05); border-left: 3px solid #3b82f6; }
-      
-      /* 类型徽章 */
-      .type-badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; }
-    `
+    pageStyle: '[x-cloak] { display: none !important; } .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; } .scrollbar-thin::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; } .scrollbar-thin::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; } .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #a1a1a1; } .message-item { transition: all 0.2s ease; } .message-item:hover { background-color: #f8fafc; transform: translateX(2px); } .unread { background-color: rgba(59, 130, 246, 0.05); border-left: 3px solid #3b82f6; } .type-badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; }' 
   }) %>
 </head>
 <body class="themed-bg-base min-h-screen">

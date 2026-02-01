@@ -39,11 +39,11 @@
  * - sold/withdrawn/admin_withdrawn 为终态，不可逆转
  *
  * 数据库表名：market_listings
- * 主键：listing_id（BIGINT，自增）
+ * 主键：market_listing_id（BIGINT，自增）
  * 外键：
  * - seller_user_id（users.user_id，卖家用户）
  * - offer_item_instance_id（item_instances.item_instance_id，标的物品实例）
- * - locked_by_order_id（trade_orders.order_id，锁定订单）
+ * - locked_by_order_id（trade_orders.trade_order_id，锁定订单）
  *
  * 集成服务：
  * - BalanceService：冻结/解冻卖家标的资产（可叠加资产挂牌）
@@ -63,7 +63,7 @@ module.exports = sequelize => {
     'MarketListing',
     {
       // 主键
-      listing_id: {
+      market_listing_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
@@ -205,7 +205,7 @@ module.exports = sequelize => {
         type: DataTypes.BIGINT,
         allowNull: true,
         comment:
-          '锁定订单ID（Locked By Order ID）：记录当前锁定该挂牌的订单ID，外键关联 trade_orders.order_id；业务规则：status=locked 时必填，用于防止并发购买和超时解锁'
+          '锁定订单ID（Locked By Order ID）：记录当前锁定该挂牌的订单ID，外键关联 trade_orders.trade_order_id；业务规则：status=locked 时必填，用于防止并发购买和超时解锁'
       },
 
       locked_at: {
@@ -354,7 +354,7 @@ module.exports = sequelize => {
 
     // 关联的订单列表
     MarketListing.hasMany(models.TradeOrder, {
-      foreignKey: 'listing_id',
+      foreignKey: 'market_listing_id',
       as: 'orders',
       comment: '订单列表关联（Orders Association）- 关联该挂牌的所有订单'
     })

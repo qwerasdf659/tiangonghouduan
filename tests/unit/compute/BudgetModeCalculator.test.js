@@ -35,10 +35,10 @@ const DEFAULT_THRESHOLDS = {
  * 模拟奖品列表
  */
 const MOCK_PRIZES = [
-  { prize_id: 1, prize_name: '特等奖', reward_tier: 'high', prize_value_points: 5000 },
-  { prize_id: 2, prize_name: '一等奖', reward_tier: 'mid', prize_value_points: 500 },
-  { prize_id: 3, prize_name: '二等奖', reward_tier: 'low', prize_value_points: 100 },
-  { prize_id: 4, prize_name: '参与奖', reward_tier: 'fallback', prize_value_points: 0 }
+  { lottery_prize_id: 1, prize_name: '特等奖', reward_tier: 'high', prize_value_points: 5000 },
+  { lottery_prize_id: 2, prize_name: '一等奖', reward_tier: 'mid', prize_value_points: 500 },
+  { lottery_prize_id: 3, prize_name: '二等奖', reward_tier: 'low', prize_value_points: 100 },
+  { lottery_prize_id: 4, prize_name: '参与奖', reward_tier: 'fallback', prize_value_points: 0 }
 ]
 
 describe('【P1】预算计算器专项测试 - BudgetCalculator', () => {
@@ -300,9 +300,9 @@ describe('【P1】预算计算器专项测试 - BudgetCalculator', () => {
       console.log('📊 2.6.3.4 验证阈值递减顺序...')
 
       const prizes = [
-        { prize_id: 1, reward_tier: 'high', prize_value_points: 500 },
-        { prize_id: 2, reward_tier: 'mid', prize_value_points: 1000 }, // mid > high
-        { prize_id: 3, reward_tier: 'low', prize_value_points: 100 }
+        { lottery_prize_id: 1, reward_tier: 'high', prize_value_points: 500 },
+        { lottery_prize_id: 2, reward_tier: 'mid', prize_value_points: 1000 }, // mid > high
+        { lottery_prize_id: 3, reward_tier: 'low', prize_value_points: 100 }
       ]
 
       const thresholds = calculator._calculateDynamicThresholds(prizes)

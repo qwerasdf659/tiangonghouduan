@@ -334,20 +334,20 @@ router.get(
 )
 
 /**
- * GET /api/v4/console/system-data/market-listings/:listing_id
+ * GET /api/v4/console/system-data/market-listings/:market_listing_id
  * @desc 获取市场挂牌详情
  * @access Admin only (role_level >= 100)
  */
 router.get(
-  '/market-listings/:listing_id',
+  '/market-listings/:market_listing_id',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
-      const { listing_id } = req.params
+      const { market_listing_id } = req.params
       const { MarketListing, User, ItemInstance } = require('../../../models')
 
-      const listing = await MarketListing.findByPk(parseInt(listing_id), {
+      const listing = await MarketListing.findByPk(parseInt(market_listing_id), {
         include: [
           { model: User, as: 'seller', attributes: ['user_id', 'nickname', 'mobile'] },
           { model: ItemInstance, as: 'offerItem' }
@@ -381,14 +381,14 @@ router.get(
 
       // 按状态统计挂牌数量
       const statusStats = await MarketListing.findAll({
-        attributes: ['status', [fn('COUNT', col('listing_id')), 'count']],
+        attributes: ['status', [fn('COUNT', col('market_listing_id')), 'count']],
         group: ['status'],
         raw: true
       })
 
       // 按类型统计挂牌数量
       const typeStats = await MarketListing.findAll({
-        attributes: ['listing_kind', [fn('COUNT', col('listing_id')), 'count']],
+        attributes: ['listing_kind', [fn('COUNT', col('market_listing_id')), 'count']],
         group: ['listing_kind'],
         raw: true
       })
@@ -472,7 +472,7 @@ router.get(
             as: 'prizes',
             required: false,
             attributes: [
-              'prize_id',
+              'lottery_prize_id',
               'prize_name',
               'prize_type',
               'reward_tier',
@@ -511,20 +511,20 @@ router.get(
 )
 
 /**
- * GET /api/v4/console/system-data/lottery-campaigns/:campaign_id
+ * GET /api/v4/console/system-data/lottery-campaigns/:lottery_campaign_id
  * @desc 获取抽奖活动详情
  * @access Admin only (role_level >= 100)
  */
 router.get(
-  '/lottery-campaigns/:campaign_id',
+  '/lottery-campaigns/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
-      const { campaign_id } = req.params
+      const { lottery_campaign_id } = req.params
       const { LotteryCampaign, LotteryPrize } = require('../../../models')
 
-      const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id), {
+      const campaign = await LotteryCampaign.findByPk(parseInt(lottery_campaign_id), {
         include: [{ model: LotteryPrize, as: 'prizes', required: false }]
       })
 
@@ -589,17 +589,17 @@ router.post(
 )
 
 /**
- * PUT /api/v4/console/system-data/lottery-campaigns/:campaign_id
+ * PUT /api/v4/console/system-data/lottery-campaigns/:lottery_campaign_id
  * @desc 更新抽奖活动
  * @access Admin only (role_level >= 100)
  */
 router.put(
-  '/lottery-campaigns/:campaign_id',
+  '/lottery-campaigns/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
-      const { campaign_id } = req.params
+      const { lottery_campaign_id } = req.params
       const {
         campaign_name,
         campaign_type,
@@ -648,7 +648,7 @@ router.put(
       try {
         // 通过服务层执行更新操作
         const campaign = await LotteryCampaignCRUDService.updateCampaign(
-          parseInt(campaign_id),
+          parseInt(lottery_campaign_id),
           updateData,
           { transaction, operator_user_id: req.user.user_id }
         )
@@ -667,17 +667,17 @@ router.put(
 )
 
 /**
- * PUT /api/v4/console/system-data/lottery-campaigns/:campaign_id/status
+ * PUT /api/v4/console/system-data/lottery-campaigns/:lottery_campaign_id/status
  * @desc 更新抽奖活动状态
  * @access Admin only (role_level >= 100)
  */
 router.put(
-  '/lottery-campaigns/:campaign_id/status',
+  '/lottery-campaigns/:lottery_campaign_id/status',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
-      const { campaign_id } = req.params
+      const { lottery_campaign_id } = req.params
       const { status } = req.body
 
       if (!status || !['draft', 'active', 'paused', 'ended'].includes(status)) {
@@ -692,7 +692,7 @@ router.put(
       try {
         // 通过服务层执行状态更新操作
         const campaign = await LotteryCampaignCRUDService.updateCampaignStatus(
-          parseInt(campaign_id),
+          parseInt(lottery_campaign_id),
           status,
           { transaction, operator_user_id: req.user.user_id }
         )
@@ -711,17 +711,17 @@ router.put(
 )
 
 /**
- * DELETE /api/v4/console/system-data/lottery-campaigns/:campaign_id
+ * DELETE /api/v4/console/system-data/lottery-campaigns/:lottery_campaign_id
  * @desc 删除抽奖活动
  * @access Admin only (role_level >= 100)
  */
 router.delete(
-  '/lottery-campaigns/:campaign_id',
+  '/lottery-campaigns/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
-      const { campaign_id } = req.params
+      const { lottery_campaign_id } = req.params
       const { sequelize } = require('../../../models')
 
       // 开启事务（入口层管理事务边界）
@@ -729,16 +729,19 @@ router.delete(
 
       try {
         // 通过服务层执行删除操作
-        const result = await LotteryCampaignCRUDService.deleteCampaign(parseInt(campaign_id), {
-          transaction,
-          operator_user_id: req.user.user_id
-        })
+        const result = await LotteryCampaignCRUDService.deleteCampaign(
+          parseInt(lottery_campaign_id),
+          {
+            transaction,
+            operator_user_id: req.user.user_id
+          }
+        )
 
         await transaction.commit()
 
         return res.apiSuccess(
           {
-            campaign_id: result.campaign_id,
+            lottery_campaign_id: result.lottery_campaign_id,
             campaign_name: result.campaign_name,
             deleted: result.deleted
           },
@@ -766,7 +769,7 @@ router.delete(
  * @access Admin only (role_level >= 100)
  *
  * @query {number} [user_id] - 用户ID
- * @query {number} [campaign_id] - 活动ID
+ * @query {number} [lottery_campaign_id] - 活动ID
  * @query {string} [quota_date] - 配额日期（YYYY-MM-DD）
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
@@ -777,7 +780,7 @@ router.get(
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   async (req, res) => {
     try {
-      const { user_id, campaign_id, quota_date } = req.query
+      const { user_id, lottery_campaign_id, quota_date } = req.query
       const pagination = buildPaginationOptions(req.query, 'quota_date')
 
       const { LotteryUserDailyDrawQuota } = require('../../../models')
@@ -785,7 +788,7 @@ router.get(
       // 构建查询条件
       const where = {}
       if (user_id) where.user_id = parseInt(user_id)
-      if (campaign_id) where.campaign_id = parseInt(campaign_id)
+      if (lottery_campaign_id) where.lottery_campaign_id = parseInt(lottery_campaign_id)
       if (quota_date) where.quota_date = quota_date
 
       const { count, rows } = await LotteryUserDailyDrawQuota.findAndCountAll({

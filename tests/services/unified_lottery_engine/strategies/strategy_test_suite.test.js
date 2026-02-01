@@ -112,7 +112,7 @@ describe('V4.6 ManagementStrategy 管理策略测试套件', () => {
 
         if (force_win_result.success) {
           expect(force_win_result.result).toBe('force_win')
-          expect(force_win_result.prize_id).toBe(9)
+          expect(force_win_result.lottery_prize_id).toBe(9)
           console.log('✅ 管理员强制中奖功能验证通过')
         } else {
           console.log(`ℹ️ 强制中奖结果: ${force_win_result.message || force_win_result.error}`)

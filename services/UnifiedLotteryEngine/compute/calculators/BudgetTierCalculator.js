@@ -17,7 +17,7 @@
  * - B3: high + mid + low + fallback
  *
  * 关键设计决策：
- * - 文档12.2.1：allowed_campaign_ids 是预算来源桶，不是当前抽奖活动ID
+ * - 文档12.2.1：allowed_lottery_campaign_ids 是预算来源桶，不是当前抽奖活动ID
  * - 文档12.2.2：动态钱包可用性检查（空/null → 返回0）
  * - EffectiveBudget 统一作为预算输入，屏蔽 budget_mode 差异
  *
@@ -91,7 +91,7 @@ class BudgetTierCalculator {
    *
    * @param {Object} context - 抽奖上下文
    * @param {number} context.user_id - 用户ID
-   * @param {number} context.campaign_id - 活动ID
+   * @param {number} context.lottery_campaign_id - 活动ID
    * @param {Object} context.campaign - 活动配置对象
    * @param {Array} context.prizes - 奖品列表
    * @param {Object} options - 额外选项
@@ -99,12 +99,12 @@ class BudgetTierCalculator {
    * @returns {Promise<Object>} 计算结果
    */
   async calculate(context, options = {}) {
-    const { user_id, campaign_id, campaign, prizes } = context
+    const { user_id, lottery_campaign_id, campaign, prizes } = context
     const budget_mode = campaign?.budget_mode || 'none'
 
     this._log('info', '开始计算预算分层', {
       user_id,
-      campaign_id,
+      lottery_campaign_id,
       budget_mode
     })
 
@@ -140,7 +140,7 @@ class BudgetTierCalculator {
 
       this._log('info', '预算分层计算完成', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         effective_budget,
         budget_tier,
         available_tiers
@@ -150,7 +150,7 @@ class BudgetTierCalculator {
     } catch (error) {
       this._log('error', '预算分层计算失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       throw error
@@ -167,7 +167,7 @@ class BudgetTierCalculator {
    * - none：返回 Infinity（无预算限制）
    *
    * 关键设计（文档12.2.1 + 12.2.2）：
-   * - allowed_campaign_ids 是预算来源桶，不是当前抽奖活动ID
+   * - allowed_lottery_campaign_ids 是预算来源桶，不是当前抽奖活动ID
    * - 动态钱包可用性：配置为空/null 时返回 0
    *
    * @param {Object} context - 抽奖上下文
@@ -176,13 +176,13 @@ class BudgetTierCalculator {
    * @private
    */
   async _calculateEffectiveBudget(context, options = {}) {
-    const { user_id, campaign_id, campaign } = context
+    const { user_id, lottery_campaign_id, campaign } = context
     const budget_mode = campaign?.budget_mode || 'none'
     const { transaction } = options
 
     // 🔥 无预算限制模式
     if (budget_mode === 'none') {
-      this._log('debug', 'budget_mode=none，无预算限制', { user_id, campaign_id })
+      this._log('debug', 'budget_mode=none，无预算限制', { user_id, lottery_campaign_id })
       return Infinity
     }
 
@@ -200,36 +200,36 @@ class BudgetTierCalculator {
      */
     if (budget_mode === 'user' || budget_mode === 'hybrid') {
       try {
-        // 文档12.2.1：allowed_campaign_ids 是预算来源桶
-        const allowed_campaign_ids = campaign?.allowed_campaign_ids
+        // 文档12.2.1：allowed_lottery_campaign_ids 是预算来源桶
+        const allowed_lottery_campaign_ids = campaign?.allowed_lottery_campaign_ids
 
         // 文档12.2.2：动态钱包可用性检查
-        if (!allowed_campaign_ids || allowed_campaign_ids.length === 0) {
+        if (!allowed_lottery_campaign_ids || allowed_lottery_campaign_ids.length === 0) {
           // 配置为空/null，钱包不可用，返回 0
-          this._log('debug', 'user 钱包不可用（allowed_campaign_ids 为空）', {
+          this._log('debug', 'user 钱包不可用（allowed_lottery_campaign_ids 为空）', {
             user_id,
-            campaign_id,
-            allowed_campaign_ids
+            lottery_campaign_id,
+            allowed_lottery_campaign_ids
           })
           user_budget = 0
         } else {
           // 从指定的预算来源桶聚合 BUDGET_POINTS
           user_budget = await QueryService.getBudgetPointsByCampaigns(
-            { user_id, campaign_ids: allowed_campaign_ids },
+            { user_id, lottery_campaign_ids: allowed_lottery_campaign_ids },
             { transaction }
           )
 
           this._log('debug', '获取用户预算成功', {
             user_id,
-            campaign_id,
-            allowed_campaign_ids,
+            lottery_campaign_id,
+            allowed_lottery_campaign_ids,
             user_budget
           })
         }
       } catch (error) {
         this._log('warn', '获取用户预算失败，使用 0', {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           error: error.message
         })
         user_budget = 0
@@ -247,7 +247,7 @@ class BudgetTierCalculator {
          * 文档12.2.2：动态钱包可用性检查
          * 查询活动的 pool_budget_remaining
          */
-        const campaign_record = await LotteryCampaign.findByPk(campaign_id, {
+        const campaign_record = await LotteryCampaign.findByPk(lottery_campaign_id, {
           attributes: ['pool_budget_remaining', 'pool_budget_total'],
           transaction
         })
@@ -256,7 +256,7 @@ class BudgetTierCalculator {
           // 池预算未配置，钱包不可用，返回 0
           this._log('debug', 'pool 钱包不可用（pool_budget_remaining 为 null）', {
             user_id,
-            campaign_id
+            lottery_campaign_id
           })
           pool_budget = 0
         } else {
@@ -264,7 +264,7 @@ class BudgetTierCalculator {
 
           this._log('debug', '获取活动池预算成功', {
             user_id,
-            campaign_id,
+            lottery_campaign_id,
             pool_budget,
             pool_budget_total: campaign_record.pool_budget_total
           })
@@ -272,7 +272,7 @@ class BudgetTierCalculator {
       } catch (error) {
         this._log('warn', '获取活动池预算失败，使用 0', {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           error: error.message
         })
         pool_budget = 0
@@ -300,7 +300,7 @@ class BudgetTierCalculator {
         effective_budget = Math.min(user_budget, pool_budget)
         this._log('debug', 'hybrid 模式取较小值', {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           user_budget,
           pool_budget,
           effective_budget
@@ -313,7 +313,7 @@ class BudgetTierCalculator {
 
     this._log('info', 'EffectiveBudget 计算完成', {
       user_id,
-      campaign_id,
+      lottery_campaign_id,
       budget_mode,
       user_budget: budget_mode === 'user' || budget_mode === 'hybrid' ? user_budget : 'N/A',
       pool_budget: budget_mode === 'pool' || budget_mode === 'hybrid' ? pool_budget : 'N/A',

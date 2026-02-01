@@ -86,7 +86,7 @@ router.get('/by-campaign', authenticateToken, requireRoleLevel(100), async (req,
  *
  * @description 获取按奖品分组的库存欠账统计
  * @route GET /api/v4/console/debt-management/by-prize
- * @query {number} [campaign_id] - 活动ID（可选）
+ * @query {number} [lottery_campaign_id] - 活动ID（可选）
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  * @access admin
@@ -96,7 +96,7 @@ router.get('/by-prize', authenticateToken, requireRoleLevel(100), async (req, re
   try {
     const DebtManagementService = getDebtManagementService(req)
     const result = await DebtManagementService.getDebtByPrize({
-      campaign_id: req.query.campaign_id,
+      lottery_campaign_id: req.query.lottery_campaign_id,
       page: req.query.page,
       page_size: req.query.page_size
     })
@@ -179,7 +179,7 @@ router.get('/trend', authenticateToken, requireRoleLevel(100), async (req, res) 
  * @description 获取待冲销的欠账列表
  * @route GET /api/v4/console/debt-management/pending
  * @query {string} debt_type - 欠账类型: inventory|budget
- * @query {number} [campaign_id] - 活动ID（可选）
+ * @query {number} [lottery_campaign_id] - 活动ID（可选）
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  * @access admin
@@ -190,7 +190,7 @@ router.get('/pending', authenticateToken, requireRoleLevel(100), async (req, res
     const DebtManagementService = getDebtManagementService(req)
     const result = await DebtManagementService.getPendingDebts({
       debt_type: req.query.debt_type,
-      campaign_id: req.query.campaign_id,
+      lottery_campaign_id: req.query.lottery_campaign_id,
       page: req.query.page,
       page_size: req.query.page_size
     })
@@ -255,7 +255,7 @@ router.post('/clear', authenticateToken, requireRoleLevel(100), async (req, res)
  *
  * @description 获取所有活动的欠账上限配置
  * @route GET /api/v4/console/debt-management/limits
- * @query {number} [campaign_id] - 活动ID（可选）
+ * @query {number} [lottery_campaign_id] - 活动ID（可选）
  * @query {string} [status] - 状态: active|inactive
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
@@ -266,7 +266,7 @@ router.get('/limits', authenticateToken, requireRoleLevel(100), async (req, res)
   try {
     const DebtManagementService = getDebtManagementService(req)
     const result = await DebtManagementService.getDebtLimits({
-      campaign_id: req.query.campaign_id,
+      lottery_campaign_id: req.query.lottery_campaign_id,
       limit_level: req.query.limit_level,
       status: req.query.status,
       page: req.query.page,
@@ -280,40 +280,45 @@ router.get('/limits', authenticateToken, requireRoleLevel(100), async (req, res)
 })
 
 /**
- * GET /limits/:campaign_id - 获取指定活动的欠账上限配置
+ * GET /limits/:lottery_campaign_id - 获取指定活动的欠账上限配置
  *
  * @description 获取或创建指定活动的欠账上限配置
- * @route GET /api/v4/console/debt-management/limits/:campaign_id
- * @param {number} campaign_id - 活动ID
+ * @route GET /api/v4/console/debt-management/limits/:lottery_campaign_id
+ * @param {number} lottery_campaign_id - 活动ID
  * @access admin
  * @returns {Object} 欠账上限配置
  */
-router.get('/limits/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const campaign_id = parseInt(req.params.campaign_id, 10)
-    if (isNaN(campaign_id) || campaign_id <= 0) {
-      return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
-    }
+router.get(
+  '/limits/:lottery_campaign_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id, 10)
+      if (isNaN(lottery_campaign_id) || lottery_campaign_id <= 0) {
+        return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
+      }
 
-    const DebtManagementService = getDebtManagementService(req)
-    const result = await DebtManagementService.getCampaignDebtLimit(campaign_id)
-    return res.apiSuccess(result, '欠账上限配置获取成功')
-  } catch (error) {
-    logger.error('[debt-management] 获取欠账上限配置失败:', { error: error.message })
+      const DebtManagementService = getDebtManagementService(req)
+      const result = await DebtManagementService.getCampaignDebtLimit(lottery_campaign_id)
+      return res.apiSuccess(result, '欠账上限配置获取成功')
+    } catch (error) {
+      logger.error('[debt-management] 获取欠账上限配置失败:', { error: error.message })
 
-    if (error.message === '活动不存在') {
-      return res.apiError('活动不存在', 'CAMPAIGN_NOT_FOUND', null, 404)
+      if (error.message === '活动不存在') {
+        return res.apiError('活动不存在', 'CAMPAIGN_NOT_FOUND', null, 404)
+      }
+      return res.apiError(`获取欠账上限配置失败: ${error.message}`, 'LIMIT_GET_ERROR', null, 500)
     }
-    return res.apiError(`获取欠账上限配置失败: ${error.message}`, 'LIMIT_GET_ERROR', null, 500)
   }
-})
+)
 
 /**
- * PUT /limits/:campaign_id - 更新欠账上限配置
+ * PUT /limits/:lottery_campaign_id - 更新欠账上限配置
  *
  * @description 更新指定活动的欠账上限配置
- * @route PUT /api/v4/console/debt-management/limits/:campaign_id
- * @param {number} campaign_id - 活动ID
+ * @route PUT /api/v4/console/debt-management/limits/:lottery_campaign_id
+ * @param {number} lottery_campaign_id - 活动ID
  * @body {number} [inventory_debt_limit] - 最大库存欠账数量
  * @body {number} [budget_debt_limit] - 最大预算欠账金额
  * @body {string} [description] - 配置说明
@@ -321,55 +326,60 @@ router.get('/limits/:campaign_id', authenticateToken, requireRoleLevel(100), asy
  * @access admin
  * @returns {Object} 更新后的配置
  */
-router.put('/limits/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const campaign_id = parseInt(req.params.campaign_id, 10)
-    if (isNaN(campaign_id) || campaign_id <= 0) {
-      return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
-    }
-
-    const admin_id = req.user.user_id
-    const { inventory_debt_limit, budget_debt_limit, description, status } = req.body
-
-    const DebtManagementService = getDebtManagementService(req)
-    const result = await DebtManagementService.updateCampaignDebtLimit(
-      campaign_id,
-      { inventory_debt_limit, budget_debt_limit, description, status },
-      admin_id
-    )
-    return res.apiSuccess(result, '欠账上限配置更新成功')
-  } catch (error) {
-    logger.error('[debt-management] 更新欠账上限配置失败:', { error: error.message })
-
-    if (error.message === '活动不存在') {
-      return res.apiError('活动不存在', 'CAMPAIGN_NOT_FOUND', null, 404)
-    }
-    return res.apiError(`更新欠账上限配置失败: ${error.message}`, 'LIMIT_UPDATE_ERROR', null, 500)
-  }
-})
-
-/**
- * GET /limits/:campaign_id/alert-check - 检查活动欠账告警状态
- *
- * @description 检查指定活动的欠账是否接近上限
- * @route GET /api/v4/console/debt-management/limits/:campaign_id/alert-check
- * @param {number} campaign_id - 活动ID
- * @access admin
- * @returns {Object} 告警检查结果
- */
-router.get(
-  '/limits/:campaign_id/alert-check',
+router.put(
+  '/limits/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(100),
   async (req, res) => {
     try {
-      const campaign_id = parseInt(req.params.campaign_id, 10)
-      if (isNaN(campaign_id) || campaign_id <= 0) {
+      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id, 10)
+      if (isNaN(lottery_campaign_id) || lottery_campaign_id <= 0) {
+        return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
+      }
+
+      const admin_id = req.user.user_id
+      const { inventory_debt_limit, budget_debt_limit, description, status } = req.body
+
+      const DebtManagementService = getDebtManagementService(req)
+      const result = await DebtManagementService.updateCampaignDebtLimit(
+        lottery_campaign_id,
+        { inventory_debt_limit, budget_debt_limit, description, status },
+        admin_id
+      )
+      return res.apiSuccess(result, '欠账上限配置更新成功')
+    } catch (error) {
+      logger.error('[debt-management] 更新欠账上限配置失败:', { error: error.message })
+
+      if (error.message === '活动不存在') {
+        return res.apiError('活动不存在', 'CAMPAIGN_NOT_FOUND', null, 404)
+      }
+      return res.apiError(`更新欠账上限配置失败: ${error.message}`, 'LIMIT_UPDATE_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * GET /limits/:lottery_campaign_id/alert-check - 检查活动欠账告警状态
+ *
+ * @description 检查指定活动的欠账是否接近上限
+ * @route GET /api/v4/console/debt-management/limits/:lottery_campaign_id/alert-check
+ * @param {number} lottery_campaign_id - 活动ID
+ * @access admin
+ * @returns {Object} 告警检查结果
+ */
+router.get(
+  '/limits/:lottery_campaign_id/alert-check',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id, 10)
+      if (isNaN(lottery_campaign_id) || lottery_campaign_id <= 0) {
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
       }
 
       const DebtManagementService = getDebtManagementService(req)
-      const result = await DebtManagementService.checkAlertStatus(campaign_id)
+      const result = await DebtManagementService.checkAlertStatus(lottery_campaign_id)
       return res.apiSuccess(result, '告警状态检查完成')
     } catch (error) {
       logger.error('[debt-management] 检查告警状态失败:', { error: error.message })

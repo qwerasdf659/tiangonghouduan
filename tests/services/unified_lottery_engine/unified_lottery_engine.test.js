@@ -71,7 +71,7 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
 
     return {
       user_id: real_test_user.user_id,
-      campaign_id: test_campaign.campaign_id,
+      lottery_campaign_id: test_campaign.lottery_campaign_id,
       request_id: `test_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
       timestamp: BeijingTimeHelper.now(),
       ...overrides
@@ -130,7 +130,9 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
 
       console.log('✅ V4测试环境初始化完成')
       console.log(`📊 测试用户: ${real_test_user.user_id} (${real_test_user.mobile})`)
-      console.log(`📊 测试活动: ${test_campaign ? test_campaign.campaign_id : '无活跃活动'}`)
+      console.log(
+        `📊 测试活动: ${test_campaign ? test_campaign.lottery_campaign_id : '无活跃活动'}`
+      )
     } catch (error) {
       console.error('❌ 测试环境初始化失败:', error.message)
       throw error
@@ -235,7 +237,7 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
     test('应该处理不存在的用户ID', async () => {
       const invalid_context = {
         user_id: 999999, // 不存在的用户ID
-        campaign_id: test_campaign ? test_campaign.campaign_id : 1,
+        lottery_campaign_id: test_campaign ? test_campaign.lottery_campaign_id : 1,
         request_id: 'test_invalid_user'
       }
 

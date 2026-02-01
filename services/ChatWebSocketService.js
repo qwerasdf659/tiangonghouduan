@@ -108,7 +108,7 @@ class ChatWebSocketService {
         hostname: require('os').hostname()
       })
 
-      this.currentStartupLogId = startupLog.log_id
+      this.currentStartupLogId = startupLog.websocket_startup_log_id
 
       wsLogger.info('WebSocket服务启动记录已保存', {
         logId: this.currentStartupLogId,
@@ -431,7 +431,7 @@ class ChatWebSocketService {
    * @param {string} alert.alert_type - 告警类型（win_rate/budget/inventory/user/system）
    * @param {string} alert.severity - 严重程度（info/warning/danger）
    * @param {string} alert.message - 告警消息
-   * @param {number} [alert.campaign_id] - 关联活动ID
+   * @param {number} [alert.lottery_campaign_id] - 关联活动ID
    * @param {string} [alert.rule_code] - 规则代码
    * @param {Date|string} [alert.created_at] - 创建时间
    * @returns {number} 成功推送的管理员数量
@@ -443,7 +443,7 @@ class ChatWebSocketService {
    *   alert_type: 'inventory',
    *   severity: 'danger',
    *   message: '奖品"iPhone 15"库存不足，剩余5件',
-   *   campaign_id: 1,
+   *   lottery_campaign_id: 1,
    *   rule_code: 'RULE_005'
    * })
    */
@@ -456,7 +456,7 @@ class ChatWebSocketService {
       alert_type: alert.alert_type,
       severity: alert.severity,
       message: alert.message,
-      campaign_id: alert.campaign_id || null,
+      lottery_campaign_id: alert.lottery_campaign_id || null,
       rule_code: alert.rule_code || null,
       created_at: alert.created_at || BeijingTimeHelper.now(),
       timestamp: BeijingTimeHelper.now()
@@ -930,12 +930,12 @@ class ChatWebSocketService {
         }
       }
 
-      const sessionIds = sessions.map(s => s.session_id)
+      const sessionIds = sessions.map(s => s.customer_service_session_id)
 
       // 2. 查询离线期间的消息
       const messages = await ChatMessage.findAll({
         where: {
-          session_id: { [require('sequelize').Op.in]: sessionIds },
+          customer_service_session_id: { [require('sequelize').Op.in]: sessionIds },
           created_at: { [require('sequelize').Op.gte]: since },
           // 只获取系统消息或发给用户的消息
           [require('sequelize').Op.or]: [{ message_type: 'system' }, { sender_type: 'admin' }]
@@ -952,8 +952,8 @@ class ChatWebSocketService {
 
       return {
         messages: messages.map(msg => ({
-          message_id: msg.message_id,
-          session_id: msg.session_id,
+          chat_message_id: msg.chat_message_id,
+          customer_service_session_id: msg.customer_service_session_id,
           content: msg.content,
           message_type: msg.message_type,
           sender_type: msg.sender_type,

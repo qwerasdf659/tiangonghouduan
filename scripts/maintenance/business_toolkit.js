@@ -57,11 +57,11 @@ async function analyzeLotteryPoints() {
 
     for (const prize of prizes) {
       const drawCount = await LotteryDraw.count({
-        where: { prize_id: prize.prize_id }
+        where: { lottery_prize_id: prize.lottery_prize_id }
       })
       const percentage = totalDraws > 0 ? ((drawCount / totalDraws) * 100).toFixed(2) : 0
 
-      log(`   ${prize.name}: ${drawCount}次 (${percentage}%)`, 'yellow')
+      log(`   ${prize.prize_name}: ${drawCount}次 (${percentage}%)`, 'yellow')
     }
 
     // 3. 积分消耗统计
@@ -95,11 +95,11 @@ async function updatePrizes() {
 
     log(`\n当前奖品列表 (${prizes.length}个):`, 'blue')
     prizes.forEach((prize, index) => {
-      log(`\n${index + 1}. ${prize.name}`, 'cyan')
-      log(`   ID: ${prize.prize_id}`, 'yellow')
-      log(`   价值: ${prize.points_value}积分`, 'yellow')
+      log(`\n${index + 1}. ${prize.prize_name}`, 'cyan')
+      log(`   ID: ${prize.lottery_prize_id}`, 'yellow')
+      log(`   价值: ${prize.prize_value_points}积分`, 'yellow')
       log(`   概率: ${prize.win_probability || '未设置'}`, 'yellow')
-      log(`   库存: ${prize.stock || '未设置'}`, 'yellow')
+      log(`   库存: ${prize.stock_quantity || '未设置'}`, 'yellow')
     })
 
     log('\n💡 提示: 如需修改奖品，请使用管理后台或直接修改数据库', 'cyan')

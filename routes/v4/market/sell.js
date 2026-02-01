@@ -55,7 +55,7 @@ const marketRiskMiddleware = getMarketRiskControlMiddleware()
  *
  * @returns {Object} 上架结果
  * @returns {Object} data.listing - 挂牌信息
- * @returns {number} data.listing.listing_id - 挂牌ID
+ * @returns {number} data.listing.market_listing_id - 挂牌ID
  * @returns {number} data.listing.item_instance_id - 物品实例ID
  * @returns {number} data.listing.price_amount - 售价
  * @returns {boolean} data.listing.is_duplicate - 是否为幂等回放请求
@@ -213,7 +213,7 @@ router.post(
           const currentCount = listingCountInfo.active_count
           return {
             listing: {
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               item_instance_id: itemId,
               price_amount: priceAmountValue,
               is_duplicate
@@ -223,7 +223,7 @@ router.post(
               limit: listingCountInfo.max_count,
               remaining: listingCountInfo.max_count - currentCount - 1
             },
-            _listing_id: listing.listing_id, // 内部使用，记录幂等
+            _market_listing_id: listing.market_listing_id, // 内部使用，记录幂等
             _is_duplicate: is_duplicate // 内部标记
           }
         },
@@ -237,7 +237,7 @@ router.post(
          */
         await IdempotencyService.markAsCompleted(
           idempotency_key,
-          responseData._listing_id, // 业务事件ID = 挂牌ID
+          responseData._market_listing_id, // 业务事件ID = 挂牌ID
           { listing: responseData.listing, listing_status: responseData.listing_status }
         )
       }
@@ -247,7 +247,7 @@ router.post(
       logger.info('商品上架成功', {
         user_id: userId,
         item_instance_id: itemId,
-        listing_id: responseData._listing_id,
+        market_listing_id: responseData._market_listing_id,
         idempotency_key,
         price_amount: priceAmountValue,
         current_listings: responseData.listing_status.current,
@@ -311,7 +311,7 @@ router.post(
  *
  * @returns {Object} 挂牌结果
  * @returns {Object} data.listing - 挂牌信息
- * @returns {number} data.listing.listing_id - 挂牌ID
+ * @returns {number} data.listing.market_listing_id - 挂牌ID
  * @returns {string} data.listing.offer_asset_code - 挂卖资产代码
  * @returns {number} data.listing.offer_amount - 挂卖数量
  * @returns {number} data.listing.price_amount - 定价金额
@@ -466,7 +466,7 @@ router.post(
           // 构建响应数据
           return {
             listing: {
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               listing_kind: 'fungible_asset',
               offer_asset_code: listing.offer_asset_code,
               offer_amount: Number(listing.offer_amount),
@@ -486,7 +486,7 @@ router.post(
                   frozen_amount: Number(freeze_result.balance.frozen_amount)
                 }
               : null,
-            _listing_id: listing.listing_id,
+            _market_listing_id: listing.market_listing_id,
             _is_duplicate: is_duplicate
           }
         },
@@ -495,7 +495,7 @@ router.post(
 
       // 记录幂等完成状态
       if (!responseData._is_duplicate) {
-        await IdempotencyService.markAsCompleted(idempotency_key, responseData._listing_id, {
+        await IdempotencyService.markAsCompleted(idempotency_key, responseData._market_listing_id, {
           listing: responseData.listing,
           listing_status: responseData.listing_status,
           balance_after: responseData.balance_after
@@ -504,7 +504,7 @@ router.post(
 
       logger.info('可叠加资产挂牌成功', {
         user_id: userId,
-        listing_id: responseData._listing_id,
+        market_listing_id: responseData._market_listing_id,
         offer_asset_code,
         offer_amount: offerAmountValue,
         price_amount: priceAmountValue,

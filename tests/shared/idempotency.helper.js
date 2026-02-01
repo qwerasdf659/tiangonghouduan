@@ -312,20 +312,20 @@ class IdempotencyTestSuite {
 
     // 获取初始抽奖记录数
     const countBefore = await LotteryDraw.count({
-      where: { user_id: userId, campaign_id: campaignId }
+      where: { user_id: userId, lottery_campaign_id: campaignId }
     })
 
     // 第一次抽奖
     await LotteryEngine.executeLottery({
       user_id: userId,
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       draws_count: 1,
       idempotency_key: idempotencyKey
     })
 
     // 验证抽奖记录增加
     const countAfterFirst = await LotteryDraw.count({
-      where: { user_id: userId, campaign_id: campaignId }
+      where: { user_id: userId, lottery_campaign_id: campaignId }
     })
 
     if (countAfterFirst !== countBefore + 1) {
@@ -335,14 +335,14 @@ class IdempotencyTestSuite {
     // 第二次抽奖（相同idempotency_key）
     await LotteryEngine.executeLottery({
       user_id: userId,
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       draws_count: 1,
       idempotency_key: idempotencyKey // 相同幂等性键
     })
 
     // 验证抽奖记录未再次增加
     const countAfterSecond = await LotteryDraw.count({
-      where: { user_id: userId, campaign_id: campaignId }
+      where: { user_id: userId, lottery_campaign_id: campaignId }
     })
 
     if (countAfterSecond !== countAfterFirst) {

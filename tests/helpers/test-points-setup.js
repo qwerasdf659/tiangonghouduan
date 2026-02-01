@@ -267,7 +267,7 @@ async function ensureTestUserHasQuota(requiredDraws = 10000, userId = null, camp
     // 1. 获取当前配额状态
     const currentStatus = await LotteryQuotaService.getOrInitQuotaStatus({
       user_id,
-      campaign_id: campaignId
+      lottery_campaign_id: campaignId
     })
 
     const currentRemaining = currentStatus.remaining || 0
@@ -289,7 +289,7 @@ async function ensureTestUserHasQuota(requiredDraws = 10000, userId = null, camp
       console.log(`   剩余配额 ${currentRemaining.toLocaleString()} >= 目标 ${requiredDraws.toLocaleString()}\n`)
       return {
         user_id,
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         before_remaining: currentRemaining,
         after_remaining: currentRemaining,
         added_bonus: 0
@@ -305,7 +305,7 @@ async function ensureTestUserHasQuota(requiredDraws = 10000, userId = null, camp
     try {
       await LotteryQuotaService.addBonusDrawCount({
         user_id,
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         bonus_count: shortage,
         reason: '大规模测试配额补充'
       }, { transaction })
@@ -315,7 +315,7 @@ async function ensureTestUserHasQuota(requiredDraws = 10000, userId = null, camp
       // 4. 验证配额
       const newStatus = await LotteryQuotaService.getOrInitQuotaStatus({
         user_id,
-        campaign_id: campaignId
+        lottery_campaign_id: campaignId
       })
 
       const newRemaining = newStatus.remaining || 0
@@ -326,7 +326,7 @@ async function ensureTestUserHasQuota(requiredDraws = 10000, userId = null, camp
 
       return {
         user_id,
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         before_remaining: currentRemaining,
         after_remaining: newRemaining,
         added_bonus: shortage
@@ -377,7 +377,7 @@ async function resetTestUserDailyQuota(userId = null, campaignId = 1) {
     const deleted = await LotteryUserDailyDrawQuota.destroy({
       where: {
         user_id,
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         quota_date: today
       }
     })
@@ -458,7 +458,7 @@ async function resetTestUserDailyListings(userId = null, assetCode = null) {
     // 1. 查找当日挂牌
     const listings = await MarketListing.findAll({
       where: listingWhere,
-      attributes: ['listing_id', 'status']
+      attributes: ['market_listing_id', 'status']
     })
 
     if (listings.length === 0) {
@@ -466,18 +466,18 @@ async function resetTestUserDailyListings(userId = null, assetCode = null) {
       return { deleted_listings: 0, deleted_orders: 0 }
     }
 
-    const listingIds = listings.map(l => l.listing_id)
+    const listingIds = listings.map(l => l.market_listing_id)
     console.log(`   找到 ${listingIds.length} 条当日挂牌记录`)
 
     // 2. 删除关联的订单
     const deletedOrders = await TradeOrder.destroy({
-      where: { listing_id: { [Op.in]: listingIds } }
+      where: { market_listing_id: { [Op.in]: listingIds } }
     })
     console.log(`   删除 ${deletedOrders} 条关联订单`)
 
     // 3. 删除挂牌记录
     const deletedListings = await MarketListing.destroy({
-      where: { listing_id: { [Op.in]: listingIds } }
+      where: { market_listing_id: { [Op.in]: listingIds } }
     })
 
     console.log(`✅ [test-points-setup] 挂牌记录清理完成`)

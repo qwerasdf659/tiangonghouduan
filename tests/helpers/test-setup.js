@@ -282,7 +282,7 @@ const TestConfig = {
 
   /**
    * 🔴 P0-1修复：真实测试数据配置
-   * 说明：这里只保存 mobile 作为查询key，user_id 和 campaign_id 通过 initRealTestData() 动态获取
+   * 说明：这里只保存 mobile 作为查询key，user_id 和 lottery_campaign_id 通过 initRealTestData() 动态获取
    * 避免硬编码导致的测试数据不一致问题
    */
   realData: {
@@ -300,7 +300,7 @@ const TestConfig = {
 
     // ✅ 测试活动信息 - 通过 initRealTestData() 动态获取活跃活动
     testCampaign: {
-      campaign_id: null, // 🔴 P0-1修复：移除硬编码，通过 initRealTestData() 动态获取
+      lottery_campaign_id: null, // 🔴 P0-1修复：移除硬编码，通过 initRealTestData() 动态获取
       campaignName: null // 测试活动名称，动态获取
     },
 
@@ -334,7 +334,7 @@ const TestConfig = {
  * 🔴 P0-1修复：初始化真实测试数据
  *
  * 解决问题（P0-1原因）：
- * - 原先测试数据硬编码（user_id=31, campaign_id=2）
+ * - 原先测试数据硬编码（user_id=31, lottery_campaign_id=2）
  * - 数据库变更后测试失败
  *
  * 解决方案（已实施 2026-01-08）：
@@ -375,19 +375,19 @@ async function initRealTestData(mobile = '13612227930') {
     // 2. 查询活跃的测试活动
     const campaign = await LotteryCampaign.findOne({
       where: { status: 'active' },
-      order: [['campaign_id', 'ASC']], // 取第一个活跃活动
-      attributes: ['campaign_id', 'campaign_name', 'campaign_code', 'status']
+      order: [['lottery_campaign_id', 'ASC']], // 取第一个活跃活动
+      attributes: ['lottery_campaign_id', 'campaign_name', 'campaign_code', 'status']
     })
 
     if (!campaign) {
       console.warn('⚠️ initRealTestData: 未找到活跃的测试活动')
       // 不抛错，允许测试继续（某些测试可能不需要活动）
     } else {
-      TestConfig.realData.testCampaign.campaign_id = campaign.campaign_id
+      TestConfig.realData.testCampaign.lottery_campaign_id = campaign.lottery_campaign_id
       TestConfig.realData.testCampaign.campaignName = campaign.campaign_name
       TestConfig.realData.testCampaign.campaign_code = campaign.campaign_code
       console.log(
-        `✅ initRealTestData: 测试活动 campaign_id=${campaign.campaign_id}, code=${campaign.campaign_code}, name=${campaign.campaign_name}`
+        `✅ initRealTestData: 测试活动 lottery_campaign_id=${campaign.lottery_campaign_id}, code=${campaign.campaign_code}, name=${campaign.campaign_name}`
       )
     }
 
@@ -440,7 +440,7 @@ async function getRealTestCampaignId() {
   if (!TestConfig.realData._initialized) {
     await initRealTestData()
   }
-  return TestConfig.realData.testCampaign.campaign_id
+  return TestConfig.realData.testCampaign.lottery_campaign_id
 }
 
 /**

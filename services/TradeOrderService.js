@@ -106,22 +106,22 @@ class TradeOrderService {
    *
    * @param {Object} params - 订单参数
    * @param {string} params.idempotency_key - 幂等键（必需，格式：market_purchase_<timestamp>_<random>）
-   * @param {number} params.listing_id - 挂牌ID
+   * @param {number} params.market_listing_id - 挂牌ID
    * @param {number} params.buyer_id - 买家用户ID
    * @param {Object} [options] - 事务选项
    * @param {Object} [options.transaction] - Sequelize事务对象（可选，用于外部事务）
-   * @returns {Promise<Object>} 订单创建结果 {order_id, is_duplicate}
+   * @returns {Promise<Object>} 订单创建结果 {trade_order_id, is_duplicate}
    * @throws {Error} 参数验证失败、挂牌不存在、挂牌状态异常、余额不足等
    */
   static async createOrder(params, options = {}) {
-    const { idempotency_key, listing_id, buyer_id } = params
+    const { idempotency_key, market_listing_id, buyer_id } = params
 
     // 1. 参数验证
     if (!idempotency_key) {
       throw new Error('idempotency_key 是必需参数')
     }
-    if (!listing_id) {
-      throw new Error('listing_id 是必需参数')
+    if (!market_listing_id) {
+      throw new Error('market_listing_id 是必需参数')
     }
     if (!buyer_id) {
       throw new Error('buyer_id 是必需参数')
@@ -138,7 +138,7 @@ class TradeOrderService {
        * 幂等性校验：参数一致性检查
        *
        * 参数一致性指纹：
-       * - listing_id
+       * - market_listing_id
        * - buyer_user_id
        * - gross_amount（或 price_amount）
        * - asset_code（白名单校验 - 2026-01-14 多币种扩展）
@@ -151,13 +151,13 @@ class TradeOrderService {
       if (!existingAssetAllowed) {
         const whitelist = await getAllowedSettlementAssets()
         const error = new Error(
-          `幂等回放发现异常订单：订单 ${existingOrder.order_id} 的 asset_code=${existingOrder.asset_code}，` +
+          `幂等回放发现异常订单：订单 ${existingOrder.trade_order_id} 的 asset_code=${existingOrder.asset_code}，` +
             `不在允许的结算币种白名单中（当前白名单：${whitelist.join(', ')}）`
         )
         error.code = 'INVALID_ASSET_CODE'
         error.statusCode = 500 // 数据异常，服务端错误
         error.details = {
-          order_id: existingOrder.order_id,
+          trade_order_id: existingOrder.trade_order_id,
           idempotency_key: existingOrder.idempotency_key,
           asset_code: existingOrder.asset_code,
           allowed: whitelist
@@ -167,12 +167,12 @@ class TradeOrderService {
 
       // 先查询挂牌信息获取 gross_amount 和 asset_code
       const tempListing = await MarketListing.findOne({
-        where: { listing_id },
+        where: { market_listing_id },
         transaction: options.transaction
       })
 
       if (!tempListing) {
-        throw new Error(`挂牌不存在: ${listing_id}`)
+        throw new Error(`挂牌不存在: ${market_listing_id}`)
       }
 
       // 校验当前挂牌的 price_asset_code 是否在白名单中（多币种扩展 - 2026-01-14）
@@ -185,7 +185,7 @@ class TradeOrderService {
         error.code = 'INVALID_ASSET_CODE'
         error.statusCode = 400
         error.details = {
-          listing_id: tempListing.listing_id,
+          market_listing_id: tempListing.market_listing_id,
           price_asset_code: tempListing.price_asset_code,
           allowed: whitelist
         }
@@ -202,8 +202,10 @@ class TradeOrderService {
        */
       const parameterMismatch = []
 
-      if (Number(existingOrder.listing_id) !== Number(listing_id)) {
-        parameterMismatch.push(`listing_id: ${existingOrder.listing_id} ≠ ${listing_id}`)
+      if (Number(existingOrder.market_listing_id) !== Number(market_listing_id)) {
+        parameterMismatch.push(
+          `market_listing_id: ${existingOrder.market_listing_id} ≠ ${market_listing_id}`
+        )
       }
       if (Number(existingOrder.buyer_user_id) !== Number(buyer_id)) {
         parameterMismatch.push(`buyer_user_id: ${existingOrder.buyer_user_id} ≠ ${buyer_id}`)
@@ -223,15 +225,15 @@ class TradeOrderService {
         error.statusCode = 409
         error.details = {
           idempotency_key,
-          existing_order_id: existingOrder.order_id,
+          existing_trade_order_id: existingOrder.trade_order_id,
           mismatched_parameters: parameterMismatch
         }
         throw error
       }
 
-      logger.info(`[TradeOrderService] 幂等返回已有订单: ${existingOrder.order_id}`)
+      logger.info(`[TradeOrderService] 幂等返回已有订单: ${existingOrder.trade_order_id}`)
       return {
-        order_id: existingOrder.order_id,
+        trade_order_id: existingOrder.trade_order_id,
         is_duplicate: true
       }
     }
@@ -241,7 +243,7 @@ class TradeOrderService {
 
     // 3.1 查询挂牌信息
     const listing = await MarketListing.findOne({
-      where: { listing_id },
+      where: { market_listing_id },
       include: [
         {
           model: ItemInstance,
@@ -255,7 +257,7 @@ class TradeOrderService {
     })
 
     if (!listing) {
-      throw new Error(`挂牌不存在: ${listing_id}`)
+      throw new Error(`挂牌不存在: ${market_listing_id}`)
     }
 
     if (listing.status !== 'on_sale') {
@@ -393,15 +395,15 @@ class TradeOrderService {
 
     /*
      * 3.4 创建订单记录（created）
-     * 生成业务唯一键（格式：trade_order_{buyer_id}_{listing_id}_{timestamp}）
+     * 生成业务唯一键（格式：trade_order_{buyer_id}_{market_listing_id}_{timestamp}）
      */
-    const business_id = `trade_order_${buyer_id}_${listing_id}_${Date.now()}`
+    const business_id = `trade_order_${buyer_id}_${market_listing_id}_${Date.now()}`
 
     const order = await TradeOrder.create(
       {
         business_id, // ✅ 业务唯一键（事务边界治理 - 2026-01-05）
         idempotency_key,
-        listing_id,
+        market_listing_id,
         buyer_user_id: buyer_id,
         seller_user_id: listing.seller_user_id,
         asset_code: listing.price_asset_code,
@@ -419,7 +421,7 @@ class TradeOrderService {
     // 3.5 更新挂牌的锁定订单ID（绑定订单）
     await listing.update(
       {
-        locked_by_order_id: order.order_id
+        locked_by_order_id: order.trade_order_id
       },
       { transaction }
     )
@@ -435,9 +437,9 @@ class TradeOrderService {
         amount: grossAmount,
         meta: {
           order_action: 'freeze',
-          order_id: order.order_id,
-          listing_id,
-          freeze_reason: `购买挂牌 ${listing_id}`
+          trade_order_id: order.trade_order_id,
+          market_listing_id,
+          freeze_reason: `购买挂牌 ${market_listing_id}`
         }
       },
       { transaction }
@@ -455,14 +457,14 @@ class TradeOrderService {
       { transaction }
     )
 
-    logger.info(`[TradeOrderService] 订单创建成功: ${order.order_id}`, {
+    logger.info(`[TradeOrderService] 订单创建成功: ${order.trade_order_id}`, {
       idempotency_key,
-      listing_id,
+      market_listing_id,
       buyer_id
     })
 
     return {
-      order_id: order.order_id,
+      trade_order_id: order.trade_order_id,
       is_duplicate: false
     }
   }
@@ -478,7 +480,7 @@ class TradeOrderService {
    * 5. 更新挂牌状态（sold）
    *
    * @param {Object} params - 完成订单参数
-   * @param {number} params.order_id - 订单ID
+   * @param {number} params.trade_order_id - 订单ID
    * @param {number} params.buyer_id - 买家用户ID（用于验证）
    * @param {Object} [options] - 事务选项
    * @param {Object} [options.transaction] - Sequelize事务对象（可选）
@@ -486,11 +488,11 @@ class TradeOrderService {
    * @throws {Error} 订单不存在、状态异常等
    */
   static async completeOrder(params, options = {}) {
-    const { order_id, buyer_id: _buyer_id } = params
+    const { trade_order_id, buyer_id: _buyer_id } = params
 
     // 参数验证
-    if (!order_id) {
-      throw new Error('order_id 是必需参数')
+    if (!trade_order_id) {
+      throw new Error('trade_order_id 是必需参数')
     }
 
     // 强制要求事务边界 - 2026-01-05 治理决策
@@ -498,7 +500,7 @@ class TradeOrderService {
 
     // 1. 查询订单
     const order = await TradeOrder.findOne({
-      where: { order_id },
+      where: { trade_order_id },
       include: [
         {
           model: MarketListing,
@@ -509,7 +511,7 @@ class TradeOrderService {
     })
 
     if (!order) {
-      throw new Error(`订单不存在: ${order_id}`)
+      throw new Error(`订单不存在: ${trade_order_id}`)
     }
 
     if (order.status !== 'frozen') {
@@ -533,8 +535,8 @@ class TradeOrderService {
         asset_code: order.asset_code,
         amount: order.gross_amount,
         meta: {
-          order_id: order.order_id,
-          listing_id: order.listing_id,
+          trade_order_id: order.trade_order_id,
+          market_listing_id: order.market_listing_id,
           gross_amount: order.gross_amount,
           fee_amount: order.fee_amount,
           net_amount: order.net_amount
@@ -554,8 +556,8 @@ class TradeOrderService {
           asset_code: order.asset_code,
           delta_amount: order.net_amount,
           meta: {
-            order_id: order.order_id,
-            listing_id: order.listing_id,
+            trade_order_id: order.trade_order_id,
+            market_listing_id: order.market_listing_id,
             buyer_user_id: order.buyer_user_id,
             gross_amount: order.gross_amount,
             fee_amount: order.fee_amount,
@@ -577,8 +579,8 @@ class TradeOrderService {
           asset_code: order.asset_code,
           delta_amount: order.fee_amount,
           meta: {
-            order_id: order.order_id,
-            listing_id: order.listing_id,
+            trade_order_id: order.trade_order_id,
+            market_listing_id: order.market_listing_id,
             buyer_user_id: order.buyer_user_id,
             seller_user_id: order.seller_user_id,
             gross_amount: order.gross_amount,
@@ -617,7 +619,7 @@ class TradeOrderService {
           business_type: 'market_transfer',
           idempotency_key: `${idempotency_key}:transfer_item`, // 派生子幂等键
           meta: {
-            listing_id: order.listing_id,
+            market_listing_id: order.market_listing_id,
             from_user: order.seller_user_id,
             to_user: order.buyer_user_id,
             gross_amount: order.gross_amount,
@@ -652,8 +654,8 @@ class TradeOrderService {
           asset_code: listing.offer_asset_code,
           amount: listing.offer_amount,
           meta: {
-            order_id: order.order_id,
-            listing_id: order.listing_id,
+            trade_order_id: order.trade_order_id,
+            market_listing_id: order.market_listing_id,
             buyer_user_id: order.buyer_user_id,
             offer_asset_code: listing.offer_asset_code,
             offer_amount: listing.offer_amount,
@@ -664,7 +666,7 @@ class TradeOrderService {
       )
 
       logger.info('[TradeOrderService] 卖家标的资产已从冻结扣减', {
-        order_id,
+        trade_order_id,
         seller_user_id: order.seller_user_id,
         asset_code: listing.offer_asset_code,
         amount: listing.offer_amount
@@ -680,8 +682,8 @@ class TradeOrderService {
           asset_code: listing.offer_asset_code,
           delta_amount: listing.offer_amount,
           meta: {
-            order_id: order.order_id,
-            listing_id: order.listing_id,
+            trade_order_id: order.trade_order_id,
+            market_listing_id: order.market_listing_id,
             seller_user_id: order.seller_user_id,
             offer_asset_code: listing.offer_asset_code,
             offer_amount: listing.offer_amount,
@@ -692,7 +694,7 @@ class TradeOrderService {
       )
 
       logger.info('[TradeOrderService] 买家已收到标的资产', {
-        order_id,
+        trade_order_id,
         buyer_user_id: order.buyer_user_id,
         asset_code: listing.offer_asset_code,
         amount: listing.offer_amount
@@ -730,7 +732,7 @@ class TradeOrderService {
     try {
       // 通知卖家：挂牌已售出
       await NotificationService.notifyListingSold(order.seller_user_id, {
-        listing_id: order.listing_id,
+        market_listing_id: order.market_listing_id,
         offer_asset_code: listing.offer_asset_code || listing.offer_item_instance_id?.toString(),
         offer_amount: Number(listing.offer_amount) || 1,
         price_amount: Number(order.gross_amount),
@@ -743,7 +745,7 @@ class TradeOrderService {
     try {
       // 通知买家：购买成功
       await NotificationService.notifyPurchaseCompleted(order.buyer_user_id, {
-        order_id: order.order_id,
+        trade_order_id: order.trade_order_id,
         offer_asset_code: listing.offer_asset_code || listing.offer_item_instance_id?.toString(),
         offer_amount: Number(listing.offer_amount) || 1,
         price_amount: Number(order.gross_amount)
@@ -752,7 +754,7 @@ class TradeOrderService {
       logger.warn('[TradeOrderService] 发送买家购买成功通知失败（非致命）:', notifyError.message)
     }
 
-    logger.info(`[TradeOrderService] 订单完成: ${order_id}`, {
+    logger.info(`[TradeOrderService] 订单完成: ${trade_order_id}`, {
       idempotency_key,
       buyer_user_id: order.buyer_user_id,
       seller_user_id: order.seller_user_id,
@@ -778,7 +780,7 @@ class TradeOrderService {
    * 4. 更新订单状态（cancelled）
    *
    * @param {Object} params - 取消订单参数
-   * @param {number} params.order_id - 订单ID
+   * @param {number} params.trade_order_id - 订单ID
    * @param {string} [params.cancel_reason] - 取消原因（可选）
    * @param {Object} [options] - 事务选项
    * @param {Object} [options.transaction] - Sequelize事务对象（可选）
@@ -786,11 +788,11 @@ class TradeOrderService {
    * @throws {Error} 订单不存在、状态异常等
    */
   static async cancelOrder(params, options = {}) {
-    const { order_id, cancel_reason } = params
+    const { trade_order_id, cancel_reason } = params
 
     // 参数验证
-    if (!order_id) {
-      throw new Error('order_id 是必需参数')
+    if (!trade_order_id) {
+      throw new Error('trade_order_id 是必需参数')
     }
 
     // 强制要求事务边界 - 2026-01-05 治理决策
@@ -798,7 +800,7 @@ class TradeOrderService {
 
     // 1. 查询订单
     const order = await TradeOrder.findOne({
-      where: { order_id },
+      where: { trade_order_id },
       include: [
         {
           model: MarketListing,
@@ -809,7 +811,7 @@ class TradeOrderService {
     })
 
     if (!order) {
-      throw new Error(`订单不存在: ${order_id}`)
+      throw new Error(`订单不存在: ${trade_order_id}`)
     }
 
     if (order.status !== 'frozen' && order.status !== 'created') {
@@ -832,8 +834,8 @@ class TradeOrderService {
         amount: order.gross_amount,
         meta: {
           order_action: 'unfreeze',
-          order_id,
-          unfreeze_reason: cancel_reason || `取消订单 ${order_id}`
+          trade_order_id,
+          unfreeze_reason: cancel_reason || `取消订单 ${trade_order_id}`
         }
       },
       { transaction }
@@ -869,7 +871,7 @@ class TradeOrderService {
       { transaction }
     )
 
-    logger.info(`[TradeOrderService] 订单取消: ${order_id}`, {
+    logger.info(`[TradeOrderService] 订单取消: ${trade_order_id}`, {
       idempotency_key,
       cancel_reason
     })
@@ -883,12 +885,12 @@ class TradeOrderService {
   /**
    * 查询订单详情
    *
-   * @param {number} order_id - 订单ID
+   * @param {number} trade_order_id - 订单ID
    * @returns {Promise<Object>} 订单详情
    */
-  static async getOrderDetail(order_id) {
+  static async getOrderDetail(trade_order_id) {
     const order = await TradeOrder.findOne({
-      where: { order_id },
+      where: { trade_order_id },
       include: [
         {
           model: MarketListing,
@@ -904,7 +906,7 @@ class TradeOrderService {
     })
 
     if (!order) {
-      throw new Error(`订单不存在: ${order_id}`)
+      throw new Error(`订单不存在: ${trade_order_id}`)
     }
 
     return order
@@ -973,7 +975,7 @@ class TradeOrderService {
    * @param {Object} options - 查询参数
    * @param {number} [options.buyer_user_id] - 买家用户ID
    * @param {number} [options.seller_user_id] - 卖家用户ID
-   * @param {number} [options.listing_id] - 挂牌ID
+   * @param {number} [options.market_listing_id] - 挂牌ID
    * @param {string} [options.status] - 订单状态（created/frozen/completed/cancelled/failed）
    * @param {string} [options.asset_code] - 结算资产代码
    * @param {string} [options.start_time] - 开始时间（ISO8601格式，北京时间）
@@ -986,7 +988,7 @@ class TradeOrderService {
     const {
       buyer_user_id,
       seller_user_id,
-      listing_id,
+      market_listing_id,
       status,
       asset_code,
       start_time,
@@ -999,7 +1001,7 @@ class TradeOrderService {
 
     if (buyer_user_id) where.buyer_user_id = buyer_user_id
     if (seller_user_id) where.seller_user_id = seller_user_id
-    if (listing_id) where.listing_id = listing_id
+    if (market_listing_id) where.market_listing_id = market_listing_id
     if (status) where.status = status
     if (asset_code) where.asset_code = asset_code
 
@@ -1029,7 +1031,7 @@ class TradeOrderService {
           model: MarketListing,
           as: 'listing',
           attributes: [
-            'listing_id',
+            'market_listing_id',
             'listing_kind',
             'offer_item_instance_id',
             'offer_asset_code',
@@ -1076,11 +1078,11 @@ class TradeOrderService {
   /**
    * 获取单个交易订单详情（管理后台用，包含中文显示名称）
    *
-   * @param {number} order_id - 订单ID
+   * @param {number} trade_order_id - 订单ID
    * @returns {Promise<Object|null>} 订单详情或null
    */
-  static async getOrderById(order_id) {
-    const order = await TradeOrder.findByPk(order_id, {
+  static async getOrderById(trade_order_id) {
+    const order = await TradeOrder.findByPk(trade_order_id, {
       include: [
         {
           model: User,
@@ -1096,7 +1098,7 @@ class TradeOrderService {
           model: MarketListing,
           as: 'listing',
           attributes: [
-            'listing_id',
+            'market_listing_id',
             'listing_kind',
             'offer_item_instance_id',
             'offer_asset_code',
@@ -1151,7 +1153,7 @@ class TradeOrderService {
           model: MarketListing,
           as: 'listing',
           attributes: [
-            'listing_id',
+            'market_listing_id',
             'listing_kind',
             'offer_item_instance_id',
             'offer_asset_code',
@@ -1205,7 +1207,7 @@ class TradeOrderService {
 
     // 按状态统计
     const statusStats = await TradeOrder.findAll({
-      attributes: ['status', [fn('COUNT', col('order_id')), 'count']],
+      attributes: ['status', [fn('COUNT', col('trade_order_id')), 'count']],
       where,
       group: ['status'],
       raw: true
@@ -1214,7 +1216,7 @@ class TradeOrderService {
     // 金额汇总统计
     const amountStats = await TradeOrder.findOne({
       attributes: [
-        [fn('COUNT', col('order_id')), 'total_orders'],
+        [fn('COUNT', col('trade_order_id')), 'total_orders'],
         [fn('SUM', col('gross_amount')), 'total_gross_amount'],
         [fn('SUM', col('fee_amount')), 'total_fee_amount'],
         [fn('SUM', col('net_amount')), 'total_net_amount']
@@ -1260,7 +1262,7 @@ class TradeOrderService {
     // 作为买家的统计
     const buyerStats = await TradeOrder.findOne({
       attributes: [
-        [fn('COUNT', col('order_id')), 'total_orders'],
+        [fn('COUNT', col('trade_order_id')), 'total_orders'],
         [fn('SUM', col('gross_amount')), 'total_spent']
       ],
       where: { buyer_user_id: user_id, status: 'completed' },
@@ -1270,7 +1272,7 @@ class TradeOrderService {
     // 作为卖家的统计
     const sellerStats = await TradeOrder.findOne({
       attributes: [
-        [fn('COUNT', col('order_id')), 'total_orders'],
+        [fn('COUNT', col('trade_order_id')), 'total_orders'],
         [fn('SUM', col('net_amount')), 'total_earned']
       ],
       where: { seller_user_id: user_id, status: 'completed' },

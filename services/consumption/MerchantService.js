@@ -204,7 +204,7 @@ class MerchantService {
         where: whereClause,
         attributes: [
           'status',
-          [sequelize.fn('COUNT', sequelize.col('record_id')), 'count'],
+          [sequelize.fn('COUNT', sequelize.col('consumption_record_id')), 'count'],
           [sequelize.fn('SUM', sequelize.col('consumption_amount')), 'total_amount'],
           [sequelize.fn('SUM', sequelize.col('points_to_award')), 'total_points']
         ],

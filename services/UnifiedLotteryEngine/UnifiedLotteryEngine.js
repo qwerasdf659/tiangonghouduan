@@ -96,7 +96,7 @@
  *
  *   const result = await engine.executeLottery({
  *     user_id: 1,
- *     campaign_id: 2,
+ *     lottery_campaign_id: 2,
  *     draws_count: 1,
  *     user_points: 500,
  *     user_draws_today: 2
@@ -226,7 +226,7 @@ class UnifiedLotteryEngine {
    *
    * @param {Object} context - 抽奖上下文
    * @param {number} context.user_id - 用户ID
-   * @param {number} context.campaign_id - 活动ID
+   * @param {number} context.lottery_campaign_id - 活动ID
    * @param {string} context.idempotency_key - 幂等键
    * @param {Object} context.user_status - 用户状态（可选）
    * @param {Transaction} transaction - 外部事务对象（可选，用于连抽统一事务保护）
@@ -240,7 +240,7 @@ class UnifiedLotteryEngine {
       this.logInfo('开始执行抽奖（Pipeline 模式）', {
         executionId,
         user_id: context?.user_id,
-        campaign_id: context?.campaign_id,
+        lottery_campaign_id: context?.lottery_campaign_id,
         hasExternalTransaction: !!transaction
       })
 
@@ -336,8 +336,8 @@ class UnifiedLotteryEngine {
       message: '抽奖成功',
       data: {
         draw_result: {
-          draw_id: drawRecord.draw_id,
-          prize_id: drawRecord.prize_id,
+          lottery_draw_id: drawRecord.lottery_draw_id,
+          lottery_prize_id: drawRecord.lottery_prize_id,
           prize_name: drawRecord.prize_name,
           prize_type: drawRecord.prize_type,
           prize_value: drawRecord.prize_value,
@@ -425,7 +425,7 @@ class UnifiedLotteryEngine {
         data: {
           draw_result: {
             reward_tier: result.reward_tier, // V4.0：奖励档位
-            prize_id: result.prize?.id || null,
+            lottery_prize_id: result.prize?.id || null,
             prize_name: result.prize?.name || null,
             prize_type: result.prize?.type || null,
             prize_value: result.prize?.value || null,
@@ -772,25 +772,25 @@ class UnifiedLotteryEngine {
 
   /**
    * 获取活动的奖品列表
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 抽奖活动ID
    * @returns {Promise<Array>} 奖品列表
    */
-  async get_campaign_prizes(campaign_id) {
+  async get_campaign_prizes(lottery_campaign_id) {
     try {
       const models = require('../../models')
 
       const prizes = await models.LotteryPrize.findAll({
         where: {
-          campaign_id,
+          lottery_campaign_id,
           status: 'active'
         },
         attributes: [
-          'prize_id',
+          'lottery_prize_id',
           'prize_name',
           'prize_type',
           'prize_value',
           'prize_description',
-          'image_id',
+          'image_resource_id',
           'win_probability',
           'stock_quantity',
           'max_daily_wins',
@@ -801,20 +801,20 @@ class UnifiedLotteryEngine {
         ],
         order: [
           ['sort_order', 'ASC'],
-          ['prize_id', 'ASC']
+          ['lottery_prize_id', 'ASC']
         ],
         raw: true // 返回普通JSON对象，而非Sequelize模型实例
       })
 
       this.logInfo('获取活动奖品列表', {
-        campaign_id,
+        lottery_campaign_id,
         prizesCount: prizes.length
       })
 
       return prizes
     } catch (error) {
       this.logError('获取活动奖品列表失败', {
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       throw new Error(`获取活动奖品失败: ${error.message}`)
@@ -823,20 +823,20 @@ class UnifiedLotteryEngine {
 
   /**
    * 获取活动配置信息
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 抽奖活动ID
    * @param {Object} options - 选项
    * @param {boolean} options.refresh - 强制刷新缓存
    * @returns {Promise<Object>} 活动配置
    */
-  async get_campaign_config(campaign_id, options = {}) {
+  async get_campaign_config(lottery_campaign_id, options = {}) {
     const { refresh = false } = options
 
     try {
       // ========== Redis 缓存读取（2026-01-03 P1 缓存优化）==========
       if (!refresh) {
-        const cached = await BusinessCacheHelper.getLotteryCampaign(campaign_id)
+        const cached = await BusinessCacheHelper.getLotteryCampaign(lottery_campaign_id)
         if (cached) {
-          this.logDebug('[活动配置缓存] 命中', { campaign_id })
+          this.logDebug('[活动配置缓存] 命中', { lottery_campaign_id })
           return cached
         }
       }
@@ -844,9 +844,9 @@ class UnifiedLotteryEngine {
       const models = require('../../models')
 
       const campaign = await models.LotteryCampaign.findOne({
-        where: { campaign_id },
+        where: { lottery_campaign_id },
         attributes: [
-          'campaign_id',
+          'lottery_campaign_id',
           'campaign_name',
           'campaign_code',
           'campaign_type',
@@ -877,7 +877,7 @@ class UnifiedLotteryEngine {
       const guaranteeRule = null // V4.6: Pipeline 内部处理保底规则
 
       this.logInfo('获取活动配置', {
-        campaign_id,
+        lottery_campaign_id,
         campaign_name: campaign.campaign_name,
         status: campaign.status
       })
@@ -888,12 +888,12 @@ class UnifiedLotteryEngine {
       }
 
       // ========== 写入 Redis 缓存（60s TTL）==========
-      await BusinessCacheHelper.setLotteryCampaign(campaign_id, config)
+      await BusinessCacheHelper.setLotteryCampaign(lottery_campaign_id, config)
 
       return config
     } catch (error) {
       this.logError('获取活动配置失败', {
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       throw new Error(`获取活动配置失败: ${error.message}`)
@@ -913,7 +913,7 @@ class UnifiedLotteryEngine {
    * - 流水幂等：通过派生 idempotency_key 保证每条流水唯一
    *
    * @param {number} user_id - 用户ID
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 抽奖活动ID
    * @param {number} draw_count - 抽奖次数（默认1次）
    * @param {Object} options - 选项参数
    * @param {string} options.idempotency_key - 请求级幂等键（用于派生事务级幂等键）
@@ -921,7 +921,7 @@ class UnifiedLotteryEngine {
    * @param {Object} options.transaction - Sequelize事务对象（可选，由路由层 TransactionManager 传入）
    * @returns {Promise<Object>} 抽奖结果
    */
-  async execute_draw(user_id, campaign_id, draw_count = 1, options = {}) {
+  async execute_draw(user_id, lottery_campaign_id, draw_count = 1, options = {}) {
     // 方案B：从请求参数获取或生成幂等键
     const {
       generateLotterySessionId,
@@ -960,13 +960,13 @@ class UnifiedLotteryEngine {
     try {
       this.logInfo('开始执行抽奖（路由层调用）', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         draw_count
       })
 
       // 🔴 参数验证
-      if (!user_id || !campaign_id) {
-        throw new Error('缺少必需参数：user_id或campaign_id')
+      if (!user_id || !lottery_campaign_id) {
+        throw new Error('缺少必需参数：user_id或lottery_campaign_id')
       }
 
       if (draw_count < 1 || draw_count > 10) {
@@ -998,7 +998,7 @@ class UnifiedLotteryEngine {
       }
 
       // 🔴 获取活动配置（用于读取定价配置）
-      const campaign = await models.LotteryCampaign.findByPk(campaign_id, {
+      const campaign = await models.LotteryCampaign.findByPk(lottery_campaign_id, {
         transaction
       })
 
@@ -1017,9 +1017,13 @@ class UnifiedLotteryEngine {
        * - 修改定价只需改配置，无需改代码
        * - 支持灵活的折扣策略
        */
-      const pricing = await LotteryPricingService.getDrawPricing(draw_count, campaign.campaign_id, {
-        transaction
-      }) // 从 LotteryPricingService 统一获取定价
+      const pricing = await LotteryPricingService.getDrawPricing(
+        draw_count,
+        campaign.lottery_campaign_id,
+        {
+          transaction
+        }
+      ) // 从 LotteryPricingService 统一获取定价
       const requiredPoints = pricing.total_cost // 使用配置的总价格
 
       // 记录详细的积分计算日志
@@ -1051,7 +1055,7 @@ class UnifiedLotteryEngine {
       const quotaResult = await LotteryQuotaService.tryDeductQuota(
         {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           draw_count
         },
         { transaction }
@@ -1067,7 +1071,7 @@ class UnifiedLotteryEngine {
         quotaError.errorCode = 'DAILY_DRAW_LIMIT_EXCEEDED' // 关键：明确设置业务码
         quotaError.data = {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           requested_count: draw_count,
           remaining_quota: quotaResult.remaining || 0,
           limit_value: quotaResult.limit || 0,
@@ -1080,7 +1084,7 @@ class UnifiedLotteryEngine {
 
       this.logInfo('配额扣减成功', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         draw_count,
         remaining: quotaResult.remaining,
         limit: quotaResult.limit,
@@ -1134,7 +1138,7 @@ class UnifiedLotteryEngine {
                 ? `单次抽奖消耗${requiredPoints}积分`
                 : `${draw_count}连抽消耗${requiredPoints}积分（${pricing.label}，原价${pricing.original_cost}积分，节省${pricing.saved_points}积分）`,
             request_idempotency_key: requestIdempotencyKey,
-            campaign_id,
+            lottery_campaign_id,
             draw_count
           }
         },
@@ -1195,7 +1199,7 @@ class UnifiedLotteryEngine {
 
         const context = {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           draw_number: i + 1,
           total_draws: draw_count,
           draw_count, // 🆕 Phase 2：传递抽奖次数
@@ -1230,9 +1234,9 @@ class UnifiedLotteryEngine {
             draw_number: i + 1,
             // V4.0语义更新：使用 reward_tier 替代 is_winner
             reward_tier: drawResult.data?.draw_result?.reward_tier || 'low',
-            prize: drawResult.data?.draw_result?.prize_id
+            prize: drawResult.data?.draw_result?.lottery_prize_id
               ? {
-                  id: drawResult.data.draw_result.prize_id,
+                  id: drawResult.data.draw_result.lottery_prize_id,
                   name: drawResult.data.draw_result.prize_name,
                   type: drawResult.data.draw_result.prize_type,
                   value: drawResult.data.draw_result.prize_value,
@@ -1280,7 +1284,7 @@ class UnifiedLotteryEngine {
 
       this.logInfo('抽奖执行完成（事务已提交）', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         draw_count,
         actualPointsCost: requiredPoints, // 🔥 修复：实际扣除的积分数（含折扣）
         remainingPoints,
@@ -1341,7 +1345,7 @@ class UnifiedLotteryEngine {
 
       this.logError('抽奖执行失败，事务已回滚', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         draw_count,
         error: error.message
       })
@@ -1352,20 +1356,20 @@ class UnifiedLotteryEngine {
   /**
    * 获取用户抽奖历史
    * @param {number} user_id - 用户ID
-   * @param {Object} options - 查询选项 {page, limit, campaign_id}
+   * @param {Object} options - 查询选项 {page, limit, lottery_campaign_id}
    * @returns {Promise<Object>} 抽奖历史记录
    */
   async get_user_history(user_id, options = {}) {
     try {
       const models = require('../../models')
-      const { page = 1, limit = 20, campaign_id } = options
+      const { page = 1, limit = 20, lottery_campaign_id } = options
 
       const offset = (page - 1) * limit
 
       // 构建查询条件
       const whereClause = { user_id }
-      if (campaign_id) {
-        whereClause.campaign_id = campaign_id
+      if (lottery_campaign_id) {
+        whereClause.lottery_campaign_id = lottery_campaign_id
       }
 
       // 查询抽奖记录
@@ -1375,27 +1379,27 @@ class UnifiedLotteryEngine {
           {
             model: models.LotteryCampaign,
             as: 'campaign',
-            attributes: ['campaign_id', 'campaign_name', 'campaign_type']
+            attributes: ['lottery_campaign_id', 'campaign_name', 'campaign_type']
           },
           {
             model: models.LotteryPrize,
             as: 'prize',
             attributes: [
-              'prize_id',
+              'lottery_prize_id',
               'prize_name',
               'prize_type',
               'prize_value',
-              'image_id',
+              'image_resource_id',
               'win_probability'
             ], // 🎯 从奖品中获取概率
             required: false
           }
         ],
         attributes: [
-          'draw_id',
+          'lottery_draw_id',
           'user_id',
-          'campaign_id',
-          'prize_id',
+          'lottery_campaign_id',
+          'lottery_prize_id',
           'reward_tier', // V4.0：使用 reward_tier 替代 is_winner
           'draw_type',
           'cost_points',
@@ -1420,18 +1424,18 @@ class UnifiedLotteryEngine {
 
       return {
         records: records.map(record => ({
-          draw_id: record.draw_id,
-          campaign_id: record.campaign_id,
+          lottery_draw_id: record.lottery_draw_id,
+          lottery_campaign_id: record.lottery_campaign_id,
           campaign_name: record.campaign?.campaign_name || '未知活动',
           // V4.0语义更新：使用 reward_tier 替代 is_winner
           reward_tier: record.reward_tier,
           prize: record.prize
             ? {
-                id: record.prize.prize_id,
+                id: record.prize.lottery_prize_id,
                 name: record.prize.prize_name,
                 type: record.prize.prize_type,
                 value: record.prize.prize_value,
-                image_id: record.prize.image_id
+                image_resource_id: record.prize.image_resource_id
               }
             : null,
           points_cost: record.cost_points,
@@ -1476,7 +1480,7 @@ class UnifiedLotteryEngine {
       const campaigns = await models.LotteryCampaign.findAll({
         where: whereClause,
         attributes: [
-          'campaign_id',
+          'lottery_campaign_id',
           'campaign_name',
           'campaign_code',
           'campaign_type',
@@ -1505,7 +1509,7 @@ class UnifiedLotteryEngine {
         const today = BeijingTimeHelper.todayStart()
 
         // Step 2: 提取所有活动ID数组，示例：[1, 2, 3, 4, 5]
-        const campaignIds = campaigns.map(c => c.campaign_id)
+        const campaignIds = campaigns.map(c => c.lottery_campaign_id)
 
         /**
          * Step 3: 批量查询所有活动的今日抽奖次数（关键优化点）
@@ -1514,27 +1518,27 @@ class UnifiedLotteryEngine {
         const drawCounts = await models.LotteryDraw.findAll({
           where: {
             user_id, // 查询条件1：指定用户
-            campaign_id: campaignIds, // 查询条件2：所有活动ID（IN查询）
+            lottery_campaign_id: campaignIds, // 查询条件2：所有活动ID（IN查询）
             created_at: {
               // 查询条件3：今日抽奖记录
               [require('sequelize').Op.gte]: today // 大于等于今日00:00:00
             }
           },
           attributes: [
-            'campaign_id', // 分组字段：活动ID
-            [models.sequelize.fn('COUNT', models.sequelize.col('draw_id')), 'count']
-            // SQL聚合函数：COUNT(draw_id) AS count（统计每个活动的抽奖次数）
+            'lottery_campaign_id', // 分组字段：活动ID
+            [models.sequelize.fn('COUNT', models.sequelize.col('lottery_draw_id')), 'count']
+            // SQL聚合函数：COUNT(lottery_draw_id) AS count（统计每个活动的抽奖次数）
           ],
-          group: ['campaign_id'], // SQL分组：按活动ID分组统计
+          group: ['lottery_campaign_id'], // SQL分组：按活动ID分组统计
           raw: true // 返回普通对象（性能优化）
         })
 
         /**
          * 查询结果示例：
          * [
-         *   { campaign_id: 1, count: '3' },  活动1今日抽奖3次
-         *   { campaign_id: 2, count: '1' },  活动2今日抽奖1次
-         *   { campaign_id: 5, count: '2' }   活动5今日抽奖2次
+         *   { lottery_campaign_id: 1, count: '3' },  活动1今日抽奖3次
+         *   { lottery_campaign_id: 2, count: '1' },  活动2今日抽奖1次
+         *   { lottery_campaign_id: 5, count: '2' }   活动5今日抽奖2次
          * ]
          * 注意：活动3和4今日未抽奖，不会出现在结果中
          */
@@ -1545,7 +1549,7 @@ class UnifiedLotteryEngine {
          * parseInt()：将字符串'3'转换为数字3
          */
         drawCounts.forEach(item => {
-          userDrawCounts[item.campaign_id] = parseInt(item.count)
+          userDrawCounts[item.lottery_campaign_id] = parseInt(item.count)
         })
 
         /**
@@ -1563,7 +1567,7 @@ class UnifiedLotteryEngine {
       })
 
       return campaigns.map(campaign => ({
-        campaign_id: campaign.campaign_id,
+        lottery_campaign_id: campaign.lottery_campaign_id,
         campaign_name: campaign.campaign_name,
         campaign_code: campaign.campaign_code,
         campaign_type: campaign.campaign_type,
@@ -1574,9 +1578,9 @@ class UnifiedLotteryEngine {
         end_time: campaign.end_time,
         total_prize_pool: campaign.total_prize_pool,
         remaining_prize_pool: campaign.remaining_prize_pool,
-        user_today_draws: user_id ? userDrawCounts[campaign.campaign_id] || 0 : undefined,
+        user_today_draws: user_id ? userDrawCounts[campaign.lottery_campaign_id] || 0 : undefined,
         can_draw: user_id
-          ? (userDrawCounts[campaign.campaign_id] || 0) < campaign.max_draws_per_user_daily
+          ? (userDrawCounts[campaign.lottery_campaign_id] || 0) < campaign.max_draws_per_user_daily
           : undefined
       }))
     } catch (error) {
@@ -1769,7 +1773,7 @@ class UnifiedLotteryEngine {
        * 📊 查询方式（Query Method）：SELECT * FROM lottery_draws WHERE user_id = ? AND reward_tier = 'high' ORDER BY created_at DESC LIMIT 1
        * 📊 关联查询（Join Query）：关联lottery_prizes表获取奖品详情（奖品名称、类型、价值）
        * 📊 索引命中（Index Hit）：user_id + reward_tier + created_at复合索引（ORDER BY优化）
-       * 📊 数据类型（Data Type）：对象（Object），包含draw_id、campaign_id、prize、is_guarantee、win_time
+       * 📊 数据类型（Data Type）：对象（Object），包含draw_id、lottery_campaign_id、prize、is_guarantee、win_time
        * 📊 业务场景（Business Scenario）：显示"您最近一次高档奖励：100积分（2025-11-11 05:24:05）"
        * 📊 性能评估（Performance）：单次查询耗时约25-30ms（包含JOIN操作）
        */
@@ -1782,10 +1786,10 @@ class UnifiedLotteryEngine {
           {
             model: models.LotteryPrize,
             as: 'prize',
-            attributes: ['prize_id', 'prize_name', 'prize_type', 'prize_value']
+            attributes: ['lottery_prize_id', 'prize_name', 'prize_type', 'prize_value']
           }
         ],
-        attributes: ['draw_id', 'campaign_id', 'created_at', 'guarantee_triggered'],
+        attributes: ['lottery_draw_id', 'lottery_campaign_id', 'created_at', 'guarantee_triggered'],
         order: [['created_at', 'DESC']]
       })
 
@@ -1837,11 +1841,11 @@ class UnifiedLotteryEngine {
         }, {}), // 奖励档位分布（对象 - Object），如 { high: 15, mid: 18, low: 17 }
         last_high_tier_win: lastHighTierWin
           ? {
-              draw_id: lastHighTierWin.draw_id, // 抽奖记录ID
-              campaign_id: lastHighTierWin.campaign_id, // 抽奖活动ID
+              lottery_draw_id: lastHighTierWin.lottery_draw_id, // 抽奖记录ID
+              lottery_campaign_id: lastHighTierWin.lottery_campaign_id, // 抽奖活动ID
               prize: lastHighTierWin.prize
                 ? {
-                    id: lastHighTierWin.prize.prize_id, // 奖品ID
+                    id: lastHighTierWin.prize.lottery_prize_id, // 奖品ID
                     name: lastHighTierWin.prize.prize_name, // 奖品名称（如："100积分"）
                     type: lastHighTierWin.prize.prize_type, // 奖品类型（如："points"）
                     value: lastHighTierWin.prize.prize_value // 奖品价值（如：100）
@@ -1912,7 +1916,7 @@ class UnifiedLotteryEngine {
 
       this.logInfo('通过campaign_code获取活动', {
         campaign_code,
-        campaign_id: campaign.campaign_id,
+        lottery_campaign_id: campaign.lottery_campaign_id,
         status: campaign.status
       })
 
@@ -1943,12 +1947,12 @@ class UnifiedLotteryEngine {
       // 步骤1：获取并验证活动
       const campaign = await this.getCampaignByCode(campaign_code)
 
-      // 步骤2：获取奖品列表（使用campaign_id）
-      const prizes = await this.get_campaign_prizes(campaign.campaign_id)
+      // 步骤2：获取奖品列表（使用lottery_campaign_id）
+      const prizes = await this.get_campaign_prizes(campaign.lottery_campaign_id)
 
       this.logInfo('获取活动奖品列表成功', {
         campaign_code,
-        campaign_id: campaign.campaign_id,
+        lottery_campaign_id: campaign.lottery_campaign_id,
         prizesCount: prizes.length
       })
 
@@ -1980,12 +1984,12 @@ class UnifiedLotteryEngine {
       // 步骤1：获取并验证活动
       const campaign = await this.getCampaignByCode(campaign_code, options)
 
-      // 步骤2：获取完整配置（使用campaign_id）
-      const config = await this.get_campaign_config(campaign.campaign_id)
+      // 步骤2：获取完整配置（使用lottery_campaign_id）
+      const config = await this.get_campaign_config(campaign.lottery_campaign_id)
 
       this.logInfo('获取活动配置成功', {
         campaign_code,
-        campaign_id: campaign.campaign_id
+        lottery_campaign_id: campaign.lottery_campaign_id
       })
 
       return config

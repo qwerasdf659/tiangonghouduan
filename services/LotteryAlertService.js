@@ -103,12 +103,12 @@ class LotteryAlertService {
    * @param {string} [params.level] - 告警级别 (info/warning/danger)
    * @param {string} [params.type] - 告警类型 (win_rate/budget/inventory/user/system)
    * @param {string} [params.status] - 告警状态 (active/acknowledged/resolved)
-   * @param {number} [params.campaign_id] - 活动ID
+   * @param {number} [params.lottery_campaign_id] - 活动ID
    * @param {number} [params.limit=50] - 返回数量
    * @returns {Promise<Object>} 告警列表和统计信息
    */
   static async getAlertList(params = {}) {
-    const { level, type, status, campaign_id, limit = 50 } = params
+    const { level, type, status, lottery_campaign_id, limit = 50 } = params
 
     try {
       // 构建查询条件
@@ -123,8 +123,8 @@ class LotteryAlertService {
       if (status) {
         whereConditions.status = status
       }
-      if (campaign_id) {
-        whereConditions.campaign_id = parseInt(campaign_id)
+      if (lottery_campaign_id) {
+        whereConditions.lottery_campaign_id = parseInt(lottery_campaign_id)
       }
 
       // 查询告警列表
@@ -134,7 +134,7 @@ class LotteryAlertService {
           {
             model: LotteryCampaign,
             as: 'campaign',
-            attributes: ['campaign_id', 'campaign_name', 'campaign_code', 'status']
+            attributes: ['lottery_campaign_id', 'campaign_name', 'campaign_code', 'status']
           },
           {
             model: User,
@@ -151,7 +151,7 @@ class LotteryAlertService {
 
       // 统计各状态数量
       const statusCounts = await LotteryAlert.findAll({
-        where: campaign_id ? { campaign_id: parseInt(campaign_id) } : {},
+        where: lottery_campaign_id ? { lottery_campaign_id: parseInt(lottery_campaign_id) } : {},
         attributes: ['status', [fn('COUNT', col('alert_id')), 'count']],
         group: ['status'],
         raw: true
@@ -168,7 +168,7 @@ class LotteryAlertService {
       // 格式化告警数据
       const formattedAlerts = alerts.map(alert => ({
         alert_id: alert.alert_id,
-        campaign_id: alert.campaign_id,
+        lottery_campaign_id: alert.lottery_campaign_id,
         campaign_name: alert.campaign?.campaign_name || '未知活动',
         campaign_code: alert.campaign?.campaign_code || null,
         alert_type: alert.alert_type,
@@ -226,7 +226,7 @@ class LotteryAlertService {
           {
             model: LotteryCampaign,
             as: 'campaign',
-            attributes: ['campaign_id', 'campaign_name', 'campaign_code', 'status']
+            attributes: ['lottery_campaign_id', 'campaign_name', 'campaign_code', 'status']
           },
           {
             model: User,
@@ -242,7 +242,7 @@ class LotteryAlertService {
 
       return {
         alert_id: alert.alert_id,
-        campaign_id: alert.campaign_id,
+        lottery_campaign_id: alert.lottery_campaign_id,
         campaign_name: alert.campaign?.campaign_name || '未知活动',
         alert_type: alert.alert_type,
         alert_type_name: LotteryAlertService.getAlertTypeName(alert.alert_type),
@@ -276,7 +276,7 @@ class LotteryAlertService {
    * 支持告警去重（相同类型+活动+1小时内不重复触发）
    *
    * @param {Object} params - 告警参数
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {string} params.alert_type - 告警类型
    * @param {string} params.severity - 严重程度
    * @param {string} params.rule_code - 规则代码
@@ -288,8 +288,15 @@ class LotteryAlertService {
    * @returns {Promise<Object>} 创建的告警
    */
   static async createAlert(params, options = {}) {
-    const { campaign_id, alert_type, severity, rule_code, threshold_value, actual_value, message } =
-      params
+    const {
+      lottery_campaign_id,
+      alert_type,
+      severity,
+      rule_code,
+      threshold_value,
+      actual_value,
+      message
+    } = params
     const { transaction } = options
 
     try {
@@ -298,7 +305,7 @@ class LotteryAlertService {
 
       const existingAlert = await LotteryAlert.findOne({
         where: {
-          campaign_id,
+          lottery_campaign_id,
           alert_type,
           rule_code,
           status: { [Op.ne]: 'resolved' },
@@ -309,7 +316,7 @@ class LotteryAlertService {
 
       if (existingAlert) {
         logger.info('告警已存在，跳过创建', {
-          campaign_id,
+          lottery_campaign_id,
           alert_type,
           rule_code,
           existing_alert_id: existingAlert.alert_id
@@ -320,7 +327,7 @@ class LotteryAlertService {
       // 创建新告警
       const alert = await LotteryAlert.create(
         {
-          campaign_id,
+          lottery_campaign_id,
           alert_type,
           severity,
           rule_code,
@@ -335,7 +342,7 @@ class LotteryAlertService {
 
       logger.info('创建新告警', {
         alert_id: alert.alert_id,
-        campaign_id,
+        lottery_campaign_id,
         alert_type,
         severity,
         rule_code
@@ -359,7 +366,7 @@ class LotteryAlertService {
               alert_type,
               severity,
               message,
-              campaign_id,
+              lottery_campaign_id,
               rule_code,
               created_at: alert.created_at
             })
@@ -462,12 +469,12 @@ class LotteryAlertService {
    * 运行告警检测规则（定时任务调用）
    * 检测所有活动的告警状态
    *
-   * @param {number} [campaign_id] - 指定活动ID（可选，不指定则检测所有活动）
+   * @param {number} [lottery_campaign_id] - 指定活动ID（可选，不指定则检测所有活动）
    * @returns {Promise<Object>} 检测结果
    */
-  static async runAlertDetection(campaign_id = null) {
+  static async runAlertDetection(lottery_campaign_id = null) {
     try {
-      logger.info('开始运行告警检测', { campaign_id })
+      logger.info('开始运行告警检测', { lottery_campaign_id })
 
       const results = {
         checked_campaigns: 0,
@@ -480,7 +487,7 @@ class LotteryAlertService {
       const campaigns = await LotteryCampaign.findAll({
         where: {
           status: 'active',
-          ...(campaign_id ? { campaign_id } : {})
+          ...(lottery_campaign_id ? { lottery_campaign_id } : {})
         }
       })
 
@@ -489,26 +496,32 @@ class LotteryAlertService {
       // 对每个活动运行检测规则
       for (const campaign of campaigns) {
         // 检测库存不足
-        const inventoryAlerts = await LotteryAlertService.checkInventoryAlert(campaign.campaign_id)
+        const inventoryAlerts = await LotteryAlertService.checkInventoryAlert(
+          campaign.lottery_campaign_id
+        )
         results.new_alerts += inventoryAlerts.length
 
         // 检测预算消耗
-        const budgetAlerts = await LotteryAlertService.checkBudgetAlert(campaign.campaign_id)
+        const budgetAlerts = await LotteryAlertService.checkBudgetAlert(
+          campaign.lottery_campaign_id
+        )
         results.new_alerts += budgetAlerts.length
 
         // 检测中奖率异常（RULE_001）
-        const winRateAlerts = await LotteryAlertService.checkWinRateAlert(campaign.campaign_id)
+        const winRateAlerts = await LotteryAlertService.checkWinRateAlert(
+          campaign.lottery_campaign_id
+        )
         results.new_alerts += winRateAlerts.length
 
         // 检测高档奖品发放过快（RULE_002）
         const highTierAlerts = await LotteryAlertService.checkHighTierSpeedAlert(
-          campaign.campaign_id
+          campaign.lottery_campaign_id
         )
         results.new_alerts += highTierAlerts.length
 
         // 检测连续空奖异常（RULE_006）
         const emptyStreakAlerts = await LotteryAlertService.checkEmptyStreakAlert(
-          campaign.campaign_id
+          campaign.lottery_campaign_id
         )
         results.new_alerts += emptyStreakAlerts.length
       }
@@ -529,10 +542,10 @@ class LotteryAlertService {
   /**
    * 检测库存不足告警
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @returns {Promise<Array>} 创建的告警列表
    */
-  static async checkInventoryAlert(campaign_id) {
+  static async checkInventoryAlert(lottery_campaign_id) {
     const rule = ALERT_RULES.INVENTORY_LOW
     const alerts = []
 
@@ -540,7 +553,7 @@ class LotteryAlertService {
       // 查询库存不足的奖品
       const lowStockPrizes = await LotteryPrize.findAll({
         where: {
-          campaign_id,
+          lottery_campaign_id,
           status: 'active',
           remaining_stock: { [Op.lt]: rule.threshold_count }
         }
@@ -548,7 +561,7 @@ class LotteryAlertService {
 
       for (const prize of lowStockPrizes) {
         const alert = await LotteryAlertService.createAlert({
-          campaign_id,
+          lottery_campaign_id,
           alert_type: rule.alert_type,
           severity: rule.severity,
           rule_code: rule.rule_code,
@@ -572,15 +585,15 @@ class LotteryAlertService {
   /**
    * 检测预算消耗告警
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @returns {Promise<Array>} 创建的告警列表
    */
-  static async checkBudgetAlert(campaign_id) {
+  static async checkBudgetAlert(lottery_campaign_id) {
     const alerts = []
 
     try {
       // 获取活动预算配置
-      const campaign = await LotteryCampaign.findByPk(campaign_id)
+      const campaign = await LotteryCampaign.findByPk(lottery_campaign_id)
       if (!campaign || !campaign.daily_budget_points) {
         return alerts
       }
@@ -594,7 +607,7 @@ class LotteryAlertService {
       const todayUsage =
         (await LotteryDraw.sum('cost_points', {
           where: {
-            campaign_id,
+            lottery_campaign_id,
             created_at: { [Op.gte]: today }
           }
         })) || 0
@@ -604,7 +617,7 @@ class LotteryAlertService {
       // 检测预算耗尽
       if (usageRatio >= ALERT_RULES.BUDGET_EXHAUSTED.threshold_percentage) {
         const alert = await LotteryAlertService.createAlert({
-          campaign_id,
+          lottery_campaign_id,
           alert_type: ALERT_RULES.BUDGET_EXHAUSTED.alert_type,
           severity: ALERT_RULES.BUDGET_EXHAUSTED.severity,
           rule_code: ALERT_RULES.BUDGET_EXHAUSTED.rule_code,
@@ -618,7 +631,7 @@ class LotteryAlertService {
       } else if (usageRatio >= ALERT_RULES.BUDGET_WARNING.threshold_percentage) {
         // 检测预算预警
         const alert = await LotteryAlertService.createAlert({
-          campaign_id,
+          lottery_campaign_id,
           alert_type: ALERT_RULES.BUDGET_WARNING.alert_type,
           severity: ALERT_RULES.BUDGET_WARNING.severity,
           rule_code: ALERT_RULES.BUDGET_WARNING.rule_code,
@@ -642,16 +655,16 @@ class LotteryAlertService {
    * 检测中奖率异常告警（RULE_001）
    * 检测最近1小时内中奖率是否偏离配置值±20%
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @returns {Promise<Array>} 创建的告警列表
    */
-  static async checkWinRateAlert(campaign_id) {
+  static async checkWinRateAlert(lottery_campaign_id) {
     const rule = ALERT_RULES.WIN_RATE_ABNORMAL
     const alerts = []
 
     try {
       // 获取活动配置的预期中奖率
-      const campaign = await LotteryCampaign.findByPk(campaign_id)
+      const campaign = await LotteryCampaign.findByPk(lottery_campaign_id)
       if (!campaign) {
         return alerts
       }
@@ -667,7 +680,7 @@ class LotteryAlertService {
 
       const totalDraws = await LotteryDraw.count({
         where: {
-          campaign_id,
+          lottery_campaign_id,
           created_at: { [Op.gte]: oneHourAgo }
         }
       })
@@ -680,9 +693,9 @@ class LotteryAlertService {
       // 统计非空奖（有实际奖品）的抽奖次数
       const nonEmptyDraws = await LotteryDraw.count({
         where: {
-          campaign_id,
+          lottery_campaign_id,
           created_at: { [Op.gte]: oneHourAgo },
-          prize_id: { [Op.not]: null }
+          lottery_prize_id: { [Op.not]: null }
         }
       })
 
@@ -692,7 +705,7 @@ class LotteryAlertService {
       // 如果偏离超过阈值，触发告警
       if (deviation > rule.threshold_deviation) {
         const alert = await LotteryAlertService.createAlert({
-          campaign_id,
+          lottery_campaign_id,
           alert_type: rule.alert_type,
           severity: rule.severity,
           rule_code: rule.rule_code,
@@ -716,16 +729,16 @@ class LotteryAlertService {
    * 检测高档奖品发放速度过快告警（RULE_002）
    * 检测高档奖品（high档位）发放速度是否超过预算的1.5倍
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @returns {Promise<Array>} 创建的告警列表
    */
-  static async checkHighTierSpeedAlert(campaign_id) {
+  static async checkHighTierSpeedAlert(lottery_campaign_id) {
     const rule = ALERT_RULES.HIGH_TIER_FAST
     const alerts = []
 
     try {
       // 获取活动配置
-      const campaign = await LotteryCampaign.findByPk(campaign_id)
+      const campaign = await LotteryCampaign.findByPk(lottery_campaign_id)
       if (!campaign || !campaign.daily_budget_points) {
         return alerts
       }
@@ -737,7 +750,7 @@ class LotteryAlertService {
       // 查询今日高档奖品发放情况
       const highTierDraws = await LotteryDraw.findAll({
         where: {
-          campaign_id,
+          lottery_campaign_id,
           created_at: { [Op.gte]: today }
         },
         include: [
@@ -778,7 +791,7 @@ class LotteryAlertService {
       ) {
         const speedRatio = highTierCost / expectedHighTierBudget
         const alert = await LotteryAlertService.createAlert({
-          campaign_id,
+          lottery_campaign_id,
           alert_type: rule.alert_type,
           severity: rule.severity,
           rule_code: rule.rule_code,
@@ -802,10 +815,10 @@ class LotteryAlertService {
    * 检测连续空奖异常告警（RULE_006）
    * 检测连续空奖≥10次的用户数占比是否超过5%
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @returns {Promise<Array>} 创建的告警列表
    */
-  static async checkEmptyStreakAlert(campaign_id) {
+  static async checkEmptyStreakAlert(lottery_campaign_id) {
     const rule = ALERT_RULES.CONSECUTIVE_EMPTY
     const alerts = []
 
@@ -816,7 +829,7 @@ class LotteryAlertService {
       // 统计参与抽奖的总用户数
       const totalUsersResult = await LotteryDraw.findAll({
         where: {
-          campaign_id,
+          lottery_campaign_id,
           created_at: { [Op.gte]: yesterday }
         },
         attributes: [[fn('DISTINCT', col('user_id')), 'user_id']],
@@ -839,11 +852,11 @@ class LotteryAlertService {
         FROM (
           SELECT 
             user_id,
-            @streak := IF(prize_id IS NULL AND @prev_user = user_id, @streak + 1, IF(prize_id IS NULL, 1, 0)) as empty_streak,
+            @streak := IF(lottery_prize_id IS NULL AND @prev_user = user_id, @streak + 1, IF(lottery_prize_id IS NULL, 1, 0)) as empty_streak,
             @prev_user := user_id
           FROM lottery_draws
           CROSS JOIN (SELECT @streak := 0, @prev_user := 0) vars
-          WHERE campaign_id = :campaign_id
+          WHERE lottery_campaign_id = :lottery_campaign_id
             AND created_at >= :yesterday
           ORDER BY user_id, created_at
         ) as streaks
@@ -852,7 +865,7 @@ class LotteryAlertService {
 
       const [emptyStreakResult] = await LotteryDraw.sequelize.query(emptyStreakQuery, {
         replacements: {
-          campaign_id,
+          lottery_campaign_id,
           yesterday,
           threshold_streak: rule.threshold_streak
         },
@@ -865,7 +878,7 @@ class LotteryAlertService {
       // 如果受影响用户比例超过阈值，触发告警
       if (userRatio > rule.threshold_user_ratio) {
         const alert = await LotteryAlertService.createAlert({
-          campaign_id,
+          lottery_campaign_id,
           alert_type: rule.alert_type,
           severity: rule.severity,
           rule_code: rule.rule_code,
@@ -907,7 +920,7 @@ class LotteryAlertService {
         // 检查库存是否已恢复
         const prize = await LotteryPrize.findOne({
           where: {
-            campaign_id: alert.campaign_id,
+            lottery_campaign_id: alert.lottery_campaign_id,
             remaining_stock: { [Op.lt]: ALERT_RULES.INVENTORY_LOW.threshold_count }
           }
         })

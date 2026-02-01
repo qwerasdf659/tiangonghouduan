@@ -274,8 +274,8 @@ describe('【P0】并发抽奖测试 - 多用户/多设备并发场景', () => {
           useSameIdempotencyKey: true,
           resultComparator: (r1, r2) => {
             // 比较关键字段
-            const id1 = r1.body.data?.results?.[0]?.draw_id || r1.body.data?.draw_id
-            const id2 = r2.body.data?.results?.[0]?.draw_id || r2.body.data?.draw_id
+            const id1 = r1.body.data?.results?.[0]?.lottery_draw_id || r1.body.data?.lottery_draw_id
+            const id2 = r2.body.data?.results?.[0]?.lottery_draw_id || r2.body.data?.lottery_draw_id
             return id1 === id2
           }
         }

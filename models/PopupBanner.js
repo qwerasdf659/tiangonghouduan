@@ -32,7 +32,7 @@ module.exports = sequelize => {
     'PopupBanner',
     {
       // 主键ID
-      banner_id: {
+      popup_banner_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,

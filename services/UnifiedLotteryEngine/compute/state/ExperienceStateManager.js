@@ -60,7 +60,7 @@ class ExperienceStateManager {
    *
    * @param {Object} params - 参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {Object} options - 选项
    * @param {Object} options.transaction - 数据库事务（可选）
    * @param {boolean} options.create_if_not_exists - 不存在时是否创建（默认 true）
@@ -70,7 +70,7 @@ class ExperienceStateManager {
    * 返回结果格式：
    * {
    *   user_id: 123,
-   *   campaign_id: 456,
+   *   lottery_campaign_id: 456,
    *   empty_streak: 5,          // 连续空奖次数
    *   recent_high_count: 1,     // 近期高价值次数
    *   anti_high_cooldown: 0,    // AntiHigh 冷却次数
@@ -83,27 +83,27 @@ class ExperienceStateManager {
    * }
    */
   async getState(params, options = {}) {
-    const { user_id, campaign_id } = params
+    const { user_id, lottery_campaign_id } = params
     const { transaction, create_if_not_exists = true } = options
 
-    this._log('debug', '获取用户体验状态', { user_id, campaign_id })
+    this._log('debug', '获取用户体验状态', { user_id, lottery_campaign_id })
 
     try {
       const Model = this._getModel()
 
       if (create_if_not_exists) {
         // 使用 findOrCreate 确保记录存在
-        const state = await Model.findOrCreateState(user_id, campaign_id, { transaction })
+        const state = await Model.findOrCreateState(user_id, lottery_campaign_id, { transaction })
         return this._formatState(state)
       } else {
         // 仅查询，不创建
         const state = await Model.findOne({
-          where: { user_id, campaign_id },
+          where: { user_id, lottery_campaign_id },
           transaction
         })
 
         if (!state) {
-          this._log('debug', '用户体验状态不存在', { user_id, campaign_id })
+          this._log('debug', '用户体验状态不存在', { user_id, lottery_campaign_id })
           return null
         }
 
@@ -112,7 +112,7 @@ class ExperienceStateManager {
     } catch (error) {
       this._log('error', '获取用户体验状态失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       throw error
@@ -124,7 +124,7 @@ class ExperienceStateManager {
    *
    * @param {Object} params - 参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {string} params.draw_tier - 本次抽奖档位（high/mid/low/fallback/empty）
    * @param {boolean} params.is_empty - 是否为空奖
    * @param {boolean} params.pity_triggered - 是否触发了 Pity 系统
@@ -137,7 +137,7 @@ class ExperienceStateManager {
   async updateState(params, options = {}) {
     const {
       user_id,
-      campaign_id,
+      lottery_campaign_id,
       draw_tier,
       is_empty = false,
       pity_triggered = false,
@@ -148,7 +148,7 @@ class ExperienceStateManager {
 
     this._log('debug', '更新用户体验状态', {
       user_id,
-      campaign_id,
+      lottery_campaign_id,
       draw_tier,
       is_empty,
       pity_triggered,
@@ -159,7 +159,7 @@ class ExperienceStateManager {
       const Model = this._getModel()
 
       // 获取或创建状态记录
-      const state = await Model.findOrCreateState(user_id, campaign_id, { transaction })
+      const state = await Model.findOrCreateState(user_id, lottery_campaign_id, { transaction })
 
       // 根据抽奖结果更新状态
       if (is_empty || draw_tier === 'fallback' || draw_tier === 'empty') {
@@ -186,7 +186,7 @@ class ExperienceStateManager {
 
       this._log('info', '用户体验状态更新完成', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         new_empty_streak: state.empty_streak,
         new_recent_high_count: state.recent_high_count,
         total_draw_count: state.total_draw_count
@@ -196,7 +196,7 @@ class ExperienceStateManager {
     } catch (error) {
       this._log('error', '更新用户体验状态失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       throw error
@@ -208,21 +208,21 @@ class ExperienceStateManager {
    *
    * @param {Object} params - 参数
    * @param {number} params.user_id - 用户ID
-   * @param {Array<number>} params.campaign_ids - 活动ID列表
+   * @param {Array<number>} params.lottery_campaign_ids - 活动ID列表
    * @param {Object} options - 选项
    * @returns {Promise<Map<number, Object>>} 活动ID -> 状态 的映射
    */
   async getStatesForUser(params, options = {}) {
-    const { user_id, campaign_ids } = params
+    const { user_id, lottery_campaign_ids } = params
     const { transaction } = options
 
-    if (!campaign_ids || campaign_ids.length === 0) {
+    if (!lottery_campaign_ids || lottery_campaign_ids.length === 0) {
       return new Map()
     }
 
     this._log('debug', '批量获取用户体验状态', {
       user_id,
-      campaign_count: campaign_ids.length
+      campaign_count: lottery_campaign_ids.length
     })
 
     try {
@@ -231,14 +231,14 @@ class ExperienceStateManager {
       const states = await Model.findAll({
         where: {
           user_id,
-          campaign_id: campaign_ids
+          lottery_campaign_id: lottery_campaign_ids
         },
         transaction
       })
 
       const state_map = new Map()
       for (const state of states) {
-        state_map.set(state.campaign_id, this._formatState(state))
+        state_map.set(state.lottery_campaign_id, this._formatState(state))
       }
 
       return state_map
@@ -258,15 +258,15 @@ class ExperienceStateManager {
    *
    * @param {Object} params - 参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {Object} options - 选项
    * @returns {Promise<boolean>} 是否重置成功
    */
   async resetState(params, options = {}) {
-    const { user_id, campaign_id } = params
+    const { user_id, lottery_campaign_id } = params
     const { transaction } = options
 
-    this._log('info', '重置用户体验状态', { user_id, campaign_id })
+    this._log('info', '重置用户体验状态', { user_id, lottery_campaign_id })
 
     try {
       const Model = this._getModel()
@@ -284,7 +284,7 @@ class ExperienceStateManager {
           last_draw_tier: null
         },
         {
-          where: { user_id, campaign_id },
+          where: { user_id, lottery_campaign_id },
           transaction
         }
       )
@@ -293,7 +293,7 @@ class ExperienceStateManager {
     } catch (error) {
       this._log('error', '重置用户体验状态失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       throw error
@@ -313,7 +313,7 @@ class ExperienceStateManager {
     return {
       state_id: state.state_id,
       user_id: state.user_id,
-      campaign_id: state.campaign_id,
+      lottery_campaign_id: state.lottery_campaign_id,
       empty_streak: state.empty_streak || 0,
       recent_high_count: state.recent_high_count || 0,
       anti_high_cooldown: state.anti_high_cooldown || 0,

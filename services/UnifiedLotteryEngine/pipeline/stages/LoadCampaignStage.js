@@ -43,30 +43,30 @@ class LoadCampaignStage extends BaseStage {
    * 执行 Stage
    *
    * @param {Object} context - 执行上下文
-   * @param {number} context.campaign_id - 活动ID
+   * @param {number} context.lottery_campaign_id - 活动ID
    * @returns {Promise<Object>} Stage 执行结果
    */
   async execute(context) {
-    const { campaign_id } = context
+    const { lottery_campaign_id } = context
 
-    this.log('info', '开始加载活动配置', { campaign_id })
+    this.log('info', '开始加载活动配置', { lottery_campaign_id })
 
     try {
       // 1. 加载活动基础配置
-      const campaign = await this._loadCampaign(campaign_id)
+      const campaign = await this._loadCampaign(lottery_campaign_id)
 
       if (!campaign) {
-        throw this.createError(`活动不存在: ${campaign_id}`, 'CAMPAIGN_NOT_FOUND', true)
+        throw this.createError(`活动不存在: ${lottery_campaign_id}`, 'CAMPAIGN_NOT_FOUND', true)
       }
 
       // 2. 验证活动状态
       this._validateCampaignStatus(campaign)
 
       // 3. 加载活动奖品
-      const prizes = await this._loadPrizes(campaign_id)
+      const prizes = await this._loadPrizes(lottery_campaign_id)
 
       // 4. 加载档位规则
-      const tier_rules = await this._loadTierRules(campaign_id)
+      const tier_rules = await this._loadTierRules(lottery_campaign_id)
 
       // 5. 获取兜底奖品
       const fallback_prize = this._getFallbackPrize(prizes, campaign)
@@ -82,7 +82,7 @@ class LoadCampaignStage extends BaseStage {
       }
 
       this.log('info', '活动配置加载完成', {
-        campaign_id,
+        lottery_campaign_id,
         prize_count: prizes.length,
         tier_rule_count: tier_rules.length,
         has_fallback: !!fallback_prize,
@@ -93,7 +93,7 @@ class LoadCampaignStage extends BaseStage {
       return this.success(result)
     } catch (error) {
       this.log('error', '加载活动配置失败', {
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       throw error
@@ -103,12 +103,12 @@ class LoadCampaignStage extends BaseStage {
   /**
    * 加载活动基础配置
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @returns {Promise<Object>} 活动配置
    * @private
    */
-  async _loadCampaign(campaign_id) {
-    return await LotteryCampaign.findByPk(campaign_id)
+  async _loadCampaign(lottery_campaign_id) {
+    return await LotteryCampaign.findByPk(lottery_campaign_id)
   }
 
   /**
@@ -140,20 +140,20 @@ class LoadCampaignStage extends BaseStage {
   /**
    * 加载活动奖品
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @returns {Promise<Array>} 奖品列表
    * @private
    */
-  async _loadPrizes(campaign_id) {
+  async _loadPrizes(lottery_campaign_id) {
     return await LotteryPrize.findAll({
       where: {
-        campaign_id,
+        lottery_campaign_id,
         status: 'active'
       },
       order: [
         ['reward_tier', 'DESC'], // high > mid > low
         ['sort_order', 'ASC'],
-        ['prize_id', 'ASC']
+        ['lottery_prize_id', 'ASC']
       ]
     })
   }
@@ -161,14 +161,14 @@ class LoadCampaignStage extends BaseStage {
   /**
    * 加载档位规则
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @returns {Promise<Array>} 档位规则列表
    * @private
    */
-  async _loadTierRules(campaign_id) {
+  async _loadTierRules(lottery_campaign_id) {
     return await LotteryTierRule.findAll({
       where: {
-        campaign_id,
+        lottery_campaign_id,
         status: 'active'
       },
       order: [
@@ -194,7 +194,9 @@ class LoadCampaignStage extends BaseStage {
   _getFallbackPrize(prizes, campaign) {
     // 1. 检查活动是否配置了指定的兜底奖品
     if (campaign.tier_fallback_prize_id) {
-      const specified_fallback = prizes.find(p => p.prize_id === campaign.tier_fallback_prize_id)
+      const specified_fallback = prizes.find(
+        p => p.lottery_prize_id === campaign.tier_fallback_prize_id
+      )
       if (specified_fallback) {
         return specified_fallback
       }
@@ -207,7 +209,7 @@ class LoadCampaignStage extends BaseStage {
 
     if (fallback_candidates.length === 0) {
       this.log('warn', '活动没有配置兜底奖品', {
-        campaign_id: campaign.campaign_id
+        lottery_campaign_id: campaign.lottery_campaign_id
       })
       return null
     }
@@ -217,7 +219,7 @@ class LoadCampaignStage extends BaseStage {
       if (a.sort_order !== b.sort_order) {
         return (a.sort_order || 0) - (b.sort_order || 0)
       }
-      return a.prize_id - b.prize_id
+      return a.lottery_prize_id - b.lottery_prize_id
     })
 
     return fallback_candidates[0]

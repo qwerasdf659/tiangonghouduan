@@ -14,7 +14,7 @@
  * - 运营可动态调整：运营可随时修改任意档位的 discount
  *
  * 关联关系：
- * - 多对一：LotteryCampaignPricingConfig.campaign_id -> LotteryCampaign.campaign_id
+ * - 多对一：LotteryCampaignPricingConfig.lottery_campaign_id -> LotteryCampaign.lottery_campaign_id
  * - 多对一：LotteryCampaignPricingConfig.created_by -> User.user_id
  * - 多对一：LotteryCampaignPricingConfig.updated_by -> User.user_id
  *
@@ -40,7 +40,7 @@ class LotteryCampaignPricingConfig extends Model {
   static associate(models) {
     // 多对一：定价配置属于某个活动
     LotteryCampaignPricingConfig.belongsTo(models.LotteryCampaign, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'campaign',
       onDelete: 'CASCADE',
       comment: '所属抽奖活动'
@@ -181,7 +181,7 @@ class LotteryCampaignPricingConfig extends Model {
 
     const config = await this.findOne({
       where: {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         status: 'active',
         [Op.and]: [
           {
@@ -210,7 +210,7 @@ class LotteryCampaignPricingConfig extends Model {
     const { transaction, limit = 20 } = options
 
     return await this.findAll({
-      where: { campaign_id: campaignId },
+      where: { lottery_campaign_id: campaignId },
       order: [['version', 'DESC']],
       limit,
       transaction
@@ -231,7 +231,7 @@ class LotteryCampaignPricingConfig extends Model {
 
     // 获取当前最大版本号
     const maxVersionResult = await this.findOne({
-      where: { campaign_id: campaignId },
+      where: { lottery_campaign_id: campaignId },
       order: [['version', 'DESC']],
       attributes: ['version'],
       transaction
@@ -247,7 +247,7 @@ class LotteryCampaignPricingConfig extends Model {
     return await this.create(
       {
         config_id: configId,
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         version: newVersion,
         pricing_config: pricingConfig,
         status,
@@ -275,7 +275,7 @@ class LotteryCampaignPricingConfig extends Model {
     await this.update(
       { status: 'archived', updated_by: updatedBy },
       {
-        where: { campaign_id: campaignId, status: 'active' },
+        where: { lottery_campaign_id: campaignId, status: 'active' },
         transaction
       }
     )
@@ -284,14 +284,14 @@ class LotteryCampaignPricingConfig extends Model {
     const [affectedRows] = await this.update(
       { status: 'active', updated_by: updatedBy },
       {
-        where: { campaign_id: campaignId, version: targetVersion },
+        where: { lottery_campaign_id: campaignId, version: targetVersion },
         transaction
       }
     )
 
     return {
       success: affectedRows > 0,
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       activated_version: targetVersion,
       affected_rows: affectedRows
     }
@@ -351,7 +351,7 @@ LotteryCampaignPricingConfig.initModel = function (sequelize) {
        * 配置ID - 主键
        * 格式：pricing_时间戳_随机码
        */
-      config_id: {
+      lottery_campaign_pricing_config_id: {
         type: DataTypes.STRING(50),
         primaryKey: true,
         comment: '配置唯一ID（格式：pricing_时间戳_随机码）'
@@ -360,10 +360,10 @@ LotteryCampaignPricingConfig.initModel = function (sequelize) {
       /**
        * 活动ID - 外键关联 lottery_campaigns
        */
-      campaign_id: {
+      lottery_campaign_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        comment: '活动ID（外键关联lottery_campaigns.campaign_id）'
+        comment: '抽奖活动ID（外键关联lottery_campaigns.lottery_campaign_id）'
       },
 
       /**
@@ -464,11 +464,11 @@ LotteryCampaignPricingConfig.initModel = function (sequelize) {
       indexes: [
         {
           name: 'idx_campaign_status',
-          fields: ['campaign_id', 'status']
+          fields: ['lottery_campaign_id', 'status']
         },
         {
           name: 'idx_campaign_version',
-          fields: ['campaign_id', 'version']
+          fields: ['lottery_campaign_id', 'version']
         },
         {
           name: 'idx_effective_at',
@@ -481,7 +481,7 @@ LotteryCampaignPricingConfig.initModel = function (sequelize) {
         {
           unique: true,
           name: 'uk_campaign_version',
-          fields: ['campaign_id', 'version']
+          fields: ['lottery_campaign_id', 'version']
         }
       ],
 
@@ -520,7 +520,7 @@ LotteryCampaignPricingConfig.initModel = function (sequelize) {
          */
         byCampaign(campaignId) {
           return {
-            where: { campaign_id: campaignId }
+            where: { lottery_campaign_id: campaignId }
           }
         }
       }

@@ -6,7 +6,7 @@
  *
  * API列表：
  * - GET /listings - 获取交易市场挂牌列表（带缓存）
- * - GET /listings/:listing_id - 获取市场挂牌详情
+ * - GET /listings/:market_listing_id - 获取市场挂牌详情
  * - GET /listing-status - 获取用户上架状态
  *
  * 业务场景：
@@ -174,14 +174,14 @@ router.get('/listings/facets', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/market/listings/:listing_id
+ * @route GET /api/v4/market/listings/:market_listing_id
  * @desc 获取市场挂牌详情
  * @access Private (需要登录)
  *
- * @param {number} listing_id - 挂牌ID
+ * @param {number} market_listing_id - 挂牌ID
  *
  * @returns {Object} 挂牌详情
- * @returns {number} data.listing_id - 挂牌ID
+ * @returns {number} data.market_listing_id - 挂牌ID
  * @returns {number} data.item_instance_id - 物品实例ID
  * @returns {string} data.name - 物品名称（2026-01-20 统一字段名）
  * @returns {string} data.item_type - 物品类型
@@ -197,15 +197,15 @@ router.get('/listings/facets', authenticateToken, async (req, res) => {
  * 业务场景：用户查看市场商品的详细信息
  */
 router.get(
-  '/listings/:listing_id',
+  '/listings/:market_listing_id',
   authenticateToken,
-  validatePositiveInteger('listing_id', 'params'),
+  validatePositiveInteger('market_listing_id', 'params'),
   async (req, res) => {
     try {
       // P1-9：通过 ServiceManager 获取服务（snake_case key）
       const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
-      const listingId = req.validated.listing_id
+      const listingId = req.validated.market_listing_id
 
       // 决策7：通过 Service 层获取挂牌详情
       const listing = await MarketListingService.getListingById(listingId)
@@ -217,9 +217,10 @@ router.get(
       /*
        * 格式化返回数据（优先使用快照字段，fallback 到关联查询）
        * 2026-01-20 技术债务清理：统一使用 name 字段名
+       * 2026-02-01 主键规范化：listing_id → market_listing_id
        */
       const listingDetail = {
-        listing_id: listing.listing_id,
+        market_listing_id: listing.market_listing_id,
         listing_kind: listing.listing_kind,
         // 物品实例挂牌字段
         item_instance_id: listing.offer_item_instance_id,
@@ -252,7 +253,7 @@ router.get(
       }
 
       logger.info('获取市场挂牌详情成功', {
-        listing_id: listingId,
+        market_listing_id: listingId,
         user_id: req.user.user_id
       })
 
@@ -260,7 +261,7 @@ router.get(
     } catch (error) {
       logger.error('获取市场挂牌详情失败', {
         error: error.message,
-        listing_id: req.validated.listing_id,
+        market_listing_id: req.validated.market_listing_id,
         user_id: req.user?.user_id
       })
 

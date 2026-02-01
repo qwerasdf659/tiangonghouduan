@@ -52,13 +52,13 @@ const { sequelize: mainSequelize } = require('../config/database')
  *    - verifyRelations()：验证表关系
  *    - generateValidationReport()：生成验证报告
  *
- * V4项目标准表结构：
+ * V4项目标准表结构（主键命名规范：{table_name}_id）：
  * - users：主键user_id
- * - user_records：主键record_id
- * - lottery_strategies：主键strategy_id
- * - prizes：主键prize_id
- * - photos：主键photo_id
- * - product_inventory：主键product_id
+ * - lottery_campaigns：主键lottery_campaign_id
+ * - lottery_prizes：主键lottery_prize_id
+ * - lottery_draws：主键lottery_draw_id
+ * - market_listings：主键market_listing_id
+ * - exchange_items：主键exchange_item_id
  *
  * 技术特性：
  * - 单例模式：全局唯一实例
@@ -138,7 +138,7 @@ class UnifiedDatabaseHelper {
         }
       },
       lottery_draws: {
-        primaryKey: 'draw_id',
+        primaryKey: 'lottery_draw_id',
         // V4.0语义更新：使用 reward_tier 替代 is_winner
         requiredFields: ['user_id', 'draw_time', 'reward_tier'],
         indexes: [
@@ -148,7 +148,7 @@ class UnifiedDatabaseHelper {
         ]
       },
       lottery_prizes: {
-        primaryKey: 'prize_id',
+        primaryKey: 'lottery_prize_id',
         requiredFields: ['prize_name', 'stock', 'status']
       }
       /*

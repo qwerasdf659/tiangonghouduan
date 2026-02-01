@@ -139,7 +139,7 @@ describe('LotteryComputeEngine', () => {
     test('无连续空奖时不触发平滑机制', async () => {
       const result = await engine.applyExperienceSmoothing({
         user_id: 1,
-        campaign_id: 1,
+        lottery_campaign_id: 1,
         selected_tier: 'mid',
         tier_weights: {
           high: 50000,
@@ -162,7 +162,7 @@ describe('LotteryComputeEngine', () => {
       const threshold1 = engine.pityCalculator.pity_config.threshold_1.streak
       const result = await engine.applyExperienceSmoothing({
         user_id: 1,
-        campaign_id: 1,
+        lottery_campaign_id: 1,
         selected_tier: 'fallback',
         tier_weights: {
           high: 50000,
@@ -224,7 +224,7 @@ describe('LotteryComputeEngine', () => {
          * 由于当前环境 Pity 是启用的，测试全局禁用需要模拟
          * 这里测试函数存在且返回正确结构
          */
-        const result = isFeatureEnabledForContext('pity', { user_id: 1, campaign_id: 1 })
+        const result = isFeatureEnabledForContext('pity', { user_id: 1, lottery_campaign_id: 1 })
         expect(result).toBeDefined()
         expect(result).toHaveProperty('enabled')
         expect(result).toHaveProperty('reason')
@@ -233,7 +233,7 @@ describe('LotteryComputeEngine', () => {
 
       test('默认配置下返回 enabled=true（全量开放）', () => {
         // 默认灰度百分比是 100%，应该返回 enabled: true
-        const result = isFeatureEnabledForContext('pity', { user_id: 123, campaign_id: 1 })
+        const result = isFeatureEnabledForContext('pity', { user_id: 123, lottery_campaign_id: 1 })
         expect(result.enabled).toBe(true)
         expect(result.grayscale_percentage).toBe(100)
       })
@@ -291,7 +291,7 @@ describe('LotteryComputeEngine', () => {
       })
 
       test('返回与 isFeatureEnabledForContext 一致的结果', () => {
-        const context = { user_id: 999, campaign_id: 1 }
+        const context = { user_id: 999, lottery_campaign_id: 1 }
         const result1 = engine.checkFeatureWithGrayscale('pity', context)
         const result2 = isFeatureEnabledForContext('pity', context)
         expect(result1.enabled).toBe(result2.enabled)
@@ -357,7 +357,7 @@ describe('LotteryComputeEngine', () => {
       test('experience_state 为 null 时安全处理', async () => {
         const result = await engine.applyExperienceSmoothing({
           user_id: 1,
-          campaign_id: 1,
+          lottery_campaign_id: 1,
           selected_tier: 'mid',
           tier_weights: {
             high: 50000,
@@ -375,7 +375,7 @@ describe('LotteryComputeEngine', () => {
       test('极大 empty_streak 值处理', async () => {
         const result = await engine.applyExperienceSmoothing({
           user_id: 1,
-          campaign_id: 1,
+          lottery_campaign_id: 1,
           selected_tier: 'fallback',
           tier_weights: {
             high: 50000,
@@ -396,7 +396,7 @@ describe('LotteryComputeEngine', () => {
       test('user_id 为 0 时正常处理', async () => {
         const result = await engine.applyExperienceSmoothing({
           user_id: 0,
-          campaign_id: 1,
+          lottery_campaign_id: 1,
           selected_tier: 'mid',
           tier_weights: {
             high: 50000,

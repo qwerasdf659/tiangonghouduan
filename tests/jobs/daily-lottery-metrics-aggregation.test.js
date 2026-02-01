@@ -143,9 +143,9 @@ describe('P3-4: DailyLotteryMetricsAggregation - 每日抽奖指标聚合任务'
       // 获取昨天的日期范围
       const range = aggregationTask.getYesterdayRange()
 
-      // 聚合该活动（参数：campaign_id, date_str, start_datetime, end_datetime）
+      // 聚合该活动（参数：lottery_campaign_id, date_str, start_datetime, end_datetime）
       const result = await aggregationTask.aggregateCampaign(
-        campaign.campaign_id,
+        campaign.lottery_campaign_id,
         range.date_str,
         range.start_datetime,
         range.end_datetime
@@ -153,8 +153,8 @@ describe('P3-4: DailyLotteryMetricsAggregation - 每日抽奖指标聚合任务'
 
       // 验证聚合结果
       if (result) {
-        expect(result).toHaveProperty('campaign_id')
-        expect(result.campaign_id).toBe(campaign.campaign_id)
+        expect(result).toHaveProperty('lottery_campaign_id')
+        expect(result.lottery_campaign_id).toBe(campaign.lottery_campaign_id)
       }
 
       console.log('[P3-4] 单活动聚合结果:', JSON.stringify(result, null, 2))
@@ -271,7 +271,7 @@ describe('P3-4: DailyLotteryMetricsAggregation - 每日抽奖指标聚合任务'
       }
 
       // 验证必要字段（模型字段：metric_date, not date_bucket）
-      expect(dailyMetrics.campaign_id).toBeDefined()
+      expect(dailyMetrics.lottery_campaign_id).toBeDefined()
       expect(dailyMetrics.metric_date).toBeDefined()
       expect(dailyMetrics.total_draws).toBeDefined()
       expect(dailyMetrics.unique_users).toBeDefined()

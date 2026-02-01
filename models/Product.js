@@ -32,7 +32,7 @@ module.exports = sequelize => {
         allowNull: true,
         references: {
           model: 'image_resources',
-          key: 'image_id'
+          key: 'image_resource_id'
         },
         comment: '商品主图片ID（关联image_resources表，用于多图片管理中的主图指定）'
       },

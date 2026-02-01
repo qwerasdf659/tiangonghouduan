@@ -17,13 +17,13 @@ class LotteryPrize extends Model {
   static associate(models) {
     // 关联到抽奖活动
     LotteryPrize.belongsTo(models.LotteryCampaign, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'campaign'
     })
 
     // 关联到抽奖记录
     LotteryPrize.hasMany(models.LotteryDraw, {
-      foreignKey: 'prize_id',
+      foreignKey: 'lottery_prize_id',
       as: 'draws'
     })
 
@@ -35,7 +35,7 @@ class LotteryPrize extends Model {
     // 🎯 关联到抽奖预设记录
     if (models.LotteryPreset) {
       LotteryPrize.hasMany(models.LotteryPreset, {
-        foreignKey: 'prize_id',
+        foreignKey: 'lottery_prize_id',
         as: 'presets',
         comment: '抽奖预设记录'
       })
@@ -44,7 +44,7 @@ class LotteryPrize extends Model {
     // 关联到图片资源
     if (models.ImageResources) {
       LotteryPrize.belongsTo(models.ImageResources, {
-        foreignKey: 'image_id',
+        foreignKey: 'image_resource_id',
         as: 'image'
       })
     }
@@ -148,7 +148,7 @@ class LotteryPrize extends Model {
    */
   toSummary() {
     return {
-      prize_id: this.prize_id,
+      lottery_prize_id: this.lottery_prize_id,
       prize_name: this.prize_name,
       prize_type: this.prize_type,
       prize_type_name: this.getPrizeTypeName(),
@@ -229,11 +229,11 @@ class LotteryPrize extends Model {
     // 查询活动的所有空奖（prize_value_points = 0 或 NULL）
     const emptyPrizes = await this.findAll({
       where: {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         status: 'active',
         [require('sequelize').Op.or]: [{ prize_value_points: 0 }, { prize_value_points: null }]
       },
-      attributes: ['prize_id', 'prize_name', 'prize_value_points', 'win_probability'],
+      attributes: ['lottery_prize_id', 'prize_name', 'prize_value_points', 'win_probability'],
       transaction
     })
 
@@ -280,10 +280,10 @@ class LotteryPrize extends Model {
     // 查询活动所有奖品
     const allPrizes = await this.findAll({
       where: {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         status: 'active'
       },
-      attributes: ['prize_id', 'prize_name', 'prize_value_points', 'win_probability'],
+      attributes: ['lottery_prize_id', 'prize_name', 'prize_value_points', 'win_probability'],
       transaction
     })
 
@@ -306,7 +306,7 @@ class LotteryPrize extends Model {
     for (const prize of allPrizes) {
       const valuePoints = prize.prize_value_points || 0
       const prizeInfo = {
-        prize_id: prize.prize_id,
+        lottery_prize_id: prize.lottery_prize_id,
         prize_name: prize.prize_name,
         prize_value_points: valuePoints,
         win_probability: parseFloat(prize.win_probability) || 0
@@ -382,13 +382,13 @@ class LotteryPrize extends Model {
     // 查询活动所有激活奖品（按档位分组）
     const allPrizes = await this.findAll({
       where: {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         status: 'active'
       },
-      attributes: ['prize_id', 'prize_name', 'reward_tier', 'win_weight'],
+      attributes: ['lottery_prize_id', 'prize_name', 'reward_tier', 'win_weight'],
       order: [
         ['reward_tier', 'ASC'],
-        ['prize_id', 'ASC']
+        ['lottery_prize_id', 'ASC']
       ],
       transaction
     })
@@ -412,7 +412,7 @@ class LotteryPrize extends Model {
       const tier = prize.reward_tier || 'low'
       if (prizesByTier[tier]) {
         prizesByTier[tier].push({
-          prize_id: prize.prize_id,
+          lottery_prize_id: prize.lottery_prize_id,
           prize_name: prize.prize_name,
           win_weight: prize.win_weight || 0
         })
@@ -434,7 +434,7 @@ class LotteryPrize extends Model {
         expected_weight: WEIGHT_SCALE,
         difference: totalWeight - WEIGHT_SCALE,
         prizes: prizes.map(p => ({
-          prize_id: p.prize_id,
+          lottery_prize_id: p.lottery_prize_id,
           prize_name: p.prize_name,
           win_weight: p.win_weight,
           probability: ((p.win_weight / WEIGHT_SCALE) * 100).toFixed(4) + '%'
@@ -464,7 +464,7 @@ class LotteryPrize extends Model {
     return {
       valid: allTiersValid && hasAtLeastOneTierWithPrizes,
       error: errors.length > 0 ? errors.join('；') : null,
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       weight_scale: WEIGHT_SCALE,
       tier_results: tierResults,
       message: allTiersValid
@@ -514,7 +514,7 @@ class LotteryPrize extends Model {
       valid: allValid,
       can_launch: allValid,
       error: errors.length > 0 ? errors.join('；') : null,
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       validation_details: {
         prize_weights: prizeWeightResult,
         empty_prize: emptyPrizeResult,
@@ -530,13 +530,13 @@ class LotteryPrize extends Model {
 module.exports = sequelize => {
   LotteryPrize.init(
     {
-      prize_id: {
+      lottery_prize_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
         comment: '奖品唯一标识'
       },
-      campaign_id: {
+      lottery_campaign_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
         comment: '关联的抽奖活动ID'
@@ -593,13 +593,14 @@ module.exports = sequelize => {
         type: DataTypes.TEXT,
         comment: '奖品描述信息'
       },
-      image_id: {
+      image_resource_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '关联的奖品图片ID，外键指向 image_resources.image_id（2026-01-08 图片存储架构）',
+        comment:
+          '关联的奖品图片ID，外键指向 image_resources.image_resource_id（2026-02-01 主键命名规范化）',
         references: {
           model: 'image_resources',
-          key: 'image_id'
+          key: 'image_resource_id'
         },
         onUpdate: 'CASCADE',
         onDelete: 'SET NULL'
@@ -762,7 +763,7 @@ module.exports = sequelize => {
       comment: '抽奖奖品配置表',
       indexes: [
         {
-          fields: ['campaign_id', 'status'],
+          fields: ['lottery_campaign_id', 'status'],
           name: 'idx_lp_campaign_status',
           comment: '活动状态复合索引'
         },
@@ -782,7 +783,7 @@ module.exports = sequelize => {
           comment: '排序索引'
         },
         {
-          fields: ['campaign_id', 'sort_order'],
+          fields: ['lottery_campaign_id', 'sort_order'],
           name: 'idx_unique_campaign_sort_order',
           unique: true,
           comment: '活动内排序唯一约束 - 防止转盘位置冲突'
@@ -800,7 +801,7 @@ module.exports = sequelize => {
     // 检查同一活动内是否已存在相同的sort_order
     const existing = await LotteryPrize.findOne({
       where: {
-        campaign_id: prize.campaign_id,
+        lottery_campaign_id: prize.lottery_campaign_id,
         sort_order: prize.sort_order
       },
       transaction: options.transaction
@@ -808,7 +809,7 @@ module.exports = sequelize => {
 
     if (existing) {
       throw new Error(
-        `奖品排序${prize.sort_order}已存在于活动${prize.campaign_id}中，请使用不同的排序值`
+        `奖品排序${prize.sort_order}已存在于活动${prize.lottery_campaign_id}中，请使用不同的排序值`
       )
     }
   })
@@ -819,20 +820,20 @@ module.exports = sequelize => {
    * 触发时机：更新奖品前自动执行
    */
   LotteryPrize.addHook('beforeUpdate', async (prize, options) => {
-    // 只有在sort_order或campaign_id发生变化时才检查
-    if (prize.changed('sort_order') || prize.changed('campaign_id')) {
+    // 只有在sort_order或lottery_campaign_id发生变化时才检查
+    if (prize.changed('sort_order') || prize.changed('lottery_campaign_id')) {
       const existing = await LotteryPrize.findOne({
         where: {
-          campaign_id: prize.campaign_id,
+          lottery_campaign_id: prize.lottery_campaign_id,
           sort_order: prize.sort_order,
-          prize_id: { [require('sequelize').Op.ne]: prize.prize_id }
+          lottery_prize_id: { [require('sequelize').Op.ne]: prize.lottery_prize_id }
         },
         transaction: options.transaction
       })
 
       if (existing) {
         throw new Error(
-          `奖品排序${prize.sort_order}已存在于活动${prize.campaign_id}中，请使用不同的排序值`
+          `奖品排序${prize.sort_order}已存在于活动${prize.lottery_campaign_id}中，请使用不同的排序值`
         )
       }
     }

@@ -135,27 +135,27 @@ router.get('/items', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/shop/exchange/items/:item_id
+ * @route GET /api/v4/shop/exchange/items/:exchange_item_id
  * @desc 获取商品详情
  * @access Private (需要登录)
  *
- * @param {number} item_id - 商品ID
+ * @param {number} exchange_item_id - 商品ID
  *
  * @returns {Object} 商品详情
  * @returns {Object} data.item - 商品信息（包含cost_asset_code + cost_amount）
  */
-router.get('/items/:item_id', authenticateToken, async (req, res) => {
+router.get('/items/:exchange_item_id', authenticateToken, async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 ExchangeService（符合TR-005规范）
     const ExchangeService = req.app.locals.services.getService('exchange_query')
 
-    const { item_id } = req.params
+    const { exchange_item_id } = req.params
     const user_id = req.user.user_id
 
-    logger.info('获取商品详情', { user_id, item_id })
+    logger.info('获取商品详情', { user_id, exchange_item_id })
 
     // 参数验证
-    const itemId = parseInt(item_id)
+    const itemId = parseInt(exchange_item_id)
     if (isNaN(itemId) || itemId <= 0) {
       return res.apiError('无效的商品ID', 'BAD_REQUEST', null, 400)
     }
@@ -176,7 +176,7 @@ router.get('/items/:item_id', authenticateToken, async (req, res) => {
 
     logger.info('获取商品详情成功', {
       user_id,
-      item_id: itemId,
+      exchange_item_id: itemId,
       item_name: result.item.item_name
     })
 
@@ -185,7 +185,7 @@ router.get('/items/:item_id', authenticateToken, async (req, res) => {
     logger.error('获取商品详情失败', {
       error: error.message,
       user_id: req.user?.user_id,
-      item_id: req.params.item_id
+      exchange_item_id: req.params.exchange_item_id
     })
     return handleServiceError(error, res, '获取商品详情失败')
   }

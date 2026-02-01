@@ -268,7 +268,7 @@ describe('审计日志功能测试', () => {
       })
 
       if (log) {
-        expect(log.log_id).toBeTruthy()
+        expect(log.admin_operation_log_id).toBeTruthy()
         expect(log.operator_id).toBeTruthy()
         expect(log.operation_type).toBeTruthy()
         expect(log.target_type).toBeTruthy()

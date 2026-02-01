@@ -58,7 +58,7 @@ function formatQuotaRuleForApi(ruleInstanceOrPlain) {
  *
  * Query参数：
  * - rule_type: 规则类型（global/campaign/role/user，可选）
- * - campaign_id: 活动ID（可选）
+ * - lottery_campaign_id: 活动ID（可选）
  * - is_active: 是否激活（可选，true/false）
  * - page: 页码（默认1）
  * - page_size: 每页数量（默认20）
@@ -67,12 +67,12 @@ function formatQuotaRuleForApi(ruleInstanceOrPlain) {
  */
 router.get('/rules', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { rule_type, campaign_id, is_active, page = 1, page_size = 20 } = req.query
+    const { rule_type, lottery_campaign_id, is_active, page = 1, page_size = 20 } = req.query
 
     // 通过 Service 层查询规则列表（2025-12-31 重构：移除直接 Model 操作）
     const { rules, pagination } = await getLotteryQuotaService(req).getRulesList({
       rule_type,
-      campaign_id,
+      lottery_campaign_id,
       is_active,
       page,
       page_size
@@ -80,7 +80,7 @@ router.get('/rules', authenticateToken, requireRoleLevel(100), async (req, res) 
 
     logger.info('查询配额规则列表', {
       admin_id: req.user.user_id,
-      filters: { rule_type, campaign_id, is_active },
+      filters: { rule_type, lottery_campaign_id, is_active },
       total: pagination.total_count
     })
 
@@ -136,7 +136,7 @@ router.get('/rules/:id', authenticateToken, requireRoleLevel(100), async (req, r
  *
  * Body参数：
  * - rule_type: 规则类型（必填，global/campaign/role/user）
- * - campaign_id: 活动ID（campaign类型必填；其他类型可传但当前实现不会参与scope匹配）
+ * - lottery_campaign_id: 活动ID（campaign类型必填；其他类型可传但当前实现不会参与scope匹配）
  * - role_uuid: 角色UUID（role类型必填）
  * - target_user_id: 目标用户ID（user类型必填）
  * - limit_value: 每日抽奖次数上限（必填，正整数）
@@ -150,7 +150,7 @@ router.post('/rules', authenticateToken, requireRoleLevel(100), async (req, res)
   try {
     const {
       rule_type,
-      campaign_id,
+      lottery_campaign_id,
       role_uuid,
       target_user_id,
       limit_value,
@@ -174,8 +174,13 @@ router.post('/rules', authenticateToken, requireRoleLevel(100), async (req, res)
     }
 
     // 根据规则类型验证必填参数
-    if (rule_type === 'campaign' && !campaign_id) {
-      return res.apiError('campaign类型规则必须指定 campaign_id', 'MISSING_CAMPAIGN_ID', null, 400)
+    if (rule_type === 'campaign' && !lottery_campaign_id) {
+      return res.apiError(
+        'campaign类型规则必须指定 lottery_campaign_id',
+        'MISSING_CAMPAIGN_ID',
+        null,
+        400
+      )
     }
 
     if (rule_type === 'role' && !role_uuid) {
@@ -189,7 +194,7 @@ router.post('/rules', authenticateToken, requireRoleLevel(100), async (req, res)
     // 通过 Service 层创建规则（2025-12-31 重构：移除直接 Model 操作）
     const rule = await getLotteryQuotaService(req).createRule({
       rule_type,
-      campaign_id,
+      lottery_campaign_id,
       role_uuid,
       target_user_id,
       limit_value,
@@ -258,41 +263,41 @@ router.put('/rules/:id/disable', authenticateToken, requireRoleLevel(100), async
  * GET /api/v4/console/lottery-quota/users/:user_id/status
  *
  * Query参数：
- * - campaign_id: 活动ID（必填）
+ * - lottery_campaign_id: 活动ID（必填）
  *
  * 返回：用户当日配额状态（已用/剩余/上限/bonus）
  */
 router.get('/users/:user_id/status', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { user_id } = req.params
-    const { campaign_id } = req.query
+    const { lottery_campaign_id } = req.query
 
-    if (!campaign_id) {
-      return res.apiError('缺少必填参数 campaign_id', 'MISSING_CAMPAIGN_ID', null, 400)
+    if (!lottery_campaign_id) {
+      return res.apiError('缺少必填参数 lottery_campaign_id', 'MISSING_CAMPAIGN_ID', null, 400)
     }
 
     const status = await getLotteryQuotaService(req).getOrInitQuotaStatus({
       user_id: parseInt(user_id),
-      campaign_id: parseInt(campaign_id)
+      lottery_campaign_id: parseInt(lottery_campaign_id)
     })
 
     // 获取命中的规则信息（limit_value 在 status 中已有，此处仅需 matched_rule）
     const { matched_rule } = await getLotteryQuotaService(req).getEffectiveDailyLimit({
       user_id: parseInt(user_id),
-      campaign_id: parseInt(campaign_id)
+      lottery_campaign_id: parseInt(lottery_campaign_id)
     })
 
     logger.info('查询用户配额状态', {
       admin_id: req.user.user_id,
       target_user_id: user_id,
-      campaign_id,
+      lottery_campaign_id,
       remaining: status.remaining
     })
 
     return res.apiSuccess(
       {
         user_id: parseInt(user_id),
-        campaign_id: parseInt(campaign_id),
+        lottery_campaign_id: parseInt(lottery_campaign_id),
         quota_date: status.quota_date,
         limit_value: status.limit_value,
         used_draw_count: status.used_draw_count,
@@ -330,7 +335,7 @@ router.get('/users/:user_id/status', authenticateToken, requireRoleLevel(100), a
  * POST /api/v4/console/lottery-quota/users/:user_id/bonus
  *
  * Body参数：
- * - campaign_id: 活动ID（必填）
+ * - lottery_campaign_id: 活动ID（必填）
  * - bonus_count: 补偿次数（必填，正整数）
  * - reason: 补偿原因（必填）
  *
@@ -339,11 +344,11 @@ router.get('/users/:user_id/status', authenticateToken, requireRoleLevel(100), a
 router.post('/users/:user_id/bonus', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { user_id } = req.params
-    const { campaign_id, bonus_count, reason } = req.body
+    const { lottery_campaign_id, bonus_count, reason } = req.body
 
     // 参数验证
-    if (!campaign_id) {
-      return res.apiError('缺少必填参数 campaign_id', 'MISSING_CAMPAIGN_ID', null, 400)
+    if (!lottery_campaign_id) {
+      return res.apiError('缺少必填参数 lottery_campaign_id', 'MISSING_CAMPAIGN_ID', null, 400)
     }
 
     if (!bonus_count || parseInt(bonus_count) <= 0) {
@@ -357,7 +362,7 @@ router.post('/users/:user_id/bonus', authenticateToken, requireRoleLevel(100), a
     const result = await getLotteryQuotaService(req).addBonusDrawCount(
       {
         user_id: parseInt(user_id),
-        campaign_id: parseInt(campaign_id),
+        lottery_campaign_id: parseInt(lottery_campaign_id),
         bonus_count: parseInt(bonus_count),
         reason: reason.trim()
       },
@@ -369,7 +374,7 @@ router.post('/users/:user_id/bonus', authenticateToken, requireRoleLevel(100), a
     logger.info('添加用户临时补偿次数成功', {
       admin_id: req.user.user_id,
       target_user_id: user_id,
-      campaign_id,
+      lottery_campaign_id,
       bonus_count,
       reason
     })
@@ -386,21 +391,21 @@ router.post('/users/:user_id/bonus', authenticateToken, requireRoleLevel(100), a
  * GET /api/v4/console/lottery-quota/statistics
  *
  * Query参数：
- * - campaign_id: 活动ID（可选，不传则返回全局统计）
+ * - lottery_campaign_id: 活动ID（可选，不传则返回全局统计）
  *
  * 返回：配额规则和使用情况的汇总统计
  */
 router.get('/statistics', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { campaign_id } = req.query
+    const { lottery_campaign_id } = req.query
 
     const statistics = await getLotteryQuotaService(req).getStatistics({
-      campaign_id: campaign_id ? parseInt(campaign_id) : null
+      lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : null
     })
 
     logger.info('获取配额统计数据', {
       admin_id: req.user.user_id,
-      campaign_id: campaign_id || 'global'
+      lottery_campaign_id: lottery_campaign_id || 'global'
     })
 
     return res.apiSuccess(statistics, '获取配额统计数据成功')
@@ -420,7 +425,7 @@ router.get('/statistics', authenticateToken, requireRoleLevel(100), async (req, 
  * GET /api/v4/console/lottery-quota/users/:user_id/check
  *
  * Query参数：
- * - campaign_id: 活动ID（必填）
+ * - lottery_campaign_id: 活动ID（必填）
  * - draw_count: 抽奖次数（可选，默认1）
  *
  * 返回：配额充足性检查结果
@@ -428,15 +433,15 @@ router.get('/statistics', authenticateToken, requireRoleLevel(100), async (req, 
 router.get('/users/:user_id/check', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { user_id } = req.params
-    const { campaign_id, draw_count = 1 } = req.query
+    const { lottery_campaign_id, draw_count = 1 } = req.query
 
-    if (!campaign_id) {
-      return res.apiError('缺少必填参数 campaign_id', 'MISSING_CAMPAIGN_ID', null, 400)
+    if (!lottery_campaign_id) {
+      return res.apiError('缺少必填参数 lottery_campaign_id', 'MISSING_CAMPAIGN_ID', null, 400)
     }
 
     const result = await getLotteryQuotaService(req).checkQuotaSufficient({
       user_id: parseInt(user_id),
-      campaign_id: parseInt(campaign_id),
+      lottery_campaign_id: parseInt(lottery_campaign_id),
       draw_count: parseInt(draw_count)
     })
 

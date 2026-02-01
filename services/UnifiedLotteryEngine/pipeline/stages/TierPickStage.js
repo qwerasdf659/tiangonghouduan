@@ -75,14 +75,14 @@ class TierPickStage extends BaseStage {
    *
    * @param {Object} context - 执行上下文
    * @param {number} context.user_id - 用户ID
-   * @param {number} context.campaign_id - 活动ID
+   * @param {number} context.lottery_campaign_id - 活动ID
    * @param {Object} context.stage_results - 前置Stage的执行结果
    * @returns {Promise<Object>} Stage 执行结果
    */
   async execute(context) {
-    const { user_id, campaign_id } = context
+    const { user_id, lottery_campaign_id } = context
 
-    this.log('info', '开始档位抽取', { user_id, campaign_id })
+    this.log('info', '开始档位抽取', { user_id, lottery_campaign_id })
 
     try {
       /*
@@ -230,14 +230,14 @@ class TierPickStage extends BaseStage {
       try {
         // 获取用户活动级体验状态
         experience_state = await LotteryUserExperienceState.findOne({
-          where: { user_id, campaign_id }
+          where: { user_id, lottery_campaign_id }
         })
 
         if (experience_state) {
           // 调用策略引擎应用体验平滑
           smoothing_result = await this.computeEngine.applyExperienceSmoothing({
             user_id,
-            campaign_id,
+            lottery_campaign_id,
             selected_tier,
             tier_weights: adjusted_weights,
             experience_state: experience_state.toJSON(),
@@ -251,7 +251,7 @@ class TierPickStage extends BaseStage {
             final_tier = smoothing_result.final_tier
             this.log('info', '体验平滑已应用', {
               user_id,
-              campaign_id,
+              lottery_campaign_id,
               original_selected_tier: selected_tier,
               smoothed_tier: final_tier,
               applied_mechanisms: smoothing_result.applied_mechanisms.map(m => m.type)
@@ -262,7 +262,7 @@ class TierPickStage extends BaseStage {
         // 体验平滑失败不应阻断抽奖，记录警告继续执行
         this.log('warn', '体验平滑处理失败（非致命）', {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           error: smoothing_error.message
         })
       }
@@ -295,7 +295,7 @@ class TierPickStage extends BaseStage {
 
       this.log('info', '档位抽取完成', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         user_segment,
         budget_tier,
         pressure_tier,
@@ -310,7 +310,7 @@ class TierPickStage extends BaseStage {
     } catch (error) {
       this.log('error', '档位抽取失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       throw error

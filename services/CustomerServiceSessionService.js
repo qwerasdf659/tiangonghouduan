@@ -205,7 +205,7 @@ class CustomerServiceSessionService {
 
       // 格式化返回数据
       let formattedSessions = sessions.map(session => ({
-        session_id: session.session_id,
+        customer_service_session_id: session.customer_service_session_id,
         user: session.user
           ? {
               user_id: session.user.user_id,
@@ -239,7 +239,7 @@ class CustomerServiceSessionService {
           formattedSessions.map(async session => {
             const unreadCount = await ChatMessage.count({
               where: {
-                session_id: session.session_id,
+                customer_service_session_id: session.customer_service_session_id,
                 sender_type: 'admin',
                 status: { [Op.in]: ['sent', 'delivered'] }
               }
@@ -300,7 +300,7 @@ class CustomerServiceSessionService {
       logger.info(`📋 获取会话 ${session_id} 的消息，参数:`, JSON.stringify(options, null, 2))
 
       // 构建会话查询条件
-      const sessionWhere = { session_id }
+      const sessionWhere = { customer_service_session_id: session_id }
       if (user_id) {
         // 用户端查询：验证权限（用户只能查看自己的会话）
         sessionWhere.user_id = user_id
@@ -328,9 +328,9 @@ class CustomerServiceSessionService {
       }
 
       // 构建消息查询条件
-      const messageWhere = { session_id }
+      const messageWhere = { customer_service_session_id: session_id }
       if (before_message_id) {
-        messageWhere.message_id = { [Op.lt]: before_message_id }
+        messageWhere.chat_message_id = { [Op.lt]: before_message_id }
       }
 
       // 构建查询选项
@@ -384,7 +384,7 @@ class CustomerServiceSessionService {
             { status: 'read' },
             {
               where: {
-                session_id,
+                customer_service_session_id: session_id,
                 sender_type: 'admin', // 只标记管理员发送的消息
                 status: { [Op.in]: ['sent', 'delivered'] } // 只更新未读消息
               }
@@ -414,8 +414,8 @@ class CustomerServiceSessionService {
         // 如果不需要所有字段，只返回基础字段
         if (!include_all_fields) {
           return {
-            message_id: data.message_id,
-            session_id: data.session_id,
+            chat_message_id: data.chat_message_id,
+            customer_service_session_id: data.customer_service_session_id,
             sender: data.sender,
             sender_type: data.sender_type,
             message_source: data.message_source,
@@ -438,7 +438,7 @@ class CustomerServiceSessionService {
 
       return {
         session: {
-          session_id: session.session_id,
+          customer_service_session_id: session.customer_service_session_id,
           user: session.user
             ? {
                 user_id: session.user.user_id,
@@ -518,7 +518,7 @@ class CustomerServiceSessionService {
 
     // ✅ 4. 验证会话是否存在
     const session = await CustomerServiceSession.findOne({
-      where: { session_id },
+      where: { customer_service_session_id: session_id },
       transaction
     })
 
@@ -554,7 +554,7 @@ class CustomerServiceSessionService {
     // ✅ 7. 创建消息记录（使用过滤后的内容）
     const message = await ChatMessage.create(
       {
-        session_id,
+        customer_service_session_id: session_id,
         sender_id: admin_id,
         sender_type: 'admin',
         message_source: 'admin_client',
@@ -624,7 +624,7 @@ class CustomerServiceSessionService {
     // ✅ 1. 验证会话是否存在且属于该用户
     const session = await CustomerServiceSession.findOne({
       where: {
-        session_id,
+        customer_service_session_id: session_id,
         user_id // 用户只能向自己的会话发送消息
       },
       transaction
@@ -643,7 +643,7 @@ class CustomerServiceSessionService {
     // ✅ 3. 创建消息记录
     const message = await ChatMessage.create(
       {
-        session_id,
+        customer_service_session_id: session_id,
         sender_id: user_id,
         sender_type: 'user',
         message_source: 'user_client',
@@ -668,7 +668,7 @@ class CustomerServiceSessionService {
     // ✅ 5. 返回消息数据（供入口层WebSocket推送使用）
     return {
       message_id: message.message_id,
-      session_id,
+      customer_service_session_id: session_id,
       sender_id: user_id,
       sender_type: 'user',
       content: message.content,
@@ -694,7 +694,7 @@ class CustomerServiceSessionService {
 
       // 验证会话是否存在
       const session = await CustomerServiceSession.findOne({
-        where: { session_id }
+        where: { customer_service_session_id: session_id }
       })
 
       if (!session) {
@@ -716,7 +716,7 @@ class CustomerServiceSessionService {
         { status: 'read' },
         {
           where: {
-            session_id,
+            customer_service_session_id: session_id,
             sender_type: 'user',
             status: { [Op.in]: ['sent', 'delivered'] }
           }
@@ -763,7 +763,7 @@ class CustomerServiceSessionService {
 
     // 验证会话
     const session = await CustomerServiceSession.findOne({
-      where: { session_id },
+      where: { customer_service_session_id: session_id },
       transaction
     })
 
@@ -803,7 +803,7 @@ class CustomerServiceSessionService {
     // 创建系统消息记录转接操作
     const systemMessage = await ChatMessage.create(
       {
-        session_id,
+        customer_service_session_id: session_id,
         sender_id: null,
         sender_type: 'admin',
         message_source: 'system',
@@ -817,7 +817,7 @@ class CustomerServiceSessionService {
     logger.info('✅ 会话转接成功')
 
     return {
-      session_id,
+      customer_service_session_id: session_id,
       new_admin_id: target_admin_id,
       new_admin_name: targetAdmin.nickname,
       system_message_id: systemMessage.message_id
@@ -856,7 +856,7 @@ class CustomerServiceSessionService {
 
     // 验证会话
     const session = await CustomerServiceSession.findOne({
-      where: { session_id },
+      where: { customer_service_session_id: session_id },
       transaction
     })
 
@@ -888,7 +888,7 @@ class CustomerServiceSessionService {
     // 创建系统消息
     await ChatMessage.create(
       {
-        session_id,
+        customer_service_session_id: session_id,
         sender_id: null,
         sender_type: 'admin',
         message_source: 'system',
@@ -902,7 +902,7 @@ class CustomerServiceSessionService {
     logger.info('✅ 会话关闭成功')
 
     return {
-      session_id,
+      customer_service_session_id: session_id,
       status: 'closed',
       closed_at: BeijingTimeHelper.formatForAPI(new Date()).iso
     }
@@ -983,9 +983,9 @@ class CustomerServiceSessionService {
       })
 
       if (existingSession) {
-        logger.info(`✅ 用户${user_id}使用现有会话: ${existingSession.session_id}`)
+        logger.info(`✅ 用户${user_id}使用现有会话: ${existingSession.customer_service_session_id}`)
         return {
-          session_id: existingSession.session_id,
+          customer_service_session_id: existingSession.customer_service_session_id,
           status: existingSession.status,
           source: existingSession.source,
           created_at: existingSession.created_at,
@@ -1003,9 +1003,9 @@ class CustomerServiceSessionService {
           created_at: BeijingTimeHelper.createBeijingTime()
         })
 
-        logger.info(`✅ 用户${user_id}创建新会话成功: ${session.session_id}`)
+        logger.info(`✅ 用户${user_id}创建新会话成功: ${session.customer_service_session_id}`)
         return {
-          session_id: session.session_id,
+          customer_service_session_id: session.customer_service_session_id,
           status: session.status,
           source: session.source,
           created_at: session.created_at,
@@ -1026,9 +1026,11 @@ class CustomerServiceSessionService {
           })
 
           if (concurrentSession) {
-            logger.info(`✅ 用户${user_id}获取并发创建的会话: ${concurrentSession.session_id}`)
+            logger.info(
+              `✅ 用户${user_id}获取并发创建的会话: ${concurrentSession.customer_service_session_id}`
+            )
             return {
-              session_id: concurrentSession.session_id,
+              customer_service_session_id: concurrentSession.customer_service_session_id,
               status: concurrentSession.status,
               source: concurrentSession.source,
               created_at: concurrentSession.created_at,
@@ -1215,7 +1217,7 @@ class CustomerServiceSessionService {
         const [firstUserMsg, firstAdminMsg] = await Promise.all([
           ChatMessage.findOne({
             where: {
-              session_id: session.session_id,
+              customer_service_session_id: session.customer_service_session_id,
               sender_type: 'user'
             },
             order: [['created_at', 'ASC']],
@@ -1223,7 +1225,7 @@ class CustomerServiceSessionService {
           }),
           ChatMessage.findOne({
             where: {
-              session_id: session.session_id,
+              customer_service_session_id: session.customer_service_session_id,
               sender_type: 'admin'
             },
             order: [['created_at', 'ASC']],
@@ -1241,7 +1243,7 @@ class CustomerServiceSessionService {
             validSessions++
           } else if (responseTime >= 3600) {
             logger.warn(
-              `⚠️ [平均响应时间] 异常数据：session_id=${session.session_id}，响应时间=${Math.round(responseTime)}秒（>1小时）`
+              `⚠️ [平均响应时间] 异常数据：session_id=${session.customer_service_session_id}，响应时间=${Math.round(responseTime)}秒（>1小时）`
             )
           }
         }

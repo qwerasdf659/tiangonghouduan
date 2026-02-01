@@ -89,7 +89,7 @@ describe('连抽状态流转测试（任务8.1）', () => {
 
       if (test_user && test_campaign) {
         console.log(
-          `✅ 测试数据加载: user=${test_user.user_id}, campaign=${test_campaign.campaign_id}`
+          `✅ 测试数据加载: user=${test_user.user_id}, campaign=${test_campaign.lottery_campaign_id}`
         )
 
         // 确保用户有足够积分
@@ -112,7 +112,7 @@ describe('连抽状态流转测试（任务8.1）', () => {
       try {
         await experience_state_manager.resetState({
           user_id: test_user.user_id,
-          campaign_id: test_campaign.campaign_id
+          lottery_campaign_id: test_campaign.lottery_campaign_id
         })
       } catch (error) {
         // 忽略重置失败
@@ -394,13 +394,13 @@ describe('连抽状态流转测试（任务8.1）', () => {
        */
       await experience_state_manager.resetState({
         user_id: test_user.user_id,
-        campaign_id: test_campaign.campaign_id
+        lottery_campaign_id: test_campaign.lottery_campaign_id
       })
 
       // 获取重置后的初始状态
       const initial_state = await experience_state_manager.getState({
         user_id: test_user.user_id,
-        campaign_id: test_campaign.campaign_id
+        lottery_campaign_id: test_campaign.lottery_campaign_id
       })
       const initial_draw_count = initial_state.total_draw_count || 0
 
@@ -411,7 +411,7 @@ describe('连抽状态流转测试（任务8.1）', () => {
       for (let i = 0; i < 3; i++) {
         await experience_state_manager.updateState({
           user_id: test_user.user_id,
-          campaign_id: test_campaign.campaign_id,
+          lottery_campaign_id: test_campaign.lottery_campaign_id,
           draw_tier: 'fallback',
           is_empty: true
         })
@@ -420,7 +420,7 @@ describe('连抽状态流转测试（任务8.1）', () => {
       // 重新读取验证
       const read_state = await experience_state_manager.getState({
         user_id: test_user.user_id,
-        campaign_id: test_campaign.campaign_id
+        lottery_campaign_id: test_campaign.lottery_campaign_id
       })
 
       console.log('📊 持久化后状态:')
@@ -450,13 +450,13 @@ describe('连抽状态流转测试（任务8.1）', () => {
        */
       await experience_state_manager.resetState({
         user_id: test_user.user_id,
-        campaign_id: test_campaign.campaign_id
+        lottery_campaign_id: test_campaign.lottery_campaign_id
       })
 
       // 获取重置后的初始状态
       const initial_state = await experience_state_manager.getState({
         user_id: test_user.user_id,
-        campaign_id: test_campaign.campaign_id
+        lottery_campaign_id: test_campaign.lottery_campaign_id
       })
       const initial_draw_count = initial_state.total_draw_count || 0
 
@@ -464,7 +464,7 @@ describe('连抽状态流转测试（任务8.1）', () => {
       for (let i = 0; i < 5; i++) {
         await experience_state_manager.updateState({
           user_id: test_user.user_id,
-          campaign_id: test_campaign.campaign_id,
+          lottery_campaign_id: test_campaign.lottery_campaign_id,
           draw_tier: 'fallback',
           is_empty: true
         })
@@ -473,7 +473,7 @@ describe('连抽状态流转测试（任务8.1）', () => {
       // 读取最终状态
       const final_state = await experience_state_manager.getState({
         user_id: test_user.user_id,
-        campaign_id: test_campaign.campaign_id
+        lottery_campaign_id: test_campaign.lottery_campaign_id
       })
 
       console.log('📊 连续抽奖后状态:')
@@ -696,7 +696,7 @@ describe('连抽状态流转测试（任务8.1）', () => {
         updates.push(
           experience_state_manager.updateState({
             user_id: test_user.user_id,
-            campaign_id: test_campaign.campaign_id,
+            lottery_campaign_id: test_campaign.lottery_campaign_id,
             draw_tier: 'fallback',
             is_empty: true
           })
@@ -708,7 +708,7 @@ describe('连抽状态流转测试（任务8.1）', () => {
       // 读取最终状态
       const final_state = await experience_state_manager.getState({
         user_id: test_user.user_id,
-        campaign_id: test_campaign.campaign_id
+        lottery_campaign_id: test_campaign.lottery_campaign_id
       })
 
       console.log('📊 并发更新后状态:')

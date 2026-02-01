@@ -67,14 +67,14 @@ class BudgetContextStage extends BaseStage {
    *
    * @param {Object} context - 执行上下文
    * @param {number} context.user_id - 用户ID
-   * @param {number} context.campaign_id - 活动ID
+   * @param {number} context.lottery_campaign_id - 活动ID
    * @param {Object} context.stage_results - 前置Stage的执行结果
    * @returns {Promise<Object>} Stage 执行结果
    */
   async execute(context) {
-    const { user_id, campaign_id } = context
+    const { user_id, lottery_campaign_id } = context
 
-    this.log('info', '开始初始化预算上下文', { user_id, campaign_id })
+    this.log('info', '开始初始化预算上下文', { user_id, lottery_campaign_id })
 
     try {
       /* 获取活动配置（从 LoadCampaignStage 的结果中） */
@@ -92,14 +92,14 @@ class BudgetContextStage extends BaseStage {
       const budget_mode = campaign.budget_mode || 'none'
 
       this.log('info', '活动预算模式', {
-        campaign_id,
+        lottery_campaign_id,
         budget_mode
       })
 
       /* 1. 创建 BudgetProvider 实例 */
       const budget_provider = budgetProviderFactory.createByMode(budget_mode, {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         campaign,
         transaction: context.transaction || null
       })
@@ -157,7 +157,7 @@ class BudgetContextStage extends BaseStage {
 
       this.log('info', '预算上下文初始化完成', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         budget_mode,
         budget_before,
         effective_budget: strategy_context.effective_budget,
@@ -171,7 +171,7 @@ class BudgetContextStage extends BaseStage {
     } catch (error) {
       this.log('error', '预算上下文初始化失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       throw error

@@ -40,7 +40,7 @@ const { MultiDimensionStatsService } = require('../../../services/reporting')
  * - start_date: 开始日期（可选，ISO格式）
  * - end_date: 结束日期（可选，ISO格式）
  * - store_id: 门店ID过滤（可选）
- * - campaign_id: 活动ID过滤（可选）
+ * - lottery_campaign_id: 活动ID过滤（可选）
  * - refresh: 是否强制刷新缓存（可选，默认 false）
  *
  * 响应格式：
@@ -67,7 +67,7 @@ router.get('/multi-dimension', authenticateToken, requireRoleLevel(100), async (
       start_date,
       end_date,
       store_id,
-      campaign_id,
+      lottery_campaign_id,
       refresh = 'false'
     } = req.query
 
@@ -100,7 +100,7 @@ router.get('/multi-dimension', authenticateToken, requireRoleLevel(100), async (
         start_date,
         end_date,
         store_id: store_id ? parseInt(store_id) : undefined,
-        campaign_id: campaign_id ? parseInt(campaign_id) : undefined
+        lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined
       },
       { refresh: refresh === 'true' }
     )
@@ -149,7 +149,7 @@ router.get('/multi-dimension', authenticateToken, requireRoleLevel(100), async (
  * - source: 数据源（必需）
  *   - 支持: lottery/consumption
  * - store_id: 门店ID过滤（可选）
- * - campaign_id: 活动ID过滤（可选）
+ * - lottery_campaign_id: 活动ID过滤（可选）
  * - period: 时间周期（可选，如 "2026-W04" 或 "2026-01-31"）
  * - start_date: 开始日期（可选）
  * - end_date: 结束日期（可选）
@@ -178,7 +178,7 @@ router.get('/drill-down', authenticateToken, requireRoleLevel(100), async (req, 
     const {
       source,
       store_id,
-      campaign_id,
+      lottery_campaign_id,
       period,
       start_date,
       end_date,
@@ -202,7 +202,7 @@ router.get('/drill-down', authenticateToken, requireRoleLevel(100), async (req, 
     // 构建过滤条件
     const filters = {}
     if (store_id) filters.store_id = parseInt(store_id)
-    if (campaign_id) filters.campaign_id = parseInt(campaign_id)
+    if (lottery_campaign_id) filters.lottery_campaign_id = parseInt(lottery_campaign_id)
     if (period) filters.period = period
     if (start_date) filters.start_date = start_date
     if (end_date) filters.end_date = end_date

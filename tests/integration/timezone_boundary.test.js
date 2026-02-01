@@ -96,7 +96,9 @@ describe('【P1-13】跨时区边界测试 - BeijingTimeHelper 和活动时间�
       )
     }
 
-    console.log(`✅ P1-13 测试初始化完成: user_id=${testUserId}, campaign_id=${testCampaignId}`)
+    console.log(
+      `✅ P1-13 测试初始化完成: user_id=${testUserId}, lottery_campaign_id=${testCampaignId}`
+    )
   }, TEST_TIMEOUT)
 
   afterAll(async () => {
@@ -322,7 +324,7 @@ describe('【P1-13】跨时区边界测试 - BeijingTimeHelper 和活动时间�
 
       // 打印活动时间配置
       console.log(`📋 测试活动信息:`)
-      console.log(`   campaign_id: ${campaign.campaign_id}`)
+      console.log(`   lottery_campaign_id: ${campaign.lottery_campaign_id}`)
       console.log(`   campaign_name: ${campaign.campaign_name}`)
       console.log(`   status: ${campaign.status}`)
       console.log(`   start_time: ${BeijingTimeHelper.toBeijingTime(campaign.start_time)}`)
@@ -482,11 +484,11 @@ describe('【P1-13】跨时区边界测试 - BeijingTimeHelper 和活动时间�
 
       // 使用原生 SQL 查询时间字段
       const [results] = await sequelize.query(
-        `SELECT campaign_id, start_time, end_time, 
+        `SELECT lottery_campaign_id, start_time, end_time, 
                 NOW() as db_now,
                 TIMESTAMPDIFF(HOUR, UTC_TIMESTAMP(), NOW()) as tz_offset_hours
          FROM lottery_campaigns 
-         WHERE campaign_id = ?`,
+         WHERE lottery_campaign_id = ?`,
         {
           replacements: [testCampaignId],
           type: sequelize.QueryTypes.SELECT
@@ -521,12 +523,12 @@ describe('【P1-13】跨时区边界测试 - BeijingTimeHelper 和活动时间�
 
       // 通过 Sequelize 模型查询
       const campaign = await LotteryCampaign.findByPk(testCampaignId, {
-        attributes: ['campaign_id', 'start_time', 'end_time']
+        attributes: ['lottery_campaign_id', 'start_time', 'end_time']
       })
 
       // 通过原生 SQL 查询
       const [rawResult] = await sequelize.query(
-        `SELECT start_time, end_time FROM lottery_campaigns WHERE campaign_id = ?`,
+        `SELECT start_time, end_time FROM lottery_campaigns WHERE lottery_campaign_id = ?`,
         { replacements: [testCampaignId] }
       )
 

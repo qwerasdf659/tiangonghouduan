@@ -111,7 +111,7 @@ class QueryService {
         where: { user_id: userId },
         attributes: [
           'status',
-          [Sequelize.fn('COUNT', Sequelize.col('record_id')), 'count'],
+          [Sequelize.fn('COUNT', Sequelize.col('consumption_record_id')), 'count'],
           [Sequelize.fn('SUM', Sequelize.col('consumption_amount')), 'total_amount'],
           [Sequelize.fn('SUM', Sequelize.col('points_to_award')), 'total_points']
         ],
@@ -275,7 +275,10 @@ class QueryService {
           distinct: true
         }),
         ConsumptionRecord.findAll({
-          attributes: ['status', [Sequelize.fn('COUNT', Sequelize.col('record_id')), 'count']],
+          attributes: [
+            'status',
+            [Sequelize.fn('COUNT', Sequelize.col('consumption_record_id')), 'count']
+          ],
           where: {
             is_deleted: 0,
             created_at: {
@@ -352,7 +355,7 @@ class QueryService {
     try {
       // 步骤1：轻量查询验证权限
       const basicRecord = await ConsumptionRecord.findByPk(recordId, {
-        attributes: ['record_id', 'user_id', 'merchant_id']
+        attributes: ['consumption_record_id', 'user_id', 'merchant_id']
       })
 
       if (!basicRecord) {
@@ -459,7 +462,7 @@ class QueryService {
 
       const record = await query.findOne({
         where: {
-          record_id: recordId
+          consumption_record_id: recordId
         }
       })
 

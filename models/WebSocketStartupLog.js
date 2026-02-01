@@ -33,7 +33,7 @@ module.exports = sequelize => {
     'WebSocketStartupLog',
     {
       // 主键
-      log_id: {
+      websocket_startup_log_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,

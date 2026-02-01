@@ -296,10 +296,10 @@ function handleServiceError(error, res, defaultMessage = '操作失败') {
 /**
  * 验证数字ID（事务实体标识符）
  *
- * @description 用于验证 URL 路径参数中的数字 ID（如 :id, :listing_id, :user_id）
+ * @description 用于验证 URL 路径参数中的数字 ID（如 :id, :market_listing_id, :user_id）
  * 适用于高频创建、有状态的事务实体（如抽奖记录、交易记录、用户等）
  *
- * @param {string} paramName - 路由参数名称（如 'id', 'listing_id'）
+ * @param {string} paramName - 路由参数名称（如 'id', 'market_listing_id'）
  * @param {string} source - 参数来源（'params', 'query', 'body'），默认 'params'
  * @param {Object} options - 可选配置
  *   - optional: boolean - 是否可选，默认 false
@@ -311,8 +311,8 @@ function handleServiceError(error, res, defaultMessage = '操作失败') {
  * // 基础用法：验证 :id 参数
  * router.get('/:id', validateNumericId('id'), (req, res) => { ... })
  *
- * // 自定义存储名：将 :listing_id 存储为 listing_id
- * router.get('/:listing_id', validateNumericId('listing_id'), (req, res) => { ... })
+ * // 自定义存储名：将 :market_listing_id 存储为 market_listing_id
+ * router.get('/:market_listing_id', validateNumericId('market_listing_id'), (req, res) => { ... })
  */
 function validateNumericId(paramName, source = 'params', options = {}) {
   return (req, res, next) => {

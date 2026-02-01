@@ -48,7 +48,7 @@ class LotteryPricingService {
    * 5. 计算 total_cost = base_cost × draw_count × discount
    *
    * @param {number} draw_count - 抽奖次数（1/3/5/10 等）
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} options - 可选参数
    * @param {Object} [options.transaction] - Sequelize 事务对象
    * @returns {Promise<Object>} 定价配置对象
@@ -86,7 +86,7 @@ class LotteryPricingService {
    * // 事务中调用
    * const pricing = await LotteryPricingService.getDrawPricing(5, 1, { transaction })
    */
-  static async getDrawPricing(draw_count, campaign_id, options = {}) {
+  static async getDrawPricing(draw_count, lottery_campaign_id, options = {}) {
     const { transaction } = options
 
     // ========== 步骤1：获取活动定价配置（优先缓存）==========
@@ -94,21 +94,24 @@ class LotteryPricingService {
     let from_cache = false
 
     // 尝试从缓存读取
-    const cached = await BusinessCacheHelper.getLotteryPricing(campaign_id)
+    const cached = await BusinessCacheHelper.getLotteryPricing(lottery_campaign_id)
     if (cached) {
       pricing_config = cached
       from_cache = true
-      logger.debug('[定价服务] 缓存命中', { campaign_id })
+      logger.debug('[定价服务] 缓存命中', { lottery_campaign_id })
     } else {
       // 缓存未命中，从数据库查询
-      const db_config = await LotteryCampaignPricingConfig.getActivePricingConfig(campaign_id, {
-        transaction
-      })
+      const db_config = await LotteryCampaignPricingConfig.getActivePricingConfig(
+        lottery_campaign_id,
+        {
+          transaction
+        }
+      )
 
       if (!db_config) {
         // 🔴 严格模式：配置缺失时报错阻断
         const error = new Error(
-          `活动 ${campaign_id} 定价配置缺失，请在 lottery_campaign_pricing_config 表中配置`
+          `活动 ${lottery_campaign_id} 定价配置缺失，请在 lottery_campaign_pricing_config 表中配置`
         )
         error.code = 'MISSING_PRICING_CONFIG'
         error.statusCode = 400
@@ -119,8 +122,8 @@ class LotteryPricingService {
       from_cache = false
 
       // 写入缓存（60秒 TTL）
-      await BusinessCacheHelper.setLotteryPricing(campaign_id, pricing_config)
-      logger.debug('[定价服务] 配置已缓存', { campaign_id, ttl: 60 })
+      await BusinessCacheHelper.setLotteryPricing(lottery_campaign_id, pricing_config)
+      logger.debug('[定价服务] 配置已缓存', { lottery_campaign_id, ttl: 60 })
     }
 
     // ========== 步骤2：获取单抽基础成本（活动级 > 全局）==========
@@ -131,7 +134,7 @@ class LotteryPricingService {
     if (pricing_config.base_cost && pricing_config.base_cost > 0) {
       base_cost = parseInt(pricing_config.base_cost, 10)
       cost_source = 'campaign'
-      logger.debug('[定价服务] 使用活动级单抽成本', { campaign_id, base_cost })
+      logger.debug('[定价服务] 使用活动级单抽成本', { lottery_campaign_id, base_cost })
     } else {
       // 活动未配置，回落全局配置
       try {
@@ -175,7 +178,7 @@ class LotteryPricingService {
       // 🔴 严格模式：档位未启用时报错阻断
       const enabled_counts = draw_buttons.filter(btn => btn.enabled !== false).map(btn => btn.count)
       const error = new Error(
-        `活动 ${campaign_id} 未启用 ${draw_count} 连抽档位，可选: ${enabled_counts.join(', ') || '无'}`
+        `活动 ${lottery_campaign_id} 未启用 ${draw_count} 连抽档位，可选: ${enabled_counts.join(', ') || '无'}`
       )
       error.code = 'DRAW_COUNT_NOT_ENABLED'
       error.statusCode = 400
@@ -193,7 +196,7 @@ class LotteryPricingService {
 
     // ========== 步骤5：记录日志并返回 ==========
     logger.info('[定价服务] 定价计算完成', {
-      campaign_id,
+      lottery_campaign_id,
       draw_count,
       base_cost,
       discount,
@@ -223,7 +226,7 @@ class LotteryPricingService {
    *
    * @description 获取活动配置中所有 enabled=true 的按钮，用于前端展示可选档位
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} options - 可选参数
    * @param {Object} [options.transaction] - Sequelize 事务对象
    * @returns {Promise<Array<Object>>} 启用的按钮数组
@@ -242,20 +245,23 @@ class LotteryPricingService {
    * //   { count: 10, discount: 0.9, label: '10连抽(九折)', sort_order: 10 }
    * // ]
    */
-  static async getEnabledDrawButtons(campaign_id, options = {}) {
+  static async getEnabledDrawButtons(lottery_campaign_id, options = {}) {
     const { transaction } = options
 
     // 尝试从缓存读取
-    let pricing_config = await BusinessCacheHelper.getLotteryPricing(campaign_id)
+    let pricing_config = await BusinessCacheHelper.getLotteryPricing(lottery_campaign_id)
 
     if (!pricing_config) {
       // 缓存未命中，从数据库查询
-      const db_config = await LotteryCampaignPricingConfig.getActivePricingConfig(campaign_id, {
-        transaction
-      })
+      const db_config = await LotteryCampaignPricingConfig.getActivePricingConfig(
+        lottery_campaign_id,
+        {
+          transaction
+        }
+      )
 
       if (!db_config) {
-        const error = new Error(`活动 ${campaign_id} 定价配置缺失`)
+        const error = new Error(`活动 ${lottery_campaign_id} 定价配置缺失`)
         error.code = 'MISSING_PRICING_CONFIG'
         error.statusCode = 400
         throw error
@@ -264,7 +270,7 @@ class LotteryPricingService {
       pricing_config = db_config.pricing_config
 
       // 写入缓存
-      await BusinessCacheHelper.setLotteryPricing(campaign_id, pricing_config)
+      await BusinessCacheHelper.setLotteryPricing(lottery_campaign_id, pricing_config)
     }
 
     const draw_buttons = pricing_config.draw_buttons || []
@@ -286,7 +292,7 @@ class LotteryPricingService {
    *
    * @description 获取活动配置中所有启用按钮的 count 值数组
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} options - 可选参数
    * @returns {Promise<Array<number>>} 启用的抽奖次数数组
    *
@@ -294,8 +300,8 @@ class LotteryPricingService {
    * const counts = await LotteryPricingService.getEnabledDrawCounts(1)
    * // [1, 3, 5, 10]
    */
-  static async getEnabledDrawCounts(campaign_id, options = {}) {
-    const buttons = await this.getEnabledDrawButtons(campaign_id, options)
+  static async getEnabledDrawCounts(lottery_campaign_id, options = {}) {
+    const buttons = await this.getEnabledDrawButtons(lottery_campaign_id, options)
     return buttons.map(btn => btn.count)
   }
 
@@ -304,7 +310,7 @@ class LotteryPricingService {
    *
    * @description 一次性计算多个档位的定价，用于前端展示所有档位价格
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} options - 可选参数
    * @returns {Promise<Array<Object>>} 所有启用档位的定价数组
    *
@@ -315,16 +321,16 @@ class LotteryPricingService {
    * //   { draw_count: 10, total_cost: 900, discount: 0.9, ... }
    * // ]
    */
-  static async getAllDrawPricings(campaign_id, options = {}) {
-    const enabled_counts = await this.getEnabledDrawCounts(campaign_id, options)
+  static async getAllDrawPricings(lottery_campaign_id, options = {}) {
+    const enabled_counts = await this.getEnabledDrawCounts(lottery_campaign_id, options)
 
     // 使用 Promise.allSettled 并行获取所有档位定价（避免循环中的 await）
     const pricing_promises = enabled_counts.map(count =>
-      this.getDrawPricing(count, campaign_id, options)
+      this.getDrawPricing(count, lottery_campaign_id, options)
         .then(pricing => ({ status: 'fulfilled', value: pricing, count }))
         .catch(error => {
           logger.warn('[定价服务] 获取档位定价失败', {
-            campaign_id,
+            lottery_campaign_id,
             draw_count: count,
             error: error.message
           })
@@ -343,7 +349,7 @@ class LotteryPricingService {
    *
    * @description 配置变更后调用，实现写后精准失效
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {string} reason - 失效原因（用于日志）
    * @returns {Promise<boolean>} 是否失效成功
    *
@@ -351,9 +357,9 @@ class LotteryPricingService {
    * // 运营后台修改定价配置后
    * await LotteryPricingService.invalidateCache(1, 'admin_updated_pricing')
    */
-  static async invalidateCache(campaign_id, reason = 'pricing_updated') {
-    const result = await BusinessCacheHelper.invalidateLotteryPricing(campaign_id, reason)
-    logger.info('[定价服务] 缓存已失效', { campaign_id, reason, success: result })
+  static async invalidateCache(lottery_campaign_id, reason = 'pricing_updated') {
+    const result = await BusinessCacheHelper.invalidateLotteryPricing(lottery_campaign_id, reason)
+    logger.info('[定价服务] 缓存已失效', { lottery_campaign_id, reason, success: result })
     return result
   }
 }

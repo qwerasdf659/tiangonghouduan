@@ -105,7 +105,7 @@ class PityCalculator {
    * @param {number} context.empty_streak - 当前连续空奖次数
    * @param {Object} context.tier_weights - 当前档位权重配置
    * @param {number} context.user_id - 用户ID（用于日志）
-   * @param {number} context.campaign_id - 活动ID（用于日志）
+   * @param {number} context.lottery_campaign_id - 活动ID（用于日志）
    * @returns {Object} 计算结果
    *
    * @example
@@ -123,11 +123,11 @@ class PityCalculator {
    * }
    */
   calculate(context) {
-    const { empty_streak = 0, tier_weights = {}, user_id, campaign_id } = context
+    const { empty_streak = 0, tier_weights = {}, user_id, lottery_campaign_id } = context
 
     this._log('debug', '开始计算 Pity 效果', {
       user_id,
-      campaign_id,
+      lottery_campaign_id,
       empty_streak
     })
 
@@ -146,7 +146,7 @@ class PityCalculator {
 
     // 连续空奖次数为 0 或负数，直接返回
     if (empty_streak <= 0) {
-      this._log('debug', 'Pity 未触发：无连续空奖', { user_id, campaign_id })
+      this._log('debug', 'Pity 未触发：无连续空奖', { user_id, lottery_campaign_id })
       return result
     }
 
@@ -154,7 +154,7 @@ class PityCalculator {
     if (empty_streak >= this.pity_config.hard_pity.streak) {
       this._log('info', '🎯 硬保底触发', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         empty_streak,
         hard_pity_streak: this.pity_config.hard_pity.streak
       })
@@ -179,7 +179,7 @@ class PityCalculator {
       if (empty_streak >= config.streak) {
         this._log('info', `🎯 软保底触发: ${config.description}`, {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           empty_streak,
           threshold_streak: config.streak,
           multiplier: config.multiplier
@@ -200,7 +200,7 @@ class PityCalculator {
     if (!result.pity_triggered) {
       this._log('debug', 'Pity 未触发：未达到任何阈值', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         empty_streak,
         min_threshold: this.pity_config.threshold_1.streak
       })

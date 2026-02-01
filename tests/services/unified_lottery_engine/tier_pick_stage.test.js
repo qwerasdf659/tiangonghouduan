@@ -78,7 +78,7 @@ describe('TierPickStage 层级选择器测试（任务2.3）', () => {
 
     return {
       user_id: real_test_user.user_id,
-      campaign_id: test_campaign.campaign_id,
+      lottery_campaign_id: test_campaign.lottery_campaign_id,
       idempotency_key: `test_tier_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`,
       lottery_session_id: `session_${Date.now()}`,
       request_id: `req_${Date.now()}`,
@@ -143,9 +143,9 @@ describe('TierPickStage 层级选择器测试（任务2.3）', () => {
       } else {
         // 获取活动关联的奖品
         test_prizes = await LotteryPrize.findAll({
-          where: { campaign_id: test_campaign.campaign_id }
+          where: { lottery_campaign_id: test_campaign.lottery_campaign_id }
         })
-        console.log(`📊 活动 ${test_campaign.campaign_id} 有 ${test_prizes.length} 个奖品`)
+        console.log(`📊 活动 ${test_campaign.lottery_campaign_id} 有 ${test_prizes.length} 个奖品`)
       }
 
       console.log('✅ TierPickStage 测试环境初始化完成')
@@ -376,7 +376,7 @@ describe('TierPickStage 层级选择器测试（任务2.3）', () => {
         data: {
           decision_source: 'preset',
           preset: {
-            prize_id: 1,
+            lottery_prize_id: 1,
             reward_tier: 'high'
           }
         }

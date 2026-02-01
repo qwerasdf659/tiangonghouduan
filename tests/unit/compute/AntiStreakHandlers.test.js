@@ -69,7 +69,7 @@ describe('AntiEmptyStreakHandler', () => {
         available_tiers: { fallback: true, low: true },
         effective_budget: 100,
         prizes_by_tier: {
-          low: [{ prize_id: 1, prize_value_points: 50 }]
+          low: [{ lottery_prize_id: 1, prize_value_points: 50 }]
         },
         user_id: 1
       })

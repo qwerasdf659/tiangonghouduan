@@ -27,7 +27,7 @@ module.exports = sequelize => {
       /**
        * 历史记录ID（自增主键）
        */
-      history_id: {
+      system_dictionary_history_id: {
         type: DataTypes.INTEGER.UNSIGNED,
         primaryKey: true,
         autoIncrement: true,
@@ -38,7 +38,7 @@ module.exports = sequelize => {
        * 字典ID
        * 关联 system_dictionaries.dict_id
        */
-      dict_id: {
+      system_dictionary_id: {
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
         comment: '字典ID（关联 system_dictionaries.dict_id）'
@@ -131,11 +131,11 @@ module.exports = sequelize => {
       underscored: true,
       indexes: [
         {
-          fields: ['dict_id'],
+          fields: ['system_dictionary_id'],
           name: 'idx_dict_id'
         },
         {
-          fields: ['dict_id', 'version'],
+          fields: ['system_dictionary_id', 'version'],
           name: 'idx_dict_version'
         },
         {
@@ -156,7 +156,7 @@ module.exports = sequelize => {
     // 关联字典主表
     if (models.SystemDictionary) {
       SystemDictionaryHistory.belongsTo(models.SystemDictionary, {
-        foreignKey: 'dict_id',
+        foreignKey: 'system_dictionary_id',
         as: 'dictionary'
       })
     }

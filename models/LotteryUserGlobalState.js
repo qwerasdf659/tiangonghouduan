@@ -101,15 +101,15 @@ class LotteryUserGlobalState extends Model {
    * 记录一次抽奖结果并更新全局统计
    *
    * @param {string} tier - 抽奖档位（high/mid/low/empty）
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 抽奖活动ID
    * @param {Object} options - 可选参数（如 transaction）
    * @returns {Promise<LotteryUserGlobalState>} 更新后的状态
    */
-  async recordDraw(tier, campaign_id, options = {}) {
+  async recordDraw(tier, lottery_campaign_id, options = {}) {
     const updates = {
       global_draw_count: this.global_draw_count + 1,
       last_draw_at: new Date(),
-      last_campaign_id: campaign_id
+      last_campaign_id: lottery_campaign_id
     }
 
     // 根据档位更新对应计数
@@ -211,7 +211,7 @@ function initModel(sequelize) {
       /**
        * 全局状态ID - 主键（自增）
        */
-      global_state_id: {
+      lottery_user_global_state_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,

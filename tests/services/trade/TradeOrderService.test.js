@@ -148,7 +148,7 @@ describe('TradeOrderService - 交易订单服务', () => {
     await test_item.update({ status: 'locked' })
 
     console.log(
-      `📦 测试数据准备完成: listing_id=${test_listing.listing_id}, item_id=${test_item.item_instance_id}`
+      `📦 测试数据准备完成: market_listing_id=${test_listing.market_listing_id}, item_instance_id=${test_item.item_instance_id}`
     )
   })
 
@@ -157,7 +157,7 @@ describe('TradeOrderService - 交易订单服务', () => {
     // 清理测试订单（如果有）
     if (test_listing) {
       await TradeOrder.destroy({
-        where: { listing_id: test_listing.listing_id }
+        where: { market_listing_id: test_listing.market_listing_id }
       })
     }
 
@@ -191,14 +191,14 @@ describe('TradeOrderService - 交易订单服务', () => {
       await expect(
         TradeOrderService.createOrder(
           {
-            listing_id: test_listing.listing_id,
+            market_listing_id: test_listing.market_listing_id,
             buyer_id: test_buyer.user_id
           },
           { transaction: await sequelize.transaction() }
         )
       ).rejects.toThrow('idempotency_key 是必需参数')
 
-      // 测试缺少 listing_id
+      // 测试缺少 market_listing_id
       await expect(
         TradeOrderService.createOrder(
           {
@@ -207,14 +207,14 @@ describe('TradeOrderService - 交易订单服务', () => {
           },
           { transaction: await sequelize.transaction() }
         )
-      ).rejects.toThrow('listing_id 是必需参数')
+      ).rejects.toThrow('market_listing_id 是必需参数')
 
       // 测试缺少 buyer_id
       await expect(
         TradeOrderService.createOrder(
           {
             idempotency_key: generateIdempotencyKey(),
-            listing_id: test_listing.listing_id
+            market_listing_id: test_listing.market_listing_id
           },
           { transaction: await sequelize.transaction() }
         )
@@ -228,7 +228,7 @@ describe('TradeOrderService - 交易订单服务', () => {
           TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey(),
-              listing_id: 999999999, // 不存在的挂牌ID
+              market_listing_id: 999999999, // 不存在的挂牌ID
               buyer_id: test_buyer.user_id
             },
             { transaction }
@@ -249,7 +249,7 @@ describe('TradeOrderService - 交易订单服务', () => {
           TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey(),
-              listing_id: test_listing.listing_id,
+              market_listing_id: test_listing.market_listing_id,
               buyer_id: test_buyer.user_id
             },
             { transaction }
@@ -278,7 +278,7 @@ describe('TradeOrderService - 交易订单服务', () => {
           TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey(),
-              listing_id: test_listing.listing_id,
+              market_listing_id: test_listing.market_listing_id,
               buyer_id: test_buyer.user_id
             },
             { transaction }
@@ -322,7 +322,7 @@ describe('TradeOrderService - 交易订单服务', () => {
         result1 = await TradeOrderService.createOrder(
           {
             idempotency_key,
-            listing_id: test_listing.listing_id,
+            market_listing_id: test_listing.market_listing_id,
             buyer_id: test_buyer.user_id
           },
           { transaction: transaction1 }
@@ -348,7 +348,7 @@ describe('TradeOrderService - 交易订单服务', () => {
         const result2 = await TradeOrderService.createOrder(
           {
             idempotency_key,
-            listing_id: test_listing.listing_id,
+            market_listing_id: test_listing.market_listing_id,
             buyer_id: test_buyer.user_id
           },
           { transaction: transaction2 }
@@ -356,9 +356,9 @@ describe('TradeOrderService - 交易订单服务', () => {
         await transaction2.commit()
         committed2 = true
 
-        // 验证幂等返回（注意：order_id 可能是字符串类型，使用 String() 转换比较）
-        expect(result2).toHaveProperty('order_id')
-        expect(String(result2.order_id)).toBe(String(result1.order_id)) // 应返回相同的订单ID
+        // 验证幂等返回（注意：trade_order_id 可能是字符串类型，使用 String() 转换比较）
+        expect(result2).toHaveProperty('trade_order_id')
+        expect(String(result2.trade_order_id)).toBe(String(result1.trade_order_id)) // 应返回相同的订单ID
         expect(result2.is_duplicate).toBe(true) // 应标记为重复
       } catch (error) {
         if (!committed2) {
@@ -394,7 +394,7 @@ describe('TradeOrderService - 交易订单服务', () => {
         await TradeOrderService.createOrder(
           {
             idempotency_key,
-            listing_id: test_listing.listing_id,
+            market_listing_id: test_listing.market_listing_id,
             buyer_id: test_buyer.user_id
           },
           { transaction: transaction1 }
@@ -430,13 +430,13 @@ describe('TradeOrderService - 交易订单服务', () => {
       })
 
       try {
-        // 使用相同的 idempotency_key 但不同的 listing_id
+        // 使用相同的 idempotency_key 但不同的 market_listing_id
         const transaction2 = await sequelize.transaction()
         try {
           await TradeOrderService.createOrder(
             {
               idempotency_key, // 相同的幂等键
-              listing_id: another_listing.listing_id, // 不同的挂牌
+              market_listing_id: another_listing.market_listing_id, // 不同的挂牌
               buyer_id: test_buyer.user_id
             },
             { transaction: transaction2 }
@@ -489,8 +489,8 @@ describe('TradeOrderService - 交易订单服务', () => {
       // 创建一个已完成的测试订单
       const completed_order = await TradeOrder.create({
         idempotency_key: generateIdempotencyKey('completed_order'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.listing_id}_${Date.now()}`,
-        listing_id: test_listing.listing_id,
+        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now()}`,
+        market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
         asset_code: 'DIAMOND',
@@ -503,7 +503,10 @@ describe('TradeOrderService - 交易订单服务', () => {
       const transaction = await sequelize.transaction()
       try {
         await expect(
-          TradeOrderService.cancelOrder({ order_id: completed_order.order_id }, { transaction })
+          TradeOrderService.cancelOrder(
+            { trade_order_id: completed_order.trade_order_id },
+            { transaction }
+          )
         ).rejects.toThrow(/订单状态异常/)
       } finally {
         await transaction.rollback()
@@ -522,8 +525,8 @@ describe('TradeOrderService - 交易订单服务', () => {
       // 创建一个测试订单用于查询
       query_test_order = await TradeOrder.create({
         idempotency_key: generateIdempotencyKey('query_test_order'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.listing_id}_${Date.now()}`,
-        listing_id: test_listing.listing_id,
+        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now()}`,
+        market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
         asset_code: 'DIAMOND',
@@ -542,11 +545,11 @@ describe('TradeOrderService - 交易订单服务', () => {
     })
 
     it('4.1 getOrderDetail 应返回订单详情', async () => {
-      const order = await TradeOrderService.getOrderDetail(query_test_order.order_id)
+      const order = await TradeOrderService.getOrderDetail(query_test_order.trade_order_id)
 
       expect(order).toBeDefined()
-      // order_id 可能是字符串类型，统一使用 String() 转换比较
-      expect(String(order.order_id)).toBe(String(query_test_order.order_id))
+      // trade_order_id 可能是字符串类型，统一使用 String() 转换比较
+      expect(String(order.trade_order_id)).toBe(String(query_test_order.trade_order_id))
       expect(order.buyer_user_id).toBe(test_buyer.user_id)
       expect(order.seller_user_id).toBe(test_seller.user_id)
       expect(Number(order.gross_amount)).toBe(100)
@@ -572,9 +575,9 @@ describe('TradeOrderService - 交易订单服务', () => {
       expect(result).toHaveProperty('page_size')
       expect(Array.isArray(result.orders)).toBe(true)
 
-      // 应能找到测试订单（注意：order_id 可能是字符串类型）
+      // 应能找到测试订单（注意：trade_order_id 可能是字符串类型）
       const found = result.orders.find(
-        o => String(o.order_id) === String(query_test_order.order_id)
+        o => String(o.trade_order_id) === String(query_test_order.trade_order_id)
       )
       expect(found).toBeDefined()
     })
@@ -597,11 +600,11 @@ describe('TradeOrderService - 交易订单服务', () => {
     })
 
     it('4.5 getOrderById（管理后台）应返回订单详情', async () => {
-      const order = await TradeOrderService.getOrderById(query_test_order.order_id)
+      const order = await TradeOrderService.getOrderById(query_test_order.trade_order_id)
 
       expect(order).toBeDefined()
-      // order_id 可能是字符串类型，统一使用 String() 转换比较
-      expect(String(order.order_id)).toBe(String(query_test_order.order_id))
+      // trade_order_id 可能是字符串类型，统一使用 String() 转换比较
+      expect(String(order.trade_order_id)).toBe(String(query_test_order.trade_order_id))
 
       // 管理后台版本应包含关联数据
       expect(order).toHaveProperty('buyer')
@@ -613,8 +616,8 @@ describe('TradeOrderService - 交易订单服务', () => {
       const order = await TradeOrderService.getOrderByBusinessId(query_test_order.business_id)
 
       expect(order).toBeDefined()
-      // order_id 可能是字符串类型，统一使用 String() 转换比较
-      expect(String(order.order_id)).toBe(String(query_test_order.order_id))
+      // trade_order_id 可能是字符串类型，统一使用 String() 转换比较
+      expect(String(order.trade_order_id)).toBe(String(query_test_order.trade_order_id))
       expect(order.business_id).toBe(query_test_order.business_id)
     })
 
@@ -670,8 +673,8 @@ describe('TradeOrderService - 交易订单服务', () => {
 
       const test_order = await TradeOrder.create({
         idempotency_key: generateIdempotencyKey('reconcile_test'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.listing_id}_${Date.now()}`,
-        listing_id: test_listing.listing_id,
+        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now()}`,
+        market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
         asset_code: 'DIAMOND',
@@ -696,8 +699,8 @@ describe('TradeOrderService - 交易订单服务', () => {
       // 创建金额不符的测试订单
       const test_order = await TradeOrder.create({
         idempotency_key: generateIdempotencyKey('bad_reconcile_test'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.listing_id}_${Date.now()}`,
-        listing_id: test_listing.listing_id,
+        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now()}`,
+        market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
         asset_code: 'DIAMOND',
@@ -723,8 +726,8 @@ describe('TradeOrderService - 交易订单服务', () => {
       // created 状态可取消
       const created_order = await TradeOrder.create({
         idempotency_key: generateIdempotencyKey('cancel_test_created'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.listing_id}_${Date.now()}`,
-        listing_id: test_listing.listing_id,
+        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now()}`,
+        market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
         asset_code: 'DIAMOND',
@@ -739,8 +742,8 @@ describe('TradeOrderService - 交易订单服务', () => {
       // frozen 状态可取消
       const frozen_order = await TradeOrder.create({
         idempotency_key: generateIdempotencyKey('cancel_test_frozen'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.listing_id}_${Date.now() + 1}`,
-        listing_id: test_listing.listing_id,
+        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now() + 1}`,
+        market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
         asset_code: 'DIAMOND',
@@ -755,8 +758,8 @@ describe('TradeOrderService - 交易订单服务', () => {
       // completed 状态不可取消
       const completed_order = await TradeOrder.create({
         idempotency_key: generateIdempotencyKey('cancel_test_completed'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.listing_id}_${Date.now() + 2}`,
-        listing_id: test_listing.listing_id,
+        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now() + 2}`,
+        market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
         asset_code: 'DIAMOND',
@@ -771,8 +774,8 @@ describe('TradeOrderService - 交易订单服务', () => {
       // cancelled 状态不可取消
       const cancelled_order = await TradeOrder.create({
         idempotency_key: generateIdempotencyKey('cancel_test_cancelled'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.listing_id}_${Date.now() + 3}`,
-        listing_id: test_listing.listing_id,
+        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now() + 3}`,
+        market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
         asset_code: 'DIAMOND',
@@ -797,8 +800,8 @@ describe('TradeOrderService - 交易订单服务', () => {
       for (const { status, expected } of statuses) {
         const test_order = await TradeOrder.create({
           idempotency_key: generateIdempotencyKey(`complete_test_${status}`),
-          business_id: `trade_order_${test_buyer.user_id}_${test_listing.listing_id}_${Date.now()}_${status}`,
-          listing_id: test_listing.listing_id,
+          business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now()}_${status}`,
+          market_listing_id: test_listing.market_listing_id,
           buyer_user_id: test_buyer.user_id,
           seller_user_id: test_seller.user_id,
           asset_code: 'DIAMOND',
@@ -821,8 +824,8 @@ describe('TradeOrderService - 交易订单服务', () => {
       // 创建一个带时间的测试订单
       const test_order = await TradeOrder.create({
         idempotency_key: generateIdempotencyKey('time_filter_test'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.listing_id}_${Date.now()}`,
-        listing_id: test_listing.listing_id,
+        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now()}`,
+        market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
         asset_code: 'DIAMOND',
@@ -845,9 +848,9 @@ describe('TradeOrderService - 交易订单服务', () => {
           page_size: 100
         })
 
-        // order_id 可能是字符串类型，统一使用 String() 转换比较
+        // trade_order_id 可能是字符串类型，统一使用 String() 转换比较
         const found = result_in_range.orders.find(
-          o => String(o.order_id) === String(test_order.order_id)
+          o => String(o.trade_order_id) === String(test_order.trade_order_id)
         )
         expect(found).toBeDefined()
 
@@ -862,9 +865,9 @@ describe('TradeOrderService - 交易订单服务', () => {
           page_size: 100
         })
 
-        // order_id 可能是字符串类型，统一使用 String() 转换比较
+        // trade_order_id 可能是字符串类型，统一使用 String() 转换比较
         const not_found = result_out_range.orders.find(
-          o => String(o.order_id) === String(test_order.order_id)
+          o => String(o.trade_order_id) === String(test_order.trade_order_id)
         )
         expect(not_found).toBeUndefined()
       } finally {

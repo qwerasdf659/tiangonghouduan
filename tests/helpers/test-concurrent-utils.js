@@ -274,7 +274,7 @@ async function detectRaceCondition(options) {
  *   {
  *     repeatCount: 5,
  *     useSameIdempotencyKey: true,
- *     resultComparator: (r1, r2) => r1.body.data.draw_id === r2.body.data.draw_id
+ *     resultComparator: (r1, r2) => r1.body.data.lottery_draw_id === r2.body.data.lottery_draw_id
  *   }
  * )
  */
@@ -457,8 +457,8 @@ function analyzeConcurrentResults(results, options = {}) {
   if (filterSuccess) {
     const successResults = results.filter(r => r.success)
     successResults.forEach(r => {
-      if (r.result?.body?.data?.draw_id) {
-        analysis.uniqueResults.add(r.result.body.data.draw_id)
+      if (r.result?.body?.data?.lottery_draw_id) {
+        analysis.uniqueResults.add(r.result.body.data.lottery_draw_id)
       }
     })
     analysis.duplicates = analysis.succeeded - analysis.uniqueResults.size

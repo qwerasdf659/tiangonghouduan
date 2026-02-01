@@ -124,7 +124,7 @@ router.get('/detail/:id', authenticateToken, async (req, res) => {
   } catch (error) {
     logger.error('查询消费记录详情失败', {
       error: error.message,
-      record_id: req.params.record_id
+      record_id: req.params.id
     })
     return handleServiceError(error, res, '查询消费记录失败')
   }
@@ -176,7 +176,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   } catch (error) {
     logger.error('软删除消费记录失败', {
       error: error.message,
-      record_id: req.params.record_id,
+      record_id: req.params.id,
       user_id: req.user?.user_id
     })
 
@@ -232,7 +232,7 @@ router.post('/:id/restore', authenticateToken, requireRoleLevel(100), async (req
 
     return res.apiSuccess(
       {
-        record_id: result.record_id,
+        record_id: result.consumption_record_id,
         is_deleted: result.is_deleted,
         user_id: result.user_id,
         note: '消费记录已恢复，用户端将重新显示该记录'
@@ -242,7 +242,7 @@ router.post('/:id/restore', authenticateToken, requireRoleLevel(100), async (req
   } catch (error) {
     logger.error('恢复消费记录失败', {
       error: error.message,
-      record_id: req.params.record_id,
+      record_id: req.params.id,
       admin_id: req.user?.user_id
     })
     return handleServiceError(error, res, '恢复消费记录失败')

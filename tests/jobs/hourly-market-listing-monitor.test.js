@@ -80,7 +80,7 @@ describe('P3-3: HourlyMarketListingMonitor - 每小时市场挂牌监控任务',
       // 如果有异常，验证数据结构
       if (report.price_anomalies.length > 0) {
         const anomaly = report.price_anomalies[0]
-        expect(anomaly).toHaveProperty('listing_id')
+        expect(anomaly).toHaveProperty('market_listing_id')
         console.log('[P3-3] 价格异常示例:', anomaly)
       }
 

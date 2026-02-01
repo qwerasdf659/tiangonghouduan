@@ -396,7 +396,7 @@ router.post(
 
       logger.info('活动条件配置成功', {
         admin_id: req.user.user_id,
-        campaign_id: result.campaign_id,
+        lottery_campaign_id: result.lottery_campaign_id,
         campaign_name: result.campaign_name,
         request_id: req.id
       })

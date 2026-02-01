@@ -33,7 +33,7 @@ models.AuthenticationSession = require('./AuthenticationSession')(sequelize, Dat
  * ✅ AuthenticationSession：用户认证会话（JWT Token生命周期管理）
  *    - 用途：管理用户登录状态和Token有效性
  *    - 特点：存储session_token、支持过期和失效管理、记录登录IP
- *    - 表名：authentication_sessions，主键：user_session_id
+ *    - 表名：authentication_sessions，主键：authentication_session_id
  *    - 业务场景：用户登录后生成Token、Token续期、退出登录时失效Token
  */
 
@@ -69,8 +69,8 @@ models.LotteryTierRule = require('./LotteryTierRule')(sequelize, DataTypes)
 /*
  * ✅ LotteryTierRule：抽奖档位规则表（整数权重制）
  *    - 用途：定义各分层用户的档位概率（支持tier_first选奖方法）
- *    - 特点：campaign_id + segment_key + tier_name 唯一约束，整数权重（SCALE=1,000,000）
- *    - 表名：lottery_tier_rules，主键：tier_rule_id
+ *    - 特点：lottery_campaign_id + segment_key + tier_name 唯一约束，整数权重（SCALE=1,000,000）
+ *    - 表名：lottery_tier_rules，主键：lottery_tier_rule_id
  *    - 业务场景：新用户高档位高概率、VIP用户专属档位配置
  */
 
@@ -79,7 +79,7 @@ models.LotteryDrawDecision = require('./LotteryDrawDecision')(sequelize, DataTyp
  * ✅ LotteryDrawDecision：抽奖决策快照表（审计核心）
  *    - 用途：记录每次抽奖的完整决策路径，支持问题排查和审计
  *    - 特点：1:1 关联 lottery_draws，记录pipeline_type、segment_key、selected_tier、随机数等
- *    - 表名：lottery_draw_decisions，主键：decision_id，唯一约束：draw_id
+ *    - 表名：lottery_draw_decisions，主键：lottery_draw_decision_id，唯一约束：lottery_draw_id
  *    - 业务场景：抽奖结果复现、概率公平性审计、系统垫付追踪
  */
 
@@ -88,7 +88,7 @@ models.LotteryCampaignUserQuota = require('./LotteryCampaignUserQuota')(sequeliz
  * ✅ LotteryCampaignUserQuota：活动用户配额表（pool_quota模式）
  *    - 用途：管理用户在pool_quota预算模式下的抽奖次数配额
  *    - 特点：remaining_quota（剩余次数）、total_granted（累计获得）、total_used（累计使用）
- *    - 表名：lottery_campaign_user_quota，主键：quota_id，唯一约束：campaign_id + user_id
+ *    - 表名：lottery_campaign_user_quota，主键：lottery_campaign_user_quota_id，唯一约束：lottery_campaign_id + user_id
  *    - 业务场景：用户消费获得配额→使用配额抽奖→配额耗尽无法抽奖
  */
 
@@ -106,7 +106,7 @@ models.LotteryCampaignPricingConfig = require('./LotteryCampaignPricingConfig').
  * ✅ LotteryCampaignPricingConfig：活动级定价配置表（版本化管理）
  *    - 用途：PricingStage的唯一定价真值来源，支持连抽定价配置
  *    - 特点：版本化管理（可回滚/可定时生效/多版本）、运营可动态调整 discount
- *    - 表名：lottery_campaign_pricing_config，主键：config_id，唯一约束：campaign_id + version
+ *    - 表名：lottery_campaign_pricing_config，主键：lottery_campaign_pricing_config_id，唯一约束：lottery_campaign_id + version
  *    - 业务场景：单抽/多连抽定价→折扣动态调整→AB测试→限时活动
  */
 
@@ -161,7 +161,7 @@ models.LotteryUserDailyDrawQuota = require('./LotteryUserDailyDrawQuota')(sequel
  * ✅ LotteryUserDailyDrawQuota：用户每日抽奖配额表（强一致扣减层）
  *    - 用途：原子操作避免并发窗口期问题，支持连抽场景
  *    - 特点：原子扣减（UPDATE ... WHERE）、配额初始化、临时补偿（bonus_draw_count）
- *    - 表名：lottery_user_daily_draw_quota，主键：quota_id，唯一索引：user_id + campaign_id + quota_date
+ *    - 表名：lottery_user_daily_draw_quota，主键：lottery_user_daily_draw_quota_id，唯一索引：user_id + lottery_campaign_id + quota_date
  *    - 业务场景：抽奖前配额检查、原子扣减、连抽支持（10连抽一次扣减10次）
  */
 
@@ -234,7 +234,7 @@ models.CustomerServiceSession = require('./CustomerServiceSession')(sequelize, D
  * ✅ CustomerServiceSession：客服聊天会话（与AuthenticationSession完全不同的概念！）
  *    - 用途：管理用户与客服之间的聊天对话会话
  *    - 特点：会话状态（等待/分配/活跃/关闭）、客服分配、满意度评分
- *    - 表名：customer_service_sessions，主键：session_id，外键：user_id、admin_id
+ *    - 表名：customer_service_sessions，主键：customer_service_session_id，外键：user_id、admin_id
  *    - 业务场景：用户发起咨询、客服接入、消息收发、会话关闭、满意度评价
  *    - ⚠️ 与AuthenticationSession的区别：CustomerServiceSession是聊天会话，AuthenticationSession是认证会话
  */
@@ -244,7 +244,7 @@ models.ChatMessage = require('./ChatMessage')(sequelize, DataTypes)
  * ✅ ChatMessage：聊天消息
  *    - 用途：记录CustomerSession中的每条聊天消息
  *    - 特点：消息内容、发送者、发送时间、消息类型
- *    - 表名：chat_messages，外键：session_id
+ *    - 表名：chat_messages，外键：customer_service_session_id
  */
 
 // V4.0新增：系统公告和反馈系统
@@ -278,7 +278,7 @@ models.ExchangeItem = require('./ExchangeItem')(sequelize, DataTypes)
  * ✅ ExchangeItem：兑换市场商品配置表
  *    - 用途：配置用户可以使用虚拟奖品价值或积分兑换的商品
  *    - 特点：支持虚拟奖品/积分/混合支付方式
- *    - 表名：exchange_items，主键：item_id
+ *    - 表名：exchange_items，主键：exchange_item_id
  *    - 业务场景：用户抽奖获得虚拟奖品（水晶等）→ 使用虚拟奖品价值兑换商品
  */
 
@@ -287,7 +287,7 @@ models.ExchangeRecord = require('./ExchangeRecord')(sequelize, DataTypes)
  * ✅ ExchangeRecord：B2C兑换订单记录表
  *    - 用途：记录用户在B2C官方商城的兑换订单
  *    - 特点：材料资产支付、订单管理、发货追踪
- *    - 表名：exchange_records，主键：record_id
+ *    - 表名：exchange_records，主键：exchange_record_id
  *    - 业务场景：用户选择商品 → 扣除材料资产 → 创建订单 → 发货
  *    - API路由：/api/v4/shop/exchange（从 /api/v4/market 迁移）
  */
@@ -305,7 +305,7 @@ models.AssetTransaction = require('./AssetTransaction')(sequelize, DataTypes)
  * ✅ AssetTransaction：资产流水表（记录所有资产变动流水）
  *    - 用途：记录DIAMOND和材料资产的所有变动流水
  *    - 特点：业界标准幂等架构（idempotency_key唯一约束），delta_amount可正可负，记录变动后余额
- *    - 表名：asset_transactions，主键：transaction_id，外键：account_id
+ *    - 表名：asset_transactions，主键：asset_transaction_id，外键：account_id
  *    - 业务场景：市场购买（买家扣减、卖家入账、平台手续费）、兑换扣减、材料转换、对账审计
  *    - 更新：2025-12-26 升级到业界标准幂等架构（方案B），删除 business_id 字段
  */
@@ -346,7 +346,7 @@ models.ConsumptionRecord = require('./ConsumptionRecord')(sequelize, DataTypes)
  * ✅ ConsumptionRecord：消费记录（商家扫码录入）
  *    - 用途：记录用户在商家处的消费信息，用于积分奖励
  *    - 特点：消费金额、预计积分、二维码、审核状态、商家备注
- *    - 表名：consumption_records，主键：record_id，外键：user_id、merchant_id
+ *    - 表名：consumption_records，主键：consumption_record_id，外键：user_id、merchant_id
  *    - 业务场景：商家扫码录入消费→积分冻结→平台审核→积分到账
  *    - 关联：AssetTransaction（资产冻结）、ContentReviewRecord（审核流程）
  */
@@ -357,7 +357,7 @@ models.ContentReviewRecord = require('./ContentReviewRecord')(sequelize, DataTyp
  * ✅ ContentReviewRecord：内容审核记录（业务审核流程管理）
  *    - 用途：管理需要人工审核的业务内容（如：兑换申请、图片审核、反馈处理）
  *    - 特点：有审核流程，状态可变更（pending→approved/rejected），有审核员
- *    - 表名：content_review_records，主键：audit_id
+ *    - 表名：content_review_records，主键：content_review_record_id
  *    - 业务场景：用户提交兑换申请 → 进入待审核状态 → 管理员审核 → 通过/拒绝
  *    - 字段特点：audit_status（状态）、auditor_id（审核员）、audit_reason（审核意见）
  *    - ⚠️ 与AdminOperationLog的区别：ContentReviewRecord是业务审核，AdminOperationLog是操作追溯
@@ -430,7 +430,7 @@ models.RiskAlert = require('./RiskAlert')(sequelize, DataTypes)
  * ✅ RiskAlert：风控告警记录（2026-01-12 商家员工域权限体系升级）
  *    - 用途：记录商家操作的风控告警（频次超限、金额异常、跨店重复等）
  *    - 特点：告警类型分类、严重程度分级、阻断/告警区分、审核流程
- *    - 表名：risk_alerts，主键：alert_id
+ *    - 表名：risk_alerts，主键：risk_alert_id
  *    - 业务场景：消费提交→风控检查→生成告警→管理员审核→处理结果
  */
 
@@ -438,18 +438,18 @@ models.RiskAlert = require('./RiskAlert')(sequelize, DataTypes)
 models.UserStatusChangeRecord = require('./UserStatusChangeRecord')(sequelize, DataTypes)
 /*
  * ✅ UserStatusChangeRecord：用户状态变更记录
- *    - 用途：为 user_status_change 审计日志提供业务主键（record_id → target_id）
+ *    - 用途：为 user_status_change 审计日志提供业务主键（user_status_change_record_id → target_id）
  *    - 特点：幂等键派生（决策6）、事务内创建（决策7）、关键操作阻断（决策5）
- *    - 表名：user_status_change_records，主键：record_id
+ *    - 表名：user_status_change_records，主键：user_status_change_record_id
  *    - 业务场景：管理员封禁/解封用户→创建变更记录→记录审计日志→可追溯
  */
 
 models.UserRoleChangeRecord = require('./UserRoleChangeRecord')(sequelize, DataTypes)
 /*
  * ✅ UserRoleChangeRecord：用户角色变更记录
- *    - 用途：为 role_change 审计日志提供业务主键（record_id → target_id）
+ *    - 用途：为 role_change 审计日志提供业务主键（user_role_change_record_id → target_id）
  *    - 特点：幂等键派生（决策6）、事务内创建（决策7）、关键操作阻断（决策5）
- *    - 表名：user_role_change_records，主键：record_id
+ *    - 表名：user_role_change_records，主键：user_role_change_record_id
  *    - 业务场景：管理员变更用户角色→创建变更记录→记录审计日志→可追溯
  *    - 注意：与 RoleChangeLog 区别 - 本模型专用于审计主键生成，不记录角色权限本身的变更
  */
@@ -457,9 +457,9 @@ models.UserRoleChangeRecord = require('./UserRoleChangeRecord')(sequelize, DataT
 models.LotteryClearSettingRecord = require('./LotteryClearSettingRecord')(sequelize, DataTypes)
 /*
  * ✅ LotteryClearSettingRecord：抽奖清除设置记录
- *    - 用途：为 lottery_clear_settings 审计日志提供业务主键（record_id → target_id）
+ *    - 用途：为 lottery_clear_settings 审计日志提供业务主键（lottery_clear_setting_record_id → target_id）
  *    - 特点：幂等键派生（决策6）、事务内创建（决策7）、关键操作阻断（决策5）
- *    - 表名：lottery_clear_setting_records，主键：record_id
+ *    - 表名：lottery_clear_setting_records，主键：lottery_clear_setting_record_id
  *    - 业务场景：管理员清除用户抽奖设置→创建清除记录→记录审计日志→可追溯
  *    - 解决问题：原 target_id: null 导致关键操作被阻断
  */
@@ -469,7 +469,7 @@ models.WebSocketStartupLog = require('./WebSocketStartupLog')(sequelize, DataTyp
  * ✅ WebSocketStartupLog：WebSocket服务启动日志
  *    - 用途：记录WebSocket服务启动/停止事件，用于审计和稳定性分析
  *    - 特点：记录启动时间、停止时间、运行时长、峰值连接数、服务器信息
- *    - 表名：websocket_startup_logs，主键：log_id
+ *    - 表名：websocket_startup_logs，主键：websocket_startup_log_id
  *    - 业务场景：服务监控→uptime计算→重启历史查询→SLA统计
  */
 
@@ -489,7 +489,7 @@ models.MarketListing = require('./MarketListing')(sequelize, DataTypes)
  * ✅ MarketListing：市场挂牌
  *    - 用途：管理交易市场的挂牌信息（不可叠加物品 + 可叠加资产）
  *    - 特点：支持锁定机制、冻结标记、状态流转（on_sale → locked → sold/withdrawn）
- *    - 表名：market_listings，主键：listing_id
+ *    - 表名：market_listings，主键：market_listing_id
  *    - 业务场景：创建挂牌→购买挂牌→撤回挂牌→超时解锁
  */
 
@@ -498,7 +498,7 @@ models.TradeOrder = require('./TradeOrder')(sequelize, DataTypes)
  * ✅ TradeOrder：交易订单
  *    - 用途：管理所有交易订单，提供强幂等性控制和对账支持
  *    - 特点：business_id全局唯一、对账字段（gross_amount = fee_amount + net_amount）
- *    - 表名：trade_orders，主键：order_id，唯一约束：business_id
+ *    - 表名：trade_orders，主键：trade_order_id，唯一约束：business_id
  *    - 业务场景：创建订单→冻结资产→成交结算→取消订单
  */
 
@@ -508,7 +508,7 @@ models.RedemptionOrder = require('./RedemptionOrder')(sequelize, DataTypes)
  * ✅ RedemptionOrder：兑换订单
  *    - 用途：管理核销码生成和核销流程
  *    - 特点：12位Base32核销码 + SHA-256哈希存储 + 30天TTL
- *    - 表名：redemption_orders，主键：order_id（UUID），唯一约束：code_hash
+ *    - 表名：redemption_orders，主键：redemption_order_id（UUID），唯一约束：code_hash
  *    - 业务场景：生成核销码→核销验证→过期清理
  */
 
@@ -518,7 +518,7 @@ models.LotteryUserExperienceState = require('./LotteryUserExperienceState')(sequ
  * ✅ LotteryUserExperienceState：用户活动级抽奖体验状态
  *    - 用途：追踪用户在特定活动中的抽奖体验状态（Pity/AntiStreak）
  *    - 特点：empty_streak（连续空奖次数）、recent_high_count（近期高价值次数）
- *    - 表名：lottery_user_experience_state，主键：state_id，唯一约束：user_id + campaign_id
+ *    - 表名：lottery_user_experience_state，主键：lottery_user_experience_state_id，唯一约束：user_id + lottery_campaign_id
  *    - 业务场景：Pity保底触发→AntiEmpty防空连→AntiHigh防高价值集中
  */
 
@@ -536,7 +536,7 @@ models.LotteryHourlyMetrics = require('./LotteryHourlyMetrics')(sequelize, DataT
  * ✅ LotteryHourlyMetrics：抽奖监控指标表（按小时聚合）
  *    - 用途：存储按小时聚合的抽奖监控指标，用于监控活动健康度和策略效果
  *    - 特点：档位分布统计、BxPx分层分布、体验机制触发统计、预计算率指标
- *    - 表名：lottery_hourly_metrics，主键：metric_id，唯一约束：campaign_id + hour_bucket
+ *    - 表名：lottery_hourly_metrics，主键：lottery_hourly_metric_id，唯一约束：lottery_campaign_id + hour_bucket
  *    - 业务场景：实时监控空奖率/高价值率、Pity/AntiEmpty触发率、异常检测预警
  */
 
@@ -544,7 +544,7 @@ models.LotteryAlert = require('./LotteryAlert').initModel(sequelize)
 /*
  * ✅ LotteryAlert：抽奖系统告警表（运营监控专用）
  *    - 用途：记录抽奖系统的实时告警信息，用于运营监控和异常检测
- *    - 特点：独立于商家风控的 risk_alerts，包含 campaign_id、阈值偏差等专用字段
+ *    - 特点：独立于商家风控的 risk_alerts，包含 lottery_campaign_id、阈值偏差等专用字段
  *    - 表名：lottery_alerts，主键：alert_id
  *    - 业务场景：中奖率异常、预算告警、库存告警、用户异常、系统告警
  *    - 设计决策来源：需求文档决策6（职责分离，便于独立演进）
@@ -576,7 +576,7 @@ models.LotteryDailyMetrics = require('./LotteryDailyMetrics')(sequelize, DataTyp
  * ✅ LotteryDailyMetrics：抽奖日报统计表（按日聚合）
  *    - 用途：存储按日聚合的抽奖监控指标，用于长期历史分析和运营决策
  *    - 特点：从小时级数据汇总、永久保留、支持跨活动对比分析
- *    - 表名：lottery_daily_metrics，主键：daily_metric_id，唯一约束：campaign_id + metric_date
+ *    - 表名：lottery_daily_metrics，主键：lottery_daily_metric_id，唯一约束：lottery_campaign_id + metric_date
  *    - 业务场景：日报生成、年度对比、运营决策、长期趋势分析
  */
 

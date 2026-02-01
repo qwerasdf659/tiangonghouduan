@@ -88,7 +88,7 @@ describe('P3-6d: HourlyExpireFungibleAssetListings - 每小时同质化资产挂
         expect(listing.listing_kind).toBe('fungible_asset')
         expect(listing.status).toBe('active')
 
-        console.log(`[P3-6d] 挂单 ${listing.listing_id}: created_at=${listing.created_at}`)
+        console.log(`[P3-6d] 挂单 ${listing.market_listing_id}: created_at=${listing.created_at}`)
       }
     })
 

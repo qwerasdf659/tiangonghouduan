@@ -48,7 +48,7 @@ class UserAnalysisService {
    * 查询用户体验状态列表（向后兼容原 LotteryAnalyticsService 签名）
    *
    * @param {Object} options - 查询参数
-   * @param {number} [options.campaign_id] - 活动ID
+   * @param {number} [options.lottery_campaign_id] - 活动ID
    * @param {number} [options.user_id] - 用户ID
    * @param {number} [options.min_empty_streak] - 最小连续空奖次数
    * @param {number} [options.page=1] - 页码
@@ -56,10 +56,10 @@ class UserAnalysisService {
    * @returns {Promise<Object>} 用户体验状态列表和分页信息
    */
   async getUserExperienceStates(options = {}) {
-    const { campaign_id, user_id, min_empty_streak, page = 1, page_size = 20 } = options
+    const { lottery_campaign_id, user_id, min_empty_streak, page = 1, page_size = 20 } = options
 
     const where = {}
-    if (campaign_id) where.campaign_id = campaign_id
+    if (lottery_campaign_id) where.lottery_campaign_id = lottery_campaign_id
     if (user_id) where.user_id = user_id
     if (min_empty_streak !== undefined) {
       where.empty_streak = { [Op.gte]: min_empty_streak }
@@ -78,7 +78,7 @@ class UserAnalysisService {
         {
           model: this.models.LotteryCampaign,
           as: 'campaign',
-          attributes: ['campaign_id', 'campaign_name', 'status']
+          attributes: ['lottery_campaign_id', 'campaign_name', 'status']
         }
       ],
       order: [['empty_streak', 'DESC']],
@@ -101,12 +101,12 @@ class UserAnalysisService {
    * 获取单个用户在特定活动的体验状态
    *
    * @param {number} user_id - 用户ID
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @returns {Promise<Object|null>} 用户体验状态或null
    */
-  async getUserExperienceState(user_id, campaign_id) {
+  async getUserExperienceState(user_id, lottery_campaign_id) {
     const state = await this.models.LotteryUserExperienceState.findOne({
-      where: { user_id, campaign_id },
+      where: { user_id, lottery_campaign_id },
       include: [
         {
           model: this.models.User,
@@ -116,7 +116,7 @@ class UserAnalysisService {
         {
           model: this.models.LotteryCampaign,
           as: 'campaign',
-          attributes: ['campaign_id', 'campaign_name', 'status']
+          attributes: ['lottery_campaign_id', 'campaign_name', 'status']
         }
       ]
     })
@@ -197,7 +197,7 @@ class UserAnalysisService {
    * 查询配额赠送记录列表（向后兼容原 LotteryAnalyticsService 签名）
    *
    * @param {Object} options - 查询参数
-   * @param {number} [options.campaign_id] - 活动ID
+   * @param {number} [options.lottery_campaign_id] - 活动ID
    * @param {number} [options.user_id] - 被赠送用户ID
    * @param {number} [options.granted_by] - 赠送操作者ID
    * @param {string} [options.grant_source] - 赠送来源
@@ -209,7 +209,7 @@ class UserAnalysisService {
    */
   async getQuotaGrants(options = {}) {
     const {
-      campaign_id,
+      lottery_campaign_id,
       user_id,
       granted_by,
       grant_source,
@@ -220,7 +220,7 @@ class UserAnalysisService {
     } = options
 
     const where = {}
-    if (campaign_id) where.campaign_id = campaign_id
+    if (lottery_campaign_id) where.lottery_campaign_id = lottery_campaign_id
     if (user_id) where.user_id = user_id
     if (granted_by) where.granted_by = granted_by
     if (grant_source) where.grant_source = grant_source
@@ -249,7 +249,7 @@ class UserAnalysisService {
         {
           model: this.models.LotteryCampaign,
           as: 'campaign',
-          attributes: ['campaign_id', 'campaign_name', 'status']
+          attributes: ['lottery_campaign_id', 'campaign_name', 'status']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -290,7 +290,7 @@ class UserAnalysisService {
         {
           model: this.models.LotteryCampaign,
           as: 'campaign',
-          attributes: ['campaign_id', 'campaign_name', 'status']
+          attributes: ['lottery_campaign_id', 'campaign_name', 'status']
         }
       ]
     })
@@ -302,7 +302,7 @@ class UserAnalysisService {
    * 查询用户配额状态列表（向后兼容原 LotteryAnalyticsService 签名）
    *
    * @param {Object} options - 查询参数
-   * @param {number} [options.campaign_id] - 活动ID
+   * @param {number} [options.lottery_campaign_id] - 活动ID
    * @param {number} [options.user_id] - 用户ID
    * @param {boolean} [options.has_remaining] - 是否有剩余配额
    * @param {number} [options.page=1] - 页码
@@ -310,10 +310,10 @@ class UserAnalysisService {
    * @returns {Promise<Object>} 用户配额状态列表和分页信息
    */
   async getUserQuotas(options = {}) {
-    const { campaign_id, user_id, has_remaining, page = 1, page_size = 20 } = options
+    const { lottery_campaign_id, user_id, has_remaining, page = 1, page_size = 20 } = options
 
     const where = {}
-    if (campaign_id) where.campaign_id = campaign_id
+    if (lottery_campaign_id) where.lottery_campaign_id = lottery_campaign_id
     if (user_id) where.user_id = user_id
     if (has_remaining !== undefined) {
       if (has_remaining) {
@@ -336,7 +336,7 @@ class UserAnalysisService {
         {
           model: this.models.LotteryCampaign,
           as: 'campaign',
-          attributes: ['campaign_id', 'campaign_name', 'status']
+          attributes: ['lottery_campaign_id', 'campaign_name', 'status']
         }
       ],
       order: [['updated_at', 'DESC']],
@@ -359,12 +359,12 @@ class UserAnalysisService {
    * 获取单个用户在特定活动的配额状态
    *
    * @param {number} user_id - 用户ID
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @returns {Promise<Object|null>} 用户配额状态或null
    */
-  async getUserQuota(user_id, campaign_id) {
+  async getUserQuota(user_id, lottery_campaign_id) {
     const quota = await this.models.LotteryCampaignUserQuota.findOne({
-      where: { user_id, campaign_id },
+      where: { user_id, lottery_campaign_id },
       include: [
         {
           model: this.models.User,
@@ -374,7 +374,7 @@ class UserAnalysisService {
         {
           model: this.models.LotteryCampaign,
           as: 'campaign',
-          attributes: ['campaign_id', 'campaign_name', 'status']
+          attributes: ['lottery_campaign_id', 'campaign_name', 'status']
         }
       ]
     })
@@ -390,7 +390,7 @@ class UserAnalysisService {
    * @param {Object} options - 查询参数
    * @param {string} [options.type='all'] - 异常类型
    * @param {string} [options.time_range='24h'] - 时间范围
-   * @param {number} [options.campaign_id] - 活动ID
+   * @param {number} [options.lottery_campaign_id] - 活动ID
    * @param {number} [options.min_risk_score] - 最小风险分数
    * @param {number} [options.page=1] - 页码
    * @param {number} [options.page_size=20] - 每页数量
@@ -400,12 +400,12 @@ class UserAnalysisService {
     const {
       type = 'all',
       time_range = '24h',
-      campaign_id,
+      lottery_campaign_id,
       min_risk_score,
       page = 1,
       page_size = 20
     } = options
-    this.logger.info('获取异常用户列表', { type, time_range, campaign_id })
+    this.logger.info('获取异常用户列表', { type, time_range, lottery_campaign_id })
 
     try {
       // 计算时间范围
@@ -414,13 +414,13 @@ class UserAnalysisService {
 
       // 明确指定表名避免 created_at 列名歧义
       const whereClause = { '$LotteryDraw.created_at$': { [Op.gte]: startTime } }
-      if (campaign_id) whereClause.campaign_id = campaign_id
+      if (lottery_campaign_id) whereClause.lottery_campaign_id = lottery_campaign_id
 
       // 查询用户抽奖聚合数据
       const userStats = await this.models.LotteryDraw.findAll({
         attributes: [
           'user_id',
-          [fn('COUNT', col('LotteryDraw.draw_id')), 'draw_count'],
+          [fn('COUNT', col('LotteryDraw.lottery_draw_id')), 'draw_count'],
           [
             fn(
               'SUM',
@@ -438,7 +438,7 @@ class UserAnalysisService {
         ],
         where: whereClause,
         group: ['LotteryDraw.user_id'],
-        having: literal('COUNT(LotteryDraw.draw_id) >= 10'), // 至少10次抽奖才分析
+        having: literal('COUNT(LotteryDraw.lottery_draw_id) >= 10'), // 至少10次抽奖才分析
         include: [
           {
             model: this.models.User,
@@ -569,7 +569,7 @@ class UserAnalysisService {
    * @returns {Promise<Object>} 抽奖详情数据
    */
   async getDrawDetails(drawId) {
-    this.logger.info('获取单次抽奖详情', { draw_id: drawId })
+    this.logger.info('获取单次抽奖详情', { lottery_draw_id: drawId })
 
     try {
       // 1. 查询抽奖记录
@@ -583,12 +583,12 @@ class UserAnalysisService {
           {
             model: this.models.LotteryCampaign,
             as: 'campaign',
-            attributes: ['campaign_id', 'campaign_name']
+            attributes: ['lottery_campaign_id', 'campaign_name']
           },
           {
             model: this.models.LotteryPrize,
             as: 'prize',
-            attributes: ['prize_id', 'prize_name', 'cost_points', 'prize_value_points']
+            attributes: ['lottery_prize_id', 'prize_name', 'cost_points', 'prize_value_points']
           }
         ]
       })
@@ -601,7 +601,7 @@ class UserAnalysisService {
       let decision = null
       if (this.models.LotteryDecision) {
         decision = await this.models.LotteryDecision.findOne({
-          where: { draw_id: drawId }
+          where: { lottery_draw_id: drawId }
         })
       }
 
@@ -611,7 +611,7 @@ class UserAnalysisService {
         userStateBefore = await this.models.LotteryUserState.findOne({
           where: {
             user_id: draw.user_id,
-            campaign_id: draw.campaign_id
+            lottery_campaign_id: draw.lottery_campaign_id
           }
         })
       }
@@ -629,17 +629,17 @@ class UserAnalysisService {
             downgrade_count: decision.downgrade_count || 0,
             fallback_triggered: decision.fallback_triggered || false,
             is_preset: decision.preset_used || false,
-            preset_id: decision.preset_id
+            lottery_preset_id: decision.lottery_preset_id
           }
         : null
 
       // 6. 组装返回数据
       return {
-        draw_id: draw.draw_id,
+        lottery_draw_id: draw.lottery_draw_id,
         basic_info: {
           user_id: draw.user_id,
           user_name: draw.user?.nickname || `用户${draw.user_id}`,
-          campaign_id: draw.campaign_id,
+          lottery_campaign_id: draw.lottery_campaign_id,
           campaign_name: draw.campaign?.campaign_name || '未知活动',
           created_at: draw.created_at,
           cost_points: draw.cost_points || 0,
@@ -660,7 +660,7 @@ class UserAnalysisService {
           : null
       }
     } catch (error) {
-      this.logger.error('获取单次抽奖详情失败', { draw_id: drawId, error: error.message })
+      this.logger.error('获取单次抽奖详情失败', { lottery_draw_id: drawId, error: error.message })
       throw error
     }
   }

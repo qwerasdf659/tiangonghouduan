@@ -156,13 +156,13 @@ class DebtManagementService {
         ? []
         : await PresetInventoryDebt.findAll({
             attributes: [
-              'campaign_id',
+              'lottery_campaign_id',
               [fn('COUNT', col('debt_id')), 'inventory_debt_count'],
               [fn('SUM', col('debt_quantity')), 'inventory_debt_quantity'],
               [fn('SUM', col('cleared_quantity')), 'inventory_cleared_quantity']
             ],
             where: { status: 'pending' },
-            group: ['campaign_id'],
+            group: ['lottery_campaign_id'],
             raw: true
           })
 
@@ -171,40 +171,40 @@ class DebtManagementService {
         ? []
         : await PresetBudgetDebt.findAll({
             attributes: [
-              'campaign_id',
+              'lottery_campaign_id',
               [fn('COUNT', col('debt_id')), 'budget_debt_count'],
               [fn('SUM', col('debt_amount')), 'budget_debt_amount'],
               [fn('SUM', col('cleared_amount')), 'budget_cleared_amount']
             ],
             where: { status: 'pending' },
-            group: ['campaign_id'],
+            group: ['lottery_campaign_id'],
             raw: true
           })
 
     // 合并活动ID
     const campaignIds = new Set()
-    inventoryCampaigns.forEach(c => campaignIds.add(c.campaign_id))
-    budgetCampaigns.forEach(c => campaignIds.add(c.campaign_id))
+    inventoryCampaigns.forEach(c => campaignIds.add(c.lottery_campaign_id))
+    budgetCampaigns.forEach(c => campaignIds.add(c.lottery_campaign_id))
 
     // 获取活动信息
     const campaigns = await LotteryCampaign.findAll({
-      where: { campaign_id: { [Op.in]: Array.from(campaignIds) } },
-      attributes: ['campaign_id', 'campaign_name', 'status']
+      where: { lottery_campaign_id: { [Op.in]: Array.from(campaignIds) } },
+      attributes: ['lottery_campaign_id', 'campaign_name', 'status']
     })
 
     const campaignMap = {}
     campaigns.forEach(c => {
-      campaignMap[c.campaign_id] = c
+      campaignMap[c.lottery_campaign_id] = c
     })
 
     // 合并数据
     campaignIds.forEach(campaignId => {
       const campaign = campaignMap[campaignId]
-      const invDebt = inventoryCampaigns.find(i => i.campaign_id === campaignId)
-      const budDebt = budgetCampaigns.find(b => b.campaign_id === campaignId)
+      const invDebt = inventoryCampaigns.find(i => i.lottery_campaign_id === campaignId)
+      const budDebt = budgetCampaigns.find(b => b.lottery_campaign_id === campaignId)
 
       results.push({
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         campaign_name: campaign ? campaign.campaign_name : `活动#${campaignId}`,
         campaign_status: campaign ? campaign.status : 'unknown',
         inventory_debt: invDebt
@@ -249,7 +249,7 @@ class DebtManagementService {
    * 按奖品汇总库存欠账
    *
    * @param {Object} options - 查询选项
-   * @param {number} [options.campaign_id] - 活动ID（可选）
+   * @param {number} [options.lottery_campaign_id] - 活动ID（可选）
    * @param {number} [options.page=1] - 页码
    * @param {number} [options.page_size=20] - 每页数量
    * @returns {Promise<Object>} 按奖品分组的库存欠账数据
@@ -257,51 +257,53 @@ class DebtManagementService {
   static async getDebtByPrize(options = {}) {
     const { PresetInventoryDebt, LotteryPrize } = getModels()
 
-    const campaignId = options.campaign_id ? parseInt(options.campaign_id, 10) : null
+    const campaignId = options.lottery_campaign_id
+      ? parseInt(options.lottery_campaign_id, 10)
+      : null
     const page = Math.max(1, parseInt(options.page, 10) || 1)
     const pageSize = Math.min(100, Math.max(1, parseInt(options.page_size, 10) || 20))
     const offset = (page - 1) * pageSize
 
     const whereCondition = { status: 'pending' }
     if (campaignId) {
-      whereCondition.campaign_id = campaignId
+      whereCondition.lottery_campaign_id = campaignId
     }
 
     // 按奖品分组统计
     const prizeDebts = await PresetInventoryDebt.findAll({
       attributes: [
-        'prize_id',
-        'campaign_id',
+        'lottery_prize_id',
+        'lottery_campaign_id',
         [fn('COUNT', col('debt_id')), 'debt_count'],
         [fn('SUM', col('debt_quantity')), 'total_quantity'],
         [fn('SUM', col('cleared_quantity')), 'cleared_quantity']
       ],
       where: whereCondition,
-      group: ['prize_id', 'campaign_id'],
+      group: ['lottery_prize_id', 'lottery_campaign_id'],
       raw: true
     })
 
     // 获取奖品信息
-    const prizeIds = prizeDebts.map(p => p.prize_id)
+    const prizeIds = prizeDebts.map(p => p.lottery_prize_id)
     const prizes = await LotteryPrize.findAll({
-      where: { prize_id: { [Op.in]: prizeIds } },
-      attributes: ['prize_id', 'prize_name', 'prize_type', 'stock_quantity']
+      where: { lottery_prize_id: { [Op.in]: prizeIds } },
+      attributes: ['lottery_prize_id', 'prize_name', 'prize_type', 'stock_quantity']
     })
 
     const prizeMap = {}
     prizes.forEach(p => {
-      prizeMap[p.prize_id] = p
+      prizeMap[p.lottery_prize_id] = p
     })
 
     // 构建结果
     const results = prizeDebts.map(item => {
-      const prize = prizeMap[item.prize_id]
+      const prize = prizeMap[item.lottery_prize_id]
       return {
-        prize_id: item.prize_id,
-        prize_name: prize ? prize.prize_name : `奖品#${item.prize_id}`,
+        lottery_prize_id: item.lottery_prize_id,
+        prize_name: prize ? prize.prize_name : `奖品#${item.lottery_prize_id}`,
         prize_type: prize ? prize.prize_type : 'unknown',
         current_stock: prize ? prize.stock_quantity : 0,
-        campaign_id: item.campaign_id,
+        lottery_campaign_id: item.lottery_campaign_id,
         debt_count: parseInt(item.debt_count, 10) || 0,
         total_quantity: parseInt(item.total_quantity, 10) || 0,
         cleared_quantity: parseInt(item.cleared_quantity, 10) || 0,
@@ -344,32 +346,32 @@ class DebtManagementService {
     const presetIds = new Set()
 
     const inventoryPresets = await PresetInventoryDebt.findAll({
-      attributes: ['preset_id'],
+      attributes: ['lottery_preset_id'],
       where: {
-        preset_id: { [Op.ne]: null },
+        lottery_preset_id: { [Op.ne]: null },
         status: 'pending'
       },
-      group: ['preset_id'],
+      group: ['lottery_preset_id'],
       raw: true
     })
 
     const budgetPresets = await PresetBudgetDebt.findAll({
-      attributes: ['preset_id'],
+      attributes: ['lottery_preset_id'],
       where: {
-        preset_id: { [Op.ne]: null },
+        lottery_preset_id: { [Op.ne]: null },
         status: 'pending'
       },
-      group: ['preset_id'],
+      group: ['lottery_preset_id'],
       raw: true
     })
 
-    inventoryPresets.forEach(p => presetIds.add(p.preset_id))
-    budgetPresets.forEach(p => presetIds.add(p.preset_id))
+    inventoryPresets.forEach(p => presetIds.add(p.lottery_preset_id))
+    budgetPresets.forEach(p => presetIds.add(p.lottery_preset_id))
 
     // 获取预设信息和创建人
     const presets = await LotteryPreset.findAll({
-      where: { preset_id: { [Op.in]: Array.from(presetIds) } },
-      attributes: ['preset_id', 'created_by']
+      where: { lottery_preset_id: { [Op.in]: Array.from(presetIds) } },
+      attributes: ['lottery_preset_id', 'created_by']
     })
 
     // 按创建人分组统计
@@ -392,23 +394,23 @@ class DebtManagementService {
 
     // 库存欠账按预设分组统计
     const invDebtByPreset = await PresetInventoryDebt.findAll({
-      attributes: ['preset_id', [fn('SUM', col('debt_quantity')), 'total']],
+      attributes: ['lottery_preset_id', [fn('SUM', col('debt_quantity')), 'total']],
       where: {
-        preset_id: { [Op.in]: presetIdArray },
+        lottery_preset_id: { [Op.in]: presetIdArray },
         status: 'pending'
       },
-      group: ['preset_id'],
+      group: ['lottery_preset_id'],
       raw: true
     })
 
     // 预算欠账按预设分组统计
     const budDebtByPreset = await PresetBudgetDebt.findAll({
-      attributes: ['preset_id', [fn('SUM', col('debt_amount')), 'total']],
+      attributes: ['lottery_preset_id', [fn('SUM', col('debt_amount')), 'total']],
       where: {
-        preset_id: { [Op.in]: presetIdArray },
+        lottery_preset_id: { [Op.in]: presetIdArray },
         status: 'pending'
       },
-      group: ['preset_id'],
+      group: ['lottery_preset_id'],
       raw: true
     })
 
@@ -416,12 +418,12 @@ class DebtManagementService {
     for (const preset of presets) {
       const creatorId = preset.created_by
 
-      const invDebt = invDebtByPreset.find(i => i.preset_id === preset.preset_id)
+      const invDebt = invDebtByPreset.find(i => i.lottery_preset_id === preset.lottery_preset_id)
       if (invDebt && invDebt.total) {
         creatorStats[creatorId].inventory_debt_quantity += parseInt(invDebt.total, 10) || 0
       }
 
-      const budDebt = budDebtByPreset.find(b => b.preset_id === preset.preset_id)
+      const budDebt = budDebtByPreset.find(b => b.lottery_preset_id === preset.lottery_preset_id)
       if (budDebt && budDebt.total) {
         creatorStats[creatorId].budget_debt_amount += parseInt(budDebt.total, 10) || 0
       }
@@ -559,7 +561,7 @@ class DebtManagementService {
    *
    * @param {Object} options - 查询选项
    * @param {string} [options.debt_type='inventory'] - 欠账类型: inventory|budget
-   * @param {number} [options.campaign_id] - 活动ID（可选）
+   * @param {number} [options.lottery_campaign_id] - 活动ID（可选）
    * @param {number} [options.page=1] - 页码
    * @param {number} [options.page_size=20] - 每页数量
    * @returns {Promise<Object>} 待冲销欠账列表
@@ -569,14 +571,16 @@ class DebtManagementService {
       getModels()
 
     const debtType = options.debt_type || 'inventory'
-    const campaignId = options.campaign_id ? parseInt(options.campaign_id, 10) : null
+    const campaignId = options.lottery_campaign_id
+      ? parseInt(options.lottery_campaign_id, 10)
+      : null
     const page = Math.max(1, parseInt(options.page, 10) || 1)
     const pageSize = Math.min(100, Math.max(1, parseInt(options.page_size, 10) || 20))
     const offset = (page - 1) * pageSize
 
     const whereCondition = { status: 'pending' }
     if (campaignId) {
-      whereCondition.campaign_id = campaignId
+      whereCondition.lottery_campaign_id = campaignId
     }
 
     let model
@@ -714,7 +718,7 @@ class DebtManagementService {
    * 获取欠账上限配置列表
    *
    * @param {Object} options - 查询选项
-   * @param {number} [options.campaign_id] - 活动ID（可选）
+   * @param {number} [options.lottery_campaign_id] - 活动ID（可选）
    * @param {string} [options.limit_level] - 限制级别: global|campaign|prize
    * @param {string} [options.status] - 状态: active|inactive
    * @param {number} [options.page=1] - 页码
@@ -724,7 +728,9 @@ class DebtManagementService {
   static async getDebtLimits(options = {}) {
     const { PresetDebtLimit, User, LotteryCampaign } = getModels()
 
-    const campaignId = options.campaign_id ? parseInt(options.campaign_id, 10) : null
+    const campaignId = options.lottery_campaign_id
+      ? parseInt(options.lottery_campaign_id, 10)
+      : null
     const limitLevel = options.limit_level
     const status = options.status
     const page = Math.max(1, parseInt(options.page, 10) || 1)
@@ -762,10 +768,10 @@ class DebtManagementService {
     const campaignMap = new Map()
     if (campaignReferenceIds.length > 0) {
       const campaigns = await LotteryCampaign.findAll({
-        where: { campaign_id: { [Op.in]: campaignReferenceIds } },
-        attributes: ['campaign_id', 'campaign_name', 'status']
+        where: { lottery_campaign_id: { [Op.in]: campaignReferenceIds } },
+        attributes: ['lottery_campaign_id', 'campaign_name', 'status']
       })
-      campaigns.forEach(c => campaignMap.set(c.campaign_id, c))
+      campaigns.forEach(c => campaignMap.set(c.lottery_campaign_id, c))
     }
 
     const items = rows.map(limit => {
@@ -800,7 +806,7 @@ class DebtManagementService {
 
     // 检查活动是否存在
     const campaign = await LotteryCampaign.findByPk(campaignId, {
-      attributes: ['campaign_id', 'campaign_name', 'status']
+      attributes: ['lottery_campaign_id', 'campaign_name', 'status']
     })
     if (!campaign) {
       throw new Error('活动不存在')
@@ -816,7 +822,7 @@ class DebtManagementService {
     return {
       limit: limit.toSummary(),
       campaign: {
-        campaign_id: campaign.campaign_id,
+        lottery_campaign_id: campaign.lottery_campaign_id,
         campaign_name: campaign.campaign_name,
         status: campaign.status
       },
@@ -894,7 +900,7 @@ class DebtManagementService {
       }
 
       logger.info('[DebtManagementService] 欠账上限配置更新', {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         admin_id: adminId,
         updates
       })
@@ -931,7 +937,7 @@ class DebtManagementService {
     )
 
     return {
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       current_debt: {
         inventory: inventoryStats,
         budget: budgetStats

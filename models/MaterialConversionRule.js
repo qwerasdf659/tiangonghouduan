@@ -115,7 +115,7 @@ module.exports = sequelize => {
   MaterialConversionRule.init(
     {
       // 主键ID（Conversion Rule ID）
-      rule_id: {
+      material_conversion_rule_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,

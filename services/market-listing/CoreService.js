@@ -217,7 +217,7 @@ class MarketListingCoreService {
       return {
         valid: false,
         existingListing: {
-          listing_id: existingListing.listing_id,
+          market_listing_id: existingListing.market_listing_id,
           price_asset_code: existingListing.price_asset_code,
           price_amount: existingListing.price_amount
         },
@@ -370,7 +370,9 @@ class MarketListingCoreService {
         throw error
       }
 
-      logger.info(`[MarketListingCoreService] 幂等返回已有挂牌: ${existingListing.listing_id}`)
+      logger.info(
+        `[MarketListingCoreService] 幂等返回已有挂牌: ${existingListing.market_listing_id}`
+      )
       return { listing: existingListing, is_duplicate: true }
     }
 
@@ -491,7 +493,7 @@ class MarketListingCoreService {
       logger.warn('[MarketListingCoreService] 缓存失效失败（非致命）:', cacheError.message)
     }
 
-    logger.info(`[MarketListingCoreService] 挂牌创建成功: ${listing.listing_id}`)
+    logger.info(`[MarketListingCoreService] 挂牌创建成功: ${listing.market_listing_id}`)
 
     return { listing, is_duplicate: false }
   }
@@ -500,27 +502,27 @@ class MarketListingCoreService {
    * 撤回市场挂牌
    *
    * @param {Object} params - 撤回参数
-   * @param {number} params.listing_id - 挂牌ID
+   * @param {number} params.market_listing_id - 挂牌ID
    * @param {number} params.seller_user_id - 卖家用户ID
    * @param {Object} [options] - 事务选项
    * @returns {Promise<Object>} 撤回结果
    */
   static async withdrawListing(params, options = {}) {
-    const { listing_id, seller_user_id } = params
+    const { market_listing_id, seller_user_id } = params
 
-    if (!listing_id) throw new Error('listing_id 是必需参数')
+    if (!market_listing_id) throw new Error('market_listing_id 是必需参数')
     if (!seller_user_id) throw new Error('seller_user_id 是必需参数')
 
     const transaction = assertAndGetTransaction(options, 'MarketListingCoreService.withdrawListing')
 
     const listing = await MarketListing.findOne({
-      where: { listing_id },
+      where: { market_listing_id },
       lock: transaction.LOCK.UPDATE,
       transaction
     })
 
     if (!listing) {
-      const error = new Error(`挂牌不存在: ${listing_id}`)
+      const error = new Error(`挂牌不存在: ${market_listing_id}`)
       error.code = 'LISTING_NOT_FOUND'
       error.statusCode = 404
       throw error
@@ -541,7 +543,10 @@ class MarketListingCoreService {
     }
 
     // 取消所有关联的买家订单并解冻资产
-    const cancelledOrders = await this._cancelBuyerOrdersForListing(listing_id, transaction)
+    const cancelledOrders = await this._cancelBuyerOrdersForListing(
+      listing.market_listing_id,
+      transaction
+    )
 
     await listing.update({ status: 'withdrawn' }, { transaction })
 
@@ -564,7 +569,7 @@ class MarketListingCoreService {
       logger.warn('[MarketListingCoreService] 缓存失效失败（非致命）:', cacheError.message)
     }
 
-    logger.info(`[MarketListingCoreService] 挂牌撤回成功: ${listing_id}`)
+    logger.info(`[MarketListingCoreService] 挂牌撤回成功: ${listing.market_listing_id}`)
 
     return { listing, item, cancelled_orders: cancelledOrders }
   }
@@ -572,15 +577,15 @@ class MarketListingCoreService {
   /**
    * 取消挂牌关联的所有买家订单并解冻资产
    *
-   * @param {number} listing_id - 挂牌ID
+   * @param {number} market_listing_id - 挂牌ID（数据库主键字段名）
    * @param {Object} transaction - Sequelize事务对象
    * @returns {Promise<Array>} 已取消的订单列表
    * @private
    */
-  static async _cancelBuyerOrdersForListing(listing_id, transaction) {
+  static async _cancelBuyerOrdersForListing(market_listing_id, transaction) {
     const pendingOrders = await TradeOrder.findAll({
       where: {
-        listing_id,
+        market_listing_id,
         status: { [Op.in]: ['frozen', 'created'] }
       },
       transaction
@@ -591,7 +596,7 @@ class MarketListingCoreService {
     }
 
     logger.info(
-      `[MarketListingCoreService] 挂牌 ${listing_id} 发现 ${pendingOrders.length} 个待取消的买家订单`
+      `[MarketListingCoreService] 挂牌 ${market_listing_id} 发现 ${pendingOrders.length} 个待取消的买家订单`
     )
 
     const cancelledOrders = []
@@ -610,8 +615,8 @@ class MarketListingCoreService {
               meta: {
                 order_action: 'withdraw_unfreeze',
                 order_id: order.order_id,
-                listing_id,
-                unfreeze_reason: `挂牌 ${listing_id} 被卖家撤回`
+                market_listing_id,
+                unfreeze_reason: `挂牌 ${market_listing_id} 被卖家撤回`
               }
             },
             { transaction }
@@ -737,14 +742,14 @@ class MarketListingCoreService {
         error.statusCode = 409
         error.details = {
           idempotency_key,
-          existing_listing_id: existingListing.listing_id,
+          existing_market_listing_id: existingListing.market_listing_id,
           mismatched_parameters: parameterMismatch
         }
         throw error
       }
 
       logger.info(
-        `[MarketListingCoreService] 幂等返回已有可叠加资产挂牌: ${existingListing.listing_id}`
+        `[MarketListingCoreService] 幂等返回已有可叠加资产挂牌: ${existingListing.market_listing_id}`
       )
       return { listing: existingListing, freeze_result: null, is_duplicate: true }
     }
@@ -907,7 +912,7 @@ class MarketListingCoreService {
     try {
       const NotificationService = require('../NotificationService')
       await NotificationService.notifyListingCreated(seller_user_id, {
-        listing_id: listing.listing_id,
+        market_listing_id: listing.market_listing_id,
         offer_asset_code,
         offer_amount,
         price_amount
@@ -916,7 +921,7 @@ class MarketListingCoreService {
       logger.warn('[MarketListingCoreService] 发送上架通知失败（非致命）:', notifyError.message)
     }
 
-    logger.info(`[MarketListingCoreService] 可叠加资产挂牌创建成功: ${listing.listing_id}`, {
+    logger.info(`[MarketListingCoreService] 可叠加资产挂牌创建成功: ${listing.market_listing_id}`, {
       idempotency_key,
       seller_user_id,
       offer_asset_code,
@@ -931,16 +936,16 @@ class MarketListingCoreService {
    * 撤回可叠加资产挂牌
    *
    * @param {Object} params - 撤回参数
-   * @param {number} params.listing_id - 挂牌ID
+   * @param {number} params.market_listing_id - 挂牌ID
    * @param {number} params.seller_user_id - 卖家用户ID
    * @param {Object} [options] - 事务选项
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 撤回结果 {listing, unfreeze_result, cancelled_orders}
    */
   static async withdrawFungibleAssetListing(params, options = {}) {
-    const { listing_id, seller_user_id } = params
+    const { market_listing_id, seller_user_id } = params
 
-    if (!listing_id) throw new Error('listing_id 是必需参数')
+    if (!market_listing_id) throw new Error('market_listing_id 是必需参数')
     if (!seller_user_id) throw new Error('seller_user_id 是必需参数')
 
     const transaction = assertAndGetTransaction(
@@ -950,13 +955,13 @@ class MarketListingCoreService {
 
     // 查询挂牌（悲观锁）
     const listing = await MarketListing.findOne({
-      where: { listing_id },
+      where: { market_listing_id },
       lock: transaction.LOCK.UPDATE,
       transaction
     })
 
     if (!listing) {
-      const error = new Error(`挂牌不存在: ${listing_id}`)
+      const error = new Error(`挂牌不存在: ${market_listing_id}`)
       error.code = 'LISTING_NOT_FOUND'
       error.statusCode = 404
       throw error
@@ -987,12 +992,15 @@ class MarketListingCoreService {
     }
 
     // 取消所有关联的买家订单
-    const cancelledOrders = await this._cancelBuyerOrdersForListing(listing_id, transaction)
+    const cancelledOrders = await this._cancelBuyerOrdersForListing(
+      listing.market_listing_id,
+      transaction
+    )
 
     // 解冻卖家资产
     let unfreezeResult = null
     if (listing.seller_offer_frozen && listing.offer_asset_code && listing.offer_amount > 0) {
-      const unfreezeIdempotencyKey = `listing_unfreeze_${listing.listing_id}_withdraw`
+      const unfreezeIdempotencyKey = `listing_unfreeze_${listing.market_listing_id}_withdraw`
       // eslint-disable-next-line no-restricted-syntax -- 已确认传递 { transaction }
       unfreezeResult = await BalanceService.unfreeze(
         {
@@ -1001,7 +1009,7 @@ class MarketListingCoreService {
           amount: Number(listing.offer_amount),
           business_type: 'market_listing_withdraw_unfreeze',
           idempotency_key: unfreezeIdempotencyKey,
-          meta: { listing_id: listing.listing_id, withdraw_reason: 'seller_withdraw' }
+          meta: { market_listing_id: listing.market_listing_id, withdraw_reason: 'seller_withdraw' }
         },
         { transaction }
       )
@@ -1021,7 +1029,7 @@ class MarketListingCoreService {
     try {
       const NotificationService = require('../NotificationService')
       await NotificationService.notifyListingWithdrawn(seller_user_id, {
-        listing_id: listing.listing_id,
+        market_listing_id: listing.market_listing_id,
         offer_asset_code: listing.offer_asset_code,
         offer_amount: Number(listing.offer_amount),
         reason: '用户主动撤回'
@@ -1030,7 +1038,7 @@ class MarketListingCoreService {
       logger.warn('[MarketListingCoreService] 发送撤回通知失败（非致命）:', notifyError.message)
     }
 
-    logger.info(`[MarketListingCoreService] 可叠加资产挂牌撤回成功: ${listing_id}`, {
+    logger.info(`[MarketListingCoreService] 可叠加资产挂牌撤回成功: ${listing.market_listing_id}`, {
       seller_user_id,
       cancelled_orders_count: cancelledOrders.length
     })
@@ -1044,16 +1052,16 @@ class MarketListingCoreService {
    * 管理员强制撤回挂牌
    *
    * @param {Object} params - 撤回参数
-   * @param {number} params.listing_id - 挂牌ID
+   * @param {number} params.market_listing_id - 挂牌ID
    * @param {number} params.operator_id - 操作员ID
    * @param {string} params.reason - 撤回原因
    * @param {Object} [options] - 事务选项
    * @returns {Promise<Object>} 撤回结果
    */
   static async adminForceWithdrawListing(params, options = {}) {
-    const { listing_id, operator_id, reason } = params
+    const { market_listing_id, operator_id, reason } = params
 
-    if (!listing_id) throw new Error('listing_id 是必需参数')
+    if (!market_listing_id) throw new Error('market_listing_id 是必需参数')
     if (!operator_id) throw new Error('operator_id 是必需参数')
     if (!reason) throw new Error('reason 是必需参数')
 
@@ -1063,37 +1071,50 @@ class MarketListingCoreService {
     )
 
     const listing = await MarketListing.findOne({
-      where: { listing_id },
+      where: { market_listing_id },
       lock: transaction.LOCK.UPDATE,
       transaction
     })
 
     if (!listing) {
-      const error = new Error(`挂牌不存在: ${listing_id}`)
+      const error = new Error(`挂牌不存在: ${market_listing_id}`)
       error.code = 'LISTING_NOT_FOUND'
       error.statusCode = 404
       throw error
     }
 
-    if (listing.status !== 'on_sale') {
-      const error = new Error(`挂牌状态不可撤回: ${listing.status}`)
+    // 管理员强制撤回支持 on_sale 和 locked 状态
+    const allowedStatuses = ['on_sale', 'locked']
+    if (!allowedStatuses.includes(listing.status)) {
+      const error = new Error(`挂牌状态不可撤回: ${listing.status}（仅支持 on_sale、locked 状态）`)
       error.code = 'INVALID_LISTING_STATUS'
       error.statusCode = 400
       throw error
     }
 
-    // 取消所有关联的买家订单
-    const cancelledOrders = await this._cancelBuyerOrdersForListing(listing_id, transaction)
+    const originalStatus = listing.status
 
-    // 更新挂牌状态
+    // 如果是 locked 状态，取消关联的买家订单
+    let cancelledOrders = []
+    if (listing.status === 'locked' && listing.locked_by_order_id) {
+      cancelledOrders = await this._cancelBuyerOrdersForListing(
+        listing.market_listing_id,
+        transaction
+      )
+    }
+
+    // 更新挂牌状态为 admin_withdrawn（管理员强制撤回使用专用状态）
     await listing.update(
       {
-        status: 'withdrawn',
+        status: 'admin_withdrawn',
+        locked_by_order_id: null,
+        locked_at: null,
         meta: {
           ...listing.meta,
           force_withdrawn_by: operator_id,
           force_withdrawn_reason: reason,
-          force_withdrawn_at: new Date().toISOString()
+          force_withdrawn_at: new Date().toISOString(),
+          original_status: originalStatus
         }
       },
       { transaction }
@@ -1113,13 +1134,13 @@ class MarketListingCoreService {
       // eslint-disable-next-line no-restricted-syntax
       await BalanceService.unfreeze(
         {
-          idempotency_key: `admin_force_withdraw_${listing_id}`,
+          idempotency_key: `admin_force_withdraw_${listing.market_listing_id}`,
           business_type: 'admin_force_withdraw_unfreeze',
           user_id: listing.seller_user_id,
           asset_code: listing.offer_asset_code,
           amount: listing.offer_amount,
           meta: {
-            listing_id,
+            market_listing_id: listing.market_listing_id,
             reason,
             operator_id
           }
@@ -1128,18 +1149,20 @@ class MarketListingCoreService {
       )
     }
 
-    // 记录审计日志
+    // 记录审计日志（使用正确的操作类型）
     const AuditLogService = require('../AuditLogService')
+    const { OPERATION_TYPES } = require('../../constants/AuditOperationTypes')
     await AuditLogService.logOperation({
       operator_id,
-      operation_type: 'market_management',
+      operation_type: OPERATION_TYPES.MARKET_LISTING_ADMIN_WITHDRAW,
       target_type: 'MarketListing',
-      target_id: listing_id,
+      target_id: listing.market_listing_id,
       action: 'admin_force_withdraw',
-      before_data: { status: 'on_sale' },
-      after_data: { status: 'withdrawn' },
+      before_data: { status: originalStatus },
+      after_data: { status: 'admin_withdrawn' },
       reason,
-      is_critical_operation: true
+      is_critical_operation: true,
+      idempotency_key: `admin_force_withdraw_${listing.market_listing_id}_${Date.now()}`
     })
 
     try {
@@ -1148,9 +1171,12 @@ class MarketListingCoreService {
       logger.warn('[MarketListingCoreService] 缓存失效失败（非致命）:', cacheError.message)
     }
 
-    logger.warn(`[MarketListingCoreService] 管理员强制撤回挂牌: ${listing_id}`, {
+    logger.warn(`[MarketListingCoreService] 管理员强制撤回挂牌: ${listing.market_listing_id}`, {
       operator_id,
-      reason
+      reason,
+      original_status: originalStatus,
+      new_status: 'admin_withdrawn',
+      cancelled_orders_count: cancelledOrders.length
     })
 
     return { listing, item, cancelled_orders: cancelledOrders }

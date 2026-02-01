@@ -210,7 +210,7 @@ function scanWriteRoutes() {
 
 /**
  * 标准化路由路径中的参数名
- * 将所有命名参数（如 :idOrCode, :campaign_id）统一转换为 :id
+ * 将所有命名参数（如 :idOrCode, :lottery_campaign_id）统一转换为 :id
  * 这是为了与 CANONICAL_OPERATION_MAP 中的映射保持一致
  * @param {string} path - 路由路径
  * @returns {string} 标准化后的路径

@@ -117,7 +117,7 @@ class AntiHighStreakHandler {
    * @param {string} context.selected_tier - 当前选中的档位
    * @param {Object} context.tier_weights - 当前档位权重（用于权重调整）
    * @param {number} context.user_id - 用户ID（用于日志）
-   * @param {number} context.campaign_id - 活动ID（用于日志）
+   * @param {number} context.lottery_campaign_id - 活动ID（用于日志）
    * @returns {Object} 处理结果
    *
    * @example
@@ -142,12 +142,12 @@ class AntiHighStreakHandler {
       selected_tier,
       tier_weights = {},
       user_id,
-      campaign_id
+      lottery_campaign_id
     } = context
 
     this._log('debug', '开始处理防连续高价值', {
       user_id,
-      campaign_id,
+      lottery_campaign_id,
       recent_high_count,
       anti_high_cooldown,
       selected_tier
@@ -171,7 +171,7 @@ class AntiHighStreakHandler {
     if (anti_high_cooldown > 0) {
       this._log('debug', '正在冷却期，跳过检测', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         anti_high_cooldown
       })
       result.result_type = ANTI_HIGH_RESULT.IN_COOLDOWN
@@ -182,7 +182,7 @@ class AntiHighStreakHandler {
     if (selected_tier !== 'high') {
       this._log('debug', '当前档位非 high，无需干预', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         selected_tier
       })
       result.result_type = ANTI_HIGH_RESULT.NOT_HIGH_TIER
@@ -205,7 +205,7 @@ class AntiHighStreakHandler {
     ) {
       this._log('warn', '⚠️ 用户近期高价值奖品次数较多', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         recent_high_count,
         warning_threshold: this.config.warning_threshold,
         remaining_until_cap: this.config.high_streak_threshold - recent_high_count
@@ -216,7 +216,7 @@ class AntiHighStreakHandler {
     if (recent_high_count < this.config.high_streak_threshold) {
       this._log('debug', '未达到限制阈值，不干预', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         recent_high_count,
         high_streak_threshold: this.config.high_streak_threshold
       })
@@ -232,7 +232,7 @@ class AntiHighStreakHandler {
     // 达到限制阈值，执行降级
     this._log('info', '🛡️ 达到防连续高价值阈值，执行降级', {
       user_id,
-      campaign_id,
+      lottery_campaign_id,
       recent_high_count,
       high_streak_threshold: this.config.high_streak_threshold,
       downgrade_to: this.config.downgrade_to_tier
@@ -252,7 +252,7 @@ class AntiHighStreakHandler {
 
     this._log('info', '🎯 降级执行成功', {
       user_id,
-      campaign_id,
+      lottery_campaign_id,
       original_tier: selected_tier,
       final_tier: result.final_tier,
       cooldown_draws: result.cooldown_draws

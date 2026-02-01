@@ -33,7 +33,7 @@ jest.setTimeout(30000)
 
 describe('LotteryPricingService - 抽奖定价服务', () => {
   // 测试数据
-  let test_campaign_id
+  let test_lottery_campaign_id
 
   // 测试前准备
   beforeAll(async () => {
@@ -41,7 +41,7 @@ describe('LotteryPricingService - 抽奖定价服务', () => {
     await sequelize.authenticate()
 
     // 获取测试活动 ID
-    test_campaign_id = global.testData?.testCampaign?.campaign_id || 1
+    test_lottery_campaign_id = global.testData?.testCampaign?.lottery_campaign_id || 1
 
     // 🔴 P1-9：直接 require 服务（LotteryPricingService 是静态类，未注册到 ServiceManager）
     LotteryPricingService = require('../../../services/lottery/LotteryPricingService')
@@ -57,7 +57,7 @@ describe('LotteryPricingService - 抽奖定价服务', () => {
   describe('getDrawPricing - 定价计算', () => {
     it('应该正确计算单抽价格（无折扣）', async () => {
       // 执行查询
-      const pricing = await LotteryPricingService.getDrawPricing(1, test_campaign_id)
+      const pricing = await LotteryPricingService.getDrawPricing(1, test_lottery_campaign_id)
 
       // 验证返回结构
       expect(pricing).toHaveProperty('total_cost')
@@ -75,7 +75,7 @@ describe('LotteryPricingService - 抽奖定价服务', () => {
 
     it('应该正确计算10连抽价格（根据数据库配置的折扣）', async () => {
       // 执行查询
-      const pricing = await LotteryPricingService.getDrawPricing(10, test_campaign_id)
+      const pricing = await LotteryPricingService.getDrawPricing(10, test_lottery_campaign_id)
 
       /*
        * 验证定价计算
@@ -90,7 +90,7 @@ describe('LotteryPricingService - 抽奖定价服务', () => {
     })
 
     it('应该正确返回成本来源（cost_source）', async () => {
-      const pricing = await LotteryPricingService.getDrawPricing(1, test_campaign_id)
+      const pricing = await LotteryPricingService.getDrawPricing(1, test_lottery_campaign_id)
 
       // cost_source 应该是 'campaign' 或 'global'
       expect(['campaign', 'global']).toContain(pricing.cost_source)
@@ -98,9 +98,9 @@ describe('LotteryPricingService - 抽奖定价服务', () => {
 
     it('应该在档位未启用时报错', async () => {
       // 尝试获取未启用的档位（假设 2 连抽未配置）
-      await expect(LotteryPricingService.getDrawPricing(2, test_campaign_id)).rejects.toThrow(
-        /未启用.*连抽档位/
-      )
+      await expect(
+        LotteryPricingService.getDrawPricing(2, test_lottery_campaign_id)
+      ).rejects.toThrow(/未启用.*连抽档位/)
     })
 
     it('应该在配置缺失时报错（严格模式）', async () => {
@@ -113,7 +113,7 @@ describe('LotteryPricingService - 抽奖定价服务', () => {
 
   describe('getEnabledDrawButtons - 启用档位查询', () => {
     it('应该返回所有启用的抽奖按钮', async () => {
-      const buttons = await LotteryPricingService.getEnabledDrawButtons(test_campaign_id)
+      const buttons = await LotteryPricingService.getEnabledDrawButtons(test_lottery_campaign_id)
 
       // 验证返回结构
       expect(Array.isArray(buttons)).toBe(true)
@@ -131,7 +131,7 @@ describe('LotteryPricingService - 抽奖定价服务', () => {
     })
 
     it('应该按 sort_order 排序', async () => {
-      const buttons = await LotteryPricingService.getEnabledDrawButtons(test_campaign_id)
+      const buttons = await LotteryPricingService.getEnabledDrawButtons(test_lottery_campaign_id)
 
       // 验证排序
       for (let i = 0; i < buttons.length - 1; i++) {
@@ -144,7 +144,7 @@ describe('LotteryPricingService - 抽奖定价服务', () => {
 
   describe('getEnabledDrawCounts - 启用次数列表', () => {
     it('应该返回启用的抽奖次数数组', async () => {
-      const counts = await LotteryPricingService.getEnabledDrawCounts(test_campaign_id)
+      const counts = await LotteryPricingService.getEnabledDrawCounts(test_lottery_campaign_id)
 
       // 验证返回类型
       expect(Array.isArray(counts)).toBe(true)
@@ -166,7 +166,7 @@ describe('LotteryPricingService - 抽奖定价服务', () => {
 
   describe('getAllDrawPricings - 批量定价查询', () => {
     it('应该返回所有启用档位的定价', async () => {
-      const pricings = await LotteryPricingService.getAllDrawPricings(test_campaign_id)
+      const pricings = await LotteryPricingService.getAllDrawPricings(test_lottery_campaign_id)
 
       // 验证返回类型
       expect(Array.isArray(pricings)).toBe(true)
@@ -183,13 +183,13 @@ describe('LotteryPricingService - 抽奖定价服务', () => {
 
     it('应该与逐个查询的结果一致', async () => {
       // 批量查询
-      const batchPricings = await LotteryPricingService.getAllDrawPricings(test_campaign_id)
+      const batchPricings = await LotteryPricingService.getAllDrawPricings(test_lottery_campaign_id)
 
       // 逐个查询验证
       for (const batchPricing of batchPricings) {
         const singlePricing = await LotteryPricingService.getDrawPricing(
           batchPricing.draw_count,
-          test_campaign_id
+          test_lottery_campaign_id
         )
 
         expect(singlePricing.total_cost).toBe(batchPricing.total_cost)
@@ -204,7 +204,7 @@ describe('LotteryPricingService - 抽奖定价服务', () => {
     it('应该成功失效缓存', async () => {
       // 失效缓存
       const result = await LotteryPricingService.invalidateCache(
-        test_campaign_id,
+        test_lottery_campaign_id,
         'unit_test_invalidation'
       )
 
@@ -214,21 +214,24 @@ describe('LotteryPricingService - 抽奖定价服务', () => {
 
     it('多次查询应该使用缓存（性能测试）', async () => {
       // 清除缓存
-      await LotteryPricingService.invalidateCache(test_campaign_id, 'performance_test_setup')
+      await LotteryPricingService.invalidateCache(
+        test_lottery_campaign_id,
+        'performance_test_setup'
+      )
 
       // 第一次查询（冷启动，会查数据库）
       const start1 = Date.now()
-      await LotteryPricingService.getDrawPricing(1, test_campaign_id)
+      await LotteryPricingService.getDrawPricing(1, test_lottery_campaign_id)
       const time1 = Date.now() - start1
 
       // 第二次查询（应该命中缓存）
       const start2 = Date.now()
-      await LotteryPricingService.getDrawPricing(1, test_campaign_id)
+      await LotteryPricingService.getDrawPricing(1, test_lottery_campaign_id)
       const time2 = Date.now() - start2
 
       // 第三次查询（应该命中缓存）
       const start3 = Date.now()
-      await LotteryPricingService.getDrawPricing(1, test_campaign_id)
+      await LotteryPricingService.getDrawPricing(1, test_lottery_campaign_id)
       const time3 = Date.now() - start3
 
       /**
@@ -246,7 +249,7 @@ describe('LotteryPricingService - 抽奖定价服务', () => {
       // 直接从数据库查询活跃配置
       const dbConfig = await LotteryCampaignPricingConfig.findOne({
         where: {
-          campaign_id: test_campaign_id,
+          lottery_campaign_id: test_lottery_campaign_id,
           status: 'active'
         }
       })
@@ -261,7 +264,10 @@ describe('LotteryPricingService - 抽奖定价服务', () => {
 
       // 验证每个启用的档位
       for (const btn of drawButtons.filter(b => b.enabled !== false)) {
-        const pricing = await LotteryPricingService.getDrawPricing(btn.count, test_campaign_id)
+        const pricing = await LotteryPricingService.getDrawPricing(
+          btn.count,
+          test_lottery_campaign_id
+        )
 
         // 验证折扣一致
         expect(pricing.discount).toBe(btn.discount)
@@ -269,7 +275,7 @@ describe('LotteryPricingService - 抽奖定价服务', () => {
     })
 
     it('所有档位的定价都应该来自新表（pricing_config_table）', async () => {
-      const pricings = await LotteryPricingService.getAllDrawPricings(test_campaign_id)
+      const pricings = await LotteryPricingService.getAllDrawPricings(test_lottery_campaign_id)
 
       // 验证所有定价来源都是新表
       pricings.forEach(pricing => {

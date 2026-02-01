@@ -7,7 +7,7 @@
  *
  * 接口说明：
  * - GET / - 获取活动列表（带 ROI、复购率、库存预警）
- * - GET /:campaign_id - 获取单个活动详情
+ * - GET /:lottery_campaign_id - 获取单个活动详情
  *
  * 实现规范（V1.3.0）：
  * - 路由层禁止直接 require models
@@ -32,8 +32,8 @@ const { getRedisClient, isRedisHealthy } = require('../../../utils/UnifiedRedisC
 
 /*
  * Redis 缓存键设计（ADR-003）：
- * - ROI 缓存：lottery:roi:campaign:{campaign_id}
- * - 复购率缓存：lottery:repeat_rate:campaign:{campaign_id}
+ * - ROI 缓存：lottery:roi:campaign:{lottery_campaign_id}
+ * - 复购率缓存：lottery:repeat_rate:campaign:{lottery_campaign_id}
  * - TTL：5 分钟（300 秒）
  */
 const CACHE_TTL = 300 // 5 分钟
@@ -108,7 +108,7 @@ async function getCachedROI(redis, campaignId) {
       repeat_rate: repeatRateStr !== null ? parseFloat(repeatRateStr) : null
     }
   } catch (error) {
-    logger.warn('读取 ROI 缓存失败', { campaign_id: campaignId, error: error.message })
+    logger.warn('读取 ROI 缓存失败', { lottery_campaign_id: campaignId, error: error.message })
     return { roi: null, repeat_rate: null }
   }
 }
@@ -129,9 +129,9 @@ async function cacheROI(redis, campaignId, roi, repeatRate) {
     pipeline.setex(CACHE_KEYS.roi(campaignId), CACHE_TTL, roi.toString())
     pipeline.setex(CACHE_KEYS.repeatRate(campaignId), CACHE_TTL, repeatRate.toString())
     await pipeline.exec()
-    logger.debug('ROI 缓存更新', { campaign_id: campaignId, roi, repeat_rate: repeatRate })
+    logger.debug('ROI 缓存更新', { lottery_campaign_id: campaignId, roi, repeat_rate: repeatRate })
   } catch (error) {
-    logger.warn('缓存 ROI 失败', { campaign_id: campaignId, error: error.message })
+    logger.warn('缓存 ROI 失败', { lottery_campaign_id: campaignId, error: error.message })
   }
 }
 
@@ -179,8 +179,8 @@ async function calculateStockWarning(analyticsService, campaignId) {
    * 库存字段：stock_quantity（初始库存）、total_win_count（已中奖数）
    */
   const prizes = await LotteryPrize.findAll({
-    where: { campaign_id: campaignId, status: 'active' },
-    attributes: ['prize_id', 'prize_name', 'stock_quantity', 'total_win_count']
+    where: { lottery_campaign_id: campaignId, status: 'active' },
+    attributes: ['lottery_prize_id', 'prize_name', 'stock_quantity', 'total_win_count']
   })
 
   const lowStockPrizes = []
@@ -195,7 +195,7 @@ async function calculateStockWarning(analyticsService, campaignId) {
     // 剩余库存百分比低于阈值时触发预警
     if (remainingPercentage < warningThreshold) {
       lowStockPrizes.push({
-        prize_id: prize.prize_id,
+        lottery_prize_id: prize.lottery_prize_id,
         prize_name: prize.prize_name,
         stock_quantity: total,
         remaining_quantity: remaining,
@@ -284,7 +284,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
     const { count, rows: campaigns } = await LotteryCampaign.findAndCountAll({
       where,
       attributes: [
-        'campaign_id',
+        'lottery_campaign_id',
         'campaign_name',
         'campaign_code',
         'status',
@@ -309,7 +309,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
     // 并行计算每个活动的 ROI、复购率、库存预警
     const enrichedCampaigns = await Promise.all(
       campaigns.map(async campaign => {
-        const campaignId = campaign.campaign_id
+        const campaignId = campaign.lottery_campaign_id
         const plainCampaign = campaign.toJSON()
 
         // 1. 尝试从缓存获取 ROI 和复购率
@@ -368,18 +368,18 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
 })
 
 /**
- * GET /:campaign_id - 获取单个活动详情（含 ROI、复购率、库存预警）
+ * GET /:lottery_campaign_id - 获取单个活动详情（含 ROI、复购率、库存预警）
  *
- * 完整路径：GET /api/v4/console/lottery-campaigns/:campaign_id
+ * 完整路径：GET /api/v4/console/lottery-campaigns/:lottery_campaign_id
  *
  * 路径参数：
- * - campaign_id: 活动 ID（数字）
+ * - lottery_campaign_id: 活动 ID（数字）
  *
  * 返回：活动详情 + ROI + 复购率 + 库存预警
  */
-router.get('/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.get('/:lottery_campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const campaignId = parseInt(req.params.campaign_id)
+    const campaignId = parseInt(req.params.lottery_campaign_id)
 
     if (!campaignId || isNaN(campaignId)) {
       return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
@@ -425,7 +425,7 @@ router.get('/:campaign_id', authenticateToken, requireRoleLevel(100), async (req
 
     logger.info('获取活动详情成功', {
       admin_id: req.user.user_id,
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       roi,
       repeat_rate
     })

@@ -56,8 +56,8 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
   /*
    * 敏感操作接口列表（基于项目实际路由）
    * POST /api/v4/market/list - 上架商品（需要会话验证）
-   * POST /api/v4/market/listings/:listing_id/withdraw - 撤回商品（需要会话验证）
-   * POST /api/v4/market/listings/:listing_id/purchase - 购买商品（需要会话验证）
+   * POST /api/v4/market/listings/:market_listing_id/withdraw - 撤回商品（需要会话验证）
+   * POST /api/v4/market/listings/:market_listing_id/purchase - 购买商品（需要会话验证）
    */
   const sensitiveEndpoints = [
     {

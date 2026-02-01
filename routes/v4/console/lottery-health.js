@@ -85,7 +85,7 @@ function parseAndValidateCampaignId(id) {
  *
  * @apiSuccess {Boolean} success 请求是否成功
  * @apiSuccess {Object} data 健康度报告数据
- * @apiSuccess {Number} data.campaign_id 活动ID
+ * @apiSuccess {Number} data.lottery_campaign_id 活动ID
  * @apiSuccess {String} data.campaign_name 活动名称
  * @apiSuccess {Number} data.overall_score 综合评分（0-100）
  * @apiSuccess {String} data.health_level 健康等级（healthy/warning/danger）
@@ -106,7 +106,7 @@ router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) =>
   const { use_cache = 'true', cache_ttl = '300' } = req.query
 
   logger.info('获取活动健康度报告', {
-    campaign_id: campaignId,
+    lottery_campaign_id: campaignId,
     user_id: req.user?.user_id,
     use_cache
   })
@@ -120,7 +120,7 @@ router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) =>
     })
 
     logger.info('活动健康度报告获取成功', {
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       overall_score: report.overall_score,
       health_level: report.health_level,
       issue_count: report.issues?.length || 0
@@ -129,7 +129,7 @@ router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) =>
     return res.apiSuccess(report, '获取活动健康度报告成功')
   } catch (error) {
     logger.error('获取活动健康度报告失败', {
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       error: error.message,
       stack: error.stack
     })
@@ -173,7 +173,7 @@ router.get('/:id/tier-distribution', authenticateToken, requireRoleLevel(100), a
   }
 
   logger.info('获取活动档位分布', {
-    campaign_id: campaignId,
+    lottery_campaign_id: campaignId,
     user_id: req.user?.user_id
   })
 
@@ -192,20 +192,20 @@ router.get('/:id/tier-distribution', authenticateToken, requireRoleLevel(100), a
     }
 
     logger.info('活动档位分布获取成功', {
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       total_draws: tierDistribution.counts?.total || 0
     })
 
     return res.apiSuccess(
       {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         tier_distribution: tierDistribution
       },
       '获取档位分布成功'
     )
   } catch (error) {
     logger.error('获取活动档位分布失败', {
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       error: error.message
     })
 
@@ -248,7 +248,7 @@ router.get('/:id/diagnose', authenticateToken, requireRoleLevel(100), async (req
   }
 
   logger.info('获取活动问题诊断', {
-    campaign_id: campaignId,
+    lottery_campaign_id: campaignId,
     user_id: req.user?.user_id
   })
 
@@ -262,7 +262,7 @@ router.get('/:id/diagnose', authenticateToken, requireRoleLevel(100), async (req
     })
 
     const diagnosis = {
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       campaign_name: report.campaign_name,
       overall_score: report.overall_score,
       health_level: report.health_level,
@@ -298,7 +298,7 @@ router.get('/:id/diagnose', authenticateToken, requireRoleLevel(100), async (req
     }
 
     logger.info('活动问题诊断获取成功', {
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       issue_count: diagnosis.issues.length,
       suggestion_count: diagnosis.suggestions.length
     })
@@ -306,7 +306,7 @@ router.get('/:id/diagnose', authenticateToken, requireRoleLevel(100), async (req
     return res.apiSuccess(diagnosis, '获取问题诊断成功')
   } catch (error) {
     logger.error('获取活动问题诊断失败', {
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       error: error.message
     })
 
@@ -348,7 +348,7 @@ router.get('/:id/budget-rate', authenticateToken, requireRoleLevel(100), async (
   }
 
   logger.info('获取活动预算消耗速度', {
-    campaign_id: campaignId,
+    lottery_campaign_id: campaignId,
     user_id: req.user?.user_id
   })
 
@@ -364,7 +364,7 @@ router.get('/:id/budget-rate', authenticateToken, requireRoleLevel(100), async (
     const budgetDetails = report.dimensions?.budget?.details || {}
 
     const budgetRate = {
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       campaign_name: report.campaign_name,
       budget_health_level: report.dimensions?.budget?.level || 'unknown',
       budget_score: report.dimensions?.budget?.score || 0,
@@ -380,7 +380,7 @@ router.get('/:id/budget-rate', authenticateToken, requireRoleLevel(100), async (
     }
 
     logger.info('活动预算消耗速度获取成功', {
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       usage_ratio: budgetRate.usage_ratio,
       daily_consumption: budgetRate.daily_consumption
     })
@@ -388,7 +388,7 @@ router.get('/:id/budget-rate', authenticateToken, requireRoleLevel(100), async (
     return res.apiSuccess(budgetRate, '获取预算消耗速度成功')
   } catch (error) {
     logger.error('获取活动预算消耗速度失败', {
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       error: error.message
     })
 

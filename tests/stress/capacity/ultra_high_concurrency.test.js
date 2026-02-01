@@ -209,7 +209,7 @@ describe('🚀 20,000并发极限压力测试（P3-1）', () => {
           api_path: apiPath,
           http_method: 'POST',
           request_params: {
-            campaign_id: testCampaignId,
+            lottery_campaign_id: testCampaignId,
             draw_count: 1,
             test_marker: 'ultra_high_concurrency'
           },

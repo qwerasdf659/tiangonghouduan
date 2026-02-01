@@ -329,7 +329,7 @@ describe('【P1-1.3】并发控制边界测试', () => {
                 // 模拟抽奖业务逻辑
                 await delay(50)
                 return {
-                  draw_id: drawId,
+                  lottery_draw_id: drawId,
                   success: true,
                   message: '抽奖成功',
                   duration: Date.now() - startTime
@@ -344,7 +344,7 @@ describe('【P1-1.3】并发控制边界测试', () => {
           } catch (error) {
             blockedDraws++
             return {
-              draw_id: drawId,
+              lottery_draw_id: drawId,
               success: false,
               message: '获取锁失败',
               error: error.message,

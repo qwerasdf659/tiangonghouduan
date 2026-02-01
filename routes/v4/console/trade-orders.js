@@ -41,7 +41,7 @@ function getTradeOrderService(req) {
  * Query参数：
  * - buyer_user_id: 买家用户ID（可选）
  * - seller_user_id: 卖家用户ID（可选）
- * - listing_id: 挂牌ID（可选）
+ * - market_listing_id: 挂牌ID（可选，数据库主键字段名）
  * - status: 订单状态（created/frozen/completed/cancelled/failed，可选）
  * - asset_code: 结算资产代码（可选）
  * - start_time: 开始时间（ISO8601格式，可选）
@@ -57,7 +57,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
     const {
       buyer_user_id,
       seller_user_id,
-      listing_id,
+      market_listing_id,
       status,
       asset_code,
       start_time,
@@ -69,7 +69,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
     const result = await TradeOrderService.getOrders({
       buyer_user_id: buyer_user_id ? parseInt(buyer_user_id) : undefined,
       seller_user_id: seller_user_id ? parseInt(seller_user_id) : undefined,
-      listing_id: listing_id ? parseInt(listing_id) : undefined,
+      market_listing_id: market_listing_id ? parseInt(market_listing_id) : undefined,
       status,
       asset_code,
       start_time,
@@ -200,9 +200,9 @@ router.get(
 router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const TradeOrderService = getTradeOrderService(req)
-    const order_id = parseInt(req.params.id)
+    const trade_order_id = parseInt(req.params.id)
 
-    const order = await TradeOrderService.getOrderById(order_id)
+    const order = await TradeOrderService.getOrderById(trade_order_id)
 
     if (!order) {
       return res.apiError('订单不存在', 'ORDER_NOT_FOUND', null, 404)

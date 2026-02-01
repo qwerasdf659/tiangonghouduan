@@ -326,19 +326,21 @@ describe('P1-3.3: 订单API参数验证单元测试', () => {
     })
   })
 
-  describe('5. 挂牌ID参数验证 (listing_id)', () => {
-    const listingIdValidator = validatePositiveInteger('listing_id', 'query', { optional: true })
+  describe('5. 挂牌ID参数验证 (market_listing_id)', () => {
+    const listingIdValidator = validatePositiveInteger('market_listing_id', 'query', {
+      optional: true
+    })
 
     test('有效的挂牌ID应通过验证', async () => {
       const validIds = [1, 100, 999999]
 
       for (const id of validIds) {
-        const req = createMockRequest({ query: { listing_id: String(id) } })
+        const req = createMockRequest({ query: { market_listing_id: String(id) } })
         const res = createMockResponse()
         const result = await runMiddleware(listingIdValidator, req, res)
 
         expect(result.passed).toBe(true)
-        expect(req.validated.listing_id).toBe(id)
+        expect(req.validated.market_listing_id).toBe(id)
       }
     })
 
@@ -346,7 +348,7 @@ describe('P1-3.3: 订单API参数验证单元测试', () => {
       const invalidIds = ['0', '-1', 'listing_123']
 
       for (const id of invalidIds) {
-        const req = createMockRequest({ query: { listing_id: id } })
+        const req = createMockRequest({ query: { market_listing_id: id } })
         const res = createMockResponse()
         const result = await runMiddleware(listingIdValidator, req, res)
 

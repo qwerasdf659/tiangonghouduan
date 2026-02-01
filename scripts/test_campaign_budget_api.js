@@ -116,7 +116,7 @@ async function testBatchBudgetStatus() {
 
       if (campaigns && campaigns.length > 0) {
         campaigns.forEach((campaign, index) => {
-          console.log(`\n   [${index + 1}] campaign_id: ${campaign.campaign_id}`)
+          console.log(`\n   [${index + 1}] lottery_campaign_id: ${campaign.lottery_campaign_id}`)
           console.log(`       campaign_name: ${campaign.campaign_name}`)
           console.log(`       budget_mode: ${campaign.budget_mode}`)
           console.log(`       status: ${campaign.status}`)
@@ -161,7 +161,7 @@ async function testActivitiesApi() {
       console.log(colors.green(`\n✅ 获取到 ${campaigns.length} 个活动`))
 
       campaigns.forEach((campaign, index) => {
-        console.log(`   [${index + 1}] ${campaign.campaign_id}: ${campaign.campaign_name}`)
+        console.log(`   [${index + 1}] ${campaign.lottery_campaign_id}: ${campaign.campaign_name}`)
       })
 
       return { success: true, campaigns }
@@ -178,7 +178,7 @@ async function testActivitiesApi() {
 
 // 测试单个活动预算配置
 async function testSingleCampaignBudget(campaignId) {
-  console.log(colors.blue(`\n📋 步骤4: 测试单个活动预算配置 (campaign_id: ${campaignId})`))
+  console.log(colors.blue(`\n📋 步骤4: 测试单个活动预算配置 (lottery_campaign_id: ${campaignId})`))
   console.log('-'.repeat(50))
   console.log(`   接口: GET /api/v4/console/campaign-budget/campaigns/${campaignId}`)
 
@@ -193,7 +193,7 @@ async function testSingleCampaignBudget(campaignId) {
 
       console.log(colors.green('\n✅ 获取活动预算配置成功'))
       console.log(colors.cyan('\n📊 活动预算配置:'))
-      console.log(`   campaign_id: ${campaign?.campaign_id}`)
+      console.log(`   lottery_campaign_id: ${campaign?.lottery_campaign_id}`)
       console.log(`   budget_mode: ${campaign?.budget_mode}`)
       console.log(`   pool_budget_total: ${campaign?.pool_budget_total}`)
       console.log(`   pool_budget_remaining: ${campaign?.pool_budget_remaining}`)
@@ -332,7 +332,7 @@ async function createTestBudgetData() {
 
       if (activities.length > 0) {
         const firstActivity = activities[0]
-        const campaignId = firstActivity.campaign_id || firstActivity.activity_id
+        const campaignId = firstActivity.lottery_campaign_id || firstActivity.activity_id
 
         console.log(
           `   为活动 ${campaignId} (${firstActivity.campaign_name || firstActivity.name}) 设置测试预算...`
@@ -392,7 +392,7 @@ async function runTests() {
 
   // 步骤4: 如果有活动，测试单个活动预算配置
   if (batchResult.success && batchResult.campaigns && batchResult.campaigns.length > 0) {
-    await testSingleCampaignBudget(batchResult.campaigns[0].campaign_id)
+    await testSingleCampaignBudget(batchResult.campaigns[0].lottery_campaign_id)
   }
 
   // 步骤5: 检查数据库数据
@@ -421,7 +421,7 @@ async function runTests() {
   console.log(colors.cyan('═'.repeat(60)))
 
   console.log(colors.cyan('\n📝 前端字段映射检查:'))
-  console.log(`   后端返回: campaign_id, campaign_name, pool_budget.total/used/remaining`)
+  console.log(`   后端返回: lottery_campaign_id, campaign_name, pool_budget.total/used/remaining`)
   console.log(`   前端期望: activity_id, activity_name, total_budget, used_budget`)
   console.log(colors.yellow(`   ⚠️ 需要修改前端使用后端字段名，不做复杂映射`))
 }

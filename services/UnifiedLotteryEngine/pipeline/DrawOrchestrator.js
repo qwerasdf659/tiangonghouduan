@@ -78,16 +78,16 @@ class DrawOrchestrator {
    *
    * @param {Object} context - 抽奖上下文
    * @param {number} context.user_id - 用户ID
-   * @param {number} context.campaign_id - 活动ID
+   * @param {number} context.lottery_campaign_id - 活动ID
    * @param {string} context.idempotency_key - 幂等键
    * @param {Object} context.transaction - 数据库事务（可选）
    * @returns {Promise<Object>} 抽奖结果
    */
   async execute(context) {
-    const { user_id, campaign_id } = context
+    const { user_id, lottery_campaign_id } = context
     const start_time = Date.now()
 
-    this._log('info', '开始抽奖编排', { user_id, campaign_id })
+    this._log('info', '开始抽奖编排', { user_id, lottery_campaign_id })
 
     try {
       // 1. 获取统一管线实例
@@ -95,7 +95,7 @@ class DrawOrchestrator {
 
       this._log('info', '使用统一管线执行抽奖', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         pipeline_type: PIPELINE_TYPES.UNIFIED
       })
 
@@ -117,7 +117,7 @@ class DrawOrchestrator {
 
       this._log('info', '抽奖编排完成', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         pipeline_type: PIPELINE_TYPES.UNIFIED,
         decision_source,
         success: result.success,
@@ -135,7 +135,7 @@ class DrawOrchestrator {
 
       this._log('error', '抽奖编排失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message,
         duration_ms: duration
       })

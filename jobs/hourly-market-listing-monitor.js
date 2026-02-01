@@ -173,7 +173,7 @@ class HourlyMarketListingMonitor {
         attributes: [
           'offer_asset_code',
           [sequelize.fn('AVG', sequelize.literal('price_amount / offer_amount')), 'avg_unit_price'],
-          [sequelize.fn('COUNT', sequelize.col('listing_id')), 'listing_count']
+          [sequelize.fn('COUNT', sequelize.col('market_listing_id')), 'listing_count']
         ],
         where: {
           listing_kind: 'fungible_asset',
@@ -214,7 +214,7 @@ class HourlyMarketListingMonitor {
         // 检查价格下限
         if (unitPrice < avgUnitPrice * config.price_low_threshold) {
           report.price_anomalies.push({
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             seller_user_id: listing.seller_user_id,
             offer_asset_code: listing.offer_asset_code,
             offer_amount: listing.offer_amount,
@@ -229,7 +229,7 @@ class HourlyMarketListingMonitor {
         // 检查价格上限
         if (unitPrice > avgUnitPrice * config.price_high_threshold) {
           report.price_anomalies.push({
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             seller_user_id: listing.seller_user_id,
             offer_asset_code: listing.offer_asset_code,
             offer_amount: listing.offer_amount,
@@ -264,7 +264,7 @@ class HourlyMarketListingMonitor {
 
       const longListings = await MarketListing.findAll({
         attributes: [
-          'listing_id',
+          'market_listing_id',
           'listing_kind',
           'seller_user_id',
           'offer_asset_code',
@@ -287,7 +287,7 @@ class HourlyMarketListingMonitor {
         )
 
         report.long_listings.push({
-          listing_id: listing.listing_id,
+          market_listing_id: listing.market_listing_id,
           listing_kind: listing.listing_kind,
           seller_user_id: listing.seller_user_id,
           offer_asset_code: listing.offer_asset_code,
@@ -527,7 +527,7 @@ class HourlyMarketListingMonitor {
     if (report.price_anomalies.length > 0) {
       parts.push(`📊 价格异常: ${report.price_anomalies.length} 条`)
       report.price_anomalies.slice(0, 5).forEach(item => {
-        parts.push(`  - 挂牌#${item.listing_id}: ${item.description}`)
+        parts.push(`  - 挂牌#${item.market_listing_id}: ${item.description}`)
       })
       if (report.price_anomalies.length > 5) {
         parts.push(`  - ...还有 ${report.price_anomalies.length - 5} 条`)
@@ -537,7 +537,7 @@ class HourlyMarketListingMonitor {
     if (report.long_listings.length > 0) {
       parts.push(`⏰ 超长挂牌: ${report.long_listings.length} 条`)
       report.long_listings.slice(0, 5).forEach(item => {
-        parts.push(`  - 挂牌#${item.listing_id}: 已上架 ${item.days_on_sale} 天`)
+        parts.push(`  - 挂牌#${item.market_listing_id}: 已上架 ${item.days_on_sale} 天`)
       })
       if (report.long_listings.length > 5) {
         parts.push(`  - ...还有 ${report.long_listings.length - 5} 条`)

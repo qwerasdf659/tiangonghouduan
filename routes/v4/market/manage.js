@@ -5,8 +5,8 @@
  * @description 卖家管理已上架的商品（撤回）
  *
  * API列表：
- * - POST /listings/:listing_id/withdraw - 撤回物品实例挂牌
- * - POST /fungible-assets/:listing_id/withdraw - 撤回可叠加资产挂牌（C2C材料交易）
+ * - POST /listings/:market_listing_id/withdraw - 撤回物品实例挂牌
+ * - POST /fungible-assets/:market_listing_id/withdraw - 撤回可叠加资产挂牌（C2C材料交易）
  *
  * 业务场景：
  * - 卖家撤回已上架的商品/可叠加资产
@@ -38,32 +38,32 @@ const {
 const marketRiskMiddleware = getMarketRiskControlMiddleware()
 
 /**
- * @route POST /api/v4/market/listings/:listing_id/withdraw
+ * @route POST /api/v4/market/listings/:market_listing_id/withdraw
  * @desc 撤回市场挂牌
  * @access Private (需要登录，只能撤回自己的商品)
  *
- * @param {number} listing_id - 挂牌ID
+ * @param {number} market_listing_id - 挂牌ID
  * @body {string} withdraw_reason - 撤回原因（可选，默认"用户主动撤回"）
  *
  * @returns {Object} 撤回结果
- * @returns {number} data.listing_id - 挂牌ID
+ * @returns {number} data.market_listing_id - 挂牌ID
  * @returns {number} data.item_instance_id - 物品实例ID
  * @returns {string} data.withdrawn_at - 撤回时间
  *
  * 业务场景：卖家撤回已上架的商品
  */
 router.post(
-  '/listings/:listing_id/withdraw',
+  '/listings/:market_listing_id/withdraw',
   authenticateToken,
   requireValidSession, // 🔐 市场撤回属于敏感操作，需验证会话（2026-01-21 会话管理功能）
   marketRiskMiddleware.createWithdrawRiskMiddleware(),
-  validatePositiveInteger('listing_id', 'params'),
+  validatePositiveInteger('market_listing_id', 'params'),
   async (req, res) => {
     // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
     const MarketListingService = req.app.locals.services.getService('market_listing_core')
 
     try {
-      const listingId = req.validated.listing_id
+      const listingId = req.validated.market_listing_id
       const sellerId = req.user.user_id
       const { withdraw_reason } = req.body
 
@@ -72,7 +72,7 @@ router.post(
         async transaction => {
           return await MarketListingService.withdrawListing(
             {
-              listing_id: listingId,
+              market_listing_id: listingId,
               seller_user_id: sellerId
             },
             { transaction }
@@ -84,7 +84,7 @@ router.post(
       // 缓存失效已在 MarketListingService.withdrawListing 中处理（决策5B）
 
       logger.info('市场挂牌撤回成功', {
-        listing_id: listingId,
+        market_listing_id: listingId,
         seller_id: sellerId,
         item_instance_id: result.listing.offer_item_instance_id,
         withdraw_reason: withdraw_reason || '用户主动撤回'
@@ -92,7 +92,7 @@ router.post(
 
       return res.apiSuccess(
         {
-          listing_id: listingId,
+          market_listing_id: listingId,
           item_instance_id: result.listing.offer_item_instance_id,
           withdrawn_at: new Date().toISOString()
         },
@@ -112,7 +112,7 @@ router.post(
 
       logger.error('撤回市场挂牌失败', {
         error: error.message,
-        listing_id: req.validated.listing_id,
+        market_listing_id: req.validated.market_listing_id,
         seller_id: req.user?.user_id
       })
 
@@ -122,15 +122,15 @@ router.post(
 )
 
 /**
- * @route POST /api/v4/market/fungible-assets/:listing_id/withdraw
+ * @route POST /api/v4/market/fungible-assets/:market_listing_id/withdraw
  * @desc 撤回可叠加资产挂牌（C2C材料交易）
  * @access Private (需要登录，只能撤回自己的挂牌)
  *
- * @param {number} listing_id - 挂牌ID
+ * @param {number} market_listing_id - 挂牌ID
  * @body {string} withdraw_reason - 撤回原因（可选，默认"用户主动撤回"）
  *
  * @returns {Object} 撤回结果
- * @returns {number} data.listing_id - 挂牌ID
+ * @returns {number} data.market_listing_id - 挂牌ID
  * @returns {string} data.offer_asset_code - 资产代码
  * @returns {number} data.offer_amount - 撤回数量
  * @returns {string} data.withdrawn_at - 撤回时间
@@ -139,17 +139,17 @@ router.post(
  * 业务场景：卖家撤回已挂牌的可叠加资产，解冻资产到可用余额
  */
 router.post(
-  '/fungible-assets/:listing_id/withdraw',
+  '/fungible-assets/:market_listing_id/withdraw',
   authenticateToken,
   requireValidSession, // 🔐 可叠加资产撤回属于敏感操作，需验证会话（2026-01-21 会话管理功能）
   marketRiskMiddleware.createWithdrawRiskMiddleware(),
-  validatePositiveInteger('listing_id', 'params'),
+  validatePositiveInteger('market_listing_id', 'params'),
   async (req, res) => {
     // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
     const MarketListingService = req.app.locals.services.getService('market_listing_core')
 
     try {
-      const listingId = req.validated.listing_id
+      const listingId = req.validated.market_listing_id
       const sellerId = req.user.user_id
       const { withdraw_reason } = req.body
 
@@ -158,7 +158,7 @@ router.post(
         async transaction => {
           return await MarketListingService.withdrawFungibleAssetListing(
             {
-              listing_id: listingId,
+              market_listing_id: listingId,
               seller_user_id: sellerId
             },
             { transaction }
@@ -170,7 +170,7 @@ router.post(
       // 缓存失效已在 MarketListingService.withdrawFungibleAssetListing 中处理
 
       logger.info('可叠加资产挂牌撤回成功', {
-        listing_id: listingId,
+        market_listing_id: listingId,
         seller_id: sellerId,
         offer_asset_code: result.listing.offer_asset_code,
         offer_amount: result.listing.offer_amount,
@@ -179,7 +179,7 @@ router.post(
 
       return res.apiSuccess(
         {
-          listing_id: listingId,
+          market_listing_id: listingId,
           offer_asset_code: result.listing.offer_asset_code,
           offer_amount: Number(result.listing.offer_amount),
           withdrawn_at: new Date().toISOString(),
@@ -205,7 +205,7 @@ router.post(
       }
       if (error.code === 'INVALID_LISTING_KIND') {
         return res.apiError(
-          '此接口仅支持可叠加资产挂牌，请使用 /listings/:listing_id/withdraw 撤回物品挂牌',
+          '此接口仅支持可叠加资产挂牌，请使用 /listings/:market_listing_id/withdraw 撤回物品挂牌',
           error.code,
           null,
           error.statusCode || 400
@@ -214,7 +214,7 @@ router.post(
 
       logger.error('撤回可叠加资产挂牌失败', {
         error: error.message,
-        listing_id: req.validated.listing_id,
+        market_listing_id: req.validated.market_listing_id,
         seller_id: req.user?.user_id
       })
 

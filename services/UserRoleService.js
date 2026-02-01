@@ -182,9 +182,9 @@ class UserRoleService {
    *
    * 审计统一入口整合（2026-01-08 决策5/6/9/10）：
    * - 【决策9】创建 UserRoleChangeRecord 记录，主键作为审计日志 target_id
-   * - 【决策6】idempotency_key 从 UserRoleChangeRecord.record_id 派生
+   * - 【决策6】idempotency_key 从 UserRoleChangeRecord.user_role_change_record_id 派生
    * - 【决策5】审计日志失败时阻断业务流程（关键操作）
-   * - 【决策10】target_id 指向 UserRoleChangeRecord.record_id
+   * - 【决策10】target_id 指向 UserRoleChangeRecord.user_role_change_record_id
    *
    * @param {number} user_id - 用户ID
    * @param {string} role_name - 新角色名称
@@ -280,13 +280,13 @@ class UserRoleService {
 
     /*
      * 【决策5/10】记录审计日志（关键操作，失败时阻断业务流程）
-     * target_id 指向 UserRoleChangeRecord.record_id（决策10）
+     * target_id 指向 UserRoleChangeRecord.user_role_change_record_id（决策10）
      */
     await AuditLogService.logOperation({
       operator_id,
       operation_type: 'role_change',
       target_type: 'UserRoleChangeRecord',
-      target_id: changeRecord.record_id, // 决策10：指向业务记录主键
+      target_id: changeRecord.user_role_change_record_id, // 决策10：指向业务记录主键
       action: 'update',
       before_data: {
         roles: oldRoles,
@@ -308,7 +308,7 @@ class UserRoleService {
       user_id,
       new_role: role_name,
       operator_id,
-      record_id: changeRecord.record_id
+      record_id: changeRecord.user_role_change_record_id
     })
 
     // 返回结果（包含 post_commit_actions 供调用方在事务提交后处理副作用）
@@ -320,7 +320,7 @@ class UserRoleService {
       old_role_level: oldRoleLevel,
       operator_id,
       reason,
-      record_id: changeRecord.record_id, // 业务记录ID
+      record_id: changeRecord.user_role_change_record_id, // 业务记录ID
       // 事务提交后由调用方处理的副作用
       post_commit_actions: {
         invalidate_cache: true,
@@ -339,9 +339,9 @@ class UserRoleService {
    *
    * 审计统一入口整合（2026-01-08 决策5/6/9/10）：
    * - 【决策9】创建 UserStatusChangeRecord 记录，主键作为审计日志 target_id
-   * - 【决策6】idempotency_key 从 UserStatusChangeRecord.record_id 派生
+   * - 【决策6】idempotency_key 从 UserStatusChangeRecord.user_status_change_record_id 派生
    * - 【决策5】审计日志失败时阻断业务流程（关键操作）
-   * - 【决策10】target_id 指向 UserStatusChangeRecord.record_id
+   * - 【决策10】target_id 指向 UserStatusChangeRecord.user_status_change_record_id
    *
    * @param {number} user_id - 用户ID
    * @param {string} status - 状态（active/inactive/banned/pending）
@@ -405,13 +405,13 @@ class UserRoleService {
 
     /*
      * 【决策5/10】记录审计日志（关键操作，失败时阻断业务流程）
-     * target_id 指向 UserStatusChangeRecord.record_id（决策10）
+     * target_id 指向 UserStatusChangeRecord.user_status_change_record_id（决策10）
      */
     await AuditLogService.logOperation({
       operator_id,
       operation_type: 'user_status_change',
       target_type: 'UserStatusChangeRecord',
-      target_id: changeRecord.record_id, // 决策10：指向业务记录主键
+      target_id: changeRecord.user_status_change_record_id, // 决策10：指向业务记录主键
       action: 'update',
       before_data: { status: oldStatus },
       after_data: { status },
@@ -428,7 +428,7 @@ class UserRoleService {
       old_status: oldStatus,
       new_status: status,
       operator_id,
-      record_id: changeRecord.record_id
+      record_id: changeRecord.user_status_change_record_id
     })
 
     // 返回结果（包含 post_commit_actions 供调用方在事务提交后处理副作用）
@@ -438,7 +438,7 @@ class UserRoleService {
       new_status: status,
       operator_id,
       reason,
-      record_id: changeRecord.record_id, // 业务记录ID
+      record_id: changeRecord.user_status_change_record_id, // 业务记录ID
       // 事务提交后由调用方处理的副作用
       post_commit_actions: {
         invalidate_cache: true,

@@ -10,10 +10,10 @@
  * - shop/exchange 负责B2C官方兑换
  *
  * 子模块划分（按业务职责）：
- * - listings.js - 市场挂单查询（GET /listings, GET /listings/:listing_id, GET /listing-status）
+ * - listings.js - 市场挂单查询（GET /listings, GET /listings/:market_listing_id, GET /listing-status）
  * - sell.js     - 上架商品（POST /list, POST /fungible-assets/list）
- * - buy.js      - 购买商品（POST /listings/:listing_id/purchase）
- * - manage.js   - 撤回/管理（POST /listings/:listing_id/withdraw, POST /fungible-assets/:listing_id/withdraw）
+ * - buy.js      - 购买商品（POST /listings/:market_listing_id/purchase）
+ * - manage.js   - 撤回/管理（POST /listings/:market_listing_id/withdraw, POST /fungible-assets/:market_listing_id/withdraw）
  *
  * 业务说明：
  * - 用户可以将 inventory 中的物品挂单出售

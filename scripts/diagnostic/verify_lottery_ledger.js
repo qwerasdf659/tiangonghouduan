@@ -49,12 +49,12 @@ async function verifyLotteryLedger() {
 
     // 3. 检查活动状态
     const [campaigns] = await sequelize.query(`
-      SELECT campaign_id, campaign_name, status, cost_per_draw
+      SELECT lottery_campaign_id, campaign_name, status, cost_per_draw
       FROM lottery_campaigns
-      WHERE campaign_id = 1
+      WHERE lottery_campaign_id = 1
     `)
     console.log(`\n📋 活动信息:`)
-    console.log(`   - campaign_id: ${campaigns[0].campaign_id}`)
+    console.log(`   - lottery_campaign_id: ${campaigns[0].lottery_campaign_id}`)
     console.log(`   - campaign_name: ${campaigns[0].campaign_name}`)
     console.log(`   - status: ${campaigns[0].status}`)
     console.log(`   - cost_per_draw: ${campaigns[0].cost_per_draw}`)
@@ -70,7 +70,7 @@ async function verifyLotteryLedger() {
 
     // 5. 临时将活动状态改为 active
     console.log('\n🔧 临时启用活动...')
-    await sequelize.query(`UPDATE lottery_campaigns SET status = 'active' WHERE campaign_id = 1`)
+    await sequelize.query(`UPDATE lottery_campaigns SET status = 'active' WHERE lottery_campaign_id = 1`)
 
     // 6. 执行抽奖验证
     console.log('\n🎰 执行抽奖验证...')
@@ -104,7 +104,7 @@ async function verifyLotteryLedger() {
 
     // 7. 恢复活动状态
     console.log('\n🔧 恢复活动状态...')
-    await sequelize.query(`UPDATE lottery_campaigns SET status = 'ended' WHERE campaign_id = 1`)
+    await sequelize.query(`UPDATE lottery_campaigns SET status = 'ended' WHERE lottery_campaign_id = 1`)
 
     // 8. 验证流水写入
     const [afterTxns] = await sequelize.query(`
@@ -161,7 +161,7 @@ async function verifyLotteryLedger() {
 
     // 确保恢复活动状态
     try {
-      await sequelize.query(`UPDATE lottery_campaigns SET status = 'ended' WHERE campaign_id = 1`)
+      await sequelize.query(`UPDATE lottery_campaigns SET status = 'ended' WHERE lottery_campaign_id = 1`)
     } catch (e) {
       // ignore
     }

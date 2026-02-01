@@ -139,7 +139,7 @@ module.exports = sequelize => {
   AssetTransaction.init(
     {
       // 主键ID（Transaction ID - 流水唯一标识）
-      transaction_id: {
+      asset_transaction_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,

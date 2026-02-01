@@ -14,7 +14,7 @@
  * - 读取：每小时定时任务从 Redis 聚合到 MySQL lottery_hourly_metrics
  *
  * Redis Key 设计规范：
- * - lottery:metrics:{campaign_id}:{metric_type}:{hour_bucket}
+ * - lottery:metrics:{lottery_campaign_id}:{metric_type}:{hour_bucket}
  * - TTL：25 小时（保留至下一小时聚合完成）
  *
  * 采集指标清单：
@@ -35,7 +35,7 @@
  * ```javascript
  * const collector = require('./LotteryMetricsCollector')
  * await collector.recordDraw({
- *   campaign_id: 1,
+ *   lottery_campaign_id: 1,
  *   user_id: 123,
  *   selected_tier: 'mid',
  *   budget_tier: 'B2',
@@ -176,15 +176,15 @@ class LotteryMetricsCollector {
   /**
    * 构建 Redis Key
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {string} metric_type - 指标类型
    * @param {string} bucket - 时间桶标识
    * @returns {string} 完整的 Redis Key
    * @example
    * _buildKey(1, 'total_draws', '2026012214') // 返回 'lottery:metrics:1:total_draws:2026012214'
    */
-  _buildKey(campaign_id, metric_type, bucket) {
-    return `${KEY_PREFIX}:${campaign_id}:${metric_type}:${bucket}`
+  _buildKey(lottery_campaign_id, metric_type, bucket) {
+    return `${KEY_PREFIX}:${lottery_campaign_id}:${metric_type}:${bucket}`
   }
 
   /**
@@ -212,15 +212,15 @@ class LotteryMetricsCollector {
   /**
    * 原子递增计数器
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {string} metric_type - 指标类型
    * @param {string} hour_bucket - 小时桶标识
    * @param {number} increment - 增量值（默认 1）
    * @returns {Promise<number|null>} 递增后的值
    * @private
    */
-  async _incrMetric(campaign_id, metric_type, hour_bucket, increment = 1) {
-    const key = this._buildKey(campaign_id, metric_type, hour_bucket)
+  async _incrMetric(lottery_campaign_id, metric_type, hour_bucket, increment = 1) {
+    const key = this._buildKey(lottery_campaign_id, metric_type, hour_bucket)
     return this._safeExecute(async () => {
       const client = this._getClient()
       const result = await client.incrby(key, increment)
@@ -233,15 +233,15 @@ class LotteryMetricsCollector {
   /**
    * 原子递增浮点数计数器（用于金额类指标）
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {string} metric_type - 指标类型
    * @param {string} hour_bucket - 小时桶标识
    * @param {number} increment - 增量值（浮点数）
    * @returns {Promise<string|null>} 递增后的值（字符串形式）
    * @private
    */
-  async _incrFloatMetric(campaign_id, metric_type, hour_bucket, increment) {
-    const key = this._buildKey(campaign_id, metric_type, hour_bucket)
+  async _incrFloatMetric(lottery_campaign_id, metric_type, hour_bucket, increment) {
+    const key = this._buildKey(lottery_campaign_id, metric_type, hour_bucket)
     return this._safeExecute(async () => {
       const client = this._getClient()
       const result = await client.incrbyfloat(key, increment)
@@ -253,14 +253,14 @@ class LotteryMetricsCollector {
   /**
    * 添加独立用户（HyperLogLog）
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {number} user_id - 用户ID
    * @param {string} date_bucket - 日期桶标识
    * @returns {Promise<number|null>} 是否新增（1=新增，0=已存在）
    * @private
    */
-  async _pfAddUser(campaign_id, user_id, date_bucket) {
-    const key = this._buildKey(campaign_id, 'unique_users', date_bucket)
+  async _pfAddUser(lottery_campaign_id, user_id, date_bucket) {
+    const key = this._buildKey(lottery_campaign_id, 'unique_users', date_bucket)
     return this._safeExecute(async () => {
       const client = this._getClient()
       const result = await client.pfadd(key, user_id.toString())
@@ -276,7 +276,7 @@ class LotteryMetricsCollector {
    * 使用 Redis Pipeline 批量执行，减少网络往返。
    *
    * @param {Object} draw_data - 抽奖数据
-   * @param {number} draw_data.campaign_id - 活动ID
+   * @param {number} draw_data.lottery_campaign_id - 活动ID
    * @param {number} draw_data.user_id - 用户ID
    * @param {string} draw_data.selected_tier - 选中的奖品档位（high/mid/low/fallback）
    * @param {string} draw_data.budget_tier - 预算档位（B0/B1/B2/B3）
@@ -291,7 +291,7 @@ class LotteryMetricsCollector {
    * @returns {Promise<Object>} 采集结果
    * @example
    * const result = await collector.recordDraw({
-   *   campaign_id: 1,
+   *   lottery_campaign_id: 1,
    *   user_id: 123,
    *   selected_tier: 'mid',
    *   budget_tier: 'B2',
@@ -307,7 +307,7 @@ class LotteryMetricsCollector {
    */
   async recordDraw(draw_data) {
     const {
-      campaign_id,
+      lottery_campaign_id,
       user_id,
       selected_tier,
       budget_tier,
@@ -318,9 +318,9 @@ class LotteryMetricsCollector {
     } = draw_data
 
     // 参数验证
-    if (!campaign_id || !user_id) {
+    if (!lottery_campaign_id || !user_id) {
       this.logger.warn('[LotteryMetricsCollector] recordDraw 缺少必需参数', {
-        campaign_id,
+        lottery_campaign_id,
         user_id
       })
       return { success: false, error: 'MISSING_REQUIRED_PARAMS' }
@@ -334,19 +334,19 @@ class LotteryMetricsCollector {
       const pipeline = client.pipeline()
 
       // 1. 总抽奖次数
-      const total_draws_key = this._buildKey(campaign_id, 'total_draws', hour_bucket)
+      const total_draws_key = this._buildKey(lottery_campaign_id, 'total_draws', hour_bucket)
       pipeline.incr(total_draws_key)
       pipeline.expire(total_draws_key, this.ttl_seconds)
 
       // 2. 独立用户（HyperLogLog）
-      const unique_users_key = this._buildKey(campaign_id, 'unique_users', date_bucket)
+      const unique_users_key = this._buildKey(lottery_campaign_id, 'unique_users', date_bucket)
       pipeline.pfadd(unique_users_key, user_id.toString())
       pipeline.expire(unique_users_key, 48 * 60 * 60)
 
       // 3. Budget Tier 分布
       if (budget_tier && BUDGET_TIER_MAP[budget_tier]) {
         const budget_tier_key = this._buildKey(
-          campaign_id,
+          lottery_campaign_id,
           BUDGET_TIER_MAP[budget_tier],
           hour_bucket
         )
@@ -356,7 +356,7 @@ class LotteryMetricsCollector {
 
       // 4. 奖品档位分布
       if (selected_tier && TIER_MAP[selected_tier]) {
-        const tier_key = this._buildKey(campaign_id, TIER_MAP[selected_tier], hour_bucket)
+        const tier_key = this._buildKey(lottery_campaign_id, TIER_MAP[selected_tier], hour_bucket)
         pipeline.incr(tier_key)
         pipeline.expire(tier_key, this.ttl_seconds)
 
@@ -367,7 +367,7 @@ class LotteryMetricsCollector {
          */
         if (selected_tier === 'empty') {
           this.logger.warn('[LotteryMetricsCollector] 检测到真正空奖（empty），请运营关注！', {
-            campaign_id,
+            lottery_campaign_id,
             user_id,
             hour_bucket,
             alert_type: 'EMPTY_PRIZE_DETECTED',
@@ -379,7 +379,7 @@ class LotteryMetricsCollector {
       // 5. 体验机制触发统计
       for (const [trigger_name, redis_field] of Object.entries(TRIGGER_MAP)) {
         if (triggers[trigger_name] === true) {
-          const trigger_key = this._buildKey(campaign_id, redis_field, hour_bucket)
+          const trigger_key = this._buildKey(lottery_campaign_id, redis_field, hour_bucket)
           pipeline.incr(trigger_key)
           pipeline.expire(trigger_key, this.ttl_seconds)
         }
@@ -387,14 +387,14 @@ class LotteryMetricsCollector {
 
       // 7. 总预算消耗（浮点数累加）
       if (budget_consumed > 0) {
-        const budget_key = this._buildKey(campaign_id, 'total_budget_consumed', hour_bucket)
+        const budget_key = this._buildKey(lottery_campaign_id, 'total_budget_consumed', hour_bucket)
         pipeline.incrbyfloat(budget_key, budget_consumed)
         pipeline.expire(budget_key, this.ttl_seconds)
       }
 
       // 8. 总奖品价值（浮点数累加）
       if (prize_value > 0) {
-        const prize_key = this._buildKey(campaign_id, 'total_prize_value', hour_bucket)
+        const prize_key = this._buildKey(lottery_campaign_id, 'total_prize_value', hour_bucket)
         pipeline.incrbyfloat(prize_key, prize_value)
         pipeline.expire(prize_key, this.ttl_seconds)
       }
@@ -406,7 +406,7 @@ class LotteryMetricsCollector {
       const errors = results.filter(([err]) => err !== null)
       if (errors.length > 0) {
         this.logger.warn('[LotteryMetricsCollector] Pipeline 部分操作失败', {
-          campaign_id,
+          lottery_campaign_id,
           user_id,
           error_count: errors.length,
           errors: errors.map(([err]) => err.message)
@@ -414,7 +414,7 @@ class LotteryMetricsCollector {
       }
 
       this.logger.debug('[LotteryMetricsCollector] recordDraw 完成', {
-        campaign_id,
+        lottery_campaign_id,
         user_id,
         hour_bucket,
         selected_tier,
@@ -432,7 +432,7 @@ class LotteryMetricsCollector {
     } catch (error) {
       if (this.silent_errors) {
         this.logger.warn('[LotteryMetricsCollector] recordDraw 失败（静默处理）', {
-          campaign_id,
+          lottery_campaign_id,
           user_id,
           error: error.message
         })
@@ -447,14 +447,14 @@ class LotteryMetricsCollector {
    *
    * 用于小时聚合任务从 Redis 读取数据。
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {string} hour_bucket - 小时桶标识（YYYYMMDDHH）
    * @returns {Promise<Object>} 该小时的所有指标
    * @example
    * const metrics = await collector.getHourMetrics(1, '2026012214')
    * // 返回 { total_draws: 100, b0_count: 10, b1_count: 30, ... }
    */
-  async getHourMetrics(campaign_id, hour_bucket) {
+  async getHourMetrics(lottery_campaign_id, hour_bucket) {
     try {
       const client = this._getClient()
       const pipeline = client.pipeline()
@@ -481,7 +481,7 @@ class LotteryMetricsCollector {
 
       // 构建批量获取命令
       for (const metric_type of metric_types) {
-        const key = this._buildKey(campaign_id, metric_type, hour_bucket)
+        const key = this._buildKey(lottery_campaign_id, metric_type, hour_bucket)
         pipeline.get(key)
       }
 
@@ -511,7 +511,7 @@ class LotteryMetricsCollector {
       return metrics
     } catch (error) {
       this.logger.error('[LotteryMetricsCollector] getHourMetrics 失败', {
-        campaign_id,
+        lottery_campaign_id,
         hour_bucket,
         error: error.message
       })
@@ -522,19 +522,19 @@ class LotteryMetricsCollector {
   /**
    * 获取指定日期的独立用户数
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {string} date_bucket - 日期桶标识（YYYYMMDD）
    * @returns {Promise<number>} 独立用户数
    */
-  async getUniqueUsersCount(campaign_id, date_bucket) {
+  async getUniqueUsersCount(lottery_campaign_id, date_bucket) {
     try {
       const client = this._getClient()
-      const key = this._buildKey(campaign_id, 'unique_users', date_bucket)
+      const key = this._buildKey(lottery_campaign_id, 'unique_users', date_bucket)
       const count = await client.pfcount(key)
       return count
     } catch (error) {
       this.logger.error('[LotteryMetricsCollector] getUniqueUsersCount 失败', {
-        campaign_id,
+        lottery_campaign_id,
         date_bucket,
         error: error.message
       })
@@ -545,14 +545,14 @@ class LotteryMetricsCollector {
   /**
    * 删除指定小时的所有指标（清理用途）
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {string} hour_bucket - 小时桶标识（YYYYMMDDHH）
    * @returns {Promise<number>} 删除的 Key 数量
    */
-  async deleteHourMetrics(campaign_id, hour_bucket) {
+  async deleteHourMetrics(lottery_campaign_id, hour_bucket) {
     try {
       const client = this._getClient()
-      const pattern = `${KEY_PREFIX}:${campaign_id}:*:${hour_bucket}`
+      const pattern = `${KEY_PREFIX}:${lottery_campaign_id}:*:${hour_bucket}`
 
       // 使用 SCAN 安全获取匹配的 Keys（SCAN 迭代必须使用循环 await）
       const keys = []
@@ -571,14 +571,14 @@ class LotteryMetricsCollector {
       // 批量删除
       const deleted_count = await client.del(...keys)
       this.logger.info('[LotteryMetricsCollector] deleteHourMetrics 完成', {
-        campaign_id,
+        lottery_campaign_id,
         hour_bucket,
         deleted_count
       })
       return deleted_count
     } catch (error) {
       this.logger.error('[LotteryMetricsCollector] deleteHourMetrics 失败', {
-        campaign_id,
+        lottery_campaign_id,
         hour_bucket,
         error: error.message
       })

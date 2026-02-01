@@ -110,7 +110,7 @@ class PresetDebtLimit extends Model {
    */
   toSummary() {
     return {
-      limit_id: this.limit_id,
+      preset_debt_limit_id: this.preset_debt_limit_id,
       limit_level: this.limit_level,
       limit_level_name: this.getLimitLevelName(),
       reference_id: this.reference_id,
@@ -299,7 +299,7 @@ module.exports = sequelize => {
       /**
        * 配置ID - 主键
        */
-      limit_id: {
+      preset_debt_limit_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
@@ -324,7 +324,8 @@ module.exports = sequelize => {
       reference_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '关联ID：campaign级别为campaign_id，prize级别为prize_id，global级别为null'
+        comment:
+          '关联ID：campaign级别为lottery_campaign_id，prize级别为lottery_prize_id，global级别为null'
       },
 
       /**

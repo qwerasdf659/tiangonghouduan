@@ -46,7 +46,7 @@ function getUserAnalysisService(req) {
  * - user_id: 用户ID（数字）
  *
  * Query参数：
- * - campaign_id: 活动ID（可选，不传则查询所有活动）
+ * - lottery_campaign_id: 活动ID（可选，不传则查询所有活动）
  *
  * 返回聚合数据：
  * - stats: 抽奖统计
@@ -58,7 +58,7 @@ function getUserAnalysisService(req) {
 router.get('/profile/:user_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const user_id = parseInt(req.params.user_id)
-    const { campaign_id } = req.query
+    const { lottery_campaign_id } = req.query
 
     if (!user_id || isNaN(user_id)) {
       return res.apiError('无效的用户ID', 'INVALID_USER_ID', null, 400)
@@ -67,14 +67,14 @@ router.get('/profile/:user_id', authenticateToken, requireRoleLevel(100), async 
     const userAnalysisService = getUserAnalysisService(req)
 
     const profile = await userAnalysisService.getUserProfile(user_id, {
-      campaign_id: campaign_id ? parseInt(campaign_id) : undefined,
+      lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
       recent_limit: 20
     })
 
     logger.info('获取用户抽奖档案成功', {
       admin_id: req.user.user_id,
       target_user_id: user_id,
-      campaign_id: campaign_id || 'all',
+      lottery_campaign_id: lottery_campaign_id || 'all',
       total_draws: profile.stats.total_draws
     })
 
@@ -95,7 +95,7 @@ router.get('/profile/:user_id', authenticateToken, requireRoleLevel(100), async 
  * GET /experience-states - 查询用户体验状态列表
  *
  * Query参数：
- * - campaign_id: 活动ID（可选）
+ * - lottery_campaign_id: 活动ID（可选）
  * - user_id: 用户ID（可选）
  * - min_empty_streak: 最小连续空奖次数（可选）
  * - page: 页码（默认1）
@@ -105,10 +105,10 @@ router.get('/profile/:user_id', authenticateToken, requireRoleLevel(100), async 
  */
 router.get('/experience-states', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { campaign_id, user_id, min_empty_streak, page = 1, page_size = 20 } = req.query
+    const { lottery_campaign_id, user_id, min_empty_streak, page = 1, page_size = 20 } = req.query
 
     const result = await getUserAnalysisService(req).getUserExperienceStates({
-      campaign_id: campaign_id ? parseInt(campaign_id) : undefined,
+      lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
       user_id: user_id ? parseInt(user_id) : undefined,
       min_empty_streak: min_empty_streak !== undefined ? parseInt(min_empty_streak) : undefined,
       page: parseInt(page),
@@ -117,7 +117,7 @@ router.get('/experience-states', authenticateToken, requireRoleLevel(100), async
 
     logger.info('查询用户体验状态列表', {
       admin_id: req.user.user_id,
-      campaign_id,
+      lottery_campaign_id,
       user_id,
       total: result.pagination.total_count
     })
@@ -130,28 +130,31 @@ router.get('/experience-states', authenticateToken, requireRoleLevel(100), async
 })
 
 /**
- * GET /experience-states/:user_id/:campaign_id - 获取用户在特定活动的体验状态
+ * GET /experience-states/:user_id/:lottery_campaign_id - 获取用户在特定活动的体验状态
  *
  * 路径参数：
  * - user_id: 用户ID
- * - campaign_id: 活动ID
+ * - lottery_campaign_id: 活动ID
  *
  * 返回：用户体验状态详情
  */
 router.get(
-  '/experience-states/:user_id/:campaign_id',
+  '/experience-states/:user_id/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(100),
   async (req, res) => {
     try {
       const user_id = parseInt(req.params.user_id)
-      const campaign_id = parseInt(req.params.campaign_id)
+      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
 
-      if (!user_id || isNaN(user_id) || !campaign_id || isNaN(campaign_id)) {
+      if (!user_id || isNaN(user_id) || !lottery_campaign_id || isNaN(lottery_campaign_id)) {
         return res.apiError('无效的用户ID或活动ID', 'INVALID_PARAMS', null, 400)
       }
 
-      const state = await getUserAnalysisService(req).getUserExperienceState(user_id, campaign_id)
+      const state = await getUserAnalysisService(req).getUserExperienceState(
+        user_id,
+        lottery_campaign_id
+      )
 
       if (!state) {
         return res.apiError('用户体验状态不存在', 'STATE_NOT_FOUND', null, 404)
@@ -248,7 +251,7 @@ router.get(
  * GET /quotas - 查询用户配额列表
  *
  * Query参数：
- * - campaign_id: 活动ID（可选）
+ * - lottery_campaign_id: 活动ID（可选）
  * - user_id: 用户ID（可选）
  * - page: 页码（默认1）
  * - page_size: 每页数量（默认20）
@@ -257,10 +260,10 @@ router.get(
  */
 router.get('/quotas', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { campaign_id, user_id, page = 1, page_size = 20 } = req.query
+    const { lottery_campaign_id, user_id, page = 1, page_size = 20 } = req.query
 
     const result = await getUserAnalysisService(req).getUserQuotas({
-      campaign_id: campaign_id ? parseInt(campaign_id) : undefined,
+      lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
       user_id: user_id ? parseInt(user_id) : undefined,
       page: parseInt(page),
       page_size: parseInt(page_size)
@@ -268,7 +271,7 @@ router.get('/quotas', authenticateToken, requireRoleLevel(100), async (req, res)
 
     logger.info('查询用户配额列表', {
       admin_id: req.user.user_id,
-      campaign_id,
+      lottery_campaign_id,
       user_id,
       total: result.pagination.total_count
     })
@@ -281,28 +284,28 @@ router.get('/quotas', authenticateToken, requireRoleLevel(100), async (req, res)
 })
 
 /**
- * GET /quotas/:user_id/:campaign_id - 获取用户在特定活动的配额
+ * GET /quotas/:user_id/:lottery_campaign_id - 获取用户在特定活动的配额
  *
  * 路径参数：
  * - user_id: 用户ID
- * - campaign_id: 活动ID
+ * - lottery_campaign_id: 活动ID
  *
  * 返回：用户配额详情
  */
 router.get(
-  '/quotas/:user_id/:campaign_id',
+  '/quotas/:user_id/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(100),
   async (req, res) => {
     try {
       const user_id = parseInt(req.params.user_id)
-      const campaign_id = parseInt(req.params.campaign_id)
+      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
 
-      if (!user_id || isNaN(user_id) || !campaign_id || isNaN(campaign_id)) {
+      if (!user_id || isNaN(user_id) || !lottery_campaign_id || isNaN(lottery_campaign_id)) {
         return res.apiError('无效的用户ID或活动ID', 'INVALID_PARAMS', null, 400)
       }
 
-      const quota = await getUserAnalysisService(req).getUserQuota(user_id, campaign_id)
+      const quota = await getUserAnalysisService(req).getUserQuota(user_id, lottery_campaign_id)
 
       if (!quota) {
         return res.apiError('用户配额不存在', 'QUOTA_NOT_FOUND', null, 404)
@@ -317,26 +320,26 @@ router.get(
 )
 
 /**
- * GET /quotas/stats/:campaign_id - 获取活动配额统计
+ * GET /quotas/stats/:lottery_campaign_id - 获取活动配额统计
  *
  * 路径参数：
- * - campaign_id: 活动ID
+ * - lottery_campaign_id: 活动ID
  *
  * 返回：活动配额统计数据
  */
 router.get(
-  '/quotas/stats/:campaign_id',
+  '/quotas/stats/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(100),
   async (req, res) => {
     try {
-      const campaign_id = parseInt(req.params.campaign_id)
+      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
 
-      if (!campaign_id || isNaN(campaign_id)) {
+      if (!lottery_campaign_id || isNaN(lottery_campaign_id)) {
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
       }
 
-      const stats = await getUserAnalysisService(req).getQuotaStats(campaign_id)
+      const stats = await getUserAnalysisService(req).getQuotaStats(lottery_campaign_id)
 
       return res.apiSuccess(stats, '获取配额统计成功')
     } catch (error) {
@@ -356,7 +359,7 @@ router.get(
  * GET /quota-grants - 查询配额赠送记录列表
  *
  * Query参数：
- * - campaign_id: 活动ID（可选）
+ * - lottery_campaign_id: 活动ID（可选）
  * - user_id: 用户ID（可选）
  * - page: 页码（默认1）
  * - page_size: 每页数量（默认20）
@@ -365,10 +368,10 @@ router.get(
  */
 router.get('/quota-grants', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { campaign_id, user_id, page = 1, page_size = 20 } = req.query
+    const { lottery_campaign_id, user_id, page = 1, page_size = 20 } = req.query
 
     const result = await getUserAnalysisService(req).getQuotaGrants({
-      campaign_id: campaign_id ? parseInt(campaign_id) : undefined,
+      lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
       user_id: user_id ? parseInt(user_id) : undefined,
       page: parseInt(page),
       page_size: parseInt(page_size)
@@ -376,7 +379,7 @@ router.get('/quota-grants', authenticateToken, requireRoleLevel(100), async (req
 
     logger.info('查询配额赠送记录', {
       admin_id: req.user.user_id,
-      campaign_id,
+      lottery_campaign_id,
       user_id,
       total: result.pagination.total_count
     })
@@ -435,7 +438,7 @@ router.get('/quota-grants/:id', authenticateToken, requireRoleLevel(100), async 
  * Query参数：
  * - type: 异常类型（high_frequency/high_win_rate/high_tier_abnormal/all，默认all）
  * - time_range: 时间范围（1h/24h/7d，默认24h）
- * - campaign_id: 活动ID（可选）
+ * - lottery_campaign_id: 活动ID（可选）
  * - min_risk_score: 最小风险分数（0-100，可选）
  * - page: 页码（默认1）
  * - page_size: 每页数量（默认20）
@@ -450,7 +453,7 @@ router.get('/abnormal', authenticateToken, requireRoleLevel(100), async (req, re
     const {
       type = 'all',
       time_range = '24h',
-      campaign_id,
+      lottery_campaign_id,
       min_risk_score,
       page = 1,
       page_size = 20
@@ -461,7 +464,7 @@ router.get('/abnormal', authenticateToken, requireRoleLevel(100), async (req, re
     const result = await userAnalysisService.getAbnormalUsers({
       type,
       time_range,
-      campaign_id: campaign_id ? parseInt(campaign_id) : undefined,
+      lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
       min_risk_score: min_risk_score !== undefined ? parseInt(min_risk_score) : undefined,
       page: parseInt(page),
       page_size: parseInt(page_size)
@@ -471,7 +474,7 @@ router.get('/abnormal', authenticateToken, requireRoleLevel(100), async (req, re
       admin_id: req.user.user_id,
       type,
       time_range,
-      campaign_id: campaign_id || 'all',
+      lottery_campaign_id: lottery_campaign_id || 'all',
       total_users: result.pagination.total_count,
       high_risk_count: result.summary.high_risk_count
     })

@@ -244,8 +244,8 @@ describe('体验策略模块测试套件', () => {
         effective_budget: 100,
         // 必须提供 prizes_by_tier 才能让 _selectForcedTier 选择档位
         prizes_by_tier: {
-          low: [{ prize_id: 1, prize_value_points: 10 }],
-          mid: [{ prize_id: 2, prize_value_points: 50 }]
+          low: [{ lottery_prize_id: 1, prize_value_points: 10 }],
+          mid: [{ lottery_prize_id: 2, prize_value_points: 50 }]
         }
       })
 

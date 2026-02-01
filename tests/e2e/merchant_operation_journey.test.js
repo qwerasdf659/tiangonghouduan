@@ -79,9 +79,9 @@ describe('E2E - 商户运营流程测试', () => {
     })
 
     if (campaign) {
-      testCampaignId = campaign.campaign_id
+      testCampaignId = campaign.lottery_campaign_id
       console.log('[E2E Setup] 找到测试活动:', {
-        campaign_id: testCampaignId,
+        lottery_campaign_id: testCampaignId,
         campaign_name: campaign.campaign_name
       })
     }
@@ -188,11 +188,11 @@ describe('E2E - 商户运营流程测试', () => {
 
         if (campaigns.length > 0) {
           const firstCampaign = campaigns[0]
-          expect(firstCampaign).toHaveProperty('campaign_id')
+          expect(firstCampaign).toHaveProperty('lottery_campaign_id')
           expect(firstCampaign).toHaveProperty('campaign_name')
 
           if (!testCampaignId) {
-            testCampaignId = firstCampaign.campaign_id
+            testCampaignId = firstCampaign.lottery_campaign_id
           }
         }
       }
@@ -232,7 +232,7 @@ describe('E2E - 商户运营流程测试', () => {
       if (response.body.success && response.body.data) {
         const campaign = response.body.data.campaign || response.body.data
         console.log('[Step 4] 活动详情:', {
-          campaign_id: campaign.campaign_id,
+          lottery_campaign_id: campaign.lottery_campaign_id,
           campaign_name: campaign.campaign_name,
           status: campaign.status
         })
@@ -384,7 +384,7 @@ describe('E2E - 商户运营流程测试', () => {
       console.log('[运营流程总结] 测试完成:', {
         user_id: testUserId,
         store_id: testStoreId || '未配置',
-        campaign_id: testCampaignId || '未配置'
+        lottery_campaign_id: testCampaignId || '未配置'
       })
 
       // 基本断言：用户应该存在

@@ -301,7 +301,7 @@ function generateExchangeBusinessId(userId, exchangeItemId, timestamp) {
 /**
  * 生成交易订单业务唯一键
  *
- * 格式：trade_order_{buyer_id}_{listing_id}_{timestamp}
+ * 格式：trade_order_{buyer_id}_{market_listing_id}_{timestamp}
  *
  * 业务语义：同一买家在同一时间点（毫秒级）只能对同一挂牌下单一次
  *
@@ -348,7 +348,7 @@ function isValidBusinessId(businessId, type) {
       return /^exchange_\d+_\d+_\d+$/.test(businessId)
 
     case 'trade_order':
-      // trade_order_{buyer_id}_{listing_id}_{timestamp}
+      // trade_order_{buyer_id}_{market_listing_id}_{timestamp}
       return /^trade_order_\d+_\d+_\d+$/.test(businessId)
 
     default:

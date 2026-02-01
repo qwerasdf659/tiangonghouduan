@@ -435,8 +435,8 @@ class LotteryHistoryService {
     const formatted_record = {
       id: record.id,
       user_id: record.user_id,
-      campaign_id: record.campaign_id,
-      prize_id: record.prize_id,
+      lottery_campaign_id: record.lottery_campaign_id,
+      lottery_prize_id: record.lottery_prize_id,
       // V4.0语义更新：使用 reward_tier 替代 is_winner
       reward_tier: record.reward_tier,
       prize_type: record.prize_type,

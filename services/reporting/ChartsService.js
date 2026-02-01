@@ -293,7 +293,7 @@ class ChartsService {
       const daily_lottery = await models.LotteryDraw.findAll({
         attributes: [
           [fn('DATE', col('created_at')), 'date'],
-          [fn('COUNT', col('draw_id')), 'count'],
+          [fn('COUNT', col('lottery_draw_id')), 'count'],
           // V4.0语义更新：统计高档奖励次数
           [
             fn('SUM', literal("CASE WHEN reward_tier = 'high' THEN 1 ELSE 0 END")),
@@ -356,7 +356,7 @@ class ChartsService {
       const daily_consumption = await models.ConsumptionRecord.findAll({
         attributes: [
           [fn('DATE', col('created_at')), 'date'],
-          [fn('COUNT', col('record_id')), 'count'],
+          [fn('COUNT', col('consumption_record_id')), 'count'],
           [fn('SUM', col('consumption_amount')), 'amount'],
           [fn('AVG', col('consumption_amount')), 'avg_amount']
         ],
@@ -417,7 +417,12 @@ class ChartsService {
           [fn('DATE', col('created_at')), 'date'],
           [fn('SUM', literal('CASE WHEN delta_amount > 0 THEN delta_amount ELSE 0 END')), 'earned'],
           [
-            fn('SUM', literal('CASE WHEN delta_amount < 0 THEN ABS(delta_amount) ELSE 0 END')),
+            fn(
+              'SUM',
+              literal(
+                'CASE WHEN delta_amount < 0 THEN -CAST(delta_amount AS DECIMAL(30,2)) ELSE 0 END'
+              )
+            ),
             'spent'
           ]
         ],
@@ -473,7 +478,7 @@ class ChartsService {
     try {
       // V4.0语义更新：查询高档奖励记录，统计各奖品的获得次数
       const prize_stats = await models.LotteryDraw.findAll({
-        attributes: ['prize_name', [fn('COUNT', col('draw_id')), 'count']],
+        attributes: ['prize_name', [fn('COUNT', col('lottery_draw_id')), 'count']],
         where: {
           created_at: {
             [Op.between]: [start_date, end_date]
@@ -484,7 +489,7 @@ class ChartsService {
           }
         },
         group: ['prize_name'],
-        order: [[fn('COUNT', col('draw_id')), 'DESC']],
+        order: [[fn('COUNT', col('lottery_draw_id')), 'DESC']],
         limit: 10,
         raw: true
       })
@@ -520,7 +525,7 @@ class ChartsService {
       const hourly_activity = await models.LotteryDraw.findAll({
         attributes: [
           [fn('HOUR', col('created_at')), 'hour'],
-          [fn('COUNT', col('draw_id')), 'activity_count']
+          [fn('COUNT', col('lottery_draw_id')), 'activity_count']
         ],
         where: {
           created_at: {

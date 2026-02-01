@@ -23,7 +23,7 @@ async function testActivityConditionsAPI() {
     console.log('\n📊 1. 检查活动数据（模拟前端 /api/v4/lottery/campaigns）...')
     const campaigns = await models.LotteryCampaign.findAll({
       attributes: [
-        'campaign_id',
+        'lottery_campaign_id',
         'campaign_name',
         'campaign_code',
         'campaign_type',
@@ -39,7 +39,7 @@ async function testActivityConditionsAPI() {
       ],
       order: [
         ['status', 'DESC'],
-        ['campaign_id', 'DESC']
+        ['lottery_campaign_id', 'DESC']
       ]
     })
 

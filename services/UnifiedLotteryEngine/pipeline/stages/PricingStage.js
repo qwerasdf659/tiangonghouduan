@@ -67,15 +67,15 @@ class PricingStage extends BaseStage {
    *
    * @param {Object} context - 执行上下文
    * @param {number} context.user_id - 用户ID
-   * @param {number} context.campaign_id - 活动ID
+   * @param {number} context.lottery_campaign_id - 活动ID
    * @param {number} context.draw_count - 抽奖次数（默认1）
    * @param {Object} context.stage_results - 前置Stage的执行结果
    * @returns {Promise<Object>} Stage 执行结果
    */
   async execute(context) {
-    const { user_id, campaign_id, draw_count = 1 } = context
+    const { user_id, lottery_campaign_id, draw_count = 1 } = context
 
-    this.log('info', '开始定价计算', { user_id, campaign_id, draw_count })
+    this.log('info', '开始定价计算', { user_id, lottery_campaign_id, draw_count })
 
     try {
       // 🔴 校验 draw_count 基础范围（已拍板 2026-01-18：动态 1-20）
@@ -105,9 +105,13 @@ class PricingStage extends BaseStage {
 
       // 调用 LotteryPricingService 统一定价服务
       const transaction = context.transaction // 从上下文获取事务（如有）
-      const pricing = await LotteryPricingService.getDrawPricing(draw_count, campaign.campaign_id, {
-        transaction
-      })
+      const pricing = await LotteryPricingService.getDrawPricing(
+        draw_count,
+        campaign.lottery_campaign_id,
+        {
+          transaction
+        }
+      )
 
       /**
        * 🔧 P1修复：连抽场景下积分充足性检查逻辑
@@ -141,7 +145,7 @@ class PricingStage extends BaseStage {
         // 连抽场景：积分已在外层扣除，跳过检查
         this.log('info', '跳过积分充足性检查（连抽模式：积分已在外层统一扣除）', {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           draw_count,
           skip_points_deduction: true,
           budget_before_from_db: user_points,
@@ -188,13 +192,13 @@ class PricingStage extends BaseStage {
 
         // 额外信息（便于审计）
         draw_count,
-        campaign_id,
+        lottery_campaign_id,
         base_cost: pricing.base_cost // 单抽基础成本
       }
 
       this.log('info', '定价计算完成', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         draw_count,
         total_cost: pricing.total_cost,
         discount: pricing.discount,
@@ -206,7 +210,7 @@ class PricingStage extends BaseStage {
     } catch (error) {
       this.log('error', '定价计算失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         draw_count,
         error: error.message
       })

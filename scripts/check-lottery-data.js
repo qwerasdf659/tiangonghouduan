@@ -114,7 +114,7 @@ async function checkLotteryData() {
         MIN(hour_bucket) as earliest,
         MAX(hour_bucket) as latest,
         COUNT(DISTINCT DATE(hour_bucket)) as days_count,
-        COUNT(DISTINCT campaign_id) as campaigns_count
+        COUNT(DISTINCT lottery_campaign_id) as campaigns_count
       FROM lottery_hourly_metrics
     `, { type: QueryTypes.SELECT })
 
@@ -131,7 +131,7 @@ async function checkLotteryData() {
       SELECT 
         COUNT(*) as total,
         COUNT(DISTINCT user_id) as unique_users,
-        COUNT(DISTINCT campaign_id) as unique_campaigns,
+        COUNT(DISTINCT lottery_campaign_id) as unique_campaigns,
         AVG(total_draw_count) as avg_draws,
         AVG(empty_streak) as avg_empty_streak
       FROM lottery_user_experience_state
@@ -167,19 +167,19 @@ async function checkLotteryData() {
 
     const campaigns = await sequelize.query(`
       SELECT 
-        campaign_id,
+        lottery_campaign_id,
         name,
         status,
         budget_mode,
         start_date,
         end_date
       FROM lottery_campaigns
-      ORDER BY campaign_id
+      ORDER BY lottery_campaign_id
       LIMIT 10
     `, { type: QueryTypes.SELECT })
 
     campaigns.forEach(c => {
-      console.log(`  ID:${c.campaign_id} ${c.name} [${c.status}] ${c.budget_mode}`)
+      console.log(`  ID:${c.lottery_campaign_id} ${c.campaign_name} [${c.status}] ${c.budget_mode}`)
     })
 
     // 9. 检查 risk_alerts 表结构和数据
@@ -248,7 +248,7 @@ async function checkLotteryData() {
 
     const recentDraws = await sequelize.query(`
       SELECT 
-        ld.draw_id,
+        ld.lottery_draw_id,
         ld.user_id,
         ld.reward_tier,
         ld.pipeline_type,
@@ -257,7 +257,7 @@ async function checkLotteryData() {
         ldd.pressure_tier,
         ldd.pity_decision
       FROM lottery_draws ld
-      LEFT JOIN lottery_draw_decisions ldd ON ld.draw_id = ldd.draw_id
+      LEFT JOIN lottery_draw_decisions ldd ON ld.lottery_draw_id = ldd.lottery_draw_id
       ORDER BY ld.created_at DESC
       LIMIT 5
     `, { type: QueryTypes.SELECT })

@@ -55,7 +55,7 @@ class LotteryPresetService {
    *
    * @param {number} adminId - 管理员用户ID
    * @param {number} userId - 目标用户ID
-   * @param {Array} presets - 预设数组 [{prize_id, queue_order}, ...]
+   * @param {Array} presets - 预设数组 [{lottery_prize_id, queue_order}, ...]
    * @returns {Promise<Array>} 创建的预设列表
    * @throws {Error} 参数错误、用户不存在、奖品不存在等
    */
@@ -98,7 +98,11 @@ class LotteryPresetService {
     // eslint-disable-next-line no-await-in-loop
     for (const preset of presets) {
       // 验证必需字段存在性
-      if (!preset.prize_id || preset.queue_order === undefined || preset.queue_order === null) {
+      if (
+        !preset.lottery_prize_id ||
+        preset.queue_order === undefined ||
+        preset.queue_order === null
+      ) {
         const error = new Error('预设数据格式错误：需要prize_id和queue_order')
         error.code = 'INVALID_PRESET_DATA'
         throw error
@@ -113,9 +117,9 @@ class LotteryPresetService {
 
       // 验证奖品存在
       // eslint-disable-next-line no-await-in-loop
-      const prize = await models.LotteryPrize.findByPk(preset.prize_id)
+      const prize = await models.LotteryPrize.findByPk(preset.lottery_prize_id)
       if (!prize) {
-        const error = new Error(`奖品ID ${preset.prize_id} 不存在`)
+        const error = new Error(`奖品ID ${preset.lottery_prize_id} 不存在`)
         error.code = 'PRIZE_NOT_FOUND'
         throw error
       }
@@ -182,7 +186,13 @@ class LotteryPresetService {
         {
           model: models.LotteryPrize,
           as: 'prize',
-          attributes: ['prize_id', 'prize_name', 'prize_type', 'prize_value', 'prize_description']
+          attributes: [
+            'lottery_prize_id',
+            'prize_name',
+            'prize_type',
+            'prize_value',
+            'prize_description'
+          ]
         },
         {
           model: models.User,
@@ -212,8 +222,8 @@ class LotteryPresetService {
       },
       stats,
       presets: presets.map(preset => ({
-        preset_id: preset.preset_id,
-        prize_id: preset.prize_id,
+        lottery_preset_id: preset.lottery_preset_id,
+        lottery_prize_id: preset.lottery_prize_id,
         queue_order: preset.queue_order,
         status: preset.status,
         created_at: preset.created_at,
@@ -359,7 +369,13 @@ class LotteryPresetService {
           {
             model: models.LotteryPrize,
             as: 'prize',
-            attributes: ['prize_id', 'prize_name', 'prize_type', 'prize_value', 'prize_description']
+            attributes: [
+              'lottery_prize_id',
+              'prize_name',
+              'prize_type',
+              'prize_value',
+              'prize_description'
+            ]
           },
           {
             model: models.User,
@@ -379,9 +395,9 @@ class LotteryPresetService {
 
     return {
       list: presets.map(preset => ({
-        preset_id: preset.preset_id,
+        lottery_preset_id: preset.lottery_preset_id,
         user_id: preset.user_id,
-        prize_id: preset.prize_id,
+        lottery_prize_id: preset.lottery_prize_id,
         queue_order: preset.queue_order,
         status: preset.status,
         created_at: preset.created_at,
@@ -422,7 +438,13 @@ class LotteryPresetService {
         {
           model: models.LotteryPrize,
           as: 'prize',
-          attributes: ['prize_id', 'prize_name', 'prize_type', 'prize_value', 'prize_description']
+          attributes: [
+            'lottery_prize_id',
+            'prize_name',
+            'prize_type',
+            'prize_value',
+            'prize_description'
+          ]
         },
         {
           model: models.User,
@@ -442,7 +464,7 @@ class LotteryPresetService {
         {
           model: models.LotteryCampaign,
           as: 'campaign',
-          attributes: ['campaign_id', 'campaign_name', 'status']
+          attributes: ['lottery_campaign_id', 'campaign_name', 'status']
         }
       ]
     })
@@ -458,11 +480,11 @@ class LotteryPresetService {
    * 业务规则：
    * - 只能更新 pending 状态的预设
    * - 已使用(used)或已过期(expired)的预设不能更新
-   * - 可更新字段：prize_id, queue_order, expires_at, reason
+   * - 可更新字段：lottery_prize_id, queue_order, expires_at, reason
    *
    * @param {number} presetId - 预设ID
    * @param {Object} updateData - 更新数据
-   * @param {number} updateData.prize_id - 新奖品ID（可选）
+   * @param {number} updateData.lottery_prize_id - 新奖品ID（可选）
    * @param {number} updateData.queue_order - 新队列顺序（可选）
    * @param {Date} updateData.expires_at - 新过期时间（可选）
    * @param {string} updateData.reason - 更新原因（可选）
@@ -496,7 +518,7 @@ class LotteryPresetService {
     }
 
     // 允许更新的字段白名单
-    const allowedFields = ['prize_id', 'queue_order', 'expires_at', 'reason']
+    const allowedFields = ['lottery_prize_id', 'queue_order', 'expires_at', 'reason']
     const filteredData = {}
     for (const field of allowedFields) {
       if (updateData[field] !== undefined) {
@@ -504,9 +526,11 @@ class LotteryPresetService {
       }
     }
 
-    // 如果更新 prize_id，验证奖品存在性
-    if (filteredData.prize_id) {
-      const prize = await models.LotteryPrize.findByPk(filteredData.prize_id, { transaction })
+    // 如果更新 lottery_prize_id，验证奖品存在性
+    if (filteredData.lottery_prize_id) {
+      const prize = await models.LotteryPrize.findByPk(filteredData.lottery_prize_id, {
+        transaction
+      })
       if (!prize) {
         const error = new Error('奖品不存在')
         error.code = 'PRIZE_NOT_FOUND'
@@ -517,7 +541,7 @@ class LotteryPresetService {
     await preset.update(filteredData, { transaction })
 
     logger.info('[LotteryPresetService] 更新预设', {
-      preset_id: presetId,
+      lottery_preset_id: presetId,
       user_id: preset.user_id,
       updated_fields: Object.keys(filteredData)
     })
@@ -570,15 +594,15 @@ class LotteryPresetService {
     await preset.destroy({ transaction })
 
     logger.info('[LotteryPresetService] 删除预设', {
-      preset_id: presetId,
+      lottery_preset_id: presetId,
       user_id: preset.user_id,
-      prize_id: preset.prize_id
+      lottery_prize_id: preset.lottery_prize_id
     })
 
     return {
-      preset_id: presetId,
+      lottery_preset_id: presetId,
       user_id: preset.user_id,
-      prize_id: preset.prize_id,
+      lottery_prize_id: preset.lottery_prize_id,
       deleted_at: BeijingTimeHelper.apiTimestamp()
     }
   }
@@ -606,7 +630,10 @@ class LotteryPresetService {
     const prizeTypeStats = await models.LotteryPreset.findAll({
       attributes: [
         [models.sequelize.col('prize.prize_type'), 'prize_type'],
-        [models.sequelize.fn('COUNT', models.sequelize.col('LotteryPreset.preset_id')), 'count']
+        [
+          models.sequelize.fn('COUNT', models.sequelize.col('LotteryPreset.lottery_preset_id')),
+          'count'
+        ]
       ],
       include: [
         {

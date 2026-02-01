@@ -69,7 +69,9 @@ describe('🎯 活动条件API集成测试', () => {
 
       console.log('✅ 测试环境初始化完成')
       console.log(`📊 测试用户: ${testUser.user_id} (${testUser.mobile})`)
-      console.log(`📊 测试活动: ${testCampaign.campaign_id} (${testCampaign.campaign_name})`)
+      console.log(
+        `📊 测试活动: ${testCampaign.lottery_campaign_id} (${testCampaign.campaign_name})`
+      )
     } catch (error) {
       console.warn('⚠️ 测试环境初始化失败，跳过测试:', error.message)
       skipTests = true
@@ -110,7 +112,7 @@ describe('🎯 活动条件API集成测试', () => {
     }
 
     const response = await request(app)
-      .get(`/api/v4/activities/${testCampaign.campaign_id}/check-eligibility`)
+      .get(`/api/v4/activities/${testCampaign.lottery_campaign_id}/check-eligibility`)
       .set('Authorization', `Bearer ${authToken}`)
 
     expect(response.status).toBe(200)
@@ -138,7 +140,7 @@ describe('🎯 活动条件API集成测试', () => {
 
     expect(response.status).toBe(200)
     expect(response.body.success).toBe(true)
-    expect(response.body.data.activity_id).toBe(testCampaign.campaign_id)
+    expect(response.body.data.activity_id).toBe(testCampaign.lottery_campaign_id)
   })
 
   /**
@@ -152,7 +154,7 @@ describe('🎯 活动条件API集成测试', () => {
     }
 
     const response = await request(app)
-      .post(`/api/v4/activities/${testCampaign.campaign_id}/participate`)
+      .post(`/api/v4/activities/${testCampaign.lottery_campaign_id}/participate`)
       .set('Authorization', `Bearer ${authToken}`)
 
     expect(response.status).toBe(200)

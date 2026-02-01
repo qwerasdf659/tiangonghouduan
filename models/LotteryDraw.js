@@ -34,14 +34,14 @@ class LotteryDraw extends Model {
 
     // 关联到抽奖活动
     LotteryDraw.belongsTo(models.LotteryCampaign, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'campaign',
       comment: '关联的抽奖活动'
     })
 
     // 关联到奖品
     LotteryDraw.belongsTo(models.LotteryPrize, {
-      foreignKey: 'prize_id',
+      foreignKey: 'lottery_prize_id',
       as: 'prize',
       comment: '获得的奖品'
     })
@@ -51,8 +51,8 @@ class LotteryDraw extends Model {
      * 一对一：每次抽奖有一个决策快照
      */
     LotteryDraw.hasOne(models.LotteryDrawDecision, {
-      foreignKey: 'draw_id',
-      sourceKey: 'draw_id',
+      foreignKey: 'lottery_draw_id',
+      sourceKey: 'lottery_draw_id',
       as: 'decision',
       onDelete: 'CASCADE',
       comment: '抽奖决策快照（审计用）'
@@ -118,7 +118,7 @@ class LotteryDraw extends Model {
    * 业务场景：创建抽奖记录前验证必需字段
    * @param {Object} data - 抽奖记录数据
    * @param {number} data.user_id - 用户ID
-   * @param {number} data.campaign_id - 活动ID
+   * @param {number} data.lottery_campaign_id - 抽奖活动ID
    * @param {string} data.reward_tier - 奖励档位
    * @returns {Array<string>} 错误信息数组（为空表示验证通过）
    */
@@ -129,8 +129,8 @@ class LotteryDraw extends Model {
       errors.push('用户ID无效')
     }
 
-    if (!data.campaign_id || data.campaign_id <= 0) {
-      errors.push('活动ID无效')
+    if (!data.lottery_campaign_id || data.lottery_campaign_id <= 0) {
+      errors.push('抽奖活动ID无效')
     }
 
     if (!data.reward_tier || !['low', 'mid', 'high'].includes(data.reward_tier)) {
@@ -145,7 +145,7 @@ module.exports = sequelize => {
   LotteryDraw.init(
     {
       // 记录标识
-      draw_id: {
+      lottery_draw_id: {
         type: DataTypes.STRING(50),
         primaryKey: true,
         comment: '抽奖记录唯一ID'
@@ -235,7 +235,7 @@ module.exports = sequelize => {
           key: 'user_id'
         }
       },
-      campaign_id: {
+      lottery_campaign_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 2,
@@ -248,13 +248,13 @@ module.exports = sequelize => {
       },
 
       // 奖品信息
-      prize_id: {
+      lottery_prize_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
         comment: '获得的奖品ID',
         references: {
           model: 'lottery_prizes',
-          key: 'prize_id'
+          key: 'lottery_prize_id'
         }
       },
       prize_name: {
@@ -604,8 +604,8 @@ module.exports = sequelize => {
           comment: '业务唯一键索引（用于业务级幂等保护）'
         },
         {
-          name: 'idx_prize_id',
-          fields: ['prize_id']
+          name: 'idx_lottery_prize_id',
+          fields: ['lottery_prize_id']
         },
         {
           name: 'idx_prize_type',

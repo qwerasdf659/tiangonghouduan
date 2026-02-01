@@ -117,7 +117,7 @@ class NotificationService {
 
     // 3. 创建系统消息记录（持久化）
     const message = await ChatMessage.create({
-      session_id: session.session_id,
+      customer_service_session_id: session.customer_service_session_id,
       sender_id: null, // ✅ 系统消息sender_id为NULL（符合外键约束）
       sender_type: 'admin', // 系统消息以admin身份发送
       message_source: 'system', // ✅ 关键：标记为系统消息
@@ -145,7 +145,7 @@ class NotificationService {
     try {
       const messageData = {
         message_id: message.message_id,
-        session_id: session.session_id,
+        session_id: session.customer_service_session_id,
         sender_id: null, // ✅ 系统消息sender_id为NULL
         sender_type: 'admin',
         sender_name: '系统通知',
@@ -172,7 +172,7 @@ class NotificationService {
 
     return {
       message_id: message.message_id,
-      session_id: session.session_id,
+      session_id: session.customer_service_session_id,
       content: systemMessageContent,
       created_at: message.created_at,
       pushed_to_websocket: pushed
@@ -567,11 +567,11 @@ class NotificationService {
    * @param {string} lotteryData.prize_name - 奖品名称
    * @param {string} lotteryData.prize_type - 奖品类型
    * @param {number} lotteryData.prize_value - 奖品价值
-   * @param {string} lotteryData.draw_id - 抽奖记录ID
+   * @param {string} lotteryData.lottery_draw_id - 抽奖记录ID
    * @returns {Promise<Object>} 通知结果
    */
   static async notifyLotteryWin(user_id, lotteryData) {
-    const { prize_name, prize_type, prize_value, draw_id } = lotteryData
+    const { prize_name, prize_type, prize_value, lottery_draw_id } = lotteryData
 
     // 根据奖品类型定制消息
     let content = `恭喜您在抽奖中获得【${prize_name}】！`
@@ -589,7 +589,7 @@ class NotificationService {
       title: '🎉 恭喜中奖',
       content,
       data: {
-        draw_id,
+        lottery_draw_id,
         prize_name,
         prize_type,
         prize_value,
@@ -860,21 +860,21 @@ class NotificationService {
    *
    * @param {number} user_id - 卖家用户ID
    * @param {Object} listingData - 挂牌数据
-   * @param {number} listingData.listing_id - 挂牌ID
+   * @param {number} listingData.market_listing_id - 挂牌ID（数据库主键字段名）
    * @param {string} listingData.offer_asset_code - 挂卖资产代码
    * @param {number} listingData.offer_amount - 挂卖数量
    * @param {number} listingData.price_amount - 定价金额
    * @returns {Promise<Object>} 通知结果
    */
   static async notifyListingCreated(user_id, listingData) {
-    const { listing_id, offer_asset_code, offer_amount, price_amount } = listingData
+    const { market_listing_id, offer_asset_code, offer_amount, price_amount } = listingData
 
     return await this.send(user_id, {
       type: 'listing_created',
       title: '📦 挂牌成功',
       content: `您的 ${offer_amount} 个 ${offer_asset_code} 已成功上架，标价 ${price_amount} DIAMOND。资产已冻结，等待买家购买。`,
       data: {
-        listing_id,
+        market_listing_id,
         offer_asset_code,
         offer_amount,
         price_amount,
@@ -888,7 +888,7 @@ class NotificationService {
    *
    * @param {number} user_id - 卖家用户ID
    * @param {Object} saleData - 销售数据
-   * @param {number} saleData.listing_id - 挂牌ID
+   * @param {number} saleData.market_listing_id - 挂牌ID（数据库主键字段名）
    * @param {string} saleData.offer_asset_code - 售出资产代码
    * @param {number} saleData.offer_amount - 售出数量
    * @param {number} saleData.price_amount - 成交金额
@@ -897,14 +897,14 @@ class NotificationService {
    * @returns {Promise<Object>} 通知结果
    */
   static async notifyListingSold(user_id, saleData) {
-    const { listing_id, offer_asset_code, offer_amount, price_amount, net_amount } = saleData
+    const { market_listing_id, offer_asset_code, offer_amount, price_amount, net_amount } = saleData
 
     return await this.send(user_id, {
       type: 'listing_sold',
       title: '💰 售出成功',
       content: `恭喜！您的 ${offer_amount} 个 ${offer_asset_code} 已售出，成交价 ${price_amount} DIAMOND，实际到账 ${net_amount} DIAMOND（扣除5%手续费）。`,
       data: {
-        listing_id,
+        market_listing_id,
         offer_asset_code,
         offer_amount,
         price_amount,
@@ -947,21 +947,26 @@ class NotificationService {
    *
    * @param {number} user_id - 卖家用户ID
    * @param {Object} withdrawData - 撤回数据
-   * @param {number} withdrawData.listing_id - 挂牌ID
+   * @param {number} withdrawData.market_listing_id - 挂牌ID（数据库主键字段名）
    * @param {string} withdrawData.offer_asset_code - 撤回资产代码
    * @param {number} withdrawData.offer_amount - 撤回数量
    * @param {string} [withdrawData.reason='用户主动撤回'] - 撤回原因
    * @returns {Promise<Object>} 通知结果
    */
   static async notifyListingWithdrawn(user_id, withdrawData) {
-    const { listing_id, offer_asset_code, offer_amount, reason = '用户主动撤回' } = withdrawData
+    const {
+      market_listing_id,
+      offer_asset_code,
+      offer_amount,
+      reason = '用户主动撤回'
+    } = withdrawData
 
     return await this.send(user_id, {
       type: 'listing_withdrawn',
       title: '📤 挂牌已撤回',
       content: `您的 ${offer_amount} 个 ${offer_asset_code} 挂牌已撤回（${reason}）。资产已解冻至您的可用余额。`,
       data: {
-        listing_id,
+        market_listing_id,
         offer_asset_code,
         offer_amount,
         reason,
@@ -975,20 +980,20 @@ class NotificationService {
    *
    * @param {number} user_id - 卖家用户ID
    * @param {Object} expireData - 过期数据
-   * @param {number} expireData.listing_id - 挂牌ID
+   * @param {number} expireData.market_listing_id - 挂牌ID（数据库主键字段名）
    * @param {string} expireData.offer_asset_code - 过期资产代码
    * @param {number} expireData.offer_amount - 过期数量
    * @returns {Promise<Object>} 通知结果
    */
   static async notifyListingExpired(user_id, expireData) {
-    const { listing_id, offer_asset_code, offer_amount } = expireData
+    const { market_listing_id, offer_asset_code, offer_amount } = expireData
 
     return await this.send(user_id, {
       type: 'listing_expired',
       title: '⏰ 挂牌已过期',
       content: `您的 ${offer_amount} 个 ${offer_asset_code} 挂牌已超时（3天），系统已自动撤回并解冻资产。如需继续出售，请重新上架。`,
       data: {
-        listing_id,
+        market_listing_id,
         offer_asset_code,
         offer_amount,
         action: 'listing_expired'

@@ -13,9 +13,9 @@
  * 7. 欠账看板 - DebtManagementService 统计功能
  *
  * 相关模型：
- * - LotteryManagementSetting: 抽奖管理设置表（setting_id, user_id, setting_type, setting_data）
- * - PresetBudgetDebt: 预算欠账表（debt_id, user_id, campaign_id, debt_amount, status）
- * - PresetInventoryDebt: 库存欠账表（debt_id, prize_id, debt_quantity, status）
+ * - LotteryManagementSetting: 抽奖管理设置表（lottery_management_setting_id, user_id, setting_type, setting_data）
+ * - PresetBudgetDebt: 预算欠账表（preset_budget_debt_id, user_id, lottery_campaign_id, debt_amount, status）
+ * - PresetInventoryDebt: 库存欠账表（preset_inventory_debt_id, lottery_prize_id, debt_quantity, status）
  *
  * 相关服务：
  * - DebtManagementService: 欠账管理服务
@@ -51,7 +51,7 @@ let DebtManagementService
 // 测试数据
 let admin_token = null
 let admin_user_id = null
-let test_campaign_id = null
+let test_lottery_campaign_id = null
 let test_setting_id = null
 
 // 测试用户数据（使用管理员账号）
@@ -101,12 +101,12 @@ describe('抽奖管理干预测试 - P1优先级', () => {
     })
 
     if (active_campaign) {
-      test_campaign_id = active_campaign.campaign_id
+      test_lottery_campaign_id = active_campaign.lottery_campaign_id
     }
 
     console.log('✅ 抽奖管理干预测试初始化完成')
     console.log(`   管理员用户ID: ${admin_user_id}`)
-    console.log(`   测试活动ID: ${test_campaign_id || '无活跃活动'}`)
+    console.log(`   测试活动ID: ${test_lottery_campaign_id || '无活跃活动'}`)
   })
 
   /*
@@ -143,7 +143,7 @@ describe('抽奖管理干预测试 - P1优先级', () => {
         user_id: admin_user_id,
         setting_type: 'force_win',
         setting_data: {
-          prize_id: prize.prize_id,
+          lottery_prize_id: prize.lottery_prize_id,
           reason: '测试强制中奖（自动化测试）'
         },
         expires_at: addHours(new Date(), 24),
@@ -283,12 +283,12 @@ describe('抽奖管理干预测试 - P1优先级', () => {
     })
 
     test('2.3 应该能够按活动统计预算欠账', async () => {
-      if (!test_campaign_id) {
+      if (!test_lottery_campaign_id) {
         console.warn('⚠️ 没有测试活动，跳过此测试')
         return
       }
 
-      const stats = await PresetBudgetDebt.getDebtStatsByCampaign(test_campaign_id)
+      const stats = await PresetBudgetDebt.getDebtStatsByCampaign(test_lottery_campaign_id)
 
       expect(stats).toBeDefined()
       expect(typeof stats.total_debts).toBe('number')
@@ -296,7 +296,7 @@ describe('抽奖管理干预测试 - P1优先级', () => {
       expect(typeof stats.total_cleared_amount).toBe('number')
       expect(typeof stats.remaining_debt_amount).toBe('number')
 
-      console.log(`✅ 活动 ${test_campaign_id} 预算欠账统计:`)
+      console.log(`✅ 活动 ${test_lottery_campaign_id} 预算欠账统计:`)
       console.log(`   总欠账数: ${stats.total_debts}`)
       console.log(`   总欠账金额: ${stats.total_debt_amount}`)
       console.log(`   已清偿金额: ${stats.total_cleared_amount}`)
@@ -354,14 +354,14 @@ describe('抽奖管理干预测试 - P1优先级', () => {
       if (prize) {
         const debts = await PresetInventoryDebt.findAll({
           where: {
-            prize_id: prize.prize_id,
+            lottery_prize_id: prize.lottery_prize_id,
             status: 'pending'
           }
         })
 
         expect(Array.isArray(debts)).toBe(true)
 
-        console.log(`✅ 奖品 ${prize.prize_id} 有 ${debts.length} 条库存欠账`)
+        console.log(`✅ 奖品 ${prize.lottery_prize_id} 有 ${debts.length} 条库存欠账`)
       } else {
         console.log('ℹ️ 没有可用奖品进行库存欠账测试')
       }
@@ -430,7 +430,7 @@ describe('抽奖管理干预测试 - P1优先级', () => {
    * ===== 测试组5：设置类型验证 =====
    */
   describe('5. 设置类型验证', () => {
-    test('5.1 force_win 设置应包含prize_id', async () => {
+    test('5.1 force_win 设置应包含lottery_prize_id', async () => {
       const force_win_settings = await LotteryManagementSetting.findAll({
         where: { setting_type: 'force_win' },
         limit: 5
@@ -438,9 +438,9 @@ describe('抽奖管理干预测试 - P1优先级', () => {
 
       force_win_settings.forEach(setting => {
         expect(setting.setting_data).toBeDefined()
-        // force_win 应该有 prize_id
-        if (setting.setting_data.prize_id) {
-          expect(typeof setting.setting_data.prize_id).not.toBe('undefined')
+        // force_win 应该有 lottery_prize_id（完整前缀命名规范）
+        if (setting.setting_data.lottery_prize_id) {
+          expect(typeof setting.setting_data.lottery_prize_id).not.toBe('undefined')
         }
       })
 

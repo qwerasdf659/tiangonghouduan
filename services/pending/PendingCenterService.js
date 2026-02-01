@@ -297,7 +297,7 @@ class PendingCenterService {
     const { ConsumptionRecord } = require('../../models')
 
     const records = await ConsumptionRecord.scope('pending').findAll({
-      attributes: ['record_id', 'created_at']
+      attributes: ['consumption_record_id', 'created_at']
     })
 
     const now = new Date()
@@ -345,7 +345,7 @@ class PendingCenterService {
         const isUrgent = waitMinutes >= threshold
 
         return {
-          id: record.record_id,
+          id: record.consumption_record_id,
           category: PENDING_CATEGORIES.CONSUMPTION,
           category_name: '消费记录审核',
           title: `消费金额 ¥${record.consumption_amount}`,
@@ -361,7 +361,7 @@ class PendingCenterService {
           waiting_time: this._formatWaitingTime(waitMinutes),
           waiting_minutes: waitMinutes,
           is_urgent: isUrgent,
-          action_url: `/admin/consumption/review/${record.record_id}`
+          action_url: `/admin/consumption/review/${record.consumption_record_id}`
         }
       })
       .filter(item => (urgent_only ? item.is_urgent : true))
@@ -446,7 +446,7 @@ class PendingCenterService {
         }
 
         return {
-          id: session.session_id,
+          id: session.customer_service_session_id,
           category: PENDING_CATEGORIES.CUSTOMER_SERVICE,
           category_name: '客服会话',
           title: statusMap[session.status] || session.status,
@@ -462,7 +462,7 @@ class PendingCenterService {
           waiting_time: this._formatWaitingTime(waitMinutes),
           waiting_minutes: waitMinutes,
           is_urgent: isUrgent,
-          action_url: `/admin/customer-service/session/${session.session_id}`
+          action_url: `/admin/customer-service/session/${session.customer_service_session_id}`
         }
       })
       .filter(item => (urgent_only ? item.is_urgent : true))
@@ -634,7 +634,7 @@ class PendingCenterService {
             category_name: '抽奖告警',
             title: alert.alert_type || '抽奖告警',
             description: alert.message || '待处理抽奖告警',
-            campaign_id: alert.campaign_id,
+            lottery_campaign_id: alert.lottery_campaign_id,
             created_at: BeijingTimeHelper.format(alert.created_at),
             waiting_time: this._formatWaitingTime(waitMinutes),
             waiting_minutes: waitMinutes,

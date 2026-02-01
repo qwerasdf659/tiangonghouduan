@@ -17,7 +17,7 @@
  * - 北京时间标准：所有时间数据使用BeijingTimeHelper生成，确保时区一致性
  *
  * 🔴 P0-1修复（2026-01-08）：
- * - 移除硬编码的 user_id=31、campaign_id=2
+ * - 移除硬编码的 user_id=31、lottery_campaign_id=2
  * - 通过 getTestUserId()、getTestCampaignId() 从 global.testData 动态获取
  * - 测试数据由 jest.setup.js 在测试启动时从数据库加载
  */
@@ -46,10 +46,10 @@ function getTestUserId() {
  * @returns {number|null} 活动ID
  */
 function getTestCampaignId() {
-  if (global.testData && global.testData.testCampaign && global.testData.testCampaign.campaign_id) {
-    return global.testData.testCampaign.campaign_id
+  if (global.testData && global.testData.testCampaign && global.testData.testCampaign.lottery_campaign_id) {
+    return global.testData.testCampaign.lottery_campaign_id
   }
-  console.warn('⚠️ [test-data] global.testData.testCampaign.campaign_id 未初始化')
+  console.warn('⚠️ [test-data] global.testData.testCampaign.lottery_campaign_id 未初始化')
   return null
 }
 
@@ -99,7 +99,7 @@ const TEST_DATA = {
   prizes: {
     // 积分奖品（最常见）
     pointsPrize: {
-      prize_id: 1, // 奖品ID（假设值,需要从数据库确认）
+      lottery_prize_id: 1, // 奖品ID（假设值,需要从数据库确认）
       name: '100积分',
       type: 'points',
       value: 100,
@@ -112,7 +112,7 @@ const TEST_DATA = {
 
     // 实物奖品
     physicalPrize: {
-      prize_id: 2, // 奖品ID（假设值,需要从数据库确认）
+      lottery_prize_id: 2, // 奖品ID（假设值,需要从数据库确认）
       name: '测试商品',
       type: 'physical',
       value: 50, // 50元
@@ -125,7 +125,7 @@ const TEST_DATA = {
 
     // 谢谢参与（保底奖品）
     thanksPrize: {
-      prize_id: 3, // 奖品ID（假设值,需要从数据库确认）
+      lottery_prize_id: 3, // 奖品ID（假设值,需要从数据库确认）
       name: '谢谢参与',
       type: 'thanks',
       value: 0,
@@ -171,15 +171,15 @@ const TEST_DATA = {
   /*
    * ==========================================
    * 🎲 测试抽奖数据（基于UnifiedLotteryEngine）
-   * 🔴 P0-1修复：campaign_id 和 user_id 通过 getter 动态获取
+   * 🔴 P0-1修复：lottery_campaign_id 和 user_id 通过 getter 动态获取
    * ==========================================
    */
   lottery: {
     // 测试活动信息
-    // 🔴 P0-1修复：campaign_id 使用 getter 动态获取
+    // 🔴 P0-1修复：lottery_campaign_id 使用 getter 动态获取
     get testCampaign() {
       return {
-        campaign_id: getTestCampaignId(), // 🔴 P0-1修复：动态获取，不再硬编码
+        lottery_campaign_id: getTestCampaignId(), // 🔴 P0-1修复：动态获取，不再硬编码
         name: global.testData?.testCampaign?.campaign_name || '餐厅积分抽奖活动'
         /*
          * 业务含义：默认测试活动
@@ -262,7 +262,7 @@ const TEST_DATA = {
  * 🛠️ 测试数据工厂函数
  *
  * 用于创建可变的测试数据副本，避免测试间数据污染
- * 🔴 P0-1修复：所有 user_id 和 campaign_id 通过动态获取
+ * 🔴 P0-1修复：所有 user_id 和 lottery_campaign_id 通过动态获取
  */
 const createTestData = {
   /**
@@ -305,11 +305,11 @@ const createTestData = {
    * 使用示例：
    * const lotteryRequest = createTestData.lotteryRequest();
    *
-   * 🔴 P0-1修复：user_id 和 campaign_id 动态获取
+   * 🔴 P0-1修复：user_id 和 lottery_campaign_id 动态获取
    */
   lotteryRequest: (overrides = {}) => ({
     user_id: getTestUserId(), // 🔴 P0-1修复：动态获取
-    campaign_id: getTestCampaignId(), // 🔴 P0-1修复：动态获取
+    lottery_campaign_id: getTestCampaignId(), // 🔴 P0-1修复：动态获取
     timestamp: BeijingTimeHelper.formatToISO(), // 使用北京时间ISO格式
     ...overrides
   })
@@ -431,8 +431,8 @@ const testDataGenerator = {
 
       return {
         user_id: actualUserId, // 🔴 P0-1修复：使用 actualUserId
-        campaign_id: actualCampaignId, // 🔴 P0-1修复：使用 actualCampaignId
-        prize_id: (index % 3) + 1, // 奖品ID轮换（V4.0：每次抽奖必得奖品）
+        lottery_campaign_id: actualCampaignId, // 🔴 P0-1修复：使用 actualCampaignId
+        lottery_prize_id: (index % 3) + 1, // 奖品ID轮换（V4.0：每次抽奖必得奖品）
         reward_tier: rewardTier, // V4.0语义更新：替代 is_winner
         prize_value: prizeValues[rewardTier][index % 3],
         lottery_time: BeijingTimeHelper.getHoursAgo(index), // 使用北京时间，每条记录间隔1小时
@@ -529,7 +529,7 @@ const testScenarios = {
   get newUserFirstLottery() {
     return {
       user: createTestData.user(),
-      campaign_id: getTestCampaignId(),
+      lottery_campaign_id: getTestCampaignId(),
       is_first_lottery: true,
       expected_result: {
         // V4.0语义更新：使用 reward_tier 替代 is_winner
@@ -547,7 +547,7 @@ const testScenarios = {
   get oldUserGuarantee() {
     return {
       user: createTestData.user(),
-      campaign_id: getTestCampaignId(),
+      lottery_campaign_id: getTestCampaignId(),
       previous_lottery_count: 5,
       all_previous_low_tier: true, // V4.0：改为低档计数
       expected_result: {
@@ -565,7 +565,7 @@ const testScenarios = {
   get managementTargetWin() {
     return {
       user: createTestData.user(),
-      campaign_id: getTestCampaignId(),
+      lottery_campaign_id: getTestCampaignId(),
       is_management_target: true,
       custom_probability: 1.0,
       expected_result: {
@@ -601,7 +601,7 @@ const testScenarios = {
   get concurrentLotteryIdempotency() {
     return {
       user: createTestData.user(),
-      campaign_id: getTestCampaignId(),
+      lottery_campaign_id: getTestCampaignId(),
       request_id: 'test-request-' + Date.now(),
       concurrent_requests: 3,
       expected_result: {

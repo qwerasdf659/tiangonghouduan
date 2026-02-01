@@ -11,8 +11,8 @@
  * - 测试环境万能验证码：123456（仅开发/测试环境启用）
  *
  * API 契约：
- * - GET  /api/v4/console/campaign-budget/campaigns/:campaign_id
- * - PUT  /api/v4/console/campaign-budget/campaigns/:campaign_id
+ * - GET  /api/v4/console/campaign-budget/campaigns/:lottery_campaign_id
+ * - PUT  /api/v4/console/campaign-budget/campaigns/:lottery_campaign_id
  */
 
 'use strict'
@@ -25,14 +25,14 @@ const { TestAssertions } = require('../helpers/test-setup')
 
 describe('🛠️ Console 活动预设预算策略配置管理（preset_budget_policy）', () => {
   let admin_token = null
-  let campaign_id = null
+  let lottery_campaign_id = null
   let original_policy = null
 
   beforeAll(async () => {
-    campaign_id = TEST_DATA.lottery.testCampaign.campaign_id
+    lottery_campaign_id = TEST_DATA.lottery.testCampaign.lottery_campaign_id
 
-    if (!campaign_id) {
-      console.warn('⚠️ 未获取到测试活动 campaign_id，跳过 preset_budget_policy 集成测试')
+    if (!lottery_campaign_id) {
+      console.warn('⚠️ 未获取到测试活动 lottery_campaign_id，跳过 preset_budget_policy 集成测试')
       return
     }
 
@@ -41,13 +41,13 @@ describe('🛠️ Console 活动预设预算策略配置管理（preset_budget_p
 
   afterAll(async () => {
     // ✅ 恢复原始配置，避免污染共享 dev 数据库（restaurant_points_dev）
-    if (!admin_token || !campaign_id || !original_policy) {
+    if (!admin_token || !lottery_campaign_id || !original_policy) {
       return
     }
 
     try {
       await request(app)
-        .put(`/api/v4/console/campaign-budget/campaigns/${campaign_id}`)
+        .put(`/api/v4/console/campaign-budget/campaigns/${lottery_campaign_id}`)
         .set('Authorization', `Bearer ${admin_token}`)
         .send({ preset_budget_policy: original_policy })
     } catch (error) {
@@ -57,7 +57,7 @@ describe('🛠️ Console 活动预设预算策略配置管理（preset_budget_p
   })
 
   test('管理员可以更新并读取 preset_budget_policy（字段真源：lottery_campaigns.preset_budget_policy）', async () => {
-    if (!admin_token || !campaign_id) {
+    if (!admin_token || !lottery_campaign_id) {
       // 允许在缺少测试活动时跳过（与项目其他测试一致）
       expect(true).toBe(true)
       return
@@ -65,7 +65,7 @@ describe('🛠️ Console 活动预设预算策略配置管理（preset_budget_p
 
     // 1) 读取当前配置（作为回滚基线）
     const get_before = await request(app)
-      .get(`/api/v4/console/campaign-budget/campaigns/${campaign_id}`)
+      .get(`/api/v4/console/campaign-budget/campaigns/${lottery_campaign_id}`)
       .set('Authorization', `Bearer ${admin_token}`)
       .expect(200)
 
@@ -80,7 +80,7 @@ describe('🛠️ Console 活动预设预算策略配置管理（preset_budget_p
     const target_policy = current_policy === 'pool_first' ? 'user_first' : 'pool_first'
 
     const update_res = await request(app)
-      .put(`/api/v4/console/campaign-budget/campaigns/${campaign_id}`)
+      .put(`/api/v4/console/campaign-budget/campaigns/${lottery_campaign_id}`)
       .set('Authorization', `Bearer ${admin_token}`)
       .send({ preset_budget_policy: target_policy })
       .expect(200)
@@ -98,7 +98,7 @@ describe('🛠️ Console 活动预设预算策略配置管理（preset_budget_p
 
     // 3) 再次读取，验证数据库落库已生效
     const get_after = await request(app)
-      .get(`/api/v4/console/campaign-budget/campaigns/${campaign_id}`)
+      .get(`/api/v4/console/campaign-budget/campaigns/${lottery_campaign_id}`)
       .set('Authorization', `Bearer ${admin_token}`)
       .expect(200)
 

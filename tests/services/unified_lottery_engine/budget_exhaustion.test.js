@@ -71,49 +71,49 @@ describe('预算耗尽降级测试（任务8.3）', () => {
    */
   const MOCK_PRIZES = [
     {
-      prize_id: 1,
+      lottery_prize_id: 1,
       name: 'high_prize_1',
       reward_tier: 'high',
       prize_value_points: 1000,
       status: 'active'
     },
     {
-      prize_id: 2,
+      lottery_prize_id: 2,
       name: 'high_prize_2',
       reward_tier: 'high',
       prize_value_points: 800,
       status: 'active'
     },
     {
-      prize_id: 3,
+      lottery_prize_id: 3,
       name: 'mid_prize_1',
       reward_tier: 'mid',
       prize_value_points: 500,
       status: 'active'
     },
     {
-      prize_id: 4,
+      lottery_prize_id: 4,
       name: 'mid_prize_2',
       reward_tier: 'mid',
       prize_value_points: 400,
       status: 'active'
     },
     {
-      prize_id: 5,
+      lottery_prize_id: 5,
       name: 'low_prize_1',
       reward_tier: 'low',
       prize_value_points: 100,
       status: 'active'
     },
     {
-      prize_id: 6,
+      lottery_prize_id: 6,
       name: 'low_prize_2',
       reward_tier: 'low',
       prize_value_points: 50,
       status: 'active'
     },
     {
-      prize_id: 7,
+      lottery_prize_id: 7,
       name: 'fallback_prize',
       reward_tier: 'fallback',
       prize_value_points: 0,
@@ -125,7 +125,7 @@ describe('预算耗尽降级测试（任务8.3）', () => {
    * 模拟活动配置
    */
   const MOCK_CAMPAIGN = {
-    campaign_id: 999,
+    lottery_campaign_id: 999,
     name: 'Test Campaign',
     budget_mode: 'pool',
     pool_budget_total: 10000,
@@ -151,13 +151,13 @@ describe('预算耗尽降级测试（任务8.3）', () => {
       if (test_campaign) {
         test_prizes = await LotteryPrize.findAll({
           where: {
-            campaign_id: test_campaign.campaign_id,
+            lottery_campaign_id: test_campaign.lottery_campaign_id,
             status: 'active'
           }
         })
 
         console.log(
-          `✅ 加载真实活动数据: campaign_id=${test_campaign.campaign_id}, prizes=${test_prizes.length}`
+          `✅ 加载真实活动数据: lottery_campaign_id=${test_campaign.lottery_campaign_id}, prizes=${test_prizes.length}`
         )
       } else {
         console.log('⚠️ 未找到活跃活动，将使用模拟数据')
@@ -378,9 +378,9 @@ describe('预算耗尽降级测试（任务8.3）', () => {
     test('当 high 档位无奖品时应降级到 mid', () => {
       const prizes_by_tier = {
         high: [], // 无高档奖品
-        mid: [{ prize_id: 1 }],
-        low: [{ prize_id: 2 }],
-        fallback: [{ prize_id: 3 }]
+        mid: [{ lottery_prize_id: 1 }],
+        low: [{ lottery_prize_id: 2 }],
+        fallback: [{ lottery_prize_id: 3 }]
       }
 
       const result = simulateTierDowngrade(
@@ -399,8 +399,8 @@ describe('预算耗尽降级测试（任务8.3）', () => {
       const prizes_by_tier = {
         high: [], // 无高档奖品
         mid: [], // 无中档奖品
-        low: [{ prize_id: 1 }],
-        fallback: [{ prize_id: 2 }]
+        low: [{ lottery_prize_id: 1 }],
+        fallback: [{ lottery_prize_id: 2 }]
       }
 
       const result = simulateTierDowngrade(
@@ -420,7 +420,7 @@ describe('预算耗尽降级测试（任务8.3）', () => {
         high: [],
         mid: [],
         low: [],
-        fallback: [{ prize_id: 1 }]
+        fallback: [{ lottery_prize_id: 1 }]
       }
 
       const result = simulateTierDowngrade(
@@ -457,10 +457,10 @@ describe('预算耗尽降级测试（任务8.3）', () => {
 
     test('B2 预算下 high 不可用时应直接从 mid 开始', () => {
       const prizes_by_tier = {
-        high: [{ prize_id: 1 }], // 有高档奖品但预算不够
-        mid: [{ prize_id: 2 }],
-        low: [{ prize_id: 3 }],
-        fallback: [{ prize_id: 4 }]
+        high: [{ lottery_prize_id: 1 }], // 有高档奖品但预算不够
+        mid: [{ lottery_prize_id: 2 }],
+        low: [{ lottery_prize_id: 3 }],
+        fallback: [{ lottery_prize_id: 4 }]
       }
 
       // B2 不允许 high 档位
@@ -478,10 +478,10 @@ describe('预算耗尽降级测试（任务8.3）', () => {
 
     test('B1 预算下应只能选择 low 或 fallback', () => {
       const prizes_by_tier = {
-        high: [{ prize_id: 1 }],
-        mid: [{ prize_id: 2 }],
-        low: [{ prize_id: 3 }],
-        fallback: [{ prize_id: 4 }]
+        high: [{ lottery_prize_id: 1 }],
+        mid: [{ lottery_prize_id: 2 }],
+        low: [{ lottery_prize_id: 3 }],
+        fallback: [{ lottery_prize_id: 4 }]
       }
 
       // B1 只允许 low 和 fallback
@@ -675,7 +675,7 @@ describe('预算耗尽降级测试（任务8.3）', () => {
         return
       }
 
-      console.log(`📊 真实活动: ${test_campaign.campaign_id} (${test_campaign.name})`)
+      console.log(`📊 真实活动: ${test_campaign.lottery_campaign_id} (${test_campaign.name})`)
       console.log(`📊 真实奖品数: ${test_prizes.length}`)
 
       // 按档位统计奖品
@@ -760,8 +760,8 @@ describe('预算耗尽降级测试（任务8.3）', () => {
 
     test('所有奖品价值为0时应正确处理', () => {
       const zero_value_prizes = [
-        { prize_id: 1, reward_tier: 'fallback', prize_value_points: 0 },
-        { prize_id: 2, reward_tier: 'fallback', prize_value_points: 0 }
+        { lottery_prize_id: 1, reward_tier: 'fallback', prize_value_points: 0 },
+        { lottery_prize_id: 2, reward_tier: 'fallback', prize_value_points: 0 }
       ]
 
       const dynamic_thresholds =
@@ -782,7 +782,7 @@ describe('预算耗尽降级测试（任务8.3）', () => {
         high: [],
         mid: [],
         low: [],
-        fallback: [{ prize_id: 1 }]
+        fallback: [{ lottery_prize_id: 1 }]
       }
 
       // 从任意档位开始都应该降级到 fallback

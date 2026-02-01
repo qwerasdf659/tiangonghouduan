@@ -67,7 +67,7 @@ class ActivityService {
     const queryOptions = {
       where: whereCondition,
       attributes: [
-        'campaign_id',
+        'lottery_campaign_id',
         'campaign_name',
         'campaign_code',
         'description',
@@ -80,7 +80,7 @@ class ActivityService {
         'created_at',
         'updated_at'
       ],
-      order: [['campaign_id', 'DESC']]
+      order: [['lottery_campaign_id', 'DESC']]
     }
 
     if (limit) {
@@ -91,7 +91,7 @@ class ActivityService {
 
     // 格式化返回数据，统一字段名称
     return campaigns.map(campaign => ({
-      campaign_id: campaign.campaign_id,
+      lottery_campaign_id: campaign.lottery_campaign_id,
       campaign_name: campaign.campaign_name,
       campaign_code: campaign.campaign_code,
       description: campaign.description,
@@ -132,7 +132,7 @@ class ActivityService {
           end_time: { [Op.gte]: now }
         },
         attributes: [
-          'campaign_id',
+          'lottery_campaign_id',
           'campaign_name',
           'campaign_code',
           'campaign_type',
@@ -166,7 +166,7 @@ class ActivityService {
           const todayDrawCount = await models.LotteryDraw.count({
             where: {
               user_id: userId,
-              campaign_id: activity.campaign_id,
+              lottery_campaign_id: activity.lottery_campaign_id,
               created_at: {
                 [Op.gte]: todayStartTime
               }
@@ -214,7 +214,7 @@ class ActivityService {
       // 查找活动（支持ID或代码）
       const activity = await models.LotteryCampaign.findOne({
         where: {
-          [Op.or]: [{ campaign_id: activityIdOrCode }, { campaign_code: activityIdOrCode }]
+          [Op.or]: [{ lottery_campaign_id: activityIdOrCode }, { campaign_code: activityIdOrCode }]
         }
       })
 
@@ -232,7 +232,7 @@ class ActivityService {
 
       return {
         eligible: validation.valid,
-        activity_id: activity.campaign_id,
+        activity_id: activity.lottery_campaign_id,
         activity_name: activity.campaign_name,
         failed_conditions: validation.failedConditions,
         messages: validation.messages
@@ -258,10 +258,10 @@ class ActivityService {
     // 查找活动（支持ID或代码）
     const activity = await models.LotteryCampaign.findOne({
       where: {
-        [Op.or]: [{ campaign_id: idOrCode }, { campaign_code: idOrCode }]
+        [Op.or]: [{ lottery_campaign_id: idOrCode }, { campaign_code: idOrCode }]
       },
       attributes: [
-        'campaign_id',
+        'lottery_campaign_id',
         'campaign_name',
         'campaign_code',
         'participation_conditions',
@@ -277,7 +277,7 @@ class ActivityService {
     }
 
     return {
-      campaign_id: activity.campaign_id,
+      lottery_campaign_id: activity.lottery_campaign_id,
       campaign_name: activity.campaign_name,
       campaign_code: activity.campaign_code,
       participation_conditions: activity.participation_conditions,
@@ -316,7 +316,7 @@ class ActivityService {
       })
 
       return {
-        campaign_id: activity.campaign_id,
+        lottery_campaign_id: activity.lottery_campaign_id,
         campaign_name: activity.campaign_name,
         participation_conditions: activity.participation_conditions,
         condition_error_messages: activity.condition_error_messages
@@ -333,19 +333,19 @@ class ActivityService {
    * @description 批量查询多个活动的预算状态，避免前端逐个请求
    *
    * @param {Object} options - 查询选项
-   * @param {Array<number>} options.campaign_ids - 活动ID列表（可选）
+   * @param {Array<number>} options.lottery_campaign_ids - 活动ID列表（可选）
    * @param {string} options.status - 活动状态筛选（可选，如：active/draft/completed/paused）
    * @param {number} options.limit - 限制返回数量（默认20，最大50）
    * @returns {Promise<Object>} 活动预算状态列表和汇总
    */
   static async getBatchBudgetStatus(options = {}) {
-    const { campaign_ids = [], status = '', limit = 20 } = options
+    const { lottery_campaign_ids = [], status = '', limit = 20 } = options
     const maxLimit = Math.min(parseInt(limit) || 20, 50)
 
     // 构建查询条件（支持 status 参数筛选）
     let whereCondition = {}
-    if (campaign_ids.length > 0) {
-      whereCondition = { campaign_id: { [Op.in]: campaign_ids } }
+    if (lottery_campaign_ids.length > 0) {
+      whereCondition = { lottery_campaign_id: { [Op.in]: lottery_campaign_ids } }
     } else if (status && ['active', 'draft', 'completed', 'paused'].includes(status)) {
       whereCondition = { status }
     }
@@ -355,7 +355,7 @@ class ActivityService {
     const campaigns = await models.LotteryCampaign.findAll({
       where: whereCondition,
       attributes: [
-        'campaign_id',
+        'lottery_campaign_id',
         'campaign_name',
         'campaign_code',
         'budget_mode',
@@ -364,7 +364,7 @@ class ActivityService {
         'status'
       ],
       limit: maxLimit,
-      order: [['campaign_id', 'ASC']]
+      order: [['lottery_campaign_id', 'ASC']]
     })
 
     if (campaigns.length === 0) {
@@ -372,25 +372,25 @@ class ActivityService {
     }
 
     // 批量获取使用统计（所有活动一次查询）
-    const campaignIdList = campaigns.map(c => c.campaign_id)
+    const campaignIdList = campaigns.map(c => c.lottery_campaign_id)
     const budgetStats = await models.LotteryDraw.findAll({
       where: {
-        campaign_id: { [Op.in]: campaignIdList },
+        lottery_campaign_id: { [Op.in]: campaignIdList },
         prize_value_points: { [Op.gt]: 0 }
       },
       attributes: [
-        'campaign_id',
-        [models.sequelize.fn('COUNT', models.sequelize.col('draw_id')), 'draw_count'],
+        'lottery_campaign_id',
+        [models.sequelize.fn('COUNT', models.sequelize.col('lottery_draw_id')), 'draw_count'],
         [models.sequelize.fn('SUM', models.sequelize.col('prize_value_points')), 'total_consumed']
       ],
-      group: ['campaign_id'],
+      group: ['lottery_campaign_id'],
       raw: true
     })
 
     // 将统计数据映射为快速查找表
     const statsMap = {}
     budgetStats.forEach(stat => {
-      statsMap[stat.campaign_id] = {
+      statsMap[stat.lottery_campaign_id] = {
         winning_draws: parseInt(stat.draw_count) || 0,
         total_consumed: parseInt(stat.total_consumed) || 0
       }
@@ -398,13 +398,16 @@ class ActivityService {
 
     // 组装结果
     const results = campaigns.map(campaign => {
-      const stats = statsMap[campaign.campaign_id] || { winning_draws: 0, total_consumed: 0 }
+      const stats = statsMap[campaign.lottery_campaign_id] || {
+        winning_draws: 0,
+        total_consumed: 0
+      }
       const total = Number(campaign.pool_budget_total) || 0
       const remaining = Number(campaign.pool_budget_remaining) || 0
       const used = total - remaining
 
       return {
-        campaign_id: campaign.campaign_id,
+        lottery_campaign_id: campaign.lottery_campaign_id,
         campaign_name: campaign.campaign_name,
         campaign_code: campaign.campaign_code,
         budget_mode: campaign.budget_mode,
@@ -442,13 +445,13 @@ class ActivityService {
   static async getCampaignBudgetConfig(campaignId) {
     const campaign = await models.LotteryCampaign.findByPk(parseInt(campaignId), {
       attributes: [
-        'campaign_id',
+        'lottery_campaign_id',
         'campaign_name',
         'campaign_code',
         'budget_mode',
         'pool_budget_total',
         'pool_budget_remaining',
-        'allowed_campaign_ids',
+        'allowed_lottery_campaign_ids',
         // ======================== 预设欠账控制字段（统一架构 V1.6） ========================
         'preset_debt_enabled',
         'preset_budget_policy',
@@ -464,7 +467,7 @@ class ActivityService {
     }
 
     return {
-      campaign_id: campaign.campaign_id,
+      lottery_campaign_id: campaign.lottery_campaign_id,
       campaign_name: campaign.campaign_name,
       campaign_code: campaign.campaign_code,
       budget_mode: campaign.budget_mode,
@@ -481,7 +484,7 @@ class ActivityService {
        */
       preset_debt_enabled: !!campaign.preset_debt_enabled,
       preset_budget_policy: campaign.preset_budget_policy,
-      allowed_campaign_ids: campaign.allowed_campaign_ids || [],
+      allowed_lottery_campaign_ids: campaign.allowed_lottery_campaign_ids || [],
       status: campaign.status
     }
   }
@@ -498,7 +501,7 @@ class ActivityService {
   static async getPrizeConfig(campaignId) {
     // 验证活动存在
     const campaign = await models.LotteryCampaign.findByPk(parseInt(campaignId), {
-      attributes: ['campaign_id', 'campaign_name', 'campaign_code', 'budget_mode']
+      attributes: ['lottery_campaign_id', 'campaign_name', 'campaign_code', 'budget_mode']
     })
 
     if (!campaign) {
@@ -510,9 +513,9 @@ class ActivityService {
 
     // 获取奖品配置
     const prizes = await models.LotteryPrize.findAll({
-      where: { campaign_id: parseInt(campaignId) },
+      where: { lottery_campaign_id: parseInt(campaignId) },
       attributes: [
-        'prize_id',
+        'lottery_prize_id',
         'prize_name',
         'prize_type',
         'prize_value_points',
@@ -523,7 +526,7 @@ class ActivityService {
       ],
       order: [
         ['sort_order', 'ASC'],
-        ['prize_id', 'ASC']
+        ['lottery_prize_id', 'ASC']
       ]
     })
 
@@ -536,11 +539,11 @@ class ActivityService {
     }
 
     return {
-      campaign_id: campaign.campaign_id,
+      lottery_campaign_id: campaign.lottery_campaign_id,
       campaign_name: campaign.campaign_name,
       budget_mode: campaign.budget_mode,
       prizes: prizes.map(p => ({
-        prize_id: p.prize_id,
+        lottery_prize_id: p.lottery_prize_id,
         prize_name: p.prize_name,
         prize_type: p.prize_type,
         prize_value_points: p.prize_value_points,
@@ -571,7 +574,7 @@ class ActivityService {
     // 验证活动存在
     const campaign = await models.LotteryCampaign.findByPk(parseInt(campaignId), {
       attributes: [
-        'campaign_id',
+        'lottery_campaign_id',
         'campaign_name',
         'campaign_code',
         'budget_mode',
@@ -589,7 +592,7 @@ class ActivityService {
 
     // 构建查询条件
     const drawWhere = {
-      campaign_id: parseInt(campaignId),
+      lottery_campaign_id: parseInt(campaignId),
       prize_value_points: { [Op.gt]: 0 }
     }
 
@@ -603,7 +606,7 @@ class ActivityService {
     const consumptionStats = await models.LotteryDraw.findOne({
       where: drawWhere,
       attributes: [
-        [models.sequelize.fn('COUNT', models.sequelize.col('draw_id')), 'total_draws'],
+        [models.sequelize.fn('COUNT', models.sequelize.col('lottery_draw_id')), 'total_draws'],
         [models.sequelize.fn('SUM', models.sequelize.col('prize_value_points')), 'total_consumed'],
         [models.sequelize.fn('AVG', models.sequelize.col('prize_value_points')), 'avg_value'],
         [models.sequelize.fn('MAX', models.sequelize.col('prize_value_points')), 'max_value'],
@@ -615,13 +618,13 @@ class ActivityService {
     // 按日期分组统计（最近7天）
     const dailyStats = await models.LotteryDraw.findAll({
       where: {
-        campaign_id: parseInt(campaignId),
+        lottery_campaign_id: parseInt(campaignId),
         prize_value_points: { [Op.gt]: 0 },
         created_at: { [Op.gte]: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
       },
       attributes: [
         [models.sequelize.fn('DATE', models.sequelize.col('created_at')), 'date'],
-        [models.sequelize.fn('COUNT', models.sequelize.col('draw_id')), 'draws'],
+        [models.sequelize.fn('COUNT', models.sequelize.col('lottery_draw_id')), 'draws'],
         [models.sequelize.fn('SUM', models.sequelize.col('prize_value_points')), 'consumed']
       ],
       group: [models.sequelize.fn('DATE', models.sequelize.col('created_at'))],
@@ -634,7 +637,7 @@ class ActivityService {
 
     return {
       campaign: {
-        campaign_id: campaign.campaign_id,
+        lottery_campaign_id: campaign.lottery_campaign_id,
         campaign_name: campaign.campaign_name,
         campaign_code: campaign.campaign_code,
         budget_mode: campaign.budget_mode
@@ -672,7 +675,7 @@ class ActivityService {
   static async validatePrizeConfig(campaignId) {
     // 验证活动存在
     const campaign = await models.LotteryCampaign.findByPk(parseInt(campaignId), {
-      attributes: ['campaign_id', 'campaign_name', 'campaign_code', 'budget_mode']
+      attributes: ['lottery_campaign_id', 'campaign_name', 'campaign_code', 'budget_mode']
     })
 
     if (!campaign) {
@@ -693,7 +696,7 @@ class ActivityService {
     )
 
     return {
-      campaign_id: parseInt(campaignId),
+      lottery_campaign_id: parseInt(campaignId),
       campaign_name: campaign.campaign_name,
       budget_mode: campaign.budget_mode,
       empty_prize_constraint: {
@@ -731,7 +734,7 @@ class ActivityService {
     // 验证活动存在
     const campaign = await models.LotteryCampaign.findByPk(parsedCampaignId, {
       attributes: [
-        'campaign_id',
+        'lottery_campaign_id',
         'campaign_name',
         'campaign_code',
         'budget_mode',
@@ -755,7 +758,7 @@ class ActivityService {
     if (campaign.pick_method === 'tier_first') {
       // 获取所有该活动的 segment_key
       const segmentKeys = await models.LotteryTierRule.findAll({
-        where: { campaign_id: parsedCampaignId, status: 'active' },
+        where: { lottery_campaign_id: parsedCampaignId, status: 'active' },
         attributes: [
           [models.sequelize.fn('DISTINCT', models.sequelize.col('segment_key')), 'segment_key']
         ],
@@ -834,7 +837,7 @@ class ActivityService {
     return {
       valid: allValid,
       can_launch: allValid,
-      campaign_id: parsedCampaignId,
+      lottery_campaign_id: parsedCampaignId,
       campaign_name: campaign.campaign_name,
       campaign_code: campaign.campaign_code,
       pick_method: campaign.pick_method,
@@ -900,7 +903,7 @@ class ActivityService {
     // 2. 查找活动
     const campaign = await models.LotteryCampaign.findByPk(campaignId, { transaction })
     if (!campaign) {
-      const error = new Error(`活动不存在: campaign_id=${campaignId}`)
+      const error = new Error(`活动不存在: lottery_campaign_id=${campaignId}`)
       error.code = 'CAMPAIGN_NOT_FOUND'
       error.statusCode = 404
       throw error
@@ -942,7 +945,7 @@ class ActivityService {
     await campaign.update({ status: newStatus }, { transaction })
 
     logger.info('[ActivityService] 活动状态已更新', {
-      campaign_id: campaignId,
+      lottery_campaign_id: campaignId,
       campaign_code: campaign.campaign_code,
       old_status: oldStatus,
       new_status: newStatus,
@@ -970,7 +973,7 @@ class ActivityService {
     } catch (notifyError) {
       // 通知失败不影响主流程
       logger.warn('[ActivityService] WebSocket通知发送失败（非关键）', {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         error: notifyError.message
       })
     }
@@ -978,7 +981,7 @@ class ActivityService {
     return {
       success: true,
       campaign: {
-        campaign_id: campaign.campaign_id,
+        lottery_campaign_id: campaign.lottery_campaign_id,
         campaign_code: campaign.campaign_code,
         campaign_name: campaign.campaign_name,
         old_status: oldStatus,

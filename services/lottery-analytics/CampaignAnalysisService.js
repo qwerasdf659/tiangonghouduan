@@ -61,7 +61,7 @@ class CampaignAnalysisService {
    * @returns {Promise<Object>} 复盘报告数据
    */
   async generateCampaignReport(campaignId) {
-    this.logger.info('生成活动复盘报告', { campaign_id: campaignId })
+    this.logger.info('生成活动复盘报告', { lottery_campaign_id: campaignId })
 
     try {
       // 1. 获取活动信息
@@ -75,12 +75,12 @@ class CampaignAnalysisService {
       const durationDays = Math.ceil((endTime - startTime) / (24 * 60 * 60 * 1000))
 
       // 2. 查询基础统计数据
-      const whereClause = { campaign_id: campaignId }
+      const whereClause = { lottery_campaign_id: campaignId }
 
       // 抽奖统计
       const drawStats = await this.models.LotteryDraw.findOne({
         attributes: [
-          [fn('COUNT', col('draw_id')), 'total_draws'],
+          [fn('COUNT', col('lottery_draw_id')), 'total_draws'],
           [fn('COUNT', fn('DISTINCT', col('user_id'))), 'unique_users'],
           [fn('SUM', col('cost_points')), 'total_cost_points'],
           [
@@ -119,7 +119,7 @@ class CampaignAnalysisService {
       const repeatUsers = await this.models.LotteryDraw.count({
         where: whereClause,
         group: ['user_id'],
-        having: literal('COUNT(draw_id) > 1')
+        having: literal('COUNT(lottery_draw_id) > 1')
       })
 
       const repeatRate = uniqueUsers > 0 ? (repeatUsers.length / uniqueUsers) * 100 : 0
@@ -148,7 +148,7 @@ class CampaignAnalysisService {
       // 组装报告
       return {
         campaign_info: {
-          campaign_id: campaignId,
+          lottery_campaign_id: campaignId,
           campaign_name: campaign.campaign_name,
           period: {
             start_time: startTime.toISOString().replace('Z', '+08:00'),
@@ -198,7 +198,7 @@ class CampaignAnalysisService {
       }
     } catch (error) {
       this.logger.error('生成活动复盘报告失败', {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         error: error.message
       })
       throw error
@@ -211,14 +211,14 @@ class CampaignAnalysisService {
    * P2 优先级需求：评估策略配置效果
    *
    * @param {Object} options - 查询参数
-   * @param {number} [options.campaign_id] - 活动ID
+   * @param {number} [options.lottery_campaign_id] - 活动ID
    * @param {string} [options.time_range='7d'] - 时间范围
    * @param {string} [options.strategy_type='all'] - 策略类型
    * @returns {Promise<Object>} 策略效果分析数据
    */
   async getStrategyEffectiveness(options = {}) {
-    const { campaign_id, time_range = '7d', strategy_type = 'all' } = options
-    this.logger.info('获取策略效果分析', { campaign_id, time_range, strategy_type })
+    const { lottery_campaign_id, time_range = '7d', strategy_type = 'all' } = options
+    this.logger.info('获取策略效果分析', { lottery_campaign_id, time_range, strategy_type })
 
     try {
       // 计算时间范围
@@ -230,15 +230,15 @@ class CampaignAnalysisService {
 
       // 如果需要筛选活动，先获取该活动的 draw_ids
       let drawIds = null
-      if (campaign_id) {
+      if (lottery_campaign_id) {
         const draws = await this.models.LotteryDraw.findAll({
-          attributes: ['draw_id'],
-          where: { campaign_id, created_at: { [Op.gte]: startTime } },
+          attributes: ['lottery_draw_id'],
+          where: { lottery_campaign_id, created_at: { [Op.gte]: startTime } },
           raw: true
         })
-        drawIds = draws.map(d => d.draw_id)
+        drawIds = draws.map(d => d.lottery_draw_id)
         if (drawIds.length > 0) {
-          whereClause.draw_id = { [Op.in]: drawIds }
+          whereClause.lottery_draw_id = { [Op.in]: drawIds }
         } else {
           return this._emptyStrategyEffectivenessResult(startTime, endTime)
         }
@@ -302,9 +302,9 @@ class CampaignAnalysisService {
     const results = await this.models.LotteryDraw.findAll({
       attributes: [
         [fn('HOUR', col('created_at')), 'hour'],
-        [fn('COUNT', col('draw_id')), 'count']
+        [fn('COUNT', col('lottery_draw_id')), 'count']
       ],
-      where: { campaign_id: campaignId },
+      where: { lottery_campaign_id: campaignId },
       group: [fn('HOUR', col('created_at'))],
       order: [[fn('HOUR', col('created_at')), 'ASC']],
       raw: true
@@ -328,9 +328,9 @@ class CampaignAnalysisService {
     const results = await this.models.LotteryDraw.findAll({
       attributes: [
         [fn('DATE', col('created_at')), 'date'],
-        [fn('COUNT', col('draw_id')), 'count']
+        [fn('COUNT', col('lottery_draw_id')), 'count']
       ],
-      where: { campaign_id: campaignId },
+      where: { lottery_campaign_id: campaignId },
       group: [fn('DATE', col('created_at'))],
       order: [[fn('DATE', col('created_at')), 'ASC']],
       raw: true
@@ -347,8 +347,8 @@ class CampaignAnalysisService {
    */
   async _getCampaignTierDistribution(campaignId) {
     const results = await this.models.LotteryDraw.findAll({
-      attributes: ['reward_tier', [fn('COUNT', col('draw_id')), 'count']],
-      where: { campaign_id: campaignId },
+      attributes: ['reward_tier', [fn('COUNT', col('lottery_draw_id')), 'count']],
+      where: { lottery_campaign_id: campaignId },
       group: ['reward_tier'],
       raw: true
     })
@@ -376,10 +376,10 @@ class CampaignAnalysisService {
    */
   async _getCampaignTopPrizes(campaignId, limit) {
     const results = await this.models.LotteryDraw.findAll({
-      attributes: ['prize_id', [fn('COUNT', col('draw_id')), 'count']],
-      where: { campaign_id: campaignId, prize_id: { [Op.ne]: null } },
-      group: ['prize_id'],
-      order: [[fn('COUNT', col('draw_id')), 'DESC']],
+      attributes: ['lottery_prize_id', [fn('COUNT', col('lottery_draw_id')), 'count']],
+      where: { lottery_campaign_id: campaignId, lottery_prize_id: { [Op.ne]: null } },
+      group: ['lottery_prize_id'],
+      order: [[fn('COUNT', col('lottery_draw_id')), 'DESC']],
       limit,
       include: [
         {
@@ -407,10 +407,10 @@ class CampaignAnalysisService {
   async _getCampaignUserAnalysis(campaignId) {
     const avgStats = await this.models.LotteryDraw.findOne({
       attributes: [
-        [fn('COUNT', col('draw_id')), 'total_draws'],
+        [fn('COUNT', col('lottery_draw_id')), 'total_draws'],
         [fn('COUNT', fn('DISTINCT', col('user_id'))), 'unique_users']
       ],
-      where: { campaign_id: campaignId },
+      where: { lottery_campaign_id: campaignId },
       raw: true
     })
 
@@ -420,10 +420,10 @@ class CampaignAnalysisService {
         : 0
 
     const maxDrawUser = await this.models.LotteryDraw.findOne({
-      attributes: ['user_id', [fn('COUNT', col('draw_id')), 'count']],
-      where: { campaign_id: campaignId },
+      attributes: ['user_id', [fn('COUNT', col('lottery_draw_id')), 'count']],
+      where: { lottery_campaign_id: campaignId },
       group: ['user_id'],
-      order: [[fn('COUNT', col('draw_id')), 'DESC']],
+      order: [[fn('COUNT', col('lottery_draw_id')), 'DESC']],
       raw: true
     })
 
@@ -446,7 +446,7 @@ class CampaignAnalysisService {
    */
   async _getCampaignExperienceMetrics(campaignId) {
     const states = await this.models.LotteryUserExperienceState.findAll({
-      where: { campaign_id: campaignId },
+      where: { lottery_campaign_id: campaignId },
       attributes: ['empty_streak', 'pity_trigger_count', 'total_empty_count', 'max_empty_streak']
     })
 
@@ -481,8 +481,8 @@ class CampaignAnalysisService {
    */
   async _getCampaignHistoryComparison(campaignId, currentStats) {
     const previousCampaign = await this.models.LotteryCampaign.findOne({
-      where: { campaign_id: { [Op.lt]: campaignId } },
-      order: [['campaign_id', 'DESC']]
+      where: { lottery_campaign_id: { [Op.lt]: campaignId } },
+      order: [['lottery_campaign_id', 'DESC']]
     })
 
     if (!previousCampaign) {
@@ -491,10 +491,10 @@ class CampaignAnalysisService {
 
     const prevStats = await this.models.LotteryDraw.findOne({
       attributes: [
-        [fn('COUNT', col('draw_id')), 'total_draws'],
+        [fn('COUNT', col('lottery_draw_id')), 'total_draws'],
         [fn('COUNT', fn('DISTINCT', col('user_id'))), 'unique_users']
       ],
-      where: { campaign_id: previousCampaign.campaign_id },
+      where: { lottery_campaign_id: previousCampaign.lottery_campaign_id },
       raw: true
     })
 

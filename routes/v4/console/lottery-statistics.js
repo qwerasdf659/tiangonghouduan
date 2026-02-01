@@ -5,7 +5,7 @@
  * URL重命名方案（2026-01-31 大文件拆分方案 Phase 2）：
  * - /console/lottery-monitoring/hourly-metrics → /console/lottery-statistics/hourly
  * - /console/lottery-monitoring/hourly-metrics/:id → /console/lottery-statistics/hourly/:id
- * - /console/lottery-monitoring/hourly-metrics/summary/:campaign_id → /console/lottery-statistics/hourly/summary/:campaign_id
+ * - /console/lottery-monitoring/hourly-metrics/summary/:lottery_campaign_id → /console/lottery-statistics/hourly/summary/:lottery_campaign_id
  *
  * 对应服务：lottery_analytics_statistics (StatisticsService)
  *
@@ -39,7 +39,7 @@ function getStatisticsService(req) {
  * GET /hourly - 查询抽奖小时统计指标列表
  *
  * Query参数：
- * - campaign_id: 活动ID（可选）
+ * - lottery_campaign_id: 活动ID（可选）
  * - start_time: 开始时间（ISO8601格式，可选）
  * - end_time: 结束时间（ISO8601格式，可选）
  * - page: 页码（默认1）
@@ -49,10 +49,10 @@ function getStatisticsService(req) {
  */
 router.get('/hourly', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { campaign_id, start_time, end_time, page = 1, page_size = 24 } = req.query
+    const { lottery_campaign_id, start_time, end_time, page = 1, page_size = 24 } = req.query
 
     const result = await getStatisticsService(req).getHourlyMetrics({
-      campaign_id: campaign_id ? parseInt(campaign_id) : undefined,
+      lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
       start_time,
       end_time,
       page: parseInt(page),
@@ -61,7 +61,7 @@ router.get('/hourly', authenticateToken, requireRoleLevel(100), async (req, res)
 
     logger.info('查询小时统计指标', {
       admin_id: req.user.user_id,
-      campaign_id,
+      lottery_campaign_id,
       start_time,
       end_time,
       total: result.pagination.total_count
@@ -104,10 +104,10 @@ router.get('/hourly/:id', authenticateToken, requireRoleLevel(100), async (req, 
 })
 
 /**
- * GET /hourly/summary/:campaign_id - 获取活动统计汇总
+ * GET /hourly/summary/:lottery_campaign_id - 获取活动统计汇总
  *
  * 路径参数：
- * - campaign_id: 活动ID
+ * - lottery_campaign_id: 活动ID
  *
  * Query参数：
  * - start_time: 开始时间（可选）
@@ -116,20 +116,20 @@ router.get('/hourly/:id', authenticateToken, requireRoleLevel(100), async (req, 
  * 返回：统计汇总数据
  */
 router.get(
-  '/hourly/summary/:campaign_id',
+  '/hourly/summary/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(100),
   async (req, res) => {
     try {
-      const campaign_id = parseInt(req.params.campaign_id)
+      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
       const { start_time, end_time } = req.query
 
-      if (!campaign_id || isNaN(campaign_id)) {
+      if (!lottery_campaign_id || isNaN(lottery_campaign_id)) {
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
       }
 
       const summary = await getStatisticsService(req).getHourlyMetricsSummary(
-        campaign_id,
+        lottery_campaign_id,
         start_time,
         end_time
       )

@@ -131,7 +131,7 @@ class ConsumptionBatchService {
     }
 
     // 5. 标记跳过的记录（ID存在但状态不是pending）
-    const foundIds = new Set(records.map(r => r.record_id))
+    const foundIds = new Set(records.map(r => r.consumption_record_id))
     record_ids.forEach(id => {
       if (!foundIds.has(id)) {
         result.processed.skipped.push({
@@ -159,12 +159,12 @@ class ConsumptionBatchService {
         }
       } catch (error) {
         logger.error('[批量审核] 单条记录处理失败', {
-          record_id: record.record_id,
+          record_id: record.consumption_record_id,
           error: error.message
         })
 
         result.processed.failed.push({
-          record_id: record.record_id,
+          record_id: record.consumption_record_id,
           error: error.message,
           error_code: error.code || 'PROCESSING_ERROR'
         })
@@ -236,7 +236,7 @@ class ConsumptionBatchService {
       await transaction.commit()
 
       return {
-        record_id: record.record_id,
+        consumption_record_id: record.consumption_record_id,
         action,
         previous_status: 'pending',
         new_status: updateData.status,
@@ -277,7 +277,7 @@ class ConsumptionBatchService {
       const BalanceService = require('../asset/BalanceService')
 
       // 生成幂等键：业务类型_记录ID_操作员ID
-      const idempotencyKey = `consumption_reward_${record.record_id}_${operator_id}`
+      const idempotencyKey = `consumption_reward_${record.consumption_record_id}_${operator_id}`
 
       await BalanceService.changeBalance(
         {
@@ -287,7 +287,7 @@ class ConsumptionBatchService {
           business_type: 'consumption_reward', // 业务类型
           idempotency_key: idempotencyKey, // 幂等键
           meta: {
-            reference_id: record.record_id,
+            reference_id: record.consumption_record_id,
             reference_type: 'consumption_record',
             description: `消费奖励: ¥${record.consumption_amount}`,
             operator_id
@@ -297,12 +297,12 @@ class ConsumptionBatchService {
       )
 
       // 更新记录的积分交易关联
-      record.reward_transaction_id = record.record_id
+      record.reward_transaction_id = record.consumption_record_id
 
       return pointsToAward
     } catch (error) {
       logger.error('[批量审核] 积分发放失败', {
-        record_id: record.record_id,
+        record_id: record.consumption_record_id,
         error: error.message
       })
       throw new Error(`积分发放失败: ${error.message}`)
@@ -404,7 +404,7 @@ class ConsumptionBatchService {
         operation_type: 'consumption_batch_review',
         operation_name: '消费记录批量审核',
         resource_type: 'consumption_record',
-        resource_ids: result.processed.success.map(s => s.record_id),
+        resource_ids: result.processed.success.map(s => s.consumption_record_id),
         details: {
           operation_id: result.operation_id,
           action: result.action,

@@ -319,7 +319,7 @@ describe('【P1】用户异常行为测试 - 快速点击、边界值、刷子�
 
       /*
        * 验证：应该只有一个唯一的抽奖结果（幂等性）
-       * TDD红灯：如果返回多个不同的draw_id，说明幂等性未实现
+       * TDD红灯：如果返回多个不同的lottery_draw_id，说明幂等性未实现
        */
       if (analysis.uniqueResults.size > 1) {
         console.log('   ⚠️ 警告：检测到多个不同的抽奖结果，幂等性可能未正确实现')

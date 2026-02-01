@@ -108,7 +108,7 @@ module.exports = sequelize => {
   SystemSettings.init(
     {
       // 主键：设置项唯一标识
-      setting_id: {
+      system_setting_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,

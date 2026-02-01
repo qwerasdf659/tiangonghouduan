@@ -22,7 +22,7 @@ module.exports = sequelize => {
     'UserHierarchy',
     {
       // 层级关系ID（主键）
-      hierarchy_id: {
+      user_hierarchy_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,

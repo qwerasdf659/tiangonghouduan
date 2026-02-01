@@ -29,8 +29,8 @@
  * const monitor = new PerformanceMonitor()
  * const handle = monitor.startMonitoring('决策流程', { user_id: 123 })
  * handle.checkpoint('概率计算完成', { probability: 0.05 })
- * handle.checkpoint('奖品选择完成', { prize_id: 5 })
- * const report = handle.finish({ success: true, prize_id: 5 })
+ * handle.checkpoint('奖品选择完成', { lottery_prize_id: 5 })
+ * const report = handle.finish({ success: true, lottery_prize_id: 5 })
  * const analysis = monitor.analyzePerformance(report)
  * logger.info('性能评分:', analysis.performanceScore)
  * ```
@@ -80,10 +80,10 @@ const BeijingTimeHelper = require('../../../utils/timeHelper')
  *
  * // 添加检查点
  * handle.checkpoint('概率计算完成', { probability: 0.05 })
- * handle.checkpoint('奖品选择完成', { prize_id: 5 })
+ * handle.checkpoint('奖品选择完成', { lottery_prize_id: 5 })
  *
  * // 结束监控
- * const report = handle.finish({ success: true, prize_id: 5 })
+ * const report = handle.finish({ success: true, lottery_prize_id: 5 })
  *
  * // 分析性能
  * const analysis = monitor.analyzePerformance(report)
@@ -215,7 +215,7 @@ class PerformanceMonitor {
    *
    * // 奖品选择完成后添加检查点
    * handle.checkpoint('奖品选择完成', {
-   *   prize_id: 5,
+   *   lottery_prize_id: 5,
    *   prize_name: '50元优惠券'
    * })
    */

@@ -99,7 +99,7 @@ module.exports = sequelize => {
   ApiIdempotencyRequest.init(
     {
       // 主键ID（Request ID - 请求记录唯一标识）
-      request_id: {
+      api_idempotency_request_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,

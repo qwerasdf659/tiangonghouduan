@@ -418,7 +418,7 @@ describe('抽奖系统API测试（V4架构）', () => {
       const probability_data = {
         user_id: test_user_id || testUser.user_id,
         pipeline: 'NormalDrawPipeline',
-        campaign_id: 1
+        lottery_campaign_id: 1
       }
 
       const response = await tester.make_authenticated_request(

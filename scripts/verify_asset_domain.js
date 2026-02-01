@@ -126,12 +126,12 @@ async function verifyDatabaseLayer() {
     fail('检查 CREDITS 清理状态失败', err.message)
   }
 
-  // 2. 检查 campaign_id 字段和 campaign_key 归一化列（2026-01-07 P0数据一致性加固）
-  console.log('\n【检查2】BUDGET_POINTS 迁移状态 (campaign_id + campaign_key 字段)')
+  // 2. 检查 lottery_campaign_id 字段和 campaign_key 归一化列（2026-01-07 P0数据一致性加固）
+  console.log('\n【检查2】BUDGET_POINTS 迁移状态 (lottery_campaign_id + campaign_key 字段)')
   try {
-    const hasCampaignId = await columnExists('account_asset_balances', 'campaign_id')
+    const hasCampaignId = await columnExists('account_asset_balances', 'lottery_campaign_id')
     if (hasCampaignId) {
-      pass('account_asset_balances 表已添加 campaign_id 字段')
+      pass('account_asset_balances 表已添加 lottery_campaign_id 字段')
 
       // 检查 campaign_key 归一化列
       const hasCampaignKey = await columnExists('account_asset_balances', 'campaign_key')
@@ -152,10 +152,10 @@ async function verifyDatabaseLayer() {
         fail('缺少 uk_account_asset_campaign_key 唯一索引')
       }
     } else {
-      fail('account_asset_balances 表缺少 campaign_id 字段')
+      fail('account_asset_balances 表缺少 lottery_campaign_id 字段')
     }
   } catch (err) {
-    fail('检查 campaign_id/campaign_key 字段失败', err.message)
+    fail('检查 lottery_campaign_id/campaign_key 字段失败', err.message)
   }
 
   // 3. 检查 item_instance_events 表

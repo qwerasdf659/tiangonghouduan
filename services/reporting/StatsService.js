@@ -547,7 +547,9 @@ class StatsService {
                   [
                     fn(
                       'SUM',
-                      literal('CASE WHEN delta_amount < 0 THEN ABS(delta_amount) ELSE 0 END')
+                      literal(
+                        'CASE WHEN delta_amount < 0 THEN -CAST(delta_amount AS DECIMAL(30,2)) ELSE 0 END'
+                      )
                     ),
                     'total_consumed'
                   ],
@@ -748,7 +750,12 @@ class StatsService {
               'total_points_issued'
             ],
             [
-              fn('SUM', literal('CASE WHEN delta_amount < 0 THEN ABS(delta_amount) ELSE 0 END')),
+              fn(
+                'SUM',
+                literal(
+                  'CASE WHEN delta_amount < 0 THEN -CAST(delta_amount AS DECIMAL(30,2)) ELSE 0 END'
+                )
+              ),
               'total_points_consumed'
             ],
             [

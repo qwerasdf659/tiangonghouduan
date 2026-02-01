@@ -198,7 +198,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
     // 清理测试订单
     for (const order_id of createdOrders) {
       try {
-        await TradeOrder.destroy({ where: { order_id }, force: true })
+        await TradeOrder.destroy({ where: { trade_order_id: order_id }, force: true })
       } catch (error) {
         console.log(`清理订单 ${order_id} 失败:`, error.message)
       }
@@ -206,11 +206,11 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
     createdOrders = []
 
     // 清理测试挂牌
-    for (const listing_id of createdListings) {
+    for (const market_listing_id of createdListings) {
       try {
-        await MarketListing.destroy({ where: { listing_id }, force: true })
+        await MarketListing.destroy({ where: { market_listing_id }, force: true })
       } catch (error) {
-        console.log(`清理挂牌 ${listing_id} 失败:`, error.message)
+        console.log(`清理挂牌 ${market_listing_id} 失败:`, error.message)
       }
     }
     createdListings = []
@@ -260,7 +260,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             { transaction: listing_tx }
           )
           await listing_tx.commit()
-          createdListings.push(listing_result.listing.listing_id)
+          createdListings.push(listing_result.listing.market_listing_id)
         } catch (error) {
           await listing_tx.rollback()
           throw error
@@ -309,8 +309,10 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             { transaction: tx1 }
           )
           await tx1.commit()
-          createdListings.push(first_result.listing.listing_id)
-          console.log(`✅ 第一次创建成功: listing_id=${first_result.listing.listing_id}`)
+          createdListings.push(first_result.listing.market_listing_id)
+          console.log(
+            `✅ 第一次创建成功: market_listing_id=${first_result.listing.market_listing_id}`
+          )
         } catch (error) {
           await tx1.rollback()
           throw error
@@ -340,8 +342,8 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
 
         // 4. 验证幂等性
         expect(second_result.is_duplicate).toBe(true)
-        expect(String(second_result.listing.listing_id)).toBe(
-          String(first_result.listing.listing_id)
+        expect(String(second_result.listing.market_listing_id)).toBe(
+          String(first_result.listing.market_listing_id)
         )
 
         console.log('✅ 挂牌幂等性验证通过')
@@ -375,7 +377,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
           )
           await listing_tx.commit()
           listing = result.listing
-          createdListings.push(listing.listing_id)
+          createdListings.push(listing.market_listing_id)
         } catch (error) {
           await listing_tx.rollback()
           throw error
@@ -394,22 +396,22 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
           order_result = await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey('order_lock'),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: testBuyer.user_id
             },
             { transaction: order_tx }
           )
           await order_tx.commit()
-          createdOrders.push(order_result.order_id)
+          createdOrders.push(order_result.trade_order_id)
         } catch (error) {
           await order_tx.rollback()
           throw error
         }
 
         // 4. 验证挂牌状态变为 locked
-        const locked_listing = await MarketListing.findByPk(listing.listing_id)
+        const locked_listing = await MarketListing.findByPk(listing.market_listing_id)
         expect(locked_listing.status).toBe('locked')
-        expect(Number(locked_listing.locked_by_order_id)).toBe(Number(order_result.order_id))
+        expect(Number(locked_listing.locked_by_order_id)).toBe(Number(order_result.trade_order_id))
         expect(locked_listing.locked_at).not.toBeNull()
 
         console.log('✅ on_sale → locked 状态转换验证通过')
@@ -443,7 +445,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
           )
           await listing_tx.commit()
           listing = result.listing
-          createdListings.push(listing.listing_id)
+          createdListings.push(listing.market_listing_id)
         } catch (error) {
           await listing_tx.rollback()
           throw error
@@ -458,13 +460,13 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
           const order_result = await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey('order_sold'),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: testBuyer.user_id
             },
             { transaction: order_tx }
           )
           await order_tx.commit()
-          order_id = order_result.order_id
+          order_id = order_result.trade_order_id
           createdOrders.push(order_id)
         } catch (error) {
           await order_tx.rollback()
@@ -472,14 +474,14 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         }
 
         // 验证挂牌状态为 locked
-        const locked_listing = await MarketListing.findByPk(listing.listing_id)
+        const locked_listing = await MarketListing.findByPk(listing.market_listing_id)
         expect(locked_listing.status).toBe('locked')
 
         // 3. 完成订单
         const complete_tx = await sequelize.transaction()
         try {
           await TradeOrderService.completeOrder(
-            { order_id, buyer_id: testBuyer.user_id },
+            { trade_order_id: order_id, buyer_id: testBuyer.user_id },
             { transaction: complete_tx }
           )
           await complete_tx.commit()
@@ -489,7 +491,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         }
 
         // 4. 验证挂牌状态变为 sold
-        const sold_listing = await MarketListing.findByPk(listing.listing_id)
+        const sold_listing = await MarketListing.findByPk(listing.market_listing_id)
         expect(sold_listing.status).toBe('sold')
 
         // 验证物品所有权转移
@@ -527,7 +529,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
           )
           await listing_tx.commit()
           listing = result.listing
-          createdListings.push(listing.listing_id)
+          createdListings.push(listing.market_listing_id)
         } catch (error) {
           await listing_tx.rollback()
           throw error
@@ -542,13 +544,13 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
           const order_result = await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey('order_rollback'),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: testBuyer.user_id
             },
             { transaction: order_tx }
           )
           await order_tx.commit()
-          order_id = order_result.order_id
+          order_id = order_result.trade_order_id
           createdOrders.push(order_id)
         } catch (error) {
           await order_tx.rollback()
@@ -556,14 +558,14 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         }
 
         // 验证挂牌状态为 locked
-        const locked_listing = await MarketListing.findByPk(listing.listing_id)
+        const locked_listing = await MarketListing.findByPk(listing.market_listing_id)
         expect(locked_listing.status).toBe('locked')
 
         // 3. 取消订单
         const cancel_tx = await sequelize.transaction()
         try {
           await TradeOrderService.cancelOrder(
-            { order_id, cancel_reason: '测试回滚' },
+            { trade_order_id: order_id, cancel_reason: '测试回滚' },
             { transaction: cancel_tx }
           )
           await cancel_tx.commit()
@@ -573,7 +575,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         }
 
         // 4. 验证挂牌状态恢复为 on_sale
-        const restored_listing = await MarketListing.findByPk(listing.listing_id)
+        const restored_listing = await MarketListing.findByPk(listing.market_listing_id)
         expect(restored_listing.status).toBe('on_sale')
         expect(restored_listing.locked_by_order_id).toBeNull()
         expect(restored_listing.locked_at).toBeNull()
@@ -608,7 +610,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
           )
           await listing_tx.commit()
           listing = result.listing
-          createdListings.push(listing.listing_id)
+          createdListings.push(listing.market_listing_id)
         } catch (error) {
           await listing_tx.rollback()
           throw error
@@ -622,7 +624,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         try {
           await MarketListingService.withdrawListing(
             {
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               seller_user_id: testSeller.user_id
             },
             { transaction: withdraw_tx }
@@ -634,7 +636,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         }
 
         // 3. 验证挂牌状态变为 withdrawn
-        const withdrawn_listing = await MarketListing.findByPk(listing.listing_id)
+        const withdrawn_listing = await MarketListing.findByPk(listing.market_listing_id)
         expect(withdrawn_listing.status).toBe('withdrawn')
 
         // 验证物品状态恢复
@@ -667,7 +669,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
           )
           await listing_tx.commit()
           listing = result.listing
-          createdListings.push(listing.listing_id)
+          createdListings.push(listing.market_listing_id)
         } catch (error) {
           await listing_tx.rollback()
           throw error
@@ -678,9 +680,9 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         try {
           await MarketListingService.adminForceWithdrawListing(
             {
-              listing_id: listing.listing_id,
-              admin_id: testAdmin.user_id,
-              withdraw_reason: '测试管理员强制撤回（在售状态）'
+              market_listing_id: listing.market_listing_id,
+              operator_id: testAdmin.user_id,
+              reason: '测试管理员强制撤回（在售状态）'
             },
             { transaction: admin_tx }
           )
@@ -691,7 +693,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         }
 
         // 3. 验证挂牌状态变为 admin_withdrawn
-        const admin_withdrawn_listing = await MarketListing.findByPk(listing.listing_id)
+        const admin_withdrawn_listing = await MarketListing.findByPk(listing.market_listing_id)
         expect(admin_withdrawn_listing.status).toBe('admin_withdrawn')
 
         console.log('✅ on_sale → admin_withdrawn 状态转换验证通过')
@@ -725,7 +727,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
           )
           await listing_tx.commit()
           listing = result.listing
-          createdListings.push(listing.listing_id)
+          createdListings.push(listing.market_listing_id)
         } catch (error) {
           await listing_tx.rollback()
           throw error
@@ -739,13 +741,13 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
           const order_result = await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey('order_admin_cancel'),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: testBuyer.user_id
             },
             { transaction: order_tx }
           )
           await order_tx.commit()
-          order_id = order_result.order_id
+          order_id = order_result.trade_order_id
           createdOrders.push(order_id)
         } catch (error) {
           await order_tx.rollback()
@@ -753,7 +755,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         }
 
         // 验证挂牌已锁定
-        const locked_listing = await MarketListing.findByPk(listing.listing_id)
+        const locked_listing = await MarketListing.findByPk(listing.market_listing_id)
         expect(locked_listing.status).toBe('locked')
 
         // 3. 管理员强制撤回已锁定挂牌
@@ -761,9 +763,9 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         try {
           await MarketListingService.adminForceWithdrawListing(
             {
-              listing_id: listing.listing_id,
-              admin_id: testAdmin.user_id,
-              withdraw_reason: '测试管理员强制撤回（已锁定状态）'
+              market_listing_id: listing.market_listing_id,
+              operator_id: testAdmin.user_id,
+              reason: '测试管理员强制撤回（已锁定状态）'
             },
             { transaction: admin_tx }
           )
@@ -774,7 +776,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         }
 
         // 4. 验证挂牌状态变为 admin_withdrawn
-        const admin_withdrawn_listing = await MarketListing.findByPk(listing.listing_id)
+        const admin_withdrawn_listing = await MarketListing.findByPk(listing.market_listing_id)
         expect(admin_withdrawn_listing.status).toBe('admin_withdrawn')
 
         /*
@@ -903,7 +905,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
           )
           await listing_tx.commit()
           listing = result.listing
-          createdListings.push(listing.listing_id)
+          createdListings.push(listing.market_listing_id)
         } catch (error) {
           await listing_tx.rollback()
           throw error
@@ -916,13 +918,13 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
           const order_result = await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey('lock_order'),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: testBuyer.user_id
             },
             { transaction: order_tx }
           )
           await order_tx.commit()
-          createdOrders.push(order_result.order_id)
+          createdOrders.push(order_result.trade_order_id)
         } catch (error) {
           await order_tx.rollback()
           throw error
@@ -933,7 +935,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         try {
           await MarketListingService.withdrawListing(
             {
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               seller_user_id: testSeller.user_id
             },
             { transaction: withdraw_tx }
@@ -978,7 +980,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
           )
           await listing_tx.commit()
           listing = result.listing
-          createdListings.push(listing.listing_id)
+          createdListings.push(listing.market_listing_id)
         } catch (error) {
           await listing_tx.rollback()
           throw error
@@ -992,13 +994,13 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
           const order_result = await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey('sold_order'),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id: testBuyer.user_id
             },
             { transaction: order_tx }
           )
           await order_tx.commit()
-          order_id = order_result.order_id
+          order_id = order_result.trade_order_id
           createdOrders.push(order_id)
         } catch (error) {
           await order_tx.rollback()
@@ -1008,7 +1010,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         const complete_tx = await sequelize.transaction()
         try {
           await TradeOrderService.completeOrder(
-            { order_id, buyer_id: testBuyer.user_id },
+            { trade_order_id: order_id, buyer_id: testBuyer.user_id },
             { transaction: complete_tx }
           )
           await complete_tx.commit()
@@ -1022,7 +1024,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         try {
           await MarketListingService.withdrawListing(
             {
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               seller_user_id: testSeller.user_id
             },
             { transaction: withdraw_tx }
@@ -1067,7 +1069,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
           )
           await listing_tx.commit()
           listing = result.listing
-          createdListings.push(listing.listing_id)
+          createdListings.push(listing.market_listing_id)
         } catch (error) {
           await listing_tx.rollback()
           throw error
@@ -1078,7 +1080,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         try {
           await MarketListingService.withdrawListing(
             {
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               seller_user_id: testBuyer.user_id // 买家尝试撤回
             },
             { transaction: withdraw_tx }
@@ -1108,7 +1110,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         try {
           await MarketListingService.withdrawListing(
             {
-              listing_id: fake_listing_id,
+              market_listing_id: fake_listing_id,
               seller_user_id: testSeller.user_id
             },
             { transaction: withdraw_tx }
@@ -1161,14 +1163,14 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         )
         await listing_tx.commit()
         listing = result.listing
-        createdListings.push(listing.listing_id)
+        createdListings.push(listing.market_listing_id)
       } catch (error) {
         await listing_tx.rollback()
         throw error
       }
 
       expect(listing.status).toBe('on_sale')
-      console.log(`Step 2: 挂牌创建 listing_id=${listing.listing_id}, status=on_sale`)
+      console.log(`Step 2: 挂牌创建 market_listing_id=${listing.market_listing_id}, status=on_sale`)
 
       // Step 3: 买家下单
       await grantTestAsset(testBuyer.user_id, 'DIAMOND', 200)
@@ -1179,20 +1181,20 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         const order_result = await TradeOrderService.createOrder(
           {
             idempotency_key: generateIdempotencyKey('e2e_order'),
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             buyer_id: testBuyer.user_id
           },
           { transaction: order_tx }
         )
         await order_tx.commit()
-        order_id = order_result.order_id
+        order_id = order_result.trade_order_id
         createdOrders.push(order_id)
       } catch (error) {
         await order_tx.rollback()
         throw error
       }
 
-      const listing_after_order = await MarketListing.findByPk(listing.listing_id)
+      const listing_after_order = await MarketListing.findByPk(listing.market_listing_id)
       expect(listing_after_order.status).toBe('locked')
       console.log(`Step 3: 买家下单 order_id=${order_id}, listing_status=locked`)
 
@@ -1200,7 +1202,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
       const complete_tx = await sequelize.transaction()
       try {
         await TradeOrderService.completeOrder(
-          { order_id, buyer_id: testBuyer.user_id },
+          { trade_order_id: order_id, buyer_id: testBuyer.user_id },
           { transaction: complete_tx }
         )
         await complete_tx.commit()
@@ -1210,7 +1212,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
       }
 
       // Step 5: 最终状态验证
-      const final_listing = await MarketListing.findByPk(listing.listing_id)
+      const final_listing = await MarketListing.findByPk(listing.market_listing_id)
       const final_item = await ItemInstance.findByPk(test_item.item_instance_id)
       const final_order = await TradeOrder.findByPk(order_id)
 
@@ -1251,21 +1253,21 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         )
         await listing_tx.commit()
         listing = result.listing
-        createdListings.push(listing.listing_id)
+        createdListings.push(listing.market_listing_id)
       } catch (error) {
         await listing_tx.rollback()
         throw error
       }
 
       expect(listing.status).toBe('on_sale')
-      console.log(`Step 2: 挂牌创建 listing_id=${listing.listing_id}, status=on_sale`)
+      console.log(`Step 2: 挂牌创建 market_listing_id=${listing.market_listing_id}, status=on_sale`)
 
       // Step 3: 撤回挂牌
       const withdraw_tx = await sequelize.transaction()
       try {
         await MarketListingService.withdrawListing(
           {
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             seller_user_id: testSeller.user_id
           },
           { transaction: withdraw_tx }
@@ -1277,7 +1279,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
       }
 
       // Step 4: 最终状态验证
-      const final_listing = await MarketListing.findByPk(listing.listing_id)
+      const final_listing = await MarketListing.findByPk(listing.market_listing_id)
       const final_item = await ItemInstance.findByPk(test_item.item_instance_id)
 
       expect(final_listing.status).toBe('withdrawn')

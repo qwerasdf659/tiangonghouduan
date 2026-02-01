@@ -61,7 +61,13 @@ const DATA_SOURCE_CONFIG = {
    */
   consumptions: {
     model: 'ConsumptionRecord',
-    defaultFields: ['record_id', 'user_id', 'consumption_amount', 'points_earned', 'created_at'],
+    defaultFields: [
+      'consumption_record_id',
+      'user_id',
+      'consumption_amount',
+      'points_earned',
+      'created_at'
+    ],
     aggregateFields: {
       total_amount: 'SUM(consumption_amount)',
       total_points: 'SUM(points_earned)',
@@ -75,7 +81,14 @@ const DATA_SOURCE_CONFIG = {
    */
   exchanges: {
     model: 'ExchangeRecord',
-    defaultFields: ['exchange_id', 'user_id', 'prize_id', 'points_cost', 'status', 'created_at'],
+    defaultFields: [
+      'exchange_record_id',
+      'user_id',
+      'lottery_prize_id',
+      'points_cost',
+      'status',
+      'created_at'
+    ],
     aggregateFields: {
       total_cost: 'SUM(points_cost)',
       exchange_count: 'COUNT(*)',
@@ -87,12 +100,18 @@ const DATA_SOURCE_CONFIG = {
    * 抽奖数据源
    */
   lottery: {
-    model: 'LotteryRecord',
-    defaultFields: ['record_id', 'user_id', 'campaign_id', 'prize_id', 'created_at'],
+    model: 'LotteryDraw',
+    defaultFields: [
+      'lottery_draw_id',
+      'user_id',
+      'lottery_campaign_id',
+      'lottery_prize_id',
+      'created_at'
+    ],
     aggregateFields: {
       draw_count: 'COUNT(*)',
       user_count: 'COUNT(DISTINCT user_id)',
-      prize_count: 'COUNT(DISTINCT prize_id)'
+      prize_count: 'COUNT(DISTINCT lottery_prize_id)'
     }
   },
 
@@ -101,7 +120,7 @@ const DATA_SOURCE_CONFIG = {
    */
   campaigns: {
     model: 'LotteryCampaign',
-    defaultFields: ['campaign_id', 'name', 'status', 'start_time', 'end_time'],
+    defaultFields: ['lottery_campaign_id', 'name', 'status', 'start_time', 'end_time'],
     aggregateFields: {
       total_count: 'COUNT(*)',
       active_count: "COUNT(CASE WHEN status = 'active' THEN 1 END)"

@@ -19,7 +19,7 @@
  *
  * 数据模型：
  * - Account：账户（user_id/system_code + account_type）
- * - AccountAssetBalance：账户余额（account_id + asset_code + campaign_id）
+ * - AccountAssetBalance：账户余额（account_id + asset_code + lottery_campaign_id）
  * - AssetTransaction：资产变更交易记录
  *
  * 设计原则（继承自 AssetService）：
@@ -122,22 +122,22 @@ class BalanceService {
    * 获取或创建资产余额记录
    *
    * 业务规则（BUDGET_POINTS 架构）：
-   * - BUDGET_POINTS 必须指定 campaign_id（活动隔离）
-   * - 其他资产类型 campaign_id 可选
+   * - BUDGET_POINTS 必须指定 lottery_campaign_id（活动隔离）
+   * - 其他资产类型 lottery_campaign_id 可选
    *
    * @param {number} account_id - 账户ID
    * @param {string} asset_code - 资产代码（如DIAMOND、red_shard、BUDGET_POINTS）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象
-   * @param {string|number} options.campaign_id - 活动ID（BUDGET_POINTS 必填，其他资产可选）
+   * @param {string|number} options.lottery_campaign_id - 活动ID（BUDGET_POINTS 必填，其他资产可选）
    * @returns {Promise<Object>} 资产余额对象
    */
   static async getOrCreateBalance(account_id, asset_code, options = {}) {
-    const { transaction, campaign_id } = options
+    const { transaction, lottery_campaign_id } = options
 
-    // 🔥 BUDGET_POINTS 必须指定 campaign_id
-    if (asset_code === 'BUDGET_POINTS' && !campaign_id) {
-      throw new Error('BUDGET_POINTS 必须指定 campaign_id 参数（活动隔离规则）')
+    // 🔥 BUDGET_POINTS 必须指定 lottery_campaign_id
+    if (asset_code === 'BUDGET_POINTS' && !lottery_campaign_id) {
+      throw new Error('BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）')
     }
 
     // 构建查询条件
@@ -147,8 +147,8 @@ class BalanceService {
     }
 
     // BUDGET_POINTS 按活动隔离
-    if (asset_code === 'BUDGET_POINTS' && campaign_id) {
-      whereCondition.campaign_id = String(campaign_id)
+    if (asset_code === 'BUDGET_POINTS' && lottery_campaign_id) {
+      whereCondition.lottery_campaign_id = String(lottery_campaign_id)
     }
 
     // 默认值
@@ -159,9 +159,9 @@ class BalanceService {
       frozen_amount: 0
     }
 
-    // BUDGET_POINTS 需要记录 campaign_id
-    if (asset_code === 'BUDGET_POINTS' && campaign_id) {
-      defaults.campaign_id = String(campaign_id)
+    // BUDGET_POINTS 需要记录 lottery_campaign_id
+    if (asset_code === 'BUDGET_POINTS' && lottery_campaign_id) {
+      defaults.lottery_campaign_id = String(lottery_campaign_id)
     }
 
     // 查找或创建资产余额记录（使用findOrCreate确保原子性）
@@ -178,7 +178,7 @@ class BalanceService {
         balance_id: balance.balance_id,
         account_id,
         asset_code,
-        campaign_id: campaign_id || null
+        lottery_campaign_id: lottery_campaign_id || null
       })
     }
 
@@ -193,7 +193,7 @@ class BalanceService {
    * - 扣减时必须验证可用余额充足
    * - 记录变动前后余额用于完整对账（before + delta = after）
    * - 支持外部事务传入
-   * - BUDGET_POINTS 必须指定 campaign_id（活动隔离）
+   * - BUDGET_POINTS 必须指定 lottery_campaign_id（活动隔离）
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID（用户账户）
@@ -203,7 +203,7 @@ class BalanceService {
    * @param {string} params.business_type - 业务类型（必填）
    * @param {string} params.idempotency_key - 独立幂等键（必填）
    * @param {string} params.lottery_session_id - 抽奖会话ID（可选，仅抽奖业务使用）
-   * @param {string|number} params.campaign_id - 活动ID（BUDGET_POINTS 必填，其他资产可选）
+   * @param {string|number} params.lottery_campaign_id - 活动ID（BUDGET_POINTS 必填，其他资产可选）
    * @param {Object} params.meta - 扩展信息（可选）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象（强制要求）
@@ -218,7 +218,7 @@ class BalanceService {
       business_type,
       idempotency_key,
       lottery_session_id,
-      campaign_id,
+      lottery_campaign_id,
       meta = {}
     } = params
     const { transaction } = options
@@ -240,9 +240,9 @@ class BalanceService {
       throw new Error('asset_code是必填参数')
     }
 
-    // 🔥 BUDGET_POINTS 必须指定 campaign_id（活动隔离规则）
-    if (asset_code === 'BUDGET_POINTS' && !campaign_id) {
-      throw new Error('BUDGET_POINTS 必须指定 campaign_id 参数（活动隔离规则）')
+    // 🔥 BUDGET_POINTS 必须指定 lottery_campaign_id（活动隔离规则）
+    if (asset_code === 'BUDGET_POINTS' && !lottery_campaign_id) {
+      throw new Error('BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）')
     }
 
     try {
@@ -265,7 +265,7 @@ class BalanceService {
         const account = await this.getOrCreateAccount({ user_id, system_code }, { transaction })
         const balance = await this.getOrCreateBalance(account.account_id, asset_code, {
           transaction,
-          campaign_id
+          lottery_campaign_id
         })
 
         return {
@@ -286,8 +286,8 @@ class BalanceService {
       }
 
       // BUDGET_POINTS 按活动隔离查询
-      if (asset_code === 'BUDGET_POINTS' && campaign_id) {
-        balanceWhereCondition.campaign_id = String(campaign_id)
+      if (asset_code === 'BUDGET_POINTS' && lottery_campaign_id) {
+        balanceWhereCondition.lottery_campaign_id = String(lottery_campaign_id)
       }
 
       // 获取或创建余额记录（加行级锁）
@@ -305,7 +305,7 @@ class BalanceService {
         }
         finalBalance = await this.getOrCreateBalance(account.account_id, asset_code, {
           transaction,
-          campaign_id
+          lottery_campaign_id
         })
       } else {
         finalBalance = balance
@@ -355,7 +355,7 @@ class BalanceService {
           idempotency_key,
           meta: {
             ...meta,
-            campaign_id: campaign_id || null
+            lottery_campaign_id: lottery_campaign_id || null
           }
         },
         { transaction }
@@ -372,7 +372,7 @@ class BalanceService {
         balance_after,
         business_type,
         lottery_session_id: lottery_session_id || null,
-        campaign_id: campaign_id || null,
+        lottery_campaign_id: lottery_campaign_id || null,
         idempotency_key,
         transaction_id: transaction_record.transaction_id
       })
@@ -395,7 +395,7 @@ class BalanceService {
         asset_code,
         delta_amount,
         business_type,
-        campaign_id: campaign_id || null,
+        lottery_campaign_id: lottery_campaign_id || null,
         idempotency_key,
         error: error.message
       })
@@ -952,18 +952,18 @@ class BalanceService {
    * @param {number} params.user_id - 用户ID（用户账户）
    * @param {string} params.system_code - 系统账户代码（系统账户）
    * @param {string} params.asset_code - 资产代码
-   * @param {string|number} params.campaign_id - 活动ID（BUDGET_POINTS 必填，其他资产可选）
+   * @param {string|number} params.lottery_campaign_id - 活动ID（BUDGET_POINTS 必填，其他资产可选）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象（可选）
    * @returns {Promise<Object|null>} 余额对象或null
    */
   static async getBalance(params, options = {}) {
-    const { user_id, system_code, asset_code, campaign_id } = params
+    const { user_id, system_code, asset_code, lottery_campaign_id } = params
     const { transaction } = options
 
-    // 🔥 BUDGET_POINTS 必须指定 campaign_id
-    if (asset_code === 'BUDGET_POINTS' && !campaign_id) {
-      throw new Error('BUDGET_POINTS 必须指定 campaign_id 参数（活动隔离规则）')
+    // 🔥 BUDGET_POINTS 必须指定 lottery_campaign_id
+    if (asset_code === 'BUDGET_POINTS' && !lottery_campaign_id) {
+      throw new Error('BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）')
     }
 
     try {
@@ -977,8 +977,8 @@ class BalanceService {
       }
 
       // BUDGET_POINTS 按活动隔离查询
-      if (asset_code === 'BUDGET_POINTS' && campaign_id) {
-        whereCondition.campaign_id = String(campaign_id)
+      if (asset_code === 'BUDGET_POINTS' && lottery_campaign_id) {
+        whereCondition.lottery_campaign_id = String(lottery_campaign_id)
       }
 
       // 查找余额记录

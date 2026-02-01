@@ -315,7 +315,7 @@ class UserSegmentService {
         attributes: [
           [fn('HOUR', col('created_at')), 'hour'],
           [fn('DAYOFWEEK', col('created_at')), 'day_of_week'],
-          [fn('COUNT', col('draw_id')), 'count']
+          [fn('COUNT', col('lottery_draw_id')), 'count']
         ],
         where: {
           created_at: { [Op.gte]: startDate }

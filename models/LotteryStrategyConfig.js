@@ -276,7 +276,7 @@ module.exports = (sequelize, DataTypes) => {
       /**
        * 配置ID（自增主键）
        */
-      strategy_config_id: {
+      lottery_strategy_config_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,

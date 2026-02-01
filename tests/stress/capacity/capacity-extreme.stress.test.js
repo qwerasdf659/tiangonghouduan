@@ -425,7 +425,7 @@ describe('🚀 极限容量压力测试（P2-1）', () => {
                   await IdempotencyService.getOrCreateRequest(idempotencyKey, {
                     api_path: '/api/v4/lottery/draw',
                     http_method: 'POST',
-                    request_params: { campaign_id: testCampaignId, draw_count: 1 },
+                    request_params: { lottery_campaign_id: testCampaignId, draw_count: 1 },
                     user_id: testUserId + globalIndex
                   })
 
@@ -664,7 +664,7 @@ describe('🚀 极限容量压力测试（P2-1）', () => {
                   await IdempotencyService.getOrCreateRequest(idempotencyKey, {
                     api_path: '/api/v4/lottery/draw',
                     http_method: 'POST',
-                    request_params: { campaign_id: testCampaignId, draw_count: 1 },
+                    request_params: { lottery_campaign_id: testCampaignId, draw_count: 1 },
                     user_id: testUserId + globalIndex
                   })
 

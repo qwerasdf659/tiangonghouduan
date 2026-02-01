@@ -96,7 +96,7 @@ function parseDateRange(query) {
  */
 
 /**
- * GET /realtime/:campaign_id - 获取实时概览统计
+ * GET /realtime/:lottery_campaign_id - 获取实时概览统计
  *
  * 提供今日的核心统计指标，包括：
  * - 总抽奖次数
@@ -107,7 +107,7 @@ function parseDateRange(query) {
  * - 平均单次消耗
  *
  * 路径参数：
- * - campaign_id: 活动ID
+ * - lottery_campaign_id: 活动ID
  *
  * 返回示例：
  * {
@@ -125,29 +125,34 @@ function parseDateRange(query) {
  *   }
  * }
  */
-router.get('/realtime/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const campaign_id = parseInt(req.params.campaign_id)
+router.get(
+  '/realtime/:lottery_campaign_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
 
-    if (isNaN(campaign_id)) {
-      return res.apiError('campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
+      if (isNaN(lottery_campaign_id)) {
+        return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
+      }
+
+      // 🔴 修正：调用正确的服务方法 getRealtimeOverview（不是 getRealtimeStats）
+      const result = await getLotteryAnalyticsService(req).getRealtimeOverview(lottery_campaign_id)
+
+      logger.info('查询实时概览统计', {
+        admin_id: req.user.user_id,
+        lottery_campaign_id,
+        today_total_draws: result.today?.total_draws || 0
+      })
+
+      return res.apiSuccess(result, '获取实时概览统计成功')
+    } catch (error) {
+      logger.error('获取实时概览统计失败:', error)
+      return res.apiError(`查询失败：${error.message}`, 'GET_REALTIME_STATS_FAILED', null, 500)
     }
-
-    // 🔴 修正：调用正确的服务方法 getRealtimeOverview（不是 getRealtimeStats）
-    const result = await getLotteryAnalyticsService(req).getRealtimeOverview(campaign_id)
-
-    logger.info('查询实时概览统计', {
-      admin_id: req.user.user_id,
-      campaign_id,
-      today_total_draws: result.today?.total_draws || 0
-    })
-
-    return res.apiSuccess(result, '获取实时概览统计成功')
-  } catch (error) {
-    logger.error('获取实时概览统计失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'GET_REALTIME_STATS_FAILED', null, 500)
   }
-})
+)
 
 /*
  * ==========================================
@@ -156,7 +161,7 @@ router.get('/realtime/:campaign_id', authenticateToken, requireRoleLevel(100), a
  */
 
 /**
- * GET /hourly/:campaign_id - 获取小时级趋势数据
+ * GET /hourly/:lottery_campaign_id - 获取小时级趋势数据
  *
  * 提供指定时间范围内的小时级统计趋势，包括：
  * - 每小时抽奖次数
@@ -166,7 +171,7 @@ router.get('/realtime/:campaign_id', authenticateToken, requireRoleLevel(100), a
  * - 每小时平均消耗
  *
  * 路径参数：
- * - campaign_id: 活动ID
+ * - lottery_campaign_id: 活动ID
  *
  * Query参数：
  * - start_time: 开始时间（ISO8601格式，默认24小时前）
@@ -174,44 +179,49 @@ router.get('/realtime/:campaign_id', authenticateToken, requireRoleLevel(100), a
  *
  * 返回：小时级统计数据列表
  */
-router.get('/hourly/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const campaign_id = parseInt(req.params.campaign_id)
+router.get(
+  '/hourly/:lottery_campaign_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
 
-    if (isNaN(campaign_id)) {
-      return res.apiError('campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
-    }
+      if (isNaN(lottery_campaign_id)) {
+        return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
+      }
 
-    const { start_time, end_time } = parseTimeRange(req.query)
+      const { start_time, end_time } = parseTimeRange(req.query)
 
-    // 🔴 修正：调用正确的服务方法 getHourlyTrend 并使用 options 对象参数格式
-    const result = await getLotteryAnalyticsService(req).getHourlyTrend(campaign_id, {
-      start_time,
-      end_time
-    })
+      // 🔴 修正：调用正确的服务方法 getHourlyTrend 并使用 options 对象参数格式
+      const result = await getLotteryAnalyticsService(req).getHourlyTrend(lottery_campaign_id, {
+        start_time,
+        end_time
+      })
 
-    logger.info('查询小时级趋势数据', {
-      admin_id: req.user.user_id,
-      campaign_id,
-      start_time,
-      end_time,
-      data_points: result.length
-    })
-
-    return res.apiSuccess(
-      {
-        campaign_id,
+      logger.info('查询小时级趋势数据', {
+        admin_id: req.user.user_id,
+        lottery_campaign_id,
         start_time,
         end_time,
-        data: result
-      },
-      '获取小时级趋势数据成功'
-    )
-  } catch (error) {
-    logger.error('获取小时级趋势数据失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'GET_HOURLY_STATS_FAILED', null, 500)
+        data_points: result.length
+      })
+
+      return res.apiSuccess(
+        {
+          lottery_campaign_id,
+          start_time,
+          end_time,
+          data: result
+        },
+        '获取小时级趋势数据成功'
+      )
+    } catch (error) {
+      logger.error('获取小时级趋势数据失败:', error)
+      return res.apiError(`查询失败：${error.message}`, 'GET_HOURLY_STATS_FAILED', null, 500)
+    }
   }
-})
+)
 
 /*
  * ==========================================
@@ -220,13 +230,13 @@ router.get('/hourly/:campaign_id', authenticateToken, requireRoleLevel(100), asy
  */
 
 /**
- * GET /daily/:campaign_id - 获取日级趋势数据
+ * GET /daily/:lottery_campaign_id - 获取日级趋势数据
  *
  * 提供指定日期范围内的日级统计趋势。
  * 数据来源：lottery_daily_metrics（永久保留）
  *
  * 路径参数：
- * - campaign_id: 活动ID
+ * - lottery_campaign_id: 活动ID
  *
  * Query参数：
  * - start_date: 开始日期（YYYY-MM-DD，默认7天前）
@@ -234,44 +244,49 @@ router.get('/hourly/:campaign_id', authenticateToken, requireRoleLevel(100), asy
  *
  * 返回：日级统计数据列表
  */
-router.get('/daily/:campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const campaign_id = parseInt(req.params.campaign_id)
+router.get(
+  '/daily/:lottery_campaign_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
 
-    if (isNaN(campaign_id)) {
-      return res.apiError('campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
-    }
+      if (isNaN(lottery_campaign_id)) {
+        return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
+      }
 
-    const { start_date, end_date } = parseDateRange(req.query)
+      const { start_date, end_date } = parseDateRange(req.query)
 
-    // 🔴 修正：调用正确的服务方法 getDailyTrend 并使用 options 对象参数格式
-    const result = await getLotteryAnalyticsService(req).getDailyTrend(campaign_id, {
-      start_date,
-      end_date
-    })
+      // 🔴 修正：调用正确的服务方法 getDailyTrend 并使用 options 对象参数格式
+      const result = await getLotteryAnalyticsService(req).getDailyTrend(lottery_campaign_id, {
+        start_date,
+        end_date
+      })
 
-    logger.info('查询日级趋势数据', {
-      admin_id: req.user.user_id,
-      campaign_id,
-      start_date,
-      end_date,
-      data_points: result.length
-    })
-
-    return res.apiSuccess(
-      {
-        campaign_id,
+      logger.info('查询日级趋势数据', {
+        admin_id: req.user.user_id,
+        lottery_campaign_id,
         start_date,
         end_date,
-        data: result
-      },
-      '获取日级趋势数据成功'
-    )
-  } catch (error) {
-    logger.error('获取日级趋势数据失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'GET_DAILY_STATS_FAILED', null, 500)
+        data_points: result.length
+      })
+
+      return res.apiSuccess(
+        {
+          lottery_campaign_id,
+          start_date,
+          end_date,
+          data: result
+        },
+        '获取日级趋势数据成功'
+      )
+    } catch (error) {
+      logger.error('获取日级趋势数据失败:', error)
+      return res.apiError(`查询失败：${error.message}`, 'GET_DAILY_STATS_FAILED', null, 500)
+    }
   }
-})
+)
 
 /*
  * ==========================================
@@ -280,7 +295,7 @@ router.get('/daily/:campaign_id', authenticateToken, requireRoleLevel(100), asyn
  */
 
 /**
- * GET /tier-distribution/:campaign_id - 获取奖品档位分布
+ * GET /tier-distribution/:lottery_campaign_id - 获取奖品档位分布
  *
  * 统计指定时间范围内各奖品档位的分布情况：
  * - high: 高价值奖品
@@ -289,7 +304,7 @@ router.get('/daily/:campaign_id', authenticateToken, requireRoleLevel(100), asyn
  * - fallback: 空奖/保底奖
  *
  * 路径参数：
- * - campaign_id: 活动ID
+ * - lottery_campaign_id: 活动ID
  *
  * Query参数：
  * - start_time: 开始时间（ISO8601格式，默认24小时前）
@@ -307,28 +322,31 @@ router.get('/daily/:campaign_id', authenticateToken, requireRoleLevel(100), asyn
  * }
  */
 router.get(
-  '/tier-distribution/:campaign_id',
+  '/tier-distribution/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(100),
   async (req, res) => {
     try {
-      const campaign_id = parseInt(req.params.campaign_id)
+      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
 
-      if (isNaN(campaign_id)) {
-        return res.apiError('campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
+      if (isNaN(lottery_campaign_id)) {
+        return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
       }
 
       const { start_time, end_time } = parseTimeRange(req.query)
 
       // 🔴 修正：使用 options 对象参数格式
-      const result = await getLotteryAnalyticsService(req).getTierDistribution(campaign_id, {
-        start_time,
-        end_time
-      })
+      const result = await getLotteryAnalyticsService(req).getTierDistribution(
+        lottery_campaign_id,
+        {
+          start_time,
+          end_time
+        }
+      )
 
       logger.info('查询奖品档位分布', {
         admin_id: req.user.user_id,
-        campaign_id,
+        lottery_campaign_id,
         start_time,
         end_time,
         total_draws: result.total_draws
@@ -349,7 +367,7 @@ router.get(
  */
 
 /**
- * GET /experience-triggers/:campaign_id - 获取体验机制触发统计
+ * GET /experience-triggers/:lottery_campaign_id - 获取体验机制触发统计
  *
  * 统计指定时间范围内各体验机制的触发情况：
  * - pity_triggered: Pity 保底触发次数
@@ -358,7 +376,7 @@ router.get(
  * - luck_debt_triggered: 运气债务触发次数
  *
  * 路径参数：
- * - campaign_id: 活动ID
+ * - lottery_campaign_id: 活动ID
  *
  * Query参数：
  * - start_time: 开始时间（ISO8601格式，默认24小时前）
@@ -376,28 +394,31 @@ router.get(
  * }
  */
 router.get(
-  '/experience-triggers/:campaign_id',
+  '/experience-triggers/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(100),
   async (req, res) => {
     try {
-      const campaign_id = parseInt(req.params.campaign_id)
+      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
 
-      if (isNaN(campaign_id)) {
-        return res.apiError('campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
+      if (isNaN(lottery_campaign_id)) {
+        return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
       }
 
       const { start_time, end_time } = parseTimeRange(req.query)
 
       // 🔴 修正：调用正确的服务方法 getExperienceTriggers（不是 getExperienceTriggerStats）并使用 options 对象参数格式
-      const result = await getLotteryAnalyticsService(req).getExperienceTriggers(campaign_id, {
-        start_time,
-        end_time
-      })
+      const result = await getLotteryAnalyticsService(req).getExperienceTriggers(
+        lottery_campaign_id,
+        {
+          start_time,
+          end_time
+        }
+      )
 
       logger.info('查询体验机制触发统计', {
         admin_id: req.user.user_id,
-        campaign_id,
+        lottery_campaign_id,
         start_time,
         end_time,
         total_draws: result.total_draws
@@ -418,7 +439,7 @@ router.get(
  */
 
 /**
- * GET /budget-consumption/:campaign_id - 获取预算消耗统计
+ * GET /budget-consumption/:lottery_campaign_id - 获取预算消耗统计
  *
  * 统计指定时间范围内的预算消耗情况：
  * - 总抽奖次数
@@ -426,7 +447,7 @@ router.get(
  * - 平均单次消耗
  *
  * 路径参数：
- * - campaign_id: 活动ID
+ * - lottery_campaign_id: 活动ID
  *
  * Query参数：
  * - start_time: 开始时间（ISO8601格式，默认24小时前）
@@ -440,28 +461,31 @@ router.get(
  * }
  */
 router.get(
-  '/budget-consumption/:campaign_id',
+  '/budget-consumption/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(100),
   async (req, res) => {
     try {
-      const campaign_id = parseInt(req.params.campaign_id)
+      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
 
-      if (isNaN(campaign_id)) {
-        return res.apiError('campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
+      if (isNaN(lottery_campaign_id)) {
+        return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
       }
 
       const { start_time, end_time } = parseTimeRange(req.query)
 
       // 🔴 修正：调用正确的服务方法 getBudgetConsumption（不是 getBudgetConsumptionStats）并使用 options 对象参数格式
-      const result = await getLotteryAnalyticsService(req).getBudgetConsumption(campaign_id, {
-        start_time,
-        end_time
-      })
+      const result = await getLotteryAnalyticsService(req).getBudgetConsumption(
+        lottery_campaign_id,
+        {
+          start_time,
+          end_time
+        }
+      )
 
       logger.info('查询预算消耗统计', {
         admin_id: req.user.user_id,
-        campaign_id,
+        lottery_campaign_id,
         start_time,
         end_time,
         total_budget_consumed: result.total_budget_consumed

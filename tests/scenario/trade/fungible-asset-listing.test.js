@@ -92,18 +92,18 @@ describe('C2C 材料交易功能集成测试', () => {
               async transaction => {
                 await MarketListingService.withdrawFungibleAssetListing(
                   {
-                    listing_id: listing.listing_id,
+                    market_listing_id: listing.market_listing_id,
                     seller_user_id: listing.seller_user_id,
                     withdraw_reason: 'beforeAll cleanup'
                   },
                   { transaction }
                 )
               },
-              { description: `cleanup_orphan_${listing.listing_id}` }
+              { description: `cleanup_orphan_${listing.market_listing_id}` }
             )
-            console.log(`  ✅ 撤回挂牌: ${listing.listing_id}`)
+            console.log(`  ✅ 撤回挂牌: ${listing.market_listing_id}`)
           } catch (error) {
-            console.warn(`  ⚠️ 撤回失败: ${listing.listing_id} (${error.message})`)
+            console.warn(`  ⚠️ 撤回失败: ${listing.market_listing_id} (${error.message})`)
           }
         }
       }
@@ -207,7 +207,7 @@ describe('C2C 材料交易功能集成测试', () => {
             async transaction => {
               await MarketListingService.withdrawFungibleAssetListing(
                 {
-                  listing_id: listingId,
+                  market_listing_id: listingId,
                   seller_user_id: listing.seller_user_id,
                   withdraw_reason: '测试清理'
                 },
@@ -221,9 +221,9 @@ describe('C2C 材料交易功能集成测试', () => {
           // item_instance 类型的撤回
           await TransactionManager.execute(
             async transaction => {
-              await MarketListingService.withdrawItemInstanceListing(
+              await MarketListingService.withdrawListing(
                 {
-                  listing_id: listingId,
+                  market_listing_id: listingId,
                   seller_user_id: listing.seller_user_id,
                   withdraw_reason: '测试清理'
                 },
@@ -294,7 +294,7 @@ describe('C2C 材料交易功能集成测试', () => {
       )
 
       // 记录用于清理
-      createdListingIds.push(result.listing.listing_id)
+      createdListingIds.push(result.listing.market_listing_id)
 
       // 3. 验证结果
       expect(result.is_duplicate).toBe(false)
@@ -320,7 +320,7 @@ describe('C2C 材料交易功能集成测试', () => {
       expect(afterBalance.available_amount).toBe(initialBalance.available_amount - offerAmount)
 
       console.log('✅ 创建挂牌成功:', {
-        listing_id: result.listing.listing_id,
+        market_listing_id: result.listing.market_listing_id,
         offer_amount: offerAmount,
         price_amount: priceAmount,
         frozen_amount: afterBalance.frozen_amount
@@ -363,7 +363,7 @@ describe('C2C 材料交易功能集成测试', () => {
         { description: 'test_idempotency_first' }
       )
 
-      createdListingIds.push(firstResult.listing.listing_id)
+      createdListingIds.push(firstResult.listing.market_listing_id)
 
       // 3. 第二次使用相同幂等键创建
       const secondResult = await TransactionManager.execute(
@@ -385,13 +385,16 @@ describe('C2C 材料交易功能集成测试', () => {
       // 4. 验证幂等性
       expect(firstResult.is_duplicate).toBe(false)
       expect(secondResult.is_duplicate).toBe(true)
-      // 注意：listing_id 可能是字符串或数字，使用 Number() 转换比较
-      expect(Number(secondResult.listing.listing_id)).toBe(Number(firstResult.listing.listing_id))
+      // 注意：market_listing_id 可能是字符串或数字，使用 Number() 转换比较
+      expect(Number(secondResult.listing.market_listing_id)).toBe(
+        Number(firstResult.listing.market_listing_id)
+      )
 
       console.log('✅ 幂等性测试通过:', {
         first_is_duplicate: firstResult.is_duplicate,
         second_is_duplicate: secondResult.is_duplicate,
-        same_listing_id: secondResult.listing.listing_id === firstResult.listing.listing_id
+        same_market_listing_id:
+          secondResult.listing.market_listing_id === firstResult.listing.market_listing_id
       })
     })
 
@@ -478,7 +481,7 @@ describe('C2C 材料交易功能集成测试', () => {
         { description: 'test_withdraw_create' }
       )
 
-      const listingId = createResult.listing.listing_id
+      const listingId = createResult.listing.market_listing_id
       createdListingIds.push(listingId)
 
       // 3. 记录创建后的余额
@@ -492,7 +495,7 @@ describe('C2C 材料交易功能集成测试', () => {
         async transaction => {
           return await MarketListingService.withdrawFungibleAssetListing(
             {
-              listing_id: listingId,
+              market_listing_id: listingId,
               seller_user_id: testUser.user_id
             },
             { transaction }
@@ -524,7 +527,7 @@ describe('C2C 材料交易功能集成测试', () => {
       )
 
       console.log('✅ 撤回挂牌成功:', {
-        listing_id: listingId,
+        market_listing_id: listingId,
         unfrozen_amount: offerAmount,
         available_after: balanceAfterWithdraw.available_amount
       })
@@ -566,7 +569,7 @@ describe('C2C 材料交易功能集成测试', () => {
         { description: 'test_not_owner_create' }
       )
 
-      const listingId = createResult.listing.listing_id
+      const listingId = createResult.listing.market_listing_id
       createdListingIds.push(listingId)
 
       // 3. 使用不同的用户ID尝试撤回
@@ -577,7 +580,7 @@ describe('C2C 材料交易功能集成测试', () => {
           async transaction => {
             return await MarketListingService.withdrawFungibleAssetListing(
               {
-                listing_id: listingId,
+                market_listing_id: listingId,
                 seller_user_id: fakeUserId
               },
               { transaction }
@@ -603,7 +606,7 @@ describe('C2C 材料交易功能集成测试', () => {
           async transaction => {
             return await MarketListingService.withdrawFungibleAssetListing(
               {
-                listing_id: fakeListingId,
+                market_listing_id: fakeListingId,
                 seller_user_id: testUser.user_id
               },
               { transaction }
@@ -690,7 +693,7 @@ describe('C2C 材料交易功能集成测试', () => {
         { description: 'test_multi_currency_listing' }
       )
 
-      createdListingIds.push(result.listing.listing_id)
+      createdListingIds.push(result.listing.market_listing_id)
 
       // 3. 验证结果
       expect(result.is_duplicate).toBe(false)
@@ -700,7 +703,7 @@ describe('C2C 材料交易功能集成测试', () => {
       expect(result.listing.status).toBe('on_sale')
 
       console.log('✅ red_shard 定价挂牌创建成功:', {
-        listing_id: result.listing.listing_id,
+        market_listing_id: result.listing.market_listing_id,
         price_asset_code: result.listing.price_asset_code,
         price_amount: result.listing.price_amount
       })

@@ -140,22 +140,24 @@ router.post(
 )
 
 /**
- * GET /api/v4/console/images/:image_id
+ * GET /api/v4/console/images/:id
  *
  * @description 获取图片详情
  *
  * @header Authorization - Bearer {token} 管理员认证
- * @param {number} image_id - 图片资源 ID
+ * @param {number} id - 图片资源 ID（image_resource_id）
  *
  * @response {Object} 200 - 图片详情
  * @response {Object} 404 - 图片不存在
+ *
+ * @since 2026-02-01 主键命名规范化：事务实体路由参数使用 :id（混合策略）
  */
 router.get(
-  '/:image_id',
+  '/:id',
   authenticateToken,
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
-    const imageId = parseInt(req.params.image_id, 10)
+    const imageId = parseInt(req.params.id, 10)
     if (isNaN(imageId)) {
       return res.apiError('无效的图片 ID', 'INVALID_IMAGE_ID', null, 400)
     }
@@ -257,23 +259,25 @@ router.get(
 )
 
 /**
- * PATCH /api/v4/console/images/:image_id/bind
+ * PATCH /api/v4/console/images/:id/bind
  *
  * @description 绑定图片到业务记录（上传后再绑定场景）
  *
  * @header Authorization - Bearer {token} 管理员认证
- * @param {number} image_id - 图片资源 ID
+ * @param {number} id - 图片资源 ID（image_resource_id）
  * @body {number} context_id - 要绑定的业务上下文 ID（如 prize_id、product_id）
  *
  * @response {Object} 200 - 绑定成功
+ *
+ * @since 2026-02-01 主键命名规范化：事务实体路由参数使用 :id（混合策略）
  */
 router.patch(
-  '/:image_id/bind',
+  '/:id/bind',
   authenticateToken,
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
-    const imageId = parseInt(req.params.image_id, 10)
-    // 🔴 修复：使用 context_id（与表结构一致）
+    const imageId = parseInt(req.params.id, 10)
+    // 使用 context_id（与表结构一致）
     const { context_id: contextId } = req.body
 
     if (isNaN(imageId)) {
@@ -290,12 +294,13 @@ router.patch(
       return res.apiError('图片不存在或更新失败', 'UPDATE_FAILED', null, 404)
     }
 
-    return res.apiSuccess({ image_id: imageId, context_id: contextId }, '图片绑定成功')
+    // 2026-02-01 主键命名规范化：API响应字段使用完整前缀 image_resource_id
+    return res.apiSuccess({ image_resource_id: imageId, context_id: contextId }, '图片绑定成功')
   })
 )
 
 /**
- * DELETE /api/v4/console/images/:image_id
+ * DELETE /api/v4/console/images/:id
  *
  * @description 物理删除图片（从数据库和 Sealos 对象存储中删除）
  *
@@ -305,17 +310,19 @@ router.patch(
  *   - 数据库记录物理删除，不保留历史
  *
  * @header Authorization - Bearer {token} 管理员认证
- * @param {number} image_id - 图片资源 ID
+ * @param {number} id - 图片资源 ID（image_resource_id）
  *
  * @response {Object} 200 - 删除成功
  * @response {Object} 404 - 图片不存在
+ *
+ * @since 2026-02-01 主键命名规范化：事务实体路由参数使用 :id（混合策略）
  */
 router.delete(
-  '/:image_id',
+  '/:id',
   authenticateToken,
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
-    const imageId = parseInt(req.params.image_id, 10)
+    const imageId = parseInt(req.params.id, 10)
     if (isNaN(imageId)) {
       return res.apiError('无效的图片 ID', 'INVALID_IMAGE_ID', null, 400)
     }
@@ -326,7 +333,8 @@ router.delete(
       return res.apiError('图片不存在或删除失败', 'DELETE_FAILED', null, 404)
     }
 
-    return res.apiSuccess({ image_id: imageId }, '图片删除成功')
+    // 2026-02-01 主键命名规范化：API响应字段使用完整前缀 image_resource_id
+    return res.apiSuccess({ image_resource_id: imageId }, '图片删除成功')
   })
 )
 

@@ -52,7 +52,7 @@ const DIMENSION_CONFIG = {
     name_field: 'store_name'
   },
   campaign: {
-    field: 'campaign_id',
+    field: 'lottery_campaign_id',
     label: '活动',
     join_table: 'lottery_campaigns',
     name_field: 'name'
@@ -85,7 +85,7 @@ const METRIC_CONFIG = {
     label: '抽奖次数',
     aggregate: 'COUNT',
     source_table: 'lottery_draws',
-    field: 'draw_id'
+    field: 'lottery_draw_id'
   },
   consumption: {
     label: '消费金额',
@@ -160,7 +160,7 @@ class MultiDimensionStatsService {
    * @param {Date} [params.start_date] - 开始日期
    * @param {Date} [params.end_date] - 结束日期
    * @param {number} [params.store_id] - 门店ID过滤
-   * @param {number} [params.campaign_id] - 活动ID过滤
+   * @param {number} [params.lottery_campaign_id] - 活动ID过滤
    * @param {Object} [options={}] - 选项
    * @param {boolean} [options.refresh=false] - 是否强制刷新缓存
    * @returns {Promise<Object>} 多维度统计结果
@@ -187,7 +187,7 @@ class MultiDimensionStatsService {
         start_date,
         end_date,
         store_id,
-        campaign_id
+        lottery_campaign_id
       } = params
 
       // 解析维度和指标
@@ -210,7 +210,7 @@ class MultiDimensionStatsService {
         start: startTime.toISOString().split('T')[0],
         end: endTime.toISOString().split('T')[0],
         store_id: store_id || 'all',
-        campaign_id: campaign_id || 'all'
+        lottery_campaign_id: lottery_campaign_id || 'all'
       }
 
       if (!refresh) {
@@ -230,7 +230,10 @@ class MultiDimensionStatsService {
       })
 
       // ========== 3. 构建查询 ==========
-      const whereClause = this._buildWhereClause(startTime, endTime, { store_id, campaign_id })
+      const whereClause = this._buildWhereClause(startTime, endTime, {
+        store_id,
+        lottery_campaign_id
+      })
       const groupByFields = this._buildGroupByFields(dimensions, period)
 
       // ========== 4. 执行主查询 ==========
@@ -247,7 +250,7 @@ class MultiDimensionStatsService {
       if (compare && compareStartTime && compareEndTime) {
         const compareWhereClause = this._buildWhereClause(compareStartTime, compareEndTime, {
           store_id,
-          campaign_id
+          lottery_campaign_id
         })
         compareData = await this._executeMultiDimensionQuery(
           dimensions,
@@ -541,8 +544,8 @@ class MultiDimensionStatsService {
       where.store_id = filters.store_id
     }
 
-    if (filters.campaign_id) {
-      where.campaign_id = filters.campaign_id
+    if (filters.lottery_campaign_id) {
+      where.lottery_campaign_id = filters.lottery_campaign_id
     }
 
     return where
@@ -720,7 +723,7 @@ class MultiDimensionStatsService {
   static _buildRowKey(row) {
     const keyParts = []
     if (row.store_id !== undefined) keyParts.push(`store:${row.store_id}`)
-    if (row.campaign_id !== undefined) keyParts.push(`campaign:${row.campaign_id}`)
+    if (row.lottery_campaign_id !== undefined) keyParts.push(`campaign:${row.lottery_campaign_id}`)
     if (row.period !== undefined) keyParts.push(`period:${row.period}`)
     if (row.user_id !== undefined) keyParts.push(`user:${row.user_id}`)
     return keyParts.join('|') || 'all'
@@ -779,11 +782,18 @@ class MultiDimensionStatsService {
           {
             model: models.LotteryPrize,
             as: 'prize',
-            attributes: ['prize_id', 'prize_name', 'prize_type'],
+            attributes: ['lottery_prize_id', 'prize_name', 'prize_type'],
             required: false
           }
         ],
-        fields: ['draw_id', 'user_id', 'campaign_id', 'prize_id', 'reward_tier', 'created_at']
+        fields: [
+          'lottery_draw_id',
+          'user_id',
+          'lottery_campaign_id',
+          'lottery_prize_id',
+          'reward_tier',
+          'created_at'
+        ]
       },
       consumption: {
         model: models.ConsumptionRecord,
@@ -794,7 +804,14 @@ class MultiDimensionStatsService {
             attributes: ['user_id', 'nickname', 'mobile']
           }
         ],
-        fields: ['record_id', 'user_id', 'consumption_amount', 'status', 'store_id', 'created_at']
+        fields: [
+          'consumption_record_id',
+          'user_id',
+          'consumption_amount',
+          'status',
+          'store_id',
+          'created_at'
+        ]
       }
     }
 
@@ -842,8 +859,8 @@ class MultiDimensionStatsService {
       where.store_id = filters.store_id
     }
 
-    if (filters.campaign_id) {
-      where.campaign_id = filters.campaign_id
+    if (filters.lottery_campaign_id) {
+      where.lottery_campaign_id = filters.lottery_campaign_id
     }
 
     if (filters.user_id) {

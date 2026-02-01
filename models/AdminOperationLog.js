@@ -62,7 +62,7 @@ module.exports = sequelize => {
     'AdminOperationLog',
     {
       // 主键
-      log_id: {
+      admin_operation_log_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,

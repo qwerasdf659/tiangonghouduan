@@ -143,7 +143,7 @@ class LotteryHealthService {
    * const report = await healthService.getHealthReport(123)
    * // 返回：
    * // {
-   * //   campaign_id: 123,
+   * //   lottery_campaign_id: 123,
    * //   campaign_name: '双12抽奖活动',
    * //   overall_score: 85,
    * //   health_level: 'healthy',
@@ -156,7 +156,7 @@ class LotteryHealthService {
   async getHealthReport(campaignId, options = {}) {
     const { use_cache = true, cache_ttl = 300 } = options
 
-    this.logger.info('获取活动健康报告', { campaign_id: campaignId })
+    this.logger.info('获取活动健康报告', { lottery_campaign_id: campaignId })
 
     // 尝试从缓存获取
     const cacheKey = `lottery:health:${campaignId}`
@@ -164,7 +164,7 @@ class LotteryHealthService {
       try {
         const cached = await this.cacheHelper.get(cacheKey)
         if (cached) {
-          this.logger.debug('健康报告命中缓存', { campaign_id: campaignId })
+          this.logger.debug('健康报告命中缓存', { lottery_campaign_id: campaignId })
           return JSON.parse(cached)
         }
       } catch (error) {
@@ -212,7 +212,7 @@ class LotteryHealthService {
 
       // 6. 组装报告
       const report = {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         campaign_name: campaign.campaign_name,
         campaign_status: campaign.status,
         overall_score: overallScore,
@@ -233,14 +233,14 @@ class LotteryHealthService {
       if (use_cache && this.cacheHelper) {
         try {
           await this.cacheHelper.set(cacheKey, JSON.stringify(report), cache_ttl)
-          this.logger.debug('健康报告已缓存', { campaign_id: campaignId, ttl: cache_ttl })
+          this.logger.debug('健康报告已缓存', { lottery_campaign_id: campaignId, ttl: cache_ttl })
         } catch (error) {
           this.logger.warn('写入健康报告缓存失败', { error: error.message })
         }
       }
 
       this.logger.info('活动健康报告生成完成', {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         overall_score: overallScore,
         health_level: report.health_level,
         issue_count: issues.length
@@ -249,7 +249,7 @@ class LotteryHealthService {
       return report
     } catch (error) {
       this.logger.error('生成活动健康报告失败', {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         error: error.message,
         stack: error.stack
       })
@@ -312,7 +312,10 @@ class LotteryHealthService {
         }
       }
     } catch (error) {
-      this.logger.error('计算预算健康度失败', { campaign_id: campaignId, error: error.message })
+      this.logger.error('计算预算健康度失败', {
+        lottery_campaign_id: campaignId,
+        error: error.message
+      })
       return { score: 0, max_score: 30, level: 'unknown', details: null, error: error.message }
     }
   }
@@ -331,13 +334,13 @@ class LotteryHealthService {
       // 获取实际中奖率统计
       const drawStats = await this.models.LotteryDraw.findOne({
         attributes: [
-          [fn('COUNT', col('draw_id')), 'total_draws'],
+          [fn('COUNT', col('lottery_draw_id')), 'total_draws'],
           [
             fn('SUM', literal("CASE WHEN reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END")),
             'total_wins'
           ]
         ],
-        where: { campaign_id: campaignId },
+        where: { lottery_campaign_id: campaignId },
         raw: true
       })
 
@@ -379,7 +382,10 @@ class LotteryHealthService {
         }
       }
     } catch (error) {
-      this.logger.error('计算中奖率健康度失败', { campaign_id: campaignId, error: error.message })
+      this.logger.error('计算中奖率健康度失败', {
+        lottery_campaign_id: campaignId,
+        error: error.message
+      })
       return { score: 0, max_score: 25, level: 'unknown', details: null, error: error.message }
     }
   }
@@ -394,8 +400,8 @@ class LotteryHealthService {
    */
   async _getTierDistribution(campaignId) {
     const distribution = await this.models.LotteryDraw.findAll({
-      attributes: ['reward_tier', [fn('COUNT', col('draw_id')), 'count']],
-      where: { campaign_id: campaignId },
+      attributes: ['reward_tier', [fn('COUNT', col('lottery_draw_id')), 'count']],
+      where: { lottery_campaign_id: campaignId },
       group: ['reward_tier'],
       raw: true
     })
@@ -446,8 +452,14 @@ class LotteryHealthService {
        * status 字段使用枚举值 'active'/'inactive'
        */
       const prizes = await this.models.LotteryPrize.findAll({
-        where: { campaign_id: campaignId, status: 'active' },
-        attributes: ['prize_id', 'prize_name', 'reward_tier', 'stock_quantity', 'total_win_count'],
+        where: { lottery_campaign_id: campaignId, status: 'active' },
+        attributes: [
+          'lottery_prize_id',
+          'prize_name',
+          'reward_tier',
+          'stock_quantity',
+          'total_win_count'
+        ],
         raw: true
       })
 
@@ -472,7 +484,7 @@ class LotteryHealthService {
         if (remainingStock < HEALTH_THRESHOLDS.inventory.danger) {
           dangerStockCount++
           lowStockPrizes.push({
-            prize_id: prize.prize_id,
+            lottery_prize_id: prize.lottery_prize_id,
             prize_name: prize.prize_name,
             reward_tier: prize.reward_tier,
             remaining: remainingStock,
@@ -481,7 +493,7 @@ class LotteryHealthService {
         } else if (remainingStock < HEALTH_THRESHOLDS.inventory.warning) {
           lowStockCount++
           lowStockPrizes.push({
-            prize_id: prize.prize_id,
+            lottery_prize_id: prize.lottery_prize_id,
             prize_name: prize.prize_name,
             reward_tier: prize.reward_tier,
             remaining: remainingStock,
@@ -512,7 +524,10 @@ class LotteryHealthService {
         }
       }
     } catch (error) {
-      this.logger.error('计算库存健康度失败', { campaign_id: campaignId, error: error.message })
+      this.logger.error('计算库存健康度失败', {
+        lottery_campaign_id: campaignId,
+        error: error.message
+      })
       return { score: 0, max_score: 20, level: 'unknown', details: null, error: error.message }
     }
   }
@@ -529,10 +544,10 @@ class LotteryHealthService {
       // 获取参与用户统计
       const stats = await this.models.LotteryDraw.findOne({
         attributes: [
-          [fn('COUNT', col('draw_id')), 'total_draws'],
+          [fn('COUNT', col('lottery_draw_id')), 'total_draws'],
           [fn('COUNT', fn('DISTINCT', col('user_id'))), 'unique_users']
         ],
-        where: { campaign_id: campaignId },
+        where: { lottery_campaign_id: campaignId },
         raw: true
       })
 
@@ -572,7 +587,10 @@ class LotteryHealthService {
         }
       }
     } catch (error) {
-      this.logger.error('计算参与度健康度失败', { campaign_id: campaignId, error: error.message })
+      this.logger.error('计算参与度健康度失败', {
+        lottery_campaign_id: campaignId,
+        error: error.message
+      })
       return { score: 0, max_score: 15, level: 'unknown', details: null, error: error.message }
     }
   }
@@ -591,7 +609,7 @@ class LotteryHealthService {
       // 获取用户体验状态（连续空奖 >= 10次的用户）
       const highEmptyStreakCount = await this.models.LotteryUserExperienceState.count({
         where: {
-          campaign_id: campaignId,
+          lottery_campaign_id: campaignId,
           empty_streak: { [Op.gte]: emptyStreakThreshold }
         }
       })
@@ -600,7 +618,7 @@ class LotteryHealthService {
       const totalUsers = await this.models.LotteryDraw.count({
         distinct: true,
         col: 'user_id',
-        where: { campaign_id: campaignId }
+        where: { lottery_campaign_id: campaignId }
       })
 
       const emptyStreakRatio = totalUsers > 0 ? highEmptyStreakCount / totalUsers : 0
@@ -608,7 +626,7 @@ class LotteryHealthService {
       // 获取保底机制触发次数（数据库字段为 guarantee_triggered）
       const pityTriggerCount = await this.models.LotteryDraw.count({
         where: {
-          campaign_id: campaignId,
+          lottery_campaign_id: campaignId,
           guarantee_triggered: true
         }
       })
@@ -639,7 +657,10 @@ class LotteryHealthService {
         }
       }
     } catch (error) {
-      this.logger.error('计算体验健康度失败', { campaign_id: campaignId, error: error.message })
+      this.logger.error('计算体验健康度失败', {
+        lottery_campaign_id: campaignId,
+        error: error.message
+      })
       return { score: 0, max_score: 10, level: 'unknown', details: null, error: error.message }
     }
   }

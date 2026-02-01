@@ -138,7 +138,7 @@ const RULE_PROCESSORS = {
 
       if (usagePercentage >= threshold_percentage) {
         alertCampaigns.push({
-          campaign_id: campaign.campaign_id,
+          lottery_campaign_id: campaign.lottery_campaign_id,
           campaign_name: campaign.name,
           usage_percentage: usagePercentage.toFixed(2)
         })
@@ -173,7 +173,7 @@ const RULE_PROCESSORS = {
         stock: { [Op.lt]: min_stock || 10 },
         status: 'active'
       },
-      attributes: ['prize_id', 'name', 'stock'],
+      attributes: ['lottery_prize_id', 'name', 'stock'],
       raw: true
     })
 

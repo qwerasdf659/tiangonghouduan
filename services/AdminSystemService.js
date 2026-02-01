@@ -448,7 +448,7 @@ class AdminSystemService {
     budget_allocation_ratio: '预算分配比例',
     daily_lottery_limit: '每日抽奖次数限制',
     merchant_review_budget_ratio: '商户审核预算比例',
-    merchant_review_campaign_id: '商户审核活动ID',
+    merchant_review_lottery_campaign_id: '商户审核活动ID',
 
     // ===== 通知设置 (notification) =====
     sms_enabled: '短信通知',
@@ -506,7 +506,7 @@ class AdminSystemService {
           is_visible: true // 只返回可见的配置项
         },
         attributes: [
-          'setting_id',
+          'system_setting_id',
           'category',
           'setting_key',
           'setting_value',
@@ -516,7 +516,7 @@ class AdminSystemService {
           'updated_by',
           'updated_at'
         ],
-        order: [['setting_id', 'ASC']]
+        order: [['system_setting_id', 'ASC']]
       })
 
       // 转换配置项数据（自动解析value_type，添加中文名称）
@@ -560,7 +560,10 @@ class AdminSystemService {
     try {
       // 查询所有分类的配置数量
       const categoryCounts = await SystemSettings.findAll({
-        attributes: ['category', [sequelize.fn('COUNT', sequelize.col('setting_id')), 'count']],
+        attributes: [
+          'category',
+          [sequelize.fn('COUNT', sequelize.col('system_setting_id')), 'count']
+        ],
         where: {
           is_visible: true
         },

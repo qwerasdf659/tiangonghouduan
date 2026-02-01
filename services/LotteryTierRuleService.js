@@ -39,7 +39,7 @@ class LotteryTierRuleService {
    * 获取档位规则列表（分页）
    *
    * @param {Object} params - 查询参数
-   * @param {number} [params.campaign_id] - 活动ID（可选）
+   * @param {number} [params.lottery_campaign_id] - 活动ID（可选）
    * @param {string} [params.segment_key] - 用户分层标识（可选）
    * @param {string} [params.tier_name] - 档位名称（可选：high/mid/low）
    * @param {string} [params.status] - 规则状态（可选：active/inactive）
@@ -49,11 +49,11 @@ class LotteryTierRuleService {
    * @returns {Promise<Object>} { list, total, page, page_size }
    */
   async list(params = {}, options = {}) {
-    const { campaign_id, segment_key, tier_name, status, page = 1, page_size = 20 } = params
+    const { lottery_campaign_id, segment_key, tier_name, status, page = 1, page_size = 20 } = params
 
     // 构建查询条件
     const where = {}
-    if (campaign_id) where.campaign_id = campaign_id
+    if (lottery_campaign_id) where.lottery_campaign_id = lottery_campaign_id
     if (segment_key) where.segment_key = segment_key
     if (tier_name) where.tier_name = tier_name
     if (status) where.status = status
@@ -64,7 +64,7 @@ class LotteryTierRuleService {
         {
           model: this.LotteryCampaign,
           as: 'campaign',
-          attributes: ['campaign_id', 'campaign_name', 'status']
+          attributes: ['lottery_campaign_id', 'campaign_name', 'status']
         },
         {
           model: this.User,
@@ -78,7 +78,7 @@ class LotteryTierRuleService {
         }
       ],
       order: [
-        ['campaign_id', 'ASC'],
+        ['lottery_campaign_id', 'ASC'],
         ['segment_key', 'ASC'],
         ['tier_name', 'ASC']
       ],
@@ -113,7 +113,7 @@ class LotteryTierRuleService {
         {
           model: this.LotteryCampaign,
           as: 'campaign',
-          attributes: ['campaign_id', 'campaign_name', 'status']
+          attributes: ['lottery_campaign_id', 'campaign_name', 'status']
         },
         {
           model: this.User,
@@ -140,15 +140,15 @@ class LotteryTierRuleService {
   /**
    * 获取指定活动和分层的所有档位规则
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {string} [segment_key='default'] - 用户分层标识
    * @param {Object} [options={}] - Sequelize查询选项
    * @returns {Promise<Object>} 档位规则配置
    */
-  async getByCampaignAndSegment(campaign_id, segment_key = 'default', options = {}) {
+  async getByCampaignAndSegment(lottery_campaign_id, segment_key = 'default', options = {}) {
     const rules = await this.LotteryTierRule.findAll({
       where: {
-        campaign_id,
+        lottery_campaign_id,
         segment_key,
         status: 'active'
       },
@@ -160,7 +160,7 @@ class LotteryTierRuleService {
     const totalWeight = rules.reduce((sum, rule) => sum + rule.tier_weight, 0)
 
     return {
-      campaign_id,
+      lottery_campaign_id,
       segment_key,
       rules: rules.map(rule => ({
         tier_rule_id: rule.tier_rule_id,
@@ -178,7 +178,7 @@ class LotteryTierRuleService {
    * 创建档位规则
    *
    * @param {Object} data - 规则数据
-   * @param {number} data.campaign_id - 活动ID（必填）
+   * @param {number} data.lottery_campaign_id - 活动ID（必填）
    * @param {string} [data.segment_key='default'] - 用户分层标识
    * @param {string} data.tier_name - 档位名称（必填：high/mid/low）
    * @param {number} data.tier_weight - 档位权重（必填）
@@ -189,7 +189,7 @@ class LotteryTierRuleService {
    */
   async create(data, options = {}) {
     const {
-      campaign_id,
+      lottery_campaign_id,
       segment_key = 'default',
       tier_name,
       tier_weight,
@@ -198,8 +198,8 @@ class LotteryTierRuleService {
     } = data
 
     // 验证必填字段
-    if (!campaign_id) {
-      throw new Error('活动ID（campaign_id）不能为空')
+    if (!lottery_campaign_id) {
+      throw new Error('活动ID（lottery_campaign_id）不能为空')
     }
     if (!tier_name || !['high', 'mid', 'low'].includes(tier_name)) {
       throw new Error('档位名称（tier_name）必须是 high/mid/low 之一')
@@ -209,23 +209,25 @@ class LotteryTierRuleService {
     }
 
     // 验证活动是否存在
-    const campaign = await this.LotteryCampaign.findByPk(campaign_id, options)
+    const campaign = await this.LotteryCampaign.findByPk(lottery_campaign_id, options)
     if (!campaign) {
-      throw new Error(`活动不存在：campaign_id=${campaign_id}`)
+      throw new Error(`活动不存在：lottery_campaign_id=${lottery_campaign_id}`)
     }
 
     // 检查是否已存在相同的规则
     const existing = await this.LotteryTierRule.findOne({
-      where: { campaign_id, segment_key, tier_name },
+      where: { lottery_campaign_id, segment_key, tier_name },
       ...options
     })
     if (existing) {
-      throw new Error(`规则已存在：活动=${campaign_id}, 分层=${segment_key}, 档位=${tier_name}`)
+      throw new Error(
+        `规则已存在：活动=${lottery_campaign_id}, 分层=${segment_key}, 档位=${tier_name}`
+      )
     }
 
     const rule = await this.LotteryTierRule.create(
       {
-        campaign_id,
+        lottery_campaign_id,
         segment_key,
         tier_name,
         tier_weight,
@@ -238,7 +240,7 @@ class LotteryTierRuleService {
 
     logger.info('[LotteryTierRuleService] 创建档位规则', {
       tier_rule_id: rule.tier_rule_id,
-      campaign_id,
+      lottery_campaign_id,
       segment_key,
       tier_name,
       tier_weight
@@ -251,7 +253,7 @@ class LotteryTierRuleService {
    * 批量创建三档位规则
    *
    * @param {Object} data - 批量创建数据
-   * @param {number} data.campaign_id - 活动ID（必填）
+   * @param {number} data.lottery_campaign_id - 活动ID（必填）
    * @param {string} [data.segment_key='default'] - 用户分层标识
    * @param {Object} data.weights - 各档位权重 { high: number, mid: number, low: number }
    * @param {number} [data.created_by] - 创建人ID
@@ -259,7 +261,7 @@ class LotteryTierRuleService {
    * @returns {Promise<Array>} 创建的规则列表
    */
   async createTierRules(data, options = {}) {
-    const { campaign_id, segment_key = 'default', weights, created_by } = data
+    const { lottery_campaign_id, segment_key = 'default', weights, created_by } = data
 
     // 验证权重之和
     const totalWeight = (weights.high || 0) + (weights.mid || 0) + (weights.low || 0)
@@ -268,19 +270,19 @@ class LotteryTierRuleService {
     }
 
     // 验证活动是否存在
-    const campaign = await this.LotteryCampaign.findByPk(campaign_id, options)
+    const campaign = await this.LotteryCampaign.findByPk(lottery_campaign_id, options)
     if (!campaign) {
-      throw new Error(`活动不存在：campaign_id=${campaign_id}`)
+      throw new Error(`活动不存在：lottery_campaign_id=${lottery_campaign_id}`)
     }
 
     // 检查是否已存在规则
     const existingCount = await this.LotteryTierRule.count({
-      where: { campaign_id, segment_key },
+      where: { lottery_campaign_id, segment_key },
       ...options
     })
     if (existingCount > 0) {
       throw new Error(
-        `该活动和分层已存在规则：campaign_id=${campaign_id}, segment_key=${segment_key}`
+        `该活动和分层已存在规则：lottery_campaign_id=${lottery_campaign_id}, segment_key=${segment_key}`
       )
     }
 
@@ -288,7 +290,7 @@ class LotteryTierRuleService {
     const rules = await Promise.all([
       this.LotteryTierRule.create(
         {
-          campaign_id,
+          lottery_campaign_id,
           segment_key,
           tier_name: 'high',
           tier_weight: weights.high,
@@ -300,7 +302,7 @@ class LotteryTierRuleService {
       ),
       this.LotteryTierRule.create(
         {
-          campaign_id,
+          lottery_campaign_id,
           segment_key,
           tier_name: 'mid',
           tier_weight: weights.mid,
@@ -312,7 +314,7 @@ class LotteryTierRuleService {
       ),
       this.LotteryTierRule.create(
         {
-          campaign_id,
+          lottery_campaign_id,
           segment_key,
           tier_name: 'low',
           tier_weight: weights.low,
@@ -325,7 +327,7 @@ class LotteryTierRuleService {
     ])
 
     logger.info('[LotteryTierRuleService] 批量创建档位规则', {
-      campaign_id,
+      lottery_campaign_id,
       segment_key,
       weights,
       created_count: rules.length
@@ -392,7 +394,7 @@ class LotteryTierRuleService {
 
     logger.info('[LotteryTierRuleService] 删除档位规则', {
       tier_rule_id,
-      campaign_id: rule.campaign_id,
+      lottery_campaign_id: rule.lottery_campaign_id,
       segment_key: rule.segment_key,
       tier_name: rule.tier_name
     })
@@ -403,13 +405,13 @@ class LotteryTierRuleService {
   /**
    * 验证三档位权重配置完整性
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {string} [segment_key='default'] - 用户分层标识
    * @param {Object} [options={}] - Sequelize查询选项
    * @returns {Promise<Object>} 验证结果
    */
-  async validateTierWeights(campaign_id, segment_key = 'default', options = {}) {
-    return this.LotteryTierRule.validateTierWeights(campaign_id, segment_key, options)
+  async validateTierWeights(lottery_campaign_id, segment_key = 'default', options = {}) {
+    return this.LotteryTierRule.validateTierWeights(lottery_campaign_id, segment_key, options)
   }
 
   /**
@@ -420,25 +422,25 @@ class LotteryTierRuleService {
    */
   async getConfigOverview(options = {}) {
     const rules = await this.LotteryTierRule.findAll({
-      attributes: ['campaign_id', 'segment_key'],
+      attributes: ['lottery_campaign_id', 'segment_key'],
       include: [
         {
           model: this.LotteryCampaign,
           as: 'campaign',
-          attributes: ['campaign_id', 'campaign_name', 'status']
+          attributes: ['lottery_campaign_id', 'campaign_name', 'status']
         }
       ],
-      group: ['campaign_id', 'segment_key', 'campaign.campaign_id'],
+      group: ['lottery_campaign_id', 'segment_key', 'campaign.lottery_campaign_id'],
       ...options
     })
 
     // 按活动ID分组
     const campaignMap = new Map()
     for (const rule of rules) {
-      const key = rule.campaign_id
+      const key = rule.lottery_campaign_id
       if (!campaignMap.has(key)) {
         campaignMap.set(key, {
-          campaign_id: rule.campaign_id,
+          lottery_campaign_id: rule.lottery_campaign_id,
           campaign_name: rule.campaign?.campaign_name,
           campaign_status: rule.campaign?.status,
           segments: []
@@ -462,7 +464,7 @@ class LotteryTierRuleService {
 
     const formatted = {
       tier_rule_id: rule.tier_rule_id,
-      campaign_id: rule.campaign_id,
+      lottery_campaign_id: rule.lottery_campaign_id,
       segment_key: rule.segment_key,
       tier_name: rule.tier_name,
       tier_weight: rule.tier_weight,
@@ -477,7 +479,7 @@ class LotteryTierRuleService {
     // 添加关联信息
     if (rule.campaign) {
       formatted.campaign = {
-        campaign_id: rule.campaign.campaign_id,
+        lottery_campaign_id: rule.campaign.lottery_campaign_id,
         campaign_name: rule.campaign.campaign_name,
         status: rule.campaign.status
       }

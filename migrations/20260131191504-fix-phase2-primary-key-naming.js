@@ -3,7 +3,7 @@
 /**
  * 修复P2阶段表的主键命名，使其符合项目规范
  *
- * 项目规范：主键字段命名格式为 {table_name}_id（如user_id、prize_id）
+ * 项目规范：主键字段命名格式为 {table_name}_id（如user_id、lottery_prize_id）
  *
  * 修复内容：
  * - reminder_rules: rule_id → reminder_rule_id

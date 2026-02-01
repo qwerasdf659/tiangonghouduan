@@ -56,38 +56,41 @@ class LotteryCampaignPricingConfigService {
    *
    * @description 获取指定活动当前 status='active' 的定价配置
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} options - 查询选项
    * @param {Object} [options.transaction] - 事务对象（可选）
    * @returns {Promise<Object|null>} 定价配置对象或 null
    * @throws {Error} 活动不存在等业务错误
    */
-  static async getActivePricingConfig(campaign_id, options = {}) {
+  static async getActivePricingConfig(lottery_campaign_id, options = {}) {
     const { transaction } = options
 
     // 验证活动存在
-    const campaign = await LotteryCampaign.findByPk(campaign_id, { transaction })
+    const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
     if (!campaign) {
-      const error = new Error(`活动不存在: ${campaign_id}`)
+      const error = new Error(`活动不存在: ${lottery_campaign_id}`)
       error.code = 'CAMPAIGN_NOT_FOUND'
       error.statusCode = 404
       throw error
     }
 
     // 获取活跃的定价配置
-    const pricing_config = await LotteryCampaignPricingConfig.getActivePricingConfig(campaign_id, {
-      transaction
-    })
+    const pricing_config = await LotteryCampaignPricingConfig.getActivePricingConfig(
+      lottery_campaign_id,
+      {
+        transaction
+      }
+    )
 
     if (!pricing_config) {
-      logger.info('活动暂无定价配置', { campaign_id })
+      logger.info('活动暂无定价配置', { lottery_campaign_id })
       return null
     }
 
     // 构建响应数据（包含计算属性）
     return {
       config_id: pricing_config.config_id,
-      campaign_id: pricing_config.campaign_id,
+      lottery_campaign_id: pricing_config.lottery_campaign_id,
       campaign_code: campaign.campaign_code,
       version: pricing_config.version,
       pricing_config: pricing_config.pricing_config,
@@ -109,26 +112,28 @@ class LotteryCampaignPricingConfigService {
    *
    * @description 获取指定活动的所有定价配置版本（按版本号降序）
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} options - 查询选项
    * @param {Object} [options.transaction] - 事务对象（可选）
    * @returns {Promise<Object>} 包含版本列表和总数的对象
    * @throws {Error} 活动不存在等业务错误
    */
-  static async getAllVersions(campaign_id, options = {}) {
+  static async getAllVersions(lottery_campaign_id, options = {}) {
     const { transaction } = options
 
     // 验证活动存在
-    const campaign = await LotteryCampaign.findByPk(campaign_id, { transaction })
+    const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
     if (!campaign) {
-      const error = new Error(`活动不存在: ${campaign_id}`)
+      const error = new Error(`活动不存在: ${lottery_campaign_id}`)
       error.code = 'CAMPAIGN_NOT_FOUND'
       error.statusCode = 404
       throw error
     }
 
     // 获取所有版本
-    const versions = await LotteryCampaignPricingConfig.getAllVersions(campaign_id, { transaction })
+    const versions = await LotteryCampaignPricingConfig.getAllVersions(lottery_campaign_id, {
+      transaction
+    })
 
     // 转换为响应格式
     const versions_data = versions.map(v => ({
@@ -144,7 +149,7 @@ class LotteryCampaignPricingConfigService {
     }))
 
     return {
-      campaign_id: parseInt(campaign_id, 10),
+      lottery_campaign_id: parseInt(lottery_campaign_id, 10),
       campaign_code: campaign.campaign_code,
       versions: versions_data,
       total: versions_data.length
@@ -156,7 +161,7 @@ class LotteryCampaignPricingConfigService {
    *
    * @description 为活动创建新版本的定价配置，版本号自动递增
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} pricing_config - 定价配置 JSON
    * @param {number} created_by - 创建人用户ID
    * @param {Object} options - 操作选项
@@ -165,13 +170,13 @@ class LotteryCampaignPricingConfigService {
    * @returns {Promise<Object>} 新创建的配置对象
    * @throws {Error} 活动不存在、配置格式错误等业务错误
    */
-  static async createNewVersion(campaign_id, pricing_config, created_by, options = {}) {
+  static async createNewVersion(lottery_campaign_id, pricing_config, created_by, options = {}) {
     const { activate_immediately = false, transaction } = options
 
     // 验证活动存在
-    const campaign = await LotteryCampaign.findByPk(campaign_id, { transaction })
+    const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
     if (!campaign) {
-      const error = new Error(`活动不存在: ${campaign_id}`)
+      const error = new Error(`活动不存在: ${lottery_campaign_id}`)
       error.code = 'CAMPAIGN_NOT_FOUND'
       error.statusCode = 404
       throw error
@@ -189,14 +194,14 @@ class LotteryCampaignPricingConfigService {
 
     // 创建新版本
     const new_config = await LotteryCampaignPricingConfig.createNewVersion(
-      campaign_id,
+      lottery_campaign_id,
       pricing_config,
       created_by,
       { transaction }
     )
 
     logger.info('创建新版本定价配置成功', {
-      campaign_id,
+      lottery_campaign_id,
       config_id: new_config.config_id,
       version: new_config.version,
       created_by
@@ -205,28 +210,28 @@ class LotteryCampaignPricingConfigService {
     // 如果需要立即激活
     if (activate_immediately) {
       await LotteryCampaignPricingConfig.activateVersion(
-        campaign_id,
+        lottery_campaign_id,
         new_config.version,
         created_by,
         { transaction }
       )
 
       // 失效缓存：活动缓存 + 定价缓存
-      await BusinessCacheHelper.invalidateLotteryCampaign(campaign_id)
+      await BusinessCacheHelper.invalidateLotteryCampaign(lottery_campaign_id)
       await LotteryPricingService.invalidateCache(
-        campaign_id,
+        lottery_campaign_id,
         'pricing_config_created_and_activated'
       )
 
       logger.info('新版本已激活', {
-        campaign_id,
+        lottery_campaign_id,
         version: new_config.version
       })
     }
 
     return {
       config_id: new_config.config_id,
-      campaign_id: new_config.campaign_id,
+      lottery_campaign_id: new_config.lottery_campaign_id,
       version: new_config.version,
       status: activate_immediately ? 'active' : new_config.status,
       pricing_config: new_config.pricing_config,
@@ -240,7 +245,7 @@ class LotteryCampaignPricingConfigService {
    *
    * @description 将指定版本设为 active，其他版本设为 archived
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {number} version - 要激活的版本号
    * @param {number} updated_by - 操作人用户ID
    * @param {Object} options - 操作选项
@@ -248,13 +253,13 @@ class LotteryCampaignPricingConfigService {
    * @returns {Promise<Object>} 激活后的配置对象
    * @throws {Error} 活动不存在、版本不存在等业务错误
    */
-  static async activateVersion(campaign_id, version, updated_by, options = {}) {
+  static async activateVersion(lottery_campaign_id, version, updated_by, options = {}) {
     const { transaction } = options
 
     // 验证活动存在
-    const campaign = await LotteryCampaign.findByPk(campaign_id, { transaction })
+    const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
     if (!campaign) {
-      const error = new Error(`活动不存在: ${campaign_id}`)
+      const error = new Error(`活动不存在: ${lottery_campaign_id}`)
       error.code = 'CAMPAIGN_NOT_FOUND'
       error.statusCode = 404
       throw error
@@ -262,25 +267,28 @@ class LotteryCampaignPricingConfigService {
 
     // 激活指定版本（模型层方法会处理版本不存在的情况）
     const result = await LotteryCampaignPricingConfig.activateVersion(
-      campaign_id,
+      lottery_campaign_id,
       version,
       updated_by,
       { transaction }
     )
 
     // 失效缓存：活动缓存 + 定价缓存
-    await BusinessCacheHelper.invalidateLotteryCampaign(campaign_id)
-    await LotteryPricingService.invalidateCache(campaign_id, 'pricing_config_version_activated')
+    await BusinessCacheHelper.invalidateLotteryCampaign(lottery_campaign_id)
+    await LotteryPricingService.invalidateCache(
+      lottery_campaign_id,
+      'pricing_config_version_activated'
+    )
 
     logger.info('激活定价配置版本成功', {
-      campaign_id,
+      lottery_campaign_id,
       version,
       config_id: result.config_id,
       updated_by
     })
 
     return {
-      campaign_id: parseInt(campaign_id, 10),
+      lottery_campaign_id: parseInt(lottery_campaign_id, 10),
       activated_version: result.version,
       config_id: result.config_id,
       status: result.status,
@@ -293,7 +301,7 @@ class LotteryCampaignPricingConfigService {
    *
    * @description 将指定版本设为 archived（不影响其他版本）
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {number} version - 要归档的版本号
    * @param {number} updated_by - 操作人用户ID
    * @param {Object} options - 操作选项
@@ -301,13 +309,13 @@ class LotteryCampaignPricingConfigService {
    * @returns {Promise<Object>} 归档后的配置信息
    * @throws {Error} 版本不存在、尝试归档激活版本等业务错误
    */
-  static async archiveVersion(campaign_id, version, updated_by, options = {}) {
+  static async archiveVersion(lottery_campaign_id, version, updated_by, options = {}) {
     const { transaction } = options
 
     // 查找目标版本
     const config = await LotteryCampaignPricingConfig.findOne({
       where: {
-        campaign_id,
+        lottery_campaign_id,
         version: parseInt(version, 10)
       },
       transaction
@@ -317,7 +325,7 @@ class LotteryCampaignPricingConfigService {
       const error = new Error(`版本不存在: ${version}`)
       error.code = 'VERSION_NOT_FOUND'
       error.statusCode = 404
-      error.details = { campaign_id, version }
+      error.details = { lottery_campaign_id, version }
       throw error
     }
 
@@ -339,14 +347,14 @@ class LotteryCampaignPricingConfigService {
     )
 
     logger.info('归档定价配置版本成功', {
-      campaign_id,
+      lottery_campaign_id,
       version,
       config_id: config.config_id,
       updated_by
     })
 
     return {
-      campaign_id: parseInt(campaign_id, 10),
+      lottery_campaign_id: parseInt(lottery_campaign_id, 10),
       archived_version: parseInt(version, 10),
       config_id: config.config_id,
       status: 'archived'
@@ -369,7 +377,7 @@ class LotteryCampaignPricingConfigService {
    * - 避免历史版本被意外修改
    * - 便于审计追溯（新版本记录了回滚来源）
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {number} target_version - 要回滚到的目标版本号
    * @param {number} updated_by - 操作人用户ID
    * @param {string} [rollback_reason=''] - 回滚原因（用于审计）
@@ -379,7 +387,7 @@ class LotteryCampaignPricingConfigService {
    * @throws {Error} 版本不存在、尝试回滚到当前激活版本等业务错误
    */
   static async rollbackToVersion(
-    campaign_id,
+    lottery_campaign_id,
     target_version,
     updated_by,
     rollback_reason = '',
@@ -388,9 +396,9 @@ class LotteryCampaignPricingConfigService {
     const { transaction } = options
 
     // 1. 验证活动存在
-    const campaign = await LotteryCampaign.findByPk(campaign_id, { transaction })
+    const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
     if (!campaign) {
-      const error = new Error(`活动不存在: ${campaign_id}`)
+      const error = new Error(`活动不存在: ${lottery_campaign_id}`)
       error.code = 'CAMPAIGN_NOT_FOUND'
       error.statusCode = 404
       throw error
@@ -399,7 +407,7 @@ class LotteryCampaignPricingConfigService {
     // 2. 查找目标版本
     const target_config = await LotteryCampaignPricingConfig.findOne({
       where: {
-        campaign_id,
+        lottery_campaign_id,
         version: parseInt(target_version, 10)
       },
       transaction
@@ -409,7 +417,7 @@ class LotteryCampaignPricingConfigService {
       const error = new Error(`目标版本不存在: ${target_version}`)
       error.code = 'VERSION_NOT_FOUND'
       error.statusCode = 404
-      error.details = { campaign_id, target_version }
+      error.details = { lottery_campaign_id, target_version }
       throw error
     }
 
@@ -434,7 +442,7 @@ class LotteryCampaignPricingConfigService {
 
     // 5. 创建新版本（直接激活）
     const new_config = await LotteryCampaignPricingConfig.createNewVersion(
-      campaign_id,
+      lottery_campaign_id,
       pricing_config_with_metadata,
       updated_by,
       { transaction, status: 'draft' }
@@ -442,21 +450,21 @@ class LotteryCampaignPricingConfigService {
 
     // 6. 激活新版本
     await LotteryCampaignPricingConfig.activateVersion(
-      campaign_id,
+      lottery_campaign_id,
       new_config.version,
       updated_by,
       { transaction }
     )
 
     // 7. 失效缓存：活动缓存 + 定价缓存
-    await BusinessCacheHelper.invalidateLotteryCampaign(campaign_id)
+    await BusinessCacheHelper.invalidateLotteryCampaign(lottery_campaign_id)
     await LotteryPricingService.invalidateCache(
-      campaign_id,
+      lottery_campaign_id,
       `pricing_config_rollback_from_v${target_version}`
     )
 
     logger.info('定价配置回滚成功', {
-      campaign_id,
+      lottery_campaign_id,
       rollback_from_version: target_version,
       new_version: new_config.version,
       config_id: new_config.config_id,
@@ -465,7 +473,7 @@ class LotteryCampaignPricingConfigService {
     })
 
     return {
-      campaign_id: parseInt(campaign_id, 10),
+      lottery_campaign_id: parseInt(lottery_campaign_id, 10),
       rollback_from_version: parseInt(target_version, 10),
       new_version: new_config.version,
       new_config_id: new_config.config_id,
@@ -485,7 +493,7 @@ class LotteryCampaignPricingConfigService {
    * 3. 更新版本状态为 scheduled 并设置 effective_at
    * 4. 定时任务会在 effective_at 时间后自动激活此版本
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {number} version - 要设置定时生效的版本号
    * @param {string} effective_at - 生效时间（ISO8601 格式，北京时间）
    * @param {number} updated_by - 操作人用户ID
@@ -494,13 +502,19 @@ class LotteryCampaignPricingConfigService {
    * @returns {Promise<Object>} 设置结果
    * @throws {Error} 版本不存在、时间无效等业务错误
    */
-  static async scheduleActivation(campaign_id, version, effective_at, updated_by, options = {}) {
+  static async scheduleActivation(
+    lottery_campaign_id,
+    version,
+    effective_at,
+    updated_by,
+    options = {}
+  ) {
     const { transaction } = options
 
     // 1. 验证活动存在
-    const campaign = await LotteryCampaign.findByPk(campaign_id, { transaction })
+    const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
     if (!campaign) {
-      const error = new Error(`活动不存在: ${campaign_id}`)
+      const error = new Error(`活动不存在: ${lottery_campaign_id}`)
       error.code = 'CAMPAIGN_NOT_FOUND'
       error.statusCode = 404
       throw error
@@ -509,7 +523,7 @@ class LotteryCampaignPricingConfigService {
     // 2. 查找目标版本
     const config = await LotteryCampaignPricingConfig.findOne({
       where: {
-        campaign_id,
+        lottery_campaign_id,
         version: parseInt(version, 10)
       },
       transaction
@@ -519,7 +533,7 @@ class LotteryCampaignPricingConfigService {
       const error = new Error(`版本不存在: ${version}`)
       error.code = 'VERSION_NOT_FOUND'
       error.statusCode = 404
-      error.details = { campaign_id, version }
+      error.details = { lottery_campaign_id, version }
       throw error
     }
 
@@ -558,7 +572,7 @@ class LotteryCampaignPricingConfigService {
     )
 
     logger.info('设置定价配置定时生效成功', {
-      campaign_id,
+      lottery_campaign_id,
       version,
       config_id: config.config_id,
       effective_at: effective_date.toISOString(),
@@ -566,7 +580,7 @@ class LotteryCampaignPricingConfigService {
     })
 
     return {
-      campaign_id: parseInt(campaign_id, 10),
+      lottery_campaign_id: parseInt(lottery_campaign_id, 10),
       scheduled_version: parseInt(version, 10),
       config_id: config.config_id,
       status: 'scheduled',
@@ -579,7 +593,7 @@ class LotteryCampaignPricingConfigService {
    *
    * @description 将 scheduled 状态的版本恢复为 draft 状态
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {number} version - 要取消定时生效的版本号
    * @param {number} updated_by - 操作人用户ID
    * @param {Object} options - 操作选项
@@ -587,13 +601,13 @@ class LotteryCampaignPricingConfigService {
    * @returns {Promise<Object>} 取消结果
    * @throws {Error} 版本不存在、状态不是 scheduled 等业务错误
    */
-  static async cancelScheduledActivation(campaign_id, version, updated_by, options = {}) {
+  static async cancelScheduledActivation(lottery_campaign_id, version, updated_by, options = {}) {
     const { transaction } = options
 
     // 查找目标版本
     const config = await LotteryCampaignPricingConfig.findOne({
       where: {
-        campaign_id,
+        lottery_campaign_id,
         version: parseInt(version, 10)
       },
       transaction
@@ -603,7 +617,7 @@ class LotteryCampaignPricingConfigService {
       const error = new Error(`版本不存在: ${version}`)
       error.code = 'VERSION_NOT_FOUND'
       error.statusCode = 404
-      error.details = { campaign_id, version }
+      error.details = { lottery_campaign_id, version }
       throw error
     }
 
@@ -626,14 +640,14 @@ class LotteryCampaignPricingConfigService {
     )
 
     logger.info('取消定价配置定时生效成功', {
-      campaign_id,
+      lottery_campaign_id,
       version,
       config_id: config.config_id,
       updated_by
     })
 
     return {
-      campaign_id: parseInt(campaign_id, 10),
+      lottery_campaign_id: parseInt(lottery_campaign_id, 10),
       cancelled_version: parseInt(version, 10),
       config_id: config.config_id,
       status: 'draft'
@@ -647,7 +661,7 @@ class LotteryCampaignPricingConfigService {
    *
    * 业务逻辑：
    * 1. 查询所有需要激活的 scheduled 配置
-   * 2. 按 campaign_id 分组，每个活动只激活最新版本
+   * 2. 按 lottery_campaign_id 分组，每个活动只激活最新版本
    * 3. 激活配置并失效缓存
    *
    * @returns {Promise<Object>} 处理结果（激活数量、失败数量）
@@ -662,7 +676,7 @@ class LotteryCampaignPricingConfigService {
         effective_at: { [require('sequelize').Op.lte]: now }
       },
       order: [
-        ['campaign_id', 'ASC'],
+        ['lottery_campaign_id', 'ASC'],
         ['version', 'DESC']
       ]
     })
@@ -674,36 +688,36 @@ class LotteryCampaignPricingConfigService {
 
     logger.info('开始处理定时生效配置', { count: scheduled_configs.length })
 
-    // 按 campaign_id 分组（每个活动只激活最新版本）
+    // 按 lottery_campaign_id 分组（每个活动只激活最新版本）
     const campaign_config_map = new Map()
     for (const config of scheduled_configs) {
-      if (!campaign_config_map.has(config.campaign_id)) {
-        campaign_config_map.set(config.campaign_id, config)
+      if (!campaign_config_map.has(config.lottery_campaign_id)) {
+        campaign_config_map.set(config.lottery_campaign_id, config)
       }
     }
 
     // 并行激活所有配置（每个活动最新版本）
     const activation_promises = Array.from(campaign_config_map.entries()).map(
-      async ([campaign_id, config]) => {
+      async ([lottery_campaign_id, config]) => {
         // 激活版本
         await LotteryCampaignPricingConfig.activateVersion(
-          campaign_id,
+          lottery_campaign_id,
           config.version,
           config.created_by // 使用创建者作为激活者
         )
 
         // 失效缓存：活动缓存 + 定价缓存
-        await BusinessCacheHelper.invalidateLotteryCampaign(campaign_id)
-        await LotteryPricingService.invalidateCache(campaign_id, 'scheduled_activation')
+        await BusinessCacheHelper.invalidateLotteryCampaign(lottery_campaign_id)
+        await LotteryPricingService.invalidateCache(lottery_campaign_id, 'scheduled_activation')
 
         logger.info('定时生效配置已激活', {
-          campaign_id,
+          lottery_campaign_id,
           version: config.version,
           config_id: config.config_id,
           effective_at: config.effective_at
         })
 
-        return { campaign_id, config }
+        return { lottery_campaign_id, config }
       }
     )
 
@@ -717,9 +731,9 @@ class LotteryCampaignPricingConfigService {
       if (result.status === 'fulfilled') {
         activated++
       } else {
-        const [campaign_id, config] = Array.from(campaign_config_map.entries())[index]
+        const [lottery_campaign_id, config] = Array.from(campaign_config_map.entries())[index]
         logger.error('定时生效配置激活失败', {
-          campaign_id,
+          lottery_campaign_id,
           version: config.version,
           config_id: config.config_id,
           error: result.reason?.message || String(result.reason)
@@ -731,15 +745,15 @@ class LotteryCampaignPricingConfigService {
     // 归档其他同活动的 scheduled 版本（被跳过的旧版本）
     const skipped_configs = scheduled_configs.filter(
       c =>
-        !campaign_config_map.get(c.campaign_id) ||
-        campaign_config_map.get(c.campaign_id).config_id !== c.config_id
+        !campaign_config_map.get(c.lottery_campaign_id) ||
+        campaign_config_map.get(c.lottery_campaign_id).config_id !== c.config_id
     )
 
     // 并行归档跳过的版本
     const archive_promises = skipped_configs.map(async config => {
       await config.update({ status: 'archived' })
       logger.info('跳过的定时版本已归档', {
-        campaign_id: config.campaign_id,
+        lottery_campaign_id: config.lottery_campaign_id,
         version: config.version,
         reason: '同活动有更新版本已激活'
       })
@@ -784,11 +798,11 @@ class LotteryCampaignPricingConfigService {
         {
           model: LotteryCampaign,
           as: 'campaign',
-          attributes: ['campaign_id', 'campaign_code', 'campaign_name', 'status']
+          attributes: ['lottery_campaign_id', 'campaign_code', 'campaign_name', 'status']
         }
       ],
       order: [
-        ['campaign_id', 'ASC'],
+        ['lottery_campaign_id', 'ASC'],
         ['version', 'DESC']
       ],
       transaction
@@ -800,7 +814,7 @@ class LotteryCampaignPricingConfigService {
 
     // 格式化返回数据
     return pricing_configs.map(config => ({
-      campaign_id: config.campaign_id,
+      lottery_campaign_id: config.lottery_campaign_id,
       campaign_code: config.campaign?.campaign_code,
       campaign_name: config.campaign?.campaign_name,
       campaign_status: config.campaign?.status,

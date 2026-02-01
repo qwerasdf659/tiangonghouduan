@@ -62,7 +62,7 @@ class PipelineRunner {
    *
    * @param {Object} context - 执行上下文
    * @param {number} context.user_id - 用户ID
-   * @param {number} context.campaign_id - 活动ID
+   * @param {number} context.lottery_campaign_id - 活动ID
    * @param {string} context.idempotency_key - 幂等键
    * @param {Object} context.transaction - 数据库事务（可选，由 SettleStage 管理）
    * @returns {Promise<Object>} 执行结果
@@ -85,7 +85,7 @@ class PipelineRunner {
     this._log('info', '开始执行管线', {
       execution_id,
       user_id: context.user_id,
-      campaign_id: context.campaign_id,
+      lottery_campaign_id: context.lottery_campaign_id,
       stage_count: this.stages.length
     })
 

@@ -309,11 +309,11 @@ class TierMatrixCalculator {
    * 2. 将数据库字段映射到计算器内部格式（high_multiplier → high）
    * 3. 如果数据库无配置，回退到默认矩阵
    *
-   * @param {number} campaign_id - 活动ID（可选，用于活动级配置，预留扩展）
+   * @param {number} lottery_campaign_id - 活动ID（可选，用于活动级配置，预留扩展）
    * @param {Object} _options - 额外选项（预留扩展）
    * @returns {Promise<Object>} 加载的矩阵配置
    */
-  async loadFromDatabase(campaign_id = null, _options = {}) {
+  async loadFromDatabase(lottery_campaign_id = null, _options = {}) {
     try {
       // 动态引入模型（避免循环依赖）
       const { LotteryTierMatrixConfig } = require('../../../../models')
@@ -323,7 +323,7 @@ class TierMatrixCalculator {
 
       // 检查数据库是否有配置
       if (!db_matrix || Object.keys(db_matrix).length === 0) {
-        this._log('warn', '数据库无矩阵配置，使用默认配置', { campaign_id })
+        this._log('warn', '数据库无矩阵配置，使用默认配置', { lottery_campaign_id })
         return this.matrix
       }
 
@@ -354,7 +354,7 @@ class TierMatrixCalculator {
       )
 
       this._log('info', '从数据库加载矩阵配置成功', {
-        campaign_id,
+        lottery_campaign_id,
         config_count,
         budget_tiers: Object.keys(db_matrix)
       })
@@ -363,7 +363,7 @@ class TierMatrixCalculator {
     } catch (error) {
       // 加载失败时回退到默认配置，不影响业务流程
       this._log('error', '加载矩阵配置失败，使用默认配置', {
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       return this.matrix

@@ -38,7 +38,7 @@ module.exports = sequelize => {
     'UserRiskProfile',
     {
       // 主键
-      risk_profile_id: {
+      user_risk_profile_id: {
         type: DataTypes.INTEGER.UNSIGNED,
         primaryKey: true,
         autoIncrement: true,
@@ -197,7 +197,7 @@ module.exports = sequelize => {
         is_frozen: userConfig.is_frozen,
         frozen_reason: userConfig.frozen_reason,
         config_source: 'user',
-        config_id: userConfig.risk_profile_id
+        config_id: userConfig.user_risk_profile_id
       }
     }
 
@@ -215,7 +215,7 @@ module.exports = sequelize => {
         is_frozen: false, // 等级配置不涉及冻结状态
         frozen_reason: null,
         config_source: 'level',
-        config_id: levelConfig.risk_profile_id
+        config_id: levelConfig.user_risk_profile_id
       }
     }
 
@@ -233,7 +233,7 @@ module.exports = sequelize => {
         is_frozen: false,
         frozen_reason: null,
         config_source: 'level_default',
-        config_id: defaultConfig.risk_profile_id
+        config_id: defaultConfig.user_risk_profile_id
       }
     }
 

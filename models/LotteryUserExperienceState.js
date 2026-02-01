@@ -52,7 +52,7 @@ class LotteryUserExperienceState extends Model {
 
     // 关联活动表
     LotteryUserExperienceState.belongsTo(models.LotteryCampaign, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'campaign',
       onDelete: 'CASCADE',
       onUpdate: 'CASCADE'
@@ -62,16 +62,16 @@ class LotteryUserExperienceState extends Model {
   /**
    * 查找或创建用户在特定活动的体验状态
    * @param {number} user_id - 用户ID
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 抽奖活动ID
    * @param {Object} options - 可选参数（如 transaction）
    * @returns {Promise<LotteryUserExperienceState>} 体验状态记录
    */
-  static async findOrCreateState(user_id, campaign_id, options = {}) {
+  static async findOrCreateState(user_id, lottery_campaign_id, options = {}) {
     const [state, _created] = await this.findOrCreate({
-      where: { user_id, campaign_id },
+      where: { user_id, lottery_campaign_id },
       defaults: {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         empty_streak: 0,
         recent_high_count: 0,
         max_empty_streak: 0,
@@ -169,7 +169,7 @@ function initModel(sequelize) {
       /**
        * 状态ID - 主键（自增）
        */
-      state_id: {
+      lottery_user_experience_state_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
@@ -192,13 +192,13 @@ function initModel(sequelize) {
       /**
        * 活动ID - 外键关联 lottery_campaigns 表
        */
-      campaign_id: {
+      lottery_campaign_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        comment: '活动ID（外键关联lottery_campaigns.campaign_id）',
+        comment: '抽奖活动ID（外键关联lottery_campaigns.lottery_campaign_id）',
         references: {
           model: 'lottery_campaigns',
-          key: 'campaign_id'
+          key: 'lottery_campaign_id'
         }
       },
 
@@ -314,7 +314,7 @@ function initModel(sequelize) {
       indexes: [
         {
           unique: true,
-          fields: ['user_id', 'campaign_id'],
+          fields: ['user_id', 'lottery_campaign_id'],
           name: 'uk_user_campaign_experience'
         },
         {
@@ -322,7 +322,7 @@ function initModel(sequelize) {
           name: 'idx_experience_user_id'
         },
         {
-          fields: ['campaign_id'],
+          fields: ['lottery_campaign_id'],
           name: 'idx_experience_campaign_id'
         },
         {

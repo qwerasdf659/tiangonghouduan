@@ -276,10 +276,10 @@ router.get('/', (req, res) => {
       campaign_budget: {
         description: '活动预算管理（2026-01-03 BUDGET_POINTS架构）',
         endpoints: [
-          '/campaign-budget/campaigns/:campaign_id',
-          '/campaign-budget/campaigns/:campaign_id/validate',
-          '/campaign-budget/campaigns/:campaign_id/pool/add',
-          '/campaign-budget/campaigns/:campaign_id/budget-status',
+          '/campaign-budget/campaigns/:lottery_campaign_id',
+          '/campaign-budget/campaigns/:lottery_campaign_id/validate',
+          '/campaign-budget/campaigns/:lottery_campaign_id/pool/add',
+          '/campaign-budget/campaigns/:lottery_campaign_id/budget-status',
           '/campaign-budget/users/:user_id'
         ],
         note: '活动预算配置（budget_mode）、空奖约束验证、活动池预算补充、用户BUDGET_POINTS查询'
@@ -295,15 +295,15 @@ router.get('/', (req, res) => {
         note: '资产总览、物品列表、物品详情、物品事件历史；权限要求：admin（可写）或 ops（只读）'
       },
       images: {
-        description: '通用图片上传（2026-01-08 图片存储架构）',
+        description: '通用图片上传（2026-01-08 图片存储架构，2026-02-01 主键规范化）',
         endpoints: [
           '/images/upload',
-          '/images/:image_id',
+          '/images/:id',
           '/images',
-          '/images/:image_id/bind',
-          '/images/:image_id (DELETE)'
+          '/images/:id/bind',
+          '/images/:id (DELETE)'
         ],
-        note: '统一图片上传接口，存储到 Sealos 对象存储，返回 image_id + CDN URL；支持 lottery/exchange/trade/uploads 业务类型'
+        note: '统一图片上传接口，存储到 Sealos 对象存储，返回 image_resource_id + CDN URL；支持 lottery/exchange/trade/uploads 业务类型'
       },
       orphan_frozen: {
         description: '孤儿冻结清理（P0-2 2026-01-09）',
@@ -373,7 +373,7 @@ router.get('/', (req, res) => {
       },
       lottery_health: {
         description: '抽奖健康度评估（2026-01-31 P1 B-14~B-18）',
-        endpoints: ['/lottery-health/:campaign_id'],
+        endpoints: ['/lottery-health/:lottery_campaign_id'],
         note: '抽奖活动健康度评估：健康分数、问题诊断、优化建议；仅限 admin 访问'
       },
       user_segments: {
@@ -461,8 +461,8 @@ router.get('/', (req, res) => {
           '/debt-management/pending',
           '/debt-management/clear',
           '/debt-management/limits',
-          '/debt-management/limits/:campaign_id',
-          '/debt-management/limits/:campaign_id/alert-check'
+          '/debt-management/limits/:lottery_campaign_id',
+          '/debt-management/limits/:lottery_campaign_id/alert-check'
         ],
         note: '预设欠账看板、清偿管理、上限配置；支持按活动/奖品/责任人统计；仅限 admin 访问'
       },
@@ -535,16 +535,16 @@ router.get('/', (req, res) => {
         endpoints: [
           '/lottery-monitoring/hourly-metrics',
           '/lottery-monitoring/hourly-metrics/:id',
-          '/lottery-monitoring/hourly-metrics/summary/:campaign_id',
+          '/lottery-monitoring/hourly-metrics/summary/:lottery_campaign_id',
           '/lottery-monitoring/user-experience-states',
-          '/lottery-monitoring/user-experience-states/:user_id/:campaign_id',
+          '/lottery-monitoring/user-experience-states/:user_id/:lottery_campaign_id',
           '/lottery-monitoring/user-global-states',
           '/lottery-monitoring/user-global-states/:user_id',
           '/lottery-monitoring/quota-grants',
           '/lottery-monitoring/quota-grants/:id',
           '/lottery-monitoring/user-quotas',
-          '/lottery-monitoring/user-quotas/:user_id/:campaign_id',
-          '/lottery-monitoring/user-quotas/stats/:campaign_id'
+          '/lottery-monitoring/user-quotas/:user_id/:lottery_campaign_id',
+          '/lottery-monitoring/user-quotas/stats/:lottery_campaign_id'
         ],
         note: '抽奖监控数据只读查询（lottery_hourly_metrics/lottery_user_experience_state/lottery_user_global_state/lottery_campaign_quota_grants/lottery_campaign_user_quota）；仅限 admin 访问'
       },
@@ -594,11 +594,11 @@ router.get('/', (req, res) => {
           '/system-data/accounts/:account_id',
           '/system-data/user-roles',
           '/system-data/market-listings',
-          '/system-data/market-listings/:listing_id',
+          '/system-data/market-listings/:market_listing_id',
           '/system-data/market-listings/statistics/summary',
           '/system-data/lottery-campaigns',
-          '/system-data/lottery-campaigns/:campaign_id',
-          '/system-data/lottery-campaigns/:campaign_id/status',
+          '/system-data/lottery-campaigns/:lottery_campaign_id',
+          '/system-data/lottery-campaigns/:lottery_campaign_id/status',
           '/system-data/lottery-daily-quotas',
           '/system-data/lottery-daily-quotas/:quota_id'
         ],
@@ -631,7 +631,7 @@ router.get('/', (req, res) => {
       },
       lottery_campaigns: {
         description: '抽奖活动列表管理（2026-01-28 P1 运营后台 ROI/复购率/库存预警）',
-        endpoints: ['/lottery/campaigns', '/lottery/campaigns/:campaign_id'],
+        endpoints: ['/lottery/campaigns', '/lottery/campaigns/:lottery_campaign_id'],
         note: '活动列表含 ROI、复购率、库存预警；ROI/复购率使用 Redis 缓存（5分钟 TTL）；仅限 admin 访问'
       },
       lottery_analytics: {

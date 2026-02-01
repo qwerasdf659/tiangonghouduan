@@ -44,7 +44,7 @@ class LotteryDailyMetrics extends Model {
   static associate(models) {
     // 关联活动表
     LotteryDailyMetrics.belongsTo(models.LotteryCampaign, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'campaign',
       onDelete: 'CASCADE',
       onUpdate: 'CASCADE'
@@ -54,12 +54,12 @@ class LotteryDailyMetrics extends Model {
   /**
    * 查找或创建某天的日报记录
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 抽奖活动ID
    * @param {Date|string} metric_date - 统计日期（YYYY-MM-DD）
    * @param {Object} options - 可选参数（如 transaction）
    * @returns {Promise<LotteryDailyMetrics>} 日报记录
    */
-  static async findOrCreateDaily(campaign_id, metric_date, options = {}) {
+  static async findOrCreateDaily(lottery_campaign_id, metric_date, options = {}) {
     // 标准化日期格式（转为 YYYY-MM-DD）
     const normalized_date =
       typeof metric_date === 'string'
@@ -67,9 +67,9 @@ class LotteryDailyMetrics extends Model {
         : metric_date.toISOString().slice(0, 10)
 
     const [metrics, _created] = await this.findOrCreate({
-      where: { campaign_id, metric_date: normalized_date },
+      where: { lottery_campaign_id, metric_date: normalized_date },
       defaults: {
-        campaign_id,
+        lottery_campaign_id,
         metric_date: normalized_date,
         total_draws: 0,
         unique_users: 0,
@@ -101,13 +101,13 @@ class LotteryDailyMetrics extends Model {
   /**
    * 获取活动的时间范围内日报
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 抽奖活动ID
    * @param {Date|string} start_date - 开始日期
    * @param {Date|string} end_date - 结束日期
    * @param {Object} options - 可选参数
    * @returns {Promise<Array<LotteryDailyMetrics>>} 日报记录列表
    */
-  static async getDailyInRange(campaign_id, start_date, end_date, options = {}) {
+  static async getDailyInRange(lottery_campaign_id, start_date, end_date, options = {}) {
     // 标准化日期格式
     const start =
       typeof start_date === 'string'
@@ -118,7 +118,7 @@ class LotteryDailyMetrics extends Model {
 
     return this.findAll({
       where: {
-        campaign_id,
+        lottery_campaign_id,
         metric_date: {
           [Op.gte]: start,
           [Op.lte]: end
@@ -132,19 +132,19 @@ class LotteryDailyMetrics extends Model {
   /**
    * 获取最近 N 天的日报
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 抽奖活动ID
    * @param {number} days - 天数
    * @param {Object} options - 可选参数
    * @returns {Promise<Array<LotteryDailyMetrics>>} 日报记录列表
    */
-  static async getRecentDailyMetrics(campaign_id, days = 30, options = {}) {
+  static async getRecentDailyMetrics(lottery_campaign_id, days = 30, options = {}) {
     const start_date = new Date()
     start_date.setDate(start_date.getDate() - days)
     const formatted_start = start_date.toISOString().slice(0, 10)
 
     return this.findAll({
       where: {
-        campaign_id,
+        lottery_campaign_id,
         metric_date: {
           [Op.gte]: formatted_start
         }
@@ -157,13 +157,13 @@ class LotteryDailyMetrics extends Model {
   /**
    * 从小时级数据聚合生成日报
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 抽奖活动ID
    * @param {Date|string} target_date - 目标日期
    * @param {Array<Object>} hourly_data - 当天的小时级数据数组
    * @param {Object} options - 可选参数（如 transaction）
    * @returns {Promise<LotteryDailyMetrics>} 创建或更新后的日报记录
    */
-  static async aggregateFromHourly(campaign_id, target_date, hourly_data, options = {}) {
+  static async aggregateFromHourly(lottery_campaign_id, target_date, hourly_data, options = {}) {
     // 标准化日期
     const normalized_date =
       typeof target_date === 'string'
@@ -223,7 +223,7 @@ class LotteryDailyMetrics extends Model {
     // 使用 upsert 更新或创建
     const [record, _created] = await this.upsert(
       {
-        campaign_id,
+        lottery_campaign_id,
         metric_date: normalized_date,
         ...aggregated,
         aggregated_at: new Date()
@@ -302,7 +302,7 @@ function initModel(sequelize) {
       /**
        * 日报指标ID - 主键（自增）
        */
-      daily_metric_id: {
+      lottery_daily_metric_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
@@ -312,13 +312,13 @@ function initModel(sequelize) {
       /**
        * 活动ID
        */
-      campaign_id: {
+      lottery_campaign_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        comment: '活动ID（外键关联lottery_campaigns.campaign_id）',
+        comment: '抽奖活动ID（外键关联lottery_campaigns.lottery_campaign_id）',
         references: {
           model: 'lottery_campaigns',
-          key: 'campaign_id'
+          key: 'lottery_campaign_id'
         }
       },
 
@@ -580,7 +580,7 @@ function initModel(sequelize) {
       indexes: [
         {
           unique: true,
-          fields: ['campaign_id', 'metric_date'],
+          fields: ['lottery_campaign_id', 'metric_date'],
           name: 'uk_daily_campaign_date'
         },
         {
@@ -588,7 +588,7 @@ function initModel(sequelize) {
           name: 'idx_daily_metrics_date'
         },
         {
-          fields: ['campaign_id'],
+          fields: ['lottery_campaign_id'],
           name: 'idx_daily_metrics_campaign'
         },
         {

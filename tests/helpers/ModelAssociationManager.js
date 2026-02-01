@@ -64,38 +64,38 @@ class ModelAssociationManager {
         hasMany: [
           {
             model: 'PrizeDistribution',
-            foreignKey: 'draw_id',
-            sourceKey: 'draw_id',
+            foreignKey: 'lottery_draw_id',
+            sourceKey: 'lottery_draw_id',
             as: 'prizeDistributions'
           }
         ],
         hasOne: [],
         belongsTo: [
           { model: 'User', foreignKey: 'user_id', as: 'user' },
-          { model: 'LotteryPrize', foreignKey: 'prize_id', as: 'prize' },
+          { model: 'LotteryPrize', foreignKey: 'lottery_prize_id', as: 'prize' },
           {
             model: 'LotteryCampaign',
             foreignKey: 'lottery_id',
-            targetKey: 'campaign_id',
+            targetKey: 'lottery_campaign_id',
             as: 'campaign'
           }
         ]
       },
       LotteryPrize: {
         hasMany: [
-          { model: 'LotteryDraw', foreignKey: 'prize_id', as: 'lotteryDraws' },
-          { model: 'PrizeDistribution', foreignKey: 'prize_id', as: 'distributions' }
+          { model: 'LotteryDraw', foreignKey: 'lottery_prize_id', as: 'lotteryDraws' },
+          { model: 'PrizeDistribution', foreignKey: 'lottery_prize_id', as: 'distributions' }
         ],
         hasOne: [],
-        belongsTo: [{ model: 'LotteryCampaign', foreignKey: 'campaign_id', as: 'campaign' }]
+        belongsTo: [{ model: 'LotteryCampaign', foreignKey: 'lottery_campaign_id', as: 'campaign' }]
       },
       LotteryCampaign: {
         hasMany: [
-          { model: 'LotteryPrize', foreignKey: 'campaign_id', as: 'prizes' },
+          { model: 'LotteryPrize', foreignKey: 'lottery_campaign_id', as: 'prizes' },
           {
             model: 'LotteryDraw',
             foreignKey: 'lottery_id',
-            sourceKey: 'campaign_id',
+            sourceKey: 'lottery_campaign_id',
             as: 'lotteryDraws'
           }
         ],
@@ -109,11 +109,11 @@ class ModelAssociationManager {
           { model: 'User', foreignKey: 'user_id', as: 'user' },
           {
             model: 'LotteryDraw',
-            foreignKey: 'draw_id',
-            targetKey: 'draw_id',
+            foreignKey: 'lottery_draw_id',
+            targetKey: 'lottery_draw_id',
             as: 'lotteryDraw'
           },
-          { model: 'LotteryPrize', foreignKey: 'prize_id', as: 'prize' }
+          { model: 'LotteryPrize', foreignKey: 'lottery_prize_id', as: 'prize' }
         ]
       }
     }

@@ -44,7 +44,7 @@ const MODEL_PRIMARY_KEYS = {
   User: 'user_id',
   ItemInstance: 'item_instance_id',
   ItemTemplate: 'item_template_id',
-  MarketListing: 'listing_id',
+  MarketListing: 'market_listing_id',
   TradeOrder: 'order_id',
 
   // 资产相关
@@ -53,9 +53,9 @@ const MODEL_PRIMARY_KEYS = {
   Account: 'account_id',
 
   // 抽奖相关
-  LotteryCampaign: 'campaign_id',
+  LotteryCampaign: 'lottery_campaign_id',
   LotteryRecord: 'record_id',
-  LotteryPrize: 'prize_id',
+  LotteryPrize: 'lottery_prize_id',
 
   // 会话和消息
   CustomerSession: 'session_id',
@@ -180,7 +180,7 @@ class TestDataCleaner {
    * @example
    * const order = await testCleaner.createAndRegister('TradeOrder', {
    *   buyer_user_id: userId,
-   *   listing_id: listingId,
+   *   market_listing_id: listingId,
    *   // ...
    * })
    */

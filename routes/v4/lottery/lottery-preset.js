@@ -38,8 +38,8 @@ router.post('/create', authenticateToken, requireRoleLevel(100), async (req, res
         user_id,
         presets_count: createdPresets.length,
         created_presets: createdPresets.map(preset => ({
-          preset_id: preset.preset_id,
-          prize_id: preset.prize_id,
+          lottery_preset_id: preset.lottery_preset_id,
+          lottery_prize_id: preset.lottery_prize_id,
           queue_order: preset.queue_order,
           status: preset.status
         }))

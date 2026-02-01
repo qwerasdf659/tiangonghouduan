@@ -25,7 +25,7 @@ class LotteryCampaign extends Model {
   static associate(models) {
     // 一对多：一个活动有多个奖品
     LotteryCampaign.hasMany(models.LotteryPrize, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'prizes',
       onDelete: 'CASCADE',
       comment: '活动奖品'
@@ -33,7 +33,7 @@ class LotteryCampaign extends Model {
 
     // 一对多：一个活动有多个抽奖记录
     LotteryCampaign.hasMany(models.LotteryDraw, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'draws',
       onDelete: 'CASCADE',
       comment: '抽奖记录'
@@ -43,7 +43,7 @@ class LotteryCampaign extends Model {
 
     // 一对多：一个活动有多个档位规则
     LotteryCampaign.hasMany(models.LotteryTierRule, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'tierRules',
       onDelete: 'CASCADE',
       comment: '档位规则（tier_first选奖方法使用）'
@@ -51,7 +51,7 @@ class LotteryCampaign extends Model {
 
     // 一对多：一个活动有多个用户配额记录
     LotteryCampaign.hasMany(models.LotteryCampaignUserQuota, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'userQuotas',
       onDelete: 'CASCADE',
       comment: '用户配额（pool_quota预算模式使用）'
@@ -59,7 +59,7 @@ class LotteryCampaign extends Model {
 
     // 一对多：一个活动有多个配额赠送记录
     LotteryCampaign.hasMany(models.LotteryCampaignQuotaGrant, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'quotaGrants',
       onDelete: 'CASCADE',
       comment: '配额赠送记录'
@@ -67,7 +67,7 @@ class LotteryCampaign extends Model {
 
     // 一对多：一个活动有多个库存欠账记录
     LotteryCampaign.hasMany(models.PresetInventoryDebt, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'inventoryDebts',
       onDelete: 'RESTRICT',
       comment: '库存欠账（禁止删除有欠账的活动）'
@@ -75,7 +75,7 @@ class LotteryCampaign extends Model {
 
     // 一对多：一个活动有多个预算欠账记录
     LotteryCampaign.hasMany(models.PresetBudgetDebt, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'budgetDebts',
       onDelete: 'RESTRICT',
       comment: '预算欠账（禁止删除有欠账的活动）'
@@ -83,10 +83,10 @@ class LotteryCampaign extends Model {
 
     /*
      * 注意：PresetDebtLimit 使用多态设计（limit_level + reference_id）
-     * 不直接通过 campaign_id 关联，而是通过:
+     * 不直接通过 lottery_campaign_id 关联，而是通过:
      *   - limit_level = 'campaign'
-     *   - reference_id = campaign_id
-     * 获取活动的欠账上限配置请使用: PresetDebtLimit.getOrCreateForCampaign(campaign_id)
+     *   - reference_id = lottery_campaign_id
+     * 获取活动的欠账上限配置请使用: PresetDebtLimit.getOrCreateForCampaign(lottery_campaign_id)
      */
 
     // 多对一：档位降级保底奖品
@@ -99,7 +99,7 @@ class LotteryCampaign extends Model {
 
     /*
      * 🔥 LotteryRecord已合并到LotteryDraw，使用draws关联即可
-     * 注意：新合并模型中lottery_id字段对应campaign_id关联
+     * 注意：新合并模型中lottery_campaign_id字段对应活动关联
      */
   }
 
@@ -521,7 +521,7 @@ class LotteryCampaign extends Model {
     const healthStatus = this.getHealthStatus()
 
     return {
-      campaign_id: this.campaign_id,
+      lottery_campaign_id: this.lottery_campaign_id,
       basic_info: {
         name: this.campaign_name,
         code: this.campaign_code,
@@ -561,7 +561,7 @@ class LotteryCampaign extends Model {
 module.exports = sequelize => {
   LotteryCampaign.init(
     {
-      campaign_id: {
+      lottery_campaign_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
@@ -756,14 +756,14 @@ module.exports = sequelize => {
        * 档位保底奖品ID
        * @type {number}
        * @业务含义 当所有档位都无可用奖品时，发放此保底奖品
-       * @关联 lottery_prizes.prize_id
+       * @关联 lottery_prizes.lottery_prize_id
        * @注意 此奖品应配置为prize_value_points=0的空奖
        */
       tier_fallback_prize_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
         defaultValue: null,
-        comment: '档位保底奖品ID（所有档位无货时发放，外键关联lottery_prizes.prize_id）'
+        comment: '档位保底奖品ID（所有档位无货时发放，外键关联lottery_prizes.lottery_prize_id）'
       },
 
       /**

@@ -15,7 +15,7 @@
  * - pending（待核销）→ cancelled（已取消）：用户/管理员取消
  *
  * 数据库表名：redemption_orders
- * 主键：order_id（UUID）
+ * 主键：redemption_order_id（UUID）
  * 唯一键：code_hash（SHA-256哈希）
  *
  * 创建时间：2025-12-17
@@ -30,7 +30,7 @@ module.exports = sequelize => {
     'RedemptionOrder',
     {
       // 主键 - 订单ID
-      order_id: {
+      redemption_order_id: {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,

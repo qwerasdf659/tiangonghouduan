@@ -152,7 +152,7 @@ class HourlyExpireFungibleAssetListings {
         // 1. 重新查询并加锁
         const lockedListing = await MarketListing.findOne({
           where: {
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             status: 'on_sale' // 确保状态未变
           },
           lock: transaction.LOCK.UPDATE,
@@ -172,7 +172,7 @@ class HourlyExpireFungibleAssetListings {
           lockedListing.offer_asset_code &&
           lockedListing.offer_amount > 0
         ) {
-          const unfreezeIdempotencyKey = `listing_expire_unfreeze_${lockedListing.listing_id}_${Date.now()}`
+          const unfreezeIdempotencyKey = `listing_expire_unfreeze_${lockedListing.market_listing_id}_${Date.now()}`
 
           unfreezeResult = await BalanceService.unfreeze(
             {
@@ -182,7 +182,7 @@ class HourlyExpireFungibleAssetListings {
               business_type: 'market_listing_expire_unfreeze',
               idempotency_key: unfreezeIdempotencyKey,
               meta: {
-                listing_id: lockedListing.listing_id,
+                market_listing_id: lockedListing.market_listing_id,
                 expire_reason: 'auto_expire_3_days'
               }
             },
@@ -205,7 +205,7 @@ class HourlyExpireFungibleAssetListings {
 
         expired_count++
         details.push({
-          listing_id: lockedListing.listing_id,
+          market_listing_id: lockedListing.market_listing_id,
           seller_user_id: lockedListing.seller_user_id,
           offer_asset_code: lockedListing.offer_asset_code,
           offer_amount: Number(lockedListing.offer_amount),
@@ -214,7 +214,7 @@ class HourlyExpireFungibleAssetListings {
           success: true
         })
 
-        logger.info(`挂牌 ${lockedListing.listing_id} 已自动过期`, {
+        logger.info(`挂牌 ${lockedListing.market_listing_id} 已自动过期`, {
           seller_user_id: lockedListing.seller_user_id,
           offer_asset_code: lockedListing.offer_asset_code,
           offer_amount: lockedListing.offer_amount,
@@ -224,13 +224,13 @@ class HourlyExpireFungibleAssetListings {
         // 发送过期通知给卖家（站内信 + WebSocket）
         try {
           await NotificationService.notifyListingExpired(lockedListing.seller_user_id, {
-            listing_id: lockedListing.listing_id,
+            market_listing_id: lockedListing.market_listing_id,
             offer_asset_code: lockedListing.offer_asset_code,
             offer_amount: Number(lockedListing.offer_amount)
           })
         } catch (notifyError) {
           // 通知发送失败不影响主流程
-          logger.warn(`挂牌 ${lockedListing.listing_id} 过期通知发送失败`, {
+          logger.warn(`挂牌 ${lockedListing.market_listing_id} 过期通知发送失败`, {
             error: notifyError.message
           })
         }
@@ -238,14 +238,14 @@ class HourlyExpireFungibleAssetListings {
         await transaction.rollback()
         failed_count++
         details.push({
-          listing_id: listing.listing_id,
+          market_listing_id: listing.market_listing_id,
           seller_user_id: listing.seller_user_id,
           action: 'failed',
           success: false,
           error: error.message
         })
 
-        logger.error(`处理挂牌 ${listing.listing_id} 过期失败`, { error: error.message })
+        logger.error(`处理挂牌 ${listing.market_listing_id} 过期失败`, { error: error.message })
       }
     }
 

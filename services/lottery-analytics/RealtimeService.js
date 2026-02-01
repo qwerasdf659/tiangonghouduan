@@ -130,11 +130,11 @@ class RealtimeService {
    * 1. Redis实时计数器（优先）
    * 2. lottery_draws表查询（降级方案）
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @returns {Promise<Object>} 实时概览数据
    */
-  async getRealtimeOverview(campaign_id) {
-    this.logger.info('获取实时概览数据', { campaign_id })
+  async getRealtimeOverview(lottery_campaign_id) {
+    this.logger.info('获取实时概览数据', { lottery_campaign_id })
 
     const todayRange = this._getTodayRange()
     const hourRange = this._getCurrentHourRange()
@@ -145,8 +145,8 @@ class RealtimeService {
 
     if (redis) {
       try {
-        const today_key = `${REDIS_KEY_PREFIX.REALTIME_DRAWS}${campaign_id}:${todayRange.start.toISOString().slice(0, 10)}`
-        const hour_key = `${REDIS_KEY_PREFIX.HOURLY_COUNTER}${campaign_id}:${hourRange.start.toISOString().slice(0, 13)}`
+        const today_key = `${REDIS_KEY_PREFIX.REALTIME_DRAWS}${lottery_campaign_id}:${todayRange.start.toISOString().slice(0, 10)}`
+        const hour_key = `${REDIS_KEY_PREFIX.HOURLY_COUNTER}${lottery_campaign_id}:${hourRange.start.toISOString().slice(0, 13)}`
 
         const [today_draws, hour_draws] = await Promise.all([
           redis.get(today_key),
@@ -167,8 +167,8 @@ class RealtimeService {
 
     // 从MySQL查询完整数据
     const [today_stats, hour_stats] = await Promise.all([
-      this._getTodayStatsFromDraws(campaign_id, todayRange),
-      this._getHourStatsFromDraws(campaign_id, hourRange)
+      this._getTodayStatsFromDraws(lottery_campaign_id, todayRange),
+      this._getHourStatsFromDraws(lottery_campaign_id, hourRange)
     ])
 
     // 合并Redis和MySQL数据
@@ -194,18 +194,18 @@ class RealtimeService {
   /**
    * 从lottery_draws表获取今日统计
    * @private
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} range - 时间范围
    * @returns {Promise<Object>} 统计数据
    */
-  async _getTodayStatsFromDraws(campaign_id, range) {
+  async _getTodayStatsFromDraws(lottery_campaign_id, range) {
     const LotteryDraw = this.models.LotteryDraw
     const LotteryDrawDecision = this.models.LotteryDrawDecision
 
     // 基础统计
     const draws = await LotteryDraw.findAll({
       where: {
-        campaign_id,
+        lottery_campaign_id,
         created_at: {
           [Op.gte]: range.start,
           [Op.lte]: range.end
@@ -225,7 +225,7 @@ class RealtimeService {
     const total_draws = draws.length
     const unique_users = new Set(draws.map(d => d.user_id)).size
     // empty_count 只统计真正空奖（empty 或 prize_id 为空），不包括正常保底（fallback）
-    const empty_count = draws.filter(d => d.prize_type === 'empty' || !d.prize_id).length
+    const empty_count = draws.filter(d => d.prize_type === 'empty' || !d.lottery_prize_id).length
     const empty_rate = total_draws > 0 ? empty_count / total_draws : 0
 
     // 预算消耗计算（从decision表，字段为 budget_deducted）
@@ -250,16 +250,16 @@ class RealtimeService {
   /**
    * 从lottery_draws表获取当前小时统计
    * @private
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} range - 时间范围
    * @returns {Promise<Object>} 统计数据
    */
-  async _getHourStatsFromDraws(campaign_id, range) {
+  async _getHourStatsFromDraws(lottery_campaign_id, range) {
     const LotteryDraw = this.models.LotteryDraw
 
     const draws = await LotteryDraw.count({
       where: {
-        campaign_id,
+        lottery_campaign_id,
         created_at: {
           [Op.gte]: range.start,
           [Op.lte]: range.end
@@ -270,12 +270,12 @@ class RealtimeService {
     // empty_count 只统计真正空奖（empty 或 prize_id 为空），不包括正常保底（fallback）
     const empty_count = await LotteryDraw.count({
       where: {
-        campaign_id,
+        lottery_campaign_id,
         created_at: {
           [Op.gte]: range.start,
           [Op.lte]: range.end
         },
-        [Op.or]: [{ prize_type: 'empty' }, { prize_id: null }]
+        [Op.or]: [{ prize_type: 'empty' }, { lottery_prize_id: null }]
       }
     })
 
@@ -293,7 +293,7 @@ class RealtimeService {
    * P0 优先级需求：为运营后台提供实时风险预警
    *
    * @param {Object} options - 查询参数
-   * @param {number} [options.campaign_id] - 活动ID
+   * @param {number} [options.lottery_campaign_id] - 活动ID
    * @param {string} [options.level] - 告警级别过滤（danger/warning/info）
    * @param {boolean} [options.acknowledged] - 是否已确认
    * @param {number} [options.page=1] - 页码
@@ -301,31 +301,31 @@ class RealtimeService {
    * @returns {Promise<Object>} 告警列表和汇总
    */
   async getRealtimeAlerts(options = {}) {
-    const { campaign_id, level, acknowledged, page = 1, page_size = 20 } = options
-    this.logger.info('获取实时告警列表', { campaign_id, level, page })
+    const { lottery_campaign_id, level, acknowledged, page = 1, page_size = 20 } = options
+    this.logger.info('获取实时告警列表', { lottery_campaign_id, level, page })
 
     const alerts = []
     const now = new Date()
 
     try {
       // 1. 检查预算告警
-      const budgetAlerts = await this._checkBudgetAlerts(campaign_id)
+      const budgetAlerts = await this._checkBudgetAlerts(lottery_campaign_id)
       alerts.push(...budgetAlerts)
 
       // 2. 检查库存告警
-      const stockAlerts = await this._checkStockAlerts(campaign_id)
+      const stockAlerts = await this._checkStockAlerts(lottery_campaign_id)
       alerts.push(...stockAlerts)
 
       // 3. 检查中奖率告警（最近1小时）
-      const winRateAlerts = await this._checkWinRateAlerts(campaign_id)
+      const winRateAlerts = await this._checkWinRateAlerts(lottery_campaign_id)
       alerts.push(...winRateAlerts)
 
       // 4. 检查高频用户告警（最近1小时）
-      const highFrequencyAlerts = await this._checkHighFrequencyAlerts(campaign_id)
+      const highFrequencyAlerts = await this._checkHighFrequencyAlerts(lottery_campaign_id)
       alerts.push(...highFrequencyAlerts)
 
       // 5. 检查连空用户告警
-      const emptyStreakAlerts = await this._checkEmptyStreakAlerts(campaign_id)
+      const emptyStreakAlerts = await this._checkEmptyStreakAlerts(lottery_campaign_id)
       alerts.push(...emptyStreakAlerts)
 
       // 为每个告警添加唯一ID和时间戳
@@ -386,12 +386,12 @@ class RealtimeService {
   async _checkBudgetAlerts(campaignId) {
     const alerts = []
     const whereClause = { status: 'active' }
-    if (campaignId) whereClause.campaign_id = campaignId
+    if (campaignId) whereClause.lottery_campaign_id = campaignId
 
     const campaigns = await this.models.LotteryCampaign.findAll({
       where: whereClause,
       attributes: [
-        'campaign_id',
+        'lottery_campaign_id',
         'campaign_name',
         'pool_budget_total',
         'pool_budget_remaining',
@@ -413,7 +413,7 @@ class RealtimeService {
             message: `${campaign.campaign_name} 预算消耗已达${consumptionRate.toFixed(1)}%`,
             related_entity: {
               type: 'campaign',
-              id: campaign.campaign_id,
+              id: campaign.lottery_campaign_id,
               name: campaign.campaign_name
             },
             threshold: 90,
@@ -427,7 +427,7 @@ class RealtimeService {
             message: `${campaign.campaign_name} 预算消耗已达${consumptionRate.toFixed(1)}%`,
             related_entity: {
               type: 'campaign',
-              id: campaign.campaign_id,
+              id: campaign.lottery_campaign_id,
               name: campaign.campaign_name
             },
             threshold: 80,
@@ -450,17 +450,17 @@ class RealtimeService {
   async _checkStockAlerts(campaignId) {
     const alerts = []
     const whereClause = { status: 'active' }
-    if (campaignId) whereClause.campaign_id = campaignId
+    if (campaignId) whereClause.lottery_campaign_id = campaignId
 
     const prizes = await this.models.LotteryPrize.findAll({
       where: whereClause,
       attributes: [
-        'prize_id',
+        'lottery_prize_id',
         'prize_name',
         'reward_tier',
         'stock_quantity',
         'total_win_count',
-        'campaign_id'
+        'lottery_campaign_id'
       ],
       include: [
         {
@@ -481,7 +481,7 @@ class RealtimeService {
           level: 'danger',
           type: 'stock_low',
           message: `高档位奖品「${prize.prize_name}」库存告急，仅剩${remaining}件`,
-          related_entity: { type: 'prize', id: prize.prize_id, name: prize.prize_name },
+          related_entity: { type: 'prize', id: prize.lottery_prize_id, name: prize.prize_name },
           threshold: 100,
           current_value: remaining,
           suggestion: '建议立即补充库存或调整配置'
@@ -492,7 +492,7 @@ class RealtimeService {
           level: 'warning',
           type: 'stock_warning',
           message: `奖品「${prize.prize_name}」库存偏低，剩余${((remaining / initialStock) * 100).toFixed(1)}%`,
-          related_entity: { type: 'prize', id: prize.prize_id, name: prize.prize_name },
+          related_entity: { type: 'prize', id: prize.lottery_prize_id, name: prize.prize_name },
           threshold: 10,
           current_value: (remaining / initialStock) * 100,
           suggestion: '建议关注库存消耗速度'
@@ -514,20 +514,20 @@ class RealtimeService {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
 
     const whereClause = { created_at: { [Op.gte]: oneHourAgo } }
-    if (campaignId) whereClause.campaign_id = campaignId
+    if (campaignId) whereClause.lottery_campaign_id = campaignId
 
     // 查询最近1小时的抽奖统计
     const stats = await this.models.LotteryDraw.findAll({
       attributes: [
-        'campaign_id',
-        [fn('COUNT', col('draw_id')), 'total_draws'],
+        'lottery_campaign_id',
+        [fn('COUNT', col('lottery_draw_id')), 'total_draws'],
         [
           fn('SUM', literal("CASE WHEN reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END")),
           'total_wins'
         ]
       ],
       where: whereClause,
-      group: ['campaign_id'],
+      group: ['lottery_campaign_id'],
       include: [
         {
           model: this.models.LotteryCampaign,
@@ -556,7 +556,7 @@ class RealtimeService {
             message: `活动「${stat.campaign?.campaign_name || '未知'}」最近1小时中奖率异常高 (${winRate.toFixed(1)}%)`,
             related_entity: {
               type: 'campaign',
-              id: stat.campaign_id,
+              id: stat.lottery_campaign_id,
               name: stat.campaign?.campaign_name
             },
             threshold: normalWinRate * 1.5,
@@ -570,7 +570,7 @@ class RealtimeService {
             message: `活动「${stat.campaign?.campaign_name || '未知'}」最近1小时中奖率偏低 (${winRate.toFixed(1)}%)`,
             related_entity: {
               type: 'campaign',
-              id: stat.campaign_id,
+              id: stat.lottery_campaign_id,
               name: stat.campaign?.campaign_name
             },
             threshold: normalWinRate * 0.5,
@@ -595,14 +595,14 @@ class RealtimeService {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
 
     const whereClause = { created_at: { [Op.gte]: oneHourAgo } }
-    if (campaignId) whereClause.campaign_id = campaignId
+    if (campaignId) whereClause.lottery_campaign_id = campaignId
 
     // 查询1小时内抽奖超过100次的用户
     const highFreqUsers = await this.models.LotteryDraw.findAll({
-      attributes: ['user_id', [fn('COUNT', col('draw_id')), 'draw_count']],
+      attributes: ['user_id', [fn('COUNT', col('lottery_draw_id')), 'draw_count']],
       where: whereClause,
       group: ['user_id'],
-      having: literal('COUNT(draw_id) > 100'),
+      having: literal('COUNT(lottery_draw_id) > 100'),
       include: [
         {
           model: this.models.User,
@@ -641,7 +641,7 @@ class RealtimeService {
     const alerts = []
 
     const whereClause = { empty_streak: { [Op.gte]: 10 } }
-    if (campaignId) whereClause.campaign_id = campaignId
+    if (campaignId) whereClause.lottery_campaign_id = campaignId
 
     // 统计连空≥10次的用户数量
     const emptyStreakCount = await this.models.LotteryUserExperienceState.count({
@@ -650,7 +650,7 @@ class RealtimeService {
 
     // 统计总用户数
     const totalUserCount = await this.models.LotteryUserExperienceState.count({
-      where: campaignId ? { campaign_id: campaignId } : {}
+      where: campaignId ? { lottery_campaign_id: campaignId } : {}
     })
 
     if (totalUserCount > 0) {
@@ -680,11 +680,11 @@ class RealtimeService {
    */
   async _checkLowStockPrizes(campaignId) {
     const whereClause = { status: 'active' }
-    if (campaignId) whereClause.campaign_id = campaignId
+    if (campaignId) whereClause.lottery_campaign_id = campaignId
 
     const prizes = await this.models.LotteryPrize.findAll({
       where: whereClause,
-      attributes: ['prize_id', 'prize_name', 'stock_quantity', 'total_win_count']
+      attributes: ['lottery_prize_id', 'prize_name', 'stock_quantity', 'total_win_count']
     })
 
     const lowStockPrizes = []
@@ -692,7 +692,7 @@ class RealtimeService {
       const remaining = (prize.stock_quantity || 0) - (prize.total_win_count || 0)
       if (remaining < 10) {
         lowStockPrizes.push({
-          prize_id: prize.prize_id,
+          lottery_prize_id: prize.lottery_prize_id,
           prize_name: prize.prize_name,
           remaining
         })
@@ -706,17 +706,17 @@ class RealtimeService {
    * 获取综合监控统计数据
    *
    * @param {Object} options - 查询参数
-   * @param {number} [options.campaign_id] - 活动ID
+   * @param {number} [options.lottery_campaign_id] - 活动ID
    * @param {Date|string} [options.start_time] - 开始时间
    * @param {Date|string} [options.end_time] - 结束时间
    * @returns {Promise<Object>} 综合监控统计
    */
   async getMonitoringStats(options = {}) {
-    const { campaign_id, start_time, end_time } = options
-    this.logger.info('获取综合监控统计', { campaign_id, start_time, end_time })
+    const { lottery_campaign_id, start_time, end_time } = options
+    this.logger.info('获取综合监控统计', { lottery_campaign_id, start_time, end_time })
 
     const whereClause = {}
-    if (campaign_id) whereClause.campaign_id = campaign_id
+    if (lottery_campaign_id) whereClause.lottery_campaign_id = lottery_campaign_id
     if (start_time || end_time) {
       whereClause.created_at = {}
       if (start_time) whereClause.created_at[Op.gte] = new Date(start_time)
@@ -733,7 +733,7 @@ class RealtimeService {
       }),
       this.models.LotteryDraw.findAll({
         attributes: [
-          [fn('COUNT', col('draw_id')), 'total'],
+          [fn('COUNT', col('lottery_draw_id')), 'total'],
           [
             fn('SUM', literal("CASE WHEN reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END")),
             'wins'
@@ -756,7 +756,7 @@ class RealtimeService {
     const emptyRate = stats.total > 0 ? (parseInt(stats.empty) / parseInt(stats.total)) * 100 : 0
 
     // 获取低库存奖品
-    const lowStockPrizes = await this._checkLowStockPrizes(campaign_id)
+    const lowStockPrizes = await this._checkLowStockPrizes(lottery_campaign_id)
 
     return {
       total_draws: totalDraws,

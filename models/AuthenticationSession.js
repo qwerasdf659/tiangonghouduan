@@ -12,7 +12,7 @@
  *    - 特点：存储JWT Token、记录登录IP、支持过期和失效管理
  *    - 状态特点：is_active（是否活跃）、expires_at（过期时间）
  *    - 典型字段：session_token（JWT Token）、user_id、user_type、is_active、expires_at
- *    - 表名：authentication_sessions，主键：user_session_id
+ *    - 表名：authentication_sessions，主键：authentication_session_id
  *
  * ❌ CustomerServiceSession（另一个模型）：客服聊天会话 - 管理用户与客服的对话
  *    - 概念：记录用户与客服之间的聊天对话会话
@@ -20,7 +20,7 @@
  *    - 特点：包含多条聊天消息（ChatMessage）、有客服分配、有满意度评分
  *    - 状态流转：waiting（等待客服）→ assigned（已分配）→ active（活跃）→ closed（已关闭）
  *    - 典型字段：user_id（咨询用户）、admin_id（接入客服）、status（会话状态）、satisfaction_score（满意度）
- *    - 表名：customer_service_sessions，主键：session_id
+ *    - 表名：customer_service_sessions，主键：customer_service_session_id
  *
  * 📌 记忆口诀：
  * - AuthenticationSession = 用户认证会话 = 登录Token = 权限验证 = 用户登录系统
@@ -48,7 +48,7 @@ module.exports = sequelize => {
   const AuthenticationSession = sequelize.define(
     'AuthenticationSession',
     {
-      user_session_id: {
+      authentication_session_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,

@@ -50,7 +50,7 @@ class BudgetProvider {
    *
    * @param {Object} params - 查询参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {Object} _options - 额外选项（子类实现时使用）
    * @returns {Promise<Object>} 预算信息 { available: number, details: Object }
    * @abstract
@@ -64,7 +64,7 @@ class BudgetProvider {
    *
    * @param {Object} params - 检查参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {number} params.amount - 需要的预算金额
    * @param {Object} options - 额外选项
    * @returns {Promise<Object>} 检查结果 { sufficient: boolean, available: number, shortage: number }
@@ -87,10 +87,10 @@ class BudgetProvider {
    *
    * @param {Object} params - 扣减参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {number} params.amount - 扣减金额
    * @param {string} params.reason - 扣减原因
-   * @param {string} params.reference_id - 关联ID（如 draw_id）
+   * @param {string} params.reference_id - 关联ID（如 lottery_draw_id）
    * @param {Object} _options - 额外选项（子类实现时使用）
    * @param {Object} _options.transaction - 数据库事务
    * @returns {Promise<Object>} 扣减结果 { success: boolean, deducted: number, remaining: number }
@@ -105,7 +105,7 @@ class BudgetProvider {
    *
    * @param {Object} params - 回滚参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {number} params.amount - 回滚金额
    * @param {string} params.original_reference_id - 原扣减的关联ID
    * @param {Object} _options - 额外选项（子类实现时使用）
@@ -124,7 +124,7 @@ class BudgetProvider {
    *
    * @param {Object} params - 过滤参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.campaign_id - 活动ID
+   * @param {number} params.lottery_campaign_id - 活动ID
    * @param {Array} params.prizes - 原始奖品列表
    * @param {Object} options - 额外选项
    * @returns {Promise<Array>} 过滤后的奖品列表
@@ -149,7 +149,7 @@ class BudgetProvider {
 
     this._log('debug', '预算过滤奖品', {
       user_id: params.user_id,
-      campaign_id: params.campaign_id,
+      lottery_campaign_id: params.lottery_campaign_id,
       available_budget: available,
       original_count: prizes.length,
       filtered_count: filtered.length

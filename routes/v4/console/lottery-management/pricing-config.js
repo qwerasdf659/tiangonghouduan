@@ -63,7 +63,7 @@ function getPricingConfigService(req) {
 /**
  * 通过活动业务码获取活动ID
  *
- * @description 根据 campaign_code 查询活动信息，返回 campaign_id
+ * @description 根据 campaign_code 查询活动信息，返回 lottery_campaign_id
  * @param {Object} req - Express 请求对象（包含验证后的参数）
  * @returns {Promise<Object>} 活动信息对象
  * @throws {Error} 活动不存在时抛出错误
@@ -95,7 +95,7 @@ async function getCampaignByCode(req) {
  * - total: 配置总数
  *
  * 每个配置包含：
- * - campaign_id: 活动ID
+ * - lottery_campaign_id: 活动ID
  * - campaign_code: 活动业务码
  * - campaign_name: 活动名称
  * - campaign_status: 活动状态
@@ -134,7 +134,7 @@ router.get(
  *
  * 响应字段说明：
  * - config_id: 配置唯一ID
- * - campaign_id: 关联活动ID
+ * - lottery_campaign_id: 关联活动ID
  * - campaign_code: 活动业务码
  * - version: 版本号
  * - pricing_config: 定价配置 JSON（包含 draw_buttons 数组）
@@ -153,14 +153,19 @@ router.get(
     const campaign = await getCampaignByCode(req)
     const PricingConfigService = getPricingConfigService(req)
 
-    // 调用 Service 获取活跃配置（使用 campaign_id）
-    const pricing_config = await PricingConfigService.getActivePricingConfig(campaign.campaign_id)
+    // 调用 Service 获取活跃配置（使用 lottery_campaign_id）
+    const pricing_config = await PricingConfigService.getActivePricingConfig(
+      campaign.lottery_campaign_id
+    )
 
     if (!pricing_config) {
       return res.apiError(
         '该活动暂无定价配置，请先创建',
         'PRICING_CONFIG_NOT_FOUND',
-        { campaign_code: campaign.campaign_code, campaign_id: campaign.campaign_id },
+        {
+          campaign_code: campaign.campaign_code,
+          lottery_campaign_id: campaign.lottery_campaign_id
+        },
         404
       )
     }
@@ -196,8 +201,8 @@ router.get(
     const campaign = await getCampaignByCode(req)
     const PricingConfigService = getPricingConfigService(req)
 
-    // 调用 Service 获取所有版本（使用 campaign_id）
-    const result = await PricingConfigService.getAllVersions(campaign.campaign_id)
+    // 调用 Service 获取所有版本（使用 lottery_campaign_id）
+    const result = await PricingConfigService.getAllVersions(campaign.lottery_campaign_id)
 
     return res.apiSuccess({ campaign_code: campaign.campaign_code, ...result }, '获取版本列表成功')
   })
@@ -248,9 +253,9 @@ router.post(
 
     const PricingConfigService = getPricingConfigService(req)
 
-    // 调用 Service 创建新版本（使用 campaign_id）
+    // 调用 Service 创建新版本（使用 lottery_campaign_id）
     const result = await PricingConfigService.createNewVersion(
-      campaign.campaign_id,
+      campaign.lottery_campaign_id,
       pricing_config,
       created_by,
       { activate_immediately }
@@ -296,9 +301,9 @@ router.put(
 
     const PricingConfigService = getPricingConfigService(req)
 
-    // 调用 Service 激活版本（使用 campaign_id）
+    // 调用 Service 激活版本（使用 lottery_campaign_id）
     const result = await PricingConfigService.activateVersion(
-      campaign.campaign_id,
+      campaign.lottery_campaign_id,
       version,
       updated_by
     )
@@ -336,9 +341,9 @@ router.put(
 
     const PricingConfigService = getPricingConfigService(req)
 
-    // 调用 Service 归档版本（使用 campaign_id）
+    // 调用 Service 归档版本（使用 lottery_campaign_id）
     const result = await PricingConfigService.archiveVersion(
-      campaign.campaign_id,
+      campaign.lottery_campaign_id,
       version,
       updated_by
     )
@@ -390,9 +395,9 @@ router.post(
 
     const PricingConfigService = getPricingConfigService(req)
 
-    // 调用 Service 执行回滚（使用 campaign_id）
+    // 调用 Service 执行回滚（使用 lottery_campaign_id）
     const result = await PricingConfigService.rollbackToVersion(
-      campaign.campaign_id,
+      campaign.lottery_campaign_id,
       parseInt(target_version, 10),
       updated_by,
       rollback_reason
@@ -443,9 +448,9 @@ router.put(
 
     const PricingConfigService = getPricingConfigService(req)
 
-    // 调用 Service 设置定时生效（使用 campaign_id）
+    // 调用 Service 设置定时生效（使用 lottery_campaign_id）
     const result = await PricingConfigService.scheduleActivation(
-      campaign.campaign_id,
+      campaign.lottery_campaign_id,
       version,
       effective_at,
       updated_by
@@ -484,9 +489,9 @@ router.delete(
 
     const PricingConfigService = getPricingConfigService(req)
 
-    // 调用 Service 取消定时生效（使用 campaign_id）
+    // 调用 Service 取消定时生效（使用 lottery_campaign_id）
     const result = await PricingConfigService.cancelScheduledActivation(
-      campaign.campaign_id,
+      campaign.lottery_campaign_id,
       version,
       updated_by
     )

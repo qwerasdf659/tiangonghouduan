@@ -12,7 +12,7 @@ module.exports = sequelize => {
     'ImageResources',
     {
       // 基础标识
-      image_id: {
+      image_resource_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
@@ -196,7 +196,7 @@ module.exports = sequelize => {
     } else {
       // 缩略图缺失时：记录 ERROR 日志 + 返回占位图（生产安全兜底）
       logger.error('❌ ImageResources.toSafeJSON: 图片缺少预生成缩略图', {
-        image_id: values.image_id,
+        image_id: values.image_resource_id,
         file_path: values.file_path,
         business_type: values.business_type,
         category: values.category,

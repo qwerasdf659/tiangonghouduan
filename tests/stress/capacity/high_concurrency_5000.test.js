@@ -162,7 +162,7 @@ describe('🚀 5000并发压力测试（P2-3）', () => {
             const result = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
               api_path: '/api/v4/lottery/draw',
               http_method: 'POST',
-              request_params: { campaign_id: testCampaignId, draw_count: 1 },
+              request_params: { lottery_campaign_id: testCampaignId, draw_count: 1 },
               user_id: testUserId
             })
 
@@ -242,7 +242,7 @@ describe('🚀 5000并发压力测试（P2-3）', () => {
             const result = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
               api_path: '/api/v4/lottery/draw',
               http_method: 'POST',
-              request_params: { campaign_id: testCampaignId, draw_count: 1 },
+              request_params: { lottery_campaign_id: testCampaignId, draw_count: 1 },
               user_id: testUserId
             })
 

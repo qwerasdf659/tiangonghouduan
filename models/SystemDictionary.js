@@ -28,7 +28,7 @@ module.exports = sequelize => {
       /**
        * 字典ID（自增主键）
        */
-      dict_id: {
+      system_dictionary_id: {
         type: DataTypes.INTEGER.UNSIGNED,
         primaryKey: true,
         autoIncrement: true,

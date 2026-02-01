@@ -3,7 +3,7 @@
  *
  * 业务场景：为审计日志提供业务主键（决策9实现）
  * - 记录用户角色变更操作（升级/降级/授权等）
- * - 主键 record_id 作为审计日志的 target_id
+ * - 主键 user_role_change_record_id 作为审计日志的 target_id
  * - 确保关键操作的可追溯性
  *
  * 注意：与 RoleChangeLog 模型的区别
@@ -11,7 +11,7 @@
  * - UserRoleChangeRecord：专门为审计日志提供业务主键，使用角色名称字符串
  *
  * 表名（snake_case）：user_role_change_records
- * 主键命名：record_id（BIGINT自增）
+ * 主键命名：user_role_change_record_id（BIGINT自增）
  *
  * 创建时间：2026-01-08
  * 关联文档：审计统一入口整合方案-2026-01-08.md
@@ -91,7 +91,7 @@ module.exports = (sequelize, _DataTypes) => {
   UserRoleChangeRecord.init(
     {
       // 变更记录ID（主键，作为审计日志的 target_id）
-      record_id: {
+      user_role_change_record_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,

@@ -30,7 +30,7 @@ module.exports = sequelize => {
        * 主键字段
        * ========================================
        */
-      id: {
+      user_premium_status_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,

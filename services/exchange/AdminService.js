@@ -121,7 +121,7 @@ class AdminService {
       { transaction }
     )
 
-    logger.info(`[兑换市场] 商品创建成功，item_id: ${item.item_id}`)
+    logger.info(`[兑换市场] 商品创建成功，exchange_item_id: ${item.exchange_item_id}`)
 
     // 图片绑定
     let bound_image = false
@@ -130,18 +130,20 @@ class AdminService {
         const ImageService = require('../ImageService')
         await ImageService.updateImageContextId(
           itemData.primary_image_id,
-          item.item_id,
+          item.exchange_item_id,
           transaction
         )
         bound_image = true
         logger.info('[兑换市场] 商品图片绑定成功', {
-          item_id: item.item_id,
-          image_id: itemData.primary_image_id
+          exchange_item_id: item.exchange_item_id,
+          // 2026-02-01 主键命名规范化：使用完整前缀 image_resource_id
+          image_resource_id: itemData.primary_image_id
         })
       } catch (bindError) {
         logger.warn('[兑换市场] 商品图片绑定失败（非致命）', {
-          item_id: item.item_id,
-          image_id: itemData.primary_image_id,
+          exchange_item_id: item.exchange_item_id,
+          // 2026-02-01 主键命名规范化：使用完整前缀 image_resource_id
+          image_resource_id: itemData.primary_image_id,
           error: bindError.message
         })
       }
@@ -371,13 +373,15 @@ class AdminService {
         const deleteResult = await ImageService.deleteImage(associated_image_id, transaction)
         logger.info('[兑换市场] 商品关联图片删除成功', {
           item_id,
-          image_id: associated_image_id,
+          // 2026-02-01 主键命名规范化：使用完整前缀 image_resource_id
+          image_resource_id: associated_image_id,
           delete_result: deleteResult.success
         })
       } catch (imageError) {
         logger.warn('[兑换市场] 商品关联图片删除失败（非致命）', {
           item_id,
-          image_id: associated_image_id,
+          // 2026-02-01 主键命名规范化：使用完整前缀 image_resource_id
+          image_resource_id: associated_image_id,
           error: imageError.message
         })
       }
@@ -386,7 +390,8 @@ class AdminService {
     await item.destroy({ transaction })
 
     logger.info(`[兑换市场] 商品删除成功，item_id: ${item_id}`, {
-      deleted_image_id: associated_image_id
+      // 2026-02-01 主键命名规范化：使用完整前缀 image_resource_id
+      deleted_image_resource_id: associated_image_id
     })
 
     try {
@@ -399,7 +404,8 @@ class AdminService {
       success: true,
       action: 'deleted',
       message: '商品删除成功',
-      deleted_image_id: associated_image_id,
+      // 2026-02-01 主键命名规范化：使用完整前缀 image_resource_id
+      deleted_image_resource_id: associated_image_id,
       timestamp: BeijingTimeHelper.now()
     }
   }
@@ -425,7 +431,7 @@ class AdminService {
         where: { status: 'on_sale' },
         attributes: [
           'seller_user_id',
-          [this.sequelize.fn('COUNT', this.sequelize.col('listing_id')), 'count']
+          [this.sequelize.fn('COUNT', this.sequelize.col('market_listing_id')), 'count']
         ],
         group: ['seller_user_id'],
         raw: true
@@ -527,7 +533,14 @@ class AdminService {
           status: 'pending',
           created_at: { [Op.lt]: timeoutThreshold }
         },
-        attributes: ['record_id', 'order_no', 'user_id', 'item_id', 'pay_amount', 'created_at'],
+        attributes: [
+          'exchange_record_id',
+          'order_no',
+          'user_id',
+          'exchange_item_id',
+          'pay_amount',
+          'created_at'
+        ],
         order: [['created_at', 'ASC']],
         limit: 100
       })
@@ -550,7 +563,7 @@ class AdminService {
         count,
         hours,
         orders: timeoutOrders.map(order => ({
-          record_id: order.record_id,
+          record_id: order.exchange_record_id,
           order_no: order.order_no,
           user_id: order.user_id,
           pay_amount: order.pay_amount,

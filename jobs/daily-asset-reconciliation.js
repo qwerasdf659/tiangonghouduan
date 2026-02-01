@@ -434,7 +434,13 @@ class DailyAssetReconciliation {
       where: {
         created_at: { [Op.gte]: cutoffDate }
       },
-      attributes: ['draw_id', 'user_id', 'asset_transaction_id', 'cost_points', 'created_at']
+      attributes: [
+        'lottery_draw_id',
+        'user_id',
+        'asset_transaction_id',
+        'cost_points',
+        'created_at'
+      ]
     })
 
     const missing_transaction_ids = []
@@ -444,7 +450,7 @@ class DailyAssetReconciliation {
       if (!draw.asset_transaction_id) {
         // 缺失关联：抽奖记录没有关联流水ID
         missing_transaction_ids.push({
-          draw_id: draw.draw_id,
+          lottery_draw_id: draw.lottery_draw_id,
           user_id: draw.user_id,
           cost_points: draw.cost_points,
           created_at: draw.created_at
@@ -455,7 +461,7 @@ class DailyAssetReconciliation {
         const transaction = await AssetTransaction.findByPk(draw.asset_transaction_id)
         if (!transaction) {
           orphan_transaction_ids.push({
-            draw_id: draw.draw_id,
+            lottery_draw_id: draw.lottery_draw_id,
             asset_transaction_id: draw.asset_transaction_id,
             user_id: draw.user_id,
             created_at: draw.created_at
@@ -600,7 +606,9 @@ class DailyAssetReconciliation {
     if (results.lottery_draws.missing_transaction_ids.length > 0) {
       console.log('   缺失详情:')
       results.lottery_draws.missing_transaction_ids.slice(0, 5).forEach(d => {
-        console.log(`     - draw_id=${d.draw_id}, user=${d.user_id}, cost=${d.cost_points}`)
+        console.log(
+          `     - lottery_draw_id=${d.lottery_draw_id}, user=${d.user_id}, cost=${d.cost_points}`
+        )
       })
       if (results.lottery_draws.missing_transaction_ids.length > 5) {
         console.log(

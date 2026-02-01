@@ -6,7 +6,7 @@
  * @date 2026-01-06
  *
  * 核心功能：
- * - 活动预算配置（budget_mode、pool_budget_remaining、allowed_campaign_ids）
+ * - 活动预算配置（budget_mode、pool_budget_remaining、allowed_lottery_campaign_ids）
  * - 用户 BUDGET_POINTS 余额查询
  * - 奖品配置验证（空奖约束）
  * - 活动池预算补充
@@ -54,7 +54,7 @@ function getServices(req) {
  * @route GET /api/v4/console/campaign-budget/batch-status
  * @access Private (需要管理员权限)
  *
- * @query {string} campaign_ids - 活动ID列表（逗号分隔，如：1,2,3）
+ * @query {string} lottery_campaign_ids - 活动ID列表（逗号分隔，如：1,2,3）
  * @query {number} limit - 限制返回数量（默认20，最大50）
  *
  * @returns {Object} 多个活动的预算状态列表
@@ -63,13 +63,13 @@ router.get(
   '/batch-status',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { campaign_ids, status, limit = 20 } = req.query
+    const { lottery_campaign_ids, status, limit = 20 } = req.query
 
     try {
-      // 解析 campaign_ids（支持逗号分隔或单独指定）
+      // 解析 lottery_campaign_ids（支持逗号分隔或单独指定）
       let targetIds = []
-      if (campaign_ids) {
-        targetIds = campaign_ids
+      if (lottery_campaign_ids) {
+        targetIds = lottery_campaign_ids
           .split(',')
           .map(id => parseInt(id.trim()))
           .filter(id => !isNaN(id))
@@ -83,7 +83,7 @@ router.get(
        * 支持按活动状态筛选（status: active/draft/completed/paused）
        */
       const { campaigns: results, summary } = await ActivityService.getBatchBudgetStatus({
-        campaign_ids: targetIds,
+        lottery_campaign_ids: targetIds,
         status: status || '',
         limit: parseInt(limit) || 20
       })
@@ -117,22 +117,22 @@ router.get(
 )
 
 /**
- * GET /campaigns/:campaign_id - 获取活动预算配置
+ * GET /campaigns/:lottery_campaign_id - 获取活动预算配置
  *
  * @description 获取指定活动的预算模式和配置信息
- * @route GET /api/v4/console/campaign-budget/campaigns/:campaign_id
+ * @route GET /api/v4/console/campaign-budget/campaigns/:lottery_campaign_id
  * @access Private (需要管理员权限)
  *
  * @returns {Object} 活动预算配置信息
  */
 router.get(
-  '/campaigns/:campaign_id',
+  '/campaigns/:lottery_campaign_id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { campaign_id } = req.params
+    const { lottery_campaign_id } = req.params
 
     try {
-      if (!campaign_id || isNaN(parseInt(campaign_id))) {
+      if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
       }
 
@@ -140,13 +140,15 @@ router.get(
       const { ActivityService } = getServices(req)
 
       // 通过 Service 层获取活动预算配置（符合路由层规范）
-      const campaignConfig = await ActivityService.getCampaignBudgetConfig(parseInt(campaign_id))
+      const campaignConfig = await ActivityService.getCampaignBudgetConfig(
+        parseInt(lottery_campaign_id)
+      )
 
       // 通过 Service 层获取奖品配置（符合路由层规范）
-      const prizeConfig = await ActivityService.getPrizeConfig(parseInt(campaign_id))
+      const prizeConfig = await ActivityService.getPrizeConfig(parseInt(lottery_campaign_id))
 
       sharedComponents.logger.info('获取活动预算配置成功', {
-        campaign_id,
+        lottery_campaign_id,
         budget_mode: campaignConfig.budget_mode,
         operated_by: req.user?.id
       })
@@ -170,15 +172,15 @@ router.get(
 )
 
 /**
- * PUT /campaigns/:campaign_id - 更新活动预算配置
+ * PUT /campaigns/:lottery_campaign_id - 更新活动预算配置
  *
  * @description 更新活动的预算模式和相关配置，通过 Service 层处理（包含缓存失效）
- * @route PUT /api/v4/console/campaign-budget/campaigns/:campaign_id
+ * @route PUT /api/v4/console/campaign-budget/campaigns/:lottery_campaign_id
  * @access Private (需要管理员权限)
  *
  * @body {string} budget_mode - 预算模式（user/pool/none）
  * @body {number} pool_budget_total - 活动池总预算（budget_mode=pool时使用）
- * @body {Array<string|number>} allowed_campaign_ids - 允许使用的预算来源活动ID列表
+ * @body {Array<string|number>} allowed_lottery_campaign_ids - 允许使用的预算来源活动ID列表
  * @body {boolean} preset_debt_enabled - 预设是否允许欠账（true/false）
  * @body {string} preset_budget_policy - 预设预算扣减策略（follow_campaign/pool_first/user_first）
  *
@@ -186,14 +188,14 @@ router.get(
  * - 更新成功后在 Service 层精准失效活动配置缓存
  */
 router.put(
-  '/campaigns/:campaign_id',
+  '/campaigns/:lottery_campaign_id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { campaign_id } = req.params
+    const { lottery_campaign_id } = req.params
     const {
       budget_mode,
       pool_budget_total,
-      allowed_campaign_ids,
+      allowed_lottery_campaign_ids,
       preset_debt_enabled,
       preset_budget_policy
     } = req.body
@@ -202,7 +204,7 @@ router.put(
     const { AdminLotteryService } = getServices(req)
 
     try {
-      if (!campaign_id || isNaN(parseInt(campaign_id))) {
+      if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
       }
 
@@ -215,22 +217,24 @@ router.put(
         async transaction => {
           // 决策7：通过 Service 层更新活动预算（包含缓存失效）
           return await AdminLotteryService.updateCampaignBudget(
-            parseInt(campaign_id),
+            parseInt(lottery_campaign_id),
             {
               budget_mode,
               pool_budget_total,
-              allowed_campaign_ids,
+              allowed_lottery_campaign_ids,
               preset_debt_enabled,
               preset_budget_policy
             },
             { operated_by: req.user?.user_id, transaction }
           )
         },
-        { description: `console_update_campaign_budget: campaign_id=${campaign_id}` }
+        {
+          description: `console_update_campaign_budget: lottery_campaign_id=${lottery_campaign_id}`
+        }
       )
 
       sharedComponents.logger.info('活动预算配置更新成功', {
-        campaign_id,
+        lottery_campaign_id,
         updated_fields: result.updated_fields,
         operated_by: req.user?.id
       })
@@ -240,13 +244,13 @@ router.put(
 
       return res.apiSuccess(
         {
-          campaign_id: parseInt(campaign_id),
+          lottery_campaign_id: parseInt(lottery_campaign_id),
           updated_fields: result.updated_fields,
           current_config: {
             budget_mode: campaign.budget_mode,
             pool_budget_total: campaign.pool_budget_total,
             pool_budget_remaining: campaign.pool_budget_remaining,
-            allowed_campaign_ids: campaign.allowed_campaign_ids,
+            allowed_lottery_campaign_ids: campaign.allowed_lottery_campaign_ids,
             preset_debt_enabled: campaign.preset_debt_enabled,
             preset_budget_policy: campaign.preset_budget_policy
           }
@@ -271,10 +275,10 @@ router.put(
 )
 
 /**
- * POST /campaigns/:campaign_id/validate - 验证活动奖品配置
+ * POST /campaigns/:lottery_campaign_id/validate - 验证活动奖品配置
  *
  * @description 验证活动的奖品池配置是否符合 BUDGET_POINTS 架构要求
- * @route POST /api/v4/console/campaign-budget/campaigns/:campaign_id/validate
+ * @route POST /api/v4/console/campaign-budget/campaigns/:lottery_campaign_id/validate
  * @access Private (需要管理员权限)
  *
  * 验证规则：
@@ -282,13 +286,13 @@ router.put(
  * - 空奖必须有大于0的中奖概率
  */
 router.post(
-  '/campaigns/:campaign_id/validate',
+  '/campaigns/:lottery_campaign_id/validate',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { campaign_id } = req.params
+    const { lottery_campaign_id } = req.params
 
     try {
-      if (!campaign_id || isNaN(parseInt(campaign_id))) {
+      if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
       }
 
@@ -296,10 +300,12 @@ router.post(
       const ActivityService = req.app.locals.services.getService('activity')
 
       // 通过 Service 层验证奖品配置（符合路由层规范）
-      const validationResult = await ActivityService.validatePrizeConfig(parseInt(campaign_id))
+      const validationResult = await ActivityService.validatePrizeConfig(
+        parseInt(lottery_campaign_id)
+      )
 
       sharedComponents.logger.info('活动奖品配置验证完成', {
-        campaign_id,
+        lottery_campaign_id,
         overall_valid: validationResult.overall_valid,
         operated_by: req.user?.id
       })
@@ -321,7 +327,7 @@ router.post(
 )
 
 /**
- * POST /campaigns/:campaign_id/validate-for-launch - 活动上线前完整校验（纯严格模式）
+ * POST /campaigns/:lottery_campaign_id/validate-for-launch - 活动上线前完整校验（纯严格模式）
  *
  * @description 活动上线前的完整配置校验，不通过则禁止上线
  *
@@ -333,19 +339,19 @@ router.post(
  *
  * 业务规则：配置不正确就禁止上线活动
  *
- * @route POST /api/v4/console/campaign-budget/campaigns/:campaign_id/validate-for-launch
+ * @route POST /api/v4/console/campaign-budget/campaigns/:lottery_campaign_id/validate-for-launch
  * @access Private (需要管理员权限)
- * @param {number} campaign_id - 活动ID
+ * @param {number} lottery_campaign_id - 活动ID
  * @returns {Object} 完整校验结果，包含 can_launch 字段
  */
 router.post(
-  '/campaigns/:campaign_id/validate-for-launch',
+  '/campaigns/:lottery_campaign_id/validate-for-launch',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { campaign_id } = req.params
+    const { lottery_campaign_id } = req.params
 
     try {
-      if (!campaign_id || isNaN(parseInt(campaign_id))) {
+      if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
       }
 
@@ -353,10 +359,12 @@ router.post(
       const ActivityService = req.app.locals.services.getService('activity')
 
       // 调用活动上线前完整校验（纯严格模式）
-      const validationResult = await ActivityService.validateForLaunch(parseInt(campaign_id))
+      const validationResult = await ActivityService.validateForLaunch(
+        parseInt(lottery_campaign_id)
+      )
 
       sharedComponents.logger.info('活动上线前完整校验完成', {
-        campaign_id,
+        lottery_campaign_id,
         can_launch: validationResult.can_launch,
         errors_count: validationResult.errors?.length || 0,
         operated_by: req.user?.id
@@ -370,7 +378,7 @@ router.post(
       }
     } catch (error) {
       sharedComponents.logger.error('活动上线前校验失败', {
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
 
@@ -443,7 +451,7 @@ router.get(
           },
           budget_balances: budgetBalances.map(b => ({
             balance_id: b.balance_id,
-            campaign_id: b.campaign_id,
+            lottery_campaign_id: b.lottery_campaign_id,
             available_amount: Number(b.available_amount),
             frozen_amount: Number(b.frozen_amount),
             total_amount: Number(b.available_amount) + Number(b.frozen_amount),
@@ -462,10 +470,10 @@ router.get(
 )
 
 /**
- * POST /campaigns/:campaign_id/pool/add - 补充活动池预算
+ * POST /campaigns/:lottery_campaign_id/pool/add - 补充活动池预算
  *
  * @description 为活动池模式的活动补充预算，通过 Service 层处理（包含缓存失效）
- * @route POST /api/v4/console/campaign-budget/campaigns/:campaign_id/pool/add
+ * @route POST /api/v4/console/campaign-budget/campaigns/:lottery_campaign_id/pool/add
  * @access Private (需要管理员权限)
  *
  * @body {number} amount - 补充金额（必须为正数）
@@ -475,14 +483,14 @@ router.get(
  * - 补充成功后在 Service 层精准失效活动配置缓存
  */
 router.post(
-  '/campaigns/:campaign_id/pool/add',
+  '/campaigns/:lottery_campaign_id/pool/add',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { campaign_id } = req.params
+    const { lottery_campaign_id } = req.params
     const { amount, reason } = req.body
 
     try {
-      if (!campaign_id || isNaN(parseInt(campaign_id))) {
+      if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
       }
 
@@ -500,16 +508,22 @@ router.post(
       const result = await TransactionManager.execute(
         async transaction => {
           // 决策7：通过 Service 层补充预算（包含缓存失效）
-          return await AdminLotteryService.supplementCampaignBudget(parseInt(campaign_id), amount, {
-            operated_by: req.user?.user_id,
-            transaction
-          })
+          return await AdminLotteryService.supplementCampaignBudget(
+            parseInt(lottery_campaign_id),
+            amount,
+            {
+              operated_by: req.user?.user_id,
+              transaction
+            }
+          )
         },
-        { description: `console_supplement_campaign_budget: campaign_id=${campaign_id}` }
+        {
+          description: `console_supplement_campaign_budget: lottery_campaign_id=${lottery_campaign_id}`
+        }
       )
 
       sharedComponents.logger.info('活动池预算补充成功', {
-        campaign_id,
+        lottery_campaign_id,
         amount,
         reason: reason.trim(),
         operated_by: req.user?.id
@@ -517,7 +531,7 @@ router.post(
 
       return res.apiSuccess(
         {
-          campaign_id: parseInt(campaign_id),
+          lottery_campaign_id: parseInt(lottery_campaign_id),
           campaign_name: result.campaign.name,
           amount_added: result.amount,
           new_remaining: result.new_remaining,
@@ -540,20 +554,20 @@ router.post(
 )
 
 /**
- * GET /campaigns/:campaign_id/budget-status - 获取活动预算使用状态
+ * GET /campaigns/:lottery_campaign_id/budget-status - 获取活动预算使用状态
  *
  * @description 获取活动的预算使用情况统计
- * @route GET /api/v4/console/campaign-budget/campaigns/:campaign_id/budget-status
+ * @route GET /api/v4/console/campaign-budget/campaigns/:lottery_campaign_id/budget-status
  * @access Private (需要管理员权限)
  */
 router.get(
-  '/campaigns/:campaign_id/budget-status',
+  '/campaigns/:lottery_campaign_id/budget-status',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { campaign_id } = req.params
+    const { lottery_campaign_id } = req.params
 
     try {
-      if (!campaign_id || isNaN(parseInt(campaign_id))) {
+      if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
       }
 
@@ -561,10 +575,12 @@ router.get(
       const ActivityService = req.app.locals.services.getService('activity')
 
       // 通过 Service 层获取预算消耗统计（符合路由层规范）
-      const statsResult = await ActivityService.getBudgetConsumptionStats(parseInt(campaign_id))
+      const statsResult = await ActivityService.getBudgetConsumptionStats(
+        parseInt(lottery_campaign_id)
+      )
 
       const result = {
-        campaign_id: statsResult.campaign.campaign_id,
+        lottery_campaign_id: statsResult.campaign.lottery_campaign_id,
         campaign_name: statsResult.campaign.campaign_name,
         budget_mode: statsResult.campaign.budget_mode,
         pool_budget: statsResult.budget,
@@ -575,7 +591,7 @@ router.get(
       }
 
       sharedComponents.logger.info('活动预算状态查询成功', {
-        campaign_id,
+        lottery_campaign_id,
         budget_mode: result.budget_mode,
         operated_by: req.user?.id
       })

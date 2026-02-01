@@ -46,14 +46,14 @@ class PrizePickStage extends BaseStage {
    *
    * @param {Object} context - 执行上下文
    * @param {number} context.user_id - 用户ID
-   * @param {number} context.campaign_id - 活动ID
+   * @param {number} context.lottery_campaign_id - 活动ID
    * @param {Object} context.stage_results - 前置Stage的执行结果
    * @returns {Promise<Object>} Stage 执行结果
    */
   async execute(context) {
-    const { user_id, campaign_id } = context
+    const { user_id, lottery_campaign_id } = context
 
-    this.log('info', '开始奖品抽取', { user_id, campaign_id })
+    this.log('info', '开始奖品抽取', { user_id, lottery_campaign_id })
 
     try {
       /*
@@ -72,7 +72,7 @@ class PrizePickStage extends BaseStage {
         this.log('info', '预设模式：使用预设奖品', {
           user_id,
           decision_source,
-          prize_id: preset_prize.prize_id || preset.prize_id,
+          lottery_prize_id: preset_prize.lottery_prize_id || preset.lottery_prize_id,
           prize_name: preset_prize.prize_name || '预设奖品'
         })
 
@@ -100,7 +100,7 @@ class PrizePickStage extends BaseStage {
           this.log('info', '干预模式（强制中奖）：使用指定奖品', {
             user_id,
             decision_source,
-            prize_id: override_prize.prize_id,
+            lottery_prize_id: override_prize.lottery_prize_id,
             prize_name: override_prize.prize_name
           })
 
@@ -126,7 +126,7 @@ class PrizePickStage extends BaseStage {
             this.log('info', '干预模式（强制不中）：使用兜底奖品', {
               user_id,
               decision_source,
-              prize_id: fallback_prize.prize_id,
+              lottery_prize_id: fallback_prize.lottery_prize_id,
               prize_name: fallback_prize.prize_name
             })
 
@@ -154,7 +154,7 @@ class PrizePickStage extends BaseStage {
           this.log('info', '保底模式：使用保底奖品', {
             user_id,
             decision_source,
-            prize_id: guarantee_prize.prize_id,
+            lottery_prize_id: guarantee_prize.lottery_prize_id,
             prize_name: guarantee_prize.prize_name
           })
 
@@ -224,9 +224,9 @@ class PrizePickStage extends BaseStage {
 
       this.log('info', '奖品抽取完成', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         selected_tier,
-        prize_id: selected_prize.prize_id,
+        lottery_prize_id: selected_prize.lottery_prize_id,
         prize_name: selected_prize.prize_name,
         prize_value_points: selected_prize.prize_value_points,
         random_value_percent:
@@ -238,7 +238,7 @@ class PrizePickStage extends BaseStage {
     } catch (error) {
       this.log('error', '奖品抽取失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       throw error
@@ -302,7 +302,7 @@ class PrizePickStage extends BaseStage {
       hit_range = [total_weight - last_weight, total_weight]
 
       this.log('debug', '使用兜底选择最后一个奖品', {
-        prize_id: selected_prize.prize_id,
+        lottery_prize_id: selected_prize.lottery_prize_id,
         random_value,
         total_weight
       })

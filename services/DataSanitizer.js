@@ -102,7 +102,7 @@ class DataSanitizer {
 
     // 普通用户数据脱敏
     const sanitized = prizes.map(prize => ({
-      id: prize.prize_id,
+      id: prize.lottery_prize_id,
       name: prize.prize_name,
       type: prize.prize_type,
       icon: this.getPrizeIcon(prize.prize_type),
@@ -1240,7 +1240,7 @@ class DataSanitizer {
   /**
    * 兑换市场商品列表数据脱敏
    *
-   * 🗄️ 数据库表：exchange_items（主键：item_id）
+   * 🗄️ 数据库表：exchange_items（主键：exchange_item_id）
    *
    * 业务场景：兑换市场商品列表API响应时调用，防止泄露商业敏感信息
    *
@@ -1250,16 +1250,16 @@ class DataSanitizer {
    *
    * 输入契约：
    * - 输入数据必须来自 exchange_items 表的 Sequelize 查询结果
-   * - 必须包含 item_id 字段（数据库主键）
+   * - 必须包含 exchange_item_id 字段（数据库主键）
    * - 🔧 2026-01-13 图片字段策略：需要 include primaryImage（ImageResources 关联）
    *
    * 输出字段（统一规范）：
    * - primary_image_id: 主图片ID（关联 image_resources 表）
-   * - primary_image: 图片对象 { image_id, url, width, height, mime }，缺失时为 null
+   * - primary_image: 图片对象 { id, url, mime }，缺失时为 null（id为脱敏输出字段）
    *
    * @param {Array<Object>} items - 商品数据数组（来自 exchange_items 表，需 include primaryImage）
    * @param {string} dataLevel - 数据级别：'full'（管理员）或'public'（普通用户）
-   * @returns {Array<Object>} 脱敏后的商品数组（id 字段映射自 item_id）
+   * @returns {Array<Object>} 脱敏后的商品数组（id 字段映射自 exchange_item_id）
    */
   static sanitizeExchangeMarketItems(items, dataLevel) {
     /*
@@ -1279,16 +1279,18 @@ class DataSanitizer {
         if (typeof primaryImageData.toSafeJSON === 'function') {
           const safeImage = primaryImageData.toSafeJSON()
           primaryImage = {
-            image_id: safeImage.image_id,
-            url: safeImage.url, // 公开永久 URL（无签名）
+            // 2026-02-01 主键命名规范化：输出 id 用于脱敏，源字段为 image_resource_id
+            id: safeImage.image_resource_id,
+            url: safeImage.imageUrl, // 公开永久 URL（无签名），toSafeJSON 返回 imageUrl
             mime: safeImage.mime_type,
             // 列表视图使用缩略图 URL
-            thumbnail_url: safeImage.thumbnails?.small || safeImage.url
+            thumbnail_url: safeImage.thumbnails?.small || safeImage.imageUrl
           }
         } else {
           // 降级处理：如果没有 toSafeJSON 方法（不应该发生）
           primaryImage = {
-            image_id: primaryImageData.image_id,
+            // 2026-02-01 主键命名规范化：输出 id 用于脱敏，源字段为 image_resource_id
+            id: primaryImageData.image_resource_id,
             url: null, // 无法生成 URL
             mime: primaryImageData.mime_type,
             thumbnail_url: null
@@ -1297,7 +1299,7 @@ class DataSanitizer {
       }
 
       return {
-        id: item.item_id, // 数据库主键（唯一真相源）
+        id: item.exchange_item_id, // 数据库主键（唯一真相源）
         name: item.item_name, // 兑换商品名称（数据库字段为 item_name，API 输出为 name 保持前端兼容）
         description: item.description,
         // V4.5.0: 材料资产支付字段
@@ -1360,7 +1362,7 @@ class DataSanitizer {
 
     // 普通用户数据脱敏（V4.5.0 材料资产支付）
     const sanitized = orders.map(order => ({
-      id: order.record_id, // 数据库主键（唯一真相源）
+      id: order.exchange_record_id, // 数据库主键（唯一真相源）
       order_no: order.order_no,
       item_snapshot: {
         name: order.item_snapshot?.name,

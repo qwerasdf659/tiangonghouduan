@@ -114,8 +114,8 @@ describe('MarketListingService - 市场挂牌服务', () => {
         // 找到刚创建的测试挂牌
         const found_listing = result.products.find(
           p =>
-            p.listing_id === test_listing.listing_id ||
-            String(p.listing_id) === String(test_listing.listing_id)
+            p.market_listing_id === test_listing.market_listing_id ||
+            String(p.market_listing_id) === String(test_listing.market_listing_id)
         )
 
         // 如果能找到该挂牌
@@ -125,7 +125,7 @@ describe('MarketListingService - 市场挂牌服务', () => {
            * - 物品实例类型：item_info.display_name（而非顶层 name）
            * - 可叠加资产类型：asset_info.display_name
            */
-          expect(found_listing).toHaveProperty('listing_id')
+          expect(found_listing).toHaveProperty('market_listing_id')
           expect(found_listing).toHaveProperty('listing_kind', 'item_instance')
           expect(found_listing).toHaveProperty('price_amount')
           expect(found_listing).toHaveProperty('price_asset_code')
@@ -141,7 +141,7 @@ describe('MarketListingService - 市场挂牌服务', () => {
           if (result.products.length > 0) {
             const sample = result.products[0]
             // 验证基础字段存在
-            expect(sample).toHaveProperty('listing_id')
+            expect(sample).toHaveProperty('market_listing_id')
             expect(sample).toHaveProperty('listing_kind')
           }
         }
@@ -230,15 +230,15 @@ describe('MarketListingService - 市场挂牌服务', () => {
       })
 
       if (list_result.products.length > 0) {
-        const listing_id = list_result.products[0].listing_id
+        const marketListingId = list_result.products[0].market_listing_id
 
         // 查询详情
-        const listing = await MarketListingService.getListingById(listing_id)
+        const listing = await MarketListingService.getListingById(marketListingId)
 
         // getListingById 可能返回 null（如果挂牌被删除或不存在）
         if (listing) {
-          expect(listing).toHaveProperty('listing_id')
-          expect(String(listing.listing_id)).toBe(String(listing_id))
+          expect(listing).toHaveProperty('market_listing_id')
+          expect(String(listing.market_listing_id)).toBe(String(marketListingId))
         } else {
           // 挂牌可能已被删除或状态变更，跳过此测试
           console.log('挂牌不存在或状态已变更，跳过详情验证')
@@ -279,7 +279,7 @@ describe('MarketListingService - 市场挂牌服务', () => {
         const listing = result.products[0]
 
         // 验证基础字段
-        expect(listing).toHaveProperty('listing_id')
+        expect(listing).toHaveProperty('market_listing_id')
         expect(listing).toHaveProperty('listing_kind', 'item_instance')
         expect(listing).toHaveProperty('status')
         expect(listing).toHaveProperty('price_amount')

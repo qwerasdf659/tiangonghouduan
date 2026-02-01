@@ -73,14 +73,14 @@ class BuildPrizePoolStage extends BaseStage {
    *
    * @param {Object} context - 执行上下文
    * @param {number} context.user_id - 用户ID
-   * @param {number} context.campaign_id - 活动ID
+   * @param {number} context.lottery_campaign_id - 活动ID
    * @param {Object} context.stage_results - 前置Stage的执行结果
    * @returns {Promise<Object>} Stage 执行结果
    */
   async execute(context) {
-    const { user_id, campaign_id } = context
+    const { user_id, lottery_campaign_id } = context
 
-    this.log('info', '开始构建奖品池', { user_id, campaign_id })
+    this.log('info', '开始构建奖品池', { user_id, lottery_campaign_id })
 
     try {
       /* 获取活动配置和奖品列表（从 LoadCampaignStage 的结果中） */
@@ -108,7 +108,7 @@ class BuildPrizePoolStage extends BaseStage {
       const effective_budget = budget_data?.effective_budget || 0
 
       this.log('info', '奖品池构建参数', {
-        campaign_id,
+        lottery_campaign_id,
         total_prizes: prizes.length,
         budget_before,
         effective_budget,
@@ -164,7 +164,7 @@ class BuildPrizePoolStage extends BaseStage {
       }
 
       this.log('info', '奖品池构建完成', {
-        campaign_id,
+        lottery_campaign_id,
         user_id,
         total_available: filtered_prizes.length,
         available_tiers,
@@ -179,7 +179,7 @@ class BuildPrizePoolStage extends BaseStage {
     } catch (error) {
       this.log('error', '奖品池构建失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       throw error
@@ -200,7 +200,7 @@ class BuildPrizePoolStage extends BaseStage {
       // 检查库存（null 表示无限库存）
       if (prize.stock_quantity !== null && prize.stock_quantity <= 0) {
         this.log('debug', '奖品库存不足，已排除', {
-          prize_id: prize.prize_id,
+          lottery_prize_id: prize.lottery_prize_id,
           prize_name: prize.prize_name,
           stock_quantity: prize.stock_quantity
         })
@@ -212,7 +212,7 @@ class BuildPrizePoolStage extends BaseStage {
         const today_wins = prize.daily_win_count || 0
         if (today_wins >= prize.max_daily_wins) {
           this.log('debug', '奖品今日中奖次数已达上限，已排除', {
-            prize_id: prize.prize_id,
+            lottery_prize_id: prize.lottery_prize_id,
             prize_name: prize.prize_name,
             today_wins,
             max_daily_wins: prize.max_daily_wins
@@ -225,7 +225,7 @@ class BuildPrizePoolStage extends BaseStage {
       const win_weight = prize.win_weight || 0
       if (win_weight <= 0) {
         this.log('debug', '奖品中奖权重为0，已排除', {
-          prize_id: prize.prize_id,
+          lottery_prize_id: prize.lottery_prize_id,
           prize_name: prize.prize_name
         })
         continue

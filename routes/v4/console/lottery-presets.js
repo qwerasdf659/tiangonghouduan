@@ -147,7 +147,7 @@ router.get(
 
     logger.info('[GET /:id] 获取预设详情', {
       admin_id: req.user.user_id,
-      preset_id: id
+      lottery_preset_id: id
     })
 
     return res.apiSuccess(preset, '获取预设详情成功')
@@ -160,15 +160,15 @@ router.get(
  * 请求体：
  * - user_id: number - 目标用户ID（必填）
  * - presets: array - 预设数组（必填）
- *   - prize_id: number - 奖品ID
+ *   - lottery_prize_id: number - 奖品ID
  *   - queue_order: number - 队列顺序
- * - campaign_id: number - 活动ID（可选）
+ * - lottery_campaign_id: number - 活动ID（可选）
  * - reason: string - 创建原因（可选）
  */
 router.post(
   '/',
   asyncHandler(async (req, res) => {
-    const { user_id, presets, campaign_id, reason } = req.body
+    const { user_id, presets, lottery_campaign_id, reason } = req.body
 
     // 验证必填字段
     if (!user_id) {
@@ -182,7 +182,7 @@ router.post(
       // 添加额外字段
       const presetsWithMeta = presets.map(preset => ({
         ...preset,
-        campaign_id,
+        lottery_campaign_id,
         reason
       }))
 
@@ -266,7 +266,7 @@ router.delete(
  * - id: number - 预设ID
  *
  * 请求体（可选字段）：
- * - prize_id: number - 新奖品ID
+ * - lottery_prize_id: number - 新奖品ID
  * - queue_order: number - 新队列顺序
  * - expires_at: string - 新过期时间（ISO格式）
  * - reason: string - 更新原因
@@ -287,7 +287,7 @@ router.put(
 
       logger.info('[PUT /:id] 更新预设', {
         admin_id: req.user.user_id,
-        preset_id: id,
+        lottery_preset_id: id,
         updated_fields: Object.keys(updateData)
       })
 
@@ -295,7 +295,7 @@ router.put(
     } catch (error) {
       logger.error('[PUT /:id] 更新预设失败', {
         admin_id: req.user.user_id,
-        preset_id: id,
+        lottery_preset_id: id,
         error: error.message
       })
       return handleServiceError(res, error)
@@ -322,14 +322,14 @@ router.delete(
 
       logger.info('[DELETE /:id] 删除预设', {
         admin_id: req.user.user_id,
-        preset_id: id
+        lottery_preset_id: id
       })
 
       return res.apiSuccess(result, '删除预设成功')
     } catch (error) {
       logger.error('[DELETE /:id] 删除预设失败', {
         admin_id: req.user.user_id,
-        preset_id: id,
+        lottery_preset_id: id,
         error: error.message
       })
       return handleServiceError(res, error)

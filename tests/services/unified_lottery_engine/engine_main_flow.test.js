@@ -55,7 +55,7 @@ describe('UnifiedLotteryEngine 主流程测试（任务2.1）', () => {
 
     return {
       user_id: real_test_user.user_id,
-      campaign_id: test_campaign.campaign_id,
+      lottery_campaign_id: test_campaign.lottery_campaign_id,
       request_id: `test_main_flow_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
       timestamp: BeijingTimeHelper.now(),
       ...overrides
@@ -116,7 +116,9 @@ describe('UnifiedLotteryEngine 主流程测试（任务2.1）', () => {
 
       console.log('✅ 主流程测试环境初始化完成')
       console.log(`📊 测试用户: ${real_test_user.user_id} (${real_test_user.mobile})`)
-      console.log(`📊 测试活动: ${test_campaign ? test_campaign.campaign_id : '无活跃活动'}`)
+      console.log(
+        `📊 测试活动: ${test_campaign ? test_campaign.lottery_campaign_id : '无活跃活动'}`
+      )
       console.log(`📊 用户初始积分: ${initial_user_points}`)
     } catch (error) {
       console.error('❌ 测试环境初始化失败:', error.message)
@@ -156,7 +158,7 @@ describe('UnifiedLotteryEngine 主流程测试（任务2.1）', () => {
       const idempotency_key = generate_idempotency_key('single_draw')
       const result = await engine.execute_draw(
         real_test_user.user_id,
-        test_campaign.campaign_id,
+        test_campaign.lottery_campaign_id,
         1, // draw_count = 1
         { idempotency_key }
       )
@@ -180,19 +182,19 @@ describe('UnifiedLotteryEngine 主流程测试（任务2.1）', () => {
         // 验证必有奖品（每次抽奖100%获得奖品）
         expect(draw_result.prize).toBeDefined()
         console.log(
-          `✅ 单抽成功，获得奖品: ${draw_result.prize?.name || draw_result.prize?.prize_id}`
+          `✅ 单抽成功，获得奖品: ${draw_result.prize?.name || draw_result.prize?.lottery_prize_id}`
         )
 
         // 验证抽奖记录已创建
         const draw_record = await LotteryDraw.findOne({
           where: {
             user_id: real_test_user.user_id,
-            campaign_id: test_campaign.campaign_id,
+            lottery_campaign_id: test_campaign.lottery_campaign_id,
             idempotency_key
           }
         })
         expect(draw_record).not.toBeNull()
-        console.log(`✅ 抽奖记录已创建: draw_id=${draw_record.draw_id}`)
+        console.log(`✅ 抽奖记录已创建: lottery_draw_id=${draw_record.lottery_draw_id}`)
       } else {
         // 记录失败原因
         console.log(`ℹ️ 单抽执行失败: ${result.message || result.error}`)
@@ -227,7 +229,7 @@ describe('UnifiedLotteryEngine 主流程测试（任务2.1）', () => {
       const idempotency_key = generate_idempotency_key('multi_draw')
       const result = await engine.execute_draw(
         real_test_user.user_id,
-        test_campaign.campaign_id,
+        test_campaign.lottery_campaign_id,
         draw_count,
         { idempotency_key }
       )
@@ -247,7 +249,7 @@ describe('UnifiedLotteryEngine 主流程测试（任务2.1）', () => {
         result.draws.forEach((draw_result, index) => {
           expect(draw_result.prize).toBeDefined()
           console.log(
-            `  📦 第${index + 1}次: ${draw_result.prize?.name || draw_result.prize?.prize_id}`
+            `  📦 第${index + 1}次: ${draw_result.prize?.name || draw_result.prize?.lottery_prize_id}`
           )
         })
 
@@ -283,7 +285,7 @@ describe('UnifiedLotteryEngine 主流程测试（任务2.1）', () => {
       // 第一次执行
       const result1 = await engine.execute_draw(
         real_test_user.user_id,
-        test_campaign.campaign_id,
+        test_campaign.lottery_campaign_id,
         1,
         { idempotency_key }
       )
@@ -291,7 +293,7 @@ describe('UnifiedLotteryEngine 主流程测试（任务2.1）', () => {
       // 第二次使用相同幂等键执行
       const result2 = await engine.execute_draw(
         real_test_user.user_id,
-        test_campaign.campaign_id,
+        test_campaign.lottery_campaign_id,
         1,
         { idempotency_key }
       )
@@ -305,7 +307,7 @@ describe('UnifiedLotteryEngine 主流程测试（任务2.1）', () => {
         const draw_records = await LotteryDraw.findAll({
           where: {
             user_id: real_test_user.user_id,
-            campaign_id: test_campaign.campaign_id,
+            lottery_campaign_id: test_campaign.lottery_campaign_id,
             idempotency_key
           }
         })
@@ -332,7 +334,7 @@ describe('UnifiedLotteryEngine 主流程测试（任务2.1）', () => {
       await expect(
         engine.execute_draw(
           999999, // 不存在的用户ID
-          test_campaign.campaign_id,
+          test_campaign.lottery_campaign_id,
           1,
           { idempotency_key: generate_idempotency_key('invalid_user') }
         )
@@ -375,7 +377,7 @@ describe('UnifiedLotteryEngine 主流程测试（任务2.1）', () => {
       await expect(
         engine.execute_draw(
           real_test_user.user_id,
-          test_campaign.campaign_id,
+          test_campaign.lottery_campaign_id,
           excessive_draw_count,
           { idempotency_key: generate_idempotency_key('excessive_count') }
         )
@@ -395,7 +397,7 @@ describe('UnifiedLotteryEngine 主流程测试（任务2.1）', () => {
 
       // 测试 draw_count = 0
       await expect(
-        engine.execute_draw(real_test_user.user_id, test_campaign.campaign_id, 0, {
+        engine.execute_draw(real_test_user.user_id, test_campaign.lottery_campaign_id, 0, {
           idempotency_key: generate_idempotency_key('zero_count')
         })
       ).rejects.toThrow(/抽奖次数/)
@@ -404,7 +406,7 @@ describe('UnifiedLotteryEngine 主流程测试（任务2.1）', () => {
 
       // 测试 draw_count = -1
       await expect(
-        engine.execute_draw(real_test_user.user_id, test_campaign.campaign_id, -1, {
+        engine.execute_draw(real_test_user.user_id, test_campaign.lottery_campaign_id, -1, {
           idempotency_key: generate_idempotency_key('negative_count')
         })
       ).rejects.toThrow(/抽奖次数/)

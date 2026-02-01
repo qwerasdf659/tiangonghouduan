@@ -30,7 +30,7 @@ class LotteryTierRule extends Model {
   static associate(models) {
     // 多对一：档位规则属于某个活动
     LotteryTierRule.belongsTo(models.LotteryCampaign, {
-      foreignKey: 'campaign_id',
+      foreignKey: 'lottery_campaign_id',
       as: 'campaign',
       onDelete: 'CASCADE',
       comment: '所属抽奖活动'
@@ -90,7 +90,7 @@ class LotteryTierRule extends Model {
     // 查询该活动和分层下的所有档位规则
     const rules = await this.findAll({
       where: {
-        campaign_id: campaignId,
+        lottery_campaign_id: campaignId,
         segment_key: segmentKey,
         status: 'active'
       },
@@ -157,7 +157,7 @@ class LotteryTierRule extends Model {
     const rules = await Promise.all([
       this.create(
         {
-          campaign_id: campaignId,
+          lottery_campaign_id: campaignId,
           segment_key: segmentKey,
           tier_name: 'high',
           tier_weight: weights.high,
@@ -168,7 +168,7 @@ class LotteryTierRule extends Model {
       ),
       this.create(
         {
-          campaign_id: campaignId,
+          lottery_campaign_id: campaignId,
           segment_key: segmentKey,
           tier_name: 'mid',
           tier_weight: weights.mid,
@@ -179,7 +179,7 @@ class LotteryTierRule extends Model {
       ),
       this.create(
         {
-          campaign_id: campaignId,
+          lottery_campaign_id: campaignId,
           segment_key: segmentKey,
           tier_name: 'low',
           tier_weight: weights.low,
@@ -205,7 +205,7 @@ module.exports = sequelize => {
       /**
        * 规则ID - 主键
        */
-      tier_rule_id: {
+      lottery_tier_rule_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
@@ -215,13 +215,13 @@ module.exports = sequelize => {
       /**
        * 活动ID - 外键关联lottery_campaigns
        */
-      campaign_id: {
+      lottery_campaign_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        comment: '所属活动ID（外键关联lottery_campaigns.campaign_id）',
+        comment: '抽奖活动ID（外键关联lottery_campaigns.lottery_campaign_id）',
         references: {
           model: 'lottery_campaigns',
-          key: 'campaign_id'
+          key: 'lottery_campaign_id'
         },
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE'
@@ -313,13 +313,13 @@ module.exports = sequelize => {
       indexes: [
         // 唯一索引：同一活动+分层+档位只能有一条规则
         {
-          fields: ['campaign_id', 'segment_key', 'tier_name'],
+          fields: ['lottery_campaign_id', 'segment_key', 'tier_name'],
           unique: true,
           name: 'uk_campaign_segment_tier'
         },
         // 查询索引：按活动和状态查询
         {
-          fields: ['campaign_id', 'status'],
+          fields: ['lottery_campaign_id', 'status'],
           name: 'idx_tier_rules_campaign_status'
         }
       ]

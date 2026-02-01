@@ -238,7 +238,7 @@ class AuditLogService {
       const auditLog = await AdminOperationLog.create(logData, { transaction })
 
       logger.info(
-        `[审计日志] 记录成功: log_id=${auditLog.log_id}, 操作员=${operator_id}, ` +
+        `[审计日志] 记录成功: admin_operation_log_id=${auditLog.admin_operation_log_id}, 操作员=${operator_id}, ` +
           `类型=${operation_type}, 动作=${action}, 关键操作=${isCritical}`
       )
 

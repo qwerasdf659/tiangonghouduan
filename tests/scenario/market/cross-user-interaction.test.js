@@ -129,7 +129,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
     // 清理创建的订单
     if (created_orders.length > 0) {
       await TradeOrder.destroy({
-        where: { order_id: { [sequelize.Sequelize.Op.in]: created_orders } }
+        where: { trade_order_id: { [sequelize.Sequelize.Op.in]: created_orders } }
       })
       console.log(`✅ 清理 ${created_orders.length} 个测试订单`)
     }
@@ -137,7 +137,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
     // 清理创建的挂牌
     if (created_listings.length > 0) {
       await MarketListing.destroy({
-        where: { listing_id: { [sequelize.Sequelize.Op.in]: created_listings } }
+        where: { market_listing_id: { [sequelize.Sequelize.Op.in]: created_listings } }
       })
       console.log(`✅ 清理 ${created_listings.length} 个测试挂牌`)
     }
@@ -268,7 +268,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
           { transaction: create_tx }
         )
         listing = result.listing
-        created_listings.push(listing.listing_id)
+        created_listings.push(listing.market_listing_id)
         await create_tx.commit()
       } catch (e) {
         await create_tx.rollback()
@@ -277,7 +277,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
 
       expect(listing).toBeDefined()
       expect(listing.status).toBe('on_sale')
-      console.log(`✅ 创建挂牌成功: listing_id=${listing.listing_id}`)
+      console.log(`✅ 创建挂牌成功: market_listing_id=${listing.market_listing_id}`)
 
       /*
        * ========== 3. 买家下单（冻结买家资产） ==========
@@ -294,12 +294,12 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
         const result = await TradeOrderService.createOrder(
           {
             idempotency_key: generateIdempotencyKey('cancel_test_order'),
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             buyer_id: test_buyer_1.user_id
           },
           { transaction: order_tx }
         )
-        order_id = result.order_id
+        order_id = result.trade_order_id
         created_orders.push(order_id)
         await order_tx.commit()
       } catch (e) {
@@ -314,7 +314,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
       const order_after_create = await TradeOrder.findByPk(order_id)
       expect(order_after_create.status).toBe('frozen')
 
-      const listing_after_order = await MarketListing.findByPk(listing.listing_id)
+      const listing_after_order = await MarketListing.findByPk(listing.market_listing_id)
       expect(listing_after_order.status).toBe('locked')
       console.log('✅ 下单后挂牌状态为 locked')
 
@@ -354,7 +354,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
       console.log('✅ 订单状态已更新为 cancelled')
 
       // 5.2 【核心验证】挂牌应恢复为 on_sale 状态
-      const listing_after_cancel = await MarketListing.findByPk(listing.listing_id)
+      const listing_after_cancel = await MarketListing.findByPk(listing.market_listing_id)
       expect(listing_after_cancel.status).toBe('on_sale')
       expect(listing_after_cancel.locked_by_order_id).toBeNull()
       console.log('✅ 挂牌状态已恢复为 on_sale')
@@ -386,7 +386,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
       const mock_order = await TradeOrder.create({
         business_id: generateIdempotencyKey('mock_completed'),
         idempotency_key: generateIdempotencyKey('mock_completed_order'),
-        listing_id: 1, // 模拟挂牌ID
+        market_listing_id: 1, // 模拟挂牌ID
         buyer_user_id: test_buyer_1?.user_id || test_seller.user_id,
         seller_user_id: test_seller.user_id,
         asset_code: TEST_ASSET_CODE,
@@ -395,14 +395,14 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
         net_amount: 95,
         status: 'completed'
       })
-      created_orders.push(mock_order.order_id)
+      created_orders.push(mock_order.trade_order_id)
 
       // 尝试取消已完成的订单
       const cancel_tx = await sequelize.transaction()
       try {
         await expect(
           TradeOrderService.cancelOrder(
-            { order_id: mock_order.order_id, cancel_reason: '测试取消' },
+            { trade_order_id: mock_order.trade_order_id, cancel_reason: '测试取消' },
             { transaction: cancel_tx }
           )
         ).rejects.toThrow(/状态异常/)
@@ -524,7 +524,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
           { transaction: create_tx }
         )
         listing = result.listing
-        created_listings.push(listing.listing_id)
+        created_listings.push(listing.market_listing_id)
         await create_tx.commit()
       } catch (e) {
         await create_tx.rollback()
@@ -538,12 +538,12 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
         const result = await TradeOrderService.createOrder(
           {
             idempotency_key: generateIdempotencyKey('timeout_test_order'),
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             buyer_id: test_buyer_1.user_id
           },
           { transaction: order_tx }
         )
-        order_id = result.order_id
+        order_id = result.trade_order_id
         created_orders.push(order_id)
         await order_tx.commit()
       } catch (e) {
@@ -555,8 +555,10 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
       const timeout_time = new Date(
         Date.now() - (HourlyUnlockTimeoutTradeOrders.LOCK_TIMEOUT_MINUTES + 1) * 60 * 1000
       )
-      await TradeOrder.update({ created_at: timeout_time }, { where: { order_id } })
-      console.log(`✅ 模拟订单超时: order_id=${order_id}, created_at=${timeout_time.toISOString()}`)
+      await TradeOrder.update({ created_at: timeout_time }, { where: { trade_order_id: order_id } })
+      console.log(
+        `✅ 模拟订单超时: trade_order_id=${order_id}, created_at=${timeout_time.toISOString()}`
+      )
 
       // 记录超时前的状态
       const order_before_timeout = await TradeOrder.findByPk(order_id)
@@ -572,7 +574,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
       expect(order_after_timeout.status).toBe('cancelled')
       console.log('✅ 超时订单已自动取消')
 
-      const listing_after_timeout = await MarketListing.findByPk(listing.listing_id)
+      const listing_after_timeout = await MarketListing.findByPk(listing.market_listing_id)
       expect(listing_after_timeout.status).toBe('on_sale')
       console.log('✅ 挂牌已恢复为 on_sale')
 
@@ -647,14 +649,14 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
           { transaction: create_tx }
         )
         listing = result.listing
-        created_listings.push(listing.listing_id)
+        created_listings.push(listing.market_listing_id)
         await create_tx.commit()
       } catch (e) {
         await create_tx.rollback()
         throw e
       }
 
-      console.log(`✅ 创建抢购挂牌: listing_id=${listing.listing_id}`)
+      console.log(`✅ 创建抢购挂牌: market_listing_id=${listing.market_listing_id}`)
 
       // ========== 3. 模拟并发抢购 ==========
       const createOrderForBuyer = async (buyer_id, buyer_name) => {
@@ -663,14 +665,14 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
           const result = await TradeOrderService.createOrder(
             {
               idempotency_key: generateIdempotencyKey(`rush_order_${buyer_id}`),
-              listing_id: listing.listing_id,
+              market_listing_id: listing.market_listing_id,
               buyer_id
             },
             { transaction: tx }
           )
-          created_orders.push(result.order_id)
+          created_orders.push(result.trade_order_id)
           await tx.commit()
-          return { success: true, buyer_name, order_id: result.order_id }
+          return { success: true, buyer_name, trade_order_id: result.trade_order_id }
         } catch (e) {
           await tx.rollback()
           return { success: false, buyer_name, error: e.message }
@@ -741,7 +743,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
           { transaction: create_tx }
         )
         listing = result.listing
-        created_listings.push(listing.listing_id)
+        created_listings.push(listing.market_listing_id)
         await create_tx.commit()
       } catch (e) {
         await create_tx.rollback()
@@ -751,7 +753,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
       // ========== 2. 手动将挂牌设置为 locked 状态（模拟已被其他买家锁定） ==========
       await MarketListing.update(
         { status: 'locked', locked_by_order_id: 99999 },
-        { where: { listing_id: listing.listing_id } }
+        { where: { market_listing_id: listing.market_listing_id } }
       )
 
       // ========== 3. 买家尝试下单（应失败） ==========
@@ -760,7 +762,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
         await TradeOrderService.createOrder(
           {
             idempotency_key: generateIdempotencyKey('lock_test_order'),
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             buyer_id: test_buyer_1.user_id
           },
           { transaction: order_tx }
@@ -780,7 +782,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
       // 清理：恢复挂牌状态以便清理
       await MarketListing.update(
         { status: 'on_sale', locked_by_order_id: null },
-        { where: { listing_id: listing.listing_id } }
+        { where: { market_listing_id: listing.market_listing_id } }
       )
     })
   })
@@ -829,7 +831,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
           { transaction: create_tx }
         )
         listing = result.listing
-        created_listings.push(listing.listing_id)
+        created_listings.push(listing.market_listing_id)
         await create_tx.commit()
       } catch (e) {
         await create_tx.rollback()
@@ -838,7 +840,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
 
       expect(listing.status).toBe('on_sale')
       expect(listing.seller_offer_frozen).toBe(true)
-      console.log(`✅ 创建挂牌成功: listing_id=${listing.listing_id}`)
+      console.log(`✅ 创建挂牌成功: market_listing_id=${listing.market_listing_id}`)
 
       // 记录下架前卖家的冻结余额
       const seller_frozen_before = await getUserFrozenBalance(test_seller.user_id, TEST_ASSET_CODE)
@@ -849,7 +851,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
       try {
         withdraw_result = await MarketListingService.adminForceWithdrawListing(
           {
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             admin_id: test_admin.user_id,
             withdraw_reason: '测试：违规挂牌强制下架',
             ip_address: '127.0.0.1',
@@ -866,7 +868,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
       // ========== 4. 验证结果 ==========
 
       // 4.1 验证挂牌状态变为 admin_withdrawn
-      const listing_after = await MarketListing.findByPk(listing.listing_id)
+      const listing_after = await MarketListing.findByPk(listing.market_listing_id)
       expect(listing_after.status).toBe('admin_withdrawn')
       expect(listing_after.seller_offer_frozen).toBe(false)
       console.log('✅ 挂牌状态已更新为 admin_withdrawn')
@@ -913,7 +915,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
           { transaction: create_tx }
         )
         listing = result.listing
-        created_listings.push(listing.listing_id)
+        created_listings.push(listing.market_listing_id)
         await create_tx.commit()
       } catch (e) {
         await create_tx.rollback()
@@ -925,7 +927,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
       try {
         await MarketListingService.adminForceWithdrawListing(
           {
-            listing_id: listing.listing_id,
+            market_listing_id: listing.market_listing_id,
             admin_id: test_admin.user_id,
             withdraw_reason: '' // 空原因
           },
@@ -949,7 +951,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
       try {
         await MarketListingService.adminForceWithdrawListing(
           {
-            listing_id: 999999999, // 不存在的挂牌ID
+            market_listing_id: 999999999, // 不存在的挂牌ID
             admin_id: test_admin.user_id,
             withdraw_reason: '测试不存在的挂牌'
           },
@@ -982,13 +984,13 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
         status: 'sold', // 已售出状态
         seller_offer_frozen: false
       })
-      created_listings.push(mock_listing.listing_id)
+      created_listings.push(mock_listing.market_listing_id)
 
       const withdraw_tx = await sequelize.transaction()
       try {
         await MarketListingService.adminForceWithdrawListing(
           {
-            listing_id: mock_listing.listing_id,
+            market_listing_id: mock_listing.market_listing_id,
             admin_id: test_admin.user_id,
             withdraw_reason: '测试已售出挂牌'
           },

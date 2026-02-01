@@ -58,14 +58,14 @@ class GuaranteeStage extends BaseStage {
    *
    * @param {Object} context - 执行上下文
    * @param {number} context.user_id - 用户ID
-   * @param {number} context.campaign_id - 活动ID
+   * @param {number} context.lottery_campaign_id - 活动ID
    * @param {Object} context.stage_results - 前置Stage的执行结果
    * @returns {Promise<Object>} Stage 执行结果
    */
   async execute(context) {
-    const { user_id, campaign_id } = context
+    const { user_id, lottery_campaign_id } = context
 
-    this.log('info', '开始检查保底机制', { user_id, campaign_id })
+    this.log('info', '开始检查保底机制', { user_id, lottery_campaign_id })
 
     try {
       // 获取活动配置（从 LoadCampaignStage 的结果中）
@@ -84,7 +84,7 @@ class GuaranteeStage extends BaseStage {
       // 检查活动是否启用保底机制
       const guarantee_enabled = campaign.guarantee_enabled !== false
       if (!guarantee_enabled) {
-        this.log('info', '活动未启用保底机制', { campaign_id })
+        this.log('info', '活动未启用保底机制', { lottery_campaign_id })
         return this.success({
           guarantee_triggered: false,
           reason: '活动未启用保底机制'
@@ -96,7 +96,7 @@ class GuaranteeStage extends BaseStage {
       const guarantee_prize_id = campaign.guarantee_prize_id || null
 
       // 1. 获取用户累计抽奖次数（不含当前这次）
-      const user_draw_count = await this._getUserDrawCount(user_id, campaign_id)
+      const user_draw_count = await this._getUserDrawCount(user_id, lottery_campaign_id)
       const next_draw_number = user_draw_count + 1 // 即将进行的抽奖次数
 
       // 2. 检查是否触发保底
@@ -109,7 +109,7 @@ class GuaranteeStage extends BaseStage {
 
         this.log('info', '未触发保底机制', {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           user_draw_count,
           next_draw_number,
           remaining_to_guarantee
@@ -125,13 +125,17 @@ class GuaranteeStage extends BaseStage {
       }
 
       // 3. 触发保底，获取保底奖品
-      const guarantee_prize = await this._getGuaranteePrize(campaign_id, prizes, guarantee_prize_id)
+      const guarantee_prize = await this._getGuaranteePrize(
+        lottery_campaign_id,
+        prizes,
+        guarantee_prize_id
+      )
 
       if (!guarantee_prize) {
         // 没有配置保底奖品，降级为使用当前抽中的奖品
         this.log('warn', '未配置保底奖品，保底机制降级', {
           user_id,
-          campaign_id,
+          lottery_campaign_id,
           guarantee_prize_id
         })
 
@@ -147,9 +151,9 @@ class GuaranteeStage extends BaseStage {
       // 4. 构建保底结果
       this.log('info', '触发保底机制', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         next_draw_number,
-        guarantee_prize_id: guarantee_prize.prize_id,
+        guarantee_prize_id: guarantee_prize.lottery_prize_id,
         guarantee_prize_name: guarantee_prize.prize_name
       })
 
@@ -165,7 +169,7 @@ class GuaranteeStage extends BaseStage {
     } catch (error) {
       this.log('error', '保底机制检查失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
 
@@ -181,16 +185,16 @@ class GuaranteeStage extends BaseStage {
    * 获取用户累计抽奖次数
    *
    * @param {number} user_id - 用户ID
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @returns {Promise<number>} 累计抽奖次数
    * @private
    */
-  async _getUserDrawCount(user_id, campaign_id) {
+  async _getUserDrawCount(user_id, lottery_campaign_id) {
     try {
       const count = await LotteryDraw.count({
         where: {
           user_id,
-          campaign_id
+          lottery_campaign_id
         }
       })
 
@@ -198,7 +202,7 @@ class GuaranteeStage extends BaseStage {
     } catch (error) {
       this.log('warn', '获取用户累计抽奖次数失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       return 0
@@ -213,16 +217,16 @@ class GuaranteeStage extends BaseStage {
    * 2. 否则自动选择 reward_tier = 'high' 的第一个奖品
    * 3. 如果没有高档奖品，选择 reward_tier = 'mid' 的第一个奖品
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 活动ID
    * @param {Array} prizes - 奖品列表
    * @param {number|null} guarantee_prize_id - 指定的保底奖品ID
    * @returns {Promise<Object|null>} 保底奖品
    * @private
    */
-  async _getGuaranteePrize(campaign_id, prizes, guarantee_prize_id) {
+  async _getGuaranteePrize(lottery_campaign_id, prizes, guarantee_prize_id) {
     // 1. 如果指定了保底奖品ID，查找该奖品
     if (guarantee_prize_id) {
-      const specified_prize = prizes.find(p => p.prize_id === guarantee_prize_id)
+      const specified_prize = prizes.find(p => p.lottery_prize_id === guarantee_prize_id)
       if (specified_prize) {
         return specified_prize
       }
@@ -231,8 +235,8 @@ class GuaranteeStage extends BaseStage {
       try {
         const db_prize = await LotteryPrize.findOne({
           where: {
-            prize_id: guarantee_prize_id,
-            campaign_id,
+            lottery_prize_id: guarantee_prize_id,
+            lottery_campaign_id,
             status: 'active'
           }
         })

@@ -27,7 +27,7 @@ module.exports = sequelize => {
     'ExchangeItem',
     {
       // 主键
-      item_id: {
+      exchange_item_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
@@ -49,10 +49,10 @@ module.exports = sequelize => {
       primary_image_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '主图片ID，关联 image_resources.image_id（2026-01-08 图片存储架构）',
+        comment: '主图片ID，关联 image_resources.image_resource_id（2026-01-08 图片存储架构）',
         references: {
           model: 'image_resources',
-          key: 'image_id'
+          key: 'image_resource_id'
         },
         onUpdate: 'CASCADE',
         onDelete: 'SET NULL'
@@ -138,7 +138,7 @@ module.exports = sequelize => {
   ExchangeItem.associate = function (models) {
     // 一对多：商品有多个兑换记录
     ExchangeItem.hasMany(models.ExchangeRecord, {
-      foreignKey: 'item_id',
+      foreignKey: 'exchange_item_id',
       as: 'exchangeRecords'
     })
 

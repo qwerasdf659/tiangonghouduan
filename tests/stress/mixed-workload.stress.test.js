@@ -465,7 +465,7 @@ describe('【P2-2】混合负载压力测试', () => {
       const result = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
         api_path: '/api/v4/lottery/draw',
         http_method: 'POST',
-        request_params: { campaign_id: testCampaignId, draw_count: 1 },
+        request_params: { lottery_campaign_id: testCampaignId, draw_count: 1 },
         user_id: testUserId
       })
 
@@ -500,7 +500,7 @@ describe('【P2-2】混合负载压力测试', () => {
       const result = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
         api_path: '/api/v4/market/listings/:id/purchase',
         http_method: 'POST',
-        request_params: { listing_id: Math.floor(Math.random() * 100) + 1 },
+        request_params: { market_listing_id: Math.floor(Math.random() * 100) + 1 },
         user_id: testUserId
       })
 
@@ -559,7 +559,7 @@ describe('【P2-2】混合负载压力测试', () => {
 
       const campaigns = await LotteryCampaign.findAll({
         where: { status: 'active' },
-        attributes: ['campaign_id', 'campaign_name', 'status'],
+        attributes: ['lottery_campaign_id', 'campaign_name', 'status'],
         limit: 10
       })
 
@@ -587,7 +587,7 @@ describe('【P2-2】混合负载压力测试', () => {
       }
 
       const campaign = await LotteryCampaign.findByPk(testCampaignId, {
-        attributes: ['campaign_id', 'campaign_name', 'status', 'start_time', 'end_time']
+        attributes: ['lottery_campaign_id', 'campaign_name', 'status', 'start_time', 'end_time']
       })
 
       return {

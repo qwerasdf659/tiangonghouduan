@@ -166,7 +166,7 @@ describe('🎲 用户完整抽奖流程（核心关键路径 - V4架构）', () 
         .post('/api/v4/lottery/draw')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          campaign_id: TEST_DATA.lottery.testCampaign.campaign_id
+          lottery_campaign_id: TEST_DATA.lottery.testCampaign.lottery_campaign_id
         })
 
       // API可能返回200成功或400业务错误（积分不足等）
@@ -267,7 +267,7 @@ describe('🎲 用户完整抽奖流程（核心关键路径 - V4架构）', () 
             .post('/api/v4/lottery/draw')
             .set('Authorization', `Bearer ${authToken}`)
             .send({
-              campaign_id: TEST_DATA.lottery.testCampaign.campaign_id
+              lottery_campaign_id: TEST_DATA.lottery.testCampaign.lottery_campaign_id
             })
 
           // 处理API返回错误（可能积分不足等）

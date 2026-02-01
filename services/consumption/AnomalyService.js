@@ -131,7 +131,7 @@ class AnomalyService {
       throw new Error('消费记录不能为空')
     }
 
-    const recordId = record.record_id || record.id
+    const recordId = record.consumption_record_id
     logger.debug('开始异常检测', { record_id: recordId })
 
     try {
@@ -275,7 +275,7 @@ class AnomalyService {
       const batchResults = await Promise.all(
         batch.map(record =>
           AnomalyService.detectAnomalies(record, { models, save }).catch(error => ({
-            record_id: record.record_id || record.id,
+            consumption_record_id: record.consumption_record_id,
             error: error.message
           }))
         )
@@ -367,7 +367,7 @@ class AnomalyService {
               `),
               'risk_level'
             ],
-            [fn('COUNT', col('record_id')), 'count']
+            [fn('COUNT', col('consumption_record_id')), 'count']
           ],
           where,
           group: [literal('risk_level')],
@@ -607,7 +607,9 @@ class AnomalyService {
         user_id: record.user_id,
         is_deleted: 0,
         created_at: { [Op.gte]: timeWindow },
-        record_id: { [Op.ne]: record.record_id || record.id } // 排除当前记录
+        consumption_record_id: {
+          [Op.ne]: record.consumption_record_id
+        } // 排除当前记录
       },
       transaction
     })

@@ -43,7 +43,7 @@ function generateIdempotencyKey(prefix = 'cross_module_test') {
 describe('阶段八：跨模块集成测试', () => {
   // 测试数据
   let test_user_id
-  let test_campaign_id
+  let test_lottery_campaign_id
   let BalanceService
   let MarketListingService
   let TradeOrderService
@@ -63,7 +63,7 @@ describe('阶段八：跨模块集成测试', () => {
     }
 
     test_user_id = global.testData.testUser.user_id
-    test_campaign_id = global.testData.testCampaign.campaign_id
+    test_lottery_campaign_id = global.testData.testCampaign.lottery_campaign_id
 
     if (!test_user_id) {
       console.warn('⚠️ 测试用户ID未获取，某些测试将被跳过')
@@ -78,7 +78,7 @@ describe('阶段八：跨模块集成测试', () => {
 
     console.log('✅ 跨模块测试初始化完成', {
       test_user_id,
-      test_campaign_id,
+      test_lottery_campaign_id,
       services_loaded: {
         BalanceService: !!BalanceService,
         MarketListingService: !!MarketListingService,
@@ -112,7 +112,7 @@ describe('阶段八：跨模块集成测试', () => {
    */
   describe('9.1 抽奖→资产→物品', () => {
     it('抽奖扣费成功后物品正确发放', async () => {
-      if (!test_user_id || !test_campaign_id) {
+      if (!test_user_id || !test_lottery_campaign_id) {
         console.warn('⚠️ 跳过测试：缺少测试用户或活动')
         return
       }
@@ -144,7 +144,7 @@ describe('阶段八：跨模块集成测试', () => {
         })
 
         // 3. 查询活动配置获取单次抽奖费用
-        const campaign = await LotteryCampaign.findByPk(test_campaign_id, { transaction })
+        const campaign = await LotteryCampaign.findByPk(test_lottery_campaign_id, { transaction })
         expect(campaign).not.toBeNull()
         const cost_per_draw = Number(campaign.cost_per_draw) || 100
 
@@ -180,7 +180,7 @@ describe('阶段八：跨模块集成测试', () => {
         const draw_idempotency_key = generateIdempotencyKey('draw')
         const draw_result = await lottery_engine.execute_draw(
           test_user_id,
-          test_campaign_id,
+          test_lottery_campaign_id,
           1, // 单次抽奖
           {
             idempotency_key: draw_idempotency_key,
@@ -237,7 +237,7 @@ describe('阶段八：跨模块集成测试', () => {
         const draw_record = await LotteryDraw.findOne({
           where: {
             user_id: test_user_id,
-            campaign_id: test_campaign_id
+            lottery_campaign_id: test_lottery_campaign_id
           },
           order: [['created_at', 'DESC']],
           transaction
@@ -287,7 +287,7 @@ describe('阶段八：跨模块集成测试', () => {
    */
   describe('9.2 抽奖→保底→资产', () => {
     it('保底计数器与抽奖记录保持同步', async () => {
-      if (!test_user_id || !test_campaign_id) {
+      if (!test_user_id || !test_lottery_campaign_id) {
         console.warn('⚠️ 跳过测试：缺少测试用户或活动')
         return
       }
@@ -296,13 +296,13 @@ describe('阶段八：跨模块集成测试', () => {
       const initial_draw_count = await LotteryDraw.count({
         where: {
           user_id: test_user_id,
-          campaign_id: test_campaign_id
+          lottery_campaign_id: test_lottery_campaign_id
         }
       })
 
       console.log('📊 初始保底状态', {
         user_id: test_user_id,
-        campaign_id: test_campaign_id,
+        lottery_campaign_id: test_lottery_campaign_id,
         initial_draw_count
       })
 
@@ -313,7 +313,7 @@ describe('阶段八：跨模块集成测试', () => {
       const draw_count_result = await LotteryDraw.count({
         where: {
           user_id: test_user_id,
-          campaign_id: test_campaign_id,
+          lottery_campaign_id: test_lottery_campaign_id,
           guarantee_triggered: false // 未触发保底的抽奖次数
         }
       })
@@ -347,7 +347,7 @@ describe('阶段八：跨模块集成测试', () => {
     })
 
     it('保底触发时创建正确的抽奖记录', async () => {
-      if (!test_user_id || !test_campaign_id) {
+      if (!test_user_id || !test_lottery_campaign_id) {
         console.warn('⚠️ 跳过测试：缺少测试用户或活动')
         return
       }
@@ -355,14 +355,14 @@ describe('阶段八：跨模块集成测试', () => {
       // 查询历史上触发过保底的抽奖记录
       const guarantee_draws = await LotteryDraw.findAll({
         where: {
-          campaign_id: test_campaign_id,
+          lottery_campaign_id: test_lottery_campaign_id,
           guarantee_triggered: true
         },
         limit: 5
       })
 
       console.log('🎯 保底触发记录查询', {
-        campaign_id: test_campaign_id,
+        lottery_campaign_id: test_lottery_campaign_id,
         guarantee_draws_found: guarantee_draws.length
       })
 
@@ -370,7 +370,7 @@ describe('阶段八：跨模块集成测试', () => {
       for (const draw of guarantee_draws) {
         expect(draw.guarantee_triggered).toBe(true)
         expect(draw.user_id).not.toBeNull()
-        expect(draw.prize_id).not.toBeNull()
+        expect(draw.lottery_prize_id).not.toBeNull()
         // 验证保底奖品通常是较高价值的奖品
         expect(draw.reward_tier).toBeDefined()
       }
@@ -460,15 +460,15 @@ describe('阶段八：跨模块集成测试', () => {
         )
 
         expect(listing_result).not.toBeNull()
-        // createListing 返回 { listing, is_duplicate }，需要从 listing 对象中获取 listing_id
+        // createListing 返回 { listing, is_duplicate }，需要从 listing 对象中获取 market_listing_id
         expect(listing_result.listing).toBeDefined()
-        expect(listing_result.listing.listing_id).toBeDefined()
-        const listing_id = listing_result.listing.listing_id
+        expect(listing_result.listing.market_listing_id).toBeDefined()
+        const market_listing_id = listing_result.listing.market_listing_id
         // 🔴 P0修复：使用统一清理器注册
-        testCleaner.registerById('MarketListing', listing_id)
+        testCleaner.registerById('MarketListing', market_listing_id)
 
         console.log('📦 物品上架完成', {
-          listing_id,
+          market_listing_id,
           price: 50,
           asset_code: 'DIAMOND'
         })
@@ -505,33 +505,33 @@ describe('阶段八：跨模块集成测试', () => {
         const order_result = await TradeOrderService.createOrder(
           {
             idempotency_key: order_idempotency_key,
-            listing_id, // 使用前面提取的 listing_id
+            market_listing_id, // 使用前面提取的 market_listing_id
             buyer_id: buyer_user_id
           },
           { transaction }
         )
 
         expect(order_result).not.toBeNull()
-        expect(order_result.order_id).toBeDefined()
+        expect(order_result.trade_order_id).toBeDefined()
         // 🔴 P0修复：使用统一清理器注册
-        testCleaner.registerById('TradeOrder', order_result.order_id)
+        testCleaner.registerById('TradeOrder', order_result.trade_order_id)
 
         console.log('🛒 订单创建完成', {
-          order_id: order_result.order_id,
+          trade_order_id: order_result.trade_order_id,
           is_duplicate: order_result.is_duplicate
         })
 
         // 5. 完成订单
         const complete_result = await TradeOrderService.completeOrder(
           {
-            order_id: order_result.order_id,
+            trade_order_id: order_result.trade_order_id,
             buyer_id: buyer_user_id
           },
           { transaction }
         )
 
         expect(complete_result).not.toBeNull()
-        console.log('✅ 订单完成', { order: complete_result.order?.order_id })
+        console.log('✅ 订单完成', { order: complete_result.order?.trade_order_id })
 
         /*
          * 6. 验证资产结算
@@ -562,7 +562,7 @@ describe('阶段八：跨模块集成测试', () => {
         })
 
         // 7. 验证订单状态
-        const final_order = await TradeOrder.findByPk(order_result.order_id, { transaction })
+        const final_order = await TradeOrder.findByPk(order_result.trade_order_id, { transaction })
         expect(final_order.status).toBe('completed')
 
         await transaction.commit()

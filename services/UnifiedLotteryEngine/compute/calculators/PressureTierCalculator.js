@@ -82,18 +82,18 @@ class PressureTierCalculator {
    *
    * @param {Object} context - 抽奖上下文
    * @param {number} context.user_id - 用户ID
-   * @param {number} context.campaign_id - 活动ID
+   * @param {number} context.lottery_campaign_id - 活动ID
    * @param {Object} context.campaign - 活动配置对象
    * @param {Object} options - 额外选项
    * @param {Object} options.transaction - 数据库事务
    * @returns {Promise<Object>} 计算结果
    */
   async calculate(context, options = {}) {
-    const { user_id, campaign_id, campaign } = context
+    const { user_id, lottery_campaign_id, campaign } = context
 
     this._log('info', '开始计算活动压力分层', {
       user_id,
-      campaign_id
+      lottery_campaign_id
     })
 
     try {
@@ -124,7 +124,7 @@ class PressureTierCalculator {
 
       this._log('info', '活动压力分层计算完成', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         pressure_index: pressure_index.toFixed(4),
         pressure_tier,
         time_progress: (time_progress * 100).toFixed(2) + '%',
@@ -135,7 +135,7 @@ class PressureTierCalculator {
     } catch (error) {
       this._log('error', '活动压力分层计算失败', {
         user_id,
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       throw error
@@ -164,7 +164,7 @@ class PressureTierCalculator {
     // 如果没有配置时间，返回默认进度
     if (!start_time || !end_time) {
       this._log('debug', '活动未配置时间范围，使用默认时间进度 0.5', {
-        campaign_id: campaign.campaign_id,
+        lottery_campaign_id: campaign.lottery_campaign_id,
         start_time: campaign.start_time,
         end_time: campaign.end_time
       })
@@ -177,7 +177,7 @@ class PressureTierCalculator {
     // 防止除零
     if (total_duration <= 0) {
       this._log('warn', '活动时间范围无效，使用默认时间进度 0.5', {
-        campaign_id: campaign.campaign_id,
+        lottery_campaign_id: campaign.lottery_campaign_id,
         start_time: start_time.toISOString(),
         end_time: end_time.toISOString()
       })
@@ -192,7 +192,7 @@ class PressureTierCalculator {
     const progress = elapsed_duration / total_duration
 
     this._log('debug', '计算时间进度', {
-      campaign_id: campaign.campaign_id,
+      lottery_campaign_id: campaign.lottery_campaign_id,
       start_time: start_time.toISOString(),
       end_time: end_time.toISOString(),
       now: now.toISOString(),
@@ -219,7 +219,7 @@ class PressureTierCalculator {
    * @private
    */
   async _calculateVirtualConsumption(context, options = {}) {
-    const { campaign_id, campaign } = context
+    const { lottery_campaign_id, campaign } = context
     const budget_mode = campaign?.budget_mode || 'none'
     const { transaction } = options
 
@@ -227,7 +227,7 @@ class PressureTierCalculator {
     if (budget_mode === 'none') {
       const time_progress = this._calculateTimeProgress(campaign)
       this._log('debug', 'budget_mode=none，使用时间进度作为虚拟消耗', {
-        campaign_id,
+        lottery_campaign_id,
         virtual_consumption: time_progress
       })
       return time_progress
@@ -239,20 +239,20 @@ class PressureTierCalculator {
       const { Op } = require('sequelize')
 
       // 获取活动配置
-      const campaign_record = await LotteryCampaign.findByPk(campaign_id, {
+      const campaign_record = await LotteryCampaign.findByPk(lottery_campaign_id, {
         attributes: ['pool_budget_total', 'pool_budget_remaining', 'budget_mode'],
         transaction
       })
 
       if (!campaign_record) {
-        this._log('warn', '活动不存在，使用默认虚拟消耗 0.5', { campaign_id })
+        this._log('warn', '活动不存在，使用默认虚拟消耗 0.5', { lottery_campaign_id })
         return 0.5
       }
 
       // 计算已发放奖品价值总和（使用 reward_tier 判断中奖状态）
       const prize_value_sum = await LotteryDraw.sum('prize_value_points', {
         where: {
-          campaign_id,
+          lottery_campaign_id,
           reward_tier: { [Op.in]: ['high', 'mid', 'low'] } // 有效中奖的档位
         },
         transaction
@@ -272,7 +272,7 @@ class PressureTierCalculator {
       if (total_budget === 0) {
         // 估算：奖品价值总和 * 预期发放次数
         const prize_total = await LotteryPrize.sum('prize_value_points', {
-          where: { campaign_id, status: 'active' },
+          where: { lottery_campaign_id, status: 'active' },
           transaction
         })
 
@@ -283,7 +283,7 @@ class PressureTierCalculator {
       // 防止除零
       if (total_budget <= 0) {
         this._log('debug', '无法确定总预算，使用默认虚拟消耗 0.5', {
-          campaign_id,
+          lottery_campaign_id,
           total_consumed
         })
         return 0.5
@@ -292,7 +292,7 @@ class PressureTierCalculator {
       const virtual_consumption = total_consumed / total_budget
 
       this._log('debug', '计算虚拟消耗率', {
-        campaign_id,
+        lottery_campaign_id,
         budget_mode,
         total_consumed,
         total_budget,
@@ -302,7 +302,7 @@ class PressureTierCalculator {
       return virtual_consumption
     } catch (error) {
       this._log('warn', '计算虚拟消耗失败，使用默认值 0.5', {
-        campaign_id,
+        lottery_campaign_id,
         error: error.message
       })
       return 0.5
