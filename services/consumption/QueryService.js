@@ -215,6 +215,8 @@ class QueryService {
    * @param {number} options.page_size - 每页数量（默认20，最大100）
    * @param {string} options.status - 状态筛选
    * @param {string} options.search - 搜索关键词
+   * @param {string} options.start_date - 开始日期筛选（ISO格式）
+   * @param {string} options.end_date - 结束日期筛选（ISO格式）
    * @returns {Promise<Object>} 查询结果
    */
   static async getAdminRecords(options = {}) {
@@ -232,6 +234,33 @@ class QueryService {
 
       if (status !== 'all') {
         whereConditions.status = status
+      }
+
+      // 🔴 日期范围筛选（修复 Bug：后端未处理 start_date/end_date 参数）
+      if (options.start_date || options.end_date) {
+        whereConditions.created_at = {}
+
+        if (options.start_date) {
+          // 开始日期：当天 00:00:00 开始（北京时间）
+          const startDate = new Date(options.start_date)
+          startDate.setHours(0, 0, 0, 0)
+          whereConditions.created_at[Op.gte] = startDate
+          logger.debug('日期筛选 - 开始日期', {
+            start_date: options.start_date,
+            parsed: startDate.toISOString()
+          })
+        }
+
+        if (options.end_date) {
+          // 结束日期：当天 23:59:59 结束（北京时间）
+          const endDate = new Date(options.end_date)
+          endDate.setHours(23, 59, 59, 999)
+          whereConditions.created_at[Op.lte] = endDate
+          logger.debug('日期筛选 - 结束日期', {
+            end_date: options.end_date,
+            parsed: endDate.toISOString()
+          })
+        }
       }
 
       // 搜索条件

@@ -510,6 +510,28 @@ export function useConsumptionMethods() {
       this.isAllSelected = false
     },
 
+    /**
+     * 重置消费记录筛选条件并重新加载
+     */
+    resetConsumptionFilters() {
+      this.consumptionFilters = {
+        user_id: '',
+        status: '',
+        payment_method: '',
+        start_date: '',
+        end_date: '',
+        anomaly_type: ''
+      }
+      // 重置分页到第一页
+      if (this.financePagination) {
+        this.financePagination.page = 1
+      }
+      // 清空选择
+      this.clearSelection()
+      // 重新加载数据
+      this.loadConsumptions()
+    },
+
     // ==================== 风控标记相关方法 (P1-4) ====================
 
     /**

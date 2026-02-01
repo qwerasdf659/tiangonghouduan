@@ -1,0 +1,557 @@
+# 🧪 Playwright E2E 测试规范
+
+## 📋 规范概述
+
+本规范基于实际测试中发现的问题制定，确保 E2E 测试能够有效发现和报告问题，而不是"跑了一遍但没有验证结果"。
+
+---
+
+## 🔴 核心规则：断言强制要求
+
+### 规则 E2E-ASSERT-001：每个测试必须包含断言
+
+**强制要求**：每个 `test()` 用例必须包含至少一个 `expect()` 断言来验证业务逻辑结果。
+
+**问题背景**：
+```
+测试结果显示：
+⚠️ 日期筛选似乎没有生效，结果数量相同  ← 发现了问题
+✓ 1 passed  ← 但测试却通过了！
+```
+
+**禁止模式** ❌
+```javascript
+test('验证日期筛选功能', async ({ page }) => {
+  await page.fill('input[type="date"]', '2026-02-01')
+  await page.click('button:has-text("搜索")')
+  
+  const count = await page.locator('tbody tr').count()
+  
+  // ❌ 禁止：只打印结果，不断言
+  console.log(`结果: ${count} 条`)
+  
+  // ❌ 禁止：用 if 判断打印警告，但测试仍然通过
+  if (count === 20) {
+    console.log('⚠️ 筛选可能没生效')
+  }
+})
+```
+
+**正确模式** ✅
+```javascript
+test('验证日期筛选功能', async ({ page }) => {
+  await page.fill('input[type="date"]', '2026-02-01')
+  await page.click('button:has-text("搜索")')
+  
+  const count = await page.locator('tbody tr').count()
+  
+  // ✅ 正确：使用 expect() 断言验证结果
+  expect(count, '日期筛选后应该返回更少的记录').toBeLessThan(20)
+})
+```
+
+---
+
+## 🎯 断言覆盖要求
+
+### 1. API 调用断言
+
+**必须验证**：
+- API 是否被调用
+- 请求参数是否正确
+- 响应状态是否成功
+
+```javascript
+test('点击按钮触发 API 调用', async ({ page }) => {
+  // 设置 API 拦截
+  const apiPromise = page.waitForRequest(req => 
+    req.url().includes('/api/v4/console/consumption')
+  )
+  
+  await page.click('button:has-text("通过")')
+  
+  // ✅ 断言：API 被调用
+  const request = await apiPromise
+  expect(request.url()).toContain('start_date=2026-02-01')
+  
+  // ✅ 断言：响应成功
+  const response = await page.waitForResponse(resp => 
+    resp.url().includes('/consumption') && resp.status() === 200
+  )
+  const json = await response.json()
+  expect(json.success).toBe(true)
+})
+```
+
+### 2. 数据变化断言
+
+**必须验证**：筛选/操作后数据是否按预期变化
+
+```javascript
+test('状态筛选功能', async ({ page }) => {
+  // 获取初始数据
+  const initialCount = await page.locator('tbody tr').count()
+  
+  // 执行筛选操作
+  await page.selectOption('select', 'pending')
+  await page.click('button:has-text("搜索")')
+  await page.waitForTimeout(1000)
+  
+  // ✅ 断言：数据发生变化或符合预期
+  const filteredCount = await page.locator('tbody tr').count()
+  expect(filteredCount).toBeLessThanOrEqual(initialCount)
+  
+  // ✅ 断言：所有记录状态正确
+  const statuses = await page.locator('tbody tr td:nth-child(3)').allTextContents()
+  statuses.forEach(status => {
+    expect(status).toContain('待审核')
+  })
+})
+```
+
+### 3. UI 状态断言
+
+**必须验证**：UI 元素状态是否正确更新
+
+```javascript
+test('审核后状态更新', async ({ page }) => {
+  // 点击审核按钮
+  page.once('dialog', dialog => dialog.accept())
+  await page.click('button:has-text("通过")')
+  
+  await page.waitForTimeout(2000)
+  
+  // ✅ 断言：状态标签更新
+  const statusBadge = page.locator('tbody tr:first-child .status-badge')
+  await expect(statusBadge).toHaveText('已通过')
+  
+  // ✅ 断言：按钮状态变化
+  const approveBtn = page.locator('tbody tr:first-child button:has-text("通过")')
+  await expect(approveBtn).toBeDisabled()
+})
+```
+
+---
+
+## 🔧 Alpine.js 组件测试规范
+
+### 规则 E2E-ALPINE-001：正确查找嵌套组件
+
+**问题背景**：
+```javascript
+// ❌ 错误：只获取第一个 x-data 元素
+const el = document.querySelector('[x-data]')
+// 结果：找到外层组件，但方法在内层组件中
+```
+
+**正确模式** ✅
+```javascript
+// ✅ 正确：遍历所有组件，找到包含目标方法的组件
+async function findAlpineComponentWithMethod(page, methodName) {
+  return page.evaluate(async (methodName) => {
+    const alpineElements = document.querySelectorAll('[x-data]')
+    
+    for (const el of alpineElements) {
+      const data = window.Alpine.$data(el)
+      if (data && typeof data[methodName] === 'function') {
+        return { found: true, componentName: el.getAttribute('x-data') }
+      }
+    }
+    
+    return { found: false, error: `${methodName} not found` }
+  }, methodName)
+}
+```
+
+---
+
+## 🔄 confirm() 对话框处理规范
+
+### 规则 E2E-DIALOG-001：必须处理原生对话框
+
+**问题背景**：`confirm()` 对话框会阻塞 Playwright 执行
+
+**正确模式** ✅
+```javascript
+test('处理确认对话框', async ({ page }) => {
+  // ✅ 在点击前设置对话框处理器
+  page.once('dialog', async dialog => {
+    expect(dialog.type()).toBe('confirm')
+    expect(dialog.message()).toContain('确定')
+    await dialog.accept()  // 或 dialog.dismiss() 取消
+  })
+  
+  await page.click('button:has-text("删除")')
+})
+```
+
+---
+
+## 📊 测试结构模板
+
+### 标准测试文件结构
+
+```javascript
+import { test, expect } from '@playwright/test'
+
+// 登录函数（复用）
+async function login(page) {
+  await page.goto('login.html')
+  await page.fill('input[type="tel"]', '13612227930')
+  await page.fill('input[x-model="code"]', '123456')
+  await page.click('button[type="submit"]')
+  await expect(page).toHaveURL(/workspace/, { timeout: 15000 })
+}
+
+test.describe('功能模块名称', () => {
+  test.beforeEach(async ({ page }) => {
+    await login(page)
+  })
+
+  test('测试用例1：验证XXX功能', async ({ page }) => {
+    // 1. 准备：导航到目标页面
+    await page.goto('target-page.html')
+    await page.waitForLoadState('networkidle')
+    
+    // 2. 执行：进行操作
+    await page.click('button')
+    
+    // 3. 断言：验证结果（必须有！）
+    await expect(page.locator('.result')).toBeVisible()
+    expect(await page.locator('.count').textContent()).toBe('10')
+  })
+})
+```
+
+---
+
+## ✅ 测试检查清单
+
+### 每个测试用例必须检查
+
+- [ ] 是否有至少一个 `expect()` 断言？
+- [ ] 断言是否验证了业务逻辑（不只是元素存在）？
+- [ ] API 调用是否被验证（调用、参数、响应）？
+- [ ] 数据变化是否被验证（筛选、增删改）？
+- [ ] UI 状态变化是否被验证（按钮、标签、显示）？
+- [ ] 对话框（confirm/alert）是否被处理？
+- [ ] Alpine.js 组件是否正确定位（嵌套组件问题）？
+
+### 测试文件自查命令
+
+```bash
+# 检查每个 test() 是否有 expect()
+grep -n "test\(" tests/e2e/*.spec.js | while read line; do
+  file=$(echo $line | cut -d: -f1)
+  # 检查文件中 expect 数量
+  expect_count=$(grep -c "expect(" $file)
+  test_count=$(grep -c "test(" $file)
+  
+  if [ $expect_count -lt $test_count ]; then
+    echo "⚠️ $file: $test_count 个测试但只有 $expect_count 个断言"
+  fi
+done
+```
+
+---
+
+## 🚫 常见错误模式
+
+### 1. 只验证元素存在，不验证内容
+
+```javascript
+// ❌ 错误：只验证按钮存在
+await expect(page.locator('button')).toBeVisible()
+
+// ✅ 正确：验证按钮文本和状态
+await expect(page.locator('button')).toHaveText('提交')
+await expect(page.locator('button')).toBeEnabled()
+```
+
+### 2. 等待固定时间而不是条件
+
+```javascript
+// ❌ 错误：等待固定时间
+await page.waitForTimeout(5000)
+expect(something).toBe(true)
+
+// ✅ 正确：等待条件满足
+await expect(page.locator('.loading')).toBeHidden({ timeout: 5000 })
+await expect(page.locator('.data')).toBeVisible()
+```
+
+### 3. 不验证 API 响应
+
+```javascript
+// ❌ 错误：只验证请求发出
+const request = await page.waitForRequest('/api/save')
+// 没有验证响应！
+
+// ✅ 正确：验证请求和响应
+const responsePromise = page.waitForResponse('/api/save')
+await page.click('button')
+const response = await responsePromise
+expect(response.status()).toBe(200)
+const json = await response.json()
+expect(json.success).toBe(true)
+```
+
+---
+
+## 📈 预期效果
+
+遵循本规范后：
+- **问题发现率**：从"可能漏掉"提升到"必定捕获"
+- **测试可靠性**：测试通过 = 功能正常，测试失败 = 发现问题
+- **调试效率**：断言失败信息明确指出问题所在
+
+---
+
+## 🧑‍💼 用户行为导向测试规范
+
+### 规则 E2E-USER-001：模拟真实用户操作流程
+
+**核心理念**：测试应该模拟运营人员的**完整操作路径**，而不是单独验证某个功能点。
+
+**死板测试** ❌
+```javascript
+// ❌ 只测试"能填入日期"
+test('日期筛选', async ({ page }) => {
+  await page.fill('input[type="date"]', '2026-02-01')
+  await expect(page.locator('input[type="date"]')).toHaveValue('2026-02-01')
+  // 测试结束，没有验证实际效果
+})
+```
+
+**用户行为测试** ✅
+```javascript
+// ✅ 模拟完整操作流程：选择日期 → 查看结果 → 清除日期 → 恢复全部
+test('日期筛选完整流程', async ({ page }) => {
+  const initialCount = await page.locator('tbody tr').count()
+  
+  // 1. 选择日期筛选
+  await page.fill('input[type="date"]', '2026-02-01')
+  await page.click('button:has-text("搜索")')
+  await page.waitForTimeout(1500)
+  const filteredCount = await page.locator('tbody tr').count()
+  expect(filteredCount).toBeLessThanOrEqual(initialCount)
+  
+  // 2. 清除日期，应该能恢复全部数据 ← 这是用户的真实需求！
+  await page.fill('input[type="date"]', '')
+  await page.click('button:has-text("搜索")')
+  await page.waitForTimeout(1500)
+  const restoredCount = await page.locator('tbody tr').count()
+  expect(restoredCount).toBeGreaterThanOrEqual(filteredCount)
+})
+```
+
+---
+
+### 规则 E2E-USER-002：必须测试"恢复/重置"操作
+
+**问题背景**：用户经常需要"取消筛选"、"清除条件"、"恢复默认"，但这些往往被忽略。
+
+**必须测试的恢复场景**：
+
+| 操作类型 | 必须验证的恢复场景 |
+|---------|-------------------|
+| 筛选条件 | 清除后能查看全部数据 |
+| 表单输入 | 取消/重置后字段清空 |
+| 弹窗/模态框 | 关闭后不影响原数据 |
+| 批量选择 | 取消全选后状态正确 |
+| 日期选择 | 清除后不残留值 |
+
+```javascript
+// ✅ 重置/恢复测试模板
+test('筛选重置功能', async ({ page }) => {
+  // 1. 设置多个筛选条件
+  await page.fill('input[placeholder="用户ID"]', '31')
+  await page.selectOption('select.status', 'pending')
+  await page.fill('input[type="date"]', '2026-02-01')
+  
+  // 2. 点击重置按钮
+  await page.click('button:has-text("重置")')
+  
+  // 3. 验证所有条件已清空
+  await expect(page.locator('input[placeholder="用户ID"]')).toHaveValue('')
+  await expect(page.locator('select.status')).toHaveValue('')
+  await expect(page.locator('input[type="date"]')).toHaveValue('')
+  
+  // 4. 验证数据已恢复全部
+  const count = await page.locator('tbody tr').count()
+  expect(count).toBeGreaterThan(0)
+})
+```
+
+---
+
+### 规则 E2E-USER-003：边界条件和异常输入测试
+
+**必须覆盖的边界场景**：
+
+| 场景类型 | 测试用例示例 |
+|---------|-------------|
+| 空值 | 不填任何条件直接搜索 |
+| 极端值 | 日期设为未来/过去很久 |
+| 无结果 | 搜索不存在的用户ID |
+| 快速操作 | 连续点击多次提交 |
+| 并发 | 同时选择多个筛选条件 |
+
+```javascript
+// ✅ 边界条件测试模板
+test('无结果时显示友好提示', async ({ page }) => {
+  await page.fill('input[placeholder="用户ID"]', '99999999')
+  await page.click('button:has-text("搜索")')
+  await page.waitForTimeout(1500)
+  
+  // 应该显示"暂无数据"而不是崩溃
+  const emptyState = page.locator('text=暂无数据, text=没有记录')
+  const tableRows = page.locator('tbody tr')
+  
+  const hasEmpty = await emptyState.first().isVisible().catch(() => false)
+  const rowCount = await tableRows.count()
+  
+  expect(hasEmpty || rowCount === 0).toBe(true)
+})
+
+test('未来日期应该返回空结果', async ({ page }) => {
+  await page.fill('input[type="date"]', '2030-12-31')
+  await page.click('button:has-text("搜索")')
+  await page.waitForTimeout(1500)
+  
+  const count = await page.locator('tbody tr').count()
+  expect(count).toBeLessThan(5)  // 未来日期不应该有数据
+})
+```
+
+---
+
+### 规则 E2E-USER-004：基于真实业务场景的测试
+
+**思考方式**：问自己"运营人员每天会怎么用这个页面？"
+
+**运营人员的典型工作流程**：
+
+```javascript
+// ✅ 模拟运营人员日常审核流程
+test('运营人员审核工作流程', async ({ page }) => {
+  // 1. 运营人员首先筛选"待审核"记录
+  await page.selectOption('select.status', 'pending')
+  await page.click('button:has-text("搜索")')
+  await page.waitForTimeout(1500)
+  
+  const pendingCount = await page.locator('tbody tr').count()
+  console.log(`📊 今日待审核: ${pendingCount} 条`)
+  
+  if (pendingCount === 0) {
+    console.log('✅ 没有待审核记录，工作完成')
+    return
+  }
+  
+  // 2. 运营人员会查看第一条记录详情
+  await page.click('tbody tr:first-child button:has-text("详情")')
+  await page.waitForTimeout(500)
+  
+  // 3. 确认详情弹窗正确显示
+  const modal = page.locator('.modal, [role="dialog"]')
+  await expect(modal.first()).toBeVisible({ timeout: 3000 })
+  
+  // 4. 关闭详情，进行审核
+  await page.click('button:has-text("关闭"), .modal-close')
+  
+  // 5. 运营人员处理完一条后，可能想看"今天还剩多少"
+  //    这时候需要能方便地刷新/重新筛选
+})
+```
+
+---
+
+### 规则 E2E-USER-005：防呆测试（用户误操作容错）
+
+**必须验证的防呆场景**：
+
+```javascript
+// ✅ 防止误操作的测试
+test('审核前有确认提示', async ({ page }) => {
+  let dialogShown = false
+  
+  page.once('dialog', async dialog => {
+    dialogShown = true
+    expect(dialog.message()).toContain('确定')  // 必须有确认提示
+    await dialog.dismiss()  // 用户取消
+  })
+  
+  await page.click('button:has-text("通过")')
+  await page.waitForTimeout(1000)
+  
+  // ✅ 断言：确认对话框应该弹出
+  expect(dialogShown).toBe(true)
+  
+  // ✅ 断言：取消后记录状态不变
+  const status = await page.locator('tbody tr:first-child .status').textContent()
+  expect(status).toContain('待审核')
+})
+
+test('批量操作有二次确认', async ({ page }) => {
+  // 选择多条记录
+  await page.click('thead input[type="checkbox"]')
+  
+  let confirmMessage = ''
+  page.once('dialog', async dialog => {
+    confirmMessage = dialog.message()
+    await dialog.dismiss()
+  })
+  
+  await page.click('button:has-text("批量通过")')
+  
+  // ✅ 批量操作应该明确告知影响范围
+  expect(confirmMessage).toMatch(/\d+.*条|确定.*批量/)
+})
+```
+
+---
+
+## 📋 用户行为测试检查清单
+
+### 每个功能模块必须包含的测试
+
+- [ ] **正向流程测试**：完整的操作路径（从开始到结束）
+- [ ] **恢复/重置测试**：清除条件后能恢复初始状态
+- [ ] **边界条件测试**：空值、极端值、无结果场景
+- [ ] **防呆测试**：误操作时有提示、可取消
+- [ ] **状态一致性测试**：操作后 UI 和数据保持同步
+
+### 筛选功能必须测试
+
+- [ ] 设置筛选 → 查看结果数量变化
+- [ ] 清除筛选 → 恢复全部数据
+- [ ] 多条件组合 → 结果正确
+- [ ] 重置按钮 → 所有条件清空
+- [ ] 日期变更 → 自动/手动触发搜索
+
+### 表单操作必须测试
+
+- [ ] 提交成功 → 显示成功提示
+- [ ] 提交失败 → 显示错误信息
+- [ ] 取消操作 → 数据不变
+- [ ] 重复提交 → 防止重复请求
+
+---
+
+## 🎯 测试思维转变
+
+| 死板测试思维 | 用户行为测试思维 |
+|-------------|-----------------|
+| "这个输入框能填值吗？" | "用户填完后能得到想要的结果吗？" |
+| "按钮能点击吗？" | "点击后发生了什么？用户满意吗？" |
+| "API 被调用了吗？" | "API 返回后 UI 正确更新了吗？" |
+| "功能存在吗？" | "功能符合用户预期吗？" |
+| "测试通过了" | "用户能完成他的工作吗？" |
+
+---
+
+**核心原则**：
+
+1. **E2E 测试的价值在于断言验证**，不在于"跑了一遍"。没有断言的测试等于没有测试。
+2. **测试应该模拟真实用户**，而不是机械验证技术实现。
+3. **每个操作都要测试"撤销/恢复"**，用户总是需要"回到最初"的能力。

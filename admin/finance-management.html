@@ -113,8 +113,9 @@
               <option value="first_time_high">🆕 首次大额</option>
               <option value="pattern_break">📊 行为异常</option>
             </select>
-            <input type="date" x-model="consumptionFilters.start_date" class="px-3 py-2 border rounded">
+            <input type="date" x-model="consumptionFilters.start_date" @change="loadConsumptions()" class="px-3 py-2 border rounded">
             <button @click="loadConsumptions()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
+            <button @click="resetConsumptionFilters()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">🔄 重置</button>
           </div>
         </div>
         <div class="overflow-x-auto">

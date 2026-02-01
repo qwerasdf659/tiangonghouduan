@@ -84,6 +84,8 @@ router.get('/pending', authenticateToken, requireRoleLevel(100), async (req, res
  * @query {string} status - 状态筛选（pending/approved/rejected/all，默认all）
  * @query {string} search - 搜索关键词（手机号、用户昵称）
  * @query {number} store_id - 门店ID筛选（可选）
+ * @query {string} start_date - 开始日期筛选（ISO格式，如 2026-02-01）
+ * @query {string} end_date - 结束日期筛选（ISO格式，如 2026-02-28）
  *
  * @returns {Object} {
  *   records: Array - 消费记录列表
@@ -96,7 +98,15 @@ router.get('/records', authenticateToken, requireRoleLevel(100), async (req, res
     // 🔄 通过 ServiceManager 获取 QueryService（V4.7.0 服务拆分）
     const QueryService = req.app.locals.services.getService('consumption_query')
 
-    const { page = 1, page_size = 20, status = 'all', search = '', store_id } = req.query
+    const {
+      page = 1,
+      page_size = 20,
+      status = 'all',
+      search = '',
+      store_id,
+      start_date,
+      end_date
+    } = req.query
 
     logger.info('管理员查询消费记录', {
       admin_id: req.user.user_id,
@@ -104,7 +114,9 @@ router.get('/records', authenticateToken, requireRoleLevel(100), async (req, res
       page_size,
       status,
       search,
-      store_id
+      store_id,
+      start_date,
+      end_date
     })
 
     // 调用服务层查询
@@ -113,7 +125,9 @@ router.get('/records', authenticateToken, requireRoleLevel(100), async (req, res
       page_size: parseInt(page_size),
       status,
       search,
-      store_id: store_id ? parseInt(store_id) : undefined
+      store_id: store_id ? parseInt(store_id) : undefined,
+      start_date: start_date || undefined,
+      end_date: end_date || undefined
     })
 
     return res.apiSuccess(result, '查询成功')

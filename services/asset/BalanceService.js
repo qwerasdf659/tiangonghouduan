@@ -146,7 +146,7 @@ class BalanceService {
       asset_code
     }
 
-    // BUDGET_POINTS 按活动隔离
+    // BUDGET_POINTS 按活动隔离（lottery_campaign_id 隔离规则）
     if (asset_code === 'BUDGET_POINTS' && lottery_campaign_id) {
       whereCondition.lottery_campaign_id = String(lottery_campaign_id)
     }
@@ -159,7 +159,7 @@ class BalanceService {
       frozen_amount: 0
     }
 
-    // BUDGET_POINTS 需要记录 lottery_campaign_id
+    // BUDGET_POINTS 需要记录 lottery_campaign_id（活动隔离）
     if (asset_code === 'BUDGET_POINTS' && lottery_campaign_id) {
       defaults.lottery_campaign_id = String(lottery_campaign_id)
     }

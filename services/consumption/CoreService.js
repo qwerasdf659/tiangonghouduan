@@ -284,7 +284,8 @@ class CoreService {
       `✅ 积分发放成功: user_id=${record.user_id}, 积分=${record.points_to_award}, 幂等=${pointsResult.is_duplicate ? '重复' : '新增'}`
     )
 
-    const rewardTransactionId = pointsResult.transaction_record?.transaction_id || null
+    // 🔧 修复：BalanceService 返回的是 asset_transaction_id，不是 transaction_id
+    const rewardTransactionId = pointsResult.transaction_record?.asset_transaction_id || null
 
     if (!rewardTransactionId) {
       throw new Error('积分发放成功但未获取到流水ID，无法完成审核')
