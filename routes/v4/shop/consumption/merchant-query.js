@@ -69,7 +69,7 @@ router.get(
   requireMerchantPermission('consumption:read'),
   async (req, res) => {
     try {
-      const ConsumptionService = getService(req, 'consumption_merchant')
+      const MerchantService = getService(req, 'consumption_merchant')
       const StaffManagementService = getService(req, 'staff_management')
 
       const userId = req.user.user_id
@@ -108,7 +108,7 @@ router.get(
       })
 
       // 5. 调用服务层查询
-      const result = await ConsumptionService.getMerchantRecords({
+      const result = await MerchantService.getMerchantRecords({
         user_id: userId,
         store_id: storeId,
         is_manager: isManager,
@@ -149,7 +149,7 @@ router.get(
   requireMerchantPermission('consumption:read'),
   async (req, res) => {
     try {
-      const ConsumptionService = getService(req, 'consumption_merchant')
+      const MerchantService = getService(req, 'consumption_merchant')
       const StaffManagementService = getService(req, 'staff_management')
 
       const userId = req.user.user_id
@@ -162,7 +162,7 @@ router.get(
       }
 
       // 2. 调用服务层查询记录详情
-      const record = await ConsumptionService.getMerchantRecordDetail(recordId)
+      const record = await MerchantService.getMerchantRecordDetail(recordId)
 
       if (!record) {
         return res.apiError('消费记录不存在', 'RECORD_NOT_FOUND', null, 404)
@@ -223,7 +223,7 @@ router.get(
   requireMerchantPermission('consumption:read'),
   async (req, res) => {
     try {
-      const ConsumptionService = getService(req, 'consumption_merchant')
+      const MerchantService = getService(req, 'consumption_merchant')
       const StaffManagementService = getService(req, 'staff_management')
 
       const userId = req.user.user_id
@@ -256,7 +256,7 @@ router.get(
       })
 
       // 4. 调用服务层查询统计
-      const stats = await ConsumptionService.getMerchantStats({
+      const stats = await MerchantService.getMerchantStats({
         user_id: userId,
         store_id: storeId,
         is_manager: isManager

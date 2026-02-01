@@ -46,8 +46,8 @@ const TransactionManager = require('../../../utils/TransactionManager')
  */
 router.get('/pending', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-    const ConsumptionService = req.app.locals.services.getService('consumption_query')
+    // 🔄 通过 ServiceManager 获取 QueryService（V4.7.0 服务拆分）
+    const QueryService = req.app.locals.services.getService('consumption_query')
 
     const { page = 1, page_size = 20 } = req.query
 
@@ -62,7 +62,7 @@ router.get('/pending', authenticateToken, requireRoleLevel(100), async (req, res
     })
 
     // 调用服务层查询
-    const result = await ConsumptionService.getPendingConsumptionRecords({
+    const result = await QueryService.getPendingConsumptionRecords({
       page: finalPage,
       page_size: finalPageSize
     })
@@ -93,8 +93,8 @@ router.get('/pending', authenticateToken, requireRoleLevel(100), async (req, res
  */
 router.get('/records', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-    const ConsumptionService = req.app.locals.services.getService('consumption_query')
+    // 🔄 通过 ServiceManager 获取 QueryService（V4.7.0 服务拆分）
+    const QueryService = req.app.locals.services.getService('consumption_query')
 
     const { page = 1, page_size = 20, status = 'all', search = '', store_id } = req.query
 
@@ -108,7 +108,7 @@ router.get('/records', authenticateToken, requireRoleLevel(100), async (req, res
     })
 
     // 调用服务层查询
-    const result = await ConsumptionService.getAdminRecords({
+    const result = await QueryService.getAdminRecords({
       page: parseInt(page),
       page_size: parseInt(page_size),
       status,
@@ -149,8 +149,8 @@ router.get('/records', authenticateToken, requireRoleLevel(100), async (req, res
  */
 router.post('/approve/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    // 🔄 通过 ServiceManager 获取 ConsumptionCoreService（审核操作需要核心服务）
-    const ConsumptionService = req.app.locals.services.getService('consumption_core')
+    // 🔄 通过 ServiceManager 获取 CoreService（V4.7.0 服务拆分：审核操作在 CoreService 中）
+    const CoreService = req.app.locals.services.getService('consumption_core')
 
     const record_id = parseInt(req.params.id, 10)
     const { admin_notes } = req.body
@@ -163,7 +163,7 @@ router.post('/approve/:id', authenticateToken, requireRoleLevel(100), async (req
 
     // 使用 TransactionManager 统一事务边界（符合治理决策）
     const result = await TransactionManager.execute(async transaction => {
-      return await ConsumptionService.approveConsumption(parseInt(record_id), {
+      return await CoreService.approveConsumption(parseInt(record_id), {
         reviewer_id: reviewerId,
         admin_notes,
         transaction
@@ -297,8 +297,8 @@ router.post('/batch-review', authenticateToken, requireRoleLevel(100), async (re
  */
 router.post('/reject/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    // 🔄 通过 ServiceManager 获取 ConsumptionCoreService（审核操作需要核心服务）
-    const ConsumptionService = req.app.locals.services.getService('consumption_core')
+    // 🔄 通过 ServiceManager 获取 CoreService（V4.7.0 服务拆分：审核操作在 CoreService 中）
+    const CoreService = req.app.locals.services.getService('consumption_core')
 
     const record_id = parseInt(req.params.id, 10)
     const { admin_notes } = req.body
@@ -321,7 +321,7 @@ router.post('/reject/:id', authenticateToken, requireRoleLevel(100), async (req,
 
     // 使用 TransactionManager 统一事务边界（符合治理决策）
     const result = await TransactionManager.execute(async transaction => {
-      return await ConsumptionService.rejectConsumption(parseInt(record_id), {
+      return await CoreService.rejectConsumption(parseInt(record_id), {
         reviewer_id: reviewerId,
         admin_notes,
         transaction

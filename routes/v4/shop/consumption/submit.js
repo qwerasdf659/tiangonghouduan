@@ -86,9 +86,9 @@ router.post(
   authenticateToken,
   requireMerchantPermission('consumption:create', { scope: 'store', storeIdParam: 'body' }),
   async (req, res) => {
-    // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
+    // P1-9：通过 ServiceManager 获取服务（V4.7.0 服务拆分）
     const IdempotencyService = req.app.locals.services.getService('idempotency')
-    const ConsumptionService = req.app.locals.services.getService('consumption_core')
+    const CoreService = req.app.locals.services.getService('consumption_core')
 
     // 【业界标准形态】强制从 Header 获取幂等键，不接受 body，不服务端生成
     const idempotency_key = req.headers['idempotency-key']
@@ -288,7 +288,7 @@ router.post(
        * V2升级：传入从二维码验证获取的 user_uuid，避免服务层重复验证
        */
       const result = await TransactionManager.execute(async transaction => {
-        return await ConsumptionService.merchantSubmitConsumption(
+        return await CoreService.merchantSubmitConsumption(
           {
             qr_code, // 保留完整二维码用于记录
             user_uuid: qr_validation.user_uuid, // V2：直接传入已验证的 user_uuid

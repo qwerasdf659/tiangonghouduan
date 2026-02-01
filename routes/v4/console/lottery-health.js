@@ -48,10 +48,10 @@ function getLotteryHealthService(req) {
     return service
   }
 
-  // 兜底：直接实例化（带模型注入）
+  // 兜底：直接实例化（通过 ServiceManager 获取 models，Phase 3 收口）
   logger.warn('通过 app.locals.services 获取 lottery_health 失败，使用直接实例化')
   const { LotteryHealthService } = require('../../../services/lottery')
-  const models = req.models || require('../../../models')
+  const models = req.models || req.app.locals.models
   return new LotteryHealthService(models)
 }
 

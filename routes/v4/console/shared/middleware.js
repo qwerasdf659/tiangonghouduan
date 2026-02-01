@@ -129,11 +129,11 @@ const sharedComponents = {
  */
 async function getSimpleSystemStats(serviceManager) {
   try {
-    // ✅ 通过ServiceManager获取ReportingService（P2-C架构重构：已合并AdminAnalyticsService、StatisticsService、UserDashboardService）
-    const ReportingService = serviceManager.getService('reporting_stats')
+    // ✅ 通过ServiceManager获取StatsService（V4.7.0 服务拆分）
+    const StatsService = serviceManager.getService('reporting_stats')
 
     // ✅ 调用Service方法，不再直连models
-    return await ReportingService.getSimpleSystemStats()
+    return await StatsService.getSimpleSystemStats()
   } catch (error) {
     sharedComponents.logger.error('获取系统统计失败:', error)
     throw error

@@ -7,6 +7,11 @@
  *
  * 任务编号：B-35 提醒历史接口
  * 创建时间：2026年01月31日
+ * 最后更新：2026-02-02（Phase 3 读写分层收口）
+ *
+ * 架构规范：
+ * - 读操作通过 BusinessRecordQueryService 执行（Phase 3 收口）
+ * - 通过 ServiceManager 获取服务，避免直连 models
  *
  * @module routes/v4/console/reminder-history
  */
@@ -15,11 +20,41 @@
 
 const express = require('express')
 const router = express.Router()
-const ServiceManager = require('../../../services')
 const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger')
 
 // ==================== 路由配置 ====================
+
+/**
+ * GET /api/v4/console/reminder-history/stats/overview
+ *
+ * 获取提醒统计概览
+ * 注意：静态路由必须在动态路由 /:id 之前定义
+ *
+ * 查询参数:
+ * - start_time: 开始时间
+ * - end_time: 结束时间
+ */
+router.get('/stats/overview', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    // 通过 ServiceManager 获取查询服务（Phase 3 收口）
+    const BusinessRecordQueryService = req.app.locals.services.getService(
+      'console_business_record_query'
+    )
+
+    const { start_time, end_time } = req.query
+
+    const result = await BusinessRecordQueryService.getReminderHistoryStatsOverview({
+      start_time,
+      end_time
+    })
+
+    return res.apiSuccess(result, '获取提醒统计成功')
+  } catch (error) {
+    logger.error('[提醒历史] 获取统计失败', { error: error.message })
+    return res.apiError('获取提醒统计失败', 'REMINDER_STATS_ERROR', null, 500)
+  }
+})
 
 /**
  * GET /api/v4/console/reminder-history
@@ -37,7 +72,9 @@ const logger = require('../../../utils/logger')
  */
 router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reminderService = ServiceManager.getService('reminder_engine')
+    // 通过 ServiceManager 获取服务
+    const reminderService = req.app.locals.services.getService('reminder_engine')
+
     const {
       reminder_rule_id,
       user_id,
@@ -72,7 +109,8 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  */
 router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reminderService = ServiceManager.getService('reminder_engine')
+    // 通过 ServiceManager 获取服务
+    const reminderService = req.app.locals.services.getService('reminder_engine')
     const historyId = parseInt(req.params.id, 10)
 
     if (!historyId || isNaN(historyId)) {
@@ -89,84 +127,6 @@ router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) =>
   } catch (error) {
     logger.error('[提醒历史] 获取详情失败', { error: error.message })
     return res.apiError('获取提醒历史详情失败', 'REMINDER_HISTORY_GET_ERROR', null, 500)
-  }
-})
-
-/**
- * GET /api/v4/console/reminder-history/stats/overview
- *
- * 获取提醒统计概览
- *
- * 查询参数:
- * - start_time: 开始时间
- * - end_time: 结束时间
- */
-router.get('/stats/overview', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { ReminderHistory } = require('../../../models')
-    const { Op } = require('sequelize')
-    const sequelize = require('../../../models').sequelize
-
-    const { start_time, end_time } = req.query
-
-    const where = {}
-    if (start_time || end_time) {
-      where.triggered_at = {}
-      if (start_time) {
-        where.triggered_at[Op.gte] = new Date(start_time)
-      }
-      if (end_time) {
-        where.triggered_at[Op.lte] = new Date(end_time)
-      }
-    }
-
-    // 总触发次数
-    const totalTriggers = await ReminderHistory.count({ where })
-
-    // 按状态统计
-    const byStatus = await ReminderHistory.findAll({
-      where,
-      attributes: [
-        'notification_status',
-        [sequelize.fn('COUNT', sequelize.col('reminder_history_id')), 'count']
-      ],
-      group: ['notification_status'],
-      raw: true
-    })
-
-    // 按规则统计（Top 10）
-    const byRule = await ReminderHistory.findAll({
-      where,
-      attributes: [
-        'reminder_rule_id',
-        [sequelize.fn('COUNT', sequelize.col('reminder_history_id')), 'count']
-      ],
-      group: ['reminder_rule_id'],
-      order: [[sequelize.fn('COUNT', sequelize.col('reminder_history_id')), 'DESC']],
-      limit: 10,
-      raw: true
-    })
-
-    // 转换格式
-    const statusStats = {}
-    byStatus.forEach(item => {
-      statusStats[item.notification_status] = parseInt(item.count, 10)
-    })
-
-    return res.apiSuccess(
-      {
-        total_triggers: totalTriggers,
-        by_status: statusStats,
-        top_rules: byRule.map(item => ({
-          reminder_rule_id: item.reminder_rule_id,
-          trigger_count: parseInt(item.count, 10)
-        }))
-      },
-      '获取提醒统计成功'
-    )
-  } catch (error) {
-    logger.error('[提醒历史] 获取统计失败', { error: error.message })
-    return res.apiError('获取提醒统计失败', 'REMINDER_STATS_ERROR', null, 500)
   }
 })
 

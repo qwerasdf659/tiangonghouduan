@@ -21,11 +21,11 @@ const MarketListingService = require('../../services/market-listing/CoreService'
 const AdminSystemService = require('../../services/AdminSystemService')
 
 /**
- * 生成幂等键
+ * 生成幂等键（预留，未来测试可能使用）
  * @param {string} prefix - 前缀
  * @returns {string} 幂等键
  */
-function generateIdempotencyKey(prefix = 'config_test') {
+function _generateIdempotencyKey(prefix = 'config_test') {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`
 }
 

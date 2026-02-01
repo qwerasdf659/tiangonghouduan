@@ -58,7 +58,7 @@ class DebtManagementService {
     // 库存欠账总览
     const inventoryStats = await PresetInventoryDebt.findOne({
       attributes: [
-        [fn('COUNT', col('debt_id')), 'total_count'],
+        [fn('COUNT', col('preset_inventory_debt_id')), 'total_count'],
         [fn('SUM', col('debt_quantity')), 'total_quantity'],
         [fn('SUM', col('cleared_quantity')), 'cleared_quantity'],
         [fn('COUNT', literal("CASE WHEN status = 'pending' THEN 1 END")), 'pending_count'],
@@ -70,7 +70,7 @@ class DebtManagementService {
     // 预算欠账总览
     const budgetStats = await PresetBudgetDebt.findOne({
       attributes: [
-        [fn('COUNT', col('debt_id')), 'total_count'],
+        [fn('COUNT', col('preset_budget_debt_id')), 'total_count'],
         [fn('SUM', col('debt_amount')), 'total_amount'],
         [fn('SUM', col('cleared_amount')), 'cleared_amount'],
         [fn('COUNT', literal("CASE WHEN status = 'pending' THEN 1 END")), 'pending_count'],
@@ -83,7 +83,7 @@ class DebtManagementService {
     const budgetBySource = await PresetBudgetDebt.findAll({
       attributes: [
         'debt_source',
-        [fn('COUNT', col('debt_id')), 'count'],
+        [fn('COUNT', col('preset_budget_debt_id')), 'count'],
         [fn('SUM', col('debt_amount')), 'total_amount'],
         [fn('SUM', col('cleared_amount')), 'cleared_amount']
       ],
@@ -157,7 +157,7 @@ class DebtManagementService {
         : await PresetInventoryDebt.findAll({
             attributes: [
               'lottery_campaign_id',
-              [fn('COUNT', col('debt_id')), 'inventory_debt_count'],
+              [fn('COUNT', col('preset_inventory_debt_id')), 'inventory_debt_count'],
               [fn('SUM', col('debt_quantity')), 'inventory_debt_quantity'],
               [fn('SUM', col('cleared_quantity')), 'inventory_cleared_quantity']
             ],
@@ -172,7 +172,7 @@ class DebtManagementService {
         : await PresetBudgetDebt.findAll({
             attributes: [
               'lottery_campaign_id',
-              [fn('COUNT', col('debt_id')), 'budget_debt_count'],
+              [fn('COUNT', col('preset_budget_debt_id')), 'budget_debt_count'],
               [fn('SUM', col('debt_amount')), 'budget_debt_amount'],
               [fn('SUM', col('cleared_amount')), 'budget_cleared_amount']
             ],
@@ -274,7 +274,7 @@ class DebtManagementService {
       attributes: [
         'lottery_prize_id',
         'lottery_campaign_id',
-        [fn('COUNT', col('debt_id')), 'debt_count'],
+        [fn('COUNT', col('preset_inventory_debt_id')), 'debt_count'],
         [fn('SUM', col('debt_quantity')), 'total_quantity'],
         [fn('SUM', col('cleared_quantity')), 'cleared_quantity']
       ],
@@ -519,7 +519,7 @@ class DebtManagementService {
       trend.inventory_trend = await PresetInventoryDebt.findAll({
         attributes: [
           [fn('DATE_FORMAT', col('created_at'), dateFormat), 'period'],
-          [fn('COUNT', col('debt_id')), 'count'],
+          [fn('COUNT', col('preset_inventory_debt_id')), 'count'],
           [fn('SUM', col('debt_quantity')), 'quantity']
         ],
         where: {
@@ -536,7 +536,7 @@ class DebtManagementService {
       trend.budget_trend = await PresetBudgetDebt.findAll({
         attributes: [
           [fn('DATE_FORMAT', col('created_at'), dateFormat), 'period'],
-          [fn('COUNT', col('debt_id')), 'count'],
+          [fn('COUNT', col('preset_budget_debt_id')), 'count'],
           [fn('SUM', col('debt_amount')), 'amount']
         ],
         where: {

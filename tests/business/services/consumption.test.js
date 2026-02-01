@@ -210,13 +210,14 @@ describe('ConsumptionService - 消费服务层单元测试', () => {
       const record = result.record || result
 
       expect(record).toBeDefined()
-      expect(record.record_id).toBeDefined()
+      // 主键字段是 consumption_record_id（符合 {table_name}_id 命名规范）
+      expect(record.consumption_record_id).toBeDefined()
       expect(record.user_id).toBe(testUser.user_id)
       expect(record.status).toBe('pending')
       expect(record.points_to_award).toBe(89) // 88.5 四舍五入 = 89
 
-      recordsToClean.push(record.record_id)
-      console.log(`✅ 消费记录创建成功，record_id: ${record.record_id}`)
+      recordsToClean.push(record.consumption_record_id)
+      console.log(`✅ 消费记录创建成功，consumption_record_id: ${record.consumption_record_id}`)
     })
 
     it('幂等键重复时应返回 is_duplicate: true', async () => {
@@ -238,23 +239,26 @@ describe('ConsumptionService - 消费服务层单元测试', () => {
       })
 
       const record1 = result1.record || result1
-      recordsToClean.push(record1.record_id)
+      recordsToClean.push(record1.consumption_record_id)
 
       // 第二次调用（相同幂等键）
       const result2 = await TransactionManager.execute(async transaction => {
         return await ConsumptionService.merchantSubmitConsumption(consumptionData, { transaction })
       })
 
-      // 验证幂等性
+      /*
+       * 验证幂等性：
+       * - 如果服务层返回 is_duplicate，验证其为 true
+       * - BIGINT类型可能导致字符串/数字类型不一致，转换为字符串比较
+       * - 主键字段是 consumption_record_id（符合 {table_name}_id 命名规范）
+       */
       if (result2.is_duplicate !== undefined) {
         expect(result2.is_duplicate).toBe(true)
         const record2 = result2.record || result2
-        // BIGINT类型可能导致字符串/数字类型不一致，转换为字符串比较
-        expect(String(record2.record_id)).toBe(String(record1.record_id))
+        expect(String(record2.consumption_record_id)).toBe(String(record1.consumption_record_id))
         console.log('✅ 幂等性验证通过，重复请求返回原记录')
       } else {
-        // 如果服务层不返回 is_duplicate，验证记录ID相同
-        expect(String(result2.record_id)).toBe(String(record1.record_id))
+        expect(String(result2.consumption_record_id)).toBe(String(record1.consumption_record_id))
         console.log('✅ 幂等性验证通过（通过记录ID匹配）')
       }
     })
@@ -265,7 +269,7 @@ describe('ConsumptionService - 消费服务层单元测试', () => {
         if (recordId) {
           try {
             await ConsumptionRecord.destroy({
-              where: { record_id: recordId },
+              where: { consumption_record_id: recordId },
               force: true
             })
             console.log(`🧹 清理测试消费记录: ${recordId}`)

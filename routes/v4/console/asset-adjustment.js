@@ -23,7 +23,7 @@
  * - 决策5：资产调整是关键操作，审计失败阻断业务
  * - 决策6：幂等键由业务主键派生（禁止自动生成）
  * - 决策7：审计日志在同一事务内
- * - 决策10：target_id 指向 AssetTransaction.transaction_id
+ * - 决策10：target_id 指向 AssetTransaction.asset_transaction_id
  *
  * 创建时间：2025-12-30
  * 更新时间：2026-01-08（审计整合决策5/6/7/10实现）
@@ -142,14 +142,14 @@ router.post(
 
           /*
            * 【决策5/10】记录审计日志（关键操作，失败阻断业务流程）
-           * target_id 指向 AssetTransaction.transaction_id（决策10）
+           * target_id 指向 AssetTransaction.asset_transaction_id（决策10）
            * 审计日志与业务在同一事务内（决策7）
            */
           await AuditLogService.logOperation({
             operator_id: admin_id,
             operation_type: 'asset_adjustment',
             target_type: 'AssetTransaction',
-            target_id: changeResult.transaction_record?.transaction_id,
+            target_id: changeResult.transaction_record?.asset_transaction_id,
             action: Number(amount) > 0 ? 'increase' : 'decrease',
             before_data: {
               user_id,
@@ -194,7 +194,7 @@ router.post(
         amount,
         balance_before: result.transaction_record?.balance_before,
         balance_after: result.transaction_record?.balance_after,
-        transaction_id: result.transaction_record?.transaction_id,
+        asset_transaction_id: result.transaction_record?.asset_transaction_id,
         idempotency_key
       })
     } catch (error) {
@@ -301,7 +301,7 @@ router.post(
                 operator_id: admin_id,
                 operation_type: 'asset_adjustment',
                 target_type: 'AssetTransaction',
-                target_id: changeResult.transaction_record?.transaction_id,
+                target_id: changeResult.transaction_record?.asset_transaction_id,
                 action: Number(amount) > 0 ? 'increase' : 'decrease',
                 before_data: {
                   user_id,

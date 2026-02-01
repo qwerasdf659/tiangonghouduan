@@ -2,10 +2,12 @@
 /**
  * 路由层规范合规性检查脚本
  *
- * 检查规则（基于D4决策：路由层严格治理）：
+ * 检查规则（基于架构设计-读写操作分层策略.md）：
  * 1. 路由不得直接 require models.*（写操作应收口到 Service）
- * 2. 路由不得使用 sequelize.transaction()（事务应在 Service 层处理）
- * 3. 路由不得直接调用 Model.create/update/destroy（写操作应通过 Service）
+ * 2. 路由不得直接调用 Model.create/update/destroy（写操作应通过 Service）
+ *
+ * ⚠️ 注意：路由层使用 sequelize.transaction() 是**正确的架构模式**
+ *    见决策6：路由管理事务边界 + Service执行业务逻辑
  *
  * 执行方式：
  *   node scripts/validation/check-route-layer-compliance.js [--fix-report]
@@ -14,7 +16,8 @@
  *   在 .husky/pre-commit 中添加：node scripts/validation/check-route-layer-compliance.js --staged
  *
  * @since 2026-01-09
- * @see docs/待处理问题清单-2026-01-09.md D4决策
+ * @updated 2026-02-02 删除 NO_ROUTE_TRANSACTION 规则（与决策6冲突）
+ * @see docs/架构设计-读写操作分层策略.md 决策6
  */
 
 'use strict'
@@ -33,14 +36,22 @@ const COMPLIANCE_RULES = [
     message: '路由不应直接require models，请通过Service层访问数据库',
     suggestion: '使用 ServiceManager.get("XXXService") 获取服务实例'
   },
-  {
-    id: 'NO_ROUTE_TRANSACTION',
-    name: '禁止路由层事务',
-    pattern: /sequelize\.transaction\s*\(/g,
-    severity: 'warning',
-    message: '路由层不应直接使用事务，事务应在Service层处理',
-    suggestion: '将事务逻辑迁移到对应Service方法中'
-  },
+  /* 
+   * ❌ 已删除 NO_ROUTE_TRANSACTION 规则（2026-02-02）
+   * 
+   * 原因：路由层使用 sequelize.transaction() 是项目采用的标准事务管理模式
+   * 见决策6：路由管理事务边界 + Service执行业务逻辑
+   * 
+   * 代码模式（✅ 正确）：
+   *   const transaction = await sequelize.transaction()
+   *   try {
+   *     await SomeService.doSomething({ transaction })
+   *     await transaction.commit()
+   *   } catch (error) {
+   *     await transaction.rollback()
+   *     throw error
+   *   }
+   */
   {
     id: 'NO_DIRECT_MODEL_CREATE',
     name: '禁止路由直接Model.create',
@@ -67,6 +78,10 @@ const COMPLIANCE_RULES = [
         'Buffer',
         'process'
       ]
+      /* 排除 Service 对象（以 Service 结尾的变量名） */
+      if (modelName && modelName.endsWith('Service')) {
+        return false
+      }
       return modelName && !allowedObjects.includes(modelName)
     }
   },

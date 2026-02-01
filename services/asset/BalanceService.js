@@ -258,7 +258,7 @@ class BalanceService {
           method: 'changeBalance',
           idempotency_key,
           business_type,
-          transaction_id: existingTransaction.transaction_id
+          asset_transaction_id: existingTransaction.asset_transaction_id
         })
 
         // 获取当前账户和余额状态
@@ -374,7 +374,7 @@ class BalanceService {
         lottery_session_id: lottery_session_id || null,
         lottery_campaign_id: lottery_campaign_id || null,
         idempotency_key,
-        transaction_id: transaction_record.transaction_id
+        asset_transaction_id: transaction_record.asset_transaction_id
       })
 
       // 刷新余额数据
@@ -465,7 +465,7 @@ class BalanceService {
           method: 'freeze',
           idempotency_key,
           business_type,
-          transaction_id: existingTransaction.transaction_id
+          asset_transaction_id: existingTransaction.asset_transaction_id
         })
 
         const account = await this.getOrCreateAccount({ user_id, system_code }, { transaction })
@@ -557,7 +557,7 @@ class BalanceService {
         frozen_after,
         business_type,
         idempotency_key,
-        transaction_id: transaction_record.transaction_id
+        asset_transaction_id: transaction_record.asset_transaction_id
       })
 
       await balance.reload({ transaction })
@@ -646,7 +646,7 @@ class BalanceService {
           method: 'unfreeze',
           idempotency_key,
           business_type,
-          transaction_id: existingTransaction.transaction_id
+          asset_transaction_id: existingTransaction.asset_transaction_id
         })
 
         const account = await this.getOrCreateAccount({ user_id, system_code }, { transaction })
@@ -738,7 +738,7 @@ class BalanceService {
         frozen_after,
         business_type,
         idempotency_key,
-        transaction_id: transaction_record.transaction_id
+        asset_transaction_id: transaction_record.asset_transaction_id
       })
 
       await balance.reload({ transaction })
@@ -827,7 +827,7 @@ class BalanceService {
           method: 'settleFromFrozen',
           idempotency_key,
           business_type,
-          transaction_id: existingTransaction.transaction_id
+          asset_transaction_id: existingTransaction.asset_transaction_id
         })
 
         const account = await this.getOrCreateAccount({ user_id, system_code }, { transaction })
@@ -918,7 +918,7 @@ class BalanceService {
         frozen_after,
         business_type,
         idempotency_key,
-        transaction_id: transaction_record.transaction_id
+        asset_transaction_id: transaction_record.asset_transaction_id
       })
 
       await balance.reload({ transaction })

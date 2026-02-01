@@ -1,0 +1,445 @@
+'use strict'
+
+/**
+ * 抽奖分析查询服务
+ *
+ * @description 提供抽奖统计分析的只读查询功能
+ *
+ * 遵循架构规范：读写分层策略 Phase 3
+ * 热点分析查询启用缓存
+ *
+ * 涵盖查询：
+ * - 抽奖趋势分析（按小时/天）
+ * - 奖品分布统计
+ * - 用户抽奖行为分析
+ * - 活动效果分析
+ * - 预算消耗分析
+ *
+ * @module services/lottery/AnalyticsQueryService
+ * @version 1.0.0
+ * @date 2026-02-01
+ */
+
+const { Op, fn, col, literal } = require('sequelize')
+const logger = require('../../utils/logger').logger
+const BusinessCacheHelper = require('../../utils/BusinessCacheHelper')
+
+/**
+ * 缓存配置
+ * @constant
+ */
+const CACHE_CONFIG = {
+  /** 趋势分析缓存 TTL (5分钟) */
+  TREND_ANALYSIS: 300,
+  /** 奖品分布缓存 TTL (5分钟) */
+  PRIZE_DISTRIBUTION: 300,
+  /** 活动效果缓存 TTL (5分钟) */
+  CAMPAIGN_EFFECT: 300
+}
+
+/**
+ * 抽奖分析查询服务类
+ * 提供抽奖统计分析的只读查询功能
+ *
+ * @class LotteryAnalyticsQueryService
+ */
+class LotteryAnalyticsQueryService {
+  /**
+   * 获取抽奖趋势分析（按小时）
+   * 热点查询 - 启用缓存
+   *
+   * @param {number} campaign_id - 活动ID
+   * @param {Object} options - 查询选项
+   * @param {string} [options.start_date] - 开始日期
+   * @param {string} [options.end_date] - 结束日期
+   * @returns {Promise<Object>} 趋势数据
+   */
+  static async getHourlyTrend(campaign_id, options = {}) {
+    const { start_date, end_date } = options
+    const cacheKey = `lottery:analytics:hourly:${campaign_id}:${start_date || 'all'}:${end_date || 'all'}`
+
+    // 尝试从缓存获取
+    const cached = await BusinessCacheHelper.get(cacheKey)
+    if (cached) {
+      logger.debug('小时趋势分析命中缓存', { cacheKey })
+      return cached
+    }
+
+    const { LotteryDraw } = require('../../models')
+
+    // 构建日期过滤
+    const where = { lottery_campaign_id: parseInt(campaign_id) }
+    if (start_date || end_date) {
+      where.created_at = {}
+      if (start_date) where.created_at[Op.gte] = new Date(start_date)
+      if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
+    }
+
+    // 按小时分组统计
+    const trend = await LotteryDraw.findAll({
+      attributes: [
+        [fn('DATE_FORMAT', col('created_at'), '%Y-%m-%d %H:00:00'), 'hour'],
+        [fn('COUNT', col('lottery_draw_id')), 'draw_count'],
+        [
+          fn('SUM', literal('CASE WHEN lottery_prize_id IS NOT NULL THEN 1 ELSE 0 END')),
+          'win_count'
+        ],
+        [fn('COUNT', fn('DISTINCT', col('user_id'))), 'unique_users']
+      ],
+      where,
+      group: [literal('hour')],
+      order: [[literal('hour'), 'ASC']],
+      raw: true
+    })
+
+    const result = {
+      campaign_id: parseInt(campaign_id),
+      data_points: trend.map(item => ({
+        hour: item.hour,
+        draw_count: parseInt(item.draw_count) || 0,
+        win_count: parseInt(item.win_count) || 0,
+        unique_users: parseInt(item.unique_users) || 0,
+        win_rate:
+          item.draw_count > 0 ? ((item.win_count / item.draw_count) * 100).toFixed(2) : '0.00'
+      })),
+      date_range: { start_date, end_date }
+    }
+
+    // 写入缓存
+    await BusinessCacheHelper.set(cacheKey, result, CACHE_CONFIG.TREND_ANALYSIS)
+
+    return result
+  }
+
+  /**
+   * 获取抽奖趋势分析（按天）
+   * 热点查询 - 启用缓存
+   *
+   * @param {number} campaign_id - 活动ID
+   * @param {Object} options - 查询选项
+   * @param {string} [options.start_date] - 开始日期
+   * @param {string} [options.end_date] - 结束日期
+   * @returns {Promise<Object>} 趋势数据
+   */
+  static async getDailyTrend(campaign_id, options = {}) {
+    const { start_date, end_date } = options
+    const cacheKey = `lottery:analytics:daily:${campaign_id}:${start_date || 'all'}:${end_date || 'all'}`
+
+    // 尝试从缓存获取
+    const cached = await BusinessCacheHelper.get(cacheKey)
+    if (cached) {
+      logger.debug('每日趋势分析命中缓存', { cacheKey })
+      return cached
+    }
+
+    const { LotteryDraw } = require('../../models')
+
+    // 构建日期过滤
+    const where = { lottery_campaign_id: parseInt(campaign_id) }
+    if (start_date || end_date) {
+      where.created_at = {}
+      if (start_date) where.created_at[Op.gte] = new Date(start_date)
+      if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
+    }
+
+    // 按日期分组统计
+    const trend = await LotteryDraw.findAll({
+      attributes: [
+        [fn('DATE', col('created_at')), 'date'],
+        [fn('COUNT', col('lottery_draw_id')), 'draw_count'],
+        [
+          fn('SUM', literal('CASE WHEN lottery_prize_id IS NOT NULL THEN 1 ELSE 0 END')),
+          'win_count'
+        ],
+        [fn('COUNT', fn('DISTINCT', col('user_id'))), 'unique_users']
+      ],
+      where,
+      group: [fn('DATE', col('created_at'))],
+      order: [[fn('DATE', col('created_at')), 'ASC']],
+      raw: true
+    })
+
+    const result = {
+      campaign_id: parseInt(campaign_id),
+      data_points: trend.map(item => ({
+        date: item.date,
+        draw_count: parseInt(item.draw_count) || 0,
+        win_count: parseInt(item.win_count) || 0,
+        unique_users: parseInt(item.unique_users) || 0,
+        win_rate:
+          item.draw_count > 0 ? ((item.win_count / item.draw_count) * 100).toFixed(2) : '0.00'
+      })),
+      date_range: { start_date, end_date }
+    }
+
+    // 写入缓存
+    await BusinessCacheHelper.set(cacheKey, result, CACHE_CONFIG.TREND_ANALYSIS)
+
+    return result
+  }
+
+  /**
+   * 获取奖品分布统计
+   * 热点查询 - 启用缓存
+   *
+   * @param {number} campaign_id - 活动ID
+   * @returns {Promise<Object>} 奖品分布统计
+   */
+  static async getPrizeDistribution(campaign_id) {
+    const cacheKey = `lottery:analytics:prize_dist:${campaign_id}`
+
+    // 尝试从缓存获取
+    const cached = await BusinessCacheHelper.get(cacheKey)
+    if (cached) {
+      logger.debug('奖品分布命中缓存', { cacheKey })
+      return cached
+    }
+
+    const { LotteryDraw, LotteryPrize } = require('../../models')
+
+    // 按奖品分组统计
+    const distribution = await LotteryDraw.findAll({
+      attributes: ['lottery_prize_id', [fn('COUNT', col('lottery_draw_id')), 'win_count']],
+      where: {
+        lottery_campaign_id: parseInt(campaign_id),
+        lottery_prize_id: { [Op.ne]: null }
+      },
+      include: [
+        {
+          model: LotteryPrize,
+          as: 'prize',
+          attributes: ['prize_name', 'prize_type', 'reward_tier'],
+          required: true
+        }
+      ],
+      group: ['lottery_prize_id', 'prize.lottery_prize_id'],
+      order: [[fn('COUNT', col('lottery_draw_id')), 'DESC']],
+      raw: true,
+      nest: true
+    })
+
+    // 计算总中奖数
+    const totalWins = distribution.reduce((sum, item) => sum + parseInt(item.win_count), 0)
+
+    const result = {
+      campaign_id: parseInt(campaign_id),
+      total_wins: totalWins,
+      prizes: distribution.map(item => ({
+        lottery_prize_id: item.lottery_prize_id,
+        prize_name: item.prize?.prize_name,
+        prize_type: item.prize?.prize_type,
+        reward_tier: item.prize?.reward_tier,
+        win_count: parseInt(item.win_count) || 0,
+        percentage: totalWins > 0 ? ((item.win_count / totalWins) * 100).toFixed(2) : '0.00'
+      }))
+    }
+
+    // 写入缓存
+    await BusinessCacheHelper.set(cacheKey, result, CACHE_CONFIG.PRIZE_DISTRIBUTION)
+
+    return result
+  }
+
+  /**
+   * 获取档位分布统计
+   *
+   * @param {number} campaign_id - 活动ID
+   * @returns {Promise<Object>} 档位分布统计
+   */
+  static async getTierDistribution(campaign_id) {
+    const cacheKey = `lottery:analytics:tier_dist:${campaign_id}`
+
+    const cached = await BusinessCacheHelper.get(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const { LotteryDraw, LotteryPrize } = require('../../models')
+
+    // 按档位分组统计
+    const distribution = await LotteryDraw.findAll({
+      attributes: [[fn('COUNT', col('LotteryDraw.lottery_draw_id')), 'win_count']],
+      where: {
+        lottery_campaign_id: parseInt(campaign_id),
+        lottery_prize_id: { [Op.ne]: null }
+      },
+      include: [
+        {
+          model: LotteryPrize,
+          as: 'prize',
+          attributes: ['reward_tier'],
+          required: true
+        }
+      ],
+      group: ['prize.reward_tier'],
+      order: [[literal('win_count'), 'DESC']],
+      raw: true,
+      nest: true
+    })
+
+    const totalWins = distribution.reduce((sum, item) => sum + parseInt(item.win_count), 0)
+
+    const result = {
+      campaign_id: parseInt(campaign_id),
+      total_wins: totalWins,
+      tiers: distribution.map(item => ({
+        reward_tier: item.prize?.reward_tier,
+        win_count: parseInt(item.win_count) || 0,
+        percentage: totalWins > 0 ? ((item.win_count / totalWins) * 100).toFixed(2) : '0.00'
+      }))
+    }
+
+    await BusinessCacheHelper.set(cacheKey, result, CACHE_CONFIG.PRIZE_DISTRIBUTION)
+
+    return result
+  }
+
+  /**
+   * 获取活动效果分析
+   * 热点查询 - 启用缓存
+   *
+   * @param {number} campaign_id - 活动ID
+   * @returns {Promise<Object>} 活动效果分析
+   */
+  static async getCampaignEffectAnalysis(campaign_id) {
+    const cacheKey = `lottery:analytics:effect:${campaign_id}`
+
+    const cached = await BusinessCacheHelper.get(cacheKey)
+    if (cached) {
+      logger.debug('活动效果分析命中缓存', { cacheKey })
+      return cached
+    }
+
+    const { LotteryDraw, LotteryCampaign } = require('../../models')
+
+    // 获取活动信息
+    const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id), {
+      attributes: ['lottery_campaign_id', 'campaign_name', 'status', 'start_time', 'end_time']
+    })
+
+    if (!campaign) {
+      return null
+    }
+
+    // 获取抽奖统计
+    const [totalDraws, winDraws, uniqueUsers, repeatUsers] = await Promise.all([
+      // 总抽奖次数
+      LotteryDraw.count({
+        where: { lottery_campaign_id: parseInt(campaign_id) }
+      }),
+      // 中奖次数
+      LotteryDraw.count({
+        where: {
+          lottery_campaign_id: parseInt(campaign_id),
+          lottery_prize_id: { [Op.ne]: null }
+        }
+      }),
+      // 独立用户数
+      LotteryDraw.count({
+        where: { lottery_campaign_id: parseInt(campaign_id) },
+        distinct: true,
+        col: 'user_id'
+      }),
+      // 重复用户数（抽奖次数>1的用户）
+      (async () => {
+        const result = await LotteryDraw.findAll({
+          attributes: ['user_id', [fn('COUNT', col('lottery_draw_id')), 'draw_count']],
+          where: { lottery_campaign_id: parseInt(campaign_id) },
+          group: ['user_id'],
+          having: literal('draw_count > 1'),
+          raw: true
+        })
+        return result.length
+      })()
+    ])
+
+    const result = {
+      campaign_id: parseInt(campaign_id),
+      campaign_name: campaign.campaign_name,
+      status: campaign.status,
+      start_time: campaign.start_time,
+      end_time: campaign.end_time,
+      metrics: {
+        total_draws: totalDraws,
+        win_draws: winDraws,
+        unique_users: uniqueUsers,
+        repeat_users: repeatUsers,
+        win_rate: totalDraws > 0 ? ((winDraws / totalDraws) * 100).toFixed(2) : '0.00',
+        avg_draws_per_user: uniqueUsers > 0 ? (totalDraws / uniqueUsers).toFixed(2) : '0.00',
+        repeat_rate: uniqueUsers > 0 ? ((repeatUsers / uniqueUsers) * 100).toFixed(2) : '0.00'
+      }
+    }
+
+    // 写入缓存
+    await BusinessCacheHelper.set(cacheKey, result, CACHE_CONFIG.CAMPAIGN_EFFECT)
+
+    return result
+  }
+
+  /**
+   * 获取用户抽奖行为分析
+   *
+   * @param {number} user_id - 用户ID
+   * @param {Object} options - 查询选项
+   * @param {number} [options.campaign_id] - 活动ID（可选）
+   * @returns {Promise<Object>} 用户行为分析
+   */
+  static async getUserBehaviorAnalysis(user_id, options = {}) {
+    const { LotteryDraw, LotteryPrize } = require('../../models')
+
+    const { campaign_id } = options
+
+    // 构建查询条件
+    const where = { user_id: parseInt(user_id) }
+    if (campaign_id) where.lottery_campaign_id = parseInt(campaign_id)
+
+    // 获取用户抽奖统计
+    const [totalDraws, winDraws, prizeStats] = await Promise.all([
+      // 总抽奖次数
+      LotteryDraw.count({ where }),
+      // 中奖次数
+      LotteryDraw.count({
+        where: {
+          ...where,
+          lottery_prize_id: { [Op.ne]: null }
+        }
+      }),
+      // 按奖品类型统计
+      LotteryDraw.findAll({
+        attributes: [[fn('COUNT', col('lottery_draw_id')), 'win_count']],
+        where: {
+          ...where,
+          lottery_prize_id: { [Op.ne]: null }
+        },
+        include: [
+          {
+            model: LotteryPrize,
+            as: 'prize',
+            attributes: ['prize_type', 'reward_tier'],
+            required: true
+          }
+        ],
+        group: ['prize.prize_type', 'prize.reward_tier'],
+        raw: true,
+        nest: true
+      })
+    ])
+
+    return {
+      user_id: parseInt(user_id),
+      campaign_id: campaign_id ? parseInt(campaign_id) : null,
+      metrics: {
+        total_draws: totalDraws,
+        win_draws: winDraws,
+        win_rate: totalDraws > 0 ? ((winDraws / totalDraws) * 100).toFixed(2) : '0.00'
+      },
+      prize_breakdown: prizeStats.map(item => ({
+        prize_type: item.prize?.prize_type,
+        reward_tier: item.prize?.reward_tier,
+        win_count: parseInt(item.win_count) || 0
+      }))
+    }
+  }
+}
+
+module.exports = LotteryAnalyticsQueryService

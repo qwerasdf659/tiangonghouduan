@@ -51,9 +51,9 @@ router.get('/history/:user_id', authenticateToken, async (req, res) => {
       return res.apiError('无权查看其他用户的抽奖历史', 'ACCESS_DENIED', {}, 403)
     }
 
-    // 获取抽奖历史
-    const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
-    const history = await lottery_engine.get_user_history(user_id, {
+    // 获取抽奖历史（读写分离架构）
+    const LotteryQueryService = req.app.locals.services.getService('lottery_query')
+    const history = await LotteryQueryService.getUserHistory(user_id, {
       page: finalPage,
       limit: finalLimit
     })
@@ -87,9 +87,9 @@ router.get('/campaigns', authenticateToken, async (req, res) => {
   try {
     const { status = 'active' } = req.query
 
-    // 获取活动列表
-    const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
-    const campaigns = await lottery_engine.get_campaigns({
+    // 获取活动列表（读写分离架构）
+    const LotteryQueryService = req.app.locals.services.getService('lottery_query')
+    const campaigns = await LotteryQueryService.getActiveCampaigns({
       status,
       user_id: req.user.user_id
     })
@@ -148,8 +148,8 @@ router.get('/metrics', authenticateToken, async (req, res) => {
 
     const hoursInt = Math.min(Math.max(parseInt(hours) || 24, 1), 168) // 限制 1-168 小时
 
-    // 3. 查询 LotteryHourlyMetrics 数据
-    const { LotteryHourlyMetrics } = require('../../../models')
+    // 3. 查询 LotteryHourlyMetrics 数据（Phase 3 收口：通过 ServiceManager 获取 models）
+    const { LotteryHourlyMetrics } = req.app.locals.models
 
     const recentMetrics = await LotteryHourlyMetrics.getRecentMetrics(campaignIdInt, hoursInt)
 

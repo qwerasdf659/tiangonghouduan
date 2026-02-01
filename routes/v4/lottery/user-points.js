@@ -125,11 +125,11 @@ router.get('/statistics/:user_id', authenticateToken, async (req, res) => {
     }
 
     /*
-     * 📡 调用统一抽奖引擎的统计服务（核心业务逻辑在Service层）
-     * 服务层方法：UnifiedLotteryEngine.get_user_statistics(user_id)
+     * 📡 调用 LotteryQueryService 的统计服务（读写分离架构）
+     * 服务层方法：LotteryQueryService.getUserStatistics(user_id)
      */
-    const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
-    const statistics = await lottery_engine.get_user_statistics(user_id)
+    const LotteryQueryService = req.app.locals.services.getService('lottery_query')
+    const statistics = await LotteryQueryService.getUserStatistics(user_id)
 
     /*
      * ✅ 成功返回统计数据（使用统一的API响应格式ApiResponse）

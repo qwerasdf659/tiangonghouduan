@@ -26,7 +26,8 @@ const { logger, sanitize } = require('../../../utils/logger')
 const { generateTokens, getUserRoles } = require('../../../middleware/auth')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const TransactionManager = require('../../../utils/TransactionManager')
-const { AuthenticationSession } = require('../../../models') // 🆕 会话模型
+
+// Phase 3 收口：AuthenticationSession 在路由内通过 ServiceManager 获取，避免顶部直连 models
 
 /**
  * 🛡️ 用户登录（支持自动注册）
@@ -138,6 +139,9 @@ router.post('/login', async (req, res) => {
   const sessionToken = uuidv4()
   const userType = userRoles.role_level >= 100 ? 'admin' : 'user'
   const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
+
+  // 通过 app.locals.models 获取 AuthenticationSession（app.js 中注入）
+  const { AuthenticationSession } = req.app.locals.models
 
   try {
     /**
@@ -416,6 +420,9 @@ router.post('/quick-login', async (req, res) => {
   const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
 
   try {
+    // Phase 3 收口：通过 ServiceManager 获取 AuthenticationSession（快速登录流程）
+    const { AuthenticationSession } = req.app.locals.models
+
     /**
      * 🆕 2026-01-29 多设备登录冲突处理（P0-6 安全审计）- 快速登录
      *

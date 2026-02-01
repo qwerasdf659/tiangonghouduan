@@ -199,7 +199,8 @@ router.get('/:dictId', authenticateToken, requireRoleLevel(30), async (req, res)
   try {
     const DisplayNameService = getDisplayNameService(req)
     const { dictId } = req.params
-    const { SystemDictionary } = require('../../../models')
+    // Phase 3 收口：通过 ServiceManager 获取 SystemDictionary
+    const { SystemDictionary } = req.app.locals.models
 
     const dictionary = await SystemDictionary.findByPk(dictId, {
       include: [

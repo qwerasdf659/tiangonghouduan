@@ -39,8 +39,8 @@ const logger = require('../../../../utils/logger').logger
  */
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-    const ConsumptionService = req.app.locals.services.getService('consumption_query')
+    // 🔄 通过 ServiceManager 获取 QueryService（V4.7.0 服务拆分）
+    const QueryService = req.app.locals.services.getService('consumption_query')
 
     // 从token获取用户ID（用户只能查询自己的记录）
     const userId = req.user.user_id
@@ -58,7 +58,7 @@ router.get('/me', authenticateToken, async (req, res) => {
     })
 
     // 调用服务层查询
-    const result = await ConsumptionService.getUserConsumptionRecords(userId, {
+    const result = await QueryService.getUserConsumptionRecords(userId, {
       status,
       page: finalPage,
       page_size: finalPageSize
@@ -91,15 +91,15 @@ router.get('/me', authenticateToken, async (req, res) => {
  */
 router.get('/detail/:id', authenticateToken, async (req, res) => {
   try {
-    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-    const ConsumptionService = req.app.locals.services.getService('consumption_query')
+    // 🔄 通过 ServiceManager 获取 QueryService（V4.7.0 服务拆分）
+    const QueryService = req.app.locals.services.getService('consumption_query')
 
     const recordId = parseInt(req.params.id, 10)
 
     logger.info('查询消费记录详情', { record_id: recordId })
 
     // 调用 Service 层方法（含权限检查）
-    const record = await ConsumptionService.getConsumptionDetailWithAuth(
+    const record = await QueryService.getConsumptionDetailWithAuth(
       recordId,
       req.user.user_id,
       req.user.role_level >= 100,
@@ -149,8 +149,8 @@ router.get('/detail/:id', authenticateToken, async (req, res) => {
  */
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
-    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-    const ConsumptionService = req.app.locals.services.getService('consumption_query')
+    // 🔄 通过 ServiceManager 获取 CoreService（V4.7.0 服务拆分：softDeleteRecord 在 CoreService 中）
+    const CoreService = req.app.locals.services.getService('consumption_core')
 
     const userId = req.user.user_id
     const recordId = parseInt(req.params.id, 10)
@@ -167,7 +167,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
      * - 路由层不直接操作 models，所有写操作收口到 Service 层
      * - Service 层负责权限验证、状态检查、数据更新
      */
-    const result = await ConsumptionService.softDeleteRecord(recordId, userId, {
+    const result = await CoreService.softDeleteRecord(recordId, userId, {
       has_admin_access,
       role_level
     })
@@ -212,8 +212,8 @@ router.delete('/:id', authenticateToken, async (req, res) => {
  */
 router.post('/:id/restore', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-    const ConsumptionService = req.app.locals.services.getService('consumption_query')
+    // 🔄 通过 ServiceManager 获取 CoreService（V4.7.0 服务拆分：restoreRecord 在 CoreService 中）
+    const CoreService = req.app.locals.services.getService('consumption_core')
 
     const recordId = parseInt(req.params.id, 10)
     const adminId = req.user.user_id
@@ -228,7 +228,7 @@ router.post('/:id/restore', authenticateToken, requireRoleLevel(100), async (req
      * - 路由层不直接操作 models，所有写操作收口到 Service 层
      * - Service 层负责验证、数据更新
      */
-    const result = await ConsumptionService.restoreRecord(recordId, adminId)
+    const result = await CoreService.restoreRecord(recordId, adminId)
 
     return res.apiSuccess(
       {

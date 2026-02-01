@@ -29,7 +29,8 @@ const {
 } = require('../../../middleware/auth')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { getRateLimiter } = require('../../../middleware/RateLimiterMiddleware')
-const { AuthenticationSession } = require('../../../models') // 🆕 会话模型
+
+// Phase 3 收口：AuthenticationSession 在路由内通过 ServiceManager 获取，避免顶部直连 models
 
 // 创建Token验证接口专用限流器
 const rateLimiter = getRateLimiter()
@@ -214,6 +215,8 @@ router.post('/logout', authenticateToken, async (req, res) => {
    */
   if (sessionToken) {
     try {
+      // Phase 3 收口：通过 ServiceManager 获取 AuthenticationSession
+      const { AuthenticationSession } = req.app.locals.models
       const session = await AuthenticationSession.findByToken(sessionToken)
       if (session) {
         await session.deactivate('用户主动退出登录')

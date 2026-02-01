@@ -52,14 +52,14 @@ const { handleServiceError } = require('../../../middleware/validation')
  */
 router.get('/charts', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    // 1. 通过 ServiceManager 获取 ReportingService（P2-C架构重构：合并StatisticsService）
-    const ReportingService = req.app.locals.services.getService('reporting_stats')
+    // 1. 通过 ServiceManager 获取 ChartsService（V4.7.0 服务拆分：getChartsData 在 ChartsService 中）
+    const ChartsService = req.app.locals.services.getService('reporting_charts')
 
     // 2. 参数验证
     const days = parseInt(req.query.days) || 30
 
     // 3. 调用 Service 层获取图表数据
-    const statistics_data = await ReportingService.getChartsData(days)
+    const statistics_data = await ChartsService.getChartsData(days)
 
     return res.apiSuccess(
       statistics_data,
@@ -86,17 +86,16 @@ router.get('/charts', authenticateToken, requireRoleLevel(100), async (req, res)
  */
 router.get('/report', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    // 1. 通过 ServiceManager 获取 ReportingService（P2-C架构重构）
-    const ReportingService = req.app.locals.services.getService('reporting_stats')
+    // 1. 通过 ServiceManager 获取 ChartsService（V4.7.0 服务拆分：getChartsData 在 ChartsService 中）
+    const ChartsService = req.app.locals.services.getService('reporting_charts')
 
     // 2. 参数验证
     const { period = 'week' } = req.query
 
     /*
-     * 3. 调用 Service 层获取报表数据（注意：ReportingService没有getStatisticsReport方法，需要使用其他方法）
-     * 使用getChartsData作为替代，或者需要在ReportingService中添加此方法
+     * 3. 调用 Service 层获取报表数据（V4.7.0：使用 ChartsService.getChartsData）
      */
-    const report_data = await ReportingService.getChartsData(
+    const report_data = await ChartsService.getChartsData(
       period === 'week' ? 7 : period === 'month' ? 30 : 365
     )
 
@@ -130,8 +129,8 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
   try {
     const XLSX = require('xlsx')
 
-    // 1. 通过 ServiceManager 获取 ReportingService（P2-C架构重构）
-    const ReportingService = req.app.locals.services.getService('reporting_stats')
+    // 1. 通过 ServiceManager 获取 ChartsService（V4.7.0 服务拆分：getChartsData 在 ChartsService 中）
+    const ChartsService = req.app.locals.services.getService('reporting_charts')
 
     // 2. 参数验证
     const days = parseInt(req.query.days) || 30
@@ -140,7 +139,7 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
 
     // 3. 调用 Service 层获取图表数据
     const { user_growth, user_types, lottery_trend, consumption_trend, points_flow, top_prizes } =
-      await ReportingService.getChartsData(days)
+      await ChartsService.getChartsData(days)
 
     // 4. 创建工作簿
     const workbook = XLSX.utils.book_new()

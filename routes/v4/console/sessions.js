@@ -17,17 +17,19 @@
  * 权限要求：
  * - 仅限管理员（role_level >= 100）访问
  *
+ * 架构规范：
+ * - 读操作通过 SessionQueryService 执行（Phase 3 收口）
+ * - 写操作通过 SessionManagementService 执行
+ *
  * @see docs/会话管理功能补齐方案.md
  * @since 2026-01-21
+ * @updated 2026-02-02（Phase 3 读写分层收口）
  */
 const express = require('express')
 const router = express.Router()
-const { Op } = require('sequelize')
 const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
-const { AuthenticationSession, User } = require('../../../models')
 const logger = require('../../../utils/logger').logger
-const BeijingTimeHelper = require('../../../utils/timeHelper')
-const SessionManagementService = require('../../../services/SessionManagementService')
+
 /**
  * GET /api/v4/console/sessions - 会话列表（分页、筛选）
  *
@@ -43,96 +45,18 @@ const SessionManagementService = require('../../../services/SessionManagementSer
  */
 router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const {
-      page = 1,
-      page_size = 20,
-      user_type,
-      is_active,
-      user_id,
-      sort_by = 'last_activity',
-      sort_order = 'desc'
-    } = req.query
-    // 参数校验
-    const pageNum = Math.max(1, parseInt(page, 10) || 1)
-    const pageSizeNum = Math.min(100, Math.max(1, parseInt(page_size, 10) || 20))
-    // 构建查询条件
-    const whereCondition = {}
-    if (user_type && ['user', 'admin'].includes(user_type)) {
-      whereCondition.user_type = user_type
-    }
-    if (is_active !== undefined && is_active !== '') {
-      whereCondition.is_active = is_active === 'true'
-    }
-    if (user_id) {
-      const userIdNum = parseInt(user_id, 10)
-      if (!isNaN(userIdNum) && userIdNum > 0) {
-        whereCondition.user_id = userIdNum
-      }
-    }
-    // 排序配置
-    const allowedSortFields = ['last_activity', 'created_at', 'expires_at']
-    const sortField = allowedSortFields.includes(sort_by) ? sort_by : 'last_activity'
-    const sortDirection = sort_order === 'asc' ? 'ASC' : 'DESC'
-    // 查询会话（不使用include避免模型scope问题）
-    const { count, rows: sessions } = await AuthenticationSession.findAndCountAll({
-      where: whereCondition,
-      order: [[sortField, sortDirection]],
-      limit: pageSizeNum,
-      offset: (pageNum - 1) * pageSizeNum
-    })
-    // 批量查询关联的用户信息（避免N+1查询）
-    const userIds = [...new Set(sessions.map(s => s.user_id).filter(Boolean))]
-    const users =
-      userIds.length > 0
-        ? await User.findAll({
-            where: { user_id: userIds },
-            attributes: ['user_id', 'nickname', 'mobile', 'status']
-          })
-        : []
-    const userMap = new Map(users.map(u => [u.user_id, u]))
-    // 格式化返回数据
-    const formattedSessions = sessions.map(session => {
-      const userInfo = userMap.get(session.user_id)
-      return {
-        user_session_id: session.user_session_id,
-        session_token: `${session.session_token.substring(0, 8)}...`, // 脱敏显示
-        user_type: session.user_type,
-        user_id: session.user_id,
-        user_info: userInfo
-          ? {
-              nickname: userInfo.nickname,
-              mobile: userInfo.mobile
-                ? `${userInfo.mobile.substring(0, 3)}****${userInfo.mobile.substring(7)}`
-                : null,
-              status: userInfo.status
-            }
-          : null,
-        login_ip: session.login_ip,
-        is_active: session.is_active,
-        is_expired: session.isExpired(),
-        is_valid: session.isValid(),
-        last_activity: BeijingTimeHelper.formatToISO(session.last_activity),
-        expires_at: BeijingTimeHelper.formatToISO(session.expires_at),
-        created_at: BeijingTimeHelper.formatToISO(session.created_at)
-      }
-    })
-    return res.apiSuccess(
-      {
-        sessions: formattedSessions,
-        pagination: {
-          page: pageNum,
-          page_size: pageSizeNum,
-          total: count,
-          total_pages: Math.ceil(count / pageSizeNum)
-        }
-      },
-      '获取会话列表成功'
-    )
+    // 通过 ServiceManager 获取查询服务
+    const SessionQueryService = req.app.locals.services.getService('console_session_query')
+
+    const result = await SessionQueryService.getSessions(req.query)
+
+    return res.apiSuccess(result, '获取会话列表成功')
   } catch (error) {
     logger.error(`❌ [Sessions] 获取会话列表失败: ${error.message}`)
     return res.apiError('获取会话列表失败', 'SESSION_LIST_FAILED', { error: error.message }, 500)
   }
 })
+
 /**
  * GET /api/v4/console/sessions/stats - 会话统计
  *
@@ -140,49 +64,17 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  */
 router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    // 获取活跃会话统计（按用户类型分组）
-    const activeStats = await AuthenticationSession.getActiveSessionStats()
-    // 计算总活跃会话数
-    const totalActiveSessions = Object.values(activeStats).reduce(
-      (sum, stat) => sum + stat.active_sessions,
-      0
-    )
-    // 获取待清理的过期会话数
-    const expiredPendingCleanup = await AuthenticationSession.count({
-      where: {
-        expires_at: {
-          [Op.lt]: BeijingTimeHelper.createBeijingTime()
-        }
-      }
-    })
-    // 获取今日新建会话数
-    const todayStart = BeijingTimeHelper.createBeijingTime()
-    todayStart.setHours(0, 0, 0, 0)
-    const todayNewSessions = await AuthenticationSession.count({
-      where: {
-        created_at: {
-          [Op.gte]: todayStart
-        }
-      }
-    })
-    return res.apiSuccess(
-      {
-        total_active_sessions: totalActiveSessions,
-        by_user_type: {
-          user: activeStats.user || { active_sessions: 0, unique_users: 0 },
-          admin: activeStats.admin || { active_sessions: 0, unique_users: 0 }
-        },
-        expired_pending_cleanup: expiredPendingCleanup,
-        today_new_sessions: todayNewSessions,
-        timestamp: BeijingTimeHelper.apiTimestamp()
-      },
-      '获取会话统计成功'
-    )
+    const SessionQueryService = req.app.locals.services.getService('console_session_query')
+
+    const result = await SessionQueryService.getSessionStats()
+
+    return res.apiSuccess(result, '获取会话统计成功')
   } catch (error) {
     logger.error(`❌ [Sessions] 获取会话统计失败: ${error.message}`)
     return res.apiError('获取会话统计失败', 'SESSION_STATS_FAILED', { error: error.message }, 500)
   }
 })
+
 /**
  * GET /api/v4/console/sessions/online-users - 在线用户列表
  *
@@ -190,80 +82,11 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
  */
 router.get('/online-users', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const now = BeijingTimeHelper.createBeijingTime()
-    /*
-     * 查询所有活跃且未过期的会话，按用户分组
-     * 查询活跃会话（不使用include避免模型scope问题）
-     */
-    const activeSessions = await AuthenticationSession.findAll({
-      where: {
-        is_active: true,
-        expires_at: {
-          [Op.gt]: now
-        }
-      },
-      order: [['last_activity', 'DESC']]
-    })
+    const SessionQueryService = req.app.locals.services.getService('console_session_query')
 
-    // 批量查询关联用户信息
-    const userIds = [...new Set(activeSessions.map(s => s.user_id).filter(Boolean))]
-    const users =
-      userIds.length > 0
-        ? await User.findAll({
-            where: { user_id: userIds },
-            attributes: ['user_id', 'nickname', 'mobile', 'status']
-          })
-        : []
-    const userMap = new Map(users.map(u => [u.user_id, u]))
+    const result = await SessionQueryService.getOnlineUsers()
 
-    // 按用户聚合
-    const userSessionMap = new Map()
-    for (const session of activeSessions) {
-      const userId = session.user_id
-      const userType = session.user_type
-      const userInfo = userMap.get(userId)
-      if (!userSessionMap.has(userId)) {
-        userSessionMap.set(userId, {
-          user_id: userId,
-          user_type: userType,
-          nickname: userInfo?.nickname || null,
-          mobile: userInfo?.mobile
-            ? `${userInfo.mobile.substring(0, 3)}****${userInfo.mobile.substring(7)}`
-            : null,
-          status: userInfo?.status || null,
-          active_sessions: 0,
-          last_activity: session.last_activity,
-          login_ips: new Set()
-        })
-      }
-      const userData = userSessionMap.get(userId)
-      userData.active_sessions++
-      if (session.login_ip) {
-        userData.login_ips.add(session.login_ip)
-      }
-      // 保留最近的活动时间
-      if (session.last_activity > userData.last_activity) {
-        userData.last_activity = session.last_activity
-      }
-    }
-    // 格式化返回数据
-    const onlineUsers = Array.from(userSessionMap.values()).map(user => ({
-      user_id: user.user_id,
-      user_type: user.user_type,
-      nickname: user.nickname,
-      mobile: user.mobile,
-      status: user.status,
-      active_sessions: user.active_sessions,
-      last_activity: BeijingTimeHelper.formatToISO(user.last_activity),
-      login_ips: Array.from(user.login_ips)
-    }))
-    return res.apiSuccess(
-      {
-        online_users: onlineUsers,
-        total_online: onlineUsers.length
-      },
-      '获取在线用户列表成功'
-    )
+    return res.apiSuccess(result, '获取在线用户列表成功')
   } catch (error) {
     logger.error(`❌ [Sessions] 获取在线用户列表失败: ${error.message}`)
     return res.apiError(
@@ -274,6 +97,7 @@ router.get('/online-users', authenticateToken, requireRoleLevel(100), async (req
     )
   }
 })
+
 /**
  * GET /api/v4/console/sessions/:id - 会话详情
  *
@@ -287,55 +111,21 @@ router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) =>
       return res.apiError('无效的会话ID', 'INVALID_SESSION_ID', null, 400)
     }
 
-    // 查询会话（不使用include避免模型scope问题）
-    const session = await AuthenticationSession.findOne({
-      where: { user_session_id: sessionId }
-    })
+    const SessionQueryService = req.app.locals.services.getService('console_session_query')
+
+    const session = await SessionQueryService.getSessionById(sessionId)
 
     if (!session) {
       return res.apiError('会话不存在', 'SESSION_NOT_FOUND', null, 404)
     }
 
-    // 单独查询用户信息
-    const userInfo = await User.findOne({
-      where: { user_id: session.user_id },
-      attributes: ['user_id', 'nickname', 'mobile', 'status', 'created_at', 'last_login']
-    })
-
-    return res.apiSuccess(
-      {
-        user_session_id: session.user_session_id,
-        session_token: `${session.session_token.substring(0, 8)}...`, // 脱敏显示
-        user_type: session.user_type,
-        user_id: session.user_id,
-        user_info: userInfo
-          ? {
-              user_id: userInfo.user_id,
-              nickname: userInfo.nickname,
-              mobile: userInfo.mobile
-                ? `${userInfo.mobile.substring(0, 3)}****${userInfo.mobile.substring(7)}`
-                : null,
-              status: userInfo.status,
-              created_at: BeijingTimeHelper.formatToISO(userInfo.created_at),
-              last_login: BeijingTimeHelper.formatToISO(userInfo.last_login)
-            }
-          : null,
-        login_ip: session.login_ip,
-        is_active: session.is_active,
-        is_expired: session.isExpired(),
-        is_valid: session.isValid(),
-        last_activity: BeijingTimeHelper.formatToISO(session.last_activity),
-        expires_at: BeijingTimeHelper.formatToISO(session.expires_at),
-        created_at: BeijingTimeHelper.formatToISO(session.created_at),
-        updated_at: BeijingTimeHelper.formatToISO(session.updated_at)
-      },
-      '获取会话详情成功'
-    )
+    return res.apiSuccess(session, '获取会话详情成功')
   } catch (error) {
     logger.error(`❌ [Sessions] 获取会话详情失败: ${error.message}`)
     return res.apiError('获取会话详情失败', 'SESSION_DETAIL_FAILED', { error: error.message }, 500)
   }
 })
+
 /**
  * POST /api/v4/console/sessions/:id/deactivate - 失效单个会话
  *
@@ -350,7 +140,10 @@ router.post('/:id/deactivate', authenticateToken, requireRoleLevel(100), async (
     if (isNaN(sessionId) || sessionId <= 0) {
       return res.apiError('无效的会话ID', 'INVALID_SESSION_ID', null, 400)
     }
-    // 通过服务层执行失效操作
+
+    // 通过 ServiceManager 获取写服务
+    const SessionManagementService = req.app.locals.services.getService('session_management')
+
     const result = await SessionManagementService.deactivateSession(sessionId, {
       operator_user_id: req.user.user_id,
       reason
@@ -375,6 +168,7 @@ router.post('/:id/deactivate', authenticateToken, requireRoleLevel(100), async (
     return res.apiError('失效会话失败', 'SESSION_DEACTIVATE_FAILED', { error: error.message }, 500)
   }
 })
+
 /**
  * POST /api/v4/console/sessions/deactivate-user - 失效用户所有会话
  *
@@ -386,6 +180,7 @@ router.post('/:id/deactivate', authenticateToken, requireRoleLevel(100), async (
 router.post('/deactivate-user', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { user_type, user_id, reason } = req.body
+
     // 参数校验
     if (!user_type || !['user', 'admin'].includes(user_type)) {
       return res.apiError('无效的用户类型', 'INVALID_USER_TYPE', null, 400)
@@ -394,7 +189,10 @@ router.post('/deactivate-user', authenticateToken, requireRoleLevel(100), async 
     if (isNaN(userIdNum) || userIdNum <= 0) {
       return res.apiError('无效的用户ID', 'INVALID_USER_ID', null, 400)
     }
-    // 通过服务层执行批量失效操作
+
+    // 通过 ServiceManager 获取写服务
+    const SessionManagementService = req.app.locals.services.getService('session_management')
+
     const result = await SessionManagementService.deactivateUserSessions(
       { user_type, user_id: userIdNum },
       {
@@ -427,6 +225,7 @@ router.post('/deactivate-user', authenticateToken, requireRoleLevel(100), async 
     )
   }
 })
+
 /**
  * POST /api/v4/console/sessions/cleanup - 清理过期会话
  *
@@ -434,7 +233,9 @@ router.post('/deactivate-user', authenticateToken, requireRoleLevel(100), async 
  */
 router.post('/cleanup', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    // 通过服务层执行清理操作
+    // 通过 ServiceManager 获取写服务
+    const SessionManagementService = req.app.locals.services.getService('session_management')
+
     const result = await SessionManagementService.cleanupExpiredSessions({
       operator_user_id: req.user.user_id
     })
@@ -452,4 +253,5 @@ router.post('/cleanup', authenticateToken, requireRoleLevel(100), async (req, re
     return res.apiError('清理过期会话失败', 'CLEANUP_FAILED', { error: error.message }, 500)
   }
 })
+
 module.exports = router

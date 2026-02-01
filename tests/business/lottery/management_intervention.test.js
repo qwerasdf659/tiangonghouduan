@@ -116,7 +116,9 @@ describe('抽奖管理干预测试 - P1优先级', () => {
     // 清理测试创建的管理设置
     if (test_setting_id) {
       try {
-        await LotteryManagementSetting.destroy({ where: { setting_id: test_setting_id } })
+        await LotteryManagementSetting.destroy({
+          where: { lottery_management_setting_id: test_setting_id }
+        })
         console.log(`🧹 清理测试管理设置: ${test_setting_id}`)
       } catch (error) {
         console.warn('清理测试管理设置失败:', error.message)
@@ -152,15 +154,15 @@ describe('抽奖管理干预测试 - P1优先级', () => {
       }
 
       const new_setting = await LotteryManagementSetting.create(setting_data)
-      test_setting_id = new_setting.setting_id // 保存以便清理
+      test_setting_id = new_setting.lottery_management_setting_id // 保存以便清理
 
-      expect(new_setting.setting_id).toBeDefined()
+      expect(new_setting.lottery_management_setting_id).toBeDefined()
       expect(new_setting.user_id).toBe(admin_user_id)
       expect(new_setting.setting_type).toBe('force_win')
       expect(new_setting.status).toBe('active')
       expect(new_setting.isActive()).toBe(true)
 
-      console.log(`✅ 创建强制中奖设置成功: ${new_setting.setting_id}`)
+      console.log(`✅ 创建强制中奖设置成功: ${new_setting.lottery_management_setting_id}`)
     })
 
     test('1.2 应该能够查询用户的有效管理设置', async () => {

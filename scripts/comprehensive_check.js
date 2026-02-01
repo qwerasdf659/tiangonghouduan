@@ -124,21 +124,21 @@ function checkBackendAPICompleteness() {
   const routesDir = path.join(__dirname, '../routes')
   const issues = []
 
-  // 检查必需的API端点
+  // 检查必需的API端点（V4.7.0 路由结构更新 - 2026-02-02）
   const requiredAPIs = [
-    { path: 'v4/unified-engine/auth.js', endpoint: 'POST /login', description: '用户登录' },
-    { path: 'v4/unified-engine/auth.js', endpoint: 'POST /logout', description: '用户登出' },
+    { path: 'v4/auth/login.js', endpoint: 'POST /login', description: '用户登录' },
+    { path: 'v4/auth/token.js', endpoint: 'POST /refresh', description: 'Token刷新' },
     {
-      path: 'v4/unified-engine/lottery-preset.js',
-      endpoint: 'GET /list',
-      description: '获取预设列表'
-    },
-    {
-      path: 'v4/unified-engine/lottery-preset.js',
+      path: 'v4/lottery/lottery-preset.js',
       endpoint: 'POST /create',
       description: '创建预设'
     },
-    { path: 'v4/unified-engine/admin.js', endpoint: 'GET /dashboard', description: '管理员仪表板' }
+    {
+      path: 'v4/lottery/lottery-preset.js',
+      endpoint: 'GET /list',
+      description: '获取预设列表'
+    },
+    { path: 'v4/console/dashboard.js', endpoint: 'GET /pending-summary', description: '管理员待处理摘要' }
   ]
 
   requiredAPIs.forEach(api => {

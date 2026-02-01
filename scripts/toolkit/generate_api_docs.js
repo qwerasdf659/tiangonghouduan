@@ -103,15 +103,15 @@ function parseRouteFile(filePath, routePrefix = '') {
  * 扫描routes目录下的所有路由文件
  */
 function scanRoutes(baseDir) {
-  // V4统一引擎路由
+  // V4统一引擎路由（V4.7.0 路由结构更新 - 2026-02-02）
   const v4Routes = [
-    { file: 'routes/v4/unified-engine/auth.js', prefix: '/api/v4/auth' },
-    { file: 'routes/v4/unified-engine/lottery.js', prefix: '/api/v4/lottery' },
-    { file: 'routes/v4/unified-engine/points.js', prefix: '/api/v4/points' },
-    { file: 'routes/v4/unified-engine/consumption.js', prefix: '/api/v4/consumption' },
-    { file: 'routes/v4/unified-engine/admin.js', prefix: '/api/v4/console' },
-    { file: 'routes/v4/system.js', prefix: '/api/v4/system' },
-    { file: 'routes/v4/permissions.js', prefix: '/api/v4/permissions' }
+    { file: 'routes/v4/auth/login.js', prefix: '/api/v4/auth' },
+    { file: 'routes/v4/lottery/draw.js', prefix: '/api/v4/lottery' },
+    { file: 'routes/v4/assets/balance.js', prefix: '/api/v4/assets' },
+    { file: 'routes/v4/shop/consumption/submit.js', prefix: '/api/v4/shop/consumption' },
+    { file: 'routes/v4/console/dashboard.js', prefix: '/api/v4/console' },
+    { file: 'routes/v4/system/status.js', prefix: '/api/v4/system' },
+    { file: 'routes/v4/auth/permissions.js', prefix: '/api/v4/permissions' }
   ]
 
   v4Routes.forEach(({ file, prefix }) => {

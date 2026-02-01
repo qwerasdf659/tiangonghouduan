@@ -41,8 +41,12 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
-const { BatchOperationLog } = require('../../../models')
-const { sequelize } = require('../../../models')
+const TransactionManager = require('../../../utils/TransactionManager')
+
+/*
+ * Phase 3 收口：通过 ServiceManager 获取 models，避免直连 models
+ * sequelize 和 BatchOperationLog 在各路由中通过 req.app.locals.models 获取
+ */
 
 // ==================== 辅助函数 ====================
 
@@ -135,6 +139,8 @@ function getActivityService(req) {
  */
 router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const operator_id = req.user.user_id
+  // 通过 ServiceManager 获取 models（Phase 3 收口）
+  const { BatchOperationLog } = req.app.locals.models
   const operation_type = BatchOperationLog.OPERATION_TYPES.QUOTA_GRANT_BATCH
 
   try {
@@ -212,20 +218,22 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
     const LotteryQuotaService = getLotteryQuotaService(req)
 
     for (const user_id of user_ids) {
-      const transaction = await sequelize.transaction()
       try {
-        // 调用单用户赠送接口
-        const result = await LotteryQuotaService.addBonusDrawCount(
-          {
-            user_id: parseInt(user_id),
-            lottery_campaign_id: parseInt(lottery_campaign_id),
-            bonus_count: parseInt(bonus_count),
-            reason: `[批量赠送] ${reason.trim()}`
+        // 使用 TransactionManager 管理单个子操作的事务边界
+        const result = await TransactionManager.execute(
+          async transaction => {
+            return LotteryQuotaService.addBonusDrawCount(
+              {
+                user_id: parseInt(user_id),
+                lottery_campaign_id: parseInt(lottery_campaign_id),
+                bonus_count: parseInt(bonus_count),
+                reason: `[批量赠送] ${reason.trim()}`
+              },
+              { transaction, admin_id: operator_id }
+            )
           },
-          { transaction, admin_id: operator_id }
+          { description: `批量赠送-用户${user_id}` }
         )
-
-        await transaction.commit()
 
         successItems.push({
           user_id: parseInt(user_id),
@@ -233,8 +241,6 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
           message: '赠送成功'
         })
       } catch (error) {
-        await transaction.rollback()
-
         failedItems.push({
           user_id: parseInt(user_id),
           error_code: error.code || 'GRANT_FAILED',
@@ -320,6 +326,8 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
  */
 router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const operator_id = req.user.user_id
+  // 通过 ServiceManager 获取 models（Phase 3 收口）
+  const { BatchOperationLog } = req.app.locals.models
   const operation_type = BatchOperationLog.OPERATION_TYPES.CAMPAIGN_STATUS_BATCH
 
   try {
@@ -387,15 +395,22 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
     const ActivityService = getActivityService(req)
 
     for (const lottery_campaign_id of lottery_campaign_ids) {
-      const transaction = await sequelize.transaction()
       try {
-        await ActivityService.updateCampaignStatus(parseInt(lottery_campaign_id), target_status, {
-          reason: `[批量切换] ${reason.trim()}`,
-          operator_id,
-          transaction
-        })
-
-        await transaction.commit()
+        // 使用 TransactionManager 管理单个子操作的事务边界
+        await TransactionManager.execute(
+          async transaction => {
+            await ActivityService.updateCampaignStatus(
+              parseInt(lottery_campaign_id),
+              target_status,
+              {
+                reason: `[批量切换] ${reason.trim()}`,
+                operator_id,
+                transaction
+              }
+            )
+          },
+          { description: `批量切换状态-活动${lottery_campaign_id}` }
+        )
 
         successItems.push({
           lottery_campaign_id: parseInt(lottery_campaign_id),
@@ -403,8 +418,6 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
           message: '状态切换成功'
         })
       } catch (error) {
-        await transaction.rollback()
-
         failedItems.push({
           lottery_campaign_id: parseInt(lottery_campaign_id),
           error_code: error.code || 'STATUS_CHANGE_FAILED',
@@ -498,6 +511,8 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
  */
 router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const operator_id = req.user.user_id
+  // 通过 ServiceManager 获取 models（Phase 3 收口）
+  const { BatchOperationLog } = req.app.locals.models
   const operation_type = BatchOperationLog.OPERATION_TYPES.PRESET_BATCH
 
   try {
@@ -569,22 +584,25 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
 
     for (let i = 0; i < rules.length; i++) {
       const rule = rules[i]
-      const transaction = await sequelize.transaction()
       try {
-        const preset = await LotteryPresetService.createPreset(
-          {
-            user_id: parseInt(rule.user_id),
-            lottery_campaign_id: parseInt(rule.lottery_campaign_id),
-            lottery_prize_id: parseInt(rule.lottery_prize_id),
-            trigger_type: rule.trigger_type || 'first_draw',
-            trigger_value: rule.trigger_value || 1,
-            reason: `[批量设置] ${reason.trim()}`,
-            created_by: operator_id
+        // 使用 TransactionManager 管理单个子操作的事务边界
+        const preset = await TransactionManager.execute(
+          async transaction => {
+            return LotteryPresetService.createPreset(
+              {
+                user_id: parseInt(rule.user_id),
+                lottery_campaign_id: parseInt(rule.lottery_campaign_id),
+                lottery_prize_id: parseInt(rule.lottery_prize_id),
+                trigger_type: rule.trigger_type || 'first_draw',
+                trigger_value: rule.trigger_value || 1,
+                reason: `[批量设置] ${reason.trim()}`,
+                created_by: operator_id
+              },
+              { transaction }
+            )
           },
-          { transaction }
+          { description: `批量设置规则-用户${rule.user_id}` }
         )
-
-        await transaction.commit()
 
         successItems.push({
           index: i,
@@ -594,8 +612,6 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
           message: '规则创建成功'
         })
       } catch (error) {
-        await transaction.rollback()
-
         failedItems.push({
           index: i,
           user_id: rule.user_id,
@@ -678,6 +694,8 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
  */
 router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const operator_id = req.user.user_id
+  // 通过 ServiceManager 获取 models（Phase 3 收口）
+  const { BatchOperationLog } = req.app.locals.models
   const operation_type = BatchOperationLog.OPERATION_TYPES.REDEMPTION_VERIFY_BATCH
 
   try {
@@ -735,15 +753,18 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
     const RedemptionService = getRedemptionService(req)
 
     for (const order_id of order_ids) {
-      const transaction = await sequelize.transaction()
       try {
-        await RedemptionService.verifyOrder(parseInt(order_id), {
-          verifier_id: operator_id,
-          verify_reason: `[批量核销] ${reason.trim()}`,
-          transaction
-        })
-
-        await transaction.commit()
+        // 使用 TransactionManager 管理单个子操作的事务边界
+        await TransactionManager.execute(
+          async transaction => {
+            await RedemptionService.verifyOrder(parseInt(order_id), {
+              verifier_id: operator_id,
+              verify_reason: `[批量核销] ${reason.trim()}`,
+              transaction
+            })
+          },
+          { description: `批量核销-订单${order_id}` }
+        )
 
         successItems.push({
           order_id: parseInt(order_id),
@@ -751,8 +772,6 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
           message: '核销成功'
         })
       } catch (error) {
-        await transaction.rollback()
-
         failedItems.push({
           order_id: parseInt(order_id),
           error_code: error.code || 'VERIFY_FAILED',
@@ -842,6 +861,8 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
  */
 router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const operator_id = req.user.user_id
+  // 通过 ServiceManager 获取 models（Phase 3 收口）
+  const { BatchOperationLog } = req.app.locals.models
   const operation_type = BatchOperationLog.OPERATION_TYPES.BUDGET_ADJUST_BATCH
 
   try {
@@ -922,20 +943,23 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
 
     for (let i = 0; i < adjustments.length; i++) {
       const adj = adjustments[i]
-      const transaction = await sequelize.transaction()
       try {
-        const result = await ActivityService.adjustCampaignBudget(
-          parseInt(adj.lottery_campaign_id),
-          adj.adjustment_type,
-          parseFloat(adj.amount),
-          {
-            reason: `[批量调整] ${reason.trim()}`,
-            operator_id,
-            transaction
-          }
+        // 使用 TransactionManager 管理单个子操作的事务边界
+        const result = await TransactionManager.execute(
+          async transaction => {
+            return ActivityService.adjustCampaignBudget(
+              parseInt(adj.lottery_campaign_id),
+              adj.adjustment_type,
+              parseFloat(adj.amount),
+              {
+                reason: `[批量调整] ${reason.trim()}`,
+                operator_id,
+                transaction
+              }
+            )
+          },
+          { description: `批量预算调整-活动${adj.lottery_campaign_id}` }
         )
-
-        await transaction.commit()
 
         successItems.push({
           index: i,
@@ -946,8 +970,6 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
           message: '预算调整成功'
         })
       } catch (error) {
-        await transaction.rollback()
-
         failedItems.push({
           index: i,
           lottery_campaign_id: adj.lottery_campaign_id,
@@ -1091,6 +1113,8 @@ router.get('/logs/:id', authenticateToken, requireRoleLevel(100), async (req, re
  */
 router.get('/config', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
+    // 通过 ServiceManager 获取 models（Phase 3 收口）
+    const { BatchOperationLog } = req.app.locals.models
     const configs = await getSystemConfigService(req).getAllBatchConfigs()
 
     return res.apiSuccess(

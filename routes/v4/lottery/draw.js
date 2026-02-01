@@ -169,13 +169,14 @@ router.post(
        *    - 事务内包含：积分扣除、奖品发放、保底计数、抽奖记录创建
        */
 
-      // ✅ 通过Service获取并验证活动（不再直连models）
-      const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
-      const campaign = await lottery_engine.getCampaignByCode(campaign_code, {
+      // ✅ 通过 LotteryQueryService 获取并验证活动（读写分离架构）
+      const LotteryQueryService = req.app.locals.services.getService('lottery_query')
+      const campaign = await LotteryQueryService.getCampaignByCode(campaign_code, {
         checkStatus: true // 只获取active状态的活动
       })
 
       // 使用 TransactionManager 统一管理事务边界
+      const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
       const drawResult = await TransactionManager.execute(
         async transaction => {
           // 传递幂等键和事务到抽奖引擎

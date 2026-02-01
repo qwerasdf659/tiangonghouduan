@@ -50,7 +50,7 @@ class ValidatorChecker {
   scanImplementedValidators() {
     console.log('\n🔍 扫描已实现的验证器...\n')
 
-    const middlewareFile = 'routes/v4/unified-engine/admin/shared/middleware.js'
+    const middlewareFile = 'routes/v4/console/shared/middleware.js'
     const content = fs.readFileSync(middlewareFile, 'utf8')
 
     // 匹配 validateXxx: function 或 validateXxx: () =>
@@ -87,7 +87,7 @@ class ValidatorChecker {
       })
 
       console.log('\n💡 解决方案:')
-      console.log('   1. 在 routes/v4/unified-engine/admin/shared/middleware.js 中添加')
+      console.log('   1. 在 routes/v4/console/shared/middleware.js 中添加')
       console.log('   2. 参考 validateUserId 的实现方式')
       console.log('   3. 添加完整的JSDoc注释\n')
 

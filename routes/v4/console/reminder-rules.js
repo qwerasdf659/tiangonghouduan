@@ -430,22 +430,17 @@ router.get('/history/stats', authenticateToken, requireRoleLevel(100), async (re
  */
 router.get('/history/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const models = require('../../../models')
+    // 通过 ServiceManager 获取查询服务（Phase 3 收口）
+    const BusinessRecordQueryService = req.app.locals.services.getService(
+      'console_business_record_query'
+    )
     const historyId = parseInt(req.params.id, 10)
 
     if (!historyId || isNaN(historyId)) {
       return res.apiError('无效的历史记录ID', 'INVALID_HISTORY_ID', null, 400)
     }
 
-    const history = await models.ReminderHistory.findByPk(historyId, {
-      include: [
-        {
-          model: models.ReminderRule,
-          as: 'rule',
-          attributes: ['reminder_rule_id', 'rule_code', 'rule_name', 'rule_type']
-        }
-      ]
-    })
+    const history = await BusinessRecordQueryService.getReminderHistoryById(historyId)
 
     if (!history) {
       return res.apiError('提醒历史记录不存在', 'HISTORY_NOT_FOUND', null, 404)

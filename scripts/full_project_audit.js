@@ -254,7 +254,7 @@ class ProjectAuditor {
     })
 
     // 检查已实现的验证器
-    const middlewareFile = 'routes/v4/unified-engine/admin/shared/middleware.js'
+    const middlewareFile = 'routes/v4/console/shared/middleware.js'
     if (!fs.existsSync(middlewareFile)) {
       console.log('⚠️ 验证器文件不存在\n')
       return []

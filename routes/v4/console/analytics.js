@@ -29,11 +29,11 @@ router.get(
     try {
       const { days = 7, user_filter } = req.query
 
-      // 获取统一报表服务（P2-C架构重构：合并AdminAnalyticsService、StatisticsService、UserDashboardService）
-      const ReportingService = req.app.locals.services.getService('reporting_analytics')
+      // 获取分析服务（V4.7.0 服务拆分：getDecisionAnalytics 在 AnalyticsService 中）
+      const AnalyticsService = req.app.locals.services.getService('reporting_analytics')
 
       // 调用服务层方法获取决策分析数据
-      const analyticsData = await ReportingService.getDecisionAnalytics(
+      const analyticsData = await AnalyticsService.getDecisionAnalytics(
         parseInt(days),
         user_filter ? parseInt(user_filter) : null,
         sharedComponents.performanceMonitor
@@ -67,11 +67,11 @@ router.get(
     try {
       const { period = 'week', granularity = 'daily' } = req.query
 
-      // 获取统一报表服务
-      const ReportingService = req.app.locals.services.getService('reporting_analytics')
+      // 获取分析服务（V4.7.0 服务拆分：getLotteryTrends 在 AnalyticsService 中）
+      const AnalyticsService = req.app.locals.services.getService('reporting_analytics')
 
       // 调用服务层方法获取趋势分析数据
-      const trendsData = await ReportingService.getLotteryTrends(period, granularity)
+      const trendsData = await AnalyticsService.getLotteryTrends(period, granularity)
 
       return res.apiSuccess(trendsData, '趋势分析数据获取成功')
     } catch (error) {
@@ -93,11 +93,11 @@ router.get(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      // 获取统一报表服务
-      const ReportingService = req.app.locals.services.getService('reporting_analytics')
+      // 获取统计服务（V4.7.0 服务拆分：getPerformanceReport 在 StatsService 中）
+      const StatsService = req.app.locals.services.getService('reporting_stats')
 
       // 调用服务层方法获取性能报告
-      const performanceReport = await ReportingService.getPerformanceReport(
+      const performanceReport = await StatsService.getPerformanceReport(
         sharedComponents.performanceMonitor,
         sharedComponents.lotteryEngine
       )

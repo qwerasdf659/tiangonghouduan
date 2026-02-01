@@ -194,52 +194,18 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
  */
 router.get('/stats/by-operator', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { AdminOperationLog, User } = require('../../../models')
-    const { Op } = require('sequelize')
-    const sequelize = require('../../../models').sequelize
+    // 通过 ServiceManager 获取查询服务（Phase 3 收口）
+    const BusinessRecordQueryService = req.app.locals.services.getService(
+      'console_business_record_query'
+    )
 
     const { start_time, end_time, limit } = req.query
 
-    const where = {}
-    if (start_time || end_time) {
-      where.created_at = {}
-      if (start_time) {
-        where.created_at[Op.gte] = new Date(start_time)
-      }
-      if (end_time) {
-        where.created_at[Op.lte] = new Date(end_time)
-      }
-    }
-
-    const stats = await AdminOperationLog.findAll({
-      where,
-      attributes: [
-        'operator_id',
-        [sequelize.fn('COUNT', sequelize.col('log_id')), 'total_operations'],
-        [
-          sequelize.fn('COUNT', sequelize.fn('DISTINCT', sequelize.col('operation_type'))),
-          'operation_types'
-        ]
-      ],
-      include: [
-        {
-          model: User,
-          as: 'operator',
-          attributes: ['nickname']
-        }
-      ],
-      group: ['operator_id', 'operator.user_id', 'operator.nickname'],
-      order: [[sequelize.fn('COUNT', sequelize.col('log_id')), 'DESC']],
-      limit: parseInt(limit, 10) || 10,
-      raw: false
+    const result = await BusinessRecordQueryService.getAuditStatsByOperator({
+      start_time,
+      end_time,
+      limit: limit ? parseInt(limit, 10) : 10
     })
-
-    const result = stats.map(item => ({
-      operator_id: item.operator_id,
-      nickname: item.operator?.nickname || 'Unknown',
-      total_operations: parseInt(item.dataValues.total_operations, 10),
-      operation_types: parseInt(item.dataValues.operation_types, 10)
-    }))
 
     return res.apiSuccess(result, '获取操作者统计成功')
   } catch (error) {
@@ -259,33 +225,16 @@ router.get('/stats/by-operator', authenticateToken, requireRoleLevel(100), async
  */
 router.get('/stats/by-risk-level', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { AdminOperationLog } = require('../../../models')
-    const { Op } = require('sequelize')
-    const sequelize = require('../../../models').sequelize
+    // 通过 ServiceManager 获取查询服务（Phase 3 收口）
+    const BusinessRecordQueryService = req.app.locals.services.getService(
+      'console_business_record_query'
+    )
 
     const { start_time, end_time } = req.query
 
-    const where = {}
-    if (start_time || end_time) {
-      where.created_at = {}
-      if (start_time) {
-        where.created_at[Op.gte] = new Date(start_time)
-      }
-      if (end_time) {
-        where.created_at[Op.lte] = new Date(end_time)
-      }
-    }
-
-    const stats = await AdminOperationLog.findAll({
-      where,
-      attributes: ['risk_level', [sequelize.fn('COUNT', sequelize.col('log_id')), 'count']],
-      group: ['risk_level'],
-      raw: true
-    })
-
-    const result = {}
-    stats.forEach(item => {
-      result[item.risk_level] = parseInt(item.count, 10)
+    const result = await BusinessRecordQueryService.getAuditStatsByRiskLevel({
+      start_time,
+      end_time
     })
 
     return res.apiSuccess(result, '获取风险等级统计成功')

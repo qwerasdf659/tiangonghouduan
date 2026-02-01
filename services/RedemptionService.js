@@ -25,10 +25,10 @@
  * 4. 过期清理（expireOrders）：
  *    - 批量更新过期订单（status = expired）
  *
- * 事务边界治理（2026-01-05 决策）：
- * - 所有写操作 **强制要求** 外部事务传入（options.transaction）
- * - 未提供事务时直接报错（使用 assertAndGetTransaction）
- * - 服务层禁止自建事务，由入口层统一使用 TransactionManager.execute()
+ * 事务边界治理（2026-02-02 更新）：
+ * - 采用"外部传入事务"模式：路由层通过 TransactionManager.execute() 创建事务
+ * - 所有写操作方法强制要求 options.transaction 参数
+ * - Service 层通过 assertAndGetTransaction() 验证事务存在性
  *
  * 创建时间：2025-12-17
  * 最后更新：2026年01月05日（事务边界治理改造）

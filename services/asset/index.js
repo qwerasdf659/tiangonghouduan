@@ -44,9 +44,11 @@
 const BalanceService = require('./BalanceService')
 const ItemService = require('./ItemService')
 const QueryService = require('./QueryService')
+const PortfolioQueryService = require('./PortfolioQueryService')
 
 module.exports = {
   BalanceService,
   ItemService,
-  QueryService
+  QueryService,
+  PortfolioQueryService
 }

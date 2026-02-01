@@ -94,10 +94,10 @@ router.get('/:code/prizes', authenticateToken, dataAccessControl, async (req, re
       return res.apiError(validation.error.message, validation.error.code, { campaign_code }, 400)
     }
 
-    // 通过 Service 获取活动和奖品列表（不再直连 models）
-    const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
+    // 通过 LotteryQueryService 获取活动和奖品列表（读写分离架构）
+    const LotteryQueryService = req.app.locals.services.getService('lottery_query')
     const { campaign: _campaign, prizes: fullPrizes } =
-      await lottery_engine.getCampaignWithPrizes(campaign_code)
+      await LotteryQueryService.getCampaignWithPrizes(campaign_code)
 
     // 根据用户权限进行数据脱敏
     const sanitizedPrizes = DataSanitizer.sanitizePrizes(fullPrizes, req.dataLevel)
@@ -136,12 +136,12 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
       return res.apiError(validation.error.message, validation.error.code, { campaign_code }, 400)
     }
 
-    // 通过 Service 获取活动配置（不再直连 models）
-    const lottery_engine = req.app.locals.services.getService('unified_lottery_engine')
-    const campaign = await lottery_engine.getCampaignByCode(campaign_code)
+    // 通过 LotteryQueryService 获取活动配置（读写分离架构）
+    const LotteryQueryService = req.app.locals.services.getService('lottery_query')
+    const campaign = await LotteryQueryService.getCampaignByCode(campaign_code)
 
     // 使用 campaign.lottery_campaign_id 获取完整配置（内部仍用 ID）
-    const fullConfig = await lottery_engine.get_campaign_config(campaign.lottery_campaign_id)
+    const fullConfig = await LotteryQueryService.getCampaignConfig(campaign.lottery_campaign_id)
 
     /*
      * 使用 LotteryPricingService 统一定价服务获取定价配置

@@ -57,11 +57,11 @@ router.get('/user/statistics/:user_id', authenticateToken, dataAccessControl, as
       return res.apiError('无权限查看其他用户统计', 'FORBIDDEN', null, 403)
     }
 
-    // 🔄 通过 ServiceManager 获取 ReportingService（P2-C架构重构）
-    const ReportingService = req.app.locals.services.getService('reporting_stats')
+    // 🔄 通过 ServiceManager 获取 StatsService（V4.7.0 服务拆分）
+    const StatsService = req.app.locals.services.getService('reporting_stats')
 
-    // ✅ 使用 ReportingService 获取用户统计数据
-    const statistics = await ReportingService.getUserStatistics(user_id, hasAdminAccess)
+    // ✅ 使用 StatsService 获取用户统计数据
+    const statistics = await StatsService.getUserStatistics(user_id, hasAdminAccess)
 
     return res.apiSuccess(
       {
@@ -101,11 +101,11 @@ router.get('/admin/overview', authenticateToken, dataAccessControl, async (req, 
       return res.apiError('需要管理员权限', 'FORBIDDEN', null, 403)
     }
 
-    // 🔄 通过 ServiceManager 获取 ReportingService（P2-C架构重构）
-    const ReportingService = req.app.locals.services.getService('reporting_stats')
+    // 🔄 通过 ServiceManager 获取 StatsService（V4.7.0 服务拆分）
+    const StatsService = req.app.locals.services.getService('reporting_stats')
 
-    // ✅ 使用 ReportingService 获取系统概览
-    const overview = await ReportingService.getSystemOverview()
+    // ✅ 使用 StatsService 获取系统概览
+    const overview = await StatsService.getSystemOverview()
 
     return res.apiSuccess(
       {

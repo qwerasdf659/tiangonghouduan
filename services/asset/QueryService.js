@@ -35,7 +35,13 @@
 'use strict'
 
 const { Op } = require('sequelize')
-const { Account, AccountAssetBalance, AssetTransaction, User } = require('../../models')
+const {
+  Account,
+  AccountAssetBalance,
+  AssetTransaction,
+  User,
+  MaterialAssetType
+} = require('../../models')
 const logger = require('../../utils/logger')
 
 /**
@@ -475,12 +481,22 @@ class QueryService {
       transaction
     })
 
+    // 批量查询资产类型的 display_name（避免 N+1 查询）
+    const assetCodes = [...new Set(balances.map(b => b.asset_code))]
+    const materialTypes = await MaterialAssetType.findAll({
+      where: { asset_code: { [Op.in]: assetCodes } },
+      attributes: ['asset_code', 'display_name'],
+      transaction
+    })
+    // 构建 asset_code -> display_name 映射
+    const assetNameMap = new Map(materialTypes.map(t => [t.asset_code, t.display_name]))
+
     // 格式化返回数据
     return balances.map(balance => ({
       user_id: balance.account?.user?.user_id || balance.account?.user_id,
       nickname: balance.account?.user?.nickname || null,
       asset_code: balance.asset_code,
-      asset_name: balance.asset_code, // TODO: 可从 MaterialAssetType 获取显示名称
+      asset_name: assetNameMap.get(balance.asset_code) || balance.asset_code, // 优先使用配置表的显示名称
       available_amount: balance.available_amount,
       frozen_amount: balance.frozen_amount,
       lottery_campaign_id: balance.lottery_campaign_id,

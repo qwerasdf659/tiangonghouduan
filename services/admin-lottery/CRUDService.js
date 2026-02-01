@@ -12,11 +12,13 @@
  * 架构规范：
  * - 所有写操作通过此服务层统一处理
  * - 路由层不直接操作 LotteryCampaign 模型的写方法
- * - 遵循 "Service + options.transaction" 模式
+ * - 路由层通过 TransactionManager.execute() 管理事务边界
+ * - Service 层强制要求事务传入（模式A：外部传入事务）
  *
- * 事务边界治理（2026-01-05 决策）：
- * - 写操作强制要求外部事务传入（options.transaction）
- * - 未提供事务时直接报错，由入口层统一管理事务
+ * 事务边界治理（2026-02-02 确定）：
+ * - 采用模式A：外部传入事务（跨服务事务天然支持、事务边界清晰）
+ * - 路由层使用 TransactionManager.execute() 创建事务
+ * - Service 层通过 assertAndGetTransaction() 强制验证事务存在
  *
  * 创建时间：2026-01-31
  * 拆分自：routes/v4/console/system-data.js（路由层直接操作模型）
@@ -61,15 +63,19 @@ class LotteryCampaignCRUDService {
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @param {number} options.operator_user_id - 操作者用户ID（必填）
    * @returns {Promise<LotteryCampaign>} 创建的活动对象
-   * @throws {Error} 必填字段缺失、活动代码重复等
+   * @throws {Error} 必填字段缺失、活动代码重复、缺少事务等
    *
    * @example
-   * const campaign = await LotteryCampaignCRUDService.createCampaign(
-   *   { campaign_name: '新年活动', campaign_code: 'NY2026', campaign_type: 'normal' },
-   *   { transaction, operator_user_id: 123 }
-   * )
+   * // 路由层使用 TransactionManager.execute() 管理事务
+   * const campaign = await TransactionManager.execute(async (transaction) => {
+   *   return await LotteryCampaignCRUDService.createCampaign(
+   *     { campaign_name: '新年活动', campaign_code: 'NY2026', campaign_type: 'normal' },
+   *     { transaction, operator_user_id: 123 }
+   *   )
+   * })
    */
   static async createCampaign(campaignData, options = {}) {
+    // 强制要求事务（模式A：外部传入事务）
     const transaction = assertAndGetTransaction(
       options,
       'LotteryCampaignCRUDService.createCampaign'
@@ -167,16 +173,19 @@ class LotteryCampaignCRUDService {
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @param {number} options.operator_user_id - 操作者用户ID（必填）
    * @returns {Promise<LotteryCampaign>} 更新后的活动对象
-   * @throws {Error} 活动不存在等
+   * @throws {Error} 活动不存在、缺少事务等
    *
    * @example
-   * const campaign = await LotteryCampaignCRUDService.updateCampaign(
-   *   123,
-   *   { campaign_name: '新名称', status: 'active' },
-   *   { transaction, operator_user_id: 456 }
-   * )
+   * const campaign = await TransactionManager.execute(async (transaction) => {
+   *   return await LotteryCampaignCRUDService.updateCampaign(
+   *     123,
+   *     { campaign_name: '新名称', status: 'active' },
+   *     { transaction, operator_user_id: 456 }
+   *   )
+   * })
    */
   static async updateCampaign(lottery_campaign_id, updateData, options = {}) {
+    // 强制要求事务（模式A：外部传入事务）
     const transaction = assertAndGetTransaction(
       options,
       'LotteryCampaignCRUDService.updateCampaign'
@@ -275,16 +284,19 @@ class LotteryCampaignCRUDService {
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @param {number} options.operator_user_id - 操作者用户ID（必填）
    * @returns {Promise<LotteryCampaign>} 更新后的活动对象
-   * @throws {Error} 活动不存在、状态无效等
+   * @throws {Error} 活动不存在、状态无效、缺少事务等
    *
    * @example
-   * const campaign = await LotteryCampaignCRUDService.updateCampaignStatus(
-   *   123,
-   *   'active',
-   *   { transaction, operator_user_id: 456 }
-   * )
+   * const campaign = await TransactionManager.execute(async (transaction) => {
+   *   return await LotteryCampaignCRUDService.updateCampaignStatus(
+   *     123,
+   *     'active',
+   *     { transaction, operator_user_id: 456 }
+   *   )
+   * })
    */
   static async updateCampaignStatus(lottery_campaign_id, status, options = {}) {
+    // 强制要求事务（模式A：外部传入事务）
     const transaction = assertAndGetTransaction(
       options,
       'LotteryCampaignCRUDService.updateCampaignStatus'
@@ -359,15 +371,18 @@ class LotteryCampaignCRUDService {
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @param {number} options.operator_user_id - 操作者用户ID（必填）
    * @returns {Promise<Object>} 删除结果 { lottery_campaign_id, campaign_name, deleted: true }
-   * @throws {Error} 活动不存在、存在关联数据等
+   * @throws {Error} 活动不存在、存在关联数据、缺少事务等
    *
    * @example
-   * const result = await LotteryCampaignCRUDService.deleteCampaign(
-   *   123,
-   *   { transaction, operator_user_id: 456 }
-   * )
+   * const result = await TransactionManager.execute(async (transaction) => {
+   *   return await LotteryCampaignCRUDService.deleteCampaign(
+   *     123,
+   *     { transaction, operator_user_id: 456 }
+   *   )
+   * })
    */
   static async deleteCampaign(lottery_campaign_id, options = {}) {
+    // 强制要求事务（模式A：外部传入事务）
     const transaction = assertAndGetTransaction(
       options,
       'LotteryCampaignCRUDService.deleteCampaign'

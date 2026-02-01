@@ -236,7 +236,7 @@ class PresetBudgetDebt extends Model {
 
     const result = await this.findOne({
       attributes: [
-        [fn('COUNT', col('debt_id')), 'total_debts'],
+        [fn('COUNT', col('preset_budget_debt_id')), 'total_debts'],
         [fn('SUM', col('debt_amount')), 'total_debt_amount'],
         [fn('SUM', col('cleared_amount')), 'total_cleared_amount']
       ],
@@ -269,7 +269,7 @@ class PresetBudgetDebt extends Model {
 
     const result = await this.findOne({
       attributes: [
-        [fn('COUNT', col('debt_id')), 'total_debts'],
+        [fn('COUNT', col('preset_budget_debt_id')), 'total_debts'],
         [fn('SUM', col('debt_amount')), 'total_debt_amount'],
         [fn('SUM', col('cleared_amount')), 'total_cleared_amount']
       ],
@@ -338,7 +338,7 @@ class PresetBudgetDebt extends Model {
         'debt_source',
         [fn('SUM', col('debt_amount')), 'total_debt'],
         [fn('SUM', col('cleared_amount')), 'total_cleared'],
-        [fn('COUNT', col('debt_id')), 'debt_count']
+        [fn('COUNT', col('preset_budget_debt_id')), 'debt_count']
       ],
       where: {
         lottery_campaign_id: campaignId,

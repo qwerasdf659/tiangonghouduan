@@ -35,7 +35,8 @@ const UserSegmentService = require('../../../services/user/UserSegmentService')
  * @returns {Object} Sequelize 模型集合
  */
 function getModels(req) {
-  return req.models || require('../../../models')
+  // Phase 3 收口：通过 ServiceManager 获取 models，避免直连
+  return req.models || req.app.locals.models
 }
 
 /**

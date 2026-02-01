@@ -183,8 +183,8 @@ router.get(
   requireMerchantPermission('consumption:scan_user', { scope: 'store', storeIdParam: 'query' }),
   async (req, res) => {
     try {
-      // 🔄 通过 ServiceManager 获取 ConsumptionService（符合TR-005规范）
-      const ConsumptionService = req.app.locals.services.getService('consumption_core')
+      // 🔄 通过 ServiceManager 获取 QueryService（V4.7.0 服务拆分：getUserInfoByQRCode 在 QueryService 中）
+      const QueryService = req.app.locals.services.getService('consumption_query')
 
       const { qr_code } = req.query
 
@@ -249,7 +249,7 @@ router.get(
       })
 
       // 调用服务层获取用户信息（服务层内部会验证v2二维码）
-      const userInfo = await ConsumptionService.getUserInfoByQRCode(qr_code)
+      const userInfo = await QueryService.getUserInfoByQRCode(qr_code)
 
       logger.info('用户信息获取成功', {
         user_id: userInfo.user_id,

@@ -290,8 +290,8 @@ describe('P3-6e: HourlyLotteryMetricsAggregation - 每小时抽奖指标聚合�
         return
       }
 
-      // 验证必要字段（字段名是 metric_id 不是 metrics_id）
-      expect(hourlyMetrics.metric_id).toBeDefined()
+      // 验证必要字段（字段名是 lottery_hourly_metric_id，符合 {table_name}_id 命名规范）
+      expect(hourlyMetrics.lottery_hourly_metric_id).toBeDefined()
       expect(hourlyMetrics.lottery_campaign_id).toBeDefined()
       expect(hourlyMetrics.hour_bucket).toBeDefined()
       expect(hourlyMetrics.total_draws).toBeDefined()

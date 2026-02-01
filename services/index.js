@@ -207,7 +207,22 @@ const DrawOrchestrator = require('./UnifiedLotteryEngine/pipeline/DrawOrchestrat
 const ManagementStrategy = require('./UnifiedLotteryEngine/strategies/ManagementStrategy')
 
 // V4 模块化服务
-const { lottery_service_container, LotteryHealthService } = require('./lottery')
+const {
+  lottery_service_container,
+  LotteryHealthService,
+  LotteryQueryService,
+  LotteryAnalyticsQueryService
+} = require('./lottery')
+
+// V4.7.0 Phase 3 复杂查询收口服务（2026-02-02 读写操作分层策略）
+const {
+  SystemDataQueryService,
+  SessionQueryService,
+  BusinessRecordQueryService,
+  DashboardQueryService
+} = require('./console')
+const { QueryService: MarketQueryService } = require('./market')
+const { PortfolioQueryService: AssetPortfolioQueryService } = require('./asset')
 
 // 数据库模型
 const models = require('../models')
@@ -505,8 +520,19 @@ class ServiceManager {
       // ========== P1 抽奖健康度服务（2026-01-31 运营优化任务） ==========
 
       this._services.set('lottery_health', new LotteryHealthService(this.models)) // 抽奖健康度计算服务（B-14，需实例化）
+      this._services.set('lottery_query', LotteryQueryService) // 抽奖查询服务（读操作收口，静态类，2026-02-01）
+      this._services.set('lottery_analytics_query', LotteryAnalyticsQueryService) // 抽奖统计分析查询服务（Phase 3 复杂查询收口，静态类）
 
       // [已移除] lottery_analytics 向后兼容代理 - 请使用 lottery_analytics_realtime/statistics/report/user/campaign
+
+      // ========== Phase 3 复杂查询收口服务（2026-02-02 读写操作分层策略） ==========
+
+      this._services.set('console_system_data_query', SystemDataQueryService) // 管理后台系统数据查询服务（静态类）
+      this._services.set('console_session_query', SessionQueryService) // 管理后台会话查询服务（静态类）
+      this._services.set('console_business_record_query', BusinessRecordQueryService) // 管理后台业务记录查询服务（静态类）
+      this._services.set('console_dashboard_query', DashboardQueryService) // 管理后台仪表盘查询服务（静态类）
+      this._services.set('market_query', MarketQueryService) // 市场热点读查询服务（静态类）
+      this._services.set('asset_portfolio_query', AssetPortfolioQueryService) // 资产组合分析查询服务（静态类）
 
       // ========== 阶段C 批量操作基础设施服务（2026-01-30） ==========
 
@@ -722,8 +748,8 @@ const serviceManager = new ServiceManager()
  *
  * 用于 app.js 中注入到 app.locals.services
  *
- * @param {Object} _models - 数据库模型（未使用，保留接口兼容）
- * @returns {Object} 服务容器
+ * @param {Object} _models - 数据库模型（通过参数传入，供路由层访问）
+ * @returns {Object} 服务容器（包含 getService/getAllServices/getHealthStatus/models）
  */
 function initializeServices(_models) {
   const container = {
@@ -734,7 +760,17 @@ function initializeServices(_models) {
     getAllServices: () => serviceManager._services,
 
     // 提供服务健康状态
-    getHealthStatus: () => serviceManager.getHealthStatus()
+    getHealthStatus: () => serviceManager.getHealthStatus(),
+
+    /**
+     * 数据库模型访问（Phase 3 收口）
+     *
+     * 业务场景：路由层需要访问特定 Model 进行读操作时使用
+     * 用法：const { AuthenticationSession, sequelize } = req.app.locals.services.models
+     *
+     * 注意：写操作仍必须通过 Service 层进行，不可直接使用 models 写入
+     */
+    models: _models || serviceManager.models
   }
 
   // 异步初始化

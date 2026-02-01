@@ -45,11 +45,11 @@ router.get('/status', optionalAuth, dataAccessControl, async (req, res) => {
      * ✅ P2-C架构重构：使用 ReportingService.getSystemStatus() 统一查询（符合TR-005规范）
      */
     if (dataLevel === 'full') {
-      // 🔄 通过 ServiceManager 获取 ReportingService
-      const ReportingService = req.app.locals.services.getService('reporting_stats')
+      // 🔄 通过 ServiceManager 获取 StatsService（V4.7.0 服务拆分）
+      const StatsService = req.app.locals.services.getService('reporting_stats')
 
       // ✅ 使用 Service 查询系统状态统计（不直接操作models）
-      const statistics = await ReportingService.getSystemOverview()
+      const statistics = await StatsService.getSystemOverview()
 
       // 添加统计数据到响应中（Add Statistics to Response）
       systemStatus.statistics = {

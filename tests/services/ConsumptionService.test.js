@@ -175,7 +175,8 @@ describe('ConsumptionService - 消费记录服务', () => {
 
       // 验证返回结果
       expect(result).toBeDefined()
-      expect(result.record || result).toHaveProperty('record_id')
+      // 主键字段是 consumption_record_id（符合 {table_name}_id 命名规范）
+      expect(result.record || result).toHaveProperty('consumption_record_id')
       expect(result.record || result).toHaveProperty('user_id', test_user.user_id)
       expect(result.record || result).toHaveProperty('status', 'pending')
       expect(result.record || result).toHaveProperty('points_to_award', 100)
@@ -461,8 +462,13 @@ describe('ConsumptionService - 消费记录服务', () => {
 
       // 验证返回相同记录
       expect(result2.is_duplicate).toBe(true)
-      // 使用 == 进行宽松比较，因为数据库返回可能是字符串
-      expect(String(result2.record.record_id)).toBe(String(record1.record_id))
+      /*
+       * 使用 == 进行宽松比较，因为数据库返回可能是字符串
+       * 主键字段是 consumption_record_id（符合 {table_name}_id 命名规范）
+       */
+      expect(String(result2.record.consumption_record_id)).toBe(
+        String(record1.consumption_record_id)
+      )
     })
   })
 

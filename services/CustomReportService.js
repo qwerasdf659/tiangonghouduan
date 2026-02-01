@@ -662,7 +662,10 @@ class CustomReportService {
     // 生成报表
     const reportData = await CustomReportService.generateReport(templateId, timeRange)
 
-    // TODO: 推送报表（通过NotificationService）
+    /*
+     * 推送逻辑由调度层 jobs/scheduled-report-push.js 的 pushReportNotification() 负责
+     * 职责分离：Service 层负责报表生成，Job 层负责调度和推送
+     */
 
     logger.info(`[自定义报表] 定时报表执行完成`, {
       report_template_id: templateId,
