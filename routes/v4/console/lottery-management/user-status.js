@@ -8,7 +8,7 @@
  * 架构规范：
  * - 路由层不直连 models（通过 Service 层）
  * - 写操作使用 TransactionManager.execute() 统一管理事务
- * - 使用 AdminLotteryService 封装所有抽奖管理逻辑
+ * - 使用 AdminLotteryCoreService (admin_lottery_core) 封装核心干预逻辑（V4.7.0 拆分后）
  *
  * 创建时间：2025-12-22
  * 更新时间：2026-01-05（事务边界治理改造）
@@ -36,11 +36,11 @@ router.get(
       // 参数验证
       const validatedUserId = validators.validateUserId(user_id)
 
-      // 通过 ServiceManager 获取 AdminLotteryService
-      const AdminLotteryService = req.app.locals.services.getService('admin_lottery_core')
+      // 通过 ServiceManager 获取 AdminLotteryCoreService（V4.7.0 拆分后：核心干预操作）
+      const AdminLotteryCoreService = req.app.locals.services.getService('admin_lottery_core')
 
       // 🔧 V4.3修复：调用正确的服务层方法名 getUserManagementStatus
-      const result = await AdminLotteryService.getUserManagementStatus(validatedUserId)
+      const result = await AdminLotteryCoreService.getUserManagementStatus(validatedUserId)
 
       return res.apiSuccess(result, '用户抽奖控制状态查询成功')
     } catch (error) {
@@ -70,13 +70,13 @@ router.delete(
       // 参数验证
       const validatedUserId = validators.validateUserId(user_id)
 
-      // 通过 ServiceManager 获取 AdminLotteryService
-      const AdminLotteryService = req.app.locals.services.getService('admin_lottery_core')
+      // 通过 ServiceManager 获取 AdminLotteryCoreService（V4.7.0 拆分后：核心干预操作）
+      const AdminLotteryCoreService = req.app.locals.services.getService('admin_lottery_core')
 
       // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
       const result = await TransactionManager.execute(
         async transaction => {
-          return await AdminLotteryService.clearUserSettings(
+          return await AdminLotteryCoreService.clearUserSettings(
             req.user?.user_id || req.user?.id,
             validatedUserId,
             null, // settingType: null表示清除所有设置

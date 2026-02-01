@@ -22,7 +22,7 @@
 
 const { Op, fn, col, literal } = require('sequelize')
 const logger = require('../../utils/logger').logger
-const BusinessCacheHelper = require('../../utils/BusinessCacheHelper')
+const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 
 /**

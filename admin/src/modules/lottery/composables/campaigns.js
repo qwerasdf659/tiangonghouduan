@@ -178,7 +178,7 @@ export function useCampaignsMethods(context) {
      * @param {Object} campaign - 活动对象
      */
     editCampaign(campaign) {
-      this.editingCampaignId = campaign.campaign_id
+      this.editingCampaignId = campaign.lottery_campaign_id
       this.isEditMode = true
       this.campaignForm = {
         campaign_name: campaign.campaign_name || '',
@@ -300,7 +300,7 @@ export function useCampaignsMethods(context) {
         `确认删除活动「${campaign.campaign_name}」？此操作不可恢复`,
         async () => {
           // apiCall 成功时返回 response.data，失败时抛出错误
-          await this.apiCall(`${LOTTERY_ENDPOINTS.CAMPAIGN_LIST}/${campaign.campaign_id}`, {
+          await this.apiCall(`${LOTTERY_ENDPOINTS.CAMPAIGN_LIST}/${campaign.lottery_campaign_id}`, {
             method: 'DELETE'
           })
           // 如果没有抛出错误，则表示成功
@@ -322,10 +322,13 @@ export function useCampaignsMethods(context) {
         `确认${newStatus === 'active' ? '启用' : '暂停'}活动「${campaign.campaign_name}」？`,
         async () => {
           // apiCall 成功时返回 response.data，失败时抛出错误
-          await this.apiCall(`${LOTTERY_ENDPOINTS.CAMPAIGN_LIST}/${campaign.campaign_id}/status`, {
-            method: 'PUT',
-            data: { status: newStatus }
-          })
+          await this.apiCall(
+            `${LOTTERY_ENDPOINTS.CAMPAIGN_LIST}/${campaign.lottery_campaign_id}/status`,
+            {
+              method: 'PUT',
+              data: { status: newStatus }
+            }
+          )
           // 如果没有抛出错误，则表示成功
           await this.loadCampaigns()
           await this.loadCampaignStats()
@@ -387,9 +390,10 @@ export function useCampaignsMethods(context) {
         if (data) {
           this.campaignRoiData = {
             ...data,
-            campaign_id: campaignId,
+            lottery_campaign_id: campaignId,
             campaign_name:
-              this.campaigns.find(c => c.campaign_id === campaignId)?.campaign_name || '未知活动'
+              this.campaigns.find(c => c.lottery_campaign_id === campaignId)?.campaign_name ||
+              '未知活动'
           }
           logger.info('[Campaigns] ROI分析数据加载成功')
         }
@@ -407,7 +411,7 @@ export function useCampaignsMethods(context) {
      */
     async openCampaignRoiModal(campaign) {
       this.selectedCampaign = campaign
-      await this.loadCampaignRoiData(campaign.campaign_id)
+      await this.loadCampaignRoiData(campaign.lottery_campaign_id)
       this.showCampaignRoiModal = true
     },
 

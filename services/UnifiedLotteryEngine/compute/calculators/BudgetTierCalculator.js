@@ -17,7 +17,7 @@
  * - B3: high + mid + low + fallback
  *
  * 关键设计决策：
- * - 文档12.2.1：allowed_lottery_campaign_ids 是预算来源桶，不是当前抽奖活动ID
+ * - 文档12.2.1：allowed_campaign_ids 是预算来源桶，不是当前抽奖活动ID
  * - 文档12.2.2：动态钱包可用性检查（空/null → 返回0）
  * - EffectiveBudget 统一作为预算输入，屏蔽 budget_mode 差异
  *
@@ -167,7 +167,7 @@ class BudgetTierCalculator {
    * - none：返回 Infinity（无预算限制）
    *
    * 关键设计（文档12.2.1 + 12.2.2）：
-   * - allowed_lottery_campaign_ids 是预算来源桶，不是当前抽奖活动ID
+   * - allowed_campaign_ids 是预算来源桶，不是当前抽奖活动ID
    * - 动态钱包可用性：配置为空/null 时返回 0
    *
    * @param {Object} context - 抽奖上下文
@@ -200,29 +200,29 @@ class BudgetTierCalculator {
      */
     if (budget_mode === 'user' || budget_mode === 'hybrid') {
       try {
-        // 文档12.2.1：allowed_lottery_campaign_ids 是预算来源桶
-        const allowed_lottery_campaign_ids = campaign?.allowed_lottery_campaign_ids
+        // 文档12.2.1：allowed_campaign_ids 是预算来源桶
+        const allowed_campaign_ids = campaign?.allowed_campaign_ids
 
         // 文档12.2.2：动态钱包可用性检查
-        if (!allowed_lottery_campaign_ids || allowed_lottery_campaign_ids.length === 0) {
+        if (!allowed_campaign_ids || allowed_campaign_ids.length === 0) {
           // 配置为空/null，钱包不可用，返回 0
-          this._log('debug', 'user 钱包不可用（allowed_lottery_campaign_ids 为空）', {
+          this._log('debug', 'user 钱包不可用（allowed_campaign_ids 为空）', {
             user_id,
             lottery_campaign_id,
-            allowed_lottery_campaign_ids
+            allowed_campaign_ids
           })
           user_budget = 0
         } else {
           // 从指定的预算来源桶聚合 BUDGET_POINTS
           user_budget = await QueryService.getBudgetPointsByCampaigns(
-            { user_id, lottery_campaign_ids: allowed_lottery_campaign_ids },
+            { user_id, lottery_campaign_ids: allowed_campaign_ids },
             { transaction }
           )
 
           this._log('debug', '获取用户预算成功', {
             user_id,
             lottery_campaign_id,
-            allowed_lottery_campaign_ids,
+            allowed_campaign_ids,
             user_budget
           })
         }

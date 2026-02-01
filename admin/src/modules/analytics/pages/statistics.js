@@ -169,7 +169,7 @@ function statisticsPage() {
     },
 
     // ==================== 多维度统计分析 (P1-3) ====================
-    
+
     /** 多维度统计Tab */
     multiDimensionTab: 'store',
 
@@ -913,7 +913,7 @@ function statisticsPage() {
       if (this.drillDownStack.length === 0) return
 
       this.drillDownStack.pop()
-      
+
       if (this.drillDownStack.length === 0) {
         await this.loadMultiDimensionStats()
       } else {
@@ -929,7 +929,7 @@ function statisticsPage() {
     updateMultiDimensionChart() {
       const container = document.getElementById('multiDimensionChart')
       const echarts = this._echarts
-      
+
       if (!container || !echarts) return
 
       if (!this._charts.multiDimension) {
@@ -942,50 +942,58 @@ function statisticsPage() {
       // 根据维度类型选择图表类型
       if (dimension === 'time') {
         // 时间维度使用折线图
-        this._charts.multiDimension.setOption({
-          tooltip: { trigger: 'axis' },
-          legend: { data: ['抽奖次数', '消费金额'] },
-          grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-          xAxis: { type: 'category', data: data.map(d => d.date || d.name) },
-          yAxis: [
-            { type: 'value', name: '次数' },
-            { type: 'value', name: '金额', position: 'right' }
-          ],
-          series: [
-            {
-              name: '抽奖次数',
-              type: 'line',
-              smooth: true,
-              data: data.map(d => d.draw_count || d.count || 0)
-            },
-            {
-              name: '消费金额',
-              type: 'bar',
-              yAxisIndex: 1,
-              data: data.map(d => d.consumption || d.amount || 0)
-            }
-          ]
-        }, true)
+        this._charts.multiDimension.setOption(
+          {
+            tooltip: { trigger: 'axis' },
+            legend: { data: ['抽奖次数', '消费金额'] },
+            grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+            xAxis: { type: 'category', data: data.map(d => d.date || d.name) },
+            yAxis: [
+              { type: 'value', name: '次数' },
+              { type: 'value', name: '金额', position: 'right' }
+            ],
+            series: [
+              {
+                name: '抽奖次数',
+                type: 'line',
+                smooth: true,
+                data: data.map(d => d.draw_count || d.count || 0)
+              },
+              {
+                name: '消费金额',
+                type: 'bar',
+                yAxisIndex: 1,
+                data: data.map(d => d.consumption || d.amount || 0)
+              }
+            ]
+          },
+          true
+        )
       } else {
         // 其他维度使用柱状图
-        this._charts.multiDimension.setOption({
-          tooltip: { trigger: 'axis' },
-          grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-          xAxis: { 
-            type: 'category', 
-            data: data.slice(0, 10).map(d => d.name || d.store_name || d.campaign_name || '未知'),
-            axisLabel: { interval: 0, rotate: 30 }
+        this._charts.multiDimension.setOption(
+          {
+            tooltip: { trigger: 'axis' },
+            grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+            xAxis: {
+              type: 'category',
+              data: data.slice(0, 10).map(d => d.name || d.store_name || d.campaign_name || '未知'),
+              axisLabel: { interval: 0, rotate: 30 }
+            },
+            yAxis: { type: 'value', name: '数量' },
+            series: [
+              {
+                type: 'bar',
+                data: data.slice(0, 10).map(d => ({
+                  value: d.count || d.draw_count || d.consumption || 0,
+                  itemStyle: { color: this.getBarColor(d) }
+                })),
+                label: { show: true, position: 'top' }
+              }
+            ]
           },
-          yAxis: { type: 'value', name: '数量' },
-          series: [{
-            type: 'bar',
-            data: data.slice(0, 10).map(d => ({
-              value: d.count || d.draw_count || d.consumption || 0,
-              itemStyle: { color: this.getBarColor(d) }
-            })),
-            label: { show: true, position: 'top' }
-          }]
-        }, true)
+          true
+        )
       }
     },
 
@@ -993,7 +1001,16 @@ function statisticsPage() {
      * 获取柱状图颜色
      */
     getBarColor(item) {
-      const colors = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4']
+      const colors = [
+        '#5470c6',
+        '#91cc75',
+        '#fac858',
+        '#ee6666',
+        '#73c0de',
+        '#3ba272',
+        '#fc8452',
+        '#9a60b4'
+      ]
       const index = this.multiDimensionData.breakdown.indexOf(item)
       return colors[index % colors.length]
     },
@@ -1063,7 +1080,10 @@ function statisticsPage() {
         this.exporting = true
         let response
         if (this.editingTemplateId) {
-          response = await ReportTemplatesAPI.updateTemplate(this.editingTemplateId, this.reportTemplateForm)
+          response = await ReportTemplatesAPI.updateTemplate(
+            this.editingTemplateId,
+            this.reportTemplateForm
+          )
         } else {
           response = await ReportTemplatesAPI.createTemplate(this.reportTemplateForm)
         }
@@ -1086,7 +1106,9 @@ function statisticsPage() {
     async deleteReportTemplate(template) {
       if (!confirm('确定要删除此报表模板吗？')) return
       try {
-        const response = await ReportTemplatesAPI.deleteTemplate(template.template_id || template.id)
+        const response = await ReportTemplatesAPI.deleteTemplate(
+          template.template_id || template.id
+        )
         if (response?.success) {
           this.showSuccess('模板已删除')
           await this.loadReportTemplates()

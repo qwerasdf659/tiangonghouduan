@@ -78,16 +78,13 @@ export const ANALYTICS_ENDPOINTS = {
   STRATEGY_STATS_REALTIME: `${API_PREFIX}/console/lottery-strategy-stats/realtime/:campaign_id`,
   STRATEGY_STATS_HOURLY: `${API_PREFIX}/console/lottery-strategy-stats/hourly/:campaign_id`,
   STRATEGY_STATS_DAILY: `${API_PREFIX}/console/lottery-strategy-stats/daily/:campaign_id`,
-  STRATEGY_STATS_TIER_DISTRIBUTION:
-    `${API_PREFIX}/console/lottery-strategy-stats/tier-distribution/:campaign_id`,
-  STRATEGY_STATS_EXPERIENCE:
-    `${API_PREFIX}/console/lottery-strategy-stats/experience-triggers/:campaign_id`,
+  STRATEGY_STATS_TIER_DISTRIBUTION: `${API_PREFIX}/console/lottery-strategy-stats/tier-distribution/:campaign_id`,
+  STRATEGY_STATS_EXPERIENCE: `${API_PREFIX}/console/lottery-strategy-stats/experience-triggers/:campaign_id`,
   STRATEGY_STATS_BUDGET: `${API_PREFIX}/console/lottery-strategy-stats/budget-consumption/:campaign_id`,
 
   // 客服统计
   CUSTOMER_SERVICE_SESSIONS: `${API_PREFIX}/console/customer-service/sessions`,
-  CUSTOMER_SERVICE_SESSION_MESSAGES:
-    `${API_PREFIX}/console/customer-service/sessions/:session_id/messages`,
+  CUSTOMER_SERVICE_SESSION_MESSAGES: `${API_PREFIX}/console/customer-service/sessions/:session_id/messages`,
   CUSTOMER_SERVICE_SEND_MESSAGE: `${API_PREFIX}/console/customer-service/sessions/:session_id/messages`,
   CUSTOMER_SERVICE_CLOSE: `${API_PREFIX}/console/customer-service/sessions/:session_id/close`,
   CUSTOMER_SERVICE_MARK_READ: `${API_PREFIX}/console/customer-service/sessions/:session_id/mark-read`,

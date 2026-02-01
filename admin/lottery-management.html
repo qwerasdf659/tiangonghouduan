@@ -122,7 +122,7 @@
                 </div>
               </template>
               <!-- 数据列表 -->
-              <template x-for="campaign in campaigns" :key="campaign.campaign_id">
+              <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
                 <div class="border rounded-lg p-4 hover:shadow-md transition-shadow relative">
                   <!-- 库存预警标志 -->
                   <div x-show="campaign.stock_warning?.is_warning" class="absolute -top-2 -right-2 z-10">
@@ -177,7 +177,7 @@
                     <button class="px-3 py-1 text-sm border border-purple-500 text-purple-500 rounded hover:bg-purple-50" @click="openCampaignRoiModal(campaign)">
                       📊 分析
                     </button>
-                    <button class="px-3 py-1 text-sm border border-green-500 text-green-500 rounded hover:bg-green-50" @click="openCampaignReport(campaign.campaign_id)">
+                    <button class="px-3 py-1 text-sm border border-green-500 text-green-500 rounded hover:bg-green-50" @click="openCampaignReport(campaign.lottery_campaign_id)">
                       📋 复盘
                     </button>
                     <button class="px-3 py-1 text-sm border border-yellow-500 text-yellow-500 rounded hover:bg-yellow-50" @click="toggleCampaign(campaign)" x-text="campaign.status === 'active' ? '⏸️ 停止' : '▶️ 启动'"></button>
@@ -395,7 +395,7 @@
                 <template x-if="budgetCampaigns.length === 0">
                   <tr><td colspan="7" class="px-4 py-8 text-center themed-text-muted">暂无预算数据</td></tr>
                 </template>
-                <template x-for="campaign in budgetCampaigns" :key="campaign.campaign_id">
+                <template x-for="campaign in budgetCampaigns" :key="campaign.lottery_campaign_id">
                   <tr class="themed-hover-bg">
                     <td class="px-4 py-3 text-sm" x-text="campaign.campaign_name"></td>
                     <td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded bg-cyan-100 text-cyan-700" x-text="getBudgetModeText(campaign.budget_mode)"></span></td>
@@ -415,7 +415,7 @@
                             x-text="getBudgetUsageRate(campaign) >= 100 ? '超支' : (getBudgetUsageRate(campaign) >= 80 ? '预警' : '正常')"></span>
                     </td>
                     <td class="px-4 py-3 space-x-2">
-                      <button class="themed-text-primary hover:text-blue-700 text-sm" @click="openSetBudgetModal(campaign.campaign_id)">设置</button>
+                      <button class="themed-text-primary hover:text-blue-700 text-sm" @click="openSetBudgetModal(campaign.lottery_campaign_id)">设置</button>
                       <button class="text-cyan-600 hover:text-cyan-800 text-sm" @click="viewBudgetTrend(campaign)">📈 趋势</button>
                     </td>
                   </tr>
@@ -441,8 +441,8 @@
                 @change="loadBudgetTrendData(selectedBudgetCampaignId)"
               >
                 <option value="">请选择活动</option>
-                <template x-for="campaign in budgetCampaigns" :key="campaign.campaign_id">
-                  <option :value="campaign.campaign_id" x-text="campaign.campaign_name"></option>
+                <template x-for="campaign in budgetCampaigns" :key="campaign.lottery_campaign_id">
+                  <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
                 </template>
               </select>
               <button 
@@ -862,8 +862,8 @@
                 x-model="searchCampaignId"
               >
                 <option value="">全部活动</option>
-                <template x-for="campaign in campaigns" :key="campaign.campaign_id">
-                  <option :value="campaign.campaign_id" x-text="campaign.campaign_name"></option>
+                <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
+                  <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
                 </template>
               </select>
               <button 
@@ -1458,8 +1458,8 @@
                       @change="applyStrategyEffectivenessFilters()"
                       class="themed-input rounded px-3 py-2 text-sm w-40">
                 <option value="">全部活动</option>
-                <template x-for="campaign in campaigns" :key="campaign.campaign_id">
-                  <option :value="campaign.campaign_id" x-text="campaign.campaign_name"></option>
+                <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
+                  <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
                 </template>
               </select>
               <input type="date" x-model="strategyEffectivenessFilters.start_date"
@@ -1779,8 +1779,8 @@
                       @change="applyDailyReportFilters()"
                       class="themed-input rounded px-3 py-2 text-sm w-40">
                 <option value="">全部活动</option>
-                <template x-for="campaign in campaigns" :key="campaign.campaign_id">
-                  <option :value="campaign.campaign_id" x-text="campaign.campaign_name"></option>
+                <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
+                  <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
                 </template>
               </select>
               <button @click="resetDailyReportFilters()" 
@@ -2237,8 +2237,8 @@
                   <label class="block text-sm font-medium mb-1">活动选择 <span class="text-red-500">*</span></label>
                   <select x-model="batchQuotaGrantForm.campaign_id" class="themed-input w-full rounded px-3 py-2">
                     <option value="">请选择活动</option>
-                    <template x-for="campaign in campaigns" :key="campaign.campaign_id">
-                      <option :value="campaign.campaign_id" x-text="campaign.campaign_name"></option>
+                    <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
+                      <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
                     </template>
                   </select>
                 </div>
@@ -2275,11 +2275,11 @@
                              :checked="batchCampaignStatusForm.campaign_ids.length === campaigns.length">
                       <span class="text-sm font-medium">全选</span>
                     </label>
-                    <template x-for="campaign in campaigns" :key="campaign.campaign_id">
+                    <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
                       <label class="flex items-center gap-2 p-2 border-b hover:bg-gray-50 cursor-pointer">
                         <input type="checkbox" 
-                               :checked="isCampaignSelected(campaign.campaign_id)"
-                               @change="toggleCampaignSelection(campaign.campaign_id)">
+                               :checked="isCampaignSelected(campaign.lottery_campaign_id)"
+                               @change="toggleCampaignSelection(campaign.lottery_campaign_id)">
                         <span class="text-sm" x-text="campaign.campaign_name"></span>
                         <span class="text-xs px-2 py-0.5 rounded"
                               :class="campaign.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
@@ -2318,11 +2318,11 @@
                              :checked="batchBudgetAdjustForm.campaign_ids.length === campaigns.length">
                       <span class="text-sm font-medium">全选</span>
                     </label>
-                    <template x-for="campaign in campaigns" :key="campaign.campaign_id">
+                    <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
                       <label class="flex items-center gap-2 p-2 border-b hover:bg-gray-50 cursor-pointer">
                         <input type="checkbox" 
-                               :checked="batchBudgetAdjustForm.campaign_ids.includes(campaign.campaign_id)"
-                               @change="toggleCampaignSelection(campaign.campaign_id)">
+                               :checked="batchBudgetAdjustForm.campaign_ids.includes(campaign.lottery_campaign_id)"
+                               @change="toggleCampaignSelection(campaign.lottery_campaign_id)">
                         <span class="text-sm" x-text="campaign.campaign_name"></span>
                       </label>
                     </template>
@@ -2931,8 +2931,8 @@
             <template x-if="campaigns && campaigns.length > 0">
               <select class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.campaign_id" required>
                 <option value="">请选择活动</option>
-                <template x-for="campaign in campaigns" :key="campaign.campaign_id">
-                  <option :value="campaign.campaign_id" x-text="campaign.campaign_name"></option>
+                <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
+                  <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
                 </template>
               </select>
             </template>
@@ -3001,8 +3001,8 @@
           <label class="block text-sm font-medium themed-text-secondary whitespace-nowrap">所属活动 *</label>
           <select class="flex-1 px-3 py-2 border rounded" x-model.number="batchCampaignId">
             <option value="">请选择活动</option>
-            <template x-for="campaign in campaigns" :key="campaign.campaign_id">
-              <option :value="campaign.campaign_id" x-text="campaign.campaign_name"></option>
+            <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
+              <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
             </template>
           </select>
         </div>
@@ -3266,8 +3266,8 @@
             <label class="block text-sm font-medium themed-text-secondary mb-1">选择活动 <span class="text-red-500">*</span></label>
             <select class="w-full px-3 py-2 border rounded" x-model="quotaForm.campaign_id" :disabled="isEditQuota">
               <option value="">请选择活动...</option>
-              <template x-for="campaign in campaigns" :key="campaign.campaign_id">
-                <option :value="campaign.campaign_id" x-text="campaign.campaign_name + ' (#' + campaign.campaign_id + ')'"></option>
+              <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
+                <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name + ' (#' + campaign.lottery_campaign_id + ')'"></option>
               </template>
             </select>
           </div>
@@ -3392,7 +3392,7 @@
             <label class="block text-sm font-medium themed-text-secondary mb-1">活动代码 <span class="text-red-500">*</span></label>
             <select class="w-full px-3 py-2 border rounded" x-model="pricingForm.campaign_code" :disabled="isEditPricing" required>
               <option value="">请选择活动</option>
-              <template x-for="campaign in campaigns" :key="campaign.campaign_id">
+              <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
                 <option :value="campaign.campaign_code" x-text="campaign.campaign_name + ' (' + campaign.campaign_code + ')'"></option>
               </template>
             </select>
@@ -3805,7 +3805,7 @@
                     </tr>
                   </thead>
                   <tbody class="divide-y">
-                    <template x-for="campaign in dailyReportData.campaigns_breakdown" :key="campaign.campaign_id">
+                    <template x-for="campaign in dailyReportData.campaigns_breakdown" :key="campaign.lottery_campaign_id">
                       <tr class="themed-hover-bg">
                         <td class="px-3 py-2" x-text="campaign.campaign_name"></td>
                         <td class="px-3 py-2 text-right" x-text="campaign.draw_count?.toLocaleString() || 0"></td>

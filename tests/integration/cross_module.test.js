@@ -24,7 +24,7 @@ const {
   LotteryDraw,
   LotteryCampaign,
   TradeOrder,
-  MarketListing,
+  // MarketListing 用于后续市场交易测试扩展
   User
 } = require('../../models')
 const BeijingTimeHelper = require('../../utils/timeHelper')

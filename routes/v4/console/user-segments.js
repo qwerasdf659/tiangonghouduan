@@ -26,7 +26,23 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
-const UserSegmentService = require('../../../services/user/UserSegmentService')
+
+/**
+ * 获取 UserSegmentService 服务实例
+ *
+ * 遵循项目规范：通过 req.app.locals.services.getService 获取服务
+ * 禁止直接 require 服务文件
+ *
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} UserSegmentService 静态类
+ */
+function getUserSegmentService(req) {
+  const service = req.app.locals.services?.getService('user_segment')
+  if (!service) {
+    throw new Error('UserSegmentService 未在 ServiceManager 中注册')
+  }
+  return service
+}
 
 /**
  * 获取 models
@@ -61,6 +77,7 @@ router.get('/segments', authenticateToken, requireRoleLevel(100), async (req, re
 
   try {
     const models = getModels(req)
+    const UserSegmentService = getUserSegmentService(req)
     const stats = await UserSegmentService.getSegmentStats(models)
 
     return res.apiSuccess(stats, '获取分层统计成功')
@@ -119,6 +136,7 @@ router.get('/segments/:type', authenticateToken, requireRoleLevel(100), async (r
 
   try {
     const models = getModels(req)
+    const UserSegmentService = getUserSegmentService(req)
     const result = await UserSegmentService.getSegmentUsers(models, type, {
       page: parseInt(page, 10) || 1,
       page_size: parseInt(page_size, 10) || 20
@@ -170,6 +188,7 @@ router.get('/activity-heatmap', authenticateToken, requireRoleLevel(100), async 
 
   try {
     const models = getModels(req)
+    const UserSegmentService = getUserSegmentService(req)
     const heatmap = await UserSegmentService.getActivityHeatmap(models, {
       days: parseInt(days, 10) || 7
     })
@@ -216,6 +235,7 @@ router.get('/exchange-preferences', authenticateToken, requireRoleLevel(100), as
 
   try {
     const models = getModels(req)
+    const UserSegmentService = getUserSegmentService(req)
     const preferences = await UserSegmentService.getExchangePreferences(models, {
       days: parseInt(days, 10) || 30,
       limit: parseInt(limit, 10) || 10
@@ -262,6 +282,7 @@ router.get('/funnel', authenticateToken, requireRoleLevel(100), async (req, res)
 
   try {
     const models = getModels(req)
+    const UserSegmentService = getUserSegmentService(req)
     const funnel = await UserSegmentService.getBehaviorFunnel(models, {
       days: parseInt(days, 10) || 7
     })
@@ -296,6 +317,7 @@ router.get('/segment-rules', authenticateToken, requireRoleLevel(100), async (re
   logger.info('获取分层规则配置', { user_id: req.user?.user_id })
 
   try {
+    const UserSegmentService = getUserSegmentService(req)
     const rules = UserSegmentService.getSegmentRules()
     return res.apiSuccess(rules, '获取分层规则配置成功')
   } catch (error) {

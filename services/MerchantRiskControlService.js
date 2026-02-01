@@ -793,7 +793,7 @@ class MerchantRiskControlService {
         where,
         attributes: [
           'status',
-          [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('alert_id')), 'count']
+          [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('risk_alert_id')), 'count']
         ],
         group: ['status'],
         raw: true
@@ -804,7 +804,7 @@ class MerchantRiskControlService {
         where,
         attributes: [
           'alert_type',
-          [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('alert_id')), 'count']
+          [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('risk_alert_id')), 'count']
         ],
         group: ['alert_type'],
         raw: true
@@ -815,7 +815,7 @@ class MerchantRiskControlService {
         where,
         attributes: [
           'severity',
-          [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('alert_id')), 'count']
+          [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('risk_alert_id')), 'count']
         ],
         group: ['severity'],
         raw: true

@@ -31,9 +31,8 @@ const {
   sequelize,
   User,
   MarketListing,
-  TradeOrder,
-  ItemInstance,
-  AccountAssetBalance
+  TradeOrder
+  // ItemInstance, AccountAssetBalance 用于后续资产交割验证扩展
 } = require('../../../models')
 // V4.7.0 拆分：使用 market-listing/CoreService
 const MarketListingService = require('../../../services/market-listing/CoreService')
@@ -42,7 +41,8 @@ const TradeOrderService = require('../../../services/TradeOrderService')
 const BalanceService = require('../../../services/asset/BalanceService')
 const { v4: uuidv4 } = require('uuid')
 
-const { initRealTestData, getRealTestUserId, TestConfig } = require('../../helpers/test-setup')
+const { initRealTestData, getRealTestUserId } = require('../../helpers/test-setup')
+// TestConfig 用于后续参数化测试扩展
 
 const {
   resetTestUserDailyListings,
@@ -59,7 +59,7 @@ const PLATFORM_FEE_RATE = 0.05 // 平台手续费率 5%
  */
 describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
   let sellerUser
-  let buyerUser
+  let _buyerUser // 用于后续买家状态验证扩展
   let sellerUserId
   let buyerUserId
   const createdListingIds = []
@@ -87,11 +87,11 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
 
     if (secondUser) {
       buyerUserId = secondUser.user_id
-      buyerUser = secondUser
+      _buyerUser = secondUser
     } else {
       // 如果没有第二个用户，使用同一个用户测试（部分场景会跳过）
       buyerUserId = sellerUserId
-      buyerUser = sellerUser
+      _buyerUser = sellerUser
       console.warn('⚠️ 只有一个测试用户，部分跨用户场景将被跳过')
     }
 

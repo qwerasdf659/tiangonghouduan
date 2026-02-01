@@ -46,57 +46,155 @@ const WHITELIST_FILES = [
 /** snake_case 验证正则 */
 const SNAKE_CASE_PATTERN = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/
 
-/** 已注册的 snake_case service keys（从 ServiceManager 中提取） */
+/**
+ * 已注册的 snake_case service keys（从 ServiceManager 中提取）
+ *
+ * @description 与 services/index.js 中 _initializeServices() 注册的服务保持一致
+ * @lastUpdated 2026-02-02
+ */
 const REGISTERED_SERVICE_KEYS = [
-  /* 抽奖引擎服务 */
-  'unified_lottery_engine',
-  'lottery_container',
-  'lottery_preset',
-  'lottery_management',
-  'lottery_quota',
-  /* 交易与市场服务 */
-  'exchange_market',
-  'market_listing',
-  'trade_order',
-  'redemption_order',
-  /* 用户与权限服务 */
-  'user',
-  'user_role',
-  'hierarchy_management',
-  /* 客服系统服务 */
-  'customer_service_session',
-  'admin_customer_service',
-  'chat_web_socket',
-  'chat_rate_limit',
-  /* 资产与积分服务 */
-  'asset',
-  'asset_conversion',
-  'merchant_points',
-  'consumption',
-  'backpack',
-  /* 管理后台服务 */
-  'admin_system',
-  'admin_lottery',
-  'material_management',
-  'orphan_frozen_cleanup',
-  /* 活动与奖品服务 */
-  'activity',
-  'prize_pool',
-  'premium',
-  /* 系统功能服务 */
-  'announcement',
-  'notification',
-  'feedback',
-  'popup_banner',
-  'image',
-  'reporting',
-  /* 审计与日志服务 */
-  'audit_log',
-  'content_audit',
-  /* 工具服务 */
-  'idempotency',
-  'data_sanitizer',
-  'performance_monitor'
+  /* ==================== 抽奖引擎服务 ==================== */
+  'unified_lottery_engine', // 统一抽奖引擎（需实例化）
+  'lottery_container', // 抽奖服务容器
+  'lottery_preset', // 预设抽奖配置服务
+  'lottery_quota', // 抽奖配额服务
+  'draw_orchestrator', // 抽奖编排器
+  'management_strategy', // 管理策略服务
+
+  /* ==================== 抽奖管理服务（V4.7.0 AdminLotteryService 拆分） ==================== */
+  'admin_lottery_core', // 核心干预操作（静态类）
+  'admin_lottery_campaign', // 活动管理操作（静态类）
+  'admin_lottery_query', // 干预规则查询（静态类）
+  'lottery_campaign_crud', // 活动 CRUD 操作（静态类）
+
+  /* ==================== 抽奖配置管理服务 ==================== */
+  'lottery_campaign_pricing_config', // 活动定价配置管理服务
+  'lottery_pricing', // 抽奖定价服务
+  'lottery_config', // 抽奖配置管理服务
+  'lottery_tier_rule', // 抽奖档位规则管理服务
+
+  /* ==================== 抽奖分析服务 ==================== */
+  'lottery_analytics_realtime', // 实时监控服务
+  'lottery_analytics_statistics', // 统计趋势服务
+  'lottery_analytics_report', // 报表生成服务
+  'lottery_analytics_user', // 用户维度分析服务
+  'lottery_analytics_campaign', // 活动维度分析服务
+  'lottery_analytics_query', // 抽奖统计分析查询服务（Phase 3 复杂查询收口）
+  'lottery_alert', // 抽奖告警服务
+  'lottery_health', // 抽奖健康度计算服务
+  'lottery_query', // 抽奖查询服务（读操作收口）
+
+  /* ==================== 交易与市场服务 ==================== */
+  'exchange_core', // 核心兑换操作（需实例化）
+  'exchange_query', // 查询服务（需实例化）
+  'exchange_admin', // 管理后台操作（需实例化）
+  'trade_order', // 交易订单服务
+  'redemption_order', // 兑换订单服务
+  'redemption', // 兑换服务（核心兑换业务逻辑）
+
+  /* ==================== 市场挂牌服务 ==================== */
+  'market_listing_core', // 核心挂牌操作（静态类）
+  'market_listing_query', // 查询/搜索/筛选（静态类）
+  'market_listing_admin', // 管理控制/止损（静态类）
+  'market_query', // 市场热点读查询服务（静态类）
+
+  /* ==================== 用户与权限服务 ==================== */
+  'user', // 用户服务
+  'user_role', // 用户角色服务
+  'hierarchy_management', // 层级管理服务
+  'user_segment', // 用户分层服务
+  'user_risk_profile', // 用户风控配置管理服务
+  'user_behavior_track', // 用户行为轨迹服务
+
+  /* ==================== 客服系统服务 ==================== */
+  'customer_service_session', // 客服会话服务
+  'admin_customer_service', // 管理后台客服服务
+  'chat_web_socket', // WebSocket 聊天服务
+  'chat_rate_limit', // 聊天限流服务
+  'session_management', // 会话管理服务（静态类）
+
+  /* ==================== 资产服务（AssetService 拆分三件套） ==================== */
+  'asset_balance', // 资产余额服务（8个方法，静态类）
+  'asset_item', // 资产物品服务（9个方法，静态类）
+  'asset_query', // 资产查询服务（7个方法，静态类）
+  'asset_conversion', // 资产转换服务
+  'asset_portfolio_query', // 资产组合分析查询服务（静态类）
+  'backpack', // 背包服务
+  'merchant_points', // 商家积分服务
+
+  /* ==================== 消费服务（ConsumptionService 拆分三件套） ==================== */
+  'consumption_core', // 核心操作（静态类）
+  'consumption_query', // 查询服务（静态类）
+  'consumption_merchant', // 商家侧服务（静态类）
+  'consumption_batch', // 消费记录批量审核服务（静态类）
+  'consumption_anomaly', // 消费异常检测服务
+
+  /* ==================== 管理后台服务 ==================== */
+  'admin_system', // 管理系统服务
+  'material_management', // 物料管理服务
+  'orphan_frozen_cleanup', // 孤儿冻结清理服务
+
+  /* ==================== 管理后台查询服务（Phase 3 读操作收口） ==================== */
+  'console_system_data_query', // 管理后台系统数据查询服务（静态类）
+  'console_session_query', // 管理后台会话查询服务（静态类）
+  'console_business_record_query', // 管理后台业务记录查询服务（静态类）
+  'console_dashboard_query', // 管理后台仪表盘查询服务（静态类）
+
+  /* ==================== 活动与奖品服务 ==================== */
+  'activity', // 活动服务
+  'prize_pool', // 奖品池服务
+  'premium', // 付费会员服务
+
+  /* ==================== 系统功能服务 ==================== */
+  'announcement', // 公告服务
+  'notification', // 通知服务
+  'feedback', // 反馈服务
+  'popup_banner', // 弹窗/Banner 服务
+  'image', // 图片服务
+
+  /* ==================== 报表服务（ReportingService 拆分） ==================== */
+  'reporting_analytics', // 决策分析/趋势分析（静态类）
+  'reporting_charts', // 图表数据生成（静态类）
+  'reporting_stats', // 统计/概览/画像（静态类）
+  'multi_dimension_stats', // 多维度组合统计
+
+  /* ==================== 审计与日志服务 ==================== */
+  'audit_log', // 审计日志服务
+  'content_audit', // 内容审核引擎
+  'audit_rollback', // 审计回滚服务
+
+  /* ==================== 商家管理服务 ==================== */
+  'staff_management', // 员工管理服务
+  'store', // 门店管理服务
+  'region', // 行政区划服务（省市区级联选择）
+  'merchant_operation_log', // 商家操作审计日志服务
+  'merchant_risk_control', // 商家风控服务
+  'debt_management', // 欠账管理服务
+
+  /* ==================== 字典配置管理服务 ==================== */
+  'dictionary', // 字典表管理服务（category_defs, rarity_defs, asset_group_defs）
+  'item_template', // 物品模板管理服务（item_templates）
+
+  /* ==================== 系统基础服务 ==================== */
+  'system_config', // 系统配置服务（动态限流配置）
+  'batch_operation', // 批量操作服务（幂等性+状态管理）
+  'display_name', // 显示名称翻译服务
+  'feature_flag', // 功能开关服务
+  'sealos_storage', // Sealos 对象存储服务
+
+  /* ==================== 待处理中心服务 ==================== */
+  'pending_summary', // 仪表盘待处理汇总服务（静态类）
+  'pending_center', // 待处理中心服务（静态类）
+  'nav_badge', // 导航栏徽标计数服务（静态类）
+
+  /* ==================== 智能分析服务 ==================== */
+  'reminder_engine', // 智能提醒规则引擎服务
+  'custom_report', // 自定义报表服务
+
+  /* ==================== 工具服务 ==================== */
+  'idempotency', // 幂等性服务
+  'data_sanitizer', // 数据脱敏服务
+  'performance_monitor' // 性能监控服务
 ]
 
 /* ========================================

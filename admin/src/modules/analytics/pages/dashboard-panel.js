@@ -6,7 +6,7 @@
  * - 趋势图表（抽奖趋势、用户趋势、奖品发放趋势）
  * - 实时预警列表
  * - 预算消耗状态
- * 
+ *
  * @version 1.0.0
  * @date 2026-01-31
  */
@@ -30,7 +30,7 @@ function dashboardPanelPage() {
     timeRange: 'today',
     trendType: 'lottery',
     lastUpdateTime: '--:--:--',
-    
+
     // 核心统计数据
     stats: {
       lottery_count: 0,
@@ -45,7 +45,7 @@ function dashboardPanelPage() {
       risk_alerts: 0,
       budget_usage: 0
     },
-    
+
     // 趋势数据
     trendData: {
       dates: [],
@@ -53,37 +53,40 @@ function dashboardPanelPage() {
       users: [],
       prizes: []
     },
-    
+
     // 预警列表
     alerts: [],
-    
+
     // 预算列表
     budgetList: [],
-    
+
     // 图表实例
     trendChart: null,
-    
+
     /**
      * 初始化页面
      */
     async init() {
       logger.info('[DashboardPanel] 初始化运营仪表盘')
-      
+
       await this.loadDashboardData()
-      
+
       // 监听趋势类型变化
       this.$watch('trendType', () => {
         this.renderTrendChart()
       })
-      
+
       // 5分钟自动刷新
-      setInterval(() => {
-        this.loadDashboardData()
-      }, 5 * 60 * 1000)
-      
+      setInterval(
+        () => {
+          this.loadDashboardData()
+        },
+        5 * 60 * 1000
+      )
+
       logger.info('[DashboardPanel] 初始化完成')
     },
-    
+
     /**
      * 加载仪表盘所有数据
      */
@@ -97,36 +100,35 @@ function dashboardPanelPage() {
           this.fetchAlerts(),
           this.fetchBudgetStatus()
         ])
-        
+
         if (statsRes.status === 'fulfilled' && statsRes.value) {
           this.stats = { ...this.stats, ...statsRes.value }
         }
-        
+
         if (trendRes.status === 'fulfilled' && trendRes.value) {
           this.trendData = trendRes.value
           this.renderTrendChart()
         }
-        
+
         if (alertsRes.status === 'fulfilled' && alertsRes.value) {
           this.alerts = alertsRes.value
         }
-        
+
         if (budgetRes.status === 'fulfilled' && budgetRes.value) {
           this.budgetList = budgetRes.value
         }
-        
-        this.lastUpdateTime = new Date().toLocaleTimeString('zh-CN', { 
+
+        this.lastUpdateTime = new Date().toLocaleTimeString('zh-CN', {
           hour12: false,
           timeZone: 'Asia/Shanghai'
         })
-        
       } catch (error) {
         logger.error('[DashboardPanel] 加载仪表盘数据失败:', error)
       } finally {
         this.loading = false
       }
     },
-    
+
     /**
      * 获取今日统计数据
      */
@@ -142,7 +144,7 @@ function dashboardPanelPage() {
         return null
       }
     },
-    
+
     /**
      * 获取趋势数据
      */
@@ -158,7 +160,7 @@ function dashboardPanelPage() {
         return null
       }
     },
-    
+
     /**
      * 获取预警列表
      */
@@ -174,7 +176,7 @@ function dashboardPanelPage() {
         return []
       }
     },
-    
+
     /**
      * 获取预算状态
      */
@@ -190,31 +192,39 @@ function dashboardPanelPage() {
         return []
       }
     },
-    
+
     /**
      * 渲染趋势图表
      */
     async renderTrendChart() {
       const chartDom = document.getElementById('trend-chart')
       if (!chartDom) return
-      
+
       // 动态加载 ECharts
       const echarts = await loadECharts()
       if (!echarts) {
         logger.warn('[DashboardPanel] ECharts 加载失败')
         return
       }
-      
+
       if (!this.trendChart) {
         this.trendChart = echarts.init(chartDom)
       }
-      
-      const seriesName = this.trendType === 'lottery' ? '抽奖次数' : 
-                        this.trendType === 'users' ? '活跃用户' : '奖品发放'
+
+      const seriesName =
+        this.trendType === 'lottery'
+          ? '抽奖次数'
+          : this.trendType === 'users'
+            ? '活跃用户'
+            : '奖品发放'
       const seriesData = this.trendData[this.trendType] || []
-      const color = this.trendType === 'lottery' ? '#3b82f6' :
-                   this.trendType === 'users' ? '#10b981' : '#f59e0b'
-      
+      const color =
+        this.trendType === 'lottery'
+          ? '#3b82f6'
+          : this.trendType === 'users'
+            ? '#10b981'
+            : '#f59e0b'
+
       const option = {
         tooltip: {
           trigger: 'axis',
@@ -243,30 +253,35 @@ function dashboardPanelPage() {
           splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
           axisLabel: { color: '#64748b' }
         },
-        series: [{
-          name: seriesName,
-          type: 'line',
-          smooth: true,
-          data: seriesData,
-          lineStyle: { color: color, width: 3 },
-          areaStyle: {
-            color: {
-              type: 'linear',
-              x: 0, y: 0, x2: 0, y2: 1,
-              colorStops: [
-                { offset: 0, color: color + '40' },
-                { offset: 1, color: color + '05' }
-              ]
-            }
-          },
-          symbol: 'circle',
-          symbolSize: 8,
-          itemStyle: { color: color }
-        }]
+        series: [
+          {
+            name: seriesName,
+            type: 'line',
+            smooth: true,
+            data: seriesData,
+            lineStyle: { color: color, width: 3 },
+            areaStyle: {
+              color: {
+                type: 'linear',
+                x: 0,
+                y: 0,
+                x2: 0,
+                y2: 1,
+                colorStops: [
+                  { offset: 0, color: color + '40' },
+                  { offset: 1, color: color + '05' }
+                ]
+              }
+            },
+            symbol: 'circle',
+            symbolSize: 8,
+            itemStyle: { color: color }
+          }
+        ]
       }
-      
+
       this.trendChart.setOption(option)
-      
+
       // 响应式
       const resizeHandler = () => {
         this.trendChart && this.trendChart.resize()
@@ -274,7 +289,7 @@ function dashboardPanelPage() {
       window.removeEventListener('resize', resizeHandler)
       window.addEventListener('resize', resizeHandler)
     },
-    
+
     /**
      * 切换时间范围
      */
@@ -282,14 +297,14 @@ function dashboardPanelPage() {
       this.timeRange = range
       this.loadDashboardData()
     },
-    
+
     /**
      * 刷新仪表盘
      */
     async refreshDashboard() {
       await this.loadDashboardData()
     },
-    
+
     /**
      * 快捷操作 - 跳转到对应页面
      */
@@ -300,27 +315,29 @@ function dashboardPanelPage() {
         'lottery-alerts': '/admin/lottery-alerts.html',
         'risk-alerts': '/admin/risk-alerts.html',
         'campaign-create': '/admin/lottery-management.html',
-        'statistics': '/admin/statistics.html'
+        statistics: '/admin/statistics.html'
       }
-      
+
       const url = actionMap[action]
       if (url) {
         // 通知父窗口打开Tab
         if (window.parent && window.parent !== window) {
-          window.parent.dispatchEvent(new CustomEvent('open-tab', {
-            detail: {
-              id: action,
-              title: this.getActionTitle(action),
-              icon: this.getActionIcon(action),
-              url: url
-            }
-          }))
+          window.parent.dispatchEvent(
+            new CustomEvent('open-tab', {
+              detail: {
+                id: action,
+                title: this.getActionTitle(action),
+                icon: this.getActionIcon(action),
+                url: url
+              }
+            })
+          )
         } else {
           window.location.href = url
         }
       }
     },
-    
+
     /**
      * 获取操作标题
      */
@@ -331,11 +348,11 @@ function dashboardPanelPage() {
         'lottery-alerts': '抽奖告警',
         'risk-alerts': '风控告警',
         'campaign-create': '抽奖活动',
-        'statistics': '数据统计'
+        statistics: '数据统计'
       }
       return titles[action] || action
     },
-    
+
     /**
      * 获取操作图标
      */
@@ -346,17 +363,21 @@ function dashboardPanelPage() {
         'lottery-alerts': '🚨',
         'risk-alerts': '⚠️',
         'campaign-create': '🎯',
-        'statistics': '📊'
+        statistics: '📊'
       }
       return icons[action] || '📄'
     },
-    
+
     /**
      * 处理预警项
      */
     handleAlert(alert) {
       // 根据预警类型跳转到相应页面
-      if (alert.type === 'lottery' || alert.title?.includes('抽奖') || alert.title?.includes('中奖')) {
+      if (
+        alert.type === 'lottery' ||
+        alert.title?.includes('抽奖') ||
+        alert.title?.includes('中奖')
+      ) {
         this.quickAction('lottery-alerts')
       } else if (alert.type === 'risk' || alert.title?.includes('风控')) {
         this.quickAction('risk-alerts')
@@ -364,7 +385,7 @@ function dashboardPanelPage() {
         this.quickAction('campaign-create')
       }
     },
-    
+
     /**
      * 格式化数字
      */
@@ -374,7 +395,7 @@ function dashboardPanelPage() {
       }
       return num?.toLocaleString() || '0'
     },
-    
+
     /**
      * 格式化时间
      */
@@ -383,15 +404,15 @@ function dashboardPanelPage() {
       const date = new Date(dateStr)
       const now = new Date()
       const diff = now - date
-      
+
       if (diff < 60000) return '刚刚'
       if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前'
       if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前'
-      
-      return date.toLocaleString('zh-CN', { 
-        month: '2-digit', 
-        day: '2-digit', 
-        hour: '2-digit', 
+
+      return date.toLocaleString('zh-CN', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
         minute: '2-digit',
         timeZone: 'Asia/Shanghai'
       })
@@ -410,4 +431,3 @@ document.addEventListener('alpine:init', () => {
 // 导出
 export { dashboardPanelPage }
 export default dashboardPanelPage
-

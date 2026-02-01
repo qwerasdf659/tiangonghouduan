@@ -13,9 +13,9 @@ import { request, buildURL } from '../api/base.js'
 // API 端点
 const MESSAGE_ENDPOINTS = {
   LIST: '/console/notifications',
-  MARK_READ: (id) => `/console/notifications/${id}/read`,
+  MARK_READ: id => `/console/notifications/${id}/read`,
   MARK_ALL_READ: '/console/notifications/read-all',
-  DELETE: (id) => `/console/notifications/${id}`
+  DELETE: id => `/console/notifications/${id}`
 }
 
 /**
@@ -90,7 +90,8 @@ function messageCenterPage() {
         if (result.data) {
           this.messages = result.data.items || result.data || []
           this.pagination.total = result.data.total || this.messages.length
-          this.unreadCount = result.data.unread_count || this.messages.filter(m => !m.is_read).length
+          this.unreadCount =
+            result.data.unread_count || this.messages.filter(m => !m.is_read).length
         }
       } catch (e) {
         logger.warn('[MessageCenter] loadMessages 失败:', e.message)
@@ -381,4 +382,3 @@ document.addEventListener('alpine:init', () => {
 })
 
 export { messageCenterPage }
-

@@ -26,7 +26,7 @@ export function useConsumptionState() {
       payment_method: '',
       start_date: '',
       end_date: '',
-      anomaly_type: ''  // F-41: 异常类型筛选
+      anomaly_type: '' // F-41: 异常类型筛选
     },
     // ========== F-43: 异常统计面板状态 ==========
     /** @type {Object} 异常统计数据 */
@@ -152,7 +152,7 @@ export function useConsumptionMethods() {
         payment_method: '',
         start_date: '',
         end_date: '',
-        anomaly_type: ''  // F-41: 异常类型筛选
+        anomaly_type: '' // F-41: 异常类型筛选
       }
       this.financePagination.page = 1
       this.loadConsumptions()
@@ -209,9 +209,15 @@ export function useConsumptionMethods() {
       this.consumptions.forEach(record => {
         if (record.is_suspicious || record.risk_level === 'high' || record.anomaly_type) {
           stats.total_anomaly++
-          if (record.anomaly_type === 'high_frequency' || record.anomaly_type === 'rapid_succession') {
+          if (
+            record.anomaly_type === 'high_frequency' ||
+            record.anomaly_type === 'rapid_succession'
+          ) {
             stats.high_frequency++
-          } else if (record.anomaly_type === 'high_amount' || record.anomaly_type === 'first_time_high') {
+          } else if (
+            record.anomaly_type === 'high_amount' ||
+            record.anomaly_type === 'first_time_high'
+          ) {
             stats.high_amount++
           } else if (record.anomaly_type === 'unusual_time') {
             stats.unusual_time++
@@ -417,16 +423,13 @@ export function useConsumptionMethods() {
         async () => {
           this.batchProcessing = true
           try {
-            const response = await this.apiCall(
-              '/api/v4/console/consumption/batch-review',
-              {
-                method: 'POST',
-                data: {
-                  record_ids: this.selectedIds,
-                  action: 'approve'
-                }
+            const response = await this.apiCall('/api/v4/console/consumption/batch-review', {
+              method: 'POST',
+              data: {
+                record_ids: this.selectedIds,
+                action: 'approve'
               }
-            )
+            })
 
             if (response?.success) {
               this.batchResult = response.data
@@ -470,17 +473,14 @@ export function useConsumptionMethods() {
         async () => {
           this.batchProcessing = true
           try {
-            const response = await this.apiCall(
-              '/api/v4/console/consumption/batch-review',
-              {
-                method: 'POST',
-                data: {
-                  record_ids: this.selectedIds,
-                  action: 'reject',
-                  reason: reason.trim()
-                }
+            const response = await this.apiCall('/api/v4/console/consumption/batch-review', {
+              method: 'POST',
+              data: {
+                record_ids: this.selectedIds,
+                action: 'reject',
+                reason: reason.trim()
               }
-            )
+            })
 
             if (response?.success) {
               this.batchResult = response.data
@@ -540,15 +540,15 @@ export function useConsumptionMethods() {
      */
     getAnomalyTooltip(record) {
       const tips = []
-      
+
       if (record.anomaly_type) {
         tips.push(`异常类型: ${this.getAnomalyLabel(record.anomaly_type)}`)
       }
-      
+
       if (record.risk_reasons && record.risk_reasons.length > 0) {
         tips.push(`风险原因: ${record.risk_reasons.join('、')}`)
       }
-      
+
       if (record.risk_level) {
         const levelText = { high: '高风险', medium: '中风险', low: '低风险' }
         tips.push(`风险级别: ${levelText[record.risk_level] || record.risk_level}`)

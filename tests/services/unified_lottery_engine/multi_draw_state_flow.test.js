@@ -27,13 +27,14 @@ const {
 } = require('../../../services/UnifiedLotteryEngine/compute')
 
 const models = require('../../../models')
-const { User, LotteryCampaign, LotteryUserExperienceState } = models
+const { User, LotteryCampaign } = models
+// LotteryUserExperienceState 用于后续状态持久化测试扩展
 
 describe('连抽状态流转测试（任务8.1）', () => {
   let experience_state_manager
-  let anti_high_handler
-  let lottery_compute_engine
-  let unified_lottery_engine
+  let _anti_high_handler // 用于后续集成测试场景扩展
+  let _lottery_compute_engine // 用于后续集成测试场景扩展
+  let _unified_lottery_engine // 用于后续集成测试场景扩展
   let test_user = null
   let test_campaign = null
 
@@ -59,12 +60,12 @@ describe('连抽状态流转测试（任务8.1）', () => {
 
     // 创建计算器实例
     experience_state_manager = new ExperienceStateManager()
-    anti_high_handler = new AntiHighStreakHandler()
-    lottery_compute_engine = new LotteryComputeEngine()
+    _anti_high_handler = new AntiHighStreakHandler()
+    _lottery_compute_engine = new LotteryComputeEngine()
 
     // 获取服务实例（如果可用）
     try {
-      unified_lottery_engine = global.getTestService('unified_lottery_engine')
+      _unified_lottery_engine = global.getTestService('unified_lottery_engine')
     } catch (error) {
       console.log('⚠️ 未能获取 unified_lottery_engine 服务，部分测试将使用模拟数据')
     }

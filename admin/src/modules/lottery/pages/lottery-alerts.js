@@ -352,15 +352,19 @@ function lotteryAlertsPage() {
 
     /**
      * 加载活动列表
+     * @description 后端返回字段为 lottery_campaign_id 和 campaign_name
      */
     async loadCampaigns() {
       try {
         const response = await apiRequest(LOTTERY_CORE_ENDPOINTS.CAMPAIGN_LIST)
         if (response && response.success) {
+          // 后端返回 data.campaigns 数组，每个元素包含 lottery_campaign_id 和 campaign_name
           this.campaigns = response.data?.campaigns || response.data?.items || response.data || []
+          logger.info('[LotteryAlerts] 加载活动列表成功:', this.campaigns.length)
         }
       } catch (error) {
         logger.warn('[LotteryAlerts] 加载活动列表失败:', error.message)
+        this.campaigns = []
       }
     },
 
@@ -412,16 +416,17 @@ function lotteryAlertsPage() {
      */
     updateStats(data) {
       const summary = data.summary || {}
-      
+
       // 从 summary 获取统计数据
       this.stats.danger = summary.danger || 0
       this.stats.warning = summary.warning || 0
       this.stats.info = summary.info || 0
-      
+
       // 计算已确认和已解决数量
       const alerts = data.alerts || data.items || []
       this.stats.acknowledged = alerts.filter(a => a.status === 'acknowledged').length
-      this.stats.resolved = data.resolved_count || alerts.filter(a => a.status === 'resolved').length
+      this.stats.resolved =
+        data.resolved_count || alerts.filter(a => a.status === 'resolved').length
     },
 
     // ==================== 分页操作 ====================
@@ -480,9 +485,12 @@ function lotteryAlertsPage() {
         `确定要批量确认选中的 ${this.selectedAlerts.length} 条告警吗？`,
         async () => {
           const promises = this.selectedAlerts.map(alertId =>
-            apiRequest(buildURL(LOTTERY_ADVANCED_ENDPOINTS.REALTIME_ALERT_ACKNOWLEDGE, { id: alertId }), {
-              method: 'POST'
-            })
+            apiRequest(
+              buildURL(LOTTERY_ADVANCED_ENDPOINTS.REALTIME_ALERT_ACKNOWLEDGE, { id: alertId }),
+              {
+                method: 'POST'
+              }
+            )
           )
           await Promise.all(promises)
           return { count: this.selectedAlerts.length }
@@ -509,10 +517,13 @@ function lotteryAlertsPage() {
         `确定要批量解决选中的 ${this.selectedAlerts.length} 条告警吗？`,
         async () => {
           const promises = this.selectedAlerts.map(alertId =>
-            apiRequest(buildURL(LOTTERY_ADVANCED_ENDPOINTS.REALTIME_ALERT_RESOLVE, { id: alertId }), {
-              method: 'POST',
-              data: { resolve_notes: '批量解决' }
-            })
+            apiRequest(
+              buildURL(LOTTERY_ADVANCED_ENDPOINTS.REALTIME_ALERT_RESOLVE, { id: alertId }),
+              {
+                method: 'POST',
+                data: { resolve_notes: '批量解决' }
+              }
+            )
           )
           await Promise.all(promises)
           return { count: this.selectedAlerts.length }
@@ -540,7 +551,7 @@ function lotteryAlertsPage() {
      */
     async acknowledgeAlert(alert) {
       const alertId = alert.alert_id
-      
+
       try {
         const response = await apiRequest(
           buildURL(LOTTERY_ADVANCED_ENDPOINTS.REALTIME_ALERT_ACKNOWLEDGE, { id: alertId }),
@@ -579,7 +590,9 @@ function lotteryAlertsPage() {
       this.submitting = true
       try {
         const response = await apiRequest(
-          buildURL(LOTTERY_ADVANCED_ENDPOINTS.REALTIME_ALERT_RESOLVE, { id: this.resolveForm.alert_id }),
+          buildURL(LOTTERY_ADVANCED_ENDPOINTS.REALTIME_ALERT_RESOLVE, {
+            id: this.resolveForm.alert_id
+          }),
           {
             method: 'POST',
             data: { resolve_notes: this.resolveForm.resolve_notes }
@@ -657,13 +670,15 @@ function lotteryAlertsPage() {
      */
     formatThreshold(alert) {
       if (!alert.threshold && !alert.current_value) return '-'
-      
-      const threshold = alert.threshold !== null && alert.threshold !== undefined
-        ? parseFloat(alert.threshold).toFixed(2)
-        : '-'
-      const actual = alert.current_value !== null && alert.current_value !== undefined
-        ? parseFloat(alert.current_value).toFixed(2)
-        : '-'
+
+      const threshold =
+        alert.threshold !== null && alert.threshold !== undefined
+          ? parseFloat(alert.threshold).toFixed(2)
+          : '-'
+      const actual =
+        alert.current_value !== null && alert.current_value !== undefined
+          ? parseFloat(alert.current_value).toFixed(2)
+          : '-'
       return `${threshold} / ${actual}`
     },
 
@@ -676,7 +691,8 @@ function lotteryAlertsPage() {
         // 如果是后端返回的时间对象格式
         if (typeof dateValue === 'object' && dateValue !== null) {
           if (dateValue.beijing) return dateValue.beijing
-          if (dateValue.iso) return new Date(dateValue.iso).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+          if (dateValue.iso)
+            return new Date(dateValue.iso).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
         }
         // 如果是字符串格式
         return new Date(dateValue).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
@@ -718,13 +734,14 @@ function lotteryAlertsPage() {
 
       if (result.success && result.data) {
         const data = result.data.data || result.data
-        
+
         // 更新健康度数据
         this.healthData = {
           overall_score: data.overall_score || data.health_score || 0,
           budget_health: data.budget_health || data.dimensions?.budget_health || 0,
           win_rate_health: data.win_rate_health || data.dimensions?.win_rate_health || 0,
-          prize_distribution_health: data.prize_distribution_health || data.dimensions?.prize_distribution_health || 0,
+          prize_distribution_health:
+            data.prize_distribution_health || data.dimensions?.prize_distribution_health || 0,
           budget_remaining_days: data.budget_remaining_days || data.budget?.remaining_days || 0,
           current_win_rate: data.current_win_rate || data.metrics?.win_rate || 0,
           high_tier_ratio: data.high_tier_ratio || data.tier_distribution?.high?.percentage || 0,
@@ -769,19 +786,19 @@ function lotteryAlertsPage() {
       if (this.tierDistributionChart) {
         const tierData = this.healthData.tier_distribution
         const pieData = [
-          { 
-            value: tierData.high?.count || tierData.high || 0, 
-            name: '高档位', 
+          {
+            value: tierData.high?.count || tierData.high || 0,
+            name: '高档位',
             itemStyle: { color: '#ee6666' }
           },
-          { 
-            value: tierData.mid?.count || tierData.mid || 0, 
-            name: '中档位', 
+          {
+            value: tierData.mid?.count || tierData.mid || 0,
+            name: '中档位',
             itemStyle: { color: '#fac858' }
           },
-          { 
-            value: tierData.fallback?.count || tierData.fallback || tierData.low || 0, 
-            name: '保底', 
+          {
+            value: tierData.fallback?.count || tierData.fallback || tierData.low || 0,
+            name: '保底',
             itemStyle: { color: '#91cc75' }
           }
         ].filter(item => item.value > 0)
@@ -789,15 +806,17 @@ function lotteryAlertsPage() {
         this.tierDistributionChart.setOption({
           tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
           legend: { orient: 'vertical', left: 'left', top: 'center' },
-          series: [{
-            name: '档位分布',
-            type: 'pie',
-            radius: ['40%', '70%'],
-            avoidLabelOverlap: true,
-            itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
-            label: { show: true, formatter: '{b}: {d}%' },
-            data: pieData
-          }]
+          series: [
+            {
+              name: '档位分布',
+              type: 'pie',
+              radius: ['40%', '70%'],
+              avoidLabelOverlap: true,
+              itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
+              label: { show: true, formatter: '{b}: {d}%' },
+              data: pieData
+            }
+          ]
         })
       }
 
@@ -812,29 +831,34 @@ function lotteryAlertsPage() {
           grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
           xAxis: { type: 'category', data: dates },
           yAxis: { type: 'value', min: 0, max: 100, name: '健康度' },
-          series: [{
-            name: '健康度',
-            type: 'line',
-            smooth: true,
-            data: scores,
-            lineStyle: { color: '#5470c6', width: 3 },
-            areaStyle: {
-              color: {
-                type: 'linear',
-                x: 0, y: 0, x2: 0, y2: 1,
-                colorStops: [
-                  { offset: 0, color: 'rgba(84, 112, 198, 0.5)' },
-                  { offset: 1, color: 'rgba(84, 112, 198, 0.1)' }
+          series: [
+            {
+              name: '健康度',
+              type: 'line',
+              smooth: true,
+              data: scores,
+              lineStyle: { color: '#5470c6', width: 3 },
+              areaStyle: {
+                color: {
+                  type: 'linear',
+                  x: 0,
+                  y: 0,
+                  x2: 0,
+                  y2: 1,
+                  colorStops: [
+                    { offset: 0, color: 'rgba(84, 112, 198, 0.5)' },
+                    { offset: 1, color: 'rgba(84, 112, 198, 0.1)' }
+                  ]
+                }
+              },
+              markLine: {
+                data: [
+                  { yAxis: 80, name: '良好', lineStyle: { color: '#91cc75' } },
+                  { yAxis: 60, name: '警戒', lineStyle: { color: '#fac858' } }
                 ]
               }
-            },
-            markLine: {
-              data: [
-                { yAxis: 80, name: '良好', lineStyle: { color: '#91cc75' } },
-                { yAxis: 60, name: '警戒', lineStyle: { color: '#fac858' } }
-              ]
             }
-          }]
+          ]
         })
       }
     }
@@ -847,4 +871,3 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('lotteryAlertsPage', lotteryAlertsPage)
   logger.info('[LotteryAlertsPage] Alpine 组件已注册')
 })
-

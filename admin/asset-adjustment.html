@@ -101,8 +101,8 @@
               <label class="block text-sm font-medium themed-text-secondary mb-1">关联活动 <span class="text-red-500">*</span></label>
               <select x-model="form.campaign_id" class="w-full px-3 py-2 border rounded-lg">
                 <option value="">请选择活动</option>
-                <template x-for="campaign in campaigns" :key="campaign.campaign_id">
-                  <option :value="campaign.campaign_id" x-text="campaign.name || campaign.campaign_name || ('活动#' + campaign.campaign_id)"></option>
+                <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
+                  <option :value="campaign.lottery_campaign_id" x-text="campaign.name || campaign.campaign_name || ('活动#' + campaign.lottery_campaign_id)"></option>
                 </template>
               </select>
               <p x-show="campaigns.length === 0" class="mt-1 text-sm text-yellow-600">⚠️ 暂无可用活动，请先创建活动</p>
@@ -269,8 +269,8 @@
             <label class="block text-sm font-medium themed-text-secondary mb-1">关联活动 <span class="text-red-500">*</span></label>
             <select x-model="adjustForm.campaign_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500">
               <option value="">请选择活动</option>
-              <template x-for="campaign in campaigns" :key="campaign.campaign_id">
-                <option :value="campaign.campaign_id" x-text="campaign.campaign_name"></option>
+              <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
+                <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
               </template>
             </select>
           </div>

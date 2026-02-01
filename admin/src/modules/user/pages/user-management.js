@@ -311,23 +311,27 @@ document.addEventListener('alpine:init', () => {
       const segmentContainer = document.getElementById('userSegmentChart')
       if (segmentContainer && !this.segmentChart) {
         this.segmentChart = echarts.init(segmentContainer)
-        
-        const segmentData = Object.entries(this.userSegments).map(([key, value]) => ({
-          name: this.getSegmentName(key),
-          value: value.count || value
-        })).filter(item => item.value > 0)
+
+        const segmentData = Object.entries(this.userSegments)
+          .map(([key, value]) => ({
+            name: this.getSegmentName(key),
+            value: value.count || value
+          }))
+          .filter(item => item.value > 0)
 
         this.segmentChart.setOption({
           tooltip: { trigger: 'item', formatter: '{b}: {c}人 ({d}%)' },
           legend: { orient: 'vertical', left: 'left', top: 'center' },
-          series: [{
-            type: 'pie',
-            radius: ['40%', '70%'],
-            avoidLabelOverlap: true,
-            itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
-            label: { show: true, formatter: '{b}: {d}%' },
-            data: segmentData
-          }]
+          series: [
+            {
+              type: 'pie',
+              radius: ['40%', '70%'],
+              avoidLabelOverlap: true,
+              itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
+              label: { show: true, formatter: '{b}: {d}%' },
+              data: segmentData
+            }
+          ]
         })
       }
 
@@ -343,19 +347,21 @@ document.addEventListener('alpine:init', () => {
 
         this.funnelChart.setOption({
           tooltip: { trigger: 'item', formatter: '{b}: {c}' },
-          series: [{
-            type: 'funnel',
-            left: '10%',
-            top: 60,
-            bottom: 60,
-            width: '80%',
-            min: 0,
-            max: funnelData[0]?.value || 100,
-            gap: 2,
-            label: { show: true, position: 'inside' },
-            labelLine: { show: false },
-            data: funnelData
-          }]
+          series: [
+            {
+              type: 'funnel',
+              left: '10%',
+              top: 60,
+              bottom: 60,
+              width: '80%',
+              min: 0,
+              max: funnelData[0]?.value || 100,
+              gap: 2,
+              label: { show: true, position: 'inside' },
+              labelLine: { show: false },
+              data: funnelData
+            }
+          ]
         })
       }
 
@@ -363,12 +369,12 @@ document.addEventListener('alpine:init', () => {
       const heatmapContainer = document.getElementById('activityHeatmapChart')
       if (heatmapContainer && !this.heatmapChart && this.activityHeatmap?.length > 0) {
         this.heatmapChart = echarts.init(heatmapContainer)
-        
+
         // 格式化热力图数据 [weekday, hour, value]
         const heatmapData = []
         const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
         const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`)
-        
+
         this.activityHeatmap.forEach((dayData, dayIndex) => {
           if (Array.isArray(dayData)) {
             dayData.forEach((value, hourIndex) => {
@@ -376,14 +382,15 @@ document.addEventListener('alpine:init', () => {
             })
           }
         })
-        
+
         // 计算最大值
         const maxValue = Math.max(...heatmapData.map(d => d[2]), 1)
-        
+
         this.heatmapChart.setOption({
           tooltip: {
             position: 'top',
-            formatter: (params) => `${days[params.value[1]]} ${hours[params.value[0]]}<br/>活跃用户: ${params.value[2]}`
+            formatter: params =>
+              `${days[params.value[1]]} ${hours[params.value[0]]}<br/>活跃用户: ${params.value[2]}`
           },
           grid: {
             top: '10%',
@@ -416,14 +423,16 @@ document.addEventListener('alpine:init', () => {
               color: ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39']
             }
           },
-          series: [{
-            type: 'heatmap',
-            data: heatmapData,
-            label: { show: false },
-            emphasis: {
-              itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' }
+          series: [
+            {
+              type: 'heatmap',
+              data: heatmapData,
+              label: { show: false },
+              emphasis: {
+                itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' }
+              }
             }
-          }]
+          ]
         })
       }
     },
@@ -450,7 +459,7 @@ document.addEventListener('alpine:init', () => {
      */
     async loadUserActivities(userId) {
       if (!userId) return
-      
+
       try {
         const response = await fetch(`${API_PREFIX}/console/users/${userId}/activities?limit=10`, {
           headers: authHeaders()

@@ -726,7 +726,7 @@ class MockDistributedLock {
    * 检查故障注入
    * @private
    */
-  async _checkFault(operation) {
+  async _checkFault(_operation) {
     // 检查固定故障类型
     if (this._fault_type !== LOCK_FAULT_TYPE.NONE) {
       this._stats.simulated_faults++

@@ -40,8 +40,9 @@ const cron = require('node-cron')
  * P1-9：服务通过 ServiceManager 获取（snake_case key）
  * 移除直接 require 服务文件，改为在 initializeServices() 中通过 ServiceManager 获取
  * 以下服务统一通过 ServiceManager 获取：
- * - exchange_market (ExchangeService)
- * - admin_lottery (AdminLotteryService)
+ * - exchange_core (ExchangeService) - V4.7.0 拆分后
+ * - admin_lottery_core (AdminLotteryCoreService) - V4.7.0 拆分后：核心干预操作
+ * - admin_lottery_campaign (AdminLotteryCampaignService) - V4.7.0 拆分后：活动管理操作
  * - notification (NotificationService)
  * - trade_order (TradeOrderService)
  * - management_strategy (ManagementStrategy)
@@ -98,15 +99,17 @@ class ScheduledTasks {
    * P1-9：服务实例（通过 ServiceManager 获取，使用 snake_case key）
    * 在 initializeServices() 中初始化，供定时任务使用
    * snake_case 服务键：
-   * - exchange_market → ExchangeService
-   * - admin_lottery → AdminLotteryService
+   * - exchange_core → ExchangeService（V4.7.0 拆分后）
+   * - admin_lottery_core → AdminLotteryCoreService（V4.7.0 拆分后 - 核心干预操作）
+   * - admin_lottery_campaign → AdminLotteryCampaignService（V4.7.0 拆分后 - 活动管理）
    * - notification → NotificationService
    * - trade_order → TradeOrderService
    * - management_strategy → ManagementStrategy
    * - unified_lottery_engine → UnifiedLotteryEngine（2026-01-30 新增，Task 27 缓存清理）
    */
   static ExchangeService = null
-  static AdminLotteryService = null
+  static AdminLotteryCoreService = null // V4.7.0 拆分后：核心干预操作
+  static AdminLotteryCampaignService = null // V4.7.0 拆分后：活动管理操作
   static NotificationService = null
   static TradeOrderService = null
   static ManagementStrategy = null
@@ -133,11 +136,14 @@ class ScheduledTasks {
 
       /*
        * P1-9：使用 snake_case 服务键获取服务
-       * V4.7.0 大文件拆分：exchange_market → exchange_core, admin_lottery → admin_lottery_core
+       * V4.7.0 大文件拆分：
+       * - exchange_market → exchange_core
+       * - admin_lottery → admin_lottery_core (核心干预) + admin_lottery_campaign (活动管理)
        * 2026-01-30 新增：unified_lottery_engine（用于 Task 27 CacheManager 缓存清理）
        */
       this.ExchangeService = serviceManager.getService('exchange_core') // V4.7.0 拆分后使用 exchange_core
-      this.AdminLotteryService = serviceManager.getService('admin_lottery_core') // V4.7.0 拆分后使用 admin_lottery_core
+      this.AdminLotteryCoreService = serviceManager.getService('admin_lottery_core') // V4.7.0 拆分后：核心干预操作
+      this.AdminLotteryCampaignService = serviceManager.getService('admin_lottery_campaign') // V4.7.0 拆分后：活动管理操作
       this.NotificationService = serviceManager.getService('notification')
       this.TradeOrderService = serviceManager.getService('trade_order')
       this.ManagementStrategy = serviceManager.getService('management_strategy')
@@ -148,6 +154,7 @@ class ScheduledTasks {
         services: [
           'exchange_core',
           'admin_lottery_core',
+          'admin_lottery_campaign',
           'notification',
           'trade_order',
           'management_strategy',
@@ -766,7 +773,8 @@ class ScheduledTasks {
    * 2. 记录重置日志和统计信息
    *
    * 架构设计：
-   * - 从LotteryPrize模型迁移到AdminLotteryService（符合任务2.1）
+   * - 从LotteryPrize模型迁移到AdminLotteryCampaignService（V4.7.0拆分后）
+   * - ServiceManager key: admin_lottery_campaign
    * - 批处理逻辑应在Service层，Model层只保留字段定义
    *
    * 参考文档：docs/架构重构待办清单.md - 任务2.1
@@ -782,8 +790,8 @@ class ScheduledTasks {
 
         logger.info('[定时任务] 开始重置抽奖奖品每日中奖次数...')
 
-        // P1-9：通过 ServiceManager 获取 AdminLotteryService
-        const result = await ScheduledTasks.AdminLotteryService.resetDailyWinCounts()
+        // V4.7.0 拆分后：通过 AdminLotteryCampaignService 执行活动管理操作
+        const result = await ScheduledTasks.AdminLotteryCampaignService.resetDailyWinCounts()
 
         logger.info('[定时任务] 抽奖奖品每日中奖次数重置完成', {
           updated_count: result.updated_count,
@@ -813,7 +821,8 @@ class ScheduledTasks {
    * 3. 记录状态变更日志和统计信息
    *
    * 架构设计：
-   * - 从LotteryCampaign模型迁移到AdminLotteryService（符合任务2.1）
+   * - 从LotteryCampaign模型迁移到AdminLotteryCampaignService（V4.7.0拆分后）
+   * - ServiceManager key: admin_lottery_campaign
    * - 批处理逻辑应在Service层，Model层只保留字段定义
    *
    * 参考文档：docs/架构重构待办清单.md - 任务2.1
@@ -829,8 +838,8 @@ class ScheduledTasks {
 
         logger.info('[定时任务] 开始同步抽奖活动状态...')
 
-        // P1-9：通过 ServiceManager 获取 AdminLotteryService
-        const result = await ScheduledTasks.AdminLotteryService.syncCampaignStatus()
+        // V4.7.0 拆分后：通过 AdminLotteryCampaignService 执行活动管理操作
+        const result = await ScheduledTasks.AdminLotteryCampaignService.syncCampaignStatus()
 
         if (result.started > 0 || result.ended > 0) {
           logger.info('[定时任务] 抽奖活动状态同步完成', {
@@ -872,8 +881,8 @@ class ScheduledTasks {
       // P1-9：确保服务已初始化
       await ScheduledTasks.initializeServices()
 
-      // P1-9：通过 ServiceManager 获取 AdminLotteryService
-      const result = await ScheduledTasks.AdminLotteryService.resetDailyWinCounts()
+      // V4.7.0 拆分后：通过 AdminLotteryCampaignService 执行活动管理操作
+      const result = await ScheduledTasks.AdminLotteryCampaignService.resetDailyWinCounts()
       logger.info('[手动触发] 重置完成', { result })
       return result
     } catch (error) {
@@ -906,8 +915,8 @@ class ScheduledTasks {
       // P1-9：确保服务已初始化
       await ScheduledTasks.initializeServices()
 
-      // P1-9：通过 ServiceManager 获取 AdminLotteryService
-      const result = await ScheduledTasks.AdminLotteryService.syncCampaignStatus()
+      // V4.7.0 拆分后：通过 AdminLotteryCampaignService 执行活动管理操作
+      const result = await ScheduledTasks.AdminLotteryCampaignService.syncCampaignStatus()
       logger.info('[手动触发] 同步完成', { result })
       return result
     } catch (error) {

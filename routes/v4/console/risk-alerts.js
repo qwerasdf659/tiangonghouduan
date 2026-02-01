@@ -154,7 +154,7 @@ router.get('/pending', authenticateToken, requireRoleLevel(100), async (req, res
 
     // 格式化响应
     const items = (result.items || result.alerts || []).map(alert => ({
-      alert_id: alert.alert_id,
+      risk_alert_id: alert.risk_alert_id,
       alert_type: alert.alert_type,
       severity: alert.severity,
       rule_name: alert.rule_name,

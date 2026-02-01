@@ -27,13 +27,13 @@
 const request = require('supertest')
 const app = require('../../app')
 const BeijingTimeHelper = require('../../utils/timeHelper')
-const { sequelize, LotteryCampaign, User } = require('../../models')
+const { sequelize, LotteryCampaign } = require('../../models')
+// User 用于后续用户时区偏好测试扩展
 const {
-  TestConfig,
   initRealTestData,
   getRealTestUserId,
-  getRealTestCampaignId,
-  TestAssertions
+  getRealTestCampaignId
+  // TestConfig, TestAssertions 用于后续参数化测试扩展
 } = require('../helpers/test-setup')
 
 // 测试配置常量

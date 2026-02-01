@@ -10,13 +10,14 @@ import { API_PREFIX, authHeaders, handleResponse } from './base.js'
 // 健康度端点（与后端 routes/v4/console/lottery-health.js 对齐）
 export const LOTTERY_HEALTH_ENDPOINTS = {
   // GET /console/lottery-health/:id - 获取活动健康度报告
-  CAMPAIGN: (campaignId) => `${API_PREFIX}/console/lottery-health/${campaignId}`,
+  CAMPAIGN: campaignId => `${API_PREFIX}/console/lottery-health/${campaignId}`,
   // GET /console/lottery-health/:id/tier-distribution - 档位分布
-  TIER_DISTRIBUTION: (campaignId) => `${API_PREFIX}/console/lottery-health/${campaignId}/tier-distribution`,
+  TIER_DISTRIBUTION: campaignId =>
+    `${API_PREFIX}/console/lottery-health/${campaignId}/tier-distribution`,
   // GET /console/lottery-health/:id/diagnose - 问题诊断
-  DIAGNOSE: (campaignId) => `${API_PREFIX}/console/lottery-health/${campaignId}/diagnose`,
+  DIAGNOSE: campaignId => `${API_PREFIX}/console/lottery-health/${campaignId}/diagnose`,
   // GET /console/lottery-health/:id/budget-rate - 预算消耗速度
-  BUDGET_RATE: (campaignId) => `${API_PREFIX}/console/lottery-health/${campaignId}/budget-rate`
+  BUDGET_RATE: campaignId => `${API_PREFIX}/console/lottery-health/${campaignId}/budget-rate`
 }
 
 /**
@@ -84,4 +85,3 @@ export const LotteryHealthAPI = {
     return handleResponse(response)
   }
 }
-

@@ -4,7 +4,8 @@
  * 创建抽奖清除设置记录表（lottery_clear_setting_records）
  *
  * 业务场景：为 lottery_clear_settings 审计日志提供业务主键
- * - 解决 AdminLotteryService.clearUserSettings 审计时 target_id: null 导致关键操作被阻断的问题
+ * - 解决 AdminLotteryCoreService.clearUserSettings 审计时 target_id: null 导致关键操作被阻断的问题
+ *   （V4.7.0 大文件拆分：AdminLotteryService → AdminLotteryCoreService，ServiceManager key: admin_lottery_core）
  * - 符合审计统一入口整合方案（2026-01-08）决策9：无业务主键的关键操作新增业务记录表
  *
  * 表结构说明：

@@ -14,12 +14,12 @@ import { request, buildURL } from '../api/base.js'
 const REMINDER_ENDPOINTS = {
   LIST: '/console/reminder-rules',
   CREATE: '/console/reminder-rules',
-  DETAIL: (id) => `/console/reminder-rules/${id}`,
-  UPDATE: (id) => `/console/reminder-rules/${id}`,
-  DELETE: (id) => `/console/reminder-rules/${id}`,
-  TOGGLE: (id) => `/console/reminder-rules/${id}/toggle`,
-  TEST: (id) => `/console/reminder-rules/${id}/test`,
-  EXECUTE: (id) => `/console/reminder-rules/${id}/execute`
+  DETAIL: id => `/console/reminder-rules/${id}`,
+  UPDATE: id => `/console/reminder-rules/${id}`,
+  DELETE: id => `/console/reminder-rules/${id}`,
+  TOGGLE: id => `/console/reminder-rules/${id}/toggle`,
+  TEST: id => `/console/reminder-rules/${id}/test`,
+  EXECUTE: id => `/console/reminder-rules/${id}/execute`
 }
 
 /**
@@ -94,12 +94,12 @@ function reminderRulesPage() {
      */
     async init() {
       logger.info('[ReminderRules] 初始化页面')
-      
+
       // 监听筛选变化
       this.$watch('filter.rule_type', () => this.loadRules())
       this.$watch('filter.priority', () => this.loadRules())
       this.$watch('filter.is_enabled', () => this.loadRules())
-      
+
       // 加载数据
       await this.loadRules()
     },
@@ -114,7 +114,7 @@ function reminderRulesPage() {
           page: this.pagination.page,
           page_size: this.pagination.page_size
         }
-        
+
         // 添加筛选条件
         if (this.filter.rule_type) {
           params.rule_type = this.filter.rule_type
@@ -212,7 +212,7 @@ function reminderRulesPage() {
 
       this.saving = true
       try {
-        const url = this.editMode 
+        const url = this.editMode
           ? REMINDER_ENDPOINTS.UPDATE(this.form.reminder_rule_id)
           : REMINDER_ENDPOINTS.CREATE
         const method = this.editMode ? 'PUT' : 'POST'
@@ -244,7 +244,7 @@ function reminderRulesPage() {
     async toggleRule(rule) {
       try {
         const newStatus = !rule.is_enabled
-        
+
         const response = await request({
           url: REMINDER_ENDPOINTS.TOGGLE(rule.reminder_rule_id),
           method: 'PUT',
@@ -277,7 +277,7 @@ function reminderRulesPage() {
 
         if (response.success) {
           const data = response.data
-          const msg = data.would_trigger 
+          const msg = data.would_trigger
             ? `规则会触发\n匹配用户数: ${data.matched_users}`
             : '规则不会触发（条件不满足）'
           this.showSuccess(msg)
@@ -421,4 +421,3 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('reminderRulesPage', reminderRulesPage)
   logger.info('[ReminderRules] 页面组件已注册')
 })
-

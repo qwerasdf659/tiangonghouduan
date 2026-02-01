@@ -19,7 +19,12 @@
  *
  * 相关服务：
  * - DebtManagementService: 欠账管理服务
- * - AdminLotteryService: 抽奖管理服务
+ * - AdminLotteryCoreService: 抽奖核心干预服务 (ServiceManager key: admin_lottery_core)
+ * - AdminLotteryCampaignService: 抽奖活动管理服务 (ServiceManager key: admin_lottery_campaign)
+ * - AdminLotteryQueryService: 抽奖干预查询服务 (ServiceManager key: admin_lottery_query)
+ *
+ * V4.7.0 大文件拆分（2026-01-31）：
+ * - 原 AdminLotteryService 已拆分为 AdminLotteryCoreService/CampaignService/QueryService
  *
  * 设置类型：
  * - force_win: 强制中奖（指定用户下次抽奖必中指定奖品）

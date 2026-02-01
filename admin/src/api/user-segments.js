@@ -10,7 +10,7 @@ import { API_PREFIX, authHeaders, handleResponse, buildURL } from './base.js'
 // 用户画像端点（后端挂载在 /console/users 下）
 export const USER_SEGMENTS_ENDPOINTS = {
   SEGMENTS: `${API_PREFIX}/console/users/segments`,
-  SEGMENT_USERS: (type) => `${API_PREFIX}/console/users/segments/${type}`,
+  SEGMENT_USERS: type => `${API_PREFIX}/console/users/segments/${type}`,
   ACTIVITY_HEATMAP: `${API_PREFIX}/console/users/activity-heatmap`,
   EXCHANGE_PREFERENCES: `${API_PREFIX}/console/users/exchange-preferences`,
   FUNNEL: `${API_PREFIX}/console/users/funnel`
@@ -88,4 +88,3 @@ export const UserSegmentsAPI = {
     return handleResponse(response)
   }
 }
-

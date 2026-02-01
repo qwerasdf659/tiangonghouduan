@@ -37,22 +37,17 @@ const logger = require('../../../utils/logger').logger
  * 获取 LotteryHealthService 服务实例
  *
  * 遵循项目规范：通过 req.app.locals.services.getService 获取服务
+ * 禁止直接 require 服务文件
  *
  * @param {Object} req - Express 请求对象
  * @returns {Object} LotteryHealthService 实例
  */
 function getLotteryHealthService(req) {
-  // 通过 app.locals.services 获取（项目标准模式）
   const service = req.app.locals.services?.getService('lottery_health')
-  if (service) {
-    return service
+  if (!service) {
+    throw new Error('LotteryHealthService 未在 ServiceManager 中注册')
   }
-
-  // 兜底：直接实例化（通过 ServiceManager 获取 models，Phase 3 收口）
-  logger.warn('通过 app.locals.services 获取 lottery_health 失败，使用直接实例化')
-  const { LotteryHealthService } = require('../../../services/lottery')
-  const models = req.models || req.app.locals.models
-  return new LotteryHealthService(models)
+  return service
 }
 
 /**

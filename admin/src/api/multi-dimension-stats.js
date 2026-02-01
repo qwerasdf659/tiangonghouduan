@@ -60,4 +60,3 @@ export const MultiDimensionStatsAPI = {
     return handleResponse(response)
   }
 }
-

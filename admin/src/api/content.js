@@ -61,8 +61,7 @@ import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
 export const CONTENT_ENDPOINTS = {
   // 客服会话
   CUSTOMER_SERVICE_SESSIONS: `${API_PREFIX}/console/customer-service/sessions`,
-  CUSTOMER_SERVICE_SESSION_MESSAGES:
-    `${API_PREFIX}/console/customer-service/sessions/:session_id/messages`,
+  CUSTOMER_SERVICE_SESSION_MESSAGES: `${API_PREFIX}/console/customer-service/sessions/:session_id/messages`,
   CUSTOMER_SERVICE_SEND_MESSAGE: `${API_PREFIX}/console/customer-service/sessions/:session_id/send`,
   CUSTOMER_SERVICE_MARK_READ: `${API_PREFIX}/console/customer-service/sessions/:session_id/mark-read`,
   CUSTOMER_SERVICE_TRANSFER: `${API_PREFIX}/console/customer-service/sessions/:session_id/transfer`,

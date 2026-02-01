@@ -451,7 +451,7 @@ export function useBudgetMethods() {
      * @param {Object} campaign - 活动对象
      */
     async viewBudgetTrend(campaign) {
-      const campaignId = campaign.campaign_id || campaign.id
+      const campaignId = campaign.lottery_campaign_id || campaign.id
       this.selectedBudgetCampaignId = campaignId
 
       // 加载趋势数据

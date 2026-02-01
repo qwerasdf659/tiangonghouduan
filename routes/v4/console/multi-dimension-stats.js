@@ -20,8 +20,22 @@ const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
 
-// 服务导入
-const { MultiDimensionStatsService } = require('../../../services/reporting')
+/**
+ * 获取 MultiDimensionStatsService 服务实例
+ *
+ * 遵循项目规范：通过 req.app.locals.services.getService 获取服务
+ * 禁止直接 require 服务文件
+ *
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} MultiDimensionStatsService 静态类
+ */
+function getMultiDimensionStatsService(req) {
+  const service = req.app.locals.services?.getService('multi_dimension_stats')
+  if (!service) {
+    throw new Error('MultiDimensionStatsService 未在 ServiceManager 中注册')
+  }
+  return service
+}
 
 /**
  * GET /multi-dimension - 多维度统计接口（B-25）
@@ -89,6 +103,9 @@ router.get('/multi-dimension', authenticateToken, requireRoleLevel(100), async (
         400
       )
     }
+
+    // 通过 ServiceManager 获取服务
+    const MultiDimensionStatsService = getMultiDimensionStatsService(req)
 
     // 调用服务
     const result = await MultiDimensionStatsService.getMultiDimensionStats(
@@ -207,6 +224,9 @@ router.get('/drill-down', authenticateToken, requireRoleLevel(100), async (req, 
     if (start_date) filters.start_date = start_date
     if (end_date) filters.end_date = end_date
     if (user_id) filters.user_id = parseInt(user_id)
+
+    // 通过 ServiceManager 获取服务
+    const MultiDimensionStatsService = getMultiDimensionStatsService(req)
 
     // 调用服务
     const result = await MultiDimensionStatsService.getDrillDownDetails({

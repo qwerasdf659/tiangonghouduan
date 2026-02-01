@@ -19,12 +19,7 @@
 
 .skeleton {
   border-radius: 0.25rem;
-  background: linear-gradient(
-    90deg,
-    #e5e7eb 25%,
-    #d1d5db 50%,
-    #e5e7eb 75%
-  );
+  background: linear-gradient(90deg, #e5e7eb 25%, #d1d5db 50%, #e5e7eb 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite ease-in-out;
 }
@@ -192,7 +187,8 @@
 /* ========== 脉冲动画 Pulse ========== */
 
 @keyframes pulse-fade {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -223,7 +219,9 @@
 /* ========== 三点跳动 Dots ========== */
 
 @keyframes bounce-dot {
-  0%, 80%, 100% {
+  0%,
+  80%,
+  100% {
     transform: scale(0.6);
     opacity: 0.5;
   }

@@ -110,4 +110,3 @@ export const ExchangeAPI = {
 }
 
 export default ExchangeAPI
-

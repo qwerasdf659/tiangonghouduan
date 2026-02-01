@@ -295,8 +295,8 @@ export function useStrategyMethods() {
 
         if (response?.success) {
           this.strategyEffectiveness = response.data
-          logger.info('[Strategy] 策略效果分析加载成功', { 
-            period: response.data?.analysis_period 
+          logger.info('[Strategy] 策略效果分析加载成功', {
+            period: response.data?.analysis_period
           })
         } else {
           this.showError('加载策略效果分析失败: ' + (response?.message || '未知错误'))

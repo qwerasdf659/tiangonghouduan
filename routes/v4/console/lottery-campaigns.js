@@ -46,6 +46,7 @@ const CACHE_KEYS = {
  * 获取 LotteryAnalyticsService 服务实例
  *
  * 遵循项目规范：通过 req.app.locals.services.getService 获取服务
+ * 禁止直接 require 服务文件
  *
  * @param {Object} req - Express 请求对象
  * @returns {Object} LotteryAnalyticsService 实例
@@ -58,15 +59,10 @@ function getLotteryAnalyticsService(req) {
 
   // 通过 app.locals.services 获取（项目标准模式）
   const service = req.app.locals.services?.getService('lottery_analytics_report')
-  if (service) {
-    return service
+  if (!service) {
+    throw new Error('LotteryAnalyticsService (lottery_analytics_report) 未在 ServiceManager 中注册')
   }
-
-  // 兜底：直接实例化拆分后的 ReportService（通过 ServiceManager 获取 models，Phase 3 收口）
-  logger.warn('通过 app.locals.services 获取 lottery_analytics_report 失败，使用直接实例化')
-  const LotteryReportService = require('../../../services/lottery-analytics/ReportService')
-  const models = req.models || req.app.locals.models
-  return new LotteryReportService(models)
+  return service
 }
 
 /**

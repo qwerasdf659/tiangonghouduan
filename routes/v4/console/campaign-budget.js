@@ -6,7 +6,7 @@
  * @date 2026-01-06
  *
  * 核心功能：
- * - 活动预算配置（budget_mode、pool_budget_remaining、allowed_lottery_campaign_ids）
+ * - 活动预算配置（budget_mode、pool_budget_remaining、allowed_campaign_ids）
  * - 用户 BUDGET_POINTS 余额查询
  * - 奖品配置验证（空奖约束）
  * - 活动池预算补充
@@ -36,10 +36,15 @@ const TransactionManager = require('../../../utils/TransactionManager')
  *
  * @param {Object} req - Express 请求对象
  * @returns {Object} 服务实例集合
+ *
+ * V4.7.0 大文件拆分后服务引用更新（2026-02-02）：
+ * - AdminLotteryCampaignService (admin_lottery_campaign): 活动管理操作
+ *   包含：updateCampaignBudget、supplementCampaignBudget、resetDailyWinCounts 等
  */
 function getServices(req) {
   return {
-    AdminLotteryService: req.app.locals.services.getService('admin_lottery_core'),
+    // V4.7.0 拆分：活动预算管理使用 admin_lottery_campaign（非 admin_lottery_core）
+    AdminLotteryCampaignService: req.app.locals.services.getService('admin_lottery_campaign'),
     ActivityService: req.app.locals.services.getService('activity'),
     UserService: req.app.locals.services.getService('user'),
     // V4.7.0 AssetService 拆分：使用 BalanceService（2026-01-31）
@@ -180,7 +185,7 @@ router.get(
  *
  * @body {string} budget_mode - 预算模式（user/pool/none）
  * @body {number} pool_budget_total - 活动池总预算（budget_mode=pool时使用）
- * @body {Array<string|number>} allowed_lottery_campaign_ids - 允许使用的预算来源活动ID列表
+ * @body {Array<string|number>} allowed_campaign_ids - 允许使用的预算来源活动ID列表
  * @body {boolean} preset_debt_enabled - 预设是否允许欠账（true/false）
  * @body {string} preset_budget_policy - 预设预算扣减策略（follow_campaign/pool_first/user_first）
  *
@@ -195,13 +200,16 @@ router.put(
     const {
       budget_mode,
       pool_budget_total,
-      allowed_lottery_campaign_ids,
+      allowed_campaign_ids,
       preset_debt_enabled,
       preset_budget_policy
     } = req.body
 
-    // P1-9：通过 ServiceManager 获取服务
-    const { AdminLotteryService } = getServices(req)
+    /*
+     * P1-9：通过 ServiceManager 获取服务
+     * V4.7.0 拆分：活动预算管理使用 AdminLotteryCampaignService
+     */
+    const { AdminLotteryCampaignService } = getServices(req)
 
     try {
       if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
@@ -211,17 +219,17 @@ router.put(
       /*
        * ✅ 事务边界治理：通过 TransactionManager.execute() 统一创建事务
        * - 路由层不直连 models
-       * - 写操作收口到 Service（AdminLotteryService），并显式传入 transaction
+       * - 写操作收口到 Service（AdminLotteryCampaignService），并显式传入 transaction
        */
       const result = await TransactionManager.execute(
         async transaction => {
           // 决策7：通过 Service 层更新活动预算（包含缓存失效）
-          return await AdminLotteryService.updateCampaignBudget(
+          return await AdminLotteryCampaignService.updateCampaignBudget(
             parseInt(lottery_campaign_id),
             {
               budget_mode,
               pool_budget_total,
-              allowed_lottery_campaign_ids,
+              allowed_campaign_ids,
               preset_debt_enabled,
               preset_budget_policy
             },
@@ -250,7 +258,7 @@ router.put(
             budget_mode: campaign.budget_mode,
             pool_budget_total: campaign.pool_budget_total,
             pool_budget_remaining: campaign.pool_budget_remaining,
-            allowed_lottery_campaign_ids: campaign.allowed_lottery_campaign_ids,
+            allowed_campaign_ids: campaign.allowed_campaign_ids,
             preset_debt_enabled: campaign.preset_debt_enabled,
             preset_budget_policy: campaign.preset_budget_policy
           }
@@ -498,8 +506,12 @@ router.post(
         return res.apiError('必须提供补充原因', 'MISSING_REASON')
       }
 
-      // 通过 ServiceManager 获取服务（P1-9 snake_case key）
-      const AdminLotteryService = req.app.locals.services.getService('admin_lottery_core')
+      /*
+       * 通过 ServiceManager 获取服务（P1-9 snake_case key）
+       * V4.7.0 拆分：活动预算管理使用 admin_lottery_campaign（非 admin_lottery_core）
+       */
+      const AdminLotteryCampaignService =
+        req.app.locals.services.getService('admin_lottery_campaign')
 
       /*
        * ✅ 事务边界治理：通过 TransactionManager.execute() 统一创建事务
@@ -508,7 +520,7 @@ router.post(
       const result = await TransactionManager.execute(
         async transaction => {
           // 决策7：通过 Service 层补充预算（包含缓存失效）
-          return await AdminLotteryService.supplementCampaignBudget(
+          return await AdminLotteryCampaignService.supplementCampaignBudget(
             parseInt(lottery_campaign_id),
             amount,
             {

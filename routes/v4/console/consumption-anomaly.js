@@ -39,19 +39,18 @@ const logger = require('../../../utils/logger').logger
 /**
  * 获取 AnomalyService 服务
  *
+ * 遵循项目规范：通过 req.app.locals.services.getService 获取服务
+ * 禁止直接 require 服务文件
+ *
  * @param {Object} req - Express 请求对象
  * @returns {Object} AnomalyService 类（静态方法）
  */
 function getAnomalyService(req) {
-  // 通过 app.locals.services 获取
   const service = req.app.locals.services?.getService('consumption_anomaly')
-  if (service) {
-    return service
+  if (!service) {
+    throw new Error('ConsumptionAnomalyService 未在 ServiceManager 中注册')
   }
-
-  // 兜底：直接引入
-  logger.warn('通过 app.locals.services 获取 consumption_anomaly 失败，使用直接引入')
-  return require('../../../services/consumption/AnomalyService')
+  return service
 }
 
 /**

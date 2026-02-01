@@ -167,7 +167,11 @@ export const SystemCoreAPI = {
    * @returns {Promise<Object>} 更新结果响应
    */
   async updateMaintenanceConfig(data) {
-    return await request({ url: SYSTEM_CORE_ENDPOINTS.SYSTEM_CONFIG_MAINTENANCE, method: 'PUT', data })
+    return await request({
+      url: SYSTEM_CORE_ENDPOINTS.SYSTEM_CONFIG_MAINTENANCE,
+      method: 'PUT',
+      data
+    })
   },
 
   /**
@@ -193,4 +197,3 @@ export const SystemCoreAPI = {
 }
 
 export default SystemCoreAPI
-

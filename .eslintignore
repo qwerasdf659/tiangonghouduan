@@ -5,6 +5,7 @@ build/
 scripts/archived/
 scripts/archive/
 backups/
+backup/
 logs/
 scripts/toolkit/
 **/*.md

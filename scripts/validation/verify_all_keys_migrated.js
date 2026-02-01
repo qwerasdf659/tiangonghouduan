@@ -32,14 +32,21 @@ const SCAN_DIRS = ['routes', 'services', 'scripts', 'tests']
 /** snake_case 验证正则 */
 const SNAKE_CASE_PATTERN = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/
 
-/** 已知的 camelCase 遗留键映射（用于迁移建议） */
+/**
+ * 已知的 camelCase 遗留键映射（用于迁移建议）
+ *
+ * V4.7.0 大文件拆分说明（2026-01-31）：
+ * - AdminLotteryService 已拆分为 admin_lottery_core/campaign/query/crud
+ * - 旧的 admin_lottery 键已废弃，请使用拆分后的子服务键
+ */
 const LEGACY_KEY_MAPPING = {
   tradeOrder: 'trade_order',
   exchangeMarket: 'exchange_market',
   marketListing: 'market_listing',
   merchantPoints: 'merchant_points',
   adminSystem: 'admin_system',
-  adminLotteryService: 'admin_lottery',
+  /* V4.7.0 拆分：adminLotteryService 建议迁移到 admin_lottery_core（核心操作） */
+  adminLotteryService: 'admin_lottery_core',
   prizePool: 'prize_pool',
   assetConversion: 'asset_conversion',
   chatWebSocket: 'chat_websocket',

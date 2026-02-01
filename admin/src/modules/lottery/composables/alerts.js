@@ -390,5 +390,3 @@ export function useAlertsMethods() {
 }
 
 export default { useAlertsState, useAlertsMethods }
-
-

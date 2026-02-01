@@ -203,7 +203,7 @@ module.exports = sequelize => {
     order: [
       ['dict_type', 'ASC'],
       ['sort_order', 'ASC'],
-      ['dict_id', 'ASC']
+      ['system_dictionary_id', 'ASC']
     ]
   })
 

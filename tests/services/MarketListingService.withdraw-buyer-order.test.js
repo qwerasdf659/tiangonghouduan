@@ -19,7 +19,7 @@
 const {
   sequelize,
   User,
-  MarketListing,
+  // MarketListing 用于后续市场交易验证扩展
   TradeOrder,
   AccountAssetBalance,
   Account

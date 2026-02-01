@@ -42,7 +42,7 @@ class BudgetProviderFactory {
    *
    * @param {Object} campaign - 活动配置
    * @param {string} campaign.budget_mode - 预算模式（user/pool/pool_quota/none）
-   * @param {Array} campaign.allowed_lottery_campaign_ids - 允许的活动ID列表（user模式）
+   * @param {Array} campaign.allowed_campaign_ids - 允许的活动ID列表（user模式）
    * @param {string} campaign.quota_init_mode - 配额初始化模式（pool_quota模式）
    * @param {number} campaign.default_quota - 默认配额（pool_quota模式）
    * @param {Object} options - 额外选项
@@ -65,8 +65,8 @@ class BudgetProviderFactory {
     switch (budget_mode) {
       case BudgetProvider.MODES.USER:
         provider = new UserBudgetProvider({
-          allowed_lottery_campaign_ids: campaign.allowed_lottery_campaign_ids
-            ? JSON.parse(campaign.allowed_lottery_campaign_ids)
+          allowed_campaign_ids: campaign.allowed_campaign_ids
+            ? JSON.parse(campaign.allowed_campaign_ids)
             : null,
           ...options
         })

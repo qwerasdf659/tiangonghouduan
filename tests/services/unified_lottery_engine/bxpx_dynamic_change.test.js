@@ -21,13 +21,16 @@
  */
 
 const {
-  LotteryComputeEngine,
   BudgetTierCalculator,
   PressureTierCalculator,
   TierMatrixCalculator,
-  BUDGET_TIERS,
-  PRESSURE_TIERS
+  getComputeEngine
 } = require('../../../services/UnifiedLotteryEngine/compute')
+
+/**
+ * 获取 LotteryComputeEngine 实例（用于集成测试）
+ */
+const lottery_compute_engine = getComputeEngine()
 
 /**
  * 权重缩放比例常量
@@ -54,9 +57,9 @@ const PRESSURE_TIER = PressureTierCalculator.PRESSURE_TIER || {
 }
 
 /**
- * Tier 可用性映射
+ * Tier 可用性映射（用于后续权限控制扩展）
  */
-const TIER_AVAILABILITY = BudgetTierCalculator.TIER_AVAILABILITY || {
+const _TIER_AVAILABILITY = BudgetTierCalculator.TIER_AVAILABILITY || {
   [BUDGET_TIER.B0]: ['fallback'],
   [BUDGET_TIER.B1]: ['low', 'fallback'],
   [BUDGET_TIER.B2]: ['mid', 'low', 'fallback'],
@@ -65,9 +68,8 @@ const TIER_AVAILABILITY = BudgetTierCalculator.TIER_AVAILABILITY || {
 
 describe('BxPx矩阵动态变化测试（任务8.2）', () => {
   let tier_matrix_calculator
-  let budget_tier_calculator
-  let pressure_tier_calculator
-  let lottery_compute_engine
+  let _budget_tier_calculator // 用于后续集成测试场景扩展
+  let _pressure_tier_calculator // 用于后续集成测试场景扩展
 
   /**
    * 标准基础权重（用于测试）
@@ -84,9 +86,8 @@ describe('BxPx矩阵动态变化测试（任务8.2）', () => {
 
     // 创建计算器实例
     tier_matrix_calculator = new TierMatrixCalculator()
-    budget_tier_calculator = new BudgetTierCalculator()
-    pressure_tier_calculator = new PressureTierCalculator()
-    lottery_compute_engine = new LotteryComputeEngine()
+    _budget_tier_calculator = new BudgetTierCalculator()
+    _pressure_tier_calculator = new PressureTierCalculator()
 
     console.log('✅ BxPx矩阵测试环境初始化完成')
     console.log(`📊 WEIGHT_SCALE: ${WEIGHT_SCALE}`)

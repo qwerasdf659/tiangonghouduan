@@ -5,7 +5,7 @@
  *
  * 职责：
  * 1. 从用户 BUDGET_POINTS 资产中扣减预算
- * 2. 支持 allowed_lottery_campaign_ids 桶限制
+ * 2. 支持 allowed_campaign_ids 桶限制
  * 3. 与 BalanceService/QueryService 集成进行资产操作
  *
  * 适用场景：
@@ -30,28 +30,28 @@ class UserBudgetProvider extends BudgetProvider {
    * 创建用户预算提供者实例
    *
    * @param {Object} options - 配置选项
-   * @param {Array} options.allowed_lottery_campaign_ids - 允许使用的活动ID列表（桶限制）
+   * @param {Array} options.allowed_campaign_ids - 允许使用的活动ID列表（桶限制）
    */
   constructor(options = {}) {
     super(BudgetProvider.MODES.USER, options)
-    this.allowed_lottery_campaign_ids = options.allowed_lottery_campaign_ids || null
+    this.allowed_campaign_ids = options.allowed_campaign_ids || null
   }
 
   /**
    * 获取用户可用预算
    *
    * 🔧 修复（2026-01-27）：
-   * 从 allowed_lottery_campaign_ids 指定的所有桶汇总 BUDGET_POINTS 余额，
+   * 从 allowed_campaign_ids 指定的所有桶汇总 BUDGET_POINTS 余额，
    * 而不是只查询单个 lottery_campaign_id 的余额。
    *
    * 业务规则：
-   * - 活动配置 allowed_lottery_campaign_ids 指定哪些来源桶的预算可以用于该活动
-   * - 例如：活动1配置 allowed_lottery_campaign_ids = ['CONSUMPTION_DEFAULT']
+   * - 活动配置 allowed_campaign_ids 指定哪些来源桶的预算可以用于该活动
+   * - 例如：活动1配置 allowed_campaign_ids = ['CONSUMPTION_DEFAULT']
    *   表示使用来源为消费的预算（不是活动1桶的预算）
    *
    * @param {Object} params - 查询参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.lottery_campaign_id - 活动ID（用于日志，实际查询用 allowed_lottery_campaign_ids）
+   * @param {number} params.lottery_campaign_id - 活动ID（用于日志，实际查询用 allowed_campaign_ids）
    * @param {Object} options - 额外选项
    * @returns {Promise<Object>} 预算信息
    */
@@ -59,35 +59,35 @@ class UserBudgetProvider extends BudgetProvider {
     const { user_id, lottery_campaign_id } = params
 
     try {
-      // 🔴 关键修正：allowed_lottery_campaign_ids 为空视为钱包不可用
-      if (!this.allowed_lottery_campaign_ids || this.allowed_lottery_campaign_ids.length === 0) {
-        this._log('warn', 'allowed_lottery_campaign_ids 未配置或为空，无法获取预算', {
+      // 🔴 关键修正：allowed_campaign_ids 为空视为钱包不可用
+      if (!this.allowed_campaign_ids || this.allowed_campaign_ids.length === 0) {
+        this._log('warn', 'allowed_campaign_ids 未配置或为空，无法获取预算', {
           user_id,
           lottery_campaign_id,
-          allowed_lottery_campaign_ids: this.allowed_lottery_campaign_ids
+          allowed_campaign_ids: this.allowed_campaign_ids
         })
         return {
           available: 0,
           details: {
-            reason: 'allowed_lottery_campaign_ids_not_configured',
-            allowed_lottery_campaign_ids: this.allowed_lottery_campaign_ids
+            reason: 'allowed_campaign_ids_not_configured',
+            allowed_campaign_ids: this.allowed_campaign_ids
           }
         }
       }
 
-      // 🔧 修复：使用 getBudgetPointsByCampaigns 从 allowed_lottery_campaign_ids 指定的桶汇总余额
+      // 🔧 修复：使用 getBudgetPointsByCampaigns 从 allowed_campaign_ids 指定的桶汇总余额
       const available_amount = await QueryService.getBudgetPointsByCampaigns(
         {
           user_id,
-          lottery_campaign_ids: this.allowed_lottery_campaign_ids
+          lottery_campaign_ids: this.allowed_campaign_ids
         },
         options
       )
 
-      this._log('debug', '获取用户预算余额（从 allowed_lottery_campaign_ids 汇总）', {
+      this._log('debug', '获取用户预算余额（从 allowed_campaign_ids 汇总）', {
         user_id,
         lottery_campaign_id,
-        allowed_lottery_campaign_ids: this.allowed_lottery_campaign_ids,
+        allowed_campaign_ids: this.allowed_campaign_ids,
         available_amount
       })
 
@@ -97,7 +97,7 @@ class UserBudgetProvider extends BudgetProvider {
           asset_code: 'BUDGET_POINTS',
           user_id,
           lottery_campaign_id,
-          allowed_lottery_campaign_ids: this.allowed_lottery_campaign_ids,
+          allowed_campaign_ids: this.allowed_campaign_ids,
           source: 'getBudgetPointsByCampaigns'
         }
       }
@@ -105,7 +105,7 @@ class UserBudgetProvider extends BudgetProvider {
       this._log('error', '获取用户预算失败', {
         user_id,
         lottery_campaign_id,
-        allowed_lottery_campaign_ids: this.allowed_lottery_campaign_ids,
+        allowed_campaign_ids: this.allowed_campaign_ids,
         error: error.message
       })
       throw error
@@ -116,12 +116,12 @@ class UserBudgetProvider extends BudgetProvider {
    * 扣减用户预算
    *
    * 🔧 修复（2026-01-27）：
-   * 从 allowed_lottery_campaign_ids 指定的桶中按顺序扣减，
+   * 从 allowed_campaign_ids 指定的桶中按顺序扣减，
    * 优先扣减第一个有足够余额的桶。
    *
    * @param {Object} params - 扣减参数
    * @param {number} params.user_id - 用户ID
-   * @param {number} params.lottery_campaign_id - 活动ID（用于日志，实际扣减用 allowed_lottery_campaign_ids）
+   * @param {number} params.lottery_campaign_id - 活动ID（用于日志，实际扣减用 allowed_campaign_ids）
    * @param {number} params.amount - 扣减金额
    * @param {string} params.reason - 扣减原因
    * @param {string} params.reference_id - 关联ID（如 lottery_draw_id）
@@ -141,7 +141,7 @@ class UserBudgetProvider extends BudgetProvider {
         this._log('warn', '用户预算不足', {
           user_id,
           lottery_campaign_id,
-          allowed_lottery_campaign_ids: this.allowed_lottery_campaign_ids,
+          allowed_campaign_ids: this.allowed_campaign_ids,
           required: amount,
           available: budget_check.available
         })
@@ -155,16 +155,16 @@ class UserBudgetProvider extends BudgetProvider {
         }
       }
 
-      // 🔴 关键修正：从 allowed_lottery_campaign_ids 中选择扣减的桶
-      if (!this.allowed_lottery_campaign_ids || this.allowed_lottery_campaign_ids.length === 0) {
-        throw new Error('allowed_lottery_campaign_ids 未配置，无法扣减预算')
+      // 🔴 关键修正：从 allowed_campaign_ids 中选择扣减的桶
+      if (!this.allowed_campaign_ids || this.allowed_campaign_ids.length === 0) {
+        throw new Error('allowed_campaign_ids 未配置，无法扣减预算')
       }
 
       /*
        * 使用第一个配置的桶作为扣减目标（业务规则：消费产生的预算优先）
        * 如果需要更复杂的扣减策略（如按余额排序），可以在这里扩展
        */
-      const deduct_lottery_campaign_id = this.allowed_lottery_campaign_ids[0]
+      const deduct_lottery_campaign_id = this.allowed_campaign_ids[0]
 
       // 执行扣减（使用 changeBalance，负数表示扣减）
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction（见下方 options 参数）
@@ -175,7 +175,7 @@ class UserBudgetProvider extends BudgetProvider {
           delta_amount: -amount,
           business_type: 'lottery_budget_deduct',
           idempotency_key: reference_id,
-          lottery_campaign_id: deduct_lottery_campaign_id, // ✅ 使用 allowed_lottery_campaign_ids 中的桶
+          lottery_campaign_id: deduct_lottery_campaign_id, // ✅ 使用 allowed_campaign_ids 中的桶
           meta: {
             reason: reason || '抽奖预算扣减',
             reference_type: 'lottery_draw',
@@ -206,7 +206,7 @@ class UserBudgetProvider extends BudgetProvider {
       this._log('error', '用户预算扣减失败', {
         user_id,
         lottery_campaign_id,
-        allowed_lottery_campaign_ids: this.allowed_lottery_campaign_ids,
+        allowed_campaign_ids: this.allowed_campaign_ids,
         amount,
         error: error.message
       })
@@ -218,7 +218,7 @@ class UserBudgetProvider extends BudgetProvider {
    * 回滚用户预算
    *
    * 🔧 修复（2026-01-27）：
-   * 回滚到 allowed_lottery_campaign_ids 中的第一个桶（与扣减逻辑保持一致）
+   * 回滚到 allowed_campaign_ids 中的第一个桶（与扣减逻辑保持一致）
    *
    * @param {Object} params - 回滚参数
    * @param {number} params.user_id - 用户ID
@@ -234,12 +234,12 @@ class UserBudgetProvider extends BudgetProvider {
     const { transaction } = options
 
     try {
-      // 🔴 关键修正：回滚到 allowed_lottery_campaign_ids 中的第一个桶
-      if (!this.allowed_lottery_campaign_ids || this.allowed_lottery_campaign_ids.length === 0) {
-        throw new Error('allowed_lottery_campaign_ids 未配置，无法回滚预算')
+      // 🔴 关键修正：回滚到 allowed_campaign_ids 中的第一个桶
+      if (!this.allowed_campaign_ids || this.allowed_campaign_ids.length === 0) {
+        throw new Error('allowed_campaign_ids 未配置，无法回滚预算')
       }
 
-      const rollback_lottery_campaign_id = this.allowed_lottery_campaign_ids[0]
+      const rollback_lottery_campaign_id = this.allowed_campaign_ids[0]
 
       // 执行回滚（使用 changeBalance，正数表示增加）
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction（见下方 options 参数）
@@ -250,7 +250,7 @@ class UserBudgetProvider extends BudgetProvider {
           delta_amount: amount,
           business_type: 'lottery_budget_rollback',
           idempotency_key: `${original_reference_id}_rollback`,
-          lottery_campaign_id: rollback_lottery_campaign_id, // ✅ 使用 allowed_lottery_campaign_ids 中的桶
+          lottery_campaign_id: rollback_lottery_campaign_id, // ✅ 使用 allowed_campaign_ids 中的桶
           meta: {
             reason: '抽奖预算回滚',
             reference_type: 'lottery_draw_rollback',
@@ -282,7 +282,7 @@ class UserBudgetProvider extends BudgetProvider {
       this._log('error', '用户预算回滚失败', {
         user_id,
         lottery_campaign_id,
-        allowed_lottery_campaign_ids: this.allowed_lottery_campaign_ids,
+        allowed_campaign_ids: this.allowed_campaign_ids,
         amount,
         error: error.message
       })

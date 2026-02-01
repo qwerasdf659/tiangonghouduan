@@ -97,7 +97,7 @@ function registerSystemSettingsComponents() {
       { id: 'system-config', name: '系统配置', icon: '⚙️' },
       { id: 'reminder-rules', name: '提醒规则', icon: '🔔' },
       { id: 'audit-logs', name: '审计日志', icon: '📋' },
-      { id: 'audit-report', name: '审计报告', icon: '📊' }  // F-59
+      { id: 'audit-report', name: '审计报告', icon: '📊' } // F-59
     ],
 
     // ==================== F-59: 审计报告状态 ====================
@@ -112,7 +112,7 @@ function registerSystemSettingsComponents() {
     auditReportFilters: {
       start_date: '',
       end_date: '',
-      time_range: '7d'  // 7d, 30d, 90d
+      time_range: '7d' // 7d, 30d, 90d
     },
 
     // ==================== 通用状态 ====================
@@ -178,7 +178,7 @@ function registerSystemSettingsComponents() {
             case 'audit-logs':
               await this.loadAuditLogs()
               break
-            case 'audit-report':  // F-59
+            case 'audit-report': // F-59
               await this.loadAuditReport()
               break
           }
@@ -208,7 +208,11 @@ function registerSystemSettingsComponents() {
      * 回滚操作
      */
     async rollbackOperation(log) {
-      if (!confirm(`确定要回滚此操作吗？\n操作：${log.action_name || log.action}\n目标：${log.target || log.operation_type_name}`)) {
+      if (
+        !confirm(
+          `确定要回滚此操作吗？\n操作：${log.action_name || log.action}\n目标：${log.target || log.operation_type_name}`
+        )
+      ) {
         return
       }
 
@@ -385,11 +389,11 @@ function registerSystemSettingsComponents() {
 
         if (response?.success && response.data) {
           this.auditReport = {
-            summary: response.data.summary || { 
-              total_operations: 0, 
-              high_risk_count: 0, 
-              rollback_count: 0, 
-              unique_operators: 0 
+            summary: response.data.summary || {
+              total_operations: 0,
+              high_risk_count: 0,
+              rollback_count: 0,
+              unique_operators: 0
             },
             by_action: response.data.by_action || [],
             by_module: response.data.by_module || [],

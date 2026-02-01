@@ -55,4 +55,3 @@ export const PendingAPI = {
 }
 
 export default PendingAPI
-

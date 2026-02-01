@@ -11,14 +11,14 @@ import { API_PREFIX, authHeaders, handleResponse, buildURL } from './base.js'
 export const REMINDER_ENDPOINTS = {
   // 规则管理
   RULES: `${API_PREFIX}/console/reminder-rules`,
-  RULE_DETAIL: (id) => `${API_PREFIX}/console/reminder-rules/${id}`,
-  RULE_TOGGLE: (id) => `${API_PREFIX}/console/reminder-rules/${id}/toggle`,
-  RULE_TEST: (id) => `${API_PREFIX}/console/reminder-rules/${id}/test`,
-  RULE_EXECUTE: (id) => `${API_PREFIX}/console/reminder-rules/${id}/execute`,
+  RULE_DETAIL: id => `${API_PREFIX}/console/reminder-rules/${id}`,
+  RULE_TOGGLE: id => `${API_PREFIX}/console/reminder-rules/${id}/toggle`,
+  RULE_TEST: id => `${API_PREFIX}/console/reminder-rules/${id}/test`,
+  RULE_EXECUTE: id => `${API_PREFIX}/console/reminder-rules/${id}/execute`,
   // 提醒历史（在 reminder-rules 路由下）
   HISTORY: `${API_PREFIX}/console/reminder-rules/history`,
   HISTORY_STATS: `${API_PREFIX}/console/reminder-rules/history/stats`,
-  HISTORY_DETAIL: (id) => `${API_PREFIX}/console/reminder-rules/history/${id}`
+  HISTORY_DETAIL: id => `${API_PREFIX}/console/reminder-rules/history/${id}`
 }
 
 /**
@@ -185,4 +185,3 @@ export const ReminderHistoryAPI = {
     return handleResponse(response)
   }
 }
-

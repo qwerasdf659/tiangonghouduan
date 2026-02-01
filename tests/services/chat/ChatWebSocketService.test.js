@@ -20,7 +20,8 @@
  * - 测试重点是业务逻辑，而非 Socket.IO 协议实现
  */
 
-const BeijingTimeHelper = require('../../../utils/timeHelper')
+/* BeijingTimeHelper 用于后续时间相关测试场景扩展 */
+// const BeijingTimeHelper = require('../../../utils/timeHelper')
 
 // Mock Socket.IO
 jest.mock('socket.io', () => {

@@ -152,7 +152,7 @@ class LotteryAlertService {
       // 统计各状态数量
       const statusCounts = await LotteryAlert.findAll({
         where: lottery_campaign_id ? { lottery_campaign_id: parseInt(lottery_campaign_id) } : {},
-        attributes: ['status', [fn('COUNT', col('alert_id')), 'count']],
+        attributes: ['status', [fn('COUNT', col('lottery_alert_id')), 'count']],
         group: ['status'],
         raw: true
       })
@@ -167,7 +167,7 @@ class LotteryAlertService {
 
       // 格式化告警数据
       const formattedAlerts = alerts.map(alert => ({
-        alert_id: alert.alert_id,
+        lottery_alert_id: alert.lottery_alert_id,
         lottery_campaign_id: alert.lottery_campaign_id,
         campaign_name: alert.campaign?.campaign_name || '未知活动',
         campaign_code: alert.campaign?.campaign_code || null,
@@ -241,7 +241,7 @@ class LotteryAlertService {
       }
 
       return {
-        alert_id: alert.alert_id,
+        lottery_alert_id: alert.lottery_alert_id,
         lottery_campaign_id: alert.lottery_campaign_id,
         campaign_name: alert.campaign?.campaign_name || '未知活动',
         alert_type: alert.alert_type,
@@ -319,7 +319,7 @@ class LotteryAlertService {
           lottery_campaign_id,
           alert_type,
           rule_code,
-          existing_alert_id: existingAlert.alert_id
+          existing_alert_id: existingAlert.lottery_alert_id
         })
         return existingAlert
       }
@@ -341,7 +341,7 @@ class LotteryAlertService {
       )
 
       logger.info('创建新告警', {
-        alert_id: alert.alert_id,
+        lottery_alert_id: alert.lottery_alert_id,
         lottery_campaign_id,
         alert_type,
         severity,
@@ -362,7 +362,7 @@ class LotteryAlertService {
           const chatWebSocketService = require('./ChatWebSocketService').getInstance()
           if (chatWebSocketService && chatWebSocketService.io) {
             chatWebSocketService.pushAlertToAdmins({
-              alert_id: alert.alert_id,
+              lottery_alert_id: alert.lottery_alert_id,
               alert_type,
               severity,
               message,
@@ -374,7 +374,7 @@ class LotteryAlertService {
         } catch (wsError) {
           // WebSocket推送失败不影响主流程
           logger.warn('告警WebSocket推送失败（非致命）', {
-            alert_id: alert.alert_id,
+            lottery_alert_id: alert.lottery_alert_id,
             error: wsError.message
           })
         }

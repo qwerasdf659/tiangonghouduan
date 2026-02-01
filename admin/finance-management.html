@@ -427,7 +427,7 @@
         </div>
         <!-- 分页 -->
         <div class="p-4 border-t themed-bg-base flex justify-between items-center" x-show="merchantPoints.length > 0">
-          <span class="text-sm themed-text-muted">共 <span x-text="total"></span> 条记录</span>
+          <span class="text-sm themed-text-muted">共 <span x-text="financePagination.total"></span> 条记录</span>
           <div class="flex space-x-1">
             <button @click="changePage(financePagination.page - 1)" :disabled="financePagination.page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
             <span class="px-3 py-1 text-sm">第 <span x-text="financePagination.page"></span> / <span x-text="financeTotalPages"></span> 页</span>
@@ -523,7 +523,7 @@
         </div>
         <!-- 分页 -->
         <div class="p-4 border-t themed-bg-base flex justify-between items-center" x-show="debts.length > 0">
-          <span class="text-sm themed-text-muted">共 <span x-text="total"></span> 条记录</span>
+          <span class="text-sm themed-text-muted">共 <span x-text="financePagination.total"></span> 条记录</span>
           <div class="flex space-x-1">
             <button @click="changePage(financePagination.page - 1)" :disabled="financePagination.page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
             <span class="px-3 py-1 text-sm">第 <span x-text="financePagination.page"></span> / <span x-text="financeTotalPages"></span> 页</span>
@@ -622,7 +622,7 @@
         </div>
         <!-- 分页 -->
         <div class="p-4 border-t themed-bg-base flex justify-between items-center" x-show="budgets.length > 0">
-          <span class="text-sm themed-text-muted">共 <span x-text="total"></span> 条记录</span>
+          <span class="text-sm themed-text-muted">共 <span x-text="financePagination.total"></span> 条记录</span>
           <div class="flex space-x-1">
             <button @click="changePage(financePagination.page - 1)" :disabled="financePagination.page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
             <span class="px-3 py-1 text-sm">第 <span x-text="financePagination.page"></span> / <span x-text="financeTotalPages"></span> 页</span>
@@ -688,7 +688,7 @@
         </div>
         <!-- 分页 -->
         <div class="p-4 border-t themed-bg-base flex justify-between items-center" x-show="merchantLogs.length > 0">
-          <span class="text-sm themed-text-muted">共 <span x-text="total"></span> 条记录</span>
+          <span class="text-sm themed-text-muted">共 <span x-text="financePagination.total"></span> 条记录</span>
           <div class="flex space-x-1">
             <button @click="changePage(financePagination.page - 1)" :disabled="financePagination.page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
             <span class="px-3 py-1 text-sm">第 <span x-text="financePagination.page"></span> / <span x-text="financeTotalPages"></span> 页</span>

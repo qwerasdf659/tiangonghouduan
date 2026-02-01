@@ -210,7 +210,7 @@ class LotteryComputeEngine {
    *
    * 输入：
    * - user_id: 用户ID
-   * - campaign: 活动配置（包含 budget_mode, allowed_lottery_campaign_ids 等）
+   * - campaign: 活动配置（包含 budget_mode, allowed_campaign_ids 等）
    * - transaction: 事务对象（可选）
    *
    * 输出：
@@ -224,7 +224,7 @@ class LotteryComputeEngine {
    * @param {number} params.user_id - 用户ID
    * @param {Object} params.campaign - 活动配置对象
    * @param {string} params.campaign.budget_mode - 预算模式（'user'|'pool'|'hybrid'|'none'）
-   * @param {Array<string>} params.campaign.allowed_lottery_campaign_ids - 允许的预算来源桶（user 模式）
+   * @param {Array<string>} params.campaign.allowed_campaign_ids - 允许的预算来源桶（user 模式）
    * @param {number} params.campaign.pool_budget_remaining - 奖池剩余预算（pool/hybrid 模式）
    * @param {number} params.campaign.pool_budget_total - 奖池总预算（pool/hybrid 模式）
    * @param {Object} params.transaction - Sequelize 事务对象（可选）
@@ -628,10 +628,10 @@ class LotteryComputeEngine {
   /**
    * 计算有效预算（核心算法）
    *
-   * 🔴 关键逻辑：修正文档中发现的 allowed_lottery_campaign_ids 误读问题
+   * 🔴 关键逻辑：修正文档中发现的 allowed_campaign_ids 误读问题
    *
    * 规则：
-   * - user 模式：从 allowed_lottery_campaign_ids 指定的来源桶汇总 BUDGET_POINTS
+   * - user 模式：从 allowed_campaign_ids 指定的来源桶汇总 BUDGET_POINTS
    * - pool 模式：使用 pool_budget_remaining
    * - hybrid 模式：min(user_budget, pool_budget_remaining)
    * - none 模式：返回 0
@@ -653,11 +653,11 @@ class LotteryComputeEngine {
 
     // user 模式：从用户钱包获取 BUDGET_POINTS
     if (budget_mode === 'user') {
-      const allowed_ids = campaign?.allowed_lottery_campaign_ids || []
+      const allowed_ids = campaign?.allowed_campaign_ids || []
 
-      // 🔴 关键修正：allowed_lottery_campaign_ids 为空视为钱包不可用
+      // 🔴 关键修正：allowed_campaign_ids 为空视为钱包不可用
       if (!allowed_ids || allowed_ids.length === 0) {
-        this._log('warn', 'user 模式但 allowed_lottery_campaign_ids 为空，返回 0 预算', {
+        this._log('warn', 'user 模式但 allowed_campaign_ids 为空，返回 0 预算', {
           user_id,
           lottery_campaign_id: campaign?.lottery_campaign_id
         })
@@ -700,7 +700,7 @@ class LotteryComputeEngine {
 
     // hybrid 模式：取用户预算和奖池预算的较小值
     if (budget_mode === 'hybrid') {
-      const allowed_ids = campaign?.allowed_lottery_campaign_ids || []
+      const allowed_ids = campaign?.allowed_campaign_ids || []
       const pool_remaining = campaign?.pool_budget_remaining ?? 0
 
       // 分别检查两个钱包

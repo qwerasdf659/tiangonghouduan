@@ -42,7 +42,7 @@ const { initRealTestData, TestConfig } = require('../helpers/test-setup')
 const {
   executeConcurrent,
   detectRaceCondition,
-  runStressTest,
+  // runStressTest 用于后续压力测试场景扩展
   delay
 } = require('../helpers/test-concurrent-utils')
 const { v4: uuidv4 } = require('uuid')
@@ -374,7 +374,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
 
         try {
           // 1. 创建测试商品（卖家是测试用户）
-          const seller_account = await BalanceService.getOrCreateAccount(
+          const _seller_account = await BalanceService.getOrCreateAccount(
             { user_id: test_user_id },
             { transaction }
           )
@@ -529,7 +529,11 @@ describe('阶段九：压力测试与高并发（P1）', () => {
         console.log(
           `\n💰 10.3 资产操作压测 - ${STRESS_CONFIG.ASSET_STRESS.CONCURRENT_OPERATIONS}次并发扣费`
         )
-        const { CONCURRENT_OPERATIONS, DEDUCT_AMOUNT, TIMEOUT_MS } = STRESS_CONFIG.ASSET_STRESS
+        const {
+          CONCURRENT_OPERATIONS,
+          DEDUCT_AMOUNT,
+          TIMEOUT_MS: _TIMEOUT_MS
+        } = STRESS_CONFIG.ASSET_STRESS
 
         // 记录初始余额
         const initial_balance = (await getTestUserPointsBalance(test_user_id)) || 0
@@ -745,7 +749,8 @@ describe('阶段九：压力测试与高并发（P1）', () => {
         expect(typeof ChatWebSocketService.broadcastToAllAdmins).toBe('function')
 
         // 测试消息推送能力（不需要实际WebSocket连接）
-        const { CONCURRENT_CONNECTIONS, MESSAGE_COUNT } = STRESS_CONFIG.WEBSOCKET_STRESS
+        const { CONCURRENT_CONNECTIONS, MESSAGE_COUNT: _MESSAGE_COUNT } =
+          STRESS_CONFIG.WEBSOCKET_STRESS
 
         // 创建并发消息推送任务
         const tasks = Array(Math.min(CONCURRENT_CONNECTIONS, 50))
@@ -843,7 +848,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
           .map((_, i) => async () => {
             const query_fn = query_types[i % query_types.length]
             try {
-              const result = await query_fn()
+              const _result = await query_fn()
               return { success: true, type: i % query_types.length }
             } catch (error) {
               return { success: false, error: error.message }

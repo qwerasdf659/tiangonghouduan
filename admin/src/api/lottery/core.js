@@ -33,13 +33,11 @@ export const LOTTERY_CORE_ENDPOINTS = {
   PRIZE_ADD_STOCK: `${API_PREFIX}/console/prize-pool/prize/:prize_id/add-stock`,
   PRIZE_TOGGLE: `${API_PREFIX}/console/prize-pool/prize/:prize_id/toggle`,
 
-  // 活动管理
-  CAMPAIGN_LIST: `${API_PREFIX}/console/system-data/lottery-campaigns`,
-  CAMPAIGN_DETAIL: `${API_PREFIX}/console/system-data/lottery-campaigns/:campaign_id`,
+  // 活动管理（管理后台 - 使用 console 路由）
+  CAMPAIGN_LIST: `${API_PREFIX}/console/lottery-campaigns`,
+  CAMPAIGN_DETAIL: `${API_PREFIX}/console/lottery-campaigns/:lottery_campaign_id`,
 
-  // 活动条件
-  CAMPAIGN_LIST: `${API_PREFIX}/lottery/campaigns`,
-  CAMPAIGN_DETAIL: `${API_PREFIX}/lottery/campaigns/:campaign_code`,
+  // 活动条件配置
   CAMPAIGN_CONDITIONS: `${API_PREFIX}/activities/:code/conditions`,
   CAMPAIGN_CONFIGURE_CONDITIONS: `${API_PREFIX}/activities/:code/configure-conditions`
 }
@@ -210,11 +208,13 @@ export const LotteryCoreAPI = {
 
   /**
    * 获取活动详情
-   * @param {string} campaignId - 活动 ID
+   * @param {number} lotteryCampaignId - 活动 ID
    * @returns {Promise<Object>} 活动详情
    */
-  async getCampaignDetail(campaignId) {
-    const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGN_DETAIL, { campaign_id: campaignId })
+  async getCampaignDetail(lotteryCampaignId) {
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGN_DETAIL, {
+      lottery_campaign_id: lotteryCampaignId
+    })
     return await request({ url, method: 'GET' })
   },
 
@@ -243,4 +243,3 @@ export const LotteryCoreAPI = {
 }
 
 export default LotteryCoreAPI
-

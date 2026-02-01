@@ -105,12 +105,13 @@ const {
 
 /*
  * V4.7.0 ReportingService 拆分子服务（2026-01-31 大文件拆分方案 Phase 5）
- * 原 ReportingService.js (1820行) 已拆分为3个子服务
+ * 原 ReportingService.js (1820行) 已拆分为4个子服务
  */
 const {
   AnalyticsService: ReportingAnalyticsService, // 决策分析/趋势分析（~400行）
   ChartsService: ReportingChartsService, // 图表数据生成（~600行）
-  StatsService: ReportingStatsService // 统计/概览/画像（~700行）
+  StatsService: ReportingStatsService, // 统计/概览/画像（~700行）
+  MultiDimensionStatsService: ReportingMultiDimensionStatsService // 多维度组合统计（B-25/B-27）
 } = require('./reporting')
 
 /*
@@ -424,8 +425,9 @@ class ServiceManager {
       this._services.set('reporting_analytics', ReportingAnalyticsService) // 决策分析/趋势分析（静态类）
       this._services.set('reporting_charts', ReportingChartsService) // 图表数据生成（静态类）
       this._services.set('reporting_stats', ReportingStatsService) // 统计/概览/画像（静态类）
+      this._services.set('multi_dimension_stats', ReportingMultiDimensionStatsService) // 多维度组合统计（B-25/B-27，静态类）
 
-      // [已移除] reporting 向后兼容别名 - 请使用 reporting_analytics/reporting_charts/reporting_stats
+      // [已移除] reporting 向后兼容别名 - 请使用 reporting_analytics/reporting_charts/reporting_stats/multi_dimension_stats
 
       /*
        * ========== 材料系统服务（使用 snake_case key） ==========
@@ -582,7 +584,16 @@ class ServiceManager {
       if (typeof AdminCustomerServiceService.initialize === 'function') {
         AdminCustomerServiceService.initialize(this)
       }
-      // [已移除] AdminLotteryService.initialize - 原文件已拆分
+
+      // 初始化 AdminLotteryCoreService 依赖（V4.7.0 大文件拆分后需要手动初始化）
+      if (typeof AdminLotteryCoreService.initialize === 'function') {
+        AdminLotteryCoreService.initialize(this)
+      }
+
+      // 初始化 MerchantRiskControlService（需要注入 models）
+      if (typeof MerchantRiskControlService.initialize === 'function') {
+        MerchantRiskControlService.initialize(this.models)
+      }
 
       logger.info('✅ Service依赖注入完成')
 

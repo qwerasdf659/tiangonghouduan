@@ -221,9 +221,7 @@ document.addEventListener('alpine:init', () => {
       this.editableSettings = {}
 
       try {
-        const response = await apiRequest(
-          buildURL(SYSTEM_ENDPOINTS.SETTING_CATEGORY, { category })
-        )
+        const response = await apiRequest(buildURL(SYSTEM_ENDPOINTS.SETTING_CATEGORY, { category }))
         if (response && response.success) {
           const data = response.data || {}
           this.categorySettings = data.settings || []

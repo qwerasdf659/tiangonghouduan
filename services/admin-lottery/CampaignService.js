@@ -302,7 +302,7 @@ class AdminLotteryCampaignService {
     const {
       budget_mode,
       pool_budget_total,
-      allowed_lottery_campaign_ids,
+      allowed_campaign_ids,
       preset_debt_enabled,
       preset_budget_policy
     } = updateData
@@ -332,14 +332,14 @@ class AdminLotteryCampaignService {
       fieldsToUpdate.pool_budget_remaining = Math.max(0, pool_budget_total - usedBudget)
     }
 
-    if (allowed_lottery_campaign_ids !== undefined) {
-      if (allowed_lottery_campaign_ids !== null && !Array.isArray(allowed_lottery_campaign_ids)) {
-        const error = new Error('allowed_lottery_campaign_ids 必须是数组或 null')
+    if (allowed_campaign_ids !== undefined) {
+      if (allowed_campaign_ids !== null && !Array.isArray(allowed_campaign_ids)) {
+        const error = new Error('allowed_campaign_ids 必须是数组或 null')
         error.code = 'INVALID_ALLOWED_CAMPAIGNS'
         error.statusCode = 400
         throw error
       }
-      fieldsToUpdate.allowed_lottery_campaign_ids = allowed_lottery_campaign_ids
+      fieldsToUpdate.allowed_campaign_ids = allowed_campaign_ids
     }
 
     if (preset_debt_enabled !== undefined) {

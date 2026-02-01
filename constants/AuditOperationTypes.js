@@ -154,39 +154,39 @@ const OPERATION_TYPES = Object.freeze({
    */
   CAMPAIGN_CONFIG: 'campaign_config',
 
-  // ==================== 抽奖管理类（V4.5.0新增）====================
+  // ==================== 抽奖管理类（V4.5.0新增，V4.7.0拆分）====================
   /**
    * 强制中奖
    * @description 管理员设置用户强制中指定奖品
-   * @example AdminLotteryService.forceWinForUser()
+   * @example AdminLotteryCoreService.forceWinForUser() // ServiceManager key: admin_lottery_core
    */
   LOTTERY_FORCE_WIN: 'lottery_force_win',
 
   /**
    * 强制不中奖
    * @description 管理员设置用户强制不中奖
-   * @example AdminLotteryService.forceLoseForUser()
+   * @example AdminLotteryCoreService.forceLoseForUser() // ServiceManager key: admin_lottery_core
    */
   LOTTERY_FORCE_LOSE: 'lottery_force_lose',
 
   /**
    * 概率调整
    * @description 管理员调整用户中奖概率
-   * @example AdminLotteryService.adjustUserProbability()
+   * @example AdminLotteryCoreService.adjustUserProbability() // ServiceManager key: admin_lottery_core
    */
   LOTTERY_PROBABILITY_ADJUST: 'lottery_probability_adjust',
 
   /**
    * 用户队列
    * @description 管理员设置用户专属抽奖队列
-   * @example AdminLotteryService.setUserQueue()
+   * @example AdminLotteryCoreService.setUserQueue() // ServiceManager key: admin_lottery_core
    */
   LOTTERY_USER_QUEUE: 'lottery_user_queue',
 
   /**
    * 清除设置
    * @description 管理员清除用户的抽奖管理设置
-   * @example AdminLotteryService.clearUserSettings()
+   * @example AdminLotteryCoreService.clearUserSettings() // ServiceManager key: admin_lottery_core
    */
   LOTTERY_CLEAR_SETTINGS: 'lottery_clear_settings',
 

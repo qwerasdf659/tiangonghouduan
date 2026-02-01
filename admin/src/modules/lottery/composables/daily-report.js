@@ -47,12 +47,14 @@ export function useDailyReportMethods() {
       const yesterday = new Date()
       yesterday.setDate(yesterday.getDate() - 1)
       // 使用北京时间
-      return yesterday.toLocaleDateString('zh-CN', {
-        timeZone: 'Asia/Shanghai',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      }).replace(/\//g, '-')
+      return yesterday
+        .toLocaleDateString('zh-CN', {
+          timeZone: 'Asia/Shanghai',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        })
+        .replace(/\//g, '-')
     },
 
     /**
@@ -64,12 +66,12 @@ export function useDailyReportMethods() {
       this.dailyReport = null
       try {
         const params = {}
-        
+
         // 使用筛选条件的日期，否则使用默认（昨天）
         if (this.dailyReportFilters.report_date) {
           params.report_date = this.dailyReportFilters.report_date
         }
-        
+
         if (this.dailyReportFilters.campaign_id) {
           params.campaign_id = this.dailyReportFilters.campaign_id
         }
@@ -131,12 +133,12 @@ export function useDailyReportMethods() {
      * @param {number} days - 天数偏移（-1 前一天，+1 后一天）
      */
     async changeDailyReportDate(days) {
-      const currentDate = this.dailyReportFilters.report_date 
+      const currentDate = this.dailyReportFilters.report_date
         ? new Date(this.dailyReportFilters.report_date)
         : new Date()
-      
+
       currentDate.setDate(currentDate.getDate() + days)
-      
+
       this.dailyReportFilters.report_date = currentDate.toISOString().split('T')[0]
       await this.loadDailyReportPage()
     },
@@ -149,11 +151,11 @@ export function useDailyReportMethods() {
         this.showError('没有可导出的日报数据')
         return
       }
-      
+
       // 前端提示，实际导出可能需要后端支持
       this.showSuccess('日报导出功能正在开发中...')
-      logger.info('[DailyReport] 尝试导出日报', { 
-        report_date: this.dailyReport.report_date 
+      logger.info('[DailyReport] 尝试导出日报', {
+        report_date: this.dailyReport.report_date
       })
     },
 
@@ -167,14 +169,14 @@ export function useDailyReportMethods() {
       if (value === null || value === undefined) {
         return { text: '-', colorClass: 'text-gray-500' }
       }
-      
+
       const isPositive = value > 0
       const isNegative = value < 0
       const absValue = Math.abs(value * 100).toFixed(1)
-      
+
       let text = `${absValue}%`
       let colorClass = 'text-gray-500'
-      
+
       if (isPositive) {
         text = `+${text}`
         colorClass = inverse ? 'text-red-600' : 'text-green-600'
@@ -182,7 +184,7 @@ export function useDailyReportMethods() {
         text = `-${text}`
         colorClass = inverse ? 'text-green-600' : 'text-red-600'
       }
-      
+
       return { text, colorClass }
     },
 
@@ -243,4 +245,3 @@ export function useDailyReportMethods() {
 }
 
 export default { useDailyReportState, useDailyReportMethods }
-

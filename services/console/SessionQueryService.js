@@ -22,7 +22,7 @@
 const { Op } = require('sequelize')
 const logger = require('../../utils/logger').logger
 const BeijingTimeHelper = require('../../utils/timeHelper')
-const BusinessCacheHelper = require('../../utils/BusinessCacheHelper')
+const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 
 /**
  * 缓存配置

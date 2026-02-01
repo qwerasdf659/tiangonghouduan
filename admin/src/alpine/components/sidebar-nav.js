@@ -174,7 +174,11 @@ export function sidebarNav() {
           { id: 'pricing', name: '定价配置', url: '/admin/pricing-config.html' },
           { id: 'feature-flags', name: '功能开关', url: '/admin/feature-flags.html' },
           { id: 'orphan', name: '孤儿冻结清理', url: '/admin/orphan-frozen.html' },
-          { id: 'material-rules', name: '物料转换规则', url: '/admin/material-conversion-rules.html' },
+          {
+            id: 'material-rules',
+            name: '物料转换规则',
+            url: '/admin/material-conversion-rules.html'
+          },
           { id: 'assets-portfolio', name: '资产组合', url: '/admin/assets-portfolio.html' },
           { id: 'settings', name: '系统配置', url: '/admin/system-settings.html' },
           { id: 'reminder-rules', name: '提醒规则配置', url: '/admin/reminder-rules.html' },
@@ -229,9 +233,12 @@ export function sidebarNav() {
       this.fetchAllBadgeCounts()
 
       // 每5分钟刷新一次徽标数量
-      setInterval(() => {
-        this.fetchAllBadgeCounts()
-      }, 5 * 60 * 1000)
+      setInterval(
+        () => {
+          this.fetchAllBadgeCounts()
+        },
+        5 * 60 * 1000
+      )
     },
 
     /**

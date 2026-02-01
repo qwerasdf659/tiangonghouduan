@@ -27,7 +27,8 @@ const {
 } = require('../../../services/UnifiedLotteryEngine/compute')
 
 const models = require('../../../models')
-const { User, LotteryCampaign, LotteryPrize } = models
+const { LotteryCampaign, LotteryPrize } = models
+// User 模型用于后续扩展测试场景
 
 /**
  * 权重缩放比例常量
@@ -62,7 +63,7 @@ const TIER_DOWNGRADE_PATH = ['high', 'mid', 'low', 'fallback']
 describe('预算耗尽降级测试（任务8.3）', () => {
   let budget_tier_calculator
   let tier_matrix_calculator
-  let lottery_compute_engine
+  let _lottery_compute_engine // 用于后续扩展的抽奖引擎实例（变量名以下划线开头表示预留）
   let test_campaign = null
   let test_prizes = []
 
@@ -122,9 +123,9 @@ describe('预算耗尽降级测试（任务8.3）', () => {
   ]
 
   /**
-   * 模拟活动配置
+   * 模拟活动配置（用于后续集成测试场景扩展）
    */
-  const MOCK_CAMPAIGN = {
+  const _MOCK_CAMPAIGN = {
     lottery_campaign_id: 999,
     name: 'Test Campaign',
     budget_mode: 'pool',
@@ -139,7 +140,7 @@ describe('预算耗尽降级测试（任务8.3）', () => {
     // 创建计算器实例
     budget_tier_calculator = new BudgetTierCalculator()
     tier_matrix_calculator = new TierMatrixCalculator()
-    lottery_compute_engine = new LotteryComputeEngine()
+    _lottery_compute_engine = new LotteryComputeEngine()
 
     // 获取真实活动和奖品数据
     try {

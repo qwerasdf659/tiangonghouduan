@@ -451,7 +451,7 @@ class ActivityService {
         'budget_mode',
         'pool_budget_total',
         'pool_budget_remaining',
-        'allowed_lottery_campaign_ids',
+        'allowed_campaign_ids',
         // ======================== 预设欠账控制字段（统一架构 V1.6） ========================
         'preset_debt_enabled',
         'preset_budget_policy',
@@ -484,7 +484,7 @@ class ActivityService {
        */
       preset_debt_enabled: !!campaign.preset_debt_enabled,
       preset_budget_policy: campaign.preset_budget_policy,
-      allowed_lottery_campaign_ids: campaign.allowed_lottery_campaign_ids || [],
+      allowed_campaign_ids: campaign.allowed_campaign_ids || [],
       status: campaign.status
     }
   }

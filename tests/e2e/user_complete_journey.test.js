@@ -19,7 +19,8 @@
  */
 
 const request = require('supertest')
-const { sequelize, User, AccountAssetBalance } = require('../../models')
+const { sequelize, User } = require('../../models')
+// AccountAssetBalance 用于后续资产状态验证扩展
 
 // 延迟加载 app（需要等待数据库连接）
 let app
@@ -33,7 +34,7 @@ describe('E2E - 新用户完整旅程测试', () => {
   let accessToken
   let testUserId
   let testCampaignCode
-  let drawResult
+  let _drawResult // 用于后续资产验证扩展
   let itemInstanceId
 
   beforeAll(async () => {
@@ -242,7 +243,7 @@ describe('E2E - 新用户完整旅程测试', () => {
         if (response.body.data.prizes.length > 0) {
           const prize = response.body.data.prizes[0]
           expect(prize).toHaveProperty('reward_tier')
-          drawResult = prize
+          _drawResult = prize
 
           console.log('[Step 4] 抽奖结果:', {
             reward_tier: prize.reward_tier,

@@ -31,8 +31,8 @@ const {
   sequelize,
   User,
   MarketListing,
-  TradeOrder,
-  AccountAssetBalance
+  TradeOrder
+  // AccountAssetBalance 用于后续资产交割验证扩展
 } = require('../../../models')
 // V4.7.0 拆分：使用 market-listing/CoreService
 const MarketListingService = require('../../../services/market-listing/CoreService')
@@ -42,9 +42,8 @@ const BalanceService = require('../../../services/asset/BalanceService')
 const { v4: uuidv4 } = require('uuid')
 
 const {
-  executeConcurrent,
-  generateConcurrentTestId,
-  delay
+  executeConcurrent
+  // generateConcurrentTestId, delay 用于后续并发测试扩展
 } = require('../../helpers/test-concurrent-utils')
 
 const { initRealTestData, getRealTestUserId } = require('../../helpers/test-setup')
@@ -549,9 +548,9 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
 
       // 重复取消（使用相同幂等键）
       const transaction2 = await sequelize.transaction()
-      let duplicateResult
+      let _duplicateResult // 用于后续幂等性验证扩展
       try {
-        duplicateResult = await TradeOrderService.cancelOrder(
+        _duplicateResult = await TradeOrderService.cancelOrder(
           {
             trade_order_id: testOrderId,
             idempotency_key: cancelIdempotencyKey
@@ -564,7 +563,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
           await transaction2.rollback()
         }
         // 幂等返回可能以异常形式返回已取消的信息
-        duplicateResult = { order: { status: 'cancelled' }, is_duplicate: true }
+        _duplicateResult = { order: { status: 'cancelled' }, is_duplicate: true }
       }
 
       // 验证订单仍然是已取消状态

@@ -10,10 +10,10 @@ import { API_PREFIX, authHeaders, handleResponse, buildURL } from './base.js'
 // 报表模板端点
 export const REPORT_TEMPLATES_ENDPOINTS = {
   LIST: `${API_PREFIX}/console/report-templates`,
-  DETAIL: (id) => `${API_PREFIX}/console/report-templates/${id}`,
+  DETAIL: id => `${API_PREFIX}/console/report-templates/${id}`,
   PREVIEW: `${API_PREFIX}/console/report-templates/preview`,
-  EXPORT: (id) => `${API_PREFIX}/console/report-templates/${id}/export`,
-  SCHEDULE: (id) => `${API_PREFIX}/console/report-templates/${id}/schedule`
+  EXPORT: id => `${API_PREFIX}/console/report-templates/${id}/export`,
+  SCHEDULE: id => `${API_PREFIX}/console/report-templates/${id}/schedule`
 }
 
 /**
@@ -140,4 +140,3 @@ export const ReportTemplatesAPI = {
     return handleResponse(response)
   }
 }
-
