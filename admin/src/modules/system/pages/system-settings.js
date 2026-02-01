@@ -26,6 +26,12 @@ import {
   useAuditLogsMethods
 } from '../composables/index.js'
 
+// 导入提醒规则 API (P2-1)
+import { ReminderRulesAPI, ReminderHistoryAPI } from '../../../api/reminder.js'
+
+// 导入系统 API (F-59 审计报告)
+import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
+
 /**
  * 注册系统设置相关的 Alpine.js 组件
  */
@@ -51,6 +57,7 @@ function registerSystemSettingsComponents() {
     // 方案A: 字典管理/定价配置/功能开关已分离为独立页面
     subPages: [
       { id: 'system-config', name: '系统配置', icon: 'bi-gear' },
+      { id: 'reminder-rules', name: '提醒规则', icon: 'bi-bell' },
       { id: 'audit-logs', name: '审计日志', icon: 'bi-journal-text' }
     ],
 
@@ -85,11 +92,28 @@ function registerSystemSettingsComponents() {
     // ==================== 导航状态 ====================
     current_page: 'system-config',
 
-    // 子页面配置（方案A：只保留系统配置和审计日志）
+    // 子页面配置（方案A + P2-1提醒规则 + F-59审计报告）
     subPages: [
       { id: 'system-config', name: '系统配置', icon: '⚙️' },
-      { id: 'audit-logs', name: '审计日志', icon: '📋' }
+      { id: 'reminder-rules', name: '提醒规则', icon: '🔔' },
+      { id: 'audit-logs', name: '审计日志', icon: '📋' },
+      { id: 'audit-report', name: '审计报告', icon: '📊' }  // F-59
     ],
+
+    // ==================== F-59: 审计报告状态 ====================
+    auditReport: {
+      summary: { total_operations: 0, high_risk_count: 0, rollback_count: 0, unique_operators: 0 },
+      by_action: [],
+      by_module: [],
+      by_operator: [],
+      trend: [],
+      risk_distribution: { high: 0, medium: 0, low: 0 }
+    },
+    auditReportFilters: {
+      start_date: '',
+      end_date: '',
+      time_range: '7d'  // 7d, 30d, 90d
+    },
 
     // ==================== 通用状态 ====================
     page: 1,
@@ -97,6 +121,18 @@ function registerSystemSettingsComponents() {
     total_pages: 1,
     total: 0,
     saving: false,
+
+    // ==================== 提醒规则状态 (P2-1) ====================
+    reminderRules: [],
+    reminderRuleForm: {
+      rule_type: '',
+      condition_type: '',
+      threshold: '',
+      notify_channels: ['in_app'],
+      is_enabled: true
+    },
+    reminderRuleModalOpen: false,
+    editingRuleId: null,
 
     // ==================== 初始化和数据加载 ====================
 
@@ -136,8 +172,14 @@ function registerSystemSettingsComponents() {
             case 'system-config':
               await this.loadSystemConfig()
               break
+            case 'reminder-rules':
+              await this.loadReminderRules()
+              break
             case 'audit-logs':
               await this.loadAuditLogs()
+              break
+            case 'audit-report':  // F-59
+              await this.loadAuditReport()
               break
           }
         },
@@ -148,6 +190,282 @@ function registerSystemSettingsComponents() {
     // ==================== 从 Composables 导入方法 ====================
     ...useConfigMethods(),
     ...useAuditLogsMethods(),
+
+    // ==================== 操作日志增强方法 (P2-3) ====================
+
+    /** 选中的审计日志 */
+    selectedLog: null,
+
+    /**
+     * 查看审计日志详情
+     */
+    viewAuditLogDetail(log) {
+      this.selectedLog = log
+      this.showModal('auditDetailModal')
+    },
+
+    /**
+     * 回滚操作
+     */
+    async rollbackOperation(log) {
+      if (!confirm(`确定要回滚此操作吗？\n操作：${log.action_name || log.action}\n目标：${log.target || log.operation_type_name}`)) {
+        return
+      }
+
+      try {
+        this.saving = true
+        const response = await this.apiPost(`/api/v4/console/operations/${log.id}/rollback`, {})
+        if (response?.success) {
+          this.showSuccess('操作已回滚')
+          await this.loadAuditLogs()
+        } else {
+          this.showError(response?.message || '回滚失败')
+        }
+      } catch (error) {
+        logger.error('[AuditLogs] 回滚失败:', error)
+        this.showError('回滚操作失败')
+      } finally {
+        this.saving = false
+      }
+    },
+
+    // ==================== 提醒规则方法 (P2-1) ====================
+
+    /**
+     * 加载提醒规则列表
+     */
+    async loadReminderRules() {
+      try {
+        const response = await ReminderRulesAPI.getRules()
+        if (response?.success) {
+          this.reminderRules = response.data?.rules || response.data || []
+        }
+      } catch (error) {
+        logger.error('[ReminderRules] 加载失败:', error)
+        this.showError('加载提醒规则失败')
+      }
+    },
+
+    /**
+     * 打开新增/编辑规则弹窗
+     */
+    openReminderRuleModal(rule = null) {
+      if (rule) {
+        this.editingRuleId = rule.rule_id || rule.id
+        this.reminderRuleForm = {
+          rule_type: rule.rule_type || '',
+          condition_type: rule.condition_type || '',
+          threshold: rule.threshold || '',
+          notify_channels: rule.notify_channels || ['in_app'],
+          is_enabled: rule.is_enabled !== false
+        }
+      } else {
+        this.editingRuleId = null
+        this.reminderRuleForm = {
+          rule_type: '',
+          condition_type: '',
+          threshold: '',
+          notify_channels: ['in_app'],
+          is_enabled: true
+        }
+      }
+      this.reminderRuleModalOpen = true
+    },
+
+    /**
+     * 保存提醒规则
+     */
+    async saveReminderRule() {
+      try {
+        this.saving = true
+        let response
+        if (this.editingRuleId) {
+          response = await ReminderRulesAPI.updateRule(this.editingRuleId, this.reminderRuleForm)
+        } else {
+          response = await ReminderRulesAPI.createRule(this.reminderRuleForm)
+        }
+        if (response?.success) {
+          this.showSuccess(this.editingRuleId ? '规则更新成功' : '规则创建成功')
+          this.reminderRuleModalOpen = false
+          await this.loadReminderRules()
+        }
+      } catch (error) {
+        logger.error('[ReminderRules] 保存失败:', error)
+        this.showError('保存规则失败')
+      } finally {
+        this.saving = false
+      }
+    },
+
+    /**
+     * 切换规则启用状态
+     */
+    async toggleReminderRule(rule) {
+      try {
+        const response = await ReminderRulesAPI.toggleRule(rule.rule_id || rule.id)
+        if (response?.success) {
+          this.showSuccess(rule.is_enabled ? '规则已禁用' : '规则已启用')
+          await this.loadReminderRules()
+        }
+      } catch (error) {
+        logger.error('[ReminderRules] 切换失败:', error)
+        this.showError('操作失败')
+      }
+    },
+
+    /**
+     * 删除规则
+     */
+    async deleteReminderRule(rule) {
+      if (!confirm('确定要删除此提醒规则吗？')) return
+      try {
+        const response = await ReminderRulesAPI.deleteRule(rule.rule_id || rule.id)
+        if (response?.success) {
+          this.showSuccess('规则已删除')
+          await this.loadReminderRules()
+        }
+      } catch (error) {
+        logger.error('[ReminderRules] 删除失败:', error)
+        this.showError('删除失败')
+      }
+    },
+
+    /**
+     * 获取规则类型名称
+     */
+    getRuleTypeName(type) {
+      const map = {
+        budget_alert: '预算告警',
+        consumption_pending: '消费待审核',
+        win_rate_abnormal: '中奖率异常',
+        high_tier_win: '高档位中奖',
+        customer_service: '客服咨询',
+        risk_alert: '风控告警'
+      }
+      return map[type] || type
+    },
+
+    /**
+     * 获取条件类型名称
+     */
+    getConditionTypeName(type) {
+      const map = {
+        threshold_exceed: '超过阈值',
+        count_reach: '数量达到',
+        time_trigger: '定时触发',
+        event_trigger: '事件触发'
+      }
+      return map[type] || type
+    },
+
+    // ==================== F-59: 审计报告方法 ====================
+
+    /**
+     * 加载审计报告数据
+     * 后端接口: GET /api/v4/admin/operations/audit-report
+     */
+    async loadAuditReport() {
+      try {
+        const params = new URLSearchParams()
+        if (this.auditReportFilters.time_range) {
+          params.append('time_range', this.auditReportFilters.time_range)
+        }
+        if (this.auditReportFilters.start_date) {
+          params.append('start_date', this.auditReportFilters.start_date)
+        }
+        if (this.auditReportFilters.end_date) {
+          params.append('end_date', this.auditReportFilters.end_date)
+        }
+
+        const response = await this.apiGet(
+          `${SYSTEM_ENDPOINTS.AUDIT_LOG_REPORT}?${params}`,
+          {},
+          { showLoading: false }
+        )
+
+        if (response?.success && response.data) {
+          this.auditReport = {
+            summary: response.data.summary || { 
+              total_operations: 0, 
+              high_risk_count: 0, 
+              rollback_count: 0, 
+              unique_operators: 0 
+            },
+            by_action: response.data.by_action || [],
+            by_module: response.data.by_module || [],
+            by_operator: response.data.by_operator || [],
+            trend: response.data.trend || [],
+            risk_distribution: response.data.risk_distribution || { high: 0, medium: 0, low: 0 }
+          }
+          logger.debug('[AuditReport] 数据加载成功', this.auditReport)
+        }
+      } catch (error) {
+        logger.error('[AuditReport] 加载失败:', error)
+        this.showError('加载审计报告失败')
+      }
+    },
+
+    /**
+     * 切换审计报告时间范围
+     * @param {string} range - 时间范围: 7d, 30d, 90d
+     */
+    switchAuditReportRange(range) {
+      this.auditReportFilters.time_range = range
+      this.loadAuditReport()
+    },
+
+    /**
+     * 导出审计报告
+     */
+    async exportAuditReport() {
+      try {
+        const params = new URLSearchParams()
+        params.append('time_range', this.auditReportFilters.time_range)
+        params.append('format', 'xlsx')
+
+        const response = await this.apiGet(
+          `${SYSTEM_ENDPOINTS.AUDIT_LOG_EXPORT}?${params}`,
+          {},
+          { showLoading: true, loadingText: '生成报告...' }
+        )
+
+        if (response?.success && response.data?.download_url) {
+          window.open(response.data.download_url, '_blank')
+          this.showSuccess('审计报告导出成功')
+        } else {
+          this.showWarning('暂不支持导出功能')
+        }
+      } catch (error) {
+        logger.error('[AuditReport] 导出失败:', error)
+        this.showError('导出审计报告失败')
+      }
+    },
+
+    /**
+     * 获取操作类型颜色类
+     */
+    getActionColor(action) {
+      const colors = {
+        create: 'bg-green-100 text-green-700',
+        update: 'bg-blue-100 text-blue-700',
+        delete: 'bg-red-100 text-red-700',
+        login: 'bg-purple-100 text-purple-700',
+        logout: 'bg-gray-100 text-gray-700'
+      }
+      return colors[action] || 'bg-gray-100 text-gray-700'
+    },
+
+    /**
+     * 获取风险等级颜色类
+     */
+    getRiskColor(level) {
+      const colors = {
+        high: 'bg-red-500',
+        medium: 'bg-yellow-500',
+        low: 'bg-green-500'
+      }
+      return colors[level] || 'bg-gray-500'
+    },
 
     // ==================== 工具方法 ====================
 

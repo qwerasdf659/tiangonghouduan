@@ -12,9 +12,11 @@
 const CoreService = require('./CoreService')
 const QueryService = require('./QueryService')
 const MerchantService = require('./MerchantService')
+const AnomalyService = require('./AnomalyService')
 
 module.exports = {
   CoreService,
   QueryService,
-  MerchantService
+  MerchantService,
+  AnomalyService
 }

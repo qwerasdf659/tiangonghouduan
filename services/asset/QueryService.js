@@ -502,14 +502,17 @@ class QueryService {
       method: 'getSystemStats'
     })
 
-    // 从 account_asset_balances 表聚合统计
+    /*
+     * 从 account_asset_balances 表聚合统计
+     * 使用 CAST 转换为 DECIMAL 避免 BIGINT 溢出问题
+     */
     const [stats] = await sequelize.query(`
       SELECT 
         asset_code,
         COUNT(DISTINCT account_id) as holder_count,
-        SUM(available_amount) as total_circulation,
-        SUM(frozen_amount) as total_frozen,
-        SUM(available_amount + frozen_amount) as total_issued
+        CAST(SUM(available_amount) AS DECIMAL(30,4)) as total_circulation,
+        CAST(SUM(frozen_amount) AS DECIMAL(30,4)) as total_frozen,
+        CAST(SUM(available_amount) AS DECIMAL(30,4)) + CAST(SUM(frozen_amount) AS DECIMAL(30,4)) as total_issued
       FROM account_asset_balances
       WHERE available_amount > 0 OR frozen_amount > 0
       GROUP BY asset_code

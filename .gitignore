@@ -75,3 +75,7 @@ migrations/manual/
 
 # Environment variables
 .env
+
+# 大型备份文件（超过GitHub 100MB限制）
+backups/backup_2026-02-01_complete/*.sql
+backups/backup_2026-02-01_complete/*.json

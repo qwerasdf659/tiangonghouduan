@@ -37,13 +37,21 @@ export function workspaceTabs() {
         // 可选：根据 URL 切换 Tab
       })
 
-      // 默认打开统计页面（作为工作台首页）
+      // 默认打开待处理中心和运营仪表盘（待处理中心为默认激活）
       if (this.tabs.length === 0) {
+        // 先打开运营仪表盘
         this.openTab({
-          id: 'statistics',
-          title: '数据统计',
+          id: 'dashboard-panel',
+          title: '运营仪表盘',
           icon: '📊',
-          url: '/admin/statistics.html'
+          url: '/admin/dashboard-panel.html'
+        })
+        // 再打开待处理中心（后打开的会成为激活Tab）
+        this.openTab({
+          id: 'pending-center',
+          title: '待处理中心',
+          icon: '🔔',
+          url: '/admin/pending-center.html'
         })
       }
     },

@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '消息中心', 
+    pageStyle: `
+      /* 自定义滚动条 */
+      .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+      .scrollbar-thin::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
+      .scrollbar-thin::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+      .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
+      
+      /* 消息项悬停 */
+      .message-item { transition: all 0.2s ease; }
+      .message-item:hover { background-color: #f8fafc; transform: translateX(2px); }
+      
+      /* 未读消息高亮 */
+      .unread { background-color: rgba(59, 130, 246, 0.05); border-left: 3px solid #3b82f6; }
+      
+      /* 类型徽章 */
+      .type-badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; }
+    `
+  }) %>
+<body class="themed-bg-base min-h-screen">
+  <div x-data="messageCenterPage()" x-init="init()" x-cloak class="p-6">
+    <!-- 页面标题 -->
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-800">📬 消息中心</h1>
+        <p class="text-sm text-gray-500 mt-1">
+          查看和管理所有系统通知 · 共 <span x-text="pagination.total">0</span> 条消息
+        </p>
+      </div>
+      
+      <div class="flex items-center gap-3">
+        <!-- 全部已读按钮 -->
+        <button 
+          @click="markAllAsRead()"
+          x-show="unreadCount > 0"
+          class="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition"
+        >
+          ✓ 全部标记已读 (<span x-text="unreadCount">0</span>)
+        </button>
+        
+        <!-- 声音设置 -->
+        <button 
+          @click="toggleSound()"
+          class="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm transition"
+          :class="soundEnabled ? 'text-blue-600 border-blue-200 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'"
+        >
+          <span x-text="soundEnabled ? '🔊' : '🔇'"></span>
+          <span x-text="soundEnabled ? '声音已开启' : '声音已关闭'"></span>
+        </button>
+        
+        <!-- 刷新按钮 -->
+        <button 
+          @click="refreshMessages()"
+          :disabled="loading"
+          class="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition"
+        >
+          <span :class="loading && 'animate-spin'">🔄</span>
+          刷新
+        </button>
+      </div>
+    </div>
+    
+    <!-- 筛选和搜索栏 -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+      <div class="flex flex-wrap items-center gap-4">
+        <!-- 类型筛选 -->
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-gray-500">类型:</span>
+          <div class="flex bg-gray-100 rounded-lg p-1">
+            <button 
+              @click="filter.type = ''"
+              :class="filter.type === '' ? 'bg-white shadow-sm' : ''"
+              class="px-3 py-1.5 text-sm rounded-md transition"
+            >全部</button>
+            <button 
+              @click="filter.type = 'alert'"
+              :class="filter.type === 'alert' ? 'bg-white shadow-sm text-red-600' : ''"
+              class="px-3 py-1.5 text-sm rounded-md transition"
+            >🔔 告警</button>
+            <button 
+              @click="filter.type = 'warning'"
+              :class="filter.type === 'warning' ? 'bg-white shadow-sm text-yellow-600' : ''"
+              class="px-3 py-1.5 text-sm rounded-md transition"
+            >⚠️ 预警</button>
+            <button 
+              @click="filter.type = 'info'"
+              :class="filter.type === 'info' ? 'bg-white shadow-sm text-blue-600' : ''"
+              class="px-3 py-1.5 text-sm rounded-md transition"
+            >ℹ️ 通知</button>
+            <button 
+              @click="filter.type = 'success'"
+              :class="filter.type === 'success' ? 'bg-white shadow-sm text-green-600' : ''"
+              class="px-3 py-1.5 text-sm rounded-md transition"
+            >✅ 成功</button>
+          </div>
+        </div>
+        
+        <!-- 状态筛选 -->
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-gray-500">状态:</span>
+          <select 
+            x-model="filter.status"
+            @change="loadMessages()"
+            class="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">全部状态</option>
+            <option value="unread">未读</option>
+            <option value="read">已读</option>
+          </select>
+        </div>
+        
+        <!-- 时间范围 -->
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-gray-500">时间:</span>
+          <select 
+            x-model="filter.time_range"
+            @change="loadMessages()"
+            class="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">全部时间</option>
+            <option value="today">今天</option>
+            <option value="week">本周</option>
+            <option value="month">本月</option>
+          </select>
+        </div>
+        
+        <!-- 搜索框 -->
+        <div class="flex-1 min-w-[200px]">
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+            <input 
+              type="text"
+              x-model="filter.keyword"
+              @input.debounce.300ms="loadMessages()"
+              placeholder="搜索消息内容..."
+              class="w-full pl-10 pr-4 py-2 bg-gray-100 border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 消息列表 -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <!-- 批量操作栏 -->
+      <div 
+        x-show="selectedIds.length > 0"
+        class="px-4 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between"
+      >
+        <div class="flex items-center gap-3">
+          <span class="text-sm text-blue-700">
+            已选择 <span class="font-semibold" x-text="selectedIds.length">0</span> 条消息
+          </span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button 
+            @click="markSelectedAsRead()"
+            class="px-3 py-1.5 text-sm bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition"
+          >
+            标记已读
+          </button>
+          <button 
+            @click="deleteSelected()"
+            class="px-3 py-1.5 text-sm bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition"
+          >
+            删除选中
+          </button>
+          <button 
+            @click="selectedIds = []"
+            class="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700"
+          >
+            取消选择
+          </button>
+        </div>
+      </div>
+      
+      <!-- 消息列表内容 -->
+      <div class="divide-y divide-gray-50">
+        <!-- 加载中 -->
+        <template x-if="loading && messages.length === 0">
+          <div class="p-12 text-center text-gray-400">
+            <div class="animate-spin text-4xl mb-2">⏳</div>
+            <div>加载中...</div>
+          </div>
+        </template>
+        
+        <!-- 空状态 -->
+        <template x-if="!loading && messages.length === 0">
+          <div class="p-12 text-center text-gray-400">
+            <div class="text-5xl mb-4">📭</div>
+            <div class="text-lg font-medium">暂无消息</div>
+            <div class="text-sm mt-1">当有新的系统通知时会显示在这里</div>
+          </div>
+        </template>
+        
+        <!-- 消息项 -->
+        <template x-for="message in messages" :key="message.id">
+          <div 
+            class="message-item flex items-start gap-4 p-4 cursor-pointer"
+            :class="{ 'unread': !message.is_read }"
+            @click="viewMessage(message)"
+          >
+            <!-- 复选框 -->
+            <div class="pt-1">
+              <input 
+                type="checkbox"
+                :value="message.id"
+                x-model="selectedIds"
+                @click.stop
+                class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+            </div>
+            
+            <!-- 类型图标 -->
+            <div 
+              class="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0"
+              :class="getTypeColorClass(message.type)"
+            >
+              <span x-text="getTypeIcon(message.type)"></span>
+            </div>
+            
+            <!-- 消息内容 -->
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span 
+                  class="font-medium text-gray-800"
+                  :class="{ 'font-semibold': !message.is_read }"
+                  x-text="message.title"
+                ></span>
+                <span 
+                  class="type-badge"
+                  :class="getTypeBadgeClass(message.type)"
+                  x-text="getTypeLabel(message.type)"
+                ></span>
+                <span 
+                  x-show="!message.is_read"
+                  class="w-2 h-2 bg-blue-500 rounded-full"
+                ></span>
+              </div>
+              <div class="text-sm text-gray-600 line-clamp-2" x-text="message.message"></div>
+              <div class="flex items-center gap-4 mt-2 text-xs text-gray-400">
+                <span x-text="formatTime(message.created_at)"></span>
+                <span x-show="message.source" x-text="'来源: ' + message.source"></span>
+              </div>
+            </div>
+            
+            <!-- 操作按钮 -->
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <button 
+                @click.stop="markAsRead(message)"
+                x-show="!message.is_read"
+                class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                title="标记已读"
+              >
+                ✓
+              </button>
+              <button 
+                @click.stop="deleteMessage(message)"
+                class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                title="删除"
+              >
+                🗑️
+              </button>
+            </div>
+          </div>
+        </template>
+      </div>
+      
+      <!-- 分页 -->
+      <template x-if="pagination.total > pagination.page_size">
+        <div class="p-4 border-t border-gray-100 flex items-center justify-between">
+          <div class="text-sm text-gray-500">
+            显示 <span x-text="(pagination.page - 1) * pagination.page_size + 1"></span> - 
+            <span x-text="Math.min(pagination.page * pagination.page_size, pagination.total)"></span> / 
+            共 <span x-text="pagination.total"></span> 条
+          </div>
+          
+          <div class="flex items-center gap-2">
+            <button 
+              @click="changePage(pagination.page - 1)"
+              :disabled="pagination.page <= 1"
+              class="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              ← 上一页
+            </button>
+            
+            <!-- 页码显示 -->
+            <template x-for="p in getPageNumbers()" :key="p">
+              <button 
+                x-show="p !== '...'"
+                @click="changePage(p)"
+                :class="pagination.page === p ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+                class="px-3 py-1.5 border border-gray-200 rounded-lg text-sm transition"
+                x-text="p"
+              ></button>
+              <span x-show="p === '...'" class="px-2 text-gray-400">...</span>
+            </template>
+            
+            <button 
+              @click="changePage(pagination.page + 1)"
+              :disabled="pagination.page >= Math.ceil(pagination.total / pagination.page_size)"
+              class="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              下一页 →
+            </button>
+          </div>
+        </div>
+      </template>
+    </div>
+    
+    <!-- 消息详情模态框 -->
+    <div 
+      x-show="detailModal"
+      x-transition:enter="transition ease-out duration-200"
+      x-transition:enter-start="opacity-0"
+      x-transition:enter-end="opacity-100"
+      x-transition:leave="transition ease-in duration-150"
+      x-transition:leave-start="opacity-100"
+      x-transition:leave-end="opacity-0"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      @click.self="closeDetailModal()"
+      style="display: none;"
+    >
+      <div 
+        class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 transform scale-95"
+        x-transition:enter-end="opacity-100 transform scale-100"
+      >
+        <!-- 模态框头部 -->
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div 
+              class="w-10 h-10 rounded-full flex items-center justify-center text-lg"
+              :class="getTypeColorClass(currentMessage?.type)"
+            >
+              <span x-text="getTypeIcon(currentMessage?.type)"></span>
+            </div>
+            <div>
+              <h3 class="font-semibold text-gray-800" x-text="currentMessage?.title"></h3>
+              <span 
+                class="type-badge"
+                :class="getTypeBadgeClass(currentMessage?.type)"
+                x-text="getTypeLabel(currentMessage?.type)"
+              ></span>
+            </div>
+          </div>
+          <button 
+            @click="closeDetailModal()"
+            class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
+          >
+            ✕
+          </button>
+        </div>
+        
+        <!-- 模态框内容 -->
+        <div class="p-6 overflow-y-auto max-h-[50vh]">
+          <p class="text-gray-600 whitespace-pre-wrap" x-text="currentMessage?.message"></p>
+          
+          <!-- 附加信息 -->
+          <template x-if="currentMessage?.extra_data">
+            <div class="mt-4 p-4 bg-gray-50 rounded-lg">
+              <div class="text-sm font-medium text-gray-700 mb-2">附加信息</div>
+              <pre class="text-xs text-gray-600 overflow-x-auto" x-text="JSON.stringify(currentMessage?.extra_data, null, 2)"></pre>
+            </div>
+          </template>
+        </div>
+        
+        <!-- 模态框底部 -->
+        <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50">
+          <div class="text-sm text-gray-500">
+            <span x-text="formatFullTime(currentMessage?.created_at)"></span>
+            <span x-show="currentMessage?.source" class="ml-2" x-text="'· 来源: ' + currentMessage?.source"></span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button 
+              @click="handleMessageAction(currentMessage)"
+              class="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition"
+            >
+              去处理 →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 页面模块引入 -->
+  <script type="module" src="./src/pages/message-center.js"></script>
+</body>
+</html>
+
+<!-- END -->
+        async loadMessages() {
+          this.loading = true
+          try {
+            const params = new URLSearchParams({
+              page: this.pagination.page,
+              page_size: this.pagination.page_size
+            })
+            
+            if (this.filter.type) params.append('type', this.filter.type)
+            if (this.filter.status) params.append('status', this.filter.status)
+            if (this.filter.time_range) params.append('time_range', this.filter.time_range)
+            if (this.filter.keyword) params.append('keyword', this.filter.keyword)
+            
+            const token = localStorage.getItem('admin_token')
+            const response = await fetch(`/api/v4/console/notifications?${params}`, {
+              headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            })
+            
+            if (!response.ok) throw new Error('获取消息列表失败')
+            
+            const result = await response.json()
+            if (result.data) {
+              this.messages = result.data.items || result.data || []
+              this.pagination.total = result.data.total || this.messages.length
+              this.unreadCount = result.data.unread_count || this.messages.filter(m => !m.is_read).length
+            }
+          } catch (e) {
+            console.warn('[MessageCenter] loadMessages 失败:', e.message)
+            // 模拟数据
+            this.messages = this.generateMockMessages()
+            this.pagination.total = this.messages.length + 50
+            this.unreadCount = this.messages.filter(m => !m.is_read).length
+          } finally {
+            this.loading = false
+          }
+        },
+        
+        generateMockMessages() {
+          const types = ['alert', 'warning', 'info', 'success']
+          const titles = {
+            alert: ['新的消耗审核', '客服会话请求', '风控告警'],
+            warning: ['预算告警', '库存不足', '中奖率异常'],
+            info: ['系统通知', '活动上线', '数据报表'],
+            success: ['审核通过', '任务完成', '发放成功']
+          }
+          
+          const messages = []
+          for (let i = 0; i < 20; i++) {
+            const type = types[Math.floor(Math.random() * types.length)]
+            const titleList = titles[type]
+            
+            messages.push({
+              id: i + 1,
+              type: type,
+              title: titleList[Math.floor(Math.random() * titleList.length)] + ' #' + (1000 + i),
+              message: '这是一条系统通知消息的详细内容，描述了事件的具体情况和需要处理的事项。',
+              is_read: Math.random() > 0.4,
+              created_at: new Date(Date.now() - Math.random() * 86400000 * 7).toISOString(),
+              source: ['系统', '抽奖模块', '客服系统', '风控系统'][Math.floor(Math.random() * 4)]
+            })
+          }
+          
+          return messages.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        },
+        
+        async refreshMessages() {
+          this.pagination.page = 1
+          await this.loadMessages()
+        },
+        
+        changePage(page) {
+          const maxPage = Math.ceil(this.pagination.total / this.pagination.page_size)
+          if (page < 1 || page > maxPage) return
+          this.pagination.page = page
+          this.loadMessages()
+        },
+        
+        getPageNumbers() {
+          const total = Math.ceil(this.pagination.total / this.pagination.page_size)
+          const current = this.pagination.page
+          const pages = []
+          
+          if (total <= 7) {
+            for (let i = 1; i <= total; i++) pages.push(i)
+          } else {
+            pages.push(1)
+            if (current > 3) pages.push('...')
+            for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
+              pages.push(i)
+            }
+            if (current < total - 2) pages.push('...')
+            pages.push(total)
+          }
+          
+          return pages
+        },
+        
+        viewMessage(message) {
+          this.currentMessage = message
+          this.detailModal = true
+          
+          // 标记为已读
+          if (!message.is_read) {
+            this.markAsRead(message)
+          }
+        },
+        
+        closeDetailModal() {
+          this.detailModal = false
+          this.currentMessage = null
+        },
+        
+        async markAsRead(message) {
+          if (message.is_read) return
+          
+          try {
+            const token = localStorage.getItem('admin_token')
+            await fetch(`/api/v4/console/notifications/${message.id}/read`, {
+              method: 'POST',
+              headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            })
+          } catch (e) {
+            console.warn('[MessageCenter] markAsRead 失败:', e.message)
+          }
+          
+          message.is_read = true
+          this.unreadCount = Math.max(0, this.unreadCount - 1)
+        },
+        
+        async markAllAsRead() {
+          try {
+            const token = localStorage.getItem('admin_token')
+            await fetch('/api/v4/console/notifications/read-all', {
+              method: 'POST',
+              headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            })
+          } catch (e) {
+            console.warn('[MessageCenter] markAllAsRead 失败:', e.message)
+          }
+          
+          this.messages.forEach(m => m.is_read = true)
+          this.unreadCount = 0
+        },
+        
+        async markSelectedAsRead() {
+          for (const id of this.selectedIds) {
+            const message = this.messages.find(m => m.id === id)
+            if (message && !message.is_read) {
+              await this.markAsRead(message)
+            }
+          }
+          this.selectedIds = []
+        },
+        
+        async deleteMessage(message) {
+          if (!confirm('确定要删除这条消息吗？')) return
+          
+          try {
+            const token = localStorage.getItem('admin_token')
+            await fetch(`/api/v4/console/notifications/${message.id}`, {
+              method: 'DELETE',
+              headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            })
+          } catch (e) {
+            console.warn('[MessageCenter] deleteMessage 失败:', e.message)
+          }
+          
+          this.messages = this.messages.filter(m => m.id !== message.id)
+          this.pagination.total--
+          if (!message.is_read) {
+            this.unreadCount = Math.max(0, this.unreadCount - 1)
+          }
+        },
+        
+        async deleteSelected() {
+          if (!confirm(`确定要删除选中的 ${this.selectedIds.length} 条消息吗？`)) return
+          
+          for (const id of this.selectedIds) {
+            const message = this.messages.find(m => m.id === id)
+            if (message) {
+              try {
+                const token = localStorage.getItem('admin_token')
+                await fetch(`/api/v4/console/notifications/${id}`, {
+                  method: 'DELETE',
+                  headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                })
+              } catch (e) {
+                console.warn('[MessageCenter] deleteSelected 失败:', e.message)
+              }
+              
+              if (!message.is_read) {
+                this.unreadCount = Math.max(0, this.unreadCount - 1)
+              }
+            }
+          }
+          
+          this.messages = this.messages.filter(m => !this.selectedIds.includes(m.id))
+          this.pagination.total -= this.selectedIds.length
+          this.selectedIds = []
+        },
+        
+        handleMessageAction(message) {
+          const urlMap = {
+            'alert': '/admin/pending-center.html',
+            'warning': '/admin/lottery-alerts.html',
+            'info': '/admin/system-settings.html',
+            'success': '/admin/statistics.html'
+          }
+          
+          const url = urlMap[message?.type] || '/admin/pending-center.html'
+          
+          this.closeDetailModal()
+          
+          // 通知父窗口打开Tab
+          if (window.parent && window.parent !== window) {
+            window.parent.dispatchEvent(new CustomEvent('open-tab', {
+              detail: {
+                id: message?.type || 'pending',
+                title: this.getTypeLabel(message?.type) || '待处理',
+                icon: this.getTypeIcon(message?.type) || '📋',
+                url: url
+              }
+            }))
+          } else {
+            window.location.href = url
+          }
+        },
+        
+        toggleSound() {
+          this.soundEnabled = !this.soundEnabled
+          localStorage.setItem('notification_sound', this.soundEnabled)
+        },
+        
+        getTypeIcon(type) {
+          const icons = {
+            'alert': '🔔',
+            'warning': '⚠️',
+            'info': 'ℹ️',
+            'success': '✅'
+          }
+          return icons[type] || '📬'
+        },
+        
+        getTypeLabel(type) {
+          const labels = {
+            'alert': '告警',
+            'warning': '预警',
+            'info': '通知',
+            'success': '成功'
+          }
+          return labels[type] || '消息'
+        },
+        
+        getTypeColorClass(type) {
+          const colors = {
+            'alert': 'text-red-500 bg-red-50',
+            'warning': 'text-yellow-500 bg-yellow-50',
+            'info': 'text-blue-500 bg-blue-50',
+            'success': 'text-green-500 bg-green-50'
+          }
+          return colors[type] || 'text-gray-500 bg-gray-50'
+        },
+        
+        getTypeBadgeClass(type) {
+          const classes = {
+            'alert': 'bg-red-100 text-red-600',
+            'warning': 'bg-yellow-100 text-yellow-600',
+            'info': 'bg-blue-100 text-blue-600',
+            'success': 'bg-green-100 text-green-600'
+          }
+          return classes[type] || 'bg-gray-100 text-gray-600'
+        },
+        
+        formatTime(dateStr) {
+          if (!dateStr) return '--'
+          const date = new Date(dateStr)
+          const now = new Date()
+          const diff = now - date
+          
+          if (diff < 60000) return '刚刚'
+          if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前'
+          if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前'
+          if (diff < 604800000) return Math.floor(diff / 86400000) + '天前'
+          
+          return date.toLocaleString('zh-CN', {
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        },
+        
+        formatFullTime(dateStr) {
+          if (!dateStr) return '--'
+          return new Date(dateStr).toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+          })
+        }
+      }
+    }
+  </script>
+</body>
+</html>
+

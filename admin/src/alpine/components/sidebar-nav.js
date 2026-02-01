@@ -1,8 +1,9 @@
 /**
  * 侧边栏导航组件
  * @description 管理侧边栏导航的展开/折叠和菜单状态，支持基于 role_level 的权限过滤
- * @version 1.2.0
- * @date 2026-01-27
+ * @version 2.0.0
+ * @date 2026-02-01
+ * @changelog 2.0.0 - 重构导航结构：待处理中心置顶、风控中心分组、资产交易合并
  */
 
 import { hasMenuAccess, getUserRoleLevel } from '../../config/permission-rules.js'
@@ -19,48 +20,73 @@ export function sidebarNav() {
     // 移动端菜单显示状态
     mobileOpen: false,
     // 默认展开的分组
-    expandedGroups: ['operations', 'lottery-ops'],
+    expandedGroups: ['pending-center', 'lottery-ops'],
     // 当前激活的菜单项ID（用于工作台Tab模式下的高亮）
     activeItemId: null,
-    // 未处理的风控告警数量（动态获取）
+
+    // ========== 徽标数量 ==========
+    // 总待处理数量
+    totalPendingCount: 0,
+    // 消费审核待处理数量
+    consumptionPendingCount: 0,
+    // 客服会话待处理数量
+    customerPendingCount: 0,
+    // 风控告警待处理数量
     pendingAlertCount: 0,
-    // 未处理的抽奖告警数量（动态获取）
+    // 抽奖告警待处理数量
     lotteryAlertCount: 0,
+
     // 用户权限等级（用于权限过滤）
     userRoleLevel: 0,
 
-    // 原始导航配置（7大业务模块）- 过滤前的完整配置
+    // 原始导航配置 - 过滤前的完整配置
     _originalNavGroups: null,
 
-    // 导航配置（7大业务模块）- 会被权限过滤
+    // 导航配置（已按文档要求重构）
     navGroups: [
+      // 1️⃣ 待处理中心 - 置顶最高优先级
       {
-        id: 'dashboard',
-        name: '工作台',
-        icon: '🏠',
-        type: 'single',
-        url: '/admin/statistics.html'
-      },
-      {
-        id: 'operations',
-        name: '日常运营',
-        icon: '📋',
+        id: 'pending-center',
+        name: '待处理中心',
+        icon: '🔔',
         items: [
-          { id: 'consumption', name: '消费记录审核', url: '/admin/finance-management.html' },
           {
-            id: 'risk',
+            id: 'consumption-review',
+            name: '消费记录审核',
+            url: '/admin/finance-management.html',
+            badgeKey: 'consumptionPendingCount'
+          },
+          {
+            id: 'customer-service',
+            name: '客服工作台',
+            url: '/admin/customer-service.html',
+            badgeKey: 'customerPendingCount'
+          },
+          {
+            id: 'risk-alerts',
             name: '风控告警',
             url: '/admin/risk-alerts.html',
             badgeKey: 'pendingAlertCount'
           },
-          { id: 'customer', name: '客服工作台', url: '/admin/customer-service.html' },
-          { id: 'item-tpl', name: '物品模板', url: '/admin/item-templates.html' },
-          { id: 'content', name: '内容管理', url: '/admin/content-management.html' },
-          { id: 'dict', name: '字典管理', url: '/admin/dict-management.html' },
-          { id: 'pricing', name: '定价配置', url: '/admin/pricing-config.html' },
-          { id: 'feature-flags', name: '功能开关', url: '/admin/feature-flags.html' }
+          {
+            id: 'lottery-alerts',
+            name: '抽奖告警',
+            url: '/admin/lottery-alerts.html',
+            badgeKey: 'lotteryAlertCount'
+          }
         ]
       },
+
+      // 2️⃣ 运营仪表盘 - 第二位
+      {
+        id: 'dashboard',
+        name: '运营仪表盘',
+        icon: '📊',
+        type: 'single',
+        url: '/admin/workspace.html?tab=dashboard'
+      },
+
+      // 3️⃣ 抽奖运营 - 高频操作区
       {
         id: 'lottery-ops',
         name: '抽奖运营',
@@ -71,12 +97,6 @@ export function sidebarNav() {
             name: '实时监控',
             url: '/admin/lottery-management.html?page=lottery-metrics',
             badge: 'live'
-          },
-          {
-            id: 'lottery-alerts',
-            name: '抽奖告警',
-            url: '/admin/lottery-alerts.html',
-            badgeKey: 'lotteryAlertCount'
           },
           {
             id: 'lottery-campaigns',
@@ -105,31 +125,21 @@ export function sidebarNav() {
           }
         ]
       },
+
+      // 4️⃣ 资产交易 - 合并原「资产中心」和「市场交易」
       {
-        id: 'assets',
-        name: '资产中心',
+        id: 'asset-trade',
+        name: '资产交易',
         icon: '💎',
         items: [
           { id: 'asset-mgmt', name: '资产管理', url: '/admin/asset-management.html' },
           { id: 'asset-adj', name: '资产调整', url: '/admin/asset-adjustment.html' },
-          { id: 'orphan', name: '孤儿冻结清理', url: '/admin/orphan-frozen.html' },
-          {
-            id: 'material-rules',
-            name: '物料转换规则',
-            url: '/admin/material-conversion-rules.html'
-          },
-          { id: 'assets-portfolio', name: '资产组合', url: '/admin/assets-portfolio.html' }
-        ]
-      },
-      {
-        id: 'market',
-        name: '市场交易',
-        icon: '🏪',
-        items: [
           { id: 'exchange', name: '兑换市场', url: '/admin/exchange-market.html' },
           { id: 'trade', name: 'C2C交易', url: '/admin/trade-management.html' }
         ]
       },
+
+      // 5️⃣ 用户门店
       {
         id: 'users',
         name: '用户门店',
@@ -140,21 +150,34 @@ export function sidebarNav() {
           { id: 'stores', name: '门店管理', url: '/admin/store-management.html' }
         ]
       },
+
+      // 6️⃣ 数据分析
       {
         id: 'analytics',
         name: '数据分析',
-        icon: '📊',
+        icon: '📈',
         items: [
           { id: 'stats', name: '统计报表', url: '/admin/statistics.html' },
           { id: 'analytics', name: '运营分析', url: '/admin/analytics.html' }
         ]
       },
+
+      // 7️⃣ 系统设置 - 低频功能整合
       {
         id: 'system',
         name: '系统设置',
         icon: '⚙️',
         items: [
+          { id: 'content', name: '内容管理', url: '/admin/content-management.html' },
+          { id: 'item-tpl', name: '物品模板', url: '/admin/item-templates.html' },
+          { id: 'dict', name: '字典管理', url: '/admin/dict-management.html' },
+          { id: 'pricing', name: '定价配置', url: '/admin/pricing-config.html' },
+          { id: 'feature-flags', name: '功能开关', url: '/admin/feature-flags.html' },
+          { id: 'orphan', name: '孤儿冻结清理', url: '/admin/orphan-frozen.html' },
+          { id: 'material-rules', name: '物料转换规则', url: '/admin/material-conversion-rules.html' },
+          { id: 'assets-portfolio', name: '资产组合', url: '/admin/assets-portfolio.html' },
           { id: 'settings', name: '系统配置', url: '/admin/system-settings.html' },
+          { id: 'reminder-rules', name: '提醒规则配置', url: '/admin/reminder-rules.html' },
           { id: 'sessions', name: '会话管理', url: '/admin/sessions.html' },
           { id: 'config-tools', name: '配置工具', url: '/admin/config-tools.html' }
         ]
@@ -202,21 +225,59 @@ export function sidebarNav() {
       // 从 localStorage 恢复当前激活的 Tab 状态
       this.restoreActiveItemFromTabs()
 
-      // 获取未处理的风控告警数量
-      this.fetchPendingAlertCount()
+      // 获取所有徽标数量（统一API）
+      this.fetchAllBadgeCounts()
 
-      // 获取未处理的抽奖告警数量
-      this.fetchLotteryAlertCount()
-
-      // 每5分钟刷新一次告警数量
+      // 每5分钟刷新一次徽标数量
       setInterval(() => {
-        this.fetchPendingAlertCount()
-        this.fetchLotteryAlertCount()
+        this.fetchAllBadgeCounts()
       }, 5 * 60 * 1000)
     },
 
     /**
-     * 获取未处理的风控告警数量
+     * 获取所有徽标数量（调用统一徽标API）
+     */
+    async fetchAllBadgeCounts() {
+      try {
+        const token = localStorage.getItem('admin_token')
+        if (!token) return
+
+        const response = await fetch('/api/v4/console/nav/badges', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.data) {
+            // 直接使用后端字段名
+            this.totalPendingCount = data.data.total || 0
+            this.consumptionPendingCount = data.data.badges?.consumption || 0
+            this.customerPendingCount = data.data.badges?.customer_service || 0
+            this.pendingAlertCount = data.data.badges?.risk_alert || 0
+            this.lotteryAlertCount = data.data.badges?.lottery_alert || 0
+
+            logger.debug('[SidebarNav] 徽标数量已更新', {
+              total: this.totalPendingCount,
+              consumption: this.consumptionPendingCount,
+              customer: this.customerPendingCount,
+              risk: this.pendingAlertCount,
+              lottery: this.lotteryAlertCount
+            })
+          }
+        }
+      } catch (error) {
+        logger.warn('获取徽标数量失败:', error.message)
+        // 降级：使用原有单独的API获取
+        this.fetchPendingAlertCount()
+        this.fetchLotteryAlertCount()
+      }
+    },
+
+    /**
+     * 获取未处理的风控告警数量（降级方案）
      */
     async fetchPendingAlertCount() {
       try {
@@ -237,24 +298,27 @@ export function sidebarNav() {
           }
         }
       } catch (error) {
-        logger.warn('获取告警数量失败:', error.message)
+        logger.warn('获取风控告警数量失败:', error.message)
       }
     },
 
     /**
-     * 获取未处理的抽奖告警数量
+     * 获取未处理的抽奖告警数量（降级方案）
      */
     async fetchLotteryAlertCount() {
       try {
         const token = localStorage.getItem('admin_token')
         if (!token) return
 
-        const response = await fetch('/api/v4/console/lottery-monitoring/realtime-alerts?status=active&page_size=1', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
+        const response = await fetch(
+          '/api/v4/console/lottery-realtime/alerts?status=active&page_size=1',
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
           }
-        })
+        )
 
         if (response.ok) {
           const data = await response.json()
@@ -267,6 +331,15 @@ export function sidebarNav() {
       } catch (error) {
         logger.warn('获取抽奖告警数量失败:', error.message)
       }
+    },
+
+    /**
+     * 获取徽标数量（供模板使用）
+     * @param {string} badgeKey - 徽标键名
+     * @returns {number}
+     */
+    getBadgeCount(badgeKey) {
+      return this[badgeKey] || 0
     },
 
     /**
@@ -451,7 +524,7 @@ export function sidebarNav() {
           // 深拷贝分组对象
           const filteredGroup = { ...group }
 
-          // 单项菜单（如工作台）
+          // 单项菜单（如运营仪表盘）
           if (group.type === 'single') {
             // 检查该菜单是否有权限
             if (!hasMenuAccess(group.id)) {
@@ -485,7 +558,7 @@ export function sidebarNav() {
 
     /**
      * 检查指定菜单是否有访问权限
-     * @param {string} menuId - 菜单ID（如 'operations.customer'）
+     * @param {string} menuId - 菜单ID（如 'pending-center.consumption-review'）
      * @returns {boolean}
      */
     hasMenuAccess(menuId) {

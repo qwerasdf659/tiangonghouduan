@@ -218,6 +218,7 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 消费审批 =====
   '/api/v4/console/consumption/approve/:id': 'ADMIN_CONSUMPTION_APPROVE', // 审批消费（修复：console/approve/:id → console/consumption/approve/:id）
   '/api/v4/console/consumption/reject/:id': 'ADMIN_CONSUMPTION_REJECT', // 拒绝消费（修复：console/reject/:id → console/consumption/reject/:id）
+  '/api/v4/console/consumption/batch-review': 'ADMIN_CONSUMPTION_BATCH_REVIEW', // 批量审核消费记录（2026-01-31 P0 运营后台任务清单）
 
   // ===== 客服管理 =====
   '/api/v4/console/customer-service/sessions/:id/send': 'ADMIN_CS_MESSAGE_SEND', // 发送客服消息（canonical 路径）

@@ -70,7 +70,7 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
       admin_id: req.user.user_id,
       campaign_id,
       time_range,
-      total_draws: stats.summary.total_draws
+      total_draws: stats?.total_draws || 0
     })
 
     return res.apiSuccess(stats, '获取抽奖监控统计成功')

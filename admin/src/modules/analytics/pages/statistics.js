@@ -33,6 +33,8 @@ import { request, getToken } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/index.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
 import { EASING_FUNCTIONS } from '../../../alpine/components/animated-counter.js'
+import { MultiDimensionStatsAPI } from '../../../api/multi-dimension-stats.js'
+import { ReportTemplatesAPI } from '../../../api/report-templates.js'
 
 /* global Alpine, cancelAnimationFrame, requestAnimationFrame */
 /**
@@ -166,10 +168,55 @@ function statisticsPage() {
       coverageRate: '-'
     },
 
+    // ==================== 多维度统计分析 (P1-3) ====================
+    
+    /** 多维度统计Tab */
+    multiDimensionTab: 'store',
+
+    /** 多维度筛选条件 */
+    multiDimensionFilters: {
+      dimension: 'store',
+      start_date: '',
+      end_date: '',
+      compare: ''
+    },
+
+    /** 多维度统计数据 */
+    multiDimensionData: {
+      summary: {},
+      breakdown: [],
+      comparison: null
+    },
+
+    /** 下钻维度 */
+    drillDownStack: [],
+
+    // ==================== 自定义报表状态 (P2-2) ====================
+
+    /** 显示报表模板弹窗 */
+    reportTemplateModalOpen: false,
+
+    /** 报表模板列表 */
+    reportTemplates: [],
+
+    /** 当前编辑的报表模板 */
+    reportTemplateForm: {
+      name: '',
+      description: '',
+      dimensions: [],
+      metrics: [],
+      filters: {},
+      schedule: null
+    },
+
+    /** 编辑中的模板ID */
+    editingTemplateId: null,
+
     /** ECharts 图表实例 */
     _charts: {
       trend: null,
-      userType: null
+      userType: null,
+      multiDimension: null
     },
 
     /** ECharts 核心模块引用 */
@@ -792,6 +839,300 @@ function statisticsPage() {
         return value.toFixed(2)
       }
       return Math.round(value).toLocaleString()
+    },
+
+    // ==================== 多维度统计分析方法 (P1-3) ====================
+
+    /**
+     * 切换多维度统计维度
+     * @param {string} dimension - 维度类型
+     */
+    async switchDimension(dimension) {
+      this.multiDimensionTab = dimension
+      this.multiDimensionFilters.dimension = dimension
+      this.drillDownStack = []
+      await this.loadMultiDimensionStats()
+    },
+
+    /**
+     * 加载多维度统计数据
+     */
+    async loadMultiDimensionStats() {
+      const result = await this.withLoading(async () => {
+        return await MultiDimensionStatsAPI.getStats({
+          // 后端要求 dimensions（复数），支持多维度逗号分隔
+          dimensions: this.multiDimensionFilters.dimension || 'store,time',
+          period: this.multiDimensionFilters.period || 'week',
+          compare: this.multiDimensionFilters.compare
+        })
+      })
+
+      if (result.success && result.data) {
+        const data = result.data.data || result.data
+        this.multiDimensionData = {
+          summary: data.summary || {},
+          breakdown: data.breakdown || data.dimensions || [],
+          comparison: data.comparison || null
+        }
+
+        // 更新图表
+        this.$nextTick(() => this.updateMultiDimensionChart())
+      }
+    },
+
+    /**
+     * 多维度下钻分析
+     * @param {Object} item - 当前项
+     */
+    async drillDown(item) {
+      this.drillDownStack.push({
+        dimension: this.multiDimensionFilters.dimension,
+        value: item.name || item.id
+      })
+
+      const result = await this.withLoading(async () => {
+        return await MultiDimensionStatsAPI.drillDown({
+          dimension: this.multiDimensionFilters.dimension,
+          value: item.id || item.value,
+          start_date: this.multiDimensionFilters.start_date || this.filters.start_date,
+          end_date: this.multiDimensionFilters.end_date || this.filters.end_date
+        })
+      })
+
+      if (result.success && result.data) {
+        const data = result.data.data || result.data
+        this.multiDimensionData.breakdown = data.breakdown || data.details || []
+        this.$nextTick(() => this.updateMultiDimensionChart())
+      }
+    },
+
+    /**
+     * 返回上级维度
+     */
+    async drillUp() {
+      if (this.drillDownStack.length === 0) return
+
+      this.drillDownStack.pop()
+      
+      if (this.drillDownStack.length === 0) {
+        await this.loadMultiDimensionStats()
+      } else {
+        const parent = this.drillDownStack[this.drillDownStack.length - 1]
+        await this.drillDown({ id: parent.value, name: parent.value })
+        this.drillDownStack.pop() // 移除重复添加的
+      }
+    },
+
+    /**
+     * 更新多维度图表
+     */
+    updateMultiDimensionChart() {
+      const container = document.getElementById('multiDimensionChart')
+      const echarts = this._echarts
+      
+      if (!container || !echarts) return
+
+      if (!this._charts.multiDimension) {
+        this._charts.multiDimension = echarts.init(container)
+      }
+
+      const data = this.multiDimensionData.breakdown
+      const dimension = this.multiDimensionFilters.dimension
+
+      // 根据维度类型选择图表类型
+      if (dimension === 'time') {
+        // 时间维度使用折线图
+        this._charts.multiDimension.setOption({
+          tooltip: { trigger: 'axis' },
+          legend: { data: ['抽奖次数', '消费金额'] },
+          grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+          xAxis: { type: 'category', data: data.map(d => d.date || d.name) },
+          yAxis: [
+            { type: 'value', name: '次数' },
+            { type: 'value', name: '金额', position: 'right' }
+          ],
+          series: [
+            {
+              name: '抽奖次数',
+              type: 'line',
+              smooth: true,
+              data: data.map(d => d.draw_count || d.count || 0)
+            },
+            {
+              name: '消费金额',
+              type: 'bar',
+              yAxisIndex: 1,
+              data: data.map(d => d.consumption || d.amount || 0)
+            }
+          ]
+        }, true)
+      } else {
+        // 其他维度使用柱状图
+        this._charts.multiDimension.setOption({
+          tooltip: { trigger: 'axis' },
+          grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+          xAxis: { 
+            type: 'category', 
+            data: data.slice(0, 10).map(d => d.name || d.store_name || d.campaign_name || '未知'),
+            axisLabel: { interval: 0, rotate: 30 }
+          },
+          yAxis: { type: 'value', name: '数量' },
+          series: [{
+            type: 'bar',
+            data: data.slice(0, 10).map(d => ({
+              value: d.count || d.draw_count || d.consumption || 0,
+              itemStyle: { color: this.getBarColor(d) }
+            })),
+            label: { show: true, position: 'top' }
+          }]
+        }, true)
+      }
+    },
+
+    /**
+     * 获取柱状图颜色
+     */
+    getBarColor(item) {
+      const colors = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4']
+      const index = this.multiDimensionData.breakdown.indexOf(item)
+      return colors[index % colors.length]
+    },
+
+    /**
+     * 获取维度名称
+     */
+    getDimensionName(dimension) {
+      const map = {
+        store: '门店',
+        campaign: '活动',
+        user_segment: '用户群',
+        time: '时间'
+      }
+      return map[dimension] || dimension
+    },
+
+    // ==================== 自定义报表方法 (P2-2) ====================
+
+    /**
+     * 加载报表模板列表
+     */
+    async loadReportTemplates() {
+      try {
+        const response = await ReportTemplatesAPI.getTemplates()
+        if (response?.success) {
+          this.reportTemplates = response.data?.templates || response.data || []
+        }
+      } catch (error) {
+        logger.error('[ReportTemplates] 加载失败:', error)
+      }
+    },
+
+    /**
+     * 打开报表模板弹窗
+     */
+    openReportTemplateModal(template = null) {
+      if (template) {
+        this.editingTemplateId = template.template_id || template.id
+        this.reportTemplateForm = {
+          name: template.name || '',
+          description: template.description || '',
+          dimensions: template.dimensions || [],
+          metrics: template.metrics || [],
+          filters: template.filters || {},
+          schedule: template.schedule || null
+        }
+      } else {
+        this.editingTemplateId = null
+        this.reportTemplateForm = {
+          name: '',
+          description: '',
+          dimensions: [],
+          metrics: [],
+          filters: {},
+          schedule: null
+        }
+      }
+      this.reportTemplateModalOpen = true
+    },
+
+    /**
+     * 保存报表模板
+     */
+    async saveReportTemplate() {
+      try {
+        this.exporting = true
+        let response
+        if (this.editingTemplateId) {
+          response = await ReportTemplatesAPI.updateTemplate(this.editingTemplateId, this.reportTemplateForm)
+        } else {
+          response = await ReportTemplatesAPI.createTemplate(this.reportTemplateForm)
+        }
+        if (response?.success) {
+          this.showSuccess(this.editingTemplateId ? '模板更新成功' : '模板创建成功')
+          this.reportTemplateModalOpen = false
+          await this.loadReportTemplates()
+        }
+      } catch (error) {
+        logger.error('[ReportTemplates] 保存失败:', error)
+        this.showError('保存模板失败')
+      } finally {
+        this.exporting = false
+      }
+    },
+
+    /**
+     * 删除报表模板
+     */
+    async deleteReportTemplate(template) {
+      if (!confirm('确定要删除此报表模板吗？')) return
+      try {
+        const response = await ReportTemplatesAPI.deleteTemplate(template.template_id || template.id)
+        if (response?.success) {
+          this.showSuccess('模板已删除')
+          await this.loadReportTemplates()
+        }
+      } catch (error) {
+        logger.error('[ReportTemplates] 删除失败:', error)
+        this.showError('删除失败')
+      }
+    },
+
+    /**
+     * 预览报表
+     */
+    async previewReport(template) {
+      try {
+        const response = await ReportTemplatesAPI.preview({
+          ...template,
+          start_date: this.filters.start_date,
+          end_date: this.filters.end_date
+        })
+        if (response?.success) {
+          // 显示预览数据
+          this.showSuccess('报表预览生成成功')
+        }
+      } catch (error) {
+        logger.error('[ReportTemplates] 预览失败:', error)
+        this.showError('预览失败')
+      }
+    },
+
+    /**
+     * 导出报表
+     */
+    async exportTemplateReport(template) {
+      try {
+        this.exporting = true
+        const response = await ReportTemplatesAPI.export(template.template_id || template.id)
+        if (response?.success) {
+          this.showSuccess('报表导出成功')
+        }
+      } catch (error) {
+        logger.error('[ReportTemplates] 导出失败:', error)
+        this.showError('导出失败')
+      } finally {
+        this.exporting = false
+      }
     }
   }
 }

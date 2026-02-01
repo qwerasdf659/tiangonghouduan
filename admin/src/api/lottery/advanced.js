@@ -92,13 +92,13 @@ export const LOTTERY_ADVANCED_ENDPOINTS = {
   MONITORING_CAMPAIGN_ROI: `${API_PREFIX}/console/lottery-monitoring/campaign-roi/:campaign_id`,
   ANALYTICS_DAILY_REPORT: `${API_PREFIX}/console/lottery-analytics/daily-report`,
 
-  // 实时告警API
-  REALTIME_ALERTS: `${API_PREFIX}/console/lottery-monitoring/realtime-alerts`,
-  REALTIME_ALERT_ACKNOWLEDGE: `${API_PREFIX}/console/lottery-monitoring/realtime-alerts/:id/acknowledge`,
-  REALTIME_ALERT_RESOLVE: `${API_PREFIX}/console/lottery-monitoring/realtime-alerts/:id/resolve`,
+  // 实时告警API（2026-01-31 路径更新: lottery-monitoring → lottery-realtime）
+  REALTIME_ALERTS: `${API_PREFIX}/console/lottery-realtime/alerts`,
+  REALTIME_ALERT_ACKNOWLEDGE: `${API_PREFIX}/console/lottery-realtime/alerts/:id/acknowledge`,
+  REALTIME_ALERT_RESOLVE: `${API_PREFIX}/console/lottery-realtime/alerts/:id/resolve`,
 
-  // 单次抽奖详情/异常用户/活动复盘/策略效果
-  DRAW_DETAILS: `${API_PREFIX}/console/lottery-monitoring/draw-details/:draw_id`,
+  // 单次抽奖详情/异常用户/活动复盘/策略效果（2026-01-31 路径更新: lottery-monitoring → lottery-realtime）
+  DRAW_DETAILS: `${API_PREFIX}/console/lottery-realtime/draw-details/:draw_id`,
   ABNORMAL_USERS: `${API_PREFIX}/console/lottery-monitoring/abnormal-users`,
   CAMPAIGN_REPORT: `${API_PREFIX}/console/lottery-monitoring/campaign-report/:campaign_id`,
   STRATEGY_EFFECTIVENESS: `${API_PREFIX}/console/lottery-monitoring/strategy-effectiveness`,

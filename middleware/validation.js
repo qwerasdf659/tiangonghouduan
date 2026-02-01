@@ -265,7 +265,9 @@ function handleServiceError(error, res, defaultMessage = '操作失败') {
     errorMessage.includes('已存在') ||
     errorMessage.includes('已被占用') ||
     errorMessage.includes('已离职') ||
-    errorMessage.includes('状态异常')
+    errorMessage.includes('状态异常') ||
+    errorMessage.includes('必须') ||
+    errorMessage.includes('必填')
   ) {
     return res.apiError(errorMessage, 'BAD_REQUEST', null, 400)
   }

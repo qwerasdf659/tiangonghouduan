@@ -41,19 +41,77 @@
     <div x-data="financePageContent()" x-init="init()">
 
     <!-- 消费记录审核 -->
-    <div x-show="current_page === 'consumption'" x-cloak>
+    <div x-show="current_page === 'consumption'" x-cloak x-init="loadAnomalyStats()">
+      
+      <!-- F-43: 异常统计面板 -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-red-500">
+          <h6 class="themed-text-muted text-sm mb-1">异常总数</h6>
+          <p class="text-2xl font-bold text-red-600" x-text="anomalyStats.total_anomaly || 0"></p>
+        </div>
+        <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-orange-500">
+          <h6 class="themed-text-muted text-sm mb-1">高频消费</h6>
+          <p class="text-2xl font-bold text-orange-600" x-text="anomalyStats.high_frequency || 0"></p>
+        </div>
+        <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-yellow-500">
+          <h6 class="themed-text-muted text-sm mb-1">大额异常</h6>
+          <p class="text-2xl font-bold text-yellow-600" x-text="anomalyStats.high_amount || 0"></p>
+        </div>
+        <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-purple-500">
+          <h6 class="themed-text-muted text-sm mb-1">异常时段</h6>
+          <p class="text-2xl font-bold text-purple-600" x-text="anomalyStats.unusual_time || 0"></p>
+        </div>
+        <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-gray-500">
+          <h6 class="themed-text-muted text-sm mb-1">其他异常</h6>
+          <p class="text-2xl font-bold text-gray-600" x-text="anomalyStats.other || 0"></p>
+        </div>
+      </div>
+
       <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b">
+        <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold">消费记录审核</h5>
+          <!-- 批量操作工具栏 -->
+          <div x-show="selectedIds.length > 0" class="flex items-center gap-3">
+            <span class="text-sm text-gray-600">已选择 <strong x-text="selectedIds.length"></strong> 项</span>
+            <button 
+              @click="batchApprove()" 
+              :disabled="batchProcessing"
+              class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              <span x-show="!batchProcessing">✅ 批量通过</span>
+              <span x-show="batchProcessing">处理中...</span>
+            </button>
+            <button 
+              @click="batchReject()" 
+              :disabled="batchProcessing"
+              class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              <span x-show="!batchProcessing">❌ 批量拒绝</span>
+              <span x-show="batchProcessing">处理中...</span>
+            </button>
+            <button @click="clearSelection()" class="text-gray-500 hover:text-gray-700 text-sm">取消选择</button>
+          </div>
         </div>
         <div class="p-4 border-b themed-bg-base">
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
             <input type="text" x-model="consumptionFilters.user_id" placeholder="用户ID" class="px-3 py-2 border rounded">
             <select x-model="consumptionFilters.status" class="px-3 py-2 border rounded">
               <option value="">全部状态</option>
               <option value="pending">待审核</option>
               <option value="approved">已通过</option>
               <option value="rejected">已拒绝</option>
+            </select>
+            <!-- F-41: 异常类型筛选 -->
+            <select x-model="consumptionFilters.anomaly_type" class="px-3 py-2 border rounded">
+              <option value="">全部风控标记</option>
+              <option value="high_frequency">🔄 高频消费</option>
+              <option value="high_amount">💰 大额异常</option>
+              <option value="unusual_time">🌙 异常时段</option>
+              <option value="location_mismatch">📍 位置异常</option>
+              <option value="device_change">📱 设备变更</option>
+              <option value="rapid_succession">⚡ 短时多次</option>
+              <option value="first_time_high">🆕 首次大额</option>
+              <option value="pattern_break">📊 行为异常</option>
             </select>
             <input type="date" x-model="consumptionFilters.start_date" class="px-3 py-2 border rounded">
             <button @click="loadConsumptions()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
@@ -63,10 +121,21 @@
           <table class="w-full">
             <thead class="themed-bg-base">
               <tr>
+                <!-- 全选复选框 -->
+                <th class="px-4 py-3 text-center w-12">
+                  <input 
+                    type="checkbox" 
+                    :checked="isAllSelected"
+                    @change="toggleSelectAll()"
+                    class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    title="全选/取消全选待审核记录"
+                  >
+                </th>
                 <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">记录ID</th>
                 <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户</th>
                 <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">门店</th>
                 <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">金额</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">风控标记</th>
                 <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
                 <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">提交时间</th>
                 <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
@@ -74,11 +143,51 @@
             </thead>
             <tbody class="divide-y">
               <template x-for="record in consumptions" :key="record.id || record.record_id">
-                <tr class="themed-hover-bg">
+                <tr class="themed-hover-bg" :class="{ 'bg-blue-50': isSelected(record) }">
+                  <!-- 单选复选框（仅待审核记录可选） -->
+                  <td class="px-4 py-3 text-center">
+                    <template x-if="record.status === 'pending'">
+                      <input 
+                        type="checkbox" 
+                        :checked="isSelected(record)"
+                        @change="toggleSelection(record.record_id || record.id)"
+                        class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      >
+                    </template>
+                    <template x-if="record.status !== 'pending'">
+                      <span class="text-gray-300">-</span>
+                    </template>
+                  </td>
                   <td class="px-4 py-3 text-sm" x-text="record.record_id"></td>
                   <td class="px-4 py-3 text-sm" x-text="record.user_name || record.user_id"></td>
                   <td class="px-4 py-3 text-sm" x-text="record.store_name"></td>
                   <td class="px-4 py-3 text-sm font-mono" x-text="'¥' + (record.amount / 100).toFixed(2)"></td>
+                  <!-- 风控标记列 (P1-4) + F-42: 异常详情提示 -->
+                  <td class="px-4 py-3">
+                    <template x-if="record.is_suspicious || record.risk_level === 'high'">
+                      <!-- F-42: 添加 title 属性显示详细异常信息 -->
+                      <div class="flex flex-col gap-1 cursor-help" :title="getAnomalyTooltip(record)">
+                        <span class="inline-flex items-center px-2 py-0.5 text-xs rounded bg-red-100 text-red-700">
+                          ⚠️ 异常
+                        </span>
+                        <template x-if="record.risk_reasons && record.risk_reasons.length > 0">
+                          <span class="text-xs text-red-500" x-text="record.risk_reasons[0]"></span>
+                        </template>
+                        <template x-if="record.anomaly_type">
+                          <span class="text-xs text-red-500" x-text="getAnomalyLabel(record.anomaly_type)"></span>
+                        </template>
+                      </div>
+                    </template>
+                    <template x-if="record.risk_level === 'medium'">
+                      <span class="inline-flex items-center px-2 py-0.5 text-xs rounded bg-yellow-100 text-yellow-700 cursor-help"
+                            :title="getAnomalyTooltip(record)">
+                        ⚡ 关注
+                      </span>
+                    </template>
+                    <template x-if="!record.is_suspicious && !record.risk_level">
+                      <span class="text-gray-400 text-xs">正常</span>
+                    </template>
+                  </td>
                   <td class="px-4 py-3">
                     <span 
                       :class="{

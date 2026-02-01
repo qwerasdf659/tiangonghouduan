@@ -441,6 +441,68 @@ export const http = {
   delete: (url, options = {}) => request({ url, method: 'DELETE', ...options })
 }
 
+/*
+ * ============================================================================
+ * 简化API调用辅助函数
+ * ============================================================================
+ */
+
+/**
+ * 生成带Token的认证请求头
+ * @returns {Object} 包含Authorization和Content-Type的请求头对象
+ * @example
+ * const headers = authHeaders()
+ * // { 'Content-Type': 'application/json', 'Authorization': 'Bearer xxx' }
+ */
+export function authHeaders() {
+  const headers = {
+    'Content-Type': 'application/json'
+  }
+  const token = getToken()
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+  return headers
+}
+
+/**
+ * 处理fetch响应，统一错误处理
+ * @param {Response} response - fetch响应对象
+ * @returns {Promise<Object>} 解析后的JSON数据
+ * @throws {Error} 响应状态非2xx或解析失败
+ * @example
+ * const response = await fetch(url, { headers: authHeaders() })
+ * const data = await handleResponse(response)
+ */
+export async function handleResponse(response) {
+  // 处理 401 未授权
+  if (response.status === 401) {
+    clearToken()
+    if (window.location.pathname !== '/admin/login.html') {
+      if (window.self !== window.top) {
+        try {
+          window.top.location.href = '/admin/login.html'
+        } catch (e) {
+          window.parent.postMessage({ type: 'AUTH_EXPIRED', redirect: '/admin/login.html' }, '*')
+        }
+      } else {
+        window.location.href = '/admin/login.html'
+      }
+    }
+    throw new Error('未授权，请重新登录')
+  }
+
+  // 解析响应
+  const result = await response.json()
+
+  // 检查业务错误
+  if (!response.ok) {
+    throw new Error(result.message || `请求失败: ${response.status}`)
+  }
+
+  return result
+}
+
 export default {
   API_VERSION,
   API_PREFIX,
@@ -451,5 +513,7 @@ export default {
   buildURL,
   buildApiURL,
   request,
-  http
+  http,
+  authHeaders,
+  handleResponse
 }

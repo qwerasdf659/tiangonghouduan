@@ -159,6 +159,94 @@ module.exports = sequelize => {
         comment: '幂等键（业界标准命名 - 必填），用于关联业务操作（如兑换单号、交易单号等）'
       },
 
+      // ========== P2阶段新增字段（2026-01-31 回滚支持和风险标记） ==========
+
+      // 回滚相关字段
+      is_reversible: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否可回滚（部分操作支持一键回滚）'
+      },
+      reversal_data: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: '回滚所需数据（用于执行回滚操作的完整数据）'
+      },
+      is_reversed: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否已回滚'
+      },
+      reversed_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: '回滚执行时间'
+      },
+      reversed_by: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '回滚操作者ID'
+      },
+
+      // 风险和审批相关字段
+      risk_level: {
+        type: DataTypes.ENUM('low', 'medium', 'high', 'critical'),
+        allowNull: false,
+        defaultValue: 'low',
+        comment: '操作风险等级'
+      },
+      requires_approval: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否需要二次审批（高风险操作）'
+      },
+      approval_status: {
+        type: DataTypes.ENUM('not_required', 'pending', 'approved', 'rejected'),
+        allowNull: false,
+        defaultValue: 'not_required',
+        comment: '审批状态'
+      },
+
+      // ========== P2阶段补充字段（2026-02-01 影响评估和回滚时限） ==========
+
+      /**
+       * 影响用户数
+       * @type {number|null}
+       * 用于评估操作影响范围，如批量操作时记录影响的用户数量
+       */
+      affected_users: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: 0,
+        comment: '影响用户数（用于评估操作影响范围）'
+      },
+
+      /**
+       * 影响金额/积分数
+       * @type {number|null}
+       * 单位：分，用于评估财务影响
+       */
+      affected_amount: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        defaultValue: 0,
+        comment: '影响金额/积分数（分为单位，用于评估财务影响）'
+      },
+
+      /**
+       * 回滚截止时间
+       * @type {Date|null}
+       * 超过此时间后即使 is_reversible 为 true 也不可回滚
+       */
+      rollback_deadline: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: '回滚截止时间（超时后不可回滚，与 is_reversible 配合使用）'
+      },
+
       // 时间字段
       created_at: {
         type: DataTypes.DATE,

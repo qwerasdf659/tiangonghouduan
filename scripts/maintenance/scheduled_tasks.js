@@ -76,6 +76,16 @@ const HourlyPricingConfigScheduler = require('../../jobs/hourly-pricing-config-s
 const HourlyLotteryMetricsAggregation = require('../../jobs/hourly-lottery-metrics-aggregation')
 // 2026-01-23新增：抽奖策略引擎监控 - 日报级指标聚合
 const DailyLotteryMetricsAggregation = require('../../jobs/daily-lottery-metrics-aggregation')
+// 2026-01-31新增：智能提醒定时检测（P2阶段 B-32）
+const ScheduledReminderCheck = require('../../jobs/scheduled-reminder-check')
+// 2026-01-31新增：事务管理器（修复锁超时解锁事务边界问题）
+const TransactionManager = require('../../utils/TransactionManager')
+// 2026-01-31新增：定时报表推送（P2阶段 B-39）
+const ScheduledReportPush = require('../../jobs/scheduled-report-push')
+// 2026-01-31新增：分布式锁（P2定时任务防止重复执行）
+const UnifiedDistributedLock = require('../../utils/UnifiedDistributedLock')
+// 创建分布式锁实例（用于定时任务的锁控制）
+const distributedLock = new UnifiedDistributedLock()
 
 /**
  * 定时任务管理类
@@ -254,7 +264,15 @@ class ScheduledTasks {
     // 任务30: 每天凌晨3:30清理超过180天的WebSocket启动日志（数据库级别，需要分布式锁）
     this.scheduleDailyWebSocketStartupLogCleanup()
 
-    logger.info('所有定时任务已初始化完成（包含2026-01-30新增的6个迁移任务）')
+    // ========== 2026-01-31 P2阶段新增任务 ==========
+
+    // 任务31: 每分钟执行智能提醒规则检测（B-32）
+    this.scheduleSmartReminderCheck()
+
+    // 任务32: 每小时第5分钟执行定时报表推送（B-39）
+    this.scheduleReportPush()
+
+    logger.info('所有定时任务已初始化完成（包含2026-01-30新增的6个迁移任务 + 2026-01-31 P2阶段2个任务）')
   }
 
   /**
@@ -991,17 +1009,28 @@ class ScheduledTasks {
       let failed_count = 0
       const details = []
 
+      // 2026-01-31修复：每个挂牌独立事务处理（部分成功模式）
+      // 修复问题：TradeOrderService.cancelOrder() 需要事务支持
       for (const listing of timeoutListings) {
         try {
           const order = listing.lockingOrder
 
           if (!order) {
-            // 没有关联订单，直接回滚挂牌状态
-            await listing.update({
-              status: 'on_sale',
-              locked_by_order_id: null,
-              locked_at: null
-            })
+            // 没有关联订单，直接回滚挂牌状态（使用事务保证一致性）
+            await TransactionManager.execute(
+              async (transaction) => {
+                await listing.update({
+                  status: 'on_sale',
+                  locked_by_order_id: null,
+                  locked_at: null
+                }, { transaction })
+              },
+              {
+                maxRetries: 2,
+                timeout: 10000,
+                description: `锁超时解锁（无订单）listing_id=${listing.listing_id}`
+              }
+            )
 
             unlocked_count++
             details.push({
@@ -1015,15 +1044,28 @@ class ScheduledTasks {
             continue
           }
 
-          // 有关联订单，取消订单并解冻资产
+          // 有关联订单，取消订单并解冻资产（使用事务包裹）
           const business_id = `timeout_unlock_${order.order_id}_${Date.now()}`
 
           // P1-9：通过 ServiceManager 获取 TradeOrderService
-          await ScheduledTasks.TradeOrderService.cancelOrder({
-            order_id: order.order_id,
-            business_id,
-            cancel_reason: '订单超时自动取消（锁定超过15分钟）'
-          })
+          // 2026-01-31修复：传递事务参数，满足 cancelOrder 的事务边界要求
+          await TransactionManager.execute(
+            async (transaction) => {
+              await ScheduledTasks.TradeOrderService.cancelOrder(
+                {
+                  order_id: order.order_id,
+                  business_id,
+                  cancel_reason: '订单超时自动取消（锁定超过15分钟）'
+                },
+                { transaction }
+              )
+            },
+            {
+              maxRetries: 2,
+              timeout: 30000, // 取消订单涉及资产解冻，给更多时间
+              description: `锁超时取消订单 order_id=${order.order_id}`
+            }
+          )
 
           unlocked_count++
           details.push({
@@ -1045,7 +1087,8 @@ class ScheduledTasks {
           })
 
           logger.error(`[锁超时解锁] 处理挂牌${listing.listing_id}失败`, {
-            error: error.message
+            error: error.message,
+            stack: error.stack
           })
         }
       }
@@ -3166,6 +3209,120 @@ class ScheduledTasks {
       return report
     } catch (error) {
       logger.error('[手动触发] WebSocket启动日志清理失败', { error: error.message })
+      throw error
+    }
+  }
+
+  // ========== 2026-01-31 P2阶段新增任务（智能提醒与报表系统）==========
+
+  /**
+   * 定时任务31: 每分钟执行智能提醒规则检测
+   *
+   * 业务场景：检查到期的提醒规则，符合条件则触发通知
+   * Cron表达式: * * * * * (每分钟)
+   *
+   * @since 2026-01-31
+   * @see jobs/scheduled-reminder-check.js - B-32
+   * @returns {void}
+   */
+  static scheduleSmartReminderCheck() {
+    cron.schedule('* * * * *', async () => {
+      try {
+        // 使用 withLock 自动管理锁的获取和释放（30秒超时）
+        await distributedLock.withLock('smart_reminder_check', async () => {
+          await ScheduledReminderCheck.execute()
+        }, { ttl: 30000, maxRetries: 1 })
+      } catch (error) {
+        // 如果获取锁失败或执行失败，记录错误（获取锁失败通常只是跳过本次执行）
+        if (!error.message.includes('无法获取锁')) {
+          logger.error('[智能提醒检测] 执行失败', {
+            error: error.message,
+            stack: error.stack
+          })
+        } else {
+          logger.debug('[智能提醒检测] 未获取到锁，跳过本次执行')
+        }
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 智能提醒规则检测（每分钟执行，支持分布式锁，Task 31 B-32）')
+  }
+
+  /**
+   * 定时任务32: 每小时第5分钟执行定时报表推送
+   *
+   * 业务场景：检查配置了定时推送的报表模板，生成并推送报表
+   * Cron表达式: 5 * * * * (每小时第5分钟)
+   *
+   * @since 2026-01-31
+   * @see jobs/scheduled-report-push.js - B-39
+   * @returns {void}
+   */
+  static scheduleReportPush() {
+    cron.schedule('5 * * * *', async () => {
+      try {
+        // 使用 withLock 自动管理锁的获取和释放（5分钟超时）
+        await distributedLock.withLock('scheduled_report_push', async () => {
+          await ScheduledReportPush.execute()
+        }, { ttl: 300000, maxRetries: 1 })
+      } catch (error) {
+        // 如果获取锁失败或执行失败，记录错误
+        if (!error.message.includes('无法获取锁')) {
+          logger.error('[定时报表推送] 执行失败', {
+            error: error.message,
+            stack: error.stack
+          })
+        } else {
+          logger.debug('[定时报表推送] 未获取到锁，跳过本次执行')
+        }
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 定时报表推送（每小时第5分钟执行，支持分布式锁，Task 32 B-39）')
+  }
+
+  /**
+   * 手动触发智能提醒检测（用于测试）
+   *
+   * @returns {Promise<Object>} 执行结果
+   */
+  static async manualSmartReminderCheck() {
+    try {
+      logger.info('[手动触发] 开始执行智能提醒检测...')
+      const result = await ScheduledReminderCheck.execute()
+
+      logger.info('[手动触发] 智能提醒检测完成', {
+        rules_checked: result.rules_checked,
+        rules_triggered: result.rules_triggered,
+        notifications_sent: result.notifications_sent
+      })
+
+      return result
+    } catch (error) {
+      logger.error('[手动触发] 智能提醒检测失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 手动触发定时报表推送（用于测试）
+   *
+   * @returns {Promise<Object>} 执行结果
+   */
+  static async manualReportPush() {
+    try {
+      logger.info('[手动触发] 开始执行定时报表推送...')
+      const result = await ScheduledReportPush.execute()
+
+      logger.info('[手动触发] 定时报表推送完成', {
+        templates_checked: result.templates_checked,
+        reports_generated: result.reports_generated,
+        reports_pushed: result.reports_pushed
+      })
+
+      return result
+    } catch (error) {
+      logger.error('[手动触发] 定时报表推送失败', { error: error.message })
       throw error
     }
   }

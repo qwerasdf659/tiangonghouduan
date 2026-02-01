@@ -169,6 +169,20 @@ const FeatureFlagService = require('./FeatureFlagService') // 功能开关服务
 // 阶段C 批量操作基础设施服务（2026-01-30）
 const SystemConfigService = require('./SystemConfigService') // 系统配置服务（动态限流配置）
 const BatchOperationService = require('./BatchOperationService') // 批量操作服务（幂等性+状态管理）
+
+// P0 待处理中心服务（2026-01-31 运营后台任务清单）
+const PendingSummaryService = require('./dashboard/PendingSummaryService') // 仪表盘待处理汇总服务
+const PendingCenterService = require('./pending/PendingCenterService') // 待处理中心服务
+const ConsumptionBatchService = require('./consumption/ConsumptionBatchService') // 消费记录批量审核服务
+const ConsumptionAnomalyService = require('./consumption/AnomalyService') // 消费异常检测服务（P1 B-25）
+const UserSegmentService = require('./user/UserSegmentService') // 用户分层服务（P1 B-19~B-24）
+const NavBadgeService = require('./nav/NavBadgeService') // 导航栏徽标计数服务
+
+// P2 新增服务（2026-01-31 第2阶段任务）
+const ReminderEngineService = require('./ReminderEngineService') // 智能提醒规则引擎服务（B-31~B-35）
+const UserBehaviorTrackService = require('./UserBehaviorTrackService') // 用户行为轨迹服务（B-46~B-49）
+const AuditRollbackService = require('./AuditRollbackService') // 审计回滚服务（B-42~B-45）
+const CustomReportService = require('./CustomReportService') // 自定义报表服务（B-36~B-40）
 /*
  * 服务合并记录（2026-01-21）：
  * - LotteryMonitoringService + LotteryStrategyStatsService → LotteryAnalyticsService
@@ -193,7 +207,7 @@ const DrawOrchestrator = require('./UnifiedLotteryEngine/pipeline/DrawOrchestrat
 const ManagementStrategy = require('./UnifiedLotteryEngine/strategies/ManagementStrategy')
 
 // V4 模块化服务
-const { lottery_service_container } = require('./lottery')
+const { lottery_service_container, LotteryHealthService } = require('./lottery')
 
 // 数据库模型
 const models = require('../models')
@@ -488,6 +502,10 @@ class ServiceManager {
       ) // 活动维度分析服务（~1000行，需实例化）
       this._services.set('lottery_alert', LotteryAlertService) // 抽奖告警服务（B1 实时告警列表API，2026-01-29，静态类）
 
+      // ========== P1 抽奖健康度服务（2026-01-31 运营优化任务） ==========
+
+      this._services.set('lottery_health', new LotteryHealthService(this.models)) // 抽奖健康度计算服务（B-14，需实例化）
+
       // [已移除] lottery_analytics 向后兼容代理 - 请使用 lottery_analytics_realtime/statistics/report/user/campaign
 
       // ========== 阶段C 批量操作基础设施服务（2026-01-30） ==========
@@ -496,6 +514,28 @@ class ServiceManager {
       this._services.set('batch_operation', BatchOperationService) // 批量操作服务（幂等性+状态管理，静态类）
       this._services.set('display_name', DisplayNameService) // 显示名称翻译服务（系统字典，静态类）
       this._services.set('feature_flag', FeatureFlagService) // 功能开关服务（静态类）
+
+      // ========== P0 待处理中心服务（2026-01-31 运营后台任务清单） ==========
+
+      this._services.set('pending_summary', PendingSummaryService) // 仪表盘待处理汇总服务（静态类）
+      this._services.set('pending_center', PendingCenterService) // 待处理中心服务（静态类）
+      this._services.set('consumption_batch', ConsumptionBatchService) // 消费记录批量审核服务（静态类）
+      this._services.set('nav_badge', NavBadgeService) // 导航栏徽标计数服务（静态类）
+
+      // ========== P1 消费异常检测服务（2026-01-31 运营优化任务） ==========
+
+      this._services.set('consumption_anomaly', ConsumptionAnomalyService) // 消费异常检测服务（B-25，静态类）
+
+      // ========== P1 用户分层服务（2026-01-31 B-19~B-24） ==========
+
+      this._services.set('user_segment', UserSegmentService) // 用户分层服务（B-19，静态类）
+
+      // ========== P2 新增服务（2026-01-31 第2阶段任务） ==========
+
+      this._services.set('reminder_engine', ReminderEngineService) // 智能提醒规则引擎服务（B-31~B-35，静态类）
+      this._services.set('user_behavior_track', UserBehaviorTrackService) // 用户行为轨迹服务（B-46~B-49，静态类）
+      this._services.set('audit_rollback', AuditRollbackService) // 审计回滚服务（B-42~B-45，静态类）
+      this._services.set('custom_report', CustomReportService) // 自定义报表服务（B-36~B-40，静态类）
 
       /**
        * V4.6 管线编排器

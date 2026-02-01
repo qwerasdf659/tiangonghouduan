@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '待处理中心', 
+    pageStyle: `
+      [x-cloak] { display: none !important; }
+      
+      /* 自定义滚动条 */
+      .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+      .scrollbar-thin::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
+      .scrollbar-thin::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+      .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
+      
+      /* 紧急项高亮 */
+      .urgent-item { 
+        animation: urgentPulse 2s infinite;
+        border-left: 4px solid #ef4444;
+      }
+      @keyframes urgentPulse {
+        0%, 100% { background-color: rgba(254, 226, 226, 0.5); }
+        50% { background-color: rgba(254, 226, 226, 1); }
+      }
+      
+      /* 超时计时器 */
+      .timeout-warning { color: #f59e0b; }
+      .timeout-critical { color: #ef4444; font-weight: 600; }
+      
+      /* 卡片悬停 */
+      .stat-card { transition: all 0.3s ease; }
+      .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+      
+      /* 表格行悬停 */
+      .item-row { transition: background-color 0.2s; }
+      .item-row:hover { background-color: #f8fafc; }
+    `
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  <div x-data="pendingCenterPage()" x-init="init()" x-cloak class="p-6 space-y-6">
+    <!-- 顶部标题和刷新 -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold themed-text">🔔 待处理中心</h1>
+        <p class="text-sm themed-text-muted mt-1">
+          汇总所有待处理事项 · 最后更新: <span x-text="lastUpdateTime">--:--:--</span>
+        </p>
+      </div>
+      
+      <div class="flex items-center gap-3">
+        <!-- 类型筛选器 -->
+        <select 
+          x-model="filter.type"
+          @change="loadPendingItems()"
+          class="px-4 py-2 themed-bg-base themed-border rounded-lg text-sm themed-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">全部类型</option>
+          <option value="consumption">消耗审核</option>
+          <option value="customer_service">客服会话</option>
+          <option value="lottery_alert">抽奖告警</option>
+          <option value="risk_alert">风控告警</option>
+          <option value="refund">退款申请</option>
+        </select>
+        
+        <!-- 紧急程度筛选 -->
+        <select 
+          x-model="filter.urgency"
+          @change="loadPendingItems()"
+          class="px-4 py-2 themed-bg-base themed-border rounded-lg text-sm themed-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">全部紧急程度</option>
+          <option value="urgent">紧急</option>
+          <option value="high">高</option>
+          <option value="normal">普通</option>
+          <option value="low">低</option>
+        </select>
+        
+        <button 
+          @click="refreshAll()" 
+          :disabled="loading"
+          class="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition disabled:opacity-50"
+        >
+          <span :class="loading && 'animate-spin'">🔄</span>
+          刷新
+        </button>
+      </div>
+    </div>
+    
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <!-- 消耗审核 -->
+      <div 
+        class="stat-card themed-card rounded-xl p-4 cursor-pointer border-l-4 border-orange-500"
+        @click="filter.type = 'consumption'; loadPendingItems()"
+      >
+        <div class="flex items-center justify-between">
+          <div class="text-2xl">📋</div>
+          <div class="text-2xl font-bold text-orange-600" x-text="summary.consumption">0</div>
+        </div>
+        <div class="text-sm themed-text-muted mt-2">消耗审核</div>
+      </div>
+      
+      <!-- 客服会话 -->
+      <div 
+        class="stat-card themed-card rounded-xl p-4 cursor-pointer border-l-4 border-blue-500"
+        @click="filter.type = 'customer_service'; loadPendingItems()"
+      >
+        <div class="flex items-center justify-between">
+          <div class="text-2xl">💬</div>
+          <div class="text-2xl font-bold text-blue-600" x-text="summary.customer_service">0</div>
+        </div>
+        <div class="text-sm themed-text-muted mt-2">客服会话</div>
+      </div>
+      
+      <!-- 抽奖告警 -->
+      <div 
+        class="stat-card themed-card rounded-xl p-4 cursor-pointer border-l-4 border-yellow-500"
+        @click="filter.type = 'lottery_alert'; loadPendingItems()"
+      >
+        <div class="flex items-center justify-between">
+          <div class="text-2xl">🎰</div>
+          <div class="text-2xl font-bold text-yellow-600" x-text="summary.lottery_alert">0</div>
+        </div>
+        <div class="text-sm themed-text-muted mt-2">抽奖告警</div>
+      </div>
+      
+      <!-- 风控告警 -->
+      <div 
+        class="stat-card themed-card rounded-xl p-4 cursor-pointer border-l-4 border-red-500"
+        @click="filter.type = 'risk_alert'; loadPendingItems()"
+      >
+        <div class="flex items-center justify-between">
+          <div class="text-2xl">⚠️</div>
+          <div class="text-2xl font-bold text-red-600" x-text="summary.risk_alert">0</div>
+        </div>
+        <div class="text-sm themed-text-muted mt-2">风控告警</div>
+      </div>
+      
+      <!-- 退款申请 -->
+      <div 
+        class="stat-card themed-card rounded-xl p-4 cursor-pointer border-l-4 border-purple-500"
+        @click="filter.type = 'refund'; loadPendingItems()"
+      >
+        <div class="flex items-center justify-between">
+          <div class="text-2xl">💰</div>
+          <div class="text-2xl font-bold text-purple-600" x-text="summary.refund">0</div>
+        </div>
+        <div class="text-sm themed-text-muted mt-2">退款申请</div>
+      </div>
+    </div>
+    
+    <!-- 紧急事项区域 -->
+    <template x-if="urgentItems.length > 0">
+      <div class="themed-card rounded-xl overflow-hidden border-l-4 border-red-500">
+        <div class="p-4 bg-red-50 border-b border-red-100">
+          <h3 class="text-lg font-semibold text-red-800 flex items-center gap-2">
+            🚨 紧急事项 <span class="text-sm font-normal" x-text="'(' + urgentItems.length + ')'"></span>
+          </h3>
+        </div>
+        <div class="divide-y divide-red-100">
+          <template x-for="item in urgentItems.slice(0, 5)" :key="'urgent-' + item.id">
+            <div 
+              class="urgent-item p-4 flex items-center justify-between cursor-pointer hover:bg-red-50"
+              @click="handleItem(item)"
+            >
+              <div class="flex items-center gap-3">
+                <span class="text-xl" x-text="getTypeIcon(item.type)"></span>
+                <div>
+                  <span class="font-medium text-red-800" x-text="item.title"></span>
+                  <span class="text-sm text-red-600 ml-2" x-text="'等待 ' + formatWaitingTime(item.created_at)"></span>
+                </div>
+              </div>
+              <button class="px-3 py-1.5 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition">
+                立即处理
+              </button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+    
+    <!-- 待处理列表 -->
+    <div class="themed-card rounded-xl overflow-hidden">
+      <div class="p-4 themed-border-b flex items-center justify-between">
+        <h3 class="text-lg font-semibold themed-text">
+          📋 待处理列表 
+          <span class="text-sm font-normal themed-text-muted" x-text="'共 ' + pagination.total + ' 条'"></span>
+        </h3>
+        
+        <!-- 排序选项 -->
+        <div class="flex items-center gap-2">
+          <span class="text-sm themed-text-muted">排序:</span>
+          <select 
+            x-model="filter.sort"
+            @change="loadPendingItems()"
+            class="px-3 py-1.5 themed-bg-subtle themed-border rounded-lg text-sm themed-text focus:outline-none"
+          >
+            <option value="created_at_desc">最新创建</option>
+            <option value="created_at_asc">最早创建</option>
+            <option value="urgency_desc">紧急优先</option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- 列表内容 -->
+      <div class="divide-y themed-divide max-h-[600px] overflow-y-auto scrollbar-thin">
+        <template x-if="loading">
+          <div class="p-12 text-center themed-text-muted">
+            <div class="animate-spin text-4xl mb-2">⏳</div>
+            <div>加载中...</div>
+          </div>
+        </template>
+        
+        <template x-if="!loading && items.length === 0">
+          <div class="p-12 text-center themed-text-muted">
+            <div class="text-4xl mb-2">✅</div>
+            <div>太棒了！没有待处理事项</div>
+          </div>
+        </template>
+        
+        <template x-for="item in items" :key="item.id">
+          <div 
+            class="item-row flex items-center justify-between p-4 cursor-pointer"
+            @click="handleItem(item)"
+          >
+            <div class="flex items-center gap-4">
+              <!-- 类型图标 -->
+              <div 
+                class="w-10 h-10 rounded-lg flex items-center justify-center text-xl"
+                :class="{
+                  'bg-orange-100': item.type === 'consumption',
+                  'bg-blue-100': item.type === 'customer_service',
+                  'bg-yellow-100': item.type === 'lottery_alert',
+                  'bg-red-100': item.type === 'risk_alert',
+                  'bg-purple-100': item.type === 'refund'
+                }"
+              >
+                <span x-text="getTypeIcon(item.type)"></span>
+              </div>
+              
+              <!-- 内容 -->
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium themed-text" x-text="item.title"></span>
+                  <!-- 紧急程度标签 -->
+                  <span 
+                    class="px-2 py-0.5 text-xs rounded-full font-medium"
+                    :class="{
+                      'bg-red-100 text-red-600': item.urgency === 'urgent',
+                      'bg-orange-100 text-orange-600': item.urgency === 'high',
+                      'bg-blue-100 text-blue-600': item.urgency === 'normal',
+                      'bg-gray-100 text-gray-600': item.urgency === 'low'
+                    }"
+                    x-text="getUrgencyLabel(item.urgency)"
+                  ></span>
+                </div>
+                <div class="text-sm themed-text-muted mt-0.5" x-text="item.description"></div>
+              </div>
+            </div>
+            
+            <div class="flex items-center gap-4">
+              <!-- 等待时间 -->
+              <div class="text-right">
+                <div 
+                  class="text-sm font-mono"
+                  :class="getTimeoutClass(item.created_at)"
+                  x-text="'等待 ' + formatWaitingTime(item.created_at)"
+                ></div>
+                <div class="text-xs themed-text-muted" x-text="formatTime(item.created_at)"></div>
+              </div>
+              
+              <!-- 操作按钮 -->
+              <button 
+                class="px-3 py-1.5 themed-border themed-text text-sm rounded-lg hover:themed-bg-subtle transition"
+              >
+                处理 →
+              </button>
+            </div>
+          </div>
+        </template>
+      </div>
+      
+      <!-- 分页 -->
+      <template x-if="pagination.total > pagination.page_size">
+        <div class="p-4 themed-border-t flex items-center justify-between">
+          <div class="text-sm themed-text-muted">
+            显示 <span x-text="(pagination.page - 1) * pagination.page_size + 1"></span> - 
+            <span x-text="Math.min(pagination.page * pagination.page_size, pagination.total)"></span> / 
+            共 <span x-text="pagination.total"></span> 条
+          </div>
+          
+          <div class="flex items-center gap-2">
+            <button 
+              @click="changePage(pagination.page - 1)"
+              :disabled="pagination.page <= 1"
+              class="px-3 py-1.5 themed-border rounded-lg text-sm themed-text hover:themed-bg-subtle disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              上一页
+            </button>
+            
+            <span class="px-3 py-1.5 text-sm themed-text" x-text="'第 ' + pagination.page + ' 页'"></span>
+            
+            <button 
+              @click="changePage(pagination.page + 1)"
+              :disabled="pagination.page >= totalPages"
+              class="px-3 py-1.5 themed-border rounded-lg text-sm themed-text hover:themed-bg-subtle disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              下一页
+            </button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <%- include('partials/footer') %>
+
+  <script type="module" src="./src/modules/operations/pages/pending-center.js"></script>
+</body>
+</html>
+

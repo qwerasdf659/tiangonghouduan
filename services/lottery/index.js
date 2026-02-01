@@ -11,6 +11,7 @@ const LotteryUserService = require('./LotteryUserService')
 const LotteryHistoryService = require('./LotteryHistoryService')
 const LotteryQuotaService = require('./LotteryQuotaService')
 const LotteryPricingService = require('./LotteryPricingService')
+const LotteryHealthService = require('./LotteryHealthService')
 
 /**
  * 抽奖服务容器
@@ -114,6 +115,7 @@ module.exports = {
   LotteryHistoryService,
   LotteryQuotaService,
   LotteryPricingService,
+  LotteryHealthService,
   LotteryServiceContainer,
   lottery_service_container
 }

@@ -197,6 +197,82 @@ router.post('/approve/:id', authenticateToken, requireRoleLevel(100), async (req
 })
 
 /**
+ * @route POST /api/v4/console/consumption/batch-review
+ * @desc 批量审核消费记录（通过或拒绝）
+ * @access Private (管理员，role_level >= 100)
+ *
+ * 📌 批量操作说明：
+ * - 支持部分成功模式：单条失败不影响其他记录
+ * - 支持幂等性控制：通过 idempotency_key 防止重复提交
+ * - 审批通过自动发放积分
+ *
+ * @body {Array<number>} record_ids - 要审核的记录 ID 列表（最多100条）
+ * @body {string} action - 审核动作（'approve' | 'reject'）
+ * @body {string} [reason] - 审核原因（拒绝时必填）
+ * @body {string} [idempotency_key] - 幂等性键（可选，建议使用）
+ *
+ * @returns {Object} 批量处理结果
+ * @returns {string} data.operation_id - 操作 ID
+ * @returns {Object} data.stats - 统计数据
+ * @returns {Array} data.processed.success - 成功记录列表
+ * @returns {Array} data.processed.failed - 失败记录列表
+ * @returns {Array} data.processed.skipped - 跳过记录列表
+ *
+ * @example
+ * POST /api/v4/console/consumption/batch-review
+ * {
+ *   "record_ids": [1, 2, 3, 4, 5],
+ *   "action": "approve",
+ *   "idempotency_key": "batch_review_20260131_001"
+ * }
+ */
+router.post('/batch-review', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    // 🔄 通过 ServiceManager 获取 ConsumptionBatchService（符合TR-005规范）
+    const ConsumptionBatchService = req.app.locals.services.getService('consumption_batch')
+
+    const { record_ids, action, reason, idempotency_key } = req.body
+    const operator_id = req.user.user_id
+
+    logger.info('[批量审核] 开始批量审核消费记录', {
+      admin_id: operator_id,
+      record_count: record_ids?.length || 0,
+      action,
+      idempotency_key
+    })
+
+    const result = await ConsumptionBatchService.batchReview({
+      record_ids,
+      action,
+      reason,
+      operator_id,
+      idempotency_key
+    })
+
+    // 如果是重复操作，返回之前的结果
+    if (result.is_duplicate) {
+      logger.warn('[批量审核] 检测到重复操作', { idempotency_key })
+      return res.apiSuccess(result, '操作已执行（重复请求）')
+    }
+
+    logger.info('[批量审核] 批量审核完成', {
+      operation_id: result.operation_id,
+      success: result.stats.success_count,
+      failed: result.stats.failed_count,
+      skipped: result.stats.skipped_count
+    })
+
+    return res.apiSuccess(
+      result,
+      `批量审核完成：成功${result.stats.success_count}条，失败${result.stats.failed_count}条，跳过${result.stats.skipped_count}条`
+    )
+  } catch (error) {
+    logger.error('[批量审核] 批量审核失败', { error: error.message })
+    return handleServiceError(error, res, '批量审核失败')
+  }
+})
+
+/**
  * @route POST /api/v4/console/consumption/reject/:id
  * @desc 管理员审核拒绝消费记录
  * @access Private (管理员，role_level >= 100)

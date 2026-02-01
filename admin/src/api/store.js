@@ -112,6 +112,12 @@ export const STORE_ENDPOINTS = {
   CONSUMPTION_STATS: `${API_PREFIX}/console/consumption/stats`,
   CONSUMPTION_AUDIT: `${API_PREFIX}/console/consumption/audit/:id`,
 
+  // 消费异常检测（适配后端 consumption-anomaly 路由）
+  CONSUMPTION_ANOMALY_SUMMARY: `${API_PREFIX}/console/consumption-anomaly/summary`,
+  CONSUMPTION_ANOMALY_HIGH_RISK: `${API_PREFIX}/console/consumption-anomaly/high-risk`,
+  CONSUMPTION_ANOMALY_DETECT: `${API_PREFIX}/console/consumption-anomaly/detect/:id`,
+  CONSUMPTION_ANOMALY_MARK: `${API_PREFIX}/console/consumption-anomaly/:id/mark`,
+
   // 商户积分扩展
   MERCHANT_POINT_HISTORY: `${API_PREFIX}/console/merchant-points/:id/history`,
 

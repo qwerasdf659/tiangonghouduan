@@ -216,6 +216,10 @@ export function useUsersMethods() {
             status: userData.status || 'active'
           }
           this.showModal('userDetailModal')
+          // P2-4: 加载用户行为轨迹
+          if (typeof this.loadUserActivities === 'function') {
+            this.loadUserActivities(userId)
+          }
         }
       } catch (error) {
         logger.error('加载用户详情失败:', error)

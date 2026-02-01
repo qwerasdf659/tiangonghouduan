@@ -56,6 +56,7 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   AUDIT_LOG_STATISTICS: `${API_PREFIX}/console/system/audit-logs/statistics`,
   AUDIT_LOG_DETAIL: `${API_PREFIX}/console/system/audit-logs/:id`,
   AUDIT_LOG_EXPORT: `${API_PREFIX}/console/audit-logs/export`,
+  AUDIT_LOG_REPORT: `${API_PREFIX}/admin/operations/audit-report`,  // F-59: 审计报告
 
   // 会话管理
   SESSION_LIST: `${API_PREFIX}/console/sessions`,

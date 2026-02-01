@@ -158,6 +158,63 @@ class ConsumptionRecord extends Model {
     return Math.round(parseFloat(this.consumption_amount || 0))
   }
 
+  /*
+   * ========================================
+   * 异常检测实例方法（P1 阶段 - 2026-01-31）
+   * ========================================
+   */
+
+  /**
+   * 检查是否为异常记录
+   * @returns {boolean} 是否存在异常标记
+   */
+  isAnomaly() {
+    const flags = this.anomaly_flags || []
+    return Array.isArray(flags) && flags.length > 0
+  }
+
+  /**
+   * 获取异常风险等级
+   * @returns {string} 风险等级名称：normal/low/medium/high
+   */
+  getAnomalyLevel() {
+    const score = this.anomaly_score || 0
+    if (score === 0) return 'normal'
+    if (score <= 30) return 'low'
+    if (score <= 60) return 'medium'
+    return 'high'
+  }
+
+  /**
+   * 获取异常风险等级颜色（用于前端展示）
+   * @returns {string} 颜色代码
+   */
+  getAnomalyColor() {
+    const level = this.getAnomalyLevel()
+    const colors = {
+      normal: '#52c41a', // 绿色-正常
+      low: '#faad14', // 黄色-低风险
+      medium: '#fa8c16', // 橙色-中风险
+      high: '#f5222d' // 红色-高风险
+    }
+    return colors[level] || colors.normal
+  }
+
+  /**
+   * 获取异常标记的中文描述
+   * @returns {string[]} 异常标记的中文描述数组
+   */
+  getAnomalyDescriptions() {
+    const flags = this.anomaly_flags || []
+    const descriptions = {
+      large_amount: '大额消费（>¥500）',
+      high_frequency: '高频消费（24h>5次）',
+      new_user_large: '新用户大额（注册<7天且>¥100）',
+      cross_store: '跨店消费'
+    }
+    return flags.map(flag => descriptions[flag] || flag)
+  }
+
   /**
    * 验证消费记录的有效性
    * @returns {Object} 验证结果
@@ -265,7 +322,11 @@ class ConsumptionRecord extends Model {
       created_at: BeijingTimeHelper.formatForAPI(this.created_at),
       updated_at: BeijingTimeHelper.formatForAPI(this.updated_at),
       age: this.getAge(),
-      review_duration: this.getReviewDuration()
+      review_duration: this.getReviewDuration(),
+      // 异常检测字段（P1 阶段 - 2026-01-31）
+      anomaly_flags: this.anomaly_flags || [],
+      anomaly_score: this.anomaly_score || 0,
+      is_anomaly: this.isAnomaly()
     }
 
     // 关联的用户信息（消费用户）- 通过include查询时可用
@@ -587,6 +648,45 @@ module.exports = sequelize => {
         allowNull: true,
         defaultValue: null,
         comment: '删除时间（软删除时记录，管理员恢复时清空），时区：北京时间（GMT+8）'
+      },
+
+      /*
+       * ========================================
+       * 异常检测字段（P1 阶段 - 2026-01-31）
+       * 用于消费审核的异常标记和风险评分
+       * ========================================
+       */
+
+      /**
+       * 异常标记 JSON 数组
+       * 存储检测到的异常类型列表
+       * 可能的值：
+       * - large_amount: 大额消费（>¥500）
+       * - high_frequency: 高频消费（24h内>5次）
+       * - new_user_large: 新用户大额（注册<7天且>¥100）
+       * - cross_store: 跨店消费（同日多店消费）
+       */
+      anomaly_flags: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: null,
+        comment: '异常标记JSON数组，如["large_amount","high_frequency"]'
+      },
+
+      /**
+       * 异常评分（0-100）
+       * 分数越高越可疑，用于排序和筛选
+       * 评分规则：
+       * - 0: 正常
+       * - 1-30: 低风险
+       * - 31-60: 中风险
+       * - 61-100: 高风险
+       */
+      anomaly_score: {
+        type: DataTypes.TINYINT.UNSIGNED,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '异常评分 0-100，0=正常，分数越高越可疑'
       }
     },
     {
@@ -649,6 +749,17 @@ module.exports = sequelize => {
           name: 'idx_consumption_store_merchant',
           fields: ['store_id', 'merchant_id', 'created_at'],
           comment: '门店+商家维度消费记录查询'
+        },
+        // 异常检测索引（P1 阶段 - 2026-01-31）
+        {
+          name: 'idx_anomaly_score',
+          fields: ['anomaly_score'],
+          comment: '异常评分索引，用于高风险记录筛选排序'
+        },
+        {
+          name: 'idx_status_anomaly',
+          fields: ['status', 'anomaly_score'],
+          comment: '状态+异常评分复合索引，用于待审核高风险记录查询'
         }
       ],
 
@@ -782,6 +893,65 @@ module.exports = sequelize => {
              * 新架构中通过 meta 字段查询 AssetTransaction
              */
           ]
+        },
+
+        /*
+         * ========================================
+         * 异常检测查询 Scopes（P1 阶段 - 2026-01-31）
+         * ========================================
+         */
+
+        /**
+         * 存在异常标记的记录
+         * 用于筛选所有被标记为异常的消费记录
+         */
+        withAnomalies: {
+          where: {
+            anomaly_score: { [require('sequelize').Op.gt]: 0 },
+            is_deleted: 0
+          }
+        },
+
+        /**
+         * 高风险记录（评分 > 60）
+         * 用于优先审核处理
+         */
+        highRisk: {
+          where: {
+            anomaly_score: { [require('sequelize').Op.gt]: 60 },
+            is_deleted: 0
+          }
+        },
+
+        /**
+         * 中风险记录（评分 31-60）
+         */
+        mediumRisk: {
+          where: {
+            anomaly_score: { [require('sequelize').Op.between]: [31, 60] },
+            is_deleted: 0
+          }
+        },
+
+        /**
+         * 低风险记录（评分 1-30）
+         */
+        lowRisk: {
+          where: {
+            anomaly_score: { [require('sequelize').Op.between]: [1, 30] },
+            is_deleted: 0
+          }
+        },
+
+        /**
+         * 待审核 + 高风险（优先处理）
+         */
+        pendingHighRisk: {
+          where: {
+            status: 'pending',
+            anomaly_score: { [require('sequelize').Op.gt]: 60 },
+            is_deleted: 0
+          }
         }
       },
 

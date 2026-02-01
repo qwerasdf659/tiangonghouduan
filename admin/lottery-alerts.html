@@ -23,6 +23,26 @@
   </nav>
 
   <div class="container mx-auto px-4 py-6">
+    <!-- Tab切换 -->
+    <div class="mb-6 border-b">
+      <nav class="flex space-x-4">
+        <button 
+          @click="activeTab = 'alerts'" 
+          :class="activeTab === 'alerts' ? 'border-b-2 themed-border-primary themed-text-primary' : 'themed-text-muted hover:themed-text-secondary'"
+          class="px-4 py-2 text-sm font-medium transition-colors">
+          🚨 实时告警
+        </button>
+        <button 
+          @click="activeTab = 'health'; loadHealthData()" 
+          :class="activeTab === 'health' ? 'border-b-2 themed-border-primary themed-text-primary' : 'themed-text-muted hover:themed-text-secondary'"
+          class="px-4 py-2 text-sm font-medium transition-colors">
+          📊 健康度分析
+        </button>
+      </nav>
+    </div>
+
+    <!-- ============ 实时告警Tab ============ -->
+    <div x-show="activeTab === 'alerts'" x-cloak>
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
       <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-red-500">
@@ -219,6 +239,120 @@
         </div>
       </div>
     </div>
+    </div><!-- 结束实时告警Tab -->
+
+    <!-- ============ 健康度分析Tab ============ -->
+    <div x-show="activeTab === 'health'" x-cloak>
+      <!-- 活动选择 -->
+      <div class="themed-card rounded-lg shadow p-4 mb-6">
+        <div class="flex items-center space-x-4">
+          <label class="text-sm font-medium themed-text-secondary">选择活动：</label>
+          <select x-model="selectedCampaignId" @change="loadHealthData()" class="px-3 py-2 border rounded-lg min-w-64">
+            <option value="">全部活动汇总</option>
+            <template x-for="campaign in campaigns" :key="campaign.campaign_id">
+              <option :value="campaign.campaign_id" x-text="campaign.campaign_name"></option>
+            </template>
+          </select>
+          <button @click="loadHealthData()" class="px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary">
+            🔄 刷新
+          </button>
+        </div>
+      </div>
+
+      <!-- 健康度概览卡片 -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <div class="text-4xl mb-2" :class="healthData.overall_score >= 80 ? 'text-green-500' : healthData.overall_score >= 60 ? 'text-yellow-500' : 'text-red-500'">
+            <span x-text="healthData.overall_score || 0"></span>
+          </div>
+          <p class="text-lg font-semibold">综合评分</p>
+          <p class="text-sm themed-text-muted" x-text="getHealthLevel(healthData.overall_score)"></p>
+        </div>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <div class="text-4xl mb-2" :class="healthData.budget_health >= 70 ? 'text-green-500' : 'text-yellow-500'">
+            <span x-text="healthData.budget_health || 0"></span>
+          </div>
+          <p class="text-lg font-semibold">预算健康度</p>
+          <p class="text-sm themed-text-muted">剩余 <span x-text="healthData.budget_remaining_days || '-'"></span> 天</p>
+        </div>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <div class="text-4xl mb-2" :class="healthData.win_rate_health >= 70 ? 'text-green-500' : 'text-yellow-500'">
+            <span x-text="healthData.win_rate_health || 0"></span>
+          </div>
+          <p class="text-lg font-semibold">中奖率健康度</p>
+          <p class="text-sm themed-text-muted">当前 <span x-text="(healthData.current_win_rate || 0).toFixed(1)"></span>%</p>
+        </div>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <div class="text-4xl mb-2" :class="healthData.prize_distribution_health >= 70 ? 'text-green-500' : 'text-yellow-500'">
+            <span x-text="healthData.prize_distribution_health || 0"></span>
+          </div>
+          <p class="text-lg font-semibold">奖品分布健康度</p>
+          <p class="text-sm themed-text-muted">高档位 <span x-text="(healthData.high_tier_ratio || 0).toFixed(1)"></span>%</p>
+        </div>
+      </div>
+
+      <!-- 图表区域 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <!-- 档位分布饼图 -->
+        <div class="themed-card rounded-lg shadow">
+          <div class="p-4 border-b">
+            <h5 class="font-semibold">📊 档位分布</h5>
+          </div>
+          <div class="p-4">
+            <div id="tierDistributionChart" style="height: 250px;"></div>
+          </div>
+        </div>
+        <!-- 健康度趋势 -->
+        <div class="themed-card rounded-lg shadow">
+          <div class="p-4 border-b">
+            <h5 class="font-semibold">📈 健康度趋势（7天）</h5>
+          </div>
+          <div class="p-4">
+            <div id="healthTrendChart" style="height: 250px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 问题诊断列表 -->
+      <div class="themed-card rounded-lg shadow">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold">🔍 问题诊断与建议</h5>
+          <span class="text-sm themed-text-muted" x-text="'共 ' + (healthData.issues?.length || 0) + ' 个问题'"></span>
+        </div>
+        <div class="p-4">
+          <template x-if="!healthData.issues || healthData.issues.length === 0">
+            <div class="text-center py-8 themed-text-muted">
+              ✅ 暂无问题，系统运行健康
+            </div>
+          </template>
+          <div class="space-y-3">
+            <template x-for="(issue, index) in (healthData.issues || [])" :key="index">
+              <div class="p-4 rounded-lg border-l-4" 
+                   :class="{
+                     'border-red-500 bg-red-50': issue.level === 'error',
+                     'border-yellow-500 bg-yellow-50': issue.level === 'warning',
+                     'border-blue-500 bg-blue-50': issue.level === 'info'
+                   }">
+                <div class="flex items-start justify-between">
+                  <div>
+                    <span class="font-medium" x-text="issue.title || issue.message"></span>
+                    <p class="text-sm themed-text-muted mt-1" x-text="issue.description || issue.suggestion"></p>
+                  </div>
+                  <span class="px-2 py-1 text-xs rounded" 
+                        :class="{
+                          'bg-red-100 text-red-700': issue.level === 'error',
+                          'bg-yellow-100 text-yellow-700': issue.level === 'warning',
+                          'bg-blue-100 text-blue-700': issue.level === 'info'
+                        }"
+                        x-text="issue.level === 'error' ? '严重' : issue.level === 'warning' ? '警告' : '提示'">
+                  </span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div><!-- 结束健康度分析Tab -->
   </div>
 
   <!-- 解决告警 Modal -->

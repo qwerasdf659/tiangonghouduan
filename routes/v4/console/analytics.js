@@ -126,11 +126,11 @@ router.get(
         admin_id: req.user.user_id
       })
 
-      // 获取统一报表服务
-      const ReportingService = req.app.locals.services.getService('reporting_analytics')
+      // 获取报表统计服务（V4.7.0 ReportingService 拆分：getTodayStats 在 StatsService 中）
+      const StatsService = req.app.locals.services.getService('reporting_stats')
 
       // 调用服务层方法获取今日统计数据
-      const todayStats = await ReportingService.getTodayStats()
+      const todayStats = await StatsService.getTodayStats()
 
       sharedComponents.logger.info('管理员今日统计数据获取成功', {
         admin_id: req.user.user_id,

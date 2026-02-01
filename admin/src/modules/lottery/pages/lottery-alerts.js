@@ -24,6 +24,7 @@
 import { logger } from '../../../utils/logger.js'
 import { LOTTERY_ADVANCED_ENDPOINTS } from '../../../api/lottery/advanced.js'
 import { LOTTERY_CORE_ENDPOINTS } from '../../../api/lottery/core.js'
+import { LOTTERY_HEALTH_ENDPOINTS, LotteryHealthAPI } from '../../../api/lottery-health.js'
 import { buildURL, request, buildQueryString } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/index.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
@@ -48,11 +49,37 @@ function lotteryAlertsPage() {
 
     // ==================== 页面特有状态 ====================
 
+    /** @type {string} 当前激活的Tab */
+    activeTab: 'alerts',
+
     /** @type {boolean} 表单提交状态 */
     submitting: false,
 
     /** @type {Array} 告警列表 */
     alerts: [],
+
+    /** @type {number|string} 选中的活动ID（用于健康度分析） */
+    selectedCampaignId: '',
+
+    /** @type {Object} 健康度数据 */
+    healthData: {
+      overall_score: 0,
+      budget_health: 0,
+      win_rate_health: 0,
+      prize_distribution_health: 0,
+      budget_remaining_days: 0,
+      current_win_rate: 0,
+      high_tier_ratio: 0,
+      issues: [],
+      tier_distribution: [],
+      trend: []
+    },
+
+    /** @type {Object|null} 档位分布图表实例 */
+    tierDistributionChart: null,
+
+    /** @type {Object|null} 健康度趋势图表实例 */
+    healthTrendChart: null,
 
     /** @type {Object|null} 当前选中的告警 */
     selectedAlert: null,
@@ -655,6 +682,160 @@ function lotteryAlertsPage() {
         return new Date(dateValue).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
       } catch {
         return typeof dateValue === 'string' ? dateValue : '-'
+      }
+    },
+
+    // ==================== 健康度分析方法（P1-1） ====================
+
+    /**
+     * 获取健康等级文本
+     */
+    getHealthLevel(score) {
+      if (score >= 90) return '🟢 优秀'
+      if (score >= 80) return '🟢 良好'
+      if (score >= 70) return '🟡 一般'
+      if (score >= 60) return '🟡 需关注'
+      return '🔴 危险'
+    },
+
+    /**
+     * 加载健康度数据
+     * @description 后端要求必须指定 campaign_id，无汇总端点
+     */
+    async loadHealthData() {
+      if (this.activeTab !== 'health') return
+
+      // 后端要求必须指定 campaign_id
+      if (!this.selectedCampaignId) {
+        logger.warn('健康度分析需要选择具体活动')
+        this.showNotification('请先选择一个抽奖活动', 'warning')
+        return
+      }
+
+      const result = await this.withLoading(async () => {
+        return await LotteryHealthAPI.getCampaignHealth(this.selectedCampaignId)
+      })
+
+      if (result.success && result.data) {
+        const data = result.data.data || result.data
+        
+        // 更新健康度数据
+        this.healthData = {
+          overall_score: data.overall_score || data.health_score || 0,
+          budget_health: data.budget_health || data.dimensions?.budget_health || 0,
+          win_rate_health: data.win_rate_health || data.dimensions?.win_rate_health || 0,
+          prize_distribution_health: data.prize_distribution_health || data.dimensions?.prize_distribution_health || 0,
+          budget_remaining_days: data.budget_remaining_days || data.budget?.remaining_days || 0,
+          current_win_rate: data.current_win_rate || data.metrics?.win_rate || 0,
+          high_tier_ratio: data.high_tier_ratio || data.tier_distribution?.high?.percentage || 0,
+          issues: data.issues || data.diagnoses || [],
+          tier_distribution: data.tier_distribution || {},
+          trend: data.trend || data.history || []
+        }
+
+        // 更新图表
+        this.$nextTick(() => {
+          this.initHealthCharts()
+          this.updateHealthCharts()
+        })
+      }
+    },
+
+    /**
+     * 初始化健康度图表
+     */
+    initHealthCharts() {
+      const echarts = this._echarts
+      if (!echarts) return
+
+      // 档位分布饼图
+      const tierContainer = document.getElementById('tierDistributionChart')
+      if (tierContainer && !this.tierDistributionChart) {
+        this.tierDistributionChart = echarts.init(tierContainer)
+      }
+
+      // 健康度趋势图
+      const trendContainer = document.getElementById('healthTrendChart')
+      if (trendContainer && !this.healthTrendChart) {
+        this.healthTrendChart = echarts.init(trendContainer)
+      }
+    },
+
+    /**
+     * 更新健康度图表
+     */
+    updateHealthCharts() {
+      // 更新档位分布饼图
+      if (this.tierDistributionChart) {
+        const tierData = this.healthData.tier_distribution
+        const pieData = [
+          { 
+            value: tierData.high?.count || tierData.high || 0, 
+            name: '高档位', 
+            itemStyle: { color: '#ee6666' }
+          },
+          { 
+            value: tierData.mid?.count || tierData.mid || 0, 
+            name: '中档位', 
+            itemStyle: { color: '#fac858' }
+          },
+          { 
+            value: tierData.fallback?.count || tierData.fallback || tierData.low || 0, 
+            name: '保底', 
+            itemStyle: { color: '#91cc75' }
+          }
+        ].filter(item => item.value > 0)
+
+        this.tierDistributionChart.setOption({
+          tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+          legend: { orient: 'vertical', left: 'left', top: 'center' },
+          series: [{
+            name: '档位分布',
+            type: 'pie',
+            radius: ['40%', '70%'],
+            avoidLabelOverlap: true,
+            itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
+            label: { show: true, formatter: '{b}: {d}%' },
+            data: pieData
+          }]
+        })
+      }
+
+      // 更新健康度趋势图
+      if (this.healthTrendChart) {
+        const trend = this.healthData.trend || []
+        const dates = trend.map(item => item.date || item.snapshot_date)
+        const scores = trend.map(item => item.score || item.health_score || item.overall_score)
+
+        this.healthTrendChart.setOption({
+          tooltip: { trigger: 'axis' },
+          grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+          xAxis: { type: 'category', data: dates },
+          yAxis: { type: 'value', min: 0, max: 100, name: '健康度' },
+          series: [{
+            name: '健康度',
+            type: 'line',
+            smooth: true,
+            data: scores,
+            lineStyle: { color: '#5470c6', width: 3 },
+            areaStyle: {
+              color: {
+                type: 'linear',
+                x: 0, y: 0, x2: 0, y2: 1,
+                colorStops: [
+                  { offset: 0, color: 'rgba(84, 112, 198, 0.5)' },
+                  { offset: 1, color: 'rgba(84, 112, 198, 0.1)' }
+                ]
+              }
+            },
+            markLine: {
+              data: [
+                { yAxis: 80, name: '良好', lineStyle: { color: '#91cc75' } },
+                { yAxis: 60, name: '警戒', lineStyle: { color: '#fac858' } }
+              ]
+            }
+          }]
+        })
       }
     }
   }

@@ -61,6 +61,20 @@ const sessionsRoutes = require('./sessions') // 🆕 会话管理（2026-01-21 �
 const lotteryCampaignsRoutes = require('./lottery-campaigns') // 🆕 抽奖活动列表管理（2026-01-28 P1 运营后台 ROI/复购率/库存预警）
 // [已删除] const lotteryAnalyticsRoutes = require('./lottery-analytics') // 已拆分到 lottery-report.js
 const batchOperationsRoutes = require('./batch-operations') // 🆕 批量操作（2026-01-30 阶段C 批量操作API）
+const dashboardRoutes = require('./dashboard') // 🆕 运营看板（2026-01-31 P0 待处理聚合）
+const pendingRoutes = require('./pending') // 🆕 待处理中心（2026-01-31 P0 统一待处理管理）
+const navRoutes = require('./nav') // 🆕 导航徽标（2026-01-31 P0 侧边栏徽标）
+const lotteryHealthRoutes = require('./lottery-health') // 🆕 抽奖健康度（2026-01-31 P1 B-14~B-18）
+const consumptionAnomalyRoutes = require('./consumption-anomaly') // 🆕 消费异常检测（2026-01-31 P1 B-25~B-30）
+const userSegmentsRoutes = require('./user-segments') // 🆕 用户分层（2026-01-31 P1 B-19~B-24）
+
+// P2新增路由（2026-01-31 第2阶段任务）
+const reminderRulesRoutes = require('./reminder-rules') // 🆕 智能提醒规则管理（B-31~B-35）
+const reminderHistoryRoutes = require('./reminder-history') // 🆕 提醒历史记录（B-35）
+const reportTemplatesRoutes = require('./report-templates') // 🆕 自定义报表模板（B-36~B-40）
+const auditRollbackRoutes = require('./audit-rollback') // 🆕 审计回滚管理（B-42~B-45）
+const userBehaviorTracksRoutes = require('./user-behavior-tracks') // 🆕 用户行为轨迹（B-46~B-49）
+const multiDimensionStatsRoutes = require('./multi-dimension-stats') // 🆕 多维度统计（B-25/B-27）
 
 // 挂载子模块路由
 router.use('/auth', authRoutes)
@@ -113,6 +127,20 @@ router.use('/sessions', sessionsRoutes) // 🆕 会话管理路由（2026-01-21 
 router.use('/lottery-campaigns', lotteryCampaignsRoutes) // 🆕 抽奖活动列表管理路由（2026-01-28 P1 运营后台 ROI/复购率/库存预警）
 // [已删除] router.use('/lottery-analytics', lotteryAnalyticsRoutes) // 已迁移到 /lottery-report
 router.use('/batch-operations', batchOperationsRoutes) // 🆕 批量操作路由（2026-01-30 阶段C 批量赠送/核销/状态切换/预算调整）
+router.use('/dashboard', dashboardRoutes) // 🆕 运营看板路由（2026-01-31 P0 待处理聚合）
+router.use('/pending', pendingRoutes) // 🆕 待处理中心路由（2026-01-31 P0 统一待处理管理）
+router.use('/nav', navRoutes) // 🆕 导航徽标路由（2026-01-31 P0 侧边栏徽标）
+router.use('/lottery-health', lotteryHealthRoutes) // 🆕 抽奖健康度路由（2026-01-31 P1 B-14~B-18 活动健康度评估）
+router.use('/consumption-anomaly', consumptionAnomalyRoutes) // 🆕 消费异常检测路由（2026-01-31 P1 B-25~B-30 风险评估）
+router.use('/users', userSegmentsRoutes) // 🆕 用户分层路由（2026-01-31 P1 B-19~B-24 用户画像）
+
+// P2新增路由（2026-01-31 第2阶段任务）
+router.use('/reminder-rules', reminderRulesRoutes) // 🆕 智能提醒规则管理路由（B-31~B-35）
+router.use('/reminder-history', reminderHistoryRoutes) // 🆕 提醒历史记录路由（B-35）
+router.use('/report-templates', reportTemplatesRoutes) // 🆕 自定义报表模板路由（B-36~B-40）
+router.use('/audit-rollback', auditRollbackRoutes) // 🆕 审计回滚管理路由（B-42~B-45）
+router.use('/user-behavior-tracks', userBehaviorTracksRoutes) // 🆕 用户行为轨迹路由（B-46~B-49）
+router.use('/statistics', multiDimensionStatsRoutes) // 🆕 多维度统计路由（B-25/B-27）
 
 /**
  * GET / - Admin API根路径信息
@@ -311,9 +339,54 @@ router.get('/', (req, res) => {
           '/consumption/pending',
           '/consumption/records',
           '/consumption/approve/:id', // 记录ID（事务实体）
-          '/consumption/reject/:id' // 记录ID（事务实体）
+          '/consumption/reject/:id', // 记录ID（事务实体）
+          '/consumption/batch-review' // 🆕 批量审核（2026-01-31 P0）
         ],
         note: '仅限 admin（role_level >= 100）访问，不开放 ops/区域经理；商家员工使用 /api/v4/shop/* 提交消费记录'
+      },
+      dashboard: {
+        description: '运营看板（2026-01-31 P0 待处理聚合）',
+        endpoints: ['/dashboard/pending-summary'],
+        note: '运营首页看板待处理事项聚合统计；仅限 admin 访问'
+      },
+      pending: {
+        description: '待处理中心（2026-01-31 P0 统一待处理管理）',
+        endpoints: ['/pending/summary', '/pending/list'],
+        note: '统一待处理事项管理：分类汇总、列表筛选、紧急优先；仅限 admin 访问'
+      },
+      nav: {
+        description: '导航徽标（2026-01-31 P0 侧边栏徽标）',
+        endpoints: ['/nav/badges'],
+        note: '侧边栏待处理徽标计数，轻量级接口适合轮询（建议30-60秒）；仅限 admin 访问'
+      },
+      consumption_anomaly: {
+        description: '消费异常检测（2026-01-31 P1 B-25~B-30）',
+        endpoints: [
+          '/consumption-anomaly/summary',
+          '/consumption-anomaly/high-risk',
+          '/consumption-anomaly/detect/:id',
+          '/consumption-anomaly/batch-detect',
+          '/consumption-anomaly/:id/mark',
+          '/consumption-anomaly/rules'
+        ],
+        note: '消费记录异常检测：汇总统计、高风险列表、单条/批量检测、手动标记、规则配置；仅限 admin 访问'
+      },
+      lottery_health: {
+        description: '抽奖健康度评估（2026-01-31 P1 B-14~B-18）',
+        endpoints: ['/lottery-health/:campaign_id'],
+        note: '抽奖活动健康度评估：健康分数、问题诊断、优化建议；仅限 admin 访问'
+      },
+      user_segments: {
+        description: '用户分层分析（2026-01-31 P1 B-19~B-24）',
+        endpoints: [
+          '/users/segments',
+          '/users/segments/:type',
+          '/users/activity-heatmap',
+          '/users/exchange-preferences',
+          '/users/funnel',
+          '/users/segment-rules'
+        ],
+        note: '用户分层统计：高价值/活跃/沉默/流失用户分布、活跃热力图、兑换偏好、行为漏斗；仅限 admin 访问'
       },
       stores: {
         description: '门店管理（2026-01-12 P1 门店数据维护入口）',
