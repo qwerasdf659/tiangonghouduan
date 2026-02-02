@@ -149,13 +149,14 @@ module.exports = sequelize => {
       },
 
       /**
-       * 会话ID
+       * 用户行为会话ID（P5迁移重命名：session_id → behavior_session_id）
        * @type {string|null}
+       * @业务含义 关联同一次会话内的多个行为记录
        */
-      session_id: {
+      behavior_session_id: {
         type: DataTypes.STRING(100),
         allowNull: true,
-        comment: '会话ID'
+        comment: '用户行为会话ID（关联同一次会话内的多个行为记录）'
       },
 
       /**
@@ -204,7 +205,7 @@ module.exports = sequelize => {
         { fields: ['behavior_type'], name: 'idx_behavior_tracks_type' },
         { fields: ['behavior_time'], name: 'idx_behavior_tracks_time' },
         { fields: ['user_id', 'behavior_type'], name: 'idx_behavior_tracks_user_type' },
-        { fields: ['session_id'], name: 'idx_behavior_tracks_session' }
+        { fields: ['behavior_session_id'], name: 'idx_behavior_tracks_session' }
       ],
 
       scopes: {
@@ -284,7 +285,7 @@ module.exports = sequelize => {
    * @param {number} [params.behavior_target_id] - 目标ID
    * @param {Object} [params.behavior_data] - 行为数据
    * @param {string} [params.behavior_result] - 行为结果
-   * @param {string} [params.session_id] - 会话ID
+   * @param {string} [params.behavior_session_id] - 用户行为会话ID
    * @param {Object} [params.device_info] - 设备信息
    * @param {string} [params.ip_address] - IP地址
    * @param {Object} [options] - Sequelize 选项
@@ -299,7 +300,7 @@ module.exports = sequelize => {
       behavior_target_id,
       behavior_data,
       behavior_result,
-      session_id,
+      behavior_session_id,
       device_info,
       ip_address
     } = params
@@ -313,7 +314,7 @@ module.exports = sequelize => {
         behavior_target_id,
         behavior_data,
         behavior_result,
-        session_id,
+        behavior_session_id,
         device_info,
         ip_address,
         behavior_time: new Date()

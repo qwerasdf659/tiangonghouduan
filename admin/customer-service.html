@@ -28,15 +28,15 @@
           <h5 class="font-semibold">会话列表</h5>
         </div>
         <div class="flex-1 overflow-y-auto">
-          <template x-for="session in sessions" :key="session.session_id">
+          <template x-for="session in sessions" :key="session.customer_service_session_id">
             <div 
               @click="selectSession(session)"
-              :class="selectedSession?.session_id === session.session_id ? 'bg-pink-50 border-l-4 border-pink-500' : 'themed-hover-bg'"
+              :class="selectedSession?.customer_service_session_id === session.customer_service_session_id ? 'bg-pink-50 border-l-4 border-pink-500' : 'themed-hover-bg'"
               class="p-4 border-b cursor-pointer"
             >
               <div class="flex justify-between items-start">
                 <div>
-                  <p class="font-medium" x-text="session.user?.nickname || '用户' + (session.user?.user_id || session.session_id)"></p>
+                  <p class="font-medium" x-text="session.user?.nickname || '用户' + (session.user?.user_id || session.customer_service_session_id)"></p>
                   <p class="text-sm themed-text-muted truncate" x-text="session.last_message?.content || session.last_message || '暂无消息'"></p>
                 </div>
                 <span 
@@ -54,10 +54,10 @@
       <!-- 聊天区域 -->
       <div class="col-span-6 themed-card rounded-lg shadow overflow-hidden flex flex-col">
         <div class="p-4 border-b">
-          <h5 class="font-semibold" x-text="selectedSession ? (selectedSession.user?.nickname || '用户' + (selectedSession.user?.user_id || selectedSession.session_id)) : '请选择会话'"></h5>
+          <h5 class="font-semibold" x-text="selectedSession ? (selectedSession.user?.nickname || '用户' + (selectedSession.user?.user_id || selectedSession.customer_service_session_id)) : '请选择会话'"></h5>
         </div>
         <div class="flex-1 overflow-y-auto p-4 space-y-4" x-ref="messageContainer">
-          <template x-for="msg in messages" :key="msg.message_id">
+          <template x-for="msg in messages" :key="msg.chat_message_id">
             <div :class="msg.sender_type === 'admin' ? 'flex justify-end' : 'flex justify-start'">
               <div 
                 :class="msg.sender_type === 'admin' ? 'bg-pink-500 text-white' : 'themed-bg-muted themed-text'"

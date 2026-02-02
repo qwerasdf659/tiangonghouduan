@@ -299,13 +299,18 @@ module.exports = sequelize => {
         allowNull: true,
         comment: '本次抽奖包含的次数'
       },
-      batch_id: {
+      /**
+       * 抽奖批次ID（P5迁移重命名：batch_id → lottery_batch_id）
+       * @业务含义 用于关联同一批次的多次抽奖（如10连抽）
+       * @格式 batch_<timestamp>_<user_id>
+       */
+      lottery_batch_id: {
         type: DataTypes.STRING(50),
         allowNull: true,
-        comment: '批次ID'
+        comment: '抽奖批次ID（用于关联同一批次的多次抽奖）'
       },
       /**
-       * 批次抽奖ID（连抽功能专用）
+       * 批次内抽奖序号ID（P5迁移重命名：batch_draw_id → lottery_batch_draw_id）
        *
        * 业务含义：
        * - 用于关联同一批次（10连抽）的多条抽奖记录
@@ -322,10 +327,10 @@ module.exports = sequelize => {
        * - 有索引支持（快速查询）
        * - 不是外键（避免额外约束）
        */
-      batch_draw_id: {
+      lottery_batch_draw_id: {
         type: DataTypes.STRING(50),
         allowNull: true,
-        comment: '批次抽奖ID（连抽时使用，用于关联同一批次的多次抽奖）'
+        comment: '批次内抽奖序号ID（连抽时区分同一批次内的每次抽奖）'
       },
 
       // 核心业务字段（V4.0语义清理版）
@@ -476,33 +481,36 @@ module.exports = sequelize => {
       },
 
       /**
-       * 关联预设ID
+       * 关联预设ID（P1迁移重命名：preset_id → lottery_preset_id）
        * @业务含义 预设发放时关联的预设记录
+       * @外键关联 lottery_presets.lottery_preset_id
        */
-      preset_id: {
+      lottery_preset_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '关联预设ID（lottery_presets.preset_id）'
+        comment: '关联预设ID（外键关联 lottery_presets.lottery_preset_id）'
       },
 
       /**
-       * 关联库存欠账ID
+       * 关联库存欠账ID（P4迁移重命名：inventory_debt_id → preset_inventory_debt_id）
        * @业务含义 预设发放产生库存欠账时的关联ID
+       * @外键关联 preset_inventory_debt.preset_inventory_debt_id
        */
-      inventory_debt_id: {
+      preset_inventory_debt_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '关联库存欠账ID（preset_inventory_debt.debt_id）'
+        comment: '关联库存欠账ID（外键关联 preset_inventory_debt.preset_inventory_debt_id）'
       },
 
       /**
-       * 关联预算欠账ID
+       * 关联预算欠账ID（P4迁移重命名：budget_debt_id → preset_budget_debt_id）
        * @业务含义 预设发放产生预算欠账时的关联ID
+       * @外键关联 preset_budget_debt.preset_budget_debt_id
        */
-      budget_debt_id: {
+      preset_budget_debt_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '关联预算欠账ID（preset_budget_debt.debt_id）'
+        comment: '关联预算欠账ID（外键关联 preset_budget_debt.preset_budget_debt_id）'
       },
 
       /**
@@ -517,13 +525,14 @@ module.exports = sequelize => {
       },
 
       /**
-       * 关联决策快照ID
+       * 关联决策快照ID（P4迁移重命名：decision_id → lottery_draw_decision_id）
        * @业务含义 关联lottery_draw_decisions表，用于审计追溯
+       * @外键关联 lottery_draw_decisions.lottery_draw_decision_id
        */
-      decision_id: {
+      lottery_draw_decision_id: {
         type: DataTypes.BIGINT,
         allowNull: true,
-        comment: '关联决策快照ID（lottery_draw_decisions.decision_id）'
+        comment: '关联决策快照ID（外键关联 lottery_draw_decisions.lottery_draw_decision_id）'
       },
 
       // ========== 双账户模型预算审计字段 ==========
@@ -616,8 +625,9 @@ module.exports = sequelize => {
           fields: ['draw_type']
         },
         {
-          name: 'idx_batch_id',
-          fields: ['batch_id']
+          name: 'idx_draws_lottery_batch',
+          fields: ['lottery_batch_id'],
+          comment: '抽奖批次ID索引（P5迁移更新）'
         },
         {
           name: 'idx_created_at',

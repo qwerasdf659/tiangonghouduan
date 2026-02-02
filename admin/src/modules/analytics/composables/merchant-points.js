@@ -19,13 +19,19 @@ import { buildURL } from '../../../api/base.js'
  */
 export function useMerchantPointsState() {
   return {
-    /** @type {Array} 商户积分列表 */
+    /** @type {Array} 商户积分申请列表 */
     merchantPoints: [],
-    /** @type {Object} 商户积分筛选条件 */
-    merchantFilters: { merchant_id: '', keyword: '' },
-    /** @type {Object} 商户积分统计 */
-    merchantStats: { totalMerchants: 0, totalPoints: 0, activeMerchants: 0 },
-    /** @type {Object|null} 选中的商户 */
+    /** @type {Object} 商户积分筛选条件 - user_id对应后端API参数 */
+    merchantFilters: { user_id: '', keyword: '' },
+    /**
+     * 商户积分审核统计 - 与后端API字段一致
+     * @property {number} pending_count - 待审核数量
+     * @property {number} approved_count - 已通过数量
+     * @property {number} rejected_count - 已拒绝数量
+     * @property {number} today_points - 今日发放积分
+     */
+    merchantStats: { pending_count: 0, approved_count: 0, rejected_count: 0, today_points: 0 },
+    /** @type {Object|null} 选中的商户积分申请 */
     selectedMerchant: null,
     /** @type {Array} 商户积分历史 */
     merchantPointsHistory: []
@@ -39,16 +45,22 @@ export function useMerchantPointsState() {
 export function useMerchantPointsMethods() {
   return {
     /**
-     * 加载商户积分列表
+     * 加载商户积分申请列表
+     * 后端API: GET /api/v4/console/merchant-points
+     * 返回格式: { rows: [...], count: number, pagination: {...} }
      */
     async loadMerchantPoints() {
       try {
         const params = new URLSearchParams()
         params.append('page', this.financePagination?.page || 1)
         params.append('page_size', this.financePagination?.page_size || 20)
-        if (this.merchantFilters.merchant_id)
-          params.append('merchant_id', this.merchantFilters.merchant_id)
-        if (this.merchantFilters.keyword) params.append('keyword', this.merchantFilters.keyword)
+        // user_id 对应后端 API 的筛选参数
+        if (this.merchantFilters.user_id) {
+          params.append('user_id', this.merchantFilters.user_id)
+        }
+        if (this.merchantFilters.keyword) {
+          params.append('keyword', this.merchantFilters.keyword)
+        }
 
         const response = await this.apiGet(
           `${STORE_ENDPOINTS.MERCHANT_POINT_LIST}?${params}`,
@@ -57,20 +69,25 @@ export function useMerchantPointsMethods() {
         )
 
         if (response?.success) {
-          this.merchantPoints = response.data?.merchants || response.data?.list || []
+          // 后端返回 rows 字段
+          this.merchantPoints = response.data?.rows || []
           if (response.data?.pagination) {
             // 只更新 total，total_pages 由 getter 计算
             this.financePagination.total = response.data.pagination.total || 0
+          } else if (response.data?.count !== undefined) {
+            this.financePagination.total = response.data.count
           }
         }
       } catch (error) {
-        logger.error('加载商户积分失败:', error)
+        logger.error('加载商户积分申请列表失败:', error)
         this.merchantPoints = []
       }
     },
 
     /**
-     * 加载商户积分统计
+     * 加载商户积分审核统计
+     * 后端API: GET /api/v4/console/merchant-points/stats/pending
+     * 返回格式: { pending_count, approved_count, rejected_count, today_points }
      */
     async loadMerchantStats() {
       try {
@@ -80,14 +97,16 @@ export function useMerchantPointsMethods() {
           { showLoading: false, showError: false }
         )
         if (response?.success && response.data) {
+          // 直接使用后端返回的字段名（snake_case）
           this.merchantStats = {
-            totalMerchants: response.data.total_merchants ?? 0,
-            totalPoints: response.data.total_points ?? 0,
-            activeMerchants: response.data.active_merchants ?? 0
+            pending_count: response.data.pending_count ?? 0,
+            approved_count: response.data.approved_count ?? 0,
+            rejected_count: response.data.rejected_count ?? 0,
+            today_points: response.data.today_points ?? 0
           }
         }
       } catch (error) {
-        logger.error('加载商户统计失败:', error)
+        logger.error('加载商户积分审核统计失败:', error)
       }
     },
 
@@ -100,49 +119,108 @@ export function useMerchantPointsMethods() {
     },
 
     /**
-     * 查看商户积分详情
-     * @param {Object} merchant - 商户对象
+     * 查看商户积分申请详情
+     * 后端API: GET /api/v4/console/merchant-points/:audit_id
+     * @param {Object} item - 商户积分申请对象
      */
-    async viewMerchantDetail(merchant) {
+    async viewMerchantDetail(item) {
       try {
+        // 后端使用 audit_id 作为主键
+        const auditId = item.audit_id || item.id
+        logger.debug('[商户积分] 查看详情, audit_id:', auditId)
         const response = await this.apiGet(
-          buildURL(STORE_ENDPOINTS.MERCHANT_POINT_DETAIL, {
-            id: merchant.merchant_id || merchant.id
-          }),
+          buildURL(STORE_ENDPOINTS.MERCHANT_POINT_DETAIL, { id: auditId }),
           {},
           { showLoading: true }
         )
         if (response?.success) {
           this.selectedMerchant = response.data
-          this.showModal('merchantDetailModal')
+          // 修复：模态框名称与HTML保持一致（merchantPointDetailModal）
+          this.showModal('merchantPointDetailModal')
         }
       } catch (error) {
-        logger.error('加载商户详情失败:', error)
-        this.showError('加载商户详情失败')
+        logger.error('加载商户积分申请详情失败:', error)
+        this.showError('加载商户积分申请详情失败')
       }
     },
 
     /**
      * 查看商户积分历史
-     * @param {Object} merchant - 商户对象
+     * 后端API: GET /api/v4/console/merchant-points/:id/history
+     * @param {Object} item - 商户积分申请对象
      */
-    async viewMerchantHistory(merchant) {
+    async viewMerchantHistory(item) {
       try {
+        const auditId = item.audit_id || item.id
+        logger.debug('[商户积分] 查看历史, audit_id:', auditId)
         const response = await this.apiGet(
-          buildURL(STORE_ENDPOINTS.MERCHANT_POINT_HISTORY, {
-            id: merchant.merchant_id || merchant.id
-          }),
+          buildURL(STORE_ENDPOINTS.MERCHANT_POINT_HISTORY, { id: auditId }),
           {},
           { showLoading: true }
         )
         if (response?.success) {
-          this.selectedMerchant = merchant
-          this.merchantPointsHistory = response.data?.history || response.data?.list || []
-          this.showModal('merchantHistoryModal')
+          this.selectedMerchant = item
+          this.merchantPointsHistory = response.data?.rows || response.data?.history || []
+          // 修复：模态框名称与HTML保持一致（merchantPointHistoryModal）
+          this.showModal('merchantPointHistoryModal')
         }
       } catch (error) {
         logger.error('加载商户积分历史失败:', error)
         this.showError('加载商户积分历史失败')
+      }
+    },
+
+    /**
+     * 审核通过商户积分申请
+     * 后端API: POST /api/v4/console/merchant-points/:audit_id/approve
+     * @param {Object} item - 商户积分申请对象
+     */
+    async approveMerchantPoints(item) {
+      if (!confirm('确认通过该商户积分申请？')) return
+      try {
+        const auditId = item.audit_id || item.id
+        const response = await this.apiPost(
+          buildURL(STORE_ENDPOINTS.MERCHANT_POINT_APPROVE, { id: auditId }),
+          {},
+          { showLoading: true }
+        )
+        if (response?.success) {
+          this.showSuccess('审核通过成功')
+          // 刷新列表和统计
+          await Promise.all([this.loadMerchantPoints(), this.loadMerchantStats()])
+        }
+      } catch (error) {
+        logger.error('审核通过失败:', error)
+        this.showError('审核通过失败')
+      }
+    },
+
+    /**
+     * 审核拒绝商户积分申请
+     * 后端API: POST /api/v4/console/merchant-points/:audit_id/reject
+     * @param {Object} item - 商户积分申请对象
+     */
+    async rejectMerchantPoints(item) {
+      const reason = prompt('请输入拒绝原因：')
+      if (!reason || reason.trim() === '') {
+        this.showError('拒绝原因不能为空')
+        return
+      }
+      try {
+        const auditId = item.audit_id || item.id
+        const response = await this.apiPost(
+          buildURL(STORE_ENDPOINTS.MERCHANT_POINT_REJECT, { id: auditId }),
+          { reason: reason.trim() },
+          { showLoading: true }
+        )
+        if (response?.success) {
+          this.showSuccess('审核拒绝成功')
+          // 刷新列表和统计
+          await Promise.all([this.loadMerchantPoints(), this.loadMerchantStats()])
+        }
+      } catch (error) {
+        logger.error('审核拒绝失败:', error)
+        this.showError('审核拒绝失败')
       }
     }
   }

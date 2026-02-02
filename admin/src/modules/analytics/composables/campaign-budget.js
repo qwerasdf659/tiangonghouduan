@@ -29,14 +29,14 @@ export function useCampaignBudgetState() {
     /** @type {Array} 活动预算列表（来自 batch-status） */
     budgets: [],
     /** @type {Object} 预算筛选条件 */
-    budgetFilters: { campaign_id: '', status: '', keyword: '' },
+    budgetFilters: { lottery_campaign_id: '', status: '', keyword: '' },
     /** @type {Object} 预算统计（从 batch-status 数据计算） */
     budgetStats: { totalBudget: 0, usedBudget: 0, remainingBudget: 0, utilizationRate: 0 },
     /** @type {Object|null} 选中的预算 */
     selectedBudget: null,
     /** @type {Object} 预算表单 */
     budgetForm: {
-      campaign_id: '',
+      lottery_campaign_id: '',
       budget_mode: 'UNLIMITED',
       pool_budget_remaining: 0,
       allowed_campaign_ids: [],
@@ -64,8 +64,8 @@ export function useCampaignBudgetMethods() {
       try {
         const params = new URLSearchParams()
         params.append('limit', this.financePagination?.page_size || 50)
-        if (this.budgetFilters.campaign_id) {
-          params.append('campaign_ids', this.budgetFilters.campaign_id)
+        if (this.budgetFilters.lottery_campaign_id) {
+          params.append('campaign_ids', this.budgetFilters.lottery_campaign_id)
         }
 
         const response = await this.apiGet(
@@ -211,7 +211,8 @@ export function useCampaignBudgetMethods() {
      */
     openEditBudgetModal(budget) {
       this.budgetForm = {
-        campaign_id: budget.campaign_id,
+        // 使用后端返回的 lottery_campaign_id 字段
+        lottery_campaign_id: budget.lottery_campaign_id,
         budget_mode: budget.budget_mode || 'UNLIMITED',
         pool_budget_remaining: budget.pool_budget_remaining || 0,
         allowed_campaign_ids: budget.allowed_campaign_ids || []
@@ -226,7 +227,7 @@ export function useCampaignBudgetMethods() {
      * @description 只支持更新现有活动预算，后端没有 CREATE 端点
      */
     async saveBudget() {
-      if (!this.budgetForm.campaign_id) {
+      if (!this.budgetForm.lottery_campaign_id) {
         this.showError('请选择活动')
         return
       }
@@ -234,10 +235,10 @@ export function useCampaignBudgetMethods() {
       try {
         this.saving = true
 
-        // 只支持更新模式
+        // 只支持更新模式（使用后端的 lottery_campaign_id 参数）
         const response = await this.apiCall(
           buildURL(LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_UPDATE, {
-            campaign_id: this.budgetForm.campaign_id
+            lottery_campaign_id: this.budgetForm.lottery_campaign_id
           }),
           {
             method: 'PUT',
@@ -277,7 +278,7 @@ export function useCampaignBudgetMethods() {
         async () => {
           const response = await this.apiCall(
             buildURL(LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_POOL_ADD, {
-              campaign_id: budget.campaign_id
+              lottery_campaign_id: budget.lottery_campaign_id
             }),
             {
               method: 'POST',
@@ -299,7 +300,7 @@ export function useCampaignBudgetMethods() {
     async viewBudgetDetail(budget) {
       try {
         const response = await this.apiGet(
-          buildURL(LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_DETAIL, { campaign_id: budget.campaign_id }),
+          buildURL(LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_DETAIL, { lottery_campaign_id: budget.lottery_campaign_id }),
           {},
           { showLoading: true }
         )

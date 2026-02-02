@@ -179,12 +179,28 @@ function dashboardPanelPage() {
 
     /**
      * 获取预算状态
+     * @description 转换后端数据格式为前端展示格式
      */
     async fetchBudgetStatus() {
       try {
         const result = await DashboardAPI.getBudgetStatus()
         if (result.success) {
-          return result.data?.items || result.data || []
+          // 后端返回格式: { campaigns: [{ lottery_campaign_id, campaign_name, pool_budget: { total, remaining, used, usage_rate } }] }
+          const campaigns = result.data?.campaigns || result.data?.items || []
+          // 转换为前端展示格式
+          return campaigns.map(item => ({
+            lottery_campaign_id: item.lottery_campaign_id,
+            campaign_name: item.campaign_name || item.name || '-',
+            // 扁平化 pool_budget 字段
+            total: item.pool_budget?.total ?? item.total ?? 0,
+            used: item.pool_budget?.used ?? item.used ?? 0,
+            remaining: item.pool_budget?.remaining ?? item.remaining ?? 0,
+            // 解析 usage_rate 为数字（后端返回 "0.00%" 格式）
+            usage: parseFloat(item.pool_budget?.usage_rate) || 
+                   (item.pool_budget?.total > 0 
+                     ? (item.pool_budget.used / item.pool_budget.total * 100) 
+                     : 0)
+          }))
         }
         return []
       } catch (e) {

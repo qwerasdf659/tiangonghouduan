@@ -178,7 +178,8 @@ class LotteryDrawDecision extends Model {
     return this.findAll({
       attributes: [
         'pipeline_type',
-        [fn('COUNT', col('decision_id')), 'count'],
+        // P4迁移：decision_id → lottery_draw_decision_id
+        [fn('COUNT', col('lottery_draw_decision_id')), 'count'],
         [fn('SUM', col('budget_deducted')), 'total_budget_deducted'],
         [fn('AVG', col('processing_time_ms')), 'avg_processing_time_ms']
       ],
@@ -379,12 +380,13 @@ module.exports = sequelize => {
       },
 
       /**
-       * 关联的预设ID
+       * 关联的预设ID（P1迁移重命名：preset_id → lottery_preset_id）
+       * @外键关联 lottery_presets.lottery_preset_id
        */
-      preset_id: {
+      lottery_preset_id: {
         type: DataTypes.STRING(50),
         allowNull: true,
-        comment: '使用的预设ID（如果是预设发放）'
+        comment: '使用的预设ID（如果是预设发放，外键关联 lottery_presets.lottery_preset_id）'
       },
 
       /**

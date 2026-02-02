@@ -311,14 +311,18 @@ class MerchantPointsService {
     // 使用数字类型作为 Map 的键
     const userMap = new Map(users.map(u => [u.user_id, u]))
 
-    // 组装返回数据
+    /*
+     * 组装返回数据
+     * 注意：数据库主键是 content_review_record_id，业务上使用 audit_id 作为别名
+     */
     const enrichedRows = rows.map(record => {
       const plainRecord = record.toJSON()
       const auditData = plainRecord.audit_data || {}
       // 确保使用数字类型从 userMap 获取用户信息
       const userId = parseInt(plainRecord.auditable_id, 10)
       return {
-        audit_id: plainRecord.audit_id,
+        // 使用数据库实际主键字段名 content_review_record_id
+        audit_id: plainRecord.content_review_record_id,
         user_id: plainRecord.auditable_id,
         applicant: userMap.get(userId) || null,
         points_amount: auditData.points_amount,
@@ -352,9 +356,10 @@ class MerchantPointsService {
    * @returns {Promise<Object|null>} 申请详情，不存在时返回null
    */
   static async getApplicationById(auditId) {
+    // 注意：auditId 对应数据库的 content_review_record_id 主键
     const record = await ContentReviewRecord.findOne({
       where: {
-        audit_id: auditId,
+        content_review_record_id: auditId,
         auditable_type: 'merchant_points'
       },
       include: [
@@ -380,7 +385,8 @@ class MerchantPointsService {
     const auditData = plainRecord.audit_data || {}
 
     return {
-      audit_id: plainRecord.audit_id,
+      // 使用数据库实际主键字段名 content_review_record_id
+      audit_id: plainRecord.content_review_record_id,
       user_id: plainRecord.auditable_id,
       applicant: applicant ? applicant.toJSON() : null,
       points_amount: auditData.points_amount,

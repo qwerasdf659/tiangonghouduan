@@ -544,7 +544,11 @@ class CampaignAnalysisService {
    */
   async _analyzeBxPxMatrix(whereClause) {
     const decisions = await this.models.LotteryDrawDecision.findAll({
-      attributes: ['budget_tier', 'pressure_tier', [fn('COUNT', col('decision_id')), 'count']],
+      attributes: [
+        'budget_tier',
+        'pressure_tier',
+        [fn('COUNT', col('lottery_draw_decision_id')), 'count']
+      ],
       where: whereClause,
       group: ['budget_tier', 'pressure_tier'],
       raw: true
@@ -593,7 +597,7 @@ class CampaignAnalysisService {
           ),
           'trigger_count'
         ],
-        [fn('COUNT', col('decision_id')), 'total']
+        [fn('COUNT', col('lottery_draw_decision_id')), 'total']
       ],
       where: whereClause,
       raw: true
@@ -641,7 +645,7 @@ class CampaignAnalysisService {
     const downgradeStats = await this.models.LotteryDrawDecision.findOne({
       attributes: [
         [fn('SUM', col('downgrade_count')), 'total_downgrades'],
-        [fn('COUNT', col('decision_id')), 'total'],
+        [fn('COUNT', col('lottery_draw_decision_id')), 'total'],
         [
           fn('SUM', literal('CASE WHEN fallback_triggered = true THEN 1 ELSE 0 END')),
           'fallback_count'

@@ -622,7 +622,7 @@ class UserAnalysisService {
       // 5. 构建决策快照
       const decisionSnapshot = decision
         ? {
-            decision_id: decision.decision_id,
+            lottery_draw_decision_id: decision.lottery_draw_decision_id,
             random_number: decision.random_seed ? decision.random_seed / 1000000 : null,
             selected_tier: decision.selected_tier || decision.final_tier,
             original_tier: decision.original_tier,

@@ -70,9 +70,9 @@ export const ANALYTICS_ENDPOINTS = {
   FINANCE_SETTLEMENTS: `${API_PREFIX}/console/finance/settlements`,
   FINANCE_REPORTS: `${API_PREFIX}/console/finance/reports`,
 
-  // 活动预算
+  // 活动预算（后端使用 lottery_campaign_id 作为路由参数）
   CAMPAIGN_BUDGET_BATCH_STATUS: `${API_PREFIX}/console/campaign-budget/batch-status`,
-  CAMPAIGN_BUDGET_DETAIL: `${API_PREFIX}/console/campaign-budget/campaigns/:campaign_id`,
+  CAMPAIGN_BUDGET_DETAIL: `${API_PREFIX}/console/campaign-budget/campaigns/:lottery_campaign_id`,
 
   // 策略统计（与后端实际路由对齐，需要 campaign_id 参数）
   STRATEGY_STATS_REALTIME: `${API_PREFIX}/console/lottery-strategy-stats/realtime/:campaign_id`,
@@ -410,12 +410,12 @@ export const AnalyticsAPI = {
    *
    * @example
    * // 获取指定活动的预算详情
-   * const result = await AnalyticsAPI.getCampaignBudgetDetail('camp_12345')
+   * const result = await AnalyticsAPI.getCampaignBudgetDetail(1)
    * logger.debug(result.data.budget) // 预算金额
    * logger.debug(result.data.spent) // 已使用金额
    */
-  async getCampaignBudgetDetail(campaignId) {
-    const url = buildURL(ANALYTICS_ENDPOINTS.CAMPAIGN_BUDGET_DETAIL, { campaign_id: campaignId })
+  async getCampaignBudgetDetail(lotteryCampaignId) {
+    const url = buildURL(ANALYTICS_ENDPOINTS.CAMPAIGN_BUDGET_DETAIL, { lottery_campaign_id: lotteryCampaignId })
     return await request({ url, method: 'GET' })
   }
 }

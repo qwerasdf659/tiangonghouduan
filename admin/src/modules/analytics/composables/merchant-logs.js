@@ -25,8 +25,8 @@ export function useMerchantLogsState() {
       merchant_id: '',
       action_type: '',
       operator_id: '',
-      start_date: '',
-      end_date: ''
+      start_time: '',
+      end_time: ''
     },
     /** @type {Object} 日志统计 */
     logStats: { totalLogs: 0, todayLogs: 0, warningLogs: 0, errorLogs: 0 },
@@ -65,8 +65,20 @@ export function useMerchantLogsMethods() {
         if (this.logFilters.merchant_id) params.append('merchant_id', this.logFilters.merchant_id)
         if (this.logFilters.action_type) params.append('action_type', this.logFilters.action_type)
         if (this.logFilters.operator_id) params.append('operator_id', this.logFilters.operator_id)
-        if (this.logFilters.start_date) params.append('start_date', this.logFilters.start_date)
-        if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
+        // 后端期望完整时间格式 (YYYY-MM-DD HH:mm:ss)
+        // 日期自动补全为当天开始/结束时间
+        if (this.logFilters.start_time) {
+          const startTime = this.logFilters.start_time.includes(' ')
+            ? this.logFilters.start_time
+            : `${this.logFilters.start_time} 00:00:00`
+          params.append('start_time', startTime)
+        }
+        if (this.logFilters.end_time) {
+          const endTime = this.logFilters.end_time.includes(' ')
+            ? this.logFilters.end_time
+            : `${this.logFilters.end_time} 23:59:59`
+          params.append('end_time', endTime)
+        }
 
         const response = await this.apiGet(
           `${STORE_ENDPOINTS.MERCHANT_LOG_LIST}?${params}`,
@@ -128,8 +140,8 @@ export function useMerchantLogsMethods() {
         merchant_id: '',
         action_type: '',
         operator_id: '',
-        start_date: '',
-        end_date: ''
+        start_time: '',
+        end_time: ''
       }
       this.financePagination.page = 1
       this.loadMerchantLogs()
@@ -152,8 +164,19 @@ export function useMerchantLogsMethods() {
         const params = new URLSearchParams()
         if (this.logFilters.merchant_id) params.append('merchant_id', this.logFilters.merchant_id)
         if (this.logFilters.action_type) params.append('action_type', this.logFilters.action_type)
-        if (this.logFilters.start_date) params.append('start_date', this.logFilters.start_date)
-        if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
+        // 后端期望完整时间格式 (YYYY-MM-DD HH:mm:ss)
+        if (this.logFilters.start_time) {
+          const startTime = this.logFilters.start_time.includes(' ')
+            ? this.logFilters.start_time
+            : `${this.logFilters.start_time} 00:00:00`
+          params.append('start_time', startTime)
+        }
+        if (this.logFilters.end_time) {
+          const endTime = this.logFilters.end_time.includes(' ')
+            ? this.logFilters.end_time
+            : `${this.logFilters.end_time} 23:59:59`
+          params.append('end_time', endTime)
+        }
 
         const response = await this.apiGet(
           `${STORE_ENDPOINTS.MERCHANT_LOG_EXPORT}?${params}`,

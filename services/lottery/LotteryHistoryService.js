@@ -265,13 +265,13 @@ class LotteryHistoryService {
 
   /**
    * 获取批量抽奖历史
-   * @param {string} batch_id - 批量ID
+   * @param {string} lottery_batch_id - 抽奖批次ID
    * @returns {Object} 批量抽奖历史
    */
-  async get_batch_lottery_history(batch_id) {
+  async get_batch_lottery_history(lottery_batch_id) {
     try {
       const records = await models.LotteryDraw.findAll({
-        where: { batch_id },
+        where: { lottery_batch_id },
         include: [
           {
             model: models.LotteryPrize,
@@ -295,7 +295,7 @@ class LotteryHistoryService {
       ])
 
       return {
-        batch_id,
+        lottery_batch_id,
         total_count: records.length,
         // V4.0语义更新：统计高档奖励次数（替代原success_count）
         high_tier_count: records.filter(r => r.reward_tier === 'high').length,
@@ -303,7 +303,7 @@ class LotteryHistoryService {
         timestamp: BeijingTimeHelper.apiTimestamp()
       }
     } catch (error) {
-      this.logger.error('获取批量抽奖历史失败', { batch_id, error: error.message })
+      this.logger.error('获取批量抽奖历史失败', { lottery_batch_id, error: error.message })
       throw error
     }
   }
@@ -442,7 +442,7 @@ class LotteryHistoryService {
       prize_type: record.prize_type,
       prize_value: record.prize_value,
       draw_time: record.created_at,
-      batch_id: record.batch_id || null,
+      lottery_batch_id: record.lottery_batch_id || null,
       strategy_type: record.strategy_type || null
     }
 

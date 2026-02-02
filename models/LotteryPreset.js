@@ -20,7 +20,7 @@
  *
  * 数据库表信息：
  * - 表名: lottery_presets
- * - 主键: preset_id (字符串，格式：preset_时间戳_随机码)
+ * - 主键: lottery_preset_id (字符串，格式：preset_时间戳_随机码)
  * - 索引:
  *   - idx_user_status (user_id + status) - 快速查询用户预设
  *   - idx_queue_order (queue_order) - 排序优化
@@ -48,7 +48,7 @@ module.exports = (sequelize, DataTypes) => {
     'LotteryPreset',
     {
       /**
-       * preset_id - 预设记录唯一标识（主键）
+       * lottery_preset_id - 预设记录唯一标识（主键）
        *
        * 业务含义：预设记录的唯一ID，用于标识每一条预设记录
        *

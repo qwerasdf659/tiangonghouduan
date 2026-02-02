@@ -216,7 +216,12 @@ class RealtimeService {
           model: LotteryDrawDecision,
           as: 'decision',
           required: false,
-          attributes: ['decision_id', 'budget_deducted', 'budget_tier', 'pressure_tier']
+          attributes: [
+            'lottery_draw_decision_id',
+            'budget_deducted',
+            'budget_tier',
+            'pressure_tier'
+          ]
         }
       ],
       raw: false

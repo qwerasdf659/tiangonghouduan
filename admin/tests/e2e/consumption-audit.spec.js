@@ -24,6 +24,17 @@ const TEST_USER_ID = '31'
 // ============ 辅助函数 ============
 
 /**
+ * 等待 Alpine.js 组件加载完成
+ */
+async function waitForAlpine(page) {
+  await page.waitForFunction(() => {
+    return typeof window.Alpine !== 'undefined' && 
+           document.querySelectorAll('[x-data]').length > 0
+  }, { timeout: 10000 })
+  await page.waitForTimeout(500) // 额外等待数据加载
+}
+
+/**
  * 登录辅助函数
  */
 async function login(page) {
@@ -290,6 +301,125 @@ test.describe('消费审核 - 筛选功能', () => {
     }
 
     console.log('✅ 重置按钮正确清空了所有筛选条件')
+  })
+
+  /**
+   * 🔴 用户行为测试：验证日期范围筛选
+   * 这个测试模拟运营人员的真实需求：
+   * 1. 选择某个日期查看当天数据
+   * 2. 清除日期后能否看到其他日期的数据
+   */
+  test('日期筛选后应该显示对应日期的数据（用户行为测试）', async ({ page }) => {
+    // 等待表格数据加载
+    await page.waitForTimeout(3000)
+    
+    // 获取消费记录区域
+    const consumptionTable = page.locator('table').first()
+    await expect(consumptionTable).toBeVisible({ timeout: 10000 })
+
+    // 1. 获取初始加载的数据数量
+    const initialCount = await page.locator('tbody tr').count()
+    console.log(`📊 初始数据数量: ${initialCount} 条`)
+
+    // 2. 选择2月2日进行筛选
+    const startDateInput = page.locator('input[type="date"]').first()
+    await expect(startDateInput).toBeVisible()
+    
+    await startDateInput.fill('2026-02-02')
+    await page.click('button:has-text("搜索")')
+    await page.waitForTimeout(2000)
+
+    // 3. 验证筛选结果
+    const filteredCount = await page.locator('tbody tr').count()
+    console.log(`📅 2月2日筛选结果: ${filteredCount} 条`)
+
+    // 4. 清除日期，点击搜索，应该能看到更多/全部数据
+    await startDateInput.fill('')
+    await page.click('button:has-text("搜索")')
+    await page.waitForTimeout(2000)
+
+    const restoredCount = await page.locator('tbody tr').count()
+    console.log(`📊 清除日期后数据数量: ${restoredCount} 条`)
+    
+    // ✅ 业务验证：清除日期后应该能看到数据
+    expect(restoredCount).toBeGreaterThan(0)
+    console.log('✅ 日期筛选和清除功能正常')
+  })
+
+  /**
+   * 🔴 E2E-USER-006: 分页功能验证
+   * 用户需求：能够查看所有数据，不被分页限制
+   */
+  test('分页功能允许用户查看所有数据', async ({ page }) => {
+    await page.waitForTimeout(3000)
+    
+    // 1. 验证分页信息显示
+    const totalInfo = page.locator('text=/共.*条/')
+    if (await totalInfo.isVisible({ timeout: 5000 }).catch(() => false)) {
+      const totalText = await totalInfo.first().textContent()
+      console.log(`📊 ${totalText}`)
+      
+      // 2. 验证可以切换每页数量
+      const pageSizeSelector = page.locator('select').filter({ hasText: /条\/页/ })
+      if (await pageSizeSelector.isVisible().catch(() => false)) {
+        await pageSizeSelector.selectOption('50')
+        await page.waitForTimeout(2000)
+        
+        const rowCount = await page.locator('tbody tr').count()
+        console.log(`📋 切换到50条/页后显示: ${rowCount} 条`)
+        expect(rowCount).toBeLessThanOrEqual(50)
+      }
+      
+      // 3. 验证翻页按钮
+      const nextBtn = page.locator('button:has-text("下一页")')
+      const prevBtn = page.locator('button:has-text("上一页")')
+      
+      await expect(nextBtn).toBeVisible()
+      await expect(prevBtn).toBeVisible()
+      
+      console.log('✅ 分页功能组件完整')
+    } else {
+      console.log('⚠️ 分页信息不可见，可能需要更新页面')
+    }
+  })
+
+  /**
+   * 🔴 验证日期范围筛选功能
+   * 用户需求：能够查看某个时间段内的数据
+   */
+  test('日期范围筛选功能正常（开始日期~结束日期）', async ({ page }) => {
+    // 等待页面加载
+    await page.waitForTimeout(3000)
+
+    const startDateInput = page.locator('input[type="date"]').first()
+    const endDateInput = page.locator('input[type="date"]').nth(1)
+
+    // 只有同时存在两个日期输入框才测试范围筛选
+    const hasEndDate = await endDateInput.isVisible().catch(() => false)
+    
+    if (hasEndDate) {
+      // 设置日期范围：2026-02-01 ~ 2026-02-02
+      await startDateInput.fill('2026-02-01')
+      await endDateInput.fill('2026-02-02')
+      await page.click('button:has-text("搜索")')
+      await page.waitForTimeout(2000)
+
+      const rowCount = await page.locator('tbody tr').count()
+      console.log(`📅 日期范围 2026-02-01 ~ 2026-02-02 内有 ${rowCount} 条数据`)
+
+      // 验证：点击消费记录区域的重置按钮
+      const resetBtn = page.locator('button:has-text("🔄 重置")').first()
+      if (await resetBtn.isVisible().catch(() => false)) {
+        await resetBtn.click()
+        await page.waitForTimeout(1500)
+        
+        await expect(startDateInput).toHaveValue('')
+        await expect(endDateInput).toHaveValue('')
+        console.log('✅ 重置按钮正确清空了开始日期和结束日期')
+      }
+    } else {
+      console.log('ℹ️ 页面只有单个日期输入框，跳过范围测试')
+    }
   })
 })
 

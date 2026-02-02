@@ -142,22 +142,6 @@ export function useConsumptionMethods() {
       this.loadConsumptions()
     },
 
-    /**
-     * 重置消费筛选
-     */
-    resetConsumptionFilters() {
-      this.consumptionFilters = {
-        user_id: '',
-        status: '',
-        payment_method: '',
-        start_date: '',
-        end_date: '',
-        anomaly_type: '' // F-41: 异常类型筛选
-      }
-      this.financePagination.page = 1
-      this.loadConsumptions()
-    },
-
     // ========== F-43: 异常统计面板方法 ==========
 
     /**

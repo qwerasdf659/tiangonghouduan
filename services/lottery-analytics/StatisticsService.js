@@ -329,7 +329,10 @@ class StatisticsService {
 
     // 通过 lottery_draw_id 关联 LotteryDraw 表来过滤 lottery_campaign_id
     const distribution = await LotteryDrawDecision.findAll({
-      attributes: ['budget_tier', [fn('COUNT', col('LotteryDrawDecision.decision_id')), 'count']],
+      attributes: [
+        'budget_tier',
+        [fn('COUNT', col('LotteryDrawDecision.lottery_draw_decision_id')), 'count']
+      ],
       include: [
         {
           model: LotteryDraw,

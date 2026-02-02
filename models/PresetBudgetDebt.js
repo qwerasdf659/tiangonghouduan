@@ -374,7 +374,7 @@ module.exports = sequelize => {
       lottery_preset_id: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        comment: '关联的预设ID（外键关联lottery_presets.preset_id）'
+        comment: '关联的预设ID（外键关联lottery_presets.lottery_preset_id）'
       },
 
       /**

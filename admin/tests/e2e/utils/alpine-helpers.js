@@ -174,7 +174,7 @@ async function listAlpineComponents(page) {
   })
 }
 
-module.exports = {
+export {
   findAlpineComponentWithMethod,
   callAlpineMethod,
   getAlpineData,

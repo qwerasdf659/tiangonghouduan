@@ -182,9 +182,9 @@ class LoadCampaignStage extends BaseStage {
    * 获取兜底奖品
    *
    * 规则（已拍板 0.10.2）：
-   * 1. 如果活动配置了 tier_fallback_prize_id，使用该奖品
+   * 1. 如果活动配置了 tier_fallback_lottery_prize_id，使用该奖品
    * 2. 否则自动选取 prize_value_points=0 且 is_fallback=true 的奖品
-   * 3. 按 sort_order ASC, prize_id ASC 排序取第一个
+   * 3. 按 sort_order ASC, lottery_prize_id ASC 排序取第一个
    *
    * @param {Array} prizes - 奖品列表
    * @param {Object} campaign - 活动配置
@@ -192,10 +192,10 @@ class LoadCampaignStage extends BaseStage {
    * @private
    */
   _getFallbackPrize(prizes, campaign) {
-    // 1. 检查活动是否配置了指定的兜底奖品
-    if (campaign.tier_fallback_prize_id) {
+    // 1. 检查活动是否配置了指定的兜底奖品（P3迁移：tier_fallback_prize_id → tier_fallback_lottery_prize_id）
+    if (campaign.tier_fallback_lottery_prize_id) {
       const specified_fallback = prizes.find(
-        p => p.lottery_prize_id === campaign.tier_fallback_prize_id
+        p => p.lottery_prize_id === campaign.tier_fallback_lottery_prize_id
       )
       if (specified_fallback) {
         return specified_fallback

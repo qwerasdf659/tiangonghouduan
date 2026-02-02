@@ -69,7 +69,7 @@ class UserBehaviorTrackService {
           behavior_target_id,
           behavior_data,
           behavior_result,
-          session_id,
+          behavior_session_id: session_id,
           device_info,
           ip_address,
           behavior_time: BeijingTimeHelper.createDatabaseTime()
@@ -159,7 +159,7 @@ class UserBehaviorTrackService {
     }
 
     if (session_id) {
-      where.session_id = session_id
+      where.behavior_session_id = session_id
     }
 
     if (start_time || end_time) {
@@ -387,7 +387,7 @@ class UserBehaviorTrackService {
    */
   static async getSessionTracks(sessionId) {
     const tracks = await models.UserBehaviorTrack.findAll({
-      where: { session_id: sessionId },
+      where: { behavior_session_id: sessionId },
       order: [['behavior_time', 'ASC']],
       include: [
         {

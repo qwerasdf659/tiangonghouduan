@@ -339,7 +339,7 @@
     <div class="themed-card rounded-xl p-6">
       <h3 class="text-lg font-semibold themed-text mb-4">💰 活动预算状态</h3>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <template x-for="budget in budgetList" :key="budget.campaign_id">
+        <template x-for="budget in budgetList" :key="budget.lottery_campaign_id">
           <div class="p-4 rounded-lg border" :class="budget.usage >= 90 ? 'border-red-200 bg-red-50' : budget.usage >= 80 ? 'border-yellow-200 bg-yellow-50' : 'themed-border'">
             <div class="flex items-center justify-between mb-2">
               <span class="font-medium themed-text" x-text="budget.campaign_name"></span>

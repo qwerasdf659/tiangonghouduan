@@ -89,9 +89,9 @@ class LotteryCampaign extends Model {
      * 获取活动的欠账上限配置请使用: PresetDebtLimit.getOrCreateForCampaign(lottery_campaign_id)
      */
 
-    // 多对一：档位降级保底奖品
+    // 多对一：档位降级保底奖品（P3迁移更新外键名）
     LotteryCampaign.belongsTo(models.LotteryPrize, {
-      foreignKey: 'tier_fallback_prize_id',
+      foreignKey: 'tier_fallback_lottery_prize_id',
       as: 'tierFallbackPrize',
       onDelete: 'SET NULL',
       comment: '档位降级保底奖品（必须是prize_value_points=0的空奖）'
@@ -753,17 +753,17 @@ module.exports = sequelize => {
       },
 
       /**
-       * 档位保底奖品ID
+       * 档位保底奖品ID（P3迁移重命名：tier_fallback_prize_id → tier_fallback_lottery_prize_id）
        * @type {number}
        * @业务含义 当所有档位都无可用奖品时，发放此保底奖品
-       * @关联 lottery_prizes.lottery_prize_id
+       * @外键关联 lottery_prizes.lottery_prize_id
        * @注意 此奖品应配置为prize_value_points=0的空奖
        */
-      tier_fallback_prize_id: {
+      tier_fallback_lottery_prize_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
         defaultValue: null,
-        comment: '档位保底奖品ID（所有档位无货时发放，外键关联lottery_prizes.lottery_prize_id）'
+        comment: '档位保底奖品ID（所有档位无货时发放，外键关联 lottery_prizes.lottery_prize_id）'
       },
 
       /**
@@ -797,16 +797,17 @@ module.exports = sequelize => {
       // ======================== 预设欠账控制字段（统一架构V1.6） ========================
 
       /**
-       * 兜底奖品ID
+       * 兜底奖品ID（P3迁移重命名：fallback_prize_id → fallback_lottery_prize_id）
        * @type {number}
        * @业务含义 pick_method=fallback时使用，允许null表示自动选择prize_value_points=0的奖品
+       * @外键关联 lottery_prizes.lottery_prize_id
        */
-      fallback_prize_id: {
+      fallback_lottery_prize_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
         defaultValue: null,
         comment:
-          '兜底奖品ID（pick_method=fallback时使用，null表示自动选择prize_value_points=0的奖品）'
+          '兜底奖品ID（pick_method=fallback时使用，外键关联 lottery_prizes.lottery_prize_id）'
       },
 
       /**

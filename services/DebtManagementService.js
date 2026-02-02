@@ -433,7 +433,7 @@ class DebtManagementService {
     const creatorIds = Object.keys(creatorStats).map(id => parseInt(id, 10))
     const users = await User.findAll({
       where: { user_id: { [Op.in]: creatorIds } },
-      attributes: ['user_id', 'nickname', 'phone']
+      attributes: ['user_id', 'nickname', 'mobile'] // 修复：使用正确的字段名 mobile
     })
 
     const userMap = {}
@@ -447,7 +447,7 @@ class DebtManagementService {
       return {
         creator_id: stat.creator_id,
         creator_name: user ? user.nickname : `用户#${stat.creator_id}`,
-        creator_phone: user ? user.phone : null,
+        creator_mobile: user ? user.mobile : null, // 修复：使用正确的字段名 mobile
         preset_count: stat.preset_count,
         inventory_debt_quantity: stat.inventory_debt_quantity,
         budget_debt_amount: stat.budget_debt_amount
@@ -596,7 +596,7 @@ class DebtManagementService {
       model = PresetBudgetDebt
       includeOptions = [
         { model: LotteryCampaign, as: 'campaign', attributes: ['campaign_name'] },
-        { model: User, as: 'user', attributes: ['nickname', 'phone'] }
+        { model: User, as: 'user', attributes: ['nickname', 'mobile'] } // 修复：使用正确的字段名 mobile
       ]
     }
 

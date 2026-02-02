@@ -3,7 +3,7 @@
 > **生成时间**：2026-02-02  
 > **审计范围**：整个后端项目的数据库字段、模型定义、服务代码  
 > **审计方式**：连接真实数据库进行全面排查（非备份文件）  
-> **最后更新**：2026-02-02（决策已确认，准备执行）
+> **最后更新**：2026-02-02 08:10 (✅ P1-P5 迁移全部完成)
 
 ---
 
@@ -68,24 +68,25 @@
 | `lottery_draws` | `prize_id` | `lottery_prize_id` | `20260201075523` | 外键 |
 | `lottery_draw_decisions` | `draw_id` | `lottery_draw_id` | `20260201075523` | 外键 |
 
-### 三、待执行（P1-P5 共 11 个字段）
+### 三、✅ 已完成执行（P1-P5 共 11 个字段）
 
-| 阶段 | 字段变更 | 涉及表 | 类型 | 风险 |
-|-----|---------|-------|------|------|
-| **P1** | `preset_id` → `lottery_preset_id` | `lottery_draws`, `lottery_draw_decisions` | 外键 | 🟡中 |
-| **P2** | `last_campaign_id` → `last_lottery_campaign_id` | `lottery_user_global_state` | 外键 | 🟢低 |
-| **P3** | `fallback_prize_id` → `fallback_lottery_prize_id` | `lottery_campaigns` | 外键 | 🟢低 |
-| **P3** | `tier_fallback_prize_id` → `tier_fallback_lottery_prize_id` | `lottery_campaigns` | 外键 | 🟢低 |
-| **P4** | `decision_id` → `lottery_draw_decision_id` | `lottery_draws` | 外键 | 🟡中 |
-| **P4** | `inventory_debt_id` → `preset_inventory_debt_id` | `lottery_draws` | 外键 | 🟡中 |
-| **P4** | `budget_debt_id` → `preset_budget_debt_id` | `lottery_draws` | 外键 | 🟡中 |
-| **P5** | `batch_id` → `lottery_batch_id` | `lottery_draws` | 业务标识 | 🟢低 |
-| **P5** | `batch_draw_id` → `lottery_batch_draw_id` | `lottery_draws` | 业务标识 | 🟢低 |
-| **P5** | `session_id` → `behavior_session_id` | `user_behavior_tracks` | 业务标识 | 🟢低 |
+| 阶段 | 字段变更 | 涉及表 | 类型 | 状态 | 迁移文件 |
+|-----|---------|-------|------|------|---------|
+| **P1** | `preset_id` → `lottery_preset_id` | `lottery_draws`, `lottery_draw_decisions` | 外键 | ✅ 完成 | `20260201235341` |
+| **P2** | `last_campaign_id` → `last_lottery_campaign_id` | `lottery_user_global_state` | 外键 | ✅ 完成 | `20260201235434` |
+| **P3** | `fallback_prize_id` → `fallback_lottery_prize_id` | `lottery_campaigns` | 外键 | ✅ 完成 | `20260201235436` |
+| **P3** | `tier_fallback_prize_id` → `tier_fallback_lottery_prize_id` | `lottery_campaigns` | 外键 | ✅ 完成 | `20260201235436` |
+| **P4** | `decision_id` → `lottery_draw_decision_id` | `lottery_draws` | 外键 | ✅ 完成 | `20260201235438` |
+| **P4** | `inventory_debt_id` → `preset_inventory_debt_id` | `lottery_draws` | 外键 | ✅ 完成 | `20260201235438` |
+| **P4** | `budget_debt_id` → `preset_budget_debt_id` | `lottery_draws` | 外键 | ✅ 完成 | `20260201235438` |
+| **P5** | `batch_id` → `lottery_batch_id` | `lottery_draws` | 业务标识 | ✅ 完成 | `20260201235441` |
+| **P5** | `batch_draw_id` → `lottery_batch_draw_id` | `lottery_draws` | 业务标识 | ✅ 完成 | `20260201235441` |
+| **P5** | `session_id` → `behavior_session_id` | `user_behavior_tracks` | 业务标识 | ✅ 完成 | `20260201235441` |
 
-> ⚠️ **说明**：
+> ✅ **执行完成**：
 > - P1-P4 阶段处理**外键字段**，确保与被引用表的主键名一致
 > - P5 阶段处理**业务标识字段**，添加领域前缀提高语义清晰度
+> - 所有迁移已于 2026-02-02 08:00 成功执行
 
 ### 四、确定修复（P5 - 业务标识字段）
 
@@ -781,22 +782,22 @@ checkModelConsistency();
 
 ### 完成条件
 
-- [ ] **P1**：`lottery_draws.preset_id` → `lottery_preset_id` 完成
-- [ ] **P1**：`lottery_draw_decisions.preset_id` → `lottery_preset_id` 完成
-- [ ] **P2**：`lottery_user_global_state.last_campaign_id` → `last_lottery_campaign_id` 完成
-- [ ] **P3**：`lottery_campaigns.fallback_prize_id` → `fallback_lottery_prize_id` 完成
-- [ ] **P3**：`lottery_campaigns.tier_fallback_prize_id` → `tier_fallback_lottery_prize_id` 完成
-- [ ] **P4**：`lottery_draws.decision_id` → `lottery_draw_decision_id` 完成
-- [ ] **P4**：`lottery_draws.inventory_debt_id` → `preset_inventory_debt_id` 完成
-- [ ] **P4**：`lottery_draws.budget_debt_id` → `preset_budget_debt_id` 完成
-- [ ] **P5**：`lottery_draws.batch_id` → `lottery_batch_id` 完成
-- [ ] **P5**：`lottery_draws.batch_draw_id` → `lottery_batch_draw_id` 完成
-- [ ] **P5**：`user_behavior_tracks.session_id` → `behavior_session_id` 完成
-- [ ] 数据库字段与模型定义一致
-- [ ] 服务代码使用正确的字段名
-- [ ] ESLint 检查通过
-- [ ] 功能测试通过
-- [ ] API 合约测试通过
+- [x] **P1**：`lottery_draws.preset_id` → `lottery_preset_id` 完成
+- [x] **P1**：`lottery_draw_decisions.preset_id` → `lottery_preset_id` 完成
+- [x] **P2**：`lottery_user_global_state.last_campaign_id` → `last_lottery_campaign_id` 完成
+- [x] **P3**：`lottery_campaigns.fallback_prize_id` → `fallback_lottery_prize_id` 完成
+- [x] **P3**：`lottery_campaigns.tier_fallback_prize_id` → `tier_fallback_lottery_prize_id` 完成
+- [x] **P4**：`lottery_draws.decision_id` → `lottery_draw_decision_id` 完成
+- [x] **P4**：`lottery_draws.inventory_debt_id` → `preset_inventory_debt_id` 完成
+- [x] **P4**：`lottery_draws.budget_debt_id` → `preset_budget_debt_id` 完成
+- [x] **P5**：`lottery_draws.batch_id` → `lottery_batch_id` 完成
+- [x] **P5**：`lottery_draws.batch_draw_id` → `lottery_batch_draw_id` 完成
+- [x] **P5**：`user_behavior_tracks.session_id` → `behavior_session_id` 完成
+- [x] 数据库字段与模型定义一致
+- [x] 服务代码使用正确的字段名
+- [x] ESLint 检查通过
+- [x] 功能测试通过
+- [x] API 合约测试通过
 
 ### 回归测试
 
@@ -832,16 +833,16 @@ checkModelConsistency();
 | ✅ P0 | `preset_id` → `lottery_preset_id` | `preset_budget_debt`, `preset_inventory_debt` | 已完成 |
 | ✅ P0 | `debt_id` → `preset_*_debt_id` | `preset_budget_debt`, `preset_inventory_debt` | 已完成 |
 | ✅ P0 | `decision_id` → `lottery_draw_decision_id` | `lottery_draw_decisions` (主键) | 已完成 |
-| 🔴 P1 | `preset_id` → `lottery_preset_id` | `lottery_draws`, `lottery_draw_decisions` | 待执行 |
-| 🔴 P2 | `last_campaign_id` → `last_lottery_campaign_id` | `lottery_user_global_state` | 待执行 |
-| 🔴 P3 | `fallback_prize_id` → `fallback_lottery_prize_id` | `lottery_campaigns` | 待执行 |
-| 🔴 P3 | `tier_fallback_prize_id` → `tier_fallback_lottery_prize_id` | `lottery_campaigns` | 待执行 |
-| 🔴 P4 | `decision_id` → `lottery_draw_decision_id` | `lottery_draws` (外键) | 待执行 |
-| 🔴 P4 | `inventory_debt_id` → `preset_inventory_debt_id` | `lottery_draws` (外键) | 待执行 |
-| 🔴 P4 | `budget_debt_id` → `preset_budget_debt_id` | `lottery_draws` (外键) | 待执行 |
-| 🔴 P5 | `batch_id` → `lottery_batch_id` | `lottery_draws` | 待执行 |
-| 🔴 P5 | `batch_draw_id` → `lottery_batch_draw_id` | `lottery_draws` | 待执行 |
-| 🔴 P5 | `session_id` → `behavior_session_id` | `user_behavior_tracks` | 待执行 |
+| ✅ P1 | `preset_id` → `lottery_preset_id` | `lottery_draws`, `lottery_draw_decisions` | 已完成 |
+| ✅ P2 | `last_campaign_id` → `last_lottery_campaign_id` | `lottery_user_global_state` | 已完成 |
+| ✅ P3 | `fallback_prize_id` → `fallback_lottery_prize_id` | `lottery_campaigns` | 已完成 |
+| ✅ P3 | `tier_fallback_prize_id` → `tier_fallback_lottery_prize_id` | `lottery_campaigns` | 已完成 |
+| ✅ P4 | `decision_id` → `lottery_draw_decision_id` | `lottery_draws` (外键) | 已完成 |
+| ✅ P4 | `inventory_debt_id` → `preset_inventory_debt_id` | `lottery_draws` (外键) | 已完成 |
+| ✅ P4 | `budget_debt_id` → `preset_budget_debt_id` | `lottery_draws` (外键) | 已完成 |
+| ✅ P5 | `batch_id` → `lottery_batch_id` | `lottery_draws` | 已完成 |
+| ✅ P5 | `batch_draw_id` → `lottery_batch_draw_id` | `lottery_draws` | 已完成 |
+| ✅ P5 | `session_id` → `behavior_session_id` | `user_behavior_tracks` | 已完成 |
 
 ### 执行顺序
 

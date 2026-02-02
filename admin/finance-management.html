@@ -113,7 +113,11 @@
               <option value="first_time_high">🆕 首次大额</option>
               <option value="pattern_break">📊 行为异常</option>
             </select>
-            <input type="date" x-model="consumptionFilters.start_date" @change="loadConsumptions()" class="px-3 py-2 border rounded">
+            <div class="flex items-center gap-1">
+              <input type="date" x-model="consumptionFilters.start_date" placeholder="开始日期" class="px-2 py-2 border rounded w-36" title="开始日期">
+              <span class="text-gray-400">~</span>
+              <input type="date" x-model="consumptionFilters.end_date" placeholder="结束日期" class="px-2 py-2 border rounded w-36" title="结束日期">
+            </div>
             <button @click="loadConsumptions()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
             <button @click="resetConsumptionFilters()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">🔄 重置</button>
           </div>
@@ -216,6 +220,33 @@
               </template>
             </tbody>
           </table>
+          <!-- 空数据提示 -->
+          <div x-show="consumptions.length === 0" class="text-center py-8 themed-text-muted">
+            <div class="text-4xl mb-2">📋</div>
+            <p>暂无消费记录</p>
+          </div>
+        </div>
+        <!-- 分页 -->
+        <div class="p-4 border-t themed-bg-base flex justify-between items-center" x-show="consumptions.length > 0">
+          <div class="flex items-center gap-4">
+            <span class="text-sm themed-text-muted">
+              共 <strong x-text="financePagination.total || 0"></strong> 条记录，
+              当前显示第 <strong x-text="((financePagination.page - 1) * financePagination.page_size) + 1"></strong> - 
+              <strong x-text="Math.min(financePagination.page * financePagination.page_size, financePagination.total || 0)"></strong> 条
+            </span>
+            <select x-model="financePagination.page_size" @change="loadConsumptions()" class="px-2 py-1 border rounded text-sm">
+              <option value="20">20条/页</option>
+              <option value="50">50条/页</option>
+              <option value="100">100条/页</option>
+            </select>
+          </div>
+          <div class="flex items-center gap-2">
+            <button @click="financePagination.page = 1; loadConsumptions()" :disabled="financePagination.page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">首页</button>
+            <button @click="financePagination.page--; loadConsumptions()" :disabled="financePagination.page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
+            <span class="px-3 py-1 text-sm">第 <span x-text="financePagination.page"></span> / <span x-text="Math.ceil((financePagination.total || 0) / financePagination.page_size) || 1"></span> 页</span>
+            <button @click="financePagination.page++; loadConsumptions()" :disabled="financePagination.page >= Math.ceil((financePagination.total || 0) / financePagination.page_size)" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">下一页</button>
+            <button @click="financePagination.page = Math.ceil((financePagination.total || 0) / financePagination.page_size); loadConsumptions()" :disabled="financePagination.page >= Math.ceil((financePagination.total || 0) / financePagination.page_size)" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">末页</button>
+          </div>
         </div>
       </div>
     </div>
@@ -344,21 +375,25 @@
       </div>
     </div>
 
-    <!-- 商户积分 -->
+    <!-- 商户积分 - 适配后端 merchant-points API -->
     <div x-show="current_page === 'merchant-points'" x-cloak>
-      <!-- 统计卡片 -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <!-- 统计卡片 - 与后端 /api/v4/console/merchant-points/stats/pending 返回字段一致 -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div class="themed-card rounded-lg shadow p-4 text-center">
-          <h6 class="themed-text-muted text-sm mb-1">商户总数</h6>
-          <p class="text-2xl font-bold text-orange-600" x-text="merchantStats?.totalMerchants || 0"></p>
+          <h6 class="themed-text-muted text-sm mb-1">待审核</h6>
+          <p class="text-2xl font-bold text-yellow-600" x-text="merchantStats?.pending_count || 0"></p>
         </div>
         <div class="themed-card rounded-lg shadow p-4 text-center">
-          <h6 class="themed-text-muted text-sm mb-1">积分总量</h6>
-          <p class="text-2xl font-bold text-green-600" x-text="formatNumber(merchantStats?.totalPoints || 0)"></p>
+          <h6 class="themed-text-muted text-sm mb-1">已通过</h6>
+          <p class="text-2xl font-bold text-green-600" x-text="merchantStats?.approved_count || 0"></p>
         </div>
         <div class="themed-card rounded-lg shadow p-4 text-center">
-          <h6 class="themed-text-muted text-sm mb-1">活跃商户</h6>
-          <p class="text-2xl font-bold themed-text-primary" x-text="merchantStats?.activeMerchants || 0"></p>
+          <h6 class="themed-text-muted text-sm mb-1">已拒绝</h6>
+          <p class="text-2xl font-bold text-red-600" x-text="merchantStats?.rejected_count || 0"></p>
+        </div>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <h6 class="themed-text-muted text-sm mb-1">今日发放积分</h6>
+          <p class="text-2xl font-bold themed-text-primary" x-text="formatNumber(merchantStats?.today_points || 0)"></p>
         </div>
       </div>
 
@@ -366,13 +401,13 @@
         <div class="p-4 border-b">
           <h5 class="font-semibold">🪙 商户积分申请列表</h5>
         </div>
-        <!-- 筛选区域 -->
+        <!-- 筛选区域 - user_id 对应后端 API 参数 -->
         <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <input type="text" x-model="merchantFilters.merchant_id" placeholder="商户ID" class="px-3 py-2 border rounded">
-            <input type="text" x-model="merchantFilters.keyword" placeholder="关键词" class="px-3 py-2 border rounded">
+            <input type="text" x-model="merchantFilters.user_id" placeholder="用户ID" class="px-3 py-2 border rounded">
+            <input type="text" x-model="merchantFilters.keyword" placeholder="关键词搜索" class="px-3 py-2 border rounded">
             <button @click="searchMerchants()" class="px-4 py-2 themed-btn-primary rounded">🔍 搜索</button>
-            <button @click="merchantFilters = {}; loadMerchantPoints()" class="px-4 py-2 bg-gray-300 themed-text-secondary rounded hover:bg-gray-400">重置</button>
+            <button @click="merchantFilters = { user_id: '', keyword: '' }; loadMerchantPoints()" class="px-4 py-2 bg-gray-300 themed-text-secondary rounded hover:bg-gray-400">重置</button>
           </div>
         </div>
         <div class="overflow-x-auto">
@@ -380,19 +415,25 @@
             <thead class="themed-bg-base">
               <tr>
                 <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">申请ID</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">申请人</th>
                 <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">积分金额</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">申请描述</th>
                 <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
                 <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">申请时间</th>
                 <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
               </tr>
             </thead>
             <tbody class="divide-y">
-              <template x-for="item in merchantPoints" :key="item.audit_id || item.id">
+              <!-- 后端返回 audit_id 作为唯一标识（content_review_record_id）-->
+              <template x-for="item in merchantPoints" :key="item.audit_id">
                 <tr class="themed-hover-bg">
-                  <td class="px-4 py-3 text-sm font-mono" x-text="item.audit_id || item.id"></td>
-                  <td class="px-4 py-3 text-sm" x-text="item.user_name || item.user_id"></td>
+                  <td class="px-4 py-3 text-sm font-mono" x-text="item.audit_id"></td>
+                  <td class="px-4 py-3 text-sm">
+                    <div x-text="item.applicant?.nickname || '-'"></div>
+                    <div class="text-xs themed-text-muted" x-text="item.applicant?.mobile || ''"></div>
+                  </td>
                   <td class="px-4 py-3 text-sm font-mono text-orange-600" x-text="item.points_amount || 0"></td>
+                  <td class="px-4 py-3 text-sm themed-text-muted max-w-48 truncate" x-text="item.description || '-'" :title="item.description"></td>
                   <td class="px-4 py-3">
                     <span 
                       :class="{
@@ -404,7 +445,7 @@
                       x-text="item.status === 'pending' ? '待审核' : item.status === 'approved' ? '已通过' : '已拒绝'"
                     ></span>
                   </td>
-                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(item.created_at)"></td>
+                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="item.submitted_at || item.created_at"></td>
                   <td class="px-4 py-3">
                     <div class="flex space-x-2">
                       <button @click="viewMerchantDetail(item)" class="themed-text-primary hover:text-blue-700 text-sm">详情</button>
@@ -472,7 +513,13 @@
               <option value="inventory">库存欠账</option>
               <option value="budget">预算欠账</option>
             </select>
-            <input type="text" x-model="debtFilters.campaign_id" placeholder="活动ID" class="px-3 py-2 border rounded">
+            <!-- 活动下拉选择框（替代原输入框，运营人员更易使用） -->
+            <select x-model="debtFilters.campaign_id" class="px-3 py-2 border rounded">
+              <option value="">全部活动</option>
+              <template x-for="campaign in campaignOptions" :key="campaign.value">
+                <option :value="campaign.value" x-text="campaign.label"></option>
+              </template>
+            </select>
             <button @click="searchDebts()" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">🔍 搜索</button>
             <button @click="resetDebtFilters()" class="px-4 py-2 bg-gray-300 themed-text-secondary rounded hover:bg-gray-400">重置</button>
           </div>
@@ -563,7 +610,7 @@
         <!-- 筛选区域 -->
         <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <input type="text" x-model="budgetFilters.campaign_id" placeholder="活动ID" class="px-3 py-2 border rounded">
+            <input type="text" x-model="budgetFilters.lottery_campaign_id" placeholder="活动ID" class="px-3 py-2 border rounded">
             <input type="text" x-model="budgetFilters.keyword" placeholder="活动名称关键词" class="px-3 py-2 border rounded">
             <select x-model="budgetFilters.status" class="px-3 py-2 border rounded">
               <option value="">全部状态</option>
@@ -586,9 +633,9 @@
               </tr>
             </thead>
             <tbody class="divide-y">
-              <template x-for="budget in budgets" :key="budget.campaign_id">
+              <template x-for="budget in budgets" :key="budget.lottery_campaign_id">
                 <tr class="themed-hover-bg">
-                  <td class="px-4 py-3 text-sm font-mono" x-text="budget.campaign_id"></td>
+                  <td class="px-4 py-3 text-sm font-mono" x-text="budget.lottery_campaign_id"></td>
                   <td class="px-4 py-3 text-sm" x-text="budget.campaign_name || budget.name || '-'"></td>
                   <td class="px-4 py-3">
                     <span 
@@ -650,7 +697,11 @@
               <option value="points">积分</option>
               <option value="settlement">结算</option>
             </select>
-            <input type="date" x-model="logFilters.start_date" class="px-3 py-2 border rounded">
+            <div class="flex items-center gap-1">
+              <input type="date" x-model="logFilters.start_time" class="px-3 py-2 border rounded" title="开始日期">
+              <span class="text-gray-400">~</span>
+              <input type="date" x-model="logFilters.end_time" class="px-3 py-2 border rounded" title="结束日期">
+            </div>
             <button @click="searchLogs()" class="px-4 py-2 themed-btn-primary rounded">🔍 搜索</button>
           </div>
         </div>

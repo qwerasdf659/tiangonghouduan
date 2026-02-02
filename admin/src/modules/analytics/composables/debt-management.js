@@ -11,6 +11,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
+import { LOTTERY_CORE_ENDPOINTS } from '../../../api/lottery/core.js'
 import { buildURL } from '../../../api/base.js'
 
 /**
@@ -21,6 +22,8 @@ export function useDebtManagementState() {
   return {
     /** @type {Array} 债务记录列表 */
     debts: [],
+    /** @type {Array} 活动选项列表（供下拉框使用）*/
+    campaignOptions: [],
     /** @type {Object} 债务筛选条件 - 适配后端 debt-management API */
     debtFilters: {
       debt_type: '', // 欠账类型: inventory|budget
@@ -51,6 +54,34 @@ export function useDebtManagementState() {
  */
 export function useDebtManagementMethods() {
   return {
+    /**
+     * 加载活动选项列表（供下拉框使用）
+     * 调用后端 /api/v4/console/lottery-campaigns 获取活动列表
+     */
+    async loadCampaignOptions() {
+      try {
+        const response = await this.apiGet(
+          `${LOTTERY_CORE_ENDPOINTS.CAMPAIGN_LIST}?page=1&page_size=100`,
+          {},
+          { showLoading: false, showError: false }
+        )
+
+        if (response?.success) {
+          const campaigns = response.data?.campaigns || response.data?.list || response.data?.items || []
+          // 转换为下拉框选项格式
+          this.campaignOptions = campaigns.map((c) => ({
+            value: c.lottery_campaign_id || c.campaign_id || c.id,
+            label: c.campaign_name || c.name || `活动#${c.lottery_campaign_id || c.id}`,
+            status: c.status
+          }))
+          logger.debug('加载活动选项列表成功:', this.campaignOptions.length, '个活动')
+        }
+      } catch (error) {
+        logger.error('加载活动选项列表失败:', error)
+        this.campaignOptions = []
+      }
+    },
+
     /**
      * 加载债务列表 - 适配后端 /pending 接口
      */

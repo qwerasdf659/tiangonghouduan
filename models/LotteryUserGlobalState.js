@@ -109,7 +109,7 @@ class LotteryUserGlobalState extends Model {
     const updates = {
       global_draw_count: this.global_draw_count + 1,
       last_draw_at: new Date(),
-      last_campaign_id: lottery_campaign_id
+      last_lottery_campaign_id: lottery_campaign_id
     }
 
     // 根据档位更新对应计数
@@ -353,12 +353,13 @@ function initModel(sequelize) {
       },
 
       /**
-       * 最后一次抽奖活动ID
+       * 最后一次抽奖活动ID（P2迁移重命名：last_campaign_id → last_lottery_campaign_id）
+       * @外键关联 lottery_campaigns.lottery_campaign_id
        */
-      last_campaign_id: {
+      last_lottery_campaign_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '最后一次抽奖的活动ID'
+        comment: '最后一次抽奖的活动ID（外键关联 lottery_campaigns.lottery_campaign_id）'
       },
 
       /**

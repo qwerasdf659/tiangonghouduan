@@ -112,14 +112,14 @@ export const LOTTERY_ADVANCED_ENDPOINTS = {
   BUSINESS_RECORD_BATCH_EXPIRE: `${API_PREFIX}/console/business-records/redemption-orders/batch-expire`,
   BUSINESS_RECORD_EXPORT: `${API_PREFIX}/console/business-records/redemption-orders/export`,
 
-  // 活动预算
+  // 活动预算（后端使用 lottery_campaign_id 作为路由参数）
   CAMPAIGN_BUDGET_BATCH_STATUS: `${API_PREFIX}/console/campaign-budget/batch-status`,
-  CAMPAIGN_BUDGET_DETAIL: `${API_PREFIX}/console/campaign-budget/campaigns/:campaign_id`,
-  CAMPAIGN_BUDGET_UPDATE: `${API_PREFIX}/console/campaign-budget/campaigns/:campaign_id`,
-  CAMPAIGN_BUDGET_STATUS: `${API_PREFIX}/console/campaign-budget/campaigns/:campaign_id/budget-status`,
-  CAMPAIGN_BUDGET_POOL_ADD: `${API_PREFIX}/console/campaign-budget/campaigns/:campaign_id/pool/add`,
-  CAMPAIGN_BUDGET_VALIDATE: `${API_PREFIX}/console/campaign-budget/campaigns/:campaign_id/validate`,
-  CAMPAIGN_BUDGET_VALIDATE_LAUNCH: `${API_PREFIX}/console/campaign-budget/campaigns/:campaign_id/validate-for-launch`,
+  CAMPAIGN_BUDGET_DETAIL: `${API_PREFIX}/console/campaign-budget/campaigns/:lottery_campaign_id`,
+  CAMPAIGN_BUDGET_UPDATE: `${API_PREFIX}/console/campaign-budget/campaigns/:lottery_campaign_id`,
+  CAMPAIGN_BUDGET_STATUS: `${API_PREFIX}/console/campaign-budget/campaigns/:lottery_campaign_id/budget-status`,
+  CAMPAIGN_BUDGET_POOL_ADD: `${API_PREFIX}/console/campaign-budget/campaigns/:lottery_campaign_id/pool/add`,
+  CAMPAIGN_BUDGET_VALIDATE: `${API_PREFIX}/console/campaign-budget/campaigns/:lottery_campaign_id/validate`,
+  CAMPAIGN_BUDGET_VALIDATE_LAUNCH: `${API_PREFIX}/console/campaign-budget/campaigns/:lottery_campaign_id/validate-for-launch`,
   CAMPAIGN_BUDGET_USER: `${API_PREFIX}/console/campaign-budget/users/:user_id`,
 
   // 批量操作API

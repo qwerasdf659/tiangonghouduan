@@ -214,7 +214,8 @@ document.addEventListener('alpine:init', () => {
               await Promise.all([this.loadMerchantPoints(), this.loadMerchantStats()])
               break
             case 'debt-management':
-              await Promise.all([this.loadDebts(), this.loadDebtStats()])
+              // 加载活动列表供下拉框使用 + 债务数据 + 统计
+              await Promise.all([this.loadCampaignOptions(), this.loadDebts(), this.loadDebtStats()])
               break
             case 'campaign-budget':
               await Promise.all([this.loadBudgets(), this.loadBudgetStats()])

@@ -1,0 +1,1392 @@
+# 🧪 Playwright E2E 测试规范 - 数据验证篇
+
+## 📋 规范概述
+
+本文档是 Playwright E2E 测试规范的**数据验证篇**，包含 API 响应验证、字段映射检查、前端 Bug 检测等专项规则。
+
+**配套文档**：`09-Playwright-基础规范.mdc`（核心规则 + 用户行为测试）
+
+**测试目标环境**：https://omqktqrtntnn.sealosbja.site/admin/workspace.html（线上部署）
+
+---
+
+## 🔴 规则 E2E-DATA-001：API响应字段完整性验证（必须）
+
+### 问题背景
+
+**真实案例**：后端返回 `audit_id: undefined`，但前端测试只检查 `response.ok`，没有发现这个关键字段缺失问题。
+
+**原因**：测试只验证了"API返回成功"，没有验证"API返回的字段是否完整且有值"。
+
+### 强制要求
+
+**每个API响应必须验证**：
+1. 关键业务字段存在（not undefined）
+2. 关键业务字段有值（not null, not empty）
+3. 字段类型正确
+
+```javascript
+// ❌ 禁止：只检查响应成功
+test('获取列表', async ({ page }) => {
+  const response = await page.waitForResponse('**/merchant-points')
+  expect(response.ok()).toBe(true)  // ❌ 只检查HTTP状态
+})
+
+// ✅ 正确：验证字段完整性
+test('获取列表 - 验证字段完整性', async ({ page }) => {
+  const response = await page.waitForResponse('**/merchant-points')
+  expect(response.ok()).toBe(true)
+  
+  const json = await response.json()
+  expect(json.success).toBe(true)
+  
+  // ✅ 关键：验证业务字段存在且有值
+  if (json.data.rows.length > 0) {
+    const firstItem = json.data.rows[0]
+    
+    // 字段存在性检查
+    expect(firstItem).toHaveProperty('audit_id')
+    expect(firstItem).toHaveProperty('user_id')
+    expect(firstItem).toHaveProperty('status')
+    
+    // 字段值有效性检查
+    expect(firstItem.audit_id).toBeDefined()
+    expect(firstItem.audit_id).not.toBeNull()
+    expect(firstItem.audit_id).not.toBeUndefined()
+    
+    // 字段类型检查
+    expect(typeof firstItem.audit_id).toBe('number')
+  }
+})
+```
+
+### 字段检查工具函数
+
+```javascript
+/**
+ * 验证API响应字段完整性
+ * @param {object} item - API返回的数据项
+ * @param {string[]} requiredFields - 必需的字段列表
+ */
+function assertFieldsExist(item, requiredFields) {
+  requiredFields.forEach(field => {
+    expect(item, `响应缺少字段: ${field}`).toHaveProperty(field)
+    expect(item[field], `字段${field}值为undefined`).toBeDefined()
+    expect(item[field], `字段${field}值为null`).not.toBeNull()
+  })
+}
+
+// 使用示例
+test('商户积分列表字段完整性', async ({ page }) => {
+  const response = await page.waitForResponse('**/merchant-points')
+  const json = await response.json()
+  
+  if (json.data.rows.length > 0) {
+    const requiredFields = ['audit_id', 'user_id', 'status', 'points_amount', 'created_at']
+    assertFieldsExist(json.data.rows[0], requiredFields)
+  }
+})
+```
+
+---
+
+## 🔴 规则 E2E-DATA-002：多API数据一致性验证（必须）
+
+### 问题背景
+
+**真实案例**：统计API返回 `pending_count: 10`，但列表API返回 `rows: []`。测试分别验证两个API都成功，但没有交叉验证数据一致性。
+
+**原因**：测试没有同时监听多个API，并验证它们返回的数据逻辑一致。
+
+### 强制要求
+
+**当页面同时调用多个相关API时，必须验证**：
+1. 统计数 与 列表数 匹配
+2. 筛选条件影响所有API
+3. 数据状态在所有视图一致
+
+```javascript
+// ❌ 禁止：分别验证，不交叉检查
+test('分别验证统计和列表', async ({ page }) => {
+  // 验证统计
+  const statsRes = await page.waitForResponse('**/stats/pending')
+  const stats = await statsRes.json()
+  expect(stats.data.pending_count).toBeGreaterThan(0)  // ✅ 有待处理
+  
+  // 验证列表
+  const listRes = await page.waitForResponse('**/merchant-points')
+  const list = await listRes.json()
+  expect(list.success).toBe(true)  // ❌ 没有验证列表数量与统计匹配
+})
+
+// ✅ 正确：同时监听，交叉验证
+test('统计数据与列表数据一致性', async ({ page }) => {
+  // 同时监听两个API
+  const [statsRes, listRes] = await Promise.all([
+    page.waitForResponse('**/stats/pending'),
+    page.waitForResponse(resp => 
+      resp.url().includes('/merchant-points') && 
+      !resp.url().includes('/stats')
+    )
+  ])
+  
+  const stats = await statsRes.json()
+  const list = await listRes.json()
+  
+  // ✅ 关键：交叉验证数据一致性
+  const pendingCount = stats.data.pending_count || 0
+  const listCount = list.data.rows?.length || 0
+  const totalFromPagination = list.data.total || 0
+  
+  // 如果统计显示有待处理，列表不能为空
+  if (pendingCount > 0) {
+    expect(listCount, '统计显示有待处理，但列表为空').toBeGreaterThan(0)
+  }
+  
+  // 如果筛选条件是"待处理"，数量应该匹配
+  // （考虑分页：列表count <= total，total应与统计一致）
+  if (pendingCount > 0 && list.data.status === 'pending') {
+    expect(totalFromPagination, '列表总数应与统计的待处理数一致').toBe(pendingCount)
+  }
+})
+```
+
+### 数据一致性检查清单
+
+| 场景 | 必须验证 |
+|------|---------|
+| 统计卡片 + 列表 | 统计数 >= 当前页数量，总数 = 统计数 |
+| 筛选条件变更 | 所有API使用相同筛选参数 |
+| 状态变更后 | 统计数和列表同步更新 |
+| 分页切换 | 总数不变，当前页数据正确 |
+
+```javascript
+// ✅ 完整的数据一致性测试模板
+test('页面数据一致性验证', async ({ page }) => {
+  await page.goto('/finance-management.html')
+  
+  // 收集所有API响应
+  const apiResponses = {}
+  
+  page.on('response', async response => {
+    const url = response.url()
+    if (url.includes('/stats/pending')) {
+      apiResponses.stats = await response.json().catch(() => null)
+    }
+    if (url.includes('/merchant-points') && !url.includes('/stats')) {
+      apiResponses.list = await response.json().catch(() => null)
+    }
+  })
+  
+  // 等待页面加载完成
+  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(2000)  // 等待所有API完成
+  
+  // ✅ 一致性断言
+  if (apiResponses.stats && apiResponses.list) {
+    const stats = apiResponses.stats.data
+    const list = apiResponses.list.data
+    
+    console.log(`📊 统计: pending=${stats.pending_count}`)
+    console.log(`📋 列表: rows=${list.rows?.length}, total=${list.total}`)
+    
+    // 核心一致性检查
+    if (stats.pending_count > 0) {
+      expect(list.rows?.length, '统计有数据时列表不能为空').toBeGreaterThan(0)
+    }
+    
+    if (stats.pending_count === 0) {
+      expect(list.total, '统计为0时列表总数也应为0').toBe(0)
+    }
+  }
+})
+```
+
+---
+
+## 🔴 规则 E2E-DATA-003：前后端字段映射验证（必须）
+
+### 问题背景
+
+**真实案例**：
+- 前端代码使用 `merchantStats.totalMerchants`
+- 后端API返回 `pending_count`
+- 前端显示 `undefined` 或 `0`
+
+**原因**：前后端字段名不一致，但测试没有验证"前端绑定的字段在API响应中存在"。
+
+### 强制要求
+
+**测试必须验证**：
+1. 前端使用的字段名在API响应中存在
+2. UI显示的值与API返回的值一致
+3. 字段映射关系正确
+
+```javascript
+// ✅ 字段映射验证测试
+test('前后端字段映射正确性', async ({ page }) => {
+  // 1. 获取API响应
+  const response = await page.waitForResponse('**/stats/pending')
+  const apiData = (await response.json()).data
+  
+  console.log('📡 API返回字段:', Object.keys(apiData))
+  
+  // 2. 获取UI显示的值
+  const uiValues = await page.evaluate(() => {
+    // 假设统计卡片的结构
+    const cards = document.querySelectorAll('.stat-card')
+    const values = {}
+    cards.forEach(card => {
+      const label = card.querySelector('.label')?.textContent
+      const value = card.querySelector('.value')?.textContent
+      if (label) values[label] = value
+    })
+    return values
+  })
+  
+  console.log('🖥️ UI显示值:', uiValues)
+  
+  // 3. 验证映射关系
+  // 前端使用的字段必须在API响应中存在
+  const expectedMappings = {
+    '待审核': 'pending_count',
+    '已通过': 'approved_count',
+    '已拒绝': 'rejected_count',
+    '今日积分': 'today_points'
+  }
+  
+  Object.entries(expectedMappings).forEach(([uiLabel, apiField]) => {
+    // 验证API字段存在
+    expect(apiData, `API缺少字段: ${apiField}`).toHaveProperty(apiField)
+    
+    // 验证UI值与API值一致（如果UI有显示）
+    if (uiValues[uiLabel]) {
+      const apiValue = String(apiData[apiField])
+      const uiValue = uiValues[uiLabel].replace(/[,，]/g, '')  // 移除千分位
+      expect(uiValue, `${uiLabel}的UI值与API值不一致`).toBe(apiValue)
+    }
+  })
+})
+```
+
+### 前端组件字段检查
+
+```javascript
+// ✅ 检查Alpine.js组件使用的字段是否在API响应中存在
+test('Alpine组件字段与API响应匹配', async ({ page }) => {
+  // 获取Alpine组件中定义的字段
+  const componentFields = await page.evaluate(() => {
+    const el = document.querySelector('[x-data*="merchantStats"]')
+    if (!el) return null
+    
+    const data = window.Alpine.$data(el)
+    return data.merchantStats ? Object.keys(data.merchantStats) : null
+  })
+  
+  console.log('🔧 组件定义的字段:', componentFields)
+  
+  // 获取API响应的字段
+  const response = await page.waitForResponse('**/stats/pending')
+  const apiFields = Object.keys((await response.json()).data)
+  
+  console.log('📡 API返回的字段:', apiFields)
+  
+  // 验证组件使用的字段在API响应中存在
+  if (componentFields) {
+    componentFields.forEach(field => {
+      const found = apiFields.includes(field) || 
+                   apiFields.some(af => af.toLowerCase() === field.toLowerCase())
+      expect(found, `组件字段 "${field}" 在API响应中不存在，API字段: ${apiFields.join(', ')}`).toBe(true)
+    })
+  }
+})
+```
+
+### 🔴 核心要点：字段存在性断言（强制）
+
+**问题复盘**（campaign_id vs lottery_campaign_id）：
+- 后端 API 返回：`lottery_campaign_id`
+- 前端代码使用：`campaign_id`
+- 测试代码也使用：`campaign_id`（复制了前端的错误假设）
+- 结果：测试比较 `undefined === undefined`，测试通过但页面显示异常
+
+**强制要求**：使用 API 返回数据前，必须先断言关键字段存在且不为 undefined。
+
+```javascript
+// ❌ 禁止：直接使用字段，不检查是否存在
+const firstId = campaigns[0].campaign_id  // 可能是 undefined！
+
+// ✅ 正确：先断言字段存在
+expect(campaigns[0].lottery_campaign_id, 'lottery_campaign_id 字段不存在').toBeDefined()
+expect(campaigns[0].lottery_campaign_id, 'lottery_campaign_id 不能为 undefined').not.toBe(undefined)
+const apiId = String(campaigns[0].lottery_campaign_id)
+```
+
+### 🔴 编写测试前必须检查 API 实际响应
+
+```javascript
+// 测试前检查脚本（必须执行）
+if (data.data.campaigns?.length > 0) {
+  console.log('📊 单条记录的所有字段:', Object.keys(data.data.campaigns[0]))
+}
+// 输出：['lottery_campaign_id', 'campaign_name', ...] - 注意是 lottery_campaign_id
+```
+
+| 检查项 | 方法 |
+|--------|------|
+| API 返回的 ID 字段名 | 打印 `Object.keys(item)` |
+| 前端 HTML 使用的字段名 | 检查 `:key="budget.xxx"` |
+| 前端 JS 使用的字段名 | 检查 `filters.xxx` |
+| **三者必须完全相同** | 任何不一致都会导致 x-for 渲染失败 |
+
+---
+
+## 🔴 规则 E2E-DATA-004：防止"假通过"测试
+
+### 问题背景
+
+**真实案例**：测试显示"✓ passed"，但实际上：
+- UI显示"暂无数据"（空列表）
+- 统计数字显示 0
+- 功能根本没有工作
+
+**原因**：测试把"页面正常加载"等同于"功能正常工作"
+
+### 强制要求
+
+**测试必须区分**：
+1. 页面加载成功 ≠ 功能正常
+2. API返回成功 ≠ 数据正确
+3. 元素存在 ≠ 内容正确
+4. 无JS错误 ≠ 逻辑正确
+
+```javascript
+// ❌ "假通过"测试 - 禁止
+test('商户积分页面正常', async ({ page }) => {
+  await page.goto('/finance-management.html')
+  await page.waitForLoadState('networkidle')
+  
+  // ❌ 只检查页面加载
+  await expect(page.locator('table')).toBeVisible()
+  // 测试通过，但表格可能是空的！
+})
+
+// ✅ 真正验证功能
+test('商户积分列表显示正确数据', async ({ page }) => {
+  const response = await page.waitForResponse('**/merchant-points')
+  const json = await response.json()
+  
+  // 验证API返回数据
+  if (json.data.total > 0) {
+    // 有数据时，表格必须显示数据
+    const rowCount = await page.locator('tbody tr').count()
+    expect(rowCount, '有数据但表格为空').toBeGreaterThan(0)
+    
+    // 每行必须有内容
+    const firstRowText = await page.locator('tbody tr:first-child').textContent()
+    expect(firstRowText, '表格行内容为空').not.toBe('')
+    
+    // 关键字段不能显示undefined
+    expect(firstRowText, '显示了undefined').not.toContain('undefined')
+    expect(firstRowText, '显示了null').not.toContain('null')
+  } else {
+    // 无数据时，必须显示空状态提示
+    const emptyState = page.locator('text=/暂无|没有.*记录/')
+    await expect(emptyState.first(), '无数据时应显示空状态提示').toBeVisible()
+  }
+})
+```
+
+### 防止假通过检查清单
+
+| 检查点 | 错误做法 | 正确做法 |
+|-------|---------|---------|
+| 表格 | 只检查`<table>`存在 | 检查`<tbody tr>`数量与API一致 |
+| 统计数字 | 只检查元素存在 | 检查数字 > 0 或与API一致 |
+| 空状态 | 不检查 | 有数据时不应出现，无数据时必须出现 |
+| 字段显示 | 只检查元素存在 | 检查不含undefined/null |
+
+---
+
+## 🔴 规则 E2E-DATA-005：模态框/弹窗显示验证（必须）
+
+### 问题背景
+
+**真实案例**：点击"详情"按钮后没有任何反应，但测试通过了。
+
+**原因**：
+- JS代码调用 `showModal('merchantDetailModal')`
+- HTML中模态框名称是 `merchantPointDetailModal`
+- 名称不匹配，模态框无法显示，但没有任何报错
+
+**根本问题**：测试只验证了"按钮能点击"，没有验证"点击后模态框是否真的显示"。
+
+### 强制要求
+
+**点击触发弹窗的按钮后，必须验证**：
+1. 模态框是否可见
+2. 模态框内容是否正确加载
+3. 控制台是否有元素找不到的警告
+
+```javascript
+// ❌ 禁止：只点击不验证弹窗
+test('点击详情按钮', async ({ page }) => {
+  await page.click('button:has-text("详情")')
+  // ❌ 测试结束，但模态框可能根本没显示！
+})
+
+// ✅ 正确：点击后必须验证模态框显示
+test('点击详情按钮显示模态框', async ({ page }) => {
+  // 收集控制台警告
+  const consoleMessages = []
+  page.on('console', msg => {
+    if (msg.type() === 'warning' || msg.type() === 'error') {
+      consoleMessages.push(msg.text())
+    }
+  })
+  
+  // 点击详情按钮
+  await page.click('button:has-text("详情")')
+  
+  // ✅ 关键：验证模态框可见
+  const modal = page.locator('.modal, [role="dialog"], [x-ref*="Modal"]')
+  await expect(modal.first(), '点击详情后模态框应该显示').toBeVisible({ timeout: 5000 })
+  
+  // ✅ 验证模态框内容加载
+  const modalContent = await modal.first().textContent()
+  expect(modalContent, '模态框应该有内容').not.toBe('')
+  expect(modalContent, '模态框不应显示undefined').not.toContain('undefined')
+  
+  // ✅ 检查控制台是否有警告
+  const elementNotFound = consoleMessages.some(msg => 
+    msg.includes('找不到') || msg.includes('not found') || msg.includes('undefined')
+  )
+  expect(elementNotFound, '不应有元素找不到的警告').toBe(false)
+})
+```
+
+### 模态框测试检查清单
+
+| 检查点 | 必须验证 |
+|-------|---------|
+| 点击按钮后 | 模态框是否可见 |
+| 模态框内容 | 是否有内容、不含undefined |
+| API数据 | 是否正确加载到模态框中 |
+| 关闭按钮 | 点击后模态框是否隐藏 |
+| 控制台 | 是否有元素找不到的警告 |
+
+### Alpine.js 模态框特殊验证
+
+```javascript
+// ✅ Alpine.js 模态框验证（检查 x-ref 和 x-show）
+test('Alpine.js 模态框正确显示', async ({ page }) => {
+  // 点击触发按钮
+  await page.click('button:has-text("详情")')
+  await page.waitForTimeout(500)  // 等待 Alpine 状态更新
+  
+  // 方法1：通过 x-ref 定位
+  const modalByRef = page.locator('[x-ref="merchantPointDetailModal"]')
+  
+  // 方法2：通过可见性定位（x-show 会控制 display）
+  const visibleModal = page.locator('.modal:visible, [role="dialog"]:visible')
+  
+  // 验证至少一种方式能找到可见的模态框
+  const isModalVisible = await modalByRef.isVisible().catch(() => false) ||
+                        await visibleModal.count() > 0
+  
+  expect(isModalVisible, '模态框应该可见（检查 JS 中的 showModal 名称是否与 HTML x-ref 匹配）').toBe(true)
+  
+  // 如果失败，输出调试信息
+  if (!isModalVisible) {
+    const allModals = await page.locator('[x-ref*="Modal"]').all()
+    console.log('页面中的模态框 x-ref:', await Promise.all(
+      allModals.map(async m => await m.getAttribute('x-ref'))
+    ))
+  }
+})
+```
+
+### 常见模态框名称不匹配问题
+
+| JS调用 | HTML定义 | 问题 |
+|--------|----------|------|
+| `showModal('merchantDetailModal')` | `x-ref="merchantPointDetailModal"` | 少了 `Point` |
+| `showModal('userModal')` | `x-ref="userDetailModal"` | 少了 `Detail` |
+| `hideModal('editModal')` | `x-ref="itemEditModal"` | 少了前缀 |
+
+**预防措施**：
+1. 模态框命名统一使用 `{功能}DetailModal` 格式
+2. JS 和 HTML 同时修改时，搜索确认名称一致
+3. 测试必须验证弹窗显示，而不只是按钮点击
+
+---
+
+## 📋 完整测试用例模板
+
+### 标准审核操作测试模板
+
+```javascript
+import { test, expect } from '@playwright/test'
+
+// 测试配置
+const BASE_URL = 'https://omqktqrtntnn.sealosbja.site/admin/'
+const TEST_PHONE = '13612227930'
+const TEST_CODE = '123456'
+
+test.describe('消费记录审核 - 完整验证', () => {
+  // JS 错误收集
+  let jsErrors = []
+  
+  test.beforeEach(async ({ page }) => {
+    jsErrors = []
+    
+    // 监听 JS 错误
+    page.on('console', msg => {
+      if (msg.type() === 'error') jsErrors.push(msg.text())
+    })
+    page.on('pageerror', error => jsErrors.push(error.message))
+    
+    // 登录
+    await page.goto(BASE_URL + 'login.html')
+    await page.fill('input[type="tel"]', TEST_PHONE)
+    await page.fill('input[x-model="code"]', TEST_CODE)
+    await page.click('button[type="submit"]')
+    await expect(page).toHaveURL(/workspace/, { timeout: 15000 })
+    
+    // 导航到目标页面
+    await page.goto(BASE_URL + 'finance-management.html')
+    await page.waitForLoadState('networkidle')
+  })
+
+  test.afterEach(async ({ page }) => {
+    // 自动报告 JS 错误
+    expect(jsErrors, `发现 ${jsErrors.length} 个 JS 错误: ${jsErrors.join(', ')}`).toHaveLength(0)
+  })
+
+  test('审核通过 - 完整用户流程', async ({ page }) => {
+    // 1. 等待数据加载
+    await expect(page.locator('tbody tr').first()).toBeVisible({ timeout: 10000 })
+    
+    // 2. 记录初始状态
+    const initialCount = await page.locator('tbody tr').count()
+    const initialStatus = await page.locator('tbody tr:first-child td:nth-child(6)').textContent()
+    
+    // 如果没有待审核记录，跳过测试
+    if (!initialStatus?.includes('待审核')) {
+      test.skip()
+      return
+    }
+    
+    // 3. 设置 API 监听
+    const responsePromise = page.waitForResponse(resp => 
+      resp.url().includes('/consumption/approve') && resp.status() === 200
+    )
+    
+    // 4. 处理确认对话框
+    page.once('dialog', dialog => {
+      expect(dialog.message()).toContain('确定')
+      dialog.accept()
+    })
+    
+    // 5. 点击通过按钮
+    await page.click('tbody tr:first-child button:has-text("通过")')
+    
+    // 6. 等待 API 响应
+    const response = await responsePromise
+    const json = await response.json()
+    expect(json.success, 'API 应该返回成功').toBe(true)
+    
+    // 7. 验证 UI 更新
+    await page.waitForTimeout(1500)
+    const newStatus = await page.locator('tbody tr:first-child td:nth-child(6)').textContent()
+    expect(newStatus, 'UI 状态应该更新').toContain('已通过')
+  })
+})
+```
+
+---
+
+## ✅ 测试检查清单（每次编写测试必须核对）
+
+### 测试前准备
+- [ ] 后端服务是否正常运行？
+- [ ] 是否阅读了前端代码了解元素定位器？
+- [ ] 是否检查了现有测试文件避免重复？
+
+### 每个测试用例必须包含
+- [ ] 至少一个 `expect()` 断言（禁止只用 console.log）
+- [ ] 监听 JS 错误并断言无错误
+- [ ] 等待 API 响应后再断言 UI
+- [ ] 验证业务结果（不只是元素存在）
+
+### 交互操作验证
+- [ ] 按钮真正被点击（不只是检查存在）
+- [ ] API 请求被发送并验证参数
+- [ ] API 响应被验证（状态码 + 返回数据）
+- [ ] UI 状态正确更新
+
+### 用户行为验证
+- [ ] 模拟真实用户操作流程
+- [ ] 测试状态恢复（重置/取消/撤销）
+- [ ] 测试边界条件（空值/极端值）
+- [ ] 测试防呆机制（确认对话框/错误提示）
+
+### 🔴 字段映射与数据一致性验证（新增）
+- [ ] API响应关键字段存在且有值（not undefined/null）
+- [ ] 多个相关API数据交叉验证（统计数 = 列表总数）
+- [ ] 前端绑定的字段名在API响应中存在
+- [ ] UI显示值与API返回值一致
+- [ ] 不显示undefined/null/空值
+
+### 🔴 模态框/弹窗验证（新增）
+- [ ] 点击按钮后模态框是否可见？
+- [ ] 模态框内容是否正确加载（不为空、不含undefined）？
+- [ ] JS中showModal名称与HTML中x-ref名称是否一致？
+- [ ] 关闭按钮是否能正常关闭模态框？
+- [ ] 控制台是否有元素找不到的警告？
+
+### 数据一致性验证
+- [ ] 操作后 UI 和数据同步
+- [ ] 刷新页面后数据持久化
+- [ ] 分页功能允许查看全部数据
+- [ ] 统计数据与列表数据匹配
+
+---
+
+## 🚫 禁止的测试模式
+
+| 禁止模式 | 正确替代 |
+|---------|---------|
+| `console.log('警告')` + 测试通过 | `expect().toBe()` 断言失败 |
+| 只检查元素存在 | 点击元素并验证效果 |
+| 不等待 API 响应 | `waitForResponse()` 后断言 |
+| 忽略 JS 错误 | `page.on('pageerror')` 捕获 |
+| 硬编码等待 `waitForTimeout(5000)` | `waitForResponse/waitForSelector` |
+| 测试技术实现 | 测试业务结果 |
+
+---
+
+**核心原则**：
+
+1. **E2E 测试的价值在于断言验证**，不在于"跑了一遍"。没有断言的测试等于没有测试。
+2. **测试应该模拟真实用户**，而不是机械验证技术实现。
+3. **每个操作都要测试"撤销/恢复"**，用户总是需要"回到最初"的能力。
+4. **分页是隐藏的陷阱**，必须验证用户能看到完整数据或知道如何查看更多。
+5. **先问"用户想做什么"**，再设计测试用例。
+6. **用 expect() 自动报告错误**，不要让人工查看日志。
+7. **测试前必须检查后端服务**，并阅读前端代码。
+8. **复用现有测试**，减少技术债务。
+9. **🔴 API字段完整性是基础**，关键字段不能是undefined/null，否则测试必须失败。
+10. **🔴 多API必须交叉验证**，统计数与列表数不一致时，测试必须失败。
+11. **🔴 前后端字段映射必须验证**，前端使用的字段名必须在API响应中存在。
+12. **🔴 防止"假通过"**，页面加载成功≠功能正常，API成功≠数据正确。
+13. **🔴 模态框必须验证显示**，点击按钮后必须断言模态框可见，JS调用名与HTML定义名必须一致。
+14. **🔴 数据可发现性测试**，所有需要用户输入ID/编码的字段，必须验证用户是否能从系统中获取该值。
+15. **🔴 业务可用性测试**，不只测试技术可行性，还要测试"运营人员能否完成工作"。
+
+---
+
+## 🔴 业务可用性测试规范（重要 - 防止遗漏UX问题）
+
+### 核心概念对比
+
+| 问题层面 | 传统技术测试 | 业务可用性测试 |
+|---------|------------|--------------|
+| **测试视角** | 开发者视角 | 运营人员视角 |
+| **关注点** | 元素存在、API调用正确 | 用户能否完成工作 |
+| **ID输入框** | ✅ 能输入、能搜索 | ❌ 运营不知道输入什么 |
+| **本质差异** | 验证"技术可行性" | 验证"业务可用性" |
+
+### 问题背景
+
+**案例**：债务管理页面的"活动ID"输入框
+- ❌ 技术测试结果：输入框存在 ✅，输入值能搜索 ✅，API正常调用 ✅
+- ❌ 实际问题：运营人员不知道活动ID是什么，无法完成工作
+- ❌ 测试盲区：测试只验证了"能输入"，没验证"能知道输入什么"
+
+### 数据可发现性测试规则
+
+**核心问题**：用户能否从系统中获取需要输入的值？
+
+| 字段类型 | 错误做法 | 正确做法 |
+|---------|---------|---------|
+| ID字段（活动ID、用户ID等） | 让用户手动输入 | 提供下拉框/搜索框 |
+| 编码字段（活动码、商品码等） | 让用户记住编码 | 提供选择列表或模糊搜索 |
+| 关联字段（商户、门店等） | 只显示ID | 显示名称，值传ID |
+
+### 强制测试清单 - 筛选/搜索表单
+
+每个包含筛选条件的页面，必须执行以下测试：
+
+```javascript
+test.describe('筛选表单 - 数据可发现性测试', () => {
+  
+  /**
+   * 🔴 规则1：ID类字段必须有数据来源
+   * 检测方法：查找所有包含"ID"、"编码"、"code"的输入框
+   * 验证标准：必须是下拉框/搜索框，或有关联的数据选择器
+   */
+  test('ID类筛选字段必须提供选择方式', async ({ page }) => {
+    // 查找所有可能的ID输入框
+    const idInputs = page.locator('input[placeholder*="ID"], input[placeholder*="编码"], input[placeholder*="code"]')
+    const idInputCount = await idInputs.count()
+    
+    // 🔴 断言：ID字段不应该是纯文本输入框
+    // 如果存在，应该改为 select 下拉框或带搜索的选择器
+    for (let i = 0; i < idInputCount; i++) {
+      const placeholder = await idInputs.nth(i).getAttribute('placeholder')
+      console.error(`⚠️ UX问题: 发现ID类输入框 "${placeholder}"，建议改为下拉选择框`)
+    }
+    
+    // 可选：强制失败（取消注释启用）
+    // expect(idInputCount, 'ID字段应该用下拉框而非输入框').toBe(0)
+  })
+
+  /**
+   * 🔴 规则2：下拉框必须有可选项
+   * 验证标准：select元素必须有除"全部/请选择"外的实际选项
+   */
+  test('下拉框必须加载实际选项数据', async ({ page }) => {
+    await page.waitForTimeout(3000) // 等待异步数据加载
+    
+    const selects = page.locator('select')
+    const selectCount = await selects.count()
+    
+    for (let i = 0; i < selectCount; i++) {
+      const select = selects.nth(i)
+      const options = await select.locator('option').allTextContents()
+      
+      // 过滤占位选项
+      const actualOptions = options.filter(opt => 
+        !opt.includes('全部') && !opt.includes('请选择') && opt.trim() !== ''
+      )
+      
+      const selectModel = await select.getAttribute('x-model') || '未知'
+      
+      if (actualOptions.length === 0) {
+        console.warn(`⚠️ 下拉框 [${selectModel}] 没有可选项，运营无法使用`)
+      }
+    }
+  })
+
+  /**
+   * 🔴 规则3：运营完整工作流测试
+   */
+  test('运营人员能否仅通过界面完成筛选操作', async ({ page }) => {
+    // 检查筛选区域
+    const filterSection = page.locator('.p-4.border-b, [class*="filter"]')
+    await expect(filterSection.first()).toBeVisible()
+    
+    // 验证下拉框可选择（不需要外部信息）
+    const selects = filterSection.locator('select')
+    const selectCount = await selects.count()
+    
+    for (let i = 0; i < selectCount; i++) {
+      const options = await selects.nth(i).locator('option').count()
+      expect(options, '下拉框必须有选项').toBeGreaterThan(1)
+    }
+    
+    // 检测ID输入框（UX问题）
+    const idInputs = filterSection.locator('input[placeholder*="ID"]')
+    if (await idInputs.count() > 0) {
+      console.warn('⚠️ 存在ID输入框，运营需要知道ID才能使用，建议改为下拉框')
+    }
+  })
+})
+```
+
+### UX问题检测规则
+
+| 检测项 | 检测方法 | 期望结果 |
+|-------|---------|---------|
+| ID输入框 | `input[placeholder*="ID"]` | 应该是 `select` 或带搜索的选择器 |
+| 编码输入框 | `input[placeholder*="编码"]` | 应该有自动完成或选择列表 |
+| 关联字段 | 显示的是ID但应该显示名称 | 显示名称，传值ID |
+| 空下拉框 | `select` 只有占位选项 | 必须有实际可选数据 |
+| 无提示的输入框 | `input` 没有 placeholder | 必须有操作提示 |
+
+### 测试检查清单补充
+
+**每个筛选/表单页面必须额外验证**：
+
+- [ ] **数据来源可发现性**：用户需要输入的值，能否从系统中获取？
+- [ ] **ID字段处理**：所有ID字段是否有下拉框或搜索选择器？
+- [ ] **下拉框有效性**：下拉框是否加载了实际数据（不只是"全部"选项）？
+- [ ] **运营完整流程**：运营能否不借助外部信息完成筛选操作？
+- [ ] **关联数据显示**：ID字段是否同时显示名称便于识别？
+
+### 常见测试盲区及预防
+
+| 盲区 | 技术测试结果 | 实际问题 | 预防措施 |
+|-----|------------|---------|---------|
+| ID输入框 | 输入值能搜索 ✅ | 运营不知道ID | 验证是否有选择器 |
+| 空下拉框 | 元素存在 ✅ | 没有可选项 | 验证option数量 |
+| 关联显示 | 数据正确 ✅ | 只显示ID不显示名称 | 验证显示内容 |
+| 分页数据 | 第一页正常 ✅ | 后面的页看不到 | 验证分页功能 |
+| 筛选重置 | 字段清空 ✅ | 数据没刷新 | 验证数据重新加载 |
+
+### 🔴 强制执行规则
+
+1. **发现ID输入框必须报告**：测试中发现 `input[placeholder*="ID"]` 必须记录为待优化项
+2. **下拉框必须有数据**：空的 select（只有占位选项）必须报告为问题
+3. **运营视角测试**：每个筛选页面必须包含"运营能否完成工作"的测试用例
+4. **UX问题不忽略**：技术上可行但运营无法使用的功能，测试应该标记警告
+
+---
+
+## 🚨 前端 Bug 检测强化规则（2026-02-03 更新）
+
+### 问题背景
+
+以下是一个真实案例：Playwright 测试通过，但实际存在严重的前端 Bug：
+
+```javascript
+// ❌ HTML 模板使用 sessions，但 JS 定义的是 allSessions
+// HTML: <template x-for="session in sessions">
+// JS:   allSessions: []  ← 变量名不匹配！
+
+// 结果：Alpine.js 报错 "sessions is not defined"，页面不渲染
+```
+
+**测试为什么没发现？**
+1. 测试预先"原谅"了 JS 错误
+2. 测试只验证 API 返回数据，没验证页面是否真正渲染
+3. 测试使用过多 "如果存在则测试" 的宽容逻辑
+
+### 🔴 规则1：JavaScript 错误零容忍原则
+
+**禁止在测试中预先忽略任何 JS 错误**
+
+```javascript
+// ❌ 错误做法：预先"原谅"某些错误
+page.on('pageerror', error => {
+  if (error.message.includes('sessions is not defined')) {
+    console.warn('已知 Bug，忽略')  // ❌ 禁止！
+    return
+  }
+  jsErrors.push(error.message)
+})
+
+// ✅ 正确做法：所有 JS 错误都必须记录，测试结束后统一判断
+const jsErrors = []
+page.on('pageerror', error => {
+  console.error(`❌ JS Error: ${error.message}`)
+  jsErrors.push(error.message)
+})
+
+// 测试结束时断言
+test.afterEach(async () => {
+  expect(jsErrors, `检测到 ${jsErrors.length} 个 JS 错误`).toHaveLength(0)
+})
+```
+
+### 🔴 规则2：数据渲染强制验证原则
+
+**API 返回数据后，必须验证数据确实显示在页面上**
+
+```javascript
+// ❌ 错误做法：只验证 API，不验证渲染
+const response = await page.waitForResponse('**/sessions')
+const data = await response.json()
+expect(data.data.sessions.length).toBeGreaterThan(0)  // API 有数据
+// 但没验证页面是否显示！
+
+// ✅ 正确做法：API 数据 + 页面渲染 双重验证
+const response = await page.waitForResponse('**/sessions')
+const data = await response.json()
+const apiCount = data.data.sessions.length
+expect(apiCount).toBeGreaterThan(0)
+
+// 必须验证页面渲染数量
+await page.waitForTimeout(1000)  // 等待 Alpine.js 渲染
+const renderedItems = await page.locator('[x-for] > div').count()
+
+// 关键断言：渲染数量必须与 API 数量一致
+expect(renderedItems, 
+  `API 返回 ${apiCount} 条数据，但页面只渲染了 ${renderedItems} 条`
+).toBe(apiCount)
+```
+
+### 🔴 规则3：Alpine.js 变量名一致性检查
+
+**测试前必须验证 HTML 模板变量与 JS 组件数据定义一致**
+
+```javascript
+// ✅ 推荐：在测试中添加变量一致性检查
+test('Alpine.js 组件变量名一致性检查', async ({ page }) => {
+  // 获取 HTML 中使用的 Alpine.js 变量
+  const htmlVariables = await page.evaluate(() => {
+    const xForElements = document.querySelectorAll('[x-for]')
+    const variables = new Set()
+    xForElements.forEach(el => {
+      const match = el.getAttribute('x-for').match(/(\w+)\s+in\s+(\w+)/)
+      if (match) variables.add(match[2])  // 数组变量名
+    })
+    return Array.from(variables)
+  })
+
+  // 获取 Alpine.js 组件实际定义的数据
+  const componentData = await page.evaluate(() => {
+    const component = document.querySelector('[x-data]')
+    if (!component || !component._x_dataStack) return null
+    return Object.keys(component._x_dataStack[0])
+  })
+
+  // 验证所有 HTML 变量在组件中都有定义
+  for (const variable of htmlVariables) {
+    expect(componentData, 
+      `HTML 模板使用变量 "${variable}"，但 JS 组件未定义！`
+    ).toContain(variable)
+  }
+})
+```
+
+### 🔴 规则4：禁止过度宽容的测试设计
+
+**禁止使用 "如果存在则测试" 的逻辑掩盖问题**
+
+```javascript
+// ❌ 错误做法：元素不存在就跳过
+const sessions = await page.locator('.session-item').all()
+if (sessions.length === 0) {
+  console.log('没有会话，跳过测试')  // ❌ 可能是 Bug 导致不渲染！
+  return
+}
+
+// ✅ 正确做法：明确断言预期状态
+const sessions = await page.locator('.session-item').all()
+if (sessions.length === 0) {
+  // 检查是否真的没有数据，还是渲染失败
+  const apiHasData = await checkApiHasData()
+  if (apiHasData) {
+    throw new Error('API 有数据但页面未渲染，可能是前端 Bug！')
+  } else {
+    test.skip('测试环境无数据')
+  }
+}
+```
+
+### 🔴 规则5：前后端字段名一致性验证
+
+**API 返回字段名必须与前端使用的字段名一致**
+
+```javascript
+// ✅ 推荐：验证关键字段名一致性
+test('API 响应字段名与前端模板一致', async ({ page }) => {
+  const response = await page.waitForResponse('**/sessions')
+  const data = await response.json()
+  const session = data.data.sessions[0]
+
+  // 检查前端期望的字段是否存在
+  const expectedFields = [
+    'customer_service_session_id',  // 不是 session_id
+    'user',
+    'status',
+    'created_at'
+  ]
+
+  for (const field of expectedFields) {
+    expect(session, 
+      `API 响应缺少字段 "${field}"，前端模板可能无法正确渲染`
+    ).toHaveProperty(field)
+  }
+
+  // 检查是否有字段名不匹配的问题
+  if (session.session_id && !session.customer_service_session_id) {
+    throw new Error('字段名不匹配：API 返回 session_id，但前端期望 customer_service_session_id')
+  }
+})
+```
+
+### 🔴 规则6：强制渲染等待和验证
+
+**Alpine.js 页面必须等待渲染完成后再验证**
+
+```javascript
+// ✅ 推荐：Alpine.js 渲染完成检测
+async function waitForAlpineRender(page, selector, timeout = 5000) {
+  const startTime = Date.now()
+  
+  while (Date.now() - startTime < timeout) {
+    const count = await page.locator(selector).count()
+    const hasXCloak = await page.locator('[x-cloak]').count()
+    
+    // x-cloak 消失且有内容时，认为渲染完成
+    if (count > 0 && hasXCloak === 0) {
+      return count
+    }
+    
+    await page.waitForTimeout(100)
+  }
+  
+  // 超时后检查是否有 JS 错误
+  const consoleErrors = await page.evaluate(() => window.__consoleErrors || [])
+  if (consoleErrors.length > 0) {
+    throw new Error(`Alpine.js 渲染超时，控制台错误: ${consoleErrors.join(', ')}`)
+  }
+  
+  throw new Error(`Alpine.js 渲染超时：${selector} 未出现内容`)
+}
+
+// 使用示例
+const sessionCount = await waitForAlpineRender(page, '.session-item')
+expect(sessionCount).toBeGreaterThan(0)
+```
+
+### 📋 前端 Bug 检测检查清单
+
+**每个测试文件必须包含以下检查：**
+
+- [ ] **JS 错误收集**：`page.on('pageerror')` 收集所有错误，测试结束时断言为空
+- [ ] **渲染验证**：API 返回数据后，验证页面渲染数量与 API 数量一致
+- [ ] **字段名检查**：验证 API 响应字段名与前端模板使用的字段名一致
+- [ ] **变量名检查**：验证 HTML x-for 变量在 JS 组件中有定义
+- [ ] **禁止静默跳过**：元素不存在时，先检查是 Bug 还是真的无数据
+- [ ] **Alpine.js 特定检查**：等待 x-cloak 消失，验证组件初始化成功
+
+### 📝 测试模板：前端渲染验证
+
+```javascript
+/**
+ * 标准前端渲染验证测试模板
+ * 
+ * 解决的问题：
+ * 1. API 返回数据但页面不渲染（变量名不匹配）
+ * 2. JS 错误被忽略
+ * 3. 字段名不匹配导致显示异常
+ */
+test.describe('XX页面 - 前端渲染验证', () => {
+  const jsErrors = []
+  const consoleErrors = []
+
+  test.beforeEach(async ({ page }) => {
+    // 收集所有 JS 错误（不忽略任何错误）
+    page.on('pageerror', error => {
+      console.error(`❌ JS Error: ${error.message}`)
+      jsErrors.push(error.message)
+    })
+    
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        consoleErrors.push(msg.text())
+      }
+    })
+  })
+
+  test.afterEach(async () => {
+    // 强制断言：不允许有任何 JS 错误
+    expect(jsErrors, 
+      `检测到 ${jsErrors.length} 个 JS 错误:\n${jsErrors.join('\n')}`
+    ).toHaveLength(0)
+  })
+
+  test('API 数据正确渲染到页面', async ({ page }) => {
+    // 1. 监听 API 响应
+    const responsePromise = page.waitForResponse('**/api/endpoint')
+    await page.goto('/page')
+    const response = await responsePromise
+    const data = await response.json()
+    
+    // 2. 验证 API 有数据
+    const apiCount = data.data.list.length
+    expect(apiCount, 'API 应返回数据').toBeGreaterThan(0)
+    
+    // 3. 等待 Alpine.js 渲染
+    await page.waitForTimeout(1000)
+    await page.waitForSelector('[x-cloak]', { state: 'hidden', timeout: 5000 })
+      .catch(() => {}) // x-cloak 可能已经移除
+    
+    // 4. 验证页面渲染数量与 API 一致
+    const renderedCount = await page.locator('.list-item').count()
+    expect(renderedCount, 
+      `API 返回 ${apiCount} 条，页面渲染 ${renderedCount} 条，数量不一致！`
+    ).toBe(apiCount)
+    
+    // 5. 验证关键字段显示
+    const firstItem = page.locator('.list-item').first()
+    await expect(firstItem).toContainText(data.data.list[0].name || data.data.list[0].title)
+  })
+})
+```
+
+### ⚠️ 常见前端 Bug 模式及检测方法
+
+| Bug 模式 | 症状 | 检测方法 |
+|---------|------|---------|
+| **变量名不匹配** | `x is not defined` 错误 | `page.on('pageerror')` 捕获 |
+| **字段名不匹配** | 页面显示空白或 undefined | 比较 API 字段与 HTML 模板字段 |
+| **组件未初始化** | x-cloak 永远不消失 | 等待 x-cloak 移除超时检测 |
+| **异步渲染失败** | API 有数据但列表为空 | 比较 API count 与 DOM count |
+| **模板语法错误** | 整个组件不渲染 | 检查 Alpine.js 初始化状态 |
+
+### 🛑 测试中绝对禁止的做法
+
+```javascript
+// ❌ 禁止1：预先"原谅"特定错误
+if (error.message.includes('xxx is not defined')) {
+  return  // 忽略
+}
+
+// ❌ 禁止2：元素不存在就静默跳过
+if (items.length === 0) {
+  console.log('无数据，跳过')
+  return
+}
+
+// ❌ 禁止3：只检查 API 不检查渲染
+expect(apiData.length).toBeGreaterThan(0)  // 只检查这个是不够的！
+
+// ❌ 禁止4：使用过长的固定等待代替正确的等待条件
+await page.waitForTimeout(5000)  // 不如等待具体条件
+
+// ❌ 禁止5：catch 所有错误不报告
+try { await something() } catch (e) { /* 静默 */ }
+```
+
+---
+
+## 🚨 前后端参数契约验证规则（2026-02-03 新增）
+
+### 问题背景
+
+以下是一个真实案例：Playwright 测试全部通过（22个测试），但日期筛选功能实际不工作：
+
+```javascript
+// ❌ 前端发送的参数名
+logFilters: {
+  start_date: '',  // 前端使用 start_date
+  end_date: ''     // 前端使用 end_date
+}
+
+// ❌ 后端期望的参数名
+queryLogs(filters) {
+  const { start_time, end_time } = filters  // 后端期望 start_time/end_time
+}
+
+// 结果：参数名不匹配，后端收不到日期筛选参数，返回全部数据
+```
+
+**测试为什么没发现？**
+1. 测试只验证了"API 请求被发送"，没有验证"参数名是否正确"
+2. 测试只验证了"输入框存在"，没有验证"筛选是否真正生效"
+3. 测试没有交叉验证"返回数据是否在指定日期范围内"
+
+### 🔴 规则1：前后端参数名一致性验证（强制）
+
+**每个筛选功能必须验证前端参数名与后端 API 参数名一致**
+
+```javascript
+// ✅ 正确：测试前先检查后端 API 期望的参数名
+test.beforeAll(async () => {
+  // 从后端路由文件或 API 文档确认参数名
+  // 后端路由: routes/v4/console/audit-logs.js
+  // @query {string} [start_time] - 开始时间
+  // @query {string} [end_time] - 结束时间
+  
+  const BACKEND_EXPECTED_PARAMS = {
+    dateStart: 'start_time',  // 后端期望的开始时间参数名
+    dateEnd: 'end_time',      // 后端期望的结束时间参数名
+    merchantId: 'store_id',   // 后端期望的商户参数名
+  }
+})
+
+test('日期筛选参数名必须与后端一致', async ({ page }) => {
+  let capturedUrl = null
+  page.on('request', req => {
+    if (req.url().includes('audit-logs')) capturedUrl = req.url()
+  })
+  
+  // 操作日期筛选
+  await page.fill('input[type="date"]', '2026-01-28')
+  await page.click('button:has-text("搜索")')
+  await page.waitForTimeout(1000)
+  
+  // 🔴 强制验证：参数名必须与后端一致
+  expect(capturedUrl, '前端必须使用后端期望的参数名 start_time')
+    .toContain('start_time=')  // 不是 start_date=
+  expect(capturedUrl, '前端必须使用后端期望的参数名 end_time')
+    .toContain('end_time=')    // 不是 end_date=
+})
+
+// ❌ 错误：只验证"有日期参数"，不验证参数名
+test('日期筛选触发 API 请求', async ({ page }) => {
+  // 这样的测试无法发现参数名不匹配问题！
+  expect(url).toMatch(/start/)  // ❌ 太宽松，start_date 也会匹配
+})
+```
+
+### 🔴 规则2：日期时间格式完整性验证（强制）
+
+**日期筛选必须验证时间部分是否正确补全**
+
+```javascript
+// 场景：用户选择 2026-01-28，期望查询该天全部数据
+// 
+// ❌ 错误实现（只发送日期）
+// start_time=2026-01-28 → 解析为 00:00:00
+// end_time=2026-01-28   → 解析为 00:00:00（不是 23:59:59！）
+// 结果：只能查到 00:00:00 那一秒的数据
+//
+// ✅ 正确实现（补全时间部分）
+// start_time=2026-01-28 00:00:00
+// end_time=2026-01-28 23:59:59
+
+test('【强制】日期筛选必须包含完整时间格式', async ({ page }) => {
+  let capturedUrl = null
+  page.on('request', req => {
+    if (req.url().includes('audit-logs')) capturedUrl = req.url()
+  })
+  
+  // 设置开始和结束日期为同一天
+  await page.fill('input[x-model*="start"]', '2026-01-28')
+  await page.fill('input[x-model*="end"]', '2026-01-28')
+  await page.click('button:has-text("搜索")')
+  await page.waitForTimeout(1000)
+  
+  // 🔴 强制验证：时间部分必须正确
+  // URL编码后：00:00:00 → 00%3A00%3A00，23:59:59 → 23%3A59%3A59
+  expect(capturedUrl, 'start_time 必须补全为 00:00:00')
+    .toMatch(/start_time=2026-01-28[+%20]00%3A00%3A00/)
+  expect(capturedUrl, 'end_time 必须补全为 23:59:59')
+    .toMatch(/end_time=2026-01-28[+%20]23%3A59%3A59/)
+})
+```
+
+### 🔴 规则3：筛选结果数据交叉验证（强制）
+
+**筛选后必须验证返回数据确实在指定范围内**
+
+```javascript
+test('【强制】筛选结果必须在指定范围内', async ({ page }) => {
+  const filterDate = '2026-01-28'
+  let apiData = null
+  
+  page.on('response', async res => {
+    if (res.url().includes('audit-logs') && res.request().method() === 'GET') {
+      const body = await res.json().catch(() => null)
+      if (body?.success) apiData = body.data
+    }
+  })
+  
+  // 执行日期筛选
+  await page.fill('input[x-model*="start"]', filterDate)
+  await page.fill('input[x-model*="end"]', filterDate)
+  await page.click('button:has-text("搜索")')
+  await page.waitForTimeout(2000)
+  
+  // 🔴 强制验证：返回数据必须在指定日期范围内
+  if (apiData?.items?.length > 0) {
+    for (const item of apiData.items) {
+      const itemDate = item.created_at?.split(' ')[0] || 
+                       item.created_at?.beijing?.split(' ')[0]
+      
+      expect(itemDate, `数据日期 ${itemDate} 应该等于筛选日期 ${filterDate}`)
+        .toBe(filterDate)
+    }
+    console.log(`✅ 所有 ${apiData.items.length} 条数据都在 ${filterDate} 范围内`)
+  }
+})
+
+// ❌ 错误：只验证"有数据返回"，不验证数据是否符合筛选条件
+test('日期筛选返回数据', async ({ page }) => {
+  expect(apiData.items.length).toBeGreaterThan(0)  // ❌ 不够！
+  // 可能返回的是全部数据而不是筛选后的数据
+})
+```
+
+### 🔴 规则4：HTML-JS 变量绑定一致性检查（强制）
+
+**HTML 模板中的 x-model 绑定必须与 JS 定义的变量名一致**
+
+```javascript
+test.beforeAll('检查 HTML 与 JS 变量绑定一致性', async () => {
+  // 从 HTML 提取 x-model 绑定的变量名
+  const htmlContent = fs.readFileSync('finance-management.html', 'utf-8')
+  const xModelMatches = htmlContent.match(/x-model="([^"]+)"/g)
+  const htmlVariables = xModelMatches.map(m => m.match(/x-model="([^"]+)"/)[1])
+  
+  // 从 JS 提取定义的变量名
+  const jsContent = fs.readFileSync('composables/merchant-logs.js', 'utf-8')
+  
+  // 检查每个 HTML 绑定的变量是否在 JS 中定义
+  for (const variable of htmlVariables) {
+    const varName = variable.split('.').pop()  // logFilters.start_time → start_time
+    expect(jsContent, `HTML 使用了 ${variable}，但 JS 中未定义`).toContain(varName)
+  }
+})
+```
+
+### 📋 筛选功能测试检查清单（强制执行）
+
+在编写任何筛选功能测试前，必须完成以下检查：
+
+| # | 检查项 | 检查方法 | 示例 |
+|---|--------|---------|------|
+| 1 | **后端参数名** | 读取后端路由文件注释 | `@query {string} [start_time]` |
+| 2 | **前端参数名** | 读取前端 JS 文件 | `logFilters.start_date` |
+| 3 | **参数名是否一致** | 比较上述两者 | `start_date` ≠ `start_time` ❌ |
+| 4 | **日期格式要求** | 检查后端解析逻辑 | 是否需要完整时间 `HH:mm:ss` |
+| 5 | **HTML 绑定变量** | 检查 `x-model` 属性 | `x-model="logFilters.start_date"` |
+| 6 | **JS 变量定义** | 检查 state 定义 | `logFilters: { start_date: '' }` |
+
+### ⚠️ 常见筛选功能 Bug 模式
+
+| Bug 模式 | 表现 | 根本原因 | 检测方法 |
+|---------|------|---------|---------|
+| **参数名不匹配** | 筛选不生效，返回全部数据 | 前端 `start_date`，后端期望 `start_time` | 抓取 API URL 检查参数名 |
+| **时间格式不完整** | 日期筛选结果不精确 | 只发送日期没有时间部分 | 检查 URL 是否包含 `HH:mm:ss` |
+| **缺少输入框** | 无法精确筛选 | HTML 模板遗漏输入元素 | 检查筛选区域元素完整性 |
+| **HTML-JS 变量不匹配** | 输入无效或报错 | `x-model` 绑定了未定义的变量 | 比较 HTML 和 JS 的变量名 |
+
+### 🛑 测试中绝对禁止的做法（筛选功能）
+
+```javascript
+// ❌ 禁止1：只验证 API 被调用，不验证参数正确
+expect(apiCalled).toBe(true)  // 不够！
+
+// ❌ 禁止2：使用过于宽松的正则匹配参数名
+expect(url).toMatch(/date/)  // start_date 和 start_time 都能匹配！
+
+// ❌ 禁止3：只验证"有数据"，不验证数据符合筛选条件
+expect(data.length).toBeGreaterThan(0)  // 可能是未筛选的全部数据
+
+// ❌ 禁止4：假设日期格式不需要时间部分
+params.append('start_time', '2026-01-28')  // 缺少 00:00:00
+
+// ❌ 禁止5：不读后端代码就写测试
+// 必须先确认后端期望的参数名和格式！
+```
+
+### ✅ 正确的筛选功能测试流程
+
+```javascript
+test.describe('筛选功能测试（完整流程）', () => {
+  // 步骤1：先读后端代码确认参数契约
+  const BACKEND_CONTRACT = {
+    endpoint: '/api/v4/console/audit-logs',
+    params: {
+      start_time: 'YYYY-MM-DD HH:mm:ss',  // 后端期望格式
+      end_time: 'YYYY-MM-DD HH:mm:ss',
+      store_id: 'number'
+    }
+  }
+  
+  test('1. 验证前端使用正确的参数名', async ({ page }) => {
+    // 抓取实际发送的请求
+    // 比对参数名是否与 BACKEND_CONTRACT 一致
+  })
+  
+  test('2. 验证日期格式包含时间部分', async ({ page }) => {
+    // 检查 URL 是否包含 00:00:00 和 23:59:59
+  })
+  
+  test('3. 验证筛选结果数据在指定范围内', async ({ page }) => {
+    // 遍历返回数据，检查日期是否在筛选范围内
+  })
+  
+  test('4. 验证筛选后清除能恢复全部数据', async ({ page }) => {
+    // 清除筛选后数据量应该增加
+  })
+})
+```
+

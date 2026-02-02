@@ -662,7 +662,7 @@ class SettleStage extends BaseStage {
         lottery_id: lottery_campaign_id,
         lottery_campaign_id,
         draw_type, // 🆕 动态确定（single/multi）
-        batch_id, // 🆕 Phase 2：连抽批次ID（null 表示单抽）
+        lottery_batch_id: batch_id, // 🆕 Phase 2：连抽批次ID（null 表示单抽）
         asset_transaction_id: final_asset_transaction_id, // 🆕 关联资产流水ID（必填字段）
         lottery_prize_id: final_prize.lottery_prize_id,
         prize_name: final_prize.prize_name,

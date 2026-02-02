@@ -374,7 +374,15 @@ export function createCrudPageMixin(config, customProps = {}) {
         )
 
         if (result.success) {
-          this.afterBatchOperation()
+          // 安全调用 afterBatchOperation（仅在启用 tableSelection 时存在）
+          if (typeof this.afterBatchOperation === 'function') {
+            this.afterBatchOperation()
+          } else {
+            // 没有 tableSelection 时，直接重新加载数据
+            if (typeof this.loadData === 'function') {
+              this.loadData()
+            }
+          }
         }
       },
 

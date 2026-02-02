@@ -128,9 +128,9 @@ function customerServicePage() {
     sessionsLoading: true,
 
     /** 会话相关 */
-    allSessions: [],
+    sessions: [],           // 会话列表（HTML 模板使用 sessions）
     currentSessionId: null,
-    currentMessages: [],
+    messages: [],           // 当前会话消息（HTML 模板使用 messages）
     currentChatUser: {
       nickname: '',
       mobile: '',
@@ -272,7 +272,7 @@ function customerServicePage() {
       switch (data.type) {
         case 'new_message':
           if (String(data.session_id) === String(this.currentSessionId)) {
-            this.currentMessages.push(data.message)
+            this.messages.push(data.message)
             this.$nextTick(() => this.scrollToBottom())
           }
           this.loadSessions(true)
@@ -313,7 +313,7 @@ function customerServicePage() {
         )
 
         if (response && response.success) {
-          this.allSessions = response.data.sessions || response.data.list || []
+          this.sessions = response.data.sessions || response.data.list || []
         } else if (!silent) {
           this.showError(response?.message || '获取会话列表失败')
         }
@@ -358,7 +358,7 @@ function customerServicePage() {
             avatar: session.user?.avatar_url || this.defaultAvatar
           }
 
-          this.currentMessages = messages
+          this.messages = messages
           this.$nextTick(() => this.scrollToBottom())
           this.markAsRead(sessionId)
           this.loadSessions(true)
@@ -387,7 +387,7 @@ function customerServicePage() {
           buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_SESSION_MESSAGES, { session_id: sessionId })
         )
         if (response && response.success) {
-          this.currentMessages = response.data.messages || []
+          this.messages = response.data.messages || []
           this.$nextTick(() => this.scrollToBottom())
         }
       } catch (error) {
@@ -430,7 +430,7 @@ function customerServicePage() {
         if (response && response.success) {
           this.messageInput = ''
           // 使用后端字段名 content（不是 message_content）
-          this.currentMessages.push({
+          this.messages.push({
             sender_type: 'admin',
             content: content,
             created_at: new Date().toISOString()
@@ -574,7 +574,7 @@ function customerServicePage() {
     closeCurrentChat() {
       this.currentSessionId = null
       this.selectedSession = null
-      this.currentMessages = []
+      this.messages = []
       this.currentChatUser = { nickname: '', mobile: '', avatar: '' }
       this.messageInput = ''
     },
@@ -592,8 +592,8 @@ function customerServicePage() {
       this.loadingOverlay = true
 
       try {
-        const session = this.allSessions.find(
-          s => String(s.session_id) === String(this.currentSessionId)
+        const session = this.sessions.find(
+          s => String(s.customer_service_session_id) === String(this.currentSessionId)
         )
 
         if (!session) {
@@ -714,8 +714,8 @@ function customerServicePage() {
      * @param {Object} session - 会话对象
      */
     selectSession(session) {
-      if (session && session.session_id) {
-        this.openSession(session.session_id)
+      if (session && session.customer_service_session_id) {
+        this.openSession(session.customer_service_session_id)
       }
     },
 
