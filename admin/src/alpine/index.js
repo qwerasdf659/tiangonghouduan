@@ -38,7 +38,7 @@ import {
 // 导入布局组件
 import { sidebarNav } from './components/sidebar-nav.js'
 import { workspaceTabs } from './components/workspace-tabs.js'
-import { themeSwitcher } from './components/theme-switcher.js'
+import { appearanceSettings } from './components/appearance-settings.js'
 import { notificationCenter } from './components/notification-center.js'
 
 // 导入交互增强组件
@@ -308,9 +308,9 @@ export function initAlpine() {
   // ========== 注册布局组件 ==========
   Alpine.data('sidebarNav', sidebarNav)
   Alpine.data('workspaceTabs', workspaceTabs)
-  Alpine.data('themeSwitcher', themeSwitcher)
+  Alpine.data('appearanceSettings', appearanceSettings)
   Alpine.data('notificationCenter', notificationCenter)
-  logger.debug('布局组件已注册: sidebarNav, workspaceTabs, themeSwitcher, notificationCenter')
+  logger.debug('布局组件已注册: sidebarNav, workspaceTabs, appearanceSettings, notificationCenter')
 
   // ========== 注册交互增强组件 ==========
   Alpine.data('emptyState', emptyState)
@@ -410,7 +410,7 @@ export {
 }
 
 // 导出布局组件
-export { sidebarNav, workspaceTabs, themeSwitcher, notificationCenter }
+export { sidebarNav, workspaceTabs, appearanceSettings, notificationCenter }
 
 // 导出交互增强组件
 export {

@@ -1,0 +1,194 @@
+/**
+ * 字体预设定义
+ * @description 支持一键切换的字体方案
+ * @version 1.0.0
+ */
+
+/* =====================================================
+   字体资源引入（本地托管 - 推荐生产环境）
+   字体文件存放路径: /public/fonts/
+   ===================================================== */
+
+/* Inter - 现代无衬线 */
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/Inter-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/Inter-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/Inter-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/Inter-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Noto Sans SC - 思源黑体 */
+@font-face {
+  font-family: 'Noto Sans SC';
+  src: url('/fonts/NotoSansSC-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Sans SC';
+  src: url('/fonts/NotoSansSC-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Sans SC';
+  src: url('/fonts/NotoSansSC-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* HarmonyOS Sans SC - 鸿蒙字体 */
+@font-face {
+  font-family: 'HarmonyOS Sans SC';
+  src: url('/fonts/HarmonyOS_Sans_SC_Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'HarmonyOS Sans SC';
+  src: url('/fonts/HarmonyOS_Sans_SC_Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'HarmonyOS Sans SC';
+  src: url('/fonts/HarmonyOS_Sans_SC_Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* LXGW WenKai - 霞鹜文楷 */
+@font-face {
+  font-family: 'LXGW WenKai';
+  src: url('/fonts/LXGWWenKai-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LXGW WenKai';
+  src: url('/fonts/LXGWWenKai-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* =====================================================
+   字体变量定义
+   ===================================================== */
+
+/* 系统默认字体 */
+:root,
+[data-font='system'] {
+  --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-family-heading: var(--font-family-base);
+  --font-family-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco,
+    Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+/* Inter - 现代无衬线 */
+[data-font='inter'] {
+  --font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  --font-family-heading: 'Inter', sans-serif;
+}
+
+/* 思源黑体 */
+[data-font='noto-sans'] {
+  --font-family-base: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei',
+    sans-serif;
+  --font-family-heading: 'Noto Sans SC', sans-serif;
+}
+
+/* 鸿蒙字体（本地托管） */
+[data-font='harmony'] {
+  --font-family-base: 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei',
+    sans-serif;
+  --font-family-heading: 'HarmonyOS Sans SC', sans-serif;
+}
+
+/* 霞鹜文楷 */
+[data-font='lxgw'] {
+  --font-family-base: 'LXGW WenKai', 'PingFang SC', 'Microsoft YaHei', serif;
+  --font-family-heading: 'LXGW WenKai', serif;
+}
+
+/* =====================================================
+   字体应用规则
+   ===================================================== */
+
+/**
+ * ⚠️ 重要：使用 html[data-font] 选择器确保覆盖 index.css 中 @layer base 的样式
+ * 因为 @layer base 优先级高于普通选择器，需要使用属性选择器提升优先级
+ */
+html[data-font] {
+  font-family: var(--font-family-base);
+}
+
+/* 回退：未设置 data-font 时使用系统默认 */
+html:not([data-font]) {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-family-heading);
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-family-mono);
+}
+
+/* 字体切换过渡效果 */
+html,
+body,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+span,
+div {
+  transition: font-family 0.2s ease;
+}
+
+

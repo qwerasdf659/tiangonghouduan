@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '奖品配置', 
+    pageStyle: '[x-cloak] { display: none !important; } .tab-content-frame { border: none; width: 100%; min-height: calc(100vh - 180px); }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
+        <span class="text-lg font-semibold">🎁 奖品配置</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="prizeConfigPage()" x-init="init()">
+    
+    <!-- Tab导航 -->
+    <div class="themed-card rounded-lg shadow mb-6">
+      <div class="flex border-b overflow-x-auto">
+        <template x-for="tab in tabs" :key="tab.id">
+          <button 
+            @click="switchTab(tab.id)"
+            :class="currentTab === tab.id ? 'border-b-2 themed-border-primary themed-text-primary themed-bg-primary-light' : 'themed-text-muted themed-hover-bg'"
+            class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
+            x-text="tab.icon + ' ' + tab.name"
+          ></button>
+        </template>
+      </div>
+    </div>
+
+    <!-- Tab内容区域 -->
+    <div class="themed-card rounded-lg shadow overflow-hidden">
+      <!-- 物品模板 -->
+      <div x-show="currentTab === 'item-templates'" x-cloak>
+        <iframe 
+          src="/admin/item-templates.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="itemTemplatesFrame"
+        ></iframe>
+      </div>
+      
+      <!-- 物料转换规则 -->
+      <div x-show="currentTab === 'material-rules'" x-cloak>
+        <iframe 
+          src="/admin/material-conversion-rules.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="materialRulesFrame"
+        ></iframe>
+      </div>
+      
+      <!-- 资产组合 -->
+      <div x-show="currentTab === 'assets-portfolio'" x-cloak>
+        <iframe 
+          src="/admin/assets-portfolio.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="assetsPortfolioFrame"
+        ></iframe>
+      </div>
+    </div>
+
+  </div>
+
+  <%- include('partials/footer') %>
+
+  <script type="module">
+    import { logger } from './src/utils/logger.js'
+    import { Alpine, createPageMixin } from './src/alpine/index.js'
+
+    document.addEventListener('alpine:init', () => {
+      logger.info('[PrizeConfigPage] 注册 Alpine 组件...')
+
+      Alpine.data('prizeConfigPage', () => ({
+        ...createPageMixin(),
+
+        // Tab配置
+        tabs: [
+          { id: 'item-templates', name: '物品模板', icon: '📦' },
+          { id: 'material-rules', name: '物料转换规则', icon: '🔄' },
+          { id: 'assets-portfolio', name: '资产组合', icon: '💎' }
+        ],
+
+        // 当前选中的Tab
+        currentTab: 'item-templates',
+
+        init() {
+          logger.info('[PrizeConfigPage] 页面初始化')
+          if (!this.checkAuth()) return
+
+          // 从URL参数读取初始Tab
+          const urlParams = new URLSearchParams(window.location.search)
+          const tabParam = urlParams.get('tab')
+          if (tabParam && this.tabs.some(t => t.id === tabParam)) {
+            this.currentTab = tabParam
+          }
+        },
+
+        switchTab(tabId) {
+          this.currentTab = tabId
+          // 更新URL参数
+          const url = new URL(window.location)
+          url.searchParams.set('tab', tabId)
+          window.history.pushState({}, '', url)
+          logger.info('[PrizeConfigPage] 切换Tab:', tabId)
+        }
+      }))
+
+      logger.info('[PrizeConfigPage] Alpine 组件已注册')
+    })
+  </script>
+</body>
+</html>
+

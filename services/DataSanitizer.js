@@ -419,10 +419,10 @@ class DataSanitizer {
    *   admin_notes（管理员备注）等敏感字段
    * - 只返回业务必需的会话信息：会话ID、类型、状态、最后消息、未读数量、创建时间
    *
-   * @param {Array<Object>} sessions - 会话数据数组，包含session_id、type、internal_notes等字段
+   * @param {Array<Object>} sessions - 会话数据数组，包含customer_service_session_id、internal_notes等字段
    * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
    * @returns {Array<Object>} 脱敏后的会话数组
-   * @returns {string} return[].session_id - 会话ID
+   * @returns {number} return[].id - 会话ID（脱敏输出使用通用id字段）
    * @returns {string} return[].type - 会话类型
    * @returns {string} return[].status - 会话状态
    * @returns {Object|null} return[].last_message - 最后消息对象（包含content、sender_type、created_at）
@@ -445,11 +445,11 @@ class DataSanitizer {
    *
    * 脱敏规则：
    * - 管理员（dataLevel='full'）：返回完整会话数据（包含internal_notes、escalation_reasons等）
-   * - 普通用户（dataLevel='public'）：仅返回基础字段（session_id、type、status、messages、created_at）
+   * - 普通用户（dataLevel='public'）：仅返回基础字段（id、status、messages、created_at）
    *
    * 数据安全：
    * - 移除敏感字段：internal_notes（内部备注）、escalation_reasons（升级原因）、admin_notes（客服备注）
-   * - 保留业务字段：session_id、type、status、messages（消息关联数据）、created_at
+   * - 保留业务字段：id（脱敏会话ID）、status、messages（消息关联数据）、created_at
    *
    * @param {Array} sessions - 会话列表数组（Sequelize查询结果）
    * @param {string} dataLevel - 数据级别（'full'管理员完整数据 / 'public'普通用户脱敏数据）
@@ -475,10 +475,10 @@ class DataSanitizer {
       const sessionData = session.toJSON ? session.toJSON() : session
 
       return {
-        session_id: sessionData.session_id, // 会话ID（业务主键）
+        id: sessionData.customer_service_session_id, // 会话ID（脱敏输出使用通用id字段）
         status: sessionData.status, // 会话状态（waiting/assigned/active/closed）
         messages: sessionData.messages, // 消息关联数据（Sequelize include查询结果）
-        createdAt: sessionData.createdAt // 会话创建时间（北京时间）- 注意：Sequelize返回驼峰命名
+        created_at: sessionData.createdAt // 会话创建时间（北京时间）- 统一使用snake_case
         /*
          * ❌ 移除敏感字段：internal_notes、escalation_reasons、admin_notes、close_reason、closed_by
          * ❌ 移除type字段：数据库表中不存在此字段

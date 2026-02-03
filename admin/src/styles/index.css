@@ -11,7 +11,8 @@
 @import './layout/sidebar.css';
 @import './layout/workspace-tabs.css';
 @import './layout/themes.css';
-@import './layout/theme-switcher.css';
+@import './layout/fonts.css';
+@import './layout/appearance-settings.css';
 
 /* ========== 组件样式 - 用户交互升级 ========== */
 @import './components/skeleton.css';

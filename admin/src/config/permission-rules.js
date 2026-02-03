@@ -87,25 +87,11 @@ export const MENU_ACCESS_RULES = {
   'analytics.analytics': { minLevel: 30, description: '运营分析' },
 
   // ========== 系统设置（管理员专属 role_level >= 100） ==========
+  // 改为二级菜单结构（每个子项指向一个Tab页面）
   system: { minLevel: 100, description: '系统设置（分组）' },
-  // 奖品配置子分组
-  'system.prize-config': { minLevel: 100, description: '奖品配置（子分组）' },
-  'system.prize-config.item-tpl': { minLevel: 100, description: '物品模板' },
-  'system.prize-config.material-rules': { minLevel: 100, description: '物料转换规则' },
-  'system.prize-config.assets-portfolio': { minLevel: 100, description: '资产组合' },
-  // 运营规则子分组
-  'system.ops-rules': { minLevel: 100, description: '运营规则（子分组）' },
-  'system.ops-rules.pricing': { minLevel: 100, description: '定价配置' },
-  'system.ops-rules.feature-flags': { minLevel: 100, description: '功能开关' },
-  'system.ops-rules.reminder-rules': { minLevel: 100, description: '提醒规则' },
-  // 系统维护子分组
-  'system.sys-maintain': { minLevel: 100, description: '系统维护（子分组）' },
-  'system.sys-maintain.content': { minLevel: 100, description: '内容管理' },
-  'system.sys-maintain.dict': { minLevel: 100, description: '字典管理' },
-  'system.sys-maintain.settings': { minLevel: 100, description: '系统配置' },
-  'system.sys-maintain.sessions': { minLevel: 100, description: '会话管理' },
-  'system.sys-maintain.audit-logs': { minLevel: 100, description: '操作审计' },
-  'system.sys-maintain.config-tools': { minLevel: 100, description: '高级工具' }
+  'system.prize-config': { minLevel: 100, description: '奖品配置（Tab页面）' },
+  'system.ops-rules': { minLevel: 100, description: '运营规则（Tab页面）' },
+  'system.sys-maintain': { minLevel: 100, description: '系统维护（Tab页面）' }
 }
 
 // ========== 页面权限配置 ==========
@@ -155,7 +141,14 @@ export const PAGE_ACCESS_RULES = {
   // 方案A独立页面（从system-settings.html分离）
   'dict-management.html': { minLevel: 100, menuId: 'operations.dict' },
   'pricing-config.html': { minLevel: 100, menuId: 'operations.pricing' },
-  'feature-flags.html': { minLevel: 100, menuId: 'operations.feature-flags' }
+  'feature-flags.html': { minLevel: 100, menuId: 'operations.feature-flags' },
+
+  // 系统设置Tab页面（二级菜单改造后的新页面）
+  'prize-config.html': { minLevel: 100, menuId: 'system.prize-config' },
+  'ops-rules.html': { minLevel: 100, menuId: 'system.ops-rules' },
+  'sys-maintain.html': { minLevel: 100, menuId: 'system.sys-maintain' },
+  'reminder-rules.html': { minLevel: 100, menuId: 'system.ops-rules' },
+  'audit-logs.html': { minLevel: 100, menuId: 'system.sys-maintain' }
 }
 
 // ========== 权限判断函数 ==========

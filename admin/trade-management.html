@@ -23,6 +23,23 @@
   </nav>
 
   <div class="container mx-auto px-4 py-6">
+    <!-- Tab导航 -->
+    <div class="themed-card rounded-lg shadow mb-6">
+      <div class="flex border-b overflow-x-auto">
+        <template x-for="page in subPages" :key="page.id">
+          <button
+            @click="switchPage(page.id)"
+            :class="current_page === page.id ? 'border-b-2 themed-border-primary themed-text-primary themed-bg-primary-light' : 'themed-text-muted themed-hover-bg'"
+            class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
+            x-text="page.icon + ' ' + page.name"
+          ></button>
+        </template>
+      </div>
+    </div>
+
+    <!-- ==================== C2C交易订单 Tab ==================== -->
+    <div x-show="current_page === 'trade-orders'">
+
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
       <div class="themed-card rounded-lg shadow p-4 text-center">
@@ -145,6 +162,134 @@
         </div>
       </div>
     </div>
+
+    </div><!-- End of C2C交易订单 Tab -->
+
+    <!-- ==================== 上架统计 Tab ==================== -->
+    <div x-show="current_page === 'marketplace-stats'">
+      
+      <!-- 上架统计摘要卡片 -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <div class="text-4xl text-blue-400 mb-2">👥</div>
+          <h4 class="text-2xl font-bold themed-text-primary" x-text="marketplaceSummary.total_users_with_listings || 0">0</h4>
+          <p class="themed-text-muted text-sm">有上架商品的用户数</p>
+        </div>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <div class="text-4xl text-yellow-400 mb-2">⚠️</div>
+          <h4 class="text-2xl font-bold text-yellow-600" x-text="marketplaceSummary.users_near_limit || 0">0</h4>
+          <p class="themed-text-muted text-sm">接近上架上限</p>
+        </div>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <div class="text-4xl text-red-400 mb-2">🚫</div>
+          <h4 class="text-2xl font-bold text-red-600" x-text="marketplaceSummary.users_at_limit || 0">0</h4>
+          <p class="themed-text-muted text-sm">已达上架上限</p>
+        </div>
+        <div class="themed-card rounded-lg shadow p-4 text-center">
+          <div class="text-4xl text-green-400 mb-2">📦</div>
+          <h4 class="text-2xl font-bold text-green-600" x-text="maxListings">10</h4>
+          <p class="themed-text-muted text-sm">最大上架数限制</p>
+        </div>
+      </div>
+
+      <!-- 筛选栏 -->
+      <div class="themed-card rounded-lg shadow mb-6">
+        <div class="p-4">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">上架状态</label>
+              <select x-model="marketplaceFilters.status" class="w-full px-3 py-2 border rounded-lg">
+                <option value="all">全部状态</option>
+                <option value="normal">正常</option>
+                <option value="near_limit">接近上限</option>
+                <option value="at_limit">已达上限</option>
+              </select>
+            </div>
+            <div>
+              <button @click="loadMarketplaceStats()" class="w-full px-4 py-2 themed-btn-primary rounded-lg">
+                🔍 查询
+              </button>
+            </div>
+            <div>
+              <button @click="marketplaceFilters.status = 'all'; loadMarketplaceStats()" class="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+                🔄 重置
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 上架统计列表 -->
+      <div class="themed-card rounded-lg shadow">
+        <div class="p-4 border-b">
+          <h5 class="font-semibold">📊 用户上架统计</h5>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="themed-bg-base">
+              <tr>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户ID</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户昵称</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">当前上架数</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">上架上限</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">使用率</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <template x-if="marketplaceStats.length === 0">
+                <tr><td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无上架统计数据</td></tr>
+              </template>
+              <template x-for="stat in marketplaceStats" :key="stat.user_id">
+                <tr class="themed-hover-bg">
+                  <td class="px-4 py-3 text-sm font-mono" x-text="stat.user_id"></td>
+                  <td class="px-4 py-3 text-sm" x-text="stat.nickname || stat.user?.nickname || '-'"></td>
+                  <td class="px-4 py-3 text-sm font-mono themed-text-primary" x-text="stat.listing_count || stat.active_listings || 0"></td>
+                  <td class="px-4 py-3 text-sm font-mono" x-text="stat.max_listings || maxListings"></td>
+                  <td class="px-4 py-3">
+                    <div class="flex items-center gap-2">
+                      <div class="w-24 bg-gray-200 rounded-full h-2">
+                        <div class="h-2 rounded-full" 
+                             :class="{
+                               'bg-green-500': (stat.listing_count || 0) / (stat.max_listings || maxListings) < 0.7,
+                               'bg-yellow-500': (stat.listing_count || 0) / (stat.max_listings || maxListings) >= 0.7 && (stat.listing_count || 0) / (stat.max_listings || maxListings) < 1,
+                               'bg-red-500': (stat.listing_count || 0) >= (stat.max_listings || maxListings)
+                             }"
+                             :style="'width: ' + Math.min(100, ((stat.listing_count || 0) / (stat.max_listings || maxListings) * 100)) + '%'">
+                        </div>
+                      </div>
+                      <span class="text-sm" x-text="Math.round((stat.listing_count || 0) / (stat.max_listings || maxListings) * 100) + '%'"></span>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <span :class="{
+                      'bg-green-100 themed-text-success': (stat.listing_count || 0) < (stat.max_listings || maxListings) * 0.7,
+                      'bg-yellow-100 text-yellow-700': (stat.listing_count || 0) >= (stat.max_listings || maxListings) * 0.7 && (stat.listing_count || 0) < (stat.max_listings || maxListings),
+                      'bg-red-100 text-red-700': (stat.listing_count || 0) >= (stat.max_listings || maxListings)
+                    }" class="px-2 py-1 text-xs rounded" x-text="
+                      (stat.listing_count || 0) >= (stat.max_listings || maxListings) ? '已达上限' :
+                      (stat.listing_count || 0) >= (stat.max_listings || maxListings) * 0.7 ? '接近上限' : '正常'
+                    "></span>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- 分页 -->
+        <div class="p-4 border-t flex justify-between items-center">
+          <span class="text-sm themed-text-muted" x-text="'共 ' + (marketplacePagination?.total || 0) + ' 条记录'"></span>
+          <div class="flex space-x-2">
+            <button @click="changeMarketplacePage(marketplaceCurrentPage - 1)" :disabled="marketplaceCurrentPage <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
+            <span class="px-3 py-1" x-text="marketplaceCurrentPage + ' / ' + (marketplacePagination?.total_pages || 1)"></span>
+            <button @click="changeMarketplacePage(marketplaceCurrentPage + 1)" :disabled="marketplaceCurrentPage >= (marketplacePagination?.total_pages || 1)" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- End of 上架统计 Tab -->
+
   </div>
 
   <!-- C2C交易订单详情 Modal (新架构) -->

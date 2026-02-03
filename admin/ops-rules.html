@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '运营规则', 
+    pageStyle: '[x-cloak] { display: none !important; } .tab-content-frame { border: none; width: 100%; min-height: calc(100vh - 180px); }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
+        <span class="text-lg font-semibold">📊 运营规则</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="opsRulesPage()" x-init="init()">
+    
+    <!-- Tab导航 -->
+    <div class="themed-card rounded-lg shadow mb-6">
+      <div class="flex border-b overflow-x-auto">
+        <template x-for="tab in tabs" :key="tab.id">
+          <button 
+            @click="switchTab(tab.id)"
+            :class="currentTab === tab.id ? 'border-b-2 themed-border-primary themed-text-primary themed-bg-primary-light' : 'themed-text-muted themed-hover-bg'"
+            class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
+            x-text="tab.icon + ' ' + tab.name"
+          ></button>
+        </template>
+      </div>
+    </div>
+
+    <!-- Tab内容区域 -->
+    <div class="themed-card rounded-lg shadow overflow-hidden">
+      <!-- 定价配置 -->
+      <div x-show="currentTab === 'pricing'" x-cloak>
+        <iframe 
+          src="/admin/pricing-config.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="pricingFrame"
+        ></iframe>
+      </div>
+      
+      <!-- 功能开关 -->
+      <div x-show="currentTab === 'feature-flags'" x-cloak>
+        <iframe 
+          src="/admin/feature-flags.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="featureFlagsFrame"
+        ></iframe>
+      </div>
+      
+      <!-- 提醒规则 -->
+      <div x-show="currentTab === 'reminder-rules'" x-cloak>
+        <iframe 
+          src="/admin/reminder-rules.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="reminderRulesFrame"
+        ></iframe>
+      </div>
+    </div>
+
+  </div>
+
+  <%- include('partials/footer') %>
+
+  <script type="module">
+    import { logger } from './src/utils/logger.js'
+    import { Alpine, createPageMixin } from './src/alpine/index.js'
+
+    document.addEventListener('alpine:init', () => {
+      logger.info('[OpsRulesPage] 注册 Alpine 组件...')
+
+      Alpine.data('opsRulesPage', () => ({
+        ...createPageMixin(),
+
+        // Tab配置
+        tabs: [
+          { id: 'pricing', name: '定价配置', icon: '💰' },
+          { id: 'feature-flags', name: '功能开关', icon: '🎚️' },
+          { id: 'reminder-rules', name: '提醒规则', icon: '🔔' }
+        ],
+
+        // 当前选中的Tab
+        currentTab: 'pricing',
+
+        init() {
+          logger.info('[OpsRulesPage] 页面初始化')
+          if (!this.checkAuth()) return
+
+          // 从URL参数读取初始Tab
+          const urlParams = new URLSearchParams(window.location.search)
+          const tabParam = urlParams.get('tab')
+          if (tabParam && this.tabs.some(t => t.id === tabParam)) {
+            this.currentTab = tabParam
+          }
+        },
+
+        switchTab(tabId) {
+          this.currentTab = tabId
+          // 更新URL参数
+          const url = new URL(window.location)
+          url.searchParams.set('tab', tabId)
+          window.history.pushState({}, '', url)
+          logger.info('[OpsRulesPage] 切换Tab:', tabId)
+        }
+      }))
+
+      logger.info('[OpsRulesPage] Alpine 组件已注册')
+    })
+  </script>
+</body>
+</html>
+

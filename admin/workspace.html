@@ -267,6 +267,135 @@
             🔄
           </button>
 
+          <!-- 外观设置 - 主题和字体切换 -->
+          <div class="appearance-settings" x-data="appearanceSettings()" @click.outside="closePanel()">
+            <!-- 触发按钮 -->
+            <button 
+              class="appearance-trigger"
+              @click="togglePanel()"
+              :title="'外观设置 - 主题: ' + getCurrentThemeInfo().name + ', 字体: ' + getCurrentFontInfo().name"
+            >
+              <span class="trigger-icon" x-text="getCurrentThemeInfo().icon">💙</span>
+            </button>
+
+            <!-- 设置面板 -->
+            <div class="appearance-panel" :class="{ 'is-open': isOpen }">
+              <!-- 头部 -->
+              <div class="appearance-header">
+                <div class="appearance-title">
+                  <span>⚙️</span>
+                  <span>外观设置</span>
+                </div>
+                <button class="appearance-close" @click="closePanel()">
+                  <span>✕</span>
+                </button>
+              </div>
+
+              <!-- Tab导航 -->
+              <div class="appearance-tabs">
+                <button 
+                  class="appearance-tab" 
+                  :class="{ 'is-active': activeTab === 'theme' }"
+                  @click="activeTab = 'theme'"
+                >
+                  🎨 主题配色
+                </button>
+                <button 
+                  class="appearance-tab" 
+                  :class="{ 'is-active': activeTab === 'font' }"
+                  @click="activeTab = 'font'"
+                >
+                  🔤 字体
+                </button>
+              </div>
+
+              <!-- 内容区域 -->
+              <div class="appearance-content">
+                <!-- 主题选择 Tab -->
+                <div x-show="activeTab === 'theme'" class="appearance-section">
+                  <!-- 深色侧边栏主题 -->
+                  <div class="theme-group">
+                    <div class="theme-group-title">🌙 深色侧边栏</div>
+                    <div class="theme-grid">
+                      <template x-for="theme in darkSidebarThemes" :key="theme.id">
+                        <button 
+                          class="theme-card"
+                          :class="{ 'is-active': currentTheme === theme.id }"
+                          @click="setTheme(theme.id)"
+                        >
+                          <div class="theme-preview">
+                            <template x-for="(color, idx) in theme.colors" :key="idx">
+                              <div class="theme-color" :style="'background:' + color"></div>
+                            </template>
+                          </div>
+                          <div class="theme-info">
+                            <span class="theme-icon" x-text="theme.icon"></span>
+                            <span class="theme-name" x-text="theme.name"></span>
+                          </div>
+                          <div class="theme-check" x-show="currentTheme === theme.id">✓</div>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- 浅色侧边栏主题 -->
+                  <div class="theme-group">
+                    <div class="theme-group-title">☀️ 浅色侧边栏</div>
+                    <div class="theme-grid">
+                      <template x-for="theme in lightSidebarThemes" :key="theme.id">
+                        <button 
+                          class="theme-card"
+                          :class="{ 'is-active': currentTheme === theme.id }"
+                          @click="setTheme(theme.id)"
+                        >
+                          <div class="theme-preview">
+                            <template x-for="(color, idx) in theme.colors" :key="idx">
+                              <div class="theme-color" :style="'background:' + color"></div>
+                            </template>
+                          </div>
+                          <div class="theme-info">
+                            <span class="theme-icon" x-text="theme.icon"></span>
+                            <span class="theme-name" x-text="theme.name"></span>
+                          </div>
+                          <div class="theme-check" x-show="currentTheme === theme.id">✓</div>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 字体选择 Tab -->
+                <div x-show="activeTab === 'font'" class="appearance-section">
+                  <div class="font-list">
+                    <template x-for="font in fontPresets" :key="font.id">
+                      <button 
+                        class="font-card"
+                        :class="{ 'is-active': currentFont === font.id }"
+                        @click="setFont(font.id)"
+                      >
+                        <div class="font-preview" :style="'font-family:' + font.preview">
+                          Aa 中文
+                        </div>
+                        <div class="font-info">
+                          <span class="font-name" x-text="font.name"></span>
+                          <span class="font-desc" x-text="font.description"></span>
+                        </div>
+                        <div class="font-check" x-show="currentFont === font.id">✓</div>
+                      </button>
+                    </template>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 底部 -->
+              <div class="appearance-footer">
+                <button class="appearance-reset" @click="resetToDefault()">
+                  🔄 恢复默认
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- 实时提醒中心 -->
           <div 
             class="notification-center relative" 

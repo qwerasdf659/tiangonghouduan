@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '系统维护', 
+    pageStyle: '[x-cloak] { display: none !important; } .tab-content-frame { border: none; width: 100%; min-height: calc(100vh - 180px); }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
+        <span class="text-lg font-semibold">🔧 系统维护</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="sysMaintainPage()" x-init="init()">
+    
+    <!-- Tab导航 -->
+    <div class="themed-card rounded-lg shadow mb-6">
+      <div class="flex border-b overflow-x-auto">
+        <template x-for="tab in tabs" :key="tab.id">
+          <button 
+            @click="switchTab(tab.id)"
+            :class="currentTab === tab.id ? 'border-b-2 themed-border-primary themed-text-primary themed-bg-primary-light' : 'themed-text-muted themed-hover-bg'"
+            class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
+            x-text="tab.icon + ' ' + tab.name"
+          ></button>
+        </template>
+      </div>
+    </div>
+
+    <!-- Tab内容区域 -->
+    <div class="themed-card rounded-lg shadow overflow-hidden">
+      <!-- 内容管理 -->
+      <div x-show="currentTab === 'content'" x-cloak>
+        <iframe 
+          src="/admin/content-management.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="contentFrame"
+        ></iframe>
+      </div>
+      
+      <!-- 字典管理 -->
+      <div x-show="currentTab === 'dict'" x-cloak>
+        <iframe 
+          src="/admin/dict-management.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="dictFrame"
+        ></iframe>
+      </div>
+      
+      <!-- 系统配置 -->
+      <div x-show="currentTab === 'settings'" x-cloak>
+        <iframe 
+          src="/admin/system-settings.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="settingsFrame"
+        ></iframe>
+      </div>
+      
+      <!-- 会话管理 -->
+      <div x-show="currentTab === 'sessions'" x-cloak>
+        <iframe 
+          src="/admin/sessions.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="sessionsFrame"
+        ></iframe>
+      </div>
+      
+      <!-- 操作审计 -->
+      <div x-show="currentTab === 'audit-logs'" x-cloak>
+        <iframe 
+          src="/admin/audit-logs.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="auditLogsFrame"
+        ></iframe>
+      </div>
+      
+      <!-- 高级工具 -->
+      <div x-show="currentTab === 'config-tools'" x-cloak>
+        <iframe 
+          src="/admin/config-tools.html?embed=true" 
+          class="tab-content-frame"
+          x-ref="configToolsFrame"
+        ></iframe>
+      </div>
+    </div>
+
+  </div>
+
+  <%- include('partials/footer') %>
+
+  <script type="module">
+    import { logger } from './src/utils/logger.js'
+    import { Alpine, createPageMixin } from './src/alpine/index.js'
+
+    document.addEventListener('alpine:init', () => {
+      logger.info('[SysMaintainPage] 注册 Alpine 组件...')
+
+      Alpine.data('sysMaintainPage', () => ({
+        ...createPageMixin(),
+
+        // Tab配置
+        tabs: [
+          { id: 'content', name: '内容管理', icon: '📄' },
+          { id: 'dict', name: '字典管理', icon: '📖' },
+          { id: 'settings', name: '系统配置', icon: '⚙️' },
+          { id: 'sessions', name: '会话管理', icon: '💬' },
+          { id: 'audit-logs', name: '操作审计', icon: '📋' },
+          { id: 'config-tools', name: '高级工具', icon: '🛠️' }
+        ],
+
+        // 当前选中的Tab
+        currentTab: 'content',
+
+        init() {
+          logger.info('[SysMaintainPage] 页面初始化')
+          if (!this.checkAuth()) return
+
+          // 从URL参数读取初始Tab
+          const urlParams = new URLSearchParams(window.location.search)
+          const tabParam = urlParams.get('tab')
+          if (tabParam && this.tabs.some(t => t.id === tabParam)) {
+            this.currentTab = tabParam
+          }
+        },
+
+        switchTab(tabId) {
+          this.currentTab = tabId
+          // 更新URL参数
+          const url = new URL(window.location)
+          url.searchParams.set('tab', tabId)
+          window.history.pushState({}, '', url)
+          logger.info('[SysMaintainPage] 切换Tab:', tabId)
+        }
+      }))
+
+      logger.info('[SysMaintainPage] Alpine 组件已注册')
+    })
+  </script>
+</body>
+</html>
+

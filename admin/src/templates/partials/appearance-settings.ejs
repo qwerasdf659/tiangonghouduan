@@ -1,0 +1,134 @@
+<%# 外观设置组件 %>
+<div class="appearance-settings" x-data="appearanceSettings()" @click.outside="closePanel()">
+  
+  <!-- 触发按钮 -->
+  <button 
+    class="appearance-trigger"
+    @click="togglePanel()"
+    :title="'外观设置 - 主题: ' + getCurrentThemeInfo().name + ', 字体: ' + getCurrentFontInfo().name"
+  >
+    <span class="trigger-icon" x-text="getCurrentThemeInfo().icon">💙</span>
+  </button>
+
+  <!-- 设置面板 -->
+  <div class="appearance-panel" :class="{ 'is-open': isOpen }">
+    
+    <!-- 头部 -->
+    <div class="appearance-header">
+      <div class="appearance-title">
+        <span>⚙️</span>
+        <span>外观设置</span>
+      </div>
+      <button class="appearance-close" @click="closePanel()">
+        <span>✕</span>
+      </button>
+    </div>
+
+    <!-- Tab导航 -->
+    <div class="appearance-tabs">
+      <button 
+        class="appearance-tab" 
+        :class="{ 'active': activeTab === 'theme' }"
+        @click="setTab('theme')"
+      >
+        <span>🎨</span>
+        <span>主题</span>
+      </button>
+      <button 
+        class="appearance-tab" 
+        :class="{ 'active': activeTab === 'font' }"
+        @click="setTab('font')"
+      >
+        <span>🔤</span>
+        <span>字体</span>
+      </button>
+    </div>
+
+    <!-- 内容区 -->
+    <div class="appearance-body">
+      
+      <!-- 主题选择 -->
+      <div x-show="activeTab === 'theme'" x-transition>
+        
+        <!-- 深色侧边栏 -->
+        <div class="theme-section-title">🌙 深色侧边栏</div>
+        <div class="theme-grid">
+          <template x-for="theme in darkSidebarThemes" :key="theme.id">
+            <div 
+              class="theme-item"
+              :class="{ 'active': currentTheme === theme.id }"
+              @click="setTheme(theme.id)"
+            >
+              <span class="theme-icon" x-text="theme.icon"></span>
+              <span class="theme-name" x-text="theme.name"></span>
+              <div class="theme-colors">
+                <template x-for="(color, i) in theme.colors" :key="i">
+                  <span class="color-dot" :style="{ backgroundColor: color }"></span>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- 浅色侧边栏 -->
+        <div class="theme-section-title">☀️ 浅色侧边栏</div>
+        <div class="theme-grid">
+          <template x-for="theme in lightSidebarThemes" :key="theme.id">
+            <div 
+              class="theme-item"
+              :class="{ 'active': currentTheme === theme.id }"
+              @click="setTheme(theme.id)"
+            >
+              <span class="theme-icon" x-text="theme.icon"></span>
+              <span class="theme-name" x-text="theme.name"></span>
+              <div class="theme-colors">
+                <template x-for="(color, i) in theme.colors" :key="i">
+                  <span class="color-dot" :style="{ backgroundColor: color }"></span>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 字体选择 -->
+      <div x-show="activeTab === 'font'" x-transition>
+        <div class="font-list">
+          <template x-for="font in fonts" :key="font.id">
+            <div 
+              class="font-item"
+              :class="{ 'active': currentFont === font.id }"
+              :data-font-id="font.id"
+              @click="setFont(font.id)"
+            >
+              <div class="font-radio"></div>
+              <span class="font-icon" x-text="font.icon"></span>
+              <div class="font-info">
+                <div class="font-name" x-text="font.name"></div>
+                <div class="font-desc" x-text="font.desc"></div>
+              </div>
+              <span class="font-preview" x-text="font.preview"></span>
+            </div>
+          </template>
+        </div>
+        
+        <div class="font-tip">
+          <span>💡</span>
+          <span>提示：非系统字体首次加载可能需要几秒</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 底部 -->
+    <div class="appearance-footer">
+      <button class="quick-toggle" @click="toggleDarkMode()">
+        <span>🌓</span>
+        <span>快速切换深色/浅色</span>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+
