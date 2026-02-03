@@ -148,6 +148,68 @@
     <!-- ==================== Tab 1: 运营大盘 ==================== -->
     <template x-if="activeTab === 'overview'">
       <div class="space-y-6">
+        <!-- P0-4: 业务健康度卡片 -->
+        <div class="themed-card rounded-xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">🏥</span>
+              <div>
+                <h3 class="font-semibold themed-text">业务健康度</h3>
+                <p class="text-sm themed-text-muted" x-text="healthScore.status_text || '系统运行状态'"></p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span 
+                class="px-3 py-1 rounded-full text-sm font-medium"
+                :class="{
+                  'bg-green-100 text-green-700': healthScore.status === 'healthy',
+                  'bg-yellow-100 text-yellow-700': healthScore.status === 'warning',
+                  'bg-red-100 text-red-700': healthScore.status === 'critical',
+                  'bg-gray-100 text-gray-600': healthScore.status === 'loading' || !healthScore.status
+                }"
+                x-text="healthScore.status === 'healthy' ? '状态良好' : healthScore.status === 'warning' ? '需关注' : healthScore.status === 'critical' ? '需处理' : '加载中'"
+              ></span>
+              <span 
+                class="text-3xl font-bold"
+                :class="{
+                  'text-green-600': healthScore.score >= 90,
+                  'text-yellow-600': healthScore.score >= 70 && healthScore.score < 90,
+                  'text-orange-600': healthScore.score >= 50 && healthScore.score < 70,
+                  'text-red-600': healthScore.score < 50 && healthScore.score !== null,
+                  'text-gray-400': healthScore.score === null || healthScore.score === 0
+                }"
+                x-text="healthScore.score || '--'"
+              ></span>
+              <span class="text-sm themed-text-muted">/100</span>
+            </div>
+          </div>
+          <!-- 健康度进度条 -->
+          <div class="h-3 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              class="h-full rounded-full transition-all duration-500"
+              :class="{
+                'bg-green-500': healthScore.score >= 90,
+                'bg-yellow-500': healthScore.score >= 70 && healthScore.score < 90,
+                'bg-orange-500': healthScore.score >= 50 && healthScore.score < 70,
+                'bg-red-500': healthScore.score < 50 && healthScore.score > 0,
+                'bg-gray-400': healthScore.score === null || healthScore.score === 0
+              }"
+              :style="'width: ' + (healthScore.score || 0) + '%'"
+            ></div>
+          </div>
+          <!-- 健康度详细指标（如果有） -->
+          <template x-if="healthScore.components && Object.keys(healthScore.components).length > 0">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t themed-border">
+              <template x-for="(value, key) in healthScore.components" :key="key">
+                <div class="text-center">
+                  <div class="text-lg font-semibold themed-text" x-text="typeof value === 'object' ? value.score : value"></div>
+                  <div class="text-xs themed-text-muted" x-text="key.replace(/_/g, ' ')"></div>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+
         <!-- 核心指标卡片 - 5个 -->
         <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <!-- 今日抽奖次数 -->
@@ -263,6 +325,243 @@
           </div>
         </div>
         
+        <!-- P1-6: 时间对比卡片 -->
+        <div class="themed-card rounded-xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">📊</span>
+              <div>
+                <h3 class="font-semibold themed-text">数据对比分析</h3>
+                <p class="text-sm themed-text-muted">日环比与周同比数据对比</p>
+              </div>
+            </div>
+            <button 
+              @click="fetchComparison()" 
+              :disabled="loading"
+              class="px-3 py-1 text-sm themed-bg-subtle themed-text rounded-lg hover:themed-bg-hover transition"
+            >
+              <span x-show="!loading">🔄 刷新</span>
+              <span x-show="loading">...</span>
+            </button>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- 日环比：今日 vs 昨日 -->
+            <div class="p-4 themed-bg-subtle rounded-lg border themed-border">
+              <div class="flex items-center gap-2 mb-3">
+                <span class="text-lg">📅</span>
+                <span class="text-sm font-semibold themed-text">日环比（今日 vs 昨日）</span>
+              </div>
+              <div class="space-y-3">
+                <!-- 抽奖次数对比 -->
+                <div class="flex items-center justify-between">
+                  <span class="text-sm themed-text-muted">抽奖次数</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.daily.lottery_count?.today || 0)">--</span>
+                    <span 
+                      class="text-xs font-medium px-1.5 py-0.5 rounded"
+                      :class="{
+                        'bg-green-100 text-green-700': comparison.daily.lottery_count?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.daily.lottery_count?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.daily.lottery_count?.trend || comparison.daily.lottery_count?.trend === 'neutral'
+                      }"
+                    >
+                      <span x-text="getTrendIcon(comparison.daily.lottery_count?.trend)"></span>
+                      <span x-text="Math.abs(comparison.daily.lottery_count?.change || 0).toFixed(1) + '%'"></span>
+                    </span>
+                  </div>
+                </div>
+                <!-- 新增用户对比 -->
+                <div class="flex items-center justify-between">
+                  <span class="text-sm themed-text-muted">新增用户</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.daily.new_users?.today || 0)">--</span>
+                    <span 
+                      class="text-xs font-medium px-1.5 py-0.5 rounded"
+                      :class="{
+                        'bg-green-100 text-green-700': comparison.daily.new_users?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.daily.new_users?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.daily.new_users?.trend || comparison.daily.new_users?.trend === 'neutral'
+                      }"
+                    >
+                      <span x-text="getTrendIcon(comparison.daily.new_users?.trend)"></span>
+                      <span x-text="Math.abs(comparison.daily.new_users?.change || 0).toFixed(1) + '%'"></span>
+                    </span>
+                  </div>
+                </div>
+                <!-- 中奖率对比 -->
+                <div class="flex items-center justify-between">
+                  <span class="text-sm themed-text-muted">中奖率</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium themed-text" x-text="(comparison.daily.win_rate?.today || 0).toFixed(1) + '%'">--</span>
+                    <span 
+                      class="text-xs font-medium px-1.5 py-0.5 rounded"
+                      :class="{
+                        'bg-green-100 text-green-700': comparison.daily.win_rate?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.daily.win_rate?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.daily.win_rate?.trend || comparison.daily.win_rate?.trend === 'neutral'
+                      }"
+                    >
+                      <span x-text="getTrendIcon(comparison.daily.win_rate?.trend)"></span>
+                      <span x-text="Math.abs(comparison.daily.win_rate?.change || 0).toFixed(1) + '%'"></span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 周同比：本周 vs 上周 -->
+            <div class="p-4 themed-bg-subtle rounded-lg border themed-border">
+              <div class="flex items-center gap-2 mb-3">
+                <span class="text-lg">📆</span>
+                <span class="text-sm font-semibold themed-text">周同比（本周 vs 上周）</span>
+              </div>
+              <div class="space-y-3">
+                <!-- 抽奖次数对比 -->
+                <div class="flex items-center justify-between">
+                  <span class="text-sm themed-text-muted">抽奖次数</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.weekly.lottery_count?.this_week || 0)">--</span>
+                    <span 
+                      class="text-xs font-medium px-1.5 py-0.5 rounded"
+                      :class="{
+                        'bg-green-100 text-green-700': comparison.weekly.lottery_count?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.weekly.lottery_count?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.weekly.lottery_count?.trend || comparison.weekly.lottery_count?.trend === 'neutral'
+                      }"
+                    >
+                      <span x-text="getTrendIcon(comparison.weekly.lottery_count?.trend)"></span>
+                      <span x-text="Math.abs(comparison.weekly.lottery_count?.change || 0).toFixed(1) + '%'"></span>
+                    </span>
+                  </div>
+                </div>
+                <!-- 新增用户对比 -->
+                <div class="flex items-center justify-between">
+                  <span class="text-sm themed-text-muted">新增用户</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.weekly.new_users?.this_week || 0)">--</span>
+                    <span 
+                      class="text-xs font-medium px-1.5 py-0.5 rounded"
+                      :class="{
+                        'bg-green-100 text-green-700': comparison.weekly.new_users?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.weekly.new_users?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.weekly.new_users?.trend || comparison.weekly.new_users?.trend === 'neutral'
+                      }"
+                    >
+                      <span x-text="getTrendIcon(comparison.weekly.new_users?.trend)"></span>
+                      <span x-text="Math.abs(comparison.weekly.new_users?.change || 0).toFixed(1) + '%'"></span>
+                    </span>
+                  </div>
+                </div>
+                <!-- 中奖率对比 -->
+                <div class="flex items-center justify-between">
+                  <span class="text-sm themed-text-muted">中奖率</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium themed-text" x-text="(comparison.weekly.win_rate?.this_week || 0).toFixed(1) + '%'">--</span>
+                    <span 
+                      class="text-xs font-medium px-1.5 py-0.5 rounded"
+                      :class="{
+                        'bg-green-100 text-green-700': comparison.weekly.win_rate?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.weekly.win_rate?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.weekly.win_rate?.trend || comparison.weekly.win_rate?.trend === 'neutral'
+                      }"
+                    >
+                      <span x-text="getTrendIcon(comparison.weekly.win_rate?.trend)"></span>
+                      <span x-text="Math.abs(comparison.weekly.win_rate?.change || 0).toFixed(1) + '%'"></span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- P3-5: 资产发放/消耗比 -->
+        <div class="themed-card rounded-xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">⚖️</span>
+              <div>
+                <h3 class="font-semibold themed-text">资产发放/消耗比</h3>
+                <p class="text-sm themed-text-muted">系统资产流转健康度指标</p>
+              </div>
+            </div>
+            <span 
+              class="px-3 py-1 rounded-full text-sm font-medium"
+              :class="{
+                'bg-green-100 text-green-700': assetRatio.ratio >= 0.8 && assetRatio.ratio <= 1.5,
+                'bg-yellow-100 text-yellow-700': (assetRatio.ratio >= 0.5 && assetRatio.ratio < 0.8) || (assetRatio.ratio > 1.5 && assetRatio.ratio <= 2),
+                'bg-red-100 text-red-700': assetRatio.ratio < 0.5 || assetRatio.ratio > 2
+              }"
+              x-text="assetRatio.ratio >= 0.8 && assetRatio.ratio <= 1.5 ? '健康' : assetRatio.ratio >= 0.5 ? '需关注' : '异常'"
+            ></span>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- 发放量 -->
+            <div class="p-4 bg-green-50 rounded-lg border border-green-200">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-lg">📥</span>
+                <span class="text-sm font-medium text-green-700">发放量</span>
+              </div>
+              <div class="text-2xl font-bold text-green-600" x-text="formatNumber(assetRatio.issued)">0</div>
+            </div>
+            
+            <!-- 消耗量 -->
+            <div class="p-4 bg-red-50 rounded-lg border border-red-200">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-lg">📤</span>
+                <span class="text-sm font-medium text-red-700">消耗量</span>
+              </div>
+              <div class="text-2xl font-bold text-red-600" x-text="formatNumber(assetRatio.consumed)">0</div>
+            </div>
+            
+            <!-- 发放/消耗比 -->
+            <div class="p-4 themed-bg-subtle rounded-lg border themed-border">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-lg">⚖️</span>
+                <span class="text-sm font-medium themed-text">比例</span>
+              </div>
+              <div class="flex items-baseline gap-1">
+                <span 
+                  class="text-3xl font-bold"
+                  :class="{
+                    'text-green-600': assetRatio.ratio >= 0.8 && assetRatio.ratio <= 1.5,
+                    'text-yellow-600': (assetRatio.ratio >= 0.5 && assetRatio.ratio < 0.8) || (assetRatio.ratio > 1.5 && assetRatio.ratio <= 2),
+                    'text-red-600': assetRatio.ratio < 0.5 || assetRatio.ratio > 2
+                  }"
+                  x-text="assetRatio.ratio.toFixed(2)"
+                >1.00</span>
+                <span class="text-sm themed-text-muted">: 1</span>
+              </div>
+              <p class="text-xs themed-text-muted mt-1">理想范围: 0.8 ~ 1.5</p>
+            </div>
+          </div>
+          
+          <!-- 比例进度条 -->
+          <div class="mt-4">
+            <div class="flex justify-between text-xs themed-text-muted mb-1">
+              <span>消耗偏高</span>
+              <span>平衡</span>
+              <span>发放偏高</span>
+            </div>
+            <div class="h-2 bg-gray-200 rounded-full overflow-hidden relative">
+              <!-- 背景渐变指示 -->
+              <div class="absolute inset-0 flex">
+                <div class="w-1/4 bg-red-300"></div>
+                <div class="w-1/4 bg-yellow-300"></div>
+                <div class="w-1/4 bg-green-300"></div>
+                <div class="w-1/4 bg-yellow-300"></div>
+              </div>
+              <!-- 当前比例指示器 -->
+              <div 
+                class="absolute top-0 h-full w-1 bg-gray-800 rounded transition-all duration-500"
+                :style="'left: ' + Math.min(Math.max((assetRatio.ratio / 2.5) * 100, 0), 100) + '%'"
+              ></div>
+            </div>
+          </div>
+        </div>
+        
         <!-- 主内容区：趋势图 + 预警列表 -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <!-- 7天趋势图 -->
@@ -342,6 +641,63 @@
                 </div>
               </template>
             </div>
+          </div>
+        </div>
+        
+        <!-- P2-11: 今日核心事件时间线 -->
+        <div class="themed-card rounded-xl p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold themed-text">📅 今日核心事件</h3>
+            <button 
+              @click="loadTodayEvents()"
+              class="text-sm themed-text-muted hover:themed-text"
+            >🔄 刷新</button>
+          </div>
+          
+          <!-- 事件时间线 -->
+          <div class="relative pl-6" x-show="todayEvents.length > 0">
+            <!-- 时间线竖线 -->
+            <div class="absolute left-2 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+            
+            <template x-for="(event, index) in todayEvents" :key="index">
+              <div 
+                class="relative mb-4 pb-4 border-b border-dashed themed-border last:border-0 last:pb-0 last:mb-0 cursor-pointer hover:bg-gray-50 rounded p-2 -ml-2 transition"
+                @click="handleEventAction(event)"
+              >
+                <!-- 时间点圆点 -->
+                <div 
+                  class="absolute -left-4 top-3 w-3 h-3 rounded-full border-2 border-white shadow"
+                  :class="{
+                    'bg-red-500': event.level === 'critical',
+                    'bg-yellow-500': event.level === 'warning',
+                    'bg-green-500': event.level === 'success',
+                    'bg-blue-500': event.level === 'info' || !event.level
+                  }"
+                ></div>
+                
+                <!-- 事件内容 -->
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-mono themed-text-muted" x-text="event.time"></span>
+                      <span 
+                        class="text-lg"
+                        x-text="event.level === 'critical' ? '🔴' : event.level === 'warning' ? '🟡' : event.level === 'success' ? '🟢' : '🔵'"
+                      ></span>
+                      <span class="text-sm font-medium themed-text" x-text="event.title"></span>
+                    </div>
+                    <p class="text-xs themed-text-muted mt-1 ml-16" x-text="event.description"></p>
+                  </div>
+                  <span x-show="event.action_url" class="themed-text-muted text-sm">→</span>
+                </div>
+              </div>
+            </template>
+          </div>
+          
+          <!-- 无事件状态 -->
+          <div x-show="todayEvents.length === 0" class="text-center py-6 themed-text-muted">
+            <div class="text-4xl mb-2">✨</div>
+            <div>今日暂无核心事件</div>
           </div>
         </div>
         

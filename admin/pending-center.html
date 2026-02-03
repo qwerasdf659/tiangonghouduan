@@ -38,7 +38,7 @@
 </head>
 <body class="themed-bg-subtle min-h-screen">
   <div x-data="pendingCenterPage()" x-init="init()" x-cloak class="p-6 space-y-6">
-    <!-- 顶部标题和刷新 -->
+    <!-- 顶部标题和控制栏 -->
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-2xl font-bold themed-text">🔔 待处理中心</h1>
@@ -48,6 +48,21 @@
       </div>
       
       <div class="flex items-center gap-3">
+        <!-- P0-6: 自动刷新开关 -->
+        <label class="flex items-center gap-2 cursor-pointer">
+          <span class="text-sm themed-text-muted">自动刷新</span>
+          <button 
+            @click="toggleAutoRefresh()"
+            :class="autoRefresh ? 'bg-blue-500' : 'bg-gray-300'"
+            class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+          >
+            <span 
+              :class="autoRefresh ? 'translate-x-6' : 'translate-x-1'"
+              class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+            ></span>
+          </button>
+        </label>
+
         <!-- 类型筛选器 -->
         <select 
           x-model="filter.type"
@@ -84,6 +99,44 @@
           刷新
         </button>
       </div>
+    </div>
+    
+    <!-- P0-1: 健康度进度条 -->
+    <div class="themed-card rounded-xl p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-3">
+          <span class="text-lg">🏥</span>
+          <span class="font-semibold themed-text">待办健康度</span>
+          <span 
+            class="px-2 py-0.5 text-xs rounded-full font-medium"
+            :class="{
+              'bg-green-100 text-green-700': healthScore.score >= 90,
+              'bg-yellow-100 text-yellow-700': healthScore.score >= 70 && healthScore.score < 90,
+              'bg-orange-100 text-orange-700': healthScore.score >= 50 && healthScore.score < 70,
+              'bg-red-100 text-red-700': healthScore.score < 50 && healthScore.score !== null,
+              'bg-gray-100 text-gray-600': healthScore.score === null
+            }"
+            x-text="getHealthStatusLabel()"
+          ></span>
+        </div>
+        <div class="text-right">
+          <span 
+            class="text-2xl font-bold"
+            :class="getHealthScoreTextClass()"
+            x-text="healthScore.score !== null ? healthScore.score : '--'"
+          ></span>
+          <span class="text-sm themed-text-muted">/100</span>
+        </div>
+      </div>
+      <!-- 进度条 -->
+      <div class="h-3 bg-gray-200 rounded-full overflow-hidden">
+        <div 
+          class="h-full rounded-full transition-all duration-500"
+          :class="getHealthScoreColorClass()"
+          :style="'width: ' + (healthScore.score !== null ? healthScore.score : 0) + '%'"
+        ></div>
+      </div>
+      <p class="text-sm themed-text-muted mt-2" x-text="healthScore.status_text"></p>
     </div>
     
     <!-- 统计卡片 -->
@@ -182,10 +235,22 @@
     <!-- 待处理列表 -->
     <div class="themed-card rounded-xl overflow-hidden">
       <div class="p-4 themed-border-b flex items-center justify-between">
-        <h3 class="text-lg font-semibold themed-text">
-          📋 待处理列表 
-          <span class="text-sm font-normal themed-text-muted" x-text="'共 ' + pagination.total + ' 条'"></span>
-        </h3>
+        <div class="flex items-center gap-4">
+          <!-- 全选复选框 -->
+          <label class="flex items-center gap-2 cursor-pointer" @click.stop>
+            <input 
+              type="checkbox" 
+              :checked="selectAll"
+              @change="toggleSelectAll()"
+              class="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+            />
+            <span class="text-sm themed-text-muted" x-text="hasSelected ? '已选 ' + selectedIds.length + ' 项' : '全选'"></span>
+          </label>
+          <h3 class="text-lg font-semibold themed-text">
+            📋 待处理列表 
+            <span class="text-sm font-normal themed-text-muted" x-text="'共 ' + pagination.total + ' 条'"></span>
+          </h3>
+        </div>
         
         <!-- 排序选项 -->
         <div class="flex items-center gap-2">
@@ -220,13 +285,23 @@
         
         <template x-for="item in items" :key="item.id">
           <div 
-            class="item-row flex items-center justify-between p-4 cursor-pointer"
-            @click="handleItem(item)"
+            class="item-row flex items-center justify-between p-4"
+            :class="{ 'bg-blue-50': isSelected(item.id) }"
           >
             <div class="flex items-center gap-4">
+              <!-- 选择复选框 -->
+              <label class="flex-shrink-0" @click.stop>
+                <input 
+                  type="checkbox" 
+                  :checked="isSelected(item.id)"
+                  @change="toggleSelect(item.id)"
+                  class="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+                />
+              </label>
+              
               <!-- 类型图标 -->
               <div 
-                class="w-10 h-10 rounded-lg flex items-center justify-center text-xl"
+                class="w-10 h-10 rounded-lg flex items-center justify-center text-xl cursor-pointer"
                 :class="{
                   'bg-orange-100': item.type === 'consumption',
                   'bg-blue-100': item.type === 'customer_service',
@@ -234,12 +309,13 @@
                   'bg-red-100': item.type === 'risk_alert',
                   'bg-purple-100': item.type === 'refund'
                 }"
+                @click="handleItem(item)"
               >
                 <span x-text="getTypeIcon(item.type)"></span>
               </div>
               
               <!-- 内容 -->
-              <div class="flex-1">
+              <div class="flex-1 cursor-pointer" @click="handleItem(item)">
                 <div class="flex items-center gap-2">
                   <span class="font-medium themed-text" x-text="item.title"></span>
                   <!-- 紧急程度标签 -->
@@ -271,6 +347,7 @@
               
               <!-- 操作按钮 -->
               <button 
+                @click="handleItem(item)"
                 class="px-3 py-1.5 themed-border themed-text text-sm rounded-lg hover:themed-bg-subtle transition"
               >
                 处理 →
@@ -311,6 +388,50 @@
         </div>
       </template>
     </div>
+    
+    <!-- 批量操作浮动栏 -->
+    <template x-if="hasSelected">
+      <div 
+        class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50"
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0 translate-y-4"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100 translate-y-0"
+        x-transition:leave-end="opacity-0 translate-y-4"
+      >
+        <div class="flex items-center gap-4 px-6 py-3 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700">
+          <span class="text-sm themed-text">
+            已选择 <span class="font-bold text-blue-600" x-text="selectedIds.length"></span> 条记录
+          </span>
+          
+          <div class="h-6 w-px bg-gray-200 dark:bg-gray-700"></div>
+          
+          <button 
+            @click="batchApprove()"
+            :disabled="loading"
+            class="flex items-center gap-2 px-4 py-2 bg-green-500 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition disabled:opacity-50"
+          >
+            ✓ 批量通过
+          </button>
+          
+          <button 
+            @click="batchReject()"
+            :disabled="loading"
+            class="flex items-center gap-2 px-4 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition disabled:opacity-50"
+          >
+            ✗ 批量拒绝
+          </button>
+          
+          <button 
+            @click="clearSelection()"
+            class="flex items-center gap-2 px-4 py-2 themed-bg-subtle themed-text text-sm font-medium rounded-lg hover:themed-bg-base transition"
+          >
+            取消选择
+          </button>
+        </div>
+      </div>
+    </template>
   </div>
 
   <%- include('partials/footer') %>

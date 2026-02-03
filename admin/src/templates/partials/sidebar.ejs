@@ -19,9 +19,11 @@
   <!-- 导航菜单 -->
   <nav class="sidebar-nav scrollbar-thin">
     <template x-for="group in navGroups" :key="group.id">
-      <!-- 单项菜单（如工作台） -->
-      <template x-if="group.type === 'single'">
+      <!-- 使用 div 包装器确保 Alpine.js 正确处理多个条件分支 -->
+      <div class="nav-menu-item">
+        <!-- 单项菜单（如工作台） -->
         <a 
+          x-show="group.type === 'single'"
           class="nav-single"
           :class="{ 'active': isItemActive(group.url) }"
           @click.prevent="navigateTo(group.url, group.id, group.name, group.icon)"
@@ -30,11 +32,10 @@
           <span class="nav-icon" x-text="group.icon"></span>
           <span class="nav-text" x-text="group.name"></span>
         </a>
-      </template>
 
-      <!-- 分组菜单 -->
-      <template x-if="group.type !== 'single' && group.items">
+        <!-- 分组菜单（二级）- 有 items 但没有 subGroups -->
         <div 
+          x-show="group.type !== 'single' && group.items && group.items.length > 0 && (!group.subGroups || group.subGroups.length === 0)"
           class="nav-group"
           :class="{ 'expanded': isGroupExpanded(group.id) }"
         >
@@ -50,7 +51,7 @@
 
           <!-- 分组子项 -->
           <div class="nav-group-items">
-            <template x-for="item in group.items" :key="item.id">
+            <template x-for="item in (group.items || [])" :key="item.id">
               <a 
                 class="nav-item"
                 :class="{ 'active': isItemActive(item.url) }"
@@ -68,7 +69,55 @@
             </template>
           </div>
         </div>
-      </template>
+
+        <!-- 三级分组菜单（如系统设置）- 有 subGroups -->
+        <div 
+          x-show="group.subGroups && group.subGroups.length > 0"
+          class="nav-group nav-group-3level"
+          :class="{ 'expanded': isGroupExpanded(group.id) }"
+          :data-group-id="group.id"
+        >
+          <!-- 一级分组标题 -->
+          <div 
+            class="nav-group-title"
+            @click="toggleGroup(group.id)"
+          >
+            <span class="nav-icon" x-text="group.icon"></span>
+            <span class="nav-text" x-text="group.name"></span>
+            <span class="toggle-icon">▼</span>
+          </div>
+
+          <!-- 二级子分组 -->
+          <div class="nav-group-items">
+            <template x-for="subGroup in (group.subGroups || [])" :key="subGroup.id">
+              <div class="nav-subgroup" :class="{ 'expanded': isSubGroupExpanded(subGroup.id) }">
+                <!-- 子分组标题 -->
+                <div 
+                  class="nav-subgroup-title"
+                  @click="toggleSubGroup(subGroup.id)"
+                >
+                  <span class="nav-subicon" x-text="subGroup.icon || '📁'"></span>
+                  <span x-text="subGroup.name"></span>
+                  <span class="toggle-icon text-xs">▼</span>
+                </div>
+                <!-- 子分组菜单项 -->
+                <div class="nav-subgroup-items">
+                  <template x-for="item in (subGroup.items || [])" :key="item.id">
+                    <a 
+                      class="nav-item nav-item-nested"
+                      :class="{ 'active': isItemActive(item.url) }"
+                      @click.prevent="navigateTo(item.url, item.id, item.name, subGroup.icon || group.icon)"
+                      href="javascript:;"
+                    >
+                      <span x-text="item.name"></span>
+                    </a>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
     </template>
   </nav>
 

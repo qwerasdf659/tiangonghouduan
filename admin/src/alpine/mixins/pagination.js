@@ -215,9 +215,132 @@ export function paginationMixin(options = {}) {
     setPageSize(size) {
       this.page_size = size
       this.current_page = 1
+      // 清空预加载缓存
+      if (this._preloadCache) {
+        this._preloadCache.clear()
+      }
       if (typeof this.loadData === 'function') {
         this.loadData()
       }
+    },
+
+    // ==================== P2-12: 列表数据预加载下一页 ====================
+
+    /**
+     * 预加载缓存 (使用下划线前缀表示内部状态)
+     * @type {Map<number, {data: Array, timestamp: number}>}
+     */
+    _preloadCache: new Map(),
+
+    /**
+     * 预加载缓存过期时间（毫秒），默认5分钟
+     * @type {number}
+     */
+    _preloadCacheTTL: 5 * 60 * 1000,
+
+    /**
+     * 是否正在预加载
+     * @type {boolean}
+     */
+    _isPreloading: false,
+
+    /**
+     * 检查是否有有效的预加载缓存
+     * @param {number} page - 页码
+     * @returns {boolean}
+     */
+    hasPreloadedData(page) {
+      const cached = this._preloadCache.get(page)
+      if (!cached) return false
+      const isExpired = Date.now() - cached.timestamp > this._preloadCacheTTL
+      if (isExpired) {
+        this._preloadCache.delete(page)
+        return false
+      }
+      return true
+    },
+
+    /**
+     * 获取预加载的数据
+     * @param {number} page - 页码
+     * @returns {Array|null}
+     */
+    getPreloadedData(page) {
+      if (!this.hasPreloadedData(page)) return null
+      return this._preloadCache.get(page).data
+    },
+
+    /**
+     * 预加载下一页数据
+     * 需要组件实现 fetchPageData(page) 方法返回 Promise<Array>
+     */
+    async preloadNextPage() {
+      // 如果没有下一页或正在预加载，跳过
+      if (!this.hasNextPage || this._isPreloading) return
+
+      const nextPage = this.current_page + 1
+
+      // 如果已有缓存且未过期，跳过
+      if (this.hasPreloadedData(nextPage)) {
+        return
+      }
+
+      // 检查是否实现了 fetchPageData 方法
+      if (typeof this.fetchPageData !== 'function') {
+        return
+      }
+
+      this._isPreloading = true
+
+      try {
+        // 延迟500ms后预加载，避免影响当前页加载
+        await new Promise(resolve => setTimeout(resolve, 500))
+
+        const data = await this.fetchPageData(nextPage)
+
+        if (data && Array.isArray(data)) {
+          this._preloadCache.set(nextPage, {
+            data: data,
+            timestamp: Date.now()
+          })
+        }
+      } catch (error) {
+        // 预加载失败不影响主流程
+        console.warn('[Pagination] 预加载下一页失败:', error.message)
+      } finally {
+        this._isPreloading = false
+      }
+    },
+
+    /**
+     * 使用预加载数据跳转到下一页
+     * 如果有预加载数据则直接使用，否则调用 loadData
+     */
+    async nextPageWithPreload() {
+      if (!this.hasNextPage) return
+
+      const nextPage = this.current_page + 1
+      const preloadedData = this.getPreloadedData(nextPage)
+
+      if (preloadedData && typeof this.applyPreloadedData === 'function') {
+        // 直接使用预加载数据
+        this.current_page = nextPage
+        this.applyPreloadedData(preloadedData)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+
+        // 预加载下下一页
+        this.preloadNextPage()
+      } else {
+        // 没有预加载数据，正常加载
+        this.nextPage()
+      }
+    },
+
+    /**
+     * 清除预加载缓存
+     */
+    clearPreloadCache() {
+      this._preloadCache.clear()
     }
   }
 }

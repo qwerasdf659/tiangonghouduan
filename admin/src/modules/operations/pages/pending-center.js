@@ -346,6 +346,90 @@ function pendingCenterPage() {
     },
 
     /**
+     * 批量通过选中项
+     */
+    async batchApprove() {
+      if (this.selectedIds.length === 0) {
+        Alpine.store('notification').show('请先选择要处理的项目', 'warning')
+        return
+      }
+
+      const confirmed = await Alpine.store('confirm').show(
+        '批量通过确认',
+        `确定要通过选中的 ${this.selectedIds.length} 个待办事项吗？`
+      )
+      if (!confirmed) return
+
+      try {
+        this.loading = true
+        const response = await PendingAPI.batch({
+          ids: this.selectedIds,
+          action: 'approve'
+        })
+
+        if (response.success) {
+          Alpine.store('notification').show(
+            `成功通过 ${this.selectedIds.length} 个待办事项`,
+            'success'
+          )
+          this.clearSelection()
+          await this.refreshAll()
+        } else {
+          Alpine.store('notification').show(response.message || '批量通过失败', 'error')
+        }
+      } catch (error) {
+        logger.error('[PendingCenter] 批量通过失败:', error)
+        Alpine.store('notification').show('批量通过失败: ' + error.message, 'error')
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
+     * 批量拒绝选中项
+     */
+    async batchReject() {
+      if (this.selectedIds.length === 0) {
+        Alpine.store('notification').show('请先选择要处理的项目', 'warning')
+        return
+      }
+
+      // 弹出拒绝原因输入
+      const reason = prompt(`请输入拒绝 ${this.selectedIds.length} 个待办事项的原因：`)
+      if (reason === null) return // 用户取消
+
+      if (!reason.trim()) {
+        Alpine.store('notification').show('请填写拒绝原因', 'warning')
+        return
+      }
+
+      try {
+        this.loading = true
+        const response = await PendingAPI.batch({
+          ids: this.selectedIds,
+          action: 'reject',
+          reason: reason.trim()
+        })
+
+        if (response.success) {
+          Alpine.store('notification').show(
+            `成功拒绝 ${this.selectedIds.length} 个待办事项`,
+            'success'
+          )
+          this.clearSelection()
+          await this.refreshAll()
+        } else {
+          Alpine.store('notification').show(response.message || '批量拒绝失败', 'error')
+        }
+      } catch (error) {
+        logger.error('[PendingCenter] 批量拒绝失败:', error)
+        Alpine.store('notification').show('批量拒绝失败: ' + error.message, 'error')
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
      * 批量处理超时项（跳转到对应页面）
      */
     handleAllTimeout() {

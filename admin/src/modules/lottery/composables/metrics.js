@@ -83,7 +83,21 @@ export function useMetricsState() {
     /** @type {boolean} 显示抽奖详情弹窗 */
     showDrawDetailsModal: false,
     /** @type {string} 当前查看的抽奖ID */
-    currentDrawId: ''
+    currentDrawId: '',
+
+    // ========== P3-4: 抽奖时段热力图 ==========
+    /** @type {Array} 抽奖时段热力图数据 (7天 x 24小时矩阵) */
+    lotteryHeatmap: [],
+    /** @type {Array} 热力图天标签 */
+    heatmapDayLabels: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
+    /** @type {Array} 热力图小时标签 */
+    heatmapHourLabels: [],
+    /** @type {Object|null} 热力图峰值信息 */
+    heatmapPeak: null,
+    /** @type {boolean} 热力图加载状态 */
+    loadingHeatmap: false,
+    /** @type {Object|null} ECharts热力图实例 */
+    lotteryHeatmapChart: null
   }
 }
 
@@ -540,6 +554,7 @@ export function useMetricsMethods() {
 
     /**
      * 更新24小时趋势折线图
+     * P1-11: 增加中奖率趋势线（使用右侧Y轴百分比）
      */
     updateTrendChart() {
       if (!this.monitoringCharts.trendChart) return
@@ -550,19 +565,32 @@ export function useMetricsMethods() {
       })
       const draws = this.hourlyTrend24h.map(item => item.draws)
       const wins = this.hourlyTrend24h.map(item => item.wins)
+      // P1-11: 计算每小时中奖率
+      const winRates = this.hourlyTrend24h.map(item => {
+        if (!item.draws || item.draws === 0) return 0
+        return parseFloat(((item.wins / item.draws) * 100).toFixed(2))
+      })
 
       const option = {
         tooltip: {
           trigger: 'axis',
-          axisPointer: { type: 'cross' }
+          axisPointer: { type: 'cross' },
+          formatter: params => {
+            let result = `<strong>${params[0].axisValue}</strong><br/>`
+            params.forEach(p => {
+              const unit = p.seriesName === '中奖率' ? '%' : '次'
+              result += `${p.marker} ${p.seriesName}: ${p.value}${unit}<br/>`
+            })
+            return result
+          }
         },
         legend: {
-          data: ['抽奖次数', '中奖次数'],
+          data: ['抽奖次数', '中奖次数', '中奖率'],
           bottom: 0
         },
         grid: {
           left: '3%',
-          right: '4%',
+          right: '8%',
           bottom: '15%',
           top: '10%',
           containLabel: true
@@ -576,17 +604,34 @@ export function useMetricsMethods() {
             fontSize: 10
           }
         },
-        yAxis: {
-          type: 'value',
-          splitLine: {
-            lineStyle: { type: 'dashed' }
+        yAxis: [
+          {
+            type: 'value',
+            name: '次数',
+            position: 'left',
+            splitLine: {
+              lineStyle: { type: 'dashed' }
+            }
+          },
+          {
+            // P1-11: 右侧Y轴显示中奖率百分比
+            type: 'value',
+            name: '中奖率(%)',
+            position: 'right',
+            min: 0,
+            max: 100,
+            axisLabel: {
+              formatter: '{value}%'
+            },
+            splitLine: { show: false }
           }
-        },
+        ],
         series: [
           {
             name: '抽奖次数',
             type: 'line',
             smooth: true,
+            yAxisIndex: 0,
             data: draws,
             itemStyle: { color: '#3B82F6' },
             areaStyle: {
@@ -607,6 +652,7 @@ export function useMetricsMethods() {
             name: '中奖次数',
             type: 'line',
             smooth: true,
+            yAxisIndex: 0,
             data: wins,
             itemStyle: { color: '#10B981' },
             areaStyle: {
@@ -622,12 +668,27 @@ export function useMetricsMethods() {
                 ]
               }
             }
+          },
+          {
+            // P1-11: 中奖率趋势线
+            name: '中奖率',
+            type: 'line',
+            smooth: true,
+            yAxisIndex: 1,
+            data: winRates,
+            itemStyle: { color: '#F59E0B' },
+            lineStyle: {
+              width: 2,
+              type: 'dashed'
+            },
+            symbol: 'circle',
+            symbolSize: 6
           }
         ]
       }
 
       this.monitoringCharts.trendChart.setOption(option)
-      logger.info('趋势图表已更新')
+      logger.info('趋势图表已更新（含中奖率）')
     },
 
     /**
@@ -992,6 +1053,176 @@ export function useMetricsMethods() {
       } catch {
         return isoString
       }
+    },
+
+    // ========== P3-4: 抽奖时段热力图方法 ==========
+
+    /**
+     * 加载抽奖时段热力图数据
+     * 使用用户活跃热力图API（基于LotteryDraw统计）
+     * @param {number} [days=7] - 统计天数
+     */
+    async loadLotteryHeatmap(days = 7) {
+      logger.info('[Metrics] 加载抽奖时段热力图', { days })
+      this.loadingHeatmap = true
+
+      try {
+        // 调用 activity-heatmap API（该API基于LotteryDraw统计）
+        const response = await this.apiGet(
+          `/api/v4/console/users/activity-heatmap?days=${days}`,
+          {},
+          { showLoading: false }
+        )
+
+        if (response?.success && response.data) {
+          const data = response.data
+          this.lotteryHeatmap = data.heatmap || []
+          this.heatmapDayLabels = data.day_labels || ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+          this.heatmapHourLabels = data.hour_labels || Array.from({ length: 24 }, (_, i) => `${i}:00`)
+          this.heatmapPeak = data.peak || null
+
+          logger.info('[Metrics] 热力图数据加载成功', {
+            days,
+            peak: this.heatmapPeak,
+            total_draws: data.statistics?.total_draws || 0
+          })
+
+          // 渲染热力图
+          await this.renderLotteryHeatmap()
+        } else {
+          logger.warn('[Metrics] 热力图数据为空或失败')
+          this.lotteryHeatmap = []
+        }
+      } catch (error) {
+        logger.error('[Metrics] 加载抽奖时段热力图失败:', error)
+        this.lotteryHeatmap = []
+      } finally {
+        this.loadingHeatmap = false
+      }
+    },
+
+    /**
+     * 渲染抽奖时段热力图
+     * 使用ECharts绘制7天×24小时的热力图
+     */
+    async renderLotteryHeatmap() {
+      const container = document.getElementById('lottery-heatmap-chart')
+      if (!container) {
+        logger.warn('[Metrics] 热力图容器未找到: lottery-heatmap-chart')
+        return
+      }
+
+      if (!this.lotteryHeatmap?.length) {
+        logger.warn('[Metrics] 热力图数据为空，跳过渲染')
+        return
+      }
+
+      try {
+        const echarts = await loadECharts()
+
+        // 销毁旧实例
+        if (this.lotteryHeatmapChart) {
+          this.lotteryHeatmapChart.dispose()
+        }
+
+        this.lotteryHeatmapChart = echarts.init(container)
+
+        // 格式化热力图数据: [hourIndex, dayIndex, value]
+        const heatmapData = []
+        this.lotteryHeatmap.forEach((dayData, dayIndex) => {
+          if (Array.isArray(dayData)) {
+            dayData.forEach((value, hourIndex) => {
+              heatmapData.push([hourIndex, dayIndex, value || 0])
+            })
+          }
+        })
+
+        // 计算最大值用于颜色映射
+        const maxValue = Math.max(...heatmapData.map(d => d[2]), 1)
+
+        const option = {
+          tooltip: {
+            position: 'top',
+            formatter: (params) => {
+              const dayName = this.heatmapDayLabels[params.data[1]] || ''
+              const hour = params.data[0]
+              const value = params.data[2]
+              return `${dayName} ${hour}:00-${hour + 1}:00<br/>抽奖次数: <strong>${value}</strong>`
+            }
+          },
+          grid: {
+            left: '60',
+            right: '40',
+            top: '30',
+            bottom: '50',
+            containLabel: false
+          },
+          xAxis: {
+            type: 'category',
+            data: Array.from({ length: 24 }, (_, i) => i),
+            splitArea: { show: true },
+            axisLabel: {
+              formatter: (val) => `${val}时`
+            }
+          },
+          yAxis: {
+            type: 'category',
+            data: this.heatmapDayLabels,
+            splitArea: { show: true }
+          },
+          visualMap: {
+            min: 0,
+            max: maxValue,
+            calculable: true,
+            orient: 'horizontal',
+            left: 'center',
+            bottom: '0',
+            inRange: {
+              color: ['#f0f9ff', '#bae6fd', '#38bdf8', '#0284c7', '#0c4a6e']
+            }
+          },
+          series: [
+            {
+              name: '抽奖次数',
+              type: 'heatmap',
+              data: heatmapData,
+              label: { show: false },
+              emphasis: {
+                itemStyle: {
+                  shadowBlur: 10,
+                  shadowColor: 'rgba(0, 0, 0, 0.5)'
+                }
+              }
+            }
+          ]
+        }
+
+        this.lotteryHeatmapChart.setOption(option)
+        logger.info('[Metrics] 抽奖时段热力图渲染完成')
+
+        // 响应式调整
+        window.addEventListener('resize', () => {
+          this.lotteryHeatmapChart?.resize()
+        })
+      } catch (error) {
+        logger.error('[Metrics] 渲染抽奖时段热力图失败:', error)
+      }
+    },
+
+    /**
+     * 获取热力图单元格颜色
+     * @param {number} value - 抽奖次数
+     * @param {number} maxValue - 最大值
+     * @returns {string} CSS背景色类
+     */
+    getHeatmapCellColor(value, maxValue) {
+      if (!value || value === 0) return 'bg-gray-100'
+      const ratio = value / maxValue
+      if (ratio >= 0.8) return 'bg-blue-900 text-white'
+      if (ratio >= 0.6) return 'bg-blue-700 text-white'
+      if (ratio >= 0.4) return 'bg-blue-500 text-white'
+      if (ratio >= 0.2) return 'bg-blue-300'
+      return 'bg-blue-100'
     }
   }
 }

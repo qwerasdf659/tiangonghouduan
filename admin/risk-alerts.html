@@ -171,18 +171,43 @@
                 <td class="px-4 py-3 text-sm" x-text="alert.target_user_info?.nickname || alert.target_user_info?.user_id || '-'"></td>
                 <td class="px-4 py-3 text-sm max-w-xs truncate" x-text="alert.alert_message"></td>
                 <td class="px-4 py-3">
-                  <span :class="{
-                    'bg-yellow-100 text-yellow-700': alert.status === 'pending',
-                    'themed-bg-primary-light themed-text-primary': alert.status === 'reviewed',
-                    'bg-green-100 themed-text-success': alert.status === 'resolved',
-                    'themed-bg-subtle themed-text-secondary': alert.status === 'ignored'
-                  }" class="px-2 py-1 text-xs rounded" x-text="getStatusText(alert.status)"></span>
+                  <div class="flex flex-col gap-1">
+                    <span :class="{
+                      'bg-yellow-100 text-yellow-700': alert.status === 'pending',
+                      'themed-bg-primary-light themed-text-primary': alert.status === 'reviewed',
+                      'bg-green-100 themed-text-success': alert.status === 'resolved',
+                      'themed-bg-subtle themed-text-secondary': alert.status === 'ignored'
+                    }" class="px-2 py-1 text-xs rounded inline-block" x-text="getStatusText(alert.status)"></span>
+                    <!-- P2-8: 升级状态标识 -->
+                    <span 
+                      x-show="getEscalationStatus(alert)"
+                      class="px-2 py-0.5 text-xs rounded bg-red-100 text-red-600 animate-pulse inline-block"
+                      x-text="getEscalationStatus(alert)"
+                    ></span>
+                  </div>
                 </td>
                 <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(alert.created_at)"></td>
                 <td class="px-4 py-3">
-                  <div class="flex space-x-2">
+                  <div class="flex flex-wrap gap-1">
                     <button @click="viewAlertDetail(alert)" class="themed-text-primary hover:text-blue-700 text-sm">详情</button>
                     <button x-show="alert.status === 'pending'" @click="openHandleModal(alert)" class="text-green-500 hover:text-green-700 text-sm">处理</button>
+                    <!-- P2-8: 静默按钮 -->
+                    <button 
+                      x-show="alert.status === 'pending'"
+                      @click.stop="$refs.silenceMenu.classList.toggle('hidden')"
+                      class="text-gray-500 hover:text-gray-700 text-sm relative"
+                    >
+                      🔕静默
+                    </button>
+                    <!-- 静默下拉菜单 -->
+                    <div 
+                      x-ref="silenceMenu"
+                      class="hidden absolute right-0 mt-6 w-40 bg-white border rounded-lg shadow-lg z-20"
+                    >
+                      <button @click="silenceAlert(alert, 60); $refs.silenceMenu.classList.add('hidden')" class="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100">静默此条 (1小时)</button>
+                      <button @click="silenceAlertType(alert.alert_type, 60); $refs.silenceMenu.classList.add('hidden')" class="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100">静默同类型 (1小时)</button>
+                      <button x-show="alert.user_id" @click="silenceUserAlerts(alert.user_id, 60); $refs.silenceMenu.classList.add('hidden')" class="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100">静默该用户 (1小时)</button>
+                    </div>
                   </div>
                 </td>
               </tr>
@@ -283,6 +308,78 @@
       </div>
       <div class="p-4 border-t flex justify-end">
         <button @click="selectedAlert = null" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- P2-8: 合并告警详情弹窗 -->
+  <div 
+    x-show="showMergedAlertsModal" 
+    x-cloak
+    class="fixed inset-0 z-50 flex items-center justify-center"
+    style="display: none;"
+  >
+    <div class="fixed inset-0 bg-black/50" @click="closeMergedAlertsModal()"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[80vh] flex flex-col">
+      <div class="p-4 border-b flex justify-between items-center shrink-0">
+        <h5 class="font-semibold">📊 批量告警详情</h5>
+        <button @click="closeMergedAlertsModal()" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      
+      <template x-if="currentMergedAlertGroup">
+        <div class="p-6 overflow-y-auto flex-1">
+          <!-- 统计摘要 -->
+          <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="text-center p-3 bg-blue-50 rounded-lg">
+              <p class="text-2xl font-bold text-blue-600" x-text="currentMergedAlertGroup.count"></p>
+              <span class="text-xs themed-text-muted">告警总数</span>
+            </div>
+            <div class="text-center p-3 bg-orange-50 rounded-lg">
+              <p class="text-sm font-medium text-orange-600" x-text="getTypeText(currentMergedAlertGroup.type)"></p>
+              <span class="text-xs themed-text-muted">告警类型</span>
+            </div>
+            <div class="text-center p-3 bg-purple-50 rounded-lg">
+              <p class="text-sm font-medium text-purple-600" x-text="currentMergedAlertGroup.first_time"></p>
+              <span class="text-xs themed-text-muted">首次触发</span>
+            </div>
+          </div>
+          
+          <!-- 告警列表 -->
+          <div class="space-y-3">
+            <h6 class="font-medium themed-text mb-2">合并的告警（最近10条）</h6>
+            <template x-for="(alert, idx) in (currentMergedAlertGroup.alerts || []).slice(0, 10)" :key="idx">
+              <div class="p-3 bg-gray-50 rounded-lg flex items-start justify-between">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="text-xs font-mono themed-text-muted" x-text="alert.alert_id"></span>
+                    <span 
+                      :class="{
+                        'bg-red-100 text-red-600': alert.severity === 'critical' || alert.severity === 'high',
+                        'bg-yellow-100 text-yellow-600': alert.severity === 'medium',
+                        'bg-blue-100 text-blue-600': alert.severity === 'low'
+                      }"
+                      class="px-1.5 py-0.5 text-xs rounded"
+                      x-text="getLevelText(alert.severity)"
+                    ></span>
+                  </div>
+                  <p class="text-sm themed-text" x-text="alert.alert_message || alert.message"></p>
+                  <p class="text-xs themed-text-muted mt-1" x-text="formatDate(alert.created_at)"></p>
+                </div>
+                <button 
+                  @click="openHandleModal(alert); closeMergedAlertsModal()"
+                  class="text-green-500 hover:text-green-700 text-sm shrink-0 ml-2"
+                >
+                  处理
+                </button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+      
+      <div class="p-4 border-t flex justify-between items-center shrink-0">
+        <span class="text-sm themed-text-muted">同类告警1小时内只显示1次</span>
+        <button @click="closeMergedAlertsModal()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
       </div>
     </div>
   </div>

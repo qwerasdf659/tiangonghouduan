@@ -643,6 +643,36 @@ export function useConsumptionMethods() {
     },
 
     /**
+     * P0-3: 获取超时行的背景色CSS类对象（用于 :class 绑定）
+     * @param {Object} record - 消费记录
+     * @returns {Object} CSS类对象
+     */
+    getTimeoutRowClass(record) {
+      if (this.isOverdue(record)) {
+        return { 'bg-red-50': true }
+      }
+      if (this.isNearOverdue(record)) {
+        return { 'bg-orange-50': true }
+      }
+      return {}
+    },
+
+    /**
+     * P0-3: 获取等待时间文本的颜色CSS类
+     * @param {Object} record - 消费记录
+     * @returns {string} CSS类名
+     */
+    getTimeoutTextClass(record) {
+      if (this.isOverdue(record)) {
+        return 'text-red-600 font-semibold'
+      }
+      if (this.isNearOverdue(record)) {
+        return 'text-orange-600 font-medium'
+      }
+      return 'text-gray-500'
+    },
+
+    /**
      * 获取等待时间的文本描述
      * @param {Object} record - 消费记录
      * @returns {string} 等待时间描述

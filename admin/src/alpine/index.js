@@ -61,6 +61,7 @@ import { shortcutsStore, enterConfirm } from './components/keyboard-shortcuts.js
 import { infiniteScroll, virtualScroll } from './components/infinite-scroll.js'
 import { fileUpload } from './components/file-upload.js'
 import { resizableColumns } from './components/resizable-columns.js'
+import { exportModal } from './components/export-modal.js'
 
 /**
  * 初始化 Alpine.js
@@ -351,8 +352,11 @@ export function initAlpine() {
   // 表格列拖拽
   Alpine.data('resizableColumns', resizableColumns)
 
+  // 导出弹窗组件
+  Alpine.data('exportModal', exportModal)
+
   logger.debug(
-    '新增功能组件已注册: imageLoader, shortcuts, infiniteScroll, fileUpload, resizableColumns'
+    '新增功能组件已注册: imageLoader, shortcuts, infiniteScroll, fileUpload, resizableColumns, exportModal'
   )
 
   // 启动 Alpine
@@ -440,5 +444,6 @@ export {
   infiniteScroll,
   virtualScroll,
   fileUpload,
-  resizableColumns
+  resizableColumns,
+  exportModal
 }

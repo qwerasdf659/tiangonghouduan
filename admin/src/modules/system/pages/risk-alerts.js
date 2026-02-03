@@ -178,6 +178,51 @@ function riskAlertsPage() {
     /** @type {boolean} 浏览器通知权限状态 */
     notificationEnabled: false,
 
+    // ==================== P2-8: 告警疲劳预防机制 ====================
+
+    /**
+     * 静默的告警配置
+     * @type {Object}
+     * @property {Set} alert_ids - 静默的告警ID集合
+     * @property {Set} alert_types - 静默的告警类型集合
+     * @property {Set} user_ids - 静默的用户ID集合
+     */
+    silencedAlerts: {
+      alert_ids: new Set(),
+      alert_types: new Set(),
+      user_ids: new Set()
+    },
+
+    /**
+     * 告警合并记录 - 记录最近1小时内各类型的告警
+     * @type {Map<string, {count: number, first_time: number, last_alert: Object}>}
+     */
+    alertMergeTracker: new Map(),
+
+    /**
+     * 已升级告警的ID集合
+     * @type {Set<number>}
+     */
+    escalatedAlertIds: new Set(),
+
+    /**
+     * 告警升级检查定时器
+     * @type {number|null}
+     */
+    escalationTimer: null,
+
+    /**
+     * 是否显示合并告警弹窗
+     * @type {boolean}
+     */
+    showMergedAlertsModal: false,
+
+    /**
+     * 当前合并告警组
+     * @type {Object|null}
+     */
+    currentMergedAlertGroup: null,
+
     // ==================== 生命周期 ====================
 
     /**
@@ -240,6 +285,9 @@ function riskAlertsPage() {
           this.wsConnection.disconnect()
         }
       })
+
+      // P2-8: 启动告警升级检查（每分钟检查一次）
+      this.startEscalationChecker()
     },
 
     /**
@@ -260,6 +308,10 @@ function riskAlertsPage() {
       }
       if (this.wsConnection) {
         this.wsConnection.disconnect()
+      }
+      // P2-8: 清理告警升级定时器
+      if (this.escalationTimer) {
+        clearInterval(this.escalationTimer)
       }
     },
 
@@ -335,6 +387,23 @@ function riskAlertsPage() {
      * @returns {void}
      */
     handleNewAlert(alert) {
+      // P2-8: 检查是否被静默
+      if (this.isAlertSilenced(alert)) {
+        logger.info('[RiskAlerts] 告警已静默，跳过:', alert.alert_id)
+        return
+      }
+
+      // P2-8: 应用告警合并策略
+      const mergeResult = this.applyAlertMerging(alert)
+      if (mergeResult.merged) {
+        // 告警被合并，只更新计数
+        logger.info('[RiskAlerts] 告警已合并:', mergeResult.message)
+        if (mergeResult.showBatchAlert) {
+          this.showInfo(`批量告警: 同类告警 ${mergeResult.count} 条，点击查看详情`)
+        }
+        return
+      }
+
       // 添加到告警列表顶部
       this.alerts.unshift(alert)
 
@@ -1259,6 +1328,299 @@ function riskAlertsPage() {
       const div = document.createElement('div')
       div.textContent = str
       return div.innerHTML
+    },
+
+    // ==================== P2-8: 告警疲劳预防方法 ====================
+
+    /**
+     * 检查告警是否被静默
+     * @param {Object} alert - 告警对象
+     * @returns {boolean} 是否被静默
+     */
+    isAlertSilenced(alert) {
+      // 检查单条告警ID是否静默
+      if (this.silencedAlerts.alert_ids.has(alert.alert_id)) {
+        return true
+      }
+      // 检查告警类型是否静默
+      if (this.silencedAlerts.alert_types.has(alert.alert_type)) {
+        return true
+      }
+      // 检查用户ID是否静默
+      if (alert.user_id && this.silencedAlerts.user_ids.has(alert.user_id)) {
+        return true
+      }
+      return false
+    },
+
+    /**
+     * 静默单条告警
+     * @param {Object} alert - 告警对象
+     * @param {number} duration - 静默时长（分钟），默认60分钟
+     */
+    silenceAlert(alert, duration = 60) {
+      this.silencedAlerts.alert_ids.add(alert.alert_id)
+      logger.info('[P2-8] 静默告警:', alert.alert_id, `${duration}分钟`)
+      this.showSuccess(`已静默该告警 ${duration} 分钟`)
+
+      // 自动解除静默
+      setTimeout(() => {
+        this.silencedAlerts.alert_ids.delete(alert.alert_id)
+        logger.info('[P2-8] 解除告警静默:', alert.alert_id)
+      }, duration * 60 * 1000)
+    },
+
+    /**
+     * 静默同类告警
+     * @param {string} alertType - 告警类型
+     * @param {number} duration - 静默时长（分钟），默认60分钟
+     */
+    silenceAlertType(alertType, duration = 60) {
+      this.silencedAlerts.alert_types.add(alertType)
+      logger.info('[P2-8] 静默告警类型:', alertType, `${duration}分钟`)
+      this.showSuccess(`已静默 ${alertType} 类型告警 ${duration} 分钟`)
+
+      // 自动解除静默
+      setTimeout(() => {
+        this.silencedAlerts.alert_types.delete(alertType)
+        logger.info('[P2-8] 解除告警类型静默:', alertType)
+      }, duration * 60 * 1000)
+    },
+
+    /**
+     * 静默用户相关告警
+     * @param {number} userId - 用户ID
+     * @param {number} duration - 静默时长（分钟），默认60分钟
+     */
+    silenceUserAlerts(userId, duration = 60) {
+      this.silencedAlerts.user_ids.add(userId)
+      logger.info('[P2-8] 静默用户告警:', userId, `${duration}分钟`)
+      this.showSuccess(`已静默用户 ${userId} 的告警 ${duration} 分钟`)
+
+      // 自动解除静默
+      setTimeout(() => {
+        this.silencedAlerts.user_ids.delete(userId)
+        logger.info('[P2-8] 解除用户告警静默:', userId)
+      }, duration * 60 * 1000)
+    },
+
+    /**
+     * 应用告警合并策略
+     * @param {Object} alert - 新告警对象
+     * @returns {Object} {merged: boolean, count: number, message: string, showBatchAlert: boolean}
+     */
+    applyAlertMerging(alert) {
+      const mergeKey = `${alert.alert_type}_${alert.severity}`
+      const now = Date.now()
+      const oneHour = 60 * 60 * 1000
+
+      const existingGroup = this.alertMergeTracker.get(mergeKey)
+
+      if (existingGroup && (now - existingGroup.first_time) < oneHour) {
+        // 1小时内同类告警，增加计数
+        existingGroup.count++
+        existingGroup.last_alert = alert
+        existingGroup.alerts = existingGroup.alerts || []
+        existingGroup.alerts.push(alert)
+
+        // 超过5个同类显示"批量告警"
+        if (existingGroup.count === 5) {
+          return {
+            merged: true,
+            count: existingGroup.count,
+            message: `同类告警合并（${existingGroup.count}条）`,
+            showBatchAlert: true,
+            group: existingGroup
+          }
+        } else if (existingGroup.count > 5) {
+          return {
+            merged: true,
+            count: existingGroup.count,
+            message: `同类告警合并（${existingGroup.count}条）`,
+            showBatchAlert: false,
+            group: existingGroup
+          }
+        } else {
+          return {
+            merged: true,
+            count: existingGroup.count,
+            message: `同类告警合并（${existingGroup.count}条）`,
+            showBatchAlert: false,
+            group: existingGroup
+          }
+        }
+      } else {
+        // 新的合并组或超过1小时
+        this.alertMergeTracker.set(mergeKey, {
+          count: 1,
+          first_time: now,
+          last_alert: alert,
+          alerts: [alert]
+        })
+        return { merged: false, count: 1, message: '', showBatchAlert: false }
+      }
+    },
+
+    /**
+     * 查看合并的告警组详情
+     * @param {string} alertType - 告警类型
+     * @param {string} severity - 严重程度
+     */
+    viewMergedAlerts(alertType, severity) {
+      const mergeKey = `${alertType}_${severity}`
+      const group = this.alertMergeTracker.get(mergeKey)
+
+      if (group) {
+        this.currentMergedAlertGroup = {
+          type: alertType,
+          severity: severity,
+          count: group.count,
+          alerts: group.alerts || [],
+          first_time: new Date(group.first_time).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+        }
+        this.showMergedAlertsModal = true
+      }
+    },
+
+    /**
+     * 关闭合并告警弹窗
+     */
+    closeMergedAlertsModal() {
+      this.showMergedAlertsModal = false
+      this.currentMergedAlertGroup = null
+    },
+
+    /**
+     * 启动告警升级检查器
+     */
+    startEscalationChecker() {
+      this.escalationTimer = setInterval(() => {
+        this.checkAlertEscalation()
+      }, 60 * 1000) // 每分钟检查一次
+
+      logger.info('[P2-8] 告警升级检查器已启动')
+    },
+
+    /**
+     * 检查告警升级
+     * - 30分钟未处理→升级告警（弹窗+徽标闪烁）
+     * - 1小时未处理→紧急告警（置顶+音效）
+     * - 2小时未处理→通知管理员
+     */
+    checkAlertEscalation() {
+      const now = Date.now()
+      const thirtyMinutes = 30 * 60 * 1000
+      const oneHour = 60 * 60 * 1000
+      const twoHours = 2 * 60 * 60 * 1000
+
+      const pendingAlerts = this.alerts.filter(a => a.status === 'pending')
+
+      pendingAlerts.forEach(alert => {
+        const alertTime = new Date(alert.created_at).getTime()
+        const elapsed = now - alertTime
+        const alertId = alert.alert_id
+
+        // 已经升级过的告警不重复处理
+        if (this.escalatedAlertIds.has(`${alertId}_2h`) && elapsed >= twoHours) {
+          return
+        }
+        if (this.escalatedAlertIds.has(`${alertId}_1h`) && elapsed >= oneHour && elapsed < twoHours) {
+          return
+        }
+        if (this.escalatedAlertIds.has(`${alertId}_30m`) && elapsed >= thirtyMinutes && elapsed < oneHour) {
+          return
+        }
+
+        // 2小时未处理 - 通知管理员
+        if (elapsed >= twoHours && !this.escalatedAlertIds.has(`${alertId}_2h`)) {
+          this.escalatedAlertIds.add(`${alertId}_2h`)
+          this.escalateAlert(alert, 'admin_notify')
+          logger.warn('[P2-8] 告警2小时未处理，通知管理员:', alertId)
+        }
+        // 1小时未处理 - 紧急告警（置顶+音效）
+        else if (elapsed >= oneHour && !this.escalatedAlertIds.has(`${alertId}_1h`)) {
+          this.escalatedAlertIds.add(`${alertId}_1h`)
+          this.escalateAlert(alert, 'urgent')
+          logger.warn('[P2-8] 告警1小时未处理，升级为紧急:', alertId)
+        }
+        // 30分钟未处理 - 升级告警（弹窗+徽标闪烁）
+        else if (elapsed >= thirtyMinutes && !this.escalatedAlertIds.has(`${alertId}_30m`)) {
+          this.escalatedAlertIds.add(`${alertId}_30m`)
+          this.escalateAlert(alert, 'warning')
+          logger.warn('[P2-8] 告警30分钟未处理，升级提醒:', alertId)
+        }
+      })
+    },
+
+    /**
+     * 升级告警处理
+     * @param {Object} alert - 告警对象
+     * @param {string} level - 升级级别 'warning'|'urgent'|'admin_notify'
+     */
+    escalateAlert(alert, level) {
+      const severityText = this.getSeverityLabel(alert.severity)
+
+      switch (level) {
+        case 'warning':
+          // 30分钟未处理 - 弹窗+徽标闪烁
+          this.showWarning(`⚠️ 告警升级: "${alert.message}" 已超过30分钟未处理！`)
+          // 添加闪烁效果
+          document.title = '⚠️ 告警待处理 - 风控告警'
+          setTimeout(() => {
+            document.title = '风控告警'
+          }, 3000)
+          break
+
+        case 'urgent':
+          // 1小时未处理 - 置顶+音效
+          this.showError(`🚨 紧急告警: "${alert.message}" 已超过1小时未处理！`)
+          this.playAlertSound('critical')
+
+          // 将告警移到列表顶部
+          const index = this.alerts.findIndex(a => a.alert_id === alert.alert_id)
+          if (index > 0) {
+            const [escalatedAlert] = this.alerts.splice(index, 1)
+            escalatedAlert._escalated = 'urgent'
+            this.alerts.unshift(escalatedAlert)
+          }
+          break
+
+        case 'admin_notify':
+          // 2小时未处理 - 通知管理员
+          this.showError(`🆘 超级告警: "${alert.message}" 已超过2小时未处理，请立即处理！`)
+          this.playAlertSound('critical')
+
+          // 尝试发送桌面通知
+          if (this.notificationEnabled && Notification.permission === 'granted') {
+            new Notification('🆘 紧急告警需要处理', {
+              body: `告警 "${alert.message}" 已超过2小时未处理，请立即处理！`,
+              icon: '/admin/favicon.ico',
+              requireInteraction: true
+            })
+          }
+          break
+      }
+    },
+
+    /**
+     * 获取告警升级状态文本
+     * @param {Object} alert - 告警对象
+     * @returns {string|null} 升级状态文本
+     */
+    getEscalationStatus(alert) {
+      if (alert.status !== 'pending') return null
+
+      const alertId = alert.alert_id
+      if (this.escalatedAlertIds.has(`${alertId}_2h`)) {
+        return '🆘 超2小时未处理'
+      }
+      if (this.escalatedAlertIds.has(`${alertId}_1h`)) {
+        return '🚨 超1小时未处理'
+      }
+      if (this.escalatedAlertIds.has(`${alertId}_30m`)) {
+        return '⚠️ 超30分钟未处理'
+      }
+      return null
     }
   }
 }

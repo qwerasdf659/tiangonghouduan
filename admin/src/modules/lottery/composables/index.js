@@ -49,6 +49,15 @@ export { useDailyReportState, useDailyReportMethods } from './daily-report.js'
 // 批量操作模块
 export { useBatchOperationsState, useBatchOperationsMethods } from './batch-operations.js'
 
+// P1-3: 预设可视化模块
+export {
+  usePresetVisualizationState,
+  usePresetVisualizationMethods
+} from './preset-visualization.js'
+
+// P1-10: 系统垫付看板模块
+export { useSystemAdvanceState, useSystemAdvanceMethods } from './system-advance.js'
+
 /**
  * 组合所有状态
  * @returns {Object} 合并后的状态对象
@@ -68,7 +77,9 @@ export function useAllLotteryState() {
     ...useRiskControlState(),
     ...useReportState(),
     ...useDailyReportState(),
-    ...useBatchOperationsState()
+    ...useBatchOperationsState(),
+    ...usePresetVisualizationState(),
+    ...useSystemAdvanceState()
   }
 }
 
@@ -91,6 +102,8 @@ export function useAllLotteryMethods() {
     ...useRiskControlMethods(),
     ...useReportMethods(),
     ...useDailyReportMethods(),
-    ...useBatchOperationsMethods()
+    ...useBatchOperationsMethods(),
+    ...usePresetVisualizationMethods(),
+    ...useSystemAdvanceMethods()
   }
 }

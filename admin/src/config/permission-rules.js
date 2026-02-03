@@ -49,54 +49,63 @@ export const ROLE_LEVEL_THRESHOLDS = {
  */
 export const MENU_ACCESS_RULES = {
   // ========== 所有人可访问（role_level >= 0） ==========
-  dashboard: { minLevel: 0, description: '工作台' },
+  dashboard: { minLevel: 0, description: '运营仪表盘' },
 
-  // ========== 客服可访问（role_level >= 1） ==========
-  'operations.customer': { minLevel: 1, description: '客服工作台' },
+  // ========== 待处理中心（role_level >= 1） ==========
+  'pending-center': { minLevel: 1, description: '待处理中心（分组）' },
+  'pending-center.consumption-review': { minLevel: 30, description: '消费记录审核' },
+  'pending-center.customer-service': { minLevel: 1, description: '客服工作台' },
+  'pending-center.risk-alerts': { minLevel: 30, description: '风控告警' },
+  'pending-center.lottery-alerts': { minLevel: 30, description: '抽奖告警' },
 
-  // ========== 运营可访问（role_level >= 30，只读） ==========
-  operations: { minLevel: 30, description: '日常运营（分组）' },
-  'operations.consumption': { minLevel: 30, description: '消费记录审核' },
-  'operations.risk': { minLevel: 30, description: '风控告警' },
+  // ========== 抽奖运营（role_level >= 30） ==========
+  'lottery-ops': { minLevel: 30, description: '抽奖运营（分组）' },
+  'lottery-ops.lottery-monitoring': { minLevel: 30, description: '实时监控' },
+  'lottery-ops.lottery-campaigns': { minLevel: 30, description: '活动管理' },
+  'lottery-ops.lottery-prizes': { minLevel: 30, description: '奖品配置' },
+  'lottery-ops.lottery-budget': { minLevel: 30, description: '预算控制' },
+  'lottery-ops.lottery-strategy': { minLevel: 30, description: '策略配置' },
+  'lottery-ops.lottery-presets': { minLevel: 30, description: '干预预设' },
 
-  // ========== 管理员专属（从系统设置移入日常运营） ==========
-  'operations.item-tpl': { minLevel: 100, description: '物品模板' },
-  'operations.content': { minLevel: 100, description: '内容管理' },
-  'operations.dict': { minLevel: 100, description: '字典管理' },
-  'operations.pricing': { minLevel: 100, description: '定价配置' },
-  'operations.feature-flags': { minLevel: 100, description: '功能开关' },
+  // ========== 资产交易（role_level >= 30） ==========
+  'asset-trade': { minLevel: 30, description: '资产交易（分组）' },
+  'asset-trade.asset-mgmt': { minLevel: 30, description: '资产管理' },
+  'asset-trade.asset-adj': { minLevel: 30, description: '资产调整' },
+  'asset-trade.orphan-frozen': { minLevel: 30, description: '孤儿冻结清理' },
+  'asset-trade.exchange': { minLevel: 30, description: '兑换市场' },
+  'asset-trade.trade': { minLevel: 30, description: 'C2C交易' },
 
-  lottery: { minLevel: 30, description: '抽奖活动（分组）' },
-  'lottery.campaigns': { minLevel: 30, description: '活动管理' },
-  'lottery.presets': { minLevel: 30, description: '抽奖预设' },
-
-  assets: { minLevel: 30, description: '资产中心（分组）' },
-  'assets.asset-mgmt': { minLevel: 30, description: '资产管理' },
-  'assets.asset-adj': { minLevel: 30, description: '资产调整' },
-  'assets.orphan': { minLevel: 30, description: '孤儿冻结清理' },
-  'assets.material-rules': { minLevel: 30, description: '物料转换规则' },
-  'assets.assets-portfolio': { minLevel: 30, description: '资产组合' },
-
-  market: { minLevel: 30, description: '市场交易（分组）' },
-  'market.exchange': { minLevel: 30, description: '兑换市场' },
-  'market.trade': { minLevel: 30, description: 'C2C交易' },
-
+  // ========== 用户门店（role_level >= 30） ==========
   users: { minLevel: 30, description: '用户门店（分组）' },
   'users.user-mgmt': { minLevel: 30, description: '用户管理' },
   'users.user-hierarchy': { minLevel: 30, description: '用户层级' },
   'users.stores': { minLevel: 30, description: '门店管理' },
 
+  // ========== 数据分析（role_level >= 30） ==========
   analytics: { minLevel: 30, description: '数据分析（分组）' },
   'analytics.stats': { minLevel: 30, description: '统计报表' },
   'analytics.analytics': { minLevel: 30, description: '运营分析' },
 
-  // ========== 管理员专属（role_level >= 100） ==========
+  // ========== 系统设置（管理员专属 role_level >= 100） ==========
   system: { minLevel: 100, description: '系统设置（分组）' },
-  'system.settings': { minLevel: 100, description: '系统配置' },
-  'system.content': { minLevel: 100, description: '内容管理' },
-  'system.sessions': { minLevel: 100, description: '会话管理' },
-  'system.item-tpl': { minLevel: 100, description: '物品模板' },
-  'system.config-tools': { minLevel: 100, description: '配置工具' }
+  // 奖品配置子分组
+  'system.prize-config': { minLevel: 100, description: '奖品配置（子分组）' },
+  'system.prize-config.item-tpl': { minLevel: 100, description: '物品模板' },
+  'system.prize-config.material-rules': { minLevel: 100, description: '物料转换规则' },
+  'system.prize-config.assets-portfolio': { minLevel: 100, description: '资产组合' },
+  // 运营规则子分组
+  'system.ops-rules': { minLevel: 100, description: '运营规则（子分组）' },
+  'system.ops-rules.pricing': { minLevel: 100, description: '定价配置' },
+  'system.ops-rules.feature-flags': { minLevel: 100, description: '功能开关' },
+  'system.ops-rules.reminder-rules': { minLevel: 100, description: '提醒规则' },
+  // 系统维护子分组
+  'system.sys-maintain': { minLevel: 100, description: '系统维护（子分组）' },
+  'system.sys-maintain.content': { minLevel: 100, description: '内容管理' },
+  'system.sys-maintain.dict': { minLevel: 100, description: '字典管理' },
+  'system.sys-maintain.settings': { minLevel: 100, description: '系统配置' },
+  'system.sys-maintain.sessions': { minLevel: 100, description: '会话管理' },
+  'system.sys-maintain.audit-logs': { minLevel: 100, description: '操作审计' },
+  'system.sys-maintain.config-tools': { minLevel: 100, description: '高级工具' }
 }
 
 // ========== 页面权限配置 ==========

@@ -148,7 +148,8 @@
             </thead>
             <tbody class="divide-y">
               <template x-for="record in consumptions" :key="record.id || record.record_id">
-                <tr class="themed-hover-bg" :class="{ 'bg-blue-50': isSelected(record) }">
+                <!-- P0-3: 超时高亮 - 超过24小时红色，12-24小时橙色 -->
+                <tr class="themed-hover-bg" :class="{ 'bg-blue-50': isSelected(record), ...getTimeoutRowClass(record) }">
                   <!-- 单选复选框（仅待审核记录可选） -->
                   <td class="px-4 py-3 text-center">
                     <template x-if="record.status === 'pending'">
@@ -204,7 +205,17 @@
                       x-text="record.status === 'pending' ? '待审核' : record.status === 'approved' ? '已通过' : '已拒绝'"
                     ></span>
                   </td>
-                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateOnly(record.created_at)"></td>
+                  <td class="px-4 py-3 text-sm">
+                    <div x-text="formatDateOnly(record.created_at)" class="themed-text-muted"></div>
+                    <!-- P0-3: 显示等待时间（仅待审核状态） -->
+                    <template x-if="record.status === 'pending'">
+                      <div 
+                        class="text-xs mt-0.5"
+                        :class="getTimeoutTextClass(record)"
+                        x-text="getWaitingTimeText(record)"
+                      ></div>
+                    </template>
+                  </td>
                   <td class="px-4 py-3">
                     <template x-if="record.status === 'pending'">
                       <div class="flex space-x-2">

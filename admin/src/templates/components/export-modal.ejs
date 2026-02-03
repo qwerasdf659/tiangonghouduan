@@ -1,0 +1,200 @@
+<%#
+  数据导出弹窗组件
+  @file admin/src/templates/components/export-modal.ejs
+  @description 通用数据导出弹窗，支持多种格式和导出范围
+  @usage 在需要导出功能的页面中 include 此组件
+%>
+
+<!-- 导出弹窗 -->
+<div 
+  x-data
+  x-show="$store.exportModal.isOpen"
+  x-cloak
+  class="fixed inset-0 z-50 overflow-y-auto"
+  role="dialog"
+  aria-modal="true"
+>
+  <!-- 遮罩层 -->
+  <div 
+    x-show="$store.exportModal.isOpen"
+    x-transition:enter="transition ease-out duration-200"
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100"
+    x-transition:leave="transition ease-in duration-150"
+    x-transition:leave-start="opacity-100"
+    x-transition:leave-end="opacity-0"
+    class="fixed inset-0 bg-black/50 backdrop-blur-sm"
+    @click="$store.exportModal.close()"
+  ></div>
+  
+  <!-- 弹窗内容 -->
+  <div class="fixed inset-0 flex items-center justify-center p-4">
+    <div 
+      x-show="$store.exportModal.isOpen"
+      x-transition:enter="transition ease-out duration-200"
+      x-transition:enter-start="opacity-0 scale-95"
+      x-transition:enter-end="opacity-100 scale-100"
+      x-transition:leave="transition ease-in duration-150"
+      x-transition:leave-start="opacity-100 scale-100"
+      x-transition:leave-end="opacity-0 scale-95"
+      class="themed-card rounded-xl shadow-2xl w-full max-w-lg"
+      @click.stop
+    >
+      <!-- 标题栏 -->
+      <div class="flex items-center justify-between p-4 themed-border-b">
+        <h3 class="text-lg font-semibold themed-text flex items-center gap-2">
+          <span class="text-xl">📤</span>
+          <span x-text="$store.exportModal.title">导出数据</span>
+        </h3>
+        <button 
+          @click="$store.exportModal.close()"
+          class="p-2 rounded-lg hover:themed-bg-subtle themed-text-muted transition"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      
+      <!-- 内容区 -->
+      <div class="p-4 space-y-4">
+        <!-- 导出格式选择 -->
+        <div>
+          <label class="block text-sm font-medium themed-text mb-2">导出格式</label>
+          <div class="flex flex-wrap gap-2">
+            <template x-for="format in $store.exportModal.supportedFormats" :key="format">
+              <button 
+                @click="$store.exportModal.selectedFormat = format"
+                :class="{
+                  'bg-blue-600 text-white border-blue-600': $store.exportModal.selectedFormat === format,
+                  'themed-bg-subtle themed-text themed-border hover:border-blue-300': $store.exportModal.selectedFormat !== format
+                }"
+                class="px-4 py-2 rounded-lg border text-sm font-medium transition"
+                x-text="$store.exportModal.getFormatLabel(format)"
+              ></button>
+            </template>
+          </div>
+        </div>
+        
+        <!-- 导出范围选择 -->
+        <div>
+          <label class="block text-sm font-medium themed-text mb-2">导出范围</label>
+          <div class="space-y-2">
+            <template x-for="range in ['current', 'filtered', 'all']" :key="range">
+              <label 
+                class="flex items-center gap-3 p-3 themed-bg-subtle rounded-lg cursor-pointer hover:bg-blue-50 transition"
+                :class="{ 'ring-2 ring-blue-500': $store.exportModal.selectedRange === range }"
+              >
+                <input 
+                  type="radio" 
+                  name="export_range" 
+                  :value="range"
+                  :checked="$store.exportModal.selectedRange === range"
+                  @change="$store.exportModal.selectedRange = range"
+                  class="text-blue-600 focus:ring-blue-500"
+                >
+                <span class="text-sm themed-text" x-text="$store.exportModal.getRangeLabel(range)"></span>
+              </label>
+            </template>
+          </div>
+        </div>
+        
+        <!-- 字段选择 -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-sm font-medium themed-text">导出字段</label>
+            <button 
+              @click="$store.exportModal.toggleAllFields()"
+              class="text-xs text-blue-600 hover:text-blue-700"
+            >
+              <span x-text="$store.exportModal.selectedFields.length === $store.exportModal.availableFields.length ? '取消全选' : '全选'"></span>
+            </button>
+          </div>
+          <div class="max-h-48 overflow-y-auto themed-bg-subtle rounded-lg p-3 space-y-2">
+            <template x-for="field in $store.exportModal.availableFields" :key="field.key">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  :checked="$store.exportModal.isFieldSelected(field.key)"
+                  @change="$store.exportModal.toggleField(field.key)"
+                  class="rounded text-blue-600 focus:ring-blue-500"
+                >
+                <span class="text-sm themed-text" x-text="field.label"></span>
+                <template x-if="field.sensitive">
+                  <span class="text-xs px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded">敏感</span>
+                </template>
+              </label>
+            </template>
+          </div>
+          <div class="mt-2 text-xs themed-text-muted">
+            已选择 <span x-text="$store.exportModal.selectedFields.length"></span> / <span x-text="$store.exportModal.availableFields.length"></span> 个字段
+          </div>
+        </div>
+        
+        <!-- 脱敏选项 -->
+        <div class="flex items-center justify-between p-3 themed-bg-subtle rounded-lg">
+          <div>
+            <div class="text-sm font-medium themed-text">数据脱敏</div>
+            <div class="text-xs themed-text-muted">对手机号、姓名等敏感字段进行脱敏处理</div>
+          </div>
+          <button 
+            @click="$store.exportModal.enableMasking = !$store.exportModal.enableMasking"
+            :class="$store.exportModal.enableMasking ? 'bg-blue-600' : 'bg-gray-300'"
+            class="relative w-11 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            <span 
+              :class="$store.exportModal.enableMasking ? 'translate-x-5' : 'translate-x-0'"
+              class="inline-block w-5 h-5 bg-white rounded-full shadow transform transition-transform"
+            ></span>
+          </button>
+        </div>
+        
+        <!-- 导出进度 -->
+        <template x-if="$store.exportModal.loading">
+          <div class="p-3 bg-blue-50 rounded-lg">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm text-blue-700">正在导出...</span>
+              <span class="text-sm text-blue-700" x-text="Math.round($store.exportModal.progress) + '%'"></span>
+            </div>
+            <div class="w-full bg-blue-200 rounded-full h-2">
+              <div 
+                class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                :style="'width: ' + $store.exportModal.progress + '%'"
+              ></div>
+            </div>
+          </div>
+        </template>
+      </div>
+      
+      <!-- 底部操作栏 -->
+      <div class="flex items-center justify-between p-4 themed-border-t themed-bg-subtle rounded-b-xl">
+        <div class="text-sm themed-text-muted">
+          将导出 <span class="font-medium themed-text" x-text="$store.exportModal.selectedCount.toLocaleString()"></span> 条数据
+        </div>
+        <div class="flex items-center gap-3">
+          <button 
+            @click="$store.exportModal.close()"
+            :disabled="$store.exportModal.loading"
+            class="px-4 py-2 themed-border rounded-lg text-sm themed-text hover:themed-bg-subtle transition disabled:opacity-50"
+          >
+            取消
+          </button>
+          <button 
+            @click="$store.exportModal.doExport()"
+            :disabled="$store.exportModal.loading || $store.exportModal.selectedFields.length === 0"
+            class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2"
+          >
+            <template x-if="$store.exportModal.loading">
+              <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </template>
+            <span x-text="$store.exportModal.loading ? '导出中...' : '开始导出'"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+

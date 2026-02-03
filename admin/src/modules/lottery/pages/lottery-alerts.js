@@ -81,6 +81,17 @@ function lotteryAlertsPage() {
     /** @type {Object|null} 健康度趋势图表实例 */
     healthTrendChart: null,
 
+    // P1-21: 系统健康状态数据
+    systemHealth: {
+      api: { status: 'loading', response_time: 0, last_check: null },
+      db: { status: 'loading', host: '', database: '' },
+      redis: { status: 'loading', connected: false },
+      overall_score: 0,
+      alert_count: 0,
+      slow_apis: [],
+      recent_alerts: []
+    },
+
     /** @type {Object|null} 当前选中的告警 */
     selectedAlert: null,
 
@@ -860,6 +871,128 @@ function lotteryAlertsPage() {
             }
           ]
         })
+      }
+    },
+
+    // ==================== P1-21: 系统告警方法 ====================
+
+    /**
+     * P1-21: 加载系统健康状态
+     * @description 获取API、数据库、Redis连接状态和慢接口信息
+     */
+    async loadSystemHealth() {
+      try {
+        logger.info('[LotteryAlerts] 加载系统健康状态')
+        
+        const response = await fetch('/api/v4/console/status', {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token') || ''}`
+          }
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          const data = result.data || result
+
+          // 解析系统健康数据
+          this.systemHealth = {
+            api: {
+              status: 'healthy',
+              response_time: data.api_latency || 50,
+              last_check: new Date().toISOString()
+            },
+            db: {
+              status: data.database?.connected ? 'healthy' : 'critical',
+              host: data.database?.host || '',
+              database: data.database?.database || ''
+            },
+            redis: {
+              status: data.redis?.connected ? 'healthy' : 'warning',
+              connected: data.redis?.connected || false
+            },
+            overall_score: this.calculateSystemScore(data),
+            alert_count: (data.slow_apis?.length || 0) + (data.alerts?.length || 0),
+            slow_apis: data.slow_apis || [],
+            recent_alerts: data.alerts || data.recent_alerts || []
+          }
+
+          logger.info('[LotteryAlerts] 系统健康状态加载成功', {
+            overall_score: this.systemHealth.overall_score,
+            api_status: this.systemHealth.api.status,
+            db_status: this.systemHealth.db.status,
+            redis_status: this.systemHealth.redis.status
+          })
+        }
+      } catch (error) {
+        logger.warn('[LotteryAlerts] loadSystemHealth 失败:', error.message)
+        // 设置默认错误状态
+        this.systemHealth.api.status = 'warning'
+        this.systemHealth.db.status = 'warning'
+        this.systemHealth.redis.status = 'warning'
+      }
+    },
+
+    /**
+     * 计算系统综合健康分数
+     * @param {Object} data - 系统状态数据
+     * @returns {number} 0-100的健康分数
+     */
+    calculateSystemScore(data) {
+      let score = 100
+
+      // API状态扣分
+      if (data.api_latency > 1000) score -= 20
+      else if (data.api_latency > 500) score -= 10
+
+      // 数据库状态扣分
+      if (!data.database?.connected) score -= 40
+
+      // Redis状态扣分
+      if (!data.redis?.connected) score -= 20
+
+      // 慢接口扣分
+      const slowApiCount = data.slow_apis?.length || 0
+      score -= Math.min(slowApiCount * 5, 20)
+
+      return Math.max(0, Math.min(100, score))
+    },
+
+    /**
+     * P1-9: 按级别筛选告警
+     * @param {string} level - 告警级别（'all' | 'danger' | ''）
+     */
+    filterAlerts(level) {
+      if (level === 'all') {
+        this.filters.level = ''
+      } else if (level === 'danger') {
+        this.filters.level = 'danger'
+      } else {
+        this.filters.level = level
+      }
+      this.loadAlerts()
+    },
+
+    /**
+     * 格式化相对时间（如：1分钟前）
+     * @param {string} dateStr - ISO日期字符串
+     * @returns {string} 相对时间文本
+     */
+    formatRelativeTime(dateStr) {
+      if (!dateStr) return '--'
+      try {
+        const date = new Date(dateStr)
+        const now = new Date()
+        const diffMs = now - date
+        const diffSec = Math.floor(diffMs / 1000)
+        const diffMin = Math.floor(diffSec / 60)
+        const diffHour = Math.floor(diffMin / 60)
+
+        if (diffSec < 60) return '刚刚'
+        if (diffMin < 60) return `${diffMin}分钟前`
+        if (diffHour < 24) return `${diffHour}小时前`
+        return this.formatDate(dateStr)
+      } catch {
+        return '--'
       }
     }
   }

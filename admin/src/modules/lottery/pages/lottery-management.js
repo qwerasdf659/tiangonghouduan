@@ -53,7 +53,13 @@ import {
   useDailyReportState,
   useDailyReportMethods,
   useBatchOperationsState,
-  useBatchOperationsMethods
+  useBatchOperationsMethods,
+  // P1-3: 预设可视化模块
+  usePresetVisualizationState,
+  usePresetVisualizationMethods,
+  // P1-10: 系统垫付看板模块
+  useSystemAdvanceState,
+  useSystemAdvanceMethods
 } from '../composables/index.js'
 
 /**
@@ -104,6 +110,10 @@ function registerLotteryManagementComponents() {
       { id: 'strategy-effectiveness', title: '策略效果分析', icon: '📈', highlight: true },
       { id: 'daily-report', title: '运营日报', icon: '📋', highlight: true },
       { id: 'batch-operations', title: '批量操作工具', icon: '⚡', highlight: true },
+      // P1-3: 预设可视化
+      { id: 'preset-visualization', title: '预设可视化', icon: '🎯', highlight: true },
+      // P1-10: 系统垫付看板
+      { id: 'system-advance', title: '系统垫付', icon: '💳', highlight: true },
       { id: 'campaigns', title: '活动管理', icon: '🎁' },
       { id: 'prizes', title: '奖品管理', icon: '🏆' },
       { id: 'campaign-budget', title: '预算管理', icon: '💰' },
@@ -154,6 +164,9 @@ function registerLotteryManagementComponents() {
     const reportState = useReportState()
     const dailyReportState = useDailyReportState()
     const batchOperationsState = useBatchOperationsState()
+    // P1-3 & P1-10 模块状态
+    const presetVisualizationState = usePresetVisualizationState()
+    const systemAdvanceState = useSystemAdvanceState()
 
     // 预先调用所有方法 composables
     const campaignsMethods = useCampaignsMethods()
@@ -171,6 +184,9 @@ function registerLotteryManagementComponents() {
     const reportMethods = useReportMethods()
     const dailyReportMethods = useDailyReportMethods()
     const batchOperationsMethods = useBatchOperationsMethods()
+    // P1-3 & P1-10 模块方法
+    const presetVisualizationMethods = usePresetVisualizationMethods()
+    const systemAdvanceMethods = useSystemAdvanceMethods()
 
     // 调试日志 - 检查 quotaMethods
     logger.debug('[Quota Debug] quotaMethods keys:', Object.keys(quotaMethods || {}))
@@ -205,6 +221,9 @@ function registerLotteryManagementComponents() {
       ...reportState,
       ...dailyReportState,
       ...batchOperationsState,
+      // P1-3 & P1-10 模块状态
+      ...presetVisualizationState,
+      ...systemAdvanceState,
 
       // ==================== 通用状态 ====================
       page: 1,
@@ -318,6 +337,8 @@ function registerLotteryManagementComponents() {
                 await this.loadEnhancedMetrics()
                 // 初始化图表（延迟执行确保 DOM 已渲染）
                 setTimeout(() => this.initMonitoringCharts(), 200)
+                // P3-4: 加载抽奖时段热力图
+                await this.loadLotteryHeatmap(7)
                 // 加载活动列表供指标筛选
                 if (!this.campaigns || this.campaigns.length === 0) {
                   await this.loadCampaigns()
@@ -357,6 +378,30 @@ function registerLotteryManagementComponents() {
                   await this.loadCampaigns()
                 }
                 break
+              // P1-3: 预设可视化
+              case 'preset-visualization':
+                logger.debug('🎯 [LotteryPage] 进入预设可视化页面')
+                await this.loadPresetStats()
+                await this.loadPresets()
+                // 加载奖品列表供创建预设选择
+                if (!this.prizes || this.prizes.length === 0) {
+                  await this.loadPrizes()
+                }
+                // 将奖品列表转换为选项格式
+                this.prizeOptions = (this.prizes || []).map(p => ({
+                  value: p.lottery_prize_id || p.id,
+                  label: p.name || p.prize_name || `奖品#${p.lottery_prize_id || p.id}`
+                }))
+                break
+              // P1-10: 系统垫付看板
+              case 'system-advance':
+                logger.debug('💳 [LotteryPage] 进入系统垫付看板页面')
+                await this.loadAdvanceDashboard()
+                // 加载活动列表供筛选
+                if (!this.campaigns || this.campaigns.length === 0) {
+                  await this.loadCampaigns()
+                }
+                break
             }
           },
           { loadingText: '加载数据...' }
@@ -379,6 +424,9 @@ function registerLotteryManagementComponents() {
       ...reportMethods,
       ...dailyReportMethods,
       ...batchOperationsMethods,
+      // P1-3 & P1-10 模块方法
+      ...presetVisualizationMethods,
+      ...systemAdvanceMethods,
 
       // ==================== 工具方法 ====================
 

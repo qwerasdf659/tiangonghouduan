@@ -530,18 +530,16 @@ app.use(
   '/admin',
   express.static(path.join(__dirname, 'admin/dist'), {
     index: false, // 禁用默认首页，避免冲突
-    maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0, // 开发环境禁用缓存，生产环境缓存1小时
-    etag: process.env.NODE_ENV === 'production', // 生产环境启用ETag缓存
+    maxAge: 0, // 禁用缓存，更新立即生效
+    etag: false, // 禁用ETag
     lastModified: true, // 启用Last-Modified
     dotfiles: 'ignore', // 忽略隐藏文件
     redirect: false, // 禁用目录重定向
     setHeaders: (res, _filePath) => {
-      // 开发环境强制不缓存
-      if (process.env.NODE_ENV !== 'production') {
-        res.set('Cache-Control', 'no-cache, no-store, must-revalidate')
-        res.set('Pragma', 'no-cache')
-        res.set('Expires', '0')
-      }
+      // 强制不缓存，确保每次都获取最新文件
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate')
+      res.set('Pragma', 'no-cache')
+      res.set('Expires', '0')
     }
   })
 )

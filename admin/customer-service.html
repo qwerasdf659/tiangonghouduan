@@ -21,7 +21,47 @@
   <!-- 页面主体 -->
   <div class="container mx-auto px-4 py-6" x-data="customerService()" x-init="init()">
     
-    <div class="grid grid-cols-12 gap-4 h-[calc(100vh-140px)]">
+    <!-- P1-22: 客服响应时长指标卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+      <div class="themed-card rounded-lg shadow p-4">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">⏱️</span>
+          <div>
+            <p class="text-sm themed-text-muted">平均首响时间</p>
+            <p class="text-xl font-bold themed-text" x-text="responseStats.avg_first_response_display || '--'"></p>
+          </div>
+        </div>
+      </div>
+      <div class="themed-card rounded-lg shadow p-4">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">💬</span>
+          <div>
+            <p class="text-sm themed-text-muted">平均响应时间</p>
+            <p class="text-xl font-bold themed-text" x-text="responseStats.avg_response_display || '--'"></p>
+          </div>
+        </div>
+      </div>
+      <div class="themed-card rounded-lg shadow p-4">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">📊</span>
+          <div>
+            <p class="text-sm themed-text-muted">今日会话数</p>
+            <p class="text-xl font-bold themed-text" x-text="responseStats.today_sessions || 0"></p>
+          </div>
+        </div>
+      </div>
+      <div class="themed-card rounded-lg shadow p-4">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">✅</span>
+          <div>
+            <p class="text-sm themed-text-muted">今日已处理</p>
+            <p class="text-xl font-bold themed-text" x-text="responseStats.today_resolved || 0"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-12 gap-4 h-[calc(100vh-220px)]">
       <!-- 会话列表 -->
       <div class="col-span-3 themed-card rounded-lg shadow overflow-hidden flex flex-col">
         <div class="p-4 border-b">

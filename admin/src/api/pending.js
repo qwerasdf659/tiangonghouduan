@@ -11,7 +11,8 @@ import { API_PREFIX, authHeaders, handleResponse } from './base.js'
 export const PENDING_ENDPOINTS = {
   SUMMARY: `${API_PREFIX}/console/pending/summary`,
   LIST: `${API_PREFIX}/console/pending/list`,
-  HEALTH_SCORE: `${API_PREFIX}/console/pending/health-score`
+  HEALTH_SCORE: `${API_PREFIX}/console/pending/health-score`,
+  BATCH: `${API_PREFIX}/console/pending/batch`
 }
 
 /**
@@ -64,6 +65,26 @@ export const PendingAPI = {
   async getHealthScore() {
     const response = await fetch(PENDING_ENDPOINTS.HEALTH_SCORE, {
       headers: authHeaders()
+    })
+    return handleResponse(response)
+  },
+
+  /**
+   * 批量操作待处理事项
+   * @param {Object} params - 操作参数
+   * @param {Array<number>} params.ids - 待处理事项ID列表
+   * @param {string} params.action - 操作类型: approve/reject/handle
+   * @param {string} [params.reason] - 拒绝原因（仅拒绝时必填）
+   * @returns {Promise<Object>} 操作结果
+   */
+  async batch(params) {
+    const response = await fetch(PENDING_ENDPOINTS.BATCH, {
+      method: 'POST',
+      headers: {
+        ...authHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(params)
     })
     return handleResponse(response)
   }

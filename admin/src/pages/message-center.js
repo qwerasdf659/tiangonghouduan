@@ -1,21 +1,28 @@
 /**
- * 消息中心页面模块
- * @description 管理系统通知消息的展示和操作
- * @version 1.0.0
- * @date 2026-02-01
+ * 消息中心页面模块 - P1-4 增强版
+ * @description 管理系统通知消息的展示和操作，支持 WebSocket 实时推送
+ * @version 2.0.0
+ * @date 2026-02-04
+ *
+ * P1-4 增强内容：
+ * 1. WebSocket 实时推送新消息
+ * 2. 未读数量实时更新
+ * 3. 更多筛选项（来源筛选）
+ * 4. 浏览器通知支持
  */
 
 import Alpine from 'alpinejs'
 import { logger } from '../utils/logger.js'
 import { createPageMixin } from '../alpine/mixins/index.js'
 import { request, buildURL } from '../api/base.js'
+import { io } from 'socket.io-client'
 
-// API 端点
+// API 端点 - 使用 system 域
 const MESSAGE_ENDPOINTS = {
-  LIST: '/console/notifications',
-  MARK_READ: id => `/console/notifications/${id}/read`,
-  MARK_ALL_READ: '/console/notifications/read-all',
-  DELETE: id => `/console/notifications/${id}`
+  LIST: '/system/notifications',
+  MARK_READ: (id) => `/system/notifications/${id}/read`,
+  MARK_ALL_READ: '/system/notifications/read-all',
+  DELETE: (id) => `/system/notifications/${id}`
 }
 
 /**
@@ -37,12 +44,13 @@ function messageCenterPage() {
     // 选中的消息ID
     selectedIds: [],
 
-    // 筛选条件
+    // 筛选条件（P1-4 增强：添加来源筛选）
     filter: {
       type: '',
       status: '',
       time_range: '',
-      keyword: ''
+      keyword: '',
+      source: '' // P1-4: 新增来源筛选
     },
 
     // 分页
@@ -56,17 +64,230 @@ function messageCenterPage() {
     detailModal: false,
     currentMessage: null,
 
+    // ========== P1-4 WebSocket 实时推送 ==========
+    /** @type {Object|null} Socket.IO 连接实例 */
+    socket: null,
+    /** @type {boolean} WebSocket 连接状态 */
+    wsConnected: false,
+    /** @type {number} 重连尝试次数 */
+    wsReconnectAttempts: 0,
+    /** @type {number} 最大重连次数 */
+    maxReconnectAttempts: 5,
+    /** @type {Object|null} 音频上下文 */
+    audioContext: null,
+    /** @type {number|null} 轮询定时器 */
+    pollTimer: null,
+
+    // 可用的消息来源列表
+    availableSources: ['系统', '抽奖模块', '客服系统', '风控系统', '财务系统', '用户管理'],
+
     async init() {
-      logger.info('[MessageCenter] 初始化消息中心')
+      logger.info('[MessageCenter] 初始化消息中心 (P1-4 WebSocket 增强版)')
 
       // 加载声音设置
       this.soundEnabled = localStorage.getItem('notification_sound') !== 'false'
 
+      // 初始化音频上下文
+      this.initAudio()
+
       // 监听筛选变化
       this.$watch('filter.type', () => this.loadMessages())
+      this.$watch('filter.source', () => this.loadMessages()) // P1-4: 监听来源筛选
 
       // 加载消息列表
       await this.loadMessages()
+
+      // P1-4: 建立 WebSocket 连接
+      this.connectWebSocket()
+
+      // P1-4: 启动轮询作为降级方案
+      this.startPolling()
+
+      // P1-4: 请求浏览器通知权限
+      this.requestNotificationPermission()
+    },
+
+    // ========== P1-4 音频初始化 ==========
+    initAudio() {
+      try {
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)()
+        logger.debug('[MessageCenter] 音频上下文已初始化')
+      } catch (e) {
+        logger.warn('[MessageCenter] 音频初始化失败:', e.message)
+      }
+    },
+
+    // ========== P1-4 播放通知提示音 ==========
+    playNotificationSound() {
+      if (!this.soundEnabled || !this.audioContext) return
+
+      try {
+        if (this.audioContext.state === 'suspended') {
+          this.audioContext.resume()
+        }
+
+        const oscillator = this.audioContext.createOscillator()
+        const gainNode = this.audioContext.createGain()
+
+        oscillator.connect(gainNode)
+        gainNode.connect(this.audioContext.destination)
+
+        oscillator.frequency.value = 800
+        oscillator.type = 'sine'
+
+        gainNode.gain.setValueAtTime(0, this.audioContext.currentTime)
+        gainNode.gain.linearRampToValueAtTime(0.3, this.audioContext.currentTime + 0.05)
+        gainNode.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 0.3)
+
+        oscillator.start(this.audioContext.currentTime)
+        oscillator.stop(this.audioContext.currentTime + 0.3)
+
+        logger.debug('[MessageCenter] 播放提示音')
+      } catch (e) {
+        logger.warn('[MessageCenter] 播放提示音失败:', e.message)
+      }
+    },
+
+    // ========== P1-4 WebSocket 连接管理 ==========
+    connectWebSocket() {
+      if (this.socket && this.wsConnected) return
+
+      try {
+        const token = localStorage.getItem('admin_token')
+        if (!token) {
+          logger.warn('[MessageCenter] 未登录，跳过 WebSocket 连接')
+          return
+        }
+
+        const socketUrl = window.location.origin
+        logger.debug('[MessageCenter] 连接 Socket.IO:', socketUrl)
+
+        this.socket = io(socketUrl, {
+          path: '/socket.io',
+          transports: ['websocket', 'polling'],
+          auth: { token },
+          reconnection: true,
+          reconnectionAttempts: this.maxReconnectAttempts,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 30000
+        })
+
+        this.socket.on('connect', () => {
+          logger.info('[MessageCenter] Socket.IO 连接成功')
+          this.wsConnected = true
+          this.wsReconnectAttempts = 0
+
+          // 注册为管理员客户端
+          this.socket.emit('register_admin', { token })
+        })
+
+        // 监听通知消息
+        this.socket.on('notification', (data) => {
+          this.handleNewNotification(data)
+        })
+
+        // 监听徽章更新
+        this.socket.on('badge_update', (data) => {
+          if (data.unread_count !== undefined) {
+            this.unreadCount = data.unread_count
+          }
+        })
+
+        // 监听新消息（客服消息也作为通知）
+        this.socket.on('new_message', (data) => {
+          this.handleNewNotification({
+            type: 'info',
+            title: '新客服消息',
+            message: data.content || '收到新消息',
+            source: '客服系统',
+            ...data
+          })
+        })
+
+        this.socket.on('disconnect', (reason) => {
+          logger.info('[MessageCenter] Socket.IO 连接断开:', reason)
+          this.wsConnected = false
+        })
+
+        this.socket.on('connect_error', (error) => {
+          logger.warn('[MessageCenter] Socket.IO 连接错误:', error.message)
+          this.wsConnected = false
+          this.wsReconnectAttempts++
+        })
+      } catch (e) {
+        logger.warn('[MessageCenter] Socket.IO 连接失败:', e.message)
+        this.wsConnected = false
+      }
+    },
+
+    // ========== P1-4 处理新通知 ==========
+    handleNewNotification(notification) {
+      logger.debug('[MessageCenter] 收到新通知:', notification)
+
+      // 构造完整的消息对象
+      const newMessage = {
+        id: notification.id || Date.now(),
+        type: notification.type || 'info',
+        title: notification.title || '新消息',
+        message: notification.message || '',
+        is_read: false,
+        created_at: notification.created_at || new Date().toISOString(),
+        source: notification.source || '系统'
+      }
+
+      // 添加到列表顶部
+      this.messages.unshift(newMessage)
+      this.unreadCount++
+      this.pagination.total++
+
+      // 播放提示音
+      this.playNotificationSound()
+
+      // 显示浏览器通知
+      this.showBrowserNotification(newMessage)
+
+      // 显示 Toast 提示
+      if (typeof this.showSuccess === 'function') {
+        this.showInfo?.(`收到新消息：${newMessage.title}`)
+      }
+    },
+
+    // ========== P1-4 浏览器通知 ==========
+    requestNotificationPermission() {
+      if (!('Notification' in window)) return
+
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().then((permission) => {
+          logger.debug('[MessageCenter] 浏览器通知权限:', permission)
+        })
+      }
+    },
+
+    showBrowserNotification(message) {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return
+
+      try {
+        new Notification(message.title, {
+          body: message.message,
+          icon: '/admin/favicon.svg',
+          tag: 'message-center-' + message.id
+        })
+      } catch (e) {
+        logger.warn('[MessageCenter] 浏览器通知显示失败:', e.message)
+      }
+    },
+
+    // ========== P1-4 轮询降级方案 ==========
+    startPolling() {
+      if (this.pollTimer) {
+        clearInterval(this.pollTimer)
+      }
+
+      // 每 30 秒轮询一次
+      this.pollTimer = setInterval(() => {
+        if (this.wsConnected) return // WebSocket 连接正常则跳过轮询
+        this.loadMessages()
+      }, 30000)
     },
 
     async loadMessages() {
@@ -81,6 +302,7 @@ function messageCenterPage() {
         if (this.filter.status) params.status = this.filter.status
         if (this.filter.time_range) params.time_range = this.filter.time_range
         if (this.filter.keyword) params.keyword = this.filter.keyword
+        if (this.filter.source) params.source = this.filter.source // P1-4: 来源筛选
 
         const result = await request({
           url: buildURL(MESSAGE_ENDPOINTS.LIST, params),
@@ -91,14 +313,20 @@ function messageCenterPage() {
           this.messages = result.data.items || result.data || []
           this.pagination.total = result.data.total || this.messages.length
           this.unreadCount =
-            result.data.unread_count || this.messages.filter(m => !m.is_read).length
+            result.data.unread_count || this.messages.filter((m) => !m.is_read).length
         }
       } catch (e) {
         logger.warn('[MessageCenter] loadMessages 失败:', e.message)
         // 模拟数据
         this.messages = this.generateMockMessages()
+
+        // P1-4: 应用来源筛选到模拟数据
+        if (this.filter.source) {
+          this.messages = this.messages.filter((m) => m.source === this.filter.source)
+        }
+
         this.pagination.total = this.messages.length + 50
-        this.unreadCount = this.messages.filter(m => !m.is_read).length
+        this.unreadCount = this.messages.filter((m) => !m.is_read).length
       } finally {
         this.loading = false
       }
@@ -371,6 +599,53 @@ function messageCenterPage() {
         minute: '2-digit',
         second: '2-digit'
       })
+    },
+
+    // ========== P1-4 组件销毁清理 ==========
+    destroy() {
+      // 清理轮询定时器
+      if (this.pollTimer) {
+        clearInterval(this.pollTimer)
+        this.pollTimer = null
+      }
+
+      // 关闭 WebSocket 连接
+      if (this.socket) {
+        this.socket.disconnect()
+        this.socket = null
+        this.wsConnected = false
+      }
+
+      // 关闭音频上下文
+      if (this.audioContext) {
+        this.audioContext.close()
+        this.audioContext = null
+      }
+
+      logger.debug('[MessageCenter] 组件资源已清理')
+    },
+
+    // ========== P1-4 WebSocket 连接状态显示 ==========
+    get connectionStatusText() {
+      if (this.wsConnected) return '🟢 实时连接'
+      if (this.wsReconnectAttempts > 0) return `🟡 重连中 (${this.wsReconnectAttempts}/${this.maxReconnectAttempts})`
+      return '🔴 离线'
+    },
+
+    get connectionStatusClass() {
+      if (this.wsConnected) return 'text-green-600'
+      if (this.wsReconnectAttempts > 0) return 'text-yellow-600'
+      return 'text-red-600'
+    },
+
+    // P1-4: 手动重连
+    reconnectWebSocket() {
+      if (this.socket) {
+        this.socket.disconnect()
+        this.socket = null
+      }
+      this.wsReconnectAttempts = 0
+      this.connectWebSocket()
     }
   }
 }

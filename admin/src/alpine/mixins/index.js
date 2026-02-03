@@ -33,6 +33,7 @@ export { tableSelectionMixin } from './table-selection.js'
 export { formValidationMixin } from './form-validation.js'
 export { authGuardMixin } from './auth-guard.js'
 export { withDraftAutoSave, createDraftFormMixin } from './draft-auto-save.js'
+export { drillDownMixin, DRILL_DOWN_SIZES, DRILL_DOWN_TYPES } from './drill-down.js'
 
 // ========== 组合工具 ==========
 
@@ -42,6 +43,7 @@ import { modalMixin } from './modal.js'
 import { tableSelectionMixin } from './table-selection.js'
 import { formValidationMixin } from './form-validation.js'
 import { authGuardMixin } from './auth-guard.js'
+import { drillDownMixin } from './drill-down.js'
 
 // 导入统一的日期格式化函数（北京时间）
 import {
@@ -65,6 +67,7 @@ import {
  * @param {string|boolean} [mixinConfig.tableSelection] - 表格选择配置（ID字段名或 true）
  * @param {boolean} [mixinConfig.formValidation=false] - 是否启用表单验证
  * @param {boolean} [mixinConfig.authGuard=false] - 是否启用认证守卫
+ * @param {boolean} [mixinConfig.drillDown=false] - 是否启用数据下钻
  * @param {Object} customProps - 自定义属性和方法
  * @returns {Object} 组合后的 Alpine data 对象
  *
@@ -105,7 +108,8 @@ export function createPageMixin(mixinConfig = {}, customProps = {}) {
     modal = true,
     tableSelection = false,
     formValidation = false,
-    authGuard = true // 默认启用认证守卫（管理后台页面通常需要）
+    authGuard = true, // 默认启用认证守卫（管理后台页面通常需要）
+    drillDown = false // P1-15: 数据下钻支持
   } = mixinConfig
 
   const composed = {
@@ -206,7 +210,12 @@ export function createPageMixin(mixinConfig = {}, customProps = {}) {
     Object.assign(composed, authGuardMixin())
   }
 
-  // 7. 合并自定义属性（自定义优先级最高）
+  // 7. 数据下钻（P1-15）
+  if (drillDown) {
+    Object.assign(composed, drillDownMixin())
+  }
+
+  // 8. 合并自定义属性（自定义优先级最高）
   Object.assign(composed, customProps)
 
   return composed
@@ -504,6 +513,7 @@ export default {
   tableSelectionMixin,
   formValidationMixin,
   authGuardMixin,
+  drillDownMixin,
   createPageMixin,
   createCrudPageMixin,
   createCrudMixin,

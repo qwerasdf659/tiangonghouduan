@@ -23,19 +23,40 @@
   </nav>
 
   <div class="container mx-auto px-4 py-6">
-    <!-- Tab切换 -->
+    <!-- P1-9: Tab切换 - 调整顺序为：全部告警→紧急告警→抽奖告警→系统告警→健康度分析 -->
     <div class="mb-6 border-b">
-      <nav class="flex space-x-4">
+      <nav class="flex space-x-4 overflow-x-auto">
         <button 
-          @click="activeTab = 'alerts'" 
+          @click="activeTab = 'all'; filterAlerts('all')" 
+          :class="activeTab === 'all' ? 'border-b-2 themed-border-primary themed-text-primary' : 'themed-text-muted hover:themed-text-secondary'"
+          class="px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
+          📋 全部告警
+          <span class="ml-1 px-2 py-0.5 text-xs rounded-full themed-bg-muted" x-text="stats.danger + stats.warning + stats.info"></span>
+        </button>
+        <button 
+          @click="activeTab = 'urgent'; filterAlerts('danger')" 
+          :class="activeTab === 'urgent' ? 'border-b-2 border-red-500 text-red-600' : 'themed-text-muted hover:themed-text-secondary'"
+          class="px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
+          🔴 紧急告警
+          <span x-show="stats.danger > 0" class="ml-1 px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700" x-text="stats.danger"></span>
+        </button>
+        <button 
+          @click="activeTab = 'alerts'; filterAlerts('')" 
           :class="activeTab === 'alerts' ? 'border-b-2 themed-border-primary themed-text-primary' : 'themed-text-muted hover:themed-text-secondary'"
-          class="px-4 py-2 text-sm font-medium transition-colors">
-          🚨 实时告警
+          class="px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
+          🎰 抽奖告警
+        </button>
+        <button 
+          @click="activeTab = 'system'; loadSystemHealth()" 
+          :class="activeTab === 'system' ? 'border-b-2 border-purple-500 text-purple-600' : 'themed-text-muted hover:themed-text-secondary'"
+          class="px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
+          🖥️ 系统告警
+          <span x-show="systemHealth.alert_count > 0" class="ml-1 px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700" x-text="systemHealth.alert_count"></span>
         </button>
         <button 
           @click="activeTab = 'health'; loadHealthData()" 
           :class="activeTab === 'health' ? 'border-b-2 themed-border-primary themed-text-primary' : 'themed-text-muted hover:themed-text-secondary'"
-          class="px-4 py-2 text-sm font-medium transition-colors">
+          class="px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
           📊 健康度分析
         </button>
       </nav>
@@ -240,6 +261,210 @@
       </div>
     </div>
     </div><!-- 结束实时告警Tab -->
+
+    <!-- ============ P1-21: 系统告警Tab ============ -->
+    <div x-show="activeTab === 'system'" x-cloak>
+      <!-- 系统健康状态概览 -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <!-- API状态 -->
+        <div class="themed-card rounded-lg shadow p-4">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl">🌐</span>
+              <h4 class="font-semibold themed-text">API服务</h4>
+            </div>
+            <span 
+              class="px-2 py-1 text-xs rounded-full"
+              :class="{
+                'bg-green-100 text-green-700': systemHealth.api?.status === 'healthy',
+                'bg-yellow-100 text-yellow-700': systemHealth.api?.status === 'warning',
+                'bg-red-100 text-red-700': systemHealth.api?.status === 'critical',
+                'bg-gray-100 text-gray-700': systemHealth.api?.status === 'loading'
+              }"
+              x-text="systemHealth.api?.status === 'healthy' ? '正常' : systemHealth.api?.status === 'warning' ? '警告' : systemHealth.api?.status === 'critical' ? '异常' : '检测中'">
+            </span>
+          </div>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span class="themed-text-muted">响应时间</span>
+              <span class="font-medium themed-text" x-text="(systemHealth.api?.response_time || 0) + 'ms'"></span>
+            </div>
+            <div class="flex justify-between">
+              <span class="themed-text-muted">上次检查</span>
+              <span class="themed-text" x-text="formatRelativeTime(systemHealth.api?.last_check)"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 数据库状态 -->
+        <div class="themed-card rounded-lg shadow p-4">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl">🗄️</span>
+              <h4 class="font-semibold themed-text">数据库</h4>
+            </div>
+            <span 
+              class="px-2 py-1 text-xs rounded-full"
+              :class="{
+                'bg-green-100 text-green-700': systemHealth.db?.status === 'healthy',
+                'bg-yellow-100 text-yellow-700': systemHealth.db?.status === 'warning',
+                'bg-red-100 text-red-700': systemHealth.db?.status === 'critical',
+                'bg-gray-100 text-gray-700': systemHealth.db?.status === 'loading'
+              }"
+              x-text="systemHealth.db?.status === 'healthy' ? '正常' : systemHealth.db?.status === 'warning' ? '警告' : systemHealth.db?.status === 'critical' ? '异常' : '检测中'">
+            </span>
+          </div>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span class="themed-text-muted">主机</span>
+              <span class="font-medium themed-text truncate max-w-[120px]" :title="systemHealth.db?.host" x-text="systemHealth.db?.host || '--'"></span>
+            </div>
+            <div class="flex justify-between">
+              <span class="themed-text-muted">数据库</span>
+              <span class="themed-text" x-text="systemHealth.db?.database || '--'"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Redis状态 -->
+        <div class="themed-card rounded-lg shadow p-4">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl">⚡</span>
+              <h4 class="font-semibold themed-text">Redis缓存</h4>
+            </div>
+            <span 
+              class="px-2 py-1 text-xs rounded-full"
+              :class="{
+                'bg-green-100 text-green-700': systemHealth.redis?.status === 'healthy',
+                'bg-yellow-100 text-yellow-700': systemHealth.redis?.status === 'warning',
+                'bg-red-100 text-red-700': systemHealth.redis?.status === 'critical',
+                'bg-gray-100 text-gray-700': systemHealth.redis?.status === 'loading'
+              }"
+              x-text="systemHealth.redis?.connected ? '已连接' : '未连接'">
+            </span>
+          </div>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span class="themed-text-muted">连接状态</span>
+              <span class="font-medium" :class="systemHealth.redis?.connected ? 'text-green-600' : 'text-red-600'" x-text="systemHealth.redis?.connected ? '在线' : '离线'"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 综合健康度 -->
+        <div class="themed-card rounded-lg shadow p-4">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl">🏥</span>
+              <h4 class="font-semibold themed-text">系统健康度</h4>
+            </div>
+            <span 
+              class="text-2xl font-bold"
+              :class="{
+                'text-green-600': systemHealth.overall_score >= 80,
+                'text-yellow-600': systemHealth.overall_score >= 60 && systemHealth.overall_score < 80,
+                'text-red-600': systemHealth.overall_score < 60
+              }"
+              x-text="systemHealth.overall_score || '--'">
+            </span>
+          </div>
+          <div class="w-full themed-bg-muted rounded-full h-2">
+            <div 
+              class="h-2 rounded-full transition-all duration-500"
+              :class="{
+                'bg-green-500': systemHealth.overall_score >= 80,
+                'bg-yellow-500': systemHealth.overall_score >= 60 && systemHealth.overall_score < 80,
+                'bg-red-500': systemHealth.overall_score < 60
+              }"
+              :style="{ width: (systemHealth.overall_score || 0) + '%' }">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 慢接口告警 -->
+      <div class="themed-card rounded-lg shadow mb-6">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold">⏱️ 慢接口告警</h5>
+          <button @click="loadSystemHealth()" class="px-3 py-1 text-sm themed-bg-primary text-white rounded hover:opacity-90">
+            🔄 刷新
+          </button>
+        </div>
+        <div class="p-4">
+          <template x-if="!systemHealth.slow_apis || systemHealth.slow_apis.length === 0">
+            <div class="text-center py-8 themed-text-muted">
+              ✅ 暂无慢接口告警，系统响应正常
+            </div>
+          </template>
+          <div class="space-y-3">
+            <template x-for="(api, index) in (systemHealth.slow_apis || [])" :key="index">
+              <div class="p-4 rounded-lg border-l-4"
+                   :class="{
+                     'border-red-500 bg-red-50': api.response_time > 3000,
+                     'border-yellow-500 bg-yellow-50': api.response_time > 1000 && api.response_time <= 3000,
+                     'border-blue-500 bg-blue-50': api.response_time <= 1000
+                   }">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <span class="font-medium themed-text" x-text="api.endpoint"></span>
+                    <p class="text-sm themed-text-muted mt-1" x-text="'方法: ' + (api.method || 'GET')"></p>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-lg font-bold"
+                          :class="{
+                            'text-red-600': api.response_time > 3000,
+                            'text-yellow-600': api.response_time > 1000 && api.response_time <= 3000,
+                            'text-blue-600': api.response_time <= 1000
+                          }"
+                          x-text="api.response_time + 'ms'"></span>
+                    <p class="text-xs themed-text-muted" x-text="formatDate(api.recorded_at)"></p>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- 系统告警历史 -->
+      <div class="themed-card rounded-lg shadow">
+        <div class="p-4 border-b">
+          <h5 class="font-semibold">📜 系统告警历史</h5>
+        </div>
+        <div class="p-4">
+          <template x-if="!systemHealth.recent_alerts || systemHealth.recent_alerts.length === 0">
+            <div class="text-center py-8 themed-text-muted">
+              🛡️ 近期无系统告警记录
+            </div>
+          </template>
+          <div class="space-y-3">
+            <template x-for="(alert, index) in (systemHealth.recent_alerts || [])" :key="index">
+              <div class="p-4 rounded-lg border"
+                   :class="{
+                     'border-red-300 bg-red-50': alert.severity === 'critical',
+                     'border-yellow-300 bg-yellow-50': alert.severity === 'warning',
+                     'border-blue-300 bg-blue-50': alert.severity === 'info'
+                   }">
+                <div class="flex items-start justify-between">
+                  <div class="flex items-center gap-2">
+                    <span :class="{
+                            'text-red-500': alert.severity === 'critical',
+                            'text-yellow-500': alert.severity === 'warning',
+                            'text-blue-500': alert.severity === 'info'
+                          }"
+                          x-text="alert.severity === 'critical' ? '🔴' : alert.severity === 'warning' ? '🟡' : '🔵'"></span>
+                    <span class="font-medium themed-text" x-text="alert.message"></span>
+                  </div>
+                  <span class="text-xs themed-text-muted" x-text="formatDate(alert.created_at)"></span>
+                </div>
+                <p x-show="alert.details" class="text-sm themed-text-muted mt-2" x-text="alert.details"></p>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div><!-- 结束系统告警Tab -->
 
     <!-- ============ 健康度分析Tab ============ -->
     <div x-show="activeTab === 'health'" x-cloak>

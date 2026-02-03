@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '操作审计', 
+    pageStyle: '[x-cloak] { display: none !important; } .log-row { transition: all 0.2s ease; } .log-row:hover { background-color: #f8fafc; } .action-create { background-color: #dcfce7; color: #166534; } .action-update { background-color: #dbeafe; color: #1e40af; } .action-delete { background-color: #fee2e2; color: #991b1b; } .action-login { background-color: #e0e7ff; color: #3730a3; } .action-logout { background-color: #f3f4f6; color: #374151; }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-stone-200">← 返回工作台</a>
+        <span class="text-lg font-semibold">📋 操作审计</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-data x-text="Alpine.store('auth')?.user_info?.nickname ? `欢迎，${Alpine.store('auth').user_info.nickname}` : '欢迎，管理员'"></span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6" x-data="auditLogsPage()" x-init="init()" x-cloak>
+    
+    <!-- 页面标题和操作 -->
+    <div class="flex justify-between items-center mb-6">
+      <div>
+        <h1 class="text-2xl font-bold themed-text-primary">📋 操作审计日志</h1>
+        <p class="text-sm themed-text-muted mt-1">查看系统所有操作记录，支持按操作类型、操作人、时间范围筛选</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <button 
+          @click="exportAuditLogs()"
+          class="flex items-center gap-2 px-4 py-2 border themed-border rounded-lg text-sm themed-text-secondary hover:themed-bg-base transition"
+        >
+          📤 导出日志
+        </button>
+        <button 
+          @click="loadAuditLogs()"
+          :disabled="loading"
+          class="flex items-center gap-2 px-4 py-2 themed-bg-primary text-white rounded-lg text-sm font-medium themed-hover-primary transition"
+        >
+          <span :class="loading && 'animate-spin'">🔄</span>
+          刷新
+        </button>
+      </div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+      <div class="themed-card rounded-lg shadow p-4 text-center">
+        <div class="text-3xl text-blue-500 mb-2">📊</div>
+        <div class="text-2xl font-bold themed-text-primary" x-text="logPagination.total || 0"></div>
+        <div class="text-sm themed-text-muted">总日志数</div>
+      </div>
+      <div class="themed-card rounded-lg shadow p-4 text-center">
+        <div class="text-3xl text-green-500 mb-2">➕</div>
+        <div class="text-2xl font-bold text-green-600" x-text="stats.create || 0"></div>
+        <div class="text-sm themed-text-muted">创建操作</div>
+      </div>
+      <div class="themed-card rounded-lg shadow p-4 text-center">
+        <div class="text-3xl text-blue-500 mb-2">✏️</div>
+        <div class="text-2xl font-bold text-blue-600" x-text="stats.update || 0"></div>
+        <div class="text-sm themed-text-muted">更新操作</div>
+      </div>
+      <div class="themed-card rounded-lg shadow p-4 text-center">
+        <div class="text-3xl text-red-500 mb-2">🗑️</div>
+        <div class="text-2xl font-bold text-red-600" x-text="stats.delete || 0"></div>
+        <div class="text-sm themed-text-muted">删除操作</div>
+      </div>
+      <div class="themed-card rounded-lg shadow p-4 text-center">
+        <div class="text-3xl text-purple-500 mb-2">🔐</div>
+        <div class="text-2xl font-bold text-purple-600" x-text="stats.login || 0"></div>
+        <div class="text-sm themed-text-muted">登录操作</div>
+      </div>
+    </div>
+
+    <!-- 筛选栏 -->
+    <div class="themed-card rounded-lg shadow mb-6 p-4">
+      <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">操作人ID</label>
+          <input 
+            type="text" 
+            class="w-full border rounded-lg px-3 py-2" 
+            x-model="logFilters.operator_id" 
+            placeholder="输入操作人ID..."
+          >
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">操作类型</label>
+          <select class="w-full border rounded-lg px-3 py-2" x-model="logFilters.action">
+            <option value="">全部类型</option>
+            <template x-for="type in actionTypes" :key="type.value">
+              <option :value="type.value" x-text="type.label"></option>
+            </template>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">操作目标</label>
+          <input 
+            type="text" 
+            class="w-full border rounded-lg px-3 py-2" 
+            x-model="logFilters.target" 
+            placeholder="如: user, lottery..."
+          >
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">开始日期</label>
+          <input 
+            type="date" 
+            class="w-full border rounded-lg px-3 py-2" 
+            x-model="logFilters.start_date"
+          >
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">结束日期</label>
+          <input 
+            type="date" 
+            class="w-full border rounded-lg px-3 py-2" 
+            x-model="logFilters.end_date"
+          >
+        </div>
+        <div class="flex gap-2">
+          <button 
+            class="flex-1 px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary" 
+            @click="searchAuditLogs()"
+          >
+            🔍 搜索
+          </button>
+          <button 
+            class="px-4 py-2 border themed-border rounded-lg themed-text-secondary hover:themed-bg-base" 
+            @click="resetLogFilters()"
+          >
+            重置
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 加载状态 -->
+    <template x-if="loading">
+      <div class="text-center py-10">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 themed-border-primary mx-auto"></div>
+        <p class="mt-4 themed-text-muted">正在加载审计日志...</p>
+      </div>
+    </template>
+
+    <!-- 日志列表 -->
+    <div class="themed-card rounded-lg shadow" x-show="!loading">
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="themed-bg-base">
+            <tr>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">时间</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作人</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作类型</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作目标</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">描述</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">IP地址</th>
+              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <!-- 空状态 -->
+            <template x-if="auditLogs.length === 0">
+              <tr>
+                <td colspan="7" class="px-4 py-10 text-center">
+                  <div class="text-5xl mb-4">📋</div>
+                  <p class="themed-text-muted">暂无审计日志</p>
+                </td>
+              </tr>
+            </template>
+            
+            <!-- 日志行 -->
+            <template x-for="log in auditLogs" :key="log.log_id || log.id">
+              <tr class="log-row">
+                <td class="px-4 py-3 text-sm themed-text-secondary" x-text="formatDateTime(log.created_at)"></td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center">
+                    <span class="text-sm font-medium" x-text="log.operator_name || log.operator_id || '-'"></span>
+                    <span class="ml-2 text-xs themed-text-muted" x-text="log.operator_id ? `(ID: ${log.operator_id})` : ''"></span>
+                  </div>
+                </td>
+                <td class="px-4 py-3">
+                  <span 
+                    class="px-2 py-1 text-xs rounded"
+                    :class="getActionClass(log.action)"
+                    x-text="getActionText(log.action)"
+                  ></span>
+                </td>
+                <td class="px-4 py-3 text-sm" x-text="log.target || '-'"></td>
+                <td class="px-4 py-3 text-sm themed-text-secondary max-w-xs truncate" :title="log.description" x-text="log.description || '-'"></td>
+                <td class="px-4 py-3 text-sm font-mono themed-text-muted" x-text="log.ip_address || '-'"></td>
+                <td class="px-4 py-3">
+                  <button 
+                    @click="viewLogDetail(log)"
+                    class="themed-text-primary hover:text-blue-700 text-sm"
+                  >
+                    查看详情
+                  </button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- 分页 -->
+      <div class="p-4 border-t flex justify-between items-center" x-show="logPagination.total > 0">
+        <div class="text-sm themed-text-muted">
+          共 <span x-text="logPagination.total"></span> 条记录，
+          第 <span x-text="logPage"></span> / <span x-text="logPagination.total_pages"></span> 页
+        </div>
+        <div class="flex gap-2">
+          <button 
+            class="px-3 py-1 border rounded themed-text-secondary hover:themed-bg-base disabled:opacity-50"
+            :disabled="logPage <= 1"
+            @click="goToLogPage(logPage - 1)"
+          >
+            上一页
+          </button>
+          <button 
+            class="px-3 py-1 border rounded themed-text-secondary hover:themed-bg-base disabled:opacity-50"
+            :disabled="logPage >= logPagination.total_pages"
+            @click="goToLogPage(logPage + 1)"
+          >
+            下一页
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 日志详情模态框 -->
+    <div 
+      x-show="selectedLog" 
+      x-cloak
+      class="fixed inset-0 z-50 overflow-y-auto"
+      @keydown.escape.window="selectedLog = null"
+    >
+      <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="selectedLog = null"></div>
+        <div class="inline-block w-full max-w-2xl my-8 overflow-hidden text-left align-middle transition-all transform themed-card shadow-xl rounded-lg">
+          <!-- 模态框头部 -->
+          <div class="px-6 py-4 border-b flex justify-between items-center">
+            <h3 class="text-lg font-semibold">📋 日志详情</h3>
+            <button @click="selectedLog = null" class="text-gray-400 hover:text-gray-600">&times;</button>
+          </div>
+          
+          <!-- 模态框内容 -->
+          <div class="px-6 py-4" x-show="selectedLog">
+            <div class="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-muted">日志ID</label>
+                <p class="mt-1 text-sm" x-text="selectedLog?.log_id || selectedLog?.id || '-'"></p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-muted">操作时间</label>
+                <p class="mt-1 text-sm" x-text="formatDateTime(selectedLog?.created_at)"></p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-muted">操作人</label>
+                <p class="mt-1 text-sm" x-text="(selectedLog?.operator_name || selectedLog?.operator_id || '-') + (selectedLog?.operator_id ? ` (ID: ${selectedLog.operator_id})` : '')"></p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-muted">操作类型</label>
+                <span 
+                  class="inline-block mt-1 px-2 py-1 text-xs rounded"
+                  :class="getActionClass(selectedLog?.action)"
+                  x-text="getActionText(selectedLog?.action)"
+                ></span>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-muted">操作目标</label>
+                <p class="mt-1 text-sm" x-text="selectedLog?.target || '-'"></p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-muted">IP地址</label>
+                <p class="mt-1 text-sm font-mono" x-text="selectedLog?.ip_address || '-'"></p>
+              </div>
+            </div>
+            
+            <div class="mb-4">
+              <label class="block text-sm font-medium themed-text-muted">操作描述</label>
+              <p class="mt-1 text-sm" x-text="selectedLog?.description || '-'"></p>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium themed-text-muted">操作详情</label>
+              <pre class="mt-1 text-xs bg-gray-50 rounded p-3 overflow-x-auto max-h-60" x-text="formatLogDetails(selectedLog?.details)"></pre>
+            </div>
+          </div>
+          
+          <!-- 模态框底部 -->
+          <div class="px-6 py-4 border-t flex justify-end">
+            <button 
+              @click="selectedLog = null"
+              class="px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary"
+            >
+              关闭
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 脚本 -->
+  <script type="module" src="/src/modules/system/pages/audit-logs.js"></script>
+</body>
+</html>
+

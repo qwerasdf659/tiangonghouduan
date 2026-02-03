@@ -66,6 +66,9 @@ export const CONTENT_ENDPOINTS = {
   CUSTOMER_SERVICE_MARK_READ: `${API_PREFIX}/console/customer-service/sessions/:session_id/mark-read`,
   CUSTOMER_SERVICE_TRANSFER: `${API_PREFIX}/console/customer-service/sessions/:session_id/transfer`,
   CUSTOMER_SERVICE_CLOSE: `${API_PREFIX}/console/customer-service/sessions/:session_id/close`,
+  // P1-22: 客服响应时长统计
+  CUSTOMER_SERVICE_STATS: `${API_PREFIX}/console/customer-service/sessions/stats`,
+  CUSTOMER_SERVICE_RESPONSE_STATS: `${API_PREFIX}/console/customer-service/sessions/response-stats`,
 
   // 反馈管理
   FEEDBACK_LIST: `${API_PREFIX}/console/system/feedbacks`,

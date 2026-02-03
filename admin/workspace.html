@@ -116,62 +116,98 @@
       <!-- 导航菜单 -->
       <nav class="sidebar-nav scrollbar-thin">
         <template x-for="group in navGroups" :key="group.id">
-          <div>
-            <!-- 单项菜单（如工作台） -->
-            <template x-if="group.type === 'single'">
-              <a 
-                class="nav-single"
-                :class="{ 'active': isItemActive(group.url) }"
-                @click.prevent="navigateTo(group.url, group.id, group.name, group.icon)"
-                href="javascript:;"
+          <div class="nav-menu-item">
+            <!-- 单项菜单（如运营仪表盘） -->
+            <a 
+              x-show="group.type === 'single'"
+              class="nav-single"
+              :class="{ 'active': isItemActive(group.url) }"
+              @click.prevent="navigateTo(group.url, group.id, group.name, group.icon)"
+              href="javascript:;"
+            >
+              <span class="nav-icon" x-text="group.icon"></span>
+              <span class="nav-text" x-text="group.name"></span>
+            </a>
+
+            <!-- 二级分组菜单（有 items 但没有 subGroups） -->
+            <div 
+              x-show="group.type !== 'single' && group.items && group.items.length > 0 && (!group.subGroups || group.subGroups.length === 0)"
+              class="nav-group"
+              :class="{ 'expanded': isGroupExpanded(group.id) }"
+            >
+              <div 
+                class="nav-group-title"
+                @click="toggleGroup(group.id)"
               >
                 <span class="nav-icon" x-text="group.icon"></span>
                 <span class="nav-text" x-text="group.name"></span>
-              </a>
-            </template>
-
-            <!-- 分组菜单 -->
-            <template x-if="group.type !== 'single' && group.items">
-              <div 
-                class="nav-group"
-                :class="{ 'expanded': isGroupExpanded(group.id) }"
-              >
-                <!-- 分组标题 -->
-                <div 
-                  class="nav-group-title"
-                  @click="toggleGroup(group.id)"
-                >
-                  <span class="nav-icon" x-text="group.icon"></span>
-                  <span class="nav-text" x-text="group.name"></span>
-                  <span class="toggle-icon">▼</span>
-                </div>
-
-                <!-- 分组子项 -->
-                <div class="nav-group-items">
-                  <template x-for="item in group.items" :key="item.id">
-                    <a 
-                      class="nav-item"
-                      :class="{ 'active': isItemActive(item.url) }"
-                      @click.prevent="navigateTo(item.url, item.id, item.name, group.icon)"
-                      href="javascript:;"
-                    >
-                      <span x-text="item.name"></span>
-                      <!-- 实时直播标记 -->
-                      <template x-if="item.badge === 'live'">
-                        <span class="ml-auto w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                      </template>
-                      <!-- 徽标数字 -->
-                      <template x-if="item.badgeKey && getBadgeCount(item.badgeKey) > 0">
-                        <span 
-                          class="ml-auto px-1.5 py-0.5 text-xs font-medium bg-red-500 text-white rounded-full min-w-[20px] text-center"
-                          x-text="getBadgeCount(item.badgeKey) > 99 ? '99+' : getBadgeCount(item.badgeKey)"
-                        ></span>
-                      </template>
-                    </a>
-                  </template>
-                </div>
+                <span class="toggle-icon">▼</span>
               </div>
-            </template>
+              <div class="nav-group-items">
+                <template x-for="item in (group.items || [])" :key="item.id">
+                  <a 
+                    class="nav-item"
+                    :class="{ 'active': isItemActive(item.url) }"
+                    @click.prevent="navigateTo(item.url, item.id, item.name, group.icon)"
+                    href="javascript:;"
+                  >
+                    <span x-text="item.name"></span>
+                    <template x-if="item.badge === 'live'">
+                      <span class="ml-auto w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    </template>
+                    <template x-if="item.badgeKey && getBadgeCount(item.badgeKey) > 0">
+                      <span 
+                        class="ml-auto px-1.5 py-0.5 text-xs font-medium bg-red-500 text-white rounded-full min-w-[20px] text-center"
+                        x-text="getBadgeCount(item.badgeKey) > 99 ? '99+' : getBadgeCount(item.badgeKey)"
+                      ></span>
+                    </template>
+                  </a>
+                </template>
+              </div>
+            </div>
+
+            <!-- 三级分组菜单（如系统设置，有 subGroups） -->
+            <div 
+              x-show="group.subGroups && group.subGroups.length > 0"
+              class="nav-group nav-group-3level"
+              :class="{ 'expanded': isGroupExpanded(group.id) }"
+              :data-group-id="group.id"
+            >
+              <div 
+                class="nav-group-title"
+                @click="toggleGroup(group.id)"
+              >
+                <span class="nav-icon" x-text="group.icon"></span>
+                <span class="nav-text" x-text="group.name"></span>
+                <span class="toggle-icon">▼</span>
+              </div>
+              <div class="nav-group-items">
+                <template x-for="subGroup in (group.subGroups || [])" :key="subGroup.id">
+                  <div class="nav-subgroup" :class="{ 'expanded': isSubGroupExpanded(subGroup.id) }">
+                    <div 
+                      class="nav-subgroup-title"
+                      @click="toggleSubGroup(subGroup.id)"
+                    >
+                      <span class="nav-subicon" x-text="subGroup.icon || '📁'"></span>
+                      <span x-text="subGroup.name"></span>
+                      <span class="toggle-icon text-xs">▼</span>
+                    </div>
+                    <div class="nav-subgroup-items">
+                      <template x-for="item in (subGroup.items || [])" :key="item.id">
+                        <a 
+                          class="nav-item nav-item-nested"
+                          :class="{ 'active': isItemActive(item.url) }"
+                          @click.prevent="navigateTo(item.url, item.id, item.name, subGroup.icon || group.icon)"
+                          href="javascript:;"
+                        >
+                          <span x-text="item.name"></span>
+                        </a>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
           </div>
         </template>
       </nav>

@@ -171,6 +171,17 @@ function customerServicePage() {
     defaultAvatar:
       'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLXBlcnNvbi1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTExIDZhMyAzIDAgMSAxLTYgMCAzIDMgMCAwIDEgNiAweiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTAgOGE4IDggMCAxIDEgMTYgMEE4IDggMCAwIDEgMCA4em04IDdhNyA3IDAgMCAwIDUuMzg3LTIuNTAzQTEzLjkzMyAxMy45MzMgMCAwIDAgOCAxMS41YTEzLjkzMyAxMy45MzMgMCAwIDAtNS4zODcgMS4wMDdBNyA3IDAgMCAwIDggMTV6Ii8+PC9zdmc+',
 
+    // ========== P1-22: 客服响应时长统计 ==========
+    /** 响应时长统计数据 */
+    responseStats: {
+      avg_first_response_seconds: 0,
+      avg_first_response_display: '--',
+      avg_response_seconds: 0,
+      avg_response_display: '--',
+      today_sessions: 0,
+      today_resolved: 0
+    },
+
     // ==================== 生命周期 ====================
 
     /**
@@ -196,9 +207,11 @@ function customerServicePage() {
       this.loadSessions()
       this.loadAdminList()
       this.initWebSocket()
+      this.loadResponseStats() // P1-22: 加载响应时长统计
 
-      // 定期轮询刷新会话列表
+      // 定期轮询刷新会话列表和统计
       setInterval(() => this.loadSessions(true), 30000)
+      setInterval(() => this.loadResponseStats(), 60000) // 每分钟刷新统计
 
       // 页面卸载时关闭WebSocket
       window.addEventListener('beforeunload', () => {
@@ -737,6 +750,69 @@ function customerServicePage() {
       } catch {
         return dateStr
       }
+    },
+
+    // ========== P1-22: 客服响应时长统计方法 ==========
+
+    /**
+     * 加载客服响应时长统计
+     * @async
+     * @returns {Promise<void>}
+     */
+    async loadResponseStats() {
+      try {
+        // 尝试调用后端响应时长统计API
+        const response = await apiRequest(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_RESPONSE_STATS + '?days=1')
+        
+        if (response && response.success && response.data) {
+          const data = response.data
+          this.responseStats = {
+            avg_first_response_seconds: data.avg_first_response_seconds || 0,
+            avg_first_response_display: data.avg_first_response_display || this.formatSeconds(data.avg_first_response_seconds),
+            avg_response_seconds: data.avg_response_seconds || 0,
+            avg_response_display: data.avg_response_display || this.formatSeconds(data.avg_response_seconds),
+            today_sessions: data.today_sessions || data.total_sessions || 0,
+            today_resolved: data.today_resolved || data.resolved_sessions || 0
+          }
+          logger.info('响应时长统计加载成功', this.responseStats)
+        } else {
+          // 后端API未实现时使用本地计算
+          this.calculateResponseStatsLocally()
+        }
+      } catch (error) {
+        logger.warn('响应时长统计API调用失败，使用本地计算:', error.message)
+        this.calculateResponseStatsLocally()
+      }
+    },
+
+    /**
+     * 本地计算响应时长统计（后端未实现时的降级方案）
+     */
+    calculateResponseStatsLocally() {
+      // 从会话列表计算统计数据
+      const activeSessions = this.sessions.filter(s => s.status === 'active')
+      const closedSessions = this.sessions.filter(s => s.status === 'closed')
+      
+      this.responseStats = {
+        avg_first_response_seconds: 0,
+        avg_first_response_display: '--',
+        avg_response_seconds: 0,
+        avg_response_display: '--',
+        today_sessions: activeSessions.length + closedSessions.length,
+        today_resolved: closedSessions.length
+      }
+    },
+
+    /**
+     * 格式化秒数为可读时间
+     * @param {number} seconds - 秒数
+     * @returns {string} 格式化后的时间
+     */
+    formatSeconds(seconds) {
+      if (!seconds || seconds <= 0) return '--'
+      if (seconds < 60) return `${Math.round(seconds)}秒`
+      if (seconds < 3600) return `${Math.round(seconds / 60)}分钟`
+      return `${Math.floor(seconds / 3600)}小时${Math.round((seconds % 3600) / 60)}分钟`
     }
   }
 }

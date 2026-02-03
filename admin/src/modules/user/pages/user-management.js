@@ -489,6 +489,236 @@ document.addEventListener('alpine:init', () => {
         trade: '📦 交易'
       }
       return map[type] || type || '其他'
+    },
+
+    // ==================== P2-9: 一键分析功能 ====================
+
+    /** @type {Object|null} 用户分析报告数据 */
+    userAnalysisReport: null,
+    /** @type {boolean} 是否正在生成分析报告 */
+    generatingReport: false,
+    /** @type {boolean} 显示用户分析报告弹窗 */
+    showAnalysisReportModal: false,
+
+    /**
+     * 一键分析用户 - 获取用户完整分析报告
+     * @param {Object} user - 用户对象
+     */
+    async analyzeUser(user) {
+      if (!user?.user_id) {
+        Alpine.store('notification')?.show?.('请选择要分析的用户', 'error')
+        return
+      }
+
+      this.generatingReport = true
+      this.userAnalysisReport = null
+
+      try {
+        logger.info('[P2-9] 开始一键分析用户:', user.user_id)
+
+        // 并行获取多个分析数据
+        const [profileRes, activitiesRes, assetsRes] = await Promise.allSettled([
+          // 获取用户抽奖档案
+          fetch(`${API_PREFIX}/console/lottery-user-analysis/profile/${user.user_id}`, {
+            headers: authHeaders()
+          }).then(res => res.json()),
+          // 获取用户行为轨迹
+          fetch(`${API_PREFIX}/console/users/${user.user_id}/activities?limit=20`, {
+            headers: authHeaders()
+          }).then(res => res.json()),
+          // 获取用户资产汇总
+          fetch(`${API_PREFIX}/console/assets/user/${user.user_id}/summary`, {
+            headers: authHeaders()
+          }).then(res => res.json())
+        ])
+
+        // 组装分析报告
+        this.userAnalysisReport = {
+          user_info: {
+            user_id: user.user_id,
+            phone: user.phone,
+            nickname: user.nickname || '未设置',
+            status: user.status,
+            created_at: user.created_at
+          },
+          lottery_profile: profileRes.status === 'fulfilled' && profileRes.value?.success
+            ? profileRes.value.data
+            : null,
+          activities: activitiesRes.status === 'fulfilled' && activitiesRes.value?.success
+            ? (activitiesRes.value.data?.activities || activitiesRes.value.data || [])
+            : [],
+          assets: assetsRes.status === 'fulfilled' && assetsRes.value?.success
+            ? assetsRes.value.data
+            : null,
+          generated_at: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+        }
+
+        this.showAnalysisReportModal = true
+        logger.info('[P2-9] 用户分析报告生成成功')
+      } catch (error) {
+        logger.error('[P2-9] 一键分析失败:', error.message)
+        Alpine.store('notification')?.show?.('生成分析报告失败: ' + error.message, 'error')
+      } finally {
+        this.generatingReport = false
+      }
+    },
+
+    /**
+     * 关闭分析报告弹窗
+     */
+    closeAnalysisReportModal() {
+      this.showAnalysisReportModal = false
+      this.userAnalysisReport = null
+    },
+
+    /**
+     * 导出用户分析报告为 PDF
+     */
+    async exportAnalysisReportPDF() {
+      if (!this.userAnalysisReport) {
+        Alpine.store('notification')?.show?.('没有可导出的报告', 'warning')
+        return
+      }
+
+      try {
+        logger.info('[P2-9] 开始导出PDF报告')
+
+        // 创建打印友好的 HTML
+        const report = this.userAnalysisReport
+        const printWindow = window.open('', '_blank')
+        
+        if (!printWindow) {
+          Alpine.store('notification')?.show?.('请允许弹窗以导出PDF', 'warning')
+          return
+        }
+
+        const lotteryStats = report.lottery_profile?.stats || {}
+        const assets = report.assets || {}
+        
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>用户分析报告 - ${report.user_info.user_id}</title>
+            <style>
+              body { font-family: 'Microsoft YaHei', Arial, sans-serif; padding: 40px; color: #333; }
+              h1 { color: #1a56db; border-bottom: 2px solid #1a56db; padding-bottom: 10px; }
+              h2 { color: #374151; margin-top: 30px; border-left: 4px solid #1a56db; padding-left: 10px; }
+              table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+              th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+              th { background-color: #f3f4f6; }
+              .section { margin-bottom: 30px; }
+              .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 15px 0; }
+              .stat-card { background: #f9fafb; padding: 15px; border-radius: 8px; text-align: center; }
+              .stat-value { font-size: 24px; font-weight: bold; color: #1a56db; }
+              .stat-label { color: #6b7280; font-size: 14px; }
+              .footer { margin-top: 40px; text-align: center; color: #9ca3af; font-size: 12px; }
+              @media print { body { padding: 20px; } }
+            </style>
+          </head>
+          <body>
+            <h1>📊 用户分析报告</h1>
+            
+            <div class="section">
+              <h2>👤 基本信息</h2>
+              <table>
+                <tr><th>用户ID</th><td>${report.user_info.user_id}</td></tr>
+                <tr><th>手机号</th><td>${report.user_info.phone || '-'}</td></tr>
+                <tr><th>昵称</th><td>${report.user_info.nickname}</td></tr>
+                <tr><th>状态</th><td>${report.user_info.status === 'active' ? '正常' : '禁用'}</td></tr>
+                <tr><th>注册时间</th><td>${report.user_info.created_at || '-'}</td></tr>
+              </table>
+            </div>
+            
+            ${report.lottery_profile ? `
+            <div class="section">
+              <h2>🎰 抽奖数据</h2>
+              <div class="stat-grid">
+                <div class="stat-card">
+                  <div class="stat-value">${lotteryStats.total_draws || 0}</div>
+                  <div class="stat-label">总抽奖次数</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value">${lotteryStats.total_wins || 0}</div>
+                  <div class="stat-label">中奖次数</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value">${lotteryStats.win_rate ? (lotteryStats.win_rate * 100).toFixed(1) + '%' : '0%'}</div>
+                  <div class="stat-label">中奖率</div>
+                </div>
+              </div>
+            </div>
+            ` : ''}
+            
+            ${report.assets ? `
+            <div class="section">
+              <h2>💰 资产概览</h2>
+              <div class="stat-grid">
+                <div class="stat-card">
+                  <div class="stat-value">${assets.total_balance || 0}</div>
+                  <div class="stat-label">总资产</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value">${assets.asset_count || 0}</div>
+                  <div class="stat-label">资产种类</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value">${assets.transaction_count || 0}</div>
+                  <div class="stat-label">交易次数</div>
+                </div>
+              </div>
+            </div>
+            ` : ''}
+            
+            ${report.activities?.length > 0 ? `
+            <div class="section">
+              <h2>📋 近期行为</h2>
+              <table>
+                <thead>
+                  <tr><th>时间</th><th>类型</th><th>详情</th></tr>
+                </thead>
+                <tbody>
+                  ${report.activities.slice(0, 10).map(a => `
+                    <tr>
+                      <td>${a.created_at || a.time || '-'}</td>
+                      <td>${a.type || a.activity_type || '-'}</td>
+                      <td>${a.description || a.detail || '-'}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+            ` : ''}
+            
+            <div class="footer">
+              <p>报告生成时间：${report.generated_at}</p>
+              <p>本报告由运营后台自动生成</p>
+            </div>
+          </body>
+          </html>
+        `)
+        
+        printWindow.document.close()
+        
+        // 等待内容加载完成后触发打印
+        printWindow.onload = function() {
+          printWindow.print()
+        }
+        
+        // 如果 onload 没触发，2秒后自动打印
+        setTimeout(() => {
+          if (!printWindow.closed) {
+            printWindow.print()
+          }
+        }, 2000)
+
+        logger.info('[P2-9] PDF导出完成')
+        Alpine.store('notification')?.show?.('已打开打印预览，请选择保存为PDF', 'success')
+      } catch (error) {
+        logger.error('[P2-9] PDF导出失败:', error.message)
+        Alpine.store('notification')?.show?.('导出PDF失败: ' + error.message, 'error')
+      }
     }
   }))
 

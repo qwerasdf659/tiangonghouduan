@@ -49,6 +49,26 @@
       </div>
     </div>
     
+    <!-- P1-4: WebSocket 连接状态栏 -->
+    <div class="themed-card rounded-xl shadow-sm p-3 mb-4 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2">
+          <span class="text-xs themed-text-muted">实时连接:</span>
+          <span :class="connectionStatusClass" class="text-xs font-medium" x-text="connectionStatusText"></span>
+        </div>
+        <button 
+          x-show="!wsConnected"
+          @click="reconnectWebSocket()"
+          class="text-xs px-2 py-1 themed-bg-primary text-white rounded hover:opacity-80 transition"
+        >
+          重新连接
+        </button>
+      </div>
+      <div class="flex items-center gap-2 text-xs themed-text-muted">
+        <span>新消息将自动推送到此页面</span>
+      </div>
+    </div>
+
     <!-- 筛选和搜索栏 -->
     <div class="themed-card rounded-xl shadow-sm p-4 mb-6">
       <div class="flex flex-wrap items-center gap-4">
@@ -95,6 +115,21 @@
             <option value="">全部状态</option>
             <option value="unread">未读</option>
             <option value="read">已读</option>
+          </select>
+        </div>
+        
+        <!-- P1-4: 来源筛选 -->
+        <div class="flex items-center gap-2">
+          <span class="text-sm themed-text-muted">来源:</span>
+          <select 
+            x-model="filter.source"
+            @change="loadMessages()"
+            class="px-3 py-1.5 themed-bg-base border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">全部来源</option>
+            <template x-for="src in availableSources" :key="src">
+              <option :value="src" x-text="src"></option>
+            </template>
           </select>
         </div>
         

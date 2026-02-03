@@ -194,31 +194,43 @@ export function useUsersMethods() {
     },
 
     /**
-     * 查看用户详情
+     * 查看用户详情 - 打开用户360°视图抽屉
      * @param {Object} user - 用户对象
      */
     async viewUserDetail(user) {
       try {
         const userId = user.user_id || user.id
-        const response = await this.apiGet(
-          buildURL(USER_ENDPOINTS.DETAIL, { user_id: userId }),
-          {},
-          { showLoading: true }
-        )
-        if (response?.success) {
-          // 后端返回结构: { user: {...} }
-          const userData = response.data?.user || response.data
-          this.selectedUserDetail = userData
-          this.selectedUser = userData
-          this.editUserForm = {
-            user_id: userData.user_id || '',
-            nickname: userData.nickname || '',
-            status: userData.status || 'active'
-          }
-          this.showModal('userDetailModal')
-          // P2-4: 加载用户行为轨迹
-          if (typeof this.loadUserActivities === 'function') {
-            this.loadUserActivities(userId)
+        const userData = {
+          user_id: userId,
+          nickname: user.nickname || '',
+          mobile: user.mobile || '',
+          status: user.status || 'active',
+          role_name: user.role_name || '',
+          created_at: user.created_at || ''
+        }
+
+        // P1-1: 使用用户360°视图抽屉
+        if (window.Alpine?.store('userDrawer')) {
+          window.Alpine.store('userDrawer').open(userData)
+          logger.info('[viewUserDetail] 打开用户360°视图抽屉:', userId)
+        } else {
+          // 后备方案：使用原有弹窗
+          logger.warn('[viewUserDetail] 用户抽屉未初始化，使用弹窗')
+          const response = await this.apiGet(
+            buildURL(USER_ENDPOINTS.DETAIL, { user_id: userId }),
+            {},
+            { showLoading: true }
+          )
+          if (response?.success) {
+            const detailData = response.data?.user || response.data
+            this.selectedUserDetail = detailData
+            this.selectedUser = detailData
+            this.editUserForm = {
+              user_id: detailData.user_id || '',
+              nickname: detailData.nickname || '',
+              status: detailData.status || 'active'
+            }
+            this.showModal('userDetailModal')
           }
         }
       } catch (error) {

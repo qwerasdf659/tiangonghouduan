@@ -140,6 +140,7 @@ export function sidebarNav() {
         items: [
           { id: 'asset-mgmt', name: '资产管理', url: '/admin/asset-management.html' },
           { id: 'asset-adj', name: '资产调整', url: '/admin/asset-adjustment.html' },
+          { id: 'orphan-frozen', name: '孤儿冻结清理', url: '/admin/orphan-frozen.html' },
           { id: 'exchange', name: '兑换市场', url: '/admin/exchange-market.html' },
           { id: 'trade', name: 'C2C交易', url: '/admin/trade-management.html' }
         ]
@@ -168,44 +169,46 @@ export function sidebarNav() {
         ]
       },
 
-      // 7️⃣ 系统设置 - 低频功能整合（P2-3/P3-1: 三级分组）
+      // 7️⃣ 系统设置 - 低频功能整合（P2-3/P3-1/P3-6: 三级分组+命名优化）
       {
         id: 'system',
         name: '系统设置',
         icon: '⚙️',
-        // P2-3: 支持三级分组结构
+        // P2-3: 支持三级分组结构（决策4：系统设置三级分组）
         subGroups: [
           {
-            id: 'content-ops',
-            name: '内容运营',
-            icon: '📝',
+            // P3-6命名优化: 物品配置 → 奖品配置
+            id: 'prize-config',
+            name: '奖品配置',
+            icon: '🎁',
             items: [
-              { id: 'content', name: '内容管理', url: '/admin/content-management.html' },
-              { id: 'item-tpl', name: '物品模板', url: '/admin/item-templates.html' }
+              { id: 'item-tpl', name: '物品模板', url: '/admin/item-templates.html' },
+              { id: 'material-rules', name: '物料转换规则', url: '/admin/material-conversion-rules.html' },
+              { id: 'assets-portfolio', name: '资产组合', url: '/admin/assets-portfolio.html' }
             ]
           },
           {
-            id: 'config-mgmt',
-            name: '配置管理',
-            icon: '🔧',
+            // P3-6命名优化: 运营配置 → 运营规则
+            id: 'ops-rules',
+            name: '运营规则',
+            icon: '📊',
             items: [
-              { id: 'dict', name: '字典管理', url: '/admin/dict-management.html' },
               { id: 'pricing', name: '定价配置', url: '/admin/pricing-config.html' },
               { id: 'feature-flags', name: '功能开关', url: '/admin/feature-flags.html' },
-              { id: 'material-rules', name: '物料转换规则', url: '/admin/material-conversion-rules.html' },
-              { id: 'assets-portfolio', name: '资产组合', url: '/admin/assets-portfolio.html' },
               { id: 'reminder-rules', name: '提醒规则', url: '/admin/reminder-rules.html' }
             ]
           },
           {
             id: 'sys-maintain',
             name: '系统维护',
-            icon: '🛠️',
+            icon: '🔧',
             items: [
-              { id: 'orphan', name: '孤儿冻结清理', url: '/admin/orphan-frozen.html' },
+              { id: 'content', name: '内容管理', url: '/admin/content-management.html' },
+              { id: 'dict', name: '字典管理', url: '/admin/dict-management.html' },
               { id: 'settings', name: '系统配置', url: '/admin/system-settings.html' },
               { id: 'sessions', name: '会话管理', url: '/admin/sessions.html' },
-              { id: 'config-tools', name: '配置工具', url: '/admin/config-tools.html' }
+              { id: 'audit-logs', name: '操作审计', url: '/admin/audit-logs.html' },
+              { id: 'config-tools', name: '高级工具', url: '/admin/config-tools.html' }
             ]
           }
         ]
@@ -218,8 +221,54 @@ export function sidebarNav() {
     init() {
       // ========== 权限过滤（优先执行）==========
       this.userRoleLevel = getUserRoleLevel()
+      
+      // 🔍 DEBUG: 打印权限调试信息（帮助诊断菜单不显示问题）
+      const adminUser = localStorage.getItem('admin_user')
+      const adminUserInfo = localStorage.getItem('admin_user_info')
+      console.log('🔍 [SidebarNav DEBUG] ======= 权限调试信息 =======')
+      console.log('🔍 admin_user 原始数据:', adminUser)
+      console.log('🔍 admin_user_info 原始数据:', adminUserInfo)
+      console.log('🔍 解析后的 role_level:', this.userRoleLevel)
+      console.log('🔍 是否 >= 100 (管理员):', this.userRoleLevel >= 100)
+      console.log('🔍 ================================================')
+      
       this.filterNavByPermission()
       logger.debug(`[SidebarNav] 用户权限等级: ${this.userRoleLevel}，菜单已过滤`)
+      
+      // 🔍 DEBUG: 打印最终的 navGroups
+      console.log('🔍 [最终菜单] navGroups 共', this.navGroups.length, '个分组:')
+      this.navGroups.forEach((g, i) => {
+        console.log(`🔍   ${i+1}. ${g.name} (${g.id}) - type=${g.type || 'group'}, items=${g.items?.length || 0}, subGroups=${g.subGroups?.length || 0}`)
+      })
+      const systemGroup = this.navGroups.find(g => g.id === 'system')
+      console.log('🔍 [系统设置] 是否存在:', !!systemGroup, systemGroup ? `(subGroups: ${systemGroup.subGroups?.length})` : '')
+      
+      // 延迟检查 DOM 渲染
+      setTimeout(() => {
+        const navMenuItems = document.querySelectorAll('.sidebar-nav .nav-menu-item')
+        const navGroups = document.querySelectorAll('.sidebar-nav .nav-group')
+        const navGroups3Level = document.querySelectorAll('.sidebar-nav .nav-group-3level')
+        const navSingles = document.querySelectorAll('.sidebar-nav .nav-single')
+        console.log('🔍 [DOM检查] nav-menu-item 包装器数量:', navMenuItems.length)
+        console.log('🔍 [DOM检查] nav-group 元素数量:', navGroups.length)
+        console.log('🔍 [DOM检查] nav-group-3level 元素数量:', navGroups3Level.length)
+        console.log('🔍 [DOM检查] nav-single 元素数量:', navSingles.length)
+        
+        // 检查三级分组是否被隐藏
+        navGroups3Level.forEach((el, i) => {
+          const computed = window.getComputedStyle(el)
+          console.log(`🔍 [DOM检查] nav-group-3level[${i}]:`, {
+            display: computed.display,
+            visibility: computed.visibility,
+            hidden: el.hidden,
+            dataGroupId: el.getAttribute('data-group-id')
+          })
+        })
+        
+        // 检查系统设置
+        const systemGroup = document.querySelector('.nav-group[data-group-id="system"]')
+        console.log('🔍 [DOM检查] 系统设置DOM:', systemGroup || '未找到')
+      }, 1000)
 
       // 从 localStorage 恢复折叠状态
       const savedCollapsed = localStorage.getItem('sidebar_collapsed')
@@ -686,6 +735,55 @@ export function sidebarNav() {
             return filteredGroup
           }
 
+          // 三级分组菜单（如系统设置）
+          if (group.subGroups && group.subGroups.length > 0) {
+            // 🔍 DEBUG: 打印三级分组检查
+            const groupAccess = hasMenuAccess(group.id)
+            console.log(`🔍 [权限检查] 三级分组 "${group.name}" (${group.id}): hasAccess=${groupAccess}, 需要role_level>=100`)
+            
+            if (!groupAccess) {
+              console.log(`🔍 [权限检查] ❌ 分组 "${group.name}" 被过滤（权限不足）`)
+              return null
+            }
+            
+            console.log(`🔍 [权限检查] 开始过滤 "${group.name}" 的子分组，共 ${group.subGroups.length} 个`)
+            
+            filteredGroup.subGroups = group.subGroups
+              .map(subGroup => {
+                const filteredSubGroup = { ...subGroup }
+                console.log(`🔍 [子分组] 检查 "${subGroup.name}" (${subGroup.id})，共 ${subGroup.items?.length || 0} 项`)
+                
+                // 过滤子分组中的菜单项
+                if (subGroup.items && subGroup.items.length > 0) {
+                  filteredSubGroup.items = subGroup.items.filter(item => {
+                    const menuId = `${group.id}.${subGroup.id}.${item.id}`
+                    const access = hasMenuAccess(menuId)
+                    console.log(`🔍   [菜单项] "${item.name}" (${menuId}): hasAccess=${access}`)
+                    return access
+                  })
+                  console.log(`🔍 [子分组] "${subGroup.name}" 过滤后剩余 ${filteredSubGroup.items.length} 项`)
+                  
+                  // 如果子分组的所有项都被过滤，则隐藏整个子分组
+                  if (filteredSubGroup.items.length === 0) {
+                    console.log(`🔍 [子分组] ❌ "${subGroup.name}" 被移除（无可见项）`)
+                    return null
+                  }
+                }
+                return filteredSubGroup
+              })
+              .filter(subGroup => subGroup !== null)
+
+            console.log(`🔍 [权限检查] "${group.name}" 过滤后剩余 ${filteredGroup.subGroups.length} 个子分组`)
+            
+            // 如果所有子分组都被过滤，则隐藏整个分组
+            if (filteredGroup.subGroups.length === 0) {
+              console.log(`🔍 [权限检查] ❌ 整个分组 "${group.name}" 被移除（无可见子分组）`)
+              return null
+            }
+            console.log(`🔍 [权限检查] ✅ 分组 "${group.name}" 保留，包含子分组:`, filteredGroup.subGroups.map(s => s.name))
+            return filteredGroup
+          }
+
           // 分组菜单（含子菜单）
           if (group.items && group.items.length > 0) {
             // 过滤子菜单项
@@ -726,9 +824,14 @@ export function sidebarNav() {
       this.expandedGroups = this.expandedGroups.filter(id => validGroupIds.includes(id))
       
       // P2-3: 更新展开的子分组（移除不存在的子分组）
-      const validSubGroupIds = this.navGroups.flatMap(g => 
-        (g.items || []).filter(i => i.subItems).map(i => i.id)
-      )
+      const validSubGroupIds = [
+        ...this.navGroups.flatMap(g => 
+          (g.items || []).filter(i => i.subItems).map(i => i.id)
+        ),
+        ...this.navGroups.flatMap(g => 
+          (g.subGroups || []).map(sg => sg.id)
+        )
+      ]
       this.expandedSubGroups = this.expandedSubGroups.filter(id => validSubGroupIds.includes(id))
     },
 
