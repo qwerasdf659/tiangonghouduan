@@ -358,8 +358,8 @@ class CustomerServiceSessionService {
       // 如果需要所有字段，显式指定属性列表
       if (include_all_fields) {
         queryOptions.attributes = [
-          'message_id',
-          'session_id',
+          'chat_message_id',
+          'customer_service_session_id',
           'sender_id',
           'sender_type',
           'message_source',
@@ -1198,7 +1198,7 @@ class CustomerServiceSessionService {
             [Op.not]: 'waiting'
           }
         },
-        attributes: ['session_id', 'created_at']
+        attributes: ['customer_service_session_id', 'created_at']
       })
 
       // 2️⃣ 无数据时返回默认值60秒

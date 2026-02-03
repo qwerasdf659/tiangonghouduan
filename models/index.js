@@ -434,6 +434,16 @@ models.RiskAlert = require('./RiskAlert')(sequelize, DataTypes)
  *    - 业务场景：消费提交→风控检查→生成告警→管理员审核→处理结果
  */
 
+// 🔴 告警静默规则表（2026-02-03 运营后台优化 DB-2）
+models.AlertSilenceRule = require('./AlertSilenceRule')(sequelize, DataTypes)
+/*
+ * ✅ AlertSilenceRule：告警静默规则（运营后台优化 §3.2）
+ *    - 用途：配置告警静默规则，支持时间段静默、告警类型静默
+ *    - 特点：支持每日时段静默、日期范围静默、告警级别过滤
+ *    - 表名：alert_silence_rules，主键：alert_silence_rule_id
+ *    - 业务场景：节假日静默、夜间静默、测试环境静默
+ */
+
 // 🔴 审计业务记录表（2026-01-08 决策9实现 - 为无天然业务主键的操作提供审计锚点）
 models.UserStatusChangeRecord = require('./UserStatusChangeRecord')(sequelize, DataTypes)
 /*

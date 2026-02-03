@@ -21,6 +21,8 @@ export function sidebarNav() {
     mobileOpen: false,
     // 默认展开的分组
     expandedGroups: ['pending-center', 'lottery-ops'],
+    // P2-3: 默认展开的子分组（三级菜单）
+    expandedSubGroups: [],
     // 当前激活的菜单项ID（用于工作台Tab模式下的高亮）
     activeItemId: null,
 
@@ -35,6 +37,10 @@ export function sidebarNav() {
     pendingAlertCount: 0,
     // 抽奖告警待处理数量
     lotteryAlertCount: 0,
+
+    // ========== P0-5: 健康度指示灯 ==========
+    healthStatus: 'loading', // 'healthy' | 'warning' | 'critical' | 'loading'
+    healthScore: 0,
 
     // 用户权限等级（用于权限过滤）
     userRoleLevel: 0,
@@ -162,28 +168,46 @@ export function sidebarNav() {
         ]
       },
 
-      // 7️⃣ 系统设置 - 低频功能整合
+      // 7️⃣ 系统设置 - 低频功能整合（P2-3/P3-1: 三级分组）
       {
         id: 'system',
         name: '系统设置',
         icon: '⚙️',
-        items: [
-          { id: 'content', name: '内容管理', url: '/admin/content-management.html' },
-          { id: 'item-tpl', name: '物品模板', url: '/admin/item-templates.html' },
-          { id: 'dict', name: '字典管理', url: '/admin/dict-management.html' },
-          { id: 'pricing', name: '定价配置', url: '/admin/pricing-config.html' },
-          { id: 'feature-flags', name: '功能开关', url: '/admin/feature-flags.html' },
-          { id: 'orphan', name: '孤儿冻结清理', url: '/admin/orphan-frozen.html' },
+        // P2-3: 支持三级分组结构
+        subGroups: [
           {
-            id: 'material-rules',
-            name: '物料转换规则',
-            url: '/admin/material-conversion-rules.html'
+            id: 'content-ops',
+            name: '内容运营',
+            icon: '📝',
+            items: [
+              { id: 'content', name: '内容管理', url: '/admin/content-management.html' },
+              { id: 'item-tpl', name: '物品模板', url: '/admin/item-templates.html' }
+            ]
           },
-          { id: 'assets-portfolio', name: '资产组合', url: '/admin/assets-portfolio.html' },
-          { id: 'settings', name: '系统配置', url: '/admin/system-settings.html' },
-          { id: 'reminder-rules', name: '提醒规则配置', url: '/admin/reminder-rules.html' },
-          { id: 'sessions', name: '会话管理', url: '/admin/sessions.html' },
-          { id: 'config-tools', name: '配置工具', url: '/admin/config-tools.html' }
+          {
+            id: 'config-mgmt',
+            name: '配置管理',
+            icon: '🔧',
+            items: [
+              { id: 'dict', name: '字典管理', url: '/admin/dict-management.html' },
+              { id: 'pricing', name: '定价配置', url: '/admin/pricing-config.html' },
+              { id: 'feature-flags', name: '功能开关', url: '/admin/feature-flags.html' },
+              { id: 'material-rules', name: '物料转换规则', url: '/admin/material-conversion-rules.html' },
+              { id: 'assets-portfolio', name: '资产组合', url: '/admin/assets-portfolio.html' },
+              { id: 'reminder-rules', name: '提醒规则', url: '/admin/reminder-rules.html' }
+            ]
+          },
+          {
+            id: 'sys-maintain',
+            name: '系统维护',
+            icon: '🛠️',
+            items: [
+              { id: 'orphan', name: '孤儿冻结清理', url: '/admin/orphan-frozen.html' },
+              { id: 'settings', name: '系统配置', url: '/admin/system-settings.html' },
+              { id: 'sessions', name: '会话管理', url: '/admin/sessions.html' },
+              { id: 'config-tools', name: '配置工具', url: '/admin/config-tools.html' }
+            ]
+          }
         ]
       }
     ],
@@ -213,6 +237,16 @@ export function sidebarNav() {
         }
       }
 
+      // P2-3: 从 localStorage 恢复展开的子分组
+      const savedSubGroups = localStorage.getItem('sidebar_expanded_subgroups')
+      if (savedSubGroups) {
+        try {
+          this.expandedSubGroups = JSON.parse(savedSubGroups)
+        } catch (e) {
+          logger.warn('恢复侧边栏子分组状态失败', e)
+        }
+      }
+
       // 根据当前 URL 高亮对应菜单并展开分组
       this.highlightCurrentPage()
 
@@ -232,13 +266,87 @@ export function sidebarNav() {
       // 获取所有徽标数量（统一API）
       this.fetchAllBadgeCounts()
 
-      // 每5分钟刷新一次徽标数量
+      // P0-5: 获取健康度状态
+      this.fetchHealthStatus()
+
+      // 每5分钟刷新一次徽标数量和健康度
       setInterval(
         () => {
           this.fetchAllBadgeCounts()
+          this.fetchHealthStatus()
         },
         5 * 60 * 1000
       )
+    },
+
+    /**
+     * P0-5: 获取健康度状态
+     */
+    async fetchHealthStatus() {
+      try {
+        const token = localStorage.getItem('admin_token')
+        if (!token) return
+
+        const response = await fetch('/api/v4/console/pending/health-score', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.data) {
+            this.healthScore = data.data.score || 0
+            this.healthStatus = data.data.status || 'normal'
+            
+            // 将 'normal' 映射为 'healthy'
+            if (this.healthStatus === 'normal') {
+              this.healthStatus = 'healthy'
+            }
+            
+            logger.debug('[SidebarNav] 健康度状态已更新', {
+              score: this.healthScore,
+              status: this.healthStatus
+            })
+          }
+        }
+      } catch (error) {
+        logger.warn('获取健康度状态失败:', error.message)
+        // 降级：基于徽标数量计算健康度
+        this.calculateLocalHealthStatus()
+      }
+    },
+
+    /**
+     * 基于本地数据计算健康度状态（降级方案）
+     */
+    calculateLocalHealthStatus() {
+      const totalPending = this.totalPendingCount
+      
+      if (totalPending > 50) {
+        this.healthStatus = 'critical'
+        this.healthScore = Math.max(0, 100 - totalPending)
+      } else if (totalPending > 20) {
+        this.healthStatus = 'warning'
+        this.healthScore = Math.max(30, 100 - totalPending * 1.5)
+      } else {
+        this.healthStatus = 'healthy'
+        this.healthScore = Math.max(70, 100 - totalPending * 2)
+      }
+    },
+
+    /**
+     * P0-5: 获取健康度指示灯CSS类
+     */
+    getHealthIndicatorClass() {
+      const classes = {
+        healthy: 'bg-green-500',
+        warning: 'bg-yellow-500 animate-pulse',
+        critical: 'bg-red-500 animate-pulse',
+        loading: 'bg-gray-400'
+      }
+      return classes[this.healthStatus] || 'bg-gray-400'
     },
 
     /**
@@ -432,7 +540,30 @@ export function sidebarNav() {
     },
 
     /**
-     * 根据当前 URL 高亮菜单
+     * P2-3: 切换子分组展开/折叠（三级菜单）
+     * @param {string} subGroupId - 子分组ID
+     */
+    toggleSubGroup(subGroupId) {
+      const index = this.expandedSubGroups.indexOf(subGroupId)
+      if (index > -1) {
+        this.expandedSubGroups.splice(index, 1)
+      } else {
+        this.expandedSubGroups.push(subGroupId)
+      }
+      localStorage.setItem('sidebar_expanded_subgroups', JSON.stringify(this.expandedSubGroups))
+    },
+
+    /**
+     * P2-3: 判断子分组是否展开
+     * @param {string} subGroupId - 子分组ID
+     * @returns {boolean}
+     */
+    isSubGroupExpanded(subGroupId) {
+      return this.expandedSubGroups.includes(subGroupId)
+    },
+
+    /**
+     * 根据当前 URL 高亮菜单（支持三级菜单）
      */
     highlightCurrentPage() {
       const currentPath = window.location.pathname + window.location.search
@@ -445,12 +576,27 @@ export function sidebarNav() {
 
         if (group.items) {
           for (const item of group.items) {
-            if (currentPath.includes(item.url.split('?')[0])) {
+            // P2-3: 处理子分组（三级菜单）
+            if (item.subItems) {
+              for (const subItem of item.subItems) {
+                if (currentPath.includes(subItem.url.split('?')[0])) {
+                  // 展开对应分组
+                  if (!this.expandedGroups.includes(group.id)) {
+                    this.expandedGroups.push(group.id)
+                  }
+                  // 展开对应子分组
+                  if (!this.expandedSubGroups.includes(item.id)) {
+                    this.expandedSubGroups.push(item.id)
+                  }
+                  return
+                }
+              }
+            } else if (item.url && currentPath.includes(item.url.split('?')[0])) {
               // 展开对应分组
               if (!this.expandedGroups.includes(group.id)) {
                 this.expandedGroups.push(group.id)
               }
-              break
+              return
             }
           }
         }
@@ -543,10 +689,27 @@ export function sidebarNav() {
           // 分组菜单（含子菜单）
           if (group.items && group.items.length > 0) {
             // 过滤子菜单项
-            filteredGroup.items = group.items.filter(item => {
-              const menuId = `${group.id}.${item.id}`
-              return hasMenuAccess(menuId)
-            })
+            filteredGroup.items = group.items
+              .map(item => {
+                // P2-3: 处理子分组（三级菜单）
+                if (item.subItems && item.subItems.length > 0) {
+                  const filteredItem = { ...item }
+                  filteredItem.subItems = item.subItems.filter(subItem => {
+                    const menuId = `${group.id}.${item.id}.${subItem.id}`
+                    return hasMenuAccess(menuId)
+                  })
+                  // 如果子项全部被过滤，则隐藏整个子分组
+                  if (filteredItem.subItems.length === 0) {
+                    return null
+                  }
+                  return filteredItem
+                }
+                
+                // 普通菜单项
+                const menuId = `${group.id}.${item.id}`
+                return hasMenuAccess(menuId) ? item : null
+              })
+              .filter(item => item !== null)
 
             // 如果子菜单全部被过滤，则隐藏整个分组
             if (filteredGroup.items.length === 0) {
@@ -561,6 +724,12 @@ export function sidebarNav() {
       // 更新展开的分组（移除不存在的分组）
       const validGroupIds = this.navGroups.map(g => g.id)
       this.expandedGroups = this.expandedGroups.filter(id => validGroupIds.includes(id))
+      
+      // P2-3: 更新展开的子分组（移除不存在的子分组）
+      const validSubGroupIds = this.navGroups.flatMap(g => 
+        (g.items || []).filter(i => i.subItems).map(i => i.id)
+      )
+      this.expandedSubGroups = this.expandedSubGroups.filter(id => validSubGroupIds.includes(id))
     },
 
     /**

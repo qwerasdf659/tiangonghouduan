@@ -31,6 +31,11 @@ const DEFAULT_SHORTCUTS = {
     description: '打开全局搜索（备选）',
     scope: 'global'
   },
+  '/': {
+    action: 'openSearch',
+    description: '快速搜索',
+    scope: 'global'
+  },
   // 关闭/取消
   escape: {
     action: 'closeModal',
@@ -50,11 +55,50 @@ const DEFAULT_SHORTCUTS = {
     scope: 'table',
     preventDefault: true
   },
+  // P1-7: 强制刷新（跳过缓存）
+  'ctrl+shift+r': {
+    action: 'forceRefresh',
+    description: '强制刷新（跳过缓存）',
+    scope: 'global',
+    preventDefault: true
+  },
   // 新建
   'ctrl+n': {
     action: 'create',
     description: '新建',
     scope: 'page'
+  }
+}
+
+/**
+ * P1-7: G键组合快捷键配置
+ * 按下G后500ms内按第二个键触发
+ */
+const G_KEY_SHORTCUTS = {
+  p: {
+    action: 'gotoPending',
+    url: '/admin/pending-center.html',
+    description: '跳转待处理中心'
+  },
+  d: {
+    action: 'gotoDashboard',
+    url: '/admin/dashboard-panel.html',
+    description: '跳转数据驾驶舱'
+  },
+  u: {
+    action: 'gotoUsers',
+    url: '/admin/user-management.html',
+    description: '跳转用户管理'
+  },
+  l: {
+    action: 'gotoLottery',
+    url: '/admin/lottery-management.html',
+    description: '跳转抽奖管理'
+  },
+  s: {
+    action: 'gotoSettings',
+    url: '/admin/system-config.html',
+    description: '跳转系统设置'
   }
 }
 
@@ -65,10 +109,15 @@ const DEFAULT_SHORTCUTS = {
 export function shortcutsStore() {
   return {
     shortcuts: { ...DEFAULT_SHORTCUTS },
+    gKeyShortcuts: { ...G_KEY_SHORTCUTS },
     enabled: true,
     activeScope: 'global',
     searchOpen: false,
     handlers: new Map(),
+
+    // P1-7: G键组合状态
+    waitingForGKey: false,
+    gKeyTimeout: null,
 
     /**
      * 初始化全局快捷键监听
@@ -76,6 +125,7 @@ export function shortcutsStore() {
     init() {
       document.addEventListener('keydown', this.handleGlobalKey.bind(this))
       logger.info('[Shortcuts] 全局快捷键系统已初始化')
+      logger.info('[Shortcuts] G键组合: G+P=待处理, G+D=仪表盘, G+U=用户, G+L=抽奖, G+S=设置')
     },
 
     /**
@@ -92,6 +142,7 @@ export function shortcutsStore() {
         event.target.isContentEditable
 
       const key = this.getKeyCombo(event)
+      const singleKey = event.key.toLowerCase()
 
       // Escape 总是有效
       if (key === 'escape') {
@@ -119,6 +170,25 @@ export function shortcutsStore() {
         return
       }
 
+      // P1-7: 处理G键组合快捷键
+      if (this.waitingForGKey) {
+        const gShortcut = this.gKeyShortcuts[singleKey]
+        if (gShortcut) {
+          event.preventDefault()
+          this.clearGKeyWaiting()
+          this.handleGKeyNavigation(gShortcut)
+          return
+        }
+        // 如果按了其他键，取消G键等待状态
+        this.clearGKeyWaiting()
+      }
+
+      // P1-7: 检测G键按下，开始等待第二个键
+      if (singleKey === 'g' && !event.ctrlKey && !event.altKey && !event.shiftKey) {
+        this.startGKeyWaiting()
+        return
+      }
+
       // 查找对应的快捷键配置
       const shortcut = this.shortcuts[key]
       if (shortcut) {
@@ -127,6 +197,49 @@ export function shortcutsStore() {
         }
         this.executeAction(shortcut.action, event)
       }
+    },
+
+    /**
+     * P1-7: 开始等待G键组合的第二个键
+     */
+    startGKeyWaiting() {
+      this.waitingForGKey = true
+      // 500ms内未按第二个键则取消
+      this.gKeyTimeout = setTimeout(() => {
+        this.waitingForGKey = false
+        logger.debug('[Shortcuts] G键组合超时取消')
+      }, 500)
+      logger.debug('[Shortcuts] 等待G键组合...')
+    },
+
+    /**
+     * P1-7: 清除G键等待状态
+     */
+    clearGKeyWaiting() {
+      this.waitingForGKey = false
+      if (this.gKeyTimeout) {
+        clearTimeout(this.gKeyTimeout)
+        this.gKeyTimeout = null
+      }
+    },
+
+    /**
+     * P1-7: 处理G键导航
+     * @param {Object} shortcut - 快捷键配置
+     */
+    handleGKeyNavigation(shortcut) {
+      logger.info(`[Shortcuts] G键导航: ${shortcut.description} -> ${shortcut.url}`)
+      
+      // 显示导航提示
+      const notification = Alpine.store('notification')
+      if (notification) {
+        notification.show(`⌨️ ${shortcut.description}`, 'info')
+      }
+      
+      // 延迟跳转，让用户看到提示
+      setTimeout(() => {
+        window.location.href = shortcut.url
+      }, 200)
     },
 
     /**
@@ -174,6 +287,9 @@ export function shortcutsStore() {
           break
         case 'refresh':
           this.triggerRefresh()
+          break
+        case 'forceRefresh':
+          this.triggerForceRefresh()
           break
         case 'create':
           this.triggerCreate()
@@ -280,6 +396,44 @@ export function shortcutsStore() {
     },
 
     /**
+     * P1-7: 触发强制刷新（跳过缓存）
+     */
+    triggerForceRefresh() {
+      logger.info('[Shortcuts] 触发强制刷新（跳过缓存）')
+      
+      // 显示刷新提示
+      const notification = Alpine.store('notification')
+      if (notification) {
+        notification.show('🔄 正在强制刷新...', 'info')
+      }
+      
+      // 清除sessionStorage缓存
+      const keysToRemove = []
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i)
+        if (key && (key.includes('cache') || key.includes('pending') || key.includes('dashboard') || key.includes('stats'))) {
+          keysToRemove.push(key)
+        }
+      }
+      keysToRemove.forEach(key => sessionStorage.removeItem(key))
+      
+      // 触发强制刷新事件
+      document.dispatchEvent(new CustomEvent('shortcuts:force-refresh'))
+      
+      // 如果没有处理器监听，则重新加载页面
+      setTimeout(() => {
+        // 检查是否有页面组件处理了刷新
+        const pageComponent = document.querySelector('[x-data]')
+        if (pageComponent && pageComponent.__x && typeof pageComponent.__x.$data.refreshAll === 'function') {
+          pageComponent.__x.$data.refreshAll()
+        } else {
+          // 回退：强制重新加载页面
+          window.location.reload(true)
+        }
+      }, 100)
+    },
+
+    /**
      * 触发新建
      */
     triggerCreate() {
@@ -332,11 +486,52 @@ export function shortcutsStore() {
      * @returns {Array} 快捷键帮助
      */
     getHelp() {
-      return Object.entries(this.shortcuts).map(([key, config]) => ({
+      // 普通快捷键
+      const shortcuts = Object.entries(this.shortcuts).map(([key, config]) => ({
         key: key.replace('ctrl', '⌘/Ctrl').replace('+', ' + ').toUpperCase(),
         description: config.description,
         scope: config.scope
       }))
+      
+      // P1-7: G键组合快捷键
+      const gShortcuts = Object.entries(this.gKeyShortcuts).map(([key, config]) => ({
+        key: `G + ${key.toUpperCase()}`,
+        description: config.description,
+        scope: 'global'
+      }))
+      
+      return [...shortcuts, ...gShortcuts]
+    },
+
+    /**
+     * P1-7: 显示快捷键帮助弹窗
+     */
+    showHelp() {
+      const help = this.getHelp()
+      const modal = Alpine.store('modal')
+      
+      if (modal) {
+        // 使用modal store显示帮助
+        const helpHtml = `
+          <div class="space-y-4">
+            <h3 class="text-lg font-semibold themed-text">⌨️ 快捷键列表</h3>
+            <div class="divide-y themed-divide">
+              ${help.map(item => `
+                <div class="py-2 flex justify-between">
+                  <span class="themed-text-muted">${item.description}</span>
+                  <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm font-mono">${item.key}</kbd>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `
+        // 可以触发自定义事件让页面处理
+        document.dispatchEvent(new CustomEvent('shortcuts:show-help', { detail: { help, helpHtml } }))
+      } else {
+        // 简单的console输出
+        logger.info('[Shortcuts] 快捷键帮助:')
+        help.forEach(item => logger.info(`  ${item.key}: ${item.description}`))
+      }
     }
   }
 }

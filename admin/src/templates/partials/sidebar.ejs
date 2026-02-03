@@ -4,10 +4,16 @@
   :class="{ 'collapsed': collapsed, 'mobile-open': mobileOpen }"
   x-data="sidebarNav()"
 >
-  <!-- Logo 区域 -->
+  <!-- Logo 区域 + P0-5: 健康度指示灯 -->
   <div class="sidebar-logo">
     <span class="logo-icon">🎰</span>
     <span class="logo-text">抽奖管理后台</span>
+    <!-- P0-5: 健康度指示灯 -->
+    <span 
+      class="ml-2 w-3 h-3 rounded-full"
+      :class="getHealthIndicatorClass()"
+      :title="'系统健康度: ' + healthScore + '分 - ' + (healthStatus === 'healthy' ? '正常' : healthStatus === 'warning' ? '需关注' : '需处理')"
+    ></span>
   </div>
 
   <!-- 导航菜单 -->

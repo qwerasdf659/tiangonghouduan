@@ -326,4 +326,95 @@ router.get('/segment-rules', authenticateToken, requireRoleLevel(100), async (re
   }
 })
 
+/**
+ * @api {get} /api/v4/console/users/:user_id/approval-rate 获取用户历史审核率
+ * @apiName GetUserApprovalRate
+ * @apiGroup UserSegments
+ * @apiVersion 1.0.0
+ *
+ * @apiDescription 获取指定用户的消费记录历史审核通过率
+ * 用于管理员在审核消费记录时参考用户历史信用状况
+ *
+ * @apiParam {Number} user_id 用户ID
+ *
+ * @apiQuery {Number} [days=90] 统计天数（默认90天）
+ *
+ * @apiSuccess {Boolean} success 请求是否成功
+ * @apiSuccess {Object} data 审核率数据
+ * @apiSuccess {Number} data.approval_rate 审核通过率（0-1）
+ * @apiSuccess {Number} data.total_count 总提交数
+ * @apiSuccess {Number} data.approved_count 通过数
+ * @apiSuccess {Number} data.rejected_count 拒绝数
+ * @apiSuccess {Number} data.pending_count 待审核数
+ * @apiSuccess {String} data.credit_level 信用等级（excellent/good/normal/warning/poor）
+ *
+ * @apiHeader {String} Authorization Bearer token
+ *
+ * @apiPermission admin
+ *
+ * @example
+ * GET /api/v4/console/users/1001/approval-rate?days=90
+ *
+ * Response:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "user_id": 1001,
+ *     "approval_rate": 0.92,
+ *     "total_count": 25,
+ *     "approved_count": 23,
+ *     "rejected_count": 2,
+ *     "pending_count": 0,
+ *     "credit_level": "excellent",
+ *     "credit_level_text": "信用优秀",
+ *     "period_days": 90,
+ *     "updated_at": "2026-02-03T14:30:00.000+08:00"
+ *   },
+ *   "message": "获取成功"
+ * }
+ *
+ * 关联需求：§4.11.1 用户审核率接口
+ */
+router.get(
+  '/:user_id/approval-rate',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    const { user_id } = req.params
+    const { days = 90 } = req.query
+
+    logger.info('获取用户历史审核率', {
+      admin_id: req.user?.user_id,
+      target_user_id: user_id,
+      days: parseInt(days)
+    })
+
+    try {
+      const models = getModels(req)
+      const UserSegmentService = getUserSegmentService(req)
+
+      // 调用 UserSegmentService 获取用户审核率
+      const result = await UserSegmentService.getUserApprovalRate(models, {
+        user_id: parseInt(user_id, 10),
+        days: parseInt(days, 10) || 90
+      })
+
+      return res.apiSuccess(result, '获取成功')
+    } catch (error) {
+      logger.error('获取用户历史审核率失败', {
+        error: error.message,
+        user_id,
+        stack: error.stack
+      })
+
+      return res.apiError(
+        '获取用户历史审核率失败',
+        'APPROVAL_RATE_ERROR',
+        { error: error.message },
+        500
+      )
+    }
+  }
+)
+
 module.exports = router

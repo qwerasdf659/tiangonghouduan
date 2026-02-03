@@ -5,12 +5,14 @@
  *
  * 功能特性:
  * - 汇总统计（消耗审核、客服会话、抽奖告警、风控告警、退款申请）
+ * - 待办健康度评分（0-100分，带进度条和状态）
  * - 紧急事项高亮显示
  * - 统一待处理列表，支持分类筛选和排序
- * - 实时刷新（30秒间隔）
+ * - 可配置的自动刷新（30秒间隔）
+ * - 批量操作支持
  *
- * @version 1.0.0
- * @date 2026-01-31
+ * @version 1.1.0
+ * @date 2026-02-03
  */
 
 import { logger } from '../../../utils/logger.js'
@@ -29,6 +31,23 @@ function pendingCenterPage() {
     // ==================== 页面状态 ====================
     loading: false,
     lastUpdateTime: '--:--:--',
+
+    // ==================== 健康度状态 ====================
+    healthScore: {
+      score: null, // 0-100 或 null（加载中/失败时）
+      status: 'unknown', // healthy/warning/critical/unknown
+      status_text: '加载中...',
+      components: {},
+      alerts: []
+    },
+
+    // ==================== 自动刷新控制 ====================
+    autoRefresh: true,
+    refreshInterval: 30000, // 30秒
+
+    // ==================== 批量操作 ====================
+    selectedIds: [],
+    selectAll: false,
 
     // 汇总统计
     summary: {
@@ -66,6 +85,11 @@ function pendingCenterPage() {
       return Math.ceil(this.pagination.total / this.pagination.page_size) || 1
     },
 
+    // 计算属性：是否有选中项
+    get hasSelected() {
+      return this.selectedIds.length > 0
+    },
+
     // 更新计时器
     updateTimer: null,
 
@@ -75,16 +99,116 @@ function pendingCenterPage() {
     async init() {
       logger.info('[PendingCenter] 初始化待处理中心')
 
-      await this.loadSummary()
-      await this.loadPendingItems()
+      // 并行加载数据
+      await Promise.all([this.loadHealthScore(), this.loadSummary(), this.loadPendingItems()])
 
-      // 每30秒刷新一次
-      this.updateTimer = setInterval(() => {
-        this.loadSummary()
-        this.loadPendingItems()
-      }, 30 * 1000)
+      // 启动自动刷新
+      this.startAutoRefresh()
 
       logger.info('[PendingCenter] 初始化完成')
+    },
+
+    /**
+     * 启动自动刷新
+     */
+    startAutoRefresh() {
+      if (this.updateTimer) {
+        clearInterval(this.updateTimer)
+      }
+
+      if (this.autoRefresh) {
+        this.updateTimer = setInterval(() => {
+          logger.debug('[PendingCenter] 自动刷新数据')
+          this.loadHealthScore()
+          this.loadSummary()
+          this.loadPendingItems()
+        }, this.refreshInterval)
+      }
+    },
+
+    /**
+     * 切换自动刷新开关
+     */
+    toggleAutoRefresh() {
+      this.autoRefresh = !this.autoRefresh
+      this.startAutoRefresh()
+      logger.info('[PendingCenter] 自动刷新', this.autoRefresh ? '已开启' : '已关闭')
+    },
+
+    /**
+     * 加载健康度评分
+     */
+    async loadHealthScore() {
+      try {
+        const result = await PendingAPI.getHealthScore()
+
+        if (result.success && result.data) {
+          this.healthScore = {
+            score: result.data.score ?? null,
+            status: result.data.status || 'unknown',
+            status_text: result.data.status_text || this.getStatusText(result.data.status),
+            components: result.data.components || {},
+            alerts: result.data.alerts || []
+          }
+          logger.debug('[PendingCenter] 健康度加载成功', { score: this.healthScore.score })
+        }
+      } catch (e) {
+        logger.warn('[PendingCenter] loadHealthScore 失败:', e.message)
+        this.healthScore.score = null
+        this.healthScore.status = 'unknown'
+        this.healthScore.status_text = '数据加载失败'
+      }
+    },
+
+    /**
+     * 获取健康度状态文本
+     * @param {string} status - 状态码
+     * @returns {string}
+     */
+    getStatusText(status) {
+      const textMap = {
+        healthy: '状态良好',
+        warning: '压力较大，建议及时处理',
+        critical: '需要立即处理'
+      }
+      return textMap[status] || '未知状态'
+    },
+
+    /**
+     * 获取健康度状态颜色类
+     * @returns {string}
+     */
+    getHealthScoreColorClass() {
+      const score = this.healthScore.score
+      if (score === null) return 'bg-gray-400'
+      if (score >= 90) return 'bg-green-500'
+      if (score >= 70) return 'bg-yellow-500'
+      if (score >= 50) return 'bg-orange-500'
+      return 'bg-red-500'
+    },
+
+    /**
+     * 获取健康度状态文本颜色类
+     */
+    getHealthScoreTextClass() {
+      const score = this.healthScore.score
+      if (score === null) return 'text-gray-600'
+      if (score >= 90) return 'text-green-600'
+      if (score >= 70) return 'text-yellow-600'
+      if (score >= 50) return 'text-orange-600'
+      return 'text-red-600'
+    },
+
+    /**
+     * 获取健康度状态标签
+     */
+    getHealthStatusLabel() {
+      const score = this.healthScore.score
+      if (score === null) return '--'
+      if (score >= 90) return '优秀'
+      if (score >= 70) return '良好'
+      if (score >= 50) return '警告'
+      return '危险'
     },
 
     /**
@@ -172,8 +296,75 @@ function pendingCenterPage() {
      * 刷新所有数据
      */
     async refreshAll() {
-      await this.loadSummary()
-      await this.loadPendingItems()
+      await Promise.all([this.loadHealthScore(), this.loadSummary(), this.loadPendingItems()])
+    },
+
+    // ==================== 批量操作 ====================
+
+    /**
+     * 切换全选状态
+     */
+    toggleSelectAll() {
+      this.selectAll = !this.selectAll
+      if (this.selectAll) {
+        this.selectedIds = this.items.map(item => item.id)
+      } else {
+        this.selectedIds = []
+      }
+    },
+
+    /**
+     * 切换单项选择
+     * @param {number} id - 项目ID
+     */
+    toggleSelect(id) {
+      const index = this.selectedIds.indexOf(id)
+      if (index > -1) {
+        this.selectedIds.splice(index, 1)
+      } else {
+        this.selectedIds.push(id)
+      }
+      // 更新全选状态
+      this.selectAll = this.selectedIds.length === this.items.length && this.items.length > 0
+    },
+
+    /**
+     * 检查项目是否被选中
+     * @param {number} id - 项目ID
+     * @returns {boolean}
+     */
+    isSelected(id) {
+      return this.selectedIds.includes(id)
+    },
+
+    /**
+     * 清除选中
+     */
+    clearSelection() {
+      this.selectedIds = []
+      this.selectAll = false
+    },
+
+    /**
+     * 批量处理超时项（跳转到对应页面）
+     */
+    handleAllTimeout() {
+      // 跳转到消费审核页面，带超时筛选参数
+      const url = '/admin/finance-management.html?filter=timeout'
+      if (window.parent && window.parent !== window) {
+        window.parent.dispatchEvent(
+          new CustomEvent('open-tab', {
+            detail: {
+              id: 'consumption-review-timeout',
+              title: '超时审核处理',
+              icon: '🔴',
+              url: url
+            }
+          })
+        )
+      } else {
+        window.location.href = url
+      }
     },
 
     /**

@@ -164,6 +164,188 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
 })
 
 /**
+ * GET /contribution - 获取商户贡献度排行
+ *
+ * @description 统计各商户的消费贡献度，按贡献金额降序排列
+ *
+ * Query Parameters:
+ * - days: 统计天数（默认30天）
+ * - limit: 返回数量限制（默认20条，最大100）
+ *
+ * @returns {Object} 贡献度排行数据
+ * @returns {Array} data.rankings - 商户排行列表
+ * @returns {number} data.platform_total - 平台总消费金额
+ * @returns {number} data.period_days - 统计天数
+ * @returns {string} data.updated_at - 数据更新时间
+ *
+ * @example
+ * GET /api/v4/console/stores/contribution?days=30&limit=20
+ *
+ * Response:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "rankings": [
+ *       {
+ *         "rank": 1,
+ *         "merchant_id": 1001,
+ *         "merchant_name": "商户A",
+ *         "avatar": "...",
+ *         "order_count": 150,
+ *         "total_amount": 25000.00,
+ *         "avg_amount": 166.67,
+ *         "contribution_rate": 0.1250
+ *       }
+ *     ],
+ *     "platform_total": 200000.00,
+ *     "period_days": 30,
+ *     "updated_at": "2026-02-03T14:30:00.000+08:00"
+ *   },
+ *   "message": "获取成功"
+ * }
+ *
+ * @access Admin only (role_level >= 100)
+ *
+ * 关联需求：§6.2.1 商户贡献度排行接口
+ */
+router.get('/contribution', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const { days = 30, limit = 20 } = req.query
+
+    logger.info('[门店管理] 获取商户贡献度排行', {
+      admin_id: req.user.user_id,
+      days: parseInt(days),
+      limit: parseInt(limit)
+    })
+
+    // 🔄 通过 ServiceManager 获取 StoreContributionService
+    const StoreContributionService = req.app.locals.services.getService('store_contribution')
+    const result = await StoreContributionService.getContributionRanking({
+      days: parseInt(days) || 30,
+      limit: Math.min(parseInt(limit) || 20, 100)
+    })
+
+    return res.apiSuccess(result, '获取成功')
+  } catch (error) {
+    return handleServiceError(error, res, '获取商户贡献度排行')
+  }
+})
+
+/**
+ * GET /:store_id/trend - 获取商户消费趋势
+ *
+ * @description 获取指定商户近N天的消费趋势数据
+ *
+ * @param {number} store_id - 商户ID
+ * @query {number} [days=30] - 统计天数
+ *
+ * @access Admin only (role_level >= 100)
+ *
+ * 关联需求：§6.2 商户贡献度服务
+ */
+router.get('/:store_id/trend', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const { store_id } = req.params
+    const { days = 30 } = req.query
+
+    if (!store_id || isNaN(parseInt(store_id, 10))) {
+      return res.apiError('商户ID无效', 'INVALID_STORE_ID', null, 400)
+    }
+
+    logger.info('[门店管理] 获取商户消费趋势', {
+      admin_id: req.user.user_id,
+      store_id: parseInt(store_id),
+      days: parseInt(days)
+    })
+
+    const StoreContributionService = req.app.locals.services.getService('store_contribution')
+    const result = await StoreContributionService.getMerchantTrend(parseInt(store_id, 10), {
+      days: parseInt(days) || 30
+    })
+
+    return res.apiSuccess(result, '获取成功')
+  } catch (error) {
+    return handleServiceError(error, res, '获取商户消费趋势')
+  }
+})
+
+/**
+ * GET /:store_id/health-score - 获取商户健康度评分
+ *
+ * @description 获取商户健康度评分（基于消费金额、频次、增长趋势）
+ *
+ * @param {number} store_id - 商户ID
+ * @query {number} [days=30] - 统计天数
+ *
+ * @access Admin only (role_level >= 100)
+ *
+ * 关联需求：§6.2 商户贡献度服务
+ */
+router.get(
+  '/:store_id/health-score',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { store_id } = req.params
+      const { days = 30 } = req.query
+
+      if (!store_id || isNaN(parseInt(store_id, 10))) {
+        return res.apiError('商户ID无效', 'INVALID_STORE_ID', null, 400)
+      }
+
+      logger.info('[门店管理] 获取商户健康度评分', {
+        admin_id: req.user.user_id,
+        store_id: parseInt(store_id),
+        days: parseInt(days)
+      })
+
+      const StoreContributionService = req.app.locals.services.getService('store_contribution')
+      const result = await StoreContributionService.calculateHealthScore(parseInt(store_id, 10), {
+        days: parseInt(days) || 30
+      })
+
+      return res.apiSuccess(result, '获取成功')
+    } catch (error) {
+      return handleServiceError(error, res, '获取商户健康度评分')
+    }
+  }
+)
+
+/**
+ * GET /:store_id/comparison - 获取商户环比同比数据
+ *
+ * @description 对比本周/上周、本月/上月的消费数据
+ *
+ * @param {number} store_id - 商户ID
+ *
+ * @access Admin only (role_level >= 100)
+ *
+ * 关联需求：§6.2 商户贡献度服务
+ */
+router.get('/:store_id/comparison', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const { store_id } = req.params
+
+    if (!store_id || isNaN(parseInt(store_id, 10))) {
+      return res.apiError('商户ID无效', 'INVALID_STORE_ID', null, 400)
+    }
+
+    logger.info('[门店管理] 获取商户环比同比数据', {
+      admin_id: req.user.user_id,
+      store_id: parseInt(store_id)
+    })
+
+    const StoreContributionService = req.app.locals.services.getService('store_contribution')
+    const result = await StoreContributionService.getComparison(parseInt(store_id, 10))
+
+    return res.apiSuccess(result, '获取成功')
+  } catch (error) {
+    return handleServiceError(error, res, '获取商户环比同比数据')
+  }
+})
+
+/**
  * GET /:store_id - 获取门店详情
  *
  * @description 获取单个门店的详细信息，包括员工统计

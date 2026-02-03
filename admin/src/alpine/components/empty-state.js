@@ -119,6 +119,83 @@ const EMPTY_STATE_PRESETS = {
     icon: '✨',
     title: '任务已完成',
     description: '太棒了！没有待处理的任务'
+  },
+
+  // ========== P1-14: 正向反馈空状态 ==========
+
+  // 待办总览 - 全部处理完毕
+  'pending-complete': {
+    icon: '🎉',
+    title: '所有待办已处理完毕',
+    description: '太棒了！休息一下吧，您的工作效率非常高！',
+    positive: true,
+    actionText: '查看历史'
+  },
+
+  // 消费审核 - 无待审核
+  'consumption-empty': {
+    icon: '✅',
+    title: '暂无待审核的消费记录',
+    description: '所有消费记录都已审核完毕，系统运行正常',
+    positive: true,
+    actionText: '查看已审核'
+  },
+
+  // 客服工作台 - 无等待会话
+  'customer-service-empty': {
+    icon: '😊',
+    title: '当前没有等待中的用户会话',
+    description: '所有用户咨询都已得到回复，客服工作顺利！',
+    positive: true,
+    actionText: '查看历史'
+  },
+
+  // 告警中心 - 无告警
+  'alerts-empty': {
+    icon: '🛡️',
+    title: '系统运行正常，暂无告警',
+    description: '恭喜！所有指标都在正常范围内，继续保持',
+    positive: true,
+    actionText: '查看历史'
+  },
+
+  // 风控告警 - 无风险
+  'risk-alerts-empty': {
+    icon: '🔐',
+    title: '暂无风控告警',
+    description: '系统安全运行中，未检测到异常风险',
+    positive: true
+  },
+
+  // 抽奖告警 - 无异常
+  'lottery-alerts-empty': {
+    icon: '🎰',
+    title: '抽奖系统运行正常',
+    description: '中奖率和分布都在预期范围内，无需处理',
+    positive: true
+  },
+
+  // 健康度满分
+  'health-perfect': {
+    icon: '🏆',
+    title: '业务健康度: 100/100',
+    description: '🎊 恭喜！所有指标都处于最佳状态，继续保持！',
+    positive: true
+  },
+
+  // 消息中心 - 无新消息
+  'messages-empty': {
+    icon: '📬',
+    title: '暂无新消息',
+    description: '您已查看所有消息，保持关注最新动态',
+    positive: true
+  },
+
+  // 审计日志 - 无记录（特定筛选条件）
+  'audit-empty': {
+    icon: '📋',
+    title: '暂无匹配的操作记录',
+    description: '当前筛选条件下没有审计日志，请调整查询条件'
   }
 }
 

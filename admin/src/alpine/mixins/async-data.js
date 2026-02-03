@@ -137,11 +137,143 @@ export function asyncDataMixin() {
     /** 最后一次错误信息 */
     error: null,
 
+    // ========== P1-19: 网络超时分阶段提示状态 ==========
+    /** 
+     * 加载阶段：
+     * - 'normal': 正常加载 (0-5秒)
+     * - 'slow': 加载较慢 (5-15秒)
+     * - 'timeout': 请求超时 (>15秒)
+     * - 'idle': 空闲状态
+     */
+    loadingPhase: 'idle',
+
+    /** 加载开始时间戳 */
+    _loadingStartTime: null,
+
+    /** 加载阶段定时器ID */
+    _loadingPhaseTimers: [],
+
+    /** 最后一次失败的请求函数（用于重试） */
+    _lastFailedRequest: null,
+
+    /** 超时阈值配置（毫秒） */
+    loadingPhaseThresholds: {
+      slow: 5000,    // 5秒后显示"加载较慢"
+      timeout: 15000 // 15秒后显示"请求超时"
+    },
+
     // ========== 核心方法 ==========
+
+    // ========== P1-19: 加载阶段管理方法 ==========
+
+    /**
+     * 开始跟踪加载阶段
+     * @private
+     */
+    _startLoadingPhaseTracking() {
+      // 清除之前的定时器
+      this._clearLoadingPhaseTimers()
+      
+      // 设置开始时间
+      this._loadingStartTime = Date.now()
+      this.loadingPhase = 'normal'
+      
+      // 设置"加载较慢"阶段定时器 (5秒)
+      const slowTimer = setTimeout(() => {
+        if (this.loading || this.globalLoading) {
+          this.loadingPhase = 'slow'
+          logger.debug('[P1-19] 加载阶段切换: slow (>5秒)')
+        }
+      }, this.loadingPhaseThresholds.slow)
+      this._loadingPhaseTimers.push(slowTimer)
+      
+      // 设置"请求超时"阶段定时器 (15秒)
+      const timeoutTimer = setTimeout(() => {
+        if (this.loading || this.globalLoading) {
+          this.loadingPhase = 'timeout'
+          logger.warn('[P1-19] 加载阶段切换: timeout (>15秒)')
+        }
+      }, this.loadingPhaseThresholds.timeout)
+      this._loadingPhaseTimers.push(timeoutTimer)
+    },
+
+    /**
+     * 停止跟踪加载阶段
+     * @private
+     */
+    _stopLoadingPhaseTracking() {
+      this._clearLoadingPhaseTimers()
+      this.loadingPhase = 'idle'
+      this._loadingStartTime = null
+    },
+
+    /**
+     * 清除所有加载阶段定时器
+     * @private
+     */
+    _clearLoadingPhaseTimers() {
+      this._loadingPhaseTimers.forEach(timerId => clearTimeout(timerId))
+      this._loadingPhaseTimers = []
+    },
+
+    /**
+     * 获取当前加载阶段的提示文本
+     * @returns {string}
+     */
+    getLoadingPhaseText() {
+      switch (this.loadingPhase) {
+        case 'normal':
+          return '正在加载...'
+        case 'slow':
+          return '加载较慢，请稍候...'
+        case 'timeout':
+          return '请求超时，点击重试'
+        default:
+          return ''
+      }
+    },
+
+    /**
+     * 获取当前加载阶段的样式类
+     * @returns {string}
+     */
+    getLoadingPhaseClass() {
+      switch (this.loadingPhase) {
+        case 'normal':
+          return 'text-gray-600'
+        case 'slow':
+          return 'text-yellow-600 bg-yellow-50'
+        case 'timeout':
+          return 'text-red-600 bg-red-50'
+        default:
+          return ''
+      }
+    },
+
+    /**
+     * 判断是否显示重试按钮
+     * @returns {boolean}
+     */
+    shouldShowRetryButton() {
+      return this.loadingPhase === 'timeout'
+    },
+
+    /**
+     * 重试上一次失败的请求
+     */
+    async retryLastRequest() {
+      if (typeof this._lastFailedRequest === 'function') {
+        this._stopLoadingPhaseTracking()
+        await this._lastFailedRequest()
+      } else {
+        logger.warn('[P1-19] 没有可重试的请求')
+      }
+    },
 
     /**
      * 带加载状态的异步操作包装器
      * 自动管理 loading 状态和错误处理
+     * P1-19: 支持分阶段加载提示
      *
      * @param {Function} asyncFn - 异步函数
      * @param {Object} options - 配置选项
@@ -150,6 +282,7 @@ export function asyncDataMixin() {
      * @param {boolean} [options.showError=true] - 是否显示错误 Toast
      * @param {boolean} [options.showSuccess=false] - 是否显示成功 Toast
      * @param {string} [options.successMessage='操作成功'] - 成功提示消息
+     * @param {boolean} [options.trackPhase=true] - 是否启用分阶段提示 (P1-19)
      * @returns {Promise<{success: boolean, data?: any, error?: Error}>}
      */
     async withLoading(asyncFn, options = {}) {
@@ -158,12 +291,21 @@ export function asyncDataMixin() {
         errorMessage = '操作失败',
         showError = true,
         showSuccess = false,
-        successMessage = '操作成功'
+        successMessage = '操作成功',
+        trackPhase = true // P1-19: 默认启用分阶段提示
       } = options
 
       const loadingKey = global ? 'globalLoading' : 'loading'
       this[loadingKey] = true
       this.error = null
+      
+      // P1-19: 保存请求函数用于重试
+      this._lastFailedRequest = () => this.withLoading(asyncFn, options)
+      
+      // P1-19: 开始跟踪加载阶段
+      if (trackPhase) {
+        this._startLoadingPhaseTracking()
+      }
 
       try {
         const result = await asyncFn()
@@ -171,6 +313,9 @@ export function asyncDataMixin() {
         if (showSuccess) {
           this.showSuccess(successMessage)
         }
+        
+        // P1-19: 成功后清除重试函数
+        this._lastFailedRequest = null
 
         return { success: true, data: result }
       } catch (error) {
@@ -184,6 +329,11 @@ export function asyncDataMixin() {
         return { success: false, error }
       } finally {
         this[loadingKey] = false
+        
+        // P1-19: 停止跟踪加载阶段
+        if (trackPhase) {
+          this._stopLoadingPhaseTracking()
+        }
       }
     },
 

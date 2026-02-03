@@ -919,7 +919,7 @@ class ChatWebSocketService {
       // 1. 查找用户的聊天会话
       const sessions = await CustomerServiceSession.findAll({
         where: { user_id },
-        attributes: ['session_id']
+        attributes: ['customer_service_session_id']
       })
 
       if (sessions.length === 0) {

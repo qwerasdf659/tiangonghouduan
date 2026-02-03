@@ -118,6 +118,61 @@ router.get('/summary', authenticateToken, requireRoleLevel(100), async (req, res
  *   "message": "获取成功"
  * }
  */
+/**
+ * @route GET /api/v4/console/pending/health-score
+ * @desc 获取待办健康度评分（综合评估待处理压力状况）
+ * @access Private (管理员，role_level >= 100)
+ *
+ * @returns {Object} 健康度评分数据
+ * @returns {number} data.score - 综合健康度评分（0-100）
+ * @returns {string} data.status - 健康状态（healthy/warning/critical）
+ * @returns {Object} data.components - 各维度得分明细
+ * @returns {Array} data.alerts - 告警信息列表
+ * @returns {string} data.updated_at - 数据更新时间
+ *
+ * @example
+ * GET /api/v4/console/pending/health-score
+ *
+ * Response:
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "score": 72,
+ *     "status": "warning",
+ *     "status_text": "压力较大，建议及时处理",
+ *     "components": {
+ *       "consumption": { "score": 65, "count": 8, "urgent_count": 3 },
+ *       "customer_service": { "score": 80, "count": 2, "urgent_count": 0 },
+ *       "risk_alert": { "score": 70, "count": 5, "urgent_count": 2 },
+ *       "lottery_alert": { "score": 75, "count": 3, "urgent_count": 1 }
+ *     },
+ *     "alerts": [
+ *       { "level": "warning", "message": "消费审核积压较多", "action": "优先处理高金额记录" }
+ *     ],
+ *     "updated_at": "2026-02-03T14:30:00.000+08:00"
+ *   },
+ *   "message": "获取成功"
+ * }
+ *
+ * 关联需求：§3.1.1 待办健康度评分
+ */
+router.get('/health-score', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    logger.info('[待处理中心] 获取健康度评分', {
+      admin_id: req.user.user_id
+    })
+
+    // 🔄 通过 ServiceManager 获取 PendingHealthScoreService
+    const PendingHealthScoreService = req.app.locals.services.getService('pending_health_score')
+    const result = await PendingHealthScoreService.getHealthScore()
+
+    return res.apiSuccess(result, '获取成功')
+  } catch (error) {
+    logger.error('[待处理中心] 获取健康度评分失败', { error: error.message })
+    return handleServiceError(error, res, '获取健康度评分失败')
+  }
+})
+
 router.get('/list', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { category, urgent_only, page = 1, page_size = 20 } = req.query

@@ -67,6 +67,7 @@ const navRoutes = require('./nav') // 🆕 导航徽标（2026-01-31 P0 侧边�
 const lotteryHealthRoutes = require('./lottery-health') // 🆕 抽奖健康度（2026-01-31 P1 B-14~B-18）
 const consumptionAnomalyRoutes = require('./consumption-anomaly') // 🆕 消费异常检测（2026-01-31 P1 B-25~B-30）
 const userSegmentsRoutes = require('./user-segments') // 🆕 用户分层（2026-01-31 P1 B-19~B-24）
+const itemsRoutes = require('./items') // 🆕 物品监控（2026-02-03 运营后台优化 §5.4）
 
 // P2新增路由（2026-01-31 第2阶段任务）
 const reminderRulesRoutes = require('./reminder-rules') // 🆕 智能提醒规则管理（B-31~B-35）
@@ -133,6 +134,7 @@ router.use('/nav', navRoutes) // 🆕 导航徽标路由（2026-01-31 P0 侧边�
 router.use('/lottery-health', lotteryHealthRoutes) // 🆕 抽奖健康度路由（2026-01-31 P1 B-14~B-18 活动健康度评估）
 router.use('/consumption-anomaly', consumptionAnomalyRoutes) // 🆕 消费异常检测路由（2026-01-31 P1 B-25~B-30 风险评估）
 router.use('/users', userSegmentsRoutes) // 🆕 用户分层路由（2026-01-31 P1 B-19~B-24 用户画像）
+router.use('/items', itemsRoutes) // 🆕 物品监控路由（2026-02-03 运营后台优化 §5.4 锁定率监控）
 
 // P2新增路由（2026-01-31 第2阶段任务）
 router.use('/reminder-rules', reminderRulesRoutes) // 🆕 智能提醒规则管理路由（B-31~B-35）

@@ -338,7 +338,7 @@ describe('TradeOrderService - 交易订单服务', () => {
         throw error
       }
 
-      expect(result1).toHaveProperty('order_id')
+      expect(result1).toHaveProperty('trade_order_id')
       expect(result1.is_duplicate).toBe(false)
 
       // 第二次使用相同的 idempotency_key
@@ -463,11 +463,11 @@ describe('TradeOrderService - 交易订单服务', () => {
   // ==================== 3. 订单取消（退款）逻辑测试 ====================
 
   describe('3. 订单取消（退款）逻辑测试（cancelOrder）', () => {
-    it('3.1 应正确验证 order_id 必填', async () => {
+    it('3.1 应正确验证 trade_order_id 必填', async () => {
       const transaction = await sequelize.transaction()
       try {
         await expect(TradeOrderService.cancelOrder({}, { transaction })).rejects.toThrow(
-          'order_id 是必需参数'
+          'trade_order_id 是必需参数'
         )
       } finally {
         await transaction.rollback()
@@ -478,7 +478,7 @@ describe('TradeOrderService - 交易订单服务', () => {
       const transaction = await sequelize.transaction()
       try {
         await expect(
-          TradeOrderService.cancelOrder({ order_id: 999999999 }, { transaction })
+          TradeOrderService.cancelOrder({ trade_order_id: 999999999 }, { transaction })
         ).rejects.toThrow(/订单不存在/)
       } finally {
         await transaction.rollback()

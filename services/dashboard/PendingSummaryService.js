@@ -196,7 +196,7 @@ class PendingSummaryService {
         where: {
           status: { [Op.in]: ['waiting', 'assigned', 'active'] }
         },
-        attributes: ['session_id', 'status', 'created_at', 'last_message_at']
+        attributes: ['customer_service_session_id', 'status', 'created_at', 'last_message_at']
       })
 
       const count = sessions.length

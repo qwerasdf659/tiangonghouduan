@@ -134,6 +134,12 @@ module.exports = sequelize => {
         type: DataTypes.INTEGER,
         allowNull: true,
         comment: '满意度评分(1-5)'
+      },
+
+      first_response_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: '客服首次响应时间（用于计算响应时长）'
       }
     },
     {

@@ -1,8 +1,8 @@
 /**
  * 待处理中心 API
  * @description 待处理事项汇总和列表查询
- * @version 1.0.0
- * @date 2026-02-01
+ * @version 1.1.0
+ * @date 2026-02-03
  */
 
 import { API_PREFIX, authHeaders, handleResponse } from './base.js'
@@ -10,7 +10,8 @@ import { API_PREFIX, authHeaders, handleResponse } from './base.js'
 // 待处理中心端点
 export const PENDING_ENDPOINTS = {
   SUMMARY: `${API_PREFIX}/console/pending/summary`,
-  LIST: `${API_PREFIX}/console/pending/list`
+  LIST: `${API_PREFIX}/console/pending/list`,
+  HEALTH_SCORE: `${API_PREFIX}/console/pending/health-score`
 }
 
 /**
@@ -48,6 +49,20 @@ export const PendingAPI = {
 
     const url = `${PENDING_ENDPOINTS.LIST}?${query.toString()}`
     const response = await fetch(url, {
+      headers: authHeaders()
+    })
+    return handleResponse(response)
+  },
+
+  /**
+   * 获取待办健康度评分
+   * @returns {Promise<Object>} 健康度数据
+   * @returns {number} data.score - 综合健康度评分（0-100）
+   * @returns {string} data.status - 健康状态（healthy/warning/critical）
+   * @returns {Object} data.components - 各维度得分明细
+   */
+  async getHealthScore() {
+    const response = await fetch(PENDING_ENDPOINTS.HEALTH_SCORE, {
       headers: authHeaders()
     })
     return handleResponse(response)

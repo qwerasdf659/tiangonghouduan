@@ -913,6 +913,215 @@ class MultiDimensionStatsService {
     const daysToAdd = (week - 1) * 7 + (1 - jan1.getDay())
     return new Date(year, 0, 1 + daysToAdd)
   }
+
+  /**
+   * 获取时间对比数据（运营后台优化 API-3）
+   *
+   * @description 提供今日vs昨日、本周vs上周的核心指标对比
+   * 复用 getMultiDimensionStats 的时间维度支持
+   *
+   * @param {Object} options - 查询选项
+   * @param {string} [options.period='daily'] - 对比周期（daily/weekly/monthly）
+   * @param {string[]} [options.metrics] - 指标列表
+   *
+   * @returns {Promise<Object>} 时间对比数据
+   *
+   * 关联需求：§4.8.1 核心指标时间对比接口
+   * @since 2026-02-03
+   */
+  static async getTimeComparison(options = {}) {
+    const { period = 'daily', metrics = ['consumption', 'lottery_draws', 'users'] } = options
+
+    try {
+      logger.info('[时间对比] 开始计算', { period, metrics })
+
+      const now = new Date()
+      const result = {
+        period,
+        metrics: {},
+        day_comparison: {},
+        week_comparison: {},
+        highlights: [],
+        updated_at: BeijingTimeHelper.apiTimestamp()
+      }
+
+      // 根据周期类型计算对比数据
+      if (period === 'daily' || period === 'weekly') {
+        // 今日 vs 昨日
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        const yesterdayStart = new Date(todayStart)
+        yesterdayStart.setDate(yesterdayStart.getDate() - 1)
+
+        const [todayStats, yesterdayStats] = await Promise.all([
+          this._getPeriodStats(todayStart, now, metrics),
+          this._getPeriodStats(yesterdayStart, todayStart, metrics)
+        ])
+
+        result.day_comparison = this._buildComparisonData(todayStats, yesterdayStats, metrics)
+      }
+
+      if (period === 'weekly') {
+        // 本周 vs 上周
+        const dayOfWeek = now.getDay() || 7
+        const thisWeekStart = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate() - dayOfWeek + 1
+        )
+        const lastWeekStart = new Date(thisWeekStart)
+        lastWeekStart.setDate(lastWeekStart.getDate() - 7)
+        const lastWeekEnd = new Date(thisWeekStart)
+
+        const [thisWeekStats, lastWeekStats] = await Promise.all([
+          this._getPeriodStats(thisWeekStart, now, metrics),
+          this._getPeriodStats(lastWeekStart, lastWeekEnd, metrics)
+        ])
+
+        result.week_comparison = this._buildComparisonData(thisWeekStats, lastWeekStats, metrics)
+      }
+
+      // 生成高亮信息
+      result.highlights = this._generateHighlights(result.day_comparison, result.week_comparison)
+
+      // 缓存结果
+      await BusinessCacheHelper.setStats(
+        CACHE_CONFIG.KEY_PREFIX,
+        { type: 'time_comparison', period },
+        result,
+        CACHE_CONFIG.TTL_DASHBOARD
+      )
+
+      return result
+    } catch (error) {
+      logger.error('[时间对比] 计算失败', { error: error.message, stack: error.stack })
+      throw error
+    }
+  }
+
+  /**
+   * 获取指定时间段的统计数据
+   *
+   * @private
+   * @param {Date} startTime - 开始时间
+   * @param {Date} endTime - 结束时间
+   * @param {string[]} metrics - 指标列表
+   * @returns {Promise<Object>} 统计数据
+   */
+  static async _getPeriodStats(startTime, endTime, metrics) {
+    const { ConsumptionRecord, LotteryDraw, User } = require('../../models')
+    const stats = {}
+
+    try {
+      // 消费金额统计
+      if (metrics.includes('consumption')) {
+        const consumptionSum = await ConsumptionRecord.sum('consumption_amount', {
+          where: {
+            created_at: { [Op.gte]: startTime, [Op.lt]: endTime },
+            status: 'approved'
+          }
+        })
+        stats.consumption = parseFloat(consumptionSum || 0)
+      }
+
+      // 抽奖次数统计
+      if (metrics.includes('lottery_draws')) {
+        const drawCount = await LotteryDraw.count({
+          where: {
+            created_at: { [Op.gte]: startTime, [Op.lt]: endTime }
+          }
+        })
+        stats.lottery_draws = drawCount || 0
+      }
+
+      // 新增用户统计
+      if (metrics.includes('users')) {
+        const userCount = await User.count({
+          where: {
+            created_at: { [Op.gte]: startTime, [Op.lt]: endTime }
+          }
+        })
+        stats.users = userCount || 0
+      }
+    } catch (error) {
+      logger.warn('[时间对比] 获取统计数据部分失败', { error: error.message })
+    }
+
+    return stats
+  }
+
+  /**
+   * 构建对比数据
+   *
+   * @private
+   * @param {Object} currentStats - 当前周期统计
+   * @param {Object} previousStats - 上一周期统计
+   * @param {string[]} metrics - 指标列表
+   * @returns {Object} 对比数据
+   */
+  static _buildComparisonData(currentStats, previousStats, metrics) {
+    const comparison = {}
+
+    metrics.forEach(metric => {
+      const current = currentStats[metric] || 0
+      const previous = previousStats[metric] || 0
+      const change = previous > 0 ? (((current - previous) / previous) * 100).toFixed(2) : 0
+
+      comparison[metric] = {
+        current,
+        previous,
+        change: parseFloat(change),
+        trend: current > previous ? 'up' : current < previous ? 'down' : 'stable'
+      }
+    })
+
+    return comparison
+  }
+
+  /**
+   * 生成高亮信息
+   *
+   * @private
+   * @param {Object} dayComparison - 日对比数据
+   * @param {Object} weekComparison - 周对比数据
+   * @returns {Array} 高亮信息列表
+   */
+  static _generateHighlights(dayComparison, weekComparison) {
+    const highlights = []
+
+    const metricNames = {
+      consumption: '消费金额',
+      lottery_draws: '抽奖次数',
+      users: '新增用户'
+    }
+
+    // 生成日对比高亮
+    Object.entries(dayComparison).forEach(([metric, data]) => {
+      if (Math.abs(data.change) >= 10) {
+        const direction = data.trend === 'up' ? '上涨' : '下降'
+        highlights.push({
+          metric,
+          message: `${metricNames[metric] || metric}日环比${direction}${Math.abs(data.change)}%`,
+          level: data.trend === 'up' ? 'positive' : 'warning',
+          period: 'daily'
+        })
+      }
+    })
+
+    // 生成周对比高亮
+    Object.entries(weekComparison).forEach(([metric, data]) => {
+      if (Math.abs(data.change) >= 10) {
+        const direction = data.trend === 'up' ? '上涨' : '下降'
+        highlights.push({
+          metric,
+          message: `${metricNames[metric] || metric}周环比${direction}${Math.abs(data.change)}%`,
+          level: data.trend === 'up' ? 'positive' : 'warning',
+          period: 'weekly'
+        })
+      }
+    })
+
+    return highlights
+  }
 }
 
 module.exports = MultiDimensionStatsService

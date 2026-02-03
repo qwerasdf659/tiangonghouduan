@@ -174,6 +174,12 @@ const BatchOperationService = require('./BatchOperationService') // 批量操作
 // P0 待处理中心服务（2026-01-31 运营后台任务清单）
 const PendingSummaryService = require('./dashboard/PendingSummaryService') // 仪表盘待处理汇总服务
 const PendingCenterService = require('./pending/PendingCenterService') // 待处理中心服务
+const PendingHealthScoreService = require('./pending/PendingHealthScoreService') // 待办健康度评分服务（§3.1.1）
+const BusinessHealthScoreService = require('./dashboard/BusinessHealthScoreService') // 全局业务健康度评分服务（§3.1.2）
+const CustomerServiceResponseStatsService = require('./dashboard/CustomerServiceResponseStatsService') // 客服响应时长统计服务（§4.15）
+const APIPerformanceService = require('./monitoring/APIPerformanceService') // API性能监控服务（§4.6）
+const ItemLockRateService = require('./monitoring/ItemLockRateService') // 物品锁定率监控服务（§5.4）
+const StoreContributionService = require('./dashboard/StoreContributionService') // 商户贡献度服务（§6.2）
 const ConsumptionBatchService = require('./consumption/ConsumptionBatchService') // 消费记录批量审核服务
 const ConsumptionAnomalyService = require('./consumption/AnomalyService') // 消费异常检测服务（P1 B-25）
 const UserSegmentService = require('./user/UserSegmentService') // 用户分层服务（P1 B-19~B-24）
@@ -547,6 +553,12 @@ class ServiceManager {
 
       this._services.set('pending_summary', PendingSummaryService) // 仪表盘待处理汇总服务（静态类）
       this._services.set('pending_center', PendingCenterService) // 待处理中心服务（静态类）
+      this._services.set('pending_health_score', PendingHealthScoreService) // 待办健康度评分服务（静态类，§3.1.1）
+      this._services.set('business_health_score', new BusinessHealthScoreService(this.models)) // 全局业务健康度评分服务（需实例化，§3.1.2）
+      this._services.set('cs_response_stats', new CustomerServiceResponseStatsService(this.models)) // 客服响应时长统计服务（需实例化，§4.15）
+      this._services.set('api_performance', APIPerformanceService) // API性能监控服务（静态类，§4.6）
+      this._services.set('item_lock_rate', new ItemLockRateService(this.models)) // 物品锁定率监控服务（需实例化，§5.4）
+      this._services.set('store_contribution', new StoreContributionService(this.models)) // 商户贡献度服务（需实例化，§6.2）
       this._services.set('consumption_batch', ConsumptionBatchService) // 消费记录批量审核服务（静态类）
       this._services.set('nav_badge', NavBadgeService) // 导航栏徽标计数服务（静态类）
 

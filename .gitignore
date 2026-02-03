@@ -1,6 +1,4 @@
-node_modules
-
-# 依赖包
+# 依赖包 - 用户要求提交node_modules
 node_modules/
 npm-debug.log*
 yarn-debug.log*

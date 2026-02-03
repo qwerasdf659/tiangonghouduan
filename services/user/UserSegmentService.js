@@ -829,6 +829,103 @@ class UserSegmentService {
 
     return insights
   }
+
+  /**
+   * 获取用户历史审核通过率
+   *
+   * @description 统计指定用户的消费记录历史审核通过率
+   * 用于管理员审核时参考用户信用状况
+   *
+   * @param {Object} models - Sequelize 模型集合
+   * @param {Object} options - 查询选项
+   * @param {number} options.user_id - 用户ID
+   * @param {number} [options.days=90] - 统计天数
+   *
+   * @returns {Promise<Object>} 审核率数据
+   *
+   * 关联需求：§4.11.1 用户审核率接口
+   */
+  static async getUserApprovalRate(models, options = {}) {
+    const { user_id, days = 90 } = options
+    const { Op, fn, col } = require('sequelize')
+    const BeijingTimeHelper = require('../../utils/timeHelper')
+
+    const startDate = BeijingTimeHelper.daysAgo(days)
+
+    try {
+      // 查询用户消费记录统计
+      const stats = await models.ConsumptionRecord.findOne({
+        attributes: [
+          [fn('COUNT', col('consumption_record_id')), 'total_count'],
+          [
+            fn('SUM', models.sequelize.literal("CASE WHEN status = 'approved' THEN 1 ELSE 0 END")),
+            'approved_count'
+          ],
+          [
+            fn('SUM', models.sequelize.literal("CASE WHEN status = 'rejected' THEN 1 ELSE 0 END")),
+            'rejected_count'
+          ],
+          [
+            fn('SUM', models.sequelize.literal("CASE WHEN status = 'pending' THEN 1 ELSE 0 END")),
+            'pending_count'
+          ]
+        ],
+        where: {
+          user_id,
+          created_at: { [Op.gte]: startDate }
+        },
+        raw: true
+      })
+
+      const totalCount = parseInt(stats?.total_count || 0, 10)
+      const approvedCount = parseInt(stats?.approved_count || 0, 10)
+      const rejectedCount = parseInt(stats?.rejected_count || 0, 10)
+      const pendingCount = parseInt(stats?.pending_count || 0, 10)
+
+      // 计算审核通过率（排除待审核的）
+      const decidedCount = approvedCount + rejectedCount
+      const approvalRate = decidedCount > 0 ? approvedCount / decidedCount : 1 // 无记录默认为1
+
+      // 确定信用等级
+      let creditLevel
+      let creditLevelText
+      if (approvalRate >= 0.95) {
+        creditLevel = 'excellent'
+        creditLevelText = '信用优秀'
+      } else if (approvalRate >= 0.85) {
+        creditLevel = 'good'
+        creditLevelText = '信用良好'
+      } else if (approvalRate >= 0.7) {
+        creditLevel = 'normal'
+        creditLevelText = '信用一般'
+      } else if (approvalRate >= 0.5) {
+        creditLevel = 'warning'
+        creditLevelText = '需要关注'
+      } else {
+        creditLevel = 'poor'
+        creditLevelText = '信用较差'
+      }
+
+      return {
+        user_id,
+        approval_rate: parseFloat(approvalRate.toFixed(4)),
+        total_count: totalCount,
+        approved_count: approvedCount,
+        rejected_count: rejectedCount,
+        pending_count: pendingCount,
+        credit_level: creditLevel,
+        credit_level_text: creditLevelText,
+        period_days: days,
+        updated_at: BeijingTimeHelper.apiTimestamp()
+      }
+    } catch (error) {
+      require('../../utils/logger').logger.error('[用户分层] 获取审核率失败', {
+        user_id,
+        error: error.message
+      })
+      throw error
+    }
+  }
 }
 
 module.exports = UserSegmentService

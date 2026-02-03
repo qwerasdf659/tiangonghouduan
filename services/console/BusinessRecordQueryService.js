@@ -686,7 +686,7 @@ class BusinessRecordQueryService {
         {
           model: CustomerServiceSession,
           as: 'session',
-          attributes: ['session_id', 'user_id', 'status', 'admin_id'],
+          attributes: ['customer_service_session_id', 'user_id', 'status', 'admin_id'],
           required: false
         }
       ],
@@ -726,7 +726,13 @@ class BusinessRecordQueryService {
         {
           model: CustomerServiceSession,
           as: 'session',
-          attributes: ['session_id', 'user_id', 'status', 'admin_id', 'created_at'],
+          attributes: [
+            'customer_service_session_id',
+            'user_id',
+            'status',
+            'admin_id',
+            'created_at'
+          ],
           required: false
         },
         {

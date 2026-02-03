@@ -53,7 +53,15 @@ export function useConsumptionState() {
     /** @type {boolean} 批量操作进行中 */
     batchProcessing: false,
     /** @type {Object|null} 批量操作结果 */
-    batchResult: null
+    batchResult: null,
+    // ========== P1-17: 决策辅助信息状态 ==========
+    /** @type {Object|null} 当前审核记录的决策辅助信息 */
+    decisionInfo: null,
+    /** @type {boolean} 决策辅助信息加载中 */
+    loadingDecisionInfo: false,
+    // ========== P1-18: 智能推荐状态 ==========
+    /** @type {number} 推荐通过的异常分数阈值 */
+    recommendThreshold: 30
   }
 }
 
@@ -583,6 +591,276 @@ export function useConsumptionMethods() {
         low: 'bg-green-100 text-green-700'
       }
       return classes[level] || 'bg-gray-100 text-gray-700'
+    },
+
+    // ========== P0-3: 超时高亮功能 ==========
+
+    /**
+     * 判断记录是否超时（待审核超过24小时）
+     * @param {Object} record - 消费记录
+     * @returns {boolean}
+     */
+    isOverdue(record) {
+      if (record.status !== 'pending') return false
+      if (!record.created_at) return false
+
+      const createdAt = new Date(record.created_at)
+      const now = new Date()
+      const hoursDiff = (now - createdAt) / (1000 * 60 * 60)
+
+      return hoursDiff >= 24
+    },
+
+    /**
+     * 判断记录是否即将超时（待审核超过12小时）
+     * @param {Object} record - 消费记录
+     * @returns {boolean}
+     */
+    isNearOverdue(record) {
+      if (record.status !== 'pending') return false
+      if (!record.created_at) return false
+
+      const createdAt = new Date(record.created_at)
+      const now = new Date()
+      const hoursDiff = (now - createdAt) / (1000 * 60 * 60)
+
+      return hoursDiff >= 12 && hoursDiff < 24
+    },
+
+    /**
+     * 获取超时状态CSS类
+     * @param {Object} record - 消费记录
+     * @returns {string} CSS类名
+     */
+    getTimeoutClass(record) {
+      if (this.isOverdue(record)) {
+        return 'text-red-600 font-semibold bg-red-50'
+      }
+      if (this.isNearOverdue(record)) {
+        return 'text-orange-600 font-medium bg-orange-50'
+      }
+      return 'themed-text-muted'
+    },
+
+    /**
+     * 获取等待时间的文本描述
+     * @param {Object} record - 消费记录
+     * @returns {string} 等待时间描述
+     */
+    getWaitingTimeText(record) {
+      if (!record.created_at) return ''
+      if (record.status !== 'pending') return ''
+
+      const createdAt = new Date(record.created_at)
+      const now = new Date()
+      const hoursDiff = Math.floor((now - createdAt) / (1000 * 60 * 60))
+      const daysDiff = Math.floor(hoursDiff / 24)
+
+      if (daysDiff > 0) {
+        return `⏰ 等待 ${daysDiff} 天 ${hoursDiff % 24} 小时`
+      }
+      if (hoursDiff > 0) {
+        return `⏰ 等待 ${hoursDiff} 小时`
+      }
+      const minutesDiff = Math.floor((now - createdAt) / (1000 * 60))
+      return minutesDiff > 0 ? `⏰ 等待 ${minutesDiff} 分钟` : '刚刚提交'
+    },
+
+    // ========== P1-17: 决策辅助信息方法 ==========
+
+    /**
+     * 加载决策辅助信息
+     * @param {number|string} userId - 用户ID
+     */
+    async loadDecisionInfo(userId) {
+      if (!userId) return
+      
+      this.loadingDecisionInfo = true
+      this.decisionInfo = null
+      
+      try {
+        // 尝试从后端获取决策辅助信息
+        const response = await this.apiGet(
+          `/api/v4/console/consumption-audit/decision-info/${userId}`,
+          {},
+          { showLoading: false }
+        )
+        
+        if (response?.success && response.data) {
+          this.decisionInfo = response.data
+        } else {
+          // 如果后端未实现，使用本地计算的数据
+          this.decisionInfo = this.calculateLocalDecisionInfo(userId)
+        }
+      } catch (error) {
+        logger.warn('加载决策辅助信息失败，使用本地计算:', error)
+        this.decisionInfo = this.calculateLocalDecisionInfo(userId)
+      } finally {
+        this.loadingDecisionInfo = false
+      }
+    },
+
+    /**
+     * 本地计算决策辅助信息（后端未实现时的备用方案）
+     * @param {number|string} userId - 用户ID
+     * @returns {Object} 决策辅助信息
+     */
+    calculateLocalDecisionInfo(userId) {
+      // 从当前加载的消费记录中统计用户的历史情况
+      const userRecords = this.consumptions.filter(
+        r => (r.user_id === userId || r.user?.user_id === userId)
+      )
+      
+      const approvedCount = userRecords.filter(r => r.status === 'approved').length
+      const rejectedCount = userRecords.filter(r => r.status === 'rejected').length
+      const totalReviewed = approvedCount + rejectedCount
+      
+      // 计算通过率
+      const approval_rate = totalReviewed > 0 
+        ? Math.round((approvedCount / totalReviewed) * 100) 
+        : null
+      
+      return {
+        user_id: userId,
+        approval_rate: approval_rate,
+        total_reviewed: totalReviewed,
+        approved_count: approvedCount,
+        rejected_count: rejectedCount,
+        similar_records: [],
+        is_local_calculated: true
+      }
+    },
+
+    /**
+     * 打开审核弹窗并加载决策辅助信息
+     * @param {Object} record - 消费记录
+     */
+    async openAuditModal(record) {
+      this.selectedConsumption = record
+      // P1-17: 加载决策辅助信息
+      const userId = record.user_id || record.user?.user_id
+      if (userId) {
+        this.loadDecisionInfo(userId)
+      }
+      this.showModal('consumptionDetailModal')
+    },
+
+    // ========== P1-18: 智能推荐方法 ==========
+
+    /**
+     * 判断记录是否推荐通过（异常分数 < 30）
+     * @param {Object} record - 消费记录
+     * @returns {boolean}
+     */
+    isRecommendApproval(record) {
+      // 只有待审核记录才显示推荐
+      if (record.status !== 'pending') return false
+      
+      // 获取异常分数（后端可能返回 anomaly_score 或 risk_score）
+      const score = record.anomaly_score ?? record.risk_score ?? null
+      
+      // 如果没有异常分数，检查是否有风险标记
+      if (score === null) {
+        // 无异常标记的记录默认推荐通过
+        return !record.is_suspicious && !record.risk_level && !record.anomaly_type
+      }
+      
+      // 异常分数低于阈值则推荐通过
+      return score < this.recommendThreshold
+    },
+
+    /**
+     * 获取推荐通过的记录列表
+     * @returns {Array}
+     */
+    getRecommendedRecords() {
+      return this.consumptions.filter(r => this.isRecommendApproval(r))
+    },
+
+    /**
+     * 获取推荐通过的记录数量
+     * @returns {number}
+     */
+    getRecommendedCount() {
+      return this.getRecommendedRecords().length
+    },
+
+    /**
+     * 批量通过推荐项
+     */
+    async batchApproveRecommended() {
+      const recommendedRecords = this.getRecommendedRecords()
+      
+      if (recommendedRecords.length === 0) {
+        this.showWarning('当前没有推荐通过的记录')
+        return
+      }
+      
+      const recordIds = recommendedRecords.map(r => r.record_id || r.id)
+      
+      await this.confirmAndExecute(
+        `确定批量通过 ${recordIds.length} 条推荐记录？\n这些记录的异常评分均低于 ${this.recommendThreshold} 分`,
+        async () => {
+          this.batchProcessing = true
+          try {
+            const response = await this.apiCall('/api/v4/console/consumption/batch-review', {
+              method: 'POST',
+              data: {
+                record_ids: recordIds,
+                action: 'approve',
+                reason: '智能推荐批量通过（异常评分<30）'
+              }
+            })
+            
+            if (response?.success) {
+              const { success_count, fail_count } = response.data
+              if (fail_count > 0) {
+                this.showWarning(`成功 ${success_count} 项，失败 ${fail_count} 项`)
+              } else {
+                this.showSuccess(`成功通过 ${success_count} 条推荐记录`)
+              }
+              await this.loadConsumptions()
+            }
+          } finally {
+            this.batchProcessing = false
+          }
+        }
+      )
+    },
+
+    // ========== P1-20: 历史审核率方法 ==========
+
+    /**
+     * 获取用户历史审核率显示文本
+     * @param {Object} record - 消费记录
+     * @returns {string}
+     */
+    getUserApprovalRateText(record) {
+      // 优先使用后端返回的历史通过率
+      const rate = record.user_approval_rate ?? record.user?.approval_rate ?? null
+      
+      if (rate === null || rate === undefined) {
+        return '--'
+      }
+      
+      return `${rate}%`
+    },
+
+    /**
+     * 获取历史审核率的样式类
+     * @param {Object} record - 消费记录
+     * @returns {string}
+     */
+    getApprovalRateClass(record) {
+      const rate = record.user_approval_rate ?? record.user?.approval_rate ?? null
+      
+      if (rate === null || rate === undefined) {
+        return 'text-gray-400'
+      }
+      
+      if (rate >= 80) return 'text-green-600 font-medium'
+      if (rate >= 50) return 'text-yellow-600'
+      return 'text-red-600 font-medium'
     }
   }
 }
