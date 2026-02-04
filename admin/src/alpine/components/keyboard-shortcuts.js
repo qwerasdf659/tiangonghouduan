@@ -97,7 +97,7 @@ const G_KEY_SHORTCUTS = {
   },
   s: {
     action: 'gotoSettings',
-    url: '/admin/system-config.html',
+    url: '/admin/system-settings.html',
     description: '跳转系统设置'
   }
 }

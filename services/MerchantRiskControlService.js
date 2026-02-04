@@ -523,7 +523,7 @@ class MerchantRiskControlService {
       })
 
       logger.info('📝 风控告警记录已创建', {
-        alert_id: alert.alert_id,
+        risk_alert_id: alert.risk_alert_id, // 主键字段：风控告警ID
         alert_type: alertData.alert_type,
         severity: alertData.severity,
         is_blocked: alertData.is_blocked
@@ -870,7 +870,7 @@ class MerchantRiskControlService {
     }
 
     return await RiskAlert.findByPk(alertId, {
-      attributes: ['alert_id', 'store_id', 'status']
+      attributes: ['risk_alert_id', 'store_id', 'status'] // 主键字段：risk_alert_id
     })
   }
 
@@ -952,7 +952,7 @@ class MerchantRiskControlService {
       })
 
       const items = rows.map(alert => ({
-        alert_id: alert.alert_id,
+        risk_alert_id: alert.risk_alert_id, // 主键字段：风控告警ID
         alert_type: alert.alert_type,
         alert_type_name: RiskAlert.ALERT_TYPE_DESCRIPTIONS?.[alert.alert_type] || alert.alert_type,
         severity: alert.severity,
@@ -1073,7 +1073,7 @@ class MerchantRiskControlService {
       })
 
       return {
-        alert_id: alert.alert_id,
+        risk_alert_id: alert.risk_alert_id, // 主键字段：风控告警ID
         status: alert.status,
         reviewed_by: alert.reviewed_by,
         review_notes: alert.review_notes,

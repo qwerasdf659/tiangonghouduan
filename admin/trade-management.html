@@ -124,9 +124,9 @@
             <template x-if="tradeOrders.length === 0">
               <tr><td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无交易记录</td></tr>
             </template>
-            <template x-for="trade in tradeOrders" :key="trade.order_id">
+            <template x-for="trade in tradeOrders" :key="trade.trade_order_id">
               <tr class="themed-hover-bg">
-                <td class="px-4 py-3 text-sm font-mono" x-text="trade.order_id || trade.trade_id"></td>
+                <td class="px-4 py-3 text-sm font-mono" x-text="trade.trade_order_id"></td>
                 <td class="px-4 py-3 text-sm" x-text="trade.buyer?.nickname || trade.buyer_user_id"></td>
                 <td class="px-4 py-3 text-sm" x-text="trade.seller?.nickname || trade.seller_user_id"></td>
                 <td class="px-4 py-3 text-sm" x-text="trade.listing?.offer_asset_code || trade.asset_code || '-'"></td>
@@ -305,7 +305,7 @@
         <button @click="hideModal('tradeDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
       </div>
       <div class="p-6 space-y-3" x-show="selectedTradeOrder">
-        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">订单ID:</span><span class="font-mono" x-text="selectedTradeOrder?.order_id"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">订单ID:</span><span class="font-mono" x-text="selectedTradeOrder?.trade_order_id"></span></div>
         <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">业务ID:</span><span class="font-mono text-xs" x-text="selectedTradeOrder?.business_id || '-'"></span></div>
         <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">买家:</span><span x-text="selectedTradeOrder?.buyer?.nickname || selectedTradeOrder?.buyer_user_id"></span></div>
         <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">卖家:</span><span x-text="selectedTradeOrder?.seller?.nickname || selectedTradeOrder?.seller_user_id"></span></div>

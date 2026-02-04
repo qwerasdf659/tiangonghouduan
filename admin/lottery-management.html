@@ -21,17 +21,19 @@
   <!-- 页面主体 -->
   <div class="container mx-auto px-4 py-6" x-data="lotteryNavigation()" x-init="init()">
     
-    <!-- 子页面导航 -->
+    <!-- 子Tab导航（根据左侧侧边栏选择自动显示对应分类的Tab） -->
     <div class="themed-card rounded-lg shadow mb-6">
       <div class="flex flex-wrap">
-        <template x-for="subPage in subPages" :key="subPage.id">
+        <template x-for="tab in currentTabs" :key="tab.id">
           <button 
-            @click="switchPage(subPage.id)"
-            :class="current_page === subPage.id ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'themed-text-muted themed-hover-bg border-b themed-border'"
+            @click="switchPage(tab.id)"
+            :class="current_page === tab.id 
+              ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' 
+              : 'themed-text-muted themed-hover-bg border-b themed-border'"
             class="px-5 py-3 font-medium whitespace-nowrap transition-colors"
           >
-            <span x-text="subPage.icon"></span>
-            <span x-text="subPage.title"></span>
+            <span x-text="tab.icon"></span>
+            <span x-text="tab.title"></span>
           </button>
         </template>
       </div>

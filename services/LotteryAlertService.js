@@ -392,10 +392,14 @@ class LotteryAlertService {
    * 将告警状态从 active 更新为 acknowledged
    *
    * @param {number} alert_id - 告警ID
-   * @param {number} operator_id - 操作人ID
+   * @param {Object} options - 操作选项
+   * @param {number} options.admin_id - 操作人ID
+   * @param {string} [options.note] - 确认备注
    * @returns {Promise<Object>} 更新后的告警
    */
-  static async acknowledgeAlert(alert_id, operator_id) {
+  static async acknowledgeAlert(alert_id, options = {}) {
+    const { admin_id, note } = options
+
     try {
       const alert = await LotteryAlert.findByPk(alert_id)
 
@@ -409,12 +413,14 @@ class LotteryAlertService {
 
       await alert.update({
         status: 'acknowledged',
-        resolved_by: operator_id
+        resolved_by: admin_id,
+        resolve_notes: note || null
       })
 
       logger.info('确认告警', {
         alert_id,
-        operator_id
+        admin_id,
+        note
       })
 
       return LotteryAlertService.getAlertById(alert_id)
@@ -429,11 +435,14 @@ class LotteryAlertService {
    * 将告警状态更新为 resolved
    *
    * @param {number} alert_id - 告警ID
-   * @param {number} operator_id - 操作人ID
-   * @param {string} [notes] - 处理备注
+   * @param {Object} options - 操作选项
+   * @param {number} options.admin_id - 操作人ID
+   * @param {string} [options.resolution] - 解决方案描述
    * @returns {Promise<Object>} 更新后的告警
    */
-  static async resolveAlert(alert_id, operator_id, notes = '') {
+  static async resolveAlert(alert_id, options = {}) {
+    const { admin_id, resolution } = options
+
     try {
       const alert = await LotteryAlert.findByPk(alert_id)
 
@@ -448,14 +457,14 @@ class LotteryAlertService {
       await alert.update({
         status: 'resolved',
         resolved_at: BeijingTimeHelper.createBeijingTime(),
-        resolved_by: operator_id,
-        resolve_notes: notes
+        resolved_by: admin_id,
+        resolve_notes: resolution || ''
       })
 
       logger.info('解决告警', {
         alert_id,
-        operator_id,
-        notes
+        admin_id,
+        resolution
       })
 
       return LotteryAlertService.getAlertById(alert_id)

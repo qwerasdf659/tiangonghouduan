@@ -7,12 +7,19 @@
 
 import { API_PREFIX, authHeaders, handleResponse } from './base.js'
 
-// 仪表盘端点
+// 仪表盘端点（以后端实际路由为准）
 export const DASHBOARD_ENDPOINTS = {
+  // 运营看板核心接口
   PENDING_SUMMARY: `${API_PREFIX}/console/dashboard/pending-summary`,
+  BUSINESS_HEALTH: `${API_PREFIX}/console/dashboard/business-health`,  // 业务健康度评分
+  TIME_COMPARISON: `${API_PREFIX}/console/dashboard/time-comparison`,  // 时间对比数据
+  
+  // 统计分析接口
   TODAY_STATS: `${API_PREFIX}/console/analytics/stats/today`,
   DECISIONS_ANALYTICS: `${API_PREFIX}/console/analytics/decisions/analytics`,
-  REALTIME_ALERTS: `${API_PREFIX}/console/lottery-realtime/alerts`, // 2026-01-31 路径更新
+  
+  // 告警和预算接口
+  REALTIME_ALERTS: `${API_PREFIX}/console/lottery-realtime/alerts`,
   BUDGET_STATUS: `${API_PREFIX}/console/campaign-budget/batch-status`
 }
 
@@ -84,6 +91,38 @@ export const DashboardAPI = {
    */
   async getBudgetStatus() {
     const response = await fetch(DASHBOARD_ENDPOINTS.BUDGET_STATUS, {
+      headers: authHeaders()
+    })
+    return handleResponse(response)
+  },
+
+  /**
+   * 获取业务健康度评分
+   * @returns {Promise<Object>} 业务健康度数据
+   * @description 对应后端 /api/v4/console/dashboard/business-health
+   */
+  async getBusinessHealth() {
+    const response = await fetch(DASHBOARD_ENDPOINTS.BUSINESS_HEALTH, {
+      headers: authHeaders()
+    })
+    return handleResponse(response)
+  },
+
+  /**
+   * 获取时间对比数据
+   * @param {Object} params - 查询参数
+   * @param {string} [params.dimension] - 统计维度（consumption/lottery/user）
+   * @returns {Promise<Object>} 时间对比数据
+   * @description 对应后端 /api/v4/console/dashboard/time-comparison
+   */
+  async getTimeComparison(params = {}) {
+    const query = new URLSearchParams()
+    if (params.dimension) query.append('dimension', params.dimension)
+
+    const url = query.toString() 
+      ? `${DASHBOARD_ENDPOINTS.TIME_COMPARISON}?${query.toString()}`
+      : DASHBOARD_ENDPOINTS.TIME_COMPARISON
+    const response = await fetch(url, {
       headers: authHeaders()
     })
     return handleResponse(response)

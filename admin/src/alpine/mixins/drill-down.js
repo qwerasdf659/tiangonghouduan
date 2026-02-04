@@ -410,13 +410,13 @@ export function drillDownMixin() {
     },
 
     /**
-     * 快捷方法：跳转到订单详情
+     * 快捷方法：跳转到订单详情（跳转到财务管理页面的订单详情Tab）
      * @param {string} orderId - 订单ID
      */
     navigateToOrder(orderId) {
-      this.drillDownToPage('/admin/orders.html', {
+      this.drillDownToPage('/admin/finance-management.html', {
         newTab: true,
-        params: { order_id: orderId }
+        params: { order_id: orderId, page: 'order-detail' }
       })
     }
   }

@@ -89,44 +89,39 @@ export function sidebarNav() {
         name: '运营仪表盘',
         icon: '📊',
         type: 'single',
-        url: '/admin/workspace.html?tab=dashboard'
+        url: '/admin/dashboard-panel.html'
       },
 
-      // 3️⃣ 抽奖运营 - 高频操作区
+      // 3️⃣ 抽奖运营 - 运营型命名（数据看板、活动运营、策略管理、批量工具、干预预设）
       {
         id: 'lottery-ops',
         name: '抽奖运营',
         icon: '🎰',
         items: [
           {
-            id: 'lottery-monitoring',
-            name: '实时监控',
+            id: 'lottery-monitor',
+            name: '📊 数据看板',
             url: '/admin/lottery-management.html?page=lottery-metrics',
             badge: 'live'
           },
           {
-            id: 'lottery-campaigns',
-            name: '活动管理',
+            id: 'lottery-activity',
+            name: '🎁 活动运营',
             url: '/admin/lottery-management.html?page=campaigns'
           },
           {
-            id: 'lottery-prizes',
-            name: '奖品配置',
-            url: '/admin/lottery-management.html?page=prizes'
-          },
-          {
-            id: 'lottery-budget',
-            name: '预算控制',
-            url: '/admin/lottery-management.html?page=campaign-budget'
-          },
-          {
             id: 'lottery-strategy',
-            name: '策略配置',
+            name: '⚙️ 策略管理',
             url: '/admin/lottery-management.html?page=lottery-strategy'
           },
           {
+            id: 'lottery-tools',
+            name: '⚡ 批量工具',
+            url: '/admin/lottery-management.html?page=batch-operations'
+          },
+          {
             id: 'lottery-presets',
-            name: '干预预设',
+            name: '🎯 干预预设',
             url: '/admin/presets.html'
           }
         ]
@@ -257,7 +252,7 @@ export function sidebarNav() {
         const token = localStorage.getItem('admin_token')
         if (!token) return
 
-        const response = await fetch('/api/v4/console/pending/health-score', {
+        const response = await fetch('/api/v4/console/dashboard/business-health', {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -549,7 +544,7 @@ export function sidebarNav() {
             // P2-3: 处理子分组（三级菜单）
             if (item.subItems) {
               for (const subItem of item.subItems) {
-                if (currentPath.includes(subItem.url.split('?')[0])) {
+                if (subItem.url && currentPath.includes(subItem.url.split('?')[0])) {
                   // 展开对应分组
                   if (!this.expandedGroups.includes(group.id)) {
                     this.expandedGroups.push(group.id)
@@ -602,7 +597,7 @@ export function sidebarNav() {
 
       // 非工作台模式，使用传统的 URL 匹配
       const currentPath = window.location.pathname + window.location.search
-      return currentPath.includes(url.split('?')[0])
+      return url && currentPath.includes(url.split('?')[0])
     },
 
     /**

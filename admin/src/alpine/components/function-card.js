@@ -10,7 +10,7 @@
  * <div x-data="functionCard({
  *   title: '用户管理',
  *   icon: 'bi-people',
- *   link: '/admin/users.html',
+ *   link: '/admin/user-management.html',
  *   badge: 10
  * })">
  *   ...

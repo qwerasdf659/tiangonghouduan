@@ -154,12 +154,12 @@
             <template x-if="alerts.length === 0">
               <tr><td colspan="9" class="px-4 py-8 text-center themed-text-muted">暂无告警数据</td></tr>
             </template>
-            <template x-for="alert in alerts" :key="alert.alert_id">
+            <template x-for="alert in alerts" :key="alert.risk_alert_id">
               <tr class="themed-hover-bg">
                 <td class="px-4 py-3">
-                  <input type="checkbox" :value="alert.alert_id" x-model="selectedAlerts" class="rounded">
+                  <input type="checkbox" :value="alert.risk_alert_id" x-model="selectedAlerts" class="rounded">
                 </td>
-                <td class="px-4 py-3 text-sm font-mono" x-text="alert.alert_id"></td>
+                <td class="px-4 py-3 text-sm font-mono" x-text="alert.risk_alert_id"></td>
                 <td class="px-4 py-3">
                   <span :class="{
                     'bg-red-100 text-red-700': alert.severity === 'critical' || alert.severity === 'high',
@@ -274,7 +274,7 @@
       </div>
       <div class="p-4 space-y-4">
         <div class="grid grid-cols-2 gap-4">
-          <div><span class="themed-text-muted">告警ID:</span> <span class="font-mono" x-text="selectedAlert?.alert_id"></span></div>
+          <div><span class="themed-text-muted">告警ID:</span> <span class="font-mono" x-text="selectedAlert?.risk_alert_id"></span></div>
           <div><span class="themed-text-muted">级别:</span> <span x-text="getLevelText(selectedAlert?.severity)"></span></div>
           <div><span class="themed-text-muted">类型:</span> <span x-text="getTypeText(selectedAlert?.alert_type)"></span></div>
           <div><span class="themed-text-muted">状态:</span> <span x-text="getStatusText(selectedAlert?.status)"></span></div>
@@ -351,7 +351,7 @@
               <div class="p-3 bg-gray-50 rounded-lg flex items-start justify-between">
                 <div class="flex-1">
                   <div class="flex items-center gap-2 mb-1">
-                    <span class="text-xs font-mono themed-text-muted" x-text="alert.alert_id"></span>
+                    <span class="text-xs font-mono themed-text-muted" x-text="alert.risk_alert_id"></span>
                     <span 
                       :class="{
                         'bg-red-100 text-red-600': alert.severity === 'critical' || alert.severity === 'high',

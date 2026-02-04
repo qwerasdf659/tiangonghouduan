@@ -25,7 +25,7 @@
  * <div x-data="riskAlertsPage">
  *   <div id="levelDistChart" style="height: 300px;"></div>
  *   <table>
- *     <template x-for="alert in alerts" :key="alert.alert_id">...</template>
+ *     <template x-for="alert in alerts" :key="alert.risk_alert_id">...</template>
  *   </table>
  * </div>
  */
@@ -48,7 +48,7 @@ const apiRequest = async (url, options = {}) => {
 /**
  * 风控告警对象类型
  * @typedef {Object} RiskAlert
- * @property {number} alert_id - 告警ID
+ * @property {number} risk_alert_id - 风控告警ID（主键）
  * @property {string} severity - 严重程度 ('critical'|'high'|'medium'|'low')
  * @property {string} level - 级别别名（兼容字段）
  * @property {string} alert_type - 告警类型
@@ -74,7 +74,7 @@ const apiRequest = async (url, options = {}) => {
 /**
  * 告警处理表单类型
  * @typedef {Object} HandleForm
- * @property {string} alert_id - 告警ID
+ * @property {string} risk_alert_id - 风控告警ID（主键）
  * @property {string} status - 目标状态
  * @property {string} remark - 处理备注
  */
@@ -152,7 +152,7 @@ function riskAlertsPage() {
      * @type {HandleForm}
      */
     handleForm: {
-      alert_id: '',
+      risk_alert_id: '', // 告警ID（主键）
       status: 'reviewed',
       remark: ''
     },
@@ -183,12 +183,12 @@ function riskAlertsPage() {
     /**
      * 静默的告警配置
      * @type {Object}
-     * @property {Set} alert_ids - 静默的告警ID集合
+     * @property {Set} risk_alert_ids - 静默的告警ID集合
      * @property {Set} alert_types - 静默的告警类型集合
      * @property {Set} user_ids - 静默的用户ID集合
      */
     silencedAlerts: {
-      alert_ids: new Set(),
+      risk_alert_ids: new Set(), // 静默的告警ID集合
       alert_types: new Set(),
       user_ids: new Set()
     },
@@ -389,7 +389,7 @@ function riskAlertsPage() {
     handleNewAlert(alert) {
       // P2-8: 检查是否被静默
       if (this.isAlertSilenced(alert)) {
-        logger.info('[RiskAlerts] 告警已静默，跳过:', alert.alert_id)
+        logger.info('[RiskAlerts] 告警已静默，跳过:', alert.risk_alert_id)
         return
       }
 
@@ -492,7 +492,7 @@ function riskAlertsPage() {
         const notification = new Notification(`风控告警 - ${severityText}`, {
           body: alert.message || '新的风控告警需要处理',
           icon: '/admin/images/logo.png',
-          tag: `alert-${alert.alert_id}`,
+          tag: `alert-${alert.risk_alert_id}`,
           requireInteraction: alert.severity === 'critical' || alert.severity === 'high'
         })
 
@@ -890,7 +890,7 @@ function riskAlertsPage() {
      */
     toggleAllAlerts(checked) {
       if (checked) {
-        this.selectedAlerts = this.alerts.map(a => a.alert_id)
+        this.selectedAlerts = this.alerts.map(a => a.risk_alert_id)
       } else {
         this.selectedAlerts = []
       }
@@ -942,7 +942,7 @@ function riskAlertsPage() {
      */
     viewAlertDetail(alert) {
       this.selectedAlert = alert
-      this.loadAlertTimeline(alert.alert_id)
+      this.loadAlertTimeline(alert.risk_alert_id)
     },
 
     /**
@@ -953,7 +953,7 @@ function riskAlertsPage() {
      * @returns {Promise<void>}
      */
     async selectAlert(alertId) {
-      this.selectedAlert = this.alerts.find(a => a.alert_id === alertId)
+      this.selectedAlert = this.alerts.find(a => a.risk_alert_id === alertId)
       if (!this.selectedAlert) return
 
       // 加载处理时间线
@@ -994,9 +994,9 @@ function riskAlertsPage() {
      * @returns {void}
      */
     openHandleModal(alertOrId) {
-      const alertId = typeof alertOrId === 'object' ? alertOrId.alert_id : alertOrId
+      const alertId = typeof alertOrId === 'object' ? alertOrId.risk_alert_id : alertOrId
       this.handleForm = {
-        alert_id: alertId,
+        risk_alert_id: alertId,
         status: 'reviewed',
         remark: ''
       }
@@ -1011,13 +1011,13 @@ function riskAlertsPage() {
      * @returns {Promise<void>}
      */
     async submitHandle() {
-      if (!this.handleForm.alert_id) return
+      if (!this.handleForm.risk_alert_id) return
 
       this.submitting = true
       try {
         // 使用 data 而非 body（request 函数会自动 JSON.stringify）
         const response = await apiRequest(
-          buildURL(SYSTEM_ENDPOINTS.RISK_ALERT_REVIEW, { id: this.handleForm.alert_id }),
+          buildURL(SYSTEM_ENDPOINTS.RISK_ALERT_REVIEW, { id: this.handleForm.risk_alert_id }),
           {
             method: 'POST',
             data: {
@@ -1031,8 +1031,8 @@ function riskAlertsPage() {
           this.hideModal('handleModal')
           this.showSuccess(`告警已${this.handleForm.status === 'reviewed' ? '复核' : '处理'}`)
           await this.loadAlerts()
-          if (this.selectedAlert && this.selectedAlert.alert_id == this.handleForm.alert_id) {
-            await this.loadAlertTimeline(this.handleForm.alert_id)
+          if (this.selectedAlert && this.selectedAlert.risk_alert_id == this.handleForm.risk_alert_id) {
+            await this.loadAlertTimeline(this.handleForm.risk_alert_id)
           }
         } else {
           this.showError(response?.message || '操作失败')
@@ -1339,7 +1339,7 @@ function riskAlertsPage() {
      */
     isAlertSilenced(alert) {
       // 检查单条告警ID是否静默
-      if (this.silencedAlerts.alert_ids.has(alert.alert_id)) {
+      if (this.silencedAlerts.risk_alert_ids.has(alert.risk_alert_id)) {
         return true
       }
       // 检查告警类型是否静默
@@ -1359,14 +1359,14 @@ function riskAlertsPage() {
      * @param {number} duration - 静默时长（分钟），默认60分钟
      */
     silenceAlert(alert, duration = 60) {
-      this.silencedAlerts.alert_ids.add(alert.alert_id)
-      logger.info('[P2-8] 静默告警:', alert.alert_id, `${duration}分钟`)
+      this.silencedAlerts.risk_alert_ids.add(alert.risk_alert_id)
+      logger.info('[P2-8] 静默告警:', alert.risk_alert_id, `${duration}分钟`)
       this.showSuccess(`已静默该告警 ${duration} 分钟`)
 
       // 自动解除静默
       setTimeout(() => {
-        this.silencedAlerts.alert_ids.delete(alert.alert_id)
-        logger.info('[P2-8] 解除告警静默:', alert.alert_id)
+        this.silencedAlerts.risk_alert_ids.delete(alert.risk_alert_id)
+        logger.info('[P2-8] 解除告警静默:', alert.risk_alert_id)
       }, duration * 60 * 1000)
     },
 
@@ -1518,7 +1518,7 @@ function riskAlertsPage() {
       pendingAlerts.forEach(alert => {
         const alertTime = new Date(alert.created_at).getTime()
         const elapsed = now - alertTime
-        const alertId = alert.alert_id
+        const alertId = alert.risk_alert_id
 
         // 已经升级过的告警不重复处理
         if (this.escalatedAlertIds.has(`${alertId}_2h`) && elapsed >= twoHours) {
@@ -1577,7 +1577,7 @@ function riskAlertsPage() {
           this.playAlertSound('critical')
 
           // 将告警移到列表顶部
-          const index = this.alerts.findIndex(a => a.alert_id === alert.alert_id)
+          const index = this.alerts.findIndex(a => a.risk_alert_id === alert.risk_alert_id)
           if (index > 0) {
             const [escalatedAlert] = this.alerts.splice(index, 1)
             escalatedAlert._escalated = 'urgent'
@@ -1610,7 +1610,7 @@ function riskAlertsPage() {
     getEscalationStatus(alert) {
       if (alert.status !== 'pending') return null
 
-      const alertId = alert.alert_id
+      const alertId = alert.risk_alert_id
       if (this.escalatedAlertIds.has(`${alertId}_2h`)) {
         return '🆘 超2小时未处理'
       }

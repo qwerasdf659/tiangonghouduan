@@ -282,10 +282,15 @@ document.addEventListener('alpine:init', () => {
             total_pages: pagination.total_pages || pagination.total_pages || 1,
             total: pagination.total_count || pagination.total || this.tradeOrders.length
           }
+        } else {
+          // 确保失败时 tradeOrders 是空数组
+          this.tradeOrders = []
         }
       } catch (e) {
         logger.error('[TradeManagement] 加载交易订单失败:', e)
         this.$toast?.error('加载交易订单失败')
+        // 确保出错时 tradeOrders 是空数组
+        this.tradeOrders = []
       } finally {
         this.loading = false
       }
@@ -759,10 +764,14 @@ document.addEventListener('alpine:init', () => {
           logger.info('[TradeManagement] 加载完成，订单数:', this.tradeOrders.length)
         } else {
           logger.warn('[TradeManagement] API 返回失败:', result)
+          // 确保失败时 tradeOrders 是空数组而不是 undefined
+          this.tradeOrders = []
         }
       } catch (error) {
         logger.error('[TradeManagement] 加载交易订单失败:', error)
         this.$toast?.error('加载交易订单失败: ' + error.message)
+        // 确保出错时 tradeOrders 是空数组而不是 undefined
+        this.tradeOrders = []
       }
     },
 

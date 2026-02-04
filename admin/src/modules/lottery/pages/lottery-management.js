@@ -96,32 +96,65 @@ function registerLotteryManagementComponents() {
   Alpine.store('lotteryPage', 'lottery-metrics')
 
   /**
-   * 抽奖管理导航组件
+   * 抽奖管理导航组件 - 左侧侧边栏控制分类，右侧只显示子Tab
+   * 降低运营人员思考成本：左侧选分类（监控/活动/策略/工具），右侧切换具体页面
    */
   Alpine.data('lotteryNavigation', () => ({
     ...createPageMixin(),
 
+    // 当前激活的分类（由URL参数自动确定）
+    active_category: 'monitor',
+    // 当前激活的子Tab（具体页面）
     current_page: 'lottery-metrics',
 
-    subPages: [
-      { id: 'lottery-metrics', title: '实时监控', icon: '📊', highlight: true },
-      // 告警中心已迁移至独立页面 /admin/lottery-alerts.html
-      { id: 'lottery-risk-control', title: '风控面板', icon: '🛡️', highlight: true },
-      { id: 'strategy-effectiveness', title: '策略效果分析', icon: '📈', highlight: true },
-      { id: 'daily-report', title: '运营日报', icon: '📋', highlight: true },
-      { id: 'batch-operations', title: '批量操作工具', icon: '⚡', highlight: true },
-      // P1-3: 预设可视化
-      { id: 'preset-visualization', title: '预设可视化', icon: '🎯', highlight: true },
-      // P1-10: 系统垫付看板
-      { id: 'system-advance', title: '系统垫付', icon: '💳', highlight: true },
-      { id: 'campaigns', title: '活动管理', icon: '🎁' },
-      { id: 'prizes', title: '奖品管理', icon: '🏆' },
-      { id: 'campaign-budget', title: '预算管理', icon: '💰' },
-      { id: 'lottery-strategy', title: '策略配置', icon: '⚙️' },
-      { id: 'lottery-quota', title: '配额管理', icon: '📊' },
-      { id: 'lottery-pricing', title: '定价配置', icon: '💵' },
-      { id: 'redemption-codes', title: '核销码管理', icon: '🎫' }
-    ],
+    // 分类 -> 子Tab列表映射
+    categoryTabs: {
+      monitor: [
+        { id: 'lottery-metrics', title: '实时监控', icon: '📊' },
+        { id: 'daily-report', title: '运营日报', icon: '📋' },
+        { id: 'lottery-risk-control', title: '风控面板', icon: '🛡️' },
+        { id: 'system-advance', title: '系统垫付', icon: '💳' }
+      ],
+      activity: [
+        { id: 'campaigns', title: '活动管理', icon: '🎁' },
+        { id: 'prizes', title: '奖品管理', icon: '🏆' },
+        { id: 'campaign-budget', title: '预算管理', icon: '💰' }
+      ],
+      strategy: [
+        { id: 'lottery-strategy', title: '策略配置', icon: '⚙️' },
+        { id: 'lottery-quota', title: '配额管理', icon: '📊' },
+        { id: 'lottery-pricing', title: '定价配置', icon: '💵' },
+        { id: 'preset-visualization', title: '预设可视化', icon: '🎯' },
+        { id: 'strategy-effectiveness', title: '策略效果', icon: '📈' }
+      ],
+      tools: [
+        { id: 'batch-operations', title: '批量操作', icon: '⚡' },
+        { id: 'redemption-codes', title: '核销码管理', icon: '🎫' }
+      ]
+    },
+
+    // 页面ID -> 分类的反向映射（根据URL自动定位分类）
+    pageToCategory: {
+      'lottery-metrics': 'monitor',
+      'daily-report': 'monitor',
+      'lottery-risk-control': 'monitor',
+      'system-advance': 'monitor',
+      'campaigns': 'activity',
+      'prizes': 'activity',
+      'campaign-budget': 'activity',
+      'lottery-strategy': 'strategy',
+      'lottery-quota': 'strategy',
+      'lottery-pricing': 'strategy',
+      'preset-visualization': 'strategy',
+      'strategy-effectiveness': 'strategy',
+      'batch-operations': 'tools',
+      'redemption-codes': 'tools'
+    },
+
+    // 获取当前分类的子Tab列表（用于右侧Tab栏显示）
+    get currentTabs() {
+      return this.categoryTabs[this.active_category] || []
+    },
 
     init() {
       logger.debug('🎯 [LotteryNavigation] init() 开始执行')
@@ -130,12 +163,21 @@ function registerLotteryManagementComponents() {
         return
       }
       const urlParams = new URLSearchParams(window.location.search)
-      this.current_page = urlParams.get('page') || 'lottery-metrics'
-      logger.debug('📍 [LotteryNavigation] 设置当前页面:', this.current_page)
+      const pageFromUrl = urlParams.get('page') || 'lottery-metrics'
+      
+      // 根据URL参数自动确定分类和子Tab
+      this.current_page = pageFromUrl
+      this.active_category = this.pageToCategory[pageFromUrl] || 'monitor'
+      
+      logger.debug('📍 [LotteryNavigation] 设置状态:', {
+        active_category: this.active_category,
+        current_page: this.current_page
+      })
       Alpine.store('lotteryPage', this.current_page)
-      logger.debug('✅ [LotteryNavigation] init() 完成，store 已更新')
+      logger.debug('✅ [LotteryNavigation] init() 完成')
     },
 
+    // 切换子Tab（右侧Tab栏点击）
     switchPage(pageId) {
       this.current_page = pageId
       Alpine.store('lotteryPage', pageId)

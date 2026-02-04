@@ -142,10 +142,12 @@ function lotteryAlertsPage() {
 
     /**
      * 解决告警表单
+     * @property {number|string} alert_id - 告警ID（对应后端 lottery_alert_id）
+     * @property {string} resolution - 解决方案描述（对应后端 resolution 字段）
      */
     resolveForm: {
       alert_id: '',
-      resolve_notes: ''
+      resolution: ''
     },
 
     /** @type {Object|null} ECharts级别分布图实例 */
@@ -559,14 +561,21 @@ function lotteryAlertsPage() {
 
     /**
      * 确认告警
+     * 后端 API: POST /alerts/:id/acknowledge
+     * body: { note?: string }
+     * @param {Object} alert - 告警对象（包含 alert_id 或 lottery_alert_id）
      */
     async acknowledgeAlert(alert) {
-      const alertId = alert.alert_id
+      // 优先使用 alert_id，兼容 lottery_alert_id
+      const alertId = alert.alert_id || alert.lottery_alert_id
 
       try {
         const response = await apiRequest(
           buildURL(LOTTERY_ADVANCED_ENDPOINTS.REALTIME_ALERT_ACKNOWLEDGE, { id: alertId }),
-          { method: 'POST' }
+          {
+            method: 'POST',
+            data: {} // 后端接受可选的 note 字段
+          }
         )
 
         if (response && response.success) {
@@ -583,17 +592,21 @@ function lotteryAlertsPage() {
 
     /**
      * 打开解决告警弹窗
+     * @param {Object} alert - 告警对象（包含 alert_id 或 lottery_alert_id）
      */
     openResolveModal(alert) {
+      // 优先使用 alert_id，兼容 lottery_alert_id
       this.resolveForm = {
-        alert_id: alert.alert_id,
-        resolve_notes: ''
+        alert_id: alert.alert_id || alert.lottery_alert_id,
+        resolution: ''
       }
       this.showModal('resolveModal')
     },
 
     /**
      * 提交解决告警
+     * 后端 API: POST /alerts/:id/resolve
+     * body: { resolution: string }
      */
     async submitResolve() {
       if (!this.resolveForm.alert_id) return
@@ -606,7 +619,8 @@ function lotteryAlertsPage() {
           }),
           {
             method: 'POST',
-            data: { resolve_notes: this.resolveForm.resolve_notes }
+            // 后端期望字段名为 resolution
+            data: { resolution: this.resolveForm.resolution }
           }
         )
 

@@ -357,17 +357,17 @@
                 <div class="flex items-center justify-between">
                   <span class="text-sm themed-text-muted">抽奖次数</span>
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.daily.lottery_count?.today || 0)">--</span>
+                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.day_comparison.lottery_draws?.current || 0)">--</span>
                     <span 
                       class="text-xs font-medium px-1.5 py-0.5 rounded"
                       :class="{
-                        'bg-green-100 text-green-700': comparison.daily.lottery_count?.trend === 'up',
-                        'bg-red-100 text-red-700': comparison.daily.lottery_count?.trend === 'down',
-                        'bg-gray-100 text-gray-600': !comparison.daily.lottery_count?.trend || comparison.daily.lottery_count?.trend === 'neutral'
+                        'bg-green-100 text-green-700': comparison.day_comparison.lottery_draws?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.day_comparison.lottery_draws?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.day_comparison.lottery_draws?.trend || comparison.day_comparison.lottery_draws?.trend === 'neutral'
                       }"
                     >
-                      <span x-text="getTrendIcon(comparison.daily.lottery_count?.trend)"></span>
-                      <span x-text="Math.abs(comparison.daily.lottery_count?.change || 0).toFixed(1) + '%'"></span>
+                      <span x-text="getTrendIcon(comparison.day_comparison.lottery_draws?.trend)"></span>
+                      <span x-text="Math.abs(comparison.day_comparison.lottery_draws?.change || 0).toFixed(1) + '%'"></span>
                     </span>
                   </div>
                 </div>
@@ -375,17 +375,17 @@
                 <div class="flex items-center justify-between">
                   <span class="text-sm themed-text-muted">新增用户</span>
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.daily.new_users?.today || 0)">--</span>
+                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.day_comparison.users?.current || 0)">--</span>
                     <span 
                       class="text-xs font-medium px-1.5 py-0.5 rounded"
                       :class="{
-                        'bg-green-100 text-green-700': comparison.daily.new_users?.trend === 'up',
-                        'bg-red-100 text-red-700': comparison.daily.new_users?.trend === 'down',
-                        'bg-gray-100 text-gray-600': !comparison.daily.new_users?.trend || comparison.daily.new_users?.trend === 'neutral'
+                        'bg-green-100 text-green-700': comparison.day_comparison.users?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.day_comparison.users?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.day_comparison.users?.trend || comparison.day_comparison.users?.trend === 'neutral'
                       }"
                     >
-                      <span x-text="getTrendIcon(comparison.daily.new_users?.trend)"></span>
-                      <span x-text="Math.abs(comparison.daily.new_users?.change || 0).toFixed(1) + '%'"></span>
+                      <span x-text="getTrendIcon(comparison.day_comparison.users?.trend)"></span>
+                      <span x-text="Math.abs(comparison.day_comparison.users?.change || 0).toFixed(1) + '%'"></span>
                     </span>
                   </div>
                 </div>
@@ -393,17 +393,17 @@
                 <div class="flex items-center justify-between">
                   <span class="text-sm themed-text-muted">中奖率</span>
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium themed-text" x-text="(comparison.daily.win_rate?.today || 0).toFixed(1) + '%'">--</span>
+                    <span class="text-sm font-medium themed-text" x-text="(comparison.day_comparison.win_rate?.current || 0).toFixed(1) + '%'">--</span>
                     <span 
                       class="text-xs font-medium px-1.5 py-0.5 rounded"
                       :class="{
-                        'bg-green-100 text-green-700': comparison.daily.win_rate?.trend === 'up',
-                        'bg-red-100 text-red-700': comparison.daily.win_rate?.trend === 'down',
-                        'bg-gray-100 text-gray-600': !comparison.daily.win_rate?.trend || comparison.daily.win_rate?.trend === 'neutral'
+                        'bg-green-100 text-green-700': comparison.day_comparison.win_rate?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.day_comparison.win_rate?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.day_comparison.win_rate?.trend || comparison.day_comparison.win_rate?.trend === 'neutral'
                       }"
                     >
-                      <span x-text="getTrendIcon(comparison.daily.win_rate?.trend)"></span>
-                      <span x-text="Math.abs(comparison.daily.win_rate?.change || 0).toFixed(1) + '%'"></span>
+                      <span x-text="getTrendIcon(comparison.day_comparison.win_rate?.trend)"></span>
+                      <span x-text="Math.abs(comparison.day_comparison.win_rate?.change || 0).toFixed(1) + '%'"></span>
                     </span>
                   </div>
                 </div>
@@ -421,17 +421,17 @@
                 <div class="flex items-center justify-between">
                   <span class="text-sm themed-text-muted">抽奖次数</span>
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.weekly.lottery_count?.this_week || 0)">--</span>
+                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.week_comparison.lottery_draws?.this_week || 0)">--</span>
                     <span 
                       class="text-xs font-medium px-1.5 py-0.5 rounded"
                       :class="{
-                        'bg-green-100 text-green-700': comparison.weekly.lottery_count?.trend === 'up',
-                        'bg-red-100 text-red-700': comparison.weekly.lottery_count?.trend === 'down',
-                        'bg-gray-100 text-gray-600': !comparison.weekly.lottery_count?.trend || comparison.weekly.lottery_count?.trend === 'neutral'
+                        'bg-green-100 text-green-700': comparison.week_comparison.lottery_draws?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.week_comparison.lottery_draws?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.week_comparison.lottery_draws?.trend || comparison.week_comparison.lottery_draws?.trend === 'neutral'
                       }"
                     >
-                      <span x-text="getTrendIcon(comparison.weekly.lottery_count?.trend)"></span>
-                      <span x-text="Math.abs(comparison.weekly.lottery_count?.change || 0).toFixed(1) + '%'"></span>
+                      <span x-text="getTrendIcon(comparison.week_comparison.lottery_draws?.trend)"></span>
+                      <span x-text="Math.abs(comparison.week_comparison.lottery_draws?.change || 0).toFixed(1) + '%'"></span>
                     </span>
                   </div>
                 </div>
@@ -439,17 +439,17 @@
                 <div class="flex items-center justify-between">
                   <span class="text-sm themed-text-muted">新增用户</span>
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.weekly.new_users?.this_week || 0)">--</span>
+                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.week_comparison.users?.this_week || 0)">--</span>
                     <span 
                       class="text-xs font-medium px-1.5 py-0.5 rounded"
                       :class="{
-                        'bg-green-100 text-green-700': comparison.weekly.new_users?.trend === 'up',
-                        'bg-red-100 text-red-700': comparison.weekly.new_users?.trend === 'down',
-                        'bg-gray-100 text-gray-600': !comparison.weekly.new_users?.trend || comparison.weekly.new_users?.trend === 'neutral'
+                        'bg-green-100 text-green-700': comparison.week_comparison.users?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.week_comparison.users?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.week_comparison.users?.trend || comparison.week_comparison.users?.trend === 'neutral'
                       }"
                     >
-                      <span x-text="getTrendIcon(comparison.weekly.new_users?.trend)"></span>
-                      <span x-text="Math.abs(comparison.weekly.new_users?.change || 0).toFixed(1) + '%'"></span>
+                      <span x-text="getTrendIcon(comparison.week_comparison.users?.trend)"></span>
+                      <span x-text="Math.abs(comparison.week_comparison.users?.change || 0).toFixed(1) + '%'"></span>
                     </span>
                   </div>
                 </div>
@@ -457,17 +457,17 @@
                 <div class="flex items-center justify-between">
                   <span class="text-sm themed-text-muted">中奖率</span>
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium themed-text" x-text="(comparison.weekly.win_rate?.this_week || 0).toFixed(1) + '%'">--</span>
+                    <span class="text-sm font-medium themed-text" x-text="(comparison.week_comparison.win_rate?.this_week || 0).toFixed(1) + '%'">--</span>
                     <span 
                       class="text-xs font-medium px-1.5 py-0.5 rounded"
                       :class="{
-                        'bg-green-100 text-green-700': comparison.weekly.win_rate?.trend === 'up',
-                        'bg-red-100 text-red-700': comparison.weekly.win_rate?.trend === 'down',
-                        'bg-gray-100 text-gray-600': !comparison.weekly.win_rate?.trend || comparison.weekly.win_rate?.trend === 'neutral'
+                        'bg-green-100 text-green-700': comparison.week_comparison.win_rate?.trend === 'up',
+                        'bg-red-100 text-red-700': comparison.week_comparison.win_rate?.trend === 'down',
+                        'bg-gray-100 text-gray-600': !comparison.week_comparison.win_rate?.trend || comparison.week_comparison.win_rate?.trend === 'neutral'
                       }"
                     >
-                      <span x-text="getTrendIcon(comparison.weekly.win_rate?.trend)"></span>
-                      <span x-text="Math.abs(comparison.weekly.win_rate?.change || 0).toFixed(1) + '%'"></span>
+                      <span x-text="getTrendIcon(comparison.week_comparison.win_rate?.trend)"></span>
+                      <span x-text="Math.abs(comparison.week_comparison.win_rate?.change || 0).toFixed(1) + '%'"></span>
                     </span>
                   </div>
                 </div>
@@ -609,7 +609,7 @@
                 </div>
               </template>
               
-              <template x-for="alert in alerts" :key="alert.id">
+              <template x-for="alert in alerts" :key="alert.alert_id">
                 <div 
                   class="p-4 rounded-lg cursor-pointer hover:shadow-md transition"
                   :class="{

@@ -7,13 +7,15 @@
 
 import { API_PREFIX, authHeaders, handleResponse } from './base.js'
 
-// 待处理中心端点
+// 待处理中心端点（以后端实际路由为准）
 export const PENDING_ENDPOINTS = {
   SUMMARY: `${API_PREFIX}/console/pending/summary`,
   LIST: `${API_PREFIX}/console/pending/list`,
-  HEALTH_SCORE: `${API_PREFIX}/console/pending/health-score`,
   BATCH: `${API_PREFIX}/console/pending/batch`
 }
+
+// 注意：健康评分已移至 dashboard 模块
+// 使用 dashboard.js 中的 DASHBOARD_ENDPOINTS.BUSINESS_HEALTH
 
 /**
  * 待处理中心 API
@@ -56,14 +58,16 @@ export const PendingAPI = {
   },
 
   /**
-   * 获取待办健康度评分
+   * 获取业务健康度评分（已迁移至 dashboard 模块）
+   * @deprecated 请使用 DashboardAPI.getBusinessHealth()
    * @returns {Promise<Object>} 健康度数据
    * @returns {number} data.score - 综合健康度评分（0-100）
    * @returns {string} data.status - 健康状态（healthy/warning/critical）
    * @returns {Object} data.components - 各维度得分明细
    */
   async getHealthScore() {
-    const response = await fetch(PENDING_ENDPOINTS.HEALTH_SCORE, {
+    // 使用后端实际端点: /api/v4/console/dashboard/business-health
+    const response = await fetch(`${API_PREFIX}/console/dashboard/business-health`, {
       headers: authHeaders()
     })
     return handleResponse(response)

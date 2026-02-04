@@ -274,7 +274,7 @@ export function notificationCenter() {
         consumption: '/admin/finance-management.html',
         customer_service: '/admin/customer-service.html',
         lottery_alert: '/admin/lottery-alerts.html',
-        risk_alert: '/admin/risk-alert.html',
+        risk_alert: '/admin/risk-alerts.html',
         alert: '/admin/pending-center.html',
         warning: '/admin/lottery-alerts.html',
         info: '/admin/system-settings.html'

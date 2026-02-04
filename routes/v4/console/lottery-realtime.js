@@ -87,44 +87,99 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
  */
 
 /**
- * GET /alerts - 获取实时告警列表
+ * GET /alerts - 获取告警列表（从数据库）
  *
  * Query参数：
  * - lottery_campaign_id: 活动ID（可选）
  * - level: 告警级别过滤（danger/warning/info，可选）
- * - acknowledged: 是否已确认（true/false，可选）
- * - page: 页码（默认1）
- * - page_size: 每页数量（默认20）
+ * - type: 告警类型过滤（win_rate/budget/inventory/user/system，可选）
+ * - status: 告警状态过滤（active/acknowledged/resolved，可选）
+ * - limit: 返回数量（默认50）
  *
  * 返回数据：
- * - alerts: 告警列表
- * - summary: 告警汇总（total/danger/warning/info）
+ * - alerts: 告警列表（包含 lottery_alert_id 用于确认/解决操作）
+ * - summary: 告警汇总统计
  */
 router.get('/alerts', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { lottery_campaign_id, level, acknowledged, page = 1, page_size = 20 } = req.query
+    const { lottery_campaign_id, level, type, status, limit = 50 } = req.query
 
-    const realtimeService = getRealtimeService(req)
+    const alertService = getLotteryAlertService(req)
 
-    const result = await realtimeService.getRealtimeAlerts({
+    // 使用 LotteryAlertService 获取持久化的告警列表
+    const result = await alertService.getAlertList({
       lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
       level,
-      acknowledged: acknowledged !== undefined ? acknowledged === 'true' : undefined,
-      page: parseInt(page),
-      page_size: parseInt(page_size)
+      type,
+      status,
+      limit: parseInt(limit)
     })
 
-    logger.info('获取实时告警列表', {
+    // 转换为前端期望的格式（以后端字段为准）
+    const formattedAlerts = result.alerts.map(alert => ({
+      // 主键 - 用于确认/解决操作
+      alert_id: alert.lottery_alert_id,
+      lottery_alert_id: alert.lottery_alert_id,
+      // 关联活动
+      lottery_campaign_id: alert.lottery_campaign_id,
+      campaign_name: alert.campaign_name,
+      campaign_code: alert.campaign_code,
+      // 告警信息
+      level: alert.severity,
+      type: alert.alert_type,
+      type_name: alert.alert_type_name,
+      message: alert.message,
+      // 阈值和实际值
+      threshold: alert.threshold_value,
+      current_value: alert.actual_value,
+      deviation_percentage: alert.deviation_percentage,
+      // 状态
+      status: alert.status,
+      status_name: alert.status_name,
+      acknowledged: alert.status === 'acknowledged' || alert.status === 'resolved',
+      // 时间
+      created_at: alert.created_at,
+      resolved_at: alert.resolved_at,
+      // 处理人
+      resolved_by: alert.resolved_by,
+      resolver_name: alert.resolver_name,
+      resolve_notes: alert.resolve_notes
+    }))
+
+    // 统计汇总
+    const summary = {
+      total: result.total,
+      danger: result.alerts.filter(a => a.severity === 'danger').length,
+      warning: result.alerts.filter(a => a.severity === 'warning').length,
+      info: result.alerts.filter(a => a.severity === 'info').length,
+      active: result.active_count,
+      acknowledged: result.acknowledged_count,
+      resolved: result.resolved_count
+    }
+
+    logger.info('获取告警列表', {
       admin_id: req.user.user_id,
       lottery_campaign_id: lottery_campaign_id || 'all',
-      total_alerts: result.summary.total,
-      danger_count: result.summary.danger
+      total_alerts: result.total,
+      active_count: result.active_count
     })
 
-    return res.apiSuccess(result, '获取实时告警列表成功')
+    return res.apiSuccess(
+      {
+        alerts: formattedAlerts,
+        summary,
+        pagination: {
+          total: result.total,
+          page: 1,
+          page_size: parseInt(limit),
+          total_pages: 1
+        }
+      },
+      '获取告警列表成功'
+    )
   } catch (error) {
-    logger.error('获取实时告警列表失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'GET_REALTIME_ALERTS_FAILED', null, 500)
+    logger.error('获取告警列表失败:', error)
+    return res.apiError(`查询失败：${error.message}`, 'GET_ALERTS_FAILED', null, 500)
   }
 })
 
