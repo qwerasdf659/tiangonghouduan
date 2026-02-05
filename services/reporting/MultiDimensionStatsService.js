@@ -635,18 +635,36 @@ class MultiDimensionStatsService {
     const primaryConfig = METRIC_CONFIG[primaryMetric]
 
     let model
+    let modelSupportsStoreId = false // 标记模型是否支持 store_id 字段
+
     if (primaryConfig.source_table === 'lottery_draws') {
       model = models.LotteryDraw
+      modelSupportsStoreId = false // LotteryDraw 模型没有 store_id 字段
     } else if (primaryConfig.source_table === 'consumption_records') {
       model = models.ConsumptionRecord
+      modelSupportsStoreId = true // ConsumptionRecord 模型有 store_id 字段
     } else {
       model = models.LotteryDraw
+      modelSupportsStoreId = false
+    }
+
+    /*
+     * 根据目标模型过滤不支持的字段
+     * LotteryDraw 模型没有 store_id 字段，需要移除该过滤条件
+     */
+    const adjustedWhereClause = { ...whereClause }
+    if (!modelSupportsStoreId && adjustedWhereClause.store_id !== undefined) {
+      logger.debug('[多维度统计] 移除不支持的 store_id 过滤条件', {
+        model: model.name,
+        removed_store_id: adjustedWhereClause.store_id
+      })
+      delete adjustedWhereClause.store_id
     }
 
     // 执行查询
     const results = await model.findAll({
       attributes: selectAttrs,
-      where: whereClause,
+      where: adjustedWhereClause,
       group: groupByFields,
       raw: true
     })
@@ -823,10 +841,10 @@ class MultiDimensionStatsService {
    *
    * @private
    * @param {Object} filters - 过滤条件对象
-   * @param {Object} _modelConfig - 模型配置（预留扩展）
+   * @param {Object} modelConfig - 模型配置，用于判断是否支持 store_id
    * @returns {Object} Sequelize WHERE 条件对象
    */
-  static _buildDrillDownWhereClause(filters, _modelConfig) {
+  static _buildDrillDownWhereClause(filters, modelConfig) {
     const where = {}
 
     // 处理时间周期过滤
@@ -854,9 +872,21 @@ class MultiDimensionStatsService {
       }
     }
 
-    // 处理其他过滤条件
+    /*
+     * 处理 store_id 过滤条件
+     * 只有当模型配置中包含 store_id 字段时才添加该过滤条件
+     * ConsumptionRecord 有 store_id，LotteryDraw 没有 store_id
+     */
     if (filters.store_id) {
-      where.store_id = filters.store_id
+      const modelHasStoreId = modelConfig?.fields?.includes('store_id')
+      if (modelHasStoreId) {
+        where.store_id = filters.store_id
+      } else {
+        logger.debug('[下钻查询] 忽略 store_id 过滤条件，目标模型不支持', {
+          model: modelConfig?.model?.name,
+          store_id: filters.store_id
+        })
+      }
     }
 
     if (filters.lottery_campaign_id) {

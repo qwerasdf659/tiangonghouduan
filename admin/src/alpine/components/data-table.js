@@ -130,7 +130,7 @@ function dataTable(config = {}) {
 
     // ========== 单元格渲染 ==========
     renderCell(row, column) {
-      let value = this.getNestedValue(row, column.key)
+      const value = this.getNestedValue(row, column.key)
 
       if (column.render) {
         return column.render(value, row)

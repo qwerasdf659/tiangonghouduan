@@ -377,8 +377,9 @@ class ReportService {
     const prizeData = await this.models.LotteryDraw.findAll({
       attributes: [
         'lottery_prize_id',
-        [fn('COUNT', col('lottery_draw_id')), 'win_count'],
-        [fn('SUM', col('prize_value_points')), 'total_value']
+        [fn('COUNT', col('LotteryDraw.lottery_draw_id')), 'win_count'],
+        // 明确指定使用 LotteryDraw 表的 prize_value_points 字段，避免与关联表 LotteryPrize 的同名字段产生歧义
+        [fn('SUM', col('LotteryDraw.prize_value_points')), 'total_value']
       ],
       where: {
         created_at: { [Op.between]: [startTime, endTime] },
@@ -391,7 +392,7 @@ class ReportService {
           attributes: ['prize_name', 'reward_tier', 'cost_points']
         }
       ],
-      group: ['lottery_prize_id'],
+      group: ['LotteryDraw.lottery_prize_id'],
       order: [[literal('win_count'), 'DESC']],
       limit,
       raw: false
@@ -418,10 +419,14 @@ class ReportService {
     const campaignData = await this.models.LotteryDraw.findAll({
       attributes: [
         'lottery_campaign_id',
-        [fn('COUNT', col('lottery_draw_id')), 'draws'],
-        [fn('COUNT', fn('DISTINCT', col('user_id'))), 'users'],
+        // 明确指定表名前缀，避免与关联表字段歧义
+        [fn('COUNT', col('LotteryDraw.lottery_draw_id')), 'draws'],
+        [fn('COUNT', fn('DISTINCT', col('LotteryDraw.user_id'))), 'users'],
         [
-          fn('SUM', literal("CASE WHEN reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END")),
+          fn(
+            'SUM',
+            literal("CASE WHEN LotteryDraw.reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END")
+          ),
           'wins'
         ]
       ],
@@ -435,7 +440,7 @@ class ReportService {
           attributes: ['campaign_name', 'status']
         }
       ],
-      group: ['lottery_campaign_id'],
+      group: ['LotteryDraw.lottery_campaign_id'],
       order: [[literal('draws'), 'DESC']],
       raw: false
     })

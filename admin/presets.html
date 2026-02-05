@@ -52,8 +52,8 @@
             <label class="block text-sm font-medium themed-text-secondary mb-1">奖品类型</label>
             <select x-model="filters.prize_type" class="w-full px-3 py-2 border rounded-lg">
               <option value="">全部类型</option>
-              <template x-for="prize in allPrizes" :key="prize.prize_id">
-                <option :value="prize.prize_id" x-text="prize.prize_name"></option>
+              <template x-for="prize in allPrizes" :key="prize.lottery_prize_id">
+                <option :value="prize.lottery_prize_id" x-text="prize.prize_name"></option>
               </template>
             </select>
           </div>
@@ -175,10 +175,10 @@
         
         <div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">目标奖品 <span class="text-red-500">*</span></label>
-          <select x-model="interventionForm.prize_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+          <select x-model="interventionForm.lottery_prize_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
             <option value="">选择奖品</option>
-            <template x-for="prize in allPrizes" :key="prize.prize_id">
-              <option :value="prize.prize_id" x-text="prize.prize_name"></option>
+            <template x-for="prize in allPrizes" :key="prize.lottery_prize_id">
+              <option :value="prize.lottery_prize_id" x-text="prize.prize_name"></option>
             </template>
           </select>
         </div>

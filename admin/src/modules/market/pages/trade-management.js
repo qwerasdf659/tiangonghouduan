@@ -30,6 +30,7 @@ import { logger } from '../../../utils/logger.js'
 import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
 import { buildURL, request } from '../../../api/base.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
+
 document.addEventListener('alpine:init', () => {
   logger.info('[TradeManagement] 注册 Alpine 组件 (Mixin v3.0)...')
 

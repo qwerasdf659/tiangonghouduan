@@ -29,8 +29,7 @@ import {
 // 导入提醒规则 API (P2-1)
 import { ReminderRulesAPI, ReminderHistoryAPI } from '../../../api/reminder.js'
 
-// 导入系统 API (F-59 审计报告)
-import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
+// 注意：SYSTEM_ENDPOINTS 导入已移除（F-59 审计报告功能因后端未实现而被移除）
 
 /**
  * 注册系统设置相关的 Alpine.js 组件
@@ -92,28 +91,13 @@ function registerSystemSettingsComponents() {
     // ==================== 导航状态 ====================
     current_page: 'system-config',
 
-    // 子页面配置（方案A + P2-1提醒规则 + F-59审计报告）
+    // 子页面配置（方案A + P2-1提醒规则）
+    // 注意：审计报告(F-59)已移除（后端未实现 /api/v4/admin/operations/audit-report）
     subPages: [
       { id: 'system-config', name: '系统配置', icon: '⚙️' },
       { id: 'reminder-rules', name: '提醒规则', icon: '🔔' },
-      { id: 'audit-logs', name: '审计日志', icon: '📋' },
-      { id: 'audit-report', name: '审计报告', icon: '📊' } // F-59
+      { id: 'audit-logs', name: '审计日志', icon: '📋' }
     ],
-
-    // ==================== F-59: 审计报告状态 ====================
-    auditReport: {
-      summary: { total_operations: 0, high_risk_count: 0, rollback_count: 0, unique_operators: 0 },
-      by_action: [],
-      by_module: [],
-      by_operator: [],
-      trend: [],
-      risk_distribution: { high: 0, medium: 0, low: 0 }
-    },
-    auditReportFilters: {
-      start_date: '',
-      end_date: '',
-      time_range: '7d' // 7d, 30d, 90d
-    },
 
     // ==================== 通用状态 ====================
     page: 1,
@@ -178,9 +162,7 @@ function registerSystemSettingsComponents() {
             case 'audit-logs':
               await this.loadAuditLogs()
               break
-            case 'audit-report': // F-59
-              await this.loadAuditReport()
-              break
+            // 注意：audit-report case 已移除（后端未实现）
           }
         },
         { loadingText: '加载数据...' }
@@ -362,88 +344,7 @@ function registerSystemSettingsComponents() {
       return map[type] || type
     },
 
-    // ==================== F-59: 审计报告方法 ====================
-
-    /**
-     * 加载审计报告数据
-     * 后端接口: GET /api/v4/admin/operations/audit-report
-     */
-    async loadAuditReport() {
-      try {
-        const params = new URLSearchParams()
-        if (this.auditReportFilters.time_range) {
-          params.append('time_range', this.auditReportFilters.time_range)
-        }
-        if (this.auditReportFilters.start_date) {
-          params.append('start_date', this.auditReportFilters.start_date)
-        }
-        if (this.auditReportFilters.end_date) {
-          params.append('end_date', this.auditReportFilters.end_date)
-        }
-
-        const response = await this.apiGet(
-          `${SYSTEM_ENDPOINTS.AUDIT_LOG_REPORT}?${params}`,
-          {},
-          { showLoading: false }
-        )
-
-        if (response?.success && response.data) {
-          this.auditReport = {
-            summary: response.data.summary || {
-              total_operations: 0,
-              high_risk_count: 0,
-              rollback_count: 0,
-              unique_operators: 0
-            },
-            by_action: response.data.by_action || [],
-            by_module: response.data.by_module || [],
-            by_operator: response.data.by_operator || [],
-            trend: response.data.trend || [],
-            risk_distribution: response.data.risk_distribution || { high: 0, medium: 0, low: 0 }
-          }
-          logger.debug('[AuditReport] 数据加载成功', this.auditReport)
-        }
-      } catch (error) {
-        logger.error('[AuditReport] 加载失败:', error)
-        this.showError('加载审计报告失败')
-      }
-    },
-
-    /**
-     * 切换审计报告时间范围
-     * @param {string} range - 时间范围: 7d, 30d, 90d
-     */
-    switchAuditReportRange(range) {
-      this.auditReportFilters.time_range = range
-      this.loadAuditReport()
-    },
-
-    /**
-     * 导出审计报告
-     */
-    async exportAuditReport() {
-      try {
-        const params = new URLSearchParams()
-        params.append('time_range', this.auditReportFilters.time_range)
-        params.append('format', 'xlsx')
-
-        const response = await this.apiGet(
-          `${SYSTEM_ENDPOINTS.AUDIT_LOG_EXPORT}?${params}`,
-          {},
-          { showLoading: true, loadingText: '生成报告...' }
-        )
-
-        if (response?.success && response.data?.download_url) {
-          window.open(response.data.download_url, '_blank')
-          this.showSuccess('审计报告导出成功')
-        } else {
-          this.showWarning('暂不支持导出功能')
-        }
-      } catch (error) {
-        logger.error('[AuditReport] 导出失败:', error)
-        this.showError('导出审计报告失败')
-      }
-    },
+    // 注意：F-59 审计报告相关方法已移除（后端未实现 /api/v4/admin/operations/audit-report）
 
     /**
      * 获取操作类型颜色类

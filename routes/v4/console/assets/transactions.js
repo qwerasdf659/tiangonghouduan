@@ -98,7 +98,8 @@ router.get(
       const transactions = result.transactions.map(tx => {
         const plainTx = tx.get ? tx.get({ plain: true }) : tx
         return {
-          transaction_id: plainTx.transaction_id,
+          // 使用模型真实主键字段 asset_transaction_id
+          asset_transaction_id: plainTx.asset_transaction_id,
           asset_code: plainTx.asset_code,
           asset_name: getAssetDisplayName(plainTx.asset_code),
           tx_type: plainTx.business_type,

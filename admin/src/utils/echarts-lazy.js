@@ -19,10 +19,12 @@
  * - BarChart (柱状图) - analytics, risk-alerts
  * - PieChart (饼图) - dashboard, statistics, analytics, exchange-market, risk-alerts
  * - ScatterChart (散点图) - mini-chart组件
+ * - FunnelChart (漏斗图) - dashboard 转化漏斗 Tab
+ * - SankeyChart (桑基图) - dashboard 资产流动 Tab
  *
  * @see https://echarts.apache.org/handbook/zh/basics/import
- * @version 2.1.0
- * @date 2026-01-29
+ * @version 2.2.0
+ * @date 2026-02-05
  */
 
 import { logger } from './logger.js'
@@ -51,6 +53,8 @@ async function initEChartsCore() {
   const { BarChart } = await import('echarts/charts')
   const { PieChart } = await import('echarts/charts')
   const { ScatterChart } = await import('echarts/charts')
+  const { FunnelChart } = await import('echarts/charts')
+  const { SankeyChart } = await import('echarts/charts')
 
   // ========== 组件（按需） ==========
   const {
@@ -74,6 +78,8 @@ async function initEChartsCore() {
     BarChart,
     PieChart,
     ScatterChart,
+    FunnelChart,
+    SankeyChart,
     // 组件
     TitleComponent,
     TooltipComponent,

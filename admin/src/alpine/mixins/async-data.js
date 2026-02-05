@@ -495,7 +495,7 @@ export function asyncDataMixin() {
       } = options
 
       // 设置状态为 true
-      if (this.hasOwnProperty(stateKey)) {
+      if (Object.hasOwn(this, stateKey)) {
         this[stateKey] = true
       }
       this.error = null
@@ -519,7 +519,7 @@ export function asyncDataMixin() {
         return { success: false, error }
       } finally {
         // 重置状态为 false
-        if (this.hasOwnProperty(stateKey)) {
+        if (Object.hasOwn(this, stateKey)) {
           this[stateKey] = false
         }
       }
@@ -715,7 +715,7 @@ export function asyncDataMixin() {
         }
 
         // 更新组件数据
-        if (dataKey && this.hasOwnProperty(dataKey)) {
+        if (dataKey && Object.hasOwn(this, dataKey)) {
           this[dataKey] = listData
         }
 

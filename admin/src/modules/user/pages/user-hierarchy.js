@@ -27,7 +27,7 @@ const apiRequest = async (url, options = {}) => {
  * @typedef {Object} HierarchyFilters
  * @property {string} role_level - 角色等级筛选
  * @property {string} status - 状态筛选（active/inactive）
- * @property {string} superior_id - 上级用户ID筛选
+ * @property {string} superior_user_id - 上级用户ID筛选
  */
 
 /**
@@ -42,7 +42,7 @@ const apiRequest = async (url, options = {}) => {
  * @typedef {Object} HierarchyForm
  * @property {string} user_id - 用户ID
  * @property {string} role_id - 角色ID
- * @property {string} superior_id - 上级用户ID
+ * @property {string} superior_user_id - 上级用户ID
  * @property {string} store_id - 门店ID
  */
 
@@ -124,7 +124,7 @@ document.addEventListener('alpine:init', () => {
     filters: {
       role_level: '',
       status: '',
-      superior_id: ''
+      superior_user_id: ''
     },
 
     /**
@@ -145,7 +145,7 @@ document.addEventListener('alpine:init', () => {
     form: {
       user_id: '',
       role_id: '',
-      superior_id: '',
+      superior_user_id: '',
       store_id: ''
     },
 
@@ -226,7 +226,7 @@ document.addEventListener('alpine:init', () => {
 
         if (this.filters.role_level) params.role_level = this.filters.role_level
         if (this.filters.status) params.is_active = this.filters.status
-        if (this.filters.superior_id) params.superior_user_id = this.filters.superior_id
+        if (this.filters.superior_user_id) params.superior_user_id = this.filters.superior_user_id
 
         const response = await apiRequest(
           `${USER_ENDPOINTS.HIERARCHY_LIST}?${new URLSearchParams(params)}`
@@ -317,7 +317,7 @@ document.addEventListener('alpine:init', () => {
       this.filters = {
         role_level: '',
         status: '',
-        superior_id: ''
+        superior_user_id: ''
       }
       this.resetPagination()
       this.loadData()
@@ -350,7 +350,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     openCreateModal() {
-      this.form = { user_id: '', role_id: '', superior_id: '', store_id: '' }
+      this.form = { user_id: '', role_id: '', superior_user_id: '', store_id: '' }
       this.showModal('hierarchyModal')
     },
 
@@ -373,7 +373,7 @@ document.addEventListener('alpine:init', () => {
         {
           user_id: parseInt(this.form.user_id),
           role_id: parseInt(this.form.role_id),
-          superior_user_id: this.form.superior_id ? parseInt(this.form.superior_id) : null,
+          superior_user_id: this.form.superior_user_id ? parseInt(this.form.superior_user_id) : null,
           store_id: this.form.store_id ? parseInt(this.form.store_id) : null
         },
         { showSuccess: true, successMessage: '创建层级关系成功' }

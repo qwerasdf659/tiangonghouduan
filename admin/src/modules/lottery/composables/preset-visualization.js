@@ -157,10 +157,12 @@ export function usePresetVisualizationMethods() {
 
     /**
      * 获取预设总页数
+     * 注意：改为普通方法避免在对象展开时触发 getter
      * @returns {number} 总页数
      */
-    get presetTotalPages() {
-      return Math.ceil(this.presetPagination.total / this.presetPagination.page_size) || 1
+    getPresetTotalPages() {
+      const pagination = this.presetPagination || { total: 0, page_size: 20 }
+      return Math.ceil(pagination.total / pagination.page_size) || 1
     },
 
     /**
@@ -252,7 +254,7 @@ export function usePresetVisualizationMethods() {
      */
     async deleteUserPresets(userId) {
       await this.confirmAndExecute(
-        `确定删除该用户的所有预设吗？`,
+        '确定删除该用户的所有预设吗？',
         async () => {
           const response = await this.apiDelete(
             `${LOTTERY_CORE_ENDPOINTS.PRESET_DELETE.replace(':user_id', userId)}`,

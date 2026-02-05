@@ -15,11 +15,13 @@ import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
  * @returns {Object} 状态对象
  */
 export function useCampaignsState() {
+  // [DEBUG] 调试日志 - 确认 state 被正确初始化
+  console.log('[DEBUG-campaigns] useCampaignsState() 被调用')
   return {
     /** @type {Array} 活动列表 */
     campaigns: [],
     /** @type {Object} 活动统计 */
-    campaignStats: { total: 0, active: 0, todayParticipants: 0, todayWinners: 0 },
+    campaignStats: { total: 0, active: 0, today_participants: 0, today_winners: 0 },
     /** @type {Object} 活动筛选条件 */
     campaignFilters: { status: '', keyword: '' },
     /** @type {Object} 活动编辑表单 - 包含后端所有必填字段 */
@@ -128,8 +130,8 @@ export function useCampaignsMethods(context) {
       this.campaignStats = {
         total: this.campaigns.length,
         active: this.campaigns.filter(c => c.status === 'active').length,
-        todayParticipants: 0,
-        todayWinners: 0
+        today_participants: 0,
+        today_winners: 0
       }
     },
 

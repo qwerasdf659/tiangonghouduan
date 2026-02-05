@@ -7,7 +7,6 @@
  * @updated 2026-01-29 - 添加 API 版本常量
  */
 
-/* global localStorage, sessionStorage */
 import { logger } from '../utils/logger.js'
 
 /*

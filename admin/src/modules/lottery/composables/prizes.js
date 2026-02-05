@@ -34,7 +34,7 @@ export function usePrizesState() {
     prizeFilters: { prize_type: '', status: '', keyword: '' },
     /** @type {Object} 奖品编辑表单 - 使用后端字段名 */
     prizeForm: {
-      campaign_id: null, // 添加奖品时需要选择活动
+      lottery_campaign_id: null, // 添加奖品时需要选择活动
       prize_name: '',
       prize_type: 'virtual',
       win_probability: 0, // 前端百分比显示 0-100
@@ -43,14 +43,14 @@ export function usePrizesState() {
       image_id: null,
       prize_description: ''
     },
-    /** @type {number|string|null} 当前编辑的奖品ID */
-    editingPrizeId: null,
-    /** @type {Object} 库存补充表单 */
-    stockForm: { prize_id: null, prize_name: '', quantity: 1 },
+    /** @type {number|string|null} 当前编辑的奖品ID - 使用后端字段名 */
+    editingLotteryPrizeId: null,
+    /** @type {Object} 库存补充表单 - 使用后端字段名 */
+    stockForm: { lottery_prize_id: null, prize_name: '', quantity: 1 },
 
     // ========== 批量添加奖品 ==========
-    /** @type {number|null} 批量添加奖品的目标活动ID */
-    batchCampaignId: null,
+    /** @type {number|null} 批量添加奖品的目标活动ID - 使用后端字段名 */
+    batchLotteryCampaignId: null,
     /** @type {Array} 批量奖品列表 */
     batchPrizes: [],
     /** @type {number} 批量奖品概率总和 */
@@ -59,10 +59,10 @@ export function usePrizesState() {
     // ========== P2新增: 奖品发放统计 ==========
     /** @type {Object} 奖品发放统计汇总 */
     prizeIssuedStats: {
-      totalIssued: 0, // 总发放数量
-      totalValue: 0, // 总发放价值
-      todayIssued: 0, // 今日发放数量
-      lowStockCount: 0 // 低库存奖品数量
+      total_issued: 0, // 总发放数量
+      total_value: 0, // 总发放价值
+      today_issued: 0, // 今日发放数量
+      low_stock_count: 0 // 低库存奖品数量
     },
     /** @type {Array} 按奖品的发放明细 */
     prizeDistributionDetail: []
@@ -77,8 +77,8 @@ export function usePrizesMethods() {
   return {
     /**
      * 加载奖品列表
-     * 后端返回字段: prize_id, prize_name, prize_type, win_probability,
-     *               stock_quantity, status, prize_description, image_id
+     * 后端返回字段: lottery_prize_id, prize_name, prize_type, win_probability,
+     *               stock_quantity, status, prize_description, image_resource_id
      */
     async loadPrizes() {
       try {
@@ -127,12 +127,12 @@ export function usePrizesMethods() {
      * 打开创建奖品模态框
      */
     openCreatePrizeModal() {
-      this.editingPrizeId = null
+      this.editingLotteryPrizeId = null
       this.isEditMode = false
-      // 使用后端字段名，添加campaign_id
+      // 使用后端字段名，添加lottery_campaign_id
       // 注意：后端要求 quantity 必须为正整数，默认100
       this.prizeForm = {
-        campaign_id: this.campaigns?.[0]?.campaign_id || null, // 默认选择第一个活动
+        lottery_campaign_id: this.campaigns?.[0]?.lottery_campaign_id || null, // 默认选择第一个活动
         prize_name: '',
         prize_type: 'virtual',
         win_probability: 0, // 前端百分比 0-100
@@ -149,13 +149,13 @@ export function usePrizesMethods() {
      * @param {Object} prize - 奖品对象（后端字段名）
      */
     editPrize(prize) {
-      this.editingPrizeId = prize.prize_id
+      this.editingLotteryPrizeId = prize.lottery_prize_id
       this.isEditMode = true
       // 后端概率是小数(0-1)，前端显示百分比(0-100)
       const winProbability = parseFloat(prize.win_probability || 0) * 100
       // 使用后端字段名
       this.prizeForm = {
-        campaign_id: prize.campaign_id || null, // 编辑时保留原活动ID
+        lottery_campaign_id: prize.lottery_campaign_id || null, // 编辑时保留原活动ID
         prize_name: prize.prize_name || '',
         prize_type: prize.prize_type || 'virtual',
         win_probability: winProbability, // 转换为百分比显示
@@ -180,7 +180,7 @@ export function usePrizesMethods() {
           // apiCall 成功时返回 response.data，失败时抛出错误
           await this.apiCall(
             buildURL(LOTTERY_ENDPOINTS.PRIZE_TOGGLE, {
-              prize_id: prize.prize_id
+              prize_id: prize.lottery_prize_id
             }),
             { method: 'PUT' }
           )
@@ -202,7 +202,7 @@ export function usePrizesMethods() {
           // apiCall 成功时返回 response.data，失败时抛出错误
           await this.apiCall(
             buildURL(LOTTERY_ENDPOINTS.PRIZE_DELETE, {
-              prize_id: prize.prize_id
+              prize_id: prize.lottery_prize_id
             }),
             { method: 'DELETE' }
           )
@@ -225,7 +225,7 @@ export function usePrizesMethods() {
       }
 
       // 新增奖品时必须选择活动
-      if (!this.isEditMode && !this.prizeForm.campaign_id) {
+      if (!this.isEditMode && !this.prizeForm.lottery_campaign_id) {
         this.showError('请选择所属活动')
         return
       }
@@ -237,7 +237,7 @@ export function usePrizesMethods() {
           // 编辑模式：使用PUT更新单个奖品
           // 中奖概率：前端表单是百分比(0-100)，后端需要小数(0-1)
           const winProbability = (this.prizeForm.win_probability || 0) / 100
-          const url = buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, { prize_id: this.editingPrizeId })
+          const url = buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, { prize_id: this.editingLotteryPrizeId })
           await this.apiCall(url, {
             method: 'PUT',
             data: {
@@ -275,7 +275,7 @@ export function usePrizesMethods() {
           await this.apiCall(LOTTERY_ENDPOINTS.PRIZE_BATCH_ADD, {
             method: 'POST',
             data: {
-              campaign_id: this.prizeForm.campaign_id,
+              lottery_campaign_id: this.prizeForm.lottery_campaign_id,
               prizes: [
                 {
                   prize_name: this.prizeForm.prize_name,
@@ -330,8 +330,8 @@ export function usePrizesMethods() {
      */
     openStockModal(prize) {
       this.stockForm = {
-        prizeId: prize.prize_id,
-        prizeName: prize.prize_name,
+        lottery_prize_id: prize.lottery_prize_id,
+        prize_name: prize.prize_name,
         quantity: 1
       }
       this.showModal('stockModal')
@@ -341,7 +341,7 @@ export function usePrizesMethods() {
      * 提交奖品补货
      */
     async submitAddStock() {
-      if (!this.stockForm.prize_id) {
+      if (!this.stockForm.lottery_prize_id) {
         this.showError('奖品信息无效')
         return
       }
@@ -355,7 +355,7 @@ export function usePrizesMethods() {
         // apiCall 成功时返回 response.data，失败时抛出错误
         await this.apiCall(
           buildURL(LOTTERY_ENDPOINTS.PRIZE_ADD_STOCK, {
-            prize_id: this.stockForm.prize_id
+            prize_id: this.stockForm.lottery_prize_id
           }),
           {
             method: 'POST',
@@ -427,10 +427,10 @@ export function usePrizesMethods() {
           })
 
           this.prizeIssuedStats = {
-            totalIssued,
-            totalValue,
-            todayIssued: totalIssued, // 今日发放（与 totalIssued 相同，因为筛选了 today）
-            lowStockCount
+            total_issued: totalIssued,
+            total_value: totalValue,
+            today_issued: totalIssued, // 今日发放（与 totalIssued 相同，因为筛选了 today）
+            low_stock_count: lowStockCount
           }
 
           logger.info('[Prizes] 发放统计加载完成', this.prizeIssuedStats)
@@ -447,7 +447,7 @@ export function usePrizesMethods() {
      * @returns {number} 发放比例
      */
     getPrizeIssuedPercentage(stat) {
-      const total = this.prizeIssuedStats.totalIssued
+      const total = this.prizeIssuedStats.total_issued
       if (total === 0) return 0
       return (((stat.issued_count || stat.count || 0) / total) * 100).toFixed(1)
     },
@@ -458,7 +458,7 @@ export function usePrizesMethods() {
      * 打开批量添加奖品模态框
      */
     openBatchPrizeModal() {
-      this.batchCampaignId = this.campaigns?.[0]?.campaign_id || null
+      this.batchLotteryCampaignId = this.campaigns?.[0]?.lottery_campaign_id || null
       // 初始化一个包含多个奖品槽位的模板（直接使用后端字段名）
       this.batchPrizes = [
         {
@@ -555,7 +555,7 @@ export function usePrizesMethods() {
      */
     async submitBatchPrizes() {
       // 验证活动ID
-      if (!this.batchCampaignId) {
+      if (!this.batchLotteryCampaignId) {
         this.showError('请选择所属活动')
         return
       }
@@ -596,7 +596,7 @@ export function usePrizesMethods() {
         await this.apiCall(LOTTERY_ENDPOINTS.PRIZE_BATCH_ADD, {
           method: 'POST',
           data: {
-            campaign_id: this.batchCampaignId,
+            lottery_campaign_id: this.batchLotteryCampaignId,
             prizes: prizesData
           }
         })

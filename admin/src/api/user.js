@@ -274,8 +274,8 @@ export const USER_ENDPOINTS = {
   /** @type {string} [POST] 失效用户所有会话（强制下线） - Body: { user_type, user_id, reason? } */
   SESSION_DEACTIVATE_USER: `${API_PREFIX}/console/sessions/deactivate-user`,
 
-  // 用户统计（后端暂未实现）
-  // STATS: `${API_PREFIX}/console/user-management/stats`,
+  /** @type {string} [GET] 获取用户管理统计 - Query: { refresh?: 'true' } */
+  STATS: `${API_PREFIX}/console/user-management/stats`,
 
   // 概率调整
   /** @type {string} [POST] 调整用户中奖概率 - Path: :user_id, Body: { probability, reason } */
@@ -325,8 +325,8 @@ export const USER_ENDPOINTS = {
   // 风控配置扩展
   /** @type {string} [POST] 创建风控配置 - Body: { user_id, risk_level, limits } */
   RISK_PROFILE_CREATE: `${API_PREFIX}/console/risk-profiles`,
-  /** @type {string} [PUT] 更新风控配置 - Path: :id */
-  RISK_PROFILE_UPDATE: `${API_PREFIX}/console/risk-profiles/:id`,
+  /** @type {string} [PUT] 更新风控配置（按记录ID） - Path: :id */
+  RISK_PROFILE_UPDATE_BY_ID: `${API_PREFIX}/console/risk-profiles/:id`,
   /** @type {string} [POST] 冻结用户 - Path: :user_id */
   RISK_PROFILE_FREEZE: `${API_PREFIX}/console/risk-profiles/:user_id/freeze`,
   /** @type {string} [POST] 解冻用户 - Path: :user_id */

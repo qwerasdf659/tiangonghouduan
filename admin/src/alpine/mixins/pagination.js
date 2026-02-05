@@ -72,7 +72,7 @@ export function paginationMixin(options = {}) {
 
       const pages = []
       let start = Math.max(1, this.current_page - Math.floor(maxVisiblePages / 2))
-      let end = Math.min(this.total_pages, start + maxVisiblePages - 1)
+      const end = Math.min(this.total_pages, start + maxVisiblePages - 1)
 
       // 调整起始位置
       if (end - start < maxVisiblePages - 1) {

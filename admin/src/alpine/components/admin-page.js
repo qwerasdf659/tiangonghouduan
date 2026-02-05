@@ -255,7 +255,7 @@ function adminPage(config = {}) {
         }
       } else {
         let start = Math.max(1, current - 2)
-        let end = Math.min(total, start + maxPages - 1)
+        const end = Math.min(total, start + maxPages - 1)
 
         if (end - start < maxPages - 1) {
           start = Math.max(1, end - maxPages + 1)
@@ -281,7 +281,7 @@ function adminPage(config = {}) {
 
     // ========== 单元格渲染 ==========
     renderCell(row, column) {
-      let value = this.getNestedValue(row, column.key)
+      const value = this.getNestedValue(row, column.key)
 
       // 使用自定义渲染器
       if (column.render) {

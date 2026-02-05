@@ -105,10 +105,16 @@ function assetAdjustmentPage() {
     // ==================== 当前用户数据 ====================
 
     /**
-     * 当前查看的用户对象
+     * 当前查看的用户对象（被搜索的目标用户）
      * @type {Object|null}
      */
     current_user: null,
+
+    /**
+     * 当前登录的管理员信息
+     * @type {Object|null}
+     */
+    admin_user: null,
 
     /**
      * 用户资产余额列表
@@ -270,8 +276,15 @@ function assetAdjustmentPage() {
         baseMixin.init.call(this)
       }
 
-      // 加载用户信息
-      this.loadUserInfo()
+      // 检查登录状态（authGuardMixin 提供）
+      if (typeof this.checkAuth === 'function') {
+        if (!this.checkAuth()) {
+          return // 未登录，已跳转到登录页
+        }
+      }
+
+      // 加载当前登录的管理员信息
+      this.loadAdminUserInfo()
 
       // 加载资产类型
       await this.loadAssetTypes()
@@ -285,7 +298,23 @@ function assetAdjustmentPage() {
       logger.info('资产调整页面初始化完成')
     },
 
-    // 注意：用户信息和 logout() 方法由 authGuardMixin 提供（current_user 属性）
+    /**
+     * 加载当前登录的管理员信息
+     * @description 从 localStorage 加载管理员信息，用于页面显示
+     */
+    loadAdminUserInfo() {
+      try {
+        const userInfoStr = localStorage.getItem('user_info') || localStorage.getItem('admin_user')
+        if (userInfoStr) {
+          this.admin_user = JSON.parse(userInfoStr)
+          logger.info('已加载管理员信息:', this.admin_user?.nickname || this.admin_user?.user_id)
+        }
+      } catch (error) {
+        logger.error('加载管理员信息失败:', error)
+      }
+    },
+
+    // logout() 方法由 authGuardMixin 提供
 
     // ==================== 数据加载 ====================
 

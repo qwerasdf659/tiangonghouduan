@@ -26,27 +26,50 @@
     <!-- 页面标题和操作 -->
     <div class="flex justify-between items-center mb-6">
       <div>
-        <h1 class="text-2xl font-bold themed-text-primary">📋 操作审计日志</h1>
-        <p class="text-sm themed-text-muted mt-1">查看系统所有操作记录，支持按操作类型、操作人、时间范围筛选</p>
+        <h1 class="text-2xl font-bold themed-text-primary">📋 操作审计</h1>
+        <p class="text-sm themed-text-muted mt-1">查看系统操作记录和审计报告</p>
       </div>
       <div class="flex items-center gap-3">
+        <template x-if="activeTab === 'logs'">
+          <button 
+            @click="exportAuditLogs()"
+            class="flex items-center gap-2 px-4 py-2 border themed-border rounded-lg text-sm themed-text-secondary hover:themed-bg-base transition"
+          >
+            📤 导出日志
+          </button>
+        </template>
         <button 
-          @click="exportAuditLogs()"
-          class="flex items-center gap-2 px-4 py-2 border themed-border rounded-lg text-sm themed-text-secondary hover:themed-bg-base transition"
-        >
-          📤 导出日志
-        </button>
-        <button 
-          @click="loadAuditLogs()"
-          :disabled="loading"
+          @click="activeTab === 'logs' ? loadAuditLogs() : refreshReport()"
+          :disabled="loading || reportLoading"
           class="flex items-center gap-2 px-4 py-2 themed-bg-primary text-white rounded-lg text-sm font-medium themed-hover-primary transition"
         >
-          <span :class="loading && 'animate-spin'">🔄</span>
+          <span :class="(loading || reportLoading) && 'animate-spin'">🔄</span>
           刷新
         </button>
       </div>
     </div>
 
+    <!-- Tab 切换栏 -->
+    <div class="flex border-b themed-border mb-6">
+      <button
+        @click="switchTab('logs')"
+        :class="activeTab === 'logs' ? 'border-b-2 border-blue-500 text-blue-600 font-medium' : 'themed-text-muted hover:themed-text-secondary'"
+        class="px-6 py-3 text-sm transition"
+      >
+        📋 日志列表
+      </button>
+      <button
+        @click="switchTab('report')"
+        :class="activeTab === 'report' ? 'border-b-2 border-blue-500 text-blue-600 font-medium' : 'themed-text-muted hover:themed-text-secondary'"
+        class="px-6 py-3 text-sm transition"
+      >
+        📊 审计报告
+      </button>
+    </div>
+
+    <!-- ==================== 日志列表 Tab ==================== -->
+    <template x-if="activeTab === 'logs'">
+      <div>
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
       <div class="themed-card rounded-lg shadow p-4 text-center">
@@ -73,6 +96,104 @@
         <div class="text-3xl text-purple-500 mb-2">🔐</div>
         <div class="text-2xl font-bold text-purple-600" x-text="stats.login || 0"></div>
         <div class="text-sm themed-text-muted">登录操作</div>
+      </div>
+    </div>
+
+    <!-- 图表区域 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <!-- 操作趋势图 -->
+      <div class="themed-card rounded-lg shadow p-4">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-base font-medium themed-text-primary">📈 操作趋势</h3>
+          <div class="flex gap-2">
+            <button 
+              @click="changeTrendDays(7)"
+              :class="trendDays === 7 ? 'themed-bg-primary text-white' : 'border themed-border themed-text-secondary hover:themed-bg-base'"
+              class="px-3 py-1 text-xs rounded-lg transition"
+            >
+              7天
+            </button>
+            <button 
+              @click="changeTrendDays(14)"
+              :class="trendDays === 14 ? 'themed-bg-primary text-white' : 'border themed-border themed-text-secondary hover:themed-bg-base'"
+              class="px-3 py-1 text-xs rounded-lg transition"
+            >
+              14天
+            </button>
+            <button 
+              @click="changeTrendDays(30)"
+              :class="trendDays === 30 ? 'themed-bg-primary text-white' : 'border themed-border themed-text-secondary hover:themed-bg-base'"
+              class="px-3 py-1 text-xs rounded-lg transition"
+            >
+              30天
+            </button>
+          </div>
+        </div>
+        <!-- 趋势图容器 -->
+        <div id="trendChart" class="w-full h-64"></div>
+        <!-- 趋势统计摘要 -->
+        <div class="mt-4 grid grid-cols-3 gap-4 text-center text-sm" x-show="trendStats.total > 0">
+          <div>
+            <div class="themed-text-muted">总操作数</div>
+            <div class="font-medium themed-text-primary" x-text="trendStats.total"></div>
+          </div>
+          <div>
+            <div class="themed-text-muted">日均操作</div>
+            <div class="font-medium themed-text-primary" x-text="trendStats.average_per_day"></div>
+          </div>
+          <div>
+            <div class="themed-text-muted">峰值日期</div>
+            <div class="font-medium themed-text-primary" x-text="trendStats.max_day?.date?.substring(5) || '-'"></div>
+          </div>
+        </div>
+        <!-- 加载状态 -->
+        <div x-show="chartsLoading" class="flex items-center justify-center h-64">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 themed-border-primary"></div>
+        </div>
+        <!-- 空状态 -->
+        <div x-show="!chartsLoading && trendStats.items.length === 0" class="flex items-center justify-center h-64 text-gray-400">
+          暂无趋势数据
+        </div>
+      </div>
+
+      <!-- 目标类型分布图 -->
+      <div class="themed-card rounded-lg shadow p-4">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-base font-medium themed-text-primary">🎯 目标类型分布</h3>
+          <button 
+            @click="refreshCharts()"
+            class="text-xs themed-text-muted hover:themed-text-primary transition"
+          >
+            🔄 刷新
+          </button>
+        </div>
+        <!-- 目标类型图容器 -->
+        <div id="targetTypeChart" class="w-full h-64"></div>
+        <!-- 目标类型列表 -->
+        <div class="mt-4 space-y-2" x-show="targetTypeStats.items.length > 0">
+          <template x-for="item in targetTypeStats.items.slice(0, 5)" :key="item.target_type">
+            <div class="flex justify-between items-center text-sm">
+              <span class="themed-text-secondary" x-text="getTargetTypeName(item.target_type)"></span>
+              <div class="flex items-center gap-2">
+                <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    class="h-full bg-blue-500 rounded-full"
+                    :style="`width: ${item.percentage}%`"
+                  ></div>
+                </div>
+                <span class="w-16 text-right font-medium themed-text-primary" x-text="`${item.count} (${item.percentage}%)`"></span>
+              </div>
+            </div>
+          </template>
+        </div>
+        <!-- 加载状态 -->
+        <div x-show="chartsLoading" class="flex items-center justify-center h-64">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 themed-border-primary"></div>
+        </div>
+        <!-- 空状态 -->
+        <div x-show="!chartsLoading && targetTypeStats.items.length === 0" class="flex items-center justify-center h-64 text-gray-400">
+          暂无类型数据
+        </div>
       </div>
     </div>
 
@@ -231,6 +352,160 @@
         </div>
       </div>
     </div>
+
+      </div>
+    </template>
+
+    <!-- ==================== 审计报告 Tab ==================== -->
+    <template x-if="activeTab === 'report'">
+      <div :class="reportLoading ? 'opacity-50 pointer-events-none' : ''">
+        
+        <!-- 报告筛选 -->
+        <div class="themed-card rounded-lg shadow mb-6 p-4">
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">时间范围</label>
+              <select class="w-full border rounded-lg px-3 py-2" x-model="reportTimeRange" @change="changeReportTimeRange($event.target.value)">
+                <option value="7d">近 7 天</option>
+                <option value="30d">近 30 天</option>
+                <option value="90d">近 90 天</option>
+                <option value="custom">自定义</option>
+              </select>
+            </div>
+            <div x-show="reportTimeRange === 'custom'">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">开始日期</label>
+              <input type="date" class="w-full border rounded-lg px-3 py-2" x-model="reportStartDate">
+            </div>
+            <div x-show="reportTimeRange === 'custom'">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">结束日期</label>
+              <input type="date" class="w-full border rounded-lg px-3 py-2" x-model="reportEndDate">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">操作员（可选）</label>
+              <select class="w-full border rounded-lg px-3 py-2" x-model.number="reportOperatorId">
+                <option :value="null">全部操作员</option>
+                <template x-for="op in operatorOptions" :key="op.operator_id">
+                  <option :value="op.operator_id" x-text="`${op.operator_name} (${op.count}次操作)`"></option>
+                </template>
+              </select>
+              <p class="text-xs themed-text-muted mt-1" x-show="operatorOptions.length === 0">加载报告后显示操作员列表</p>
+            </div>
+            <div x-show="reportTimeRange === 'custom'">
+              <button @click="generateCustomReport()" class="w-full px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary">
+                生成报告
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 报告加载状态 -->
+        <template x-if="reportLoading">
+          <div class="text-center py-10">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 themed-border-primary mx-auto"></div>
+            <p class="mt-4 themed-text-muted">正在生成审计报告...</p>
+          </div>
+        </template>
+
+        <!-- 报告汇总统计 -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6" x-show="!reportLoading">
+          <div class="themed-card rounded-lg shadow p-4 text-center">
+            <div class="text-3xl text-blue-500 mb-2">📊</div>
+            <div class="text-2xl font-bold themed-text-primary" x-text="reportData.summary?.total_operations || 0"></div>
+            <div class="text-sm themed-text-muted">总操作数</div>
+          </div>
+          <div class="themed-card rounded-lg shadow p-4 text-center">
+            <div class="text-3xl text-red-500 mb-2">🚨</div>
+            <div class="text-2xl font-bold text-red-600" x-text="reportData.summary?.high_risk_count || 0"></div>
+            <div class="text-sm themed-text-muted">高风险操作</div>
+          </div>
+          <div class="themed-card rounded-lg shadow p-4 text-center">
+            <div class="text-3xl text-orange-500 mb-2">↩️</div>
+            <div class="text-2xl font-bold text-orange-600" x-text="reportData.summary?.rollback_count || 0"></div>
+            <div class="text-sm themed-text-muted">可回滚操作</div>
+          </div>
+          <div class="themed-card rounded-lg shadow p-4 text-center">
+            <div class="text-3xl text-purple-500 mb-2">👤</div>
+            <div class="text-2xl font-bold text-purple-600" x-text="reportData.summary?.unique_operators || 0"></div>
+            <div class="text-sm themed-text-muted">独立操作员</div>
+          </div>
+          <div class="themed-card rounded-lg shadow p-4 text-center">
+            <div class="text-3xl text-green-500 mb-2">👥</div>
+            <div class="text-2xl font-bold text-green-600" x-text="reportData.summary?.affected_users_total || 0"></div>
+            <div class="text-sm themed-text-muted">影响用户数</div>
+          </div>
+          <div class="themed-card rounded-lg shadow p-4 text-center">
+            <div class="text-3xl text-yellow-500 mb-2">💰</div>
+            <div class="text-2xl font-bold text-yellow-600" x-text="reportData.summary?.affected_amount_total || 0"></div>
+            <div class="text-sm themed-text-muted">影响金额</div>
+          </div>
+        </div>
+
+        <!-- 报告图表 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6" x-show="!reportLoading">
+          <!-- 操作类型分布 -->
+          <div class="themed-card rounded-lg shadow p-4">
+            <h3 class="text-base font-medium themed-text-primary mb-4">📊 操作类型分布</h3>
+            <div id="reportOperationChart" class="w-full h-64"></div>
+            <div x-show="!reportData.by_operation_type?.length" class="flex items-center justify-center h-64 text-gray-400">
+              暂无操作类型数据
+            </div>
+          </div>
+
+          <!-- 目标类型分布 -->
+          <div class="themed-card rounded-lg shadow p-4">
+            <h3 class="text-base font-medium themed-text-primary mb-4">🎯 目标类型分布</h3>
+            <div id="reportTargetChart" class="w-full h-64"></div>
+            <div x-show="!reportData.by_target_type?.length" class="flex items-center justify-center h-64 text-gray-400">
+              暂无目标类型数据
+            </div>
+          </div>
+
+          <!-- 风险级别分布 -->
+          <div class="themed-card rounded-lg shadow p-4">
+            <h3 class="text-base font-medium themed-text-primary mb-4">⚠️ 风险级别分布</h3>
+            <div id="reportRiskLevelChart" class="w-full h-64"></div>
+            <!-- 风险级别列表 -->
+            <div class="mt-4 space-y-2" x-show="reportData.by_risk_level?.length">
+              <template x-for="item in reportData.by_risk_level" :key="item.risk_level">
+                <div class="flex justify-between items-center text-sm">
+                  <span 
+                    class="px-2 py-1 rounded text-xs font-medium"
+                    :class="{
+                      'bg-red-100 text-red-800': item.risk_level === 'high',
+                      'bg-yellow-100 text-yellow-800': item.risk_level === 'medium',
+                      'bg-green-100 text-green-800': item.risk_level === 'low'
+                    }"
+                    x-text="item.risk_level === 'high' ? '高风险' : item.risk_level === 'medium' ? '中风险' : '低风险'"
+                  ></span>
+                  <span class="font-medium themed-text-primary" x-text="`${item.count} 次`"></span>
+                </div>
+              </template>
+            </div>
+            <div x-show="!reportData.by_risk_level?.length" class="flex items-center justify-center h-64 text-gray-400">
+              暂无风险级别数据
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作趋势图 -->
+        <div class="themed-card rounded-lg shadow p-4 mb-6" x-show="!reportLoading">
+          <h3 class="text-base font-medium themed-text-primary mb-4">📈 操作数量趋势</h3>
+          <div id="reportTrendChart" class="w-full h-64"></div>
+          <div x-show="!reportData.trend?.length" class="flex items-center justify-center h-64 text-gray-400">
+            暂无趋势数据
+          </div>
+        </div>
+
+        <!-- 报告元数据 -->
+        <div class="themed-card rounded-lg shadow p-4 text-sm themed-text-muted" x-show="!reportLoading && reportData.report_meta?.generated_at">
+          <div class="flex justify-between">
+            <span>报告生成时间：<span x-text="formatDateTime(reportData.report_meta?.generated_at)"></span></span>
+            <span>报告时间范围：<span x-text="reportData.report_meta?.start_date"></span> 至 <span x-text="reportData.report_meta?.end_date"></span></span>
+          </div>
+        </div>
+
+      </div>
+    </template>
 
     <!-- 日志详情模态框 -->
     <div 

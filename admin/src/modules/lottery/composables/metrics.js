@@ -17,12 +17,12 @@ import { loadECharts } from '../../../utils/echarts-lazy.js'
  */
 export function useMetricsState() {
   return {
-    /** @type {Object} 抽奖指标 - 适配后端返回字段 */
+    /** @type {Object} 抽奖指标 - 直接使用后端字段名 */
     lotteryMetrics: {
-      totalDraws: 0, // 后端: summary.total_draws
-      totalWins: 0, // 后端: summary.total_wins
-      winRate: 0, // 后端: summary.win_rate
-      totalValue: 0 // 后端: summary.total_value（奖品价值）
+      total_draws: 0,
+      total_wins: 0,
+      win_rate: 0,
+      total_value: 0
     },
     /** @type {Array} 奖品分布 - 后端: prize_distribution */
     prizeDistribution: [],
@@ -139,13 +139,13 @@ export function useMetricsMethods() {
             recentDrawsLength: (data.recent_draws || []).length
           })
 
-          // 从 summary 字段提取汇总统计（适配后端实际返回字段）
+          // 从 summary 字段提取汇总统计 - 直接使用后端字段名
           const summary = data.summary || {}
           this.lotteryMetrics = {
-            totalDraws: summary.total_draws ?? 0,
-            totalWins: summary.total_wins ?? 0,
-            winRate: summary.win_rate ?? 0,
-            totalValue: summary.total_value ?? 0 // 后端返回的是奖品总价值，非用户数
+            total_draws: summary.total_draws ?? 0,
+            total_wins: summary.total_wins ?? 0,
+            win_rate: summary.win_rate ?? 0,
+            total_value: summary.total_value ?? 0
           }
           // 从 trend 字段提取小时趋势数据
           this.hourlyMetrics = data.trend || []
@@ -162,7 +162,7 @@ export function useMetricsMethods() {
             recentDraws: this.recentDraws.length
           })
           logger.info('抽奖指标加载成功:', {
-            totalDraws: this.lotteryMetrics.totalDraws,
+            total_draws: this.lotteryMetrics.total_draws,
             prizeDistributionCount: this.prizeDistribution.length
           })
         } else {
@@ -180,7 +180,7 @@ export function useMetricsMethods() {
      * @private
      */
     _resetMetricsState() {
-      this.lotteryMetrics = { totalDraws: 0, totalWins: 0, winRate: 0, totalValue: 0 }
+      this.lotteryMetrics = { total_draws: 0, total_wins: 0, win_rate: 0, total_value: 0 }
       this.prizeDistribution = []
       this.recentDraws = []
       this.prizeStats = []
@@ -197,7 +197,7 @@ export function useMetricsMethods() {
         // 使用 Alpine.store 显示成功通知
         if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
           Alpine.store('notification').success(
-            `指标数据已刷新，共 ${this.lotteryMetrics.totalDraws} 次抽奖`
+            `指标数据已刷新，共 ${this.lotteryMetrics.total_draws} 次抽奖`
           )
         }
         logger.debug('✅ 指标数据已刷新')
@@ -446,11 +446,11 @@ export function useMetricsMethods() {
 
         // 基于现有数据生成告警
         // 1. 检查中奖率是否异常
-        if (this.lotteryMetrics.winRate > 50) {
+        if (this.lotteryMetrics.win_rate > 50) {
           alerts.push({
             level: 'warning',
             time: now.toISOString(),
-            message: `中奖率偏高：当前 ${this.lotteryMetrics.winRate}%，建议检查概率配置`
+            message: `中奖率偏高：当前 ${this.lotteryMetrics.win_rate}%，建议检查概率配置`
           })
         }
 
@@ -460,8 +460,8 @@ export function useMetricsMethods() {
             p => p.name === 'empty' || p.name === '未中奖' || p.name === '谢谢参与'
           )?.value || 0
         const emptyRate =
-          this.lotteryMetrics.totalDraws > 0
-            ? (emptyCount / this.lotteryMetrics.totalDraws) * 100
+          this.lotteryMetrics.total_draws > 0
+            ? (emptyCount / this.lotteryMetrics.total_draws) * 100
             : 0
         if (emptyRate > 70) {
           alerts.push({

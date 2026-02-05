@@ -27,16 +27,20 @@ router.get(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { days = 7, user_filter } = req.query
+      const { days = 7, user_filter, start_time, end_time } = req.query
 
       // 获取分析服务（V4.7.0 服务拆分：getDecisionAnalytics 在 AnalyticsService 中）
       const AnalyticsService = req.app.locals.services.getService('reporting_analytics')
 
-      // 调用服务层方法获取决策分析数据
+      // 调用服务层方法获取决策分析数据（支持自定义日期范围）
       const analyticsData = await AnalyticsService.getDecisionAnalytics(
         parseInt(days),
         user_filter ? parseInt(user_filter) : null,
-        sharedComponents.performanceMonitor
+        {
+          performanceMonitor: sharedComponents.performanceMonitor,
+          start_time: start_time || null,
+          end_time: end_time || null
+        }
       )
 
       sharedComponents.logger.info('决策分析数据生成成功', {
@@ -65,13 +69,16 @@ router.get(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { period = 'week', granularity = 'daily' } = req.query
+      const { period = 'week', granularity = 'daily', start_time, end_time } = req.query
 
       // 获取分析服务（V4.7.0 服务拆分：getLotteryTrends 在 AnalyticsService 中）
       const AnalyticsService = req.app.locals.services.getService('reporting_analytics')
 
-      // 调用服务层方法获取趋势分析数据
-      const trendsData = await AnalyticsService.getLotteryTrends(period, granularity)
+      // 调用服务层方法获取趋势分析数据（支持自定义日期范围）
+      const trendsData = await AnalyticsService.getLotteryTrends(period, granularity, {
+        start_time: start_time || null,
+        end_time: end_time || null
+      })
 
       return res.apiSuccess(trendsData, '趋势分析数据获取成功')
     } catch (error) {

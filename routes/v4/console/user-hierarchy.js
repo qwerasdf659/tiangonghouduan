@@ -72,7 +72,7 @@ router.get('/', async (req, res) => {
     return res.apiSuccess(
       {
         rows: rows.map(h => ({
-          hierarchy_id: h.hierarchy_id,
+          hierarchy_id: h.user_hierarchy_id,
           user_id: h.user_id,
           user_mobile: h.user?.mobile,
           user_nickname: h.user?.nickname,

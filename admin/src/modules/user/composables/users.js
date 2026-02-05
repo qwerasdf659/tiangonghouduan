@@ -21,8 +21,24 @@ export function useUsersState() {
     users: [],
     /** @type {Object} 用户筛选条件 */
     userFilters: { user_id: '', nickname: '', status: '' },
-    /** @type {Object} 用户统计 */
-    userStats: { totalUsers: 0, activeUsers: 0, totalRoles: 0, totalPermissions: 0 },
+    /** @type {Object} 用户统计 - 直接使用后端字段名 */
+    userStats: {
+      total_users: 0,
+      active_users: 0,
+      total_roles: 0,
+      total_permissions: 0,
+      new_users_today: 0,
+      new_users_last_7_days: 0,
+      new_users_last_30_days: 0,
+      active_users_today: 0,
+      daily_growth_rate: 0,
+      weekly_growth_rate: 0,
+      active_rate: 0,
+      status_distribution: {},
+      role_distribution: [],
+      recent_registrations: [],
+      generated_at: null
+    },
     /** @type {Object} 用户表单 */
     userForm: {
       user_id: '',
@@ -120,60 +136,71 @@ export function useUsersMethods() {
 
     /**
      * 加载用户统计
-     * @description 从用户列表、角色列表中获取统计数据
+     * @description 从后端 API 获取用户管理统计数据
      */
     async loadUserStats() {
-      try {
-        // 确保用户列表和角色列表已加载
-        if (!this.users || this.users.length === 0) {
-          await this.loadUsers()
-        }
-        if (!this.roles || this.roles.length === 0) {
-          await this.loadRoles()
-        }
+      // 调用后端 API: GET /api/v4/console/user-management/stats
+      const response = await this.apiGet('/api/v4/console/user-management/stats')
 
-        // 从角色的 permissions 字段中提取唯一权限数量
-        const permissionSet = new Set()
-        for (const role of this.roles || []) {
-          let permissions = role.permissions || {}
+      if (!response?.success) {
+        throw new Error(response?.message || '获取用户统计失败')
+      }
 
-          // 处理 permissions 是字符串的情况（某些旧数据格式）
-          if (typeof permissions === 'string') {
-            try {
-              permissions = JSON.parse(permissions)
-            } catch {
-              continue
+      const data = response.data
+
+      // 确保角色列表已加载（用于计算 totalRoles 和 totalPermissions）
+      if (!this.roles || this.roles.length === 0) {
+        await this.loadRoles()
+      }
+
+      // 从角色的 permissions 字段中提取唯一权限数量
+      const permissionSet = new Set()
+      for (const role of this.roles || []) {
+        let permissions = role.permissions || {}
+        if (typeof permissions === 'string') {
+          try {
+            permissions = JSON.parse(permissions)
+          } catch {
+            continue
+          }
+        }
+        if (typeof permissions === 'object' && permissions !== null) {
+          Object.keys(permissions).forEach(p => {
+            if (p !== 'description' && Array.isArray(permissions[p])) {
+              permissionSet.add(p)
             }
-          }
-
-          // 确保是对象类型
-          if (typeof permissions === 'object' && permissions !== null) {
-            Object.keys(permissions).forEach(p => {
-              // 跳过非权限字段（如 description）
-              if (p !== 'description' && Array.isArray(permissions[p])) {
-                permissionSet.add(p)
-              }
-            })
-          }
-        }
-
-        this.userStats = {
-          totalUsers: this.pagination.total || this.users.length,
-          activeUsers: this.users.filter(u => u.status === 'active').length,
-          totalRoles: this.roles?.length || 0,
-          totalPermissions: permissionSet.size
-        }
-
-        logger.info('用户统计加载完成', this.userStats)
-      } catch (error) {
-        logger.error('加载用户统计失败:', error)
-        this.userStats = {
-          totalUsers: this.pagination.total || 0,
-          activeUsers: 0,
-          totalRoles: 0,
-          totalPermissions: 0
+          })
         }
       }
+
+      // 使用后端返回的统计数据（直接使用后端字段名）
+      this.userStats = {
+        // 基础统计
+        total_users: data.summary?.total_users || 0,
+        active_users: data.summary?.active_users_last_7_days || 0,
+        total_roles: this.roles?.length || 0,
+        total_permissions: permissionSet.size,
+        // 扩展统计
+        new_users_today: data.summary?.new_users_today || 0,
+        new_users_last_7_days: data.summary?.new_users_last_7_days || 0,
+        new_users_last_30_days: data.summary?.new_users_last_30_days || 0,
+        active_users_today: data.summary?.active_users_today || 0,
+        // 增长率
+        daily_growth_rate: data.growth_rates?.daily_growth_rate || 0,
+        weekly_growth_rate: data.growth_rates?.weekly_growth_rate || 0,
+        active_rate: data.growth_rates?.active_rate || 0,
+        // 分布数据
+        status_distribution: data.status_distribution || {},
+        role_distribution: data.role_distribution || [],
+        recent_registrations: data.recent_registrations || [],
+        // 元数据
+        generated_at: data.generated_at
+      }
+
+      logger.info('用户统计加载完成', {
+        total_users: this.userStats.total_users,
+        new_users_today: this.userStats.new_users_today
+      })
     },
 
     /**

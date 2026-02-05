@@ -106,11 +106,10 @@ export function useConsumptionMethods() {
         if (response?.success) {
           // 后端返回 records 数组，字段: record_id, consumption_amount, status, created_at, user, merchant
           const rawRecords = response.data?.records || response.data?.list || []
-          // 映射字段以兼容 HTML 模板
+          // 直接使用后端字段名，仅保留复合字段（有逻辑的派生数据）
           this.consumptions = rawRecords.map(r => ({
             ...r,
-            id: r.record_id,
-            amount: r.consumption_amount, // 后端返回分，HTML 会 /100
+            // user_name 和 store_name 是复合字段，从嵌套对象提取显示名
             user_name: r.user?.nickname || r.user?.mobile || r.user_id,
             store_name: r.merchant?.nickname || r.merchant?.mobile || `商户${r.merchant_id || '-'}`
           }))
@@ -699,8 +698,11 @@ export function useConsumptionMethods() {
     // ========== P1-17: 决策辅助信息方法 ==========
 
     /**
-     * 加载决策辅助信息
+     * 加载决策辅助信息（用户审核率）
      * @param {number|string} userId - 用户ID
+     * 
+     * 后端 API: GET /api/v4/console/users/:user_id/approval-rate
+     * 返回: approval_rate, total_count, approved_count, rejected_count, credit_level
      */
     async loadDecisionInfo(userId) {
       if (!userId) return
@@ -709,21 +711,35 @@ export function useConsumptionMethods() {
       this.decisionInfo = null
       
       try {
-        // 尝试从后端获取决策辅助信息
+        // 调用后端用户审核率 API（已实现）
         const response = await this.apiGet(
-          `/api/v4/console/consumption-audit/decision-info/${userId}`,
-          {},
+          `/api/v4/console/users/${userId}/approval-rate`,
+          { days: 90 },
           { showLoading: false }
         )
         
         if (response?.success && response.data) {
-          this.decisionInfo = response.data
+          // 转换后端返回格式为前端期望格式
+          const data = response.data
+          this.decisionInfo = {
+            user_id: data.user_id,
+            approval_rate: data.approval_rate !== null ? Math.round(data.approval_rate * 100) : null,
+            total_reviewed: data.total_count || 0,
+            approved_count: data.approved_count || 0,
+            rejected_count: data.rejected_count || 0,
+            pending_count: data.pending_count || 0,
+            credit_level: data.credit_level || 'normal',
+            credit_level_text: data.credit_level_text || '正常',
+            period_days: data.period_days || 90,
+            is_local_calculated: false
+          }
+          logger.info('决策辅助信息加载成功', { user_id: userId, approval_rate: this.decisionInfo.approval_rate })
         } else {
-          // 如果后端未实现，使用本地计算的数据
+          // API 返回失败时使用本地计算
           this.decisionInfo = this.calculateLocalDecisionInfo(userId)
         }
       } catch (error) {
-        logger.warn('加载决策辅助信息失败，使用本地计算:', error)
+        logger.warn('加载决策辅助信息失败，使用本地计算:', error.message)
         this.decisionInfo = this.calculateLocalDecisionInfo(userId)
       } finally {
         this.loadingDecisionInfo = false

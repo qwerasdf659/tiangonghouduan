@@ -903,7 +903,7 @@ class StatsService {
         expired_items: statusMap.expired || 0,
         by_status: statusMap,
         by_type: typeMap,
-        generated_at: BeijingTimeHelper.formatBeijingTime(new Date())
+        generated_at: BeijingTimeHelper.format(new Date(), 'YYYY-MM-DD HH:mm:ss')
       }
 
       logger.info('StatsService.getInventoryAdminStatistics 统计完成', {
@@ -916,6 +916,272 @@ class StatsService {
       logger.error('获取库存统计失败:', error)
       throw error
     }
+  }
+
+  /**
+   * 获取用户管理统计数据
+   *
+   * @description 为管理后台用户管理模块提供统计概览数据
+   *
+   * 业务场景：
+   * - 管理员查看用户总体情况
+   * - 监控用户增长趋势
+   * - 分析用户角色和状态分布
+   *
+   * @param {Object} options - 选项
+   * @param {boolean} options.refresh - 强制刷新缓存
+   * @returns {Promise<Object>} 用户管理统计数据
+   * @returns {number} returns.total_users - 总用户数
+   * @returns {number} returns.new_users_today - 今日新增
+   * @returns {number} returns.new_users_last_7_days - 近7日新增
+   * @returns {number} returns.active_users_today - 今日活跃（有登录）
+   * @returns {number} returns.active_users_last_7_days - 近7日活跃
+   * @returns {Object} returns.status_distribution - 用户状态分布
+   * @returns {Object} returns.role_distribution - 用户角色分布
+   * @returns {Array} returns.recent_registrations - 近期注册趋势（7日）
+   * @returns {string} returns.generated_at - 生成时间（北京时间ISO格式）
+   *
+   * @since 2026-02-05（用户管理模块统计接口）
+   */
+  static async getUserManagementStats(options = {}) {
+    const { refresh = false } = options
+
+    try {
+      // ========== Redis 缓存读取（缓存优化）==========
+      const cacheParams = { type: 'user_management' }
+      if (!refresh) {
+        const cached = await BusinessCacheHelper.getStats('user_management', cacheParams)
+        if (cached) {
+          logger.debug('[报表缓存] user_management 命中')
+          return cached
+        }
+      }
+
+      // 获取时间范围（北京时间）
+      const todayStart = BeijingTimeHelper.todayStart()
+      const todayEnd = BeijingTimeHelper.todayEnd()
+      const nowBeijing = BeijingTimeHelper.now()
+
+      // 近7天、近30天起始时间
+      const sevenDaysAgo = new Date(new Date(nowBeijing).getTime() - 7 * 24 * 60 * 60 * 1000)
+      const thirtyDaysAgo = new Date(new Date(nowBeijing).getTime() - 30 * 24 * 60 * 60 * 1000)
+
+      // 并行查询各类统计数据
+      const [
+        // 基础用户统计
+        totalUsers,
+        newUsersToday,
+        newUsersLast7Days,
+        newUsersLast30Days,
+        activeUsersToday,
+        activeUsersLast7Days,
+
+        // 用户状态分布
+        statusDistribution,
+
+        // 用户角色分布
+        roleDistribution,
+
+        // 近7日注册趋势
+        registrationTrend
+      ] = await Promise.all([
+        // 总用户数
+        models.User.count(),
+
+        // 今日新增
+        models.User.count({
+          where: {
+            created_at: {
+              [Op.gte]: todayStart,
+              [Op.lte]: todayEnd
+            }
+          }
+        }),
+
+        // 近7日新增
+        models.User.count({
+          where: {
+            created_at: {
+              [Op.gte]: sevenDaysAgo
+            }
+          }
+        }),
+
+        // 近30日新增
+        models.User.count({
+          where: {
+            created_at: {
+              [Op.gte]: thirtyDaysAgo
+            }
+          }
+        }),
+
+        // 今日活跃（有登录记录）
+        models.User.count({
+          where: {
+            last_login: {
+              [Op.gte]: todayStart,
+              [Op.lte]: todayEnd
+            }
+          }
+        }),
+
+        // 近7日活跃
+        models.User.count({
+          where: {
+            last_login: {
+              [Op.gte]: sevenDaysAgo
+            }
+          }
+        }),
+
+        // 用户状态分布
+        models.User.findAll({
+          attributes: ['status', [fn('COUNT', col('user_id')), 'count']],
+          group: ['status'],
+          raw: true
+        }),
+
+        // 用户角色分布（通过 UserRole 关联查询）
+        models.sequelize.query(
+          `
+          SELECT r.role_name, r.description, COUNT(ur.user_id) as user_count
+          FROM roles r
+          LEFT JOIN user_roles ur ON r.role_id = ur.role_id AND ur.is_active = 1
+          WHERE r.is_active = 1
+          GROUP BY r.role_id, r.role_name, r.description
+          ORDER BY user_count DESC
+          `,
+          { type: models.sequelize.QueryTypes.SELECT }
+        ),
+
+        // 近7日注册趋势
+        models.sequelize.query(
+          `
+          SELECT 
+            DATE(created_at) as date,
+            COUNT(*) as count
+          FROM users
+          WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+          GROUP BY DATE(created_at)
+          ORDER BY date ASC
+          `,
+          { type: models.sequelize.QueryTypes.SELECT }
+        )
+      ])
+
+      // 转换状态分布为对象格式
+      const statusMap = {
+        active: 0,
+        inactive: 0,
+        banned: 0
+      }
+      statusDistribution.forEach(item => {
+        const status = item.status || 'unknown'
+        statusMap[status] = parseInt(item.count, 10)
+      })
+
+      // 转换角色分布为数组格式
+      const roleList = roleDistribution.map(item => ({
+        role_name: item.role_name,
+        description: item.description || item.role_name,
+        user_count: parseInt(item.user_count, 10)
+      }))
+
+      // 计算增长率
+      const dailyGrowthRate =
+        totalUsers > 0 ? ((newUsersToday / totalUsers) * 100).toFixed(2) : '0.00'
+      const weeklyGrowthRate =
+        totalUsers > 0 ? ((newUsersLast7Days / totalUsers) * 100).toFixed(2) : '0.00'
+      const activeRate =
+        totalUsers > 0 ? ((activeUsersLast7Days / totalUsers) * 100).toFixed(2) : '0.00'
+
+      // 构建统计结果
+      const stats = {
+        // 概览指标
+        summary: {
+          total_users: totalUsers,
+          new_users_today: newUsersToday,
+          new_users_last_7_days: newUsersLast7Days,
+          new_users_last_30_days: newUsersLast30Days,
+          active_users_today: activeUsersToday,
+          active_users_last_7_days: activeUsersLast7Days
+        },
+
+        // 增长率指标
+        growth_rates: {
+          daily_growth_rate: parseFloat(dailyGrowthRate),
+          weekly_growth_rate: parseFloat(weeklyGrowthRate),
+          active_rate: parseFloat(activeRate)
+        },
+
+        // 用户状态分布
+        status_distribution: statusMap,
+
+        // 用户角色分布
+        role_distribution: roleList,
+
+        // 近期注册趋势（补全7天）
+        recent_registrations: this._fillRegistrationTrend(registrationTrend, 7),
+
+        // 元数据
+        generated_at: BeijingTimeHelper.format(new Date(), 'YYYY-MM-DD HH:mm:ss')
+      }
+
+      logger.info('用户管理统计数据获取成功', {
+        total_users: stats.summary.total_users,
+        new_users_today: stats.summary.new_users_today,
+        active_users_today: stats.summary.active_users_today
+      })
+
+      // ========== 写入 Redis 缓存（60s TTL）==========
+      await BusinessCacheHelper.setStats('user_management', cacheParams, stats)
+
+      return stats
+    } catch (error) {
+      logger.error('获取用户管理统计数据失败', {
+        error: error.message,
+        stack: error.stack
+      })
+      throw error
+    }
+  }
+
+  /**
+   * 填充注册趋势数据（补全空缺日期）
+   * @private
+   * @param {Array} rawData - 原始趋势数据
+   * @param {number} days - 天数
+   * @returns {Array} 补全后的趋势数据
+   */
+  static _fillRegistrationTrend(rawData, days) {
+    const result = []
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    // 创建日期到数量的映射
+    const dataMap = {}
+    rawData.forEach(item => {
+      const dateStr =
+        item.date instanceof Date
+          ? item.date.toISOString().split('T')[0]
+          : String(item.date).split('T')[0]
+      dataMap[dateStr] = parseInt(item.count, 10)
+    })
+
+    // 填充每一天的数据
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - i)
+      const dateStr = date.toISOString().split('T')[0]
+
+      result.push({
+        date: dateStr,
+        count: dataMap[dateStr] || 0
+      })
+    }
+
+    return result
   }
 
   // ==================== 辅助方法 ====================

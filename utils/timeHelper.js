@@ -167,6 +167,18 @@ class BeijingTimeHelper {
   }
 
   /**
+   * 获取今日时间范围（北京时间）
+   * 返回今日开始和结束时间的对象，用于数据库查询过滤
+   * @returns {{ start: Date, end: Date }} 今日时间范围对象
+   */
+  static todayRange() {
+    return {
+      start: this.todayStart(),
+      end: this.todayEnd()
+    }
+  }
+
+  /**
    * 获取指定日期的开始时间（北京时间 00:00:00）
    * @param {Date|string} date - 输入日期
    * @returns {Date} 该日期 00:00:00 的 Date 对象

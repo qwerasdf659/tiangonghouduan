@@ -760,7 +760,7 @@ document.addEventListener('alpine:init', () => {
         }
 
         let url = ''
-        let method = isEdit ? 'PUT' : 'POST'
+        const method = isEdit ? 'PUT' : 'POST'
 
         // 根据字典类型选择 API
         if (dictType === 'category') {

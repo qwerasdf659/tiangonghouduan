@@ -31,7 +31,7 @@ export function useCampaignBudgetState() {
     /** @type {Object} 预算筛选条件 */
     budgetFilters: { lottery_campaign_id: '', status: '', keyword: '' },
     /** @type {Object} 预算统计（从 batch-status 数据计算） */
-    budgetStats: { totalBudget: 0, usedBudget: 0, remainingBudget: 0, utilizationRate: 0 },
+    budgetStats: { total_budget: 0, used_budget: 0, remaining_budget: 0, utilization_rate: 0 },
     /** @type {Object|null} 选中的预算 */
     selectedBudget: null,
     /** @type {Object} 预算表单 */
@@ -116,10 +116,10 @@ export function useCampaignBudgetMethods() {
           // 使用后端返回的 summary 或从数据计算统计
           if (response.data.summary) {
             this.budgetStats = {
-              totalBudget: response.data.summary.total_budget || 0,
-              usedBudget: response.data.summary.total_used || 0,
-              remainingBudget: response.data.summary.total_remaining || 0,
-              utilizationRate:
+              total_budget: response.data.summary.total_budget || 0,
+              used_budget: response.data.summary.total_used || 0,
+              remaining_budget: response.data.summary.total_remaining || 0,
+              utilization_rate:
                 response.data.summary.total_budget > 0
                   ? Math.round(
                       (response.data.summary.total_used / response.data.summary.total_budget) * 100
@@ -143,7 +143,7 @@ export function useCampaignBudgetMethods() {
      */
     calculateBudgetStats(budgets) {
       if (!Array.isArray(budgets) || budgets.length === 0) {
-        this.budgetStats = { totalBudget: 0, usedBudget: 0, remainingBudget: 0, utilizationRate: 0 }
+        this.budgetStats = { total_budget: 0, used_budget: 0, remaining_budget: 0, utilization_rate: 0 }
         return
       }
 
@@ -163,10 +163,10 @@ export function useCampaignBudgetMethods() {
       const utilizationRate = totalBudget > 0 ? Math.round((usedBudget / totalBudget) * 100) : 0
 
       this.budgetStats = {
-        totalBudget,
-        usedBudget,
-        remainingBudget,
-        utilizationRate
+        total_budget: totalBudget,
+        used_budget: usedBudget,
+        remaining_budget: remainingBudget,
+        utilization_rate: utilizationRate
       }
     },
 

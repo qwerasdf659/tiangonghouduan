@@ -285,7 +285,7 @@ export function useQuotaMethods() {
      */
     async deleteQuota(quota) {
       await this.confirmAndExecute(
-        `确认禁用此配额规则？（规则将被禁用而非删除，以保留审计记录）`,
+        '确认禁用此配额规则？（规则将被禁用而非删除，以保留审计记录）',
         async () => {
           // apiCall 成功时返回 response.data，失败时抛出错误
           await this.apiCall(

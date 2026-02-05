@@ -216,9 +216,9 @@
                   <div x-show="logFilters.user_id">暂无数据</div>
                 </td>
               </tr>
-              <template x-for="log in materialTransactions" :key="log.transaction_id">
+              <template x-for="log in materialTransactions" :key="log.asset_transaction_id">
                 <tr class="themed-hover-bg">
-                  <td class="px-4 py-3 text-sm" x-text="log.transaction_id"></td>
+                  <td class="px-4 py-3 text-sm" x-text="log.asset_transaction_id"></td>
                   <td class="px-4 py-3 text-sm" x-text="log.user_id || '-'"></td>
                   <td class="px-4 py-3 text-sm" x-text="log.asset_name"></td>
                   <td class="px-4 py-3 text-sm" x-text="log.tx_type"></td>
@@ -386,9 +386,9 @@
                   <div x-show="virtualTxFilters.user_id">暂无数据</div>
                 </td>
               </tr>
-              <template x-for="tx in virtualTransactions" :key="tx.transaction_id">
+              <template x-for="tx in virtualTransactions" :key="tx.asset_transaction_id">
                 <tr class="themed-hover-bg">
-                  <td class="px-4 py-3 text-sm" x-text="tx.transaction_id"></td>
+                  <td class="px-4 py-3 text-sm" x-text="tx.asset_transaction_id"></td>
                   <td class="px-4 py-3 text-sm" x-text="tx.asset_code"></td>
                   <td class="px-4 py-3 text-sm" x-text="tx.tx_type"></td>
                   <td class="px-4 py-3 text-sm" :class="tx.amount > 0 ? 'text-green-600' : 'text-red-600'" x-text="(tx.amount > 0 ? '+' : '') + tx.amount"></td>
@@ -438,7 +438,10 @@
             </div>
           </div>
           <div class="mt-6 text-center">
-            <button @click="loadAssetStats()" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">🔄 刷新统计</button>
+            <button @click="loadAssetStats()" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary inline-flex items-center" :disabled="loading">
+              <span x-show="loading" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+              <span x-text="loading ? '刷新中...' : '🔄 刷新统计'"></span>
+            </button>
           </div>
         </div>
       </div>

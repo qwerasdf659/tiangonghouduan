@@ -224,7 +224,7 @@ function pendingCenterPage() {
           // 后端返回格式: { segments: [...], total: {...} }
           if (segments) {
             segments.forEach(seg => {
-              if (seg.category && this.summary.hasOwnProperty(seg.category)) {
+              if (seg.category && Object.hasOwn(this.summary, seg.category)) {
                 this.summary[seg.category] = seg.count || 0
               }
             })

@@ -244,7 +244,7 @@ class AdminLotteryQueryService {
     }
 
     return {
-      setting_id: item.setting_id,
+      setting_id: item.lottery_management_setting_id,
       user_id: item.user_id,
       user_info: item.target_user
         ? {
@@ -286,7 +286,7 @@ class AdminLotteryQueryService {
     }
 
     return {
-      setting_id: setting.setting_id,
+      setting_id: setting.lottery_management_setting_id,
       user: setting.target_user
         ? {
             user_id: setting.target_user.user_id,

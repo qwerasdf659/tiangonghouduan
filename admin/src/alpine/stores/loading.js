@@ -21,6 +21,7 @@
  */
 
 import { logger } from '../../utils/logger.js'
+
 document.addEventListener('alpine:init', () => {
   logger.info('🔧 注册加载状态 Store...')
 

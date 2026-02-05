@@ -397,10 +397,12 @@ export function useSystemAdvanceMethods() {
 
     /**
      * 获取垫付总页数
+     * 注意：改为普通方法避免在对象展开时触发 getter
      * @returns {number} 总页数
      */
-    get advanceTotalPages() {
-      return Math.ceil(this.advancePagination.total / this.advancePagination.page_size) || 1
+    getAdvanceTotalPages() {
+      const pagination = this.advancePagination || { total: 0, page_size: 20 }
+      return Math.ceil(pagination.total / pagination.page_size) || 1
     },
 
     /**

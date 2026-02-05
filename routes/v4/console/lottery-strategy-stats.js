@@ -36,14 +36,25 @@ const logger = require('../../../utils/logger').logger
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
 /**
- * 获取 LotteryAnalyticsService 的辅助函数
- * （服务合并后由 LotteryAnalyticsService 提供策略统计分析功能）
+ * 获取 LotteryStatisticsService 的辅助函数
+ * （趋势统计、档位分布、体验机制触发、预算消耗等）
  *
  * @param {Object} req - Express 请求对象
- * @returns {Object} LotteryAnalyticsService 实例
+ * @returns {Object} LotteryStatisticsService 实例
  */
 function getLotteryAnalyticsService(req) {
   return req.app.locals.services.getService('lottery_analytics_statistics')
+}
+
+/**
+ * 获取 LotteryRealtimeService 的辅助函数
+ * （实时概览统计）
+ *
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} LotteryRealtimeService 实例
+ */
+function getLotteryRealtimeService(req) {
+  return req.app.locals.services.getService('lottery_analytics_realtime')
 }
 
 /**
@@ -137,8 +148,8 @@ router.get(
         return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
       }
 
-      // 🔴 修正：调用正确的服务方法 getRealtimeOverview（不是 getRealtimeStats）
-      const result = await getLotteryAnalyticsService(req).getRealtimeOverview(lottery_campaign_id)
+      // 🔴 调用 RealtimeService 的 getRealtimeOverview 方法
+      const result = await getLotteryRealtimeService(req).getRealtimeOverview(lottery_campaign_id)
 
       logger.info('查询实时概览统计', {
         admin_id: req.user.user_id,

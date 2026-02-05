@@ -54,10 +54,15 @@ router.get('/daily', authenticateToken, requireRoleLevel(100), async (req, res) 
 
     const reportService = getReportService(req)
 
-    const report = await reportService.getDailyReport({
-      date,
-      lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined
-    })
+    /**
+     * 调用 generateDailyReport(reportDate, campaignId)
+     * @param reportDate - 报表日期 (YYYY-MM-DD)，不传则默认昨日
+     * @param campaignId - 活动ID，不传则汇总所有活动
+     */
+    const report = await reportService.generateDailyReport(
+      date || null,
+      lottery_campaign_id ? parseInt(lottery_campaign_id, 10) : null
+    )
 
     logger.info('获取每日报表成功', {
       admin_id: req.user.user_id,
@@ -111,9 +116,15 @@ router.get(
 
       const reportService = getReportService(req)
 
-      const report = await reportService.getCampaignReport(lottery_campaign_id, {
-        start_date,
-        end_date
+      /**
+       * 调用 getCampaignROI(lottery_campaign_id, options)
+       * @param lottery_campaign_id - 活动ID
+       * @param options.start_time - 开始时间（ISO8601）
+       * @param options.end_time - 结束时间（ISO8601）
+       */
+      const report = await reportService.getCampaignROI(lottery_campaign_id, {
+        start_time: start_date ? `${start_date}T00:00:00+08:00` : undefined,
+        end_time: end_date ? `${end_date}T23:59:59+08:00` : undefined
       })
 
       logger.info('获取活动报表成功', {

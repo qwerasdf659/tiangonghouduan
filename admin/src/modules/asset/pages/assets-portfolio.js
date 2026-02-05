@@ -22,10 +22,10 @@ function assetsPortfolioPage() {
 
     /** 资产总览统计 - 匹配HTML模板 */
     overview: {
-      totalValue: 0,
-      totalUsers: 0,
-      totalAssets: 0,
-      growthRate: 0
+      total_circulation: 0,
+      total_holders: 0,
+      total_asset_types: 0,
+      growth_rate: 0
     },
 
     /** 资产列表 - 匹配HTML模板的 assets */
@@ -119,11 +119,12 @@ function assetsPortfolioPage() {
           const data = response.data
           const summary = data.summary || {}
 
+          // 直接使用后端字段名
           this.overview = {
-            totalValue: summary.total_circulation || 0,
-            totalUsers: summary.total_holders || 0,
-            totalAssets: summary.total_asset_types || 0,
-            growthRate: 0 // 后端暂未提供增长率
+            total_circulation: summary.total_circulation || 0,
+            total_holders: summary.total_holders || 0,
+            total_asset_types: summary.total_asset_types || 0,
+            growth_rate: 0 // 后端暂未提供增长率
           }
 
           // 保存资产统计详情用于图表
@@ -146,11 +147,12 @@ function assetsPortfolioPage() {
         const response = await request({ url: ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES, method: 'GET' })
         if (response && response.success) {
           const assetTypes = response.data?.asset_types || response.data || []
+          // 直接使用后端字段名
           this.overview = {
-            totalValue: assetTypes.reduce((sum, a) => sum + (a.total_supply || 0), 0),
-            totalUsers: 0, // 需要单独API获取
-            totalAssets: assetTypes.length,
-            growthRate: 0
+            total_circulation: assetTypes.reduce((sum, a) => sum + (a.total_supply || 0), 0),
+            total_holders: 0, // 需要单独API获取
+            total_asset_types: assetTypes.length,
+            growth_rate: 0
           }
         }
       } catch (error) {
@@ -327,14 +329,11 @@ function assetsPortfolioPage() {
 
         if (response && response.success) {
           const data = response.data
+          // 直接使用后端字段名，仅保留复合字段（description 有降级逻辑）
           this.assetHistory = (data.transactions || []).map(tx => ({
-            id: tx.transaction_id,
-            type: tx.tx_type,
-            amount: tx.amount,
-            balance_before: tx.balance_before,
-            balance_after: tx.balance_after,
-            description: tx.description || tx.reason || tx.tx_type,
-            created_at: tx.created_at
+            ...tx,
+            // description 复合字段：按优先级取值
+            description: tx.description || tx.reason || tx.tx_type
           }))
           logger.debug(
             '[AssetsPortfolioPage] 资产历史加载成功:',
@@ -493,7 +492,7 @@ function assetsPortfolioPage() {
         const date = new Date(today)
         date.setDate(date.getDate() - i)
         dates.push(`${date.getMonth() + 1}/${date.getDate()}`)
-        values.push(Math.floor(Math.random() * 1000) + this.overview.totalValue * 0.9)
+        values.push(Math.floor(Math.random() * 1000) + this.overview.total_circulation * 0.9)
       }
 
       const option = {

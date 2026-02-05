@@ -460,7 +460,7 @@ class AuditRollbackService {
         reversal_data: reversalData
       },
       {
-        where: { log_id: logId },
+        where: { admin_operation_log_id: logId },
         ...options
       }
     )
@@ -496,7 +496,7 @@ class AuditRollbackService {
       where,
       attributes: [
         'operation_type',
-        [models.sequelize.fn('COUNT', models.sequelize.col('log_id')), 'count']
+        [models.sequelize.fn('COUNT', models.sequelize.col('admin_operation_log_id')), 'count']
       ],
       group: ['operation_type'],
       raw: true
@@ -507,7 +507,7 @@ class AuditRollbackService {
       where,
       attributes: [
         'risk_level',
-        [models.sequelize.fn('COUNT', models.sequelize.col('log_id')), 'count']
+        [models.sequelize.fn('COUNT', models.sequelize.col('admin_operation_log_id')), 'count']
       ],
       group: ['risk_level'],
       raw: true
@@ -527,7 +527,7 @@ class AuditRollbackService {
       where,
       attributes: [
         'operator_id',
-        [models.sequelize.fn('COUNT', models.sequelize.col('log_id')), 'count']
+        [models.sequelize.fn('COUNT', models.sequelize.col('admin_operation_log_id')), 'count']
       ],
       include: [
         {
@@ -537,7 +537,9 @@ class AuditRollbackService {
         }
       ],
       group: ['operator_id', 'operator.user_id', 'operator.nickname'],
-      order: [[models.sequelize.fn('COUNT', models.sequelize.col('log_id')), 'DESC']],
+      order: [
+        [models.sequelize.fn('COUNT', models.sequelize.col('admin_operation_log_id')), 'DESC']
+      ],
       limit: 10,
       raw: false
     })
@@ -559,6 +561,194 @@ class AuditRollbackService {
         nickname: item.operator?.nickname || 'Unknown',
         count: parseInt(item.dataValues.count, 10)
       }))
+    }
+  }
+
+  /**
+   * 按目标类型统计审计操作
+   *
+   * 业务场景：
+   * - 统计各业务模块（用户、积分、抽奖、商家等）的操作分布
+   * - 用于分析管理员对不同业务模块的操作频率
+   *
+   * @param {Object} params - 查询参数
+   * @param {Date} [params.start_time] - 开始时间（北京时间）
+   * @param {Date} [params.end_time] - 结束时间（北京时间）
+   * @returns {Promise<Object>} 按目标类型分组的统计数据
+   *
+   * @example
+   * // 返回格式
+   * {
+   *   total: 150,
+   *   items: [
+   *     { target_type: 'user', count: 50, percentage: 33.33 },
+   *     { target_type: 'item', count: 40, percentage: 26.67 },
+   *     ...
+   *   ]
+   * }
+   */
+  static async getStatsByTargetType(params = {}) {
+    const { start_time, end_time } = params
+
+    const where = {}
+    if (start_time || end_time) {
+      where.created_at = {}
+      if (start_time) {
+        where.created_at[Op.gte] = start_time
+      }
+      if (end_time) {
+        where.created_at[Op.lte] = end_time
+      }
+    }
+
+    // 按 target_type 分组统计
+    const stats = await models.AdminOperationLog.findAll({
+      where,
+      attributes: [
+        'target_type',
+        [models.sequelize.fn('COUNT', models.sequelize.col('admin_operation_log_id')), 'count']
+      ],
+      group: ['target_type'],
+      order: [
+        [models.sequelize.fn('COUNT', models.sequelize.col('admin_operation_log_id')), 'DESC']
+      ],
+      raw: true
+    })
+
+    // 计算总数
+    const total = stats.reduce((sum, item) => sum + parseInt(item.count, 10), 0)
+
+    // 格式化结果，添加百分比
+    const items = stats.map(item => ({
+      target_type: item.target_type || 'unknown',
+      count: parseInt(item.count, 10),
+      percentage: total > 0 ? parseFloat(((parseInt(item.count, 10) / total) * 100).toFixed(2)) : 0
+    }))
+
+    logger.info('[审计统计] 按目标类型统计完成', {
+      total,
+      types_count: items.length
+    })
+
+    return {
+      total,
+      items
+    }
+  }
+
+  /**
+   * 获取操作趋势统计（按日期分组）
+   *
+   * 业务场景：
+   * - 分析最近 N 天的操作趋势变化
+   * - 用于运营监控和异常检测（如某天操作量突增/突减）
+   *
+   * @param {Object} params - 查询参数
+   * @param {number} [params.days=7] - 统计天数（默认最近7天）
+   * @param {Date} [params.end_date] - 结束日期（默认今天，北京时间）
+   * @returns {Promise<Object>} 按日期分组的趋势数据
+   *
+   * @example
+   * // 返回格式
+   * {
+   *   total: 350,
+   *   days: 7,
+   *   items: [
+   *     { date: '2026-02-01', count: 45, day_of_week: '周六' },
+   *     { date: '2026-02-02', count: 52, day_of_week: '周日' },
+   *     ...
+   *   ],
+   *   average_per_day: 50.00,
+   *   max_day: { date: '2026-02-03', count: 68 },
+   *   min_day: { date: '2026-02-01', count: 45 }
+   * }
+   */
+  static async getOperationTrend(params = {}) {
+    const { days = 7, end_date } = params
+
+    // 计算日期范围（北京时间）
+    const endDate = end_date ? new Date(end_date) : BeijingTimeHelper.createDatabaseTime()
+    const startDate = new Date(endDate)
+    startDate.setDate(startDate.getDate() - (days - 1))
+    startDate.setHours(0, 0, 0, 0)
+    endDate.setHours(23, 59, 59, 999)
+
+    // 查询条件
+    const where = {
+      created_at: {
+        [Op.gte]: startDate,
+        [Op.lte]: endDate
+      }
+    }
+
+    // 按日期分组统计（使用 DATE 函数提取日期部分）
+    const stats = await models.AdminOperationLog.findAll({
+      where,
+      attributes: [
+        [models.sequelize.fn('DATE', models.sequelize.col('created_at')), 'date'],
+        [models.sequelize.fn('COUNT', models.sequelize.col('admin_operation_log_id')), 'count']
+      ],
+      group: [models.sequelize.fn('DATE', models.sequelize.col('created_at'))],
+      order: [[models.sequelize.fn('DATE', models.sequelize.col('created_at')), 'ASC']],
+      raw: true
+    })
+
+    // 星期几中文映射
+    const weekDayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+
+    // 构建完整的日期序列（填充无数据的日期为0）
+    const dateMap = new Map()
+    for (let i = 0; i < days; i++) {
+      const currentDate = new Date(startDate)
+      currentDate.setDate(startDate.getDate() + i)
+      const dateStr = currentDate.toISOString().split('T')[0]
+      dateMap.set(dateStr, {
+        date: dateStr,
+        count: 0,
+        day_of_week: weekDayNames[currentDate.getDay()]
+      })
+    }
+
+    // 填充查询结果
+    stats.forEach(item => {
+      const dateStr =
+        item.date instanceof Date ? item.date.toISOString().split('T')[0] : String(item.date)
+      if (dateMap.has(dateStr)) {
+        dateMap.get(dateStr).count = parseInt(item.count, 10)
+      }
+    })
+
+    // 转换为数组
+    const items = Array.from(dateMap.values())
+
+    // 计算总数、平均值、最大/最小
+    const total = items.reduce((sum, item) => sum + item.count, 0)
+    const averagePerDay = items.length > 0 ? parseFloat((total / items.length).toFixed(2)) : 0
+
+    let maxDay = items[0]
+    let minDay = items[0]
+    items.forEach(item => {
+      if (item.count > maxDay.count) {
+        maxDay = item
+      }
+      if (item.count < minDay.count) {
+        minDay = item
+      }
+    })
+
+    logger.info('[审计统计] 操作趋势统计完成', {
+      days,
+      total,
+      average_per_day: averagePerDay
+    })
+
+    return {
+      total,
+      days,
+      items,
+      average_per_day: averagePerDay,
+      max_day: maxDay ? { date: maxDay.date, count: maxDay.count } : null,
+      min_day: minDay ? { date: minDay.date, count: minDay.count } : null
     }
   }
 }

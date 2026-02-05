@@ -473,7 +473,7 @@ class PremiumService {
     // 总体统计
     const totalStats = await UserPremiumStatus.findOne({
       attributes: [
-        [fn('COUNT', col('id')), 'total_records'],
+        [fn('COUNT', col('user_premium_status_id')), 'total_records'],
         [fn('SUM', col('total_unlock_count')), 'total_unlock_count']
       ],
       raw: true
@@ -497,7 +497,7 @@ class PremiumService {
 
     // 按解锁方式统计
     const methodStats = await UserPremiumStatus.findAll({
-      attributes: ['unlock_method', [fn('COUNT', col('id')), 'count']],
+      attributes: ['unlock_method', [fn('COUNT', col('user_premium_status_id')), 'count']],
       where: {
         is_unlocked: true,
         expires_at: { [Op.gt]: now }

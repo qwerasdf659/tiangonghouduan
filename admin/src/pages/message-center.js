@@ -14,15 +14,15 @@
 import Alpine from 'alpinejs'
 import { logger } from '../utils/logger.js'
 import { createPageMixin } from '../alpine/mixins/index.js'
-import { request, buildURL } from '../api/base.js'
+import { request, buildURL, API_PREFIX } from '../api/base.js'
 import { io } from 'socket.io-client'
 
-// API 端点 - 使用 system 域
+// API 端点 - 使用 system 域，添加 API_PREFIX 前缀
 const MESSAGE_ENDPOINTS = {
-  LIST: '/system/notifications',
-  MARK_READ: (id) => `/system/notifications/${id}/read`,
-  MARK_ALL_READ: '/system/notifications/read-all',
-  DELETE: (id) => `/system/notifications/${id}`
+  LIST: `${API_PREFIX}/system/notifications`,
+  MARK_READ: (id) => `${API_PREFIX}/system/notifications/${id}/read`,
+  MARK_ALL_READ: `${API_PREFIX}/system/notifications/read-all`,
+  DELETE: (id) => `${API_PREFIX}/system/notifications/${id}`
 }
 
 /**

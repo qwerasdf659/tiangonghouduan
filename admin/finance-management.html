@@ -147,7 +147,7 @@
               </tr>
             </thead>
             <tbody class="divide-y">
-              <template x-for="record in consumptions" :key="record.id || record.record_id">
+              <template x-for="record in consumptions" :key="record.record_id">
                 <!-- P0-3: 超时高亮 - 超过24小时红色，12-24小时橙色 -->
                 <tr class="themed-hover-bg" :class="{ 'bg-blue-50': isSelected(record), ...getTimeoutRowClass(record) }">
                   <!-- 单选复选框（仅待审核记录可选） -->
@@ -156,7 +156,7 @@
                       <input 
                         type="checkbox" 
                         :checked="isSelected(record)"
-                        @change="toggleSelection(record.record_id || record.id)"
+                        @change="toggleSelection(record.record_id)"
                         class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       >
                     </template>
@@ -167,7 +167,7 @@
                   <td class="px-4 py-3 text-sm" x-text="record.record_id"></td>
                   <td class="px-4 py-3 text-sm" x-text="record.user_name || record.user_id"></td>
                   <td class="px-4 py-3 text-sm" x-text="record.store_name"></td>
-                  <td class="px-4 py-3 text-sm font-mono" x-text="'¥' + (record.amount / 100).toFixed(2)"></td>
+                  <td class="px-4 py-3 text-sm font-mono" x-text="'¥' + (record.consumption_amount / 100).toFixed(2)"></td>
                   <!-- 风控标记列 (P1-4) + F-42: 异常详情提示 -->
                   <td class="px-4 py-3">
                     <template x-if="record.is_suspicious || record.risk_level === 'high'">
@@ -268,15 +268,15 @@
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div class="themed-card rounded-lg shadow p-4 text-center">
           <h6 class="themed-text-muted text-sm mb-1">持有用户数</h6>
-          <p class="text-2xl font-bold themed-text-primary" x-text="diamondStats.holderCount || 0"></p>
+          <p class="text-2xl font-bold themed-text-primary" x-text="diamondStats.holder_count || 0"></p>
         </div>
         <div class="themed-card rounded-lg shadow p-4 text-center">
           <h6 class="themed-text-muted text-sm mb-1">流通总量</h6>
-          <p class="text-2xl font-bold text-green-600" x-text="formatNumber(diamondStats.totalCirculation || 0)"></p>
+          <p class="text-2xl font-bold text-green-600" x-text="formatNumber(diamondStats.total_circulation || 0)"></p>
         </div>
         <div class="themed-card rounded-lg shadow p-4 text-center">
           <h6 class="themed-text-muted text-sm mb-1">冻结总量</h6>
-          <p class="text-2xl font-bold text-yellow-600" x-text="formatNumber(diamondStats.totalFrozen || 0)"></p>
+          <p class="text-2xl font-bold text-yellow-600" x-text="formatNumber(diamondStats.total_frozen || 0)"></p>
         </div>
       </div>
 
@@ -598,19 +598,19 @@
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div class="themed-card rounded-lg shadow p-4 text-center">
           <h6 class="themed-text-muted text-sm mb-1">总预算</h6>
-          <p class="text-2xl font-bold themed-text-primary" x-text="budgetStats?.totalBudget || 0"></p>
+          <p class="text-2xl font-bold themed-text-primary" x-text="budgetStats?.total_budget || 0"></p>
         </div>
         <div class="themed-card rounded-lg shadow p-4 text-center">
           <h6 class="themed-text-muted text-sm mb-1">已使用</h6>
-          <p class="text-2xl font-bold text-orange-600" x-text="budgetStats?.usedBudget || 0"></p>
+          <p class="text-2xl font-bold text-orange-600" x-text="budgetStats?.used_budget || 0"></p>
         </div>
         <div class="themed-card rounded-lg shadow p-4 text-center">
           <h6 class="themed-text-muted text-sm mb-1">剩余预算</h6>
-          <p class="text-2xl font-bold text-green-600" x-text="budgetStats?.remainingBudget || 0"></p>
+          <p class="text-2xl font-bold text-green-600" x-text="budgetStats?.remaining_budget || 0"></p>
         </div>
         <div class="themed-card rounded-lg shadow p-4 text-center">
           <h6 class="themed-text-muted text-sm mb-1">使用率</h6>
-          <p class="text-2xl font-bold" :class="(budgetStats?.utilizationRate || 0) > 80 ? 'text-red-600' : 'text-green-600'" x-text="(budgetStats?.utilizationRate || 0) + '%'"></p>
+          <p class="text-2xl font-bold" :class="(budgetStats?.utilization_rate || 0) > 80 ? 'text-red-600' : 'text-green-600'" x-text="(budgetStats?.utilization_rate || 0) + '%'"></p>
         </div>
       </div>
 

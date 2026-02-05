@@ -27,7 +27,7 @@
  * // HTML中使用
  * <div x-data="orphanFrozenPage">
  *   <table>
- *     <template x-for="item in orphanList" :key="item.account_id">...</template>
+ *     <template x-for="item in orphanList" :key="item.account_id + '_' + item.asset_code">...</template>
  *   </table>
  * </div>
  */
@@ -256,7 +256,8 @@ function orphanFrozenPage() {
             status: 'pending', // 后端无此字段，默认待处理
             discovered_at: generatedAt // 使用顶层的检测时间
           }))
-          this.total = this.orphanList.length
+          // 使用 paginationMixin 的 total_records 字段
+          this.total_records = this.orphanList.length
 
           logger.info('[孤儿冻结页面] 加载数据完成', {
             count: this.orphanList.length,
@@ -269,7 +270,7 @@ function orphanFrozenPage() {
           })
           // 设置空列表
           this.orphanList = []
-          this.total = 0
+          this.total_records = 0
 
           // 显示错误信息给用户
           if (detectResponse?.code === 'UNAUTHORIZED' || detectResponse?.code === 'TOKEN_EXPIRED') {

@@ -72,36 +72,40 @@ export const LOTTERY_ADVANCED_ENDPOINTS = {
   PRICING_ROLLBACK: `${API_PREFIX}/console/lottery-management/campaigns/:code/pricing/rollback`,
   PRICING_SCHEDULE: `${API_PREFIX}/console/lottery-management/campaigns/:code/pricing/:version/schedule`,
 
-  // 抽奖监控
-  MONITORING_STATS: `${API_PREFIX}/console/lottery-monitoring/stats`,
-  MONITORING_HOURLY_LIST: `${API_PREFIX}/console/lottery-monitoring/hourly-metrics`,
-  MONITORING_HOURLY_DETAIL: `${API_PREFIX}/console/lottery-monitoring/hourly-metrics/:id`,
-  MONITORING_HOURLY_SUMMARY: `${API_PREFIX}/console/lottery-monitoring/hourly-metrics/summary/:campaign_id`,
-  MONITORING_USER_EXPERIENCE_LIST: `${API_PREFIX}/console/lottery-monitoring/user-experience-states`,
-  MONITORING_USER_EXPERIENCE_DETAIL: `${API_PREFIX}/console/lottery-monitoring/user-experience-states/:user_id/:campaign_id`,
-  MONITORING_USER_GLOBAL_LIST: `${API_PREFIX}/console/lottery-monitoring/user-global-states`,
-  MONITORING_USER_GLOBAL_DETAIL: `${API_PREFIX}/console/lottery-monitoring/user-global-states/:user_id`,
-  MONITORING_QUOTA_GRANT_LIST: `${API_PREFIX}/console/lottery-monitoring/quota-grants`,
-  MONITORING_QUOTA_GRANT_DETAIL: `${API_PREFIX}/console/lottery-monitoring/quota-grants/:id`,
-  MONITORING_USER_QUOTA_LIST: `${API_PREFIX}/console/lottery-monitoring/user-quotas`,
-  MONITORING_USER_QUOTA_DETAIL: `${API_PREFIX}/console/lottery-monitoring/user-quotas/:user_id/:campaign_id`,
-  MONITORING_USER_QUOTA_STATS: `${API_PREFIX}/console/lottery-monitoring/user-quotas/stats/:campaign_id`,
+  // 抽奖实时监控（2026-01-31 路径更新: lottery-monitoring → lottery-realtime）
+  MONITORING_STATS: `${API_PREFIX}/console/lottery-realtime/stats`,
 
-  // 用户抽奖档案/活动ROI/日报
-  MONITORING_USER_PROFILE: `${API_PREFIX}/console/lottery-monitoring/user-profile/:user_id`,
-  MONITORING_CAMPAIGN_ROI: `${API_PREFIX}/console/lottery-monitoring/campaign-roi/:campaign_id`,
-  ANALYTICS_DAILY_REPORT: `${API_PREFIX}/console/lottery-analytics/daily-report`,
+  // 抽奖统计趋势（2026-01-31 路径更新: lottery-monitoring → lottery-statistics）
+  MONITORING_HOURLY_LIST: `${API_PREFIX}/console/lottery-statistics/hourly`,
+  MONITORING_HOURLY_DETAIL: `${API_PREFIX}/console/lottery-statistics/hourly/:id`,
+  MONITORING_HOURLY_SUMMARY: `${API_PREFIX}/console/lottery-statistics/hourly/summary/:campaign_id`,
+
+  // 用户分析（2026-01-31 路径更新: lottery-monitoring → lottery-user-analysis）
+  MONITORING_USER_EXPERIENCE_LIST: `${API_PREFIX}/console/lottery-user-analysis/experience-states`,
+  MONITORING_USER_EXPERIENCE_DETAIL: `${API_PREFIX}/console/lottery-user-analysis/experience-states/:user_id/:campaign_id`,
+  MONITORING_USER_GLOBAL_LIST: `${API_PREFIX}/console/lottery-user-analysis/global-states`,
+  MONITORING_USER_GLOBAL_DETAIL: `${API_PREFIX}/console/lottery-user-analysis/global-states/:user_id`,
+  MONITORING_QUOTA_GRANT_LIST: `${API_PREFIX}/console/lottery-user-analysis/quota-grants`,
+  MONITORING_QUOTA_GRANT_DETAIL: `${API_PREFIX}/console/lottery-user-analysis/quota-grants/:id`,
+  MONITORING_USER_QUOTA_LIST: `${API_PREFIX}/console/lottery-user-analysis/quotas`,
+  MONITORING_USER_QUOTA_DETAIL: `${API_PREFIX}/console/lottery-user-analysis/quotas/:user_id/:campaign_id`,
+  MONITORING_USER_QUOTA_STATS: `${API_PREFIX}/console/lottery-user-analysis/quotas/stats/:campaign_id`,
+
+  // 用户档案/活动分析/报表（2026-01-31 路径更新）
+  MONITORING_USER_PROFILE: `${API_PREFIX}/console/lottery-user-analysis/profile/:user_id`,
+  MONITORING_CAMPAIGN_ROI: `${API_PREFIX}/console/lottery-campaign-analysis/roi/:campaign_id`,
+  ANALYTICS_DAILY_REPORT: `${API_PREFIX}/console/lottery-report/daily`,
 
   // 实时告警API（2026-01-31 路径更新: lottery-monitoring → lottery-realtime）
   REALTIME_ALERTS: `${API_PREFIX}/console/lottery-realtime/alerts`,
   REALTIME_ALERT_ACKNOWLEDGE: `${API_PREFIX}/console/lottery-realtime/alerts/:id/acknowledge`,
   REALTIME_ALERT_RESOLVE: `${API_PREFIX}/console/lottery-realtime/alerts/:id/resolve`,
 
-  // 单次抽奖详情/异常用户/活动复盘/策略效果（2026-01-31 路径更新: lottery-monitoring → lottery-realtime）
+  // 单次抽奖详情/异常用户/活动复盘/策略效果（2026-01-31 路径更新: lottery-monitoring → lottery-realtime/lottery-user-analysis）
   DRAW_DETAILS: `${API_PREFIX}/console/lottery-realtime/draw-details/:draw_id`,
-  ABNORMAL_USERS: `${API_PREFIX}/console/lottery-monitoring/abnormal-users`,
-  CAMPAIGN_REPORT: `${API_PREFIX}/console/lottery-monitoring/campaign-report/:campaign_id`,
-  STRATEGY_EFFECTIVENESS: `${API_PREFIX}/console/lottery-monitoring/strategy-effectiveness`,
+  ABNORMAL_USERS: `${API_PREFIX}/console/lottery-user-analysis/abnormal`,
+  CAMPAIGN_REPORT: `${API_PREFIX}/console/lottery-report/campaign/:campaign_id`,
+  STRATEGY_EFFECTIVENESS: `${API_PREFIX}/console/lottery-campaign-analysis/strategy-effectiveness`,
 
   // 核销订单
   BUSINESS_RECORD_REDEMPTION_ORDER: `${API_PREFIX}/console/business-records/redemption-orders`,

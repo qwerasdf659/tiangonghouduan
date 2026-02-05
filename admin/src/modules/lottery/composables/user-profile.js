@@ -27,13 +27,13 @@ export function useUserProfileState() {
     userGlobalState: null,
     /** @type {Array} 用户配额列表 */
     userQuotaList: [],
-    /** @type {Object} 用户抽奖统计 */
+    /** @type {Object} 用户抽奖统计 - 直接使用后端字段名 */
     userDrawStats: {
-      totalDraws: 0,
-      totalWins: 0,
-      winRate: 0,
-      totalValue: 0,
-      lastDrawTime: null
+      total_draws: 0,
+      total_wins: 0,
+      win_rate: 0,
+      total_value: 0,
+      last_draw_time: null
     },
     /** @type {boolean} 是否正在加载用户档案 */
     loadingUserProfile: false,
@@ -90,26 +90,24 @@ export function useUserProfileMethods() {
             user_type: data.user?.user_type || data.user_type || '-'
           }
 
-          // 设置抽奖统计
+          // 设置抽奖统计 - 直接使用后端字段名
           const stats = data.stats || data.draw_stats || {}
           this.userDrawStats = {
-            totalDraws: stats.total_draws || stats.totalDraws || 0,
-            totalWins: stats.total_wins || stats.totalWins || 0,
-            winRate: stats.win_rate || stats.winRate || 0,
-            totalValue: stats.total_value || stats.totalValue || 0,
-            lastDrawTime: stats.last_draw_time || stats.lastDrawTime || null
+            total_draws: stats.total_draws || 0,
+            total_wins: stats.total_wins || 0,
+            win_rate: stats.win_rate || 0,
+            total_value: stats.total_value || 0,
+            last_draw_time: stats.last_draw_time || null
           }
 
-          // 设置抽奖历史
+          // 设置抽奖历史 - 直接使用后端字段名，仅保留复合字段
           this.userDrawHistory = (data.recent_draws || data.draw_history || []).map(draw => ({
-            drawId: draw.draw_id || draw.lottery_draw_id,
-            campaignName: draw.campaign_name || draw.campaign?.campaign_name || '-',
-            prizeName: draw.prize_name || draw.result || '-',
-            prizeType: draw.prize_type || '-',
-            prizeValue: draw.prize_value || 0,
-            isWin: draw.is_win ?? draw.prize_type !== 'empty',
-            rewardTier: draw.reward_tier || '-',
-            drawTime: draw.draw_time || draw.created_at || '-'
+            ...draw,
+            // 复合字段：按优先级取值
+            campaign_name: draw.campaign_name || draw.campaign?.campaign_name || '-',
+            prize_name: draw.prize_name || draw.result || '-',
+            is_win: draw.is_win ?? draw.prize_type !== 'empty',
+            draw_time: draw.draw_time || draw.created_at || '-'
           }))
 
           // 设置体验状态
@@ -123,7 +121,7 @@ export function useUserProfileMethods() {
 
           logger.info('用户档案加载完成', {
             userId,
-            totalDraws: this.userDrawStats.totalDraws,
+            total_draws: this.userDrawStats.total_draws,
             historyCount: this.userDrawHistory.length
           })
         } else {
@@ -190,11 +188,11 @@ export function useUserProfileMethods() {
       this.userGlobalState = null
       this.userQuotaList = []
       this.userDrawStats = {
-        totalDraws: 0,
-        totalWins: 0,
-        winRate: 0,
-        totalValue: 0,
-        lastDrawTime: null
+        total_draws: 0,
+        total_wins: 0,
+        win_rate: 0,
+        total_value: 0,
+        last_draw_time: null
       }
     },
 

@@ -29,6 +29,7 @@ import { logger } from '../../../utils/logger.js'
 import { buildURL, request, getToken } from '../../../api/base.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
+
 document.addEventListener('alpine:init', () => {
   logger.info('[ContentManagement] 注册 Alpine 组件...')
 
@@ -91,10 +92,10 @@ document.addEventListener('alpine:init', () => {
 
     /**
      * 公告表单数据
-     * @type {{announcement_id: number|null, title: string, content: string, type: string, priority: string, status: string, expires_at: string}}
+     * @type {{system_announcement_id: number|null, title: string, content: string, type: string, priority: string, status: string, expires_at: string}}
      */
     announcementForm: {
-      announcement_id: null,
+      system_announcement_id: null,
       title: '',
       content: '',
       type: 'notice',
@@ -263,7 +264,7 @@ document.addEventListener('alpine:init', () => {
     openCreateAnnouncementModal() {
       this.isEditMode = false
       this.announcementForm = {
-        announcement_id: null,
+        system_announcement_id: null,
         title: '',
         content: '',
         type: 'notice',
@@ -277,7 +278,7 @@ document.addEventListener('alpine:init', () => {
     /**
      * 编辑公告
      * @param {Object} ann - 要编辑的公告对象
-     * @param {number} ann.announcement_id - 公告ID
+     * @param {number} ann.system_announcement_id - 公告ID
      * @param {string} ann.title - 公告标题
      * @param {string} ann.content - 公告内容
      * @param {string} ann.type - 公告类型
@@ -289,7 +290,7 @@ document.addEventListener('alpine:init', () => {
     editAnnouncement(ann) {
       this.isEditMode = true
       this.announcementForm = {
-        announcement_id: ann.announcement_id || ann.id,
+        system_announcement_id: ann.system_announcement_id,
         title: ann.title || '',
         content: ann.content || '',
         type: ann.type || 'notice',
@@ -329,7 +330,7 @@ document.addEventListener('alpine:init', () => {
 
         const url = this.isEditMode
           ? buildURL(SYSTEM_ENDPOINTS.ANNOUNCEMENT_UPDATE, {
-              id: this.announcementForm.announcement_id
+              id: this.announcementForm.system_announcement_id
             })
           : SYSTEM_ENDPOINTS.ANNOUNCEMENT_CREATE
         const method = this.isEditMode ? 'PUT' : 'POST'
@@ -942,7 +943,7 @@ document.addEventListener('alpine:init', () => {
         let successMsg = ''
         const targetId =
           this.deleteTarget.id ||
-          this.deleteTarget.announcement_id ||
+          this.deleteTarget.system_announcement_id ||
           this.deleteTarget.banner_id ||
           this.deleteTarget.image_id
 

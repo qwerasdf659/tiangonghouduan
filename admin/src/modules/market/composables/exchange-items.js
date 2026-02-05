@@ -161,7 +161,7 @@ export function useExchangeItemsMethods() {
      * @param {Object} item - 商品对象（字段名与后端模型一致）
      */
     editItem(item) {
-      this.editingItemId = item.item_id
+      this.editingItemId = item.exchange_item_id
       this.itemForm = {
         item_name: item.item_name || '',
         description: item.description || '',
@@ -188,7 +188,7 @@ export function useExchangeItemsMethods() {
         this.saving = true
         const url = this.editingItemId
           ? buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_DETAIL, {
-              item_id: this.editingItemId
+              exchange_item_id: this.editingItemId
             })
           : MARKET_ENDPOINTS.EXCHANGE_ITEMS
         const method = this.editingItemId ? 'PUT' : 'POST'
@@ -229,7 +229,7 @@ export function useExchangeItemsMethods() {
 
       try {
         const res = await request({
-          url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_DETAIL, { item_id: itemId }),
+          url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_DETAIL, { exchange_item_id: itemId }),
           method: 'DELETE'
         })
         if (res.success) {
@@ -256,7 +256,7 @@ export function useExchangeItemsMethods() {
       try {
         const res = await request({
           url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_DETAIL, {
-            item_id: item.item_id
+            exchange_item_id: item.exchange_item_id
           }),
           method: 'PUT',
           data: { status: newStatus }

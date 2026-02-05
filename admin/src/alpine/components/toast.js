@@ -17,8 +17,6 @@
  * Alpine.store('notification').info('提示信息')
  */
 
-/* global Alpine */
-
 import { logger } from '../../utils/logger.js'
 
 /**

@@ -59,7 +59,7 @@ function pagination(config = {}) {
       } else {
         // 计算显示范围
         let start = Math.max(1, current - Math.floor(max / 2))
-        let end = Math.min(total, start + max - 1)
+        const end = Math.min(total, start + max - 1)
 
         if (end - start < max - 1) {
           start = Math.max(1, end - max + 1)

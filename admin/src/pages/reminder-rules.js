@@ -8,18 +8,18 @@
 import Alpine from 'alpinejs'
 import { logger } from '../utils/logger.js'
 import { createPageMixin } from '../alpine/mixins/index.js'
-import { request, buildURL } from '../api/base.js'
+import { request, buildURL, API_PREFIX } from '../api/base.js'
 
-// API 端点
+// API 端点 - 使用 API_PREFIX 确保正确的版本前缀
 const REMINDER_ENDPOINTS = {
-  LIST: '/console/reminder-rules',
-  CREATE: '/console/reminder-rules',
-  DETAIL: id => `/console/reminder-rules/${id}`,
-  UPDATE: id => `/console/reminder-rules/${id}`,
-  DELETE: id => `/console/reminder-rules/${id}`,
-  TOGGLE: id => `/console/reminder-rules/${id}/toggle`,
-  TEST: id => `/console/reminder-rules/${id}/test`,
-  EXECUTE: id => `/console/reminder-rules/${id}/execute`
+  LIST: `${API_PREFIX}/console/reminder-rules`,
+  CREATE: `${API_PREFIX}/console/reminder-rules`,
+  DETAIL: id => `${API_PREFIX}/console/reminder-rules/${id}`,
+  UPDATE: id => `${API_PREFIX}/console/reminder-rules/${id}`,
+  DELETE: id => `${API_PREFIX}/console/reminder-rules/${id}`,
+  TOGGLE: id => `${API_PREFIX}/console/reminder-rules/${id}/toggle`,
+  TEST: id => `${API_PREFIX}/console/reminder-rules/${id}/test`,
+  EXECUTE: id => `${API_PREFIX}/console/reminder-rules/${id}/execute`
 }
 
 /**

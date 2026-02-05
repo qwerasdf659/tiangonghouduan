@@ -106,6 +106,106 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
 })
 
 /**
+ * 管理员生成审计报告（F-59 审计报告功能）
+ * GET /api/v4/console/system/audit-logs/report
+ *
+ * @description 生成综合审计报告，包含汇总统计、分组统计和趋势数据
+ *
+ * @query {string} time_range - 时间范围 (7d/30d/90d/custom)，默认 7d
+ * @query {string} start_date - 自定义开始日期 (YYYY-MM-DD)，time_range=custom 时必填
+ * @query {string} end_date - 自定义结束日期 (YYYY-MM-DD)，time_range=custom 时必填
+ * @query {number} operator_id - 特定操作员ID筛选（可选）
+ *
+ * @returns {Object} 审计报告数据
+ * @returns {Object} data.summary - 汇总统计（总操作数、高风险数、回滚数、独立操作员数）
+ * @returns {Array} data.by_operation_type - 按操作类型分组统计
+ * @returns {Array} data.by_target_type - 按目标类型分组统计
+ * @returns {Array} data.by_operator - 按操作员分组统计
+ * @returns {Array} data.by_risk_level - 按风险等级分组统计
+ * @returns {Array} data.trend - 时间趋势数据（按天分组）
+ * @returns {Object} data.report_meta - 报告元数据（生成时间、时间范围）
+ *
+ * @security JWT + Admin权限
+ *
+ * @note 此路由必须在 /:log_id 之前定义，否则 "report" 会被当作 log_id 解析
+ */
+router.get('/report', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const AuditLogService = req.app.locals.services.getService('audit_log')
+
+    const { time_range = '7d', start_date, end_date, operator_id } = req.query
+    const admin_id = req.user.user_id
+
+    logger.info('管理员生成审计报告', {
+      admin_id,
+      time_range,
+      start_date,
+      end_date,
+      operator_id
+    })
+
+    // 参数验证
+    const validTimeRanges = ['7d', '30d', '90d', 'custom']
+    if (!validTimeRanges.includes(time_range)) {
+      return res.apiError(
+        '无效的时间范围参数，支持：7d/30d/90d/custom',
+        'BAD_REQUEST',
+        { valid_values: validTimeRanges },
+        400
+      )
+    }
+
+    // 自定义时间范围需要提供 start_date 和 end_date
+    if (time_range === 'custom') {
+      if (!start_date || !end_date) {
+        return res.apiError(
+          '自定义时间范围需要提供 start_date 和 end_date 参数',
+          'BAD_REQUEST',
+          null,
+          400
+        )
+      }
+      // 验证日期格式
+      const datePattern = /^\d{4}-\d{2}-\d{2}$/
+      if (!datePattern.test(start_date) || !datePattern.test(end_date)) {
+        return res.apiError(
+          '日期格式无效，应为 YYYY-MM-DD',
+          'BAD_REQUEST',
+          { expected_format: 'YYYY-MM-DD' },
+          400
+        )
+      }
+    }
+
+    // 调用服务层方法生成审计报告
+    const report = await AuditLogService.generateAuditReport({
+      time_range,
+      start_date,
+      end_date,
+      operator_id: operator_id ? parseInt(operator_id) : null
+    })
+
+    logger.info('管理员审计报告生成成功', {
+      admin_id,
+      time_range,
+      total_operations: report.summary.total_operations,
+      high_risk_count: report.summary.high_risk_count
+    })
+
+    return res.apiSuccess(report, '审计报告生成成功')
+  } catch (error) {
+    logger.error('管理员生成审计报告失败', {
+      error: error.message,
+      stack: error.stack,
+      admin_id: req.user?.user_id
+    })
+
+    return res.apiError(error.message || '生成审计报告失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
  * 管理员获取审计日志统计
  * GET /api/v4/console/system/audit-logs/statistics
  *

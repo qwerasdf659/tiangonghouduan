@@ -44,8 +44,8 @@
       /* 桑基图容器 */
       .sankey-container { min-height: 400px; }
       
-      /* 漏斗图容器 */
-      .funnel-container { min-height: 350px; }
+      /* 漏斗图容器 - 确保ECharts能正确识别容器尺寸 */
+      .funnel-container { min-height: 350px; height: 350px; width: 100%; }
     `
   }) %>
 </head>
@@ -363,7 +363,7 @@
                       :class="{
                         'bg-green-100 text-green-700': comparison.day_comparison.lottery_draws?.trend === 'up',
                         'bg-red-100 text-red-700': comparison.day_comparison.lottery_draws?.trend === 'down',
-                        'bg-gray-100 text-gray-600': !comparison.day_comparison.lottery_draws?.trend || comparison.day_comparison.lottery_draws?.trend === 'neutral'
+                        'bg-gray-100 text-gray-600': !comparison.day_comparison.lottery_draws?.trend || comparison.day_comparison.lottery_draws?.trend === 'stable'
                       }"
                     >
                       <span x-text="getTrendIcon(comparison.day_comparison.lottery_draws?.trend)"></span>
@@ -381,7 +381,7 @@
                       :class="{
                         'bg-green-100 text-green-700': comparison.day_comparison.users?.trend === 'up',
                         'bg-red-100 text-red-700': comparison.day_comparison.users?.trend === 'down',
-                        'bg-gray-100 text-gray-600': !comparison.day_comparison.users?.trend || comparison.day_comparison.users?.trend === 'neutral'
+                        'bg-gray-100 text-gray-600': !comparison.day_comparison.users?.trend || comparison.day_comparison.users?.trend === 'stable'
                       }"
                     >
                       <span x-text="getTrendIcon(comparison.day_comparison.users?.trend)"></span>
@@ -399,7 +399,7 @@
                       :class="{
                         'bg-green-100 text-green-700': comparison.day_comparison.win_rate?.trend === 'up',
                         'bg-red-100 text-red-700': comparison.day_comparison.win_rate?.trend === 'down',
-                        'bg-gray-100 text-gray-600': !comparison.day_comparison.win_rate?.trend || comparison.day_comparison.win_rate?.trend === 'neutral'
+                        'bg-gray-100 text-gray-600': !comparison.day_comparison.win_rate?.trend || comparison.day_comparison.win_rate?.trend === 'stable'
                       }"
                     >
                       <span x-text="getTrendIcon(comparison.day_comparison.win_rate?.trend)"></span>
@@ -421,13 +421,13 @@
                 <div class="flex items-center justify-between">
                   <span class="text-sm themed-text-muted">抽奖次数</span>
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.week_comparison.lottery_draws?.this_week || 0)">--</span>
+                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.week_comparison.lottery_draws?.current || 0)">--</span>
                     <span 
                       class="text-xs font-medium px-1.5 py-0.5 rounded"
                       :class="{
                         'bg-green-100 text-green-700': comparison.week_comparison.lottery_draws?.trend === 'up',
                         'bg-red-100 text-red-700': comparison.week_comparison.lottery_draws?.trend === 'down',
-                        'bg-gray-100 text-gray-600': !comparison.week_comparison.lottery_draws?.trend || comparison.week_comparison.lottery_draws?.trend === 'neutral'
+                        'bg-gray-100 text-gray-600': !comparison.week_comparison.lottery_draws?.trend || comparison.week_comparison.lottery_draws?.trend === 'stable'
                       }"
                     >
                       <span x-text="getTrendIcon(comparison.week_comparison.lottery_draws?.trend)"></span>
@@ -439,13 +439,13 @@
                 <div class="flex items-center justify-between">
                   <span class="text-sm themed-text-muted">新增用户</span>
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.week_comparison.users?.this_week || 0)">--</span>
+                    <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.week_comparison.users?.current || 0)">--</span>
                     <span 
                       class="text-xs font-medium px-1.5 py-0.5 rounded"
                       :class="{
                         'bg-green-100 text-green-700': comparison.week_comparison.users?.trend === 'up',
                         'bg-red-100 text-red-700': comparison.week_comparison.users?.trend === 'down',
-                        'bg-gray-100 text-gray-600': !comparison.week_comparison.users?.trend || comparison.week_comparison.users?.trend === 'neutral'
+                        'bg-gray-100 text-gray-600': !comparison.week_comparison.users?.trend || comparison.week_comparison.users?.trend === 'stable'
                       }"
                     >
                       <span x-text="getTrendIcon(comparison.week_comparison.users?.trend)"></span>
@@ -457,13 +457,13 @@
                 <div class="flex items-center justify-between">
                   <span class="text-sm themed-text-muted">中奖率</span>
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium themed-text" x-text="(comparison.week_comparison.win_rate?.this_week || 0).toFixed(1) + '%'">--</span>
+                    <span class="text-sm font-medium themed-text" x-text="(comparison.week_comparison.win_rate?.current || 0).toFixed(1) + '%'">--</span>
                     <span 
                       class="text-xs font-medium px-1.5 py-0.5 rounded"
                       :class="{
                         'bg-green-100 text-green-700': comparison.week_comparison.win_rate?.trend === 'up',
                         'bg-red-100 text-red-700': comparison.week_comparison.win_rate?.trend === 'down',
-                        'bg-gray-100 text-gray-600': !comparison.week_comparison.win_rate?.trend || comparison.week_comparison.win_rate?.trend === 'neutral'
+                        'bg-gray-100 text-gray-600': !comparison.week_comparison.win_rate?.trend || comparison.week_comparison.win_rate?.trend === 'stable'
                       }"
                     >
                       <span x-text="getTrendIcon(comparison.week_comparison.win_rate?.trend)"></span>
@@ -613,7 +613,7 @@
                 <div 
                   class="p-4 rounded-lg cursor-pointer hover:shadow-md transition"
                   :class="{
-                    'alert-critical': alert.level === 'critical',
+                    'alert-critical': alert.level === 'danger',
                     'alert-warning': alert.level === 'warning',
                     'alert-info': alert.level === 'info'
                   }"
@@ -625,13 +625,13 @@
                         <span 
                           class="text-xs font-medium px-2 py-0.5 rounded"
                           :class="{
-                            'bg-red-100 text-red-600': alert.level === 'critical',
+                            'bg-red-100 text-red-600': alert.level === 'danger',
                             'bg-yellow-100 text-yellow-600': alert.level === 'warning',
                             'bg-blue-100 text-blue-600': alert.level === 'info'
                           }"
-                          x-text="alert.level === 'critical' ? '紧急' : alert.level === 'warning' ? '警告' : '信息'"
+                          x-text="alert.level === 'danger' ? '紧急' : alert.level === 'warning' ? '警告' : '信息'"
                         ></span>
-                        <span class="text-sm font-medium themed-text" x-text="alert.title"></span>
+                        <span class="text-sm font-medium themed-text" x-text="alert.type_name || alert.type"></span>
                       </div>
                       <p class="text-sm themed-text-muted mt-1" x-text="alert.message"></p>
                       <div class="text-xs themed-text-muted mt-2" x-text="formatTime(alert.created_at)"></div>
@@ -873,16 +873,16 @@
           <div class="themed-card rounded-xl p-6">
             <h3 class="text-lg font-semibold themed-text mb-4">🏆 活动排行</h3>
             <div class="space-y-3 max-h-[300px] overflow-y-auto scrollbar-thin">
-              <template x-for="(campaign, index) in lotteryAnalysis.campaign_ranking" :key="campaign.id">
+              <template x-for="(campaign, index) in lotteryAnalysis.campaign_ranking" :key="campaign.lottery_campaign_id">
                 <div class="flex items-center justify-between p-3 rounded-lg themed-bg-subtle">
                   <div class="flex items-center gap-3">
                     <span class="w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold"
                       :class="index === 0 ? 'bg-yellow-100 text-yellow-600' : index === 1 ? 'bg-gray-200 text-gray-600' : index === 2 ? 'bg-orange-100 text-orange-600' : 'bg-blue-50 text-blue-600'"
                       x-text="index + 1"></span>
-                    <span class="font-medium themed-text" x-text="campaign.name"></span>
+                    <span class="font-medium themed-text" x-text="campaign.campaign_name"></span>
                   </div>
                   <div class="text-right">
-                    <div class="font-bold themed-text" x-text="formatNumber(campaign.draw_count)"></div>
+                    <div class="font-bold themed-text" x-text="formatNumber(campaign.draws)"></div>
                     <div class="text-xs themed-text-muted" x-text="'中奖率 ' + campaign.win_rate.toFixed(1) + '%'"></div>
                   </div>
                 </div>
@@ -1132,7 +1132,7 @@
           <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
             <template x-for="stage in funnelData.stages" :key="stage.name">
               <div class="p-4 themed-bg-subtle rounded-lg text-center">
-                <div class="text-3xl font-bold" :class="stage.rate >= 70 ? 'text-green-600' : stage.rate >= 40 ? 'text-yellow-600' : 'text-red-600'" x-text="stage.rate.toFixed(1) + '%'"></div>
+                <div class="text-3xl font-bold" :class="stage.percentage >= 70 ? 'text-green-600' : stage.percentage >= 40 ? 'text-yellow-600' : 'text-red-600'" x-text="stage.percentage.toFixed(1) + '%'"></div>
                 <div class="text-sm themed-text mt-1" x-text="stage.name"></div>
                 <div class="text-xs themed-text-muted mt-1" x-text="formatNumber(stage.count) + '人'"></div>
               </div>
@@ -1226,7 +1226,8 @@
                 </tr>
               </thead>
               <tbody class="divide-y themed-border">
-                <template x-for="(merchant, index) in merchantData.ranking" :key="merchant.store_id">
+                <!-- 使用后端实际字段名: merchant_id, merchant_name, total_amount, avg_amount -->
+                <template x-for="(merchant, index) in merchantData.ranking" :key="merchant.merchant_id">
                   <tr class="hover:themed-bg-subtle">
                     <td class="px-4 py-3">
                       <span 
@@ -1235,16 +1236,16 @@
                         x-text="index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1"
                       ></span>
                     </td>
-                    <td class="px-4 py-3 font-medium themed-text" x-text="merchant.store_name"></td>
-                    <td class="px-4 py-3 text-right themed-text" x-text="'¥' + formatNumber(merchant.consumption_amount)"></td>
-                    <td class="px-4 py-3 text-right themed-text" x-text="formatNumber(merchant.order_count)"></td>
-                    <td class="px-4 py-3 text-right themed-text" x-text="'¥' + formatNumber(merchant.avg_order_value)"></td>
-                    <td class="px-4 py-3 text-right themed-text" x-text="merchant.contribution_rate.toFixed(1) + '%'"></td>
+                    <td class="px-4 py-3 font-medium themed-text" x-text="merchant.merchant_name"></td>
+                    <td class="px-4 py-3 text-right themed-text" x-text="'¥' + formatNumber(merchant.total_amount || 0)"></td>
+                    <td class="px-4 py-3 text-right themed-text" x-text="formatNumber(merchant.order_count || 0)"></td>
+                    <td class="px-4 py-3 text-right themed-text" x-text="'¥' + formatNumber(merchant.avg_amount || 0)"></td>
+                    <td class="px-4 py-3 text-right themed-text" x-text="(merchant.contribution_rate || 0).toFixed(1) + '%'"></td>
                     <td class="px-4 py-3 text-right">
                       <span 
                         class="px-2 py-1 text-xs font-medium rounded-full"
-                        :class="merchant.health_score >= 80 ? 'bg-green-100 text-green-600' : merchant.health_score >= 60 ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'"
-                        x-text="merchant.health_score + '分'"
+                        :class="(merchant.health_score || 0) >= 80 ? 'bg-green-100 text-green-600' : (merchant.health_score || 0) >= 60 ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'"
+                        x-text="(merchant.health_score || '-') + (merchant.health_score ? '分' : '')"
                       ></span>
                     </td>
                   </tr>
@@ -1282,23 +1283,24 @@
                 </tr>
               </thead>
               <tbody class="divide-y themed-border">
-                <template x-for="merchant in merchantData.comparison" :key="merchant.store_id">
+                <!-- 使用后端实际字段名: merchant_id, merchant_name, this_week_amount, last_week_amount, change_rate -->
+                <template x-for="merchant in merchantData.comparison" :key="merchant.merchant_id">
                   <tr class="hover:themed-bg-subtle">
-                    <td class="px-4 py-3 font-medium themed-text" x-text="merchant.store_name"></td>
-                    <td class="px-4 py-3 text-right themed-text" x-text="'¥' + formatNumber(merchant.this_week)"></td>
-                    <td class="px-4 py-3 text-right themed-text-muted" x-text="'¥' + formatNumber(merchant.last_week)"></td>
+                    <td class="px-4 py-3 font-medium themed-text" x-text="merchant.merchant_name"></td>
+                    <td class="px-4 py-3 text-right themed-text" x-text="'¥' + formatNumber(merchant.this_week_amount || 0)"></td>
+                    <td class="px-4 py-3 text-right themed-text-muted" x-text="'¥' + formatNumber(merchant.last_week_amount || 0)"></td>
                     <td class="px-4 py-3 text-right">
                       <span 
-                        :class="merchant.change >= 0 ? 'text-green-600' : 'text-red-600'"
-                        x-text="(merchant.change >= 0 ? '+' : '') + merchant.change.toFixed(1) + '%'"
+                        :class="(merchant.change_rate || 0) >= 0 ? 'text-green-600' : 'text-red-600'"
+                        x-text="((merchant.change_rate || 0) >= 0 ? '+' : '') + (merchant.change_rate || 0).toFixed(1) + '%'"
                       ></span>
-                      <span x-text="merchant.change >= 0 ? '📈' : '📉'" class="ml-1"></span>
+                      <span x-text="(merchant.change_rate || 0) >= 0 ? '📈' : '📉'" class="ml-1"></span>
                     </td>
                     <td class="px-4 py-3 text-right">
                       <span 
                         class="px-2 py-1 text-xs font-medium rounded-full"
-                        :class="merchant.health_score >= 80 ? 'bg-green-100 text-green-600' : merchant.health_score >= 60 ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'"
-                        x-text="merchant.health_score + '分'"
+                        :class="(merchant.health_score || 0) >= 80 ? 'bg-green-100 text-green-600' : (merchant.health_score || 0) >= 60 ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'"
+                        x-text="(merchant.health_score || '-') + (merchant.health_score ? '分' : '')"
                       ></span>
                     </td>
                   </tr>

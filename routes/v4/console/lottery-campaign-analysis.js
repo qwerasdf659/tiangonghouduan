@@ -138,7 +138,7 @@ router.get(
         admin_id: req.user.user_id,
         lottery_campaign_id: lottery_campaign_id || 'all',
         time_range,
-        strategies_count: Object.keys(result.strategies).length
+        overall_score: result.overall_strategy_score
       })
 
       return res.apiSuccess(result, '获取策略效果分析成功')

@@ -235,7 +235,7 @@ export function useConfigMethods() {
             const key = config.setting_key || config.key
             const value =
               config.parsed_value !== undefined ? config.parsed_value : config.setting_value
-            if (key && this.pointsDefaults.hasOwnProperty(key)) {
+            if (key && Object.hasOwn(this.pointsDefaults, key)) {
               this.pointsDefaults[key] =
                 typeof value === 'number' ? value : parseInt(value) || this.pointsDefaults[key]
             }

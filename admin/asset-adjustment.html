@@ -16,7 +16,7 @@
         <span class="text-lg font-semibold">⚖️ 资产调账</span>
       </div>
       <div class="flex items-center space-x-4">
-        <span x-text="'欢迎，' + (current_user?.nickname || '管理员')"></span>
+        <span x-text="'欢迎，' + (admin_user?.nickname || '管理员')"></span>
         <button @click="logout()" class="px-3 py-1 border border-white/50 rounded hover:bg-white/10">退出登录</button>
       </div>
     </div>

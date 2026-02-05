@@ -235,8 +235,8 @@ document.addEventListener('alpine:init', () => {
     /** @type {Array} 活跃度热力图数据 */
     activityHeatmap: [],
 
-    /** @type {Object} 兑换偏好数据 */
-    exchangePreferences: { top_categories: [], top_prizes: [] },
+    /** @type {Object} 兑换偏好数据（后端返回 preferences 数组 + statistics 统计） */
+    exchangePreferences: { preferences: [], statistics: null },
 
     /** @type {Array} 行为漏斗数据 */
     behaviorFunnel: [],

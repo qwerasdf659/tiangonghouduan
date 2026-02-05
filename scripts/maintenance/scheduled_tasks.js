@@ -108,6 +108,7 @@ class ScheduledTasks {
    * - unified_lottery_engine → UnifiedLotteryEngine（2026-01-30 新增，Task 27 缓存清理）
    */
   static ExchangeService = null
+  static ExchangeAdminService = null // 2026-02-06 新增：管理后台操作（包含 checkTimeoutAndAlert）
   static AdminLotteryCoreService = null // V4.7.0 拆分后：核心干预操作
   static AdminLotteryCampaignService = null // V4.7.0 拆分后：活动管理操作
   static NotificationService = null
@@ -137,11 +138,13 @@ class ScheduledTasks {
       /*
        * P1-9：使用 snake_case 服务键获取服务
        * V4.7.0 大文件拆分：
-       * - exchange_market → exchange_core
+       * - exchange_market → exchange_core / exchange_admin
        * - admin_lottery → admin_lottery_core (核心干预) + admin_lottery_campaign (活动管理)
        * 2026-01-30 新增：unified_lottery_engine（用于 Task 27 CacheManager 缓存清理）
+       * 2026-02-06 新增：exchange_admin（包含 checkTimeoutAndAlert 方法）
        */
       this.ExchangeService = serviceManager.getService('exchange_core') // V4.7.0 拆分后使用 exchange_core
+      this.ExchangeAdminService = serviceManager.getService('exchange_admin') // 2026-02-06：管理后台操作
       this.AdminLotteryCoreService = serviceManager.getService('admin_lottery_core') // V4.7.0 拆分后：核心干预操作
       this.AdminLotteryCampaignService = serviceManager.getService('admin_lottery_campaign') // V4.7.0 拆分后：活动管理操作
       this.NotificationService = serviceManager.getService('notification')
@@ -153,6 +156,7 @@ class ScheduledTasks {
       logger.info('[ScheduledTasks] 服务依赖初始化完成（V4.7.0 拆分后服务键）', {
         services: [
           'exchange_core',
+          'exchange_admin',
           'admin_lottery_core',
           'admin_lottery_campaign',
           'notification',
@@ -294,7 +298,7 @@ class ScheduledTasks {
         await ScheduledTasks.initializeServices()
 
         logger.info('[定时任务] 开始执行24小时超时订单检查...')
-        const result = await ScheduledTasks.ExchangeService.checkTimeoutAndAlert(24)
+        const result = await ScheduledTasks.ExchangeAdminService.checkTimeoutAndAlert(24)
 
         if (result.hasTimeout) {
           logger.warn(`[定时任务] 发现${result.count}个超时订单（24小时）`)
@@ -321,7 +325,7 @@ class ScheduledTasks {
         await ScheduledTasks.initializeServices()
 
         logger.info('[定时任务] 开始执行72小时紧急超时订单检查...')
-        const result = await ScheduledTasks.ExchangeService.checkTimeoutAndAlert(72)
+        const result = await ScheduledTasks.ExchangeAdminService.checkTimeoutAndAlert(72)
 
         if (result.hasTimeout) {
           logger.error(`[定时任务] 🚨 发现${result.count}个紧急超时订单（72小时）`)
@@ -338,60 +342,55 @@ class ScheduledTasks {
   }
 
   /**
-   * 定时任务3: 每天凌晨3点执行数据一致性检查
+   * 定时任务3: 每天凌晨3点执行每日运营数据统计
    * Cron表达式: 0 3 * * * (每天凌晨3点)
+   *
+   * @description
+   * 2026-02-06 重构：移除已归档的 data-consistency-check 模块引用
+   * 改为执行超时订单检测和统计，数据一致性由专门的孤儿检测任务（Task 16）处理
    * @returns {void}
    */
   static scheduleDataConsistencyCheck() {
     cron.schedule('0 3 * * *', async () => {
       try {
-        logger.info('[定时任务] 开始执行每日数据一致性检查...')
-
-        // 执行完整的数据一致性检查（包括自动修复）
-        const DataConsistencyChecker = require('../archived/data-consistency-check')
-        const results = await DataConsistencyChecker.performFullCheck()
-
-        logger.info('[定时任务] 数据一致性检查完成', {
-          total_checks: results.checks.length,
-          total_fixes: results.fixes.length,
-          total_errors: results.errors.length
-        })
+        logger.info('[定时任务] 开始执行每日运营数据统计...')
 
         // P1-9：确保服务已初始化
         await ScheduledTasks.initializeServices()
 
-        // 获取待审核订单统计
-        const statistics = await ScheduledTasks.ExchangeService.getPendingOrdersStatistics()
+        // 使用 ExchangeAdminService 检查超时订单
+        const timeoutResult24h = await ScheduledTasks.ExchangeAdminService.checkTimeoutAndAlert(24)
+        const timeoutResult72h = await ScheduledTasks.ExchangeAdminService.checkTimeoutAndAlert(72)
 
-        logger.info('[定时任务] 待审核订单统计', {
-          total: statistics.total,
-          within24h: statistics.within24h,
-          over24h: statistics.over24h,
-          over72h: statistics.over72h
+        logger.info('[定时任务] 每日订单超时检测完成', {
+          over_24h_count: timeoutResult24h?.count || 0,
+          over_72h_count: timeoutResult72h?.count || 0,
+          has_24h_timeout: timeoutResult24h?.hasTimeout || false,
+          has_72h_timeout: timeoutResult72h?.hasTimeout || false
         })
 
         // 如果有大量超时订单，发送告警
-        if (statistics.over24h > 10) {
+        if (timeoutResult24h?.count > 10) {
           logger.warn('[定时任务] ⚠️ 待审核订单积压', {
-            over24h: statistics.over24h,
+            over24h: timeoutResult24h.count,
             message: '超过24小时的待审核订单数量较多，请及时处理'
           })
         }
 
-        if (statistics.over72h > 5) {
+        if (timeoutResult72h?.count > 5) {
           logger.error('[定时任务] 🚨 待审核订单严重积压', {
-            over72h: statistics.over72h,
+            over72h: timeoutResult72h.count,
             message: '超过72小时的待审核订单数量较多，需要紧急处理'
           })
         }
 
-        logger.info('[定时任务] 每日数据一致性检查完成')
+        logger.info('[定时任务] 每日运营数据统计完成')
       } catch (error) {
-        logger.error('[定时任务] 每日数据一致性检查失败', { error: error.message })
+        logger.error('[定时任务] 每日运营数据统计失败', { error: error.message })
       }
     })
 
-    logger.info('✅ 定时任务已设置: 每日数据一致性检查（每天凌晨3点执行）')
+    logger.info('✅ 定时任务已设置: 每日运营数据统计（每天凌晨3点执行）')
   }
 
   /**
@@ -404,7 +403,7 @@ class ScheduledTasks {
       // P1-9：确保服务已初始化
       await ScheduledTasks.initializeServices()
 
-      const result = await ScheduledTasks.ExchangeService.checkTimeoutAndAlert(24)
+      const result = await ScheduledTasks.ExchangeAdminService.checkTimeoutAndAlert(24)
       logger.info('[手动触发] 检查完成', { result })
       return result
     } catch (error) {
@@ -423,7 +422,7 @@ class ScheduledTasks {
       // P1-9：确保服务已初始化
       await ScheduledTasks.initializeServices()
 
-      const result = await ScheduledTasks.ExchangeService.checkTimeoutAndAlert(72)
+      const result = await ScheduledTasks.ExchangeAdminService.checkTimeoutAndAlert(72)
       logger.info('[手动触发] 检查完成', { result })
       return result
     } catch (error) {

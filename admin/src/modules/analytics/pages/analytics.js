@@ -94,18 +94,17 @@ function analyticsPage() {
      * @type {AnalyticsStats}
      */
     stats: {
-      activeUsers: 0,
-      totalUsers: 0,
-      lotteryCount: 0,
-      highTierDraws: 0,
-      pointsIssued: 0,
-      pointsSpent: 0,
-      exchangeOrders: 0,
-      newItems: 0,
-      // HTML 模板展示用统计数据（从后端 overview 映射）
-      totalDraws: 0,
-      totalWins: 0,
-      pointsConsumed: 0
+      active_users: 0,
+      total_users: 0,
+      lottery_count: 0,
+      high_tier_draws: 0,
+      points_issued: 0,
+      points_spent: 0,
+      exchange_orders: 0,
+      new_items: 0,
+      // 后端 overview 字段（直接使用后端字段名）
+      total_draws: 0,
+      points_consumed: 0
     },
 
     /**
@@ -431,17 +430,17 @@ function analyticsPage() {
           const data = response.data
           logger.info('[Analytics] TODAY_STATS 数据:', data)
 
-          this.stats.activeUsers = data.user_stats?.active_users_today || 0
-          this.stats.totalUsers = data.user_stats?.total_users || 0
-          this.stats.lotteryCount = data.lottery_stats?.draws_today || 0
-          this.stats.highTierDraws = data.lottery_stats?.high_tier_draws_today || 0
-          this.stats.pointsIssued = data.points_stats?.points_earned_today || 0
-          this.stats.pointsSpent = data.points_stats?.points_spent_today || 0
-          this.stats.exchangeOrders = data.inventory_stats?.used_items_today || 0
-          this.stats.newItems = data.inventory_stats?.new_items_today || 0
+          this.stats.active_users = data.user_stats?.active_users_today || 0
+          this.stats.total_users = data.user_stats?.total_users || 0
+          this.stats.lottery_count = data.lottery_stats?.draws_today || 0
+          this.stats.high_tier_draws = data.lottery_stats?.high_tier_draws_today || 0
+          this.stats.points_issued = data.points_stats?.points_earned_today || 0
+          this.stats.points_spent = data.points_stats?.points_spent_today || 0
+          this.stats.exchange_orders = data.inventory_stats?.used_items_today || 0
+          this.stats.new_items = data.inventory_stats?.new_items_today || 0
 
           // 注意：这里先设置今日数据，loadDecisionAnalytics 会用总数据覆盖
-          this.stats.pointsConsumed = this.stats.pointsSpent
+          this.stats.points_consumed = this.stats.points_spent
         }
       } catch (error) {
         logger.error('加载今日统计数据失败:', error)
@@ -458,7 +457,17 @@ function analyticsPage() {
       const days = this.filters.time_range
 
       try {
-        const response = await apiRequest(`${ANALYTICS_ENDPOINTS.DECISIONS}?days=${days}`)
+        // 构建查询参数（支持自定义日期范围）
+        let queryParams = `days=${days}`
+        if (this.filters.start_date && this.filters.end_date) {
+          queryParams += `&start_time=${this.filters.start_date}&end_time=${this.filters.end_date}`
+          logger.info('[Analytics] 使用自定义日期范围', {
+            start: this.filters.start_date,
+            end: this.filters.end_date
+          })
+        }
+        
+        const response = await apiRequest(`${ANALYTICS_ENDPOINTS.DECISIONS}?${queryParams}`)
 
         if (response && response.success) {
           const data = response.data
@@ -477,15 +486,15 @@ function analyticsPage() {
             tierDistribution: data.tier_distribution || []
           }
 
-          // 更新统计卡片数据 - 使用总数据（不是今日数据）
-          this.stats.totalDraws = overview.total_draws || 0
-          this.stats.totalWins = overview.high_tier_draws || 0
+          // 更新统计卡片数据 - 直接使用后端字段名
+          this.stats.total_draws = overview.total_draws || 0
+          this.stats.high_tier_draws = overview.high_tier_draws || 0
 
           logger.info('[Analytics] 更新统计卡片:', {
-            totalDraws: this.stats.totalDraws,
-            totalWins: this.stats.totalWins,
-            activeUsers: this.stats.activeUsers,
-            pointsConsumed: this.stats.pointsConsumed
+            total_draws: this.stats.total_draws,
+            high_tier_draws: this.stats.high_tier_draws,
+            active_users: this.stats.active_users,
+            points_consumed: this.stats.points_consumed
           })
 
           // 更新图表
@@ -611,8 +620,14 @@ function analyticsPage() {
         if (days >= 30) period = 'month'
         if (days >= 90) period = 'quarter'
 
+        // 构建查询参数（支持自定义日期范围）
+        let queryParams = `period=${period}&granularity=daily`
+        if (this.filters.start_date && this.filters.end_date) {
+          queryParams += `&start_time=${this.filters.start_date}&end_time=${this.filters.end_date}`
+        }
+
         const response = await apiRequest(
-          `${ANALYTICS_ENDPOINTS.LOTTERY_TRENDS}?period=${period}&granularity=daily`
+          `${ANALYTICS_ENDPOINTS.LOTTERY_TRENDS}?${queryParams}`
         )
 
         if (response && response.success) {
@@ -663,7 +678,7 @@ function analyticsPage() {
 
           // 更新用户类型分布（使用 summary 数据）
           if (data.summary && this.charts.userSource) {
-            const peakUsers = data.summary.peak_users || this.stats.totalUsers || 10
+            const peakUsers = data.summary.peak_users || this.stats.total_users || 10
             this.charts.userSource.setOption({
               series: [
                 {
@@ -737,14 +752,14 @@ function analyticsPage() {
         // 添加汇总统计行
         exportData.push(['====== 运营数据汇总 ======'])
         exportData.push(['指标', '数值'])
-        exportData.push(['活跃用户数', this.stats.activeUsers || 0])
-        exportData.push(['总用户数', this.stats.totalUsers || 0])
-        exportData.push(['抽奖次数', this.stats.lotteryCount || 0])
-        exportData.push(['高级抽奖次数', this.stats.highTierDraws || 0])
-        exportData.push(['积分发放', this.stats.pointsIssued || 0])
-        exportData.push(['积分消耗', this.stats.pointsSpent || 0])
-        exportData.push(['兑换订单数', this.stats.exchangeOrders || 0])
-        exportData.push(['新增物品数', this.stats.newItems || 0])
+        exportData.push(['活跃用户数', this.stats.active_users || 0])
+        exportData.push(['总用户数', this.stats.total_users || 0])
+        exportData.push(['抽奖次数', this.stats.lottery_count || 0])
+        exportData.push(['高级抽奖次数', this.stats.high_tier_draws || 0])
+        exportData.push(['积分发放', this.stats.points_issued || 0])
+        exportData.push(['积分消耗', this.stats.points_spent || 0])
+        exportData.push(['兑换订单数', this.stats.exchange_orders || 0])
+        exportData.push(['新增物品数', this.stats.new_items || 0])
         exportData.push([''])
 
         // 如果有每日明细数据，也导出

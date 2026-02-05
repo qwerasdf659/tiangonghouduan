@@ -324,11 +324,11 @@ function lotteryAlertsPage() {
 
       this.alerts.forEach(alert => {
         // 直接使用后端API字段: level
-        if (alert.level && severityStats.hasOwnProperty(alert.level)) {
+        if (alert.level && Object.hasOwn(severityStats, alert.level)) {
           severityStats[alert.level]++
         }
         // 直接使用后端API字段: type
-        if (alert.type && typeStats.hasOwnProperty(alert.type)) {
+        if (alert.type && Object.hasOwn(typeStats, alert.type)) {
           typeStats[alert.type]++
         }
       })

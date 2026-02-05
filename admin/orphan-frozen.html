@@ -132,7 +132,7 @@
             <template x-if="orphanList.length === 0">
               <tr><td colspan="9" class="px-4 py-8 text-center themed-text-muted">暂无孤儿/冻结资产</td></tr>
             </template>
-            <template x-for="asset in orphanList" :key="asset.account_id">
+            <template x-for="asset in orphanList" :key="asset.account_id + '_' + asset.asset_code">
               <tr class="themed-hover-bg">
                 <td class="px-4 py-3">
                   <input type="checkbox" :checked="isItemSelected(asset)" @change="toggleRowSelection(asset)" class="rounded">

@@ -27,7 +27,7 @@ const apiRequest = async (url, options = {}) => {
 
 /**
  * @typedef {Object} InterventionForm
- * @property {string|number} prize_id - 奖品ID
+ * @property {string|number} lottery_prize_id - 奖品ID
  * @property {string} expire_time - 过期时间
  * @property {string} reason - 干预原因
  * @property {string} note - 备注说明
@@ -38,7 +38,7 @@ const apiRequest = async (url, options = {}) => {
  * @property {number} id - 规则ID
  * @property {number} user_id - 用户ID
  * @property {string} setting_type - 设置类型（force_win/force_lose/probability_adjust等）
- * @property {number} prize_id - 奖品ID
+ * @property {number} lottery_prize_id - 奖品ID
  * @property {string} status - 状态
  * @property {string} expire_time - 过期时间
  * @property {Object} user_info - 用户信息
@@ -152,7 +152,7 @@ function presetsPage() {
      * @type {InterventionForm}
      */
     interventionForm: {
-      prize_id: '',
+      lottery_prize_id: '',
       expire_time: '',
       reason: '',
       note: ''
@@ -297,7 +297,7 @@ function presetsPage() {
      */
     resetForm() {
       this.interventionForm = {
-        prize_id: '',
+        lottery_prize_id: '',
         expire_time: '',
         reason: '',
         note: ''
@@ -364,12 +364,12 @@ function presetsPage() {
     /**
      * 获取当前选中的奖品
      *
-     * @description 根据表单中的prize_id从奖品列表中查找对应奖品信息
+     * @description 根据表单中的lottery_prize_id从奖品列表中查找对应奖品信息
      * @returns {Object|null} 选中的奖品对象，未选中时返回null
      */
     getSelectedPrize() {
-      if (!this.interventionForm.prize_id) return null
-      return this.allPrizes.find(p => p.prize_id == this.interventionForm.prize_id)
+      if (!this.interventionForm.lottery_prize_id) return null
+      return this.allPrizes.find(p => p.lottery_prize_id == this.interventionForm.lottery_prize_id)
     },
 
     /**
@@ -386,7 +386,7 @@ function presetsPage() {
         return
       }
 
-      if (!this.interventionForm.prize_id) {
+      if (!this.interventionForm.lottery_prize_id) {
         this.showError('请选择预设奖品')
         return
       }
@@ -413,7 +413,7 @@ function presetsPage() {
           method: 'POST',
           data: {
             user_id: parseInt(this.selectedUser.user_id),
-            prize_id: parseInt(this.interventionForm.prize_id),
+            lottery_prize_id: parseInt(this.interventionForm.lottery_prize_id),
             duration_minutes: durationMinutes,
             reason: reason
           }

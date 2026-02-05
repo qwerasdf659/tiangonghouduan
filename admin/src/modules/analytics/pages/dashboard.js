@@ -97,12 +97,12 @@ function dashboardPage() {
      * @type {DashboardStats}
      */
     stats: {
-      totalUsers: 0,
-      todayNewUsers: 0,
-      todayDraws: 0,
-      todayWins: 0,
-      winRate: 0,
-      pointsConsumed: 0,
+      total_users: 0,
+      today_new_users: 0,
+      today_draws: 0,
+      today_wins: 0,
+      win_rate: 0,
+      points_consumed: 0,
       sessions: 0,
       messages: 0
     },
@@ -376,16 +376,16 @@ function dashboardPage() {
 
         // 适配后端V4数据结构 - 总用户数据
         if (data.overview) {
-          this.stats.totalUsers = data.overview.total_users || 0
+          this.stats.total_users = data.overview.total_users || 0
         }
 
         // 适配后端V4.0数据结构 - 今日数据
         if (data.today) {
-          this.stats.todayNewUsers = data.today.new_users || 0
-          this.stats.todayDraws = data.today.lottery_draws || 0
-          this.stats.todayWins = data.today.high_tier_wins || data.today.wins || 0
-          this.stats.winRate = data.today.high_tier_rate || data.today.win_rate || 0
-          this.stats.pointsConsumed = data.today.points_consumed || 0
+          this.stats.today_new_users = data.today.new_users || 0
+          this.stats.today_draws = data.today.lottery_draws || 0
+          this.stats.today_wins = data.today.high_tier_wins || data.today.wins || 0
+          this.stats.win_rate = data.today.high_tier_rate || data.today.win_rate || 0
+          this.stats.points_consumed = data.today.points_consumed || 0
 
           // 更新今日分布饼图
           if (this.distributionChart) {

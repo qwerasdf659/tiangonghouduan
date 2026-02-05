@@ -66,9 +66,9 @@
               </tr>
             </thead>
             <tbody class="divide-y">
-              <template x-for="ann in announcements" :key="ann.announcement_id">
+              <template x-for="ann in announcements" :key="ann.system_announcement_id">
                 <tr class="themed-hover-bg">
-                  <td class="px-4 py-3 text-sm" x-text="ann.announcement_id"></td>
+                  <td class="px-4 py-3 text-sm" x-text="ann.system_announcement_id"></td>
                   <td class="px-4 py-3 text-sm" x-text="ann.title"></td>
                   <td class="px-4 py-3">
                     <span class="px-2 py-1 text-xs rounded themed-bg-primary-light themed-text-primary" x-text="ann.type || '通知'"></span>

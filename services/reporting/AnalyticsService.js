@@ -40,25 +40,46 @@ class AnalyticsService {
    * @returns {Promise<Object>} 决策分析数据
    */
   static async getDecisionAnalytics(days = 7, userFilter = null, options = {}) {
-    const { refresh = false } = options
+    const { refresh = false, start_time = null, end_time = null } = options
 
     try {
       // 参数验证
       const dayCount = Math.min(Math.max(parseInt(days) || 7, 1), 90)
 
+      // 计算时间范围（优先使用传入的自定义日期范围）
+      let startDate, endDate
+      if (start_time && end_time) {
+        // 使用用户指定的日期范围
+        startDate = new Date(start_time)
+        startDate.setHours(0, 0, 0, 0)
+        endDate = new Date(end_time)
+        endDate.setHours(23, 59, 59, 999)
+        logger.info('[Analytics] 使用自定义日期范围', { start_time, end_time })
+      } else {
+        // 使用 days 参数计算日期范围
+        endDate = BeijingTimeHelper.createBeijingTime()
+        startDate = new Date(endDate.getTime() - dayCount * 24 * 60 * 60 * 1000)
+      }
+
       // ========== Redis 缓存读取（2026-01-03 P1 缓存优化）==========
-      const cacheParams = { days: dayCount, user: userFilter || 'all' }
+      const cacheParams = {
+        days: dayCount,
+        user: userFilter || 'all',
+        start: start_time || 'default',
+        end: end_time || 'default'
+      }
       if (!refresh) {
         const cached = await BusinessCacheHelper.getStats('decision', cacheParams)
         if (cached) {
-          logger.debug('[报表缓存] decision 命中', { days: dayCount, userFilter })
+          logger.debug('[报表缓存] decision 命中', {
+            days: dayCount,
+            userFilter,
+            start_time,
+            end_time
+          })
           return cached
         }
       }
-
-      // 计算时间范围
-      const endDate = BeijingTimeHelper.createBeijingTime()
-      const startDate = new Date(endDate.getTime() - dayCount * 24 * 60 * 60 * 1000)
 
       // 构建查询条件
       const whereClause = {
@@ -192,40 +213,58 @@ class AnalyticsService {
    * @returns {Promise<Object>} 趋势分析数据
    */
   static async getLotteryTrends(period = 'week', granularity = 'daily', options = {}) {
-    const { refresh = false } = options
+    const { refresh = false, start_time = null, end_time = null } = options
 
     try {
       // ========== Redis 缓存读取（2026-01-03 P1 缓存优化）==========
-      const cacheParams = { period, granularity }
+      const cacheParams = {
+        period,
+        granularity,
+        start: start_time || 'default',
+        end: end_time || 'default'
+      }
       if (!refresh) {
         const cached = await BusinessCacheHelper.getStats('trends', cacheParams)
         if (cached) {
-          logger.debug('[报表缓存] trends 命中', { period, granularity })
+          logger.debug('[报表缓存] trends 命中', { period, granularity, start_time, end_time })
           return cached
         }
       }
 
-      // 计算时间范围
+      // 计算时间范围（优先使用传入的自定义日期范围）
+      let startDate, endDate
       let days = 7
-      switch (period) {
-        case 'day':
-          days = 1
-          break
-        case 'week':
-          days = 7
-          break
-        case 'month':
-          days = 30
-          break
-        case 'quarter':
-          days = 90
-          break
-        default:
-          days = 7
-      }
 
-      const endDate = BeijingTimeHelper.createBeijingTime()
-      const startDate = new Date(endDate.getTime() - days * 24 * 60 * 60 * 1000)
+      if (start_time && end_time) {
+        // 使用用户指定的日期范围
+        startDate = new Date(start_time)
+        startDate.setHours(0, 0, 0, 0)
+        endDate = new Date(end_time)
+        endDate.setHours(23, 59, 59, 999)
+        // 计算实际天数以便后续逻辑使用
+        days = Math.ceil((endDate - startDate) / (24 * 60 * 60 * 1000))
+        logger.info('[Trends] 使用自定义日期范围', { start_time, end_time, days })
+      } else {
+        // 使用 period 参数计算日期范围
+        switch (period) {
+          case 'day':
+            days = 1
+            break
+          case 'week':
+            days = 7
+            break
+          case 'month':
+            days = 30
+            break
+          case 'quarter':
+            days = 90
+            break
+          default:
+            days = 7
+        }
+        endDate = BeijingTimeHelper.createBeijingTime()
+        startDate = new Date(endDate.getTime() - days * 24 * 60 * 60 * 1000)
+      }
 
       // 设置聚合粒度
       let dateFormat = '%Y-%m-%d'

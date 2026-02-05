@@ -16,16 +16,17 @@
 // ========== 日志工具 ==========
 // 注意：必须先 import 再 re-export，这样才能在 default export 中使用
 import { logger, LOG_LEVELS } from './logger.js'
-export { logger, LOG_LEVELS }
 
 // ========== ECharts 懒加载 ==========
 // 同理，先 import 再 re-export
 import { loadECharts, isEChartsLoaded, getECharts, preloadECharts } from './echarts-lazy.js'
-export { loadECharts, isEChartsLoaded, getECharts, preloadECharts }
 
 // ========== 确认对话框 ==========
 // 从 Alpine Store 导出便捷函数
 import { $confirm, $confirmDanger } from '../alpine/stores/confirm-dialog.js'
+
+export { logger, LOG_LEVELS }
+export { loadECharts, isEChartsLoaded, getECharts, preloadECharts }
 export { $confirm, $confirmDanger }
 
 // ========== 格式化函数 ==========

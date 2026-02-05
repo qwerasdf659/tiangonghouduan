@@ -244,4 +244,91 @@ router.get('/stats/by-risk-level', authenticateToken, requireRoleLevel(100), asy
   }
 })
 
+/**
+ * GET /api/v4/console/audit-rollback/stats/by-target-type
+ *
+ * 按目标类型（模块）统计
+ *
+ * 业务场景：
+ * - 统计各业务模块（用户、积分、抽奖、商家等）的操作分布
+ * - 用于分析管理员对不同业务模块的操作频率
+ *
+ * 查询参数:
+ * - start_time: 开始时间（北京时间，ISO 8601格式）
+ * - end_time: 结束时间（北京时间，ISO 8601格式）
+ *
+ * 返回格式:
+ * {
+ *   total: 150,
+ *   items: [
+ *     { target_type: 'user', count: 50, percentage: 33.33 },
+ *     { target_type: 'item', count: 40, percentage: 26.67 },
+ *     ...
+ *   ]
+ * }
+ */
+router.get('/stats/by-target-type', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const rollbackService = ServiceManager.getService('audit_rollback')
+    const { start_time, end_time } = req.query
+
+    const result = await rollbackService.getStatsByTargetType({
+      start_time: start_time ? new Date(start_time) : undefined,
+      end_time: end_time ? new Date(end_time) : undefined
+    })
+
+    return res.apiSuccess(result, '获取目标类型统计成功')
+  } catch (error) {
+    logger.error('[审计回滚] 获取目标类型统计失败', { error: error.message })
+    return res.apiError('获取目标类型统计失败', 'TARGET_TYPE_STATS_ERROR', null, 500)
+  }
+})
+
+/**
+ * GET /api/v4/console/audit-rollback/stats/trend
+ *
+ * 操作趋势统计（按日期分组）
+ *
+ * 业务场景：
+ * - 分析最近 N 天的操作趋势变化
+ * - 用于运营监控和异常检测（如某天操作量突增/突减）
+ *
+ * 查询参数:
+ * - days: 统计天数（默认7天，最大90天）
+ * - end_date: 结束日期（默认今天，北京时间，格式：YYYY-MM-DD）
+ *
+ * 返回格式:
+ * {
+ *   total: 350,
+ *   days: 7,
+ *   items: [
+ *     { date: '2026-02-01', count: 45, day_of_week: '周六' },
+ *     { date: '2026-02-02', count: 52, day_of_week: '周日' },
+ *     ...
+ *   ],
+ *   average_per_day: 50.00,
+ *   max_day: { date: '2026-02-03', count: 68 },
+ *   min_day: { date: '2026-02-01', count: 45 }
+ * }
+ */
+router.get('/stats/trend', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const rollbackService = ServiceManager.getService('audit_rollback')
+    const { days, end_date } = req.query
+
+    // 参数校验：天数最大90天
+    const parsedDays = days ? Math.min(parseInt(days, 10), 90) : 7
+
+    const result = await rollbackService.getOperationTrend({
+      days: parsedDays,
+      end_date: end_date ? new Date(end_date) : undefined
+    })
+
+    return res.apiSuccess(result, '获取操作趋势统计成功')
+  } catch (error) {
+    logger.error('[审计回滚] 获取操作趋势统计失败', { error: error.message })
+    return res.apiError('获取操作趋势统计失败', 'TREND_STATS_ERROR', null, 500)
+  }
+})
+
 module.exports = router

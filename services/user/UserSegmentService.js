@@ -409,49 +409,49 @@ class UserSegmentService {
       const startDate = new Date()
       startDate.setDate(startDate.getDate() - days)
 
-      // 统计兑换商品偏好
+      // 统计兑换商品偏好（按 exchange_item_id 分组）
       const exchangeStats = await models.ExchangeRecord.findAll({
         attributes: [
-          'target_id',
-          [fn('COUNT', col('exchange_id')), 'exchange_count'],
+          'exchange_item_id',
+          [fn('COUNT', col('exchange_record_id')), 'exchange_count'],
           [fn('SUM', col('quantity')), 'total_quantity'],
           [fn('COUNT', literal('DISTINCT user_id')), 'unique_users']
         ],
         where: {
           created_at: { [Op.gte]: startDate },
-          status: { [Op.in]: ['completed', 'pending'] }
+          status: { [Op.in]: ['completed', 'pending', 'shipped'] }
         },
-        group: ['target_id'],
+        group: ['exchange_item_id'],
         order: [[literal('exchange_count'), 'DESC']],
         limit,
         raw: true
       })
 
-      // 获取商品详情
-      const targetIds = exchangeStats.map(s => s.target_id)
-      const targetDetails = {}
+      // 获取兑换商品详情（关联 ExchangeItem 模型）
+      const exchangeItemIds = exchangeStats.map(s => s.exchange_item_id)
+      const itemDetails = {}
 
-      if (targetIds.length > 0 && models.ItemTemplate) {
-        const templates = await models.ItemTemplate.findAll({
-          where: { item_template_id: { [Op.in]: targetIds } },
-          attributes: ['item_template_id', 'item_name', 'category_code', 'rarity_code'],
+      if (exchangeItemIds.length > 0 && models.ExchangeItem) {
+        const items = await models.ExchangeItem.findAll({
+          where: { exchange_item_id: { [Op.in]: exchangeItemIds } },
+          attributes: ['exchange_item_id', 'item_name', 'cost_asset_code', 'cost_amount'],
           raw: true
         })
 
-        templates.forEach(t => {
-          targetDetails[t.item_template_id] = t
+        items.forEach(item => {
+          itemDetails[item.exchange_item_id] = item
         })
       }
 
       // 构建偏好列表
       const preferences = exchangeStats.map((stat, index) => {
-        const detail = targetDetails[stat.target_id] || {}
+        const detail = itemDetails[stat.exchange_item_id] || {}
         return {
           rank: index + 1,
-          target_id: stat.target_id,
-          item_name: detail.item_name || `商品${stat.target_id}`,
-          category_code: detail.category_code,
-          rarity_code: detail.rarity_code,
+          exchange_item_id: stat.exchange_item_id,
+          item_name: detail.item_name || `商品${stat.exchange_item_id}`,
+          cost_asset_code: detail.cost_asset_code,
+          cost_amount: detail.cost_amount ? parseInt(detail.cost_amount) : null,
           exchange_count: parseInt(stat.exchange_count),
           total_quantity: parseInt(stat.total_quantity) || parseInt(stat.exchange_count),
           unique_users: parseInt(stat.unique_users)
@@ -828,6 +828,202 @@ class UserSegmentService {
     }
 
     return insights
+  }
+
+  /**
+   * 获取行为漏斗趋势数据
+   *
+   * 功能说明：获取指定天数内每日的漏斗转化率变化趋势
+   * 用于运营仪表盘"转化率趋势"图表展示
+   *
+   * @param {Object} models - Sequelize 模型集合
+   * @param {Object} [options] - 查询选项
+   * @param {number} [options.days=7] - 统计天数（默认7天）
+   * @returns {Promise<Object>} 漏斗趋势数据
+   *
+   * @example
+   * const trend = await UserSegmentService.getFunnelTrend(models, { days: 7 })
+   * // 返回：
+   * // {
+   * //   trend: [
+   * //     { date: '02/01', active_count: 100, lottery_rate: 65.5, consumption_rate: 40.2, exchange_rate: 20.1 },
+   * //     { date: '02/02', active_count: 105, lottery_rate: 68.3, consumption_rate: 42.5, exchange_rate: 22.0 },
+   * //     ...
+   * //   ],
+   * //   period_days: 7,
+   * //   generated_at: '2026-02-05T10:00:00+08:00'
+   * // }
+   */
+  static async getFunnelTrend(models, options = {}) {
+    const { days = 7 } = options
+    const cacheParams = { type: 'funnel_trend', days }
+
+    // 尝试从缓存获取（趋势数据缓存15分钟）
+    const cached = await BusinessCacheHelper.getStats('user_behavior_trend', cacheParams)
+    if (cached) {
+      logger.debug('从缓存获取漏斗趋势数据')
+      return cached
+    }
+
+    logger.info('计算漏斗趋势数据', { days })
+
+    try {
+      // 计算日期范围
+      const endDate = new Date()
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() - days)
+
+      /*
+       * 使用原生SQL查询每日漏斗数据（性能优化）
+       * 按日期分组统计各阶段数据
+       */
+      const [dailyStats] = await models.sequelize.query(
+        `
+        WITH date_series AS (
+          -- 生成日期序列
+          SELECT DATE(DATE_SUB(CURDATE(), INTERVAL n DAY)) AS stat_date
+          FROM (
+            SELECT 0 AS n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 
+            UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7
+            UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11
+            UNION SELECT 12 UNION SELECT 13 UNION SELECT 14
+          ) numbers
+          WHERE n < :days
+        ),
+        daily_active AS (
+          -- 每日活跃用户数（当日有登录）
+          SELECT 
+            DATE(last_login) AS stat_date,
+            COUNT(DISTINCT user_id) AS active_count
+          FROM users
+          WHERE last_login >= :startDate
+            AND last_login < DATE_ADD(:endDate, INTERVAL 1 DAY)
+            AND status = 'active'
+          GROUP BY DATE(last_login)
+        ),
+        daily_lottery AS (
+          -- 每日抽奖用户数
+          SELECT 
+            DATE(created_at) AS stat_date,
+            COUNT(DISTINCT user_id) AS lottery_count
+          FROM lottery_draws
+          WHERE created_at >= :startDate
+            AND created_at < DATE_ADD(:endDate, INTERVAL 1 DAY)
+          GROUP BY DATE(created_at)
+        ),
+        daily_consumption AS (
+          -- 每日消费触发用户数（已审核通过）
+          SELECT 
+            DATE(created_at) AS stat_date,
+            COUNT(DISTINCT user_id) AS consumption_count
+          FROM consumption_records
+          WHERE created_at >= :startDate
+            AND created_at < DATE_ADD(:endDate, INTERVAL 1 DAY)
+            AND status = 'approved'
+          GROUP BY DATE(created_at)
+        ),
+        daily_exchange AS (
+          -- 每日兑换用户数
+          SELECT 
+            DATE(created_at) AS stat_date,
+            COUNT(DISTINCT user_id) AS exchange_count
+          FROM exchange_records
+          WHERE created_at >= :startDate
+            AND created_at < DATE_ADD(:endDate, INTERVAL 1 DAY)
+            AND status IN ('completed', 'pending')
+          GROUP BY DATE(created_at)
+        )
+        SELECT 
+          DATE_FORMAT(ds.stat_date, '%m/%d') AS date,
+          ds.stat_date AS full_date,
+          COALESCE(da.active_count, 0) AS active_count,
+          COALESCE(dl.lottery_count, 0) AS lottery_count,
+          COALESCE(dc.consumption_count, 0) AS consumption_count,
+          COALESCE(de.exchange_count, 0) AS exchange_count
+        FROM date_series ds
+        LEFT JOIN daily_active da ON ds.stat_date = da.stat_date
+        LEFT JOIN daily_lottery dl ON ds.stat_date = dl.stat_date
+        LEFT JOIN daily_consumption dc ON ds.stat_date = dc.stat_date
+        LEFT JOIN daily_exchange de ON ds.stat_date = de.stat_date
+        ORDER BY ds.stat_date ASC
+        `,
+        {
+          replacements: {
+            days,
+            startDate: startDate.toISOString().slice(0, 10),
+            endDate: endDate.toISOString().slice(0, 10)
+          }
+        }
+      )
+
+      // 计算每日转化率
+      const trend = dailyStats.map(day => {
+        const activeCount = parseInt(day.active_count) || 0
+        const lotteryCount = parseInt(day.lottery_count) || 0
+        const consumptionCount = parseInt(day.consumption_count) || 0
+        const exchangeCount = parseInt(day.exchange_count) || 0
+
+        return {
+          date: day.date,
+          full_date: day.full_date,
+          active_count: activeCount,
+          // 转化率计算：各阶段用户数 / 活跃用户数 * 100
+          lottery_rate:
+            activeCount > 0 ? Math.round((lotteryCount / activeCount) * 10000) / 100 : 0,
+          consumption_rate:
+            activeCount > 0 ? Math.round((consumptionCount / activeCount) * 10000) / 100 : 0,
+          exchange_rate:
+            activeCount > 0 ? Math.round((exchangeCount / activeCount) * 10000) / 100 : 0
+        }
+      })
+
+      // 计算趋势统计摘要
+      const validDays = trend.filter(d => d.active_count > 0)
+      const avgLotteryRate =
+        validDays.length > 0
+          ? Math.round(
+              (validDays.reduce((sum, d) => sum + d.lottery_rate, 0) / validDays.length) * 100
+            ) / 100
+          : 0
+      const avgConsumptionRate =
+        validDays.length > 0
+          ? Math.round(
+              (validDays.reduce((sum, d) => sum + d.consumption_rate, 0) / validDays.length) * 100
+            ) / 100
+          : 0
+      const avgExchangeRate =
+        validDays.length > 0
+          ? Math.round(
+              (validDays.reduce((sum, d) => sum + d.exchange_rate, 0) / validDays.length) * 100
+            ) / 100
+          : 0
+
+      const result = {
+        trend,
+        summary: {
+          avg_lottery_rate: avgLotteryRate,
+          avg_consumption_rate: avgConsumptionRate,
+          avg_exchange_rate: avgExchangeRate,
+          total_active_days: validDays.length
+        },
+        period_days: days,
+        generated_at: BeijingTimeHelper.now()
+      }
+
+      // 缓存15分钟
+      await BusinessCacheHelper.setStats('user_behavior_trend', cacheParams, result)
+
+      logger.info('漏斗趋势数据计算完成', {
+        days,
+        trend_points: trend.length,
+        avg_lottery_rate: avgLotteryRate
+      })
+
+      return result
+    } catch (error) {
+      logger.error('获取漏斗趋势数据失败', { error: error.message, stack: error.stack })
+      throw error
+    }
   }
 
   /**

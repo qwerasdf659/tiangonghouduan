@@ -19,6 +19,8 @@ export function useDailyReportState() {
   return {
     /** @type {Object|null} 日报数据 */
     dailyReport: null,
+    /** @type {Object|null} 日报数据（HTML模板兼容别名） */
+    dailyReportData: null,
     /** @type {boolean} 日报加载状态 */
     loadingDailyReport: false,
     /** @type {Object} 日报筛选条件 */
@@ -28,6 +30,10 @@ export function useDailyReportState() {
     },
     /** @type {boolean} 显示日报页面 */
     showDailyReportPanel: true,
+    /** @type {boolean} 显示日报弹窗（HTML模板兼容） */
+    showDailyReportModal: false,
+    /** @type {string} 日报日期显示（HTML模板兼容） */
+    dailyReportDate: '',
     /** @type {Array<Object>} 日报历史记录（可选扩展） */
     dailyReportHistory: []
   }
@@ -64,6 +70,7 @@ export function useDailyReportMethods() {
     async loadDailyReportPage() {
       this.loadingDailyReport = true
       this.dailyReport = null
+      this.dailyReportData = null
       try {
         const params = {}
 
@@ -85,6 +92,8 @@ export function useDailyReportMethods() {
 
         if (response?.success) {
           this.dailyReport = response.data
+          this.dailyReportData = response.data
+          this.dailyReportDate = response.data?.report_date || ''
           logger.info('[DailyReport] 运营日报加载成功', {
             report_date: response.data?.report_date,
             total_draws: response.data?.summary?.total_draws
@@ -240,6 +249,41 @@ export function useDailyReportMethods() {
     formatDailyReportPercentage(value) {
       if (value === null || value === undefined) return '-'
       return `${(value * 100).toFixed(2)}%`
+    },
+
+    /**
+     * 获取变化值的颜色类（HTML模板兼容方法）
+     * @param {number} value - 变化百分比
+     * @returns {string} CSS颜色类
+     */
+    getChangeColorClass(value) {
+      if (value === null || value === undefined) {
+        return 'text-gray-500'
+      }
+      if (value > 0) {
+        return 'text-green-600'
+      } else if (value < 0) {
+        return 'text-red-600'
+      }
+      return 'text-gray-500'
+    },
+
+    /**
+     * 格式化变化值文本（HTML模板兼容方法）
+     * @param {number} value - 变化百分比
+     * @returns {string} 格式化的变化文本
+     */
+    formatReportChange(value) {
+      if (value === null || value === undefined) {
+        return '-'
+      }
+      const absValue = Math.abs(value * 100).toFixed(1)
+      if (value > 0) {
+        return `+${absValue}%`
+      } else if (value < 0) {
+        return `-${absValue}%`
+      }
+      return `${absValue}%`
     }
   }
 }

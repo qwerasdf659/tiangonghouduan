@@ -64,18 +64,16 @@ export function useBudgetMethods() {
           params.append('status', this.budgetFilters.status)
         }
 
-        // apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }
+        const apiUrl = `${LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_BATCH_STATUS}?${params}`
+
         const response = await this.apiGet(
-          `${LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_BATCH_STATUS}?${params}`,
+          apiUrl,
           {},
           { showLoading: false }
         )
 
-        logger.debug('📊 [Budget] API 返回数据:', response)
-
         // 解包 withLoading 返回的结构
         const data = response?.success ? response.data : response
-        logger.debug('📊 [Budget] 解包后数据:', data)
 
         if (data) {
           const { campaigns, summary } = data

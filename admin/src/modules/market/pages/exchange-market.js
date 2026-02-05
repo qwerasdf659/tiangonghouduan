@@ -100,12 +100,12 @@ document.addEventListener('alpine:init', () => {
       ...useExchangeStatsState(),
 
       // ========== 市场统计 ==========
-      /** 市场统计数据 */
+      /** 市场统计数据 - 直接使用后端字段名 */
       marketStats: {
-        totalItems: 0,
-        todayOrders: 0,
-        pendingShipments: 0,
-        pointsConsumed: 0
+        total_items: 0,
+        today_orders: 0,
+        pending_shipments: 0,
+        points_consumed: 0
       },
 
       async init() {
@@ -148,14 +148,14 @@ document.addEventListener('alpine:init', () => {
        */
       _updateMarketStats() {
         this.marketStats = {
-          totalItems: this.exchangeStats?.items?.activeCount || this.items?.length || 0,
-          todayOrders: this.exchangeStats?.orders?.total || this.orders?.length || 0,
-          pendingShipments:
+          total_items: this.exchangeStats?.items?.activeCount || this.items?.length || 0,
+          today_orders: this.exchangeStats?.orders?.total || this.orders?.length || 0,
+          pending_shipments:
             this.exchangeStats?.orders?.pending ||
             this.orders?.filter(o => o.status === 'pending')?.length ||
             0,
           // 使用累计消耗的资产数量
-          pointsConsumed: this.exchangeStats?.revenue?.total_virtual_value || 0
+          points_consumed: this.exchangeStats?.revenue?.total_virtual_value || 0
         }
       },
 
@@ -179,7 +179,7 @@ document.addEventListener('alpine:init', () => {
        * @param {Object|number} itemOrId - 商品对象或商品ID
        */
       async deleteItem(itemOrId) {
-        const itemId = typeof itemOrId === 'object' ? itemOrId.item_id : itemOrId
+        const itemId = typeof itemOrId === 'object' ? itemOrId.exchange_item_id : itemOrId
         if (!itemId) {
           logger.error('[ExchangeMarket] deleteItem: 无效的商品ID')
           return
@@ -189,7 +189,7 @@ document.addEventListener('alpine:init', () => {
 
         try {
           const res = await request({
-            url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_DETAIL, { item_id: itemId }),
+            url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_DETAIL, { exchange_item_id: itemId }),
             method: 'DELETE'
           })
           if (res.success) {

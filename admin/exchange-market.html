@@ -57,9 +57,9 @@
               </tr>
             </thead>
             <tbody class="divide-y">
-              <template x-for="item in items" :key="item.item_id">
+              <template x-for="item in items" :key="item.exchange_item_id">
                 <tr class="themed-hover-bg">
-                  <td class="px-4 py-3 text-sm" x-text="item.item_id"></td>
+                  <td class="px-4 py-3 text-sm" x-text="item.exchange_item_id"></td>
                   <td class="px-4 py-3 text-sm" x-text="item.item_name"></td>
                   <td class="px-4 py-3 text-sm font-mono" x-text="(item.cost_amount || item.price || 0) + ' ' + (item.cost_asset_code || '积分')"></td>
                   <td class="px-4 py-3 text-sm" x-text="item.stock"></td>
@@ -162,19 +162,19 @@
       <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
         <div class="themed-card rounded-lg shadow p-6 text-center">
           <h6 class="themed-text-muted mb-2">总商品数</h6>
-          <h2 class="text-3xl font-bold themed-text-primary" x-text="marketStats.totalItems"></h2>
+          <h2 class="text-3xl font-bold themed-text-primary" x-text="marketStats.total_items"></h2>
         </div>
         <div class="themed-card rounded-lg shadow p-6 text-center">
           <h6 class="themed-text-muted mb-2">今日订单</h6>
-          <h2 class="text-3xl font-bold text-green-600" x-text="marketStats.todayOrders"></h2>
+          <h2 class="text-3xl font-bold text-green-600" x-text="marketStats.today_orders"></h2>
         </div>
         <div class="themed-card rounded-lg shadow p-6 text-center">
           <h6 class="themed-text-muted mb-2">待发货</h6>
-          <h2 class="text-3xl font-bold text-yellow-600" x-text="marketStats.pendingShipments"></h2>
+          <h2 class="text-3xl font-bold text-yellow-600" x-text="marketStats.pending_shipments"></h2>
         </div>
         <div class="themed-card rounded-lg shadow p-6 text-center">
           <h6 class="themed-text-muted mb-2">积分消耗</h6>
-          <h2 class="text-3xl font-bold text-purple-600" x-text="marketStats.pointsConsumed"></h2>
+          <h2 class="text-3xl font-bold text-purple-600" x-text="marketStats.points_consumed"></h2>
         </div>
       </div>
 

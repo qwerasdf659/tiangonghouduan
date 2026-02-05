@@ -22,6 +22,57 @@ router.use(authenticateToken)
 router.use(requireRoleLevel(100))
 
 /**
+ * 📊 获取用户管理统计数据
+ * GET /api/v4/console/user_management/stats
+ *
+ * 业务场景：
+ * - 管理后台用户管理模块统计概览
+ * - 查看用户总体情况、增长趋势、角色分布
+ *
+ * 响应数据：
+ * - summary: 概览指标（总用户数、新增、活跃）
+ * - growth_rates: 增长率指标
+ * - status_distribution: 用户状态分布（active/inactive/banned）
+ * - role_distribution: 用户角色分布
+ * - recent_registrations: 近期注册趋势（7日）
+ *
+ * @since 2026-02-05（用户管理模块统计接口）
+ */
+router.get('/stats', async (req, res) => {
+  try {
+    const { refresh } = req.query
+
+    // 通过 ServiceManager 获取 ReportingStatsService
+    const StatsService = req.app.locals.services.getService('reporting_stats')
+
+    if (!StatsService) {
+      logger.error('❌ 无法获取 reporting_stats 服务')
+      return res.apiError('服务不可用', 'SERVICE_UNAVAILABLE', null, 500)
+    }
+
+    if (typeof StatsService.getUserManagementStats !== 'function') {
+      logger.error('❌ StatsService.getUserManagementStats 方法不存在')
+      return res.apiError('方法不存在', 'METHOD_NOT_FOUND', null, 500)
+    }
+
+    // 调用 Service 层方法获取用户管理统计
+    const result = await StatsService.getUserManagementStats({
+      refresh: refresh === 'true'
+    })
+
+    return res.apiSuccess(result, '获取用户管理统计成功')
+  } catch (error) {
+    logger.error('❌ 获取用户管理统计失败:', error.message, error.stack)
+    return res.apiError(
+      '获取用户管理统计失败',
+      'GET_USER_STATS_FAILED',
+      { error: error.message },
+      500
+    )
+  }
+})
+
+/**
  * 🛡️ 获取用户列表（基于UUID角色系统）
  * GET /api/v4/console/user_management/users
  */

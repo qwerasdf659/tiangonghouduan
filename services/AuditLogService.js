@@ -1260,6 +1260,261 @@ class AuditLogService {
       throw error
     }
   }
+
+  /**
+   * 生成审计报告（F-59 审计报告功能）
+   *
+   * @description 生成综合审计报告，包含汇总统计、分组统计和趋势数据
+   *
+   * 业务场景：
+   * - 管理后台审计报告页面展示
+   * - 运营数据分析和风险监控
+   * - 合规审计和安全审计
+   *
+   * @param {Object} options - 报告选项
+   * @param {string} [options.time_range='7d'] - 时间范围 (7d/30d/90d/custom)
+   * @param {string} [options.start_date] - 自定义开始日期 (YYYY-MM-DD)
+   * @param {string} [options.end_date] - 自定义结束日期 (YYYY-MM-DD)
+   * @param {number} [options.operator_id] - 特定操作员ID筛选
+   * @returns {Promise<Object>} 审计报告数据
+   *
+   * @example
+   * // 获取最近7天的审计报告
+   * const report = await AuditLogService.generateAuditReport({ time_range: '7d' })
+   *
+   * // 获取自定义时间范围的报告
+   * const report = await AuditLogService.generateAuditReport({
+   *   time_range: 'custom',
+   *   start_date: '2026-01-01',
+   *   end_date: '2026-01-31'
+   * })
+   */
+  static async generateAuditReport(options = {}) {
+    const { Op, fn, col, literal } = require('sequelize')
+    const { time_range = '7d', start_date, end_date, operator_id } = options
+
+    logger.info('[审计报告] 开始生成审计报告', { time_range, start_date, end_date, operator_id })
+
+    try {
+      // 1. 计算时间范围（北京时间）
+      const now = new Date()
+      let reportStartDate, reportEndDate
+
+      if (time_range === 'custom' && start_date && end_date) {
+        // 自定义时间范围
+        reportStartDate = new Date(start_date)
+        reportStartDate.setHours(0, 0, 0, 0)
+        reportEndDate = new Date(end_date)
+        reportEndDate.setHours(23, 59, 59, 999)
+      } else {
+        // 预设时间范围
+        reportEndDate = new Date(now)
+        reportStartDate = new Date(now)
+
+        const daysMap = { '7d': 7, '30d': 30, '90d': 90 }
+        const days = daysMap[time_range] || 7
+        reportStartDate.setDate(reportStartDate.getDate() - days)
+        reportStartDate.setHours(0, 0, 0, 0)
+      }
+
+      // 2. 构建基础查询条件
+      const baseWhere = {
+        created_at: {
+          [Op.gte]: reportStartDate,
+          [Op.lte]: reportEndDate
+        }
+      }
+
+      if (operator_id) {
+        baseWhere.operator_id = operator_id
+      }
+
+      // 3. 并行执行所有统计查询
+      const [
+        totalOperations,
+        highRiskCount,
+        rollbackCount,
+        uniqueOperators,
+        affectedStats,
+        byOperationType,
+        byTargetType,
+        byOperator,
+        byRiskLevel,
+        trendData
+      ] = await Promise.all([
+        // 3.1 总操作数
+        AdminOperationLog.count({ where: baseWhere }),
+
+        // 3.2 高风险操作数（risk_level = 'high' 或 'critical'）
+        AdminOperationLog.count({
+          where: {
+            ...baseWhere,
+            risk_level: { [Op.in]: ['high', 'critical'] }
+          }
+        }),
+
+        // 3.3 已回滚操作数（is_reversed = true）
+        AdminOperationLog.count({
+          where: {
+            ...baseWhere,
+            is_reversed: true
+          }
+        }),
+
+        // 3.4 独立操作员数
+        AdminOperationLog.count({
+          where: baseWhere,
+          distinct: true,
+          col: 'operator_id'
+        }),
+
+        // 3.5 影响统计（影响用户数、影响金额）
+        AdminOperationLog.findOne({
+          where: baseWhere,
+          attributes: [
+            [fn('SUM', col('affected_users')), 'total_affected_users'],
+            [fn('SUM', col('affected_amount')), 'total_affected_amount']
+          ],
+          raw: true
+        }),
+
+        // 3.6 按操作类型分组统计
+        AdminOperationLog.findAll({
+          where: baseWhere,
+          attributes: ['operation_type', [fn('COUNT', col('admin_operation_log_id')), 'count']],
+          group: ['operation_type'],
+          order: [[literal('count'), 'DESC']],
+          raw: true
+        }),
+
+        // 3.7 按目标类型分组统计
+        AdminOperationLog.findAll({
+          where: baseWhere,
+          attributes: ['target_type', [fn('COUNT', col('admin_operation_log_id')), 'count']],
+          group: ['target_type'],
+          order: [[literal('count'), 'DESC']],
+          raw: true
+        }),
+
+        // 3.8 按操作员分组统计（包含操作员信息）
+        AdminOperationLog.findAll({
+          where: baseWhere,
+          attributes: ['operator_id', [fn('COUNT', col('admin_operation_log_id')), 'count']],
+          include: [
+            {
+              model: require('../models').User,
+              as: 'operator',
+              attributes: ['user_id', 'nickname', 'mobile']
+            }
+          ],
+          group: ['operator_id', 'operator.user_id', 'operator.nickname', 'operator.mobile'],
+          order: [[literal('count'), 'DESC']],
+          limit: 20 // 只返回前20个操作员
+        }),
+
+        // 3.9 按风险等级分组统计
+        AdminOperationLog.findAll({
+          where: baseWhere,
+          attributes: ['risk_level', [fn('COUNT', col('admin_operation_log_id')), 'count']],
+          group: ['risk_level'],
+          order: [[literal('count'), 'DESC']],
+          raw: true
+        }),
+
+        // 3.10 时间趋势数据（按天分组）
+        AdminOperationLog.findAll({
+          where: baseWhere,
+          attributes: [
+            [fn('DATE', col('created_at')), 'date'],
+            [fn('COUNT', col('admin_operation_log_id')), 'count']
+          ],
+          group: [fn('DATE', col('created_at'))],
+          order: [[fn('DATE', col('created_at')), 'ASC']],
+          raw: true
+        })
+      ])
+
+      // 4. 格式化结果数据
+      const report = {
+        // 4.1 汇总统计
+        summary: {
+          total_operations: totalOperations,
+          high_risk_count: highRiskCount,
+          rollback_count: rollbackCount,
+          unique_operators: uniqueOperators,
+          affected_users_total: parseInt(affectedStats?.total_affected_users) || 0,
+          affected_amount_total: parseInt(affectedStats?.total_affected_amount) || 0
+        },
+
+        // 4.2 按操作类型分组
+        by_operation_type: byOperationType.map(item => ({
+          operation_type: item.operation_type,
+          count: parseInt(item.count)
+        })),
+
+        // 4.3 按目标类型分组
+        by_target_type: byTargetType.map(item => ({
+          target_type: item.target_type,
+          count: parseInt(item.count)
+        })),
+
+        // 4.4 按操作员分组
+        by_operator: byOperator.map(item => {
+          const plainItem = item.toJSON ? item.toJSON() : item
+          return {
+            operator_id: plainItem.operator_id,
+            operator_nickname: plainItem.operator?.nickname || '未知',
+            operator_mobile: plainItem.operator?.mobile || '',
+            count: parseInt(plainItem.count)
+          }
+        }),
+
+        // 4.5 按风险等级分组
+        by_risk_level: byRiskLevel.map(item => ({
+          risk_level: item.risk_level,
+          count: parseInt(item.count)
+        })),
+
+        // 4.6 时间趋势数据
+        trend: trendData.map(item => ({
+          date: item.date,
+          count: parseInt(item.count)
+        })),
+
+        // 4.7 报告元数据
+        report_meta: {
+          generated_at: BeijingTimeHelper.apiTimestamp(),
+          time_range,
+          start_date: BeijingTimeHelper.formatDate(reportStartDate),
+          end_date: BeijingTimeHelper.formatDate(reportEndDate)
+        }
+      }
+
+      // 5. 为分组数据附加中文显示名称
+      await attachDisplayNames(report.by_operation_type, [
+        { field: 'operation_type', dictType: DICT_TYPES.OPERATION_TYPE }
+      ])
+
+      await attachDisplayNames(report.by_target_type, [
+        { field: 'target_type', dictType: DICT_TYPES.TARGET_TYPE }
+      ])
+
+      logger.info('[审计报告] 审计报告生成成功', {
+        time_range,
+        total_operations: report.summary.total_operations,
+        high_risk_count: report.summary.high_risk_count
+      })
+
+      return report
+    } catch (error) {
+      logger.error('[审计报告] 生成审计报告失败:', {
+        error: error.message,
+        stack: error.stack,
+        options
+      })
+      throw new Error(`生成审计报告失败: ${error.message}`)
+    }
+  }
 }
 
 module.exports = AuditLogService

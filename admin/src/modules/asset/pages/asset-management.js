@@ -340,7 +340,8 @@ document.addEventListener('alpine:init', () => {
     },
 
     async loadAssetStats() {
-      try {
+      // 使用 withLoading 包裹，提供加载状态反馈
+      await this.withLoading(async () => {
         const response = await this.apiGet(ASSET_ENDPOINTS.STATS)
         logger.debug('[AssetManagement] loadAssetStats response:', response)
         if (response.success && response.data) {
@@ -372,10 +373,9 @@ document.addEventListener('alpine:init', () => {
             raw: response.data
           }
           logger.info('[AssetManagement] 资产统计已加载:', this.assetStats)
+          this.showSuccess('统计数据已刷新')
         }
-      } catch (error) {
-        logger.error('加载资产统计失败:', error)
-      }
+      })
     },
 
     openAddMaterialTypeModal() {

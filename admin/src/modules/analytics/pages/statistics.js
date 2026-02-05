@@ -36,7 +36,6 @@ import { EASING_FUNCTIONS } from '../../../alpine/components/animated-counter.js
 import { MultiDimensionStatsAPI } from '../../../api/multi-dimension-stats.js'
 import { ReportTemplatesAPI } from '../../../api/report-templates.js'
 
-/* global Alpine, cancelAnimationFrame, requestAnimationFrame */
 /**
  * @typedef {Object} StatisticsFilters
  * @property {string} period - 时间周期 ('today'|'yesterday'|'week'|'month'|'custom')
@@ -96,28 +95,28 @@ function statisticsPage() {
      * @type {CoreStats}
      */
     stats: {
-      totalUsers: 0,
-      totalDraws: 0,
-      winRate: 0,
-      totalRevenue: 0,
-      userTrend: 0,
-      drawTrend: 0,
-      winRateTrend: 0,
-      revenueTrend: 0,
+      total_users: 0,
+      total_draws: 0,
+      win_rate: 0,
+      total_revenue: 0,
+      user_trend: 0,
+      draw_trend: 0,
+      win_rate_trend: 0,
+      revenue_trend: 0,
       // 趋势数据数组 - 供mini-chart组件使用
-      userTrendData: [],
-      drawTrendData: [],
-      revenueTrendData: []
+      user_trend_data: [],
+      draw_trend_data: [],
+      revenue_trend_data: []
     },
 
     /**
      * 动画显示数值（用于平滑动画效果）
      */
     displayStats: {
-      totalUsers: 0,
-      totalDraws: 0,
-      winRate: 0,
-      totalRevenue: 0
+      total_users: 0,
+      total_draws: 0,
+      win_rate: 0,
+      total_revenue: 0
     },
 
     /**
@@ -125,20 +124,20 @@ function statisticsPage() {
      */
     _animationIds: {},
 
-    /** 用户统计 */
+    /** 用户统计 - 直接使用后端字段名 */
     userStats: {
-      newUsers: 0,
-      activeUsers: 0,
-      adminUsers: 0,
-      regularUsers: 0
+      new_users: 0,
+      active_users: 0,
+      admin_users: 0,
+      regular_users: 0
     },
 
-    /** 抽奖统计 */
+    /** 抽奖统计 - 直接使用后端字段名 */
     lotteryStats: {
-      totalDraws: 0,
-      highTierWins: 0,
-      regularWins: 0,
-      winRate: 0
+      total_draws: 0,
+      high_tier_wins: 0,
+      regular_wins: 0,
+      win_rate: 0
     },
 
     /** 消费统计 */
@@ -171,11 +170,12 @@ function statisticsPage() {
     // ==================== 多维度统计分析 (P1-3) ====================
 
     /** 多维度统计Tab */
-    multiDimensionTab: 'store',
+    multiDimensionTab: 'campaign',
 
     /** 多维度筛选条件 */
     multiDimensionFilters: {
-      dimension: 'store',
+      dimension: 'campaign',
+      period: 'week',
       start_date: '',
       end_date: '',
       compare: ''
@@ -251,12 +251,17 @@ function statisticsPage() {
       this.$nextTick(() => {
         this.initCharts()
         this.loadStatistics()
+        // 自动加载多维度统计数据
+        this.loadMultiDimensionStats()
+        // 加载报表模板列表
+        this.loadReportTemplates()
       })
 
       // 监听窗口大小变化
       window.addEventListener('resize', () => {
         this._charts.trend?.resize()
         this._charts.userType?.resize()
+        this._charts.multiDimension?.resize()
       })
     },
 
@@ -457,46 +462,46 @@ function statisticsPage() {
       // 1. 核心指标 - 从趋势数据汇总
       const totalNewUsers = userGrowth.reduce((sum, item) => sum + (item.count || 0), 0)
       const lastUserRecord = userGrowth.length > 0 ? userGrowth[userGrowth.length - 1] : {}
-      this.stats.totalUsers = lastUserRecord.cumulative || userTypes.total || 0
+      this.stats.total_users = lastUserRecord.cumulative || userTypes.total || 0
 
       const totalDraws = lotteryTrend.reduce((sum, item) => sum + (item.count || 0), 0)
-      this.stats.totalDraws = totalDraws
+      this.stats.total_draws = totalDraws
 
       // 计算总体高档奖励率
       const totalHighTierWins = lotteryTrend.reduce(
         (sum, item) => sum + (item.high_tier_count || 0),
         0
       )
-      this.stats.winRate = totalDraws > 0 ? ((totalHighTierWins / totalDraws) * 100).toFixed(2) : 0
+      this.stats.win_rate = totalDraws > 0 ? ((totalHighTierWins / totalDraws) * 100).toFixed(2) : 0
 
       const totalRevenue = consumptionTrend.reduce(
         (sum, item) => sum + parseFloat(item.amount || 0),
         0
       )
-      this.stats.totalRevenue = totalRevenue
+      this.stats.total_revenue = totalRevenue
 
       // 趋势计算（比较前后半段数据）
-      this.stats.userTrend = this.calculateGrowthTrend(userGrowth)
-      this.stats.drawTrend = this.calculateArrayTrend(lotteryTrend, 'count')
-      this.stats.winRateTrend = 0 // 暂不计算
-      this.stats.revenueTrend = this.calculateArrayTrend(consumptionTrend, 'amount')
+      this.stats.user_trend = this.calculateGrowthTrend(userGrowth)
+      this.stats.draw_trend = this.calculateArrayTrend(lotteryTrend, 'count')
+      this.stats.win_rate_trend = 0 // 暂不计算
+      this.stats.revenue_trend = this.calculateArrayTrend(consumptionTrend, 'amount')
 
       // 趋势数据数组 - 供mini-chart组件使用
-      this.stats.userTrendData = userGrowth.map(item => item.count || 0)
-      this.stats.drawTrendData = lotteryTrend.map(item => item.count || 0)
-      this.stats.revenueTrendData = consumptionTrend.map(item => parseFloat(item.amount) || 0)
+      this.stats.user_trend_data = userGrowth.map(item => item.count || 0)
+      this.stats.draw_trend_data = lotteryTrend.map(item => item.count || 0)
+      this.stats.revenue_trend_data = consumptionTrend.map(item => parseFloat(item.amount) || 0)
 
       // 2. 用户统计 - 使用后端用户类型数据
-      this.userStats.newUsers = totalNewUsers
-      this.userStats.activeUsers = userTypes.regular?.count || 0
-      this.userStats.adminUsers = userTypes.admin?.count || 0
-      this.userStats.regularUsers = userTypes.regular?.count || 0
+      this.userStats.new_users = totalNewUsers
+      this.userStats.active_users = userTypes.regular?.count || 0
+      this.userStats.admin_users = userTypes.admin?.count || 0
+      this.userStats.regular_users = userTypes.regular?.count || 0
 
       // 3. 抽奖统计 - 使用后端趋势数据
-      this.lotteryStats.totalDraws = totalDraws
-      this.lotteryStats.highTierWins = totalHighTierWins
-      this.lotteryStats.regularWins = totalDraws - totalHighTierWins
-      this.lotteryStats.winRate = parseFloat(this.stats.winRate) || 0
+      this.lotteryStats.total_draws = totalDraws
+      this.lotteryStats.high_tier_wins = totalHighTierWins
+      this.lotteryStats.regular_wins = totalDraws - totalHighTierWins
+      this.lotteryStats.win_rate = parseFloat(this.stats.win_rate) || 0
 
       // 4. 消费统计
       this.consumptionStats.total = totalRevenue
@@ -531,9 +536,9 @@ function statisticsPage() {
       this.animateAllStats()
 
       logger.info('统计图表数据已渲染', {
-        totalUsers: this.stats.totalUsers,
-        totalDraws: this.stats.totalDraws,
-        totalRevenue: this.stats.totalRevenue,
+        totalUsers: this.stats.total_users,
+        totalDraws: this.stats.total_draws,
+        totalRevenue: this.stats.total_revenue,
         prizeCount: this.prizeStats.length
       })
     },
@@ -820,10 +825,10 @@ function statisticsPage() {
      */
     animateAllStats() {
       // 延迟启动动画，产生交错效果
-      setTimeout(() => this.animateValue('totalUsers', this.stats.totalUsers, 1200), 0)
-      setTimeout(() => this.animateValue('totalDraws', this.stats.totalDraws, 1200), 100)
-      setTimeout(() => this.animateValue('winRate', parseFloat(this.stats.winRate) || 0, 1200), 200)
-      setTimeout(() => this.animateValue('totalRevenue', this.stats.totalRevenue, 1200), 300)
+      setTimeout(() => this.animateValue('total_users', this.stats.total_users, 1200), 0)
+      setTimeout(() => this.animateValue('total_draws', this.stats.total_draws, 1200), 100)
+      setTimeout(() => this.animateValue('win_rate', parseFloat(this.stats.win_rate) || 0, 1200), 200)
+      setTimeout(() => this.animateValue('total_revenue', this.stats.total_revenue, 1200), 300)
     },
 
     /**
@@ -861,7 +866,8 @@ function statisticsPage() {
       const result = await this.withLoading(async () => {
         return await MultiDimensionStatsAPI.getStats({
           // 后端要求 dimensions（复数），支持多维度逗号分隔
-          dimensions: this.multiDimensionFilters.dimension || 'store,time',
+          dimensions: this.multiDimensionFilters.dimension || 'campaign,time',
+          metrics: 'draws,win_rate', // 后端必需参数
           period: this.multiDimensionFilters.period || 'week',
           compare: this.multiDimensionFilters.compare
         })
@@ -869,9 +875,10 @@ function statisticsPage() {
 
       if (result.success && result.data) {
         const data = result.data.data || result.data
+        // 后端返回 rows 字段，前端使用 breakdown
         this.multiDimensionData = {
           summary: data.summary || {},
-          breakdown: data.breakdown || data.dimensions || [],
+          breakdown: data.rows || data.breakdown || [],
           comparison: data.comparison || null
         }
 
@@ -924,7 +931,7 @@ function statisticsPage() {
     },
 
     /**
-     * 更新多维度图表
+     * 更新多维度图表 - 适配后端返回字段（支持 store, campaign, time 维度）
      */
     updateMultiDimensionChart() {
       const container = document.getElementById('multiDimensionChart')
@@ -945,50 +952,73 @@ function statisticsPage() {
         this._charts.multiDimension.setOption(
           {
             tooltip: { trigger: 'axis' },
-            legend: { data: ['抽奖次数', '消费金额'] },
+            legend: { data: ['抽奖次数', '中奖率'] },
             grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-            xAxis: { type: 'category', data: data.map(d => d.date || d.name) },
+            xAxis: { type: 'category', data: data.map(d => d.period || d.date || d.name) },
             yAxis: [
               { type: 'value', name: '次数' },
-              { type: 'value', name: '金额', position: 'right' }
+              { type: 'value', name: '中奖率(%)', position: 'right', max: 100 }
             ],
             series: [
               {
                 name: '抽奖次数',
                 type: 'line',
                 smooth: true,
-                data: data.map(d => d.draw_count || d.count || 0)
+                data: data.map(d => d.draws || 0)
               },
               {
-                name: '消费金额',
-                type: 'bar',
+                name: '中奖率',
+                type: 'line',
                 yAxisIndex: 1,
-                data: data.map(d => d.consumption || d.amount || 0)
+                smooth: true,
+                data: data.map(d => d.win_rate || 0)
               }
             ]
           },
           true
         )
       } else {
-        // 其他维度使用柱状图
+        // store（门店）和 campaign（活动）维度使用柱状图
+        // 根据维度获取正确的名称字段
+        const getItemName = d => {
+          if (dimension === 'store') {
+            return d.store_name || d.name || '未知门店'
+          } else if (dimension === 'campaign') {
+            return d.name || ('活动#' + d.lottery_campaign_id) || '未知活动'
+          }
+          return d.name || d.period || '未知'
+        }
+
         this._charts.multiDimension.setOption(
           {
             tooltip: { trigger: 'axis' },
-            grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+            legend: { data: ['抽奖次数', '中奖率'] },
+            grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
             xAxis: {
               type: 'category',
-              data: data.slice(0, 10).map(d => d.name || d.store_name || d.campaign_name || '未知'),
+              data: data.slice(0, 10).map(getItemName),
               axisLabel: { interval: 0, rotate: 30 }
             },
-            yAxis: { type: 'value', name: '数量' },
+            yAxis: [
+              { type: 'value', name: '次数' },
+              { type: 'value', name: '中奖率(%)', position: 'right', max: 100 }
+            ],
             series: [
               {
+                name: '抽奖次数',
                 type: 'bar',
                 data: data.slice(0, 10).map(d => ({
-                  value: d.count || d.draw_count || d.consumption || 0,
+                  value: d.draws || 0,
                   itemStyle: { color: this.getBarColor(d) }
                 })),
                 label: { show: true, position: 'top' }
+              },
+              {
+                name: '中奖率',
+                type: 'line',
+                yAxisIndex: 1,
+                smooth: true,
+                data: data.slice(0, 10).map(d => d.win_rate || 0)
               }
             ]
           },
@@ -1037,26 +1067,31 @@ function statisticsPage() {
       try {
         const response = await ReportTemplatesAPI.getTemplates()
         if (response?.success) {
-          this.reportTemplates = response.data?.templates || response.data || []
+          // 后端返回 { items: [...] } 格式，使用 report_template_id 作为主键
+          this.reportTemplates = response.data?.items || response.data || []
+          logger.info('[ReportTemplates] 加载成功', { count: this.reportTemplates.length })
         }
       } catch (error) {
         logger.error('[ReportTemplates] 加载失败:', error)
+        this.reportTemplates = [] // 确保数组初始化，避免x-for报错
       }
     },
 
     /**
      * 打开报表模板弹窗
+     * 后端字段: report_template_id, template_name, template_description
      */
     openReportTemplateModal(template = null) {
       if (template) {
-        this.editingTemplateId = template.template_id || template.id
+        // 使用后端字段名 report_template_id
+        this.editingTemplateId = template.report_template_id
         this.reportTemplateForm = {
-          name: template.name || '',
-          description: template.description || '',
-          dimensions: template.dimensions || [],
-          metrics: template.metrics || [],
-          filters: template.filters || {},
-          schedule: template.schedule || null
+          name: template.template_name || '',
+          description: template.template_description || '',
+          dimensions: template.dimensions_config || [],
+          metrics: template.columns_config || [],
+          filters: template.filters_config || {},
+          schedule: template.schedule_config || null
         }
       } else {
         this.editingTemplateId = null
@@ -1106,9 +1141,8 @@ function statisticsPage() {
     async deleteReportTemplate(template) {
       if (!confirm('确定要删除此报表模板吗？')) return
       try {
-        const response = await ReportTemplatesAPI.deleteTemplate(
-          template.template_id || template.id
-        )
+        // 使用后端字段名 report_template_id
+        const response = await ReportTemplatesAPI.deleteTemplate(template.report_template_id)
         if (response?.success) {
           this.showSuccess('模板已删除')
           await this.loadReportTemplates()
@@ -1124,8 +1158,8 @@ function statisticsPage() {
      */
     async previewReport(template) {
       try {
-        const response = await ReportTemplatesAPI.preview({
-          ...template,
+        const response = await ReportTemplatesAPI.previewReport({
+          report_template_id: template.report_template_id,
           start_date: this.filters.start_date,
           end_date: this.filters.end_date
         })
@@ -1145,7 +1179,8 @@ function statisticsPage() {
     async exportTemplateReport(template) {
       try {
         this.exporting = true
-        const response = await ReportTemplatesAPI.export(template.template_id || template.id)
+        // 使用后端字段名 report_template_id
+        const response = await ReportTemplatesAPI.export(template.report_template_id)
         if (response?.success) {
           this.showSuccess('报表导出成功')
         }

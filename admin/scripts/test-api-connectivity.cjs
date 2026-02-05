@@ -33,7 +33,7 @@ const API_TESTS = [
   { name: '消费记录', path: '/api/v4/console/consumption' },
   { name: '客服会话', path: '/api/v4/console/customer-service/sessions' },
   { name: '审计日志', path: '/api/v4/console/admin-audit-logs' },
-  { name: '抽奖监控', path: '/api/v4/console/lottery-monitoring/stats' },
+  { name: '抽奖监控', path: '/api/v4/console/lottery-realtime/stats' },
   { name: '策略统计', path: '/api/v4/console/lottery-strategy-stats' },
 ];
 

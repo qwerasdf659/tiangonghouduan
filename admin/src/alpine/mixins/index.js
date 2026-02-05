@@ -26,15 +26,6 @@
  */
 
 // ========== Mixin 导入 ==========
-export { paginationMixin } from './pagination.js'
-export { asyncDataMixin, createDataLoaderConfig } from './async-data.js'
-export { modalMixin } from './modal.js'
-export { tableSelectionMixin } from './table-selection.js'
-export { formValidationMixin } from './form-validation.js'
-export { authGuardMixin } from './auth-guard.js'
-export { withDraftAutoSave, createDraftFormMixin } from './draft-auto-save.js'
-export { drillDownMixin, DRILL_DOWN_SIZES, DRILL_DOWN_TYPES } from './drill-down.js'
-
 // ========== 组合工具 ==========
 
 import { paginationMixin } from './pagination.js'
@@ -55,6 +46,18 @@ import {
   formatRelativeTime as formatRelativeTimeUtil,
   formatNumber as formatNumberUtil
 } from '../../utils/index.js'
+
+// ========== 草稿自动保存 ==========
+import { withDraftAutoSave, createDraftFormMixin } from './draft-auto-save.js'
+
+export { paginationMixin } from './pagination.js'
+export { asyncDataMixin, createDataLoaderConfig } from './async-data.js'
+export { modalMixin } from './modal.js'
+export { tableSelectionMixin } from './table-selection.js'
+export { formValidationMixin } from './form-validation.js'
+export { authGuardMixin } from './auth-guard.js'
+export { withDraftAutoSave, createDraftFormMixin } from './draft-auto-save.js'
+export { drillDownMixin, DRILL_DOWN_SIZES, DRILL_DOWN_TYPES } from './drill-down.js'
 
 /**
  * 创建页面 Mixin
@@ -500,9 +503,6 @@ export function createFormMixin() {
     authGuard: true
   })
 }
-
-// ========== 草稿自动保存 ==========
-import { withDraftAutoSave, createDraftFormMixin } from './draft-auto-save.js'
 
 // ========== 导出所有 ==========
 export default {

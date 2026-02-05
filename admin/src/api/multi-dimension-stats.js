@@ -5,7 +5,7 @@
  * @date 2026-02-01
  */
 
-import { API_PREFIX, authHeaders, handleResponse, buildURL } from './base.js'
+import { API_PREFIX, authHeaders, handleResponse, buildQueryString } from './base.js'
 
 // 多维度统计端点（后端挂载在 /console/statistics 下）
 export const MULTI_DIMENSION_ENDPOINTS = {
@@ -20,23 +20,23 @@ export const MultiDimensionStatsAPI = {
   /**
    * 获取多维度统计数据
    * @param {Object} params - 查询参数
-   * @param {string} params.dimensions - 维度列表（必需，逗号分隔）：store,campaign,time,user_level
-   * @param {string} [params.metrics] - 指标列表（逗号分隔）：draws,consumption,win_rate
+   * @param {string} params.dimensions - 维度列表（必需，逗号分隔）：campaign,time,user_level
+   * @param {string} [params.metrics] - 指标列表（逗号分隔）：draws,win_rate
    * @param {string} [params.period] - 时间周期：day/week/month
    * @param {string} [params.compare] - 对比类型：wow/mom（周环比/月环比）
    * @param {number} [params.campaign_id] - 活动ID
-   * @param {number} [params.store_id] - 门店ID
    * @returns {Promise<Object>} 统计数据
    */
   async getStats(params = {}) {
     // 确保必需参数存在（后端必需）
     if (!params.dimensions) {
-      params.dimensions = 'campaign,time' // 默认维度（注：store维度需要lottery_draws表有store_id字段）
+      params.dimensions = 'campaign,time' // 默认维度
     }
     if (!params.metrics) {
       params.metrics = 'draws,win_rate' // 默认指标
     }
-    const url = buildURL(MULTI_DIMENSION_ENDPOINTS.STATS, params)
+    // 使用 buildQueryString 构建查询参数，而不是 buildURL
+    const url = MULTI_DIMENSION_ENDPOINTS.STATS + buildQueryString(params)
     const response = await fetch(url, {
       headers: authHeaders()
     })
@@ -46,14 +46,18 @@ export const MultiDimensionStatsAPI = {
   /**
    * 获取下钻明细
    * @param {Object} params - 查询参数
-   * @param {string} params.dimension - 当前维度
-   * @param {string} params.dimension_value - 维度值
+   * @param {string} params.source - 数据源（必需）：lottery/consumption
+   * @param {number} [params.lottery_campaign_id] - 活动ID
+   * @param {string} [params.period] - 时间周期
    * @param {string} [params.start_date] - 开始日期
    * @param {string} [params.end_date] - 结束日期
+   * @param {number} [params.page] - 页码
+   * @param {number} [params.page_size] - 每页数量
    * @returns {Promise<Object>} 明细数据
    */
   async getDrillDown(params = {}) {
-    const url = buildURL(MULTI_DIMENSION_ENDPOINTS.DRILL_DOWN, params)
+    // 使用 buildQueryString 构建查询参数
+    const url = MULTI_DIMENSION_ENDPOINTS.DRILL_DOWN + buildQueryString(params)
     const response = await fetch(url, {
       headers: authHeaders()
     })

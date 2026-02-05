@@ -28,9 +28,9 @@ export function useDiamondAccountsState() {
     diamondFilters: { user_id: '' },
     /** @type {Object} 钻石账户统计（全局统计） */
     diamondStats: {
-      holderCount: 0,
-      totalCirculation: 0,
-      totalFrozen: 0
+      holder_count: 0,
+      total_circulation: 0,
+      total_frozen: 0
     },
     /** @type {Object|null} 选中的钻石账户 */
     selectedDiamondAccount: null,
@@ -140,17 +140,17 @@ export function useDiamondAccountsMethods() {
 
           if (diamondStat) {
             this.diamondStats = {
-              holderCount: diamondStat.holder_count ?? 0,
-              totalCirculation: diamondStat.total_circulation ?? 0,
-              totalFrozen: diamondStat.total_frozen ?? 0,
-              totalIssued: diamondStat.total_issued ?? 0
+              holder_count: diamondStat.holder_count ?? 0,
+              total_circulation: diamondStat.total_circulation ?? 0,
+              total_frozen: diamondStat.total_frozen ?? 0,
+              total_issued: diamondStat.total_issued ?? 0
             }
           } else {
             this.diamondStats = {
-              holderCount: 0,
-              totalCirculation: 0,
-              totalFrozen: 0,
-              totalIssued: 0
+              holder_count: 0,
+              total_circulation: 0,
+              total_frozen: 0,
+              total_issued: 0
             }
           }
         }

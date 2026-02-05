@@ -766,17 +766,24 @@ function customerServicePage() {
         
         if (response && response.success && response.data) {
           const data = response.data
+          // 后端 API: /api/v4/console/customer-service/sessions/response-stats
+          // 已实现，返回 summary, distribution, trend, admin_ranking 等数据
           this.responseStats = {
-            avg_first_response_seconds: data.avg_first_response_seconds || 0,
-            avg_first_response_display: data.avg_first_response_display || this.formatSeconds(data.avg_first_response_seconds),
-            avg_response_seconds: data.avg_response_seconds || 0,
-            avg_response_display: data.avg_response_display || this.formatSeconds(data.avg_response_seconds),
-            today_sessions: data.today_sessions || data.total_sessions || 0,
-            today_resolved: data.today_resolved || data.resolved_sessions || 0
+            avg_first_response_seconds: data.summary?.avg_first_response_seconds || data.avg_first_response_seconds || 0,
+            avg_first_response_display: data.summary?.avg_first_response_display || data.avg_first_response_display || this.formatSeconds(data.summary?.avg_first_response_seconds || data.avg_first_response_seconds),
+            avg_response_seconds: data.summary?.avg_response_seconds || data.avg_response_seconds || 0,
+            avg_response_display: data.summary?.avg_response_display || data.avg_response_display || this.formatSeconds(data.summary?.avg_response_seconds || data.avg_response_seconds),
+            today_sessions: data.summary?.total_sessions || data.today_sessions || data.total_sessions || 0,
+            today_resolved: data.summary?.resolved_sessions || data.today_resolved || data.resolved_sessions || 0,
+            // 额外数据（后端已提供）
+            compliance_rate: data.summary?.compliance_rate || null,
+            distribution: data.distribution || null,
+            trend: data.trend || null
           }
           logger.info('响应时长统计加载成功', this.responseStats)
         } else {
-          // 后端API未实现时使用本地计算
+          // API 返回空数据时降级到本地计算
+          logger.warn('响应时长统计API返回空数据，使用本地计算')
           this.calculateResponseStatsLocally()
         }
       } catch (error) {
@@ -786,7 +793,7 @@ function customerServicePage() {
     },
 
     /**
-     * 本地计算响应时长统计（后端未实现时的降级方案）
+     * 本地计算响应时长统计（API 调用失败时的降级方案）
      */
     calculateResponseStatsLocally() {
       // 从会话列表计算统计数据

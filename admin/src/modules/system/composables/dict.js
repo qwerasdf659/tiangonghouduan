@@ -208,7 +208,7 @@ export function useDictMethods() {
           form[field] = 0
         } else if (field === 'is_enabled' || field === 'is_tradable') {
           form[field] = true
-        } else if (!form.hasOwnProperty(field)) {
+        } else if (!Object.hasOwn(form, field)) {
           form[field] = ''
         }
       })

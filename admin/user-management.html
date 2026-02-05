@@ -805,50 +805,65 @@
           </div>
         </div>
 
-        <!-- 兑换偏好 -->
+        <!-- 兑换偏好（后端字段：preferences 数组，包含 item_name, exchange_count, unique_users, cost_asset_code, cost_amount） -->
         <div class="themed-card rounded-lg shadow">
-          <div class="p-4 border-b">
+          <div class="p-4 border-b flex justify-between items-center">
             <h5 class="font-semibold">🎁 兑换偏好分析</h5>
+            <template x-if="exchangePreferences.statistics">
+              <span class="text-sm themed-text-muted" x-text="exchangePreferences.statistics.analysis_period"></span>
+            </template>
           </div>
           <div class="p-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <!-- 热门品类 -->
-              <div>
-                <h6 class="font-medium mb-3">🏷️ 热门品类 TOP5</h6>
-                <div class="space-y-2">
-                  <template x-for="(category, index) in (exchangePreferences.top_categories || []).slice(0, 5)" :key="index">
-                    <div class="flex items-center justify-between p-2 themed-bg-base rounded">
-                      <span class="flex items-center">
-                        <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs flex items-center justify-center mr-2" x-text="index + 1"></span>
-                        <span x-text="category.name || category.category"></span>
-                      </span>
-                      <span class="themed-text-muted text-sm" x-text="(category.count || 0) + '次'"></span>
-                    </div>
-                  </template>
-                  <template x-if="!exchangePreferences.top_categories?.length">
-                    <p class="text-center themed-text-muted py-4">暂无数据</p>
-                  </template>
+            <!-- 统计汇总（后端字段：statistics.total_exchanges, statistics.total_unique_users, statistics.top_item） -->
+            <template x-if="exchangePreferences.statistics">
+              <div class="grid grid-cols-3 gap-4 mb-4 p-3 themed-bg-base rounded-lg">
+                <div class="text-center">
+                  <div class="text-lg font-bold text-blue-600" x-text="exchangePreferences.statistics.total_exchanges || 0"></div>
+                  <div class="text-xs themed-text-muted">总兑换次数</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-lg font-bold text-green-600" x-text="exchangePreferences.statistics.total_unique_users || 0"></div>
+                  <div class="text-xs themed-text-muted">参与用户数</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-lg font-bold text-purple-600 truncate" x-text="exchangePreferences.statistics.top_item || '-'"></div>
+                  <div class="text-xs themed-text-muted">最热门商品</div>
                 </div>
               </div>
+            </template>
 
-              <!-- 热门奖品 -->
-              <div>
-                <h6 class="font-medium mb-3">🏆 热门奖品 TOP5</h6>
-                <div class="space-y-2">
-                  <template x-for="(prize, index) in (exchangePreferences.top_prizes || []).slice(0, 5)" :key="index">
-                    <div class="flex items-center justify-between p-2 themed-bg-base rounded">
-                      <span class="flex items-center">
-                        <span class="w-6 h-6 rounded-full bg-green-100 text-green-600 text-xs flex items-center justify-center mr-2" x-text="index + 1"></span>
-                        <span x-text="prize.name || prize.prize_name"></span>
-                      </span>
-                      <span class="themed-text-muted text-sm" x-text="(prize.count || 0) + '次'"></span>
-                    </div>
-                  </template>
-                  <template x-if="!exchangePreferences.top_prizes?.length">
-                    <p class="text-center themed-text-muted py-4">暂无数据</p>
-                  </template>
+            <!-- 热门兑换商品排行（后端字段：preferences[].item_name, exchange_count, unique_users, cost_asset_code, cost_amount） -->
+            <h6 class="font-medium mb-3">🏆 热门兑换商品 TOP10</h6>
+            <div class="space-y-2">
+              <template x-for="(item, index) in (exchangePreferences.preferences || []).slice(0, 10)" :key="item.exchange_item_id || index">
+                <div class="flex items-center justify-between p-3 themed-bg-base rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                  <span class="flex items-center flex-1 min-w-0">
+                    <!-- 排名徽章 -->
+                    <span class="w-7 h-7 rounded-full text-xs flex items-center justify-center mr-3 flex-shrink-0"
+                          :class="index === 0 ? 'bg-yellow-100 text-yellow-600' : index === 1 ? 'bg-gray-200 text-gray-600' : index === 2 ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'"
+                          x-text="item.rank || (index + 1)"></span>
+                    <!-- 商品名称 -->
+                    <span class="truncate font-medium" x-text="item.item_name"></span>
+                  </span>
+                  <!-- 统计数据（后端字段：exchange_count, unique_users, cost_asset_code, cost_amount） -->
+                  <span class="flex items-center gap-3 flex-shrink-0 ml-2">
+                    <span class="text-sm">
+                      <span class="text-blue-600 font-medium" x-text="item.exchange_count || 0"></span>
+                      <span class="themed-text-muted">次</span>
+                    </span>
+                    <span class="text-sm">
+                      <span class="text-green-600 font-medium" x-text="item.unique_users || 0"></span>
+                      <span class="themed-text-muted">人</span>
+                    </span>
+                    <template x-if="item.cost_amount">
+                      <span class="text-xs themed-text-muted px-2 py-1 themed-bg-base rounded" x-text="item.cost_amount + ' ' + (item.cost_asset_code || '')"></span>
+                    </template>
+                  </span>
                 </div>
-              </div>
+              </template>
+              <template x-if="!exchangePreferences.preferences?.length">
+                <p class="text-center themed-text-muted py-8">暂无兑换数据</p>
+              </template>
             </div>
           </div>
         </div>
@@ -860,19 +875,19 @@
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <div class="themed-card rounded-lg shadow p-6 text-center">
             <h6 class="themed-text-muted mb-2">总用户数</h6>
-            <h2 class="text-3xl font-bold themed-text-primary" x-text="userStats.totalUsers"></h2>
+            <h2 class="text-3xl font-bold themed-text-primary" x-text="userStats.total_users"></h2>
           </div>
           <div class="themed-card rounded-lg shadow p-6 text-center">
             <h6 class="themed-text-muted mb-2">活跃用户</h6>
-            <h2 class="text-3xl font-bold text-green-600" x-text="userStats.activeUsers"></h2>
+            <h2 class="text-3xl font-bold text-green-600" x-text="userStats.active_users"></h2>
           </div>
           <div class="themed-card rounded-lg shadow p-6 text-center">
             <h6 class="themed-text-muted mb-2">角色数量</h6>
-            <h2 class="text-3xl font-bold text-purple-600" x-text="userStats.totalRoles"></h2>
+            <h2 class="text-3xl font-bold text-purple-600" x-text="userStats.total_roles"></h2>
           </div>
           <div class="themed-card rounded-lg shadow p-6 text-center">
             <h6 class="themed-text-muted mb-2">权限数量</h6>
-            <h2 class="text-3xl font-bold text-orange-600" x-text="userStats.totalPermissions"></h2>
+            <h2 class="text-3xl font-bold text-orange-600" x-text="userStats.total_permissions"></h2>
           </div>
         </div>
 
@@ -969,15 +984,15 @@
           <div class="p-6">
             <div class="flex items-center justify-between mb-4">
               <span class="themed-text-muted">活跃用户比例</span>
-              <span class="font-medium" x-text="userStats.totalUsers > 0 ? Math.round((userStats.activeUsers / userStats.totalUsers) * 100) + '%' : '0%'"></span>
+              <span class="font-medium" x-text="userStats.total_users > 0 ? Math.round((userStats.active_users / userStats.total_users) * 100) + '%' : '0%'"></span>
             </div>
             <div class="w-full themed-bg-muted rounded-full h-4">
               <div class="bg-green-500 h-4 rounded-full transition-all duration-500"
-                   :style="'width: ' + (userStats.totalUsers > 0 ? (userStats.activeUsers / userStats.totalUsers * 100) : 0) + '%'"></div>
+                   :style="'width: ' + (userStats.total_users > 0 ? (userStats.active_users / userStats.total_users * 100) : 0) + '%'"></div>
             </div>
             <div class="flex justify-between text-sm themed-text-muted mt-2">
-              <span>活跃: <span x-text="userStats.activeUsers"></span></span>
-              <span>非活跃: <span x-text="userStats.totalUsers - userStats.activeUsers"></span></span>
+              <span>活跃: <span x-text="userStats.active_users"></span></span>
+              <span>非活跃: <span x-text="userStats.total_users - userStats.active_users"></span></span>
             </div>
           </div>
         </div>
@@ -1617,8 +1632,8 @@
                           class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
                           @change="updateProbabilityPreview()">
                     <option value="">请选择奖品</option>
-                    <template x-for="prize in allPrizes" :key="prize.prize_id || prize.id">
-                      <option :value="prize.prize_id || prize.id" x-text="prize.prize_name || prize.name"></option>
+                    <template x-for="prize in allPrizes" :key="prize.lottery_prize_id">
+                      <option :value="prize.lottery_prize_id" x-text="prize.prize_name"></option>
                     </template>
                   </select>
                 </div>

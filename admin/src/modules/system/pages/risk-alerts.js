@@ -664,12 +664,12 @@ function riskAlertsPage() {
       this.alerts.forEach(alert => {
         // 后端返回的字段是 severity
         const severity = alert.severity
-        if (severity && severityStats.hasOwnProperty(severity)) {
+        if (severity && Object.hasOwn(severityStats, severity)) {
           severityStats[severity]++
         }
         // 后端返回的字段是 alert_type
         const alertType = alert.alert_type
-        if (alertType && alertTypeStats.hasOwnProperty(alertType)) {
+        if (alertType && Object.hasOwn(alertTypeStats, alertType)) {
           alertTypeStats[alertType]++
         }
       })

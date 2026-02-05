@@ -253,6 +253,83 @@ router.get('/exchange-preferences', authenticateToken, requireRoleLevel(100), as
 })
 
 /**
+ * @api {get} /api/v4/console/users/funnel/trend 获取行为漏斗趋势
+ * @apiName GetFunnelTrend
+ * @apiGroup UserSegments
+ * @apiVersion 1.0.0
+ *
+ * @apiDescription 获取用户行为漏斗的历史趋势数据，用于转化率趋势图表展示
+ *
+ * @apiQuery {Number} [days=7] 统计天数（默认7天，最大14天）
+ *
+ * @apiSuccess {Boolean} success 请求是否成功
+ * @apiSuccess {Object} data 漏斗趋势数据
+ * @apiSuccess {Array} data.trend 每日趋势数据
+ * @apiSuccess {String} data.trend.date 日期（MM/DD格式）
+ * @apiSuccess {Number} data.trend.active_count 当日活跃用户数
+ * @apiSuccess {Number} data.trend.lottery_rate 抽奖转化率（%）
+ * @apiSuccess {Number} data.trend.consumption_rate 消费转化率（%）
+ * @apiSuccess {Number} data.trend.exchange_rate 兑换转化率（%）
+ * @apiSuccess {Object} data.summary 汇总统计
+ * @apiSuccess {Number} data.period_days 统计天数
+ * @apiSuccess {String} data.generated_at 生成时间
+ *
+ * @apiHeader {String} Authorization Bearer token
+ *
+ * @apiPermission admin
+ *
+ * @apiExample {curl} 请求示例:
+ *   curl -X GET "http://localhost:3000/api/v4/console/users/funnel/trend?days=7" \
+ *     -H "Authorization: Bearer <token>"
+ *
+ * @apiSuccessExample {json} 成功响应:
+ *   {
+ *     "success": true,
+ *     "data": {
+ *       "trend": [
+ *         { "date": "02/01", "active_count": 100, "lottery_rate": 65.5, "consumption_rate": 40.2, "exchange_rate": 20.1 },
+ *         { "date": "02/02", "active_count": 105, "lottery_rate": 68.3, "consumption_rate": 42.5, "exchange_rate": 22.0 }
+ *       ],
+ *       "summary": {
+ *         "avg_lottery_rate": 66.9,
+ *         "avg_consumption_rate": 41.35,
+ *         "avg_exchange_rate": 21.05,
+ *         "total_active_days": 2
+ *       },
+ *       "period_days": 7,
+ *       "generated_at": "2026-02-05T10:00:00+08:00"
+ *     },
+ *     "message": "获取漏斗趋势成功"
+ *   }
+ */
+router.get('/funnel/trend', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  const { days = '7' } = req.query
+  const parsedDays = Math.min(parseInt(days, 10) || 7, 14) // 最大14天
+
+  logger.info('获取行为漏斗趋势', {
+    days: parsedDays,
+    user_id: req.user?.user_id
+  })
+
+  try {
+    const models = getModels(req)
+    const UserSegmentService = getUserSegmentService(req)
+    const trend = await UserSegmentService.getFunnelTrend(models, {
+      days: parsedDays
+    })
+
+    return res.apiSuccess(trend, '获取漏斗趋势成功')
+  } catch (error) {
+    logger.error('获取行为漏斗趋势失败', {
+      error: error.message,
+      stack: error.stack
+    })
+
+    return res.apiError('获取漏斗趋势失败', 'FUNNEL_TREND_ERROR', { error: error.message }, 500)
+  }
+})
+
+/**
  * @api {get} /api/v4/admin/users/funnel 获取行为漏斗
  * @apiName GetBehaviorFunnel
  * @apiGroup UserSegments

@@ -59,12 +59,12 @@
           <div class="themed-card rounded-lg shadow p-6 text-center">
             <div class="text-3xl text-cyan-500 mb-2">👥</div>
             <h6 class="themed-text-muted text-sm mb-1">今日参与</h6>
-            <h2 class="text-2xl font-bold text-cyan-600" x-text="campaignStats.todayParticipants">-</h2>
+            <h2 class="text-2xl font-bold text-cyan-600" x-text="campaignStats.today_participants">-</h2>
           </div>
           <div class="themed-card rounded-lg shadow p-6 text-center">
             <div class="text-3xl text-yellow-500 mb-2">🏆</div>
             <h6 class="themed-text-muted text-sm mb-1">今日中奖</h6>
-            <h2 class="text-2xl font-bold text-yellow-600" x-text="campaignStats.todayWinners">-</h2>
+            <h2 class="text-2xl font-bold text-yellow-600" x-text="campaignStats.today_winners">-</h2>
           </div>
         </div>
 
@@ -198,12 +198,12 @@
           <div class="themed-card rounded-lg shadow p-4 text-center">
             <div class="text-2xl mb-2">🎁</div>
             <h6 class="themed-text-muted text-xs mb-1">今日发放</h6>
-            <h2 class="text-xl font-bold themed-text-primary" x-text="prizeIssuedStats.todayIssued || 0"></h2>
+            <h2 class="text-xl font-bold themed-text-primary" x-text="prizeIssuedStats.today_issued || 0"></h2>
           </div>
           <div class="themed-card rounded-lg shadow p-4 text-center">
             <div class="text-2xl mb-2">💰</div>
             <h6 class="themed-text-muted text-xs mb-1">发放价值</h6>
-            <h2 class="text-xl font-bold text-green-600" x-text="'¥' + (prizeIssuedStats.totalValue || 0).toLocaleString()"></h2>
+            <h2 class="text-xl font-bold text-green-600" x-text="'¥' + (prizeIssuedStats.total_value || 0).toLocaleString()"></h2>
           </div>
           <div class="themed-card rounded-lg shadow p-4 text-center">
             <div class="text-2xl mb-2">📦</div>
@@ -211,11 +211,11 @@
             <h2 class="text-xl font-bold text-blue-600" x-text="prizes.length"></h2>
           </div>
           <div class="themed-card rounded-lg shadow p-4 text-center">
-            <div class="text-2xl mb-2" :class="prizeIssuedStats.lowStockCount > 0 ? 'animate-pulse' : ''">⚠️</div>
+            <div class="text-2xl mb-2" :class="prizeIssuedStats.low_stock_count > 0 ? 'animate-pulse' : ''">⚠️</div>
             <h6 class="themed-text-muted text-xs mb-1">低库存预警</h6>
             <h2 class="text-xl font-bold" 
-                :class="prizeIssuedStats.lowStockCount > 0 ? 'text-red-600' : 'text-gray-600'" 
-                x-text="prizeIssuedStats.lowStockCount || 0"></h2>
+                :class="prizeIssuedStats.low_stock_count > 0 ? 'text-red-600' : 'text-gray-600'" 
+                x-text="prizeIssuedStats.low_stock_count || 0"></h2>
           </div>
         </div>
 
@@ -254,7 +254,7 @@
           <!-- 筛选器 -->
           <div class="p-4 border-b themed-bg-base">
             <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <select class="px-3 py-2 border rounded" x-model="prizeFilters.type" @change="loadPrizes()">
+              <select class="px-3 py-2 border rounded" x-model="prizeFilters.prize_type" @change="loadPrizes()">
                 <option value="">全部类型</option>
                 <option value="physical">实物奖品</option>
                 <option value="virtual">虚拟奖品</option>
@@ -288,7 +288,7 @@
                 <template x-if="prizes.length === 0">
                   <tr><td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无奖品数据</td></tr>
                 </template>
-                <template x-for="prize in prizes" :key="prize.prize_id">
+                <template x-for="prize in prizes" :key="prize.lottery_prize_id">
                   <tr class="themed-hover-bg">
                     <td class="px-4 py-3">
                       <div class="flex items-center">
@@ -301,12 +301,12 @@
                         </div>
                         <div>
                           <div class="font-medium" x-text="prize.prize_name"></div>
-                          <small class="text-gray-400" x-text="prize.prize_id"></small>
+                          <small class="text-gray-400" x-text="prize.lottery_prize_id"></small>
                         </div>
                       </div>
                     </td>
                     <td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded bg-cyan-100 text-cyan-700" x-text="getPrizeTypeText(prize.prize_type)"></span></td>
-                    <td class="px-4 py-3 text-sm" x-text="prize.win_probability + '%'"></td>
+                    <td class="px-4 py-3 text-sm" x-text="(prize.win_probability * 100).toFixed(1) + '%'"></td>
                     <td class="px-4 py-3 text-sm" x-text="prize.stock_quantity >= 999999 ? '无限' : prize.stock_quantity"></td>
                     <td class="px-4 py-3">
                       <span class="px-2 py-1 text-xs rounded" :class="isPrizeActive(prize) ? 'bg-green-100 themed-text-success' : 'themed-bg-subtle themed-text-secondary'" x-text="isPrizeActive(prize) ? '启用' : '禁用'"></span>
@@ -315,7 +315,7 @@
                       <div class="flex space-x-2">
                         <button class="themed-text-primary hover:text-blue-700 text-sm" @click="editPrize(prize)">编辑</button>
                         <button class="text-green-500 hover:text-green-700 text-sm" @click="openStockModal(prize)">补货</button>
-                        <button class="text-yellow-500 hover:text-yellow-700 text-sm" @click="togglePrize(prize)" x-text="prize.is_active ? '禁用' : '启用'"></button>
+                        <button class="text-yellow-500 hover:text-yellow-700 text-sm" @click="togglePrize(prize)" x-text="isPrizeActive(prize) ? '禁用' : '启用'"></button>
                         <button class="text-red-500 hover:text-red-700 text-sm" @click="deletePrize(prize)">删除</button>
                       </div>
                     </td>
@@ -826,22 +826,22 @@
           <div class="themed-card rounded-lg shadow p-6 text-center">
             <div class="text-3xl themed-text-primary mb-2">🎲</div>
             <h6 class="themed-text-muted text-sm mb-1">总抽奖次数</h6>
-            <h2 class="text-2xl font-bold themed-text-primary" x-text="lotteryMetrics.totalDraws">-</h2>
+            <h2 class="text-2xl font-bold themed-text-primary" x-text="lotteryMetrics.total_draws">-</h2>
           </div>
           <div class="themed-card rounded-lg shadow p-6 text-center">
             <div class="text-3xl text-green-500 mb-2">🏆</div>
             <h6 class="themed-text-muted text-sm mb-1">中奖次数</h6>
-            <h2 class="text-2xl font-bold text-green-600" x-text="lotteryMetrics.totalWins">-</h2>
+            <h2 class="text-2xl font-bold text-green-600" x-text="lotteryMetrics.total_wins">-</h2>
           </div>
           <div class="themed-card rounded-lg shadow p-6 text-center">
             <div class="text-3xl text-yellow-500 mb-2">📈</div>
             <h6 class="themed-text-muted text-sm mb-1">中奖率</h6>
-            <h2 class="text-2xl font-bold text-yellow-600" x-text="lotteryMetrics.winRate + '%'">-</h2>
+            <h2 class="text-2xl font-bold text-yellow-600" x-text="lotteryMetrics.win_rate + '%'">-</h2>
           </div>
           <div class="themed-card rounded-lg shadow p-6 text-center">
             <div class="text-3xl text-cyan-500 mb-2">💰</div>
             <h6 class="themed-text-muted text-sm mb-1">奖品总价值</h6>
-            <h2 class="text-2xl font-bold text-cyan-600" x-text="'¥' + (lotteryMetrics.totalValue || 0).toFixed(2)">-</h2>
+            <h2 class="text-2xl font-bold text-cyan-600" x-text="'¥' + (lotteryMetrics.total_value || 0).toFixed(2)">-</h2>
           </div>
         </div>
 
@@ -1009,9 +1009,9 @@
                       <div class="flex items-center">
                         <div class="w-24 themed-bg-muted rounded-full h-2 mr-2">
                           <div class="themed-bg-primary h-2 rounded-full" 
-                               :style="'width: ' + ((prize.value || 0) / (lotteryMetrics.totalDraws || 1) * 100) + '%'"></div>
+                               :style="'width: ' + ((prize.value || 0) / (lotteryMetrics.total_draws || 1) * 100) + '%'"></div>
                         </div>
-                        <span x-text="((prize.value || 0) / (lotteryMetrics.totalDraws || 1) * 100).toFixed(1) + '%'"></span>
+                        <span x-text="((prize.value || 0) / (lotteryMetrics.total_draws || 1) * 100).toFixed(1) + '%'"></span>
                       </div>
                     </td>
                   </tr>
@@ -2600,10 +2600,10 @@
                 上一页
               </button>
               <span class="px-3 py-1">
-                <span x-text="presetPagination.page"></span> / <span x-text="presetTotalPages"></span>
+                <span x-text="presetPagination.page"></span> / <span x-text="getPresetTotalPages()"></span>
               </span>
               <button class="px-3 py-1 border rounded" 
-                      :disabled="presetPagination.page >= presetTotalPages"
+                      :disabled="presetPagination.page >= getPresetTotalPages()"
                       @click="changePresetPage(presetPagination.page + 1)">
                 下一页
               </button>
@@ -2845,10 +2845,10 @@
                 上一页
               </button>
               <span class="px-3 py-1">
-                <span x-text="advancePagination.page"></span> / <span x-text="advanceTotalPages"></span>
+                <span x-text="advancePagination.page"></span> / <span x-text="getAdvanceTotalPages()"></span>
               </span>
               <button class="px-3 py-1 border rounded" 
-                      :disabled="advancePagination.page >= advanceTotalPages"
+                      :disabled="advancePagination.page >= getAdvanceTotalPages()"
                       @click="changeAdvancePage(advancePagination.page + 1)">
                 下一页
               </button>
@@ -3502,7 +3502,7 @@
             </template>
             <!-- 有活动时显示下拉框 -->
             <template x-if="campaigns && campaigns.length > 0">
-              <select class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.campaign_id" required>
+              <select class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.lottery_campaign_id" required>
                 <option value="">请选择活动</option>
                 <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
                   <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
@@ -3572,7 +3572,7 @@
         <!-- 选择活动 -->
         <div class="flex items-center gap-4">
           <label class="block text-sm font-medium themed-text-secondary whitespace-nowrap">所属活动 *</label>
-          <select class="flex-1 px-3 py-2 border rounded" x-model.number="batchCampaignId">
+          <select class="flex-1 px-3 py-2 border rounded" x-model.number="batchLotteryCampaignId">
             <option value="">请选择活动</option>
             <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
               <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
@@ -4061,8 +4061,6 @@
     </div>
   </div>
 
-    </div><!-- 关闭 lotteryPageContent -->
-
     <!-- ==================== 用户抽奖档案模态框 ==================== -->
     <div x-show="showUserProfileModal" class="fixed inset-0 z-50 flex items-center justify-center" x-cloak>
       <div class="fixed inset-0 bg-black bg-opacity-50" @click="closeUserProfileModal()"></div>
@@ -4131,19 +4129,19 @@
               <div class="p-4">
                 <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
                   <div>
-                    <div class="text-3xl font-bold themed-text-primary" x-text="userDrawStats.totalDraws">0</div>
+                    <div class="text-3xl font-bold themed-text-primary" x-text="userDrawStats.total_draws">0</div>
                     <div class="text-sm themed-text-muted">总抽奖次数</div>
                   </div>
                   <div>
-                    <div class="text-3xl font-bold text-green-600" x-text="userDrawStats.totalWins">0</div>
+                    <div class="text-3xl font-bold text-green-600" x-text="userDrawStats.total_wins">0</div>
                     <div class="text-sm themed-text-muted">中奖次数</div>
                   </div>
                   <div>
-                    <div class="text-3xl font-bold text-yellow-600" x-text="userDrawStats.winRate + '%'">0%</div>
+                    <div class="text-3xl font-bold text-yellow-600" x-text="userDrawStats.win_rate + '%'">0%</div>
                     <div class="text-sm themed-text-muted">中奖率</div>
                   </div>
                   <div>
-                    <div class="text-3xl font-bold text-cyan-600" x-text="'¥' + (userDrawStats.totalValue || 0).toFixed(2)">¥0</div>
+                    <div class="text-3xl font-bold text-cyan-600" x-text="'¥' + (userDrawStats.total_value || 0).toFixed(2)">¥0</div>
                     <div class="text-sm themed-text-muted">奖品价值</div>
                   </div>
                   <div>
@@ -4201,15 +4199,15 @@
                     </template>
                     <template x-for="(draw, index) in userDrawHistory" :key="index">
                       <tr class="themed-hover-bg">
-                        <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatProfileTime(draw.drawTime)"></td>
-                        <td class="px-4 py-3 text-sm" x-text="draw.campaignName"></td>
+                        <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatProfileTime(draw.draw_time)"></td>
+                        <td class="px-4 py-3 text-sm" x-text="draw.campaign_name"></td>
                         <td class="px-4 py-3 text-sm">
                           <span class="px-2 py-1 rounded text-xs" 
-                                :class="draw.isWin ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
-                                x-text="draw.prizeName"></span>
+                                :class="draw.is_win ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
+                                x-text="draw.prize_name"></span>
                         </td>
-                        <td class="px-4 py-3 text-sm" x-text="draw.rewardTier || '-'"></td>
-                        <td class="px-4 py-3 text-sm" x-text="draw.prizeValue ? '¥' + draw.prizeValue.toFixed(2) : '-'"></td>
+                        <td class="px-4 py-3 text-sm" x-text="draw.reward_tier || '-'"></td>
+                        <td class="px-4 py-3 text-sm" x-text="draw.prize_value ? '¥' + draw.prize_value.toFixed(2) : '-'"></td>
                       </tr>
                     </template>
                   </tbody>
@@ -4435,7 +4433,7 @@
         </div>
 
         <!-- 模态框内容 -->
-        <div class="flex-1 overflow-y-auto p-6" x-show="campaignRoiData && !loadingCampaignRoi">
+        <div class="flex-1 overflow-y-auto p-6" x-show="typeof campaignRoiData !== 'undefined' && campaignRoiData && !loadingCampaignRoi">
           <!-- ROI核心指标 -->
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div class="themed-card rounded-lg p-4 text-center border-l-4 border-green-500">
@@ -4540,7 +4538,7 @@
         </div>
 
         <!-- 加载状态 -->
-        <div class="flex-1 flex items-center justify-center p-12" x-show="loadingCampaignRoi">
+        <div class="flex-1 flex items-center justify-center p-12" x-show="typeof loadingCampaignRoi !== 'undefined' && loadingCampaignRoi">
           <div class="text-center">
             <div class="animate-spin w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full mx-auto mb-3"></div>
             <p class="themed-text-muted">正在计算ROI数据...</p>
@@ -4548,7 +4546,7 @@
         </div>
 
         <!-- 无数据状态 -->
-        <div class="flex-1 flex items-center justify-center p-12" x-show="!campaignRoiData && !loadingCampaignRoi">
+        <div class="flex-1 flex items-center justify-center p-12" x-show="typeof campaignRoiData !== 'undefined' && !campaignRoiData && !loadingCampaignRoi">
           <div class="text-center">
             <div class="text-4xl mb-3">📭</div>
             <p class="themed-text-muted">暂无ROI分析数据</p>
@@ -4563,6 +4561,8 @@
         </div>
       </div>
     </div>
+
+    </div><!-- 关闭 lotteryPageContent -->
 
   </div><!-- 关闭 lotteryNavigation -->
 

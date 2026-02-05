@@ -327,20 +327,85 @@ export function userDrawer(config = {}) {
 
     /**
      * 加载行为轨迹
+     * 
+     * 后端 API: GET /api/v4/console/user-behavior-tracks
+     * 参数: user_id, page, page_size
      */
     async loadBehaviorTracks() {
       this.loading = true
       try {
-        // 行为轨迹目前使用模拟数据（后端暂未实现专门接口）
-        this.behaviorTracks = this.generateMockBehaviorTracks()
-        this.behaviorPagination.total = this.behaviorTracks.length
-        logger.debug(`[UserDrawer] 加载行为轨迹: ${this.behaviorTracks.length} 条`)
+        const { page, page_size } = this.behaviorPagination
+        const response = await this.apiGet(
+          '/api/v4/console/user-behavior-tracks',
+          { 
+            user_id: this.user_id,
+            page,
+            page_size
+          },
+          { showLoading: false }
+        )
+        
+        if (response?.success && response.data) {
+          // 转换后端数据格式为前端展示格式
+          const tracks = response.data.tracks || response.data.list || []
+          this.behaviorTracks = tracks.map(track => ({
+            track_id: track.track_id || track.id,
+            action_type: track.behavior_type || track.action_type,
+            action_label: this._getBehaviorLabel(track.behavior_type || track.action_type),
+            action_icon: this._getBehaviorIcon(track.behavior_type || track.action_type),
+            detail: track.detail || track.description || `用户进行了${this._getBehaviorLabel(track.behavior_type)}操作`,
+            created_at: track.created_at
+          }))
+          this.behaviorPagination.total = response.data.pagination?.total || response.data.total || tracks.length
+          logger.debug(`[UserDrawer] 加载行为轨迹成功: ${this.behaviorTracks.length} 条`)
+        } else {
+          logger.warn('[UserDrawer] 行为轨迹API返回空数据')
+          this.behaviorTracks = []
+          this.behaviorPagination.total = 0
+        }
       } catch (e) {
         logger.warn('[UserDrawer] 加载行为轨迹失败:', e.message)
         this.behaviorTracks = []
+        this.behaviorPagination.total = 0
       } finally {
         this.loading = false
       }
+    },
+    
+    /**
+     * 获取行为类型的中文标签
+     * @private
+     */
+    _getBehaviorLabel(type) {
+      const labels = {
+        login: '登录系统',
+        lottery: '参与抽奖',
+        consume: '消费购买',
+        consumption: '消费购买',
+        exchange: '兑换商品',
+        profile: '修改资料',
+        view: '浏览页面',
+        click: '点击操作'
+      }
+      return labels[type] || type || '未知操作'
+    },
+    
+    /**
+     * 获取行为类型的图标
+     * @private
+     */
+    _getBehaviorIcon(type) {
+      const icons = {
+        login: '🔑',
+        lottery: '🎰',
+        consume: '💳',
+        consumption: '💳',
+        exchange: '🎁',
+        profile: '✏️',
+        view: '👀',
+        click: '👆'
+      }
+      return icons[type] || '📝'
     },
 
     // ==================== 分页方法 ====================

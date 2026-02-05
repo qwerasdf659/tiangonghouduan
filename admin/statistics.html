@@ -86,13 +86,13 @@
             <div class="flex-1">
               <p class="themed-text-muted text-sm">总用户数</p>
               <h3 class="text-2xl font-bold themed-text tabular-nums" x-text="getAnimatedValue('totalUsers')">-</h3>
-              <span :class="stats.userTrend >= 0 ? 'text-green-500' : 'text-red-500'" class="text-sm flex items-center gap-1">
-                <span x-text="stats.userTrend >= 0 ? '📈' : '📉'"></span>
-                <span x-text="Math.abs(stats.userTrend).toFixed(1) + '%'"></span>
+              <span :class="stats.user_trend >= 0 ? 'text-green-500' : 'text-red-500'" class="text-sm flex items-center gap-1">
+                <span x-text="stats.user_trend >= 0 ? '📈' : '📉'"></span>
+                <span x-text="Math.abs(stats.user_trend).toFixed(1) + '%'"></span>
               </span>
             </div>
             <!-- 迷你趋势图 -->
-            <div class="w-20 h-10" x-data="trendLine({ data: stats.userTrendData || [10, 15, 12, 18, 22, 25, 30], color: '#818cf8' })"></div>
+            <div class="w-20 h-10" x-data="trendLine({ data: stats.user_trendData || [10, 15, 12, 18, 22, 25, 30], color: '#818cf8' })"></div>
           </div>
         </div>
       </template>
@@ -102,13 +102,13 @@
             <div class="flex-1">
               <p class="themed-text-muted text-sm">抽奖次数</p>
               <h3 class="text-2xl font-bold themed-text tabular-nums" x-text="getAnimatedValue('totalDraws')">-</h3>
-              <span :class="stats.drawTrend >= 0 ? 'text-green-500' : 'text-red-500'" class="text-sm flex items-center gap-1">
-                <span x-text="stats.drawTrend >= 0 ? '📈' : '📉'"></span>
-                <span x-text="Math.abs(stats.drawTrend).toFixed(1) + '%'"></span>
+              <span :class="stats.draw_trend >= 0 ? 'text-green-500' : 'text-red-500'" class="text-sm flex items-center gap-1">
+                <span x-text="stats.draw_trend >= 0 ? '📈' : '📉'"></span>
+                <span x-text="Math.abs(stats.draw_trend).toFixed(1) + '%'"></span>
               </span>
             </div>
             <!-- 迷你柱状图 -->
-            <div class="w-20 h-10" x-data="trendBar({ data: stats.drawTrendData || [5, 8, 12, 6, 15, 10, 18], color: '#22c55e' })"></div>
+            <div class="w-20 h-10" x-data="trendBar({ data: stats.draw_trendData || [5, 8, 12, 6, 15, 10, 18], color: '#22c55e' })"></div>
           </div>
         </div>
       </template>
@@ -120,13 +120,13 @@
               <h3 class="text-2xl font-bold themed-text tabular-nums">
                 <span x-text="getAnimatedValue('winRate')">-</span>%
               </h3>
-              <span :class="stats.winRateTrend >= 0 ? 'text-green-500' : 'text-red-500'" class="text-sm flex items-center gap-1">
-                <span x-text="stats.winRateTrend >= 0 ? '📈' : '📉'"></span>
-                <span x-text="Math.abs(stats.winRateTrend).toFixed(1) + '%'"></span>
+              <span :class="stats.win_rate_trend >= 0 ? 'text-green-500' : 'text-red-500'" class="text-sm flex items-center gap-1">
+                <span x-text="stats.win_rate_trend >= 0 ? '📈' : '📉'"></span>
+                <span x-text="Math.abs(stats.win_rate_trend).toFixed(1) + '%'"></span>
               </span>
             </div>
             <!-- 进度环 -->
-            <div class="w-12 h-12" x-data="progressRing({ data: stats.winRate || 45, color: '#eab308' })"></div>
+            <div class="w-12 h-12" x-data="progressRing({ data: stats.win_rate || 45, color: '#eab308' })"></div>
           </div>
         </div>
       </template>
@@ -136,13 +136,13 @@
             <div class="flex-1">
               <p class="themed-text-muted text-sm">积分发放</p>
               <h3 class="text-2xl font-bold themed-text tabular-nums" x-text="getAnimatedValue('totalRevenue')">-</h3>
-              <span :class="stats.revenueTrend >= 0 ? 'text-green-500' : 'text-red-500'" class="text-sm flex items-center gap-1">
-                <span x-text="stats.revenueTrend >= 0 ? '📈' : '📉'"></span>
-                <span x-text="Math.abs(stats.revenueTrend).toFixed(1) + '%'"></span>
+              <span :class="stats.revenue_trend >= 0 ? 'text-green-500' : 'text-red-500'" class="text-sm flex items-center gap-1">
+                <span x-text="stats.revenue_trend >= 0 ? '📈' : '📉'"></span>
+                <span x-text="Math.abs(stats.revenue_trend).toFixed(1) + '%'"></span>
               </span>
             </div>
             <!-- 迷你趋势图 -->
-            <div class="w-20 h-10" x-data="trendLine({ data: stats.revenueTrendData || [100, 120, 110, 150, 180, 160, 200], color: '#f97316' })"></div>
+            <div class="w-20 h-10" x-data="trendLine({ data: stats.revenue_trendData || [100, 120, 110, 150, 180, 160, 200], color: '#f97316' })"></div>
           </div>
         </div>
       </template>
@@ -158,11 +158,11 @@
         <div class="p-4 grid grid-cols-2 gap-4">
           <div class="text-center p-3 themed-bg-primary-light rounded">
             <p class="themed-text-muted text-sm">新增用户</p>
-            <h4 class="text-xl font-bold themed-text-primary" x-text="userStats.newUsers">0</h4>
+            <h4 class="text-xl font-bold themed-text-primary" x-text="userStats.new_users">0</h4>
           </div>
           <div class="text-center p-3 bg-green-50 rounded">
             <p class="themed-text-muted text-sm">活跃用户</p>
-            <h4 class="text-xl font-bold text-green-600" x-text="userStats.activeUsers">0</h4>
+            <h4 class="text-xl font-bold text-green-600" x-text="userStats.active_users">0</h4>
           </div>
           <div class="text-center p-3 bg-purple-50 rounded">
             <p class="themed-text-muted text-sm">管理员</p>
@@ -183,7 +183,7 @@
         <div class="p-4 grid grid-cols-2 gap-4">
           <div class="text-center p-3 themed-bg-primary-light rounded">
             <p class="themed-text-muted text-sm">总抽奖次数</p>
-            <h4 class="text-xl font-bold themed-text-primary" x-text="lotteryStats.totalDraws">0</h4>
+            <h4 class="text-xl font-bold themed-text-primary" x-text="lotteryStats.total_draws">0</h4>
           </div>
           <div class="text-center p-3 bg-yellow-50 rounded">
             <p class="themed-text-muted text-sm">高档奖励</p>
@@ -195,7 +195,7 @@
           </div>
           <div class="text-center p-3 bg-red-50 rounded">
             <p class="themed-text-muted text-sm">中奖率</p>
-            <h4 class="text-xl font-bold text-red-600" x-text="lotteryStats.winRate + '%'">0%</h4>
+            <h4 class="text-xl font-bold text-red-600" x-text="lotteryStats.win_rate + '%'">0%</h4>
           </div>
         </div>
       </div>
@@ -239,7 +239,7 @@
         </div>
       </div>
       
-      <!-- 维度切换Tab -->
+      <!-- 维度切换Tab（后端支持的维度：store, campaign, time） -->
       <div class="flex border-b">
         <button 
           @click="switchDimension('store')"
@@ -252,12 +252,6 @@
           :class="multiDimensionTab === 'campaign' ? 'border-b-2 themed-border-primary themed-text-primary' : 'themed-text-muted'"
           class="px-4 py-2 text-sm font-medium transition-colors">
           🎪 按活动
-        </button>
-        <button 
-          @click="switchDimension('user_segment')"
-          :class="multiDimensionTab === 'user_segment' ? 'border-b-2 themed-border-primary themed-text-primary' : 'themed-text-muted'"
-          class="px-4 py-2 text-sm font-medium transition-colors">
-          👥 按用户群
         </button>
         <button 
           @click="switchDimension('time')"
@@ -284,15 +278,14 @@
         <!-- 图表区域 -->
         <div id="multiDimensionChart" style="width: 100%; height: 350px;"></div>
 
-        <!-- 数据表格 -->
+        <!-- 数据表格 - 适配后端返回字段（支持 store, campaign, time 维度） -->
         <div class="mt-4 overflow-x-auto">
           <table class="w-full text-sm">
             <thead class="themed-bg-base">
               <tr>
                 <th class="px-3 py-2 text-left font-medium themed-text-muted" x-text="getDimensionName(multiDimensionFilters.dimension)"></th>
                 <th class="px-3 py-2 text-right font-medium themed-text-muted">抽奖次数</th>
-                <th class="px-3 py-2 text-right font-medium themed-text-muted">消费金额</th>
-                <th class="px-3 py-2 text-right font-medium themed-text-muted">用户数</th>
+                <th class="px-3 py-2 text-right font-medium themed-text-muted">中奖率</th>
                 <template x-if="multiDimensionData.comparison">
                   <th class="px-3 py-2 text-right font-medium themed-text-muted">同比变化</th>
                 </template>
@@ -300,20 +293,22 @@
               </tr>
             </thead>
             <tbody class="divide-y">
-              <template x-for="item in multiDimensionData.breakdown.slice(0, 10)" :key="item.id || item.name">
+              <template x-for="item in multiDimensionData.breakdown.slice(0, 10)" :key="item.store_id || item.lottery_campaign_id || item.period || item.id">
                 <tr class="themed-hover-bg">
-                  <td class="px-3 py-2" x-text="item.name || item.store_name || item.campaign_name || '未知'"></td>
-                  <td class="px-3 py-2 text-right tabular-nums" x-text="(item.draw_count || item.count || 0).toLocaleString()"></td>
-                  <td class="px-3 py-2 text-right tabular-nums" x-text="'¥' + (item.consumption || item.amount || 0).toLocaleString()"></td>
-                  <td class="px-3 py-2 text-right tabular-nums" x-text="(item.user_count || 0).toLocaleString()"></td>
+                  <!-- 显示维度值：门店名/活动名/时间周期 - 使用后端字段名 -->
+                  <td class="px-3 py-2" x-text="item.store_name || item.name || item.period || ('活动#' + item.lottery_campaign_id) || '未知'"></td>
+                  <!-- 抽奖次数：后端字段为 draws -->
+                  <td class="px-3 py-2 text-right tabular-nums" x-text="(item.draws || 0).toLocaleString()"></td>
+                  <!-- 中奖率：后端字段为 win_rate -->
+                  <td class="px-3 py-2 text-right tabular-nums" x-text="(item.win_rate || 0).toFixed(2) + '%'"></td>
                   <template x-if="multiDimensionData.comparison && item.change !== undefined">
                     <td class="px-3 py-2 text-right">
                       <span :class="item.change >= 0 ? 'text-green-500' : 'text-red-500'" x-text="(item.change >= 0 ? '+' : '') + item.change.toFixed(1) + '%'"></span>
                     </td>
                   </template>
                   <td class="px-3 py-2 text-center">
-                    <button 
-                      @click="drillDown(item)" 
+                    <button
+                      @click="drillDown(item)"
                       x-show="multiDimensionFilters.dimension !== 'time'"
                       class="themed-text-primary text-xs hover:underline">
                       下钻 →
@@ -323,7 +318,7 @@
               </template>
               <template x-if="multiDimensionData.breakdown.length === 0">
                 <tr>
-                  <td colspan="6" class="px-3 py-8 text-center themed-text-muted">
+                  <td colspan="5" class="px-3 py-8 text-center themed-text-muted">
                     暂无数据，请点击维度Tab加载
                   </td>
                 </tr>
@@ -354,19 +349,21 @@
           </div>
         </template>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <template x-for="template in reportTemplates" :key="template.template_id || template.id">
+          <!-- 使用后端字段: report_template_id, template_name, template_description, is_enabled -->
+          <template x-for="template in reportTemplates" :key="template.report_template_id">
             <div class="themed-card border rounded-lg p-4 hover:shadow-md transition-shadow">
               <div class="flex justify-between items-start mb-2">
-                <h6 class="font-medium" x-text="template.name"></h6>
+                <h6 class="font-medium" x-text="template.template_name"></h6>
                 <span 
-                  :class="template.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+                  :class="template.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
                   class="px-2 py-0.5 text-xs rounded"
-                  x-text="template.is_active !== false ? '启用' : '禁用'"
+                  x-text="template.is_enabled ? '启用' : '禁用'"
                 ></span>
               </div>
-              <p class="text-sm themed-text-muted mb-3 line-clamp-2" x-text="template.description || '暂无描述'"></p>
+              <p class="text-sm themed-text-muted mb-3 line-clamp-2" x-text="template.template_description || '暂无描述'"></p>
               <div class="flex flex-wrap gap-1 mb-3">
-                <template x-for="dim in (template.dimensions || []).slice(0, 3)" :key="dim">
+                <!-- 后端使用 dimensions_config 存储维度配置（数组） -->
+                <template x-for="(dim, idx) in (Array.isArray(template.dimensions_config) ? template.dimensions_config : []).slice(0, 3)" :key="'dim-' + idx">
                   <span class="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded" x-text="getDimensionName(dim)"></span>
                 </template>
               </div>

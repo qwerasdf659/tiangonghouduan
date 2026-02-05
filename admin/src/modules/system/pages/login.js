@@ -28,7 +28,6 @@
  * </form>
  */
 
-/* global Alpine */
 import { logger } from '../../../utils/logger.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
 import { AUTH_ENDPOINTS } from '../../../api/auth.js'

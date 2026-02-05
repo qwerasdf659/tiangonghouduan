@@ -12,9 +12,9 @@ import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
 // ========== API 端点 ==========
 
 export const TRADE_ENDPOINTS = {
-  // 交易订单
+  // 交易订单（marketplace）
   TRADE_ORDERS: `${API_PREFIX}/console/marketplace/trade_orders`,
-  TRADE_ORDER_DETAIL: `${API_PREFIX}/console/marketplace/trade_orders/:order_id`,
+  MARKETPLACE_ORDER_DETAIL: `${API_PREFIX}/console/marketplace/trade_orders/:order_id`,
 
   // 市场上架
   LISTING_LIST: `${API_PREFIX}/console/marketplace/listings`,
@@ -93,12 +93,12 @@ export const TradeAPI = {
   },
 
   /**
-   * 获取交易订单详情
+   * 获取市场交易订单详情
    * @param {string} orderId - 订单 ID
    * @returns {Promise<Object>} API 响应
    */
-  async getTradeOrderDetail(orderId) {
-    const url = buildURL(TRADE_ENDPOINTS.TRADE_ORDER_DETAIL, { order_id: orderId })
+  async getMarketplaceOrderDetail(orderId) {
+    const url = buildURL(TRADE_ENDPOINTS.MARKETPLACE_ORDER_DETAIL, { order_id: orderId })
     return await request({ url, method: 'GET' })
   },
 

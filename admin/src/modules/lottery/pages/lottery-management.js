@@ -21,7 +21,7 @@
 
 // ES Module 导入（替代 window.xxx 全局变量）
 import { logger } from '../../../utils/logger.js'
-import { Alpine, createPageMixin } from '../../../alpine/index.js'
+import { Alpine, createPageMixin, initAlpine } from '../../../alpine/index.js'
 
 // 导入所有 composables 模块
 import {
@@ -189,9 +189,15 @@ function registerLotteryManagementComponents() {
    * 抽奖管理内容组件 - 使用 composables 组合
    */
   Alpine.data('lotteryPageContent', () => {
-    // 预先调用所有 composables 并验证
+    // 预先调用所有 composables
     const pageMixin = createPageMixin()
     const campaignsState = useCampaignsState()
+    
+    // [DEBUG] 验证 campaignsState 包含 ROI 相关状态
+    console.log('[DEBUG-lottery] campaignsState.campaignRoiData:', campaignsState.campaignRoiData)
+    console.log('[DEBUG-lottery] campaignsState.loadingCampaignRoi:', campaignsState.loadingCampaignRoi)
+    console.log('[DEBUG-lottery] campaignsState.showCampaignRoiModal:', campaignsState.showCampaignRoiModal)
+    console.log('[DEBUG-lottery] campaignsState keys:', Object.keys(campaignsState))
     const prizesState = usePrizesState()
     const budgetState = useBudgetState()
     const strategyState = useStrategyState()
@@ -230,24 +236,9 @@ function registerLotteryManagementComponents() {
     const presetVisualizationMethods = usePresetVisualizationMethods()
     const systemAdvanceMethods = useSystemAdvanceMethods()
 
-    // 调试日志 - 检查 quotaMethods
-    logger.debug('[Quota Debug] quotaMethods keys:', Object.keys(quotaMethods || {}))
-    logger.debug(
-      '[Quota Debug] has openCreateQuotaModal:',
-      typeof quotaMethods?.openCreateQuotaModal
-    )
-
-    logger.debug('[LotteryPageContent] Composable check:', {
-      pageMixin: Object.keys(pageMixin || {}),
-      quotaMethods: Object.keys(quotaMethods || {}),
-      redemptionMethods: Object.keys(redemptionMethods || {})
-    })
-
-    return {
-      // 基础混入
+    // 合并所有状态和方法到返回对象
+    const returnObj = {
       ...pageMixin,
-
-      // ==================== 从 Composables 导入状态 ====================
       ...campaignsState,
       ...prizesState,
       ...budgetState,
@@ -257,13 +248,11 @@ function registerLotteryManagementComponents() {
       ...metricsState,
       ...redemptionState,
       ...userProfileState,
-      // 新增模块状态
       ...alertsState,
       ...riskControlState,
       ...reportState,
       ...dailyReportState,
       ...batchOperationsState,
-      // P1-3 & P1-10 模块状态
       ...presetVisualizationState,
       ...systemAdvanceState,
 
@@ -487,6 +476,8 @@ function registerLotteryManagementComponents() {
         return `¥${parseFloat(value).toFixed(2)}`
       }
     }
+    
+    return returnObj
   })
 
   logger.info('[LotteryManagement] Alpine 组件注册完成')
@@ -496,17 +487,31 @@ function registerLotteryManagementComponents() {
 
 /**
  * 组件注册策略：
- * 由于 ES 模块的导入顺序问题（Alpine.start() 在导入时执行），
- * 需要立即注册组件，而不是等待 alpine:init 事件
+ * 
+ * 问题分析：
+ * - lottery-management.js 在 <head> 中作为 ES Module 加载
+ * - main.js 中的 initAlpine() 在 DOMContentLoaded 事件中调用
+ * - 当浏览器解析 HTML 中的 x-data="lotteryPageContent()" 时，Alpine.start() 还没被调用
+ * 
+ * 解决方案：
+ * - 立即注册组件到 Alpine.data()
+ * - 然后检查 Alpine 是否已启动，如果没有则调用 initAlpine()
+ * - 这确保组件在 HTML 解析时就已经可用
  */
 
 // 立即注册组件（模块加载时执行）
 logger.debug('📦 [LotteryManagement] 模块加载，准备注册组件...')
 try {
   registerLotteryManagementComponents()
-  logger.debug('✅ [LotteryManagement] 组件注册成功完成!')
+  
+  // 确保 Alpine.js 已启动
+  const isAlpineStarted = document.querySelector('[x-data]')?._x_dataStack !== undefined
+  
+  if (!isAlpineStarted) {
+    initAlpine()
+  }
 } catch (error) {
-  logger.error('❌ [LotteryManagement] 组件注册失败:', error)
+  logger.error('[LotteryManagement] 组件注册失败:', error)
 }
 
 export { registerLotteryManagementComponents }

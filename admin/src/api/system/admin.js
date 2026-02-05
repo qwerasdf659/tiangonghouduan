@@ -56,7 +56,8 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   AUDIT_LOG_STATISTICS: `${API_PREFIX}/console/system/audit-logs/statistics`,
   AUDIT_LOG_DETAIL: `${API_PREFIX}/console/system/audit-logs/:id`,
   AUDIT_LOG_EXPORT: `${API_PREFIX}/console/audit-logs/export`,
-  AUDIT_LOG_REPORT: `${API_PREFIX}/admin/operations/audit-report`, // F-59: 审计报告
+  /** 审计报告 - 生成审计报告（支持时间范围筛选） */
+  AUDIT_LOG_REPORT: `${API_PREFIX}/console/system/audit-logs/report`,
 
   // 会话管理
   SESSION_LIST: `${API_PREFIX}/console/sessions`,
@@ -343,6 +344,20 @@ export const SystemAdminAPI = {
    */
   async getAuditLogDetail(id) {
     const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.AUDIT_LOG_DETAIL, { id })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 生成审计报告
+   * @param {Object} [params={}] - 报告参数
+   * @param {string} [params.time_range='7d'] - 时间范围（7d/30d/90d/custom）
+   * @param {string} [params.start_date] - 自定义开始日期（YYYY-MM-DD，time_range=custom时必填）
+   * @param {string} [params.end_date] - 自定义结束日期（YYYY-MM-DD，time_range=custom时必填）
+   * @param {number} [params.operator_id] - 操作员ID筛选（可选）
+   * @returns {Promise<Object>} 审计报告数据
+   */
+  async getAuditReport(params = {}) {
+    const url = SYSTEM_ADMIN_ENDPOINTS.AUDIT_LOG_REPORT + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 

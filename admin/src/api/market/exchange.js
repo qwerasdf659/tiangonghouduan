@@ -14,7 +14,7 @@ import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
 export const EXCHANGE_ENDPOINTS = {
   // 兑换市场物品
   EXCHANGE_ITEMS: `${API_PREFIX}/console/marketplace/exchange_market/items`,
-  EXCHANGE_ITEM_DETAIL: `${API_PREFIX}/console/marketplace/exchange_market/items/:item_id`,
+  EXCHANGE_ITEM_DETAIL: `${API_PREFIX}/console/marketplace/exchange_market/items/:exchange_item_id`,
   EXCHANGE_ITEM_SIMPLE: `${API_PREFIX}/console/marketplace/exchange_market/items`,
 
   // 兑换订单
@@ -55,7 +55,7 @@ export const ExchangeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async getExchangeItemDetail(itemId) {
-    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ITEM_DETAIL, { item_id: itemId })
+    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ITEM_DETAIL, { exchange_item_id: itemId })
     return await request({ url, method: 'GET' })
   },
 
