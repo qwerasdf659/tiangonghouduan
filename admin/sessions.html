@@ -116,17 +116,15 @@
     <!-- 会话列表 -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" x-show="!loading">
       <!-- 空状态 -->
-      <template x-if="sessions.length === 0 && !loading">
-        <div class="col-span-3">
-          <div class="themed-card rounded-lg shadow p-10 text-center themed-text-muted">
-            <span class="text-5xl">🔗</span>
-            <p class="mt-4">暂无会话数据</p>
-          </div>
+      <div class="col-span-3" x-show="sessions.length === 0 && !loading">
+        <div class="themed-card rounded-lg shadow p-10 text-center themed-text-muted">
+          <span class="text-5xl">🔗</span>
+          <p class="mt-4">暂无会话数据</p>
         </div>
-      </template>
+      </div>
 
       <!-- 会话卡片 -->
-      <template x-for="session in sessions" :key="session.user_session_id || session.session_id">
+      <template x-for="(session, sessionIdx) in sessions" :key="session.user_session_id || sessionIdx">
         <div 
           class="themed-card rounded-lg shadow session-card border-l-4"
           :class="[getSessionStatus(session), isCurrentSession(session) ? 'current-session' : '']"

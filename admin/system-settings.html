@@ -74,25 +74,25 @@
             <thead class="themed-bg-base">
               <tr>
                 <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">规则类型</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">触发条件</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">阈值</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">规则名称</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">触发阈值</th>
                 <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">通知渠道</th>
                 <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
                 <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
               </tr>
             </thead>
             <tbody class="divide-y">
-              <template x-if="reminderRules.length === 0">
-                <tr><td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无提醒规则</td></tr>
-              </template>
-              <template x-for="rule in reminderRules" :key="rule.rule_id || rule.id">
+              <tr x-show="!reminderRules || reminderRules.length === 0">
+                <td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无提醒规则</td>
+              </tr>
+              <template x-for="rule in (reminderRules || [])" :key="rule.reminder_rule_id">
                 <tr class="themed-hover-bg">
                   <td class="px-4 py-3 text-sm" x-text="getRuleTypeName(rule.rule_type)"></td>
-                  <td class="px-4 py-3 text-sm" x-text="getConditionTypeName(rule.condition_type)"></td>
-                  <td class="px-4 py-3 text-sm font-mono" x-text="rule.threshold || '-'"></td>
+                  <td class="px-4 py-3 text-sm" x-text="rule.rule_name || '-'"></td>
+                  <td class="px-4 py-3 text-sm font-mono" x-text="rule.trigger_condition?.threshold || '-'"></td>
                   <td class="px-4 py-3 text-sm">
-                    <template x-for="channel in (rule.notify_channels || [])" :key="channel">
-                      <span class="inline-block px-2 py-0.5 text-xs rounded bg-blue-100 text-blue-700 mr-1" x-text="channel === 'in_app' ? '站内' : channel === 'sms' ? '短信' : channel === 'email' ? '邮件' : channel"></span>
+                    <template x-for="channel in (rule.notification_channels || [])" :key="channel">
+                      <span class="inline-block px-2 py-0.5 text-xs rounded bg-blue-100 text-blue-700 mr-1" x-text="channel === 'admin_broadcast' ? '管理员广播' : channel === 'websocket' ? 'WebSocket' : channel === 'in_app' ? '站内' : channel === 'sms' ? '短信' : channel === 'email' ? '邮件' : channel"></span>
                     </template>
                   </td>
                   <td class="px-4 py-3">
@@ -151,10 +151,10 @@
               </tr>
             </thead>
             <tbody class="divide-y">
-              <template x-if="auditLogs.length === 0">
-                <tr><td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无审计日志数据</td></tr>
-              </template>
-              <template x-for="(log, index) in auditLogs" :key="log.id || index">
+              <tr x-show="!auditLogs || auditLogs.length === 0">
+                <td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无审计日志数据</td>
+              </tr>
+              <template x-for="(log, index) in (auditLogs || [])" :key="log.id || index">
                 <tr class="themed-hover-bg">
                   <td class="px-4 py-3 text-sm font-mono themed-text-muted" x-text="log.id || '-'"></td>
                   <td class="px-4 py-3 text-sm" x-text="log.operator_info?.nickname || log.operator_id || '-'"></td>

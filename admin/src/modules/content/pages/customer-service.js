@@ -697,10 +697,7 @@ function customerServicePage() {
     /**
      * 获取会话状态文本
      */
-    getSessionStatusText(status) {
-      const texts = { waiting: '待处理', active: '进行中', closed: '已关闭' }
-      return texts[status] || '未知'
-    },
+    // ✅ 已删除 getSessionStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 掩码手机号

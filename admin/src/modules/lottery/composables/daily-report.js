@@ -181,7 +181,8 @@ export function useDailyReportMethods() {
 
       const isPositive = value > 0
       const isNegative = value < 0
-      const absValue = Math.abs(value * 100).toFixed(1)
+      // 后端已返回百分比值（如 -68.8 表示下降68.8%），无需再乘以100
+      const absValue = Math.abs(value).toFixed(1)
 
       let text = `${absValue}%`
       let colorClass = 'text-gray-500'
@@ -248,7 +249,8 @@ export function useDailyReportMethods() {
      */
     formatDailyReportPercentage(value) {
       if (value === null || value === undefined) return '-'
-      return `${(value * 100).toFixed(2)}%`
+      // 后端已返回百分比值（如 100 表示100%），无需再乘以100
+      return `${parseFloat(value).toFixed(1)}%`
     },
 
     /**
@@ -277,7 +279,8 @@ export function useDailyReportMethods() {
       if (value === null || value === undefined) {
         return '-'
       }
-      const absValue = Math.abs(value * 100).toFixed(1)
+      // 后端已返回百分比值（如 -68.8 表示下降68.8%），无需再乘以100
+      const absValue = Math.abs(value).toFixed(1)
       if (value > 0) {
         return `+${absValue}%`
       } else if (value < 0) {

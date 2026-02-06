@@ -292,7 +292,7 @@ export function useRedemptionMethods() {
       if (this.checkIsAllRedemptionSelected()) {
         this.redemptionSelectedIds = []
       } else {
-        this.redemptionSelectedIds = (this.redemptionCodes || []).map(c => c.order_id)
+        this.redemptionSelectedIds = (this.redemptionCodes || []).map(c => c.redemption_order_id)
       }
       logger.debug('[Redemption] 当前选中数量:', this.redemptionSelectedIds.length)
     },
@@ -471,16 +471,7 @@ export function useRedemptionMethods() {
      * @param {string} status - 核销状态代码
      * @returns {string} 状态文本
      */
-    getRedemptionStatusText(status) {
-      const labels = {
-        pending: '待核销',
-        fulfilled: '已核销',
-        redeemed: '已核销',
-        expired: '已过期',
-        cancelled: '已取消'
-      }
-      return labels[status] || status
-    }
+    // ✅ 已删除 getRedemptionStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
   }
 }
 

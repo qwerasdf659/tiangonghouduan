@@ -211,7 +211,7 @@
         </div>
         <div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">操作类型</label>
-          <select class="w-full border rounded-lg px-3 py-2" x-model="logFilters.action">
+          <select class="w-full border rounded-lg px-3 py-2" x-model="logFilters.operation_type">
             <option value="">全部类型</option>
             <template x-for="type in actionTypes" :key="type.value">
               <option :value="type.value" x-text="type.label"></option>
@@ -223,8 +223,8 @@
           <input 
             type="text" 
             class="w-full border rounded-lg px-3 py-2" 
-            x-model="logFilters.target" 
-            placeholder="如: user, lottery..."
+            x-model="logFilters.target_type" 
+            placeholder="如: User, LotteryPool..."
           >
         </div>
         <div>
@@ -285,34 +285,33 @@
           </thead>
           <tbody class="divide-y">
             <!-- 空状态 -->
-            <template x-if="auditLogs.length === 0">
-              <tr>
+
+              <tr x-show="auditLogs.length === 0">
                 <td colspan="7" class="px-4 py-10 text-center">
                   <div class="text-5xl mb-4">📋</div>
                   <p class="themed-text-muted">暂无审计日志</p>
                 </td>
               </tr>
-            </template>
-            
+
             <!-- 日志行 -->
-            <template x-for="log in auditLogs" :key="log.log_id || log.id">
+            <template x-for="log in auditLogs" :key="log.admin_operation_log_id">
               <tr class="log-row">
                 <td class="px-4 py-3 text-sm themed-text-secondary" x-text="formatDateTime(log.created_at)"></td>
                 <td class="px-4 py-3">
                   <div class="flex items-center">
-                    <span class="text-sm font-medium" x-text="log.operator_name || log.operator_id || '-'"></span>
+                    <span class="text-sm font-medium" x-text="log.operator?.nickname || log.operator_id || '-'"></span>
                     <span class="ml-2 text-xs themed-text-muted" x-text="log.operator_id ? `(ID: ${log.operator_id})` : ''"></span>
                   </div>
                 </td>
                 <td class="px-4 py-3">
                   <span 
                     class="px-2 py-1 text-xs rounded"
-                    :class="getActionClass(log.action)"
-                    x-text="getActionText(log.action)"
+                    :class="getOperationTypeClass(log)"
+                    x-text="log.operation_type_display || log.operation_type"
                   ></span>
                 </td>
-                <td class="px-4 py-3 text-sm" x-text="log.target || '-'"></td>
-                <td class="px-4 py-3 text-sm themed-text-secondary max-w-xs truncate" :title="log.description" x-text="log.description || '-'"></td>
+                <td class="px-4 py-3 text-sm" x-text="(log.target_type_display || log.target_type || '') + (log.target_id ? ' #' + log.target_id : '')"></td>
+                <td class="px-4 py-3 text-sm themed-text-secondary max-w-xs truncate" :title="log.action || log.reason" x-text="log.action || log.reason || '-'"></td>
                 <td class="px-4 py-3 text-sm font-mono themed-text-muted" x-text="log.ip_address || '-'"></td>
                 <td class="px-4 py-3">
                   <button 
@@ -542,8 +541,8 @@
                 <label class="block text-sm font-medium themed-text-muted">操作类型</label>
                 <span 
                   class="inline-block mt-1 px-2 py-1 text-xs rounded"
-                  :class="getActionClass(selectedLog?.action)"
-                  x-text="getActionText(selectedLog?.action)"
+                  :class="getOperationTypeClass(selectedLog || {})"
+                  x-text="selectedLog?.operation_type_display || selectedLog?.operation_type"
                 ></span>
               </div>
               <div>
@@ -586,4 +585,3 @@
   <script type="module" src="/src/modules/system/pages/audit-logs.js"></script>
 </body>
 </html>
-

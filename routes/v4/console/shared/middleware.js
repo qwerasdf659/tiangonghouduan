@@ -296,10 +296,11 @@ const validators = {
     }
 
     for (const prize of prizes) {
-      if (!prize.name || !prize.type || !prize.quantity) {
-        throw new Error('奖品信息不完整')
+      // 使用数据库字段名（与 PrizePoolService 一致）
+      if (!prize.prize_name || !prize.prize_type || !prize.stock_quantity) {
+        throw new Error('奖品信息不完整（需要 prize_name, prize_type, stock_quantity）')
       }
-      if (isNaN(parseInt(prize.quantity)) || parseInt(prize.quantity) <= 0) {
+      if (isNaN(parseInt(prize.stock_quantity)) || parseInt(prize.stock_quantity) <= 0) {
         throw new Error('奖品数量必须为正整数')
       }
     }

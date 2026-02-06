@@ -976,7 +976,7 @@ function riskAlertsPage() {
           {
             created_at: reviewedAt,
             status: this.selectedAlert.status,
-            action: `状态更新为: ${this.getStatusText(this.selectedAlert.status)}`,
+            action: `状态更新为: ${this.selectedAlert.status_display || this.selectedAlert.status}`,
             remark: this.selectedAlert.review_notes,
             operator_name: this.selectedAlert.reviewer_info?.nickname || '管理员'
           }
@@ -1081,59 +1081,11 @@ function riskAlertsPage() {
      * @param {string} level - 级别代码
      * @returns {string} 级别中文文本
      */
-    getLevelText(level) {
-      const labels = {
-        critical: '严重',
-        high: '高危',
-        medium: '中等',
-        warning: '警告',
-        low: '低',
-        info: '提示'
-      }
-      return labels[level] || level || '-'
-    },
+    // ✅ 已删除 getLevelText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
-    /**
-     * 获取告警类型中文文本
-     * @method getTypeText
-     * @param {string} type - 类型代码
-     * @returns {string} 类型中文文本
-     */
-    getTypeText(type) {
-      const labels = {
-        frequency_limit: '频次限制',
-        amount_limit: '金额告警',
-        duplicate_user: '重复用户',
-        suspicious_pattern: '可疑模式',
-        fraud: '欺诈检测',
-        abuse: '滥用检测',
-        anomaly: '异常行为',
-        limit: '限额告警',
-        login_anomaly: '登录异常',
-        high_frequency: '高频操作',
-        large_transaction: '大额交易',
-        suspicious_behavior: '可疑行为'
-      }
-      return labels[type] || type || '-'
-    },
-
-    /**
-     * 获取告警状态中文文本
-     * @method getStatusText
-     * @param {string} status - 状态代码
-     * @returns {string} 状态中文文本
-     */
-    getStatusText(status) {
-      const labels = {
-        pending: '待处理',
-        reviewed: '已审核',
-        resolved: '已处理',
-        ignored: '已忽略',
-        processing: '处理中',
-        false_positive: '误报'
-      }
-      return labels[status] || status || '-'
-    },
+    // ✅ 已删除 getTypeText / getStatusText 映射函数
+    // 中文显示名称由后端 attachDisplayNames 统一返回 xxx_display 字段
+    // HTML 模板直接使用 alert.alert_type_display / alert.status_display
 
     /**
      * 格式化日期为中文显示格式

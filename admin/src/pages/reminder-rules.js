@@ -8,7 +8,7 @@
 import Alpine from 'alpinejs'
 import { logger } from '../utils/logger.js'
 import { createPageMixin } from '../alpine/mixins/index.js'
-import { request, buildURL, API_PREFIX } from '../api/base.js'
+import { request, API_PREFIX } from '../api/base.js'
 
 // API 端点 - 使用 API_PREFIX 确保正确的版本前缀
 const REMINDER_ENDPOINTS = {
@@ -127,8 +127,9 @@ function reminderRulesPage() {
         }
 
         const response = await request({
-          url: buildURL(REMINDER_ENDPOINTS.LIST, params),
-          method: 'GET'
+          url: REMINDER_ENDPOINTS.LIST,
+          method: 'GET',
+          params: params
         })
 
         if (response.success) {

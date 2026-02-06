@@ -176,7 +176,8 @@ export function useStrategyMethods() {
     async submitMatrixConfig() {
       try {
         this.saving = true
-        const configId = this.editingMatrixCell.matrix_config_id
+        // 后端主键字段: lottery_tier_matrix_config_id
+        const configId = this.editingMatrixCell.lottery_tier_matrix_config_id
         const url = configId
           ? `${LOTTERY_ENDPOINTS.MATRIX_LIST}/${configId}`
           : LOTTERY_ENDPOINTS.MATRIX_LIST
@@ -276,8 +277,9 @@ export function useStrategyMethods() {
       this.strategyEffectiveness = null
       try {
         const params = new URLSearchParams()
+        // 后端参数名: lottery_campaign_id, start_date, end_date
         if (this.strategyEffectivenessFilters.campaign_id) {
-          params.append('campaign_id', this.strategyEffectivenessFilters.campaign_id)
+          params.append('lottery_campaign_id', this.strategyEffectivenessFilters.campaign_id)
         }
         if (this.strategyEffectivenessFilters.start_date) {
           params.append('start_date', this.strategyEffectivenessFilters.start_date)
@@ -355,16 +357,16 @@ export function useStrategyMethods() {
 
     /**
      * 获取BxPx矩阵单元格颜色
-     * 基于hit_rate生成热力图颜色
-     * @param {number} hitRate - 命中率 (0-1)
+     * 基于 rate 生成热力图颜色
+     * @param {number} rate - 命中率百分比 (0-100)，后端返回格式
      * @returns {string} 背景色CSS类
      */
-    getBxPxHeatmapColor(hitRate) {
-      if (hitRate === null || hitRate === undefined) return 'bg-gray-100'
-      if (hitRate >= 0.8) return 'bg-red-500 text-white'
-      if (hitRate >= 0.6) return 'bg-orange-400 text-white'
-      if (hitRate >= 0.4) return 'bg-yellow-300 text-gray-800'
-      if (hitRate >= 0.2) return 'bg-green-300 text-gray-800'
+    getBxPxHeatmapColor(rate) {
+      if (rate === null || rate === undefined) return 'bg-gray-100'
+      if (rate >= 80) return 'bg-red-500 text-white'
+      if (rate >= 60) return 'bg-orange-400 text-white'
+      if (rate >= 40) return 'bg-yellow-300 text-gray-800'
+      if (rate >= 20) return 'bg-green-300 text-gray-800'
       return 'bg-green-100 text-gray-600'
     },
 

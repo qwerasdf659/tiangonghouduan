@@ -143,6 +143,7 @@ document.addEventListener('alpine:init', () => {
      */
     init() {
       logger.info('[ConfigTools] 初始化开始')
+      if (!this.checkAuth()) return
       this.loadConfigList()
       // 异步加载其他数据
       this.initData()

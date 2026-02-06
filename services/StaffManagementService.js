@@ -23,6 +23,7 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const { invalidateUserPermissions } = require('../middleware/auth')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const AuditLogService = require('./AuditLogService')
+const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 
 /**
  * 员工管理服务类
@@ -661,6 +662,12 @@ class StaffManagementService {
     // 格式化输出
     const staffList = rows.map(record => record.toAPIResponse())
 
+    // 附加中文显示名称（status/role_in_store → _display/_color）
+    await attachDisplayNames(staffList, [
+      { field: 'status', dictType: DICT_TYPES.STORE_STAFF_STATUS },
+      { field: 'role_in_store', dictType: DICT_TYPES.STORE_STAFF_ROLE }
+    ])
+
     logger.info('获取员工列表成功', {
       total: count,
       page: pageNum,
@@ -708,7 +715,15 @@ class StaffManagementService {
       return null
     }
 
-    return record.toAPIResponse()
+    const detail = record.toAPIResponse()
+
+    // 附加中文显示名称（status/role_in_store → _display/_color）
+    await attachDisplayNames(detail, [
+      { field: 'status', dictType: DICT_TYPES.STORE_STAFF_STATUS },
+      { field: 'role_in_store', dictType: DICT_TYPES.STORE_STAFF_ROLE }
+    ])
+
+    return detail
   }
 
   /**

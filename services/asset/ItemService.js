@@ -37,6 +37,7 @@
 const { Op } = require('sequelize')
 const logger = require('../../utils/logger')
 const { requireTransaction } = require('../../utils/transactionHelpers')
+const { attachDisplayNames, DICT_TYPES } = require('../../utils/displayNameHelper')
 
 /**
  * 物品操作服务类
@@ -857,8 +858,15 @@ class ItemService {
       transaction
     })
 
+    // 附加中文显示名称（status/item_type → _display/_color）
+    const items = rows.map(r => (r.toJSON ? r.toJSON() : r))
+    await attachDisplayNames(items, [
+      { field: 'status', dictType: DICT_TYPES.ITEM_STATUS },
+      { field: 'item_type', dictType: DICT_TYPES.ITEM_TYPE }
+    ])
+
     return {
-      items: rows,
+      items,
       total: count,
       page,
       page_size,
@@ -908,8 +916,15 @@ class ItemService {
       transaction
     })
 
+    // 附加中文显示名称（status/item_type → _display/_color）
+    const itemData = item.toJSON ? item.toJSON() : item
+    await attachDisplayNames(itemData, [
+      { field: 'status', dictType: DICT_TYPES.ITEM_STATUS },
+      { field: 'item_type', dictType: DICT_TYPES.ITEM_TYPE }
+    ])
+
     return {
-      item,
+      item: itemData,
       events
     }
   }

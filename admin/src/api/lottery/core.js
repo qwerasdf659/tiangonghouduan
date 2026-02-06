@@ -31,7 +31,6 @@ export const LOTTERY_CORE_ENDPOINTS = {
   PRIZE_DELETE: `${API_PREFIX}/console/prize-pool/prize/:prize_id`,
   PRIZE_DETAIL: `${API_PREFIX}/console/prize-pool/prize/:prize_id`,
   PRIZE_ADD_STOCK: `${API_PREFIX}/console/prize-pool/prize/:prize_id/add-stock`,
-  PRIZE_TOGGLE: `${API_PREFIX}/console/prize-pool/prize/:prize_id/toggle`,
 
   // 活动管理（管理后台 - 使用 console 路由）
   CAMPAIGN_LIST: `${API_PREFIX}/console/lottery-campaigns`,

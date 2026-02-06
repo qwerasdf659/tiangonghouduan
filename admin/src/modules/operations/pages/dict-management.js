@@ -57,19 +57,18 @@ function registerDictManagementComponents() {
     /**
      * 初始化
      */
-    init() {
+    async init() {
       logger.debug('[DictManagement] 字典管理页面初始化开始')
-      logger.debug('[DictManagement] dictList 初始值:', this.dictList)
-      logger.debug('[DictManagement] currentDictType:', this.currentDictType)
 
       if (!this.checkAuth()) {
         logger.warn('[DictManagement] 认证检查失败')
         return
       }
 
-      // 加载字典数据
+      // await 确保数据加载完成后 Alpine 再进行响应式更新，避免 x-for 空→有数据的 DOM 冲突
       logger.debug('[DictManagement] 开始加载字典数据...')
-      this.loadDictList()
+      await this.loadDictList()
+      logger.debug('[DictManagement] 字典数据加载完成, dictList.length:', this.dictList.length)
     }
   }))
 

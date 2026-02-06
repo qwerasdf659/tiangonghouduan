@@ -28,6 +28,7 @@ const { authenticateToken, requireRoleLevel } = require('../../../middleware/aut
 const { Op } = require('sequelize')
 const logger = require('../../../utils/logger').logger
 const alertThresholds = require('../../../config/alert-thresholds')
+const { attachDisplayNames, DICT_TYPES } = require('../../../utils/displayNameHelper')
 const { getRedisClient, isRedisHealthy } = require('../../../utils/UnifiedRedisClient')
 
 /*
@@ -334,6 +335,12 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
       })
     )
 
+    // 附加中文显示名称（status → status_display/status_color）
+    await attachDisplayNames(enrichedCampaigns, [
+      { field: 'status', dictType: DICT_TYPES.CAMPAIGN_STATUS },
+      { field: 'budget_mode', dictType: DICT_TYPES.BUDGET_MODE }
+    ])
+
     // 构建分页响应
     const totalPages = Math.ceil(count / limit)
     const response = {
@@ -418,6 +425,12 @@ router.get('/:lottery_campaign_id', authenticateToken, requireRoleLevel(100), as
       repeat_rate,
       stock_warning: stockWarning
     }
+
+    // 附加中文显示名称（status → status_display/status_color）
+    await attachDisplayNames(response, [
+      { field: 'status', dictType: DICT_TYPES.CAMPAIGN_STATUS },
+      { field: 'budget_mode', dictType: DICT_TYPES.BUDGET_MODE }
+    ])
 
     logger.info('获取活动详情成功', {
       admin_id: req.user.user_id,

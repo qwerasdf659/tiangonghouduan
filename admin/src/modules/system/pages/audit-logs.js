@@ -850,8 +850,8 @@ function auditLogsPage() {
         params.append('page', this.logPage)
         params.append('page_size', this.logPageSize)
         if (this.logFilters.operator_id) params.append('operator_id', this.logFilters.operator_id)
-        if (this.logFilters.action) params.append('action', this.logFilters.action)
-        if (this.logFilters.target) params.append('target', this.logFilters.target)
+        if (this.logFilters.operation_type) params.append('operation_type', this.logFilters.operation_type)
+        if (this.logFilters.target_type) params.append('target_type', this.logFilters.target_type)
         if (this.logFilters.start_date) params.append('start_date', this.logFilters.start_date)
         if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
 
@@ -885,23 +885,30 @@ function auditLogsPage() {
 
     /**
      * 加载统计数据
+     * 使用 SystemAdminAPI 直接调用，避免 apiGet 的 withLoading 切换 this.loading 导致表格闪烁
      */
     async loadStats() {
       try {
-        const response = await this.apiGet(
-          '/api/v4/console/system/audit-logs/statistics',
-          {},
-          { showLoading: false }
-        )
+        const response = await SystemAdminAPI.getAuditLogStats()
 
         if (response?.success && response.data) {
-          this.stats = {
-            create: response.data.create || 0,
-            update: response.data.update || 0,
-            delete: response.data.delete || 0,
-            login: response.data.login || 0,
-            logout: response.data.logout || 0
+          // 后端返回 by_action 数组: [{action:'create',count:5}, ...]
+          // 需要转换为前端 stats 对象的平级字段
+          const actionMap = {}
+          if (Array.isArray(response.data.by_action)) {
+            response.data.by_action.forEach(item => {
+              actionMap[item.action] = parseInt(item.count) || 0
+            })
           }
+
+          this.stats = {
+            create: actionMap.create || 0,
+            update: actionMap.update || 0,
+            delete: actionMap.delete || 0,
+            login: actionMap.login || 0,
+            logout: actionMap.logout || 0
+          }
+          logger.debug('[AuditLogs] 统计数据加载成功:', this.stats)
         }
       } catch (error) {
         logger.warn('[AuditLogs] 加载统计数据失败:', error.message)
@@ -941,7 +948,7 @@ function auditLogsPage() {
      */
     viewLogDetail(log) {
       this.selectedLog = log
-      logger.debug('[AuditLogs] 查看日志详情:', log.log_id || log.id)
+      logger.debug('[AuditLogs] 查看日志详情:', log.admin_operation_log_id)
     },
 
     /**
@@ -950,8 +957,8 @@ function auditLogsPage() {
     exportAuditLogs() {
       const params = new URLSearchParams()
       if (this.logFilters.operator_id) params.append('operator_id', this.logFilters.operator_id)
-      if (this.logFilters.action) params.append('action', this.logFilters.action)
-      if (this.logFilters.target) params.append('target', this.logFilters.target)
+      if (this.logFilters.operation_type) params.append('operation_type', this.logFilters.operation_type)
+      if (this.logFilters.target_type) params.append('target_type', this.logFilters.target_type)
       if (this.logFilters.start_date) params.append('start_date', this.logFilters.start_date)
       if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
       params.append('format', 'csv')
@@ -998,43 +1005,30 @@ function auditLogsPage() {
     },
 
     /**
-     * 获取操作类型文本
-     * @param {string} action - 操作类型代码
+     * 获取操作类型文本（使用后端返回的 display 字段）
+     * @param {Object} log - 日志对象
      * @returns {string} 操作类型文本
      */
-    getActionText(action) {
-      const map = {
-        create: '创建',
-        update: '更新',
-        delete: '删除',
-        login: '登录',
-        logout: '登出',
-        export: '导出',
-        import: '导入',
-        approve: '审批',
-        reject: '拒绝'
-      }
-      return map[action] || action || '-'
+    getOperationTypeText(log) {
+      return log.operation_type_display || log.operation_type || '-'
     },
 
     /**
-     * 获取操作类型样式类
-     * @param {string} action - 操作类型代码
+     * 获取操作类型样式类（使用后端返回的 color 字段）
+     * @param {Object} log - 日志对象
      * @returns {string} CSS类名
      */
-    getActionClass(action) {
-      const map = {
-        create: 'action-create',
-        update: 'action-update',
-        delete: 'action-delete',
-        login: 'action-login',
-        logout: 'action-logout',
-        export: 'bg-yellow-100 text-yellow-800',
-        import: 'bg-yellow-100 text-yellow-800',
-        approve: 'bg-green-100 text-green-800',
-        reject: 'bg-red-100 text-red-800'
+    getOperationTypeClass(log) {
+      const colorMap = {
+        blue: 'bg-blue-100 text-blue-800',
+        green: 'bg-green-100 text-green-800',
+        red: 'bg-red-100 text-red-800',
+        yellow: 'bg-yellow-100 text-yellow-800',
+        gray: 'bg-gray-100 text-gray-800',
+        purple: 'bg-purple-100 text-purple-800',
+        orange: 'bg-orange-100 text-orange-800'
       }
-      return map[action] || 'bg-gray-100 text-gray-800'
+      return colorMap[log.operation_type_color] || 'bg-gray-100 text-gray-800'
     },
 
     /**

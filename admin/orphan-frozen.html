@@ -129,9 +129,10 @@
             </tr>
           </thead>
           <tbody class="divide-y">
-            <template x-if="orphanList.length === 0">
-              <tr><td colspan="9" class="px-4 py-8 text-center themed-text-muted">暂无孤儿/冻结资产</td></tr>
-            </template>
+
+            <tr x-show="orphanList.length === 0">
+              <td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无孤儿/冻结资产数据</td>
+            </tr>
             <template x-for="asset in orphanList" :key="asset.account_id + '_' + asset.asset_code">
               <tr class="themed-hover-bg">
                 <td class="px-4 py-3">
@@ -149,7 +150,7 @@
                     'bg-yellow-100 text-yellow-700': asset.status === 'pending',
                     'themed-bg-primary-light themed-text-primary': asset.status === 'processing',
                     'bg-green-100 themed-text-success': asset.status === 'processed'
-                  }" class="px-2 py-1 text-xs rounded" x-text="getStatusText(asset.status)"></span>
+                  }" class="px-2 py-1 text-xs rounded" x-text="asset.status_display || asset.status"></span>
                 </td>
                 <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(asset.discovered_at)"></td>
                 <td class="px-4 py-3">
@@ -253,8 +254,6 @@
   </div>
 
   <%- include('partials/footer') %>
-
-
 
   <script type="module" src="./src/modules/system/pages/orphan-frozen.js"></script>
 </body>

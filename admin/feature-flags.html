@@ -42,10 +42,10 @@
             </tr>
           </thead>
           <tbody class="divide-y">
-            <template x-if="featureFlags.length === 0">
-              <tr><td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无功能开关</td></tr>
-            </template>
-            <template x-for="(flag, index) in featureFlags" :key="flag.flag_key || index">
+            <tr x-show="!featureFlags || featureFlags.length === 0">
+              <td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无功能开关</td>
+            </tr>
+            <template x-for="(flag, index) in (featureFlags || [])" :key="flag.flag_key || index">
               <tr class="themed-hover-bg">
                 <td class="px-4 py-3 text-sm font-mono" x-text="flag.flag_key"></td>
                 <td class="px-4 py-3 text-sm" x-text="flag.flag_name || '-'"></td>
@@ -58,7 +58,7 @@
                 <td class="px-4 py-3 text-sm">
                   <span class="px-2 py-1 text-xs rounded"
                         :class="getStrategyClass(flag.rollout_strategy)"
-                        x-text="getStrategyText(flag.rollout_strategy)"></span>
+                        x-text="flag.rollout_strategy_display || flag.rollout_strategy"></span>
                 </td>
                 <td class="px-4 py-3 text-sm">
                   <template x-if="flag.rollout_strategy === 'percentage'">

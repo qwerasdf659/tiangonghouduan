@@ -64,9 +64,9 @@ class DailyLotteryMetricsAggregation {
         where: {
           status: { [Op.in]: ['active', 'completed', 'ended'] }
         },
-        attributes: ['campaign_id']
+        attributes: ['lottery_campaign_id']
       })
-      return campaigns.map(c => c.campaign_id)
+      return campaigns.map(c => c.lottery_campaign_id)
     } catch (error) {
       logger.error('[DailyLotteryMetricsAggregation] 获取活动列表失败', {
         error: error.message
@@ -102,20 +102,20 @@ class DailyLotteryMetricsAggregation {
   /**
    * 聚合单个活动的日报指标
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 抽奖活动ID
    * @param {string} date_str - 日期字符串（YYYY-MM-DD）
    * @param {Date} start_datetime - 开始时间
    * @param {Date} end_datetime - 结束时间
    * @returns {Promise<Object|null>} 聚合结果或 null
    */
-  async aggregateCampaign(campaign_id, date_str, start_datetime, end_datetime) {
+  async aggregateCampaign(lottery_campaign_id, date_str, start_datetime, end_datetime) {
     const transaction = await sequelize.transaction()
 
     try {
       // 1. 从 lottery_hourly_metrics 聚合该日的数据
       const hourly_aggregation = await LotteryHourlyMetrics.findOne({
         where: {
-          campaign_id,
+          lottery_campaign_id,
           hour_bucket: {
             [Op.gte]: start_datetime,
             [Op.lte]: end_datetime
@@ -147,7 +147,7 @@ class DailyLotteryMetricsAggregation {
       if (!hourly_aggregation || !hourly_aggregation.total_draws) {
         await transaction.rollback()
         logger.debug('[DailyLotteryMetricsAggregation] 无小时级数据，跳过', {
-          campaign_id,
+          lottery_campaign_id,
           date_str
         })
         return null
@@ -169,11 +169,11 @@ class DailyLotteryMetricsAggregation {
       // 3. 写入或更新 lottery_daily_metrics（幂等性：使用 findOrCreate）
       const [daily_metrics, created] = await LotteryDailyMetrics.findOrCreate({
         where: {
-          campaign_id,
+          lottery_campaign_id,
           metric_date: date_str
         },
         defaults: {
-          campaign_id,
+          lottery_campaign_id,
           metric_date: date_str,
           total_draws,
           unique_users,
@@ -233,7 +233,7 @@ class DailyLotteryMetricsAggregation {
       await transaction.commit()
 
       logger.info('[DailyLotteryMetricsAggregation] 活动日报聚合完成', {
-        campaign_id,
+        lottery_campaign_id,
         date_str,
         total_draws,
         unique_users,
@@ -242,7 +242,7 @@ class DailyLotteryMetricsAggregation {
       })
 
       return {
-        campaign_id,
+        lottery_campaign_id,
         date_str,
         total_draws,
         unique_users,
@@ -255,7 +255,7 @@ class DailyLotteryMetricsAggregation {
 
       if (this.silent_errors) {
         logger.warn('[DailyLotteryMetricsAggregation] 活动日报聚合失败（静默处理）', {
-          campaign_id,
+          lottery_campaign_id,
           date_str,
           error: error.message
         })
@@ -297,11 +297,11 @@ class DailyLotteryMetricsAggregation {
       let success_count = 0
       let error_count = 0
 
-      for (const campaign_id of campaign_ids) {
+      for (const lottery_campaign_id of campaign_ids) {
         try {
           // eslint-disable-next-line no-await-in-loop -- 故意逐个活动串行聚合，避免事务冲突和数据库压力
           const result = await this.aggregateCampaign(
-            campaign_id,
+            lottery_campaign_id,
             date_str,
             start_datetime,
             end_datetime
@@ -314,7 +314,7 @@ class DailyLotteryMetricsAggregation {
         } catch (error) {
           error_count++
           logger.error('[DailyLotteryMetricsAggregation] 单个活动日报聚合失败', {
-            campaign_id,
+            lottery_campaign_id,
             error: error.message
           })
         }

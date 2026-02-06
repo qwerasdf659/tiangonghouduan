@@ -55,10 +55,10 @@
             </tr>
           </thead>
           <tbody class="divide-y">
-            <template x-if="dictList.length === 0">
-              <tr><td colspan="5" class="px-4 py-8 text-center themed-text-muted">暂无字典数据</td></tr>
-            </template>
-            <template x-for="(dict, index) in dictList" :key="getDictCode(dict) || index">
+            <tr x-show="dictList.length === 0">
+              <td colspan="5" class="px-4 py-8 text-center themed-text-muted">暂无字典数据</td>
+            </tr>
+            <template x-for="(dict, index) in dictList" :key="currentDictType + '_' + index">
               <tr class="themed-hover-bg">
                 <td class="px-4 py-3 text-sm font-mono" x-text="getDictCode(dict)"></td>
                 <td class="px-4 py-3 text-sm" x-text="getDictName(dict)"></td>

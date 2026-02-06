@@ -146,7 +146,7 @@ function pendingCenterPage() {
           this.healthScore = {
             score: result.data.score ?? null,
             status: result.data.status || 'unknown',
-            status_text: result.data.status_text || this.getStatusText(result.data.status),
+            status_text: result.data.status_text || result.data.status || '未知状态',
             components: result.data.components || {},
             alerts: result.data.alerts || []
           }
@@ -160,19 +160,7 @@ function pendingCenterPage() {
       }
     },
 
-    /**
-     * 获取健康度状态文本
-     * @param {string} status - 状态码
-     * @returns {string}
-     */
-    getStatusText(status) {
-      const textMap = {
-        healthy: '状态良好',
-        warning: '压力较大，建议及时处理',
-        critical: '需要立即处理'
-      }
-      return textMap[status] || '未知状态'
-    },
+    // ✅ 已删除 getStatusText 映射函数，直接使用后端返回的 status_text 字段
 
     /**
      * 获取健康度状态颜色类

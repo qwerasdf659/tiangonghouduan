@@ -206,7 +206,7 @@ router.post('/rules', authenticateToken, requireRoleLevel(100), async (req, res)
 
     logger.info('创建配额规则成功', {
       admin_id: req.user.user_id,
-      rule_id: rule.rule_id,
+      lottery_draw_quota_rule_id: rule.lottery_draw_quota_rule_id,
       rule_type,
       limit_value
     })
@@ -244,7 +244,7 @@ router.put('/rules/:id/disable', authenticateToken, requireRoleLevel(100), async
 
     logger.info('禁用配额规则成功', {
       admin_id: req.user.user_id,
-      rule_id: rule.rule_id,
+      lottery_draw_quota_rule_id: rule.lottery_draw_quota_rule_id,
       rule_type: rule.scope_type
     })
 
@@ -308,12 +308,11 @@ router.get('/users/:user_id/status', authenticateToken, requireRoleLevel(100), a
         last_draw_at: status.last_draw_at,
         matched_rule: matched_rule
           ? {
-              rule_id: matched_rule.rule_id,
-              rule_type: matched_rule.scope_type,
-              limit_value: matched_rule.limit_value,
-              priority: matched_rule.priority,
+              lottery_draw_quota_rule_id: matched_rule.lottery_draw_quota_rule_id,
               scope_type: matched_rule.scope_type,
-              scope_id: matched_rule.scope_id
+              scope_id: matched_rule.scope_id,
+              limit_value: matched_rule.limit_value,
+              priority: matched_rule.priority
             }
           : null
       },

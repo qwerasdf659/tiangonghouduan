@@ -14,6 +14,7 @@
 
 const { Op, fn, col, literal } = require('sequelize')
 const logger = require('../utils/logger')
+const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 
 /**
  * 延迟加载 models，避免循环依赖
@@ -609,6 +610,9 @@ class DebtManagementService {
     })
 
     const items = rows.map(item => item.toSummary())
+
+    // 附加中文显示名称（status → _display/_color）
+    await attachDisplayNames(items, [{ field: 'status', dictType: DICT_TYPES.DEBT_STATUS }])
 
     return {
       debt_type: debtType,

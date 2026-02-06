@@ -374,7 +374,7 @@ class LotteryQuotaService {
         total_available: limit_value,
         is_exhausted: false,
         last_draw_at: null,
-        matched_rule_id: matched_rule?.rule_id || null,
+        matched_rule_id: matched_rule?.lottery_draw_quota_rule_id || null,
         not_initialized: true
       }
     } catch (error) {
@@ -582,7 +582,7 @@ class LotteryQuotaService {
     })
 
     logger.info('创建配额规则成功', {
-      rule_id: rule.rule_id,
+      lottery_draw_quota_rule_id: rule.lottery_draw_quota_rule_id,
       rule_type,
       limit_value,
       created_by
@@ -625,7 +625,7 @@ class LotteryQuotaService {
     })
 
     logger.info('禁用配额规则成功', {
-      rule_id: rule.rule_id,
+      lottery_draw_quota_rule_id: rule.lottery_draw_quota_rule_id,
       rule_type: rule.scope_type,
       updated_by
     })
@@ -669,7 +669,10 @@ class LotteryQuotaService {
 
     // 按类型统计（scope_type）
     const rulesByType = await LotteryDrawQuotaRule.findAll({
-      attributes: ['scope_type', [sequelize.fn('COUNT', sequelize.col('rule_id')), 'count']],
+      attributes: [
+        'scope_type',
+        [sequelize.fn('COUNT', sequelize.col('lottery_draw_quota_rule_id')), 'count']
+      ],
       where: { status: 'active' },
       group: ['scope_type'],
       raw: true

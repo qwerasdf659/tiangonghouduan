@@ -61,8 +61,15 @@ export function useExchangeItemsMethods() {
       try {
         const res = await request({ url: ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES, method: 'GET' })
         if (res.success) {
-          // 后端返回 { asset_types: [...] }
-          this.assetTypes = res.data?.asset_types || []
+          // 后端返回 { asset_types: [...] }，按 asset_code 去重
+          const rawTypes = res.data?.asset_types || []
+          const typeMap = new Map()
+          for (const type of rawTypes) {
+            if (type && type.asset_code && !typeMap.has(type.asset_code)) {
+              typeMap.set(type.asset_code, type)
+            }
+          }
+          this.assetTypes = Array.from(typeMap.values())
         }
       } catch (e) {
         logger.error('[ExchangeItems] 加载资产类型失败:', e)
@@ -286,9 +293,7 @@ export function useExchangeItemsMethods() {
      * @param {string} status - 商品状态
      * @returns {string} 状态文本
      */
-    getItemStatusText(status) {
-      return status === 'active' ? '上架' : '下架'
-    }
+    // ✅ 已删除 getItemStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
   }
 }
 

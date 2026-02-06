@@ -209,14 +209,13 @@
         </template>
         
         <!-- 空状态 -->
-        <template x-if="!loading && messages.length === 0">
-          <div class="p-12 text-center themed-text-muted">
+
+          <div x-show="!loading && messages.length === 0" class="p-12 text-center themed-text-muted">
             <div class="text-5xl mb-4">📭</div>
             <div class="text-lg font-medium">暂无消息</div>
             <div class="text-sm mt-1">当有新的系统通知时会显示在这里</div>
           </div>
-        </template>
-        
+
         <!-- 消息项 -->
         <template x-for="message in messages" :key="message.id">
           <div 

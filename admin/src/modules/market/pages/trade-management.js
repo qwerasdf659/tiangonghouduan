@@ -339,35 +339,9 @@ document.addEventListener('alpine:init', () => {
      * @param {string} status - 交易状态码
      * @returns {string} 状态显示文本
      */
-    getTradeStatusText(status) {
-      const map = {
-        created: '待支付',
-        frozen: '冻结中',
-        completed: '已完成',
-        cancelled: '已取消',
-        pending: '待处理'
-      }
-      return map[status] || status
-    },
+    // ✅ 已删除 getTradeStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
-    /**
-     * 获取通用状态文本（HTML 模板通用函数）
-     * @param {string} status - 状态码
-     * @returns {string} 状态显示文本
-     */
-    getStatusText(status) {
-      const map = {
-        created: '待支付',
-        frozen: '冻结中',
-        completed: '已完成',
-        cancelled: '已取消',
-        pending: '待处理',
-        processing: '处理中',
-        rejected: '已拒绝',
-        approved: '已批准'
-      }
-      return map[status] || status || '-'
-    },
+    // ✅ 已删除 getStatusText 映射函数，使用后端返回的 status_display 字段
 
     /**
      * 查看交易订单详情
@@ -517,15 +491,7 @@ document.addEventListener('alpine:init', () => {
      * @param {string} status - 兑换状态码
      * @returns {string} 状态显示文本
      */
-    getRedemptionStatusText(status) {
-      const map = {
-        pending: '待处理',
-        completed: '已完成',
-        rejected: '已拒绝',
-        processing: '处理中'
-      }
-      return map[status] || status
-    },
+    // ✅ 已删除 getRedemptionStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     // 注意：后端 /api/v4/console/business-records/redemption-orders 是只读查询接口
     // 不支持审批/拒绝操作，管理员需通过核销操作处理订单
@@ -833,71 +799,22 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
-    /**
-     * 获取通用状态显示文本
-     * @param {string} status - 状态码
-     * @returns {string} 状态显示文本
-     */
-    getStatusText(status) {
-      const map = {
-        created: '待支付',
-        frozen: '冻结中',
-        completed: '已完成',
-        cancelled: '已取消',
-        pending: '待处理',
-        processing: '处理中',
-        rejected: '已拒绝',
-        approved: '已批准'
-      }
-      return map[status] || status || '-'
-    },
+    // ✅ 已删除 getStatusText 映射函数，使用后端返回的 status_display 字段
 
     /**
      * 获取交易状态显示文本
      * @param {string} status - 交易状态码
      * @returns {string} 状态显示文本
      */
-    getTradeStatusText(status) {
-      const map = {
-        created: '待支付',
-        frozen: '冻结中',
-        completed: '已完成',
-        cancelled: '已取消',
-        pending: '待处理'
-      }
-      return map[status] || status
-    },
-
-    /**
-     * 获取兑换状态显示文本
-     * @param {string} status - 兑换状态码
-     * @returns {string} 状态显示文本
-     */
-    getRedemptionStatusText(status) {
-      const map = {
-        pending: '待处理',
-        completed: '已完成',
-        rejected: '已拒绝',
-        processing: '处理中'
-      }
-      return map[status] || status
-    },
+    // ✅ 已删除 getTradeStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
+    // ✅ 已删除 getRedemptionStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 获取交易订单状态显示文本（HTML模板使用）
      * @param {string} status - 交易状态码
      * @returns {string} 状态显示文本
      */
-    getTradeOrderStatusText(status) {
-      const map = {
-        created: '待支付',
-        frozen: '冻结中',
-        completed: '已完成',
-        cancelled: '已取消',
-        pending: '待处理'
-      }
-      return map[status] || status
-    },
+    // ✅ 已删除 getTradeOrderStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 格式化日期显示（强制北京时间）

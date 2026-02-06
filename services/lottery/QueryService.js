@@ -36,6 +36,7 @@ const { Op } = require('sequelize')
 const { logger } = require('../../utils/logger')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
+const { attachDisplayNames, DICT_TYPES } = require('../../utils/displayNameHelper')
 
 /**
  * 抽奖查询服务类 - 静态服务模式
@@ -416,7 +417,13 @@ class LotteryQueryService {
           : undefined
       }))
 
-      // ========== 无 user_id 时写入缓存 ==========
+      // 附加中文显示名称（status/campaign_type → _display/_color）
+      await attachDisplayNames(result, [
+        { field: 'status', dictType: DICT_TYPES.CAMPAIGN_STATUS },
+        { field: 'campaign_type', dictType: DICT_TYPES.CAMPAIGN_TYPE }
+      ])
+
+      // ========== 无 user_id 时写入缓存（含显示名称） ==========
       if (!user_id) {
         await BusinessCacheHelper.set(cacheKey, result, CACHE_TTL)
         logger.debug('[LotteryQueryService] 活动列表已缓存', { status, cacheKey, ttl: CACHE_TTL })

@@ -209,10 +209,7 @@ export function useMerchantLogsMethods() {
      * @param {string} actionType - 操作类型代码
      * @returns {string} 操作类型文本
      */
-    getActionTypeText(actionType) {
-      const option = this.actionTypeOptions.find(opt => opt.value === actionType)
-      return option?.label || actionType || '-'
-    },
+    // ✅ 已删除 getActionTypeText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 获取日志级别CSS类

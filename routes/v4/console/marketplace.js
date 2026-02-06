@@ -268,11 +268,11 @@ router.get(
         return res.apiError('无效的商品ID', 'BAD_REQUEST', null, 400)
       }
 
-      // 🎯 通过 ServiceManager 获取 ExchangeService
-      const ExchangeService = req.app.locals.services.getService('exchange_admin')
+      // 🎯 通过 ServiceManager 获取查询服务（getItemDetail 在 QueryService 中）
+      const ExchangeQueryService = req.app.locals.services.getService('exchange_query')
 
       // 调用服务层方法获取商品详情
-      const result = await ExchangeService.getItemDetail(itemId)
+      const result = await ExchangeQueryService.getItemDetail(itemId)
 
       logger.info('管理员查询兑换商品详情成功', {
         admin_id,
@@ -951,11 +951,11 @@ router.get(
         page_size
       })
 
-      // 🎯 通过 ServiceManager 获取 ExchangeService
-      const ExchangeService = req.app.locals.services.getService('exchange_admin')
+      // 🎯 通过 ServiceManager 获取查询服务（getAdminOrders 在 QueryService 中）
+      const ExchangeQueryService = req.app.locals.services.getService('exchange_query')
 
       // 调用服务层方法获取订单列表
-      const result = await ExchangeService.getAdminOrders({
+      const result = await ExchangeQueryService.getAdminOrders({
         status,
         user_id: user_id ? parseInt(user_id) : null,
         exchange_item_id: exchange_item_id ? parseInt(exchange_item_id) : null,
@@ -1013,11 +1013,11 @@ router.get(
         order_no
       })
 
-      // 🎯 通过 ServiceManager 获取 ExchangeService
-      const ExchangeService = req.app.locals.services.getService('exchange_admin')
+      // 🎯 通过 ServiceManager 获取查询服务（getAdminOrderDetail 在 QueryService 中）
+      const ExchangeQueryService = req.app.locals.services.getService('exchange_query')
 
       // 调用服务层方法获取订单详情
-      const result = await ExchangeService.getAdminOrderDetail(order_no)
+      const result = await ExchangeQueryService.getAdminOrderDetail(order_no)
 
       logger.info('管理员获取兑换订单详情成功', {
         admin_id,

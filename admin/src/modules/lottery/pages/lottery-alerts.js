@@ -25,6 +25,7 @@ import { logger } from '../../../utils/logger.js'
 import { LOTTERY_ADVANCED_ENDPOINTS } from '../../../api/lottery/advanced.js'
 import { LOTTERY_CORE_ENDPOINTS } from '../../../api/lottery/core.js'
 import { LOTTERY_HEALTH_ENDPOINTS, LotteryHealthAPI } from '../../../api/lottery-health.js'
+import { SYSTEM_CORE_ENDPOINTS } from '../../../api/system/core.js'
 import { buildURL, request, buildQueryString } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/index.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
@@ -50,7 +51,7 @@ function lotteryAlertsPage() {
     // ==================== 页面特有状态 ====================
 
     /** @type {string} 当前激活的Tab */
-    activeTab: 'alerts',
+    activeTab: 'all',
 
     /** @type {boolean} 表单提交状态 */
     submitting: false,
@@ -187,7 +188,8 @@ function lotteryAlertsPage() {
       // 加载活动列表（用于筛选）
       await this.loadCampaigns()
 
-      // 加载告警
+      // 加载告警（默认加载全部）
+      this.filters.level = ''
       await this.loadAlerts()
 
       // 自动刷新（60秒）
@@ -311,15 +313,13 @@ function lotteryAlertsPage() {
     updateCharts() {
       // 统计告警级别分布
       const severityStats = { danger: 0, warning: 0, info: 0 }
-      // 统计告警类型分布
+      // 统计告警类型分布（以后端实际返回的 type 值为准）
       const typeStats = {
+        budget: 0,
+        inventory: 0,
         win_rate: 0,
-        budget_exhaust: 0,
-        budget_warning: 0,
-        stock_low: 0,
-        stock_warning: 0,
-        high_frequency_user: 0,
-        empty_streak_high: 0
+        user: 0,
+        system: 0
       }
 
       this.alerts.forEach(alert => {
@@ -344,17 +344,15 @@ function lotteryAlertsPage() {
         this.severityDistChart.setOption(this.getSeverityChartOption(severityData))
       }
 
-      // 更新类型分布柱状图
+      // 更新类型分布柱状图（以后端实际返回的 type 值为准）
       if (this.typeDistChart) {
-        // 根据实际API返回的告警类型
-        const typeLabels = ['预算告急', '预算预警', '库存告急', '库存预警', '高频用户', '连空用户']
+        const typeLabels = ['预算告警', '库存告警', '中奖率告警', '用户告警', '系统告警']
         const typeCounts = [
-          typeStats.budget_exhaust || 0,
-          typeStats.budget_warning || 0,
-          typeStats.stock_low || 0,
-          typeStats.stock_warning || 0,
-          typeStats.high_frequency_user || 0,
-          typeStats.empty_streak_high || 0
+          typeStats.budget || 0,
+          typeStats.inventory || 0,
+          typeStats.win_rate || 0,
+          typeStats.user || 0,
+          typeStats.system || 0
         ]
 
         this.typeDistChart.setOption(this.getTypeChartOption(typeLabels, typeCounts))
@@ -387,15 +385,14 @@ function lotteryAlertsPage() {
     async loadAlerts() {
       const result = await this.withLoading(async () => {
         const params = {
-          page: this.current_page,
-          page_size: this.page_size
+          limit: this.page_size
         }
 
-        // 筛选条件
+        // 筛选条件（参数名以后端为准）
         if (this.filters.level) params.level = this.filters.level
         if (this.filters.type) params.type = this.filters.type
         if (this.filters.status) params.status = this.filters.status
-        if (this.filters.campaign_id) params.campaign_id = this.filters.campaign_id
+        if (this.filters.campaign_id) params.lottery_campaign_id = this.filters.campaign_id
 
         const url = LOTTERY_ADVANCED_ENDPOINTS.REALTIME_ALERTS + buildQueryString(params)
         const response = await apiRequest(url)
@@ -413,9 +410,8 @@ function lotteryAlertsPage() {
           this.alerts = []
         }
 
-        // 更新分页信息
-        const summary = result.data.summary || {}
-        this.totalCount = summary.total || result.data.total || this.alerts.length
+        // 更新分页信息（以实际返回的过滤结果数量为准）
+        this.totalCount = this.alerts.length
         this.total_pages = Math.ceil(this.totalCount / this.page_size) || 1
 
         // 更新统计数据
@@ -641,53 +637,9 @@ function lotteryAlertsPage() {
 
     // ==================== 辅助方法 ====================
 
-    /**
-     * 获取告警级别中文文本
-     */
-    getSeverityText(severity) {
-      const labels = {
-        danger: '危险',
-        warning: '警告',
-        info: '提示'
-      }
-      return labels[severity] || severity || '-'
-    },
-
-    /**
-     * 获取告警类型中文文本
-     */
-    getTypeText(type) {
-      const labels = {
-        // 后端 LotteryAnalyticsService 实时告警类型
-        budget_exhaust: '预算告急',
-        budget_warning: '预算预警',
-        stock_low: '库存告急',
-        stock_warning: '库存预警',
-        win_rate_high: '中奖率偏高',
-        win_rate_low: '中奖率偏低',
-        high_frequency_user: '高频用户',
-        empty_streak_high: '连空用户',
-        // 后端 LotteryAlertService 持久化告警类型
-        win_rate: '中奖率异常',
-        budget: '预算告警',
-        inventory: '库存告警',
-        user: '用户异常',
-        system: '系统告警'
-      }
-      return labels[type] || type || '-'
-    },
-
-    /**
-     * 获取告警状态中文文本
-     */
-    getStatusText(status) {
-      const labels = {
-        active: '活跃',
-        acknowledged: '已确认',
-        resolved: '已解决'
-      }
-      return labels[status] || status || '-'
-    },
+    // ✅ 已删除 getSeverityText / getTypeText / getStatusText 映射函数
+    // 中文显示名称由后端 attachDisplayNames 统一返回 xxx_display 字段
+    // HTML 模板直接使用 alert.severity_display / alert.type_display / alert.status_display
 
     /**
      * 格式化阈值/实际值显示
@@ -746,10 +698,9 @@ function lotteryAlertsPage() {
     async loadHealthData() {
       if (this.activeTab !== 'health') return
 
-      // 后端要求必须指定 campaign_id
+      // 后端要求必须指定 campaign_id，未选择时页面已有 UI 提示，静默返回
       if (!this.selectedCampaignId) {
-        logger.warn('健康度分析需要选择具体活动')
-        this.showNotification('请先选择一个抽奖活动', 'warning')
+        logger.debug('健康度分析：等待用户选择活动')
         return
       }
 
@@ -759,20 +710,28 @@ function lotteryAlertsPage() {
 
       if (result.success && result.data) {
         const data = result.data.data || result.data
+        const dims = data.dimensions || {}
 
-        // 更新健康度数据
+        // 直接使用后端 dimensions 结构，不做复杂映射
         this.healthData = {
-          overall_score: data.overall_score || data.health_score || 0,
-          budget_health: data.budget_health || data.dimensions?.budget_health || 0,
-          win_rate_health: data.win_rate_health || data.dimensions?.win_rate_health || 0,
-          prize_distribution_health:
-            data.prize_distribution_health || data.dimensions?.prize_distribution_health || 0,
-          budget_remaining_days: data.budget_remaining_days || data.budget?.remaining_days || 0,
-          current_win_rate: data.current_win_rate || data.metrics?.win_rate || 0,
-          high_tier_ratio: data.high_tier_ratio || data.tier_distribution?.high?.percentage || 0,
-          issues: data.issues || data.diagnoses || [],
-          tier_distribution: data.tier_distribution || {},
-          trend: data.trend || data.history || []
+          overall_score: data.overall_score || 0,
+          // 从 dimensions.{name}.score 提取各维度得分
+          budget_health: dims.budget?.score || 0,
+          win_rate_health: dims.win_rate?.score || 0,
+          prize_distribution_health: dims.inventory?.score || 0,
+          // 从 dimensions.{name}.details 提取明细数据
+          budget_remaining_days: dims.budget?.details?.estimated_remaining_days || '-',
+          current_win_rate: dims.win_rate?.details?.actual_win_rate || 0,
+          high_tier_ratio: dims.win_rate?.details?.tier_distribution?.percentages?.high || 0,
+          // issues 和 suggestions 直接使用后端字段
+          issues: data.issues || [],
+          suggestions: data.suggestions || [],
+          // 档位分布数据（从 win_rate.details.tier_distribution 提取）
+          tier_distribution: dims.win_rate?.details?.tier_distribution || {},
+          // 后端暂无趋势数据
+          trend: data.trend || [],
+          // 保留完整 dimensions 供详细展示
+          dimensions: dims
         }
 
         // 更新图表
@@ -807,24 +766,30 @@ function lotteryAlertsPage() {
      * 更新健康度图表
      */
     updateHealthCharts() {
-      // 更新档位分布饼图
+      // 更新档位分布饼图 — 后端字段: tier_distribution.counts.{high,mid,low,empty}
       if (this.tierDistributionChart) {
         const tierData = this.healthData.tier_distribution
+        const counts = tierData.counts || {}
         const pieData = [
           {
-            value: tierData.high?.count || tierData.high || 0,
+            value: counts.high || 0,
             name: '高档位',
             itemStyle: { color: '#ee6666' }
           },
           {
-            value: tierData.mid?.count || tierData.mid || 0,
+            value: counts.mid || 0,
             name: '中档位',
             itemStyle: { color: '#fac858' }
           },
           {
-            value: tierData.fallback?.count || tierData.fallback || tierData.low || 0,
+            value: counts.low || counts.fallback || 0,
             name: '保底',
             itemStyle: { color: '#91cc75' }
+          },
+          {
+            value: counts.empty || 0,
+            name: '未中奖',
+            itemStyle: { color: '#999' }
           }
         ].filter(item => item.value > 0)
 
@@ -892,81 +857,99 @@ function lotteryAlertsPage() {
 
     /**
      * P1-21: 加载系统健康状态
-     * @description 获取API、数据库、Redis连接状态和慢接口信息
+     * @description 并行请求后端系统状态和健康检查，获取API、数据库、Redis连接状态
+     * 后端端点：
+     * - GET /api/v4/console/system/status → database/api/lottery_engine 状态
+     * - GET /health → database + redis 状态（无需认证）
      */
     async loadSystemHealth() {
       try {
         logger.info('[LotteryAlerts] 加载系统健康状态')
-        
-        const response = await fetch('/api/v4/console/status', {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token') || ''}`
-          }
-        })
 
-        if (response.ok) {
-          const result = await response.json()
-          const data = result.data || result
+        const startTime = Date.now()
 
-          // 解析系统健康数据
-          this.systemHealth = {
-            api: {
-              status: 'healthy',
-              response_time: data.api_latency || 50,
-              last_check: new Date().toISOString()
-            },
-            db: {
-              status: data.database?.connected ? 'healthy' : 'critical',
-              host: data.database?.host || '',
-              database: data.database?.database || ''
-            },
-            redis: {
-              status: data.redis?.connected ? 'healthy' : 'warning',
-              connected: data.redis?.connected || false
-            },
-            overall_score: this.calculateSystemScore(data),
-            alert_count: (data.slow_apis?.length || 0) + (data.alerts?.length || 0),
-            slow_apis: data.slow_apis || [],
-            recent_alerts: data.alerts || data.recent_alerts || []
-          }
+        // 并行请求：系统状态（需认证）+ 健康检查（公开）
+        const [statusResult, healthResult] = await Promise.allSettled([
+          apiRequest(SYSTEM_CORE_ENDPOINTS.STATUS),
+          fetch('/health').then(r => r.json()).catch(() => null)
+        ])
 
-          logger.info('[LotteryAlerts] 系统健康状态加载成功', {
-            overall_score: this.systemHealth.overall_score,
-            api_status: this.systemHealth.api.status,
-            db_status: this.systemHealth.db.status,
-            redis_status: this.systemHealth.redis.status
-          })
+        const responseTime = Date.now() - startTime
+
+        // 解析系统状态（后端字段：database.status, database.host, database.database, api.last_check）
+        const statusData = statusResult.status === 'fulfilled' && statusResult.value?.success
+          ? statusResult.value.data
+          : null
+
+        // 解析健康检查（后端字段：data.systems.database, data.systems.redis）
+        const healthData = healthResult.status === 'fulfilled' ? healthResult.value : null
+
+        // 映射后端字段到前端显示
+        const dbStatus = statusData?.database?.status || healthData?.data?.systems?.database
+        const redisConnected = healthData?.data?.systems?.redis === 'connected'
+
+        this.systemHealth = {
+          api: {
+            status: statusData ? 'healthy' : 'critical',
+            response_time: responseTime,
+            last_check: statusData?.api?.last_check || new Date().toISOString()
+          },
+          db: {
+            status: dbStatus === 'connected' ? 'healthy' : 'critical',
+            host: statusData?.database?.host || '',
+            database: statusData?.database?.database || ''
+          },
+          redis: {
+            status: redisConnected ? 'healthy' : 'critical',
+            connected: redisConnected
+          },
+          overall_score: this.calculateSystemScore({
+            api_ok: !!statusData,
+            db_connected: dbStatus === 'connected',
+            redis_connected: redisConnected,
+            response_time: responseTime
+          }),
+          alert_count: 0,
+          slow_apis: [],
+          recent_alerts: []
         }
+
+        logger.info('[LotteryAlerts] 系统健康状态加载成功', {
+          overall_score: this.systemHealth.overall_score,
+          api_status: this.systemHealth.api.status,
+          db_status: this.systemHealth.db.status,
+          redis_connected: redisConnected
+        })
       } catch (error) {
         logger.warn('[LotteryAlerts] loadSystemHealth 失败:', error.message)
-        // 设置默认错误状态
-        this.systemHealth.api.status = 'warning'
-        this.systemHealth.db.status = 'warning'
-        this.systemHealth.redis.status = 'warning'
+        this.systemHealth.api.status = 'critical'
+        this.systemHealth.db.status = 'critical'
+        this.systemHealth.redis.status = 'critical'
       }
     },
 
     /**
      * 计算系统综合健康分数
-     * @param {Object} data - 系统状态数据
+     * @param {Object} checks - 检查结果
+     * @param {boolean} checks.api_ok - API 是否正常
+     * @param {boolean} checks.db_connected - 数据库是否连接
+     * @param {boolean} checks.redis_connected - Redis 是否连接
+     * @param {number} checks.response_time - API 响应时间(ms)
      * @returns {number} 0-100的健康分数
      */
-    calculateSystemScore(data) {
+    calculateSystemScore(checks) {
       let score = 100
 
-      // API状态扣分
-      if (data.api_latency > 1000) score -= 20
-      else if (data.api_latency > 500) score -= 10
+      // API 状态扣分
+      if (!checks.api_ok) score -= 30
+      else if (checks.response_time > 1000) score -= 15
+      else if (checks.response_time > 500) score -= 5
 
       // 数据库状态扣分
-      if (!data.database?.connected) score -= 40
+      if (!checks.db_connected) score -= 40
 
-      // Redis状态扣分
-      if (!data.redis?.connected) score -= 20
-
-      // 慢接口扣分
-      const slowApiCount = data.slow_apis?.length || 0
-      score -= Math.min(slowApiCount * 5, 20)
+      // Redis 状态扣分
+      if (!checks.redis_connected) score -= 20
 
       return Math.max(0, Math.min(100, score))
     },

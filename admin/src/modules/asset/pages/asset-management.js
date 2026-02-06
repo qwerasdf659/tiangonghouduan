@@ -424,16 +424,7 @@ document.addEventListener('alpine:init', () => {
       this.$refs.instanceDetailModal?.show()
     },
 
-    getStatusText(status) {
-      const map = {
-        active: '有效',
-        inactive: '无效',
-        used: '已使用',
-        expired: '已过期',
-        pending: '待处理'
-      }
-      return map[status] || status || '-'
-    }
+    // ✅ 已删除 getStatusText 映射函数，使用后端返回的 status_display 字段
   }))
 
   logger.info('[AssetManagementPage] Alpine 组件已注册 (Mixin v3.0)')

@@ -110,9 +110,12 @@ function registerSystemSettingsComponents() {
     reminderRules: [],
     reminderRuleForm: {
       rule_type: '',
-      condition_type: '',
-      threshold: '',
-      notify_channels: ['in_app'],
+      rule_name: '',
+      rule_description: '',
+      trigger_condition: {},
+      notification_channels: ['admin_broadcast'],
+      notification_priority: 'medium',
+      check_interval_minutes: 60,
       is_enabled: true
     },
     reminderRuleModalOpen: false,
@@ -224,7 +227,7 @@ function registerSystemSettingsComponents() {
       try {
         const response = await ReminderRulesAPI.getRules()
         if (response?.success) {
-          this.reminderRules = response.data?.rules || response.data || []
+          this.reminderRules = response.data?.items || response.data?.rules || []
         }
       } catch (error) {
         logger.error('[ReminderRules] 加载失败:', error)
@@ -237,21 +240,27 @@ function registerSystemSettingsComponents() {
      */
     openReminderRuleModal(rule = null) {
       if (rule) {
-        this.editingRuleId = rule.rule_id || rule.id
+        this.editingRuleId = rule.reminder_rule_id
         this.reminderRuleForm = {
           rule_type: rule.rule_type || '',
-          condition_type: rule.condition_type || '',
-          threshold: rule.threshold || '',
-          notify_channels: rule.notify_channels || ['in_app'],
+          rule_name: rule.rule_name || '',
+          rule_description: rule.rule_description || '',
+          trigger_condition: rule.trigger_condition || {},
+          notification_channels: rule.notification_channels || ['admin_broadcast'],
+          notification_priority: rule.notification_priority || 'medium',
+          check_interval_minutes: rule.check_interval_minutes || 60,
           is_enabled: rule.is_enabled !== false
         }
       } else {
         this.editingRuleId = null
         this.reminderRuleForm = {
           rule_type: '',
-          condition_type: '',
-          threshold: '',
-          notify_channels: ['in_app'],
+          rule_name: '',
+          rule_description: '',
+          trigger_condition: {},
+          notification_channels: ['admin_broadcast'],
+          notification_priority: 'medium',
+          check_interval_minutes: 60,
           is_enabled: true
         }
       }
@@ -288,7 +297,7 @@ function registerSystemSettingsComponents() {
      */
     async toggleReminderRule(rule) {
       try {
-        const response = await ReminderRulesAPI.toggleRule(rule.rule_id || rule.id)
+        const response = await ReminderRulesAPI.toggleRule(rule.reminder_rule_id)
         if (response?.success) {
           this.showSuccess(rule.is_enabled ? '规则已禁用' : '规则已启用')
           await this.loadReminderRules()
@@ -305,7 +314,7 @@ function registerSystemSettingsComponents() {
     async deleteReminderRule(rule) {
       if (!confirm('确定要删除此提醒规则吗？')) return
       try {
-        const response = await ReminderRulesAPI.deleteRule(rule.rule_id || rule.id)
+        const response = await ReminderRulesAPI.deleteRule(rule.reminder_rule_id)
         if (response?.success) {
           this.showSuccess('规则已删除')
           await this.loadReminderRules()

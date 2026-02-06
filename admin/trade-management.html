@@ -121,9 +121,10 @@
             </tr>
           </thead>
           <tbody class="divide-y">
-            <template x-if="tradeOrders.length === 0">
-              <tr><td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无交易记录</td></tr>
-            </template>
+
+            <tr x-show="tradeOrders.length === 0">
+              <td colspan="7" class="px-4 py-8 text-center themed-text-muted">暂无交易订单数据</td>
+            </tr>
             <template x-for="trade in tradeOrders" :key="trade.trade_order_id">
               <tr class="themed-hover-bg">
                 <td class="px-4 py-3 text-sm font-mono" x-text="trade.trade_order_id"></td>
@@ -138,7 +139,7 @@
                     'bg-green-100 themed-text-success': trade.status === 'completed',
                     'bg-red-100 text-red-700': trade.status === 'cancelled',
                     'bg-orange-100 text-orange-700': trade.status === 'disputed'
-                  }" class="px-2 py-1 text-xs rounded" x-text="getStatusText(trade.status)"></span>
+                  }" class="px-2 py-1 text-xs rounded" x-text="trade.status_display || trade.status"></span>
                 </td>
                 <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(trade.created_at)"></td>
                 <td class="px-4 py-3">
@@ -237,9 +238,10 @@
               </tr>
             </thead>
             <tbody class="divide-y">
-              <template x-if="marketplaceStats.length === 0">
-                <tr><td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无上架统计数据</td></tr>
-              </template>
+
+              <tr x-show="marketplaceStats.length === 0">
+                <td colspan="5" class="px-4 py-8 text-center themed-text-muted">暂无市场统计数据</td>
+              </tr>
               <template x-for="stat in marketplaceStats" :key="stat.user_id">
                 <tr class="themed-hover-bg">
                   <td class="px-4 py-3 text-sm font-mono" x-text="stat.user_id"></td>
@@ -320,7 +322,7 @@
             'themed-bg-primary-light themed-text-primary': selectedTradeOrder?.status === 'frozen',
             'bg-green-100 themed-text-success': selectedTradeOrder?.status === 'completed',
             'bg-red-100 text-red-700': selectedTradeOrder?.status === 'cancelled'
-          }" x-text="getTradeOrderStatusText(selectedTradeOrder?.status)"></span>
+          }" x-text="selectedTradeOrder?.status_display || selectedTradeOrder?.status"></span>
         </div>
         <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">创建时间:</span><span x-text="formatDate(selectedTradeOrder?.created_at)"></span></div>
         <div class="flex justify-between" x-show="selectedTradeOrder?.completed_at"><span class="themed-text-muted">完成时间:</span><span x-text="formatDate(selectedTradeOrder?.completed_at)"></span></div>
@@ -332,8 +334,6 @@
   </div>
 
   <%- include('partials/footer') %>
-
-
 
   <script type="module" src="./src/modules/market/pages/trade-management.js"></script>
 </body>

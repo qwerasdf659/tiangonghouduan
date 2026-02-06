@@ -290,16 +290,7 @@ export function usePresetVisualizationMethods() {
      * @param {string} status - 状态
      * @returns {string} 文本
      */
-    getPresetStatusText(status) {
-      const map = {
-        pending: '活跃',
-        used: '已使用',
-        paused: '暂停',
-        exhausted: '耗尽',
-        expired: '过期'
-      }
-      return map[status] || status
-    },
+    // ✅ 已删除 getPresetStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 获取预设状态CSS类

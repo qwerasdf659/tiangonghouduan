@@ -263,7 +263,7 @@
               <select x-model="itemForm.cost_asset_code" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" required>
                 <option value="">请选择</option>
                 <!-- 过滤掉"预算积分"类型，该类型仅用于系统内部核算 -->
-                <template x-for="assetType in assetTypes.filter(t => !t.display_name.includes('预算'))" :key="assetType.asset_code">
+                <template x-for="(assetType, idx) in assetTypes.filter(t => t.display_name && !t.display_name.includes('预算'))" :key="assetType.asset_code + '_' + idx">
                   <option :value="assetType.asset_code" x-text="assetType.display_name"></option>
                 </template>
               </select>

@@ -30,6 +30,7 @@ const { sequelize } = require('../models')
 const { Store, User, StoreStaff, AdministrativeRegion } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const logger = require('../utils/logger').logger
+const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 
 /**
  * 门店管理服务类
@@ -263,6 +264,9 @@ class StoreService {
     // 格式化结果
     const stores = rows.map(store => StoreService.formatStoreForAPI(store))
 
+    // 附加中文显示名称（status → status_display/status_color）
+    await attachDisplayNames(stores, [{ field: 'status', dictType: DICT_TYPES.STORE_STATUS }])
+
     return {
       total: count,
       page: parseInt(page, 10),
@@ -327,6 +331,9 @@ class StoreService {
     result.staff_counts = staffCounts
     // total_staff 不包括已删除的员工
     result.total_staff = staffCounts.active + staffCounts.inactive + staffCounts.pending
+
+    // 附加中文显示名称（status → status_display/status_color）
+    await attachDisplayNames(result, [{ field: 'status', dictType: DICT_TYPES.STORE_STATUS }])
 
     return result
   }
@@ -746,7 +753,7 @@ class StoreService {
         store.street_code
       ].filter(Boolean),
       status: store.status,
-      status_name: StoreService.getStatusName(store.status),
+      // status_display 和 status_color 由 attachDisplayNames 在调用层统一附加（来自字典表）
       assigned_to: store.assigned_to,
       merchant_id: store.merchant_id,
       notes: store.notes,

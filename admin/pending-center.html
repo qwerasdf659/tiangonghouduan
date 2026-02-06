@@ -276,13 +276,11 @@
           </div>
         </template>
         
-        <template x-if="!loading && items.length === 0">
-          <div class="p-12 text-center themed-text-muted">
+          <div x-show="!loading && items.length === 0" class="p-12 text-center themed-text-muted">
             <div class="text-4xl mb-2">✅</div>
             <div>太棒了！没有待处理事项</div>
           </div>
-        </template>
-        
+
         <template x-for="item in items" :key="item.id">
           <div 
             class="item-row flex items-center justify-between p-4"
@@ -439,4 +437,3 @@
   <script type="module" src="./src/modules/operations/pages/pending-center.js"></script>
 </body>
 </html>
-

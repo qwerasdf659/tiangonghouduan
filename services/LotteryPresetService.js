@@ -34,6 +34,7 @@ const logger = require('../utils/logger').logger
 
 const models = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
+const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 
 /**
  * 抽奖预设管理服务类
@@ -393,18 +394,30 @@ class LotteryPresetService {
     // 计算总页数
     const totalPages = Math.ceil(totalCount / pageSizeNum)
 
+    // 格式化预设列表数据
+    const presetList = presets.map(preset => ({
+      lottery_preset_id: preset.lottery_preset_id,
+      user_id: preset.user_id,
+      lottery_prize_id: preset.lottery_prize_id,
+      queue_order: preset.queue_order,
+      status: preset.status,
+      approval_status: preset.approval_status,
+      advance_mode: preset.advance_mode,
+      created_at: preset.created_at,
+      target_user: preset.targetUser,
+      prize: preset.prize,
+      admin: preset.admin
+    }))
+
+    // 附加中文显示名称（status/approval_status/advance_mode → _display/_color）
+    await attachDisplayNames(presetList, [
+      { field: 'status', dictType: DICT_TYPES.PRESET_STATUS },
+      { field: 'approval_status', dictType: DICT_TYPES.PRESET_APPROVAL_STATUS },
+      { field: 'advance_mode', dictType: DICT_TYPES.ADVANCE_MODE }
+    ])
+
     return {
-      list: presets.map(preset => ({
-        lottery_preset_id: preset.lottery_preset_id,
-        user_id: preset.user_id,
-        lottery_prize_id: preset.lottery_prize_id,
-        queue_order: preset.queue_order,
-        status: preset.status,
-        created_at: preset.created_at,
-        target_user: preset.targetUser,
-        prize: preset.prize,
-        admin: preset.admin
-      })),
+      list: presetList,
       pagination: {
         total: totalCount,
         page: pageNum,

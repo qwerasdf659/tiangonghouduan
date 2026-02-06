@@ -14,6 +14,7 @@ const { SystemAnnouncement, User } = require('../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const DataSanitizer = require('./DataSanitizer')
+const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 
 /**
  * 公告服务类
@@ -102,6 +103,13 @@ class AnnouncementService {
 
     // 数据脱敏处理
     const plainAnnouncements = announcements.map(a => a.toJSON())
+
+    // 附加中文显示名称（type/priority → _display/_color）
+    await attachDisplayNames(plainAnnouncements, [
+      { field: 'type', dictType: DICT_TYPES.ANNOUNCEMENT_TYPE },
+      { field: 'priority', dictType: DICT_TYPES.PRIORITY }
+    ])
+
     return DataSanitizer.sanitizeAnnouncements(plainAnnouncements, dataLevel)
   }
 

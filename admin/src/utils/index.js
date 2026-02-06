@@ -74,6 +74,26 @@ export function formatDate(dateValue, options = {}) {
       dateStr = dateValue.iso || dateValue.timestamp || dateValue
     }
 
+    // 处理后端返回的中文预格式化日期字符串（如 "2026年2月6日星期五 02:57:16"）
+    if (typeof dateStr === 'string' && dateStr.includes('年') && dateStr.includes('月') && dateStr.includes('日')) {
+      // 后端已格式化为中文日期，直接返回（去掉星期部分以保持简洁）
+      const cnMatch = dateStr.match(/(\d{4})年(\d{1,2})月(\d{1,2})日(?:星期.)?[\s]*(\d{2}):(\d{2}):?(\d{2})?/)
+      if (cnMatch) {
+        const [, year, month, day, hour, minute, second] = cnMatch
+        const m = month.padStart(2, '0')
+        const d = day.padStart(2, '0')
+        if (dateOnly) {
+          return `${year}/${m}/${d}`
+        }
+        if (showSeconds && second) {
+          return `${year}/${m}/${d} ${hour}:${minute}:${second}`
+        }
+        return `${year}/${m}/${d} ${hour}:${minute}`
+      }
+      // 无法解析的中文格式，直接返回原值
+      return dateStr
+    }
+
     // 检查是否是数据库返回的纯日期字符串（无时区信息，已是北京时间）
     // 格式如: '2026-01-25 20:10:36' 或 '2026-01-25'
     if (typeof dateStr === 'string') {

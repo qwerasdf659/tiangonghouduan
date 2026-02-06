@@ -73,19 +73,29 @@ export function useRiskControlMethods() {
 
         if (response?.success) {
           const data = response.data || {}
-          this.abnormalUsers = data.users || []
-          this.abnormalUserStats = data.stats || {
-            total: 0,
-            high_frequency: 0,
-            high_win_rate: 0,
-            high_tier_abnormal: 0,
-            rapid_wins: 0
+          const users = data.users || []
+          this.abnormalUsers = users
+
+          // 后端返回 summary（按风险等级统计），前端从 users 计算按类型统计
+          const typeCounts = { high_frequency: 0, high_win_rate: 0, high_tier_abnormal: 0, rapid_wins: 0 }
+          for (const u of users) {
+            const types = u.abnormal_types || [u.abnormal_type]
+            for (const t of types) {
+              if (typeCounts[t] !== undefined) typeCounts[t]++
+            }
           }
-          this.abnormalUserPagination = data.pagination || {
-            current_page: 1,
-            page_size: 20,
-            total_count: 0,
-            total_pages: 0
+          this.abnormalUserStats = {
+            total: data.pagination?.total || users.length,
+            ...typeCounts
+          }
+
+          // 后端分页字段：total, page, page_size, total_pages
+          const pg = data.pagination || {}
+          this.abnormalUserPagination = {
+            current_page: pg.page || 1,
+            page_size: pg.page_size || 20,
+            total_count: pg.total || 0,
+            total_pages: pg.total_pages || 0
           }
 
           logger.info('[RiskControl] 异常用户加载成功', {
@@ -185,15 +195,7 @@ export function useRiskControlMethods() {
      * @param {string} type - 异常类型
      * @returns {string} 中文名称
      */
-    getAbnormalTypeText(type) {
-      const texts = {
-        high_frequency: '高频抽奖',
-        high_win_rate: '高中奖率',
-        high_tier_abnormal: '高档位异常',
-        rapid_wins: '快速连中'
-      }
-      return texts[type] || type
-    },
+    // ✅ 已删除 getAbnormalTypeText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 获取风险等级样式
@@ -210,20 +212,8 @@ export function useRiskControlMethods() {
       return styles[level] || 'bg-gray-500 text-white'
     },
 
-    /**
-     * 获取风险等级文本
-     * @param {string} level - 风险等级
-     * @returns {string} 中文名称
-     */
-    getRiskLevelText(level) {
-      const texts = {
-        critical: '极高风险',
-        high: '高风险',
-        medium: '中风险',
-        low: '低风险'
-      }
-      return texts[level] || level
-    },
+    // ✅ 已删除 getRiskLevelText 映射函数
+    // 中文显示名称由后端 attachDisplayNames 统一返回 risk_level_display 字段
 
     /**
      * 格式化时间
@@ -255,9 +245,12 @@ export function useRiskControlMethods() {
     async goToUserProfile(userId) {
       if (!userId) return
       this.closeAbnormalUserDetailModal()
-      // 切换到用户档案页面并加载用户数据
-      if (typeof this.loadUserProfile === 'function') {
+      // 加载用户档案并显示模态框
+      if (typeof this.openUserProfileModal === 'function') {
+        await this.openUserProfileModal(userId)
+      } else if (typeof this.loadUserProfile === 'function') {
         await this.loadUserProfile(userId)
+        this.showUserProfileModal = true
       }
     }
   }

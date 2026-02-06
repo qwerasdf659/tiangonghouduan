@@ -237,7 +237,8 @@ describe('StoreService - 门店管理服务', () => {
         expect(store).toHaveProperty('store_name')
         expect(store).toHaveProperty('store_code')
         expect(store).toHaveProperty('status')
-        expect(store).toHaveProperty('status_name')
+        expect(store).toHaveProperty('status_display') // 中文显示名称（来自字典表）
+        expect(store).toHaveProperty('status_color') // 颜色样式类（来自字典表）
         expect(store).toHaveProperty('created_at')
         expect(store).toHaveProperty('updated_at')
 
@@ -573,7 +574,8 @@ describe('StoreService - 门店管理服务', () => {
 
       expect(result.success).toBe(true)
       expect(result.store.status).toBe('inactive')
-      expect(result.store.status_name).toBe('已关闭')
+      // 中文显示名称由 attachDisplayNames 从字典表统一提供
+      expect(result.store.status_display).toBe('已停用')
     })
 
     it('应该成功将门店状态从 inactive 更新为 active', async () => {
@@ -598,7 +600,8 @@ describe('StoreService - 门店管理服务', () => {
 
       expect(result.success).toBe(true)
       expect(result.store.status).toBe('active')
-      expect(result.store.status_name).toBe('正常营业')
+      // 中文显示名称由 attachDisplayNames 从字典表统一提供
+      expect(result.store.status_display).toBe('正常营业')
     })
 
     it('应该成功将门店状态更新为 pending', async () => {
@@ -616,10 +619,11 @@ describe('StoreService - 门店管理服务', () => {
 
       expect(result.success).toBe(true)
       expect(result.store.status).toBe('pending')
-      expect(result.store.status_name).toBe('待审核')
+      // 中文显示名称由 attachDisplayNames 从字典表统一提供
+      expect(result.store.status_display).toBe('待审核')
     })
 
-    it('getStatusName 应该返回正确的状态名称', () => {
+    it('getStatusName 应该返回正确的状态名称（@deprecated 保留兼容）', () => {
       expect(StoreService.getStatusName('active')).toBe('正常营业')
       expect(StoreService.getStatusName('inactive')).toBe('已关闭')
       expect(StoreService.getStatusName('pending')).toBe('待审核')

@@ -285,7 +285,7 @@ module.exports = sequelize => {
         limit_value,
         used_draw_count: 0,
         bonus_draw_count: 0,
-        matched_rule_id: matched_rule?.rule_id || null
+        matched_rule_id: matched_rule?.lottery_draw_quota_rule_id || null
       },
       { transaction }
     )

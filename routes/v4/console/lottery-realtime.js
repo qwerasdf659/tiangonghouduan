@@ -127,7 +127,8 @@ router.get('/alerts', authenticateToken, requireRoleLevel(100), async (req, res)
       // 告警信息
       level: alert.severity,
       type: alert.alert_type,
-      type_name: alert.alert_type_name,
+      type_display: alert.alert_type_display, // 中文显示名称（来自字典表）
+      type_color: alert.alert_type_color, // 颜色样式类（来自字典表）
       message: alert.message,
       // 阈值和实际值
       threshold: alert.threshold_value,
@@ -135,7 +136,11 @@ router.get('/alerts', authenticateToken, requireRoleLevel(100), async (req, res)
       deviation_percentage: alert.deviation_percentage,
       // 状态
       status: alert.status,
-      status_name: alert.status_name,
+      status_display: alert.status_display, // 中文显示名称（来自字典表）
+      status_color: alert.status_color, // 颜色样式类（来自字典表）
+      // 严重程度
+      severity_display: alert.severity_display, // 中文显示名称（来自字典表）
+      severity_color: alert.severity_color, // 颜色样式类（来自字典表）
       acknowledged: alert.status === 'acknowledged' || alert.status === 'resolved',
       // 时间
       created_at: alert.created_at,

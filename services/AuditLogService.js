@@ -1113,7 +1113,10 @@ class AuditLogService {
           where: whereClause,
           attributes: [
             'operation_type',
-            [require('sequelize').fn('COUNT', require('sequelize').col('log_id')), 'count']
+            [
+              require('sequelize').fn('COUNT', require('sequelize').col('admin_operation_log_id')),
+              'count'
+            ]
           ],
           group: ['operation_type']
         }),
@@ -1123,7 +1126,10 @@ class AuditLogService {
           where: whereClause,
           attributes: [
             'action',
-            [require('sequelize').fn('COUNT', require('sequelize').col('log_id')), 'count']
+            [
+              require('sequelize').fn('COUNT', require('sequelize').col('admin_operation_log_id')),
+              'count'
+            ]
           ],
           group: ['action']
         })
@@ -1213,7 +1219,10 @@ class AuditLogService {
           where: rangeWhere,
           attributes: [
             'operation_type',
-            [require('sequelize').fn('COUNT', require('sequelize').col('log_id')), 'count']
+            [
+              require('sequelize').fn('COUNT', require('sequelize').col('admin_operation_log_id')),
+              'count'
+            ]
           ],
           group: ['operation_type']
         }),
@@ -1223,7 +1232,10 @@ class AuditLogService {
           where: rangeWhere,
           attributes: [
             'action',
-            [require('sequelize').fn('COUNT', require('sequelize').col('log_id')), 'count']
+            [
+              require('sequelize').fn('COUNT', require('sequelize').col('admin_operation_log_id')),
+              'count'
+            ]
           ],
           group: ['action']
         })

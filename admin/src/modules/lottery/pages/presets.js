@@ -609,23 +609,9 @@ function presetsPage() {
       return confirm(message)
     },
 
-    /**
-     * 获取状态的中文文本
-     *
-     * @description HTML模板通用函数，将状态代码转换为中文显示
-     * @param {string} status - 状态代码
-     * @returns {string} 对应的中文状态文本
-     */
-    getStatusText(status) {
-      const map = {
-        active: '生效中',
-        used: '已使用',
-        expired: '已过期',
-        cancelled: '已取消',
-        pending: '待生效'
-      }
-      return map[status] || status || '-'
-    }
+    // ✅ 已删除 getStatusText 映射函数
+    // 中文显示名称由后端 attachDisplayNames 统一返回 status_display 字段
+    // HTML 模板直接使用 item.status_display || item.status
   }
 }
 

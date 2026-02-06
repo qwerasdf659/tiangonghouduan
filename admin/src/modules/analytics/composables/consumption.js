@@ -322,16 +322,7 @@ export function useConsumptionMethods() {
      * @param {string} method - 支付方式代码
      * @returns {string} 支付方式文本
      */
-    getPaymentMethodText(method) {
-      const map = {
-        wechat: '微信',
-        alipay: '支付宝',
-        cash: '现金',
-        card: '银行卡',
-        points: '积分'
-      }
-      return map[method] || method || '-'
-    },
+    // ✅ 已删除 getPaymentMethodText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 获取消费状态CSS类
@@ -348,10 +339,7 @@ export function useConsumptionMethods() {
      * @param {string} status - 消费状态
      * @returns {string} 状态文本
      */
-    getConsumptionStatusText(status) {
-      const map = { pending: '待审核', approved: '已通过', rejected: '已拒绝' }
-      return map[status] || status
-    },
+    // ✅ 已删除 getConsumptionStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     // ========== 批量操作方法（P0-4） ==========
 

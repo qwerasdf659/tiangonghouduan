@@ -151,9 +151,10 @@
             </tr>
           </thead>
           <tbody class="divide-y">
-            <template x-if="alerts.length === 0">
-              <tr><td colspan="9" class="px-4 py-8 text-center themed-text-muted">暂无告警数据</td></tr>
-            </template>
+
+            <tr x-show="alerts.length === 0">
+              <td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无风险告警数据</td>
+            </tr>
             <template x-for="alert in alerts" :key="alert.risk_alert_id">
               <tr class="themed-hover-bg">
                 <td class="px-4 py-3">
@@ -165,9 +166,9 @@
                     'bg-red-100 text-red-700': alert.severity === 'critical' || alert.severity === 'high',
                     'bg-yellow-100 text-yellow-700': alert.severity === 'medium',
                     'themed-bg-primary-light themed-text-primary': alert.severity === 'low'
-                  }" class="px-2 py-1 text-xs rounded" x-text="getLevelText(alert.severity)"></span>
+                  }" class="px-2 py-1 text-xs rounded" x-text="alert.severity_display || alert.severity"></span>
                 </td>
-                <td class="px-4 py-3 text-sm" x-text="getTypeText(alert.alert_type)"></td>
+                <td class="px-4 py-3 text-sm" x-text="alert.alert_type_display || alert.alert_type"></td>
                 <td class="px-4 py-3 text-sm" x-text="alert.target_user_info?.nickname || alert.target_user_info?.user_id || '-'"></td>
                 <td class="px-4 py-3 text-sm max-w-xs truncate" x-text="alert.alert_message"></td>
                 <td class="px-4 py-3">
@@ -177,7 +178,7 @@
                       'themed-bg-primary-light themed-text-primary': alert.status === 'reviewed',
                       'bg-green-100 themed-text-success': alert.status === 'resolved',
                       'themed-bg-subtle themed-text-secondary': alert.status === 'ignored'
-                    }" class="px-2 py-1 text-xs rounded inline-block" x-text="getStatusText(alert.status)"></span>
+                    }" class="px-2 py-1 text-xs rounded inline-block" x-text="alert.status_display || alert.status"></span>
                     <!-- P2-8: 升级状态标识 -->
                     <span 
                       x-show="getEscalationStatus(alert)"
@@ -275,9 +276,9 @@
       <div class="p-4 space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <div><span class="themed-text-muted">告警ID:</span> <span class="font-mono" x-text="selectedAlert?.risk_alert_id"></span></div>
-          <div><span class="themed-text-muted">级别:</span> <span x-text="getLevelText(selectedAlert?.severity)"></span></div>
-          <div><span class="themed-text-muted">类型:</span> <span x-text="getTypeText(selectedAlert?.alert_type)"></span></div>
-          <div><span class="themed-text-muted">状态:</span> <span x-text="getStatusText(selectedAlert?.status)"></span></div>
+          <div><span class="themed-text-muted">级别:</span> <span x-text="selectedAlert?.severity_display || selectedAlert?.severity"></span></div>
+          <div><span class="themed-text-muted">类型:</span> <span x-text="selectedAlert?.alert_type_display || selectedAlert?.alert_type"></span></div>
+          <div><span class="themed-text-muted">状态:</span> <span x-text="selectedAlert?.status_display || selectedAlert?.status"></span></div>
           <div><span class="themed-text-muted">关联用户:</span> <span x-text="selectedAlert?.target_user_info?.nickname || selectedAlert?.target_user_info?.user_id || '-'"></span></div>
           <div><span class="themed-text-muted">触发时间:</span> <span x-text="formatDate(selectedAlert?.created_at)"></span></div>
         </div>
@@ -335,7 +336,7 @@
               <span class="text-xs themed-text-muted">告警总数</span>
             </div>
             <div class="text-center p-3 bg-orange-50 rounded-lg">
-              <p class="text-sm font-medium text-orange-600" x-text="getTypeText(currentMergedAlertGroup.type)"></p>
+              <p class="text-sm font-medium text-orange-600" x-text="currentMergedAlertGroup.type_display || currentMergedAlertGroup.type"></p>
               <span class="text-xs themed-text-muted">告警类型</span>
             </div>
             <div class="text-center p-3 bg-purple-50 rounded-lg">
@@ -359,7 +360,7 @@
                         'bg-blue-100 text-blue-600': alert.severity === 'low'
                       }"
                       class="px-1.5 py-0.5 text-xs rounded"
-                      x-text="getLevelText(alert.severity)"
+                      x-text="alert.severity_display || alert.severity"
                     ></span>
                   </div>
                   <p class="text-sm themed-text" x-text="alert.alert_message || alert.message"></p>
@@ -385,8 +386,6 @@
   </div>
 
   <%- include('partials/footer') %>
-
-
 
   <script type="module" src="./src/modules/system/pages/risk-alerts.js"></script>
 </body>

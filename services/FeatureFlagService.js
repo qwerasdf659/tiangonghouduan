@@ -24,6 +24,7 @@ const { logger } = require('../utils/logger')
 const { getRedisClient, isRedisHealthy } = require('../utils/UnifiedRedisClient')
 const { OPERATION_TYPES } = require('../constants/AuditOperationTypes')
 const crypto = require('crypto')
+const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 
 // Redis 缓存 Key 前缀
 const CACHE_PREFIX = 'feature_flag'
@@ -507,7 +508,18 @@ class FeatureFlagService {
    */
   static async getAllFlags(filters = {}) {
     const FeatureFlag = this.getModel()
-    return FeatureFlag.findAllWithFilters(filters)
+    const flags = await FeatureFlag.findAllWithFilters(filters)
+
+    // 转换为普通对象以便附加显示名称
+    const flagsData = flags.map(f => (f.toJSON ? f.toJSON() : f))
+
+    // 附加中文显示名称（rollout_strategy/fallback_behavior → _display/_color）
+    await attachDisplayNames(flagsData, [
+      { field: 'rollout_strategy', dictType: DICT_TYPES.ROLLOUT_STRATEGY },
+      { field: 'fallback_behavior', dictType: DICT_TYPES.FALLBACK_BEHAVIOR }
+    ])
+
+    return flagsData
   }
 
   // ==================== 缓存管理 ====================

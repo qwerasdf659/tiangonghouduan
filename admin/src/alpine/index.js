@@ -65,8 +65,17 @@ import { exportModal } from './components/export-modal.js'
 
 /**
  * 初始化 Alpine.js
+ * 幂等设计：多次调用只执行一次，防止 Alpine.start() 被重复调用导致事件监听器重复、状态异常
  */
+let _alpineInitialized = false
+
 export function initAlpine() {
+  if (_alpineInitialized) {
+    logger.warn('[Alpine] initAlpine 已执行过，跳过重复初始化')
+    return
+  }
+  _alpineInitialized = true
+
   // ========== 全局错误边界 ==========
   // 捕获 Alpine 组件中的所有未处理错误，防止页面崩溃
   Alpine.onError = (error, component, expression) => {

@@ -26,24 +26,24 @@
   <div class="container mx-auto px-4 py-6">
     <!-- 总览卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-emerald-500">
+      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-emerald-500 overflow-hidden">
         <div class="text-4xl text-emerald-400 mb-2">💰</div>
-        <h4 class="text-2xl font-bold text-emerald-600" x-text="formatCurrency(overview.total_circulation)">0</h4>
+        <h4 class="text-xl font-bold text-emerald-600 truncate" x-text="formatCurrency(overview.total_circulation)" :title="overview.total_circulation">0</h4>
         <p class="themed-text-muted text-sm">资产总流通量</p>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 themed-border-primary">
+      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 themed-border-primary overflow-hidden">
         <div class="text-4xl text-blue-400 mb-2">👥</div>
-        <h4 class="text-2xl font-bold themed-text-primary" x-text="overview.total_holders">0</h4>
+        <h4 class="text-2xl font-bold themed-text-primary truncate" x-text="overview.total_holders">0</h4>
         <p class="themed-text-muted text-sm">持有用户</p>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-purple-500">
+      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-purple-500 overflow-hidden">
         <div class="text-4xl text-purple-400 mb-2">📦</div>
-        <h4 class="text-2xl font-bold text-purple-600" x-text="overview.total_asset_types">0</h4>
+        <h4 class="text-2xl font-bold text-purple-600 truncate" x-text="overview.total_asset_types">0</h4>
         <p class="themed-text-muted text-sm">资产种类</p>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-orange-500">
+      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-orange-500 overflow-hidden">
         <div class="text-4xl text-orange-400 mb-2">📈</div>
-        <h4 class="text-2xl font-bold text-orange-600" x-text="formatPercentage(overview.growth_rate)">0%</h4>
+        <h4 class="text-2xl font-bold text-orange-600 truncate" x-text="formatPercentage(overview.growth_rate)">0%</h4>
         <p class="themed-text-muted text-sm">增长率</p>
       </div>
     </div>
@@ -83,10 +83,9 @@
             <label class="block text-sm font-medium themed-text-secondary mb-1">资产类型</label>
             <select x-model="searchForm.asset_type" class="w-full px-3 py-2 border rounded-lg">
               <option value="">全部</option>
-              <option value="points">积分</option>
-              <option value="balance">余额</option>
-              <option value="material">材料</option>
-              <option value="item">物品</option>
+              <template x-for="(type, idx) in assetTypes" :key="type.asset_code + '_' + idx">
+                <option :value="type.asset_code" x-text="type.display_name || type.name || type.asset_code"></option>
+              </template>
             </select>
           </div>
           <div>
@@ -125,9 +124,16 @@
             </tr>
           </thead>
           <tbody class="divide-y">
-            <template x-if="assets.length === 0">
-              <tr><td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无资产数据</td></tr>
-            </template>
+            <tr x-show="assets.length === 0">
+              <td colspan="8" class="px-4 py-8 text-center themed-text-muted">
+                <template x-if="!searchForm.user_id">
+                  <span>请输入用户ID后点击查询</span>
+                </template>
+                <template x-if="searchForm.user_id">
+                  <span>未查询到资产记录</span>
+                </template>
+              </td>
+            </tr>
             <template x-for="asset in assets" :key="asset.asset_id">
               <tr class="themed-hover-bg">
                 <td class="px-4 py-3 text-sm">
@@ -140,7 +146,7 @@
                     'bg-green-100 themed-text-success': asset.asset_type === 'balance',
                     'themed-bg-primary-light themed-text-primary': asset.asset_type === 'material',
                     'bg-purple-100 text-purple-700': asset.asset_type === 'item'
-                  }" class="px-2 py-1 text-xs rounded" x-text="getAssetTypeText(asset.asset_type)"></span>
+                  }" class="px-2 py-1 text-xs rounded" x-text="asset.asset_type_display || asset.asset_type"></span>
                 </td>
                 <td class="px-4 py-3 text-sm" x-text="asset.asset_name"></td>
                 <td class="px-4 py-3 text-sm font-mono" x-text="formatNumber(asset.quantity)"></td>
@@ -180,7 +186,7 @@
       <div class="p-4 space-y-3">
         <div class="flex justify-between"><span class="themed-text-muted">资产ID:</span><span class="font-mono" x-text="selectedAsset?.asset_id"></span></div>
         <div class="flex justify-between"><span class="themed-text-muted">用户:</span><span x-text="selectedAsset?.user_nickname || selectedAsset?.user_id"></span></div>
-        <div class="flex justify-between"><span class="themed-text-muted">资产类型:</span><span x-text="getAssetTypeText(selectedAsset?.asset_type)"></span></div>
+        <div class="flex justify-between"><span class="themed-text-muted">资产类型:</span><span x-text="selectedAsset?.asset_type_display || selectedAsset?.asset_type"></span></div>
         <div class="flex justify-between"><span class="themed-text-muted">资产名称:</span><span x-text="selectedAsset?.asset_name"></span></div>
         <div class="flex justify-between"><span class="themed-text-muted">数量:</span><span class="font-mono" x-text="formatNumber(selectedAsset?.quantity)"></span></div>
         <div class="flex justify-between"><span class="themed-text-muted">单价:</span><span class="font-mono" x-text="formatCurrency(selectedAsset?.unit_price)"></span></div>
@@ -243,8 +249,6 @@
   </div>
 
   <%- include('partials/footer') %>
-
-
 
   <script type="module" src="./src/modules/asset/pages/assets-portfolio.js"></script>
 </body>

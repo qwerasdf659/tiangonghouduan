@@ -342,35 +342,8 @@ export function useCampaignBudgetMethods() {
       return map[status] || 'bg-secondary'
     },
 
-    /**
-     * 获取预算状态文本
-     * @param {string} status - 预算状态
-     * @returns {string} 状态文本
-     */
-    getBudgetStatusText(status) {
-      const map = {
-        active: '运行中',
-        paused: '已暂停',
-        exhausted: '已耗尽',
-        expired: '已过期',
-        UNLIMITED: '无限制',
-        BUDGET_POINTS: '预算积分'
-      }
-      return map[status] || status
-    },
-
-    /**
-     * 获取预算模式文本
-     * @param {string} mode - 预算模式
-     * @returns {string} 模式文本
-     */
-    getBudgetModeText(mode) {
-      const map = {
-        UNLIMITED: '无限制模式',
-        BUDGET_POINTS: '预算积分模式'
-      }
-      return map[mode] || mode
-    }
+    // ✅ 已删除 getBudgetStatusText / getBudgetModeText 映射函数
+    // 中文显示名称由后端 attachDisplayNames 统一返回 status_display / budget_mode_display 字段
   }
 }
 

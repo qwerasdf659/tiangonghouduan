@@ -19,7 +19,7 @@
  * 4. global级规则（最低优先级）
  *
  * 数据库表名：lottery_draw_quota_rules
- * 主键：rule_id（BIGINT，自增）
+ * 主键：lottery_draw_quota_rule_id（BIGINT，自增）
  *
  * 创建时间：2025-12-23
  */
@@ -334,7 +334,7 @@ module.exports = sequelize => {
     return {
       limit_value: matchedRule.limit_value,
       matched_rule: {
-        rule_id: matchedRule.lottery_draw_quota_rule_id,
+        lottery_draw_quota_rule_id: matchedRule.lottery_draw_quota_rule_id,
         scope_type: matchedRule.scope_type,
         scope_id: matchedRule.scope_id,
         reason: matchedRule.reason
@@ -343,7 +343,7 @@ module.exports = sequelize => {
       debug: {
         total_rules_found: rules.length,
         all_rules: rules.map(r => ({
-          rule_id: r.lottery_draw_quota_rule_id,
+          lottery_draw_quota_rule_id: r.lottery_draw_quota_rule_id,
           scope_type: r.scope_type,
           scope_id: r.scope_id,
           limit_value: r.limit_value,

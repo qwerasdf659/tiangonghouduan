@@ -29,7 +29,6 @@ import { logger } from '../../../utils/logger.js'
 import { buildURL, request, getToken } from '../../../api/base.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
-
 document.addEventListener('alpine:init', () => {
   logger.info('[ContentManagement] 注册 Alpine 组件...')
 
@@ -92,10 +91,10 @@ document.addEventListener('alpine:init', () => {
 
     /**
      * 公告表单数据
-     * @type {{system_announcement_id: number|null, title: string, content: string, type: string, priority: string, status: string, expires_at: string}}
+     * @type {{announcement_id: number|null, title: string, content: string, type: string, priority: string, status: string, expires_at: string}}
      */
     announcementForm: {
-      system_announcement_id: null,
+      announcement_id: null,
       title: '',
       content: '',
       type: 'notice',
@@ -114,10 +113,10 @@ document.addEventListener('alpine:init', () => {
 
     /**
      * 轮播图表单数据
-     * @type {{banner_id: number|null, title: string, position: string, sort_order: number, is_active: boolean, image_url: string, link_url: string, start_time: string, end_time: string}}
+     * @type {{popup_banner_id: number|null, title: string, position: string, sort_order: number, is_active: boolean, image_url: string, link_url: string, start_time: string, end_time: string}}
      */
     bannerForm: {
-      banner_id: null,
+      popup_banner_id: null,
       title: '',
       position: 'home',
       sort_order: 0,
@@ -247,7 +246,7 @@ document.addEventListener('alpine:init', () => {
         logger.info('[ContentManagement] 加载公告列表...')
         const response = await this.apiGet(SYSTEM_ENDPOINTS.ANNOUNCEMENT_LIST)
         if (response?.success) {
-          this.announcements = response.data?.list || response.data?.announcements || []
+          this.announcements = response.data?.announcements || []
           logger.info('[ContentManagement] 公告数量:', this.announcements.length)
         }
       } catch (error) {
@@ -264,7 +263,7 @@ document.addEventListener('alpine:init', () => {
     openCreateAnnouncementModal() {
       this.isEditMode = false
       this.announcementForm = {
-        system_announcement_id: null,
+        announcement_id: null,
         title: '',
         content: '',
         type: 'notice',
@@ -278,7 +277,7 @@ document.addEventListener('alpine:init', () => {
     /**
      * 编辑公告
      * @param {Object} ann - 要编辑的公告对象
-     * @param {number} ann.system_announcement_id - 公告ID
+     * @param {number} ann.announcement_id - 公告ID
      * @param {string} ann.title - 公告标题
      * @param {string} ann.content - 公告内容
      * @param {string} ann.type - 公告类型
@@ -290,7 +289,7 @@ document.addEventListener('alpine:init', () => {
     editAnnouncement(ann) {
       this.isEditMode = true
       this.announcementForm = {
-        system_announcement_id: ann.system_announcement_id,
+        announcement_id: ann.announcement_id || ann.id,
         title: ann.title || '',
         content: ann.content || '',
         type: ann.type || 'notice',
@@ -330,7 +329,7 @@ document.addEventListener('alpine:init', () => {
 
         const url = this.isEditMode
           ? buildURL(SYSTEM_ENDPOINTS.ANNOUNCEMENT_UPDATE, {
-              id: this.announcementForm.system_announcement_id
+              id: this.announcementForm.announcement_id
             })
           : SYSTEM_ENDPOINTS.ANNOUNCEMENT_CREATE
         const method = this.isEditMode ? 'PUT' : 'POST'
@@ -393,7 +392,7 @@ document.addEventListener('alpine:init', () => {
 
         const response = await this.apiGet(`${SYSTEM_ENDPOINTS.POPUP_BANNER_LIST}?${params}`)
         if (response?.success) {
-          this.banners = response.data?.list || response.data?.banners || []
+          this.banners = response.data?.banners || []
           logger.info('[ContentManagement] 轮播图数量:', this.banners.length)
           // 计算统计
           this.bannerStats = {
@@ -422,7 +421,7 @@ document.addEventListener('alpine:init', () => {
       this.bannerImageFile = null
       this.bannerImagePreview = ''
       this.bannerForm = {
-        banner_id: null,
+        popup_banner_id: null,
         title: '',
         position: 'home',
         sort_order: 0,
@@ -439,7 +438,7 @@ document.addEventListener('alpine:init', () => {
     /**
      * 编辑轮播图
      * @param {Object} banner - 要编辑的轮播图对象
-     * @param {number} banner.banner_id - 轮播图ID
+     * @param {number} banner.popup_banner_id - 轮播图ID
      * @param {string} banner.title - 标题
      * @param {string} banner.position - 显示位置
      * @param {number} banner.display_order - 排序
@@ -456,7 +455,7 @@ document.addEventListener('alpine:init', () => {
       this.bannerImageFile = null
       this.bannerImagePreview = ''
       this.bannerForm = {
-        banner_id: banner.banner_id || banner.id,
+        popup_banner_id: banner.popup_banner_id,
         title: banner.title || '',
         position: banner.position || 'home',
         sort_order: banner.display_order || banner.sort_order || 0,
@@ -537,6 +536,12 @@ document.addEventListener('alpine:init', () => {
         bannerFormImageUrl: this.bannerForm.image_url
       })
 
+      // 编辑时必须有 popup_banner_id
+      if (this.isEditMode && !this.bannerForm.popup_banner_id) {
+        this.showError('轮播图 ID 缺失')
+        return
+      }
+
       // 新建时必须有图片文件，编辑时可选
       if (!this.isEditMode && !this.bannerImageFile) {
         this.showError('请选择轮播图图片')
@@ -558,7 +563,7 @@ document.addEventListener('alpine:init', () => {
       this.saving = true
       try {
         const url = this.isEditMode
-          ? buildURL(SYSTEM_ENDPOINTS.POPUP_BANNER_UPDATE, { id: this.bannerForm.banner_id })
+          ? buildURL(SYSTEM_ENDPOINTS.POPUP_BANNER_UPDATE, { id: this.bannerForm.popup_banner_id })
           : SYSTEM_ENDPOINTS.POPUP_BANNER_CREATE
         const method = this.isEditMode ? 'PUT' : 'POST'
 
@@ -617,7 +622,7 @@ document.addEventListener('alpine:init', () => {
      * 切换轮播图状态
      * @async
      * @param {Object} banner - 轮播图对象
-     * @param {number} banner.banner_id - 轮播图ID
+     * @param {number} banner.popup_banner_id - 轮播图ID
      * @param {boolean} banner.is_active - 当前状态
      * @description 启用或禁用轮播图
      * @returns {Promise<void>}
@@ -625,9 +630,8 @@ document.addEventListener('alpine:init', () => {
     async toggleBannerStatus(banner) {
       try {
         const newStatus = !banner.is_active
-        const bannerId = banner.banner_id || banner.id
         const response = await this.apiCall(
-          buildURL(SYSTEM_ENDPOINTS.POPUP_BANNER_TOGGLE, { id: bannerId }),
+          buildURL(SYSTEM_ENDPOINTS.POPUP_BANNER_TOGGLE, { id: banner.popup_banner_id }),
           {
             method: 'POST',
             data: { is_active: newStatus }
@@ -674,16 +678,7 @@ document.addEventListener('alpine:init', () => {
      * @param {string} position - 位置代码
      * @returns {string} 位置的中文名称
      */
-    getPositionText(position) {
-      const map = {
-        home: '首页',
-        lottery: '抽奖页',
-        user: '个人中心',
-        detail: '详情页',
-        splash: '启动页'
-      }
-      return map[position] || position || '-'
-    },
+    // ✅ 已删除 getPositionText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 格式化日期时间为local格式
@@ -713,7 +708,7 @@ document.addEventListener('alpine:init', () => {
      * 图片统计数据
      * @type {{total: number, totalSize: number}}
      */
-    imageStats: { total: 0, totalSize: 0 },
+    imageStats: { total: 0, totalSize: 0, weekly_uploads: 0, orphan_count: 0 },
 
     /**
      * 当前选中的图片
@@ -846,13 +841,11 @@ document.addEventListener('alpine:init', () => {
      * 在新窗口打开图片
      * @param {Object} image - 图片对象
      * @param {string} image.url - 图片URL
-     * @param {string} image.image_url - 备选图片URL
      * @returns {void}
      */
     openImageInNewTab(image) {
-      const url = image.url || image.image_url
-      if (url) {
-        window.open(url, '_blank')
+      if (image.url) {
+        window.open(image.url, '_blank')
       }
     },
 
@@ -861,12 +854,11 @@ document.addEventListener('alpine:init', () => {
      * @async
      * @param {Object} image - 图片对象
      * @param {string} image.url - 图片URL
-     * @param {string} image.image_url - 备选图片URL
      * @description 将图片链接复制到剪贴板
      * @returns {Promise<void>}
      */
     async copyImageUrl(image) {
-      const url = image.url || image.image_url
+      const url = image.url
       if (url) {
         try {
           await navigator.clipboard.writeText(url)
@@ -905,7 +897,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     resetImageFilters() {
-      this.imageFilters = { type: '', keyword: '' }
+      this.imageFilters = { business_type: '', status: '' }
       this.loadImages()
     },
 
@@ -914,17 +906,7 @@ document.addEventListener('alpine:init', () => {
      * @param {string} type - 图片类型代码
      * @returns {string} 图片类型的中文名称
      */
-    getImageTypeText(type) {
-      const map = {
-        banner: '轮播图',
-        avatar: '头像',
-        prize: '奖品图',
-        product: '商品图',
-        general: '通用',
-        qrcode: '二维码'
-      }
-      return map[type] || type || '通用'
-    },
+    // ✅ 已删除 getImageTypeText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     // ==================== 通用删除确认 ====================
 
@@ -942,10 +924,9 @@ document.addEventListener('alpine:init', () => {
         let url = ''
         let successMsg = ''
         const targetId =
-          this.deleteTarget.id ||
           this.deleteTarget.system_announcement_id ||
-          this.deleteTarget.banner_id ||
-          this.deleteTarget.image_id
+          this.deleteTarget.popup_banner_id ||
+          this.deleteTarget.image_resource_id
 
         switch (this.deleteType) {
           case 'announcement':

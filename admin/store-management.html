@@ -92,9 +92,9 @@
 
           <!-- 门店列表（卡片样式） -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <template x-if="stores.length === 0">
-              <div class="col-span-3 text-center themed-text-muted py-12">暂无门店数据</div>
-            </template>
+
+              <div x-show="stores.length === 0" class="col-span-3 text-center themed-text-muted py-12">
+
             <template x-for="store in stores" :key="store.store_id">
               <div class="store-card p-4 themed-card">
                 <div class="flex justify-between items-start mb-3">
@@ -102,7 +102,7 @@
                   <span 
                     :class="getStoreStatusClass(store.status)" 
                     class="px-2 py-1 text-xs rounded text-white"
-                    x-text="getStoreStatusText(store.status)"
+                    x-text="store.status_display || store.status"
                   ></span>
                 </div>
                 <p class="themed-text-muted text-sm mb-2">📍 <span x-text="store.store_address || store.address || '暂无地址'"></span></p>
@@ -177,9 +177,10 @@
                 </tr>
               </thead>
               <tbody class="divide-y">
-                <template x-if="staffList.length === 0">
-                  <tr><td colspan="7" class="text-center themed-text-muted py-8">暂无员工数据</td></tr>
-                </template>
+
+                <tr x-show="staffList.length === 0">
+                  <td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无员工数据</td>
+                </tr>
                 <template x-for="staff in staffList" :key="staff.store_staff_id">
                   <tr class="themed-hover-bg">
                     <td class="px-4 py-3">
@@ -194,14 +195,14 @@
                       </div>
                     </td>
                     <td class="px-4 py-3 text-sm" x-text="staff.store_name || '-'"></td>
-                    <td class="px-4 py-3"><span class="px-2 py-1 bg-cyan-100 text-cyan-700 text-xs rounded" x-text="staff.role_name || getStaffRoleText(staff.role_in_store)"></span></td>
+                    <td class="px-4 py-3"><span class="px-2 py-1 bg-cyan-100 text-cyan-700 text-xs rounded" x-text="staff.role_in_store_display || staff.role_in_store"></span></td>
                     <td class="px-4 py-3 text-sm" x-text="staff.user_mobile || '-'"></td>
                     <td class="px-4 py-3 text-sm" x-text="formatDateSafe(staff.joined_at)"></td>
                     <td class="px-4 py-3">
                       <span 
                         :class="getStaffStatusClass(staff.status)"
                         class="px-2 py-1 text-xs rounded"
-                        x-text="getStaffStatusText(staff.status)"
+                        x-text="staff.status_display || staff.status"
                       ></span>
                     </td>
                     <td class="px-4 py-3">
@@ -453,7 +454,7 @@
               <span 
                 :class="getStoreStatusClass(selectedStore.status)"
                 class="px-2 py-1 text-xs rounded text-white"
-                x-text="getStoreStatusText(selectedStore.status)"
+                x-text="selectedStore.status_display || selectedStore.status"
               ></span>
             </div>
             <div>
@@ -553,7 +554,6 @@
 
   <!-- 页面专属逻辑 -->
   <%- include('partials/footer') %>
-
 
   <script type="module" src="./src/modules/store/pages/store-management.js"></script>
 </body>

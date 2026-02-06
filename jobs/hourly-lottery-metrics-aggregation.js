@@ -61,9 +61,9 @@ class HourlyLotteryMetricsAggregation {
     try {
       const campaigns = await LotteryCampaign.findAll({
         where: { status: 'active' },
-        attributes: ['campaign_id']
+        attributes: ['lottery_campaign_id']
       })
-      return campaigns.map(c => c.campaign_id)
+      return campaigns.map(c => c.lottery_campaign_id)
     } catch (error) {
       logger.error('[HourlyLotteryMetricsAggregation] 获取活动列表失败', {
         error: error.message
@@ -111,31 +111,34 @@ class HourlyLotteryMetricsAggregation {
   /**
    * 聚合单个活动的指标
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lottery_campaign_id - 抽奖活动ID
    * @param {string} hour_bucket - 小时桶标识
    * @param {Date} hour_bucket_datetime - 小时桶的 DateTime 对象
    * @param {string} date_bucket - 日期桶标识（用于获取独立用户数）
    * @returns {Promise<Object|null>} 聚合结果或 null
    */
-  async aggregateCampaign(campaign_id, hour_bucket, hour_bucket_datetime, date_bucket) {
+  async aggregateCampaign(lottery_campaign_id, hour_bucket, hour_bucket_datetime, date_bucket) {
     const transaction = await sequelize.transaction()
 
     try {
       // 1. 从 Redis 获取该小时的所有指标
-      const redis_metrics = await this.collector.getHourMetrics(campaign_id, hour_bucket)
+      const redis_metrics = await this.collector.getHourMetrics(lottery_campaign_id, hour_bucket)
 
       // 如果没有数据，跳过该活动
       if (!redis_metrics || redis_metrics.total_draws === 0) {
         await transaction.rollback()
         logger.debug('[HourlyLotteryMetricsAggregation] 无抽奖数据，跳过', {
-          campaign_id,
+          lottery_campaign_id,
           hour_bucket
         })
         return null
       }
 
       // 2. 获取独立用户数（从 HyperLogLog）
-      const unique_users = await this.collector.getUniqueUsersCount(campaign_id, date_bucket)
+      const unique_users = await this.collector.getUniqueUsersCount(
+        lottery_campaign_id,
+        date_bucket
+      )
 
       // 3. 计算派生指标
       const total_draws = redis_metrics.total_draws || 0
@@ -152,11 +155,11 @@ class HourlyLotteryMetricsAggregation {
       // 4. 写入或更新 lottery_hourly_metrics（幂等性：使用 findOrCreate）
       const [metrics, created] = await LotteryHourlyMetrics.findOrCreate({
         where: {
-          campaign_id,
+          lottery_campaign_id,
           hour_bucket: hour_bucket_datetime
         },
         defaults: {
-          campaign_id,
+          lottery_campaign_id,
           hour_bucket: hour_bucket_datetime,
           total_draws,
           unique_users,
@@ -218,10 +221,10 @@ class HourlyLotteryMetricsAggregation {
       // 5. 可选：清理 Redis 数据
       if (this.cleanup_redis) {
         try {
-          await this.collector.deleteHourMetrics(campaign_id, hour_bucket)
+          await this.collector.deleteHourMetrics(lottery_campaign_id, hour_bucket)
         } catch (cleanup_error) {
           logger.warn('[HourlyLotteryMetricsAggregation] 清理 Redis 数据失败（非致命）', {
-            campaign_id,
+            lottery_campaign_id,
             hour_bucket,
             error: cleanup_error.message
           })
@@ -229,7 +232,7 @@ class HourlyLotteryMetricsAggregation {
       }
 
       logger.info('[HourlyLotteryMetricsAggregation] 活动聚合完成', {
-        campaign_id,
+        lottery_campaign_id,
         hour_bucket,
         total_draws,
         unique_users,
@@ -238,7 +241,7 @@ class HourlyLotteryMetricsAggregation {
       })
 
       return {
-        campaign_id,
+        lottery_campaign_id,
         hour_bucket,
         total_draws,
         unique_users,
@@ -251,7 +254,7 @@ class HourlyLotteryMetricsAggregation {
 
       if (this.silent_errors) {
         logger.warn('[HourlyLotteryMetricsAggregation] 活动聚合失败（静默处理）', {
-          campaign_id,
+          lottery_campaign_id,
           hour_bucket,
           error: error.message
         })
@@ -297,11 +300,11 @@ class HourlyLotteryMetricsAggregation {
       let success_count = 0
       let error_count = 0
 
-      for (const campaign_id of campaign_ids) {
+      for (const lottery_campaign_id of campaign_ids) {
         try {
           // eslint-disable-next-line no-await-in-loop -- 故意逐个活动串行聚合，避免事务冲突和数据库压力
           const result = await this.aggregateCampaign(
-            campaign_id,
+            lottery_campaign_id,
             hour_bucket,
             hour_bucket_datetime,
             date_bucket
@@ -314,7 +317,7 @@ class HourlyLotteryMetricsAggregation {
         } catch (error) {
           error_count++
           logger.error('[HourlyLotteryMetricsAggregation] 单个活动聚合失败', {
-            campaign_id,
+            lottery_campaign_id,
             error: error.message
           })
         }

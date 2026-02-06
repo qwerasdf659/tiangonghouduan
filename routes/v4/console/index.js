@@ -59,7 +59,6 @@ const featureFlagsRoutes = require('./feature-flags') // 🆕 功能开关管理
 const lotteryStrategyStatsRoutes = require('./lottery-strategy-stats') // 🆕 抽奖策略统计（2026-01-22 策略引擎监控方案）
 const sessionsRoutes = require('./sessions') // 🆕 会话管理（2026-01-21 会话管理功能补齐）
 const lotteryCampaignsRoutes = require('./lottery-campaigns') // 🆕 抽奖活动列表管理（2026-01-28 P1 运营后台 ROI/复购率/库存预警）
-// [已删除] const lotteryAnalyticsRoutes = require('./lottery-analytics') // 已拆分到 lottery-report.js
 const batchOperationsRoutes = require('./batch-operations') // 🆕 批量操作（2026-01-30 阶段C 批量操作API）
 const dashboardRoutes = require('./dashboard') // 🆕 运营看板（2026-01-31 P0 待处理聚合）
 const pendingRoutes = require('./pending') // 🆕 待处理中心（2026-01-31 P0 统一待处理管理）
@@ -127,7 +126,6 @@ router.use('/feature-flags', featureFlagsRoutes) // 🆕 功能开关管理路�
 router.use('/lottery-strategy-stats', lotteryStrategyStatsRoutes) // 🆕 抽奖策略统计路由（2026-01-22 策略引擎监控方案）
 router.use('/sessions', sessionsRoutes) // 🆕 会话管理路由（2026-01-21 会话管理功能补齐）
 router.use('/lottery-campaigns', lotteryCampaignsRoutes) // 🆕 抽奖活动列表管理路由（2026-01-28 P1 运营后台 ROI/复购率/库存预警）
-// [已删除] router.use('/lottery-analytics', lotteryAnalyticsRoutes) // 已迁移到 /lottery-report
 router.use('/batch-operations', batchOperationsRoutes) // 🆕 批量操作路由（2026-01-30 阶段C 批量赠送/核销/状态切换/预算调整）
 router.use('/dashboard', dashboardRoutes) // 🆕 运营看板路由（2026-01-31 P0 待处理聚合）
 router.use('/pending', pendingRoutes) // 🆕 待处理中心路由（2026-01-31 P0 统一待处理管理）

@@ -312,33 +312,14 @@ export function useAlertsMethods() {
      * @param {string} level - 告警级别
      * @returns {string} 文本
      */
-    getAlertLevelText(level) {
-      const texts = {
-        danger: '紧急',
-        warning: '警告',
-        info: '信息'
-      }
-      return texts[level] || level
-    },
+    // ✅ 已删除 getAlertLevelText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 获取告警类型文本
      * @param {string} type - 告警类型
      * @returns {string} 文本
      */
-    getAlertTypeText(type) {
-      const texts = {
-        budget_exhaust: '预算告急',
-        budget_warning: '预算预警',
-        stock_low: '库存告急',
-        stock_warning: '库存预警',
-        win_rate_high: '中奖率过高',
-        win_rate_low: '中奖率过低',
-        high_frequency_user: '高频用户',
-        empty_streak_high: '连空用户过多'
-      }
-      return texts[type] || type
-    },
+    // ✅ 已删除 getAlertTypeText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 格式化告警时间

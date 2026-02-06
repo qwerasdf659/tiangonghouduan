@@ -246,7 +246,7 @@ class LotteryCampaignPricingConfig extends Model {
 
     return await this.create(
       {
-        config_id: configId,
+        lottery_campaign_pricing_config_id: configId,
         lottery_campaign_id: campaignId,
         version: newVersion,
         pricing_config: pricingConfig,

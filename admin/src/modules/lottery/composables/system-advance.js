@@ -420,13 +420,7 @@ export function useSystemAdvanceMethods() {
      * @param {string} type - 类型
      * @returns {string} 文本
      */
-    getAdvanceTypeText(type) {
-      const map = {
-        inventory: '库存垫付',
-        budget: '预算垫付'
-      }
-      return map[type] || type
-    },
+    // ✅ 已删除 getAdvanceTypeText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 获取垫付类型CSS类

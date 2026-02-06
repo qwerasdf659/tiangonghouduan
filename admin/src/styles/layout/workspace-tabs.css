@@ -284,6 +284,8 @@
   flex: 1;
   background: var(--content-bg);
   position: relative;
+  min-height: 0; /* 允许 flex 子项正确收缩，确保 height:100% 子元素有正确参考 */
+  overflow: hidden; /* 防止内容溢出到外层导致外层滚动 */
 }
 
 .tab-panel {
@@ -293,11 +295,13 @@
 
 .tab-panel.active {
   display: block;
+  height: 100%;
 }
 
 .tab-panel iframe {
   width: 100%;
-  height: calc(100vh - var(--header-height) - var(--tab-bar-height));
+  height: 100%;
+  min-height: 0; /* 确保 iframe 可以在 flex 布局中正确收缩 */
   border: none;
 }
 

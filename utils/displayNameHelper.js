@@ -282,7 +282,8 @@ const DICT_TYPES = {
   AUDIT_STATUS: 'audit_status', // 审核状态
 
   // ==================== 物品库存相关 ====================
-  ITEM_STATUS: 'item_status', // 物品状态
+  ITEM_STATUS: 'item_status', // 物品状态（available/locked/transferred/used/expired）
+  ITEM_TYPE: 'item_type', // 物品类型（prize/product/voucher/tradable_item/service）
   PRODUCT_STATUS: 'product_status', // 商品状态
   PRODUCT_SPACE: 'product_space', // 商品空间
 
@@ -332,7 +333,24 @@ const DICT_TYPES = {
   // ==================== 预设相关 ====================
   PRESET_STATUS: 'preset_status', // 预设状态
   PRESET_APPROVAL_STATUS: 'preset_approval_status', // 预设审批状态
-  UNLOCK_METHOD: 'unlock_method' // 解锁方式
+  UNLOCK_METHOD: 'unlock_method', // 解锁方式
+
+  // ==================== 抽奖告警相关（2026-02-06 新增） ====================
+  LOTTERY_ALERT_TYPE: 'lottery_alert_type', // 抽奖告警类型（13种：预算/库存/中奖率/用户/系统等）
+  LOTTERY_ALERT_STATUS: 'lottery_alert_status', // 抽奖告警状态（active/acknowledged/resolved）
+  LOTTERY_ALERT_SEVERITY: 'lottery_alert_severity', // 抽奖告警级别（danger/warning/info）
+
+  // ==================== P2 中文化新增（2026-02-06） ====================
+  BANNER_POSITION: 'banner_position', // 弹窗广告位置（home/lottery/activity/profile）
+  BANNER_LINK_TYPE: 'banner_link_type', // 弹窗链接类型（none/page/miniprogram/webview）
+  ADVANCE_MODE: 'advance_mode', // 预设垫付模式（none/inventory/budget/both）
+  PAYMENT_METHOD: 'payment_method', // 支付方式（wechat/alipay/cash/card）
+  SCOPE_TYPE: 'scope_type', // 配额范围类型（global/campaign/rule）
+  BATCH_OPERATION_TYPE: 'batch_operation_type', // 批量操作类型（quota_grant/campaign_status等）
+  BUDGET_STATUS: 'budget_status', // 预算运行状态（active/paused/exhausted/warning）
+  USER_PHASE: 'user_phase', // 用户生命周期阶段（newcomer/growth/mature/decline）
+  DIMENSION_TYPE: 'dimension_type', // 分析维度类型（store/campaign/user_segment/time_period）
+  ASSET_TYPE: 'asset_type' // 资产类型（points/balance/coupon/diamond/item）
 }
 
 module.exports = {

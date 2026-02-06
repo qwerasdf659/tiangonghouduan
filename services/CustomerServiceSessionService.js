@@ -28,6 +28,7 @@ const logger = require('../utils/logger').logger
  */
 
 const { CustomerServiceSession, ChatMessage, User } = require('../models')
+const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { Sequelize } = require('sequelize')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
@@ -248,6 +249,11 @@ class CustomerServiceSessionService {
           })
         )
       }
+
+      // 附加中文显示名称（status → _display/_color）
+      await attachDisplayNames(formattedSessions, [
+        { field: 'status', dictType: DICT_TYPES.CS_SESSION_STATUS }
+      ])
 
       logger.info(`✅ 成功获取${formattedSessions.length}条会话记录`)
 

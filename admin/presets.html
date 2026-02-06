@@ -94,9 +94,10 @@
             </tr>
           </thead>
           <tbody class="divide-y">
-            <template x-if="interventions.length === 0">
-              <tr><td colspan="7" class="px-4 py-8 text-center themed-text-muted">暂无干预规则</td></tr>
-            </template>
+
+            <tr x-show="interventions.length === 0">
+              <td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无预设干预数据</td>
+            </tr>
             <template x-for="item in interventions" :key="item.setting_id">
               <tr class="themed-hover-bg">
                 <td class="px-4 py-3 text-sm font-mono text-xs" x-text="item.setting_id"></td>
@@ -111,7 +112,7 @@
                     'themed-bg-subtle themed-text-secondary': item.status === 'expired',
                     'themed-bg-primary-light themed-text-primary': item.status === 'used',
                     'bg-red-100 text-red-700': item.status === 'cancelled'
-                  }" class="px-2 py-1 text-xs rounded" x-text="getStatusText(item.status)"></span>
+                  }" class="px-2 py-1 text-xs rounded" x-text="item.status_display || item.status"></span>
                 </td>
                 <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(item.expires_at)"></td>
                 <td class="px-4 py-3">
@@ -217,7 +218,7 @@
         <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">用户:</span><span x-text="viewData?.user?.nickname || viewData?.user_id"></span></div>
         <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">类型:</span><span x-text="getSettingTypeLabel(viewData?.setting_type)"></span></div>
         <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">目标奖品:</span><span x-text="viewData?.prize_info?.prize_name || '-'"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">状态:</span><span x-text="getStatusText(viewData?.status)"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">状态:</span><span x-text="viewData?.status_display || viewData?.status"></span></div>
         <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">创建时间:</span><span x-text="formatDate(viewData?.created_at)"></span></div>
         <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">过期时间:</span><span x-text="formatDate(viewData?.expires_at)"></span></div>
         <div><span class="themed-text-muted">备注:</span><p class="mt-1 p-2 themed-bg-base rounded" x-text="viewData?.reason || '-'"></p></div>
@@ -229,8 +230,6 @@
   </div>
 
   <%- include('partials/footer') %>
-
-
 
   <script type="module" src="./src/modules/lottery/pages/presets.js"></script>
 </body>

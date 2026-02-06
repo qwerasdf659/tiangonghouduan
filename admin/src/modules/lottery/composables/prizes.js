@@ -169,6 +169,7 @@ export function usePrizesMethods() {
 
     /**
      * 切换奖品启用状态
+     * 后端无独立 toggle 端点，使用 PUT /prize/:id 更新 status 字段
      * @param {Object} prize - 奖品对象（后端字段名）
      */
     async togglePrize(prize) {
@@ -177,14 +178,12 @@ export function usePrizesMethods() {
       await this.confirmAndExecute(
         `确认${!isActive ? '启用' : '禁用'}奖品「${prize.prize_name}」？`,
         async () => {
-          // apiCall 成功时返回 response.data，失败时抛出错误
           await this.apiCall(
-            buildURL(LOTTERY_ENDPOINTS.PRIZE_TOGGLE, {
+            buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, {
               prize_id: prize.lottery_prize_id
             }),
-            { method: 'PUT' }
+            { method: 'PUT', data: { status: newStatus } }
           )
-          // 如果没有抛出错误，则表示成功
           this.loadPrizes()
         },
         { successMessage: `奖品已${!isActive ? '启用' : '禁用'}` }
@@ -313,16 +312,7 @@ export function usePrizesMethods() {
      * @param {string} prize_type - 奖品类型（后端字段名）
      * @returns {string} 类型文本
      */
-    getPrizeTypeText(prize_type) {
-      const map = {
-        physical: '实物',
-        virtual: '虚拟',
-        coupon: '优惠券',
-        points: '积分',
-        empty: '未中奖'
-      }
-      return map[prize_type] || prize_type || '未知'
-    },
+    // ✅ 已删除 getPrizeTypeText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 打开奖品补货模态框

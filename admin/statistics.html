@@ -342,12 +342,12 @@
         </div>
       </div>
       <div class="p-4">
-        <template x-if="reportTemplates.length === 0">
-          <div class="text-center py-8 themed-text-muted">
+
+          <div x-show="reportTemplates.length === 0" class="text-center py-8 themed-text-muted">
             <p class="mb-2">暂无报表模板</p>
             <button @click="openReportTemplateModal()" class="themed-text-primary hover:underline">点击创建第一个模板</button>
           </div>
-        </template>
+
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <!-- 使用后端字段: report_template_id, template_name, template_description, is_enabled -->
           <template x-for="template in reportTemplates" :key="template.report_template_id">
@@ -458,8 +458,6 @@
   </div>
 
   <%- include('partials/footer') %>
-
-
 
   <script type="module" src="./src/modules/analytics/pages/statistics.js"></script>
 </body>

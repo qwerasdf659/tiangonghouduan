@@ -13,6 +13,7 @@ import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
 
 export const SYSTEM_CORE_ENDPOINTS = {
   // 系统基础
+  STATUS: `${API_PREFIX}/console/system/status`,
   DASHBOARD: `${API_PREFIX}/console/system/dashboard`,
   DASHBOARD_TRENDS: `${API_PREFIX}/console/system/dashboard`,
   CHARTS: `${API_PREFIX}/system/statistics/charts`,

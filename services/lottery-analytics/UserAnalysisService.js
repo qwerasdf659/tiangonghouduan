@@ -8,12 +8,13 @@
  * 包含用户体验状态、全局状态、配额、异常用户检测等功能
  *
  * 核心功能：
- * 1. getUserExperienceStates() - 用户体验状态分布
- * 2. getUserGlobalStates() - 用户全局状态分布
- * 3. getQuotaGrants() - 配额发放记录列表
- * 4. getUserQuotas() - 用户配额汇总
- * 5. getAbnormalUsers() - 异常用户检测
- * 6. getDrawDetails() - 单次抽奖详情
+ * 1. getUserProfile() - 用户抽奖档案聚合（P0）
+ * 2. getUserExperienceStates() - 用户体验状态分布
+ * 3. getUserGlobalStates() - 用户全局状态分布
+ * 4. getQuotaGrants() - 配额发放记录列表
+ * 5. getUserQuotas() - 用户配额汇总
+ * 6. getAbnormalUsers() - 异常用户检测
+ * 7. getDrawDetails() - 单次抽奖详情
  *
  * 异常检测规则：
  * - high_frequency: 24小时内抽奖 > 100次
@@ -557,6 +558,136 @@ class UserAnalysisService {
     } catch (error) {
       this.logger.error('获取异常用户列表失败', { error: error.message })
       throw error
+    }
+  }
+
+  /**
+   * 获取用户抽奖档案聚合数据
+   *
+   * P0 优先级需求：为运营后台提供用户完整的抽奖行为视图
+   * 聚合用户基本信息、抽奖统计、体验状态、全局状态、配额、最近抽奖记录
+   *
+   * @param {number} user_id - 用户ID
+   * @param {Object} [options={}] - 查询选项
+   * @param {number} [options.lottery_campaign_id] - 活动ID（不传则查询所有活动）
+   * @param {number} [options.recent_limit=20] - 最近抽奖记录条数
+   * @returns {Promise<Object>} 用户抽奖档案聚合数据
+   */
+  async getUserProfile(user_id, options = {}) {
+    const { lottery_campaign_id, recent_limit = 20 } = options
+    this.logger.info('获取用户抽奖档案', { user_id, lottery_campaign_id })
+
+    // 1. 查询用户基本信息
+    const user = await this.models.User.findByPk(user_id, {
+      attributes: ['user_id', 'nickname', 'mobile', 'created_at']
+    })
+
+    if (!user) {
+      throw new Error(`用户不存在: ${user_id}`)
+    }
+
+    // 2. 并行查询各维度数据（提高性能）
+    const drawWhere = { user_id }
+    if (lottery_campaign_id) drawWhere.lottery_campaign_id = lottery_campaign_id
+
+    const [statsResult, recentDraws, globalState, experienceStates, quotas] = await Promise.all([
+      // 2a. 抽奖统计聚合
+      this.models.LotteryDraw.findOne({
+        attributes: [
+          [fn('COUNT', col('lottery_draw_id')), 'total_draws'],
+          [
+            fn('SUM', literal("CASE WHEN reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END")),
+            'total_wins'
+          ],
+          [fn('SUM', col('cost_points')), 'total_cost_points'],
+          [fn('MAX', col('created_at')), 'last_draw_time']
+        ],
+        where: drawWhere,
+        raw: true
+      }),
+
+      // 2b. 最近抽奖记录
+      this.models.LotteryDraw.findAll({
+        where: drawWhere,
+        include: [
+          {
+            model: this.models.LotteryCampaign,
+            as: 'campaign',
+            attributes: ['lottery_campaign_id', 'campaign_name']
+          },
+          {
+            model: this.models.LotteryPrize,
+            as: 'prize',
+            attributes: ['lottery_prize_id', 'prize_name', 'prize_value_points']
+          }
+        ],
+        order: [['created_at', 'DESC']],
+        limit: recent_limit
+      }),
+
+      // 2c. 用户全局状态
+      this.getUserGlobalState(user_id),
+
+      // 2d. 用户体验状态（按活动维度）
+      lottery_campaign_id
+        ? this.getUserExperienceState(user_id, lottery_campaign_id).then(s => (s ? [s] : []))
+        : this.getUserExperienceStates({ user_id, page_size: 50 }).then(r => r.states),
+
+      // 2e. 用户配额
+      this.getUserQuotas({
+        user_id,
+        ...(lottery_campaign_id ? { lottery_campaign_id } : {}),
+        page_size: 50
+      }).then(r => r.quotas)
+    ])
+
+    // 3. 组装统计数据
+    const totalDraws = parseInt(statsResult?.total_draws || 0)
+    const totalWins = parseInt(statsResult?.total_wins || 0)
+    const winRate = totalDraws > 0 ? parseFloat(((totalWins / totalDraws) * 100).toFixed(1)) : 0
+
+    const stats = {
+      total_draws: totalDraws,
+      total_wins: totalWins,
+      win_rate: winRate,
+      total_cost_points: parseInt(statsResult?.total_cost_points || 0),
+      last_draw_time: statsResult?.last_draw_time || null
+    }
+
+    // 4. 格式化最近抽奖记录
+    const formattedDraws = recentDraws.map(draw => {
+      const plain = draw.get({ plain: true })
+      return {
+        lottery_draw_id: plain.lottery_draw_id,
+        lottery_campaign_id: plain.lottery_campaign_id,
+        campaign_name: plain.campaign?.campaign_name || null,
+        reward_tier: plain.reward_tier,
+        prize_name: plain.prize?.prize_name || null,
+        prize_value_points: plain.prize?.prize_value_points || 0,
+        cost_points: plain.cost_points,
+        created_at: plain.created_at
+      }
+    })
+
+    this.logger.info('用户抽奖档案聚合完成', {
+      user_id,
+      total_draws: stats.total_draws,
+      recent_count: formattedDraws.length
+    })
+
+    return {
+      user_id,
+      user: {
+        user_id: user.user_id,
+        nickname: user.nickname,
+        mobile: user.mobile,
+        created_at: user.created_at
+      },
+      stats,
+      experience_states: experienceStates || [],
+      global_state: globalState,
+      quotas: quotas || [],
+      recent_draws: formattedDraws
     }
   }
 

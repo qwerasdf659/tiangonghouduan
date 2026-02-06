@@ -368,31 +368,10 @@ export function useBatchOperationsMethods() {
      * @param {string} type - 操作类型
      * @returns {string} 文本
      */
-    getBatchOperationTypeText(type) {
-      const map = {
-        'quota-grant': '批量赠送抽奖次数',
-        'campaign-status': '批量状态切换',
-        'budget-adjust': '批量预算调整',
-        'preset-rules': '批量设置干预规则',
-        'redemption-verify': '批量核销确认'
-      }
-      return map[type] || type
-    },
+    // ✅ 已删除 getBatchOperationTypeText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
-    /**
-     * 获取状态文本
-     * @param {string} status - 状态
-     * @returns {string} 文本
-     */
-    getCampaignStatusText(status) {
-      const map = {
-        active: '进行中',
-        paused: '已暂停',
-        ended: '已结束',
-        pending: '待开始'
-      }
-      return map[status] || status
-    },
+    // ✅ 已删除 getCampaignStatusText 映射函数
+    // 中文显示名称由后端 attachDisplayNames 统一返回 status_display 字段
 
     /**
      * 格式化批量操作时间

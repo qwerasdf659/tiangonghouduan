@@ -109,66 +109,105 @@ export function useMetricsMethods() {
   return {
     /**
      * 加载抽奖监控指标
-     * 使用后端综合统计接口 /stats 获取完整指标
-     * 后端返回结构: { summary, trend, prize_distribution, recent_draws, prize_stats }
+     * 并行调用多个后端 API 获取完整指标数据：
+     * - /console/lottery-realtime/stats → total_draws, unique_users, win_rate, empty_rate
+     * - /console/lottery/stats → total_draws, total_wins, win_rate, total_prize_value
+     * - /console/lottery/trend → 趋势数据
+     * - /console/lottery/prize-distribution → 奖品分布数据
      */
     async loadLotteryMetrics() {
       logger.debug('📊 [Metrics] loadLotteryMetrics 开始执行...')
       try {
-        // 调用综合统计接口，获取完整的监控数据
-        // 使用 time_range: 'month' 统计最近30天数据
         const timeRange = this.monitoringFilters?.time_range || 'month'
-        logger.debug(
-          '📊 [Metrics] 调用API:',
-          LOTTERY_ENDPOINTS.MONITORING_STATS,
-          '时间范围:',
-          timeRange
-        )
-        const statsRes = await this.apiGet(
-          `${LOTTERY_ENDPOINTS.MONITORING_STATS}?time_range=${timeRange}`,
-          {},
-          { showLoading: false, showError: false }
-        )
-        logger.debug('📊 [Metrics] API响应:', statsRes)
+        // 将 time_range 转换为 range 参数格式
+        const rangeMap = { today: '1d', yesterday: '1d', week: '7d', month: '30d' }
+        const range = rangeMap[timeRange] || '30d'
 
-        if (statsRes?.success) {
-          const data = statsRes.data || {}
-          logger.debug('📊 [Metrics] 解析数据:', {
-            summary: data.summary,
-            prizeDistributionLength: (data.prize_distribution || []).length,
-            recentDrawsLength: (data.recent_draws || []).length
-          })
+        logger.debug('📊 [Metrics] 并行调用多个API, 时间范围:', timeRange)
 
-          // 从 summary 字段提取汇总统计 - 直接使用后端字段名
-          const summary = data.summary || {}
+        // 并行调用后端 API
+        const [realtimeRes, statsRes, trendRes, distributionRes] = await Promise.allSettled([
+          this.apiGet(
+            `${LOTTERY_ENDPOINTS.MONITORING_STATS}?time_range=${timeRange}`,
+            {},
+            { showLoading: false, showError: false }
+          ),
+          this.apiGet(
+            `/api/v4/console/lottery/stats?range=${range}`,
+            {},
+            { showLoading: false, showError: false }
+          ),
+          this.apiGet(
+            `/api/v4/console/lottery/trend?range=${range}`,
+            {},
+            { showLoading: false, showError: false }
+          ),
+          this.apiGet(
+            `/api/v4/console/lottery/prize-distribution?range=${range}`,
+            {},
+            { showLoading: false, showError: false }
+          )
+        ])
+
+        // 1. 解析 lottery/stats → 核心指标卡片（total_draws, total_wins, win_rate, total_prize_value）
+        if (statsRes.status === 'fulfilled' && statsRes.value?.success) {
+          const data = statsRes.value.data || {}
           this.lotteryMetrics = {
-            total_draws: summary.total_draws ?? 0,
-            total_wins: summary.total_wins ?? 0,
-            win_rate: summary.win_rate ?? 0,
-            total_value: summary.total_value ?? 0
+            total_draws: data.total_draws ?? 0,
+            total_wins: data.total_wins ?? 0,
+            win_rate: data.win_rate ?? 0,
+            total_value: data.total_prize_value ?? 0
           }
-          // 从 trend 字段提取小时趋势数据
-          this.hourlyMetrics = data.trend || []
-          // prize_distribution 按奖品类型分布
-          this.prizeDistribution = data.prize_distribution || []
-          // recent_draws 最近抽奖记录
-          this.recentDraws = data.recent_draws || []
-          // prize_stats 奖品统计
-          this.prizeStats = data.prize_stats || []
-
-          logger.debug('📊 [Metrics] 状态已更新:', {
-            lotteryMetrics: this.lotteryMetrics,
-            prizeDistribution: this.prizeDistribution,
-            recentDraws: this.recentDraws.length
-          })
-          logger.info('抽奖指标加载成功:', {
-            total_draws: this.lotteryMetrics.total_draws,
-            prizeDistributionCount: this.prizeDistribution.length
-          })
+          logger.info('📊 [Metrics] lottery/stats 成功:', this.lotteryMetrics)
+        } else if (realtimeRes.status === 'fulfilled' && realtimeRes.value?.success) {
+          // 降级：从 realtime/stats 取部分数据（缺少 total_wins 和 total_value）
+          const data = realtimeRes.value.data || {}
+          this.lotteryMetrics = {
+            total_draws: data.total_draws ?? 0,
+            total_wins: 0,
+            win_rate: data.win_rate ?? 0,
+            total_value: 0
+          }
+          logger.warn('📊 [Metrics] 降级使用 realtime/stats:', this.lotteryMetrics)
         } else {
-          logger.warn('📊 [Metrics] API返回失败:', statsRes?.message)
+          logger.error('📊 [Metrics] 所有统计API失败')
           this._resetMetricsState()
         }
+
+        // 2. 解析 lottery/trend → 小时趋势数据
+        if (trendRes.status === 'fulfilled' && trendRes.value?.success) {
+          this.hourlyMetrics = trendRes.value.data?.trend || []
+          logger.info('📊 [Metrics] trend 成功:', this.hourlyMetrics.length, '条')
+        } else {
+          this.hourlyMetrics = []
+          logger.warn('📊 [Metrics] trend API 失败')
+        }
+
+        // 3. 解析 lottery/prize-distribution → 奖品分布
+        if (distributionRes.status === 'fulfilled' && distributionRes.value?.success) {
+          const rawDist = distributionRes.value.data?.distribution || []
+          // 转换为前端格式: { name, value }
+          this.prizeDistribution = rawDist.map(item => ({
+            name: item.tier_name || item.tier || 'unknown',
+            value: item.count || 0
+          }))
+          logger.info('📊 [Metrics] prize-distribution 成功:', this.prizeDistribution.length, '条')
+        } else {
+          this.prizeDistribution = []
+          logger.warn('📊 [Metrics] prize-distribution API 失败')
+        }
+
+        // 其他保持空
+        this.recentDraws = []
+        this.prizeStats = []
+
+        logger.info('📊 [Metrics] 全部指标加载完成:', {
+          total_draws: this.lotteryMetrics.total_draws,
+          total_wins: this.lotteryMetrics.total_wins,
+          win_rate: this.lotteryMetrics.win_rate,
+          trendCount: this.hourlyMetrics.length,
+          distributionCount: this.prizeDistribution.length
+        })
       } catch (error) {
         logger.error('📊 [Metrics] 加载失败:', error)
         this._resetMetricsState()
@@ -327,16 +366,7 @@ export function useMetricsMethods() {
      * @param {string} phase - 体验阶段代码
      * @returns {string} 体验阶段文本
      */
-    getExperiencePhaseText(phase) {
-      const map = {
-        newcomer: '新手期',
-        growth: '成长期',
-        mature: '成熟期',
-        decline: '衰退期',
-        churn_risk: '流失风险'
-      }
-      return map[phase] || phase || '-'
-    },
+    // ✅ 已删除 getExperiencePhaseText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 获取体验阶段样式
@@ -357,30 +387,30 @@ export function useMetricsMethods() {
     // ========== Phase 2: 监控页图表增强方法 ==========
 
     /**
-     * 加载24小时趋势数据
-     * 从 hourlyMetrics 中提取最近24小时的数据
+     * 加载趋势数据
+     * 后端 /console/lottery/trend 返回格式:
+     *   { date, draws, wins, win_rate }
+     * 转换为图表需要的格式: { hour, draws, wins, users }
+     * 注意: 不修改 chartLoading，由调用方 loadEnhancedMetrics 统一管理
      */
     async load24hTrend() {
       try {
-        this.chartLoading = true
-        // 使用已有的 hourlyMetrics 数据，取最近24条
         const trend = this.hourlyMetrics || []
-        // 按时间排序并取最近24条
+        // 后端趋势数据按日期排序
         this.hourlyTrend24h = trend
-          .sort((a, b) => new Date(a.hour || a.hour_start) - new Date(b.hour || b.hour_start))
+          .sort((a, b) => new Date(a.date || a.hour || a.hour_start) - new Date(b.date || b.hour || b.hour_start))
           .slice(-24)
           .map(item => ({
-            hour: item.hour || item.hour_start,
-            draws: item.total_draws || item.draws || 0,
-            wins: item.total_wins || item.wins || 0,
+            // 后端 trend API 使用 date 字段, 统计 API 使用 hour 字段
+            hour: item.date || item.hour || item.hour_start,
+            draws: item.draws || item.total_draws || 0,
+            wins: item.wins || item.total_wins || 0,
             users: item.unique_users || item.users || 0
           }))
-        logger.info('24小时趋势数据加载完成', { count: this.hourlyTrend24h.length })
+        logger.info('趋势数据加载完成', { count: this.hourlyTrend24h.length })
       } catch (error) {
-        logger.error('加载24小时趋势失败:', error)
+        logger.error('加载趋势失败:', error)
         this.hourlyTrend24h = []
-      } finally {
-        this.chartLoading = false
       }
     },
 
@@ -560,8 +590,17 @@ export function useMetricsMethods() {
       if (!this.monitoringCharts.trendChart) return
 
       const hours = this.hourlyTrend24h.map(item => {
-        const date = new Date(item.hour)
-        return date.getHours() + ':00'
+        const dateStr = item.hour || ''
+        // 如果是日期格式 (YYYY-MM-DD), 显示 MM-DD
+        if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          return dateStr.substring(5) // "01-30"
+        }
+        // 如果是时间格式, 显示小时
+        const date = new Date(dateStr)
+        if (!isNaN(date.getTime())) {
+          return date.getHours() + ':00'
+        }
+        return dateStr
       })
       const draws = this.hourlyTrend24h.map(item => item.draws)
       const wins = this.hourlyTrend24h.map(item => item.wins)
@@ -751,8 +790,9 @@ export function useMetricsMethods() {
      */
     async loadEnhancedMetrics() {
       this.chartLoading = true
+      this.refreshingMetrics = true
       try {
-        // 先加载基础指标
+        // 先加载基础指标（并行调用多个后端API）
         await this.loadLotteryMetrics()
 
         // 然后处理图表数据
@@ -764,11 +804,26 @@ export function useMetricsMethods() {
         this.updateTrendChart()
         this.updateTierChart()
 
-        logger.info('增强监控数据加载完成')
+        logger.info('增强监控数据加载完成', {
+          total_draws: this.lotteryMetrics.total_draws,
+          trend_count: this.hourlyTrend24h.length,
+          tier_count: this.tierDistribution.length
+        })
+
+        // 显示刷新成功通知
+        if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
+          Alpine.store('notification').success(
+            `数据已刷新：${this.lotteryMetrics.total_draws} 次抽奖，中奖率 ${this.lotteryMetrics.win_rate}%`
+          )
+        }
       } catch (error) {
         logger.error('加载增强监控数据失败:', error)
+        if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
+          Alpine.store('notification').error('刷新失败: ' + (error.message || '未知错误'))
+        }
       } finally {
         this.chartLoading = false
+        this.refreshingMetrics = false
       }
     },
 

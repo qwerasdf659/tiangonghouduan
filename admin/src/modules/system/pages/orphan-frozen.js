@@ -570,25 +570,7 @@ function orphanFrozenPage() {
       return confirm(message)
     },
 
-    /**
-     * 获取状态文本显示
-     * @method getStatusText
-     * @param {string} status - 状态代码
-     * @returns {string} 状态中文文本
-     */
-    getStatusText(status) {
-      const map = {
-        orphan: '孤儿冻结',
-        frozen: '冻结中',
-        cleaned: '已清理',
-        active: '活跃',
-        inactive: '非活跃',
-        pending: '待处理',
-        processing: '处理中',
-        processed: '已处理'
-      }
-      return map[status] || status || '-'
-    },
+    // ✅ 已删除 getStatusText 映射函数，使用后端返回的 status_display 字段
 
     /**
      * 格式化数字为本地化显示格式

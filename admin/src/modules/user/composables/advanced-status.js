@@ -597,26 +597,8 @@ export function useAdvancedStatusMethods() {
 
     // ==================== 辅助方法 ====================
 
-    /**
-     * 获取解锁方式文本
-     * @param {string} method - 解锁方式代码
-     * @returns {string} 解锁方式文本
-     */
-    getUnlockMethodText(method) {
-      // 后端枚举值: points, exchange, vip, manual
-      const map = { points: '积分兑换', exchange: '道具兑换', vip: 'VIP特权', manual: '手动授权' }
-      return map[method] || method || '-'
-    },
-
-    /**
-     * 获取风控等级文本
-     * @param {string} level - 风控等级代码
-     * @returns {string} 风控等级文本
-     */
-    getRiskLevelText(level) {
-      const map = { low: '低风险', medium: '中风险', high: '高风险', critical: '极高风险' }
-      return map[level] || level || '-'
-    },
+    // ✅ 已删除 getUnlockMethodText / getRiskLevelText 映射函数
+    // 中文显示名称由后端 attachDisplayNames 统一返回 unlock_method_display / risk_level_display 字段
 
     /**
      * 获取风控等级样式

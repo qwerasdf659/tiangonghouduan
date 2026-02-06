@@ -62,8 +62,8 @@
       </nav>
     </div>
 
-    <!-- ============ 实时告警Tab ============ -->
-    <div x-show="activeTab === 'alerts'" x-cloak>
+    <!-- ============ 实时告警Tab（全部告警/紧急告警/抽奖告警 共用） ============ -->
+    <div x-show="activeTab === 'alerts' || activeTab === 'all' || activeTab === 'urgent'" x-cloak>
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
       <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-red-500">
@@ -130,14 +130,11 @@
             <label class="block text-sm font-medium themed-text-secondary mb-1">告警类型</label>
             <select x-model="filters.type" class="w-full px-3 py-2 border rounded-lg">
               <option value="">全部类型</option>
-              <option value="budget_exhaust">预算告急</option>
-              <option value="budget_warning">预算预警</option>
-              <option value="stock_low">库存告急</option>
-              <option value="stock_warning">库存预警</option>
-              <option value="win_rate_high">中奖率偏高</option>
-              <option value="win_rate_low">中奖率偏低</option>
-              <option value="high_frequency_user">高频用户</option>
-              <option value="empty_streak_high">连空用户</option>
+              <option value="budget">预算告警</option>
+              <option value="inventory">库存告警</option>
+              <option value="win_rate">中奖率告警</option>
+              <option value="user">用户告警</option>
+              <option value="system">系统告警</option>
             </select>
           </div>
           <div>
@@ -207,9 +204,10 @@
             <template x-if="loading">
               <tr><td colspan="10" class="px-4 py-8 text-center themed-text-muted">加载中...</td></tr>
             </template>
-            <template x-if="!loading && alerts.length === 0">
-              <tr><td colspan="10" class="px-4 py-8 text-center themed-text-muted">暂无告警数据</td></tr>
-            </template>
+
+            <tr x-show="!loading && alerts.length === 0">
+              <td colspan="10" class="px-4 py-8 text-center themed-text-muted">暂无告警数据</td>
+            </tr>
             <template x-for="alert in alerts" :key="alert.alert_id">
               <tr class="themed-hover-bg">
                 <td class="px-4 py-3">
@@ -221,9 +219,9 @@
                     'bg-red-100 text-red-700': alert.level === 'danger',
                     'bg-yellow-100 text-yellow-700': alert.level === 'warning',
                     'themed-bg-primary-light themed-text-primary': alert.level === 'info'
-                  }" class="px-2 py-1 text-xs rounded" x-text="getSeverityText(alert.level)"></span>
+                  }" class="px-2 py-1 text-xs rounded" x-text="alert.severity_display || alert.level"></span>
                 </td>
-                <td class="px-4 py-3 text-sm" x-text="alert.alert_type_name || getTypeText(alert.type)"></td>
+                <td class="px-4 py-3 text-sm" x-text="alert.type_display || alert.type"></td>
                 <td class="px-4 py-3 text-sm" x-text="alert.campaign_name || alert.related_entity?.name || '-'"></td>
                 <td class="px-4 py-3 text-sm max-w-xs truncate" :title="alert.message" x-text="alert.message"></td>
                 <td class="px-4 py-3 text-sm">
@@ -234,7 +232,7 @@
                     'bg-red-100 text-red-700': alert.status === 'active',
                     'bg-orange-100 text-orange-700': alert.status === 'acknowledged',
                     'bg-green-100 themed-text-success': alert.status === 'resolved'
-                  }" class="px-2 py-1 text-xs rounded" x-text="getStatusText(alert.status)"></span>
+                  }" class="px-2 py-1 text-xs rounded" x-text="alert.status_display || alert.status"></span>
                 </td>
                 <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(alert.created_at)"></td>
                 <td class="px-4 py-3">
@@ -392,11 +390,11 @@
           </button>
         </div>
         <div class="p-4">
-          <template x-if="!systemHealth.slow_apis || systemHealth.slow_apis.length === 0">
-            <div class="text-center py-8 themed-text-muted">
+
+            <div x-show="!systemHealth.slow_apis || systemHealth.slow_apis.length === 0" class="text-center py-8 themed-text-muted">
               ✅ 暂无慢接口告警，系统响应正常
             </div>
-          </template>
+
           <div class="space-y-3">
             <template x-for="(api, index) in (systemHealth.slow_apis || [])" :key="index">
               <div class="p-4 rounded-lg border-l-4"
@@ -433,11 +431,11 @@
           <h5 class="font-semibold">📜 系统告警历史</h5>
         </div>
         <div class="p-4">
-          <template x-if="!systemHealth.recent_alerts || systemHealth.recent_alerts.length === 0">
-            <div class="text-center py-8 themed-text-muted">
+
+            <div x-show="!systemHealth.recent_alerts || systemHealth.recent_alerts.length === 0" class="text-center py-8 themed-text-muted">
               🛡️ 近期无系统告警记录
             </div>
-          </template>
+
           <div class="space-y-3">
             <template x-for="(alert, index) in (systemHealth.recent_alerts || [])" :key="index">
               <div class="p-4 rounded-lg border"
@@ -472,15 +470,20 @@
       <div class="themed-card rounded-lg shadow p-4 mb-6">
         <div class="flex items-center space-x-4">
           <label class="text-sm font-medium themed-text-secondary">选择活动：</label>
-          <select x-model="selectedCampaignId" @change="loadHealthData()" class="px-3 py-2 border rounded-lg min-w-64">
-            <option value="">全部活动汇总</option>
+          <select x-model="selectedCampaignId" @change="loadHealthData()" class="px-3 py-2 border rounded-lg min-w-64" :class="!selectedCampaignId ? 'border-yellow-400 ring-1 ring-yellow-300' : ''">
+            <option value="">-- 请选择一个抽奖活动 --</option>
             <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
               <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
             </template>
           </select>
-          <button @click="loadHealthData()" class="px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary">
+          <button @click="loadHealthData()" class="px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary" :disabled="!selectedCampaignId">
             🔄 刷新
           </button>
+        </div>
+        <!-- 未选择活动时的提示 -->
+        <div x-show="!selectedCampaignId" class="mt-3 flex items-center gap-2 px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm">
+          <span class="text-lg">⚠️</span>
+          <span>健康度分析需要针对<strong>具体活动</strong>进行诊断，请先在上方下拉框中选择一个抽奖活动。</span>
         </div>
       </div>
 
@@ -545,11 +548,11 @@
           <span class="text-sm themed-text-muted" x-text="'共 ' + (healthData.issues?.length || 0) + ' 个问题'"></span>
         </div>
         <div class="p-4">
-          <template x-if="!healthData.issues || healthData.issues.length === 0">
-            <div class="text-center py-8 themed-text-muted">
+
+            <div x-show="!healthData.issues || healthData.issues.length === 0" class="text-center py-8 themed-text-muted">
               ✅ 暂无问题，系统运行健康
             </div>
-          </template>
+
           <div class="space-y-3">
             <template x-for="(issue, index) in (healthData.issues || [])" :key="index">
               <div class="p-4 rounded-lg border-l-4" 
@@ -624,9 +627,9 @@
       <div class="p-4 space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <div><span class="themed-text-muted">告警ID:</span> <span class="font-mono" x-text="selectedAlert?.alert_id"></span></div>
-          <div><span class="themed-text-muted">级别:</span> <span x-text="getSeverityText(selectedAlert?.level)"></span></div>
-          <div><span class="themed-text-muted">类型:</span> <span x-text="selectedAlert?.alert_type_name || getTypeText(selectedAlert?.type)"></span></div>
-          <div><span class="themed-text-muted">状态:</span> <span x-text="getStatusText(selectedAlert?.status)"></span></div>
+          <div><span class="themed-text-muted">级别:</span> <span x-text="selectedAlert?.severity_display || selectedAlert?.level"></span></div>
+          <div><span class="themed-text-muted">类型:</span> <span x-text="selectedAlert?.type_display || selectedAlert?.type"></span></div>
+          <div><span class="themed-text-muted">状态:</span> <span x-text="selectedAlert?.status_display || selectedAlert?.status"></span></div>
           <div><span class="themed-text-muted">关联活动:</span> <span x-text="selectedAlert?.campaign_name || selectedAlert?.related_entity?.name || '-'"></span></div>
           <div><span class="themed-text-muted">触发时间:</span> <span x-text="formatDate(selectedAlert?.created_at)"></span></div>
         </div>
@@ -666,4 +669,3 @@
   <script type="module" src="./src/modules/lottery/pages/lottery-alerts.js"></script>
 </body>
 </html>
-

@@ -19,6 +19,7 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const SealosStorageService = require('./sealosStorage')
 const { getImageUrl } = require('../utils/ImageUrlHelper')
 const sharp = require('sharp')
+const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 
 // 🎯 2026-01-08 图片存储架构核查：统一尺寸限制常量（与 ImageService 保持一致）
 const MAX_IMAGE_DIMENSION = 4096 // 最大图片尺寸（宽或高）
@@ -191,6 +192,12 @@ class PopupBannerService {
         return PopupBannerService._transformBannerImageUrl(plain)
       })
 
+      // 附加中文显示名称（position/link_type → _display/_color）
+      await attachDisplayNames(bannersWithStatus, [
+        { field: 'position', dictType: DICT_TYPES.BANNER_POSITION },
+        { field: 'link_type', dictType: DICT_TYPES.BANNER_LINK_TYPE }
+      ])
+
       logger.info('获取管理后台弹窗列表成功', {
         position,
         is_active,
@@ -231,7 +238,15 @@ class PopupBannerService {
       const plain = banner.toJSON()
       plain.status_description = banner.getStatusDescription()
       // 🔴 转换 image_url：对象 key → 完整 CDN URL
-      return PopupBannerService._transformBannerImageUrl(plain)
+      const result = PopupBannerService._transformBannerImageUrl(plain)
+
+      // 附加中文显示名称（position/link_type → _display/_color）
+      await attachDisplayNames(result, [
+        { field: 'position', dictType: DICT_TYPES.BANNER_POSITION },
+        { field: 'link_type', dictType: DICT_TYPES.BANNER_LINK_TYPE }
+      ])
+
+      return result
     } catch (error) {
       logger.error('获取弹窗详情失败', { error: error.message, banner_id: bannerId })
       throw error

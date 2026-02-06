@@ -175,7 +175,7 @@ export function usePricingMethods() {
     editPricing(pricing) {
       logger.debug('✏️ [Pricing] editPricing 被调用', pricing)
       this.isEditPricing = true
-      this.editingPricingId = pricing.config_id || pricing.pricing_id || pricing.id
+      this.editingPricingId = pricing.lottery_campaign_id
 
       // 从后端数据中提取定价信息
       // 注意：pricing_config 可能是对象或 JSON 字符串
@@ -212,10 +212,10 @@ export function usePricingMethods() {
         campaign_code: pricing.campaign_code || '',
         price_per_draw: baseCost,
         discount_rate: discountRate,
-        min_purchase: pricing.min_purchase || 1,
-        max_purchase: pricing.max_purchase || 10,
-        effective_from: pricing.effective_from || pricing.effective_at || '',
-        effective_to: pricing.effective_to || pricing.expired_at || ''
+        min_purchase: 1,
+        max_purchase: 10,
+        effective_from: pricing.effective_at || '',
+        effective_to: pricing.expired_at || ''
       }
       logger.debug('📝 [Pricing] 填充表单数据:', this.pricingForm)
       this.showModal('pricingModal')
@@ -375,15 +375,7 @@ export function usePricingMethods() {
      * @param {string} status - 定价状态代码
      * @returns {string} 状态文本
      */
-    getPricingStatusText(status) {
-      const labels = {
-        active: '生效中',
-        draft: '草稿',
-        archived: '已归档',
-        scheduled: '待生效'
-      }
-      return labels[status] || status
-    }
+    // ✅ 已删除 getPricingStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
   }
 }
 

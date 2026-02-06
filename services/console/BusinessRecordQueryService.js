@@ -235,7 +235,7 @@ class BusinessRecordQueryService {
 
     // 按状态分组统计
     const statusCounts = await RedemptionOrder.findAll({
-      attributes: ['status', [fn('COUNT', col('order_id')), 'count']],
+      attributes: ['status', [fn('COUNT', col('redemption_order_id')), 'count']],
       group: ['status'],
       raw: true
     })
@@ -912,7 +912,7 @@ class BusinessRecordQueryService {
       where,
       attributes: [
         'operator_id',
-        [fn('COUNT', col('log_id')), 'total_operations'],
+        [fn('COUNT', col('admin_operation_log_id')), 'total_operations'],
         [fn('COUNT', fn('DISTINCT', col('operation_type'))), 'operation_types']
       ],
       include: [
@@ -923,7 +923,7 @@ class BusinessRecordQueryService {
         }
       ],
       group: ['operator_id', 'operator.user_id', 'operator.nickname'],
-      order: [[fn('COUNT', col('log_id')), 'DESC']],
+      order: [[fn('COUNT', col('admin_operation_log_id')), 'DESC']],
       limit: parseInt(limit, 10) || 10,
       raw: false
     })
@@ -963,7 +963,7 @@ class BusinessRecordQueryService {
 
     const stats = await AdminOperationLog.findAll({
       where,
-      attributes: ['risk_level', [fn('COUNT', col('log_id')), 'count']],
+      attributes: ['risk_level', [fn('COUNT', col('admin_operation_log_id')), 'count']],
       group: ['risk_level'],
       raw: true
     })

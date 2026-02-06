@@ -22,8 +22,8 @@ export function useAuditLogsState() {
     /** @type {Object} 审计日志筛选条件 */
     logFilters: {
       operator_id: '',
-      action: '',
-      target: '',
+      operation_type: '',
+      target_type: '',
       start_date: '',
       end_date: ''
     },
@@ -61,8 +61,8 @@ export function useAuditLogsMethods() {
         params.append('page', this.logPage)
         params.append('page_size', this.logPageSize)
         if (this.logFilters.operator_id) params.append('operator_id', this.logFilters.operator_id)
-        if (this.logFilters.action) params.append('action', this.logFilters.action)
-        if (this.logFilters.target) params.append('target', this.logFilters.target)
+        if (this.logFilters.operation_type) params.append('operation_type', this.logFilters.operation_type)
+        if (this.logFilters.target_type) params.append('target_type', this.logFilters.target_type)
         if (this.logFilters.start_date) params.append('start_date', this.logFilters.start_date)
         if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
 
@@ -101,8 +101,8 @@ export function useAuditLogsMethods() {
     resetLogFilters() {
       this.logFilters = {
         operator_id: '',
-        action: '',
-        target: '',
+        operation_type: '',
+        target_type: '',
         start_date: '',
         end_date: ''
       }
@@ -117,7 +117,7 @@ export function useAuditLogsMethods() {
     async viewLogDetail(log) {
       try {
         const response = await this.apiGet(
-          buildURL(SYSTEM_ENDPOINTS.AUDIT_LOG_DETAIL, { id: log.log_id || log.id }),
+          buildURL(SYSTEM_ENDPOINTS.AUDIT_LOG_DETAIL, { id: log.admin_operation_log_id }),
           {},
           { showLoading: true }
         )
@@ -137,8 +137,8 @@ export function useAuditLogsMethods() {
     exportAuditLogs() {
       const params = new URLSearchParams()
       if (this.logFilters.operator_id) params.append('operator_id', this.logFilters.operator_id)
-      if (this.logFilters.action) params.append('action', this.logFilters.action)
-      if (this.logFilters.target) params.append('target', this.logFilters.target)
+      if (this.logFilters.operation_type) params.append('operation_type', this.logFilters.operation_type)
+      if (this.logFilters.target_type) params.append('target_type', this.logFilters.target_type)
       if (this.logFilters.start_date) params.append('start_date', this.logFilters.start_date)
       if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
       params.append('format', 'csv')
@@ -157,39 +157,28 @@ export function useAuditLogsMethods() {
     },
 
     /**
-     * 获取操作类型文本
-     * @param {string} action - 操作类型代码
+     * 获取操作类型文本（使用后端返回的 display 字段）
+     * @param {Object} log - 日志对象
      * @returns {string} 操作类型文本
      */
-    getActionText(action) {
-      const map = {
-        create: '创建',
-        update: '更新',
-        delete: '删除',
-        login: '登录',
-        logout: '登出',
-        export: '导出',
-        import: '导入'
-      }
-      return map[action] || action || '-'
-    },
+    // ✅ 已删除 getOperationTypeText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
-     * 获取操作类型样式
-     * @param {string} action - 操作类型代码
+     * 获取操作类型样式（使用后端返回的 color 字段）
+     * @param {Object} log - 日志对象
      * @returns {string} CSS类名
      */
-    getActionClass(action) {
-      const map = {
-        create: 'bg-success',
-        update: 'bg-info',
-        delete: 'bg-danger',
-        login: 'bg-primary',
-        logout: 'bg-secondary',
-        export: 'bg-warning',
-        import: 'bg-warning'
+    getOperationTypeClass(log) {
+      const colorMap = {
+        blue: 'bg-blue-100 text-blue-800',
+        green: 'bg-green-100 text-green-800',
+        red: 'bg-red-100 text-red-800',
+        yellow: 'bg-yellow-100 text-yellow-800',
+        gray: 'bg-gray-100 text-gray-800',
+        purple: 'bg-purple-100 text-purple-800',
+        orange: 'bg-orange-100 text-orange-800'
       }
-      return map[action] || 'bg-secondary'
+      return colorMap[log.operation_type_color] || 'bg-gray-100 text-gray-800'
     },
 
     /**

@@ -1224,13 +1224,9 @@ function dashboardPanelPage() {
       } catch (e) {
         logger.warn('[DashboardPanel] fetchLotteryStats 失败:', e.message)
       }
-      // 降级数据
-      return {
-        total_draws: Math.round(Math.random() * 50000 + 10000),
-        total_wins: Math.round(Math.random() * 5000 + 1000),
-        win_rate: Math.random() * 20 + 5,
-        total_prize_value: Math.round(Math.random() * 100000 + 50000)
-      }
+      // API 失败时直接报错，不使用模拟数据
+      logger.error('[DashboardPanel] fetchLotteryStats 失败，返回空数据')
+      return null
     },
     
     async fetchLotteryTrendData() {

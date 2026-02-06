@@ -111,8 +111,8 @@
                 </template>
               </template>
               <!-- 空状态 -->
-              <template x-if="campaigns.length === 0 && !loading">
-                <div class="col-span-3 py-12">
+
+                <div x-show="campaigns.length === 0 && !loading" class="col-span-3 py-12">
                   <div class="flex flex-col items-center justify-center text-center">
                     <div class="text-6xl mb-4">🎁</div>
                     <h3 class="text-lg font-medium themed-text mb-2">暂无活动数据</h3>
@@ -122,7 +122,7 @@
                     </button>
                   </div>
                 </div>
-              </template>
+
               <!-- 数据列表 -->
               <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
                 <div class="border rounded-lg p-4 hover:shadow-md transition-shadow relative">
@@ -134,7 +134,7 @@
                   </div>
                   <div class="flex justify-between items-start mb-2">
                     <h6 class="font-medium" x-text="campaign.campaign_name"></h6>
-                    <span class="px-2 py-1 text-xs rounded" :class="getCampaignStatusClass(campaign.status)" x-text="getCampaignStatusText(campaign.status)"></span>
+                    <span class="px-2 py-1 text-xs rounded" :class="getCampaignStatusClass(campaign.status)" x-text="campaign.status_display || campaign.status"></span>
                   </div>
                   <p class="themed-text-muted text-sm mb-2 line-clamp-1" x-text="campaign.description || '暂无描述'"></p>
                   
@@ -285,9 +285,9 @@
                 </tr>
               </thead>
               <tbody class="divide-y">
-                <template x-if="prizes.length === 0">
-                  <tr><td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无奖品数据</td></tr>
-                </template>
+                <tr x-show="prizes.length === 0">
+                  <td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无奖品数据</td>
+                </tr>
                 <template x-for="prize in prizes" :key="prize.lottery_prize_id">
                   <tr class="themed-hover-bg">
                     <td class="px-4 py-3">
@@ -305,7 +305,7 @@
                         </div>
                       </div>
                     </td>
-                    <td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded bg-cyan-100 text-cyan-700" x-text="getPrizeTypeText(prize.prize_type)"></span></td>
+                    <td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded bg-cyan-100 text-cyan-700" x-text="prize.prize_type_display || prize.prize_type"></span></td>
                     <td class="px-4 py-3 text-sm" x-text="(prize.win_probability * 100).toFixed(1) + '%'"></td>
                     <td class="px-4 py-3 text-sm" x-text="prize.stock_quantity >= 999999 ? '无限' : prize.stock_quantity"></td>
                     <td class="px-4 py-3">
@@ -394,13 +394,14 @@
                 </tr>
               </thead>
               <tbody class="divide-y">
-                <template x-if="budgetCampaigns.length === 0">
-                  <tr><td colspan="7" class="px-4 py-8 text-center themed-text-muted">暂无预算数据</td></tr>
-                </template>
+
+                <tr x-show="budgetCampaigns.length === 0">
+                  <td colspan="7" class="px-4 py-8 text-center themed-text-muted">暂无预算数据</td>
+                </tr>
                 <template x-for="campaign in budgetCampaigns" :key="campaign.lottery_campaign_id">
                   <tr class="themed-hover-bg">
                     <td class="px-4 py-3 text-sm" x-text="campaign.campaign_name"></td>
-                    <td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded bg-cyan-100 text-cyan-700" x-text="getBudgetModeText(campaign.budget_mode)"></span></td>
+                    <td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded bg-cyan-100 text-cyan-700" x-text="campaign.budget_mode_display || campaign.budget_mode"></span></td>
                     <td class="px-4 py-3 text-sm" x-text="'¥' + (campaign.pool_budget?.total || 0).toLocaleString()"></td>
                     <td class="px-4 py-3 text-sm" x-text="'¥' + (campaign.pool_budget?.used || 0).toLocaleString()"></td>
                     <td class="px-4 py-3">
@@ -480,13 +481,12 @@
           <h5 class="font-semibold mb-4">⚙️ 策略配置</h5>
           
           <!-- 数据加载状态提示 -->
-          <template x-if="Object.keys(strategyGroups).length === 0">
-            <div class="text-center py-8 themed-text-muted">
+
+            <div x-show="Object.keys(strategyGroups).length === 0" class="text-center py-8 themed-text-muted">
               <p>暂无策略配置数据</p>
               <p class="text-sm mt-2">请先在后台添加策略配置</p>
             </div>
-          </template>
-          
+
           <!-- 策略组列表 - 使用后端 config_group, config_key, config_id 字段 -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <template x-for="(strategies, groupName) in strategyGroups" :key="groupName">
@@ -520,9 +520,7 @@
               <span class="text-sm themed-text-muted" x-text="tierMatrix.length + ' 个配置'"></span>
             </div>
             <div class="p-4 overflow-x-auto">
-              <template x-if="tierMatrix.length === 0">
-                <div class="text-center py-4 themed-text-muted">暂无矩阵配置数据</div>
-              </template>
+              <div x-show="tierMatrix.length === 0" class="text-center py-4 themed-text-muted">暂无矩阵配置数据</div>
               <template x-if="tierMatrix.length > 0">
                 <table class="w-full border">
                   <thead class="themed-bg-subtle">
@@ -571,7 +569,7 @@
               ➕ 新增规则
             </button>
           </div>
-          <!-- 配额规则表格 - 使用后端字段: rule_id, scope_type, scope_id, window_type, limit_value, priority, status -->
+          <!-- 配额规则表格 - 后端字段: lottery_draw_quota_rule_id, scope_type, scope_id, window_type, limit_value, priority, status -->
           <div class="overflow-x-auto">
             <table class="w-full">
               <thead class="themed-bg-base">
@@ -587,12 +585,12 @@
                 </tr>
               </thead>
               <tbody class="divide-y">
-                <template x-if="quotas.length === 0">
-                  <tr><td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无配额规则</td></tr>
-                </template>
-                <template x-for="quota in quotas" :key="quota.rule_id">
+                <tr x-show="quotas.length === 0">
+                  <td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无配额规则数据</td>
+                </tr>
+                <template x-for="quota in quotas" :key="quota.lottery_draw_quota_rule_id">
                   <tr class="themed-hover-bg">
-                    <td class="px-4 py-3 text-sm font-mono" x-text="quota.rule_id"></td>
+                    <td class="px-4 py-3 text-sm font-mono" x-text="quota.lottery_draw_quota_rule_id"></td>
                     <td class="px-4 py-3 text-sm">
                       <span class="px-2 py-1 rounded text-xs"
                             :class="{
@@ -601,7 +599,7 @@
                               'bg-purple-100 text-purple-700': quota.scope_type === 'role',
                               'bg-orange-100 text-orange-700': quota.scope_type === 'user'
                             }"
-                            x-text="getScopeTypeText(quota.scope_type)">
+                            x-text="quota.scope_type_display || quota.scope_type">
                       </span>
                     </td>
                     <td class="px-4 py-3 text-sm">
@@ -618,7 +616,7 @@
                         <span class="font-mono text-xs" x-text="'用户ID: ' + quota.scope_id"></span>
                       </template>
                     </td>
-                    <td class="px-4 py-3 text-sm" x-text="getWindowTypeText(quota.window_type)"></td>
+                    <td class="px-4 py-3 text-sm" x-text="quota.window_type_display || quota.window_type"></td>
                     <td class="px-4 py-3 text-sm font-semibold themed-text-primary" x-text="quota.limit_value + ' 次/天'"></td>
                     <td class="px-4 py-3 text-sm" x-text="quota.priority"></td>
                     <td class="px-4 py-3">
@@ -629,7 +627,6 @@
                     </td>
                     <td class="px-4 py-3">
                       <div class="flex space-x-2">
-                        <button class="themed-text-primary hover:text-blue-700 text-sm" @click="editQuota(quota)">编辑</button>
                         <button class="text-red-500 hover:text-red-700 text-sm" @click="deleteQuota(quota)" x-text="quota.status === 'active' ? '禁用' : '已禁用'" :disabled="quota.status !== 'active'" :class="quota.status !== 'active' ? 'opacity-50 cursor-not-allowed' : ''"></button>
                       </div>
                     </td>
@@ -679,27 +676,26 @@
           
           <!-- 定价配置列表 -->
           <div class="p-4">
-            <template x-if="pricingConfigs.length === 0 && !loading">
-              <div class="text-center py-8 themed-text-muted">
+
+              <div x-show="pricingConfigs.length === 0 && !loading" class="text-center py-8 themed-text-muted">
                 <p>暂无定价配置数据</p>
                 <p class="text-sm mt-2">系统将显示已配置定价的活动列表</p>
               </div>
-            </template>
-            
+
             <div class="space-y-4">
-              <template x-for="pricing in pricingConfigs" :key="pricing.campaign_id || pricing.config_id">
+              <template x-for="pricing in pricingConfigs" :key="pricing.lottery_campaign_id || pricing.campaign_code">
                 <div class="border rounded-lg overflow-hidden">
                   <!-- 活动信息头部 -->
                   <div class="p-4 themed-bg-base flex justify-between items-center">
                     <div>
-                      <h6 class="font-medium" x-text="pricing.campaign_name || '活动 ' + (pricing.campaign_code || pricing.campaign_id)"></h6>
+                      <h6 class="font-medium" x-text="pricing.campaign_name || '活动 ' + (pricing.campaign_code || pricing.lottery_campaign_id)"></h6>
                       <div class="text-sm themed-text-muted mt-1">
                         <span class="mr-4">活动代码: <code class="themed-bg-subtle px-1 rounded" x-text="pricing.campaign_code"></code></span>
                         <span>版本: <span class="font-semibold themed-text-primary" x-text="'v' + (pricing.version || 1)"></span></span>
                       </div>
                     </div>
                     <div class="flex items-center space-x-2">
-                      <span class="px-2 py-1 text-xs rounded" :class="pricing.status === 'active' ? 'bg-green-100 themed-text-success' : 'themed-bg-subtle themed-text-muted'" x-text="getPricingStatusText(pricing.status)"></span>
+                      <span class="px-2 py-1 text-xs rounded" :class="pricing.status === 'active' ? 'bg-green-100 themed-text-success' : 'themed-bg-subtle themed-text-muted'" x-text="pricing.status_display || pricing.status"></span>
                       <button class="themed-text-primary hover:text-blue-700 text-sm" @click="viewPricingVersions(pricing)">📋 版本历史</button>
                       <button class="text-green-500 hover:text-green-700 text-sm" @click="editPricing(pricing)">✏️ 编辑</button>
                     </div>
@@ -733,7 +729,7 @@
                       </div>
                       <div>
                         <span class="themed-text-muted">生效时间:</span>
-                        <span class="font-medium ml-1" x-text="formatDateOnly(pricing.effective_from || pricing.created_at)"></span>
+                        <span class="font-medium ml-1" x-text="formatDateOnly(pricing.effective_at || pricing.created_at)"></span>
                       </div>
                       <div>
                         <span class="themed-text-muted">更新时间:</span>
@@ -774,6 +770,13 @@
               :disabled="refreshingMetrics || chartLoading"
             >
               <span x-show="!refreshingMetrics && !chartLoading">🔄 刷新数据</span>
+              <span x-show="refreshingMetrics || chartLoading" class="flex items-center gap-1">
+                <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                刷新中...
+              </span>
             </button>
             <!-- P2新增: 运营日报入口 -->
             <button 
@@ -783,13 +786,6 @@
             >
               <span x-show="!loadingDailyReport">📊 查看日报</span>
               <span x-show="loadingDailyReport">⏳ 加载中...</span>
-              <span x-show="refreshingMetrics || chartLoading" class="flex items-center gap-1">
-                <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                加载中...
-              </span>
             </button>
           </div>
         </div>
@@ -804,12 +800,12 @@
             <button @click="loadActiveAlerts()" class="text-sm themed-text-primary hover:underline">刷新告警</button>
           </div>
           <div class="p-4 space-y-2 max-h-40 overflow-y-auto">
-            <template x-if="activeAlerts.length === 0">
-              <div class="text-center py-4 themed-text-muted">
+
+              <div x-show="activeAlerts.length === 0" class="text-center py-4 themed-text-muted">
                 <span class="text-2xl">✅</span>
                 <p class="text-sm mt-1">暂无告警信息</p>
               </div>
-            </template>
+
             <template x-for="(alert, index) in activeAlerts" :key="index">
               <div class="flex items-start gap-3 p-3 rounded-lg border-l-4" :class="getAlertLevelClass(alert.level)">
                 <span class="text-lg" x-text="getAlertLevelIcon(alert.level)"></span>
@@ -998,9 +994,10 @@
                 </tr>
               </thead>
               <tbody class="divide-y">
-                <template x-if="prizeDistribution.length === 0">
-                  <tr><td colspan="3" class="px-4 py-8 text-center themed-text-muted">暂无数据</td></tr>
-                </template>
+
+                <tr x-show="prizeDistribution.length === 0">
+                  <td colspan="4" class="px-4 py-8 text-center themed-text-muted">暂无奖品分布数据</td>
+                </tr>
                 <template x-for="(prize, index) in prizeDistribution" :key="index">
                   <tr class="themed-hover-bg">
                     <td class="px-4 py-3 text-sm font-medium" x-text="prize.prize_name || '-'"></td>
@@ -1038,9 +1035,10 @@
                 </tr>
               </thead>
               <tbody class="divide-y">
-                <template x-if="recentDraws.length === 0">
-                  <tr><td colspan="5" class="px-4 py-8 text-center themed-text-muted">暂无抽奖记录</td></tr>
-                </template>
+
+                <tr x-show="recentDraws.length === 0">
+                  <td colspan="5" class="px-4 py-8 text-center themed-text-muted">暂无最近抽奖记录</td>
+                </tr>
                 <template x-for="(draw, index) in recentDraws" :key="index">
                   <tr class="themed-hover-bg">
                     <td class="px-4 py-3 text-sm" x-text="draw.user || '-'"></td>
@@ -1345,16 +1343,16 @@
                       <span class="px-2 py-1 rounded text-xs inline-flex items-center gap-1"
                             :class="getAbnormalTypeStyle(user.abnormal_type)">
                         <span x-text="getAbnormalTypeIcon(user.abnormal_type)"></span>
-                        <span x-text="getAbnormalTypeText(user.abnormal_type)"></span>
+                        <span x-text="user.abnormal_type_display || user.abnormal_type"></span>
                       </span>
                     </td>
                     <td class="px-4 py-3 text-sm">
                       <span class="px-2 py-1 rounded text-xs"
                             :class="getRiskLevelStyle(user.risk_level)"
-                            x-text="getRiskLevelText(user.risk_level)"></span>
+                            x-text="user.risk_level_display || user.risk_level"></span>
                     </td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="user.abnormal_value || '-'"></td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatRiskTime(user.detected_at)"></td>
+                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="user.metrics ? '24h抽奖' + user.metrics.draw_count_24h + '次, 中奖率' + user.metrics.win_rate + '%' : '-'"></td>
+                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatRiskTime(user.last_draw_time)"></td>
                     <td class="px-4 py-3 text-sm">
                       <div class="flex items-center gap-2">
                         <button @click="viewAbnormalUserDetail(user)"
@@ -1425,7 +1423,7 @@
                     <span class="text-lg font-semibold" x-text="'用户 #' + selectedAbnormalUser.user_id"></span>
                     <span class="ml-2 px-2 py-0.5 rounded text-xs"
                           :class="getRiskLevelStyle(selectedAbnormalUser.risk_level)"
-                          x-text="getRiskLevelText(selectedAbnormalUser.risk_level)"></span>
+                          x-text="selectedAbnormalUser.risk_level_display || selectedAbnormalUser.risk_level"></span>
                   </div>
                 </div>
                 <table class="w-full text-sm">
@@ -1438,7 +1436,7 @@
                     <td class="py-2">
                       <span class="px-2 py-0.5 rounded text-xs"
                             :class="getAbnormalTypeStyle(selectedAbnormalUser.abnormal_type)"
-                            x-text="getAbnormalTypeText(selectedAbnormalUser.abnormal_type)"></span>
+                            x-text="selectedAbnormalUser.abnormal_type_display || selectedAbnormalUser.abnormal_type"></span>
                     </td>
                   </tr>
                   <tr class="border-b">
@@ -1541,15 +1539,15 @@
         <template x-if="strategyEffectiveness && !loadingStrategyEffectiveness">
           <div class="space-y-6">
             
-            <!-- 分析周期和整体评分 -->
+            <!-- 分析周期和整体评分 - 使用后端字段: analysis_period.start/end, overall_strategy_score, tier_downgrade_analysis, bxpx_matrix_analysis -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div class="themed-card rounded-lg shadow p-4 text-center">
                 <div class="text-3xl mb-2">📅</div>
                 <p class="text-xs themed-text-muted mb-1">分析周期</p>
                 <p class="font-semibold text-sm">
-                  <span x-text="strategyEffectiveness.analysis_period?.start_date || '-'"></span>
+                  <span x-text="strategyEffectiveness.analysis_period?.start ? formatDateOnly(strategyEffectiveness.analysis_period.start) : '-'"></span>
                   至
-                  <span x-text="strategyEffectiveness.analysis_period?.end_date || '-'"></span>
+                  <span x-text="strategyEffectiveness.analysis_period?.end ? formatDateOnly(strategyEffectiveness.analysis_period.end) : '-'"></span>
                 </p>
               </div>
               <div class="themed-card rounded-lg shadow p-4 text-center">
@@ -1560,14 +1558,14 @@
                    x-text="(strategyEffectiveness.overall_strategy_score || 0) + '分'"></p>
               </div>
               <div class="themed-card rounded-lg shadow p-4 text-center">
-                <div class="text-3xl mb-2">📈</div>
-                <p class="text-xs themed-text-muted mb-1">活动数量</p>
-                <p class="text-2xl font-bold" x-text="strategyEffectiveness.analysis_period?.campaigns_count || 0"></p>
+                <div class="text-3xl mb-2">📊</div>
+                <p class="text-xs themed-text-muted mb-1">BxPx矩阵评分</p>
+                <p class="text-2xl font-bold" x-text="(strategyEffectiveness.bxpx_matrix_analysis?.effectiveness_score || 0)"></p>
               </div>
               <div class="themed-card rounded-lg shadow p-4 text-center">
-                <div class="text-3xl mb-2">🎰</div>
-                <p class="text-xs themed-text-muted mb-1">总抽奖次数</p>
-                <p class="text-2xl font-bold" x-text="(strategyEffectiveness.analysis_period?.total_draws || 0).toLocaleString()"></p>
+                <div class="text-3xl mb-2">⬇️</div>
+                <p class="text-xs themed-text-muted mb-1">总降级次数</p>
+                <p class="text-2xl font-bold" x-text="(strategyEffectiveness.tier_downgrade_analysis?.total_downgrades || 0).toLocaleString()"></p>
               </div>
             </div>
 
@@ -1597,11 +1595,12 @@
                             <th class="p-2 text-center font-semibold" x-text="getBudgetTierName(bTier) + ' (' + bTier + ')'"></th>
                             <template x-for="pTier in ['P0', 'P1', 'P2']" :key="pTier">
                               <td class="p-2 text-center">
-                                <template x-if="strategyEffectiveness.bxpx_matrix_analysis.matrix">
+                                <!-- 使用后端字段: hit_distribution[key].rate (百分比0-100) 和 .count -->
+                                <template x-if="strategyEffectiveness.bxpx_matrix_analysis.hit_distribution">
                                   <div class="p-3 rounded"
-                                       :class="getBxPxHeatmapColor(strategyEffectiveness.bxpx_matrix_analysis.matrix[bTier + '_' + pTier]?.hit_rate || 0)">
-                                    <p class="font-bold" x-text="formatStrategyPercentage(strategyEffectiveness.bxpx_matrix_analysis.matrix[bTier + '_' + pTier]?.hit_rate)"></p>
-                                    <p class="text-xs opacity-75" x-text="(strategyEffectiveness.bxpx_matrix_analysis.matrix[bTier + '_' + pTier]?.count || 0) + ' 次'"></p>
+                                       :class="getBxPxHeatmapColor(strategyEffectiveness.bxpx_matrix_analysis.hit_distribution[bTier + '_' + pTier]?.rate || 0)">
+                                    <p class="font-bold" x-text="(strategyEffectiveness.bxpx_matrix_analysis.hit_distribution[bTier + '_' + pTier]?.rate || 0).toFixed(1) + '%'"></p>
+                                    <p class="text-xs opacity-75" x-text="(strategyEffectiveness.bxpx_matrix_analysis.hit_distribution[bTier + '_' + pTier]?.count || 0) + ' 次'"></p>
                                   </div>
                                 </template>
                               </td>
@@ -1621,7 +1620,7 @@
                     </div>
                   </div>
                 </template>
-                <template x-if="!strategyEffectiveness.bxpx_matrix_analysis">
+                <template x-if="!strategyEffectiveness.bxpx_matrix_analysis || !strategyEffectiveness.bxpx_matrix_analysis.hit_distribution || Object.keys(strategyEffectiveness.bxpx_matrix_analysis.hit_distribution).length === 0">
                   <p class="text-center themed-text-muted py-4">暂无BxPx矩阵数据</p>
                 </template>
               </div>
@@ -1636,61 +1635,58 @@
                 </h6>
               </div>
               <div class="p-4">
+                <!-- 使用后端字段: pity_mechanism, anti_empty_mechanism, luck_debt_mechanism -->
                 <template x-if="strategyEffectiveness.experience_mechanism_analysis">
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <!-- Pity机制 -->
+                    <!-- Pity机制 - 后端字段: pity_mechanism.trigger_count/trigger_rate/effectiveness -->
                     <div class="border rounded-lg p-4">
                       <h6 class="font-semibold mb-3 flex items-center gap-2">💔 Pity机制</h6>
                       <div class="space-y-2 text-sm">
                         <div class="flex justify-between">
                           <span class="themed-text-muted">触发次数</span>
-                          <span class="font-mono" x-text="strategyEffectiveness.experience_mechanism_analysis.pity?.trigger_count || 0"></span>
+                          <span class="font-mono" x-text="strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.trigger_count || 0"></span>
                         </div>
                         <div class="flex justify-between">
                           <span class="themed-text-muted">触发率</span>
-                          <span class="font-mono" x-text="formatStrategyPercentage(strategyEffectiveness.experience_mechanism_analysis.pity?.trigger_rate)"></span>
+                          <span class="font-mono" x-text="(strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.trigger_rate || 0).toFixed(1) + '%'"></span>
                         </div>
                         <div class="flex justify-between">
-                          <span class="themed-text-muted">平均连空数</span>
-                          <span class="font-mono" x-text="(strategyEffectiveness.experience_mechanism_analysis.pity?.avg_empty_streak || 0).toFixed(1)"></span>
+                          <span class="themed-text-muted">效果评估</span>
+                          <span class="font-mono" x-text="strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.effectiveness || '-'"></span>
                         </div>
                       </div>
                     </div>
                     
-                    <!-- 首次用户保护 -->
+                    <!-- 防空奖机制 - 后端字段: anti_empty_mechanism.total_empty_count/max_empty_streak/effectiveness -->
                     <div class="border rounded-lg p-4">
-                      <h6 class="font-semibold mb-3 flex items-center gap-2">🆕 首次用户保护</h6>
+                      <h6 class="font-semibold mb-3 flex items-center gap-2">🛡️ 防空奖机制</h6>
                       <div class="space-y-2 text-sm">
                         <div class="flex justify-between">
-                          <span class="themed-text-muted">保护用户数</span>
-                          <span class="font-mono" x-text="strategyEffectiveness.experience_mechanism_analysis.first_user?.protected_count || 0"></span>
+                          <span class="themed-text-muted">总空奖次数</span>
+                          <span class="font-mono" x-text="strategyEffectiveness.experience_mechanism_analysis.anti_empty_mechanism?.total_empty_count || 0"></span>
                         </div>
                         <div class="flex justify-between">
-                          <span class="themed-text-muted">转化率</span>
-                          <span class="font-mono" x-text="formatStrategyPercentage(strategyEffectiveness.experience_mechanism_analysis.first_user?.conversion_rate)"></span>
+                          <span class="themed-text-muted">最大连空</span>
+                          <span class="font-mono" x-text="strategyEffectiveness.experience_mechanism_analysis.anti_empty_mechanism?.max_empty_streak || 0"></span>
                         </div>
                         <div class="flex justify-between">
-                          <span class="themed-text-muted">留存率</span>
-                          <span class="font-mono" x-text="formatStrategyPercentage(strategyEffectiveness.experience_mechanism_analysis.first_user?.retention_rate)"></span>
+                          <span class="themed-text-muted">效果评估</span>
+                          <span class="font-mono" x-text="strategyEffectiveness.experience_mechanism_analysis.anti_empty_mechanism?.effectiveness || '-'"></span>
                         </div>
                       </div>
                     </div>
 
-                    <!-- 体验优化 -->
+                    <!-- 运气债务机制 - 后端字段: luck_debt_mechanism.avg_empty_streak/effectiveness -->
                     <div class="border rounded-lg p-4">
-                      <h6 class="font-semibold mb-3 flex items-center gap-2">✨ 体验优化</h6>
+                      <h6 class="font-semibold mb-3 flex items-center gap-2">🎲 运气债务机制</h6>
                       <div class="space-y-2 text-sm">
                         <div class="flex justify-between">
-                          <span class="themed-text-muted">用户满意度</span>
-                          <span class="font-mono" x-text="formatStrategyPercentage(strategyEffectiveness.experience_mechanism_analysis.experience?.satisfaction_rate)"></span>
+                          <span class="themed-text-muted">平均连空数</span>
+                          <span class="font-mono" x-text="strategyEffectiveness.experience_mechanism_analysis.luck_debt_mechanism?.avg_empty_streak || 0"></span>
                         </div>
                         <div class="flex justify-between">
-                          <span class="themed-text-muted">复抽率</span>
-                          <span class="font-mono" x-text="formatStrategyPercentage(strategyEffectiveness.experience_mechanism_analysis.experience?.repeat_rate)"></span>
-                        </div>
-                        <div class="flex justify-between">
-                          <span class="themed-text-muted">平均参与次数</span>
-                          <span class="font-mono" x-text="(strategyEffectiveness.experience_mechanism_analysis.experience?.avg_participation || 0).toFixed(1)"></span>
+                          <span class="themed-text-muted">效果评估</span>
+                          <span class="font-mono" x-text="strategyEffectiveness.experience_mechanism_analysis.luck_debt_mechanism?.effectiveness || '-'"></span>
                         </div>
                       </div>
                     </div>
@@ -1710,40 +1706,42 @@
                   <span class="text-xs themed-text-muted font-normal">各档位降级频次和原因分析</span>
                 </h6>
               </div>
+              <!-- 使用后端字段: tier_downgrade_analysis.total_downgrades/downgrade_rate/fallback_count/main_cause/suggestions -->
               <div class="p-4">
-                <template x-if="strategyEffectiveness.tier_downgrade_analysis && strategyEffectiveness.tier_downgrade_analysis.length > 0">
-                  <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                      <thead class="bg-gray-50">
-                        <tr>
-                          <th class="p-3 text-left">原档位</th>
-                          <th class="p-3 text-left">降级到</th>
-                          <th class="p-3 text-right">降级次数</th>
-                          <th class="p-3 text-right">占比</th>
-                          <th class="p-3 text-left">主要原因</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <template x-for="(item, index) in strategyEffectiveness.tier_downgrade_analysis" :key="index">
-                          <tr class="border-b hover:bg-gray-50">
-                            <td class="p-3">
-                              <span class="px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs" x-text="item.from_tier"></span>
-                            </td>
-                            <td class="p-3">
-                              <span class="px-2 py-1 rounded bg-yellow-100 text-yellow-700 text-xs" x-text="item.to_tier"></span>
-                            </td>
-                            <td class="p-3 text-right font-mono" x-text="(item.count || 0).toLocaleString()"></td>
-                            <td class="p-3 text-right font-mono" x-text="formatStrategyPercentage(item.percentage)"></td>
-                            <td class="p-3">
-                              <span class="text-xs themed-text-muted" x-text="item.reason || '-'"></span>
-                            </td>
-                          </tr>
+                <template x-if="strategyEffectiveness.tier_downgrade_analysis">
+                  <div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                      <div class="text-center p-3 themed-bg-subtle rounded">
+                        <p class="text-xs themed-text-muted mb-1">总降级次数</p>
+                        <p class="text-xl font-bold" x-text="(strategyEffectiveness.tier_downgrade_analysis.total_downgrades || 0).toLocaleString()"></p>
+                      </div>
+                      <div class="text-center p-3 themed-bg-subtle rounded">
+                        <p class="text-xs themed-text-muted mb-1">降级率</p>
+                        <p class="text-xl font-bold" :class="strategyEffectiveness.tier_downgrade_analysis.downgrade_rate > 10 ? 'text-red-600' : 'text-green-600'" x-text="(strategyEffectiveness.tier_downgrade_analysis.downgrade_rate || 0).toFixed(1) + '%'"></p>
+                      </div>
+                      <div class="text-center p-3 themed-bg-subtle rounded">
+                        <p class="text-xs themed-text-muted mb-1">兜底触发次数</p>
+                        <p class="text-xl font-bold" x-text="(strategyEffectiveness.tier_downgrade_analysis.fallback_count || 0).toLocaleString()"></p>
+                      </div>
+                      <div class="text-center p-3 themed-bg-subtle rounded">
+                        <p class="text-xs themed-text-muted mb-1">主要原因</p>
+                        <p class="text-sm font-semibold" x-text="strategyEffectiveness.tier_downgrade_analysis.main_cause === 'stock_insufficient' ? '库存不足' : '正常'"></p>
+                      </div>
+                    </div>
+                    <!-- 降级相关建议 -->
+                    <template x-if="strategyEffectiveness.tier_downgrade_analysis.suggestions && strategyEffectiveness.tier_downgrade_analysis.suggestions.length > 0">
+                      <div class="mt-2">
+                        <template x-for="(suggestion, idx) in strategyEffectiveness.tier_downgrade_analysis.suggestions" :key="idx">
+                          <p class="text-sm text-orange-600 flex items-center gap-1">
+                            <span>⚠️</span>
+                            <span x-text="suggestion"></span>
+                          </p>
                         </template>
-                      </tbody>
-                    </table>
+                      </div>
+                    </template>
                   </div>
                 </template>
-                <template x-if="!strategyEffectiveness.tier_downgrade_analysis || strategyEffectiveness.tier_downgrade_analysis.length === 0">
+                <template x-if="!strategyEffectiveness.tier_downgrade_analysis">
                   <p class="text-center themed-text-muted py-4">暂无档位降级数据</p>
                 </template>
               </div>
@@ -1879,10 +1877,10 @@
                 <div class="text-2xl mb-1">🎰</div>
                 <p class="text-xs themed-text-muted mb-1">总抽奖次数</p>
                 <p class="text-xl font-bold" x-text="(dailyReport.summary?.total_draws || 0).toLocaleString()"></p>
-                <template x-if="dailyReport.vs_yesterday?.total_draws !== undefined">
+                <template x-if="dailyReport.vs_yesterday?.draws_change !== undefined">
                   <p class="text-xs mt-1" 
-                     :class="formatDailyReportChange(dailyReport.vs_yesterday.total_draws).colorClass"
-                     x-text="'较昨日 ' + formatDailyReportChange(dailyReport.vs_yesterday.total_draws).text"></p>
+                     :class="formatDailyReportChange(dailyReport.vs_yesterday.draws_change).colorClass"
+                     x-text="'较昨日 ' + formatDailyReportChange(dailyReport.vs_yesterday.draws_change).text"></p>
                 </template>
               </div>
               
@@ -1891,10 +1889,10 @@
                 <div class="text-2xl mb-1">🎯</div>
                 <p class="text-xs themed-text-muted mb-1">中奖率</p>
                 <p class="text-xl font-bold" x-text="formatDailyReportPercentage(dailyReport.summary?.win_rate)"></p>
-                <template x-if="dailyReport.vs_yesterday?.win_rate !== undefined">
+                <template x-if="dailyReport.vs_yesterday?.wins_change !== undefined">
                   <p class="text-xs mt-1" 
-                     :class="formatDailyReportChange(dailyReport.vs_yesterday.win_rate).colorClass"
-                     x-text="'较昨日 ' + formatDailyReportChange(dailyReport.vs_yesterday.win_rate).text"></p>
+                     :class="formatDailyReportChange(dailyReport.vs_yesterday.wins_change).colorClass"
+                     x-text="'较昨日 ' + formatDailyReportChange(dailyReport.vs_yesterday.wins_change).text"></p>
                 </template>
               </div>
               
@@ -1903,10 +1901,10 @@
                 <div class="text-2xl mb-1">💰</div>
                 <p class="text-xs themed-text-muted mb-1">总成本</p>
                 <p class="text-xl font-bold" x-text="formatDailyReportCurrency(dailyReport.summary?.total_cost)"></p>
-                <template x-if="dailyReport.vs_yesterday?.total_cost !== undefined">
+                <template x-if="dailyReport.vs_yesterday?.cost_change !== undefined">
                   <p class="text-xs mt-1" 
-                     :class="formatDailyReportChange(dailyReport.vs_yesterday.total_cost, true).colorClass"
-                     x-text="'较昨日 ' + formatDailyReportChange(dailyReport.vs_yesterday.total_cost, true).text"></p>
+                     :class="formatDailyReportChange(dailyReport.vs_yesterday.cost_change, true).colorClass"
+                     x-text="'较昨日 ' + formatDailyReportChange(dailyReport.vs_yesterday.cost_change, true).text"></p>
                 </template>
               </div>
               
@@ -1915,10 +1913,10 @@
                 <div class="text-2xl mb-1">💵</div>
                 <p class="text-xs themed-text-muted mb-1">总收入</p>
                 <p class="text-xl font-bold" x-text="formatDailyReportCurrency(dailyReport.summary?.total_revenue)"></p>
-                <template x-if="dailyReport.vs_yesterday?.total_revenue !== undefined">
+                <template x-if="dailyReport.vs_yesterday?.revenue_change !== undefined">
                   <p class="text-xs mt-1" 
-                     :class="formatDailyReportChange(dailyReport.vs_yesterday.total_revenue).colorClass"
-                     x-text="'较昨日 ' + formatDailyReportChange(dailyReport.vs_yesterday.total_revenue).text"></p>
+                     :class="formatDailyReportChange(dailyReport.vs_yesterday.revenue_change).colorClass"
+                     x-text="'较昨日 ' + formatDailyReportChange(dailyReport.vs_yesterday.revenue_change).text"></p>
                 </template>
               </div>
               
@@ -1927,10 +1925,10 @@
                 <div class="text-2xl mb-1">📈</div>
                 <p class="text-xs themed-text-muted mb-1">ROI</p>
                 <p class="text-xl font-bold" x-text="formatDailyReportPercentage(dailyReport.summary?.roi)"></p>
-                <template x-if="dailyReport.vs_yesterday?.roi !== undefined">
+                <template x-if="dailyReport.vs_yesterday?.roi_change !== undefined">
                   <p class="text-xs mt-1" 
-                     :class="formatDailyReportChange(dailyReport.vs_yesterday.roi).colorClass"
-                     x-text="'较昨日 ' + formatDailyReportChange(dailyReport.vs_yesterday.roi).text"></p>
+                     :class="formatDailyReportChange(dailyReport.vs_yesterday.roi_change).colorClass"
+                     x-text="'较昨日 ' + formatDailyReportChange(dailyReport.vs_yesterday.roi_change).text"></p>
                 </template>
               </div>
               
@@ -1939,10 +1937,10 @@
                 <div class="text-2xl mb-1">👥</div>
                 <p class="text-xs themed-text-muted mb-1">活跃用户</p>
                 <p class="text-xl font-bold" x-text="(dailyReport.summary?.active_users || 0).toLocaleString()"></p>
-                <template x-if="dailyReport.vs_yesterday?.active_users !== undefined">
+                <template x-if="dailyReport.vs_yesterday?.users_change !== undefined">
                   <p class="text-xs mt-1" 
-                     :class="formatDailyReportChange(dailyReport.vs_yesterday.active_users).colorClass"
-                     x-text="'较昨日 ' + formatDailyReportChange(dailyReport.vs_yesterday.active_users).text"></p>
+                     :class="formatDailyReportChange(dailyReport.vs_yesterday.users_change).colorClass"
+                     x-text="'较昨日 ' + formatDailyReportChange(dailyReport.vs_yesterday.users_change).text"></p>
                 </template>
               </div>
             </div>
@@ -2012,7 +2010,7 @@
                       <tr>
                         <th class="p-2 text-left">档位</th>
                         <th class="p-2 text-right">次数</th>
-                        <th class="p-2 text-right">占比</th>
+                        <th class="p-2 text-right">成本</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2022,7 +2020,7 @@
                             <span class="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700" x-text="tier.tier"></span>
                           </td>
                           <td class="p-2 text-right font-mono" x-text="(tier.count || 0).toLocaleString()"></td>
-                          <td class="p-2 text-right font-mono" x-text="formatDailyReportPercentage(tier.percentage)"></td>
+                          <td class="p-2 text-right font-mono" x-text="formatDailyReportCurrency(tier.cost)"></td>
                         </tr>
                       </template>
                     </tbody>
@@ -2052,7 +2050,7 @@
                           <td class="p-2">
                             <span class="font-semibold" x-text="prize.prize_name"></span>
                           </td>
-                          <td class="p-2 text-right font-mono" x-text="(prize.count || 0).toLocaleString()"></td>
+                          <td class="p-2 text-right font-mono" x-text="(prize.win_count || 0).toLocaleString()"></td>
                           <td class="p-2 text-right font-mono" x-text="formatDailyReportCurrency(prize.total_value)"></td>
                         </tr>
                       </template>
@@ -2115,38 +2113,38 @@
                   <div>
                     <p class="themed-text-muted mb-1">抽奖次数</p>
                     <p class="font-semibold" 
-                       :class="formatDailyReportChange(dailyReport.vs_last_week?.total_draws).colorClass"
-                       x-text="formatDailyReportChange(dailyReport.vs_last_week?.total_draws).text"></p>
+                       :class="formatDailyReportChange(dailyReport.vs_last_week?.draws_change).colorClass"
+                       x-text="formatDailyReportChange(dailyReport.vs_last_week?.draws_change).text"></p>
                   </div>
                   <div>
-                    <p class="themed-text-muted mb-1">中奖率</p>
+                    <p class="themed-text-muted mb-1">中奖数</p>
                     <p class="font-semibold" 
-                       :class="formatDailyReportChange(dailyReport.vs_last_week?.win_rate).colorClass"
-                       x-text="formatDailyReportChange(dailyReport.vs_last_week?.win_rate).text"></p>
+                       :class="formatDailyReportChange(dailyReport.vs_last_week?.wins_change).colorClass"
+                       x-text="formatDailyReportChange(dailyReport.vs_last_week?.wins_change).text"></p>
                   </div>
                   <div>
                     <p class="themed-text-muted mb-1">总成本</p>
                     <p class="font-semibold" 
-                       :class="formatDailyReportChange(dailyReport.vs_last_week?.total_cost, true).colorClass"
-                       x-text="formatDailyReportChange(dailyReport.vs_last_week?.total_cost, true).text"></p>
+                       :class="formatDailyReportChange(dailyReport.vs_last_week?.cost_change, true).colorClass"
+                       x-text="formatDailyReportChange(dailyReport.vs_last_week?.cost_change, true).text"></p>
                   </div>
                   <div>
                     <p class="themed-text-muted mb-1">总收入</p>
                     <p class="font-semibold" 
-                       :class="formatDailyReportChange(dailyReport.vs_last_week?.total_revenue).colorClass"
-                       x-text="formatDailyReportChange(dailyReport.vs_last_week?.total_revenue).text"></p>
+                       :class="formatDailyReportChange(dailyReport.vs_last_week?.revenue_change).colorClass"
+                       x-text="formatDailyReportChange(dailyReport.vs_last_week?.revenue_change).text"></p>
                   </div>
                   <div>
                     <p class="themed-text-muted mb-1">ROI</p>
                     <p class="font-semibold" 
-                       :class="formatDailyReportChange(dailyReport.vs_last_week?.roi).colorClass"
-                       x-text="formatDailyReportChange(dailyReport.vs_last_week?.roi).text"></p>
+                       :class="formatDailyReportChange(dailyReport.vs_last_week?.roi_change).colorClass"
+                       x-text="formatDailyReportChange(dailyReport.vs_last_week?.roi_change).text"></p>
                   </div>
                   <div>
                     <p class="themed-text-muted mb-1">活跃用户</p>
                     <p class="font-semibold" 
-                       :class="formatDailyReportChange(dailyReport.vs_last_week?.active_users).colorClass"
-                       x-text="formatDailyReportChange(dailyReport.vs_last_week?.active_users).text"></p>
+                       :class="formatDailyReportChange(dailyReport.vs_last_week?.users_change).colorClass"
+                       x-text="formatDailyReportChange(dailyReport.vs_last_week?.users_change).text"></p>
                   </div>
                 </div>
               </div>
@@ -2239,7 +2237,7 @@
                       <tr class="border-b hover:bg-gray-50">
                         <td class="p-3">
                           <span class="px-2 py-1 rounded text-xs bg-blue-100 text-blue-700" 
-                                x-text="getBatchOperationTypeText(log.operation_type)"></span>
+                                x-text="log.operation_type_display || log.operation_type"></span>
                         </td>
                         <td class="p-3 themed-text-muted" x-text="formatBatchOperationTime(log.created_at)"></td>
                         <td class="p-3 text-right font-mono" x-text="log.total_count || 0"></td>
@@ -2263,7 +2261,7 @@
            @click.self="closeBatchOperationsPanel()">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-auto">
           <div class="p-4 border-b flex justify-between items-center themed-bg-primary text-white rounded-t-lg">
-            <h5 class="font-semibold" x-text="getBatchOperationTypeText(currentBatchOperation)"></h5>
+            <h5 class="font-semibold" x-text="currentBatchOperation"></h5>
             <button @click="closeBatchOperationsPanel()" class="p-2 hover:bg-white/20 rounded">✕</button>
           </div>
           
@@ -2321,7 +2319,7 @@
                         <span class="text-sm" x-text="campaign.campaign_name"></span>
                         <span class="text-xs px-2 py-0.5 rounded"
                               :class="campaign.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
-                              x-text="getCampaignStatusText(campaign.status)"></span>
+                              x-text="campaign.status_display || campaign.status"></span>
                       </label>
                     </template>
                   </div>
@@ -2555,7 +2553,7 @@
                       <span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
                             :class="getPresetStatusClass(preset.status)">
                         <span x-text="getPresetStatusIcon(preset.status)"></span>
-                        <span x-text="getPresetStatusText(preset.status)"></span>
+                        <span x-text="preset.status_display || preset.status"></span>
                       </span>
                     </td>
                     <td class="py-3 px-2 text-sm themed-text-muted" x-text="formatDate(preset.created_at)"></td>
@@ -2948,7 +2946,7 @@
                 <span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
                       :class="getPresetStatusClass(selectedPreset?.status)">
                   <span x-text="getPresetStatusIcon(selectedPreset?.status)"></span>
-                  <span x-text="getPresetStatusText(selectedPreset?.status)"></span>
+                  <span x-text="selectedPreset?.status_display || selectedPreset?.status"></span>
                 </span>
               </div>
               <div class="flex justify-between">
@@ -3144,18 +3142,13 @@
                     </div>
                     <div>
                       <span class="themed-text-muted">用户数变化:</span>
-                      <p class="font-medium" :class="getChangeColorClass(campaignReport.comparison_with_history?.users_change)"
-                         x-text="formatReportChange(campaignReport.comparison_with_history?.users_change)"></p>
+                      <p class="font-medium" :class="getChangeColorClass(campaignReport.comparison_with_history?.vs_last_campaign?.users_change)"
+                         x-text="formatReportChange(campaignReport.comparison_with_history?.vs_last_campaign?.users_change)"></p>
                     </div>
                     <div>
-                      <span class="themed-text-muted">ROI变化:</span>
-                      <p class="font-medium" :class="getChangeColorClass(campaignReport.comparison_with_history?.roi_change)"
-                         x-text="formatReportChange(campaignReport.comparison_with_history?.roi_change)"></p>
-                    </div>
-                    <div>
-                      <span class="themed-text-muted">中奖率变化:</span>
-                      <p class="font-medium" :class="getChangeColorClass(campaignReport.comparison_with_history?.win_rate_change)"
-                         x-text="formatReportChange(campaignReport.comparison_with_history?.win_rate_change)"></p>
+                      <span class="themed-text-muted">抽奖次数变化:</span>
+                      <p class="font-medium" :class="getChangeColorClass(campaignReport.comparison_with_history?.vs_last_campaign?.draws_change)"
+                         x-text="formatReportChange(campaignReport.comparison_with_history?.vs_last_campaign?.draws_change)"></p>
                     </div>
                   </div>
                 </div>
@@ -3273,13 +3266,13 @@
                 </tr>
               </thead>
               <tbody class="divide-y">
-                <template x-if="redemptionCodes.length === 0">
-                  <tr><td colspan="9" class="px-4 py-8 text-center themed-text-muted">暂无数据</td></tr>
-                </template>
-                <template x-for="c in redemptionCodes" :key="c.order_id">
+                <tr x-show="!redemptionCodes || redemptionCodes.length === 0">
+                  <td colspan="9" class="px-4 py-8 text-center themed-text-muted">暂无核销码数据</td>
+                </tr>
+                <template x-for="c in redemptionCodes" :key="c.redemption_order_id">
                   <tr class="themed-hover-bg" :class="'border-l-4 ' + (c.status === 'pending' ? 'border-l-yellow-500' : c.status === 'fulfilled' || c.status === 'redeemed' ? 'border-l-green-500' : c.status === 'expired' ? 'border-l-red-500' : 'border-l-gray-400')">
                     <td class="px-4 py-3">
-                      <input type="checkbox" :value="c.order_id" :checked="redemptionSelectedIds.includes(c.order_id)" @change="toggleRedemptionSelect(c.order_id)">
+                      <input type="checkbox" :value="c.redemption_order_id" :checked="redemptionSelectedIds.includes(c.redemption_order_id)" @change="toggleRedemptionSelect(c.redemption_order_id)">
                     </td>
                     <td class="px-4 py-3">
                       <code class="themed-bg-subtle px-2 py-1 rounded text-sm" :title="c.code_hash || ''" x-text="getCodeDisplay(c.code_hash)"></code>
@@ -3293,17 +3286,17 @@
                     <td class="px-4 py-3 text-sm" x-text="getRedemptionPrizeName(c)"></td>
                     <td class="px-4 py-3 text-sm" x-text="getRedemptionCampaignName(c)"></td>
                     <td class="px-4 py-3">
-                      <span class="px-2 py-1 text-xs rounded" :class="getRedemptionStatusClass(c.status)" x-text="getRedemptionStatusText(c.status)"></span>
+                      <span class="px-2 py-1 text-xs rounded" :class="getRedemptionStatusClass(c.status)" x-text="c.status_display || c.status"></span>
                     </td>
                     <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateOnly(c.created_at)"></td>
                     <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateOnly(c.expires_at)"></td>
                     <td class="px-4 py-3">
                       <div class="flex space-x-1">
-                        <button class="themed-text-primary hover:text-blue-700 text-sm" @click="viewRedemptionDetail(c.order_id)">详情</button>
+                        <button class="themed-text-primary hover:text-blue-700 text-sm" @click="viewRedemptionDetail(c.redemption_order_id)">详情</button>
                         <template x-if="c.status === 'pending'">
                           <span class="flex space-x-1">
-                            <button class="text-green-500 hover:text-green-700 text-sm" @click="openRedeemModal(c.order_id, getCodeDisplay(c.code_hash))">核销</button>
-                            <button class="text-red-500 hover:text-red-700 text-sm" @click="cancelRedemptionCode(c.order_id)">取消</button>
+                            <button class="text-green-500 hover:text-green-700 text-sm" @click="openRedeemModal(c.redemption_order_id, getCodeDisplay(c.code_hash))">核销</button>
+                            <button class="text-red-500 hover:text-red-700 text-sm" @click="cancelRedemptionCode(c.redemption_order_id)">取消</button>
                           </span>
                         </template>
                       </div>
@@ -3456,7 +3449,7 @@
       <div class="p-4" x-show="selectedCampaign">
         <div class="mb-4">
           <h4 class="text-xl font-bold" x-text="selectedCampaign?.name"></h4>
-          <span class="px-2 py-1 text-xs rounded" :class="getCampaignStatusClass(selectedCampaign?.status)" x-text="getCampaignStatusText(selectedCampaign?.status)"></span>
+          <span class="px-2 py-1 text-xs rounded" :class="getCampaignStatusClass(selectedCampaign?.status)" x-text="selectedCampaign?.status_display || selectedCampaign?.status"></span>
         </div>
         <div class="space-y-3">
           <div><strong>活动描述：</strong><p class="themed-text-muted" x-text="selectedCampaign?.description || '暂无描述'"></p></div>
@@ -3495,11 +3488,11 @@
           <div x-show="!isEditMode">
             <label class="block text-sm font-medium themed-text-secondary mb-1">所属活动 <span class="text-red-500">*</span></label>
             <!-- 无活动时显示提示 -->
-            <template x-if="!campaigns || campaigns.length === 0">
-              <div class="p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-700 text-sm">
+
+              <div x-show="!campaigns || campaigns.length === 0" class="p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-700 text-sm">
                 ⚠️ 暂无可用活动，请先到 <a href="#" @click.prevent="switchPage('campaigns')" class="themed-text-primary underline">活动管理</a> 创建活动
               </div>
-            </template>
+
             <!-- 有活动时显示下拉框 -->
             <template x-if="campaigns && campaigns.length > 0">
               <select class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.lottery_campaign_id" required>
@@ -3713,7 +3706,7 @@
         <h5 class="font-semibold">💰 设置预算</h5>
         <button @click="hideModal('budgetModal')" class="text-gray-400 hover:themed-text-muted">&times;</button>
       </div>
-      <form @submit.prevent="saveBudget()">
+      <form @submit.prevent="submitBudget()">
         <div class="p-4 space-y-4">
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">预算模式</label>
@@ -3818,7 +3811,7 @@
     <div class="fixed inset-0 bg-black bg-opacity-50" @click="hideModal('quotaModal')"></div>
     <div class="relative themed-card rounded-lg shadow-xl max-w-md w-full mx-4">
       <div class="p-4 border-b flex justify-between items-center">
-        <h5 class="font-semibold">📊 <span x-text="isEditQuota ? '编辑配额' : '新增配额'"></span></h5>
+        <h5 class="font-semibold">📊 新增配额规则</h5>
         <button @click="hideModal('quotaModal')" class="text-gray-400 hover:themed-text-muted">&times;</button>
       </div>
       <form @submit.prevent="submitQuotaForm()">
@@ -3826,7 +3819,7 @@
           <!-- 规则类型选择 -->
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">规则类型 <span class="text-red-500">*</span></label>
-            <select class="w-full px-3 py-2 border rounded" x-model="quotaForm.rule_type" :disabled="isEditQuota">
+            <select class="w-full px-3 py-2 border rounded" x-model="quotaForm.rule_type">
               <option value="global">全局（所有活动）</option>
               <option value="campaign">指定活动</option>
               <option value="role">指定角色</option>
@@ -3837,7 +3830,7 @@
           <!-- 活动选择（campaign类型时显示） -->
           <div x-show="quotaForm.rule_type === 'campaign'">
             <label class="block text-sm font-medium themed-text-secondary mb-1">选择活动 <span class="text-red-500">*</span></label>
-            <select class="w-full px-3 py-2 border rounded" x-model="quotaForm.campaign_id" :disabled="isEditQuota">
+            <select class="w-full px-3 py-2 border rounded" x-model="quotaForm.campaign_id">
               <option value="">请选择活动...</option>
               <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
                 <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name + ' (#' + campaign.lottery_campaign_id + ')'"></option>
@@ -3848,13 +3841,13 @@
           <!-- 角色UUID（role类型时显示） -->
           <div x-show="quotaForm.rule_type === 'role'">
             <label class="block text-sm font-medium themed-text-secondary mb-1">角色UUID <span class="text-red-500">*</span></label>
-            <input type="text" class="w-full px-3 py-2 border rounded" x-model="quotaForm.role_uuid" :disabled="isEditQuota" placeholder="输入角色UUID">
+            <input type="text" class="w-full px-3 py-2 border rounded" x-model="quotaForm.role_uuid" placeholder="输入角色UUID">
           </div>
           
           <!-- 目标用户ID（user类型时显示） -->
           <div x-show="quotaForm.rule_type === 'user'">
             <label class="block text-sm font-medium themed-text-secondary mb-1">目标用户ID <span class="text-red-500">*</span></label>
-            <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="quotaForm.target_user_id" :disabled="isEditQuota" placeholder="输入用户ID">
+            <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="quotaForm.target_user_id" placeholder="输入用户ID">
           </div>
           
           <!-- 每日抽奖次数限制 -->
@@ -3873,7 +3866,7 @@
         <div class="p-4 border-t flex justify-end space-x-2">
           <button type="button" class="px-4 py-2 border rounded themed-hover-bg" @click="hideModal('quotaModal')">取消</button>
           <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary" :disabled="saving">
-            <span x-text="isEditQuota ? '保存修改' : '创建配额'"></span>
+            创建配额
           </button>
         </div>
       </form>
@@ -3894,7 +3887,7 @@
           <br><small class="text-gray-400" x-text="'订单ID: ' + (redemptionDetail?.order_id || '-')"></small>
         </div>
         <table class="w-full text-sm">
-          <tr class="border-b"><th class="py-2 text-left w-1/3">状态</th><td class="py-2"><span class="px-2 py-1 text-xs rounded" :class="getRedemptionStatusClass(redemptionDetail?.status)" x-text="getRedemptionStatusText(redemptionDetail?.status)"></span></td></tr>
+          <tr class="border-b"><th class="py-2 text-left w-1/3">状态</th><td class="py-2"><span class="px-2 py-1 text-xs rounded" :class="getRedemptionStatusClass(redemptionDetail?.status)" x-text="redemptionDetail?.status_display || redemptionDetail?.status"></span></td></tr>
           <tr class="border-b"><th class="py-2 text-left">核销用户ID</th><td class="py-2" x-text="redemptionDetail?.redeemer_user_id || '-'"></td></tr>
           <tr class="border-b"><th class="py-2 text-left">核销用户</th><td class="py-2" x-text="getRedeemerName(redemptionDetail) || '-'"></td></tr>
           <tr class="border-b"><th class="py-2 text-left">物品类型</th><td class="py-2" x-text="redemptionDetail?.item_instance?.item_type || '-'"></td></tr>
@@ -4013,11 +4006,11 @@
         <button @click="hideModal('pricingVersionsModal')" class="text-gray-400 hover:themed-text-muted">&times;</button>
       </div>
       <div class="p-4 overflow-y-auto flex-1">
-        <template x-if="pricingVersions.length === 0">
-          <div class="text-center py-8 themed-text-muted">
+
+          <div x-show="pricingVersions.length === 0" class="text-center py-8 themed-text-muted">
             <p>暂无版本历史记录</p>
           </div>
-        </template>
+
         <div class="space-y-3">
           <template x-for="version in pricingVersions" :key="version.version">
             <div class="border rounded-lg p-4">
@@ -4027,7 +4020,7 @@
                     <span class="font-semibold themed-text-primary" x-text="'v' + version.version"></span>
                     <span class="px-2 py-0.5 text-xs rounded" 
                           :class="version.status === 'active' ? 'bg-green-100 themed-text-success' : 'themed-bg-subtle themed-text-muted'"
-                          x-text="getPricingStatusText(version.status)"></span>
+                          x-text="version.status_display || version.status"></span>
                   </div>
                   <div class="text-sm themed-text-muted mt-1">
                     <span>创建时间: </span><span x-text="formatDateTimeShort(version.created_at)"></span>
@@ -4109,15 +4102,15 @@
               </div>
               <div class="themed-card rounded-lg p-4 border">
                 <div class="text-sm themed-text-muted mb-1">手机号</div>
-                <div class="font-semibold" x-text="userProfile.phone || '-'"></div>
-              </div>
-              <div class="themed-card rounded-lg p-4 border">
-                <div class="text-sm themed-text-muted mb-1">用户类型</div>
-                <div class="font-semibold" x-text="userProfile.user_type || '-'"></div>
+                <div class="font-semibold" x-text="userProfile.mobile || '-'"></div>
               </div>
               <div class="themed-card rounded-lg p-4 border">
                 <div class="text-sm themed-text-muted mb-1">注册时间</div>
-                <div class="font-semibold text-sm" x-text="formatProfileTime(userProfile.register_time)"></div>
+                <div class="font-semibold text-sm" x-text="formatProfileTime(userProfile.created_at)"></div>
+              </div>
+              <div class="themed-card rounded-lg p-4 border">
+                <div class="text-sm themed-text-muted mb-1">用户ID</div>
+                <div class="font-semibold text-sm" x-text="userProfile.user_id || '-'"></div>
               </div>
             </div>
 
@@ -4141,8 +4134,8 @@
                     <div class="text-sm themed-text-muted">中奖率</div>
                   </div>
                   <div>
-                    <div class="text-3xl font-bold text-cyan-600" x-text="'¥' + (userDrawStats.total_value || 0).toFixed(2)">¥0</div>
-                    <div class="text-sm themed-text-muted">奖品价值</div>
+                    <div class="text-3xl font-bold text-cyan-600" x-text="(userDrawStats.total_cost_points || 0).toLocaleString()">0</div>
+                    <div class="text-sm themed-text-muted">消耗积分</div>
                   </div>
                   <div>
                     <div class="text-sm font-semibold themed-text" x-text="formatProfileTime(userDrawStats.lastDrawTime) || '-'">-</div>
@@ -4162,7 +4155,7 @@
                   <div class="flex items-center gap-4">
                     <span class="px-3 py-1.5 rounded-full text-sm font-medium" 
                           :class="getProfilePhaseClass(userExperienceState.current_phase)"
-                          x-text="getProfilePhaseText(userExperienceState.current_phase)"></span>
+                          x-text="userExperienceState.current_phase_display || userExperienceState.current_phase"></span>
                     <span class="text-sm themed-text-muted">
                       连续无奖: <span class="font-medium" x-text="userExperienceState.consecutive_no_win || 0"></span> 次
                     </span>
@@ -4192,22 +4185,22 @@
                     </tr>
                   </thead>
                   <tbody class="divide-y">
-                    <template x-if="userDrawHistory.length === 0">
-                      <tr>
+
+                      <tr x-show="userDrawHistory.length === 0">
                         <td colspan="5" class="px-4 py-8 text-center themed-text-muted">暂无抽奖记录</td>
                       </tr>
-                    </template>
+
                     <template x-for="(draw, index) in userDrawHistory" :key="index">
                       <tr class="themed-hover-bg">
-                        <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatProfileTime(draw.draw_time)"></td>
+                        <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatProfileTime(draw.created_at)"></td>
                         <td class="px-4 py-3 text-sm" x-text="draw.campaign_name"></td>
                         <td class="px-4 py-3 text-sm">
                           <span class="px-2 py-1 rounded text-xs" 
                                 :class="draw.is_win ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
-                                x-text="draw.prize_name"></span>
+                                x-text="draw.prize_name || '-'"></span>
                         </td>
                         <td class="px-4 py-3 text-sm" x-text="draw.reward_tier || '-'"></td>
-                        <td class="px-4 py-3 text-sm" x-text="draw.prize_value ? '¥' + draw.prize_value.toFixed(2) : '-'"></td>
+                        <td class="px-4 py-3 text-sm" x-text="draw.prize_value_points ? draw.prize_value_points + '积分' : '-'"></td>
                       </tr>
                     </template>
                   </tbody>
@@ -4256,16 +4249,16 @@
               <div class="text-xs themed-text-muted mb-1">抽奖次数</div>
               <div class="text-xl font-bold themed-text-primary" x-text="dailyReportData?.summary?.total_draws?.toLocaleString() || 0"></div>
               <div class="text-xs mt-1" 
-                   :class="getChangeColorClass(dailyReportData?.vs_yesterday?.total_draws_change)"
-                   x-text="'vs昨日 ' + formatReportChange(dailyReportData?.vs_yesterday?.total_draws_change)"></div>
+                   :class="getChangeColorClass(dailyReportData?.vs_yesterday?.draws_change)"
+                   x-text="'vs昨日 ' + formatReportChange(dailyReportData?.vs_yesterday?.draws_change)"></div>
             </div>
             <div class="themed-card rounded-lg p-4 text-center">
               <div class="text-2xl mb-1">🎯</div>
               <div class="text-xs themed-text-muted mb-1">中奖率</div>
               <div class="text-xl font-bold text-green-600" x-text="(dailyReportData?.summary?.win_rate || 0).toFixed(1) + '%'"></div>
               <div class="text-xs mt-1" 
-                   :class="getChangeColorClass(dailyReportData?.vs_yesterday?.win_rate_change)"
-                   x-text="'vs昨日 ' + formatReportChange(dailyReportData?.vs_yesterday?.win_rate_change)"></div>
+                   :class="getChangeColorClass(dailyReportData?.vs_yesterday?.wins_change)"
+                   x-text="'vs昨日 ' + formatReportChange(dailyReportData?.vs_yesterday?.wins_change)"></div>
             </div>
             <div class="themed-card rounded-lg p-4 text-center">
               <div class="text-2xl mb-1">💰</div>
@@ -4294,13 +4287,13 @@
                 🚨 告警 (<span x-text="dailyReportData?.alerts?.length || 0"></span>)
               </h6>
               <div class="space-y-2">
-                <template x-for="alert in dailyReportData.alerts" :key="alert.alert_id || alert.message">
+                <template x-for="(alert, index) in dailyReportData.alerts" :key="index">
                   <div class="p-3 rounded-lg border" :class="getAlertLevelClass(alert.level)">
                     <div class="flex items-center gap-2">
                       <span x-text="getAlertLevelIcon(alert.level)"></span>
                       <span class="font-medium text-sm" x-text="alert.message"></span>
                     </div>
-                    <div class="text-xs mt-1 opacity-75" x-text="alert.details || ''"></div>
+                    <div class="text-xs mt-1 opacity-75" x-text="alert.suggestion || ''"></div>
                   </div>
                 </template>
               </div>
@@ -4316,14 +4309,14 @@
                 <template x-for="(hour, index) in dailyReportData?.hourly_breakdown || []" :key="index">
                   <div class="flex flex-col items-center text-xs">
                     <div class="w-4 rounded-t" 
-                         :style="'height: ' + Math.max(2, (hour.count / Math.max(...(dailyReportData?.hourly_breakdown || []).map(h => h.count || 1)) * 40)) + 'px'"
+                         :style="'height: ' + Math.max(2, (hour.draws / Math.max(...(dailyReportData?.hourly_breakdown || []).map(h => h.draws || 1)) * 40)) + 'px'"
                          :class="index === new Date().getHours() ? 'bg-blue-500' : 'bg-gray-300'"></div>
                     <span class="themed-text-muted" x-text="index"></span>
                   </div>
                 </template>
               </div>
               <div class="mt-2 text-xs themed-text-muted text-center">
-                峰值时段: <span class="font-bold" x-text="dailyReportData?.peak_hour ? dailyReportData.peak_hour + ':00' : '-'"></span>
+                峰值时段: <span class="font-bold" x-text="(dailyReportData?.hourly_breakdown || []).reduce((max, h) => h.draws > (max?.draws || 0) ? h : max, {})?.hour + ':00' || '-'"></span>
               </div>
             </div>
 
@@ -4337,7 +4330,7 @@
                           :class="index < 3 ? ['bg-yellow-400', 'bg-gray-300', 'bg-amber-600'][index] + ' text-white' : 'bg-gray-100 text-gray-600'"
                           x-text="index + 1"></span>
                     <span class="flex-1 text-sm truncate" x-text="prize.prize_name"></span>
-                    <span class="text-sm font-bold text-blue-600" x-text="prize.count + '次'"></span>
+                    <span class="text-sm font-bold text-blue-600" x-text="prize.win_count + '次'"></span>
                   </div>
                 </template>
                 <template x-if="!dailyReportData?.top_prizes?.length">
@@ -4351,11 +4344,11 @@
           <div class="themed-card rounded-lg p-4 mb-6">
             <h6 class="font-semibold text-sm mb-3">📊 档位分布</h6>
             <div class="flex flex-wrap gap-3">
-              <template x-for="tier in dailyReportData?.tier_breakdown || []" :key="tier.tier_name">
+              <template x-for="tier in dailyReportData?.tier_breakdown || []" :key="tier.tier">
                 <div class="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">
-                  <span class="text-sm font-medium" x-text="tier.tier_name"></span>
+                  <span class="text-sm font-medium" x-text="tier.tier"></span>
                   <span class="text-sm text-blue-600 font-bold" x-text="tier.count + '次'"></span>
-                  <span class="text-xs themed-text-muted" x-text="'(' + tier.percentage?.toFixed(1) + '%)'"></span>
+                  <span class="text-xs themed-text-muted" x-text="'(成本: ' + (tier.cost || 0) + ')'"></span>
                 </div>
               </template>
             </div>
@@ -4379,8 +4372,8 @@
                     <template x-for="campaign in dailyReportData.campaigns_breakdown" :key="campaign.lottery_campaign_id">
                       <tr class="themed-hover-bg">
                         <td class="px-3 py-2" x-text="campaign.campaign_name"></td>
-                        <td class="px-3 py-2 text-right" x-text="campaign.draw_count?.toLocaleString() || 0"></td>
-                        <td class="px-3 py-2 text-right" x-text="campaign.win_count?.toLocaleString() || 0"></td>
+                        <td class="px-3 py-2 text-right" x-text="campaign.draws?.toLocaleString() || 0"></td>
+                        <td class="px-3 py-2 text-right" x-text="campaign.wins?.toLocaleString() || 0"></td>
                         <td class="px-3 py-2 text-right" x-text="(campaign.win_rate || 0).toFixed(1) + '%'"></td>
                       </tr>
                     </template>
@@ -4492,9 +4485,9 @@
                     </tr>
                   </thead>
                   <tbody class="divide-y">
-                    <template x-for="tier in campaignRoiData.tier_cost_breakdown" :key="tier.tier_name || tier.tier">
+                    <template x-for="tier in campaignRoiData.tier_cost_breakdown" :key="tier.tier">
                       <tr class="themed-hover-bg">
-                        <td class="px-3 py-2 font-medium" x-text="tier.tier_name || tier.tier"></td>
+                        <td class="px-3 py-2 font-medium" x-text="tier.tier"></td>
                         <td class="px-3 py-2 text-right" x-text="(tier.count || 0).toLocaleString()"></td>
                         <td class="px-3 py-2 text-right" x-text="'¥' + (tier.unit_cost || 0).toFixed(2)"></td>
                         <td class="px-3 py-2 text-right font-bold" x-text="'¥' + (tier.total_cost || 0).toLocaleString()"></td>
@@ -4568,7 +4561,6 @@
 
   <!-- 页面专属逻辑 -->
   <%- include('partials/footer') %>
-
 
   <script type="module" src="./src/modules/lottery/pages/lottery-management.js"></script>
 </body>

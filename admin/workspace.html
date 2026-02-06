@@ -477,13 +477,12 @@
                 </template>
                 
                 <!-- 空状态 -->
-                <template x-if="!loading && notifications.length === 0">
-                  <div class="p-8 text-center text-gray-400">
+
+                  <div x-show="!loading && notifications.length === 0" class="p-8 text-center text-gray-400">
                     <div class="text-3xl mb-2">📭</div>
                     <div class="text-sm">暂无消息通知</div>
                   </div>
-                </template>
-                
+
                 <!-- 通知项 -->
                 <template x-for="notification in notifications" :key="notification.id">
                   <div 
@@ -732,4 +731,3 @@
   </script>
 </body>
 </html>
-

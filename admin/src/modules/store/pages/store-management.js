@@ -486,10 +486,7 @@ function registerStoreManagementComponents() {
      * @param {string} status - 门店状态码
      * @returns {string} 状态显示文本
      */
-    getStoreStatusText(status) {
-      const map = { active: '营业中', inactive: '休息中', closed: '已关闭' }
-      return map[status] || status
-    },
+    // ✅ 已删除 getStoreStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     // ==================== 省市区联动方法 ====================
 
@@ -882,15 +879,7 @@ function registerStoreManagementComponents() {
      * @param {string} status - 员工状态码
      * @returns {string} 状态显示文本
      */
-    getStaffStatusText(status) {
-      const map = {
-        active: '在职',
-        inactive: '离职',
-        pending: '待审核',
-        deleted: '已删除'
-      }
-      return map[status] || status || '未知'
-    },
+    // ✅ 已删除 getStaffStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 保存员工（新增或更新）
@@ -945,16 +934,7 @@ function registerStoreManagementComponents() {
      * @param {string} role - 角色代码
      * @returns {string} 角色显示文本
      */
-    getStaffRoleText(role) {
-      const map = {
-        manager: '店长',
-        staff: '员工',
-        cashier: '收银员',
-        waiter: '服务员',
-        chef: '厨师'
-      }
-      return map[role] || role || '员工'
-    },
+    // ✅ 已删除 getStaffRoleText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 切换员工列表页码

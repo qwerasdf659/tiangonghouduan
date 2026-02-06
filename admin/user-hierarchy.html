@@ -126,13 +126,13 @@
             </tr>
           </thead>
           <tbody class="divide-y">
-            <template x-if="hierarchyList.length === 0">
-              <tr>
+
+              <tr x-show="hierarchyList.length === 0">
                 <td colspan="8" class="px-4 py-10 text-center themed-text-muted">
                   📭 暂无数据
                 </td>
               </tr>
-            </template>
+
             <template x-for="h in hierarchyList" :key="h.hierarchy_id">
               <tr class="themed-hover-bg" :class="{ 'inactive-row': !h.is_active }">
                 <td class="px-4 py-3 text-sm" x-text="h.hierarchy_id"></td>
@@ -354,8 +354,6 @@
   </div>
 
   <%- include('partials/footer') %>
-
-
 
   <script type="module" src="./src/modules/user/pages/user-hierarchy.js"></script>
 </body>

@@ -21,8 +21,8 @@ export function useUserProfileState() {
     userProfile: null,
     /** @type {Array} 用户抽奖历史 */
     userDrawHistory: [],
-    /** @type {Object|null} 用户体验状态 */
-    userExperienceState: null,
+    /** @type {Array} 用户体验状态列表（后端返回 experience_states 数组） */
+    userExperienceState: [],
     /** @type {Object|null} 用户全局状态 */
     userGlobalState: null,
     /** @type {Array} 用户配额列表 */
@@ -32,7 +32,7 @@ export function useUserProfileState() {
       total_draws: 0,
       total_wins: 0,
       win_rate: 0,
-      total_value: 0,
+      total_cost_points: 0,
       last_draw_time: null
     },
     /** @type {boolean} 是否正在加载用户档案 */
@@ -66,9 +66,9 @@ export function useUserProfileMethods() {
 
       this.loadingUserProfile = true
       try {
-        // 构建 API URL
+        // 构建 API URL（后端参数名：lottery_campaign_id）
         const url = buildURL(LOTTERY_ENDPOINTS.MONITORING_USER_PROFILE, { user_id: userId })
-        const queryParams = campaignId ? `?campaign_id=${campaignId}` : ''
+        const queryParams = campaignId ? `?lottery_campaign_id=${campaignId}` : ''
 
         logger.info('加载用户抽奖档案', { userId, campaignId })
 
@@ -81,37 +81,33 @@ export function useUserProfileMethods() {
         if (response?.success && response.data) {
           const data = response.data
 
-          // 设置用户基本信息
+          // 设置用户基本信息 - 直接使用后端字段名（mobile 非 phone）
           this.userProfile = {
             user_id: data.user_id || userId,
-            nickname: data.user?.nickname || data.nickname || `用户${userId}`,
-            phone: data.user?.phone || data.phone || '-',
-            register_time: data.user?.created_at || data.register_time || '-',
-            user_type: data.user?.user_type || data.user_type || '-'
+            nickname: data.user?.nickname || `用户${userId}`,
+            mobile: data.user?.mobile || '-',
+            created_at: data.user?.created_at || '-'
           }
 
           // 设置抽奖统计 - 直接使用后端字段名
-          const stats = data.stats || data.draw_stats || {}
+          const stats = data.stats || {}
           this.userDrawStats = {
             total_draws: stats.total_draws || 0,
             total_wins: stats.total_wins || 0,
             win_rate: stats.win_rate || 0,
-            total_value: stats.total_value || 0,
+            total_cost_points: stats.total_cost_points || 0,
             last_draw_time: stats.last_draw_time || null
           }
 
-          // 设置抽奖历史 - 直接使用后端字段名，仅保留复合字段
-          this.userDrawHistory = (data.recent_draws || data.draw_history || []).map(draw => ({
+          // 设置抽奖历史 - 直接使用后端字段名
+          this.userDrawHistory = (data.recent_draws || []).map(draw => ({
             ...draw,
-            // 复合字段：按优先级取值
-            campaign_name: draw.campaign_name || draw.campaign?.campaign_name || '-',
-            prize_name: draw.prize_name || draw.result || '-',
-            is_win: draw.is_win ?? draw.prize_type !== 'empty',
-            draw_time: draw.draw_time || draw.created_at || '-'
+            // reward_tier 判断中奖：high/mid/low 为中奖，fallback 为保底
+            is_win: draw.reward_tier && draw.reward_tier !== 'fallback'
           }))
 
-          // 设置体验状态
-          this.userExperienceState = data.experience_state || null
+          // 设置体验状态（后端返回 experience_states 数组）
+          this.userExperienceState = data.experience_states || []
 
           // 设置全局状态
           this.userGlobalState = data.global_state || null
@@ -184,14 +180,14 @@ export function useUserProfileMethods() {
     _resetUserProfile() {
       this.userProfile = null
       this.userDrawHistory = []
-      this.userExperienceState = null
+      this.userExperienceState = []
       this.userGlobalState = null
       this.userQuotaList = []
       this.userDrawStats = {
         total_draws: 0,
         total_wins: 0,
         win_rate: 0,
-        total_value: 0,
+        total_cost_points: 0,
         last_draw_time: null
       }
     },
@@ -201,16 +197,7 @@ export function useUserProfileMethods() {
      * @param {string} phase - 体验阶段代码
      * @returns {string} 显示文本
      */
-    getProfilePhaseText(phase) {
-      const map = {
-        newcomer: '🌱 新手期',
-        growth: '📈 成长期',
-        mature: '🌟 成熟期',
-        decline: '📉 衰退期',
-        churn_risk: '⚠️ 流失风险'
-      }
-      return map[phase] || phase || '-'
-    },
+    // ✅ 已删除 getProfilePhaseText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 获取体验阶段样式类
@@ -233,16 +220,7 @@ export function useUserProfileMethods() {
      * @param {string} tier - 档位代码
      * @returns {string} 显示文本
      */
-    getProfileTierText(tier) {
-      const map = {
-        high: '🏆 高档奖品',
-        mid: '🥈 中档奖品',
-        low: '🥉 低档奖品',
-        fallback: '🎁 保底奖品',
-        empty: '💨 未中奖'
-      }
-      return map[tier] || tier || '-'
-    },
+    // ✅ 已删除 getProfileTierText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 格式化用户档案时间

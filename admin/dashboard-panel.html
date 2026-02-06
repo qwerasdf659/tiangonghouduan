@@ -602,13 +602,12 @@
             
             <!-- 预警列表 -->
             <div class="space-y-3 max-h-[400px] overflow-y-auto scrollbar-thin">
-              <template x-if="alerts.length === 0">
-                <div class="text-center py-8 themed-text-muted">
+
+                <div x-show="alerts.length === 0" class="text-center py-8 themed-text-muted">
                   <div class="text-4xl mb-2">✅</div>
                   <div>暂无预警信息</div>
                 </div>
-              </template>
-              
+
               <template x-for="alert in alerts" :key="alert.alert_id">
                 <div 
                   class="p-4 rounded-lg cursor-pointer hover:shadow-md transition"

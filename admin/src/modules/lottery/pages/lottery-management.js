@@ -21,7 +21,7 @@
 
 // ES Module 导入（替代 window.xxx 全局变量）
 import { logger } from '../../../utils/logger.js'
-import { Alpine, createPageMixin, initAlpine } from '../../../alpine/index.js'
+import { Alpine, createPageMixin } from '../../../alpine/index.js'
 
 // 导入所有 composables 模块
 import {
@@ -192,12 +192,6 @@ function registerLotteryManagementComponents() {
     // 预先调用所有 composables
     const pageMixin = createPageMixin()
     const campaignsState = useCampaignsState()
-    
-    // [DEBUG] 验证 campaignsState 包含 ROI 相关状态
-    console.log('[DEBUG-lottery] campaignsState.campaignRoiData:', campaignsState.campaignRoiData)
-    console.log('[DEBUG-lottery] campaignsState.loadingCampaignRoi:', campaignsState.loadingCampaignRoi)
-    console.log('[DEBUG-lottery] campaignsState.showCampaignRoiModal:', campaignsState.showCampaignRoiModal)
-    console.log('[DEBUG-lottery] campaignsState keys:', Object.keys(campaignsState))
     const prizesState = usePrizesState()
     const budgetState = useBudgetState()
     const strategyState = useStrategyState()
@@ -292,7 +286,7 @@ function registerLotteryManagementComponents() {
         logger.debug('🔴 [CRITICAL] loadQuotas 存在:', typeof this.loadQuotas === 'function')
         logger.debug(
           '🔴 [CRITICAL] 所有配额方法:',
-          ['openCreateQuotaModal', 'editQuota', 'submitQuotaForm', 'deleteQuota', 'loadQuotas'].map(
+          ['openCreateQuotaModal', 'submitQuotaForm', 'deleteQuota', 'loadQuotas'].map(
             m => `${m}: ${typeof this[m]}`
           )
         )
@@ -388,6 +382,7 @@ function registerLotteryManagementComponents() {
                 break
               case 'strategy-effectiveness':
                 logger.debug('📈 [LotteryPage] 进入策略效果分析页面')
+                await this.loadStrategyEffectiveness()
                 // 加载活动列表供选择
                 if (!this.campaigns || this.campaigns.length === 0) {
                   await this.loadCampaigns()
@@ -500,16 +495,12 @@ function registerLotteryManagementComponents() {
  */
 
 // 立即注册组件（模块加载时执行）
+// 注意：Alpine.start() 由 main.js 的 DOMContentLoaded 统一触发
+// 这里只注册组件，不调用 initAlpine()，避免双重 Alpine.start() 导致事件监听器重复
 logger.debug('📦 [LotteryManagement] 模块加载，准备注册组件...')
 try {
   registerLotteryManagementComponents()
-  
-  // 确保 Alpine.js 已启动
-  const isAlpineStarted = document.querySelector('[x-data]')?._x_dataStack !== undefined
-  
-  if (!isAlpineStarted) {
-    initAlpine()
-  }
+  logger.debug('📦 [LotteryManagement] 组件注册完成，等待 main.js 触发 Alpine.start()')
 } catch (error) {
   logger.error('[LotteryManagement] 组件注册失败:', error)
 }

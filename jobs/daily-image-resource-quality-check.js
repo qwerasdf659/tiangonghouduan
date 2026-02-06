@@ -79,7 +79,7 @@ class DailyImageResourceQualityCheck {
             }
           },
           attributes: [
-            'image_id',
+            'image_resource_id',
             'file_path',
             'thumbnail_paths',
             'business_type',
@@ -105,7 +105,7 @@ class DailyImageResourceQualityCheck {
             if (missingThumbnailsRecords.length < 10) {
               // 只记录前 10 条示例
               missingThumbnailsRecords.push({
-                image_id: record.image_id,
+                image_resource_id: record.image_resource_id,
                 business_type: record.business_type,
                 category: record.category,
                 context_id: record.context_id
@@ -124,7 +124,7 @@ class DailyImageResourceQualityCheck {
               missingThumbnailsCount++
               if (missingThumbnailsRecords.length < 10) {
                 missingThumbnailsRecords.push({
-                  image_id: record.image_id,
+                  image_resource_id: record.image_resource_id,
                   business_type: record.business_type,
                   category: record.category,
                   context_id: record.context_id,
@@ -142,7 +142,7 @@ class DailyImageResourceQualityCheck {
               incompleteThumbnailsCount++
               if (incompleteThumbnailsRecords.length < 10) {
                 incompleteThumbnailsRecords.push({
-                  image_id: record.image_id,
+                  image_resource_id: record.image_resource_id,
                   business_type: record.business_type,
                   category: record.category,
                   context_id: record.context_id,
@@ -164,7 +164,7 @@ class DailyImageResourceQualityCheck {
               invalidFilePathCount++
               if (invalidFilePathRecords.length < 10) {
                 invalidFilePathRecords.push({
-                  image_id: record.image_id,
+                  image_resource_id: record.image_resource_id,
                   business_type: record.business_type,
                   category: record.category,
                   context_id: record.context_id,

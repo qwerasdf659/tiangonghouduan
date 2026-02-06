@@ -15,8 +15,6 @@ import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
  * @returns {Object} 状态对象
  */
 export function useCampaignsState() {
-  // [DEBUG] 调试日志 - 确认 state 被正确初始化
-  console.log('[DEBUG-campaigns] useCampaignsState() 被调用')
   return {
     /** @type {Array} 活动列表 */
     campaigns: [],
@@ -354,15 +352,8 @@ export function useCampaignsMethods(context) {
       return map[status] || 'bg-secondary'
     },
 
-    /**
-     * 获取活动状态文本
-     * @param {string} status - 活动状态
-     * @returns {string} 状态文本
-     */
-    getCampaignStatusText(status) {
-      const map = { active: '进行中', inactive: '已结束', pending: '待开始', ended: '已结束' }
-      return map[status] || status
-    },
+    // ✅ 已删除 getCampaignStatusText 映射函数
+    // 中文显示名称由后端 attachDisplayNames 统一返回 status_display 字段
 
     // ========== P3新增: 活动ROI分析方法 ==========
 
@@ -390,8 +381,22 @@ export function useCampaignsMethods(context) {
         const data = response?.success ? response.data : response
 
         if (data) {
+          // 转换 tier_cost_breakdown：后端返回对象 { high: 100, mid: 50 }，前端需要数组
+          const rawTierCost = data.tier_cost_breakdown || {}
+          const totalCostSum = Object.values(rawTierCost).reduce((s, v) => s + v, 0)
+          const tierCostArray = Object.entries(rawTierCost)
+            .filter(([, cost]) => cost > 0)
+            .map(([tier, total_cost]) => ({
+              tier,
+              total_cost,
+              count: 0, // 后端未返回此字段
+              unit_cost: 0, // 后端未返回此字段
+              percentage: totalCostSum > 0 ? (total_cost / totalCostSum) * 100 : 0
+            }))
+
           this.campaignRoiData = {
             ...data,
+            tier_cost_breakdown: tierCostArray,
             lottery_campaign_id: campaignId,
             campaign_name:
               this.campaigns.find(c => c.lottery_campaign_id === campaignId)?.campaign_name ||

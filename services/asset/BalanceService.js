@@ -37,6 +37,17 @@ const logger = require('../../utils/logger')
 const { requireTransaction } = require('../../utils/transactionHelpers')
 
 /**
+ * 资产余额安全上限（10亿）
+ *
+ * 防止测试/误操作写入 BIGINT MAX 等极端值污染统计数据。
+ * 单笔变动和变动后余额均不得超过此值。
+ * 如业务需要调整，修改此常量即可。
+ *
+ * @constant {number}
+ */
+const BALANCE_SAFETY_LIMIT = 1_000_000_000
+
+/**
  * 余额操作服务类
  *
  * @class BalanceService
@@ -240,6 +251,13 @@ class BalanceService {
       throw new Error('asset_code是必填参数')
     }
 
+    // 🛡️ 单笔变动金额安全上限校验（防止测试数据污染）
+    if (Math.abs(delta_amount) > BALANCE_SAFETY_LIMIT) {
+      throw new Error(
+        `单笔变动金额超出安全上限：|${delta_amount}| > ${BALANCE_SAFETY_LIMIT}（10亿），如确需大额操作请联系管理员调整 BALANCE_SAFETY_LIMIT`
+      )
+    }
+
     // 🔥 BUDGET_POINTS 必须指定 lottery_campaign_id（活动隔离规则）
     if (asset_code === 'BUDGET_POINTS' && !lottery_campaign_id) {
       throw new Error('BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）')
@@ -331,6 +349,13 @@ class BalanceService {
       if (balance_after < 0) {
         throw new Error(
           `变动后余额不能为负数：当前${balance_before} + 变动${delta_amount} = ${balance_after}`
+        )
+      }
+
+      // 🛡️ 验证变动后余额不超过安全上限（防止测试数据/溢出污染统计）
+      if (balance_after > BALANCE_SAFETY_LIMIT) {
+        throw new Error(
+          `变动后余额超出安全上限：${balance_before} + ${delta_amount} = ${balance_after} > ${BALANCE_SAFETY_LIMIT}（10亿）`
         )
       }
 
@@ -452,6 +477,11 @@ class BalanceService {
       throw new Error('asset_code是必填参数')
     }
 
+    // 🛡️ 冻结金额安全上限校验
+    if (amount > BALANCE_SAFETY_LIMIT) {
+      throw new Error(`冻结金额超出安全上限：${amount} > ${BALANCE_SAFETY_LIMIT}（10亿）`)
+    }
+
     try {
       // 🔥 幂等性检查
       const existingTransaction = await AssetTransaction.findOne({
@@ -509,9 +539,10 @@ class BalanceService {
       const available_before = Number(balance.available_amount)
       const frozen_before = Number(balance.frozen_amount)
 
-      // 计算变动后余额
-      const available_after = available_before - amount
-      const frozen_after = frozen_before + amount
+      // 计算变动后余额（🔒 强制 Number() 转换，防止 BIGINT 字符串拼接）
+      const numericAmount = Number(amount)
+      const available_after = available_before - numericAmount
+      const frozen_after = frozen_before + numericAmount
 
       // 更新余额（available减少，frozen增加）
       await balance.update(
@@ -527,16 +558,16 @@ class BalanceService {
         {
           account_id: account.account_id,
           asset_code,
-          delta_amount: -amount,
+          delta_amount: -numericAmount,
           balance_before: available_before,
           balance_after: available_after,
-          frozen_amount_change: amount,
+          frozen_amount_change: numericAmount,
           business_type,
           lottery_session_id: null,
           idempotency_key,
           meta: {
             ...meta,
-            freeze_amount: amount,
+            freeze_amount: numericAmount,
             frozen_before,
             frozen_after
           }
@@ -633,6 +664,11 @@ class BalanceService {
       throw new Error('asset_code是必填参数')
     }
 
+    // 🛡️ 解冻金额安全上限校验
+    if (amount > BALANCE_SAFETY_LIMIT) {
+      throw new Error(`解冻金额超出安全上限：${amount} > ${BALANCE_SAFETY_LIMIT}（10亿）`)
+    }
+
     try {
       // 🔥 幂等性检查
       const existingTransaction = await AssetTransaction.findOne({
@@ -690,9 +726,10 @@ class BalanceService {
       const available_before = Number(balance.available_amount)
       const frozen_before = Number(balance.frozen_amount)
 
-      // 计算变动后余额
-      const available_after = available_before + amount
-      const frozen_after = frozen_before - amount
+      // 计算变动后余额（🔒 强制 Number() 转换，防止 BIGINT 字符串拼接）
+      const numericAmount = Number(amount)
+      const available_after = available_before + numericAmount
+      const frozen_after = frozen_before - numericAmount
 
       // 更新余额（available增加，frozen减少）
       await balance.update(
@@ -708,16 +745,16 @@ class BalanceService {
         {
           account_id: account.account_id,
           asset_code,
-          delta_amount: amount,
+          delta_amount: numericAmount,
           balance_before: available_before,
           balance_after: available_after,
-          frozen_amount_change: -amount,
+          frozen_amount_change: -numericAmount,
           business_type,
           lottery_session_id: null,
           idempotency_key,
           meta: {
             ...meta,
-            unfreeze_amount: amount,
+            unfreeze_amount: numericAmount,
             frozen_before,
             frozen_after
           }
@@ -814,6 +851,11 @@ class BalanceService {
       throw new Error('asset_code是必填参数')
     }
 
+    // 🛡️ 结算金额安全上限校验
+    if (amount > BALANCE_SAFETY_LIMIT) {
+      throw new Error(`结算金额超出安全上限：${amount} > ${BALANCE_SAFETY_LIMIT}（10亿）`)
+    }
+
     try {
       // 🔥 幂等性检查
       const existingTransaction = await AssetTransaction.findOne({
@@ -871,9 +913,13 @@ class BalanceService {
       const available_before = Number(balance.available_amount)
       const frozen_before = Number(balance.frozen_amount)
 
-      // 计算变动后余额（仅从frozen扣减，available不变）
+      /*
+       * 计算变动后余额（仅从frozen扣减，available不变）
+       * 🔒 强制 Number() 转换，防止 BIGINT 字符串拼接
+       */
+      const numericAmount = Number(amount)
       const available_after = available_before
-      const frozen_after = frozen_before - amount
+      const frozen_after = frozen_before - numericAmount
 
       // 更新余额（仅frozen减少）
       await balance.update(
@@ -891,13 +937,13 @@ class BalanceService {
           delta_amount: 0, // 可用余额不变
           balance_before: available_before,
           balance_after: available_after,
-          frozen_amount_change: -amount,
+          frozen_amount_change: -numericAmount,
           business_type,
           lottery_session_id: null,
           idempotency_key,
           meta: {
             ...meta,
-            settle_amount: amount,
+            settle_amount: numericAmount,
             frozen_before,
             frozen_after
           }
@@ -1046,3 +1092,4 @@ class BalanceService {
 }
 
 module.exports = BalanceService
+module.exports.BALANCE_SAFETY_LIMIT = BALANCE_SAFETY_LIMIT

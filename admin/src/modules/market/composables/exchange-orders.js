@@ -235,17 +235,7 @@ export function useExchangeOrdersMethods() {
      * @param {string} status - 订单状态
      * @returns {string} 状态文本
      */
-    getOrderStatusText(status) {
-      const map = {
-        pending: '待发货',
-        processing: '处理中',
-        shipped: '已发货',
-        completed: '已完成',
-        cancelled: '已取消',
-        refunded: '已退款'
-      }
-      return map[status] || status
-    }
+    // ✅ 已删除 getOrderStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
   }
 }
 

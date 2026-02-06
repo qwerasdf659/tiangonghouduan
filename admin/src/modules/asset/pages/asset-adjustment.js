@@ -900,23 +900,7 @@ function assetAdjustmentPage() {
       }
     },
 
-    /**
-     * 获取状态文本
-     * @param {string} status - 状态代码
-     * @returns {string} 状态的中文文本
-     */
-    getStatusText(status) {
-      const map = {
-        pending: '待处理',
-        approved: '已批准',
-        rejected: '已拒绝',
-        completed: '已完成',
-        processing: '处理中',
-        success: '成功',
-        failed: '失败'
-      }
-      return map[status] || status || '-'
-    },
+    // ✅ 已删除 getStatusText 映射函数，使用后端返回的 status_display 字段
 
     /**
      * 搜索用户
@@ -1042,33 +1026,7 @@ function assetAdjustmentPage() {
      * @param {string} assetType - 资产类型代码
      * @returns {string} 资产类型的中文名称
      */
-    getAssetTypeText(assetType) {
-      if (!assetType) return '-'
-
-      // 内置类型映射
-      const typeMap = {
-        points: '积分',
-        POINTS: '积分',
-        balance: '余额',
-        BALANCE: '余额',
-        material: '材料',
-        MATERIAL: '材料',
-        DIAMOND: '钻石',
-        BUDGET_POINTS: '预算积分'
-      }
-
-      if (typeMap[assetType]) {
-        return typeMap[assetType]
-      }
-
-      // 从资产类型列表中查找
-      const found = this.assetTypes.find(t => t.asset_code === assetType)
-      if (found) {
-        return found.display_name || found.name || assetType
-      }
-
-      return assetType
-    },
+    // ✅ 已删除 getAssetTypeText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     // ==================== 记录操作方法 ====================
 

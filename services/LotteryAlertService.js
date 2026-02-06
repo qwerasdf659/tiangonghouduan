@@ -27,6 +27,7 @@ const { Op, fn, col } = require('sequelize')
 const { LotteryAlert, LotteryCampaign, LotteryDraw, LotteryPrize, User } = require('../models')
 const logger = require('../utils/logger').logger
 const BeijingTimeHelper = require('../utils/timeHelper')
+const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 
 /**
  * 告警规则配置
@@ -172,11 +173,8 @@ class LotteryAlertService {
         campaign_name: alert.campaign?.campaign_name || '未知活动',
         campaign_code: alert.campaign?.campaign_code || null,
         alert_type: alert.alert_type,
-        alert_type_name: LotteryAlertService.getAlertTypeName(alert.alert_type),
         severity: alert.severity,
-        severity_name: LotteryAlertService.getSeverityName(alert.severity),
         status: alert.status,
-        status_name: LotteryAlertService.getStatusName(alert.status),
         rule_code: alert.rule_code,
         threshold_value: alert.threshold_value ? parseFloat(alert.threshold_value) : null,
         actual_value: alert.actual_value ? parseFloat(alert.actual_value) : null,
@@ -191,6 +189,13 @@ class LotteryAlertService {
         resolver_name: alert.resolver?.nickname || null,
         resolve_notes: alert.resolve_notes
       }))
+
+      // 附加中文显示名称（alert_type/severity/status → _display/_color）
+      await attachDisplayNames(formattedAlerts, [
+        { field: 'alert_type', dictType: DICT_TYPES.LOTTERY_ALERT_TYPE },
+        { field: 'severity', dictType: DICT_TYPES.LOTTERY_ALERT_SEVERITY },
+        { field: 'status', dictType: DICT_TYPES.LOTTERY_ALERT_STATUS }
+      ])
 
       const totalCount = statusMap.active + statusMap.acknowledged + statusMap.resolved
 
@@ -240,16 +245,13 @@ class LotteryAlertService {
         return null
       }
 
-      return {
+      const result = {
         lottery_alert_id: alert.lottery_alert_id,
         lottery_campaign_id: alert.lottery_campaign_id,
         campaign_name: alert.campaign?.campaign_name || '未知活动',
         alert_type: alert.alert_type,
-        alert_type_name: LotteryAlertService.getAlertTypeName(alert.alert_type),
         severity: alert.severity,
-        severity_name: LotteryAlertService.getSeverityName(alert.severity),
         status: alert.status,
-        status_name: LotteryAlertService.getStatusName(alert.status),
         rule_code: alert.rule_code,
         threshold_value: alert.threshold_value ? parseFloat(alert.threshold_value) : null,
         actual_value: alert.actual_value ? parseFloat(alert.actual_value) : null,
@@ -265,6 +267,15 @@ class LotteryAlertService {
         resolver_name: alert.resolver?.nickname || null,
         resolve_notes: alert.resolve_notes
       }
+
+      // 附加中文显示名称（alert_type/severity/status → _display/_color）
+      await attachDisplayNames(result, [
+        { field: 'alert_type', dictType: DICT_TYPES.LOTTERY_ALERT_TYPE },
+        { field: 'severity', dictType: DICT_TYPES.LOTTERY_ALERT_SEVERITY },
+        { field: 'status', dictType: DICT_TYPES.LOTTERY_ALERT_STATUS }
+      ])
+
+      return result
     } catch (error) {
       logger.error('获取告警详情失败:', error)
       throw error

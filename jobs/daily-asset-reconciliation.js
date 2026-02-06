@@ -493,7 +493,13 @@ class DailyAssetReconciliation {
         status: 'approved',
         is_deleted: 0
       },
-      attributes: ['record_id', 'user_id', 'reward_transaction_id', 'points_to_award', 'created_at']
+      attributes: [
+        'consumption_record_id',
+        'user_id',
+        'reward_transaction_id',
+        'points_to_award',
+        'created_at'
+      ]
     })
 
     const missing_transaction_ids = []
@@ -503,7 +509,7 @@ class DailyAssetReconciliation {
       if (!record.reward_transaction_id) {
         // 缺失关联：已审核通过但没有奖励流水ID
         missing_transaction_ids.push({
-          record_id: record.record_id,
+          consumption_record_id: record.consumption_record_id,
           user_id: record.user_id,
           points_to_award: record.points_to_award,
           created_at: record.created_at
@@ -514,7 +520,7 @@ class DailyAssetReconciliation {
         const transaction = await AssetTransaction.findByPk(record.reward_transaction_id)
         if (!transaction) {
           orphan_transaction_ids.push({
-            record_id: record.record_id,
+            consumption_record_id: record.consumption_record_id,
             reward_transaction_id: record.reward_transaction_id,
             user_id: record.user_id,
             created_at: record.created_at
@@ -543,7 +549,13 @@ class DailyAssetReconciliation {
       where: {
         created_at: { [Op.gte]: cutoffDate }
       },
-      attributes: ['record_id', 'user_id', 'debit_transaction_id', 'pay_amount', 'created_at']
+      attributes: [
+        'exchange_record_id',
+        'user_id',
+        'debit_transaction_id',
+        'pay_amount',
+        'created_at'
+      ]
     })
 
     const missing_transaction_ids = []
@@ -553,7 +565,7 @@ class DailyAssetReconciliation {
       if (!record.debit_transaction_id) {
         // 缺失关联：兑换记录没有关联扣减流水ID
         missing_transaction_ids.push({
-          record_id: record.record_id,
+          exchange_record_id: record.exchange_record_id,
           user_id: record.user_id,
           pay_amount: record.pay_amount,
           created_at: record.created_at
@@ -564,7 +576,7 @@ class DailyAssetReconciliation {
         const transaction = await AssetTransaction.findByPk(record.debit_transaction_id)
         if (!transaction) {
           orphan_transaction_ids.push({
-            record_id: record.record_id,
+            exchange_record_id: record.exchange_record_id,
             debit_transaction_id: record.debit_transaction_id,
             user_id: record.user_id,
             created_at: record.created_at
@@ -627,7 +639,7 @@ class DailyAssetReconciliation {
       console.log('   缺失详情:')
       results.consumption_records.missing_transaction_ids.slice(0, 5).forEach(r => {
         console.log(
-          `     - record_id=${r.record_id}, user=${r.user_id}, points=${r.points_to_award}`
+          `     - consumption_record_id=${r.consumption_record_id}, user=${r.user_id}, points=${r.points_to_award}`
         )
       })
       if (results.consumption_records.missing_transaction_ids.length > 5) {
@@ -646,7 +658,9 @@ class DailyAssetReconciliation {
     if (results.exchange_records.missing_transaction_ids.length > 0) {
       console.log('   缺失详情:')
       results.exchange_records.missing_transaction_ids.slice(0, 5).forEach(r => {
-        console.log(`     - record_id=${r.record_id}, user=${r.user_id}, amount=${r.pay_amount}`)
+        console.log(
+          `     - exchange_record_id=${r.exchange_record_id}, user=${r.user_id}, amount=${r.pay_amount}`
+        )
       })
       if (results.exchange_records.missing_transaction_ids.length > 5) {
         console.log(

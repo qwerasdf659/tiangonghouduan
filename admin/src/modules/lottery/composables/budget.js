@@ -192,15 +192,8 @@ export function useBudgetMethods() {
       return 'bg-success'
     },
 
-    /**
-     * 获取预算模式文本
-     * @param {string} mode - 预算模式代码
-     * @returns {string} 预算模式文本
-     */
-    getBudgetModeText(mode) {
-      const modeMap = { pool: '总预算', user: '用户预算', daily: '每日预算', none: '无预算' }
-      return modeMap[mode] || mode || '未设置'
-    },
+    // ✅ 已删除 getBudgetModeText 映射函数
+    // 中文显示名称由后端 attachDisplayNames 统一返回 budget_mode_display 字段
 
     // ========== P1新增: 消耗趋势图方法 ==========
 

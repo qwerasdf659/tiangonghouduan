@@ -69,8 +69,8 @@
                 </template>
               </template>
               <!-- 空状态 -->
-              <template x-if="!loading && materialTypes.length === 0">
-                <tr>
+
+                <tr x-show="!loading && materialTypes.length === 0">
                   <td colspan="5" class="px-4 py-12">
                     <div class="flex flex-col items-center justify-center text-center">
                       <div class="text-6xl mb-4">📦</div>
@@ -79,7 +79,7 @@
                     </div>
                   </td>
                 </tr>
-              </template>
+
               <!-- 数据列表 -->
               <template x-for="asset in materialTypes" :key="asset.asset_code">
                 <tr class="themed-hover-bg transition-colors">
@@ -410,30 +410,30 @@
         </div>
         <div class="p-6">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div class="themed-bg-primary-light rounded-lg p-6 text-center">
-              <div class="text-3xl font-bold themed-text-primary" x-text="(assetStats.totalMaterialValue || 0).toLocaleString()"></div>
+            <div class="themed-bg-primary-light rounded-lg p-6 text-center overflow-hidden">
+              <div class="text-3xl font-bold themed-text-primary truncate" x-text="(assetStats.totalMaterialValue || 0).toLocaleString()" :title="String(assetStats.totalMaterialValue || 0)"></div>
               <div class="themed-text-muted mt-2">材料流通总量</div>
             </div>
-            <div class="bg-purple-50 rounded-lg p-6 text-center">
-              <div class="text-3xl font-bold text-purple-600" x-text="(assetStats.totalVirtualValue || 0).toLocaleString()"></div>
+            <div class="bg-purple-50 rounded-lg p-6 text-center overflow-hidden">
+              <div class="text-3xl font-bold text-purple-600 truncate" x-text="(assetStats.totalVirtualValue || 0).toLocaleString()" :title="String(assetStats.totalVirtualValue || 0)"></div>
               <div class="themed-text-muted mt-2">虚拟资产流通量</div>
             </div>
-            <div class="bg-green-50 rounded-lg p-6 text-center">
-              <div class="text-3xl font-bold text-green-600" x-text="assetStats.totalAssetTypes || 0"></div>
+            <div class="bg-green-50 rounded-lg p-6 text-center overflow-hidden">
+              <div class="text-3xl font-bold text-green-600 truncate" x-text="assetStats.totalAssetTypes || 0"></div>
               <div class="themed-text-muted mt-2">资产类型数</div>
             </div>
-            <div class="bg-orange-50 rounded-lg p-6 text-center">
-              <div class="text-3xl font-bold text-orange-600" x-text="assetStats.totalHolders || 0"></div>
+            <div class="bg-orange-50 rounded-lg p-6 text-center overflow-hidden">
+              <div class="text-3xl font-bold text-orange-600 truncate" x-text="assetStats.totalHolders || 0"></div>
               <div class="themed-text-muted mt-2">持有者数量</div>
             </div>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-            <div class="themed-bg-base rounded-lg p-6 text-center">
-              <div class="text-3xl font-bold themed-text-secondary" x-text="(assetStats.totalCirculation || 0).toLocaleString()"></div>
+            <div class="themed-bg-base rounded-lg p-6 text-center overflow-hidden">
+              <div class="text-3xl font-bold themed-text-secondary truncate" x-text="(assetStats.totalCirculation || 0).toLocaleString()" :title="String(assetStats.totalCirculation || 0)"></div>
               <div class="themed-text-muted mt-2">总流通量</div>
             </div>
-            <div class="bg-red-50 rounded-lg p-6 text-center">
-              <div class="text-3xl font-bold text-red-600" x-text="(assetStats.totalFrozen || 0).toLocaleString()"></div>
+            <div class="bg-red-50 rounded-lg p-6 text-center overflow-hidden">
+              <div class="text-3xl font-bold text-red-600 truncate" x-text="(assetStats.totalFrozen || 0).toLocaleString()" :title="String(assetStats.totalFrozen || 0)"></div>
               <div class="themed-text-muted mt-2">总冻结量</div>
             </div>
           </div>
@@ -694,8 +694,6 @@
   <!-- 页面专属逻辑 -->
   <%- include('partials/footer') %>
 
-
   <script type="module" src="./src/modules/asset/pages/asset-management.js"></script>
 </body>
 </html>
-

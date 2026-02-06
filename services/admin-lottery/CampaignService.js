@@ -19,6 +19,7 @@ const models = require('../../models')
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const logger = require('../../utils/logger').logger
+const { attachDisplayNames, DICT_TYPES } = require('../../utils/displayNameHelper')
 
 /**
  * 管理后台抽奖活动管理服务类
@@ -219,13 +220,20 @@ class AdminLotteryCampaignService {
 
       const campaigns = await LotteryCampaign.findAll(queryOptions)
 
+      // 附加中文显示名称（status/campaign_type → _display/_color）
+      const campaignData = campaigns.map(c => (c.toJSON ? c.toJSON() : c))
+      await attachDisplayNames(campaignData, [
+        { field: 'status', dictType: DICT_TYPES.CAMPAIGN_STATUS },
+        { field: 'campaign_type', dictType: DICT_TYPES.CAMPAIGN_TYPE }
+      ])
+
       logger.info('[查询任务] 活跃活动列表查询完成', {
-        count: campaigns.length,
+        count: campaignData.length,
         limit,
         includePrizes
       })
 
-      return campaigns
+      return campaignData
     } catch (error) {
       logger.error('[查询任务] 活跃活动列表查询失败', {
         error: error.message,

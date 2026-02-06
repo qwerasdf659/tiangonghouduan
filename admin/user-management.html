@@ -97,8 +97,8 @@
                   </template>
                 </template>
                 <!-- 空状态组件 -->
-                <template x-if="!loading && users.length === 0">
-                  <tr>
+
+                  <tr x-show="!loading && users.length === 0">
                     <td colspan="6" class="px-4 py-12">
                       <div class="flex flex-col items-center justify-center text-center">
                         <div class="text-6xl mb-4">👥</div>
@@ -110,7 +110,7 @@
                       </div>
                     </td>
                   </tr>
-                </template>
+
                 <template x-for="user in users" :key="user.user_id">
                   <tr class="themed-hover-bg">
                     <td class="px-4 py-3 text-sm" x-text="user.user_id"></td>
@@ -120,7 +120,7 @@
                       <span 
                         :class="getUserStatusClass(user.status)"
                         class="px-2 py-1 text-xs rounded text-white"
-                        x-text="getUserStatusText(user.status)"
+                        x-text="user.status_display || user.status"
                       ></span>
                     </td>
                     <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(user.created_at)"></td>
@@ -194,8 +194,8 @@
                   </template>
                 </template>
                 <!-- 空状态 -->
-                <template x-if="!loading && roles.length === 0">
-                  <tr>
+
+                  <tr x-show="!loading && roles.length === 0">
                     <td colspan="5" class="px-4 py-12">
                       <div class="flex flex-col items-center justify-center text-center">
                         <div class="text-6xl mb-4">🛡️</div>
@@ -204,7 +204,7 @@
                       </div>
                     </td>
                   </tr>
-                </template>
+
                 <!-- 数据列表 -->
                 <template x-for="role in roles" :key="role.role_id">
                   <tr class="themed-hover-bg transition-colors">
@@ -262,9 +262,10 @@
                 </tr>
               </thead>
               <tbody class="divide-y">
-                <template x-if="!loading && permissions.length === 0">
-                  <tr><td colspan="4" class="px-4 py-8 text-center themed-text-muted">暂无权限数据，请先在角色管理中配置角色权限</td></tr>
-                </template>
+
+                <tr x-show="!loading && permissions.length === 0">
+                  <td colspan="4" class="px-4 py-8 text-center themed-text-muted">暂无权限数据</td>
+                </tr>
                 <template x-for="perm in permissions" :key="perm.permission_code">
                   <tr class="themed-hover-bg">
                     <td class="px-4 py-3 text-sm font-mono themed-bg-base" x-text="perm.permission_code"></td>
@@ -411,9 +412,10 @@
                 <template x-if="loading">
                   <tr><td colspan="7" class="px-4 py-8 text-center themed-text-muted">加载中...</td></tr>
                 </template>
-                <template x-if="!loading && premiumUsers.length === 0">
-                  <tr><td colspan="7" class="px-4 py-8 text-center themed-text-muted">暂无高级用户数据</td></tr>
-                </template>
+
+                <tr x-show="!loading && premiumUsers.length === 0">
+                  <td colspan="7" class="px-4 py-8 text-center themed-text-muted">暂无高级用户数据</td>
+                </tr>
                 <template x-for="user in premiumUsers" :key="user.user_id">
                   <tr class="themed-hover-bg">
                     <td class="px-4 py-3 text-sm" x-text="user.user_id"></td>
@@ -425,7 +427,7 @@
                         x-text="user.is_valid ? '有效' : '无效/过期'"
                       ></span>
                     </td>
-                    <td class="px-4 py-3 text-sm" x-text="getUnlockMethodText(user.unlock_method)"></td>
+                    <td class="px-4 py-3 text-sm" x-text="user.unlock_method_display || user.unlock_method"></td>
                     <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(user.unlock_time || user.created_at)"></td>
                     <td class="px-4 py-3 text-sm themed-text-muted" x-text="user.expires_at ? formatDateTimeShort(user.expires_at) : '永久'"></td>
                     <td class="px-4 py-3">
@@ -523,9 +525,10 @@
                 <template x-if="loading">
                   <tr><td colspan="7" class="px-4 py-8 text-center themed-text-muted">加载中...</td></tr>
                 </template>
-                <template x-if="!loading && riskProfiles.length === 0">
-                  <tr><td colspan="7" class="px-4 py-8 text-center themed-text-muted">暂无风控配置数据</td></tr>
-                </template>
+
+                <tr x-show="!loading && riskProfiles.length === 0">
+                  <td colspan="7" class="px-4 py-8 text-center themed-text-muted">暂无风控画像数据</td>
+                </tr>
                 <template x-for="(profile, index) in riskProfiles" :key="profile.risk_profile_id || `risk_${index}`">
                   <tr class="themed-hover-bg">
                     <td class="px-4 py-3 text-sm">
@@ -618,9 +621,10 @@
                 </tr>
               </thead>
               <tbody class="divide-y">
-                <template x-if="!roleChangeHistory || roleChangeHistory.length === 0">
-                  <tr><td colspan="7" class="px-4 py-8 text-center themed-text-muted">暂无角色变更记录</td></tr>
-                </template>
+
+                <tr x-show="!roleChangeHistory || roleChangeHistory.length === 0">
+                  <td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无角色变更记录</td>
+                </tr>
                 <template x-for="(record, index) in roleChangeHistory" :key="`role-change-${record.id || index}`">
                   <tr class="themed-hover-bg">
                     <td class="px-4 py-3 text-sm" x-text="record.user_id"></td>
@@ -692,9 +696,10 @@
                 </tr>
               </thead>
               <tbody class="divide-y">
-                <template x-if="!statusChangeHistory || statusChangeHistory.length === 0">
-                  <tr><td colspan="7" class="px-4 py-8 text-center themed-text-muted">暂无状态变更记录</td></tr>
-                </template>
+
+                <tr x-show="!statusChangeHistory || statusChangeHistory.length === 0">
+                  <td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无状态变更记录</td>
+                </tr>
                 <template x-for="(record, index) in statusChangeHistory" :key="`status-change-${record.id || index}`">
                   <tr class="themed-hover-bg">
                     <td class="px-4 py-3 text-sm" x-text="record.user_id"></td>
@@ -1042,7 +1047,7 @@
                     <p>
                       <span class="px-2 py-1 text-xs rounded text-white" 
                             :class="getUserStatusClass(selectedUser.status)"
-                            x-text="getUserStatusText(selectedUser.status)"></span>
+                            x-text="selectedUser.status_display || selectedUser.status"></span>
                     </p>
                   </div>
                   <div>
@@ -1062,9 +1067,9 @@
                     <button @click="loadUserActivities(selectedUser.user_id)" class="text-xs themed-text-primary hover:underline">刷新</button>
                   </div>
                   <div class="max-h-48 overflow-y-auto">
-                    <template x-if="!userActivities || userActivities.length === 0">
-                      <p class="text-center py-4 themed-text-muted text-sm">暂无行为记录</p>
-                    </template>
+
+                      <p x-show="!userActivities || userActivities.length === 0" class="text-center py-4 themed-text-muted text-sm">
+
                     <div class="relative pl-6">
                       <!-- 时间线竖线 -->
                       <div class="absolute left-2 top-0 bottom-0 w-0.5 bg-gray-200"></div>
@@ -1284,7 +1289,7 @@
                   </div>
                   <div>
                     <label class="text-sm themed-text-muted">解锁方式</label>
-                    <p class="font-medium" x-text="getUnlockMethodText(selectedPremiumUser.unlock_method)"></p>
+                    <p class="font-medium" x-text="selectedPremiumUser.unlock_method_display || selectedPremiumUser.unlock_method"></p>
                   </div>
                   <div>
                     <label class="text-sm themed-text-muted">解锁时间</label>
@@ -1426,12 +1431,12 @@
               <div x-show="!roleForm.role_id || !isSystemRole(roleForm.role_name)">
                 <label class="block text-sm font-medium themed-text-secondary mb-2">权限配置</label>
                 <div class="border rounded-lg p-4 max-h-80 overflow-y-auto themed-bg-base">
-                  <template x-if="permissionResources.length === 0">
-                    <div class="text-center py-4 themed-text-muted">
+
+                    <div x-show="permissionResources.length === 0" class="text-center py-4 themed-text-muted">
                       <p>加载权限资源中...</p>
                       <button type="button" @click="loadPermissionResources()" class="themed-text-primary text-sm mt-2">点击重新加载</button>
                     </div>
-                  </template>
+
                   <template x-for="resource in permissionResources" :key="resource.code">
                     <div class="mb-4 pb-4 border-b themed-border last:border-b-0 last:pb-0 last:mb-0">
                       <div class="font-medium themed-text-secondary mb-2">

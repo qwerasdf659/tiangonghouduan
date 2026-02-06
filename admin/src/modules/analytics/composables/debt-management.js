@@ -283,16 +283,7 @@ export function useDebtManagementMethods() {
      * @param {string} status - 债务状态
      * @returns {string} 状态文本
      */
-    getDebtStatusText(status) {
-      const map = {
-        pending: '待还款',
-        partial: '部分还款',
-        paid: '已结清',
-        overdue: '已逾期',
-        written_off: '已核销'
-      }
-      return map[status] || status
-    }
+    // ✅ 已删除 getDebtStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
   }
 }
 

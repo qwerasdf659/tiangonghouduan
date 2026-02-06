@@ -140,6 +140,8 @@ export function useDictMethods() {
      */
     async switchDictType(dictType) {
       if (this.dictTypes[dictType]) {
+        // 先清空列表，防止 x-for key 在类型切换时因 codeField 变化导致重复 key
+        this.dictList = []
         this.currentDictType = dictType
         await this.loadDictList()
       }

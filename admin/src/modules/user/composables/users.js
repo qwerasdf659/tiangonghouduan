@@ -364,10 +364,7 @@ export function useUsersMethods() {
      * @param {string} status - 用户状态
      * @returns {string} 状态文本
      */
-    getUserStatusText(status) {
-      const map = { active: '正常', inactive: '禁用', banned: '封禁', pending: '待审核' }
-      return map[status] || status
-    },
+    // ✅ 已删除 getUserStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 管理用户角色 - 打开角色分配弹窗

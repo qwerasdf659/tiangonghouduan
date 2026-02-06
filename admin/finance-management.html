@@ -652,7 +652,7 @@
                     <span 
                       :class="budget.budget_mode === 'UNLIMITED' ? 'themed-bg-primary-light themed-text-primary' : 'bg-purple-100 text-purple-700'"
                       class="px-2 py-1 text-xs rounded"
-                      x-text="getBudgetModeText(budget.budget_mode)"
+                      x-text="budget.budget_mode_display || budget.budget_mode"
                     ></span>
                   </td>
                   <td class="px-4 py-3 text-sm font-mono" x-text="budget.pool_budget_remaining ?? budget.remaining ?? '-'"></td>
@@ -660,7 +660,7 @@
                     <span 
                       :class="getBudgetStatusFromData(budget) === 'active' ? 'bg-green-100 themed-text-success' : 'bg-red-100 text-red-700'"
                       class="px-2 py-1 text-xs rounded"
-                      x-text="getBudgetStatusText(getBudgetStatusFromData(budget))"
+                      x-text="budget.status_display || getBudgetStatusFromData(budget)"
                     ></span>
                   </td>
                   <td class="px-4 py-3">
@@ -795,7 +795,7 @@
             </div>
             <div class="flex justify-between border-b pb-2">
               <span class="themed-text-muted">状态</span>
-              <span class="px-2 py-1 text-xs rounded" :class="getConsumptionStatusClass(selectedConsumption?.status)" x-text="getConsumptionStatusText(selectedConsumption?.status)"></span>
+              <span class="px-2 py-1 text-xs rounded" :class="getConsumptionStatusClass(selectedConsumption?.status)" x-text="selectedConsumption?.status_display || selectedConsumption?.status"></span>
             </div>
             <div class="flex justify-between border-b pb-2">
               <span class="themed-text-muted">提交时间</span>

@@ -57,6 +57,9 @@ function assetsPortfolioPage() {
     /** ECharts 核心模块引用 */
     _echarts: null,
 
+    /** resize 事件绑定标记 */
+    _resizeHandlerBound: false,
+
     /** 资产统计详情（用于图表） */
     _assetStats: [],
 
@@ -162,6 +165,10 @@ function assetsPortfolioPage() {
 
     /**
      * 加载资产类型
+     *
+     * 后端 /asset-adjustment/asset-types 会返回 builtin (POINTS/DIAMOND/BUDGET_POINTS)
+     * 和 material (DIAMOND/BUDGET_POINTS/red_shard) 两组，存在 asset_code 重复。
+     * 前端按 asset_code 去重，优先保留 builtin 分类。
      */
     async loadAssetTypes() {
       try {
@@ -171,8 +178,20 @@ function assetsPortfolioPage() {
         })
         if (response && response.success) {
           const data = response.data?.asset_types || response.data
-          this.assetTypes = Array.isArray(data) ? data : []
-          logger.debug('[AssetsPortfolioPage] 资产类型加载成功:', this.assetTypes.length, '种类型')
+          const rawTypes = Array.isArray(data) ? data : []
+
+          // 按 asset_code 去重，优先保留 builtin 分类
+          const typeMap = new Map()
+          for (const type of rawTypes) {
+            if (!type || !type.asset_code) continue
+            // builtin 优先；如已有 builtin 则跳过 material 同名项
+            if (!typeMap.has(type.asset_code) || type.category === 'builtin') {
+              typeMap.set(type.asset_code, type)
+            }
+          }
+          this.assetTypes = Array.from(typeMap.values())
+
+          logger.debug('[AssetsPortfolioPage] 资产类型加载成功:', this.assetTypes.length, '种类型（去重后）')
         }
       } catch (error) {
         logger.error('[AssetsPortfolioPage] 加载资产类型失败:', error)
@@ -229,6 +248,20 @@ function assetsPortfolioPage() {
               updated_at: item.updated_at || new Date().toISOString()
             }
           })
+
+          // 客户端筛选：如果指定了资产类型
+          if (this.searchForm.asset_type) {
+            this.assets = this.assets.filter(
+              a => a.asset_type === this.searchForm.asset_type
+            )
+          }
+
+          // 客户端筛选：如果指定了最低价值
+          if (this.searchForm.min_value && this.searchForm.min_value > 0) {
+            this.assets = this.assets.filter(
+              a => a.total_value >= this.searchForm.min_value
+            )
+          }
 
           // 资产余额无分页，直接使用数组长度
           this.total_records = this.assets.length
@@ -401,6 +434,8 @@ function assetsPortfolioPage() {
 
     /**
      * 初始化图表
+     * 注意：此页面可能在 iframe 中加载（如 prize-config.html 的 Tab），
+     * 需要确保图表容器可见且有尺寸后再初始化
      */
     initCharts() {
       const echarts = this._echarts
@@ -411,8 +446,57 @@ function assetsPortfolioPage() {
         return
       }
 
-      this.initAssetTypeChart()
-      this.initValueTrendChart()
+      // 检查图表容器是否有尺寸（iframe 中可能还未可见）
+      const chartDom = document.getElementById('assetTypeChart')
+      if (chartDom && chartDom.offsetWidth > 0) {
+        this.initAssetTypeChart()
+        this.initValueTrendChart()
+      } else {
+        // 容器尚无尺寸，延迟初始化并监听可见性变化
+        logger.info('[AssetsPortfolioPage] 图表容器暂无尺寸，延迟初始化...')
+        this._scheduleChartInit()
+      }
+    },
+
+    /**
+     * 延迟初始化图表（处理 iframe/隐藏 Tab 场景）
+     */
+    _scheduleChartInit() {
+      // 方案1：使用 ResizeObserver 监听容器尺寸变化
+      const chartDom = document.getElementById('assetTypeChart')
+      if (chartDom && typeof ResizeObserver !== 'undefined') {
+        const observer = new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            if (entry.contentRect.width > 0 && entry.contentRect.height > 0) {
+              logger.info('[AssetsPortfolioPage] 图表容器可见，开始初始化图表')
+              observer.disconnect()
+              this.initAssetTypeChart()
+              this.initValueTrendChart()
+              return
+            }
+          }
+        })
+        observer.observe(chartDom)
+        // 安全超时：30秒后断开观察
+        setTimeout(() => observer.disconnect(), 30000)
+      } else {
+        // 方案2：降级为定时重试
+        let retries = 0
+        const maxRetries = 10
+        const retryInterval = setInterval(() => {
+          retries++
+          const dom = document.getElementById('assetTypeChart')
+          if (dom && dom.offsetWidth > 0) {
+            clearInterval(retryInterval)
+            logger.info('[AssetsPortfolioPage] 图表容器就绪（重试' + retries + '次）')
+            this.initAssetTypeChart()
+            this.initValueTrendChart()
+          } else if (retries >= maxRetries) {
+            clearInterval(retryInterval)
+            logger.warn('[AssetsPortfolioPage] 图表容器始终无尺寸，放弃初始化')
+          }
+        }, 500)
+      }
     },
 
     /**
@@ -473,6 +557,8 @@ function assetsPortfolioPage() {
 
     /**
      * 初始化资产价值趋势图
+     * 使用各资产类型的流通量作为柱状对比图
+     * （后端暂无时序趋势API，使用当前各资产流通量对比）
      */
     initValueTrendChart() {
       const echarts = this._echarts
@@ -484,24 +570,27 @@ function assetsPortfolioPage() {
       // 防止重复初始化：先检查是否已有实例
       this.valueTrendChart = echarts.getInstanceByDom(chartDom) || echarts.init(chartDom)
 
-      // 生成模拟趋势数据（实际应从API获取）
-      const dates = []
-      const values = []
-      const today = new Date()
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(today)
-        date.setDate(date.getDate() - i)
-        dates.push(`${date.getMonth() + 1}/${date.getDate()}`)
-        values.push(Math.floor(Math.random() * 1000) + this.overview.total_circulation * 0.9)
-      }
+      // 使用真实的资产统计数据作为柱状对比
+      const statsData = this._assetStats || []
+      const assetNames = statsData.map(stat => stat.asset_code)
+      const circulationValues = statsData.map(stat => stat.total_circulation || 0)
+      const frozenValues = statsData.map(stat => stat.total_frozen || 0)
 
       const option = {
         tooltip: {
-          trigger: 'axis'
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' }
+        },
+        legend: {
+          data: ['流通量', '冻结量']
         },
         xAxis: {
           type: 'category',
-          data: dates
+          data: assetNames.length > 0 ? assetNames : ['暂无数据'],
+          axisLabel: {
+            rotate: assetNames.length > 5 ? 30 : 0,
+            fontSize: 11
+          }
         },
         yAxis: {
           type: 'value',
@@ -511,32 +600,45 @@ function assetsPortfolioPage() {
         },
         series: [
           {
-            name: '资产价值',
-            type: 'line',
-            smooth: true,
-            data: values,
-            areaStyle: {
-              opacity: 0.3
-            },
-            lineStyle: {
-              width: 2
-            }
+            name: '流通量',
+            type: 'bar',
+            data: circulationValues.length > 0 ? circulationValues : [0],
+            itemStyle: { color: '#10b981' }
+          },
+          {
+            name: '冻结量',
+            type: 'bar',
+            data: frozenValues.length > 0 ? frozenValues : [0],
+            itemStyle: { color: '#f59e0b' }
           }
         ]
       }
 
       this.valueTrendChart.setOption(option)
+
+      // 监听窗口 resize 事件（iframe 场景下重要）
+      if (!this._resizeHandlerBound) {
+        this._resizeHandlerBound = true
+        window.addEventListener('resize', () => {
+          if (this.assetTypeChart) this.assetTypeChart.resize()
+          if (this.valueTrendChart) this.valueTrendChart.resize()
+        })
+      }
     },
 
     // ==================== 工具方法 ====================
 
     /**
-     * 格式化货币
+     * 格式化货币（大数使用紧凑显示：万/亿）
      */
     formatCurrency(value) {
       if (value === null || value === undefined) return '¥0.00'
       const num = Number(value)
       if (isNaN(num)) return '¥0.00'
+      if (num >= 1e16) return '¥' + (num / 1e16).toFixed(2) + '京'
+      if (num >= 1e12) return '¥' + (num / 1e12).toFixed(2) + '万亿'
+      if (num >= 1e8) return '¥' + (num / 1e8).toFixed(2) + '亿'
+      if (num >= 1e4) return '¥' + (num / 1e4).toFixed(2) + '万'
       return (
         '¥' + num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       )
@@ -567,22 +669,7 @@ function assetsPortfolioPage() {
     /**
      * 获取资产类型显示文本
      */
-    getAssetTypeText(type) {
-      const typeMap = {
-        points: '积分',
-        POINTS: '积分',
-        balance: '余额',
-        BALANCE: '余额',
-        diamond: '钻石',
-        DIAMOND: '钻石',
-        material: '材料',
-        MATERIAL: '材料',
-        item: '物品',
-        ITEM: '物品',
-        BUDGET_POINTS: '预算积分'
-      }
-      return typeMap[type] || type || '未知'
-    }
+    // ✅ 已删除 getAssetTypeText 映射函数 - 改用后端 _display 字段（P2 中文化）
   }
 }
 

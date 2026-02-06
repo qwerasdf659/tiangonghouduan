@@ -249,16 +249,14 @@ async function analyzeQuotaRules() {
 
   const quotaRules = await runQuery(`
     SELECT 
-      rule_id,
-      rule_type,
-      lottery_campaign_id,
-      role_name,
-      user_id,
-      daily_draw_limit,
+      lottery_draw_quota_rule_id,
+      scope_type,
+      scope_id,
+      limit_value,
       priority,
       status,
-      effective_start,
-      effective_end
+      effective_from,
+      effective_to
     FROM lottery_draw_quota_rules
     WHERE status = 'active'
     ORDER BY priority DESC
@@ -267,23 +265,23 @@ async function analyzeQuotaRules() {
 
   console.log(`\n📌 配额规则总数: ${quotaRules.length} 条 (显示前20条)`)
 
-  // 按规则类型分组
+  // 按作用域类型分组（scope_type: global/campaign/role/user）
   const byType = {}
   for (const rule of quotaRules) {
-    if (!byType[rule.rule_type]) {
-      byType[rule.rule_type] = []
+    if (!byType[rule.scope_type]) {
+      byType[rule.scope_type] = []
     }
-    byType[rule.rule_type].push(rule)
+    byType[rule.scope_type].push(rule)
   }
 
   for (const [type, rules] of Object.entries(byType)) {
     console.log(`\n  规则类型: ${type}`)
     for (const rule of rules.slice(0, 5)) {
       let target = ''
-      if (rule.lottery_campaign_id) target = `活动#${rule.lottery_campaign_id}`
-      if (rule.role_name) target = `角色:${rule.role_name}`
-      if (rule.user_id) target = `用户#${rule.user_id}`
-      console.log(`    [${rule.rule_id}] ${target || '全局'} | 每日限制: ${rule.daily_draw_limit} 次 | 优先级: ${rule.priority}`)
+      if (rule.scope_type === 'campaign') target = `活动#${rule.scope_id}`
+      if (rule.scope_type === 'role') target = `角色:${rule.scope_id}`
+      if (rule.scope_type === 'user') target = `用户#${rule.scope_id}`
+      console.log(`    [${rule.lottery_draw_quota_rule_id}] ${target || '全局'} | 每日限制: ${rule.limit_value} 次 | 优先级: ${rule.priority}`)
     }
   }
 

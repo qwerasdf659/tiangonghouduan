@@ -198,7 +198,7 @@ async function testGetQuotaRules() {
         log('\n规则列表（后端字段结构）:', 'cyan')
         rules.slice(0, 5).forEach((rule, idx) => {
           log(`  规则${idx + 1}:`, 'reset')
-          log(`    - rule_id: ${rule.rule_id}`, 'reset')
+          log(`    - lottery_draw_quota_rule_id: ${rule.lottery_draw_quota_rule_id}`, 'reset')
           log(`    - scope_type: ${rule.scope_type}`, 'reset')
           log(`    - scope_id: ${rule.scope_id}`, 'reset')
           log(`    - limit_value: ${rule.limit_value}`, 'reset')
@@ -291,12 +291,12 @@ async function testCreateQuotaRule(campaignId) {
     if (res.data?.success) {
       const rule = res.data.data || {}
       log('\n创建的规则（后端返回字段）:', 'cyan')
-      log(`  - rule_id: ${rule.rule_id}`, 'reset')
+      log(`  - lottery_draw_quota_rule_id: ${rule.lottery_draw_quota_rule_id}`, 'reset')
       log(`  - scope_type: ${rule.scope_type}`, 'reset')
       log(`  - limit_value: ${rule.limit_value}`, 'reset')
       log(`  - status: ${rule.status}`, 'reset')
 
-      return rule.rule_id
+      return rule.lottery_draw_quota_rule_id
     } else {
       log(`错误信息: ${res.data?.message || '未知错误'}`, 'red')
       return null
@@ -330,7 +330,7 @@ async function testDisableQuotaRule(ruleId) {
     if (res.data?.success) {
       const rule = res.data.data || {}
       log('\n禁用后的规则:', 'cyan')
-      log(`  - rule_id: ${rule.rule_id}`, 'reset')
+      log(`  - lottery_draw_quota_rule_id: ${rule.lottery_draw_quota_rule_id}`, 'reset')
       log(`  - status: ${rule.status}`, 'reset')
     } else {
       log(`错误信息: ${res.data?.message || '未知错误'}`, 'red')

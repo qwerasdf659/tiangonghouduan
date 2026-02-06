@@ -89,7 +89,7 @@ class LotteryCampaignPricingConfigService {
 
     // 构建响应数据（包含计算属性）
     return {
-      config_id: pricing_config.config_id,
+      config_id: pricing_config.lottery_campaign_pricing_config_id,
       lottery_campaign_id: pricing_config.lottery_campaign_id,
       campaign_code: campaign.campaign_code,
       version: pricing_config.version,
@@ -137,7 +137,7 @@ class LotteryCampaignPricingConfigService {
 
     // 转换为响应格式
     const versions_data = versions.map(v => ({
-      config_id: v.config_id,
+      config_id: v.lottery_campaign_pricing_config_id,
       version: v.version,
       status: v.status,
       status_display: v.getStatusDisplayName(),
@@ -202,7 +202,7 @@ class LotteryCampaignPricingConfigService {
 
     logger.info('创建新版本定价配置成功', {
       lottery_campaign_id,
-      config_id: new_config.config_id,
+      config_id: new_config.lottery_campaign_pricing_config_id,
       version: new_config.version,
       created_by
     })
@@ -230,7 +230,7 @@ class LotteryCampaignPricingConfigService {
     }
 
     return {
-      config_id: new_config.config_id,
+      config_id: new_config.lottery_campaign_pricing_config_id,
       lottery_campaign_id: new_config.lottery_campaign_id,
       version: new_config.version,
       status: activate_immediately ? 'active' : new_config.status,
@@ -283,14 +283,14 @@ class LotteryCampaignPricingConfigService {
     logger.info('激活定价配置版本成功', {
       lottery_campaign_id,
       version,
-      config_id: result.config_id,
+      config_id: result.lottery_campaign_pricing_config_id,
       updated_by
     })
 
     return {
       lottery_campaign_id: parseInt(lottery_campaign_id, 10),
       activated_version: result.version,
-      config_id: result.config_id,
+      config_id: result.lottery_campaign_pricing_config_id,
       status: result.status,
       effective_at: result.effective_at
     }
@@ -349,14 +349,14 @@ class LotteryCampaignPricingConfigService {
     logger.info('归档定价配置版本成功', {
       lottery_campaign_id,
       version,
-      config_id: config.config_id,
+      config_id: config.lottery_campaign_pricing_config_id,
       updated_by
     })
 
     return {
       lottery_campaign_id: parseInt(lottery_campaign_id, 10),
       archived_version: parseInt(version, 10),
-      config_id: config.config_id,
+      config_id: config.lottery_campaign_pricing_config_id,
       status: 'archived'
     }
   }
@@ -467,7 +467,7 @@ class LotteryCampaignPricingConfigService {
       lottery_campaign_id,
       rollback_from_version: target_version,
       new_version: new_config.version,
-      config_id: new_config.config_id,
+      config_id: new_config.lottery_campaign_pricing_config_id,
       rollback_reason,
       updated_by
     })
@@ -476,7 +476,7 @@ class LotteryCampaignPricingConfigService {
       lottery_campaign_id: parseInt(lottery_campaign_id, 10),
       rollback_from_version: parseInt(target_version, 10),
       new_version: new_config.version,
-      new_config_id: new_config.config_id,
+      new_config_id: new_config.lottery_campaign_pricing_config_id,
       status: 'active',
       rollback_reason: rollback_reason || '管理员手动回滚'
     }
@@ -574,7 +574,7 @@ class LotteryCampaignPricingConfigService {
     logger.info('设置定价配置定时生效成功', {
       lottery_campaign_id,
       version,
-      config_id: config.config_id,
+      config_id: config.lottery_campaign_pricing_config_id,
       effective_at: effective_date.toISOString(),
       updated_by
     })
@@ -582,7 +582,7 @@ class LotteryCampaignPricingConfigService {
     return {
       lottery_campaign_id: parseInt(lottery_campaign_id, 10),
       scheduled_version: parseInt(version, 10),
-      config_id: config.config_id,
+      config_id: config.lottery_campaign_pricing_config_id,
       status: 'scheduled',
       effective_at: effective_date.toISOString()
     }
@@ -642,14 +642,14 @@ class LotteryCampaignPricingConfigService {
     logger.info('取消定价配置定时生效成功', {
       lottery_campaign_id,
       version,
-      config_id: config.config_id,
+      config_id: config.lottery_campaign_pricing_config_id,
       updated_by
     })
 
     return {
       lottery_campaign_id: parseInt(lottery_campaign_id, 10),
       cancelled_version: parseInt(version, 10),
-      config_id: config.config_id,
+      config_id: config.lottery_campaign_pricing_config_id,
       status: 'draft'
     }
   }
@@ -713,7 +713,7 @@ class LotteryCampaignPricingConfigService {
         logger.info('定时生效配置已激活', {
           lottery_campaign_id,
           version: config.version,
-          config_id: config.config_id,
+          config_id: config.lottery_campaign_pricing_config_id,
           effective_at: config.effective_at
         })
 
@@ -735,7 +735,7 @@ class LotteryCampaignPricingConfigService {
         logger.error('定时生效配置激活失败', {
           lottery_campaign_id,
           version: config.version,
-          config_id: config.config_id,
+          config_id: config.lottery_campaign_pricing_config_id,
           error: result.reason?.message || String(result.reason)
         })
         failed++
@@ -746,7 +746,8 @@ class LotteryCampaignPricingConfigService {
     const skipped_configs = scheduled_configs.filter(
       c =>
         !campaign_config_map.get(c.lottery_campaign_id) ||
-        campaign_config_map.get(c.lottery_campaign_id).config_id !== c.config_id
+        campaign_config_map.get(c.lottery_campaign_id).lottery_campaign_pricing_config_id !==
+          c.lottery_campaign_pricing_config_id
     )
 
     // 并行归档跳过的版本
@@ -765,7 +766,7 @@ class LotteryCampaignPricingConfigService {
       if (result.status === 'rejected') {
         const config = skipped_configs[index]
         logger.warn('归档跳过版本失败', {
-          config_id: config.config_id,
+          config_id: config.lottery_campaign_pricing_config_id,
           error: result.reason?.message || String(result.reason)
         })
       }

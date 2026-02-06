@@ -212,16 +212,7 @@ export function useFeatureFlagsMethods() {
      * @param {string} strategy - 发布策略代码
      * @returns {string} 发布策略文本
      */
-    getStrategyText(strategy) {
-      const map = {
-        all: '全量发布',
-        percentage: '百分比灰度',
-        user_list: '用户名单',
-        user_segment: '用户分群',
-        schedule: '定时发布'
-      }
-      return map[strategy] || strategy || '-'
-    },
+    // ✅ 已删除 getStrategyText 映射函数 - 改用后端 _display 字段（P2 中文化）
 
     /**
      * 获取发布策略样式
