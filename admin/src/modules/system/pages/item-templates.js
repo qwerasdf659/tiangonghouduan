@@ -29,7 +29,7 @@
  * </div>
  */
 
-import { logger } from '../../../utils/logger.js'
+import { logger, $confirmDanger } from '../../../utils/index.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 import { buildURL, request } from '../../../api/base.js'
 import { createCrudMixin } from '../../../alpine/mixins/index.js'
@@ -416,7 +416,7 @@ document.addEventListener('alpine:init', () => {
      * @fires ASSET_ENDPOINTS.ITEM_TEMPLATE_DELETE
      */
     async deleteTemplate(templateId) {
-      if (!confirm('确定要删除此物品模板吗？此操作不可恢复！')) return
+      if (!(await $confirmDanger('确定要删除此物品模板吗？此操作不可恢复！'))) return
 
       this.loading = true
       showLoading()

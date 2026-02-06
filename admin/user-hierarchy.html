@@ -105,115 +105,22 @@
       </div>
     </div>
 
-    <!-- 层级列表 -->
-    <div class="themed-card rounded-lg shadow">
-      <div class="p-4 border-b flex justify-between items-center">
+    <!-- 层级列表（data-table） -->
+    <div class="themed-card rounded-lg shadow" @table-action="handleHierarchyTableAction($event.detail)">
+      <div class="p-4 border-b">
         <h5 class="font-semibold">📊 用户层级列表</h5>
-        <span class="themed-text-muted" x-text="`共 ${total_records || 0} 条记录`">加载中...</span>
       </div>
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead class="themed-bg-base">
-            <tr>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">ID</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">角色</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">上级</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">门店</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">激活时间</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y">
-
-              <tr x-show="hierarchyList.length === 0">
-                <td colspan="8" class="px-4 py-10 text-center themed-text-muted">
-                  📭 暂无数据
-                </td>
-              </tr>
-
-            <template x-for="h in hierarchyList" :key="h.hierarchy_id">
-              <tr class="themed-hover-bg" :class="{ 'inactive-row': !h.is_active }">
-                <td class="px-4 py-3 text-sm" x-text="h.hierarchy_id"></td>
-                <td class="px-4 py-3">
-                  <div class="font-semibold" x-text="h.user_nickname || '未设置'"></div>
-                  <small class="themed-text-muted" x-text="`${h.user_mobile || '-'} (ID: ${h.user_id})`"></small>
-                </td>
-                <td class="px-4 py-3">
-                  <span class="px-2 py-1 rounded text-xs" :class="`role-badge-${h.role_level || 40}`" x-text="h.role_name || '-'"></span>
-                  <small class="block themed-text-muted" x-text="`级别: ${h.role_level || 40}`"></small>
-                </td>
-                <td class="px-4 py-3">
-                  <template x-if="h.superior_user_id">
-                    <div>
-                      <span x-text="h.superior_nickname || '-'"></span>
-                      <small class="themed-text-muted block" x-text="`ID: ${h.superior_user_id}`"></small>
-                    </div>
-                  </template>
-                  <template x-if="!h.superior_user_id">
-                    <span class="text-gray-400">-（顶级）</span>
-                  </template>
-                </td>
-                <td class="px-4 py-3 text-sm" :class="{ 'text-gray-400': !h.store_id }" x-text="h.store_id || '-'"></td>
-                <td class="px-4 py-3">
-                  <template x-if="h.is_active">
-                    <span class="px-2 py-1 bg-green-100 themed-text-success rounded text-xs">激活中</span>
-                  </template>
-                  <template x-if="!h.is_active">
-                    <div>
-                      <span class="px-2 py-1 themed-bg-subtle themed-text-muted rounded text-xs">已停用</span>
-                      <small class="block themed-text-muted" x-text="h.deactivation_reason || ''"></small>
-                    </div>
-                  </template>
-                </td>
-                <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(h.activated_at)"></td>
-                <td class="px-4 py-3">
-                  <div class="flex space-x-1">
-                    <button class="px-2 py-1 border border-blue-300 themed-text-primary rounded hover:bg-blue-50 text-sm" @click="viewSubordinates(h.user_id)" title="查看下级">
-                      📊
-                    </button>
-                    <template x-if="h.is_active">
-                      <button class="px-2 py-1 border border-yellow-300 text-yellow-600 rounded hover:bg-yellow-50 text-sm" @click="openDeactivateModal(h.user_id, h.user_nickname || h.user_mobile)" title="停用">
-                        ⏸️
-                      </button>
-                    </template>
-                    <template x-if="!h.is_active">
-                      <button class="px-2 py-1 border border-green-300 text-green-500 rounded hover:bg-green-50 text-sm" @click="activateUser(h.user_id)" title="激活">
-                        ▶️
-                      </button>
-                    </template>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-      <!-- 分页 -->
-      <div class="p-4 border-t flex justify-center">
-        <div class="flex space-x-2">
-          <button 
-            class="px-4 py-2 border rounded-lg" 
-            :class="current_page <= 1 ? 'themed-bg-subtle text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
-            :disabled="current_page <= 1"
-            @click="goToPage(current_page - 1)"
-          >上一页</button>
-          <template x-for="page in visiblePages" :key="page">
-            <button 
-              class="px-4 py-2 border rounded-lg"
-              :class="page === current_page ? 'themed-bg-primary text-white' : (page === '...' ? 'cursor-default' : 'themed-hover-bg')"
-              @click="page !== '...' && goToPage(page)"
-              x-text="page"
-            ></button>
-          </template>
-          <button 
-            class="px-4 py-2 border rounded-lg"
-            :class="current_page >= total_pages ? 'themed-bg-subtle text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
-            :disabled="current_page >= total_pages"
-            @click="goToPage(current_page + 1)"
-          >下一页</button>
-        </div>
+      <div x-data="dataTable({
+        columns: hierarchyTableColumns,
+        dataSource: fetchHierarchyTableData,
+        primaryKey: 'hierarchy_id',
+        sortable: true,
+        selectable: false,
+        exportable: true,
+        page_size: 20,
+        emptyText: '暂无层级数据'
+      })" x-init="init()" @dt-hierarchy-refresh.window="refresh()">
+        <%- include('components/data-table') %>
       </div>
     </div>
 
@@ -249,9 +156,9 @@
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium themed-text-secondary mb-1">上级用户ID</label>
-                <input type="number" class="w-full border rounded-lg px-3 py-2" x-model.number="form.superior_user_id">
-                <small class="themed-text-muted">区域负责人可不填；业务经理需填写区域负责人ID；业务员需填写业务经理ID</small>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">上级手机号</label>
+                <input type="text" class="w-full border rounded-lg px-3 py-2" maxlength="11" x-model="form.superior_mobile">
+                <small class="themed-text-muted">区域负责人可不填；业务经理需填写区域负责人手机号；业务员需填写业务经理手机号</small>
               </div>
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">关联门店ID</label>

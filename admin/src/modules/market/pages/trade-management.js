@@ -117,6 +117,131 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('tradePageContent', () => ({
     ...createPageMixin({ userResolver: true }),
 
+    // ========== data-table 列配置 ==========
+    tradeOrderTableColumns: [
+      { key: 'trade_order_id', label: '交易ID', sortable: true, type: 'code' },
+      {
+        key: 'buyer_user_id',
+        label: '买家',
+        render: (val, row) => row.buyer?.nickname || val || '-'
+      },
+      {
+        key: 'seller_user_id',
+        label: '卖家',
+        render: (val, row) => row.seller?.nickname || val || '-'
+      },
+      {
+        key: 'asset_code',
+        label: '商品',
+        render: (val, row) => row.listing?.offer_asset_code || val || '-'
+      },
+      {
+        key: 'gross_amount',
+        label: '成交价',
+        sortable: true,
+        render: (val, row) => {
+          const amount = val || row.price_amount || 0
+          return `<span class="font-mono text-green-600">${Number(amount).toLocaleString('zh-CN')}</span>`
+        }
+      },
+      {
+        key: 'status',
+        label: '状态',
+        type: 'status',
+        statusMap: {
+          pending: { class: 'yellow', label: '待处理' },
+          processing: { class: 'blue', label: '处理中' },
+          completed: { class: 'green', label: '已完成' },
+          cancelled: { class: 'gray', label: '已取消' },
+          disputed: { class: 'red', label: '争议中' }
+        }
+      },
+      { key: 'created_at', label: '时间', type: 'datetime', sortable: true },
+      {
+        key: '_actions',
+        label: '操作',
+        type: 'actions',
+        width: '80px',
+        actions: [
+          { name: 'detail', label: '详情', class: 'text-blue-600 hover:text-blue-800' }
+        ]
+      }
+    ],
+
+    marketplaceStatsTableColumns: [
+      { key: 'user_id', label: '用户ID', sortable: true },
+      { key: 'nickname', label: '用户昵称' },
+      { key: 'active_listing_count', label: '当前上架数', type: 'number', sortable: true },
+      { key: 'max_listings', label: '上架上限', type: 'number' },
+      {
+        key: 'usage_ratio',
+        label: '使用率',
+        render: (val) => {
+          const pct = Math.round((val || 0) * 100)
+          const cls = pct >= 90 ? 'text-red-600' : pct >= 70 ? 'text-yellow-600' : 'text-green-600'
+          return `<span class="${cls} font-medium">${pct}%</span>`
+        }
+      },
+      {
+        key: 'status_label',
+        label: '状态',
+        type: 'status',
+        statusMap: {
+          normal: { class: 'green', label: '正常' },
+          near_limit: { class: 'yellow', label: '接近上限' },
+          at_limit: { class: 'red', label: '已达上限' }
+        }
+      }
+    ],
+
+    /**
+     * data-table 数据源：交易订单
+     */
+    async fetchTradeOrderTableData(params) {
+      const queryParams = {
+        page: params.page || 1,
+        page_size: params.page_size || 20
+      }
+      if (params.status) queryParams.status = params.status
+
+      Object.keys(queryParams).forEach(k => !queryParams[k] && delete queryParams[k])
+
+      const result = await this.apiGet(MARKET_ENDPOINTS.TRADE_ORDER_LIST, queryParams)
+
+      if (result?.success && result.data) {
+        const items = result.data.orders || result.data.list || result.data.items || []
+        const total = result.data.pagination?.total || result.data.total || items.length
+        this.tradeOrders = items
+        return { items, total }
+      }
+      throw new Error(result?.message || '加载交易订单失败')
+    },
+
+    /**
+     * data-table 数据源：上架统计
+     */
+    async fetchMarketplaceStatsTableData(params) {
+      const queryParams = { page: params.page || 1, page_size: params.page_size || 20 }
+      if (params.status && params.status !== 'all') queryParams.status = params.status
+
+      const result = await this.apiGet(MARKET_ENDPOINTS.MARKETPLACE_STATS, queryParams)
+
+      if (result?.success && result.data) {
+        const items = result.data.users || result.data.stats || result.data.list || []
+        const total = result.data.pagination?.total || items.length
+        return { items, total }
+      }
+      throw new Error(result?.message || '加载上架统计失败')
+    },
+
+    /**
+     * 处理交易订单表格操作
+     */
+    handleTradeOrderTableAction(detail) {
+      const { action, row } = detail
+      if (action === 'detail') this.viewTradeOrderDetail(row)
+    },
+
     // ========== C2C交易订单数据 ==========
     /** @type {Array<Object>} C2C交易订单列表 */
     tradeOrders: [],
@@ -142,6 +267,10 @@ document.addEventListener('alpine:init', () => {
       seller_mobile: '',
       listing_id: ''
     },
+    /** @type {Object|null} 买家解析结果（独立于 resolvedUser，支持同时显示买卖双方） */
+    resolvedBuyer: null,
+    /** @type {Object|null} 卖家解析结果 */
+    resolvedSeller: null,
     /** @type {number} 交易订单当前页码 */
     tradeCurrentPage: 1,
     /** @type {number} 交易订单每页数量 */
@@ -271,15 +400,15 @@ document.addEventListener('alpine:init', () => {
         // 买家手机号 → resolve 获取 buyer_user_id
         if (this.tradeFilters.buyer_mobile) {
           const buyer = await this.resolveUserByMobile(this.tradeFilters.buyer_mobile)
-          if (buyer) params.buyer_user_id = buyer.user_id
-          else { this.tradeOrders = []; this.loading = false; return }
-        }
+          if (buyer) { params.buyer_user_id = buyer.user_id; this.resolvedBuyer = buyer }
+          else { this.resolvedBuyer = null; this.tradeOrders = []; this.loading = false; return }
+        } else { this.resolvedBuyer = null }
         // 卖家手机号 → resolve 获取 seller_user_id
         if (this.tradeFilters.seller_mobile) {
           const seller = await this.resolveUserByMobile(this.tradeFilters.seller_mobile)
-          if (seller) params.seller_user_id = seller.user_id
-          else { this.tradeOrders = []; this.loading = false; return }
-        }
+          if (seller) { params.seller_user_id = seller.user_id; this.resolvedSeller = seller }
+          else { this.resolvedSeller = null; this.tradeOrders = []; this.loading = false; return }
+        } else { this.resolvedSeller = null }
 
         // 移除空值
         Object.keys(params).forEach(k => !params[k] && delete params[k])
@@ -629,6 +758,10 @@ document.addEventListener('alpine:init', () => {
     stats: { totalTrades: 0, completedTrades: 0, pendingTrades: 0, totalVolume: 0 },
     /** @type {Object} 交易订单筛选条件（手机号主导搜索） */
     tradeFilters: { status: '', buyer_mobile: '', seller_mobile: '', listing_id: '' },
+    /** @type {Object|null} 买家解析结果 */
+    resolvedBuyer: null,
+    /** @type {Object|null} 卖家解析结果 */
+    resolvedSeller: null,
     /** @type {number} 交易订单当前页码 */
     tradeCurrentPage: 1,
     /** @type {number} 交易订单每页数量 */
@@ -731,14 +864,14 @@ document.addEventListener('alpine:init', () => {
         }
         if (this.tradeFilters.buyer_mobile) {
           const buyer = await this.resolveUserByMobile(this.tradeFilters.buyer_mobile)
-          if (buyer) queryParams.buyer_user_id = buyer.user_id
-          else { this.tradeOrders = []; return }
-        }
+          if (buyer) { queryParams.buyer_user_id = buyer.user_id; this.resolvedBuyer = buyer }
+          else { this.resolvedBuyer = null; this.tradeOrders = []; return }
+        } else { this.resolvedBuyer = null }
         if (this.tradeFilters.seller_mobile) {
           const seller = await this.resolveUserByMobile(this.tradeFilters.seller_mobile)
-          if (seller) queryParams.seller_user_id = seller.user_id
-          else { this.tradeOrders = []; return }
-        }
+          if (seller) { queryParams.seller_user_id = seller.user_id; this.resolvedSeller = seller }
+          else { this.resolvedSeller = null; this.tradeOrders = []; return }
+        } else { this.resolvedSeller = null }
         // 移除空值
         Object.keys(queryParams).forEach(k => !queryParams[k] && delete queryParams[k])
 

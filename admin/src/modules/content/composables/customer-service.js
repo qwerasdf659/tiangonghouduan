@@ -41,6 +41,9 @@ export function useCustomerServiceState() {
     wsConnection: null,
     messagePollingInterval: null,
 
+    /** @type {string|null} 上次数据更新时间（#2） */
+    lastUpdateTime: null,
+
     quickReplies: [
       { text: '👋 欢迎语', content: '您好，有什么可以帮助您的吗？' },
       { text: '⏳ 查询中', content: '请稍等，我为您查询一下' },
@@ -150,6 +153,8 @@ export function useCustomerServiceMethods() {
 
         if (response && response.success) {
           this.sessions = response.data.sessions || response.data.list || []
+          // #2 更新上次刷新时间
+          this.lastUpdateTime = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
         } else if (!silent) {
           this.showError(response?.message || '获取会话列表失败')
         }

@@ -11,8 +11,8 @@
  * @requires composables - 各子模块的状态和方法
  */
 
-import { logger } from '../../../utils/logger.js'
-import { Alpine, createPageMixin } from '../../../alpine/index.js'
+import { logger, $confirmDanger, $confirm } from '../../../utils/index.js'
+import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
 import { request, buildURL } from '../../../api/base.js'
 import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
 import {
@@ -127,11 +127,13 @@ document.addEventListener('alpine:init', () => {
       async loadPageData() {
         switch (this.current_page) {
           case 'items':
-            await Promise.all([this.loadItems(), this.loadItemStats()])
+            // 表格数据由 data-table 组件自行加载，这里只加载统计
+            await this.loadItemStats()
             this._updateMarketStats()
             break
           case 'orders':
-            await Promise.all([this.loadOrders(), this.loadOrderStats()])
+            // 表格数据由 data-table 组件自行加载，这里只加载统计
+            await this.loadOrderStats()
             this._updateMarketStats()
             break
           case 'stats':
@@ -140,6 +142,16 @@ document.addEventListener('alpine:init', () => {
             this.$nextTick(() => this.initCharts())
             break
         }
+      },
+
+      /** 刷新商品表格（供 CRUD 操作后调用） */
+      _refreshItemsTable() {
+        window.dispatchEvent(new CustomEvent('refresh-exchange-items'))
+      },
+
+      /** 刷新订单表格（供 CRUD 操作后调用） */
+      _refreshOrdersTable() {
+        window.dispatchEvent(new CustomEvent('refresh-exchange-orders'))
       },
 
       /**
@@ -185,7 +197,7 @@ document.addEventListener('alpine:init', () => {
           return
         }
 
-        if (!confirm('确定要删除此商品吗？')) return
+        if (!(await $confirmDanger('确定要删除此商品吗？'))) return
 
         try {
           const res = await request({
@@ -194,7 +206,7 @@ document.addEventListener('alpine:init', () => {
           })
           if (res.success) {
             this.showSuccess?.('删除成功')
-            this.loadItems()
+            this._refreshItemsTable()
             this.loadItemStats()
             this._updateMarketStats()
           } else {
@@ -211,7 +223,7 @@ document.addEventListener('alpine:init', () => {
        * @param {Object} order - 订单对象
        */
       async completeOrder(order) {
-        if (!confirm(`确定要完成订单 ${order.order_no || order.order_id} 吗？`)) return
+        if (!(await $confirm(`确定要完成订单 ${order.order_no || order.order_id} 吗？`))) return
 
         try {
           this.saving = true
@@ -228,7 +240,7 @@ document.addEventListener('alpine:init', () => {
 
           if (res.success) {
             this.showSuccess?.('订单已完成')
-            this.loadOrders()
+            this._refreshOrdersTable()
             this.loadOrderStats()
             this._updateMarketStats()
           } else {
@@ -244,7 +256,114 @@ document.addEventListener('alpine:init', () => {
     }
   })
 
-  logger.info('[ExchangeMarket] Alpine 组件注册完成')
+  /**
+   * 兑换商品列表 - data-table 组件
+   */
+  Alpine.data('exchangeItemsTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'exchange_item_id', label: '商品ID', sortable: true },
+        { key: 'item_name', label: '商品名称', sortable: true },
+        {
+          key: 'cost_amount',
+          label: '兑换价格',
+          sortable: true,
+          render: (val, row) => `${val || 0} ${row.cost_asset_code || '积分'}`
+        },
+        { key: 'stock', label: '库存', type: 'number', sortable: true },
+        {
+          key: 'status',
+          label: '状态',
+          type: 'status',
+          statusMap: {
+            active: { class: 'green', label: '上架' },
+            inactive: { class: 'gray', label: '下架' }
+          }
+        }
+      ],
+      dataSource: async (params) => {
+        const res = await request({
+          url: MARKET_ENDPOINTS.EXCHANGE_ITEMS,
+          method: 'GET',
+          params
+        })
+        return {
+          items: res.data?.items || res.data?.list || [],
+          total: res.data?.pagination?.total || 0
+        }
+      },
+      primaryKey: 'exchange_item_id',
+      sortable: true,
+      page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () {
+      window.addEventListener('refresh-exchange-items', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
+    return table
+  })
+
+  /**
+   * 兑换订单列表 - data-table 组件
+   */
+  Alpine.data('exchangeOrdersTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'order_no', label: '订单号', sortable: true },
+        {
+          key: 'user_id',
+          label: '用户',
+          render: (val, row) => row.user_nickname || row.user_mobile || val || '-'
+        },
+        {
+          key: 'item_name',
+          label: '商品',
+          render: (val, row) => row.item_snapshot?.name || val || '-'
+        },
+        {
+          key: 'pay_amount',
+          label: '消耗积分',
+          render: (val, row) =>
+            `${val || row.cost_amount || 0} ${row.pay_asset_code || row.cost_asset_code || ''}`
+        },
+        {
+          key: 'status',
+          label: '状态',
+          type: 'status',
+          statusMap: {
+            pending: { class: 'yellow', label: '待发货' },
+            shipped: { class: 'blue', label: '已发货' },
+            completed: { class: 'green', label: '已完成' },
+            cancelled: { class: 'gray', label: '已取消' }
+          }
+        },
+        { key: 'created_at', label: '下单时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({
+          url: MARKET_ENDPOINTS.EXCHANGE_ORDERS,
+          method: 'GET',
+          params
+        })
+        return {
+          items: res.data?.orders || res.data?.list || [],
+          total: res.data?.pagination?.total || 0
+        }
+      },
+      primaryKey: 'order_no',
+      sortable: true,
+      page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () {
+      window.addEventListener('refresh-exchange-orders', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
+    return table
+  })
+
+  logger.info('[ExchangeMarket] Alpine 组件注册完成（含 data-table）')
 })
 
 export { SUB_PAGES }

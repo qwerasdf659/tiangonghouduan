@@ -24,6 +24,7 @@ const NotificationService = require('./NotificationService')
 const logger = require('../utils/logger')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { Op } = require('sequelize')
+const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 
 /**
  * 规则处理器映射表
@@ -757,12 +758,18 @@ class ReminderEngineService {
       offset
     })
 
+    // 附加中文显示名称（rule_type → rule_type_display/rule_type_color）
+    const plainRows = rows.map(r => (r.get ? r.get({ plain: true }) : r))
+    await attachDisplayNames(plainRows, [
+      { field: 'rule_type', dictType: DICT_TYPES.REMINDER_RULE_TYPE }
+    ])
+
     return {
       total: count,
       page,
       page_size,
       total_pages: Math.ceil(count / page_size),
-      items: rows
+      items: plainRows
     }
   }
 

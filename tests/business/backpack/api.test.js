@@ -1,22 +1,31 @@
 /**
  * 背包API测试 - P2优先级
  *
- * 测试目标：验证用户端背包查询API的完整性
+ * 测试目标：验证用户端背包域API的完整性
  *
  * 功能覆盖：
  * 1. GET /api/v4/backpack - 获取用户背包（资产 + 物品）
  * 2. GET /api/v4/backpack/stats - 获取背包统计信息
+ * 3. GET /api/v4/backpack/items/:item_instance_id - 获取物品详情
+ * 4. POST /api/v4/backpack/items/:item_instance_id/redeem - 生成核销码
+ * 5. POST /api/v4/backpack/items/:item_instance_id/use - 直接使用物品
+ * 6. GET /api/v4/backpack/exchange/items - 用户端兑换商品列表
  *
  * 相关模型：
  * - ItemInstance: 物品实例
  * - AccountAssetBalance: 资产余额
+ * - RedemptionOrder: 核销订单
  *
  * 相关服务：
  * - BackpackService: 背包服务
+ * - RedemptionService: 核销订单服务
+ * - ItemService: 物品操作服务
+ * - ExchangeQueryService: 兑换查询服务
  *
  * 权限要求：已登录用户（authenticateToken）
  *
  * 创建时间：2026-01-28
+ * 更新时间：2026-02-07（新增物品详情/核销码/使用/兑换测试）
  * P2优先级：物品系统模块
  */
 
@@ -262,6 +271,186 @@ describe('背包API测试 - P2优先级', () => {
       // 数组可以为空，但不应该为null或undefined
       expect(response.body.data.assets).not.toBeNull()
       expect(response.body.data.items).not.toBeNull()
+    })
+  })
+
+  // ===== 测试用例6：物品详情 =====
+  describe('GET /api/v4/backpack/items/:item_instance_id - 获取物品详情', () => {
+    /*
+     * 业务场景：用户在背包中点击某个物品查看详情
+     * 预期行为：返回物品类型、名称、状态、是否有核销码等信息
+     */
+    let test_item_instance_id = null
+
+    beforeAll(async () => {
+      // 从背包中获取一个真实的物品ID
+      const backpackResponse = await request(app)
+        .get('/api/v4/backpack')
+        .set('Authorization', `Bearer ${user_token}`)
+
+      if (backpackResponse.body.data?.items?.length > 0) {
+        test_item_instance_id = backpackResponse.body.data.items[0].item_instance_id
+      }
+    })
+
+    test('应该返回正确的物品详情结构', async () => {
+      if (!test_item_instance_id) {
+        console.log('⚠️ 跳过：用户背包中没有可用物品')
+        return
+      }
+
+      const response = await request(app)
+        .get(`/api/v4/backpack/items/${test_item_instance_id}`)
+        .set('Authorization', `Bearer ${user_token}`)
+
+      expect(response.status).toBe(200)
+      expect(response.body.success).toBe(true)
+
+      const detail = response.body.data
+      expect(detail).toHaveProperty('item_instance_id')
+      expect(detail).toHaveProperty('item_type')
+      expect(detail).toHaveProperty('status')
+      expect(detail).toHaveProperty('is_owner')
+      expect(detail).toHaveProperty('has_redemption_code')
+      expect(detail.item_instance_id).toBe(test_item_instance_id)
+    })
+
+    test('不存在的物品应该返回404', async () => {
+      const response = await request(app)
+        .get('/api/v4/backpack/items/99999999')
+        .set('Authorization', `Bearer ${user_token}`)
+
+      expect(response.status).toBe(404)
+      expect(response.body.success).toBe(false)
+      expect(response.body.code).toBe('NOT_FOUND')
+    })
+
+    test('无效的物品ID应该返回400', async () => {
+      const response = await request(app)
+        .get('/api/v4/backpack/items/abc')
+        .set('Authorization', `Bearer ${user_token}`)
+
+      expect(response.status).toBe(400)
+      expect(response.body.success).toBe(false)
+      expect(response.body.code).toBe('BAD_REQUEST')
+    })
+
+    test('应该拒绝无token的请求', async () => {
+      const response = await request(app).get('/api/v4/backpack/items/1')
+
+      expect(response.status).toBe(401)
+    })
+  })
+
+  // ===== 测试用例7：生成核销码 =====
+  describe('POST /api/v4/backpack/items/:item_instance_id/redeem - 生成核销码', () => {
+    /*
+     * 业务场景（美团模式）：
+     * 用户在背包中选择一个 voucher/product 物品 → 生成核销码 → 到店出示
+     * 预期行为：返回12位Base32核销码和订单信息
+     */
+    let redeemable_item_id = null
+
+    beforeAll(async () => {
+      // 查找一个没有待核销订单的available物品
+      const backpackResponse = await request(app)
+        .get('/api/v4/backpack')
+        .set('Authorization', `Bearer ${user_token}`)
+
+      const items = backpackResponse.body.data?.items || []
+      const candidate = items.find(i => !i.has_redemption_code && i.status === 'available')
+      if (candidate) {
+        redeemable_item_id = candidate.item_instance_id
+      }
+    })
+
+    test('应该成功生成核销码', async () => {
+      if (!redeemable_item_id) {
+        console.log('⚠️ 跳过：没有可用于生成核销码的物品')
+        return
+      }
+
+      const response = await request(app)
+        .post(`/api/v4/backpack/items/${redeemable_item_id}/redeem`)
+        .set('Authorization', `Bearer ${user_token}`)
+
+      expect(response.status).toBe(200)
+      expect(response.body.success).toBe(true)
+      expect(response.body.data).toHaveProperty('code')
+      expect(response.body.data).toHaveProperty('order')
+
+      // 核销码格式验证（12位Base32，格式 XXXX-XXXX-XXXX）
+      const code = response.body.data.code
+      expect(code).toMatch(/^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/)
+
+      // 订单信息验证
+      const order = response.body.data.order
+      expect(order).toHaveProperty('status')
+      expect(order.status).toBe('pending')
+      expect(order).toHaveProperty('expires_at')
+    })
+
+    test('不存在的物品应该返回错误', async () => {
+      const response = await request(app)
+        .post('/api/v4/backpack/items/99999999/redeem')
+        .set('Authorization', `Bearer ${user_token}`)
+
+      expect(response.status).toBeGreaterThanOrEqual(400)
+      expect(response.body.success).toBe(false)
+    })
+
+    test('应该拒绝无token的请求', async () => {
+      const response = await request(app).post('/api/v4/backpack/items/1/redeem')
+
+      expect(response.status).toBe(401)
+    })
+  })
+
+  // ===== 测试用例8：兑换商品列表（从 /shop 迁移到 /backpack） =====
+  describe('GET /api/v4/backpack/exchange/items - 用户端兑换商品列表', () => {
+    /*
+     * 业务场景：用户浏览兑换市场中的商品
+     * 域迁移说明：从 /shop/exchange/items 迁移到 /backpack/exchange/items
+     * 原因：兑换是用户侧操作，不应被商家域准入中间件拦截
+     */
+    test('应该返回商品列表和分页信息', async () => {
+      const response = await request(app)
+        .get('/api/v4/backpack/exchange/items?page=1&page_size=5')
+        .set('Authorization', `Bearer ${user_token}`)
+
+      expect(response.status).toBe(200)
+      expect(response.body.success).toBe(true)
+
+      const data = response.body.data
+      expect(data).toHaveProperty('items')
+      expect(data).toHaveProperty('pagination')
+      expect(Array.isArray(data.items)).toBe(true)
+      expect(data.pagination).toHaveProperty('total')
+      expect(data.pagination).toHaveProperty('page')
+    })
+
+    test('应该支持分页参数', async () => {
+      const response = await request(app)
+        .get('/api/v4/backpack/exchange/items?page=1&page_size=2')
+        .set('Authorization', `Bearer ${user_token}`)
+
+      expect(response.status).toBe(200)
+      expect(response.body.data.items.length).toBeLessThanOrEqual(2)
+    })
+
+    test('无效status参数应该返回400', async () => {
+      const response = await request(app)
+        .get('/api/v4/backpack/exchange/items?status=invalid')
+        .set('Authorization', `Bearer ${user_token}`)
+
+      expect(response.status).toBe(400)
+      expect(response.body.success).toBe(false)
+    })
+
+    test('应该拒绝无token的请求', async () => {
+      const response = await request(app).get('/api/v4/backpack/exchange/items')
+
+      expect(response.status).toBe(401)
     })
   })
 

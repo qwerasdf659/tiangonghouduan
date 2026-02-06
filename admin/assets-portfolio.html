@@ -76,8 +76,10 @@
       <div class="p-4">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">用户ID</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">手机号</label>
             <input type="text" x-model="searchForm.mobile" maxlength="11" class="w-full px-3 py-2 border rounded-lg" placeholder="输入手机号">
+            <div x-show="resolvedUser" class="mt-1 text-xs text-green-600">✅ <span x-text="resolvedUser?.nickname"></span> (<span x-text="resolvedUser?.mobile"></span>)</div>
+            <div x-show="resolveError" class="mt-1 text-xs text-red-500" x-text="resolveError"></div>
           </div>
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">资产类型</label>
@@ -101,78 +103,22 @@
       </div>
     </div>
 
-    <!-- 资产列表 -->
-    <div class="themed-card rounded-lg shadow">
-      <div class="p-4 border-b flex justify-between items-center">
+    <!-- 资产列表（data-table） -->
+    <div class="themed-card rounded-lg shadow" @table-action="handleAssetsTableAction($event.detail)">
+      <div class="p-4 border-b">
         <h5 class="font-semibold">资产明细</h5>
-        <button @click="exportAssets()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm">
-          📤 导出
-        </button>
       </div>
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead class="themed-bg-base">
-            <tr>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">资产类型</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">资产名称</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">数量</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">单价</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">总价值</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">更新时间</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y">
-            <tr x-show="assets.length === 0">
-              <td colspan="8" class="px-4 py-8 text-center themed-text-muted">
-                <template x-if="!searchForm.mobile">
-                  <span>请输入用户ID后点击查询</span>
-                </template>
-                <template x-if="searchForm.mobile">
-                  <span>未查询到资产记录</span>
-                </template>
-              </td>
-            </tr>
-            <template x-for="asset in assets" :key="asset.asset_id">
-              <tr class="themed-hover-bg">
-                <td class="px-4 py-3 text-sm">
-                  <div x-text="asset.user_nickname || asset.user_id"></div>
-                  <div class="text-gray-400 text-xs" x-text="'ID: ' + asset.user_id"></div>
-                </td>
-                <td class="px-4 py-3">
-                  <span :class="{
-                    'bg-yellow-100 text-yellow-700': asset.asset_type === 'points',
-                    'bg-green-100 themed-text-success': asset.asset_type === 'balance',
-                    'themed-bg-primary-light themed-text-primary': asset.asset_type === 'material',
-                    'bg-purple-100 text-purple-700': asset.asset_type === 'item'
-                  }" class="px-2 py-1 text-xs rounded" x-text="asset.asset_type_display || asset.asset_type"></span>
-                </td>
-                <td class="px-4 py-3 text-sm" x-text="asset.asset_name"></td>
-                <td class="px-4 py-3 text-sm font-mono" x-text="formatNumber(asset.quantity)"></td>
-                <td class="px-4 py-3 text-sm font-mono themed-text-muted" x-text="formatCurrency(asset.unit_price)"></td>
-                <td class="px-4 py-3 text-sm font-mono text-emerald-600 font-medium" x-text="formatCurrency(asset.total_value)"></td>
-                <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(asset.updated_at)"></td>
-                <td class="px-4 py-3">
-                  <div class="flex space-x-2">
-                    <button @click="viewAssetDetail(asset)" class="themed-text-primary hover:text-blue-700 text-sm">详情</button>
-                    <button @click="viewAssetHistory(asset)" class="text-green-500 hover:text-green-700 text-sm">历史</button>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-      
-      <!-- 分页 -->
-      <div class="p-4 border-t flex justify-between items-center" x-show="total_records > 0">
-        <span class="text-sm themed-text-muted" x-text="'共 ' + total_records + ' 条记录'"></span>
-        <div class="flex space-x-2">
-          <button @click="prevPage()" :disabled="current_page <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-          <span class="px-3 py-1" x-text="current_page + ' / ' + total_pages"></span>
-          <button @click="nextPage()" :disabled="current_page >= total_pages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
-        </div>
+      <div x-data="dataTable({
+        columns: assetsTableColumns,
+        dataSource: fetchAssetsTableData,
+        primaryKey: 'asset_id',
+        sortable: true,
+        selectable: false,
+        exportable: true,
+        page_size: 50,
+        emptyText: '请输入手机号后点击查询'
+      })" x-init="init()" @dt-assets-refresh.window="search()">
+        <%- include('components/data-table') %>
       </div>
     </div>
   </div>
@@ -228,7 +174,7 @@
             <tbody class="divide-y">
               <template x-for="tx in assetHistory" :key="tx.asset_transaction_id">
                 <tr class="themed-hover-bg">
-                  <td class="px-3 py-2" x-text="formatTxType(tx.tx_type)"></td>
+                  <td class="px-3 py-2" x-text="tx.tx_type_display || tx.tx_type || '-'"></td>
                   <td class="px-3 py-2 text-right font-mono" :class="tx.amount >= 0 ? 'text-green-600' : 'text-red-600'" x-text="(tx.amount >= 0 ? '+' : '') + tx.amount"></td>
                   <td class="px-3 py-2 text-right font-mono themed-text-muted" x-text="tx.balance_before + ' → ' + tx.balance_after"></td>
                   <td class="px-3 py-2 themed-text-muted" x-text="tx.created_at"></td>

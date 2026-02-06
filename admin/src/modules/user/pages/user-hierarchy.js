@@ -18,6 +18,7 @@ import { logger } from '../../../utils/logger.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
 import { buildURL, request } from '../../../api/base.js'
 import { Alpine, createCrudMixin } from '../../../alpine/index.js'
+import { userResolverMixin } from '../../../alpine/mixins/user-resolver.js'
 
 // API请求封装
 const apiRequest = async (url, options = {}) => {
@@ -27,7 +28,7 @@ const apiRequest = async (url, options = {}) => {
  * @typedef {Object} HierarchyFilters
  * @property {string} role_level - 角色等级筛选
  * @property {string} status - 状态筛选（active/inactive）
- * @property {string} superior_user_id - 上级用户ID筛选
+ * @property {string} superior_mobile - 上级手机号筛选（手机号主导搜索）
  */
 
 /**
@@ -40,9 +41,9 @@ const apiRequest = async (url, options = {}) => {
 
 /**
  * @typedef {Object} HierarchyForm
- * @property {string} user_id - 用户ID
+ * @property {string} mobile - 用户手机号（手机号主导搜索）
  * @property {string} role_id - 角色ID
- * @property {string} superior_user_id - 上级用户ID
+ * @property {string} superior_mobile - 上级手机号（手机号主导搜索）
  * @property {string} store_id - 门店ID
  */
 
@@ -102,6 +103,7 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('userHierarchyPage', () => ({
     // ==================== Mixin 组合 ====================
     ...createCrudMixin({ page_size: 20 }),
+    ...userResolverMixin(),
 
     // ==================== 页面特有状态 ====================
 
@@ -117,6 +119,68 @@ document.addEventListener('alpine:init', () => {
      */
     rolesList: [],
 
+    // ========== data-table 列配置 ==========
+    hierarchyTableColumns: [
+      { key: 'hierarchy_id', label: 'ID', sortable: true },
+      {
+        key: 'user_nickname',
+        label: '用户',
+        render: (val, row) => {
+          const name = val || '未设置'
+          const mobile = row.user_mobile || '-'
+          return `<div class="font-semibold">${name}</div><small class="text-gray-500">${mobile} (ID: ${row.user_id})</small>`
+        }
+      },
+      {
+        key: 'role_name',
+        label: '角色',
+        render: (val, row) => {
+          const level = row.role_level || 40
+          return `<span class="px-2 py-1 rounded text-xs role-badge-${level}">${val || '-'}</span><small class="block text-gray-500">级别: ${level}</small>`
+        }
+      },
+      {
+        key: 'superior_user_id',
+        label: '上级',
+        render: (val, row) => {
+          if (!val) return '<span class="text-gray-400">-（顶级）</span>'
+          return `<div>${row.superior_nickname || '-'}</div><small class="text-gray-500">ID: ${val}</small>`
+        }
+      },
+      { key: 'store_id', label: '门店' },
+      {
+        key: 'is_active',
+        label: '状态',
+        type: 'status',
+        statusMap: {
+          true: { class: 'green', label: '激活中' },
+          false: { class: 'gray', label: '已停用' }
+        }
+      },
+      { key: 'activated_at', label: '激活时间', type: 'datetime', sortable: true },
+      {
+        key: '_actions',
+        label: '操作',
+        type: 'actions',
+        width: '120px',
+        actions: [
+          { name: 'subordinates', label: '📊', class: 'text-blue-600 hover:text-blue-800' },
+          {
+            name: 'deactivate',
+            label: '⏸️',
+            class: 'text-yellow-600 hover:text-yellow-800',
+            condition: (row) => row.is_active
+          },
+          {
+            name: 'activate',
+            label: '▶️',
+            class: 'text-green-600 hover:text-green-800',
+            condition: (row) => !row.is_active
+          }
+        ]
+      }
+    ],
+
     /**
      * 筛选条件
      * @type {HierarchyFilters}
@@ -124,7 +188,7 @@ document.addEventListener('alpine:init', () => {
     filters: {
       role_level: '',
       status: '',
-      superior_user_id: ''
+      superior_mobile: ''
     },
 
     /**
@@ -143,9 +207,9 @@ document.addEventListener('alpine:init', () => {
      * @type {HierarchyForm}
      */
     form: {
-      user_id: '',
+      mobile: '',
       role_id: '',
-      superior_user_id: '',
+      superior_mobile: '',
       store_id: ''
     },
 
@@ -172,24 +236,67 @@ document.addEventListener('alpine:init', () => {
      */
     subordinatesLoading: false,
 
+    // ==================== data-table 数据源 ====================
+
+    /**
+     * data-table 数据源：层级列表
+     */
+    async fetchHierarchyTableData(params) {
+      const queryParams = {
+        page: params.page || 1,
+        page_size: params.page_size || 20
+      }
+      if (params.role_level) queryParams.role_level = params.role_level
+      if (params.is_active) queryParams.is_active = params.is_active
+
+      const response = await apiRequest(
+        `${USER_ENDPOINTS.HIERARCHY_LIST}?${new URLSearchParams(queryParams)}`
+      )
+
+      if (response?.success) {
+        const items = response.data.rows || []
+        const total = response.data.count || items.length
+        this.hierarchyList = items
+        this._updateStatistics(response.data)
+        return { items, total }
+      }
+      throw new Error(response?.message || '加载层级列表失败')
+    },
+
+    /**
+     * 处理表格操作事件
+     */
+    handleHierarchyTableAction(detail) {
+      const { action, row } = detail
+      switch (action) {
+        case 'subordinates':
+          this.viewSubordinates(row.user_id)
+          break
+        case 'deactivate':
+          this.openDeactivateModal(row.user_id, row.user_nickname || row.user_mobile)
+          break
+        case 'activate':
+          this.activateUser(row.user_id)
+          break
+        default:
+          logger.warn('[UserHierarchy] 未知操作:', action)
+      }
+    },
+
     // ==================== 生命周期 ====================
 
     /**
      * 初始化组件
-     *
-     * @description 执行认证检查并加载角色列表和层级数据
-     * @returns {void}
      */
     init() {
       logger.info('用户层级管理页面初始化 (Mixin v3.0)')
 
-      // 使用 Mixin 的认证检查
       if (!this.checkAuth()) {
         return
       }
 
       this.loadRoles()
-      this.loadData()
+      // 数据由 data-table 自动加载
     },
 
     // ==================== 数据加载方法 ====================
@@ -216,46 +323,11 @@ document.addEventListener('alpine:init', () => {
      * @returns {Promise<void>} 无返回值
      * @throws {Error} 当API请求失败时抛出错误
      */
+    /**
+     * 加载层级列表（刷新 data-table）
+     */
     async loadData() {
-      logger.info('[UserHierarchy] 开始加载层级列表...')
-
-      const result = await this.withLoading(async () => {
-        const params = {
-          ...this.buildPaginationParams()
-        }
-
-        if (this.filters.role_level) params.role_level = this.filters.role_level
-        if (this.filters.status) params.is_active = this.filters.status
-        if (this.filters.superior_user_id) params.superior_user_id = this.filters.superior_user_id
-
-        const response = await apiRequest(
-          `${USER_ENDPOINTS.HIERARCHY_LIST}?${new URLSearchParams(params)}`
-        )
-
-        if (response && response.success) {
-          return response.data
-        } else {
-          throw new Error(response?.message || '加载层级列表失败')
-        }
-      })
-
-      if (result.success) {
-        this.hierarchyList = result.data.rows || []
-
-        // 更新分页信息
-        this.total_records = result.data.count || 0
-        if (result.data.pagination?.total_pages) {
-          // 后端直接提供了总页数
-        }
-
-        this._updateStatistics(result.data)
-        logger.info('[UserHierarchy] 层级列表加载完成', {
-          count: this.total_records,
-          rows: this.hierarchyList.length
-        })
-      } else {
-        logger.error('[UserHierarchy] 层级列表加载失败', result)
-      }
+      window.dispatchEvent(new CustomEvent('dt-hierarchy-refresh'))
     },
 
     /**
@@ -317,7 +389,7 @@ document.addEventListener('alpine:init', () => {
       this.filters = {
         role_level: '',
         status: '',
-        superior_user_id: ''
+        superior_mobile: ''
       }
       this.resetPagination()
       this.loadData()
@@ -350,7 +422,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     openCreateModal() {
-      this.form = { user_id: '', role_id: '', superior_user_id: '', store_id: '' }
+      this.form = { mobile: '', role_id: '', superior_mobile: '', store_id: '' }
       this.showModal('hierarchyModal')
     },
 
@@ -363,17 +435,29 @@ document.addEventListener('alpine:init', () => {
      * @throws {Error} 当必填字段为空时提示警告
      */
     async saveHierarchy() {
-      if (!this.form.user_id || !this.form.role_id) {
+      if (!this.form.mobile || !this.form.role_id) {
         this.showWarning('请填写必填字段')
         return
+      }
+
+      // 手机号 → resolve 获取 user_id
+      const user = await this.resolveUserByMobile(this.form.mobile)
+      if (!user) return
+
+      // 上级手机号 → resolve（可选字段）
+      let superiorUserId = null
+      if (this.form.superior_mobile) {
+        const superiorUser = await this.resolveUserByMobile(this.form.superior_mobile)
+        if (!superiorUser) return
+        superiorUserId = superiorUser.user_id
       }
 
       const result = await this.apiPost(
         USER_ENDPOINTS.HIERARCHY_CREATE,
         {
-          user_id: parseInt(this.form.user_id),
+          user_id: user.user_id,
           role_id: parseInt(this.form.role_id),
-          superior_user_id: this.form.superior_user_id ? parseInt(this.form.superior_user_id) : null,
+          superior_user_id: superiorUserId,
           store_id: this.form.store_id ? parseInt(this.form.store_id) : null
         },
         { showSuccess: true, successMessage: '创建层级关系成功' }

@@ -80,12 +80,14 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">买家ID</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">买家手机号</label>
             <input type="text" x-model="tradeFilters.buyer_mobile" maxlength="11" placeholder="买家手机号" class="w-full px-3 py-2 border rounded-lg">
+            <div x-show="resolvedBuyer" class="mt-1 text-xs text-green-600">✅ <span x-text="resolvedBuyer?.nickname"></span></div>
           </div>
           <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">卖家ID</label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">卖家手机号</label>
             <input type="text" x-model="tradeFilters.seller_mobile" maxlength="11" placeholder="卖家手机号" class="w-full px-3 py-2 border rounded-lg">
+            <div x-show="resolvedSeller" class="mt-1 text-xs text-green-600">✅ <span x-text="resolvedSeller?.nickname"></span></div>
           </div>
           <div>
             <button @click="loadTradeOrders()" class="w-full px-4 py-2 themed-btn-primary rounded-lg">
@@ -93,7 +95,7 @@
             </button>
           </div>
           <div>
-            <button @click="tradeFilters = { status: '', buyer_mobile: '', seller_mobile: '', listing_id: '' }; loadTradeOrders()" class="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+            <button @click="tradeFilters = { status: '', buyer_mobile: '', seller_mobile: '', listing_id: '' }; resolvedBuyer = null; resolvedSeller = null; loadTradeOrders()" class="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
               🔄 重置
             </button>
           </div>
@@ -101,66 +103,22 @@
       </div>
     </div>
 
-    <!-- 交易列表 -->
-    <div class="themed-card rounded-lg shadow">
+    <!-- 交易列表（data-table） -->
+    <div class="themed-card rounded-lg shadow" @table-action="handleTradeOrderTableAction($event.detail)">
       <div class="p-4 border-b">
         <h5 class="font-semibold">交易记录</h5>
       </div>
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead class="themed-bg-base">
-            <tr>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">交易ID</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">买家</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">卖家</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">商品</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">成交价</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">时间</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y">
-
-            <tr x-show="tradeOrders.length === 0">
-              <td colspan="7" class="px-4 py-8 text-center themed-text-muted">暂无交易订单数据</td>
-            </tr>
-            <template x-for="trade in tradeOrders" :key="trade.trade_order_id">
-              <tr class="themed-hover-bg">
-                <td class="px-4 py-3 text-sm font-mono" x-text="trade.trade_order_id"></td>
-                <td class="px-4 py-3 text-sm" x-text="trade.buyer?.nickname || trade.buyer_user_id"></td>
-                <td class="px-4 py-3 text-sm" x-text="trade.seller?.nickname || trade.seller_user_id"></td>
-                <td class="px-4 py-3 text-sm" x-text="trade.listing?.offer_asset_code || trade.asset_code || '-'"></td>
-                <td class="px-4 py-3 text-sm font-mono text-green-600" x-text="formatNumber(trade.gross_amount || trade.price_amount)"></td>
-                <td class="px-4 py-3">
-                  <span :class="{
-                    'bg-yellow-100 text-yellow-700': trade.status === 'pending',
-                    'themed-bg-primary-light themed-text-primary': trade.status === 'processing',
-                    'bg-green-100 themed-text-success': trade.status === 'completed',
-                    'bg-red-100 text-red-700': trade.status === 'cancelled',
-                    'bg-orange-100 text-orange-700': trade.status === 'disputed'
-                  }" class="px-2 py-1 text-xs rounded" x-text="trade.status_display || trade.status"></span>
-                </td>
-                <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(trade.created_at)"></td>
-                <td class="px-4 py-3">
-                  <div class="flex space-x-2">
-                    <button @click="viewTradeOrderDetail(trade)" class="themed-text-primary hover:text-blue-700 text-sm">详情</button>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-      
-      <!-- 分页 -->
-      <div class="p-4 border-t flex justify-between items-center">
-        <span class="text-sm themed-text-muted" x-text="'共 ' + (tradePagination?.total || 0) + ' 条记录'"></span>
-        <div class="flex space-x-2">
-          <button @click="changeTradePage(tradeCurrentPage - 1)" :disabled="tradeCurrentPage <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-          <span class="px-3 py-1" x-text="tradeCurrentPage + ' / ' + (tradePagination?.total_pages || 1)"></span>
-          <button @click="changeTradePage(tradeCurrentPage + 1)" :disabled="tradeCurrentPage >= (tradePagination?.total_pages || 1)" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
-        </div>
+      <div x-data="dataTable({
+        columns: tradeOrderTableColumns,
+        dataSource: fetchTradeOrderTableData,
+        primaryKey: 'trade_order_id',
+        sortable: true,
+        selectable: false,
+        exportable: false,
+        page_size: 20,
+        emptyText: '暂无交易订单数据'
+      })" x-init="init()" @dt-trade-refresh.window="refresh()">
+        <%- include('components/data-table') %>
       </div>
     </div>
 
@@ -220,73 +178,22 @@
         </div>
       </div>
 
-      <!-- 上架统计列表 -->
+      <!-- 上架统计列表（data-table） -->
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
           <h5 class="font-semibold">📊 用户上架统计</h5>
         </div>
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead class="themed-bg-base">
-              <tr>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户ID</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户昵称</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">当前上架数</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">上架上限</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">使用率</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y">
-
-              <tr x-show="marketplaceStats.length === 0">
-                <td colspan="5" class="px-4 py-8 text-center themed-text-muted">暂无市场统计数据</td>
-              </tr>
-              <template x-for="stat in marketplaceStats" :key="stat.user_id">
-                <tr class="themed-hover-bg">
-                  <td class="px-4 py-3 text-sm font-mono" x-text="stat.user_id"></td>
-                  <td class="px-4 py-3 text-sm" x-text="stat.nickname || stat.user?.nickname || '-'"></td>
-                  <td class="px-4 py-3 text-sm font-mono themed-text-primary" x-text="stat.listing_count || stat.active_listings || 0"></td>
-                  <td class="px-4 py-3 text-sm font-mono" x-text="stat.max_listings || maxListings"></td>
-                  <td class="px-4 py-3">
-                    <div class="flex items-center gap-2">
-                      <div class="w-24 bg-gray-200 rounded-full h-2">
-                        <div class="h-2 rounded-full" 
-                             :class="{
-                               'bg-green-500': (stat.listing_count || 0) / (stat.max_listings || maxListings) < 0.7,
-                               'bg-yellow-500': (stat.listing_count || 0) / (stat.max_listings || maxListings) >= 0.7 && (stat.listing_count || 0) / (stat.max_listings || maxListings) < 1,
-                               'bg-red-500': (stat.listing_count || 0) >= (stat.max_listings || maxListings)
-                             }"
-                             :style="'width: ' + Math.min(100, ((stat.listing_count || 0) / (stat.max_listings || maxListings) * 100)) + '%'">
-                        </div>
-                      </div>
-                      <span class="text-sm" x-text="Math.round((stat.listing_count || 0) / (stat.max_listings || maxListings) * 100) + '%'"></span>
-                    </div>
-                  </td>
-                  <td class="px-4 py-3">
-                    <span :class="{
-                      'bg-green-100 themed-text-success': (stat.listing_count || 0) < (stat.max_listings || maxListings) * 0.7,
-                      'bg-yellow-100 text-yellow-700': (stat.listing_count || 0) >= (stat.max_listings || maxListings) * 0.7 && (stat.listing_count || 0) < (stat.max_listings || maxListings),
-                      'bg-red-100 text-red-700': (stat.listing_count || 0) >= (stat.max_listings || maxListings)
-                    }" class="px-2 py-1 text-xs rounded" x-text="
-                      (stat.listing_count || 0) >= (stat.max_listings || maxListings) ? '已达上限' :
-                      (stat.listing_count || 0) >= (stat.max_listings || maxListings) * 0.7 ? '接近上限' : '正常'
-                    "></span>
-                  </td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-        </div>
-        
-        <!-- 分页 -->
-        <div class="p-4 border-t flex justify-between items-center">
-          <span class="text-sm themed-text-muted" x-text="'共 ' + (marketplacePagination?.total || 0) + ' 条记录'"></span>
-          <div class="flex space-x-2">
-            <button @click="changeMarketplacePage(marketplaceCurrentPage - 1)" :disabled="marketplaceCurrentPage <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-            <span class="px-3 py-1" x-text="marketplaceCurrentPage + ' / ' + (marketplacePagination?.total_pages || 1)"></span>
-            <button @click="changeMarketplacePage(marketplaceCurrentPage + 1)" :disabled="marketplaceCurrentPage >= (marketplacePagination?.total_pages || 1)" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
-          </div>
+        <div x-data="dataTable({
+          columns: marketplaceStatsTableColumns,
+          dataSource: fetchMarketplaceStatsTableData,
+          primaryKey: 'user_id',
+          sortable: true,
+          selectable: false,
+          exportable: false,
+          page_size: 20,
+          emptyText: '暂无市场统计数据'
+        })" x-init="init()" @dt-marketplace-refresh.window="refresh()">
+          <%- include('components/data-table') %>
         </div>
       </div>
 

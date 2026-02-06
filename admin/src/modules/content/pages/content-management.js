@@ -10,7 +10,8 @@
 import { logger } from '../../../utils/logger.js'
 import { buildURL } from '../../../api/base.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
-import { Alpine, createPageMixin } from '../../../alpine/index.js'
+import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
+import { request } from '../../../api/base.js'
 import {
   useAllContentManagementState,
   useAllContentManagementMethods
@@ -119,7 +120,38 @@ document.addEventListener('alpine:init', () => {
     }
   }))
 
-  logger.info('[ContentManagementPage] Alpine 组件已注册 (Composable v4.1)')
+  /**
+   * 公告列表 - data-table 组件
+   */
+  Alpine.data('announcementsTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'system_announcement_id', label: '公告ID', sortable: true },
+        { key: 'title', label: '标题', sortable: true },
+        { key: 'type', label: '类型', type: 'badge', badgeMap: { notice: 'blue', alert: 'red', info: 'gray' }, labelMap: { notice: '通知', alert: '警告', info: '信息' } },
+        { key: 'is_active', label: '状态', type: 'status', statusMap: { true: { class: 'green', label: '已发布' }, false: { class: 'gray', label: '草稿' } } },
+        { key: 'created_at', label: '创建时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: SYSTEM_ENDPOINTS.ANNOUNCEMENT_LIST, method: 'GET', params })
+        return {
+          items: res.data?.list || res.data?.announcements || res.data || [],
+          total: res.data?.pagination?.total || res.data?.total || 0
+        }
+      },
+      primaryKey: 'system_announcement_id',
+      sortable: true,
+      page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () {
+      window.addEventListener('refresh-announcements', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
+    return table
+  })
+
+  logger.info('[ContentManagementPage] Alpine 组件已注册 (Composable v4.1 + data-table)')
 })
 
 logger.info('[ContentManagement] 页面脚本已加载 (Composable v4.1)')

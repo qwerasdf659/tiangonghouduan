@@ -67,7 +67,7 @@
           </div>
           <div class="p-4 space-y-4">
             <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">用户ID</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">手机号</label>
               <div class="flex space-x-2">
                 <input type="text" x-model="searchMobile" maxlength="11" class="flex-1 px-3 py-2 border rounded-lg" placeholder="请输入手机号" @keyup.enter="handleMobileSearch()">
                 <button type="button" @click="handleMobileSearch()" :disabled="searching" class="px-3 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
@@ -81,8 +81,11 @@
                   </span>
                 </button>
               </div>
-              <p x-show="form.user_info" class="mt-1 text-sm text-green-600" x-text="form.user_info"></p>
-              <p x-show="current_user" class="mt-1 text-sm themed-text-primary">
+              <div x-show="resolvedUser" class="mt-2 p-2 bg-blue-50 rounded text-sm">
+                ✅ <span x-text="resolvedUser?.nickname"></span> (<span x-text="resolvedUser?.mobile"></span>) · <span x-text="resolvedUser?.status === 'active' ? '活跃' : '异常'" :class="resolvedUser?.status === 'active' ? 'text-green-600' : 'text-red-500'"></span>
+              </div>
+              <div x-show="resolveError" class="mt-1 text-sm text-red-500" x-text="resolveError"></div>
+              <p x-show="current_user && !resolvedUser" class="mt-1 text-sm themed-text-primary">
                 ✅ 已加载用户: <span x-text="current_user?.nickname || current_user?.user_id"></span>
               </p>
             </div>
@@ -150,84 +153,23 @@
         </div>
       </div>
 
-      <!-- 调账记录 -->
-      <div class="lg:col-span-2">
+      <!-- 调账记录（data-table） -->
+      <div class="lg:col-span-2" @table-action="handleRecordsTableAction($event.detail)">
         <div class="themed-card rounded-lg shadow">
-          <div class="p-4 border-b flex justify-between items-center">
+          <div class="p-4 border-b">
             <h5 class="font-semibold">调账记录</h5>
-            <div class="flex space-x-2">
-              <select x-model="filters.status" @change="loadRecords()" class="px-3 py-1 border rounded text-sm">
-                <option value="">全部状态</option>
-                <option value="pending">待审批</option>
-                <option value="approved">已通过</option>
-                <option value="rejected">已拒绝</option>
-              </select>
-              <button @click="loadRecords()" 
-                      :disabled="loadingRecords"
-                      class="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
-                <span x-show="!loadingRecords">刷新</span>
-                <span x-show="loadingRecords" class="flex items-center">
-                  <svg class="animate-spin -ml-1 mr-1 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  刷新中...
-                </span>
-              </button>
-            </div>
           </div>
-          <div class="overflow-x-auto max-h-[600px]">
-            <table class="w-full">
-              <thead class="themed-bg-base sticky top-0">
-                <tr>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">交易ID</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作人</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">资产类型</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">变动</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">时间</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y">
-
-                <tr x-show="records.length === 0">
-                  <td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无调整记录</td>
-                </tr>
-                <template x-for="(record, index) in records" :key="record.transaction_id || index">
-                  <tr class="themed-hover-bg">
-                    <td class="px-4 py-3 text-sm font-mono" x-text="record.transaction_id || '-'"></td>
-                    <td class="px-4 py-3 text-sm">
-                      <div x-text="record.operator_name || current_user?.nickname || '-'"></div>
-                      <div class="text-gray-400 text-xs" x-text="'ID: ' + (current_user?.user_id || '-')"></div>
-                    </td>
-                    <td class="px-4 py-3 text-sm" x-text="record.asset_name || record.asset_type_display || record.asset_name || record.asset_code"></td>
-                    <td class="px-4 py-3 text-sm font-mono" :class="Number(record.amount) >= 0 ? 'text-green-600' : 'text-red-600'">
-                      <span x-text="(Number(record.amount) >= 0 ? '+' : '') + formatNumber(record.amount)"></span>
-                    </td>
-                    <td class="px-4 py-3">
-                      <span class="px-2 py-1 text-xs rounded bg-green-100 themed-text-success">已完成</span>
-                    </td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(record.created_at)"></td>
-                    <td class="px-4 py-3">
-                      <div class="flex space-x-2">
-                        <button @click="viewRecord(record)" class="themed-text-primary hover:text-blue-700 text-sm">详情</button>
-                      </div>
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-          
-          <!-- 分页 -->
-          <div class="p-4 border-t flex justify-between items-center">
-            <span class="text-sm themed-text-muted" x-text="'共 ' + total_records + ' 条记录'"></span>
-            <div class="flex space-x-2">
-              <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-              <span class="px-3 py-1" x-text="paginationInfo"></span>
-              <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
-            </div>
+          <div x-data="dataTable({
+            columns: recordsTableColumns,
+            dataSource: fetchRecordsTableData,
+            primaryKey: 'transaction_id',
+            sortable: true,
+            selectable: false,
+            exportable: false,
+            page_size: 20,
+            emptyText: '暂无调整记录，请先搜索用户'
+          })" x-init="init()" @dt-records-refresh.window="search()">
+            <%- include('components/data-table') %>
           </div>
         </div>
       </div>

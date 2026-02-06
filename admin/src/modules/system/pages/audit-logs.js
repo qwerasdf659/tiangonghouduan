@@ -83,6 +83,84 @@ function auditLogsPage() {
     /** @type {Object|null} 报告风险级别图表实例 */
     reportRiskLevelChart: null,
 
+    // ========== data-table 列配置 ==========
+    auditTableColumns: [
+      { key: 'created_at', label: '时间', type: 'datetime', sortable: true },
+      {
+        key: 'operator_id',
+        label: '操作人',
+        render: (val, row) => {
+          const name = row.operator?.nickname || val || '-'
+          const idStr = val ? `(ID: ${val})` : ''
+          return `<span class="text-sm font-medium">${name}</span><span class="ml-2 text-xs text-gray-500">${idStr}</span>`
+        }
+      },
+      {
+        key: 'operation_type',
+        label: '操作类型',
+        type: 'badge',
+        badgeMap: { create: 'green', update: 'blue', delete: 'red', login: 'purple', logout: 'gray' },
+        labelMap: { create: '创建', update: '更新', delete: '删除', login: '登录', logout: '登出' }
+      },
+      {
+        key: 'target_type',
+        label: '操作目标',
+        render: (val, row) => {
+          const display = row.target_type_display || val || ''
+          const id = row.target_id ? ` #${row.target_id}` : ''
+          return display + id
+        }
+      },
+      { key: 'action', label: '描述', type: 'truncate', maxLength: 40 },
+      { key: 'ip_address', label: 'IP地址', type: 'code' },
+      {
+        key: '_actions',
+        label: '操作',
+        type: 'actions',
+        width: '100px',
+        actions: [
+          { name: 'detail', label: '查看详情', class: 'text-blue-600 hover:text-blue-800' }
+        ]
+      }
+    ],
+
+    /**
+     * data-table 数据源：审计日志
+     */
+    async fetchAuditTableData(params) {
+      const queryParams = new URLSearchParams()
+      queryParams.append('page', params.page || 1)
+      queryParams.append('page_size', params.page_size || 20)
+      if (params.operator_id) queryParams.append('operator_id', params.operator_id)
+      if (params.operation_type) queryParams.append('operation_type', params.operation_type)
+      if (params.target_type) queryParams.append('target_type', params.target_type)
+      if (params.start_date) queryParams.append('start_date', params.start_date)
+      if (params.end_date) queryParams.append('end_date', params.end_date)
+
+      const response = await this.apiGet(
+        `${SYSTEM_ENDPOINTS.AUDIT_LOG_LIST}?${queryParams}`,
+        {},
+        { showLoading: false }
+      )
+      if (response?.success) {
+        const items = response.data?.items || response.data?.logs || response.data?.list || []
+        const total = response.data?.pagination?.total || items.length
+        this.auditLogs = items
+        return { items, total }
+      }
+      throw new Error(response?.message || '加载审计日志失败')
+    },
+
+    /**
+     * 处理审计表格操作
+     */
+    handleAuditTableAction(detail) {
+      const { action, row } = detail
+      if (action === 'detail') {
+        this.viewLogDetail(row)
+      }
+    },
+
     // ==================== 图表相关状态 ====================
     /** @type {Object|null} 趋势图表实例 */
     trendChart: null,
@@ -129,7 +207,7 @@ function auditLogsPage() {
 
       // 根据 activeTab 加载数据
       if (this.activeTab === 'logs') {
-        await this.loadAuditLogs()
+        // 日志列表由 data-table 自动加载
         await this.loadStats()
         // 加载图表数据（异步，不阻塞页面）
         this.loadChartData()
@@ -369,9 +447,9 @@ function auditLogsPage() {
         return
       }
 
-      // 直接使用后端返回的 target_type，不做映射
+      // 优先使用后端返回的 target_type_display 中文名称，降级使用原始值
       const pieData = this.targetTypeStats.items.map(item => ({
-        name: item.target_type || 'unknown',
+        name: item.target_type_display || item.target_type || 'unknown',
         value: item.count,
         percentage: item.percentage
       }))
@@ -1048,15 +1126,8 @@ function auditLogsPage() {
       }
     },
 
-    /**
-     * 获取目标类型名称（直接使用后端返回的 target_type）
-     * @param {string} target_type - 目标类型代码
-     * @returns {string} 目标类型名称
-     */
-    getTargetTypeName(target_type) {
-      // 直接返回后端数据，不做映射
-      return target_type || '-'
-    },
+    // ✅ 已删除 getTargetTypeName 映射函数
+    // HTML 直接使用 item.target_type_display || item.target_type || '-'
 
     /**
      * 组件销毁时清理资源

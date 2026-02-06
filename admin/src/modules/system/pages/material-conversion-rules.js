@@ -91,6 +91,88 @@ function materialConversionRulesPage() {
     /** @type {ConversionRule[]} 转换规则列表 */
     rules: [],
 
+    // ========== data-table 列配置 ==========
+    tableColumns: [
+      { key: 'rule_id', label: '规则ID', sortable: true, type: 'code' },
+      {
+        key: '_direction',
+        label: '转换方向',
+        render: (_val, row) =>
+          `<span class="font-mono text-sm">${row.from_asset_code || '-'} → ${row.to_asset_code || '-'}</span>`
+      },
+      {
+        key: '_ratio',
+        label: '转换比例',
+        render: (_val, row) =>
+          `<span class="font-semibold">${row.from_amount || 0} : ${row.to_amount || 0}</span>`
+      },
+      { key: 'effective_at', label: '生效时间', type: 'datetime', sortable: true },
+      {
+        key: 'is_enabled',
+        label: '状态',
+        type: 'status',
+        statusMap: {
+          true: { class: 'green', label: '启用' },
+          false: { class: 'gray', label: '禁用' }
+        }
+      },
+      {
+        key: '_risk',
+        label: '风控校验',
+        render: (_val, row) => {
+          if (row.cycle_detected) return '<span class="text-red-600 font-medium">⚠️ 循环风险</span>'
+          if (row.arbitrage_detected) return '<span class="text-yellow-600 font-medium">⚠️ 套利风险</span>'
+          return '<span class="text-green-600">✅ 正常</span>'
+        }
+      },
+      {
+        key: '_actions',
+        label: '操作',
+        type: 'actions',
+        width: '200px',
+        actions: [
+          { name: 'edit', label: '编辑', icon: '✏️', class: 'text-blue-600 hover:text-blue-800' },
+          {
+            name: 'toggle',
+            label: '切换',
+            icon: '🔄',
+            class: 'text-green-600 hover:text-green-800'
+          },
+          { name: 'delete', label: '删除', icon: '🗑️', class: 'text-red-500 hover:text-red-700' }
+        ]
+      }
+    ],
+
+    /**
+     * data-table 数据源
+     */
+    async fetchTableData(_params) {
+      const response = await request({ url: ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULES })
+      if (response?.success) {
+        const items = response.data?.rules || []
+        return { items, total: items.length }
+      }
+      throw new Error(response?.message || '加载转换规则失败')
+    },
+
+    /**
+     * 处理表格操作事件
+     */
+    handleTableAction(detail) {
+      const { action, row } = detail
+      switch (action) {
+        case 'edit':
+          this.openEditModal(row)
+          break
+        case 'toggle':
+          this.toggleRule(row.rule_id, row.is_enabled)
+          break
+        case 'delete':
+          this.deleteRule(row.rule_id)
+          break
+      }
+    },
+
     /**
      * 统计数据
      * @type {Object}
@@ -210,18 +292,17 @@ function materialConversionRulesPage() {
      * @returns {Promise<void>}
      */
     async loadRules() {
-      const result = await this.withLoading(async () => {
+      // 刷新 data-table（CRUD 操作后调用）
+      window.dispatchEvent(new CustomEvent('dt-refresh'))
+      // 同时加载统计信息
+      try {
         const response = await apiRequest(ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULES)
-
-        if (response && response.success) {
-          return response.data?.rules || []
+        if (response?.success) {
+          this.rules = response.data?.rules || []
+          this._updateStatistics()
         }
-        throw new Error(response?.message || '加载失败')
-      })
-
-      if (result.success) {
-        this.rules = result.data
-        this._updateStatistics()
+      } catch (_e) {
+        // 统计更新失败不影响表格
       }
     },
 

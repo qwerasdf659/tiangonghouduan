@@ -29,7 +29,7 @@ function reminderRulesPage() {
   return {
     ...createPageMixin(),
 
-    // 规则列表
+    // 规则列表（保留用于 stats 更新）
     rules: [],
 
     // 统计数据
@@ -46,14 +46,14 @@ function reminderRulesPage() {
       is_enabled: ''
     },
 
-    // 分页
+    // 分页（由 data-table 管理，保留兼容）
     pagination: {
       page: 1,
       page_size: 20,
       total: 0
     },
 
-    // 计算属性
+    // 计算属性（保留兼容）
     get totalPages() {
       return Math.ceil(this.pagination.total / this.pagination.page_size) || 1
     },
@@ -62,6 +62,115 @@ function reminderRulesPage() {
     },
     get hasNextPage() {
       return this.pagination.page < this.totalPages
+    },
+
+    // ========== data-table 列配置 ==========
+    tableColumns: [
+      { key: 'rule_name', label: '规则名称', sortable: true },
+      {
+        key: 'rule_type',
+        label: '类型',
+        type: 'badge',
+        badgeMap: {
+          budget: 'yellow',
+          inventory: 'blue',
+          performance: 'purple',
+          security: 'red',
+          business: 'green',
+          system: 'gray'
+        },
+        labelMap: {
+          budget: '预算提醒',
+          inventory: '库存提醒',
+          performance: '性能提醒',
+          security: '安全提醒',
+          business: '业务提醒',
+          system: '系统提醒'
+        }
+      },
+      { key: 'priority', label: '优先级', sortable: true, type: 'number' },
+      {
+        key: 'is_enabled',
+        label: '状态',
+        type: 'status',
+        statusMap: {
+          true: { class: 'green', label: '已启用' },
+          false: { class: 'gray', label: '已禁用' }
+        }
+      },
+      {
+        key: 'check_interval',
+        label: '检查间隔',
+        render: (val) => val ? `${val}分钟` : '-'
+      },
+      { key: 'updated_at', label: '更新时间', type: 'datetime', sortable: true },
+      {
+        key: '_actions',
+        label: '操作',
+        type: 'actions',
+        width: '180px',
+        actions: [
+          { name: 'edit', label: '编辑', icon: '✏️', class: 'text-blue-600 hover:text-blue-800' },
+          {
+            name: 'toggle',
+            label: '切换',
+            icon: '🔄',
+            class: 'text-green-600 hover:text-green-800'
+          },
+          { name: 'test', label: '测试', icon: '🧪', class: 'text-purple-600 hover:text-purple-800' },
+          { name: 'delete', label: '删除', icon: '🗑️', class: 'text-red-500 hover:text-red-700' }
+        ]
+      }
+    ],
+
+    /**
+     * data-table 数据源
+     */
+    async fetchTableData(params) {
+      const response = await request({
+        url: REMINDER_ENDPOINTS.LIST,
+        method: 'GET',
+        params: params
+      })
+      if (response?.success) {
+        return {
+          items: response.data?.list || response.data?.items || [],
+          total: response.data?.total || 0
+        }
+      }
+      throw new Error(response?.message || '加载提醒规则失败')
+    },
+
+    /**
+     * 处理表格操作事件
+     */
+    handleTableAction(detail) {
+      const { action, row } = detail
+      switch (action) {
+        case 'edit':
+          this.editRule(row.reminder_rule_id || row.id)
+          break
+        case 'toggle':
+          this.toggleRule(row.reminder_rule_id || row.id, row.is_enabled)
+          break
+        case 'test':
+          this.testRule(row.reminder_rule_id || row.id)
+          break
+        case 'delete':
+          this.deleteRule(row.reminder_rule_id || row.id)
+          break
+      }
+    },
+
+    /**
+     * 搜索（触发 data-table 重载）
+     */
+    searchTable() {
+      const filters = {}
+      if (this.filter.rule_type) filters.rule_type = this.filter.rule_type
+      if (this.filter.priority) filters.priority = this.filter.priority
+      if (this.filter.is_enabled !== '') filters.is_enabled = this.filter.is_enabled
+      window.dispatchEvent(new CustomEvent('dt-search', { detail: { filters } }))
     },
 
     // 编辑模态框
@@ -93,60 +202,21 @@ function reminderRulesPage() {
      * 初始化
      */
     async init() {
-      logger.info('[ReminderRules] 初始化页面')
+      logger.info('[ReminderRules] 初始化页面（data-table 模式）')
 
-      // 监听筛选变化
-      this.$watch('filter.rule_type', () => this.loadRules())
-      this.$watch('filter.priority', () => this.loadRules())
-      this.$watch('filter.is_enabled', () => this.loadRules())
+      // 监听筛选变化 → 触发 data-table 重载
+      this.$watch('filter.rule_type', () => this.searchTable())
+      this.$watch('filter.priority', () => this.searchTable())
+      this.$watch('filter.is_enabled', () => this.searchTable())
 
-      // 加载数据
-      await this.loadRules()
+      // 数据加载由 data-table 的 init() 自动完成
     },
 
     /**
-     * 加载规则列表
+     * 覆写 loadRules：刷新 data-table（CRUD 操作后调用）
      */
     async loadRules() {
-      this.loading = true
-      try {
-        const params = {
-          page: this.pagination.page,
-          page_size: this.pagination.page_size
-        }
-
-        // 添加筛选条件
-        if (this.filter.rule_type) {
-          params.rule_type = this.filter.rule_type
-        }
-        if (this.filter.priority) {
-          params.priority = this.filter.priority
-        }
-        if (this.filter.is_enabled !== '') {
-          params.is_enabled = this.filter.is_enabled
-        }
-
-        const response = await request({
-          url: REMINDER_ENDPOINTS.LIST,
-          method: 'GET',
-          params: params
-        })
-
-        if (response.success) {
-          this.rules = response.data?.list || response.data?.items || []
-          this.pagination.total = response.data?.total || 0
-          this.updateStats()
-          logger.info('[ReminderRules] 加载成功', { count: this.rules.length })
-        } else {
-          logger.error('[ReminderRules] 加载失败', response.message)
-          this.showError(response.message || '加载失败')
-        }
-      } catch (error) {
-        logger.error('[ReminderRules] 加载异常', error)
-        this.showError('加载失败: ' + error.message)
-      } finally {
-        this.loading = false
-      }
+      window.dispatchEvent(new CustomEvent('dt-refresh'))
     },
 
     /**
@@ -295,25 +365,18 @@ function reminderRulesPage() {
      * 执行规则
      */
     async executeRule(rule) {
-      if (!confirm(`确定要立即执行规则"${rule.rule_name || rule.name}"吗？这将实际发送通知。`)) {
-        return
-      }
-
-      try {
-        const response = await request({
-          url: REMINDER_ENDPOINTS.EXECUTE(rule.reminder_rule_id),
-          method: 'POST'
-        })
-
-        if (response.success) {
-          this.showSuccess('规则执行完成')
-        } else {
-          this.showError(response.message || '执行失败')
-        }
-      } catch (error) {
-        logger.error('[ReminderRules] 执行异常', error)
-        this.showError('执行失败: ' + error.message)
-      }
+      await this.confirmAndExecute(
+        `确定要立即执行规则"${rule.rule_name || rule.name}"吗？这将实际发送通知。`,
+        async () => {
+          const response = await request({
+            url: REMINDER_ENDPOINTS.EXECUTE(rule.reminder_rule_id),
+            method: 'POST'
+          })
+          if (!response.success) throw new Error(response.message || '执行失败')
+          return response
+        },
+        { successMessage: '规则执行完成', showSuccess: true }
+      )
     },
 
     /**
@@ -325,26 +388,19 @@ function reminderRulesPage() {
         return
       }
 
-      if (!confirm(`确定要删除规则"${rule.rule_name || rule.name}"吗？此操作不可撤销。`)) {
-        return
-      }
-
-      try {
-        const response = await request({
-          url: REMINDER_ENDPOINTS.DELETE(rule.reminder_rule_id),
-          method: 'DELETE'
-        })
-
-        if (response.success) {
-          this.showSuccess('规则删除成功')
-          await this.loadRules()
-        } else {
-          this.showError(response.message || '删除失败')
-        }
-      } catch (error) {
-        logger.error('[ReminderRules] 删除异常', error)
-        this.showError('删除失败: ' + error.message)
-      }
+      await this.confirmAndExecute(
+        `确定要删除规则"${rule.rule_name || rule.name}"吗？此操作不可撤销。`,
+        async () => {
+          const response = await request({
+            url: REMINDER_ENDPOINTS.DELETE(rule.reminder_rule_id),
+            method: 'DELETE'
+          })
+          if (!response.success) throw new Error(response.message || '删除失败')
+          this.loadData()
+          return response
+        },
+        { successMessage: '规则已删除', showSuccess: true, danger: true }
+      )
     },
 
     /**
@@ -371,18 +427,8 @@ function reminderRulesPage() {
       }
     },
 
-    // 工具方法
-    getRuleTypeName(type) {
-      const types = {
-        budget: '预算提醒',
-        inventory: '库存提醒',
-        performance: '性能提醒',
-        security: '安全提醒',
-        business: '业务提醒',
-        system: '系统提醒'
-      }
-      return types[type] || type || '未知'
-    },
+    // ✅ 已删除 getRuleTypeName 映射函数
+    // HTML 直接使用后端返回的 rule_type_display 字段
 
     getRuleTypeClass(type) {
       const classes = {

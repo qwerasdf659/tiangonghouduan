@@ -50,9 +50,9 @@ export function useAdvancedStatusState() {
     riskLevels: [],
     /** @type {Object|null} 选中的风控配置 */
     selectedRiskProfile: null,
-    /** @type {Object} 风控表单 */
+    /** @type {Object} 风控表单（手机号主导搜索） */
     riskForm: {
-      user_id: '',
+      mobile: '',
       daily_points_limit: 10000,
       single_transaction_limit: 1000,
       daily_lottery_limit: 100,
@@ -288,7 +288,8 @@ export function useAdvancedStatusMethods() {
         // 从 thresholds JSON 字段获取阈值，兼容旧字段格式
         const thresholds = profile.thresholds || {}
         this.riskForm = {
-          user_id: profile.user_id || '',
+          mobile: '',
+          _resolved_user_id: profile.user_id || '',
           user_level: profile.user_level || 'normal',
           daily_points_limit: thresholds.daily_points_limit || profile.daily_points_limit || 10000,
           single_transaction_limit:
@@ -299,7 +300,8 @@ export function useAdvancedStatusMethods() {
         this.selectedRiskProfile = profile
       } else {
         this.riskForm = {
-          user_id: '',
+          mobile: '',
+          _resolved_user_id: '',
           user_level: 'normal',
           daily_points_limit: 10000,
           single_transaction_limit: 1000,
@@ -315,11 +317,19 @@ export function useAdvancedStatusMethods() {
      * 提交风控配置
      */
     async submitRiskProfile() {
-      // 等级配置不需要user_id，用户配置才需要
+      // 等级配置不需要手机号/user_id，用户配置才需要
       const isLevelConfig = this.selectedRiskProfile?.config_type === 'level'
-      if (!isLevelConfig && !this.riskForm.user_id) {
-        this.showError('请输入用户ID')
+      if (!isLevelConfig && !this.riskForm.mobile && !this.riskForm._resolved_user_id) {
+        this.showError('请输入手机号')
         return
+      }
+
+      // 新建时手机号 → resolve 获取 user_id；编辑时已有 _resolved_user_id
+      let resolvedUserId = this.riskForm._resolved_user_id
+      if (!isLevelConfig && this.riskForm.mobile && !resolvedUserId) {
+        const user = await this.resolveUserByMobile(this.riskForm.mobile)
+        if (!user) return
+        resolvedUserId = user.user_id
       }
 
       try {
@@ -341,8 +351,8 @@ export function useAdvancedStatusMethods() {
           }
         }
         // 用户配置需要 user_id
-        if (!isLevelConfig && this.riskForm.user_id) {
-          submitData.user_id = this.riskForm.user_id
+        if (!isLevelConfig && resolvedUserId) {
+          submitData.user_id = resolvedUserId
         }
         // 等级配置需要 user_level
         if (isLevelConfig) {
@@ -412,13 +422,6 @@ export function useAdvancedStatusMethods() {
      * 加载角色变更历史
      */
     async loadRoleChangeHistory() {
-      // [DEBUG] 调试日志 - 待删除
-      logger.info('[DEBUG] loadRoleChangeHistory 被调用，筛选条件:', {
-        user_id: this.roleHistoryFilters.user_id,
-        operator_id: this.roleHistoryFilters.operator_id,
-        page: this.roleHistoryPagination.page
-      })
-
       try {
         const params = new URLSearchParams()
         params.append('page', this.roleHistoryPagination.page)
@@ -436,13 +439,7 @@ export function useAdvancedStatusMethods() {
           params.append('end_date', this.roleHistoryFilters.end_date)
 
         const url = `${USER_ENDPOINTS.ROLE_CHANGE_HISTORY_LIST}?${params}`
-        // [DEBUG] 调试日志 - 待删除
-        logger.info('[DEBUG] 请求URL:', url)
-
         const response = await this.apiGet(url, {}, { showLoading: true })
-
-        // [DEBUG] 调试日志 - 待删除
-        logger.info('[DEBUG] API响应:', response)
 
         if (response?.success) {
           this.roleChangeHistory =
@@ -452,16 +449,16 @@ export function useAdvancedStatusMethods() {
             this.roleHistoryPagination.total =
               response.data.pagination.total || response.data.pagination.total_count || 0
           }
-          logger.info('[DEBUG] 加载完成，记录数:', this.roleChangeHistory.length)
+          logger.info('[RoleHistory] 加载完成，记录数:', this.roleChangeHistory.length)
           // 显示刷新成功提示
           this.showSuccess &&
             this.showSuccess(`刷新成功，共 ${this.roleChangeHistory.length} 条记录`)
         } else {
-          logger.warn('[DEBUG] API返回失败:', response)
+          logger.warn('[RoleHistory] API返回失败:', response)
           this.showError(response?.message || '加载角色变更历史失败')
         }
       } catch (error) {
-        logger.error('[DEBUG] 加载角色变更历史异常:', error)
+        logger.error('[RoleHistory] 加载角色变更历史异常:', error)
         this.showError('加载角色变更历史失败: ' + (error.message || '未知错误'))
         this.roleChangeHistory = []
       }
@@ -483,13 +480,6 @@ export function useAdvancedStatusMethods() {
      * 加载状态变更历史
      */
     async loadStatusChangeHistory() {
-      // [DEBUG] 调试日志 - 待删除
-      logger.info('[DEBUG] loadStatusChangeHistory 被调用，筛选条件:', {
-        user_id: this.statusHistoryFilters.user_id,
-        operator_id: this.statusHistoryFilters.operator_id,
-        page: this.statusHistoryPagination.page
-      })
-
       try {
         const params = new URLSearchParams()
         params.append('page', this.statusHistoryPagination.page)
@@ -507,13 +497,7 @@ export function useAdvancedStatusMethods() {
           params.append('end_date', this.statusHistoryFilters.end_date)
 
         const url = `${USER_ENDPOINTS.STATUS_CHANGE_HISTORY_LIST}?${params}`
-        // [DEBUG] 调试日志 - 待删除
-        logger.info('[DEBUG] 请求URL:', url)
-
         const response = await this.apiGet(url, {}, { showLoading: true })
-
-        // [DEBUG] 调试日志 - 待删除
-        logger.info('[DEBUG] API响应:', response)
 
         if (response?.success) {
           this.statusChangeHistory =
@@ -523,13 +507,13 @@ export function useAdvancedStatusMethods() {
             this.statusHistoryPagination.total =
               response.data.pagination.total || response.data.pagination.total_count || 0
           }
-          logger.info('[DEBUG] 加载完成，记录数:', this.statusChangeHistory.length)
+          logger.info('[StatusHistory] 加载完成，记录数:', this.statusChangeHistory.length)
         } else {
-          logger.warn('[DEBUG] API返回失败:', response)
+          logger.warn('[StatusHistory] API返回失败:', response)
           this.showError(response?.message || '加载状态变更历史失败')
         }
       } catch (error) {
-        logger.error('[DEBUG] 加载状态变更历史异常:', error)
+        logger.error('[StatusHistory] 加载状态变更历史异常:', error)
         this.showError('加载状态变更历史失败: ' + (error.message || '未知错误'))
         this.statusChangeHistory = []
       }

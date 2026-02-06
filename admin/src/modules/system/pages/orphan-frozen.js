@@ -98,6 +98,58 @@ function orphanFrozenPage() {
     /** @type {OrphanItem[]} 孤儿冻结项目列表 */
     orphanList: [],
 
+    // ========== data-table 列配置 ==========
+    tableColumns: [
+      { key: 'account_id', label: '账户ID', sortable: true, type: 'code' },
+      {
+        key: 'type',
+        label: '类型',
+        type: 'badge',
+        badgeMap: { orphan: 'gray', frozen: 'blue' },
+        labelMap: { orphan: '孤儿', frozen: '冻结' }
+      },
+      { key: 'user_id', label: '用户ID' },
+      { key: 'description', label: '描述', type: 'truncate', maxLength: 30 },
+      {
+        key: 'orphan_amount',
+        label: '孤儿金额',
+        sortable: true,
+        render: (val) => `<span class="font-mono text-orange-600">${Number(val || 0).toLocaleString('zh-CN')}</span>`
+      },
+      {
+        key: 'status',
+        label: '状态',
+        type: 'status',
+        statusMap: {
+          pending: { class: 'yellow', label: '待处理' },
+          processing: { class: 'blue', label: '处理中' },
+          processed: { class: 'green', label: '已处理' }
+        }
+      },
+      { key: 'discovered_at', label: '检测时间', type: 'datetime', sortable: true },
+      {
+        key: '_actions',
+        label: '操作',
+        type: 'actions',
+        width: '160px',
+        actions: [
+          { name: 'view', label: '详情', class: 'text-blue-600 hover:text-blue-800' },
+          {
+            name: 'clean',
+            label: '处理',
+            class: 'text-green-500 hover:text-green-700',
+            condition: (row) => row.status === 'pending'
+          },
+          {
+            name: 'unfreeze',
+            label: '解冻',
+            class: 'text-orange-500 hover:text-orange-700',
+            condition: (row) => row.type === 'frozen' && row.status !== 'processed'
+          }
+        ]
+      }
+    ],
+
     /**
      * 筛选条件
      * @type {Object}
@@ -172,18 +224,85 @@ function orphanFrozenPage() {
         return
       }
 
-      logger.debug('✅ [orphanFrozenPage] checkAuth() 通过，开始加载数据')
-      // 加载数据
-      this.loadData()
+      logger.debug('✅ [orphanFrozenPage] checkAuth() 通过，数据由 data-table 自动加载')
+      // 数据由 data-table 组件自动加载
+    },
+
+    // ==================== data-table 数据源 ====================
+
+    /**
+     * data-table 数据源
+     */
+    async fetchTableData(params) {
+      const detectParams = new URLSearchParams()
+      if (params.asset_code) detectParams.append('asset_code', params.asset_code)
+
+      const detectUrl = ASSET_ENDPOINTS.ORPHAN_FROZEN_DETECT +
+        (detectParams.toString() ? '?' + detectParams.toString() : '')
+      const statsUrl = ASSET_ENDPOINTS.ORPHAN_FROZEN_STATS
+
+      const [detectResponse, statsResponse] = await Promise.all([
+        request({ url: detectUrl }),
+        request({ url: statsUrl })
+      ])
+
+      // 处理统计数据
+      if (statsResponse?.success) {
+        const data = statsResponse.data
+        this.stats = {
+          total_orphan_count: data.total_orphan_count || 0,
+          total_orphan_amount: data.total_orphan_amount || 0,
+          affected_user_count: data.affected_user_count || 0,
+          frozen_count: 0,
+          processed_count: 0
+        }
+      }
+
+      if (detectResponse?.success) {
+        const generatedAt = detectResponse.data.generated_at || new Date().toISOString()
+        const items = (detectResponse.data.orphan_items || []).map(item => ({
+          ...item,
+          type: 'orphan',
+          status: 'pending',
+          discovered_at: generatedAt
+        }))
+        this.orphanList = items
+        return { items, total: items.length }
+      }
+
+      if (detectResponse?.code === 'UNAUTHORIZED' || detectResponse?.code === 'TOKEN_EXPIRED') {
+        window.location.href = '/admin/login.html'
+        throw new Error('登录已过期')
+      }
+      throw new Error(detectResponse?.message || '加载失败')
+    },
+
+    /**
+     * 处理表格操作事件
+     */
+    handleTableAction(detail) {
+      const { action, row } = detail
+      switch (action) {
+        case 'view':
+          this.viewAssetDetail(row)
+          break
+        case 'clean':
+          this.cleanSingleItem(row)
+          break
+        case 'unfreeze':
+          this.unfreezeAsset(row)
+          break
+        default:
+          logger.warn('[OrphanFrozen] 未知操作:', action)
+      }
     },
 
     // ==================== 数据加载 ====================
 
     /**
-     * 加载孤儿冻结数据和统计信息
+     * 加载孤儿冻结数据和统计信息（保留用于扫描后刷新）
      * @async
      * @method loadData
-     * @description 并行获取检测结果和统计数据，并更新页面状态
      * @returns {Promise<void>}
      */
     async loadData() {
@@ -324,7 +443,8 @@ function orphanFrozenPage() {
         if (response && response.success) {
           const foundCount = response.data.orphan_count || 0
           this.showSuccess(`扫描完成，发现 ${foundCount} 条孤儿冻结数据`)
-          await this.loadData()
+          // 刷新 data-table
+          window.dispatchEvent(new CustomEvent('dt-refresh'))
         } else {
           logger.warn('⚠️ [orphanFrozenPage] 扫描API返回失败', response)
           // 处理认证错误
@@ -451,7 +571,7 @@ function orphanFrozenPage() {
 
           this.hideModal('cleanModal')
           this.selectedItems = []
-          this.loadData()
+          window.dispatchEvent(new CustomEvent('dt-refresh'))
         } else {
           this.showError(response?.message || '清理失败')
         }

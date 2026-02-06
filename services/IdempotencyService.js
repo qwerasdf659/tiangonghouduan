@@ -106,9 +106,9 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/lottery/campaigns/:code/prizes': 'CAMPAIGN_PRIZES', // 获取活动奖品列表
   '/api/v4/lottery/campaigns/:code/config': 'CAMPAIGN_CONFIG', // 获取活动抽奖配置
 
-  // ===== B2C 兑换下单 =====
-  '/api/v4/shop/exchange': 'SHOP_EXCHANGE_CREATE_ORDER', // 兑换商品（canonical 路径）
-  '/api/v4/shop/exchange/orders/:id/status': 'SHOP_EXCHANGE_UPDATE_STATUS', // 更新订单状态
+  // ===== B2C 兑换下单（2026-02-07 从 shop 域迁移到 backpack 域） =====
+  '/api/v4/backpack/exchange': 'BACKPACK_EXCHANGE_CREATE_ORDER', // 用户端兑换商品（新路径）
+  '/api/v4/shop/exchange/orders/:id/status': 'SHOP_EXCHANGE_UPDATE_STATUS', // 更新订单状态（管理操作保留在 shop）
 
   // ===== 材料转换 =====
   '/api/v4/shop/assets/convert': 'SHOP_ASSET_CONVERT', // 资产转换（canonical 路径）

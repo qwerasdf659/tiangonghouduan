@@ -1948,7 +1948,7 @@
                 <div>
                   <dt class="text-gray-500">状态</dt>
                   <dd>
-                    <span :class="getStatusColor(basicInfo.user?.status)" class="px-2 py-0.5 rounded text-xs font-medium" x-text="getStatusLabel(basicInfo.user?.status)"></span>
+                    <span :class="getStatusColor(basicInfo.user?.status)" class="px-2 py-0.5 rounded text-xs font-medium" x-text="basicInfo.user?.status_display || basicInfo.user?.status || '-'"></span>
                   </dd>
                 </div>
                 <div>

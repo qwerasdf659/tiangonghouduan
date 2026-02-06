@@ -19,7 +19,12 @@
   </nav>
 
   <!-- 页面主体 -->
-  <div class="container mx-auto px-4 py-6" x-data="exchangeMarket()" x-init="init()">
+  <div class="container mx-auto px-4 py-6" x-data="exchangeMarket()" x-init="init()"
+       @edit-item="editItem($event.detail)"
+       @delete-item="deleteItem($event.detail)"
+       @toggle-item-status="toggleItemStatus($event.detail)"
+       @ship-order="shipOrder($event.detail)"
+       @complete-order-action="completeOrder($event.detail)">
     
     <!-- 子页面导航 -->
     <div class="themed-card rounded-lg shadow mb-6">
@@ -44,43 +49,65 @@
             ➕ 新增商品
           </button>
         </div>
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead class="themed-bg-base">
-              <tr>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">商品ID</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">商品名称</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">兑换价格</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">库存</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y">
-              <template x-for="item in items" :key="item.exchange_item_id">
-                <tr class="themed-hover-bg">
-                  <td class="px-4 py-3 text-sm" x-text="item.exchange_item_id"></td>
-                  <td class="px-4 py-3 text-sm" x-text="item.item_name"></td>
-                  <td class="px-4 py-3 text-sm font-mono" x-text="(item.cost_amount || item.price || 0) + ' ' + (item.cost_asset_code || '积分')"></td>
-                  <td class="px-4 py-3 text-sm" x-text="item.stock"></td>
-                  <td class="px-4 py-3">
-                    <span 
-                      :class="item.status === 'active' ? 'bg-green-100 themed-text-success' : 'themed-bg-subtle themed-text-secondary'"
-                      class="px-2 py-1 text-xs rounded"
-                      x-text="item.status === 'active' ? '上架' : '下架'"
-                    ></span>
-                  </td>
-                  <td class="px-4 py-3">
-                    <div class="flex space-x-2">
-                      <button @click="editItem(item)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
-                      <button @click="toggleItemStatus(item)" class="text-yellow-500 hover:text-yellow-700 text-sm" x-text="item.status === 'active' ? '下架' : '上架'"></button>
-                      <button @click="deleteItem(item)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
-                    </div>
-                  </td>
+        <!-- data-table: 兑换商品列表 -->
+        <div x-data="exchangeItemsTable()" x-init="init()">
+          <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+          <div x-show="hasError" class="p-8 text-center">
+            <p class="text-red-500 mb-2" x-text="error"></p>
+            <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+          </div>
+          <div x-show="hasData" class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="themed-bg-base">
+                <tr>
+                  <template x-for="col in columns" :key="col.key">
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                        :class="{ 'cursor-pointer hover:text-green-600': col.sortable }"
+                        @click="sort(col)">
+                      <span x-text="col.label"></span>
+                      <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                    </th>
+                  </template>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
                 </tr>
-              </template>
-            </tbody>
-          </table>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="(row, idx) in data" :key="row.exchange_item_id || idx">
+                  <tr class="themed-hover-bg">
+                    <template x-for="col in columns" :key="col.key">
+                      <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                    </template>
+                    <td class="px-4 py-3">
+                      <div class="flex space-x-2">
+                        <button @click="$dispatch('edit-item', row)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                        <button @click="$dispatch('toggle-item-status', row)" class="text-yellow-500 hover:text-yellow-700 text-sm" x-text="row.status === 'active' ? '下架' : '上架'"></button>
+                        <button @click="$dispatch('delete-item', row)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+            <div class="text-4xl mb-4">📦</div>
+            <p>暂无商品数据</p>
+          </div>
+          <template x-if="total_pages > 1">
+            <div class="p-4 border-t flex justify-between items-center">
+              <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+              <div class="flex space-x-1">
+                <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                <template x-for="p in visiblePages" :key="'pi'+p">
+                  <button @click="goToPage(p)" :class="p === current_page ? 'bg-green-500 text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                </template>
+                <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+              </div>
+            </div>
+          </template>
+          <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+            最后更新: <span x-text="lastUpdateTime"></span>
+          </div>
         </div>
       </div>
     </div>
@@ -91,67 +118,83 @@
         <div class="p-4 border-b">
           <h5 class="font-semibold">兑换订单</h5>
         </div>
-        <div class="p-4 border-b themed-bg-base">
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <input type="text" x-model="orderFilters.order_no" placeholder="订单号" class="px-3 py-2 border rounded">
-            <select x-model="orderFilters.status" class="px-3 py-2 border rounded">
-              <option value="">全部状态</option>
-              <option value="pending">待发货</option>
-              <option value="shipped">已发货</option>
-              <option value="completed">已完成</option>
-              <option value="cancelled">已取消</option>
-            </select>
-            <button @click="loadOrders()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
-            <button @click="resetOrderFilters?.()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">🔄 重置</button>
+        <!-- data-table: 兑换订单列表（含筛选） -->
+        <div x-data="exchangeOrdersTable()" x-init="init()">
+          <!-- 筛选栏 -->
+          <div class="p-4 border-b themed-bg-base">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <input type="text" x-model="activeFilters.order_no" placeholder="订单号" class="px-3 py-2 border rounded">
+              <select x-model="activeFilters.status" class="px-3 py-2 border rounded">
+                <option value="">全部状态</option>
+                <option value="pending">待发货</option>
+                <option value="shipped">已发货</option>
+                <option value="completed">已完成</option>
+                <option value="cancelled">已取消</option>
+              </select>
+              <button @click="search()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
+              <button @click="handleFilterReset()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">🔄 重置</button>
+            </div>
           </div>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead class="themed-bg-base">
-              <tr>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">订单号</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">商品</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">消耗积分</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">下单时间</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y">
-              <template x-for="order in orders" :key="order.order_no || order.record_id">
-                <tr class="themed-hover-bg">
-                  <td class="px-4 py-3 text-sm font-mono" x-text="order.order_no"></td>
-                  <td class="px-4 py-3 text-sm" x-text="order.user_nickname || order.user_mobile || order.user_id"></td>
-                  <td class="px-4 py-3 text-sm" x-text="order.item_snapshot?.name || order.item_name || '-'"></td>
-                  <td class="px-4 py-3 text-sm" x-text="(order.pay_amount || order.cost_amount || 0) + ' ' + (order.pay_asset_code || order.cost_asset_code || '')"></td>
-                  <td class="px-4 py-3">
-                    <span 
-                      :class="{
-                        'bg-yellow-100 text-yellow-700': order.status === 'pending',
-                        'themed-bg-primary-light themed-text-primary': order.status === 'shipped',
-                        'bg-green-100 themed-text-success': order.status === 'completed',
-                        'bg-red-100 text-red-700': order.status === 'cancelled'
-                      }"
-                      class="px-2 py-1 text-xs rounded"
-                      x-text="order.status === 'pending' ? '待发货' : order.status === 'shipped' ? '已发货' : order.status === 'completed' ? '已完成' : '已取消'"
-                    ></span>
-                  </td>
-                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(order.created_at)"></td>
-                  <td class="px-4 py-3">
-                    <div class="flex space-x-2">
-                      <template x-if="order.status === 'pending'">
-                        <button @click="shipOrder(order)" class="themed-text-primary hover:text-blue-700 text-sm">发货</button>
-                      </template>
-                      <template x-if="order.status === 'shipped'">
-                        <button @click="completeOrder(order)" class="text-green-500 hover:text-green-700 text-sm">完成</button>
-                      </template>
-                    </div>
-                  </td>
+          <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+          <div x-show="hasError" class="p-8 text-center">
+            <p class="text-red-500 mb-2" x-text="error"></p>
+            <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+          </div>
+          <div x-show="hasData" class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="themed-bg-base">
+                <tr>
+                  <template x-for="col in columns" :key="col.key">
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                        :class="{ 'cursor-pointer hover:text-green-600': col.sortable }"
+                        @click="sort(col)">
+                      <span x-text="col.label"></span>
+                      <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                    </th>
+                  </template>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
                 </tr>
-              </template>
-            </tbody>
-          </table>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="(row, idx) in data" :key="row.order_no || idx">
+                  <tr class="themed-hover-bg">
+                    <template x-for="col in columns" :key="col.key">
+                      <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                    </template>
+                    <td class="px-4 py-3">
+                      <div class="flex space-x-2">
+                        <template x-if="row.status === 'pending'">
+                          <button @click="$dispatch('ship-order', row)" class="themed-text-primary hover:text-blue-700 text-sm">发货</button>
+                        </template>
+                        <template x-if="row.status === 'shipped'">
+                          <button @click="$dispatch('complete-order-action', row)" class="text-green-500 hover:text-green-700 text-sm">完成</button>
+                        </template>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+            <div class="text-4xl mb-4">📋</div>
+            <p>暂无订单数据</p>
+          </div>
+          <template x-if="total_pages > 1">
+            <div class="p-4 border-t flex justify-between items-center">
+              <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+              <div class="flex space-x-1">
+                <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                <template x-for="p in visiblePages" :key="'po'+p">
+                  <button @click="goToPage(p)" :class="p === current_page ? 'bg-green-500 text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                </template>
+                <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+              </div>
+            </div>
+          </template>
+          <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+            最后更新: <span x-text="lastUpdateTime"></span>
+          </div>
         </div>
       </div>
     </div>

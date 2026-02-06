@@ -69,7 +69,7 @@ class PopupBannerService {
         ],
         limit: parseInt(limit) || 10,
         // 仅返回小程序需要的字段（数据脱敏）
-        attributes: ['banner_id', 'title', 'image_url', 'link_url', 'link_type']
+        attributes: ['popup_banner_id', 'title', 'image_url', 'link_url', 'link_type']
       })
 
       logger.info('获取有效弹窗成功', {
@@ -123,7 +123,7 @@ class PopupBannerService {
         limit: parseInt(limit) || 10,
         // 返回更多字段供管理员查看
         attributes: [
-          'banner_id',
+          'popup_banner_id',
           'title',
           'image_url',
           'link_url',
@@ -248,7 +248,7 @@ class PopupBannerService {
 
       return result
     } catch (error) {
-      logger.error('获取弹窗详情失败', { error: error.message, banner_id: bannerId })
+      logger.error('获取弹窗详情失败', { error: error.message, popup_banner_id: bannerId })
       throw error
     }
   }
@@ -299,7 +299,7 @@ class PopupBannerService {
       })
 
       logger.info('创建弹窗Banner成功', {
-        banner_id: banner.banner_id,
+        popup_banner_id: banner.popup_banner_id,
         title: banner.title,
         position: banner.position,
         created_by: creatorId
@@ -445,7 +445,7 @@ class PopupBannerService {
       const updated = await PopupBannerService.getBannerById(bannerId)
       return updated
     } catch (error) {
-      logger.error('更新弹窗Banner失败', { error: error.message, banner_id: bannerId })
+      logger.error('更新弹窗Banner失败', { error: error.message, popup_banner_id: bannerId })
       throw error
     }
   }
@@ -479,7 +479,7 @@ class PopupBannerService {
             const storageService = new SealosStorageService()
             await storageService.deleteObject(banner.image_url)
             logger.info('删除弹窗Banner图片成功（Sealos）', {
-              banner_id: bannerId,
+              popup_banner_id: bannerId,
               object_key: banner.image_url
             })
           } catch (storageError) {
@@ -488,14 +488,14 @@ class PopupBannerService {
              * 可能原因：对象已不存在、网络问题等
              */
             logger.warn('删除弹窗Banner图片失败（非致命，继续删除数据库记录）', {
-              banner_id: bannerId,
+              popup_banner_id: bannerId,
               object_key: banner.image_url,
               error: storageError.message
             })
           }
         } else {
           logger.info('跳过图片删除（历史完整URL或外部链接）', {
-            banner_id: bannerId,
+            popup_banner_id: bannerId,
             image_url: banner.image_url.substring(0, 50) + '...'
           })
         }
@@ -504,11 +504,11 @@ class PopupBannerService {
       // 删除数据库记录
       await banner.destroy()
 
-      logger.info('删除弹窗Banner成功', { banner_id: bannerId })
+      logger.info('删除弹窗Banner成功', { popup_banner_id: bannerId })
 
       return true
     } catch (error) {
-      logger.error('删除弹窗Banner失败', { error: error.message, banner_id: bannerId })
+      logger.error('删除弹窗Banner失败', { error: error.message, popup_banner_id: bannerId })
       throw error
     }
   }
@@ -529,7 +529,7 @@ class PopupBannerService {
       await banner.save()
 
       logger.info('切换弹窗启用状态成功', {
-        banner_id: bannerId,
+        popup_banner_id: bannerId,
         is_active: banner.is_active
       })
 
@@ -578,7 +578,7 @@ class PopupBannerService {
   /**
    * 批量更新显示顺序
    *
-   * @param {Array<{banner_id: number, display_order: number}>} orderList - 排序列表
+   * @param {Array<{popup_banner_id: number, display_order: number}>} orderList - 排序列表
    * @returns {Promise<number>} 更新的记录数
    */
   static async updateDisplayOrder(orderList) {
@@ -591,7 +591,7 @@ class PopupBannerService {
             updated_at: BeijingTimeHelper.createBeijingTime()
           },
           {
-            where: { banner_id: item.banner_id }
+            where: { popup_banner_id: item.popup_banner_id }
           }
         )
       )

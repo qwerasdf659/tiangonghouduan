@@ -23,6 +23,7 @@ const AuditLogService = require('./AuditLogService')
 const logger = require('../utils/logger')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { Op } = require('sequelize')
+const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 
 /**
  * 可回滚的操作类型和对应的回滚处理器
@@ -624,6 +625,9 @@ class AuditRollbackService {
       count: parseInt(item.count, 10),
       percentage: total > 0 ? parseFloat(((parseInt(item.count, 10) / total) * 100).toFixed(2)) : 0
     }))
+
+    // 附加中文显示名称（target_type → target_type_display/target_type_color）
+    await attachDisplayNames(items, [{ field: 'target_type', dictType: DICT_TYPES.TARGET_TYPE }])
 
     logger.info('[审计统计] 按目标类型统计完成', {
       total,

@@ -164,7 +164,7 @@ export function useExchangeOrdersMethods() {
 
         if (res.success) {
           this.showSuccess?.('发货成功')
-          this.loadOrders()
+          window.dispatchEvent(new CustomEvent('refresh-exchange-orders'))
           this.loadOrderStats()
         } else {
           this.showError?.(res.message || '发货失败')
@@ -200,7 +200,7 @@ export function useExchangeOrdersMethods() {
 
         if (res.success) {
           this.showSuccess?.('订单已取消')
-          this.loadOrders()
+          window.dispatchEvent(new CustomEvent('refresh-exchange-orders'))
           this.loadOrderStats()
         } else {
           this.showError?.(res.message || '取消失败')

@@ -78,7 +78,7 @@ const apiRequest = async (url, options = {}) => {
  */
 function presetsPage() {
   return {
-    // ==================== Mixin 组合 ====================
+    // ==================== Mixin 组合（不需要 pagination/tableSelection，data-table 内置） ====================
     ...createCrudMixin({ page_size: 10 }),
 
     // ==================== 页面特有状态 ====================
@@ -106,10 +106,111 @@ function presetsPage() {
     },
 
     /**
-     * 干预规则列表
+     * 干预规则列表（保留用于 CRUD 后刷新引用）
      * @type {Array<InterventionRule>}
      */
     interventions: [],
+
+    // ========== data-table 列配置 ==========
+    tableColumns: [
+      { key: 'setting_id', label: 'ID', sortable: true, type: 'code' },
+      {
+        key: 'user_id',
+        label: '用户',
+        render: (_val, row) =>
+          `<span>${row.user_info?.nickname || row.user_id || '-'}</span>`
+      },
+      {
+        key: 'setting_type',
+        label: '干预类型',
+        type: 'badge',
+        badgeMap: { force_win: 'green', force_lose: 'red', probability_adjust: 'blue' },
+        labelMap: { force_win: '强制中奖', force_lose: '禁止中奖', probability_adjust: '概率调整' }
+      },
+      {
+        key: 'prize_info.prize_name',
+        label: '目标奖品',
+        render: (_val, row) =>
+          `<span>${row.prize_info?.prize_name || '-'}</span>`
+      },
+      {
+        key: 'status',
+        label: '状态',
+        sortable: true,
+        type: 'status',
+        statusMap: {
+          active: { class: 'green', label: '生效中' },
+          expired: { class: 'gray', label: '已过期' },
+          used: { class: 'blue', label: '已使用' },
+          cancelled: { class: 'red', label: '已取消' }
+        }
+      },
+      { key: 'expires_at', label: '过期时间', type: 'datetime', sortable: true },
+      {
+        key: '_actions',
+        label: '操作',
+        type: 'actions',
+        width: '120px',
+        actions: [
+          { name: 'view', label: '查看', icon: '👁️', class: 'text-blue-600 hover:text-blue-800' },
+          {
+            name: 'cancel',
+            label: '取消',
+            icon: '❌',
+            class: 'text-red-500 hover:text-red-700',
+            condition: (row) => row.status === 'active'
+          }
+        ]
+      }
+    ],
+
+    /**
+     * data-table 数据源（闭包，不依赖 this）
+     */
+    async fetchTableData(params) {
+      const queryParams = new URLSearchParams({
+        page: params.page || 1,
+        page_size: params.page_size || 10
+      })
+      if (params.status) queryParams.append('status', params.status)
+      if (params.user_search) queryParams.append('user_search', params.user_search)
+      if (params.setting_type) queryParams.append('setting_type', params.setting_type)
+
+      const response = await request({ url: `${LOTTERY_ENDPOINTS.INTERVENTION_LIST}?${queryParams}` })
+      if (response?.success) {
+        return {
+          items: response.data?.interventions || [],
+          total: response.data?.pagination?.total || 0
+        }
+      }
+      throw new Error(response?.message || '加载干预规则失败')
+    },
+
+    /**
+     * 处理表格操作事件
+     */
+    handleTableAction(detail) {
+      const { action, row } = detail
+      switch (action) {
+        case 'view':
+          this.viewIntervention(row.setting_id)
+          break
+        case 'cancel':
+          this.cancelIntervention(row.setting_id)
+          break
+      }
+    },
+
+    /**
+     * 搜索（触发 data-table 重载）
+     */
+    searchTable() {
+      const filters = {}
+      if (this.filters.status) filters.status = this.filters.status
+      if (this.filters.user_search.trim()) filters.user_search = this.filters.user_search.trim()
+      if (this.filters.prize_type) filters.setting_type = this.filters.prize_type
+      window.dispatchEvent(new CustomEvent('dt-search', { detail: { filters } }))
+    },
 
     /**
      * 奖品列表
@@ -241,39 +342,10 @@ function presetsPage() {
     },
 
     /**
-     * 加载干预规则列表
-     *
-     * @description 根据当前筛选条件和分页参数加载干预规则数据
-     * @async
-     * @returns {Promise<void>}
+     * 覆写 loadData：刷新 data-table（CRUD 操作后调用）
      */
     async loadData() {
-      await this.withLoading(async () => {
-        const params = new URLSearchParams({
-          page: this.current_page,
-          page_size: this.page_size
-        })
-
-        if (this.filters.status) params.append('status', this.filters.status)
-        if (this.filters.user_search.trim())
-          params.append('user_search', this.filters.user_search.trim())
-        if (this.filters.prize_type) params.append('setting_type', this.filters.prize_type)
-
-        const response = await apiRequest(`${LOTTERY_ENDPOINTS.INTERVENTION_LIST}?${params}`)
-
-        if (response && response.success) {
-          this.interventions = response.data?.interventions || []
-          const paginationData = response.data?.pagination || {}
-          // 使用 paginationMixin 提供的 total_records 字段
-          this.total_records = paginationData.total || this.interventions.length
-          logger.debug('干预规则加载成功', {
-            count: this.interventions.length,
-            total: this.total_records
-          })
-        } else {
-          logger.warn('干预规则加载响应异常', response)
-        }
-      }, '加载干预规则...')
+      window.dispatchEvent(new CustomEvent('dt-refresh'))
     },
 
     // ==================== 创建干预规则 ====================
@@ -547,15 +619,8 @@ function presetsPage() {
      * @param {string} type - 设置类型代码（probability_adjust/force_win/force_lose/blacklist）
      * @returns {string} 对应的中文标签
      */
-    getSettingTypeLabel(type) {
-      const labels = {
-        probability_adjust: '概率调整',
-        force_win: '强制中奖',
-        force_lose: '强制不中奖',
-        blacklist: '黑名单'
-      }
-      return labels[type] || type || '未知类型'
-    },
+    // ✅ 已删除 getSettingTypeLabel 映射函数
+    // HTML 直接使用后端返回的 setting_type_display 字段
 
     /**
      * 获取奖品类型的中文标签

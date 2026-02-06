@@ -7,10 +7,13 @@
  * @date 2026-02-06
  */
 
-import { logger } from '../../../utils/logger.js'
+import { logger, $confirm, formatDateTime } from '../../../utils/index.js'
 import { API_PREFIX, request } from '../../../api/base.js'
 
 const API_BASE_URL = API_PREFIX
+
+// 模块级变量：当前用户ID（供 fetchTableData 闭包使用）
+let _currentUserId = null
 
 /**
  * 资产调整状态
@@ -55,6 +58,56 @@ export function useAdjustmentState() {
 
     // 材料类型
     materialTypes: [],
+
+    // ========== data-table 列配置 ==========
+    recordsTableColumns: [
+      { key: 'transaction_id', label: '交易ID', sortable: true, type: 'code' },
+      {
+        key: 'operator_name',
+        label: '操作人',
+        render: (_val, row) => {
+          const name = row.operator_name || '管理员'
+          const id = row.operator_id || '-'
+          return `<div>${name}</div><div class="text-gray-400 text-xs">ID: ${id}</div>`
+        }
+      },
+      {
+        key: 'asset_name',
+        label: '资产类型',
+        render: (val, row) => val || row.asset_type_display || row.asset_code || '-'
+      },
+      {
+        key: 'amount',
+        label: '变动',
+        sortable: true,
+        render: (val) => {
+          const num = Number(val)
+          const cls = num >= 0 ? 'text-green-600' : 'text-red-600'
+          const prefix = num >= 0 ? '+' : ''
+          return `<span class="font-mono ${cls}">${prefix}${num.toLocaleString('zh-CN')}</span>`
+        }
+      },
+      {
+        key: 'status',
+        label: '状态',
+        type: 'status',
+        statusMap: {
+          completed: { class: 'green', label: '已完成' },
+          pending: { class: 'yellow', label: '待审批' },
+          rejected: { class: 'red', label: '已拒绝' }
+        }
+      },
+      { key: 'created_at', label: '时间', type: 'datetime', sortable: true },
+      {
+        key: '_actions',
+        label: '操作',
+        type: 'actions',
+        width: '80px',
+        actions: [
+          { name: 'view', label: '详情', class: 'text-blue-600 hover:text-blue-800' }
+        ]
+      }
+    ],
 
     // 分页
     current_page: 1,
@@ -214,6 +267,52 @@ export function useAdjustmentMethods() {
       this.stats.pendingApprovals = 0
     },
 
+    // ==================== data-table 数据源 ====================
+
+    /**
+     * data-table 数据源：调账记录
+     * 通过模块级 _currentUserId 获取当前用户
+     */
+    async fetchRecordsTableData(params) {
+      if (!_currentUserId) {
+        return { items: [], total: 0 }
+      }
+      const queryParams = {
+        user_id: _currentUserId,
+        page: params.page || 1,
+        page_size: params.page_size || 20
+      }
+      if (params.status) queryParams.status = params.status
+
+      const result = await request({
+        url: `${API_BASE_URL}/console/assets/transactions`,
+        params: queryParams
+      })
+      if (result.success) {
+        const items = result.data?.transactions || result.data?.records || []
+        const total = result.data?.pagination?.total || items.length
+        // 同步统计数据
+        this.records = items
+        this.updateStats()
+        return { items, total }
+      }
+      throw new Error(result.message || '加载调账记录失败')
+    },
+
+    /**
+     * 处理表格操作事件
+     */
+    handleRecordsTableAction(detail) {
+      const { action, row } = detail
+      switch (action) {
+        case 'view':
+          this.viewRecord(row)
+          break
+        default:
+          logger.warn('[AssetAdjustment] 未知操作:', action)
+      }
+    },
+
     // ==================== 用户搜索（手机号主导） ====================
 
     async handleMobileSearch() {
@@ -253,12 +352,15 @@ export function useAdjustmentMethods() {
           this.form.user_id = String(this.current_user?.user_id || userId)
           this.form.user_info = `✅ 已加载用户: ${this.current_user?.nickname || '未知'} (ID: ${this.form.user_id})`
 
+          // 同步模块级用户ID并刷新 data-table
+          _currentUserId = this.current_user?.user_id || userId
+
           logger.info(
             `✅ 加载用户资产完成: ${this.balances.length} 种, form.user_id=${this.form.user_id}`
           )
 
-          this.current_page = 1
-          await this.loadRecords()
+          // 刷新 data-table（替代旧 loadRecords）
+          window.dispatchEvent(new CustomEvent('dt-records-refresh'))
         } else {
           this.showError(result.message || '查询失败')
         }
@@ -514,7 +616,7 @@ export function useAdjustmentMethods() {
     },
 
     async approveRecord(record) {
-      if (!confirm(`确定要审批通过调账记录 ${record.adjustment_id} 吗？`)) return
+      if (!(await $confirm(`确定要审批通过调账记录 ${record.adjustment_id} 吗？`))) return
 
       try {
         const result = await request({

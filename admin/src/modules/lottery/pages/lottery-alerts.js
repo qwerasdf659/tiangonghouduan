@@ -56,6 +56,66 @@ function lotteryAlertsPage() {
     /** @type {Array} 告警列表 */
     alerts: [],
 
+    // ========== data-table 列配置 ==========
+    alertsTableColumns: [
+      { key: 'alert_id', label: '告警ID', sortable: true, type: 'code' },
+      {
+        key: 'level',
+        label: '级别',
+        type: 'status',
+        statusMap: {
+          danger: { class: 'red', label: '危险' },
+          warning: { class: 'yellow', label: '警告' },
+          info: { class: 'blue', label: '提示' }
+        }
+      },
+      { key: 'type', label: '类型', render: (val, row) => row.type_display || val || '-' },
+      { key: 'campaign_name', label: '关联活动', render: (val, row) => val || row.related_entity?.name || '-' },
+      { key: 'message', label: '告警描述', type: 'truncate', maxLength: 40 },
+      {
+        key: 'threshold_actual',
+        label: '阈值/实际',
+        render: (_val, row) => {
+          if (row.threshold_value !== undefined && row.actual_value !== undefined) {
+            return `<span class="text-gray-500">${row.threshold_value} / ${row.actual_value}</span>`
+          }
+          return '-'
+        }
+      },
+      {
+        key: 'status',
+        label: '状态',
+        type: 'status',
+        statusMap: {
+          active: { class: 'red', label: '活跃' },
+          acknowledged: { class: 'yellow', label: '已确认' },
+          resolved: { class: 'green', label: '已解决' }
+        }
+      },
+      { key: 'created_at', label: '时间', type: 'datetime', sortable: true },
+      {
+        key: '_actions',
+        label: '操作',
+        type: 'actions',
+        width: '150px',
+        actions: [
+          { name: 'detail', label: '详情', class: 'text-blue-600 hover:text-blue-800' },
+          {
+            name: 'acknowledge',
+            label: '确认',
+            class: 'text-orange-500 hover:text-orange-700',
+            condition: (row) => row.status === 'active'
+          },
+          {
+            name: 'resolve',
+            label: '解决',
+            class: 'text-green-500 hover:text-green-700',
+            condition: (row) => row.status !== 'resolved'
+          }
+        ]
+      }
+    ],
+
     /** @type {number|string} 选中的活动ID（用于健康度分析） */
     selectedCampaignId: '',
 
@@ -113,6 +173,9 @@ function lotteryAlertsPage() {
 
     /** @type {number|null} 自动刷新定时器ID */
     refreshTimer: null,
+
+    /** @type {string|null} 上次数据更新时间（#2 数据刷新状态透明） */
+    lastUpdateTime: null,
 
     /** @type {Array} 活动列表（用于筛选） */
     campaigns: [],
@@ -381,7 +444,51 @@ function lotteryAlertsPage() {
     },
 
     /**
-     * 加载告警列表
+     * data-table 数据源：抽奖告警
+     */
+    async fetchAlertsTableData(params) {
+      const queryParams = { limit: params.page_size || 20 }
+      if (params.level) queryParams.level = params.level
+      if (params.type) queryParams.type = params.type
+      if (params.status) queryParams.status = params.status
+
+      const url = LOTTERY_ADVANCED_ENDPOINTS.REALTIME_ALERTS + buildQueryString(queryParams)
+      const response = await apiRequest(url)
+
+      if (response?.success) {
+        const items = response.data.alerts || response.data.items || response.data.list || []
+        this.alerts = items
+        this.totalCount = items.length
+        this.updateStats(response.data)
+        this.updateCharts()
+        this.lastUpdateTime = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+        return { items, total: items.length }
+      }
+      throw new Error(response?.message || '获取告警列表失败')
+    },
+
+    /**
+     * 处理告警表格操作
+     */
+    handleAlertsTableAction(detail) {
+      const { action, row } = detail
+      switch (action) {
+        case 'detail':
+          this.viewAlertDetail(row)
+          break
+        case 'acknowledge':
+          this.acknowledgeAlert(row)
+          break
+        case 'resolve':
+          this.openResolveModal(row)
+          break
+        default:
+          logger.warn('[LotteryAlerts] 未知操作:', action)
+      }
+    },
+
+    /**
+     * 加载告警列表（旧方法保留用于刷新）
      */
     async loadAlerts() {
       const result = await this.withLoading(async () => {
@@ -418,6 +525,9 @@ function lotteryAlertsPage() {
         // 更新统计数据
         this.updateStats(result.data)
         this.updateCharts()
+
+        // #2 更新上次刷新时间
+        this.lastUpdateTime = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
       }
     },
 

@@ -12,7 +12,7 @@
  */
 
 import Alpine from 'alpinejs'
-import { logger } from '../utils/logger.js'
+import { logger, $confirmDanger } from '../utils/index.js'
 import { createPageMixin } from '../alpine/mixins/index.js'
 import { request, buildURL, API_PREFIX } from '../api/base.js'
 import { io } from 'socket.io-client'
@@ -37,6 +37,9 @@ function messageCenterPage() {
 
     // 未读数量
     unreadCount: 0,
+
+    /** @type {string|null} 上次数据更新时间（#2） */
+    lastUpdateTime: null,
 
     // 声音设置
     soundEnabled: true,
@@ -327,6 +330,8 @@ function messageCenterPage() {
 
         this.pagination.total = this.messages.length + 50
         this.unreadCount = this.messages.filter((m) => !m.is_read).length
+        // #2 更新上次刷新时间
+        this.lastUpdateTime = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
       } finally {
         this.loading = false
       }
@@ -448,7 +453,7 @@ function messageCenterPage() {
     },
 
     async deleteMessage(message) {
-      if (!confirm('确定要删除这条消息吗？')) return
+      if (!(await $confirmDanger('确定要删除这条消息吗？'))) return
 
       try {
         await request({
@@ -467,7 +472,7 @@ function messageCenterPage() {
     },
 
     async deleteSelected() {
-      if (!confirm(`确定要删除选中的 ${this.selectedIds.length} 条消息吗？`)) return
+      if (!(await $confirmDanger(`确定要删除选中的 ${this.selectedIds.length} 条消息吗？`))) return
 
       for (const id of this.selectedIds) {
         const message = this.messages.find(m => m.id === id)

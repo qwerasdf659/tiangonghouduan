@@ -9,7 +9,7 @@
  * 使用 STORE_ENDPOINTS 端点
  */
 
-import { logger } from '../../../utils/logger.js'
+import { logger, $confirm } from '../../../utils/index.js'
 import { STORE_ENDPOINTS } from '../../../api/store.js'
 import { buildURL } from '../../../api/base.js'
 
@@ -183,7 +183,7 @@ export function useMerchantPointsMethods() {
      * @param {Object} item - 商户积分申请对象
      */
     async approveMerchantPoints(item) {
-      if (!confirm('确认通过该商户积分申请？')) return
+      if (!(await $confirm('确认通过该商户积分申请？'))) return
       try {
         const auditId = item.audit_id || item.id
         const response = await this.apiPost(

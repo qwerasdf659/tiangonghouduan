@@ -376,7 +376,7 @@ class BackpackService {
           item_instance_id,
           status: 'pending'
         },
-        attributes: ['order_id'],
+        attributes: ['redemption_order_id'],
         transaction
       })
 

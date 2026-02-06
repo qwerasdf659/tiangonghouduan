@@ -51,7 +51,7 @@
       <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
         <div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
-          <select class="w-full border rounded-lg px-3 py-2" x-model="filters.status">
+          <select class="w-full border rounded-lg px-3 py-2" x-model="filters.status" x-tooltip="'筛选会话的当前状态：活跃或已过期'">
             <option value="">全部状态</option>
             <option value="active">活跃</option>
             <option value="expired">已过期/失效</option>
@@ -59,15 +59,17 @@
         </div>
         <div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">用户类型</label>
-          <select class="w-full border rounded-lg px-3 py-2" x-model="filters.user_type">
+          <select class="w-full border rounded-lg px-3 py-2" x-model="filters.user_type" x-tooltip="'区分普通用户和管理员的会话'">
             <option value="">全部类型</option>
             <option value="user">普通用户</option>
             <option value="admin">管理员</option>
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium themed-text-secondary mb-1">用户ID</label>
-          <input type="text" class="w-full border rounded-lg px-3 py-2" x-model="filters.mobile" maxlength="11" placeholder="输入手机号...">
+          <label class="block text-sm font-medium themed-text-secondary mb-1">手机号</label>
+          <input type="text" class="w-full border rounded-lg px-3 py-2" x-model="filters.mobile" maxlength="11" placeholder="输入手机号查找用户会话" x-tooltip="'输入11位手机号精确查找用户的所有会话'">
+          <div x-show="resolvedUser" class="mt-1 text-xs text-green-600">✅ <span x-text="resolvedUser?.nickname"></span></div>
+          <div x-show="resolveError" class="mt-1 text-xs text-red-500" x-text="resolveError"></div>
         </div>
         <div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">排序方式</label>

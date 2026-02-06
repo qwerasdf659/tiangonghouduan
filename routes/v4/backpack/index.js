@@ -1,23 +1,38 @@
 /**
- * 背包查询路由
+ * 背包域路由 - 用户物品操作统一入口
  *
  * 顶层路径：/api/v4/backpack
  *
  * 职责：
  * - 查询用户背包（双轨架构：assets[] + items[]）
+ * - 查询物品详情
+ * - 用户生成核销码（redeem）
+ * - 用户直接使用物品（use）
+ * - 用户兑换商品（exchange 子路由）
+ *
+ * 域边界说明（2026-02-07 阻塞项核实决策）：
+ * - /backpack = 100% 用户域，所有登录用户可访问
+ * - /shop = 100% 商家专属，不在此域
+ * - 用户"生成核销码"是用户侧操作，放在用户域（参考美团模式）
+ * - 商家"扫码核销"是商家侧操作，保留在 /shop 域
  *
  * 架构原则：
- * - 路由层不直连 models（通过 ServiceManager 获取 BackpackService）
- * - 路由层不开启事务（事务管理在 Service 层）
+ * - 路由层不直连 models（通过 ServiceManager 获取服务）
+ * - 写操作通过 TransactionManager.execute() 管理事务边界
+ * - 路由通过 ServiceManager 获取 Service，不直接 require
  *
  * 创建时间：2025-12-29
+ * 更新时间：2026-02-07（新增物品详情/核销码/使用/兑换路由）
  */
 
 'use strict'
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken } = require('../../../middleware/auth')
+const { authenticateToken, getUserRoles } = require('../../../middleware/auth')
+const { handleServiceError } = require('../../../middleware/validation')
+const TransactionManager = require('../../../utils/TransactionManager')
+const logger = require('../../../utils/logger').logger
 
 /**
  * 错误处理包装器
@@ -94,5 +109,267 @@ router.get(
     return res.apiSuccess(stats)
   })
 )
+
+/**
+ * GET /api/v4/backpack/items/:item_instance_id
+ *
+ * @description 获取背包物品详情
+ * @access Private（用户只能查看自己的物品，管理员可查看任意物品）
+ *
+ * @param {number} item_instance_id - 物品实例ID（路由参数）
+ *
+ * @returns {Object} 物品详情
+ * {
+ *   item_instance_id: 123,
+ *   item_type: 'voucher',
+ *   name: '10元代金券',
+ *   status: 'available',
+ *   rarity: 'common',
+ *   description: '满100元可用',
+ *   acquired_at: '2026-01-02T12:35:32.000+08:00',
+ *   expires_at: null,
+ *   is_owner: true,
+ *   has_redemption_code: false
+ * }
+ */
+router.get(
+  '/items/:item_instance_id',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { item_instance_id } = req.params
+    const viewer_user_id = req.user.user_id
+
+    // 参数验证：物品实例ID必须为正整数
+    const instanceId = parseInt(item_instance_id, 10)
+    if (isNaN(instanceId) || instanceId <= 0) {
+      return res.apiError('无效的物品实例ID', 'BAD_REQUEST', null, 400)
+    }
+
+    // 获取用户角色（判断是否为管理员 role_level >= 100）
+    const userRoles = await getUserRoles(viewer_user_id)
+    const has_admin_access = userRoles.role_level >= 100
+
+    // 通过 ServiceManager 获取 BackpackService
+    const BackpackService = req.app.locals.services.getService('backpack')
+
+    const itemDetail = await BackpackService.getItemDetail(instanceId, {
+      viewer_user_id,
+      has_admin_access
+    })
+
+    if (!itemDetail) {
+      return res.apiError('物品不存在', 'NOT_FOUND', null, 404)
+    }
+
+    /*
+     * 数据脱敏：通过 ServiceManager 获取 DataSanitizer
+     * 管理员查看完整数据，普通用户查看脱敏数据
+     * 使用 sanitizeInventory 方法处理物品数据（数组接口，取第一个元素）
+     */
+    const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
+    const dataLevel = has_admin_access ? 'full' : 'public'
+    const sanitizedItems = DataSanitizer.sanitizeInventory([itemDetail], dataLevel)
+    const sanitizedDetail = sanitizedItems[0] || itemDetail
+
+    return res.apiSuccess(sanitizedDetail, '获取物品详情成功')
+  })
+)
+
+/**
+ * POST /api/v4/backpack/items/:item_instance_id/redeem
+ *
+ * @description 用户为自己的物品生成核销码
+ * @access Private（仅物品所有者或管理员可操作）
+ *
+ * 业务流程（美团模式）：
+ * 1. 用户在小程序"背包"中选择一个 voucher/product 类型的物品
+ * 2. 点击"生成核销码" → 调用此接口
+ * 3. 后端生成12位Base32核销码，创建核销订单（30天有效）
+ * 4. 返回明文核销码给用户（仅此一次）
+ * 5. 用户到店出示核销码 → 商家调用 POST /shop/redemption/fulfill 完成核销
+ *
+ * @param {number} item_instance_id - 物品实例ID（路由参数）
+ *
+ * @returns {Object} { order, code }
+ * - order: 核销订单信息（order_id, status, expires_at）
+ * - code: 12位Base32明文核销码（仅此一次返回）
+ */
+router.post(
+  '/items/:item_instance_id/redeem',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { item_instance_id } = req.params
+    const user_id = req.user.user_id
+
+    // 参数验证
+    const instanceId = parseInt(item_instance_id, 10)
+    if (isNaN(instanceId) || instanceId <= 0) {
+      return res.apiError('无效的物品实例ID', 'BAD_REQUEST', null, 400)
+    }
+
+    logger.info('用户生成核销码请求', { user_id, item_instance_id: instanceId })
+
+    try {
+      // 通过 ServiceManager 获取 RedemptionService
+      const RedemptionService = req.app.locals.services.getService('redemption_order')
+
+      /*
+       * 写操作通过 TransactionManager 管理事务边界
+       * RedemptionService.createOrder 强制要求 options.transaction
+       */
+      const result = await TransactionManager.execute(async transaction => {
+        return await RedemptionService.createOrder(instanceId, {
+          transaction,
+          creator_user_id: user_id
+        })
+      })
+
+      logger.info('用户生成核销码成功', {
+        user_id,
+        item_instance_id: instanceId,
+        redemption_order_id: result.order.redemption_order_id
+      })
+
+      return res.apiSuccess(
+        {
+          order: {
+            redemption_order_id: result.order.redemption_order_id,
+            status: result.order.status,
+            expires_at: result.order.expires_at
+          },
+          code: result.code
+        },
+        '核销码生成成功，请在有效期内到店出示'
+      )
+    } catch (error) {
+      logger.error('用户生成核销码失败', {
+        error: error.message,
+        user_id,
+        item_instance_id: instanceId
+      })
+      return handleServiceError(error, res, '生成核销码失败')
+    }
+  })
+)
+
+/**
+ * POST /api/v4/backpack/items/:item_instance_id/use
+ *
+ * @description 用户直接使用物品（纯线上数字物品/可直接使用的物品）
+ * @access Private（仅物品所有者可操作）
+ *
+ * 业务场景：
+ * - 使用虚拟道具（如体验卡、增益道具）
+ * - 直接消耗不需要到店核销的物品
+ * - 物品状态从 available → used
+ *
+ * 与 redeem 的区别：
+ * - redeem：生成核销码 → 到店核销（O2O线下场景，voucher/product 类型）
+ * - use：直接使用 → 立即生效（纯线上场景）
+ *
+ * @param {number} item_instance_id - 物品实例ID（路由参数）
+ *
+ * @returns {Object} { item_instance, is_duplicate }
+ */
+router.post(
+  '/items/:item_instance_id/use',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { item_instance_id } = req.params
+    const user_id = req.user.user_id
+
+    // 参数验证
+    const instanceId = parseInt(item_instance_id, 10)
+    if (isNaN(instanceId) || instanceId <= 0) {
+      return res.apiError('无效的物品实例ID', 'BAD_REQUEST', null, 400)
+    }
+
+    logger.info('用户直接使用物品请求', { user_id, item_instance_id: instanceId })
+
+    try {
+      /*
+       * 通过 ServiceManager 获取服务
+       * - BackpackService：验证物品所有权
+       * - ItemService (asset_item)：执行物品消耗
+       */
+      const BackpackService = req.app.locals.services.getService('backpack')
+      const ItemService = req.app.locals.services.getService('asset_item')
+
+      // 写操作通过 TransactionManager 管理事务边界
+      const result = await TransactionManager.execute(async transaction => {
+        /*
+         * 1. 验证物品存在且属于当前用户
+         * 使用 getItemDetail 进行所有权检查（非管理员模式）
+         */
+        const itemDetail = await BackpackService.getItemDetail(instanceId, {
+          viewer_user_id: user_id,
+          has_admin_access: false,
+          transaction
+        })
+
+        if (!itemDetail) {
+          const notFoundError = new Error('物品不存在')
+          notFoundError.statusCode = 404
+          throw notFoundError
+        }
+
+        // 2. 验证物品状态（只有 available 状态的物品才能直接使用）
+        if (itemDetail.status !== 'available') {
+          const statusError = new Error(`物品当前状态为"${itemDetail.status}"，无法使用`)
+          statusError.statusCode = 400
+          throw statusError
+        }
+
+        // 3. 调用 ItemService.consumeItem 执行物品消耗
+        const consumeResult = await ItemService.consumeItem(
+          {
+            item_instance_id: instanceId,
+            operator_user_id: user_id,
+            business_type: 'backpack_use',
+            idempotency_key: `backpack_use_${instanceId}_${user_id}_${Date.now()}`,
+            meta: {
+              source: 'backpack',
+              action: 'direct_use'
+            }
+          },
+          { transaction }
+        )
+
+        return consumeResult
+      })
+
+      logger.info('用户直接使用物品成功', {
+        user_id,
+        item_instance_id: instanceId,
+        is_duplicate: result.is_duplicate
+      })
+
+      return res.apiSuccess(
+        {
+          item_instance_id: instanceId,
+          status: 'used',
+          is_duplicate: result.is_duplicate
+        },
+        result.is_duplicate ? '物品已使用（幂等回放）' : '物品使用成功'
+      )
+    } catch (error) {
+      logger.error('用户直接使用物品失败', {
+        error: error.message,
+        user_id,
+        item_instance_id: instanceId
+      })
+      return handleServiceError(error, res, '使用物品失败')
+    }
+  })
+)
+
+/*
+ * ========================================
+ * 兑换子路由挂载
+ * 用户端兑换商品（从 /shop/exchange 迁移到 /backpack/exchange）
+ * ========================================
+ */
+const exchangeRoutes = require('./exchange')
+router.use('/exchange', exchangeRoutes)
 
 module.exports = router

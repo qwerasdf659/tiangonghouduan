@@ -6,7 +6,7 @@
     pageStyle: '[x-cloak] { display: none !important; }' 
   }) %>
 </head>
-<body class="themed-bg-subtle min-h-screen" x-data="presetsPage()" x-init="init()" x-cloak>
+<body class="themed-bg-subtle min-h-screen" x-data="presetsPage()" x-init="init()" x-cloak @table-action="handleTableAction($event.detail)">
   
   <!-- 导航栏 -->
   <nav class="themed-bg-primary text-white shadow-lg">
@@ -40,7 +40,7 @@
         <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
-            <select x-model="filters.status" class="w-full px-3 py-2 border rounded-lg">
+            <select x-model="filters.status" class="w-full px-3 py-2 border rounded-lg" x-tooltip="'按干预规则的当前生效状态筛选'">
               <option value="">全部状态</option>
               <option value="active">生效中</option>
               <option value="expired">已过期</option>
@@ -50,7 +50,7 @@
           </div>
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">奖品类型</label>
-            <select x-model="filters.prize_type" class="w-full px-3 py-2 border rounded-lg">
+            <select x-model="filters.prize_type" class="w-full px-3 py-2 border rounded-lg" x-tooltip="'按目标奖品筛选干预规则'">
               <option value="">全部类型</option>
               <template x-for="prize in allPrizes" :key="prize.lottery_prize_id">
                 <option :value="prize.lottery_prize_id" x-text="prize.prize_name"></option>
@@ -59,10 +59,10 @@
           </div>
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">用户搜索</label>
-            <input type="text" x-model="filters.user_search" placeholder="用户ID或昵称" class="w-full px-3 py-2 border rounded-lg">
+            <input type="text" x-model="filters.user_search" placeholder="输入用户ID或昵称搜索" class="w-full px-3 py-2 border rounded-lg" x-tooltip="'支持按用户ID或昵称模糊搜索'">
           </div>
           <div>
-            <button @click="loadData()" class="w-full px-4 py-2 themed-btn-primary rounded-lg">
+            <button @click="searchTable()" class="w-full px-4 py-2 themed-btn-primary rounded-lg">
               🔍 搜索
             </button>
           </div>
@@ -75,67 +75,21 @@
       </div>
     </div>
 
-    <!-- 干预规则列表 -->
-    <div class="themed-card rounded-lg shadow">
-      <div class="p-4 border-b">
-        <h5 class="font-semibold">干预规则列表</h5>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead class="themed-bg-base">
-            <tr>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">ID</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">干预类型</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">目标奖品</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">过期时间</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y">
-
-            <tr x-show="interventions.length === 0">
-              <td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无预设干预数据</td>
-            </tr>
-            <template x-for="item in interventions" :key="item.setting_id">
-              <tr class="themed-hover-bg">
-                <td class="px-4 py-3 text-sm font-mono text-xs" x-text="item.setting_id"></td>
-                <td class="px-4 py-3 text-sm" x-text="item.user_info?.nickname || item.user_id"></td>
-                <td class="px-4 py-3">
-                  <span :class="item.setting_type === 'force_win' ? 'bg-green-100 themed-text-success' : 'bg-red-100 text-red-700'" class="px-2 py-1 text-xs rounded" x-text="getSettingTypeLabel(item.setting_type)"></span>
-                </td>
-                <td class="px-4 py-3 text-sm" x-text="item.prize_info?.prize_name || '-'"></td>
-                <td class="px-4 py-3">
-                  <span :class="{
-                    'bg-green-100 themed-text-success': item.status === 'active',
-                    'themed-bg-subtle themed-text-secondary': item.status === 'expired',
-                    'themed-bg-primary-light themed-text-primary': item.status === 'used',
-                    'bg-red-100 text-red-700': item.status === 'cancelled'
-                  }" class="px-2 py-1 text-xs rounded" x-text="item.status_display || item.status"></span>
-                </td>
-                <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(item.expires_at)"></td>
-                <td class="px-4 py-3">
-                  <div class="flex space-x-2">
-                    <button @click="viewIntervention(item.setting_id)" class="themed-text-primary hover:text-blue-700 text-sm">查看</button>
-                    <button x-show="item.status === 'active'" @click="cancelIntervention(item.setting_id)" class="text-red-500 hover:text-red-700 text-sm">取消</button>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-      
-      <!-- 分页 -->
-      <div class="p-4 border-t flex justify-between items-center">
-        <span class="text-sm themed-text-muted" x-text="'共 ' + total_records + ' 条记录'"></span>
-        <div class="flex space-x-2">
-          <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-          <span class="px-3 py-1" x-text="paginationInfo"></span>
-          <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
-        </div>
-      </div>
+    <!-- data-table 标准表格组件 -->
+    <div x-data="dataTable({
+      columns: tableColumns,
+      dataSource: fetchTableData,
+      primaryKey: 'setting_id',
+      sortable: true,
+      selectable: false,
+      exportable: false,
+      serverSort: true,
+      page_size: 10,
+      emptyText: '暂无预设干预数据'
+    })" x-init="init()"
+       @dt-refresh.window="refresh()"
+       @dt-search.window="handleFilterSearch($event.detail.filters)">
+      <%- include('components/data-table') %>
     </div>
   </div>
 
@@ -216,7 +170,7 @@
       <div class="p-6 space-y-3" x-show="viewData">
         <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">规则ID:</span><span class="font-mono text-xs" x-text="viewData?.setting_id"></span></div>
         <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">用户:</span><span x-text="viewData?.user?.nickname || viewData?.user_id"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">类型:</span><span x-text="getSettingTypeLabel(viewData?.setting_type)"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">类型:</span><span x-text="viewData?.setting_type_display || viewData?.setting_type || '-'"></span></div>
         <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">目标奖品:</span><span x-text="viewData?.prize_info?.prize_name || '-'"></span></div>
         <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">状态:</span><span x-text="viewData?.status_display || viewData?.status"></span></div>
         <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">创建时间:</span><span x-text="formatDate(viewData?.created_at)"></span></div>

@@ -17,7 +17,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { Alpine, createPageMixin } from '../../../alpine/index.js'
+import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
 import { loadECharts } from '../../../utils/index.js'
 import { API_PREFIX, request } from '../../../api/base.js'
 
@@ -723,5 +723,182 @@ document.addEventListener('alpine:init', () => {
     }
   }))
 
-  logger.info('[UserManagement] Alpine 组件注册完成')
+  // ==================== data-table 组件注册 ====================
+
+  /** 用户列表 */
+  Alpine.data('usersDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'user_id', label: '用户ID', sortable: true },
+        { key: 'mobile', label: '手机号' },
+        { key: 'nickname', label: '昵称' },
+        { key: 'role_name', label: '角色', render: (val, row) => row.role_display || val || '-' },
+        { key: 'status', label: '状态', type: 'status', statusMap: { active: { class: 'green', label: '正常' }, inactive: { class: 'gray', label: '停用' }, banned: { class: 'red', label: '封禁' } } },
+        { key: 'created_at', label: '注册时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: `${API_PREFIX}/console/user-management/users`, method: 'GET', params })
+        return { items: res.data?.rows || res.data?.list || res.data || [], total: res.data?.count || res.data?.pagination?.total || 0 }
+      },
+      primaryKey: 'user_id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-users', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 角色列表 */
+  Alpine.data('rolesDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'role_id', label: '角色ID', sortable: true },
+        { key: 'role_name', label: '角色名称' },
+        { key: 'description', label: '描述' },
+        { key: 'role_level', label: '级别', type: 'number', sortable: true },
+        { key: 'is_system', label: '系统角色', type: 'boolean' }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: `${API_PREFIX}/console/user-management/roles`, method: 'GET', params })
+        return { items: res.data?.roles || res.data?.list || res.data || [], total: res.data?.total || 0 }
+      },
+      primaryKey: 'role_id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-roles', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 权限列表 */
+  Alpine.data('permissionsDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'permission_key', label: '权限标识', sortable: true },
+        { key: 'permission_name', label: '权限名称' },
+        { key: 'description', label: '描述' },
+        { key: 'module', label: '模块', render: (val) => val || '-' }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: `${API_PREFIX}/console/user-management/permission-resources`, method: 'GET', params })
+        return { items: res.data?.permissions || res.data?.list || res.data || [], total: res.data?.total || 0 }
+      },
+      primaryKey: 'permission_key', sortable: true, page_size: 50
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-permissions', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 用户角色分配 */
+  Alpine.data('userRolesDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'user_id', label: '用户ID', sortable: true },
+        { key: 'mobile', label: '手机号' },
+        { key: 'nickname', label: '昵称' },
+        { key: 'role_name', label: '当前角色', render: (val, row) => row.role_display || val || '-' },
+        { key: 'role_level', label: '角色级别', type: 'number' }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: `${API_PREFIX}/console/user-management/users`, method: 'GET', params: { ...params, role_filter: 'all' } })
+        return { items: res.data?.rows || res.data?.list || [], total: res.data?.count || res.data?.pagination?.total || 0 }
+      },
+      primaryKey: 'user_id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-user-roles', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 高级用户状态 */
+  Alpine.data('premiumDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'user_id', label: '用户ID', sortable: true },
+        { key: 'nickname', label: '昵称', render: (val, row) => val || row.user_nickname || '-' },
+        { key: 'premium_level', label: '等级' },
+        { key: 'status', label: '状态', type: 'status' },
+        { key: 'expires_at', label: '到期时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: `${API_PREFIX}/console/user-premium`, method: 'GET', params })
+        return { items: res.data?.list || res.data?.rows || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      },
+      primaryKey: 'user_id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-premium', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 风控配置 */
+  Alpine.data('riskProfilesDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'user_id', label: '用户ID', sortable: true },
+        { key: 'nickname', label: '昵称', render: (val, row) => val || row.user_nickname || '-' },
+        { key: 'risk_level', label: '风险等级', type: 'status', statusMap: { high: { class: 'red', label: '高风险' }, medium: { class: 'yellow', label: '中风险' }, low: { class: 'green', label: '低风险' } } },
+        { key: 'total_draws', label: '抽奖次数', type: 'number', sortable: true },
+        { key: 'total_wins', label: '中奖次数', type: 'number' },
+        { key: 'updated_at', label: '更新时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: `${API_PREFIX}/console/risk-profiles`, method: 'GET', params })
+        return { items: res.data?.list || res.data?.profiles || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      },
+      primaryKey: 'user_id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-risk-profiles', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 角色变更历史 */
+  Alpine.data('roleHistoryDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'id', label: 'ID', sortable: true },
+        { key: 'user_id', label: '用户ID' },
+        { key: 'nickname', label: '用户', render: (val, row) => val || row.user_nickname || '-' },
+        { key: 'old_role', label: '原角色', render: (val, row) => row.old_role_display || val || '-' },
+        { key: 'new_role', label: '新角色', render: (val, row) => row.new_role_display || val || '-' },
+        { key: 'reason', label: '变更原因', type: 'truncate', maxLength: 30 },
+        { key: 'changed_by', label: '操作人', render: (val, row) => row.changed_by_name || val || '-' },
+        { key: 'created_at', label: '变更时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: `${API_PREFIX}/console/user-management/users/role-changes`, method: 'GET', params })
+        return { items: res.data?.list || res.data?.rows || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      },
+      primaryKey: 'id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-role-history', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 状态变更历史 */
+  Alpine.data('statusHistoryDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'id', label: 'ID', sortable: true },
+        { key: 'user_id', label: '用户ID' },
+        { key: 'nickname', label: '用户', render: (val, row) => val || row.user_nickname || '-' },
+        { key: 'old_status', label: '原状态', type: 'status', statusMap: { active: { class: 'green', label: '正常' }, inactive: { class: 'gray', label: '停用' }, banned: { class: 'red', label: '封禁' } } },
+        { key: 'new_status', label: '新状态', type: 'status', statusMap: { active: { class: 'green', label: '正常' }, inactive: { class: 'gray', label: '停用' }, banned: { class: 'red', label: '封禁' } } },
+        { key: 'reason', label: '变更原因', type: 'truncate', maxLength: 30 },
+        { key: 'changed_by', label: '操作人', render: (val, row) => row.changed_by_name || val || '-' },
+        { key: 'created_at', label: '变更时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: `${API_PREFIX}/console/user-management/users/status-changes`, method: 'GET', params })
+        return { items: res.data?.list || res.data?.rows || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      },
+      primaryKey: 'id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-status-history', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  logger.info('[UserManagement] Alpine 组件注册完成（含 8 个 data-table）')
 })

@@ -20,7 +20,7 @@ export function useUsersState() {
     /** @type {Array} 用户列表 */
     users: [],
     /** @type {Object} 用户筛选条件 */
-    userFilters: { user_id: '', nickname: '', status: '' },
+    userFilters: { phone: '', nickname: '', status: '' },
     /** @type {Object} 用户统计 - 直接使用后端字段名 */
     userStats: {
       total_users: 0,
@@ -109,7 +109,7 @@ export function useUsersMethods() {
         // 后端用户管理API使用 limit 而非 page_size
         params.append('limit', this.pagination.page_size)
         // 后端支持 search 字段进行模糊搜索（支持 mobile 和 nickname）
-        if (this.userFilters.user_id) params.append('search', this.userFilters.user_id)
+        if (this.userFilters.phone) params.append('search', this.userFilters.phone)
         if (this.userFilters.nickname) params.append('search', this.userFilters.nickname)
         // 后端使用 role_filter 而非 status 进行角色筛选
         if (this.userFilters.status) params.append('role_filter', this.userFilters.status)
@@ -215,7 +215,7 @@ export function useUsersMethods() {
      * 重置用户筛选
      */
     resetUserFilters() {
-      this.userFilters = { user_id: '', nickname: '', status: '' }
+      this.userFilters = { phone: '', nickname: '', status: '' }
       this.pagination.page = 1
       this.loadUsers()
     },

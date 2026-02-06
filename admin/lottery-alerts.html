@@ -14,6 +14,7 @@
       <div class="flex items-center space-x-4">
         <a href="/admin/workspace.html" class="hover:opacity-80">← 返回工作台</a>
         <span class="text-lg font-semibold">🎰 抽奖告警中心</span>
+        <span x-show="lastUpdateTime" class="text-xs text-white/60 ml-2">· 最后更新: <span x-text="lastUpdateTime"></span></span>
       </div>
       <div class="flex items-center space-x-4">
         <span x-text="'欢迎，' + (current_user?.nickname || '管理员')"></span>
@@ -170,7 +171,7 @@
     </div>
 
     <!-- 告警列表 -->
-    <div class="themed-card rounded-lg shadow">
+    <div class="themed-card rounded-lg shadow" @table-action="handleAlertsTableAction($event.detail)">
       <div class="p-4 border-b flex justify-between items-center">
         <h5 class="font-semibold">🚨 实时告警列表</h5>
         <div class="flex space-x-2">
@@ -182,80 +183,17 @@
           </button>
         </div>
       </div>
-      <div class="overflow-x-auto">
-        <table class="w-full" x-data="resizableColumns({ storageKey: 'lottery-alerts-columns', persistWidths: true })">
-          <thead class="themed-bg-base">
-            <tr>
-              <th class="px-4 py-3 text-left" style="width: 50px;">
-                <input type="checkbox" @change="toggleAllAlerts($event.target.checked)" class="rounded">
-              </th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted resizable-header">告警ID</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted resizable-header">级别</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted resizable-header">类型</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted resizable-header">关联活动</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted resizable-header">告警描述</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted resizable-header">阈值/实际</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted resizable-header">状态</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted resizable-header">时间</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y">
-            <template x-if="loading">
-              <tr><td colspan="10" class="px-4 py-8 text-center themed-text-muted">加载中...</td></tr>
-            </template>
-
-            <tr x-show="!loading && alerts.length === 0">
-              <td colspan="10" class="px-4 py-8 text-center themed-text-muted">暂无告警数据</td>
-            </tr>
-            <template x-for="alert in alerts" :key="alert.alert_id">
-              <tr class="themed-hover-bg">
-                <td class="px-4 py-3">
-                  <input type="checkbox" :value="alert.alert_id" x-model="selectedAlerts" class="rounded">
-                </td>
-                <td class="px-4 py-3 text-sm font-mono" x-text="alert.alert_id"></td>
-                <td class="px-4 py-3">
-                  <span :class="{
-                    'bg-red-100 text-red-700': alert.level === 'danger',
-                    'bg-yellow-100 text-yellow-700': alert.level === 'warning',
-                    'themed-bg-primary-light themed-text-primary': alert.level === 'info'
-                  }" class="px-2 py-1 text-xs rounded" x-text="alert.severity_display || alert.level"></span>
-                </td>
-                <td class="px-4 py-3 text-sm" x-text="alert.type_display || alert.type"></td>
-                <td class="px-4 py-3 text-sm" x-text="alert.campaign_name || alert.related_entity?.name || '-'"></td>
-                <td class="px-4 py-3 text-sm max-w-xs truncate" :title="alert.message" x-text="alert.message"></td>
-                <td class="px-4 py-3 text-sm">
-                  <span class="themed-text-muted" x-text="formatThreshold(alert)"></span>
-                </td>
-                <td class="px-4 py-3">
-                  <span :class="{
-                    'bg-red-100 text-red-700': alert.status === 'active',
-                    'bg-orange-100 text-orange-700': alert.status === 'acknowledged',
-                    'bg-green-100 themed-text-success': alert.status === 'resolved'
-                  }" class="px-2 py-1 text-xs rounded" x-text="alert.status_display || alert.status"></span>
-                </td>
-                <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(alert.created_at)"></td>
-                <td class="px-4 py-3">
-                  <div class="flex space-x-2">
-                    <button @click="viewAlertDetail(alert)" class="themed-text-primary hover:text-blue-700 text-sm">详情</button>
-                    <button x-show="alert.status === 'active'" @click="acknowledgeAlert(alert)" class="text-orange-500 hover:text-orange-700 text-sm">确认</button>
-                    <button x-show="alert.status !== 'resolved'" @click="openResolveModal(alert)" class="text-green-500 hover:text-green-700 text-sm">解决</button>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-      
-      <!-- 分页 -->
-      <div class="p-4 border-t flex justify-between items-center">
-        <span class="text-sm themed-text-muted" x-text="'共 ' + totalCount + ' 条记录'"></span>
-        <div class="flex space-x-2">
-          <button @click="prevPage()" :disabled="current_page <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-          <span class="px-3 py-1" x-text="'第 ' + current_page + ' / ' + total_pages + ' 页'"></span>
-          <button @click="nextPage()" :disabled="current_page >= total_pages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
-        </div>
+      <div x-data="dataTable({
+        columns: alertsTableColumns,
+        dataSource: fetchAlertsTableData,
+        primaryKey: 'alert_id',
+        sortable: true,
+        selectable: true,
+        exportable: false,
+        page_size: 20,
+        emptyText: '暂无告警数据'
+      })" x-init="init()" @dt-refresh.window="refresh()">
+        <%- include('components/data-table') %>
       </div>
     </div>
     </div><!-- 结束实时告警Tab -->

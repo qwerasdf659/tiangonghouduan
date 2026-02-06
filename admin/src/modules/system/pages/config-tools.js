@@ -32,10 +32,11 @@
  * </div>
  */
 
-import { logger } from '../../../utils/logger.js'
+import { logger, $confirmDanger } from '../../../utils/index.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { buildURL, request } from '../../../api/base.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
+import { dataTable } from '../../../alpine/components/data-table.js'
 
 // API请求封装
 const apiRequest = async (url, options = {}) => {
@@ -694,7 +695,7 @@ document.addEventListener('alpine:init', () => {
      * @param {Object} dict - 字典对象
      */
     async deleteDict(dict) {
-      if (!confirm(`确定要删除字典 "${dict.dict_name}" 吗？`)) {
+      if (!(await $confirmDanger(`确定要删除字典 "${dict.dict_name}" 吗？`))) {
         return
       }
 
@@ -912,5 +913,97 @@ document.addEventListener('alpine:init', () => {
     }
   }))
 
-  logger.info('[ConfigTools] Alpine 组件已注册')
+  /**
+   * 数据字典列表 - data-table 组件
+   */
+  Alpine.data('dictionariesTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'dict_code', label: '字典代码', sortable: true },
+        { key: 'dict_name', label: '字典名称', sortable: true },
+        { key: 'dict_value', label: '字典值/描述', type: 'truncate', maxLength: 40 },
+        { key: 'dict_type', label: '类型', type: 'badge', badgeMap: { category: 'blue', rarity: 'purple', asset_group: 'green' }, labelMap: { category: '类目', rarity: '稀有度', asset_group: '资产组' } },
+        { key: 'sort_order', label: '排序', type: 'number' },
+        { key: 'status', label: '状态', type: 'status' }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: SYSTEM_ENDPOINTS.DICT_ALL })
+        const categories = (res.data?.categories || []).map((d, idx) => ({
+          dict_id: `cat_${d.category_code || idx}`,
+          dict_code: d.category_code || '',
+          dict_name: d.display_name || '',
+          dict_value: d.description || '',
+          sort_order: d.sort_order || 0,
+          status: 'active',
+          dict_type: 'category',
+          _raw: d
+        }))
+        const rarities = (res.data?.rarities || []).map((d, idx) => ({
+          dict_id: `rar_${d.rarity_code || idx}`,
+          dict_code: d.rarity_code || '',
+          dict_name: d.display_name || '',
+          dict_value: d.color_hex || d.description || '',
+          sort_order: d.sort_order || 0,
+          status: 'active',
+          dict_type: 'rarity',
+          _raw: d
+        }))
+        const assetGroups = (res.data?.asset_groups || []).map((d, idx) => ({
+          dict_id: `grp_${d.group_code || idx}`,
+          dict_code: d.group_code || '',
+          dict_name: d.display_name || '',
+          dict_value: d.description || '',
+          sort_order: d.sort_order || 0,
+          status: 'active',
+          dict_type: 'asset_group',
+          _raw: d
+        }))
+        const allItems = [...categories, ...rarities, ...assetGroups]
+        return { items: allItems, total: allItems.length }
+      },
+      primaryKey: 'dict_id',
+      sortable: true,
+      page_size: 50
+    })
+    const origInit = table.init
+    table.init = async function () {
+      window.addEventListener('refresh-dictionaries', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
+    return table
+  })
+
+  /**
+   * 操作日志列表 - data-table 组件
+   */
+  Alpine.data('operationLogsTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'id', label: '日志ID', sortable: true },
+        { key: 'operator_name', label: '操作人', render: (val, row) => val || row.admin_name || `管理员#${row.admin_id || row.operator_id || '-'}` },
+        { key: 'action', label: '操作类型', render: (val) => { const map = { create: '创建', update: '更新', delete: '删除', login: '登录', logout: '登出' }; return map[val] || val || '-' } },
+        { key: 'target', label: '操作目标', render: (val, row) => val || row.operation_type_name || row.resource_type || '-' },
+        { key: 'ip_address', label: 'IP地址' },
+        { key: 'created_at', label: '操作时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: SYSTEM_ENDPOINTS.AUDIT_LOG_LIST, method: 'GET', params })
+        return {
+          items: res.data?.logs || res.data?.list || [],
+          total: res.data?.pagination?.total || res.data?.total || 0
+        }
+      },
+      primaryKey: 'id',
+      sortable: true,
+      page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () {
+      window.addEventListener('refresh-operation-logs', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
+    return table
+  })
+
+  logger.info('[ConfigTools] Alpine 组件已注册（含 data-table）')
 })

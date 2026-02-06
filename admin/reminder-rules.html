@@ -28,7 +28,7 @@
     input:checked + .toggle-slider:before { transform: translateX(20px); }
     input:disabled + .toggle-slider { opacity: 0.5; cursor: not-allowed; }
   </style>
-  <div x-data="reminderRulesPage()" x-init="init()" x-cloak class="p-6">
+  <div x-data="reminderRulesPage()" x-init="init()" x-cloak class="p-6" @table-action="handleTableAction($event.detail)">
     <!-- 页面标题 -->
     <div class="flex items-center justify-between mb-6">
       <div>
@@ -135,157 +135,21 @@
       </div>
     </div>
     
-    <!-- 规则列表 -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <!-- 加载状态 -->
-      <div x-show="loading" class="p-12 text-center">
-        <div class="animate-spin text-4xl mb-4">⏳</div>
-        <p class="text-gray-500">加载中...</p>
-      </div>
-      
-      <!-- 空状态 -->
-      <div x-show="!loading && rules.length === 0" class="p-12 text-center">
-        <div class="text-6xl mb-4">📭</div>
-        <p class="text-gray-500 mb-4">暂无提醒规则</p>
-        <button 
-          @click="openCreateModal()"
-          class="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 transition"
-        >
-          创建第一条规则
-        </button>
-      </div>
-      
-      <!-- 规则表格 -->
-      <table x-show="!loading && rules.length > 0" class="w-full">
-        <thead class="bg-gray-50 border-b border-gray-100">
-          <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">规则信息</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">优先级</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">检查间隔</th>
-            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
-            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          <template x-for="rule in rules" :key="rule.reminder_rule_id">
-            <tr class="rule-card hover:bg-gray-50 transition">
-              <!-- 规则信息 -->
-              <td class="px-6 py-4">
-                <div class="flex items-start gap-3">
-                  <div>
-                    <p class="font-medium text-gray-800" x-text="rule.rule_name || rule.name"></p>
-                    <p class="text-sm text-gray-500 mt-1 max-w-md truncate" x-text="rule.description || '-'"></p>
-                    <div class="flex items-center gap-2 mt-2">
-                      <span 
-                        x-show="rule.is_system" 
-                        class="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded"
-                      >系统规则</span>
-                      <span class="text-xs text-gray-400" x-text="'创建于 ' + formatDate(rule.created_at)"></span>
-                    </div>
-                  </div>
-                </div>
-              </td>
-              
-              <!-- 类型 -->
-              <td class="px-6 py-4">
-                <span 
-                  class="px-2 py-1 text-xs rounded-full"
-                  :class="getRuleTypeClass(rule.rule_type)"
-                  x-text="getRuleTypeName(rule.rule_type)"
-                ></span>
-              </td>
-              
-              <!-- 优先级 -->
-              <td class="px-6 py-4">
-                <span 
-                  class="text-sm"
-                  :class="getPriorityClass(rule.priority)"
-                  x-text="getPriorityName(rule.priority)"
-                ></span>
-              </td>
-              
-              <!-- 检查间隔 -->
-              <td class="px-6 py-4">
-                <span class="text-sm text-gray-600" x-text="formatInterval(rule.check_interval)"></span>
-              </td>
-              
-              <!-- 状态开关 -->
-              <td class="px-6 py-4 text-center">
-                <label class="toggle-switch inline-block">
-                  <input 
-                    type="checkbox" 
-                    :checked="rule.is_enabled"
-                    @change="toggleRule(rule)"
-                    :disabled="rule.is_system"
-                  >
-                  <span class="toggle-slider"></span>
-                </label>
-              </td>
-              
-              <!-- 操作 -->
-              <td class="px-6 py-4 text-right">
-                <div class="flex items-center justify-end gap-2">
-                  <button 
-                    @click="testRule(rule)"
-                    class="px-3 py-1 text-xs bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100 transition"
-                    title="测试规则"
-                  >
-                    🧪 测试
-                  </button>
-                  <button 
-                    @click="executeRule(rule)"
-                    class="px-3 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100 transition"
-                    title="立即执行"
-                  >
-                    ▶️ 执行
-                  </button>
-                  <button 
-                    @click="openEditModal(rule)"
-                    class="px-3 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition"
-                    :disabled="rule.is_system"
-                    :class="rule.is_system && 'opacity-50 cursor-not-allowed'"
-                  >
-                    ✏️ 编辑
-                  </button>
-                  <button 
-                    @click="deleteRule(rule)"
-                    class="px-3 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 transition"
-                    :disabled="rule.is_system"
-                    :class="rule.is_system && 'opacity-50 cursor-not-allowed'"
-                  >
-                    🗑️ 删除
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-      
-      <!-- 分页 -->
-      <div x-show="!loading && rules.length > 0" class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
-        <p class="text-sm text-gray-500">
-          显示 <span x-text="(pagination.page - 1) * pagination.page_size + 1"></span> - 
-          <span x-text="Math.min(pagination.page * pagination.page_size, pagination.total)"></span> 
-          条，共 <span x-text="pagination.total"></span> 条
-        </p>
-        <div class="flex items-center gap-2">
-          <button 
-            @click="prevPage()"
-            :disabled="!hasPrevPage"
-            class="px-3 py-1 border rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >上一页</button>
-          <span class="px-3 py-1 text-sm">
-            <span x-text="pagination.page"></span> / <span x-text="totalPages"></span>
-          </span>
-          <button 
-            @click="nextPage()"
-            :disabled="!hasNextPage"
-            class="px-3 py-1 border rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >下一页</button>
-        </div>
-      </div>
+    <!-- data-table 标准表格组件 -->
+    <div x-data="dataTable({
+      columns: tableColumns,
+      dataSource: fetchTableData,
+      primaryKey: 'reminder_rule_id',
+      sortable: true,
+      selectable: false,
+      exportable: false,
+      serverSort: true,
+      page_size: 20,
+      emptyText: '暂无提醒规则'
+    })" x-init="init()"
+       @dt-refresh.window="refresh()"
+       @dt-search.window="handleFilterSearch($event.detail.filters)">
+      <%- include('components/data-table') %>
     </div>
     
     <!-- 规则编辑弹窗 -->

@@ -268,7 +268,7 @@
             <span>📍 路径：</span>
             <template x-for="(item, index) in drillDownStack" :key="index">
               <span>
-                <span x-text="getDimensionName(item.dimension)"></span>: <span class="themed-text-primary" x-text="item.value"></span>
+                <span x-text="item.dimension_display || getDimensionName(item.dimension)"></span>: <span class="themed-text-primary" x-text="item.value"></span>
                 <span x-if="index < drillDownStack.length - 1"> → </span>
               </span>
             </template>
@@ -283,7 +283,7 @@
           <table class="w-full text-sm">
             <thead class="themed-bg-base">
               <tr>
-                <th class="px-3 py-2 text-left font-medium themed-text-muted" x-text="getDimensionName(multiDimensionFilters.dimension)"></th>
+                <th class="px-3 py-2 text-left font-medium themed-text-muted" x-text="multiDimensionFilters.dimension_display || getDimensionName(multiDimensionFilters.dimension)"></th>
                 <th class="px-3 py-2 text-right font-medium themed-text-muted">抽奖次数</th>
                 <th class="px-3 py-2 text-right font-medium themed-text-muted">中奖率</th>
                 <template x-if="multiDimensionData.comparison">
@@ -364,7 +364,7 @@
               <div class="flex flex-wrap gap-1 mb-3">
                 <!-- 后端使用 dimensions_config 存储维度配置（数组） -->
                 <template x-for="(dim, idx) in (Array.isArray(template.dimensions_config) ? template.dimensions_config : []).slice(0, 3)" :key="'dim-' + idx">
-                  <span class="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded" x-text="getDimensionName(dim)"></span>
+                  <span class="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded" x-text="dim.dimension_display || getDimensionName(dim)"></span>
                 </template>
               </div>
               <div class="flex justify-between items-center pt-2 border-t">

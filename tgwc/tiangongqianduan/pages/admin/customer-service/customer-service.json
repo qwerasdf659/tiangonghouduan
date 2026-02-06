@@ -1,8 +1,0 @@
-{
-  "navigationBarTitleText": "客服管理",
-  "navigationBarBackgroundColor": "#4CAF50",
-  "navigationBarTextStyle": "white",
-  "backgroundColor": "#f8f9fa",
-  "enablePullDownRefresh": true,
-  "onReachBottomDistance": 50
-}

@@ -92,6 +92,9 @@ function dashboardPage() {
      */
     refreshInterval: null,
 
+    /** @type {string|null} 上次数据更新时间（#2） */
+    lastUpdateTime: null,
+
     /**
      * 统计数据对象
      * @type {DashboardStats}
@@ -421,6 +424,8 @@ function dashboardPage() {
           this.stats.messages = data.customer_service.today_messages || 0
         }
 
+        // #2 更新上次刷新时间
+        this.lastUpdateTime = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
         logger.info('仪表盘数据加载成功', data)
       } else {
         logger.warn('仪表盘数据加载失败或为空')

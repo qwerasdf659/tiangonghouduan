@@ -120,7 +120,7 @@ function sessionsPage() {
      * @type {Object}
      * @property {string} status - 状态筛选 ('active'|'expired'|'')
      * @property {string} user_type - 用户类型筛选 ('user'|'admin'|'')
-     * @property {string} user_id - 用户ID筛选
+     * @property {string} mobile - 用户手机号筛选（手机号主导搜索）
      * @property {string} sort_by - 排序字段
      */
     filters: {

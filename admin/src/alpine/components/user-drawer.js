@@ -552,17 +552,8 @@ export function userDrawer(_config = {}) {
       return colors[level] || 'text-gray-600 bg-gray-100'
     },
 
-    /**
-     * 获取状态标签
-     */
-    getStatusLabel(status) {
-      const labels = {
-        active: '正常',
-        inactive: '停用',
-        banned: '封禁'
-      }
-      return labels[status] || status || '未知'
-    },
+    // ✅ 已删除 getStatusLabel 映射函数
+    // HTML 直接使用后端返回的 status_display 字段
 
     /**
      * 获取状态颜色

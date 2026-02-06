@@ -534,8 +534,19 @@ export function asyncDataMixin() {
      * @returns {Promise<{success: boolean, data?: any, error?: Error, cancelled?: boolean}>}
      */
     async confirmAndExecute(message, asyncFn, options = {}) {
-      // 使用原生 confirm
-      if (!confirm(message)) {
+      // 使用 confirm-dialog store（美观 Tailwind 对话框）
+      let confirmed = false
+      if (typeof Alpine !== 'undefined' && Alpine.store('confirm')) {
+        const confirmOptions = options.danger
+          ? { message, type: 'danger', title: options.confirmTitle || '危险操作' }
+          : { message, title: options.confirmTitle || '确认' }
+        confirmed = await Alpine.store('confirm').show(confirmOptions)
+      } else {
+        // 降级到原生 confirm
+        confirmed = confirm(message)
+      }
+
+      if (!confirmed) {
         return { success: false, cancelled: true }
       }
 

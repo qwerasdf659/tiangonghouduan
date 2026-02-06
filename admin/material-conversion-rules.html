@@ -6,7 +6,7 @@
     pageStyle: '[x-cloak] { display: none !important; } .asset-flow { display: flex; align-items: center; gap: 0.5rem; } .validation-warning { border-left: 4px solid #fbbf24; padding: 1rem; background-color: #fef3c7; border-radius: 4px; margin-top: 0.75rem; }' 
   }) %>
 </head>
-<body class="themed-bg-subtle min-h-screen" x-data="materialConversionRulesPage()" x-init="init()" x-cloak>
+<body class="themed-bg-subtle min-h-screen" x-data="materialConversionRulesPage()" x-init="init()" x-cloak @table-action="handleTableAction($event.detail)">
   
   <!-- 导航栏 -->
   <nav class="themed-bg-primary text-white shadow-lg">
@@ -56,89 +56,18 @@
       </div>
     </div>
 
-    <!-- 数据表格 -->
-    <div class="themed-card rounded-lg shadow">
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead class="themed-bg-base">
-            <tr>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary">规则ID</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary">转换方向</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary">转换比例</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary">生效时间</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary">状态</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary">风控校验</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary" style="width: 200px;">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <!-- 加载中 -->
-            <tr x-show="loading">
-              <td colspan="7" class="text-center py-8">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto"></div>
-                <p class="mt-2 themed-text-muted">正在加载数据...</p>
-              </td>
-            </tr>
-            <!-- 空状态 -->
-            <tr x-show="!loading && rules.length === 0">
-              <td colspan="7" class="text-center py-8">
-                <div class="text-4xl text-gray-300 mb-2">📭</div>
-                <p class="themed-text-muted">暂无转换规则，点击右上角添加</p>
-              </td>
-            </tr>
-            <!-- 数据列表 -->
-            <template x-for="rule in rules" :key="rule.rule_id">
-              <tr x-show="!loading" class="border-t themed-hover-bg">
-                <td class="px-4 py-3">
-                  <code class="text-sm themed-bg-subtle px-2 py-1 rounded" x-text="'#' + rule.rule_id"></code>
-                </td>
-                <td class="px-4 py-3">
-                  <div class="asset-flow">
-                    <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-sm" x-text="rule.from_asset_code"></span>
-                    <span class="text-gray-400">→</span>
-                    <span class="px-2 py-1 bg-green-100 themed-text-success rounded text-sm" x-text="rule.to_asset_code"></span>
-                  </div>
-                </td>
-                <td class="px-4 py-3">
-                  <strong x-text="rule.from_amount"></strong> : <strong x-text="rule.to_amount"></strong>
-                  <br><small class="themed-text-muted" x-text="'(比例: ' + getRatio(rule) + ')'"></small>
-                </td>
-                <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(rule.effective_at)"></td>
-                <td class="px-4 py-3">
-                  <span class="px-2 py-1 rounded text-xs"
-                        :class="rule.is_enabled ? 'bg-green-100 themed-text-success' : 'themed-bg-subtle themed-text-muted'"
-                        x-text="rule.is_enabled ? '已启用' : '已禁用'"></span>
-                </td>
-                <td class="px-4 py-3">
-                  <!-- 循环风险 -->
-                  <span x-show="rule.cycle_detected" class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs" title="检测到循环转换">
-                    ⚠️ 循环
-                  </span>
-                  <!-- 套利风险 -->
-                  <span x-show="rule.arbitrage_detected" class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs" title="检测到套利风险">
-                    🛡️ 套利
-                  </span>
-                  <!-- 正常 -->
-                  <span x-show="!rule.cycle_detected && !rule.arbitrage_detected" class="px-2 py-1 bg-green-100 themed-text-success rounded text-xs">
-                    ✅ 正常
-                  </span>
-                </td>
-                <td class="px-4 py-3 space-x-2">
-                  <button class="px-2 py-1 themed-bg-primary text-white rounded text-sm themed-hover-primary" @click="openViewModal(rule.rule_id)">
-                    查看
-                  </button>
-                  <!-- 只有启用的规则可以被禁用；禁用后不可重新启用，需创建新规则 -->
-                  <button x-show="rule.is_enabled"
-                          class="px-2 py-1 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600"
-                          @click="disableRule(rule.rule_id)">
-                    禁用
-                  </button>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
+    <!-- data-table 标准表格组件 -->
+    <div x-data="dataTable({
+      columns: tableColumns,
+      dataSource: fetchTableData,
+      primaryKey: 'rule_id',
+      sortable: true,
+      selectable: false,
+      exportable: false,
+      page_size: 100,
+      emptyText: '暂无转换规则，点击右上角添加'
+    })" x-init="init()" @dt-refresh.window="refresh()">
+      <%- include('components/data-table') %>
     </div>
   </div>
 

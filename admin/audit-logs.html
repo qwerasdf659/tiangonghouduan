@@ -173,7 +173,7 @@
         <div class="mt-4 space-y-2" x-show="targetTypeStats.items.length > 0">
           <template x-for="item in targetTypeStats.items.slice(0, 5)" :key="item.target_type">
             <div class="flex justify-between items-center text-sm">
-              <span class="themed-text-secondary" x-text="getTargetTypeName(item.target_type)"></span>
+              <span class="themed-text-secondary" x-text="item.target_type_display || item.target_type || '-'"></span>
               <div class="flex items-center gap-2">
                 <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div 
@@ -268,87 +268,20 @@
       </div>
     </template>
 
-    <!-- 日志列表 -->
-    <div class="themed-card rounded-lg shadow" x-show="!loading">
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead class="themed-bg-base">
-            <tr>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">时间</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作人</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作类型</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作目标</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">描述</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">IP地址</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y">
-            <!-- 空状态 -->
-
-              <tr x-show="auditLogs.length === 0">
-                <td colspan="7" class="px-4 py-10 text-center">
-                  <div class="text-5xl mb-4">📋</div>
-                  <p class="themed-text-muted">暂无审计日志</p>
-                </td>
-              </tr>
-
-            <!-- 日志行 -->
-            <template x-for="log in auditLogs" :key="log.admin_operation_log_id">
-              <tr class="log-row">
-                <td class="px-4 py-3 text-sm themed-text-secondary" x-text="formatDateTime(log.created_at)"></td>
-                <td class="px-4 py-3">
-                  <div class="flex items-center">
-                    <span class="text-sm font-medium" x-text="log.operator?.nickname || log.operator_id || '-'"></span>
-                    <span class="ml-2 text-xs themed-text-muted" x-text="log.operator_id ? `(ID: ${log.operator_id})` : ''"></span>
-                  </div>
-                </td>
-                <td class="px-4 py-3">
-                  <span 
-                    class="px-2 py-1 text-xs rounded"
-                    :class="getOperationTypeClass(log)"
-                    x-text="log.operation_type_display || log.operation_type"
-                  ></span>
-                </td>
-                <td class="px-4 py-3 text-sm" x-text="(log.target_type_display || log.target_type || '') + (log.target_id ? ' #' + log.target_id : '')"></td>
-                <td class="px-4 py-3 text-sm themed-text-secondary max-w-xs truncate" :title="log.action || log.reason" x-text="log.action || log.reason || '-'"></td>
-                <td class="px-4 py-3 text-sm font-mono themed-text-muted" x-text="log.ip_address || '-'"></td>
-                <td class="px-4 py-3">
-                  <button 
-                    @click="viewLogDetail(log)"
-                    class="themed-text-primary hover:text-blue-700 text-sm"
-                  >
-                    查看详情
-                  </button>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-      
-      <!-- 分页 -->
-      <div class="p-4 border-t flex justify-between items-center" x-show="logPagination.total > 0">
-        <div class="text-sm themed-text-muted">
-          共 <span x-text="logPagination.total"></span> 条记录，
-          第 <span x-text="logPage"></span> / <span x-text="logPagination.total_pages"></span> 页
-        </div>
-        <div class="flex gap-2">
-          <button 
-            class="px-3 py-1 border rounded themed-text-secondary hover:themed-bg-base disabled:opacity-50"
-            :disabled="logPage <= 1"
-            @click="goToLogPage(logPage - 1)"
-          >
-            上一页
-          </button>
-          <button 
-            class="px-3 py-1 border rounded themed-text-secondary hover:themed-bg-base disabled:opacity-50"
-            :disabled="logPage >= logPagination.total_pages"
-            @click="goToLogPage(logPage + 1)"
-          >
-            下一页
-          </button>
-        </div>
+    <!-- 日志列表（data-table） -->
+    <div class="themed-card rounded-lg shadow" x-show="!loading" @table-action="handleAuditTableAction($event.detail)">
+      <div x-data="dataTable({
+        columns: auditTableColumns,
+        dataSource: fetchAuditTableData,
+        primaryKey: 'admin_operation_log_id',
+        sortable: true,
+        selectable: false,
+        exportable: true,
+        serverSort: true,
+        page_size: 20,
+        emptyText: '暂无审计日志'
+      })" x-init="init()" @dt-audit-refresh.window="refresh()">
+        <%- include('components/data-table') %>
       </div>
     </div>
 

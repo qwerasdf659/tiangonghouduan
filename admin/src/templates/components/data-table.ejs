@@ -1,0 +1,166 @@
+<!-- 标准数据表格组件模板（data-table EJS partial）- 配合 Alpine.js dataTable 组件使用 -->
+<!-- ===== 工具栏 ===== -->
+<div class="flex justify-between items-center mb-3">
+  <div class="flex items-center gap-3">
+    <!-- 选择信息（#13） -->
+    <template x-if="selectable && selectedRows.length > 0">
+      <div class="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg">
+        <span>已选 <strong x-text="selectedRows.length"></strong> 项</span>
+        <button @click="clearSelection()" class="text-blue-500 hover:text-blue-700 text-xs underline">取消选择</button>
+      </div>
+    </template>
+    <!-- 上次更新时间（#2） -->
+    <template x-if="lastUpdateTime">
+      <span class="text-xs text-gray-400">最后更新: <span x-text="lastUpdateTime"></span></span>
+    </template>
+  </div>
+  <div class="flex items-center gap-2">
+    <!-- 导出按钮（#12） -->
+    <template x-if="exportable">
+      <button @click="openExport()" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1">
+        📥 <span>导出</span>
+      </button>
+    </template>
+    <!-- 刷新按钮 -->
+    <button @click="refresh()" :disabled="loading" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1 disabled:opacity-50">
+      🔄 <span>刷新</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== 表格 ===== -->
+<div class="overflow-x-auto themed-card rounded-lg shadow">
+  <table class="w-full">
+    <!-- 表头 -->
+    <thead class="themed-bg-muted">
+      <tr>
+        <!-- 选择列（#13） -->
+        <template x-if="selectable">
+          <th class="px-4 py-3 text-center w-12">
+            <input type="checkbox"
+              :checked="isAllSelected"
+              :indeterminate.prop="isPartialSelected"
+              @change="toggleSelectAll($event.target.checked)"
+              class="rounded border-gray-300">
+          </th>
+        </template>
+        <!-- 数据列（#10 排序） -->
+        <template x-for="col in columns" :key="col.key">
+          <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary"
+            :class="{ 'cursor-pointer hover:text-blue-600 select-none': sortable && col.sortable }"
+            :style="col.width ? 'width:' + col.width : ''"
+            @click="sort(col)">
+            <div class="flex items-center gap-1">
+              <span x-text="col.label"></span>
+              <template x-if="sortable && col.sortable">
+                <span class="text-xs" :class="sortColumn === col.key ? 'text-blue-600 font-bold' : 'text-gray-400'" x-text="getSortIcon(col)"></span>
+              </template>
+            </div>
+          </th>
+        </template>
+      </tr>
+    </thead>
+    <tbody class="divide-y themed-divide">
+      <!-- 加载状态 -->
+      <template x-if="loading">
+        <tr>
+          <td :colspan="colSpan" class="px-4 py-12 text-center">
+            <div class="flex flex-col items-center gap-2">
+              <div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+              <span class="text-sm themed-text-muted">加载中...</span>
+            </div>
+          </td>
+        </tr>
+      </template>
+      <!-- 错误状态（#5） -->
+      <template x-if="hasError">
+        <tr>
+          <td :colspan="colSpan" class="px-4 py-12 text-center">
+            <div class="flex flex-col items-center gap-3">
+              <span class="text-4xl">❌</span>
+              <div class="text-red-600 font-medium">加载失败</div>
+              <div class="text-sm text-gray-500" x-text="error"></div>
+              <button @click="loadData()" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">🔄 重试</button>
+            </div>
+          </td>
+        </tr>
+      </template>
+      <!-- 空状态 -->
+      <template x-if="isEmpty">
+        <tr>
+          <td :colspan="colSpan" class="px-4 py-12 text-center">
+            <div class="flex flex-col items-center gap-2">
+              <span class="text-4xl">📭</span>
+              <div class="themed-text-muted" x-text="emptyText"></div>
+            </div>
+          </td>
+        </tr>
+      </template>
+      <!-- 数据行 -->
+      <template x-if="hasData">
+        <template x-for="(row, rowIndex) in data" :key="row[primaryKey] || rowIndex">
+          <tr class="themed-hover-bg transition-colors" @click="handleRowClick(row, rowIndex)">
+            <!-- 选择列 -->
+            <template x-if="selectable">
+              <td class="px-4 py-3 text-center" @click.stop>
+                <input type="checkbox"
+                  :checked="isSelected(row[primaryKey])"
+                  @change="toggleSelect(row[primaryKey])"
+                  class="rounded border-gray-300">
+              </td>
+            </template>
+            <!-- 数据列 -->
+            <template x-for="col in columns" :key="col.key">
+              <td class="px-4 py-3 text-sm" :class="col.type === 'actions' ? '' : 'themed-text-primary'">
+                <!-- 普通列：使用 renderCell -->
+                <span x-show="col.type !== 'actions'" x-html="renderCell(row, col)"></span>
+                <!-- 操作列：使用 Alpine 指令（支持 @click） -->
+                <div x-show="col.type === 'actions'" class="flex items-center gap-1" @click.stop>
+                  <template x-for="action in (col.actions || [])" :key="action.name">
+                    <button
+                      x-show="!action.condition || action.condition(row)"
+                      @click="$dispatch('table-action', { action: action.name, row: JSON.parse(JSON.stringify(row)) })"
+                      class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
+                      :class="action.class || 'text-blue-600 hover:text-blue-800'"
+                      x-html="(action.icon ? action.icon + ' ' : '') + action.label">
+                    </button>
+                  </template>
+                </div>
+              </td>
+            </template>
+          </tr>
+        </template>
+      </template>
+    </tbody>
+  </table>
+
+  <!-- ===== 分页栏（#4 统一分页） ===== -->
+  <template x-if="total_records > 0">
+    <div class="px-4 py-3 border-t themed-divide flex justify-between items-center">
+      <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+      <div class="flex items-center gap-1">
+        <!-- 首页 -->
+        <button @click="firstPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">«</button>
+        <!-- 上一页 -->
+        <button @click="prevPage()" :disabled="!hasPrevPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+        <!-- 页码 -->
+        <template x-for="page in visiblePages" :key="'p_' + page">
+          <button @click="goToPage(page)"
+            :disabled="page === '...'"
+            :class="page === current_page ? 'bg-blue-500 text-white border-blue-500' : 'hover:bg-gray-50'"
+            class="px-3 py-1 text-sm border rounded min-w-[32px]"
+            x-text="page"></button>
+        </template>
+        <!-- 下一页 -->
+        <button @click="nextPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+        <!-- 末页 -->
+        <button @click="lastPage()" :disabled="!hasNextPage"
+          class="px-2 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">»</button>
+      </div>
+    </div>
+  </template>
+</div>
+

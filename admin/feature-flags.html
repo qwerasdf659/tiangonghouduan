@@ -19,66 +19,28 @@
   </nav>
 
   <!-- 页面主体 -->
-  <div class="container mx-auto px-4 py-6" x-data="featureFlags()">
+  <div class="container mx-auto px-4 py-6" x-data="featureFlags()" x-init="init()" @table-action="handleTableAction($event.detail)">
     
-    <!-- 功能开关列表 -->
-    <div class="themed-card rounded-lg shadow">
-      <div class="p-4 border-b flex justify-between items-center">
-        <h5 class="font-semibold">🎛️ 功能开关管理</h5>
-        <button @click="openCreateFlagModal()" class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">
-          ➕ 新增开关
-        </button>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead class="themed-bg-base">
-            <tr>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">开关键名</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">名称</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">发布策略</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">灰度比例</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y">
-            <tr x-show="!featureFlags || featureFlags.length === 0">
-              <td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无功能开关</td>
-            </tr>
-            <template x-for="(flag, index) in (featureFlags || [])" :key="flag.flag_key || index">
-              <tr class="themed-hover-bg">
-                <td class="px-4 py-3 text-sm font-mono" x-text="flag.flag_key"></td>
-                <td class="px-4 py-3 text-sm" x-text="flag.flag_name || '-'"></td>
-                <td class="px-4 py-3 text-sm">
-                  <span class="px-2 py-1 text-xs rounded cursor-pointer"
-                        :class="flag.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
-                        @click="toggleFeatureFlag(flag)"
-                        x-text="flag.is_enabled ? '✅ 启用' : '⭕ 禁用'"></span>
-                </td>
-                <td class="px-4 py-3 text-sm">
-                  <span class="px-2 py-1 text-xs rounded"
-                        :class="getStrategyClass(flag.rollout_strategy)"
-                        x-text="flag.rollout_strategy_display || flag.rollout_strategy"></span>
-                </td>
-                <td class="px-4 py-3 text-sm">
-                  <template x-if="flag.rollout_strategy === 'percentage'">
-                    <span class="font-semibold text-blue-600" x-text="(flag.rollout_percentage || 100) + '%'"></span>
-                  </template>
-                  <template x-if="flag.rollout_strategy !== 'percentage'">
-                    <span class="themed-text-muted">-</span>
-                  </template>
-                </td>
-                <td class="px-4 py-3">
-                  <div class="flex space-x-2">
-                    <button @click="editFeatureFlag(flag)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
-                    <button @click="deleteFeatureFlag(flag)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
+    <!-- 页面标题和新增按钮 -->
+    <div class="flex justify-between items-center mb-4">
+      <h5 class="font-semibold text-lg">🎛️ 功能开关管理</h5>
+      <button @click="openCreateFlagModal()" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">
+        ➕ 新增开关
+      </button>
+    </div>
+
+    <!-- data-table 标准表格组件 -->
+    <div x-data="dataTable({
+      columns: tableColumns,
+      dataSource: fetchTableData,
+      primaryKey: 'flag_key',
+      sortable: true,
+      selectable: false,
+      exportable: false,
+      page_size: 100,
+      emptyText: '暂无功能开关'
+    })" x-init="init()" @dt-refresh.window="refresh()">
+      <%- include('components/data-table') %>
     </div>
 
     <!-- 说明卡片 -->
@@ -108,7 +70,7 @@
       </div>
     </div>
 
-    <!-- 功能开关表单 Modal（必须在主组件范围内） -->
+    <!-- 功能开关表单 Modal -->
     <div x-ref="featureFlagModal" 
          x-show="isModalOpen('featureFlagModal')" 
          x-cloak 
@@ -127,7 +89,8 @@
                      x-model="featureFlagForm.flag_key" 
                      :disabled="!!editingFlagKey" 
                      required
-                     placeholder="如: feature_new_ui, enable_payment_v2">
+                     placeholder="如: feature_new_ui, enable_payment_v2"
+                     x-tooltip="'snake_case 格式的唯一标识符，用于代码中引用'">
               <p class="text-xs themed-text-muted mt-1" x-show="!editingFlagKey">snake_case格式，创建后不可修改</p>
             </div>
             <div>
@@ -160,7 +123,8 @@
               <div class="flex items-center">
                 <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500" 
                        x-model.number="featureFlagForm.rollout_percentage" 
-                       min="0" max="100">
+                       min="0" max="100"
+                       placeholder="0-100">
                 <span class="ml-2 text-sm themed-text-muted">%</span>
               </div>
             </div>
@@ -186,4 +150,3 @@
   <script type="module" src="./src/modules/operations/pages/feature-flags.js"></script>
 </body>
 </html>
-

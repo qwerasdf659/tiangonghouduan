@@ -19,7 +19,12 @@
   </nav>
 
   <!-- 页面主体 -->
-  <div class="container mx-auto px-4 py-6" x-data="systemSettings()">
+  <div class="container mx-auto px-4 py-6" x-data="systemSettings()"
+       @edit-reminder-rule="openReminderRuleModal($event.detail)"
+       @toggle-reminder-rule="toggleReminderRule($event.detail)"
+       @delete-reminder-rule="deleteReminderRule($event.detail)"
+       @view-audit-detail="viewAuditLogDetail($event.detail)"
+       @rollback-audit="rollbackOperation($event.detail)">
     
     <!-- 子页面导航（方案A：只显示系统配置和审计日志） -->
     <div class="themed-card rounded-lg shadow mb-6">
@@ -69,50 +74,62 @@
             ➕ 新增规则
           </button>
         </div>
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead class="themed-bg-base">
-              <tr>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">规则类型</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">规则名称</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">触发阈值</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">通知渠道</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y">
-              <tr x-show="!reminderRules || reminderRules.length === 0">
-                <td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无提醒规则</td>
-              </tr>
-              <template x-for="rule in (reminderRules || [])" :key="rule.reminder_rule_id">
-                <tr class="themed-hover-bg">
-                  <td class="px-4 py-3 text-sm" x-text="getRuleTypeName(rule.rule_type)"></td>
-                  <td class="px-4 py-3 text-sm" x-text="rule.rule_name || '-'"></td>
-                  <td class="px-4 py-3 text-sm font-mono" x-text="rule.trigger_condition?.threshold || '-'"></td>
-                  <td class="px-4 py-3 text-sm">
-                    <template x-for="channel in (rule.notification_channels || [])" :key="channel">
-                      <span class="inline-block px-2 py-0.5 text-xs rounded bg-blue-100 text-blue-700 mr-1" x-text="channel === 'admin_broadcast' ? '管理员广播' : channel === 'websocket' ? 'WebSocket' : channel === 'in_app' ? '站内' : channel === 'sms' ? '短信' : channel === 'email' ? '邮件' : channel"></span>
-                    </template>
-                  </td>
-                  <td class="px-4 py-3">
-                    <span 
-                      :class="rule.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
-                      class="px-2 py-1 text-xs rounded"
-                      x-text="rule.is_enabled ? '启用' : '禁用'"
-                    ></span>
-                  </td>
-                  <td class="px-4 py-3">
-                    <div class="flex space-x-2 text-sm">
-                      <button @click="openReminderRuleModal(rule)" class="text-blue-500 hover:text-blue-700">编辑</button>
-                      <button @click="toggleReminderRule(rule)" :class="rule.is_enabled ? 'text-yellow-500 hover:text-yellow-700' : 'text-green-500 hover:text-green-700'" x-text="rule.is_enabled ? '禁用' : '启用'"></button>
-                      <button @click="deleteReminderRule(rule)" class="text-red-500 hover:text-red-700">删除</button>
-                    </div>
-                  </td>
+        <!-- data-table: 提醒规则列表 -->
+        <div x-data="reminderRulesTable()" x-init="init()">
+          <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+          <div x-show="hasError" class="p-8 text-center">
+            <p class="text-red-500 mb-2" x-text="error"></p>
+            <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+          </div>
+          <div x-show="hasData" class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="themed-bg-base">
+                <tr>
+                  <template x-for="col in columns" :key="col.key">
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                        :class="{ 'cursor-pointer hover:text-blue-600': col.sortable }"
+                        @click="sort(col)">
+                      <span x-text="col.label"></span>
+                      <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                    </th>
+                  </template>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
                 </tr>
-              </template>
-            </tbody>
-          </table>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="(row, idx) in data" :key="row.reminder_rule_id || idx">
+                  <tr class="themed-hover-bg">
+                    <template x-for="col in columns" :key="col.key">
+                      <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                    </template>
+                    <td class="px-4 py-3">
+                      <div class="flex space-x-2 text-sm">
+                        <button @click="$dispatch('edit-reminder-rule', row)" class="text-blue-500 hover:text-blue-700">编辑</button>
+                        <button @click="$dispatch('toggle-reminder-rule', row)" :class="row.is_enabled ? 'text-yellow-500 hover:text-yellow-700' : 'text-green-500 hover:text-green-700'" x-text="row.is_enabled ? '禁用' : '启用'"></button>
+                        <button @click="$dispatch('delete-reminder-rule', row)" class="text-red-500 hover:text-red-700">删除</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="isEmpty" class="p-8 text-center themed-text-muted">暂无提醒规则</div>
+          <template x-if="total_pages > 1">
+            <div class="p-4 border-t flex justify-between items-center">
+              <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+              <div class="flex space-x-1">
+                <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                <template x-for="p in visiblePages" :key="'pr'+p">
+                  <button @click="goToPage(p)" :class="p === current_page ? 'bg-yellow-500 text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                </template>
+                <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+              </div>
+            </div>
+          </template>
+          <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+            最后更新: <span x-text="lastUpdateTime"></span>
+          </div>
         </div>
       </div>
     </div>
@@ -123,85 +140,76 @@
         <div class="p-4 border-b">
           <h5 class="font-semibold">审计日志</h5>
         </div>
-        <div class="p-4 border-b themed-bg-base">
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <input type="text" x-model="logFilters.operator_id" placeholder="操作人" class="px-3 py-2 border rounded">
-            <select x-model="logFilters.action" class="px-3 py-2 border rounded">
-              <option value="">全部操作</option>
-              <option value="create">创建</option>
-              <option value="update">更新</option>
-              <option value="delete">删除</option>
-            </select>
-            <input type="date" x-model="logFilters.start_date" class="px-3 py-2 border rounded">
-            <button @click="loadAuditLogs()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
+        <!-- data-table: 审计日志列表（含筛选） -->
+        <div x-data="auditLogsTable()" x-init="init()">
+          <div class="p-4 border-b themed-bg-base">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <input type="text" x-model="activeFilters.operator_id" placeholder="操作人" class="px-3 py-2 border rounded">
+              <select x-model="activeFilters.action" class="px-3 py-2 border rounded">
+                <option value="">全部操作</option>
+                <option value="create">创建</option>
+                <option value="update">更新</option>
+                <option value="delete">删除</option>
+              </select>
+              <input type="date" x-model="activeFilters.start_date" class="px-3 py-2 border rounded">
+              <button @click="search()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
+            </div>
           </div>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead class="themed-bg-base">
-              <tr>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">日志ID</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作人</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作类型</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">目标</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">影响范围</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">风险等级</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">时间</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y">
-              <tr x-show="!auditLogs || auditLogs.length === 0">
-                <td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无审计日志数据</td>
-              </tr>
-              <template x-for="(log, index) in (auditLogs || [])" :key="log.id || index">
-                <tr class="themed-hover-bg">
-                  <td class="px-4 py-3 text-sm font-mono themed-text-muted" x-text="log.id || '-'"></td>
-                  <td class="px-4 py-3 text-sm" x-text="log.operator_info?.nickname || log.operator_id || '-'"></td>
-                  <td class="px-4 py-3 text-sm">
-                    <span class="px-2 py-1 text-xs rounded themed-bg-primary-light themed-text-primary" x-text="log.action_name || log.action || '-'"></span>
-                  </td>
-                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="log.operation_type_name || log.target || '-'"></td>
-                  <!-- 影响范围 (P2-3) -->
-                  <td class="px-4 py-3 text-sm">
-                    <template x-if="log.affected_users || log.affected_amount">
-                      <div>
-                        <span x-show="log.affected_users" class="block text-xs" x-text="log.affected_users + ' 用户'"></span>
-                        <span x-show="log.affected_amount" class="block text-xs themed-text-muted" x-text="'¥' + (log.affected_amount / 100).toFixed(2)"></span>
-                      </div>
-                    </template>
-                    <template x-if="!log.affected_users && !log.affected_amount">
-                      <span class="text-gray-400">-</span>
-                    </template>
-                  </td>
-                  <!-- 风险等级 (P2-3) -->
-                  <td class="px-4 py-3 text-sm">
-                    <span 
-                      :class="{
-                        'bg-red-100 text-red-700': log.risk_level === 'high',
-                        'bg-yellow-100 text-yellow-700': log.risk_level === 'medium',
-                        'bg-green-100 text-green-700': log.risk_level === 'low'
-                      }"
-                      class="px-2 py-0.5 text-xs rounded"
-                      x-show="log.risk_level"
-                      x-text="log.risk_level === 'high' ? '高' : log.risk_level === 'medium' ? '中' : '低'"
-                    ></span>
-                    <span x-show="!log.risk_level" class="text-gray-400">-</span>
-                  </td>
-                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(log.created_at)"></td>
-                  <!-- 操作列 (P2-3) -->
-                  <td class="px-4 py-3 text-sm">
-                    <div class="flex space-x-2">
-                      <button @click="viewAuditLogDetail(log)" class="themed-text-primary hover:underline">详情</button>
-                      <template x-if="log.rollback_supported && log.rollback_status !== 'rolled_back'">
-                        <button @click="rollbackOperation(log)" class="text-orange-500 hover:text-orange-700">回滚</button>
-                      </template>
-                    </div>
-                  </td>
+          <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+          <div x-show="hasError" class="p-8 text-center">
+            <p class="text-red-500 mb-2" x-text="error"></p>
+            <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+          </div>
+          <div x-show="hasData" class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="themed-bg-base">
+                <tr>
+                  <template x-for="col in columns" :key="col.key">
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                        :class="{ 'cursor-pointer hover:text-blue-600': col.sortable }"
+                        @click="sort(col)">
+                      <span x-text="col.label"></span>
+                      <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                    </th>
+                  </template>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
                 </tr>
-              </template>
-            </tbody>
-          </table>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="(row, idx) in data" :key="row.id || idx">
+                  <tr class="themed-hover-bg">
+                    <template x-for="col in columns" :key="col.key">
+                      <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                    </template>
+                    <td class="px-4 py-3 text-sm">
+                      <div class="flex space-x-2">
+                        <button @click="$dispatch('view-audit-detail', row)" class="themed-text-primary hover:underline">详情</button>
+                        <template x-if="row.rollback_supported && row.rollback_status !== 'rolled_back'">
+                          <button @click="$dispatch('rollback-audit', row)" class="text-orange-500 hover:text-orange-700">回滚</button>
+                        </template>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="isEmpty" class="p-8 text-center themed-text-muted">暂无审计日志数据</div>
+          <template x-if="total_pages > 1">
+            <div class="p-4 border-t flex justify-between items-center">
+              <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+              <div class="flex space-x-1">
+                <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                <template x-for="p in visiblePages" :key="'pal'+p">
+                  <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                </template>
+                <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+              </div>
+            </div>
+          </template>
+          <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+            最后更新: <span x-text="lastUpdateTime"></span>
+          </div>
         </div>
       </div>
     </div>

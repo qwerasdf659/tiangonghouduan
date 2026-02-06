@@ -510,7 +510,7 @@ export function useRolesPermissionsMethods() {
      * 打开分配角色模态框
      */
     openAssignRoleModal() {
-      this.userRoleForm = { user_id: '', role_name: '', reason: '' }
+      this.userRoleForm = { mobile: '', role_name: '', reason: '' }
       // 确保角色列表已加载
       if (!this.roles || this.roles.length === 0) {
         this.loadRoles()
@@ -522,15 +522,19 @@ export function useRolesPermissionsMethods() {
      * 提交角色分配（更新用户角色）
      */
     async submitAssignRole() {
-      if (!this.userRoleForm.user_id || !this.userRoleForm.role_name) {
-        this.showError('请填写用户ID和选择角色')
+      if (!this.userRoleForm.mobile || !this.userRoleForm.role_name) {
+        this.showError('请填写手机号和选择角色')
         return
       }
+
+      // 手机号 → resolve 获取 user_id
+      const user = await this.resolveUserByMobile(this.userRoleForm.mobile)
+      if (!user) return
 
       try {
         this.saving = true
         // 使用 UPDATE_ROLE API 更新用户角色
-        const url = buildURL(USER_ENDPOINTS.UPDATE_ROLE, { user_id: this.userRoleForm.user_id })
+        const url = buildURL(USER_ENDPOINTS.UPDATE_ROLE, { user_id: user.user_id })
         const response = await this.apiCall(url, {
           method: 'PUT',
           data: {

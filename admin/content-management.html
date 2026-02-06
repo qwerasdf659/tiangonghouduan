@@ -19,7 +19,9 @@
   </nav>
 
   <!-- 页面主体 -->
-  <div class="container mx-auto px-4 py-6" x-data="contentManagement()" x-init="init()">
+  <div class="container mx-auto px-4 py-6" x-data="contentManagement()" x-init="init()"
+       @edit-announcement="editAnnouncement($event.detail)"
+       @delete-announcement="deleteAnnouncement($event.detail)">
     
     <!-- 子页面导航 -->
     <div class="themed-card rounded-lg shadow mb-6">
@@ -44,53 +46,65 @@
             ➕ 发布公告
           </button>
         </div>
-        <!-- 空状态提示 -->
-        <template x-if="announcements.length === 0">
-          <div class="p-8 text-center themed-text-muted">
+        <!-- data-table: 公告列表 -->
+        <div x-data="announcementsTable()" x-init="init()">
+          <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+          <div x-show="hasError" class="p-8 text-center">
+            <p class="text-red-500 mb-2" x-text="error"></p>
+            <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+          </div>
+          <div x-show="hasData" class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="themed-bg-base">
+                <tr>
+                  <template x-for="col in columns" :key="col.key">
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                        :class="{ 'cursor-pointer hover:text-blue-600': col.sortable }"
+                        @click="sort(col)">
+                      <span x-text="col.label"></span>
+                      <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                    </th>
+                  </template>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="(row, idx) in data" :key="row.system_announcement_id || idx">
+                  <tr class="themed-hover-bg">
+                    <template x-for="col in columns" :key="col.key">
+                      <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                    </template>
+                    <td class="px-4 py-3">
+                      <div class="flex space-x-2">
+                        <button @click="$dispatch('edit-announcement', row)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                        <button @click="$dispatch('delete-announcement', row)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
             <div class="text-4xl mb-4">📢</div>
             <p>暂无公告数据</p>
             <p class="text-sm mt-2">点击"发布公告"按钮创建第一条公告</p>
           </div>
-        </template>
-        <!-- 公告列表 -->
-        <div class="overflow-x-auto" x-show="announcements.length > 0">
-          <table class="w-full">
-            <thead class="themed-bg-base">
-              <tr>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">公告ID</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">标题</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">类型</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">创建时间</th>
-                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y">
-              <template x-for="ann in announcements" :key="ann.system_announcement_id">
-                <tr class="themed-hover-bg">
-                  <td class="px-4 py-3 text-sm" x-text="ann.system_announcement_id"></td>
-                  <td class="px-4 py-3 text-sm" x-text="ann.title"></td>
-                  <td class="px-4 py-3">
-                    <span class="px-2 py-1 text-xs rounded themed-bg-primary-light themed-text-primary" x-text="ann.type || '通知'"></span>
-                  </td>
-                  <td class="px-4 py-3">
-                    <span 
-                      :class="ann.is_active ? 'bg-green-100 themed-text-success' : 'themed-bg-subtle themed-text-secondary'"
-                      class="px-2 py-1 text-xs rounded"
-                      x-text="ann.is_active ? '已发布' : '草稿'"
-                    ></span>
-                  </td>
-                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(ann.created_at)"></td>
-                  <td class="px-4 py-3">
-                    <div class="flex space-x-2">
-                      <button @click="editAnnouncement(ann)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
-                      <button @click="deleteAnnouncement(ann)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
-                    </div>
-                  </td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
+          <template x-if="total_pages > 1">
+            <div class="p-4 border-t flex justify-between items-center">
+              <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+              <div class="flex space-x-1">
+                <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                <template x-for="p in visiblePages" :key="'pa'+p">
+                  <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                </template>
+                <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+              </div>
+            </div>
+          </template>
+          <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+            最后更新: <span x-text="lastUpdateTime"></span>
+          </div>
         </div>
       </div>
     </div>

@@ -340,6 +340,12 @@ const DICT_TYPES = {
   LOTTERY_ALERT_STATUS: 'lottery_alert_status', // 抽奖告警状态（active/acknowledged/resolved）
   LOTTERY_ALERT_SEVERITY: 'lottery_alert_severity', // 抽奖告警级别（danger/warning/info）
 
+  // ==================== 提醒规则相关（2026-02-07 新增）====================
+  REMINDER_RULE_TYPE: 'reminder_rule_type', // 提醒规则类型（pending_timeout/budget_alert/stock_low/scheduled/custom）
+
+  // ==================== 资产交易相关（2026-02-07 新增）====================
+  ASSET_BUSINESS_TYPE: 'asset_business_type', // 资产交易业务类型（admin_adjustment/lottery_reward/exchange_debit 等 25 种）
+
   // ==================== P2 中文化新增（2026-02-06） ====================
   BANNER_POSITION: 'banner_position', // 弹窗广告位置（home/lottery/activity/profile）
   BANNER_LINK_TYPE: 'banner_link_type', // 弹窗链接类型（none/page/miniprogram/webview）

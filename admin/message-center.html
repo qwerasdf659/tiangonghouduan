@@ -14,6 +14,7 @@
         <h1 class="text-2xl font-bold themed-text-primary">📬 消息中心</h1>
         <p class="text-sm themed-text-muted mt-1">
           查看和管理所有系统通知 · 共 <span x-text="pagination.total">0</span> 条消息
+          <template x-if="lastUpdateTime"><span class="ml-2">· 最后更新: <span x-text="lastUpdateTime"></span></span></template>
         </p>
       </div>
       

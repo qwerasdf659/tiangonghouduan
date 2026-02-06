@@ -64,7 +64,7 @@
         <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">资产类型</label>
-            <select x-model="filters.type" class="w-full px-3 py-2 border rounded-lg">
+            <select x-model="filters.type" class="w-full px-3 py-2 border rounded-lg" x-tooltip="'孤儿资产=用户已删除但资产仍存在；冻结资产=被系统锁定的资产'">
               <option value="">全部类型</option>
               <option value="orphan">孤儿资产</option>
               <option value="frozen">冻结资产</option>
@@ -72,7 +72,7 @@
           </div>
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">资产分类</label>
-            <select x-model="filters.asset_type" class="w-full px-3 py-2 border rounded-lg">
+            <select x-model="filters.asset_type" class="w-full px-3 py-2 border rounded-lg" x-tooltip="'按资产的具体分类筛选：积分、物品或余额'">
               <option value="">全部分类</option>
               <option value="points">积分</option>
               <option value="items">物品</option>
@@ -81,7 +81,7 @@
           </div>
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
-            <select x-model="filters.status" class="w-full px-3 py-2 border rounded-lg">
+            <select x-model="filters.status" class="w-full px-3 py-2 border rounded-lg" x-tooltip="'待处理=等待清理；处理中=正在清理；已处理=清理完成'">
               <option value="">全部状态</option>
               <option value="pending">待处理</option>
               <option value="processing">处理中</option>
@@ -102,8 +102,8 @@
       </div>
     </div>
 
-    <!-- 资产列表 -->
-    <div class="themed-card rounded-lg shadow">
+    <!-- 资产列表（data-table） -->
+    <div class="themed-card rounded-lg shadow" @table-action="handleTableAction($event.detail)">
       <div class="p-4 border-b flex justify-between items-center">
         <h5 class="font-semibold">资产列表</h5>
         <button @click="scanOrphans()" :disabled="scanning" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm">
@@ -111,69 +111,17 @@
           <span x-show="scanning">扫描中...</span>
         </button>
       </div>
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead class="themed-bg-base">
-            <tr>
-              <th class="px-4 py-3 text-left">
-                <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll()" class="rounded">
-              </th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">账户ID</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">类型</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户ID</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">描述</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">孤儿金额</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">检测时间</th>
-              <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y">
-
-            <tr x-show="orphanList.length === 0">
-              <td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无孤儿/冻结资产数据</td>
-            </tr>
-            <template x-for="asset in orphanList" :key="asset.account_id + '_' + asset.asset_code">
-              <tr class="themed-hover-bg">
-                <td class="px-4 py-3">
-                  <input type="checkbox" :checked="isItemSelected(asset)" @change="toggleRowSelection(asset)" class="rounded">
-                </td>
-                <td class="px-4 py-3 text-sm font-mono" x-text="asset.account_id"></td>
-                <td class="px-4 py-3">
-                  <span :class="asset.type === 'orphan' ? 'themed-bg-subtle themed-text-secondary' : 'themed-bg-primary-light themed-text-primary'" class="px-2 py-1 text-xs rounded" x-text="asset.type === 'orphan' ? '孤儿' : '冻结'"></span>
-                </td>
-                <td class="px-4 py-3 text-sm" x-text="asset.user_id || '-'"></td>
-                <td class="px-4 py-3 text-sm" x-text="asset.description"></td>
-                <td class="px-4 py-3 text-sm font-mono text-orange-600" x-text="formatNumber(asset.orphan_amount)"></td>
-                <td class="px-4 py-3">
-                  <span :class="{
-                    'bg-yellow-100 text-yellow-700': asset.status === 'pending',
-                    'themed-bg-primary-light themed-text-primary': asset.status === 'processing',
-                    'bg-green-100 themed-text-success': asset.status === 'processed'
-                  }" class="px-2 py-1 text-xs rounded" x-text="asset.status_display || asset.status"></span>
-                </td>
-                <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(asset.discovered_at)"></td>
-                <td class="px-4 py-3">
-                  <div class="flex space-x-2">
-                    <button @click="viewAssetDetail(asset)" class="themed-text-primary hover:text-blue-700 text-sm">详情</button>
-                    <button x-show="asset.status === 'pending'" @click="cleanSingleItem(asset)" class="text-green-500 hover:text-green-700 text-sm">处理</button>
-                    <button x-show="asset.type === 'frozen' && asset.status !== 'processed'" @click="unfreezeAsset(asset)" class="text-orange-500 hover:text-orange-700 text-sm">解冻</button>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-      
-      <!-- 分页 -->
-      <div class="p-4 border-t flex justify-between items-center">
-        <span class="text-sm themed-text-muted" x-text="'共 ' + total_records + ' 条记录'"></span>
-        <div class="flex space-x-2">
-          <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-          <span class="px-3 py-1" x-text="paginationInfo"></span>
-          <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
-        </div>
+      <div x-data="dataTable({
+        columns: tableColumns,
+        dataSource: fetchTableData,
+        primaryKey: 'account_id',
+        sortable: true,
+        selectable: true,
+        exportable: false,
+        page_size: 20,
+        emptyText: '暂无孤儿/冻结资产数据'
+      })" x-init="init()" @dt-refresh.window="refresh()">
+        <%- include('components/data-table') %>
       </div>
     </div>
   </div>

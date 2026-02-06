@@ -30,7 +30,7 @@
 import { logger } from '../../../utils/logger.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { request, getToken } from '../../../api/base.js'
-import { loadECharts } from '../../../utils/index.js'
+import { loadECharts, $confirmDanger } from '../../../utils/index.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
 import { EASING_FUNCTIONS } from '../../../alpine/components/animated-counter.js'
 import { MultiDimensionStatsAPI } from '../../../api/multi-dimension-stats.js'
@@ -1140,7 +1140,7 @@ function statisticsPage() {
      * 删除报表模板
      */
     async deleteReportTemplate(template) {
-      if (!confirm('确定要删除此报表模板吗？')) return
+      if (!(await $confirmDanger('确定要删除此报表模板吗？'))) return
       try {
         // 使用后端字段名 report_template_id
         const response = await ReportTemplatesAPI.deleteTemplate(template.report_template_id)

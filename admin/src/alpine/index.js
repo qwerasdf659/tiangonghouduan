@@ -55,6 +55,12 @@ import { formValidation, rules as validationRules } from './components/form-vali
 import { pageTransition, tabTransition, staggerTransition } from './components/page-transitions.js'
 import { miniChart, trendLine, trendBar, progressRing } from './components/mini-chart.js'
 
+// 导入数据表格组件（#9 标准表格组件）
+import { dataTable } from './components/data-table.js'
+
+// 导入虚拟列表组件（#9 大数据列表）— 自注册，仅需导入以确保打包
+import './components/virtual-list.js'
+
 // 导入新增功能组件
 import { imageLoader, blurLoader, initLazyImages } from './components/image-loader.js'
 import { shortcutsStore, enterConfirm } from './components/keyboard-shortcuts.js'
@@ -342,6 +348,10 @@ export function initAlpine() {
     '交互增强组件已注册: emptyState, animatedCounter, modal, formValidation, pageTransition, miniChart'
   )
 
+  // ========== 注册标准数据表格组件（#9 data-table 增强） ==========
+  Alpine.data('dataTable', dataTable)
+  logger.debug('标准数据表格组件已注册: dataTable')
+
   // ========== 注册新增功能组件 ==========
   // 图片加载
   Alpine.data('imageLoader', imageLoader)
@@ -367,6 +377,35 @@ export function initAlpine() {
   logger.debug(
     '新增功能组件已注册: imageLoader, shortcuts, infiniteScroll, fileUpload, resizableColumns, exportModal'
   )
+
+  // ========== 注册 x-tooltip 指令（P3 #11 帮助提示） ==========
+  Alpine.directive('tooltip', (el, { expression }, { evaluate }) => {
+    const text = evaluate(expression)
+    if (text) {
+      el.setAttribute('title', text)
+      el.classList.add('tooltip-trigger')
+
+      const tooltip = document.createElement('div')
+      tooltip.className =
+        'tooltip-content absolute hidden px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-lg z-50 whitespace-nowrap pointer-events-none'
+      tooltip.textContent = text
+
+      el.style.position = 'relative'
+      el.appendChild(tooltip)
+
+      el.addEventListener('mouseenter', () => {
+        tooltip.classList.remove('hidden')
+        tooltip.style.bottom = '100%'
+        tooltip.style.left = '50%'
+        tooltip.style.transform = 'translateX(-50%) translateY(-4px)'
+      })
+
+      el.addEventListener('mouseleave', () => {
+        tooltip.classList.add('hidden')
+      })
+    }
+  })
+  logger.debug('x-tooltip 指令已注册')
 
   // 启动 Alpine
   Alpine.start()
@@ -442,6 +481,9 @@ export {
   trendBar,
   progressRing
 }
+
+// 导出数据表格组件
+export { dataTable }
 
 // 导出新增功能组件
 export {

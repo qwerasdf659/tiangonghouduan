@@ -213,7 +213,7 @@ export function useExchangeItemsMethods() {
             this.itemFilters.sort_order = 'DESC'
           }
 
-          await this.loadItems()
+          window.dispatchEvent(new CustomEvent('refresh-exchange-items'))
           await this.loadItemStats?.()
         } else {
           this.showError?.(res.message || '操作失败')
@@ -241,7 +241,7 @@ export function useExchangeItemsMethods() {
         })
         if (res.success) {
           this.showSuccess?.('删除成功')
-          this.loadItems()
+          window.dispatchEvent(new CustomEvent('refresh-exchange-items'))
           this.loadItemStats()
         } else {
           this.showError?.(res.message || '删除失败')
@@ -270,7 +270,7 @@ export function useExchangeItemsMethods() {
         })
         if (res.success) {
           this.showSuccess?.(`商品已${actionText}`)
-          this.loadItems()
+          window.dispatchEvent(new CustomEvent('refresh-exchange-items'))
           this.loadItemStats()
         }
       } catch (e) {

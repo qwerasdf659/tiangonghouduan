@@ -25,6 +25,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
+const { attachDisplayNames, DICT_TYPES } = require('../../../../utils/displayNameHelper')
 
 /**
  * 错误处理包装器
@@ -113,6 +114,11 @@ router.get(
           created_at: plainTx.created_at
         }
       })
+
+      // 附加中文显示名称（tx_type → tx_type_display/tx_type_color）
+      await attachDisplayNames(transactions, [
+        { field: 'tx_type', dictType: DICT_TYPES.ASSET_BUSINESS_TYPE }
+      ])
 
       return res.apiSuccess({
         transactions,

@@ -17,7 +17,9 @@
 // ES Module 导入（替代 window.xxx 全局变量）
 import { logger } from '../../../utils/logger.js'
 import { API_PREFIX } from '../../../api/base.js'
-import { Alpine, createPageMixin } from '../../../alpine/index.js'
+import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
+import { request } from '../../../api/base.js'
+import { $confirmDanger } from '../../../utils/index.js'
 
 // 导入 composables 模块（方案A：只导入系统配置和审计日志）
 import {
@@ -194,11 +196,7 @@ function registerSystemSettingsComponents() {
      * 回滚操作
      */
     async rollbackOperation(log) {
-      if (
-        !confirm(
-          `确定要回滚此操作吗？\n操作：${log.action_name || log.action}\n目标：${log.target || log.operation_type_name}`
-        )
-      ) {
+      if (!(await $confirmDanger(`确定要回滚此操作吗？\n操作：${log.action_name || log.action}\n目标：${log.target || log.operation_type_name}`))) {
         return
       }
 
@@ -313,7 +311,7 @@ function registerSystemSettingsComponents() {
      * 删除规则
      */
     async deleteReminderRule(rule) {
-      if (!confirm('确定要删除此提醒规则吗？')) return
+      if (!(await $confirmDanger('确定要删除此提醒规则吗？'))) return
       try {
         const response = await ReminderRulesAPI.deleteRule(rule.reminder_rule_id)
         if (response?.success) {
@@ -326,33 +324,8 @@ function registerSystemSettingsComponents() {
       }
     },
 
-    /**
-     * 获取规则类型名称
-     */
-    getRuleTypeName(type) {
-      const map = {
-        budget_alert: '预算告警',
-        consumption_pending: '消费待审核',
-        win_rate_abnormal: '中奖率异常',
-        high_tier_win: '高档位中奖',
-        customer_service: '客服咨询',
-        risk_alert: '风控告警'
-      }
-      return map[type] || type
-    },
-
-    /**
-     * 获取条件类型名称
-     */
-    getConditionTypeName(type) {
-      const map = {
-        threshold_exceed: '超过阈值',
-        count_reach: '数量达到',
-        time_trigger: '定时触发',
-        event_trigger: '事件触发'
-      }
-      return map[type] || type
-    },
+    // ✅ 已删除 getRuleTypeName / getConditionTypeName 映射函数
+    // HTML 直接使用后端返回的 rule_type_display 字段
 
     // 注意：F-59 审计报告相关方法已移除（后端未实现 /api/v4/admin/operations/audit-report）
 
@@ -425,7 +398,71 @@ function registerSystemSettingsComponents() {
     }
   }))
 
-  logger.info('[SystemSettings] Alpine 组件注册完成')
+  /**
+   * 提醒规则列表 - data-table 组件
+   */
+  Alpine.data('reminderRulesTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'reminder_rule_id', label: '规则ID', sortable: true },
+        { key: 'rule_name', label: '规则名称', sortable: true },
+        { key: 'rule_type', label: '规则类型', render: (val, row) => row.rule_type_display || val || '-' },
+        { key: 'notification_priority', label: '优先级', type: 'status', statusMap: { high: { class: 'red', label: '高' }, medium: { class: 'yellow', label: '中' }, low: { class: 'green', label: '低' } } },
+        { key: 'check_interval_minutes', label: '检查间隔', render: (val) => val ? `${val}分钟` : '-' },
+        { key: 'is_enabled', label: '状态', type: 'status', statusMap: { true: { class: 'green', label: '启用' }, false: { class: 'gray', label: '禁用' } } }
+      ],
+      dataSource: async (params) => {
+        const res = await ReminderRulesAPI.getRules(params)
+        return {
+          items: res.data?.items || res.data?.rules || [],
+          total: res.data?.pagination?.total || res.data?.total || 0
+        }
+      },
+      primaryKey: 'reminder_rule_id',
+      sortable: true,
+      page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () {
+      window.addEventListener('refresh-reminder-rules', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
+    return table
+  })
+
+  /**
+   * 审计日志列表 - data-table 组件
+   */
+  Alpine.data('auditLogsTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'id', label: '日志ID', sortable: true },
+        { key: 'operator_name', label: '操作人', render: (val, row) => val || row.admin_name || `管理员#${row.admin_id || '-'}` },
+        { key: 'action', label: '操作', render: (val, row) => row.action_name || row.operation_type_display || val || '-' },
+        { key: 'target', label: '目标', render: (val, row) => val || row.operation_type_name || row.resource_type || '-' },
+        { key: 'ip_address', label: 'IP' },
+        { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: `${API_PREFIX}/console/system/audit-logs`, method: 'GET', params })
+        return {
+          items: res.data?.logs || res.data?.list || [],
+          total: res.data?.pagination?.total || res.data?.total || 0
+        }
+      },
+      primaryKey: 'id',
+      sortable: true,
+      page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () {
+      window.addEventListener('refresh-audit-logs', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
+    return table
+  })
+
+  logger.info('[SystemSettings] Alpine 组件注册完成（含 data-table）')
 }
 
 // ==================== 事件监听 ====================

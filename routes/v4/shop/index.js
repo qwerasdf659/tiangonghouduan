@@ -41,10 +41,11 @@ const router = express.Router()
 const { authenticateToken, requireMerchantDomainAccess } = require('../../../middleware/auth')
 
 /*
- * B2C材料兑换路由（已拆分为子模块：items.js, exchange.js, orders.js, statistics.js）
- * 📌 2025-12-22 从 /api/v4/market 迁移到 /api/v4/shop/exchange
+ * [已迁移] B2C材料兑换路由
+ * 📌 2026-02-07 从 /api/v4/shop/exchange 迁移到 /api/v4/backpack/exchange
+ * 原因：兑换是用户侧操作，不应被商家域准入中间件拦截（41个普通用户会被403）
+ * 迁移位置：routes/v4/backpack/exchange.js
  */
-const exchangeRoutes = require('./exchange/index')
 
 // 核销系统路由（已拆分为子模块：orders.js, fulfill.js, query.js）
 const redemptionRoutes = require('./redemption/index')
@@ -85,9 +86,11 @@ const riskRoutes = require('./risk/index')
  */
 router.use(authenticateToken, requireMerchantDomainAccess())
 
-// 挂载子路由
-router.use('/exchange', exchangeRoutes) // B2C材料兑换（从 /api/v4/market 迁移）
-router.use('/redemption', redemptionRoutes) // 核销系统
+/*
+ * 挂载子路由
+ * [已迁移] router.use('/exchange', ...) → /api/v4/backpack/exchange（2026-02-07）
+ */
+router.use('/redemption', redemptionRoutes) // 核销系统（商家扫码核销，保留在 shop 域）
 router.use('/consumption', consumptionRoutes) // 消费记录
 router.use('/premium', premiumRoutes) // 会员权益
 router.use('/assets', assetsRoutes) // 资产余额和流水查询（替代旧 /points 路由）

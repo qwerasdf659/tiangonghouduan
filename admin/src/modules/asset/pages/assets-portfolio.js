@@ -13,6 +13,9 @@ import { request, buildURL } from '../../../api/base.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
 import { loadECharts } from '../../../utils/index.js'
 
+// 模块级：当前已解析的用户ID
+let _portfolioUserId = null
+
 function assetsPortfolioPage() {
   return {
     // ==================== Mixin 组合 ====================
@@ -49,6 +52,100 @@ function assetsPortfolioPage() {
     historyLoading: false,
     showHistoryModal: false,
     historyAsset: null,
+
+    // ========== data-table 列配置 ==========
+    assetsTableColumns: [
+      {
+        key: 'user_nickname',
+        label: '用户',
+        render: (val, row) => `<div>${val || row.user_id}</div><div class="text-gray-400 text-xs">ID: ${row.user_id}</div>`
+      },
+      {
+        key: 'asset_type',
+        label: '资产类型',
+        type: 'badge',
+        badgeMap: { points: 'yellow', balance: 'green', material: 'blue', item: 'purple' },
+        labelMap: {}
+      },
+      { key: 'asset_name', label: '资产名称' },
+      { key: 'quantity', label: '数量', type: 'number', sortable: true },
+      {
+        key: 'unit_price',
+        label: '单价',
+        render: (val) => `<span class="font-mono text-gray-500">¥${Number(val || 0).toFixed(2)}</span>`
+      },
+      {
+        key: 'total_value',
+        label: '总价值',
+        sortable: true,
+        render: (val) => `<span class="font-mono text-emerald-600 font-medium">¥${Number(val || 0).toFixed(2)}</span>`
+      },
+      { key: 'updated_at', label: '更新时间', type: 'datetime' },
+      {
+        key: '_actions',
+        label: '操作',
+        type: 'actions',
+        width: '120px',
+        actions: [
+          { name: 'detail', label: '详情', class: 'text-blue-600 hover:text-blue-800' },
+          { name: 'history', label: '历史', class: 'text-green-500 hover:text-green-700' }
+        ]
+      }
+    ],
+
+    /**
+     * data-table 数据源：资产列表
+     */
+    async fetchAssetsTableData(params) {
+      if (!_portfolioUserId) {
+        return { items: [], total: 0 }
+      }
+      const url = buildURL(ASSET_ENDPOINTS.ADJUSTMENT_USER_BALANCES, { user_id: _portfolioUserId })
+      const response = await request({ url, method: 'GET' })
+
+      if (response?.success) {
+        const data = response.data
+        const balances = data.balances || data.assets || []
+        const items = balances.map((item, index) => {
+          const campaignPart = item.campaign_id ? `_${item.campaign_id}` : ''
+          const assetId = `${_portfolioUserId}_${item.asset_code || 'unknown'}${campaignPart}_${index}`
+          const campaignInfo = item.campaign_id ? ` (活动:${item.campaign_id})` : ''
+          return {
+            asset_id: assetId,
+            user_id: parseInt(_portfolioUserId),
+            user_nickname: data.user?.nickname || `用户${_portfolioUserId}`,
+            asset_type: item.asset_code || item.asset_type || 'unknown',
+            asset_type_display: item.display_name || item.asset_code,
+            asset_name: (item.asset_name || item.display_name || item.asset_code || '未知资产') + campaignInfo,
+            quantity: item.available_amount || item.balance || item.amount || 0,
+            frozen_amount: item.frozen_amount || 0,
+            unit_price: item.unit_price || 1,
+            total_value: item.total || item.available_amount || 0,
+            campaign_id: item.campaign_id || null,
+            updated_at: item.updated_at || new Date().toISOString()
+          }
+        })
+        return { items, total: items.length }
+      }
+      throw new Error(response?.message || '加载资产失败')
+    },
+
+    /**
+     * 处理资产表格操作
+     */
+    handleAssetsTableAction(detail) {
+      const { action, row } = detail
+      switch (action) {
+        case 'detail':
+          this.viewAssetDetail(row)
+          break
+        case 'history':
+          this.viewAssetHistory(row)
+          break
+        default:
+          logger.warn('[AssetsPortfolio] 未知操作:', action)
+      }
+    },
 
     /** 图表实例 */
     assetTypeChart: null,
@@ -283,16 +380,17 @@ function assetsPortfolioPage() {
     // ==================== 搜索和操作 ====================
 
     /**
-     * 搜索资产
+     * 搜索资产（使用 data-table）
      */
     async searchAssets() {
-      this.current_page = 1
-      await this.withLoading(
-        async () => {
-          await this.loadAssets()
-        },
-        { errorMessage: '搜索资产失败' }
-      )
+      if (!this.searchForm.mobile) {
+        this.showError('请输入手机号')
+        return
+      }
+      const user = await this.resolveUserByMobile(this.searchForm.mobile)
+      if (!user) return
+      _portfolioUserId = user.user_id
+      window.dispatchEvent(new CustomEvent('dt-assets-refresh'))
     },
 
     /**
@@ -395,22 +493,8 @@ function assetsPortfolioPage() {
       this.historyAsset = null
     },
 
-    /**
-     * 格式化交易类型
-     */
-    formatTxType(type) {
-      const typeMap = {
-        admin_adjustment: '管理员调整',
-        lottery_reward: '抽奖奖励',
-        consumption: '消费',
-        market_listing_freeze: '市场挂单冻结',
-        market_listing_withdraw_unfreeze: '市场撤单解冻',
-        market_purchase: '市场购买',
-        transfer_in: '转入',
-        transfer_out: '转出'
-      }
-      return typeMap[type] || type
-    },
+    // ✅ 已删除 formatTxType 映射函数
+    // HTML 直接使用后端返回的 tx_type_display 字段
 
     // ==================== 分页方法 ====================
 

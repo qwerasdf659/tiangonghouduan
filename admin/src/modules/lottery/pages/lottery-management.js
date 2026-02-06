@@ -190,7 +190,7 @@ function registerLotteryManagementComponents() {
    */
   Alpine.data('lotteryPageContent', () => {
     // 预先调用所有 composables
-    const pageMixin = createPageMixin()
+    const pageMixin = createPageMixin({ userResolver: true })
     const campaignsState = useCampaignsState()
     const prizesState = usePrizesState()
     const budgetState = useBudgetState()

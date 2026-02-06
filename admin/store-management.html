@@ -162,103 +162,20 @@
             </button>
           </div>
 
-          <!-- 员工表格 -->
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="themed-bg-base">
-                <tr>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">员工</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">所属门店</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">角色</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">手机号</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">入职日期</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y">
-
-                <tr x-show="staffList.length === 0">
-                  <td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无员工数据</td>
-                </tr>
-                <template x-for="staff in staffList" :key="staff.store_staff_id">
-                  <tr class="themed-hover-bg">
-                    <td class="px-4 py-3">
-                      <div class="flex items-center">
-                        <div class="w-10 h-10 rounded-full themed-bg-primary-light flex items-center justify-center themed-text-primary font-medium mr-3">
-                          <span x-text="(staff.user_nickname || '员工').charAt(0)"></span>
-                        </div>
-                        <div>
-                          <div class="font-medium" x-text="staff.user_nickname || '-'"></div>
-                          <small class="themed-text-muted" x-text="staff.user_mobile || '-'"></small>
-                        </div>
-                      </div>
-                    </td>
-                    <td class="px-4 py-3 text-sm" x-text="staff.store_name || '-'"></td>
-                    <td class="px-4 py-3"><span class="px-2 py-1 bg-cyan-100 text-cyan-700 text-xs rounded" x-text="staff.role_in_store_display || staff.role_in_store"></span></td>
-                    <td class="px-4 py-3 text-sm" x-text="staff.user_mobile || '-'"></td>
-                    <td class="px-4 py-3 text-sm" x-text="formatDateSafe(staff.joined_at)"></td>
-                    <td class="px-4 py-3">
-                      <span 
-                        :class="getStaffStatusClass(staff.status)"
-                        class="px-2 py-1 text-xs rounded"
-                        x-text="staff.status_display || staff.status"
-                      ></span>
-                    </td>
-                    <td class="px-4 py-3">
-                      <div class="flex space-x-2">
-                        <!-- 在职员工：编辑 + 离职 -->
-                        <template x-if="staff.status === 'active'">
-                          <div class="flex space-x-2">
-                            <button @click="editStaff(staff)" class="themed-text-primary hover:text-blue-800 text-sm">✏️ 编辑</button>
-                            <button @click="resignStaff(staff)" class="text-amber-600 hover:text-amber-800 text-sm">📤 离职</button>
-                          </div>
-                        </template>
-                        <!-- 离职员工：删除 -->
-                        <template x-if="staff.status === 'inactive'">
-                          <button @click="permanentDeleteStaff(staff)" class="text-red-600 hover:text-red-800 text-sm">🗑️ 删除</button>
-                        </template>
-                        <!-- 待审核员工：编辑 -->
-                        <template x-if="staff.status === 'pending'">
-                          <button @click="editStaff(staff)" class="themed-text-primary hover:text-blue-800 text-sm">✏️ 编辑</button>
-                        </template>
-                        <!-- 已删除员工：查看信息（只读） -->
-                        <template x-if="staff.status === 'deleted'">
-                          <span class="text-gray-400 text-sm">已删除 (<span x-text="formatDateSafe(staff.deleted_at)"></span>)</span>
-                        </template>
-                      </div>
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
+          <!-- 员工表格（data-table） -->
+          <div @table-action="handleStaffTableAction($event.detail)"
+               x-data="dataTable({
+                 columns: staffTableColumns,
+                 dataSource: fetchStaffTableData,
+                 primaryKey: 'store_staff_id',
+                 sortable: true,
+                 selectable: false,
+                 exportable: false,
+                 page_size: 20,
+                 emptyText: '暂无员工数据'
+               })" x-init="init()" @dt-staff-refresh.window="refresh()">
+            <%- include('components/data-table') %>
           </div>
-
-          <!-- 分页 -->
-          <nav x-show="pagination.total_pages > 1" class="mt-4">
-            <div class="flex justify-center space-x-1">
-              <button 
-                class="px-3 py-1 border rounded text-sm" 
-                :class="pagination.page <= 1 ? 'text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
-                :disabled="pagination.page <= 1"
-                @click="changePage(pagination.page - 1)"
-              >上一页</button>
-              <template x-for="p in pagination.total_pages" :key="p">
-                <button 
-                  class="px-3 py-1 border rounded text-sm" 
-                  :class="p === pagination.page ? 'themed-bg-primary text-white' : 'themed-hover-bg'"
-                  @click="changePage(p)"
-                  x-text="p"
-                ></button>
-              </template>
-              <button 
-                class="px-3 py-1 border rounded text-sm" 
-                :class="pagination.page >= pagination.total_pages ? 'text-gray-400 cursor-not-allowed' : 'themed-hover-bg'"
-                :disabled="pagination.page >= pagination.total_pages"
-                @click="changePage(pagination.page + 1)"
-              >下一页</button>
-            </div>
-          </nav>
         </div>
       </div>
     </div>

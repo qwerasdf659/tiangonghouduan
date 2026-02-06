@@ -103,6 +103,58 @@ function riskAlertsPage() {
     /** @type {number[]} 批量选择的告警ID列表 */
     selectedAlerts: [],
 
+    // ========== data-table 列配置 ==========
+    alertsTableColumns: [
+      { key: 'risk_alert_id', label: '告警ID', sortable: true, type: 'code' },
+      {
+        key: 'severity',
+        label: '级别',
+        type: 'status',
+        statusMap: {
+          critical: { class: 'red', label: '严重' },
+          high: { class: 'red', label: '高' },
+          medium: { class: 'yellow', label: '中' },
+          low: { class: 'blue', label: '低' }
+        }
+      },
+      { key: 'alert_type', label: '类型',
+        render: (val, row) => row.alert_type_display || val || '-'
+      },
+      {
+        key: 'target_user_info',
+        label: '关联用户',
+        render: (val) => val?.nickname || val?.user_id || '-'
+      },
+      { key: 'alert_message', label: '描述', type: 'truncate', maxLength: 40 },
+      {
+        key: 'status',
+        label: '状态',
+        type: 'status',
+        statusMap: {
+          pending: { class: 'yellow', label: '待处理' },
+          reviewed: { class: 'blue', label: '已审核' },
+          resolved: { class: 'green', label: '已处理' },
+          ignored: { class: 'gray', label: '已忽略' }
+        }
+      },
+      { key: 'created_at', label: '时间', type: 'datetime', sortable: true },
+      {
+        key: '_actions',
+        label: '操作',
+        type: 'actions',
+        width: '120px',
+        actions: [
+          { name: 'detail', label: '详情', class: 'text-blue-600 hover:text-blue-800' },
+          {
+            name: 'handle',
+            label: '处理',
+            class: 'text-green-500 hover:text-green-700',
+            condition: (row) => row.status === 'pending'
+          }
+        ]
+      }
+    ],
+
     /** @type {number} 当前页码 */
     current_page: 1,
 
@@ -117,6 +169,9 @@ function riskAlertsPage() {
 
     /** @type {boolean} 是否开启自动刷新 */
     autoRefresh: true,
+
+    /** @type {string|null} 上次数据更新时间（#2） */
+    lastUpdateTime: null,
 
     /** @type {number|null} 自动刷新定时器ID */
     refreshTimer: null,
@@ -223,20 +278,56 @@ function riskAlertsPage() {
      */
     currentMergedAlertGroup: null,
 
+    // ==================== data-table 数据源 ====================
+
+    /**
+     * data-table 数据源：风控告警列表
+     */
+    async fetchAlertsTableData(params) {
+      const queryParams = new URLSearchParams()
+      if (params.severity) queryParams.append('severity', params.severity)
+      if (params.alert_type) queryParams.append('alert_type', params.alert_type)
+      if (params.status) queryParams.append('status', params.status)
+      queryParams.append('page', params.page || 1)
+      queryParams.append('page_size', params.page_size || 20)
+
+      const url = SYSTEM_ENDPOINTS.RISK_ALERT_LIST +
+        (queryParams.toString() ? `?${queryParams.toString()}` : '')
+      const response = await apiRequest(url)
+
+      if (response?.success) {
+        const items = response.data.items || response.data.alerts || response.data.list || []
+        const total = response.data.total || response.data.totalCount || items.length
+        this.alerts = items
+        this.totalCount = total
+        this.updateStats(response.data.stats || this.calculateStatsFromAlerts())
+        this.updateCharts()
+        return { items, total }
+      }
+      throw new Error(response?.message || '获取告警列表失败')
+    },
+
+    /**
+     * 处理告警表格操作
+     */
+    handleAlertsTableAction(detail) {
+      const { action, row } = detail
+      switch (action) {
+        case 'detail':
+          this.viewAlertDetail(row)
+          break
+        case 'handle':
+          this.openHandleModal(row)
+          break
+        default:
+          logger.warn('[RiskAlerts] 未知操作:', action)
+      }
+    },
+
     // ==================== 生命周期 ====================
 
     /**
      * 初始化页面
-     * @async
-     * @method init
-     * @description
-     * 组件挂载时自动调用，执行以下初始化流程：
-     * 1. 验证登录状态
-     * 2. 延迟加载ECharts库
-     * 3. 初始化图表实例
-     * 4. 加载告警数据
-     * 5. 启动自动刷新定时器（60秒间隔）
-     * 6. 绑定窗口resize事件用于图表自适应
      * @returns {Promise<void>}
      */
     async init() {
@@ -781,6 +872,9 @@ function riskAlertsPage() {
 
         this.updateStats(result.data.stats || this.calculateStatsFromAlerts())
         this.updateCharts()
+
+        // #2 更新上次刷新时间
+        this.lastUpdateTime = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
       }
     },
 
