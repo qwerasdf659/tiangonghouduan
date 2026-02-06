@@ -42,7 +42,7 @@ function syncTheme() {
         document.documentElement.setAttribute('data-theme', parentTheme)
         logger.debug(`[主题同步] 从父窗口同步主题: ${parentTheme}`)
       }
-    } catch (e) {
+    } catch (_e) {
       // 跨域情况下无法直接访问父窗口
       logger.debug('[主题同步] 无法直接访问父窗口，使用 localStorage 主题')
     }
@@ -91,7 +91,7 @@ function watchThemeChanges() {
       }
 
       logger.debug('[主题同步] BroadcastChannel 监听已启动')
-    } catch (e) {
+    } catch (_e) {
       logger.warn('[主题同步] BroadcastChannel 初始化失败，回退到 localStorage 同步')
     }
   }

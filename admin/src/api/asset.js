@@ -17,8 +17,7 @@
  * @see routes/v4/console/material.js - 材料转换规则管理
  */
 
-import { logger } from '../utils/logger.js'
-import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
+import { API_PREFIX, request, buildURL, buildQueryString, authHeaders } from './base.js'
 
 // ========== API 端点 ==========
 
@@ -185,13 +184,9 @@ export const AssetAPI = {
   async exportAssets(params = {}) {
     const queryString = Object.keys(params).length > 0 ? buildQueryString(params) : ''
     const url = ASSET_ENDPOINTS.EXPORT + queryString
-    const token = localStorage.getItem('admin_token')
 
     const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+      headers: authHeaders()
     })
 
     if (!response.ok) {

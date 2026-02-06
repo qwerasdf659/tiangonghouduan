@@ -588,7 +588,7 @@ function analyticsPage() {
      * @description 更新抽奖趋势图和用户趋势图
      * @returns {void}
      */
-    updateChartsWithData(data) {
+    updateChartsWithData(_data) {
       const dates = this.dailyStats.map(item => item.date)
       const draws = this.dailyStats.map(item => item.draws)
 

@@ -1,0 +1,514 @@
+---
+alwaysApply: true
+---
+
+# 变量遮蔽预防规则 - 天工小程序项目
+
+## 🎯 三大黄金法则（已全部加入ESLint）
+
+### ✅ 法则1：同一个变量名，在整个函数及其所有嵌套作用域中，只能出现一次声明
+
+**ESLint规则**：`no-shadow: error`
+**效果**：内层作用域声明与外层同名的变量会立即报错
+**检测命令**：`npm run lint:shadow`
+
+```javascript
+// ❌ 错误 - ESLint会报错
+let userData = { points: 100 }
+function update() {
+  let userData = { points: 200 }  // 🚨 ESLint: 'userData' is already declared
+}
+
+// ✅ 正确
+let userData = { points: 100 }
+function update() {
+  let localUserData = { points: 200 }  // ✅ 使用不同名称
+}
+```
+
+---
+
+### ✅ 法则2：模块引入只在顶部一次 - 不要在函数内重复require/import
+
+**ESLint规则**：`no-duplicate-imports: error`
+**效果**：重复的模块引入会立即报错
+**检测命令**：`npm run lint`
+
+```javascript
+// ❌ 错误 - ESLint会报错
+const API = require('../../utils/api.js')  // 顶部声明
+
+Page({
+  async fetchData() {
+    const API = require('../../utils/api.js')  // 🚨 ESLint: 'API' is already imported
+  }
+})
+
+// ✅ 正确
+const API = require('../../utils/api.js')  // 只在顶部声明一次
+
+Page({
+  async fetchData() {
+    // 直接使用 API，不要重复引入
+    const result = await API.getUserInfo()
+  }
+})
+```
+
+---
+
+### ⚠️ 法则3：内层变量必须加前缀 - api-, local-, temp-, today-, history-
+
+**ESLint规则**：`id-match: warn` （警告级别，推荐但不强制）
+**效果**：不符合命名规范会显示警告，但不会阻止运行
+**推荐前缀**：api-, local-, temp-, today-, yesterday-, history-, processed-, transformed-, filtered-, formatted-, inner-, outer-, page-, prop-, response-, request-
+
+```javascript
+// ⚠️ 警告 - ESLint会显示警告
+let userData = getUser()
+wx.request({
+  success: (res) => {
+    let userInfo = res.data  // ⚠️ ESLint: 建议使用 apiUserInfo
+  }
+})
+
+// ✅ 推荐
+let userData = getUser()
+wx.request({
+  success: (res) => {
+    let apiUserData = res.data  // ✅ 使用 api- 前缀
+  }
+})
+```
+
+**为什么是警告而不是错误？**
+
+- 命名约定是风格问题，不是语法错误
+- 给团队逐步适应的时间
+- 现有代码可能有大量不符合的情况
+- 作为提醒和指导，不阻止开发
+
+---
+
+## 📊 ESLint规则配置总览
+
+```javascript
+// .eslintrc.js 中的变量遮蔽预防规则
+
+rules: {
+  // ✅ 法则1：禁止变量遮蔽
+  'no-shadow': ['error', {
+    builtinGlobals: false,
+    hoist: 'all',
+    allow: [],
+    ignoreOnInitialization: false
+  }],
+  
+  // ✅ 法则2：禁止重复导入
+  'no-duplicate-imports': 'error',
+  
+  // ⚠️ 法则3：变量命名规范（警告）
+  'id-match': ['warn', 
+    '^([a-z][a-zA-Z0-9]*|[A-Z][A-Z0-9_]*|_[a-z][a-zA-Z0-9]*|(api|local|temp|today|yesterday|history|processed|transformed|filtered|formatted|inner|outer|page|prop|response|request)[A-Z][a-zA-Z0-9]*)$',
+    { properties: false, onlyDeclarations: true, ignoreDestructuring: true }
+  ],
+  
+  // 增强规则
+  'no-var': 'error',              // 禁止var
+  'block-scoped-var': 'error',    // 强制块级作用域
+  'no-label-var': 'error',        // 禁止标签与变量同名
+  'init-declarations': 'error'    // 变量声明时必须初始化
+}
+```
+
+---
+
+## 🚀 快速检测命令
+
+```bash
+# 检测变量遮蔽（法则1）
+npm run lint:shadow
+
+# 检测所有问题（包括法则2、法则3）
+npm run lint
+
+# 自动修复部分问题
+npm run lint:fix
+```
+
+---
+
+## 🔍 Cursor AI 编码指令
+
+### 指令1：编写新代码时
+
+```
+在编写任何代码前，必须：
+1. 扫描当前作用域内的所有变量名
+2. 扫描外层作用域的所有变量名
+3. 确保新声明的变量名与所有外层变量名都不相同
+4. 如果发现潜在冲突，立即使用更具体的命名
+```
+
+### 指令2：修改现有代码时
+
+```
+在修改代码前，必须：
+1. 检查要修改的函数及其所有嵌套作用域
+2. 列出所有变量名清单
+3. 修改时确保不引入同名变量
+4. 如果发现已存在的变量遮蔽，必须重构修复
+```
+
+### 指令3：代码审查模式
+
+```
+每次完成代码编写后，自动执行：
+1. 运行变量遮蔽检测
+2. 搜索所有let/const/var声明
+3. 检查是否有同名变量
+4. 发现问题立即重构
+```
+
+---
+
+## 📐 命名规范强制要求
+
+### 1. 使用语义化前缀区分作用域
+
+| 作用域层级 | 前缀规范 | 示例 |
+|-----------|---------|------|
+| 全局/外层 | 无前缀或outer- | `userData`, `outerResult` |
+| 函数内层 | inner-/local- | `innerUserData`, `localResult` |
+| API响应 | api-/response- | `apiUserData`, `responseResult` |
+| 处理后 | processed-/transformed- | `processedData`, `transformedResult` |
+| 临时变量 | temp-/tmp- | `tempUserData`, `tmpResult` |
+
+### 2. 具体场景命名规范
+
+```javascript
+// ✅ 抽奖场景
+let lotteryResult;           // 外层：抽奖总结果
+let singleDrawResult;        // 内层：单次抽奖结果
+let apiLotteryResponse;      // API返回的原始数据
+
+// ✅ 兑换场景
+let productList;             // 外层：商品列表
+let selectedProduct;         // 用户选中的商品
+let apiProductData;          // API返回的商品数据
+
+// ✅ 用户信息场景
+let globalUserInfo;          // 全局用户信息
+let localUserProfile;        // 局部用户资料
+let apiUserResponse;         // API返回的用户数据
+```
+
+### 3. 禁止使用的通用变量名
+
+```javascript
+// 🚨 以下变量名禁止在嵌套作用域中使用
+❌ data
+❌ result
+❌ response
+❌ item
+❌ value
+❌ temp
+❌ obj
+❌ arr
+
+// ✅ 必须使用具体的命名
+✅ userData
+✅ lotteryResult
+✅ apiResponse
+✅ prizeItem
+✅ pointsValue
+✅ tempUserData
+✅ userObject
+✅ productArray
+```
+
+---
+
+## 🤖 Cursor 提示词模板
+
+### 模板1：编写新功能
+
+```
+请编写 [功能描述] 功能，严格遵守以下规则：
+1. 禁止变量遮蔽 - 所有变量名必须唯一，包括嵌套作用域
+2. 使用语义化命名 - 变量名要清晰表达用途和作用域
+3. 添加变量声明注释 - 说明变量的作用域层级
+4. 完成后自动检查 - 扫描是否存在同名变量
+```
+
+### 模板2：修改现有代码
+
+```
+请修改 [文件路径] 中的 [功能描述]，执行前必须：
+1. 先列出当前函数所有作用域的变量清单
+2. 修改时避免引入同名变量
+3. 如发现已有变量遮蔽，一并修复
+4. 修改后验证无遮蔽问题
+```
+
+### 模板3：代码审查模式
+
+```
+请审查 [文件路径]，检查变量遮蔽问题：
+1. 扫描所有变量声明（let/const/var）
+2. 检测嵌套作用域中的同名变量
+3. 生成变量遮蔽检测报告
+4. 提供重构建议
+```
+
+---
+
+## 🛠️ 技术实现规范
+
+### 1. 微信小程序 Page 作用域
+
+```javascript
+// ✅ 正确的Page数据访问模式
+Page({
+  data: {
+    pageUserPoints: 0  // Page级别：使用page前缀
+  },
+  
+  onLoad() {
+    // ❌ 禁止：let pageUserPoints = 100;
+    // ✅ 正确：
+    let localUserPoints = 100;
+    
+    this.setData({
+      pageUserPoints: localUserPoints
+    });
+  },
+  
+  async fetchUserData() {
+    // ❌ 禁止：let pageUserPoints = ...;
+    // ✅ 正确：
+    let apiUserPoints = await getPoints();
+    
+    this.setData({
+      pageUserPoints: apiUserPoints
+    });
+  }
+});
+```
+
+### 2. 异步操作作用域管理
+
+```javascript
+// ✅ 正确的异步作用域管理
+async function processLottery() {
+  // 第1层：函数作用域
+  const lotteryConfig = await getLotteryConfig();
+  
+  // 第2层：条件作用域
+  if (lotteryConfig.enabled) {
+    // ❌ 禁止：const lotteryConfig = ...;
+    // ✅ 正确：
+    const activeLotterySettings = lotteryConfig.settings;
+  }
+  
+  // 第3层：异步回调作用域
+  return new Promise((resolve) => {
+    // ❌ 禁止：const lotteryConfig = ...;
+    // ✅ 正确：
+    const finalLotteryResult = performDraw(lotteryConfig);
+    resolve(finalLotteryResult);
+  });
+}
+```
+
+### 3. 循环和迭代作用域
+
+```javascript
+// ✅ 正确的循环作用域管理
+const productList = await getProducts();
+
+productList.forEach(productItem => {
+  // ❌ 禁止：const productList = ...;
+  // ❌ 禁止：const productItem = ...;
+  
+  // ✅ 正确：
+  const processedProductData = transformProduct(productItem);
+  const formattedProductDisplay = formatProduct(processedProductData);
+});
+```
+
+---
+
+## 🔬 自动检测机制
+
+### ESLint配置（必须启用）
+
+```javascript
+// .eslintrc.js
+module.exports = {
+  rules: {
+    'no-shadow': ['error', {
+      builtinGlobals: false,
+      hoist: 'all',
+      allow: []
+    }],
+    'no-shadow-restricted-names': 'error',
+  }
+};
+```
+
+### 检测命令（每次编码后执行）
+
+```bash
+# 扫描变量遮蔽问题
+npx eslint . --rule 'no-shadow: error'
+
+# 详细报告
+npx eslint . --rule 'no-shadow: error' --format table
+```
+
+---
+
+## 📊 变量遮蔽检测清单
+
+每次编写/修改代码后，Cursor必须自动执行：
+
+- [ ] 扫描所有`let`、`const`、`var`声明
+- [ ] 检查嵌套作用域中的变量名
+- [ ] 对比外层作用域的变量名
+- [ ] 标记所有同名变量
+- [ ] 生成重构建议
+- [ ] 验证修复后无遮蔽问题
+
+---
+
+## 🚨 错误示例与修复方案
+
+### 错误1：API响应数据遮蔽
+
+```javascript
+// ❌ 错误代码
+let userData = { id: 1, points: 100 };
+
+async function refreshUserData() {
+  const response = await API.getUserInfo();
+  let userData = response.data;  // 🚨 遮蔽外层
+  return userData;
+}
+
+// ✅ 修复方案
+let currentUserData = { id: 1, points: 100 };
+
+async function refreshUserData() {
+  const response = await API.getUserInfo();
+  let refreshedUserData = response.data;  // ✅ 不同名称
+  return refreshedUserData;
+}
+```
+
+### 错误2：事件处理中的遮蔽
+
+```javascript
+// ❌ 错误代码
+Page({
+  data: { selectedProduct: null },
+  
+  onProductTap(e) {
+    const selectedProduct = e.currentTarget.dataset.product;  // 🚨 遮蔽data
+    this.confirmExchange(selectedProduct);
+  }
+});
+
+// ✅ 修复方案
+Page({
+  data: { selectedProduct: null },
+  
+  onProductTap(e) {
+    const tappedProduct = e.currentTarget.dataset.product;  // ✅ 不同名称
+    this.confirmExchange(tappedProduct);
+  }
+});
+```
+
+### 错误3：循环中的遮蔽
+
+```javascript
+// ❌ 错误代码
+const products = getProducts();
+
+products.forEach(product => {
+  if (product.available) {
+    const product = transformProduct(product);  // 🚨 遮蔽参数
+  }
+});
+
+// ✅ 修复方案
+const products = getProducts();
+
+products.forEach(product => {
+  if (product.available) {
+    const transformedProduct = transformProduct(product);  // ✅ 不同名称
+  }
+});
+```
+
+---
+
+## 💡 最佳实践总结
+
+1. **变量名必须唯一** - 在整个函数及其嵌套作用域中
+2. **使用语义化前缀** - 明确标识变量的来源和用途
+3. **避免通用命名** - 不使用data、result等过于通用的名称
+4. **代码审查必查** - 每次提交前检查变量遮蔽
+5. **启用ESLint** - 自动化检测变量遮蔽问题
+
+---
+
+## 🎓 学习参考
+
+### 变量遮蔽的本质
+
+- JavaScript词法作用域导致内层变量优先级更高
+- 遮蔽会导致外层变量在内层作用域中完全不可访问
+- 即使不修改内层变量，遮蔽本身就是反模式
+
+### 常见误区
+
+- ❌ 误区1："我不修改变量就没问题" - 错！遮蔽本身就是问题
+- ❌ 误区2："变量名一样方便记忆" - 错！会导致混淆和bug
+- ❌ 误区3："作用域不同就没关系" - 错！内层会遮蔽外层
+
+### 正确心态
+
+- ✅ 每个变量都应该有独特且描述性的名称
+- ✅ 变量名应该清晰表达其作用域和用途
+- ✅ 宁可名称长一点，也不要产生歧义
+
+---
+
+## 📌 Cursor 执行检查点
+
+每次编写代码时，Cursor必须在以下检查点停顿验证：
+
+1. **声明变量前** - 检查是否与外层同名
+2. **编写回调前** - 列出外层所有变量
+3. **完成函数后** - 扫描整个函数的变量
+4. **提交代码前** - 运行ESLint检测
+
+---
+
+## 🔗 相关规则引用
+
+- 参考 `development-automation-unified.mdc` - 代码质量要求
+- 参考 `advanced-optimization.mdc` - 代码优化规范
+- 参考主规则 - 详细注释和中文回答要求
+
+---
+
+**规则优先级：🔴 最高 - 强制执行，零容忍**
+
+**违反后果：代码必须立即重构，不得合并**
+
+---
+
+*此规则文件由 Cursor AI 遵守，用于确保天工小程序项目的代码质量和可维护性。*

@@ -170,7 +170,7 @@ export function initAlpine() {
         if (userInfo) {
           this.user = JSON.parse(userInfo)
         }
-      } catch (e) {
+      } catch (_e) {
         logger.warn('无法恢复用户信息')
       }
     },
@@ -292,7 +292,7 @@ export function initAlpine() {
         if (stored_info) {
           this.user_info = JSON.parse(stored_info)
         }
-      } catch (e) {
+      } catch (_e) {
         logger.warn('无法恢复管理员信息')
       }
     },

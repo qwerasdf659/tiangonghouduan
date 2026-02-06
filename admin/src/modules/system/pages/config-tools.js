@@ -268,7 +268,7 @@ document.addEventListener('alpine:init', () => {
         if (setting.value_type === 'json' && typeof value === 'string') {
           try {
             value = JSON.parse(value)
-          } catch (e) {
+          } catch (_e) {
             this.$toast.error(`配置项 ${key} 的JSON格式无效`)
             hasError = true
             return

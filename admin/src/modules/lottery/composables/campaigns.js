@@ -70,7 +70,7 @@ export function useCampaignsState() {
  * @param {Object} context - 组件上下文 (this)
  * @returns {Object} 方法对象
  */
-export function useCampaignsMethods(context) {
+export function useCampaignsMethods(_context) {
   return {
     /**
      * 加载活动列表

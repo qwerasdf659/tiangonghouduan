@@ -1,0 +1,596 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# 🔐 天工项目安全与质量标准规范 - 核心安全规则集
+
+## 🚨 核心安全原则 - 违反则立即停止开发
+
+### 1. 🔐 数据安全核心规则（最高优先级）
+
+#### 强制认证与授权规范
+
+```javascript
+// ✅ Token认证安全规范（详细实现见：1.mdc - TokenIssueResolver）
+const authSecurity = {
+  // 🔴 引用1.mdc的Token处理规则（避免重复）
+  validateToken: () => {
+    console.log('🔍 Token认证详细规则见：1.mdc - TokenIssueResolver')
+    // 核心安全要求：
+    return {
+      security: 'ENFORCED',
+      reference: '1.mdc - TokenIssueResolver',
+      requirement: 'ALL_API_CALLS_MUST_BE_AUTHENTICATED'
+    }
+  },
+  
+  // ✅ 安全头部要求
+  securityHeaders: {
+    'Authorization': 'Bearer <token>',
+    'X-Requested-With': 'XMLHttpRequest',
+    'Content-Type': 'application/json'
+  },
+  
+  // ✅ 敏感数据保护
+  sensitiveDataPatterns: [
+    /\d{11}/,           // 手机号
+    /\d{17}[\dXx]/,     // 身份证
+    /\d{16,19}/,        // 银行卡
+    /[a-zA-Z0-9]{32}/   // Token/密钥
+  ]
+}
+```
+
+#### 数据传输安全规范
+
+```javascript
+// ✅ HTTPS强制要求
+const transportSecurity = {
+  enforceHTTPS: true,
+  allowedDomains: ['omqktqrtntnn.sealosbja.site'],
+  forbiddenDomains: [
+    'rqchrlandora.sealoshqja.site',  // 🔴 安全威胁：拼写错误域名
+    'rqchrlqndora.sealoshqja.site'   // 🔴 安全威胁：错误TLD
+  ],
+  
+  validateDomain: (url) => {
+    const domain = new URL(url).hostname
+    if (!transportSecurity.allowedDomains.includes(domain)) {
+      throw new SecurityError(`🚨 非法域名访问: ${domain}`)
+    }
+    return true
+  }
+}
+```
+
+### 2. 🔍 Mock数据检测与安全清理
+
+#### Mock数据安全威胁检测
+
+```javascript
+// 🔴 Mock数据安全检测系统
+class MockDataSecurityDetector {
+    static criticalPatterns = [
+        /mock|fake|test|dummy/gi,
+        /setTimeout.*callback/gi,
+        /return.*\{.*data.*\}/gi,
+        /const.*mock.*=/gi,
+        /if.*useMock/gi,
+        /123456/gi,  // 🔴 安全威胁：硬编码测试数据（开发环境除外）
+        /admin.*admin/gi  // 🔴 安全威胁：默认管理员密码
+    ]
+    
+    static async securityScanForMockData(filePath) {
+        console.log('🔍 Mock数据详细检测规则见：1.mdc及相关组件')
+        
+        const securityThreats = []
+        
+        try {
+            const content = await read_file(filePath, true, 1, -1)
+            
+            this.criticalPatterns.forEach((pattern, index) => {
+                const matches = content.content.match(pattern)
+                if (matches) {
+                    securityThreats.push({
+                        file: filePath,
+                        pattern: pattern.toString(),
+                        matches: matches.length,
+                        severity: 'CRITICAL_SECURITY_THREAT',
+                        threatType: this.classifyThreat(pattern),
+                        recommendation: '立即移除，存在数据泄露风险'
+                    })
+                }
+            })
+            
+            return {
+                hasSecurityThreats: securityThreats.length > 0,
+                threats: securityThreats
+            }
+            
+        } catch (error) {
+            return {
+                hasSecurityThreats: true,
+                threats: [{ 
+                    file: filePath, 
+                    error: '文件读取失败',
+                    severity: 'HIGH' 
+                }]
+            }
+        }
+    }
+    
+    static classifyThreat(pattern) {
+        if (pattern.toString().includes('123456')) return 'HARDCODED_CREDENTIALS'
+        if (pattern.toString().includes('mock')) return 'MOCK_DATA_LEAK'
+        if (pattern.toString().includes('admin')) return 'DEFAULT_CREDENTIALS'
+        return 'POTENTIAL_DATA_EXPOSURE'
+    }
+}
+```
+
+#### 🔐 开发环境安全豁免规则
+
+```javascript
+// ✅ 开发环境安全配置
+const developmentSecurity = {
+  // 🔴 重要：仅开发环境适用
+  environment: 'DEVELOPMENT',
+  
+  // ✅ 万能验证码（仅开发/测试环境）
+  universalVerificationCode: {
+    code: '123456',
+    allowedEnvironments: ['development', 'testing'],
+    description: '开发阶段无论是用户还是管理员都可以使用123456验证码登录',
+    expiryNote: '生产环境必须禁用此功能'
+  },
+  
+  // 🔴 环境检测与安全切换
+  validateEnvironment: () => {
+    if (process.env.NODE_ENV === 'production') {
+      throw new SecurityError('🚨 生产环境禁止使用万能验证码')
+    }
+    console.log('✅ 开发环境：万能验证码123456已启用')
+  }
+}
+```
+
+### 3. 🔐 API安全访问规范
+
+#### 强制HTTPS与域名验证（基于核心API验证规则）
+
+```javascript
+// ✅ API安全调用规范（基于1.mdc的APICallValidator扩展安全层）
+const secureApiAccess = {
+  // 🔴 引用1.mdc的API验证规则（避免重复）
+  validateApiCall: () => {
+    console.log('🔍 API调用验证详细规则见：1.mdc - APICallValidator')
+    console.log('🔐 安全层扩展：Token认证规则见：1.mdc - TokenIssueResolver')
+    return { 
+      reference: '1.mdc - APICallValidator', 
+      securityLayer: '1.mdc - TokenIssueResolver'
+    }
+  },
+  
+  // ✅ 安全的API调用封装
+  secureRequest: async (endpoint, options = {}) => {
+    // 域名安全验证
+    transportSecurity.validateDomain(endpoint)
+    
+    // 添加安全头部
+    const secureOptions = {
+      ...options,
+      headers: {
+        ...authSecurity.securityHeaders,
+        ...options.headers
+      },
+      timeout: 30000,  // 防止长时间挂起
+      retry: false     // 防止重试攻击
+    }
+    
+    try {
+      // 🔴 强制HTTPS检查
+      if (!endpoint.startsWith('https://')) {
+        throw new SecurityError('🚨 安全威胁：非HTTPS请求被拒绝')
+      }
+      
+      const response = await wx.request({
+        url: endpoint,
+        ...secureOptions
+      })
+      
+      // 响应数据安全检查
+      this.validateResponseSecurity(response.data)
+      
+      return response.data
+    } catch (error) {
+      console.error('🚨 安全API调用失败:', error)
+      throw new SecurityError('安全API调用失败，请检查网络和权限')
+    }
+  },
+  
+  // 🔴 响应数据安全验证
+  validateResponseSecurity: (data) => {
+    // 检查响应是否包含敏感信息泄露
+    const dataString = JSON.stringify(data)
+    
+    authSecurity.sensitiveDataPatterns.forEach(pattern => {
+      if (pattern.test(dataString)) {
+        console.warn('⚠️ 响应包含敏感数据模式，请检查数据脱敏')
+      }
+    })
+    
+    return true
+  }
+}
+```
+
+### 4. 🛡️ 用户输入安全验证
+
+#### 输入验证与XSS防护
+
+```javascript
+// ✅ 安全输入验证工具
+const secureInputValidator = {
+  // 防XSS输入清理
+  sanitizeInput: (input) => {
+    if (typeof input !== 'string') return input
+    
+    return input
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#x27;')
+      .replace(/\//g, '&#x2F;')
+  },
+  
+  // 手机号安全验证
+  validatePhoneSecurity: (phone) => {
+    const phoneRegex = /^1[3-9]\d{9}$/
+    if (!phoneRegex.test(phone)) {
+      throw new SecurityError('无效手机号格式')
+    }
+    
+    // 防止测试手机号泄露（生产环境）
+    const testNumbers = ['13800138000', '13812345678', '18888888888']
+    if (process.env.NODE_ENV === 'production' && testNumbers.includes(phone)) {
+      throw new SecurityError('🚨 安全威胁：禁止使用测试手机号')
+    }
+    
+    return true
+  },
+  
+  // 金额安全验证
+  validateAmountSecurity: (amount) => {
+    const amountValue = parseFloat(amount)
+    
+    if (isNaN(amountValue) || amountValue <= 0) {
+      throw new SecurityError('无效金额')
+    }
+    
+    if (amountValue > 99999) {
+      throw new SecurityError('🚨 安全威胁：异常大额交易')
+    }
+    
+    return true
+  }
+}
+```
+
+### 5. 🔄 安全状态管理
+
+#### 全局状态安全保护
+
+```javascript
+// ✅ 安全的全局状态管理
+const secureStateManager = {
+  // 状态加密存储
+  secureSetData: (key, value) => {
+    // 敏感数据检查
+    if (typeof value === 'string') {
+      authSecurity.sensitiveDataPatterns.forEach(pattern => {
+        if (pattern.test(value)) {
+          console.warn(`⚠️ 状态包含敏感数据: ${key}`)
+        }
+      })
+    }
+    
+    // 安全存储
+    try {
+      wx.setStorageSync(key, value)
+    } catch (error) {
+      console.error('🚨 安全状态存储失败:', error)
+      throw new SecurityError('状态存储失败')
+    }
+  },
+  
+  // 状态安全读取
+  secureGetData: (key) => {
+    try {
+      const value = wx.getStorageSync(key)
+      
+      // 数据完整性检查
+      if (value === undefined || value === null) {
+        console.warn(`⚠️ 状态数据异常: ${key}`)
+        return null
+      }
+      
+      return value
+    } catch (error) {
+      console.error('🚨 安全状态读取失败:', error)
+      return null
+    }
+  },
+  
+  // 清理敏感状态
+  clearSensitiveData: () => {
+    const sensitiveKeys = [
+      'access_token',
+      'refresh_token', 
+      'user_info',
+      'login_info'
+    ]
+    
+    sensitiveKeys.forEach(key => {
+      try {
+        wx.removeStorageSync(key)
+        console.log(`🔒 已清理敏感数据: ${key}`)
+      } catch (error) {
+        console.error(`❌ 清理失败: ${key}`, error)
+      }
+    })
+  }
+}
+```
+
+### 6. 🎨 微信小程序API兼容性检查系统
+
+#### Canvas API兼容性双重检查
+
+```javascript
+// ✅ 统一兼容性检查工具 (utils/compatibility-check.js)
+const checkCanvasAPI = (ctx) => {
+  return {
+    createLinearGradient: typeof ctx.createLinearGradient === 'function',
+    createRadialGradient: typeof ctx.createRadialGradient === 'function',
+    quadraticCurveTo: typeof ctx.quadraticCurveTo === 'function',
+    bezierCurveTo: typeof ctx.bezierCurveTo === 'function',
+    setLineDash: typeof ctx.setLineDash === 'function',
+    filter: 'filter' in ctx
+  }
+}
+
+// ✅ 注意编写的代码符合微信小程序开发标准，考虑API兼容性
+if (compatibility.createLinearGradient && typeof ctx.createLinearGradient === 'function') {
+  try {
+    const gradient = ctx.createLinearGradient(0, 0, 100, 0)
+    gradient.addColorStop(0, '#ff0000')
+    gradient.addColorStop(1, '#00ff00')
+    ctx.fillStyle = gradient
+  } catch (error) {
+    console.warn('线性渐变不支持，使用降级方案:', error)
+    ctx.fillStyle = '#ff0000'
+  }
+} else {
+  ctx.fillStyle = '#ff0000'
+}
+```
+
+#### 智能降级策略
+
+```javascript
+// ✅ 根据兼容性检查结果智能选择策略
+const drawWithCompatibility = (ctx, compatibility) => {
+  if (compatibility.createRadialGradient && compatibility.quadraticCurveTo) {
+    drawAdvancedStyle(ctx)  // 高级绘制：渐变 + 曲线，视觉美感 95%+
+  } else if (compatibility.createLinearGradient) {
+    drawMediumStyle(ctx)    // 中级绘制：线性渐变，视觉美感 80%+
+  } else {
+    drawBasicStyle(ctx)     // 基础绘制：纯色填充，视觉美感 60%+，确保100%兼容性
+  }
+}
+```
+
+### 7. 🚀 三层错误处理与智能降级机制
+
+#### 完整错误处理模式
+
+```javascript
+// ✅ 第一层：功能检查
+if (!compatibility.targetAPI) {
+  console.warn('API不支持，使用降级方案')
+  return fallbackMethod()
+}
+
+// ✅ 第二层：类型检查
+if (typeof ctx.targetAPI !== 'function') {
+  console.warn('API类型异常，使用降级方案')
+  return fallbackMethod()
+}
+
+// ✅ 第三层：运行时错误捕获
+try {
+  return ctx.targetAPI(...args)
+} catch (error) {
+  console.error('API调用失败:', error)
+  return fallbackMethod()
+}
+```
+
+#### 增强错误处理与解决建议
+
+```javascript
+// ✅ 提供明确的错误信息和解决建议
+const handleError = (error, context) => {
+  const errorMap = {
+    'TypeError': '类型错误 - 请检查变量类型和方法调用',
+    'ReferenceError': '引用错误 - 请检查变量是否已定义',
+    'Canvas API Error': 'Canvas API不兼容 - 已启用降级方案',
+    'SecurityError': '安全错误 - 请检查认证状态和权限'
+  }
+  
+  const errorType = error.name || 'Unknown'
+  const suggestion = errorMap[errorType] || '请检查代码逻辑和环境兼容性'
+  
+  console.error(`🚨 ${context}发生错误:`, error)
+  console.warn(`💡 建议解决方案: ${suggestion}`)
+  
+  // 用户友好的错误提示
+  wx.showToast({
+    title: suggestion,
+    icon: 'none',
+    duration: 3000
+  })
+}
+```
+
+### 8. 🔐 敏感数据保护规范
+
+#### 数据加密与脱敏
+
+```javascript
+// ✅ 数据保护工具
+const dataProtector = {
+  // 手机号脱敏
+  maskPhone: (phone) => {
+    if (!phone || phone.length !== 11) return '***'
+    return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
+  },
+  
+  // 身份证脱敏
+  maskIdCard: (idCard) => {
+    if (!idCard) return '***'
+    return idCard.replace(/(\d{6})\d{8}(\d{4})/, '$1********$2')
+  },
+  
+  // 银行卡脱敏
+  maskBankCard: (cardNumber) => {
+    if (!cardNumber) return '***'
+    return cardNumber.replace(/(\d{4})\d{8,12}(\d{4})/, '$1****$2')
+  },
+  
+  // 敏感信息检测
+  detectSensitiveData: (text) => {
+    const patterns = {
+      phone: /1[3-9]\d{9}/g,
+      idCard: /\d{17}[\dXx]/g,
+      bankCard: /\d{16,19}/g,
+      email: /\w+@\w+\.\w+/g
+    }
+    
+    const findings = []
+    Object.entries(patterns).forEach(([type, pattern]) => {
+      const matches = text.match(pattern)
+      if (matches) {
+        findings.push({ type, count: matches.length })
+      }
+    })
+    
+    return findings
+  }
+}
+```
+
+### 9. 📊 安全监控与日志记录
+
+#### 安全事件监控
+
+```javascript
+// 🔴 安全监控系统
+class SecurityMonitor {
+    static securityEvents = []
+    static maxLogSize = 1000
+    
+    static logSecurityEvent(event) {
+        const securityEvent = {
+            timestamp: Date.now(),
+            type: event.type,
+            severity: event.severity,
+            message: event.message,
+            context: event.context,
+            environment: process.env.NODE_ENV || 'development'
+        }
+        
+        this.securityEvents.push(securityEvent)
+        
+        // 保持日志大小
+        if (this.securityEvents.length > this.maxLogSize) {
+            this.securityEvents.shift()
+        }
+        
+        // 高危事件立即处理
+        if (event.severity === 'CRITICAL') {
+            this.handleCriticalEvent(securityEvent)
+        }
+    }
+    
+    static handleCriticalEvent(event) {
+        console.error('🚨 安全威胁检测:', event)
+        
+        // 根据事件类型采取行动
+        switch (event.type) {
+            case 'MOCK_DATA_DETECTED':
+                if (process.env.NODE_ENV === 'production') {
+                    wx.showModal({
+                        title: '安全警告',
+                        content: '检测到Mock数据，请立即联系开发人员',
+                        showCancel: false
+                    })
+                }
+                break
+                
+            case 'UNAUTHORIZED_ACCESS':
+                wx.navigateTo({ url: '/pages/auth/auth' })
+                break
+                
+            case 'API_TAMPERING':
+                wx.showModal({
+                    title: '系统异常',
+                    content: '检测到异常API调用，请重新登录',
+                    showCancel: false,
+                    success: () => {
+                        wx.navigateTo({ url: '/pages/auth/auth' })
+                    }
+                })
+                break
+        }
+    }
+    
+    static generateSecurityReport() {
+        const report = {
+            totalEvents: this.securityEvents.length,
+            criticalEvents: this.securityEvents.filter(e => e.severity === 'CRITICAL').length,
+            recentEvents: this.securityEvents.slice(-10),
+            eventTypes: this.groupEventsByType(),
+            environment: process.env.NODE_ENV
+        }
+        
+        return report
+    }
+    
+    static groupEventsByType() {
+        return this.securityEvents.reduce((groups, event) => {
+            groups[event.type] = (groups[event.type] || 0) + 1
+            return groups
+        }, {})
+    }
+}
+```
+
+---
+
+## 📚 安全规则引用说明
+
+- **Token认证详细处理**: 详见 `1.mdc - TokenIssueResolver`
+- **API调用安全验证**: 详见 `1.mdc - APICallValidator`
+- **PowerShell安全语法**: 详见 `powershell-syntax-enforcer.mdc`
+- **并行调用安全优化**: 详见 `1.mdc - ParallelCallEnforcer`
+- **域名配置安全检查**: 详见 `1.mdc - DomainConfigChecker`
+
+---
+
+**规则创建时间**: 2025年01月08日  
+**最后更新时间**: 2025年10月04日  
+**更新内容**: 完善开发环境安全豁免规则（万能验证码123456），增强安全监控系统，优化错误处理机制  
+**适用范围**: 天工项目的所有安全相关开发场景，包括开发/测试/生产环境  
+**维护状态**: ✅ 已全面优化 - 安全规则完整，环境区分清晰，引用关系明确

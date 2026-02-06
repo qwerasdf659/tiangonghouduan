@@ -1,0 +1,122 @@
+<!--pages/camera/camera.wxml - 发现页面模板-->
+
+<view class="discover-container">
+  <!-- 页面头部 -->
+  <view class="header">
+    <view class="user-info">
+      <text class="welcome">🔍 发现精彩</text>
+      <view class="points-info">
+        <view class="points-item">
+          <text class="points-label">可用积分：</text>
+          <text class="points-value">{{pointsBalance}}</text>
+        </view>
+        <view class="points-item frozen">
+          <text class="points-label">冻结积分：</text>
+          <text class="points-value frozen">{{frozenPoints}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 统计信息卡片 -->
+  <view class="statistics-card">
+    <view class="stat-item">
+      <text class="stat-value">{{statistics.totalCount}}</text>
+      <text class="stat-label">总记录</text>
+    </view>
+    <view class="stat-item">
+      <text class="stat-value pending">{{statistics.pendingCount}}</text>
+      <text class="stat-label">审核中</text>
+    </view>
+    <view class="stat-item">
+      <text class="stat-value approved">{{statistics.approvedCount}}</text>
+      <text class="stat-label">已通过</text>
+    </view>
+    <view class="stat-item">
+      <text class="stat-value rejected">{{statistics.rejectedCount}}</text>
+      <text class="stat-label">已拒绝</text>
+    </view>
+  </view>
+
+  <!-- 筛选按钮 -->
+  <view class="filter-bar">
+    <view class="filter-item {{filterStatus === item.key ? 'active' : ''}}" wx:for="{{filterOptions}}" wx:key="key"
+      data-status="{{item.key}}" bindtap="onFilterChange">
+      <text class="filter-icon">{{item.icon}}</text>
+      <text class="filter-name">{{item.name}}</text>
+    </view>
+  </view>
+
+  <!-- 消费记录列表 -->
+  <view class="records-list">
+    <!-- 空状态提示 -->
+    <view class="empty-state" wx:if="{{!loading && consumeRecords.length === 0}}">
+      <text class="empty-icon">📭</text>
+      <text class="empty-text">暂无消费记录</text>
+      <button class="qrcode-btn" bindtap="goToShowQRCode">展示二维码供商家扫描</button>
+    </view>
+
+    <!-- 记录列表 -->
+    <view class="record-item" wx:for="{{consumeRecords}}" wx:key="id" data-record="{{item}}" bindtap="onViewDetail">
+      <!-- 记录头部 -->
+      <view class="record-header">
+        <view class="merchant-info">
+          <text class="merchant-icon">🏪</text>
+          <text class="merchant-name">{{item.merchant_name || '线下商家'}}</text>
+        </view>
+        <view class="status-badge status-{{item.status}}">
+          <text>{{item.status === 'pending' ? '审核中' : item.status === 'approved' ? '已通过' : '已拒绝'}}</text>
+        </view>
+      </view>
+
+      <!-- 记录内容 -->
+      <view class="record-content">
+        <view class="content-row">
+          <text class="label">消费金额：</text>
+          <text class="value amount">¥{{item.amount}}</text>
+        </view>
+        <view class="content-row">
+          <text class="label">获得积分：</text>
+          <text class="value points">{{item.points || 0}}分</text>
+        </view>
+        <view class="content-row">
+          <text class="label">消费时间：</text>
+          <text class="value time">{{item.created_at}}</text>
+        </view>
+        <!-- 审核信息 -->
+        <view class="content-row" wx:if="{{item.status === 'approved' && item.approved_at}}">
+          <text class="label">审核时间：</text>
+          <text class="value time approved">{{item.approved_at}}</text>
+        </view>
+        <view class="content-row" wx:if="{{item.status === 'rejected' && item.reject_reason}}">
+          <text class="label">拒绝原因：</text>
+          <text class="value reason rejected">{{item.reject_reason}}</text>
+        </view>
+      </view>
+
+      <!-- 提示信息 -->
+      <view class="record-tip" wx:if="{{item.status === 'pending'}}">
+        <text class="tip-icon">⏰</text>
+        <text class="tip-text">审核中，预计24小时内完成</text>
+      </view>
+    </view>
+
+    <!-- 加载更多提示 -->
+    <view class="load-more" wx:if="{{consumeRecords.length > 0}}">
+      <text class="load-text" wx:if="{{loading}}">加载中...</text>
+      <text class="load-text" wx:elif="{{!hasMore}}">没有更多了</text>
+      <text class="load-text" wx:else>上拉加载更多</text>
+    </view>
+  </view>
+
+  <!-- 底部提示 -->
+  <view class="bottom-tip">
+    <text class="tip-icon">💡</text>
+    <text class="tip-text">消费后请向商家展示您的身份二维码</text>
+  </view>
+
+  <!-- 加载状态 -->
+  <view class="loading-container" wx:if="{{loading && consumeRecords.length === 0}}">
+    <text class="loading-text">正在加载精彩内容...</text>
+  </view>
+</view>

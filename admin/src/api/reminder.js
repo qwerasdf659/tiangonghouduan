@@ -1,11 +1,12 @@
 /**
  * 智能提醒系统 API
  * @description 提醒规则配置和历史通知管理
- * @version 1.0.0
+ * @version 1.1.0
  * @date 2026-02-01
+ * @updated 2026-02-06 - 统一使用 request() 替代原生 fetch
  */
 
-import { API_PREFIX, authHeaders, handleResponse, buildURL } from './base.js'
+import { API_PREFIX, request } from './base.js'
 
 // 提醒系统端点
 export const REMINDER_ENDPOINTS = {
@@ -31,11 +32,7 @@ export const ReminderRulesAPI = {
    * @returns {Promise<Object>} 规则列表
    */
   async getRules(params = {}) {
-    const url = buildURL(REMINDER_ENDPOINTS.RULES, params)
-    const response = await fetch(url, {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: REMINDER_ENDPOINTS.RULES, params })
   },
 
   /**
@@ -44,10 +41,7 @@ export const ReminderRulesAPI = {
    * @returns {Promise<Object>} 规则详情
    */
   async getRuleDetail(ruleId) {
-    const response = await fetch(REMINDER_ENDPOINTS.RULE_DETAIL(ruleId), {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: REMINDER_ENDPOINTS.RULE_DETAIL(ruleId) })
   },
 
   /**
@@ -56,12 +50,7 @@ export const ReminderRulesAPI = {
    * @returns {Promise<Object>} 创建结果
    */
   async createRule(data) {
-    const response = await fetch(REMINDER_ENDPOINTS.RULES, {
-      method: 'POST',
-      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    })
-    return handleResponse(response)
+    return request({ url: REMINDER_ENDPOINTS.RULES, method: 'POST', data })
   },
 
   /**
@@ -71,12 +60,7 @@ export const ReminderRulesAPI = {
    * @returns {Promise<Object>} 更新结果
    */
   async updateRule(ruleId, data) {
-    const response = await fetch(REMINDER_ENDPOINTS.RULE_DETAIL(ruleId), {
-      method: 'PUT',
-      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    })
-    return handleResponse(response)
+    return request({ url: REMINDER_ENDPOINTS.RULE_DETAIL(ruleId), method: 'PUT', data })
   },
 
   /**
@@ -85,11 +69,7 @@ export const ReminderRulesAPI = {
    * @returns {Promise<Object>} 删除结果
    */
   async deleteRule(ruleId) {
-    const response = await fetch(REMINDER_ENDPOINTS.RULE_DETAIL(ruleId), {
-      method: 'DELETE',
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: REMINDER_ENDPOINTS.RULE_DETAIL(ruleId), method: 'DELETE' })
   },
 
   /**
@@ -99,12 +79,11 @@ export const ReminderRulesAPI = {
    * @returns {Promise<Object>} 切换结果
    */
   async toggleRule(ruleId, isEnabled) {
-    const response = await fetch(REMINDER_ENDPOINTS.RULE_TOGGLE(ruleId), {
+    return request({
+      url: REMINDER_ENDPOINTS.RULE_TOGGLE(ruleId),
       method: 'PUT',
-      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_enabled: isEnabled })
+      data: { is_enabled: isEnabled }
     })
-    return handleResponse(response)
   },
 
   /**
@@ -113,11 +92,7 @@ export const ReminderRulesAPI = {
    * @returns {Promise<Object>} 测试结果
    */
   async testRule(ruleId) {
-    const response = await fetch(REMINDER_ENDPOINTS.RULE_TEST(ruleId), {
-      method: 'POST',
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: REMINDER_ENDPOINTS.RULE_TEST(ruleId), method: 'POST' })
   },
 
   /**
@@ -126,11 +101,7 @@ export const ReminderRulesAPI = {
    * @returns {Promise<Object>} 执行结果
    */
   async executeRule(ruleId) {
-    const response = await fetch(REMINDER_ENDPOINTS.RULE_EXECUTE(ruleId), {
-      method: 'POST',
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: REMINDER_ENDPOINTS.RULE_EXECUTE(ruleId), method: 'POST' })
   }
 }
 
@@ -150,11 +121,7 @@ export const ReminderHistoryAPI = {
    * @returns {Promise<Object>} 历史列表
    */
   async getHistory(params = {}) {
-    const url = buildURL(REMINDER_ENDPOINTS.HISTORY, params)
-    const response = await fetch(url, {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: REMINDER_ENDPOINTS.HISTORY, params })
   },
 
   /**
@@ -166,11 +133,7 @@ export const ReminderHistoryAPI = {
    * @returns {Promise<Object>} 统计数据
    */
   async getStats(params = {}) {
-    const url = buildURL(REMINDER_ENDPOINTS.HISTORY_STATS, params)
-    const response = await fetch(url, {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: REMINDER_ENDPOINTS.HISTORY_STATS, params })
   },
 
   /**
@@ -179,9 +142,6 @@ export const ReminderHistoryAPI = {
    * @returns {Promise<Object>} 历史详情
    */
   async getHistoryDetail(historyId) {
-    const response = await fetch(REMINDER_ENDPOINTS.HISTORY_DETAIL(historyId), {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: REMINDER_ENDPOINTS.HISTORY_DETAIL(historyId) })
   }
 }

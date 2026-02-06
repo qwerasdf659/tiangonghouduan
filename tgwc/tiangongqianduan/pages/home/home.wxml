@@ -1,0 +1,94 @@
+<!--pages/home/home.wxml - 首页模板v2.0（融合旧项目UI功能）-->
+
+<view class="home-container">
+  <!-- 🔴 顶部状态栏（从旧项目移植） -->
+  <view class="status-bar">
+    <view class="status-item {{systemReady ? 'ready' : 'error'}}">
+      <text class="status-icon">{{systemReady ? '✅' : '❌'}}</text>
+      <text class="status-text">系统{{systemReady ? '正常' : '异常'}}</text>
+    </view>
+    <view class="status-item {{backendConnected ? 'ready' : 'error'}}">
+      <text class="status-icon">{{backendConnected ? '🔗' : '⚠️'}}</text>
+      <text class="status-text">后端{{backendConnected ? '已连接' : '未连接'}}</text>
+    </view>
+  </view>
+
+  <!-- 🔴 用户信息卡片（已登录时显示） -->
+  <view class="user-card" wx:if="{{isLoggedIn && userInfo}}">
+    <image class="avatar" src="{{userInfo.avatar || '/images/default-avatar.png'}}" mode="aspectFill"></image>
+    <view class="user-info">
+      <text class="nickname">{{userInfo.nickname || '用户'}}</text>
+      <text class="points">积分：{{pointsBalance || 0}}</text>
+    </view>
+    <view class="user-stats">
+      <view class="stat-item">
+        <text class="stat-value">{{todayEarned || 0}}</text>
+        <text class="stat-label">今日获得</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value">{{totalEarned || 0}}</text>
+        <text class="stat-label">累计获得</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 🔴 用户身份二维码（已登录时显示） -->
+  <view class="qrcode-section" wx:if="{{isLoggedIn && userInfo}}">
+    <view class="section-header">
+      <text class="section-title">🎫 我的身份二维码</text>
+      <text class="section-desc highlight">⚡ 消费后请向商家展示此二维码</text>
+      <text class="section-tips">商家扫码后输入消费金额，24小时内审核通过后积分到账</text>
+    </view>
+    <qrcode size="{{300}}" showTitle="{{false}}" showUserInfo="{{false}}" showActions="{{true}}" autoGenerate="{{true}}"
+      bind:success="onQRCodeSuccess" bind:error="onQRCodeError" bind:saved="onQRCodeSaved"></qrcode>
+  </view>
+
+  <!-- 🔴 未登录提示（完全复制旧项目布局） -->
+  <view class="login-prompt" wx:if="{{showLoginPrompt && !isLoggedIn}}">
+    <text class="prompt-text">🔐 请先登录享受完整功能</text>
+    <button class="login-btn" bindtap="navigateToLogin">立即登录</button>
+  </view>
+
+  <!-- 🔴 快捷功能入口（从旧项目移植并优化） -->
+  <view class="quick-actions-section">
+    <text class="section-title">🚀 快捷功能</text>
+    <view class="quick-actions-grid">
+      <view class="action-item" wx:for="{{quickActions}}" wx:key="name" data-action="{{item}}"
+        bindtap="onQuickActionTap">
+        <text class="action-icon">{{item.name}}</text>
+        <text class="action-desc">{{item.description}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 🔴 系统公告区域（从旧项目移植） -->
+  <view class="system-notice" wx:if="{{announcements.length > 0}}">
+    <view class="notice-header">
+      <text class="notice-title">📢 系统公告</text>
+    </view>
+    <view class="notice-content">
+      <text class="notice-item" wx:for="{{announcements}}" wx:key="*this">{{item}}</text>
+    </view>
+  </view>
+
+  <!-- 🔴 欢迎模态框（保留兼容性，但默认不显示） -->
+  <view class="welcome-modal-mask {{showWelcomeModal ? 'show' : ''}}" wx:if="{{showWelcomeModal}}">
+    <view class="welcome-modal">
+      <view class="welcome-header">
+        <text class="welcome-title">欢迎使用</text>
+      </view>
+      <view class="welcome-content">
+        <text class="welcome-subtitle">请先登录以享受完整功能</text>
+        <view class="welcome-features">
+          <text class="feature-item">🎰 抽奖赢积分</text>
+          <text class="feature-item">📷 拍照获奖励</text>
+          <text class="feature-item">🎁 积分兑换好礼</text>
+        </view>
+      </view>
+      <view class="welcome-actions">
+        <button class="welcome-btn secondary" bindtap="closeWelcomeModal">稍后</button>
+        <button class="welcome-btn primary" bindtap="goToLoginFromWelcome">立即登录</button>
+      </view>
+    </view>
+  </view>
+</view>

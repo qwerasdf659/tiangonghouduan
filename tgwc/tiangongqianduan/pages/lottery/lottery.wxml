@@ -1,0 +1,528 @@
+<!--pages/lottery/lottery.wxml - 抽奖页面模板 - 根据迁移文档v1.0.0重构-->
+
+<view class="lottery-container {{showResult ? 'showing-result' : ''}}">
+  <!-- 页面头部 -->
+  <view class="header">
+    <!-- 🆕 整合布局：用户信息 + 二维码横向排列 -->
+    <view class="header-content">
+      <!-- 左侧：用户信息和积分（横向布局） -->
+      <view class="user-info-section">
+        <!-- 欢迎语 + 审核记录徽章 -->
+        <view class="welcome-text">
+          <text>欢迎，{{userInfo.mobile || userInfo.phone || userInfo.nickname || '用户'}}</text>
+          
+          <!-- 🆕 积分审核记录查询徽章 - 紧跟手机号码后 -->
+          <view class="audit-badge-container" bindtap="viewRecentAudits">
+            <!-- 圆形徽章 -->
+            <view class="audit-badge {{auditRecordsCount > 0 ? 'has-records' : 'no-records'}}">
+              <text class="badge-icon">{{auditRecordsCount > 0 ? '📬' : '📭'}}</text>
+            </view>
+            
+            <!-- 数字角标（仅当有记录时显示） -->
+            <view class="badge-number" wx:if="{{auditRecordsCount > 0}}">
+              <text>{{auditRecordsCount}}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 积分横向容器 -->
+        <view class="points-row">
+          <!-- 可用积分 - ✅ 响应式字体 + 千分位分隔符 -->
+          <view class="points-item">
+            <text class="points-label">可用积分</text>
+            <view class="points-value">
+              <text class="points-number {{pointsClass}}">{{pointsBalanceFormatted}}</text>
+              <text class="points-icon">💰</text>
+            </view>
+          </view>
+
+          <!-- 冻结积分 - ✅ 响应式字体 + 千分位分隔符 -->
+          <view class="points-item">
+            <text class="points-label">冻结积分</text>
+            <view class="points-value">
+              <text class="points-number {{frozenClass}}">{{frozenPointsFormatted}}</text>
+              <text class="points-icon">🔒</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 右侧：二维码区域（纯净版，无文字） -->
+      <view class="qrcode-section-inline">
+        <!-- 二维码容器 - 🆕 添加点击放大功能 -->
+        <view class="qrcode-container" bindtap="enlargeQRCode">
+          <!-- 加载中状态 -->
+          <view class="qrcode-loading" wx:if="{{!qrCodeImage}}">
+            <text class="loading-icon">⏳</text>
+            <text class="loading-text">生成中...</text>
+          </view>
+
+          <!-- 二维码图片 - 正方形图片完整显示（有留白但可以看到完整二维码） -->
+          <image class="qrcode-image" src="{{qrCodeImage}}" mode="aspectFit" wx:if="{{qrCodeImage}}"
+            show-menu-by-longpress="{{true}}" />
+
+          <!-- 🆕 点击提示图标 -->
+          <view class="qrcode-hint" wx:if="{{qrCodeImage}}">
+            <text class="hint-icon">🔍</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 🔴 管理员专属功能条 - 仅管理员可见 -->
+  <view wx:if="{{isAdmin}}" class="admin-scan-bar">
+    <!-- 左侧：静态文字 -->
+    <view class="admin-scan-label">
+      <text>商家扫码</text>
+    </view>
+    
+    <!-- 中间：扫一扫功能 -->
+    <view class="admin-scan-button" bindtap="onScanTap">
+      <text class="scan-icon">📷</text>
+      <text class="scan-text">扫一扫</text>
+    </view>
+    
+    <!-- 右侧：审核详情跳转 -->
+    <view class="admin-audit-button" bindtap="onAuditTap">
+      <text class="audit-text">审核详情</text>
+      <text class="arrow-icon">→</text>
+    </view>
+  </view>
+
+  <!-- 区域轮流发亮抽奖区域 -->
+  <view class="lottery-grid-section">
+    <view class="lottery-grid {{highlightAnimation ? 'animating' : ''}}">
+      <!-- 3x3网格布局，中心为抽奖按钮 -->
+      <view class="prize-grid">
+        <!-- 奖品区域0 - 左上角 -->
+        <view class="prize-area {{currentHighlight === 0 ? 'highlighted' : ''}} {{winningIndex === 0 ? 'winning' : ''}}"
+          data-index="0">
+          <view class="prize-content">
+            <text class="prize-icon">{{prizes[0].icon || '🎫'}}</text>
+            <view class="prize-text-container {{prizes[0].displayMode || 'single-line'}}">
+              <text class="prize-name" wx:if="{{!prizes[0].displayText.isMultiLine}}">
+                {{prizes[0].displayText.fullText || prizes[0].prizeName || '奖品1'}}
+              </text>
+              <view class="prize-name-multiline" wx:if="{{prizes[0].displayText.isMultiLine}}">
+                <text class="prize-line">{{prizes[0].displayText.firstLine}}</text>
+                <text class="prize-line">{{prizes[0].displayText.secondLine}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 奖品区域1 - 中上 -->
+        <view class="prize-area {{currentHighlight === 1 ? 'highlighted' : ''}} {{winningIndex === 1 ? 'winning' : ''}}"
+          data-index="1">
+          <view class="prize-content">
+            <text class="prize-icon">{{prizes[1].icon || '🎁'}}</text>
+            <view class="prize-text-container {{prizes[1].displayMode || 'single-line'}}">
+              <text class="prize-name" wx:if="{{!prizes[1].displayText.isMultiLine}}">
+                {{prizes[1].displayText.fullText || prizes[1].prizeName || '奖品2'}}
+              </text>
+              <view class="prize-name-multiline" wx:if="{{prizes[1].displayText.isMultiLine}}">
+                <text class="prize-line">{{prizes[1].displayText.firstLine}}</text>
+                <text class="prize-line">{{prizes[1].displayText.secondLine}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 奖品区域2 - 右上角 -->
+        <view class="prize-area {{currentHighlight === 2 ? 'highlighted' : ''}} {{winningIndex === 2 ? 'winning' : ''}}"
+          data-index="2">
+          <view class="prize-content">
+            <text class="prize-icon">{{prizes[2].icon || '🏆'}}</text>
+            <view class="prize-text-container {{prizes[2].displayMode || 'single-line'}}">
+              <text class="prize-name" wx:if="{{!prizes[2].displayText.isMultiLine}}">
+                {{prizes[2].displayText.fullText || prizes[2].prizeName || '奖品3'}}
+              </text>
+              <view class="prize-name-multiline" wx:if="{{prizes[2].displayText.isMultiLine}}">
+                <text class="prize-line">{{prizes[2].displayText.firstLine}}</text>
+                <text class="prize-line">{{prizes[2].displayText.secondLine}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 奖品区域7 - 左中 -->
+        <view class="prize-area {{currentHighlight === 7 ? 'highlighted' : ''}} {{winningIndex === 7 ? 'winning' : ''}}"
+          data-index="7">
+          <view class="prize-content">
+            <text class="prize-icon">{{prizes[7].icon || '💎'}}</text>
+            <view class="prize-text-container {{prizes[7].displayMode || 'single-line'}}">
+              <text class="prize-name" wx:if="{{!prizes[7].displayText.isMultiLine}}">
+                {{prizes[7].displayText.fullText || prizes[7].prizeName || '奖品8'}}
+              </text>
+              <view class="prize-name-multiline" wx:if="{{prizes[7].displayText.isMultiLine}}">
+                <text class="prize-line">{{prizes[7].displayText.firstLine}}</text>
+                <text class="prize-line">{{prizes[7].displayText.secondLine}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 中央抽奖按钮 -->
+        <view class="lottery-center-button">
+          <button class="center-draw-btn {{isLotteryInProgress ? 'drawing' : ''}}" disabled="{{isLotteryInProgress}}"
+            bindtap="{{isLotteryInProgress ? '' : 'onSingleDraw'}}">
+            <text class="btn-text">{{isLotteryInProgress ? '抽奖中...' : '🎰 开始抽奖'}}</text>
+          </button>
+        </view>
+
+        <!-- 奖品区域3 - 右中 -->
+        <view class="prize-area {{currentHighlight === 3 ? 'highlighted' : ''}} {{winningIndex === 3 ? 'winning' : ''}}"
+          data-index="3">
+          <view class="prize-content">
+            <text class="prize-icon">{{prizes[3].icon || '🎪'}}</text>
+            <view class="prize-text-container {{prizes[3].displayMode || 'single-line'}}">
+              <text class="prize-name" wx:if="{{!prizes[3].displayText.isMultiLine}}">
+                {{prizes[3].displayText.fullText || prizes[3].prizeName || '奖品4'}}
+              </text>
+              <view class="prize-name-multiline" wx:if="{{prizes[3].displayText.isMultiLine}}">
+                <text class="prize-line">{{prizes[3].displayText.firstLine}}</text>
+                <text class="prize-line">{{prizes[3].displayText.secondLine}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 奖品区域6 - 左下角 -->
+        <view class="prize-area {{currentHighlight === 6 ? 'highlighted' : ''}} {{winningIndex === 6 ? 'winning' : ''}}"
+          data-index="6">
+          <view class="prize-content">
+            <text class="prize-icon">{{prizes[6].icon || '🎊'}}</text>
+            <view class="prize-text-container {{prizes[6].displayMode || 'single-line'}}">
+              <text class="prize-name" wx:if="{{!prizes[6].displayText.isMultiLine}}">
+                {{prizes[6].displayText.fullText || prizes[6].prizeName || '奖品7'}}
+              </text>
+              <view class="prize-name-multiline" wx:if="{{prizes[6].displayText.isMultiLine}}">
+                <text class="prize-line">{{prizes[6].displayText.firstLine}}</text>
+                <text class="prize-line">{{prizes[6].displayText.secondLine}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 奖品区域5 - 中下 -->
+        <view class="prize-area {{currentHighlight === 5 ? 'highlighted' : ''}} {{winningIndex === 5 ? 'winning' : ''}}"
+          data-index="5">
+          <view class="prize-content">
+            <text class="prize-icon">{{prizes[5].icon || '🎉'}}</text>
+            <view class="prize-text-container {{prizes[5].displayMode || 'single-line'}}">
+              <text class="prize-name" wx:if="{{!prizes[5].displayText.isMultiLine}}">
+                {{prizes[5].displayText.fullText || prizes[5].prizeName || '奖品6'}}
+              </text>
+              <view class="prize-name-multiline" wx:if="{{prizes[5].displayText.isMultiLine}}">
+                <text class="prize-line">{{prizes[5].displayText.firstLine}}</text>
+                <text class="prize-line">{{prizes[5].displayText.secondLine}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 奖品区域4 - 右下角 -->
+        <view class="prize-area {{currentHighlight === 4 ? 'highlighted' : ''}} {{winningIndex === 4 ? 'winning' : ''}}"
+          data-index="4">
+          <view class="prize-content">
+            <text class="prize-icon">{{prizes[4].icon || '🎈'}}</text>
+            <view class="prize-text-container {{prizes[4].displayMode || 'single-line'}}">
+              <text class="prize-name" wx:if="{{!prizes[4].displayText.isMultiLine}}">
+                {{prizes[4].displayText.fullText || prizes[4].prizeName || '奖品5'}}
+              </text>
+              <view class="prize-name-multiline" wx:if="{{prizes[4].displayText.isMultiLine}}">
+                <text class="prize-line">{{prizes[4].displayText.firstLine}}</text>
+                <text class="prize-line">{{prizes[4].displayText.secondLine}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 多连抽按钮组 -->
+  <view class="multi-draw-section">
+    <view class="multi-draw-grid">
+      <view class="grid-row">
+        <!-- 🔴 三连抽：积分显示从后端drawPricing.three.total_cost获取 -->
+        <button class="grid-draw-btn triple-btn" bindtap="onTripleDraw" disabled="{{isLotteryInProgress}}">
+          <view class="btn-content">
+            <text class="btn-main-text">三连抽</text>
+            <text class="btn-sub-text">{{drawPricing.three.total_cost || 300}}积分</text>
+          </view>
+        </button>
+        <!-- 🔴 五连抽：积分显示从后端drawPricing.five.total_cost获取 -->
+        <button class="grid-draw-btn five-btn" bindtap="onFiveDraw" disabled="{{isLotteryInProgress}}">
+          <view class="btn-content">
+            <text class="btn-main-text">五连抽</text>
+            <text class="btn-sub-text">{{drawPricing.five.total_cost || 500}}积分</text>
+          </view>
+        </button>
+      </view>
+      <view class="grid-row">
+        <!-- 🔴 十连抽：积分显示从后端drawPricing.ten.total_cost获取（可能有折扣）-->
+        <button class="grid-draw-btn ten-btn special full-width" bindtap="onTenDraw" disabled="{{isLotteryInProgress}}">
+          <view class="btn-content">
+            <text class="btn-main-text">十连抽</text>
+            <text class="btn-sub-text">{{drawPricing.ten.total_cost || 1000}}积分</text>
+            <text class="btn-guarantee">保底好礼</text>
+          </view>
+        </button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 抽奖结果弹窗 - 🌟 卡片渐变方案 -->
+  <view class="result-modal gradient-card-modal" wx:if="{{showResult}}">
+    <view class="modal-content gradient-card-container">
+      <!-- 右上角关闭按钮 -->
+      <view class="close-btn gradient-close" bindtap="closeResult">
+        <text class="close-icon">✕</text>
+      </view>
+
+      <!-- 弹窗头部 - 卡片式设计 -->
+      <view class="result-header gradient-header-card">
+        <!-- 中奖状态标题卡片 -->
+        <view class="title-card success-card" wx:if="{{!drawResult.isError && !drawResult.isNotWinning}}">
+          <view class="title-icon">🎉</view>
+          <view class="title-content">
+            <text class="result-title">恭喜中奖！</text>
+            <text class="result-subtitle" wx:if="{{drawResult.isMultiDraw}}">
+              {{drawResult.drawCount}}连抽获得以下奖品
+            </text>
+            <text class="result-subtitle" wx:else>
+              单次抽奖获得精美奖品
+            </text>
+          </view>
+        </view>
+
+        <!-- 未中奖状态标题卡片 -->
+        <view class="title-card not-winning-card" wx:if="{{drawResult.isNotWinning}}">
+          <view class="title-icon not-winning-icon">💨</view>
+          <view class="title-content">
+            <text class="result-title not-winning-title">很遗憾，未中奖</text>
+            <text class="result-subtitle not-winning-subtitle">
+              再接再厉，下次好运！
+            </text>
+          </view>
+        </view>
+
+        <!-- 错误状态标题卡片 -->
+        <view class="title-card error-card" wx:if="{{drawResult.isError}}">
+          <view class="title-icon error-icon">❌</view>
+          <view class="title-content">
+            <text class="result-title error-title">{{drawResult.errorTitle}}</text>
+            <text class="result-subtitle error-subtitle">
+              {{drawResult.errorDescription}}
+            </text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 弹窗主体 - 卡片网格布局 -->
+      <view class="result-body gradient-body-container">
+        <!-- 单次抽奖奖品卡片（中奖） -->
+        <view class="winning-prize-card single-prize-card"
+          wx:if="{{!drawResult.isMultiDraw && !drawResult.isError && !drawResult.isNotWinning}}">
+          <view class="prize-card-bg">
+            <view class="prize-card-shine"></view>
+            <view class="prize-card-content">
+              <view class="winning-icon-container">
+                <text class="winning-icon">🎁</text>
+                <view class="icon-glow"></view>
+              </view>
+              <view class="winning-info">
+                <text class="winning-name">{{drawResult.prize.name}}</text>
+                <text class="winning-desc">{{drawResult.prize.description}}</text>
+              </view>
+              <view class="prize-card-decoration">
+                <view class="decoration-dot"></view>
+                <view class="decoration-dot"></view>
+                <view class="decoration-dot"></view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 未中奖提示卡片 -->
+        <view class="not-winning-card single-prize-card" wx:if="{{drawResult.isNotWinning}}">
+          <view class="not-winning-card-bg">
+            <view class="not-winning-icon-container">
+              <text class="not-winning-icon-large">💨</text>
+            </view>
+            <view class="not-winning-info">
+              <text class="not-winning-message">{{drawResult.prize.description}}</text>
+              <text class="not-winning-encourage">继续努力，好运即将到来！</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 多连抽奖品卡片网格 -->
+        <view class="multi-prize-grid" wx:if="{{drawResult.isMultiDraw && !drawResult.isError}}">
+          <view class="prize-grid-header">
+            <text class="grid-title">中奖清单</text>
+            <text class="grid-count">共{{drawResult.actualCount || drawResult.drawCount}}件</text>
+          </view>
+          <!-- 滚动提示 (仅当奖品超过4个时显示) -->
+          <view class="scroll-hint" wx:if="{{drawResult.prizes.length > 4}}">
+            <text class="scroll-hint-text">👆 上下滑动查看更多奖品</text>
+          </view>
+          <view class="prize-cards-container">
+            <view class="prize-item-card" wx:for="{{drawResult.prizes}}" wx:key="index">
+              <view class="prize-card-wrapper gradient-prize-{{(index % 4) + 1}}">
+                <view class="prize-card-inner">
+                  <view class="prize-number-badge">
+                    <text class="prize-number">{{index + 1}}</text>
+                  </view>
+                  <view class="prize-card-body">
+                    <view class="prize-icon-area">
+                      <text class="prize-icon">🎁</text>
+                      <view class="prize-sparkle"></view>
+                    </view>
+                    <view class="prize-text-area">
+                      <text class="prize-name">{{item.name}}</text>
+                      <text class="prize-subtitle">{{item.description}}</text>
+                    </view>
+                  </view>
+                  <view class="prize-card-accent"></view>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 错误信息卡片 -->
+        <view class="error-info-card" wx:if="{{drawResult.isError}}">
+          <view class="error-card-bg">
+            <view class="error-icon-container">
+              <text class="error-icon">⚠️</text>
+            </view>
+            <view class="error-content">
+              <text class="error-message">{{drawResult.errorMessage}}</text>
+              <text class="error-suggestion">请检查网络连接或稍后重试</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 弹窗底部 - 渐变按钮 -->
+      <view class="result-footer gradient-footer">
+        <button class="confirm-btn gradient-confirm-btn" bindtap="closeResult">
+          <view class="btn-content">
+            <text class="btn-text">确认收下</text>
+            <text class="btn-icon">✨</text>
+          </view>
+        </button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 加载状态 -->
+  <view class="loading-container" wx:if="{{loading}}">
+    <text class="loading-text">正在加载抽奖配置...</text>
+  </view>
+
+  <!-- 🆕 隐藏的Canvas用于生成正方形高分辨率二维码（方案B：428×428正方形） -->
+  <canvas canvas-id="qrcodeCanvas" style="width: 428px; height: 428px; position: fixed; left: -9999px; top: -9999px;" />
+
+  <!-- 🆕 放大的二维码弹窗 -->
+  <view class="qrcode-enlarged-modal" wx:if="{{qrCodeEnlarged}}" bindtap="closeEnlargedQRCode">
+    <view class="qrcode-enlarged-container" catchtap="{{''}}">
+      <!-- 关闭按钮 -->
+      <view class="qrcode-close-btn" bindtap="closeEnlargedQRCode">
+        <text class="close-icon">✕</text>
+      </view>
+
+      <!-- 放大的二维码 -->
+      <view class="qrcode-enlarged-content">
+        <!-- 🔴 方案B：正方形容器(500×500) + 正方形图片(428×428) = 完美填充 -->
+        <image class="qrcode-enlarged-image" src="{{qrCodeImage}}" mode="aspectFit" show-menu-by-longpress="{{true}}" />
+
+        <!-- 提示文字 -->
+        <view class="qrcode-enlarged-tips">
+          <text class="enlarged-tip">👆 长按保存二维码</text>
+          <text class="enlarged-tip">或供商家扫码验证</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 🆕 审核记录弹窗 -->
+  <view class="audit-modal" wx:if="{{showAuditModal}}" bindtap="closeAuditModal">
+    <view class="audit-modal-content" catchtap="{{''}}">
+      <!-- 关闭按钮 -->
+      <view class="audit-modal-close" bindtap="closeAuditModal">
+        <text class="close-icon">✕</text>
+      </view>
+      
+      <!-- 弹窗标题 -->
+      <view class="audit-modal-header">
+        <text class="modal-title">📋 最近5笔积分审核记录</text>
+      </view>
+      
+      <!-- 记录列表 -->
+      <scroll-view class="audit-records-list" scroll-y="{{true}}">
+        <view class="audit-record-card {{item.status}}" 
+              wx:for="{{auditRecordsData}}" 
+              wx:key="id">
+          <!-- 记录编号 + 状态 -->
+          <view class="record-header">
+            <text class="record-number">🎯 记录 #{{index + 1}}</text>
+            <view class="record-status" style="background: {{item.statusInfo.bgColor}}">
+              <text class="status-icon">{{item.statusInfo.icon}}</text>
+              <text class="status-text" style="color: {{item.statusInfo.color}}">
+                {{item.statusInfo.text}}
+              </text>
+            </view>
+          </view>
+          
+          <!-- 消费金额 -->
+          <view class="record-row">
+            <text class="row-icon">💰</text>
+            <text class="row-label">消费金额：</text>
+            <text class="row-value amount">¥{{item.formattedAmount}}</text>
+          </view>
+          
+          <!-- 预计积分 -->
+          <view class="record-row">
+            <text class="row-icon">🎁</text>
+            <text class="row-label">
+              {{item.status === 'approved' ? '已奖励：' : '预计奖励：'}}
+            </text>
+            <text class="row-value points">+{{item.points_to_award}} 积分</text>
+          </view>
+          
+          <!-- 商家信息 -->
+          <view class="record-row" wx:if="{{item.merchant_info}}">
+            <text class="row-icon">🏪</text>
+            <text class="row-label">商家：</text>
+            <text class="row-value">{{item.merchant_info.name || '天工餐厅'}}</text>
+          </view>
+          
+          <!-- 商家备注 -->
+          <view class="record-row" wx:if="{{item.merchant_notes}}">
+            <text class="row-icon">📝</text>
+            <text class="row-label">备注：</text>
+            <text class="row-value">{{item.merchant_notes}}</text>
+          </view>
+          
+          <!-- 提交时间 -->
+          <view class="record-row">
+            <text class="row-icon">🕐</text>
+            <text class="row-label">提交时间：</text>
+            <text class="row-value time">{{item.formattedTime}}</text>
+          </view>
+        </view>
+      </scroll-view>
+      
+      <!-- 底部关闭按钮 -->
+      <view class="audit-modal-footer">
+        <button class="modal-close-btn" bindtap="closeAuditModal">
+          关闭
+        </button>
+      </view>
+    </view>
+  </view>
+</view>

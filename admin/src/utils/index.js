@@ -376,7 +376,7 @@ export function deepClone(obj) {
   if (obj === null || typeof obj !== 'object') return obj
   try {
     return JSON.parse(JSON.stringify(obj))
-  } catch (e) {
+  } catch (_e) {
     return obj
   }
 }
@@ -405,34 +405,6 @@ export function parseQueryParams(url = window.location.search) {
     result[key] = value
   }
   return result
-}
-
-/**
- * 构建查询字符串
- * @param {Object} params - 参数对象
- * @returns {string} 查询字符串
- */
-export function buildQueryString(params) {
-  if (!params || typeof params !== 'object') return ''
-  const searchParams = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== null && value !== undefined && value !== '') {
-      searchParams.append(key, value)
-    }
-  }
-  return searchParams.toString()
-}
-
-/**
- * 构建完整 URL
- * @param {string} baseUrl - 基础 URL
- * @param {Object} params - 查询参数
- * @returns {string} 完整 URL
- */
-export function buildURL(baseUrl, params) {
-  const queryString = buildQueryString(params)
-  if (!queryString) return baseUrl
-  return baseUrl.includes('?') ? `${baseUrl}&${queryString}` : `${baseUrl}?${queryString}`
 }
 
 // ========== 默认导出 ==========
@@ -472,7 +444,5 @@ export default {
   throttle,
   deepClone,
   generateUUID,
-  parseQueryParams,
-  buildQueryString,
-  buildURL
+  parseQueryParams
 }

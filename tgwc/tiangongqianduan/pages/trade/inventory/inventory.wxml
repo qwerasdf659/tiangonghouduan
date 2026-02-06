@@ -1,0 +1,305 @@
+<!--pages/trade/inventory/inventory.wxml - 库存管理页面v2.0优化版-->
+<view class="inventory-container">
+
+  <!-- 🎨 页面头部 -->
+  <view class="header-section">
+    <view class="header-content">
+      <view class="header-title">
+        <text class="title-text">🎒 我的库存</text>
+        <text class="title-desc">管理您的积分奖品和权益</text>
+      </view>
+      <view class="total-value-card">
+        <text class="value-label">总价值</text>
+        <text class="value-amount">{{totalValue}}积分</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 🔴 统计面板 - 现代化网格设计 -->
+  <view class="statistics-section">
+    <view class="stats-grid">
+      <view class="stat-card {{currentCategory === 'all' ? 'active' : ''}}" bind:tap="onCategoryChange"
+        data-category="all">
+        <view class="stat-header">
+          <text class="stat-icon">📦</text>
+          <text class="stat-label">全部</text>
+        </view>
+        <text class="stat-number">{{categoryStats.all}}</text>
+      </view>
+
+      <view class="stat-card {{currentCategory === 'voucher' ? 'active' : ''}}" bind:tap="onCategoryChange"
+        data-category="voucher">
+        <view class="stat-header">
+          <text class="stat-icon">🎫</text>
+          <text class="stat-label">优惠券</text>
+        </view>
+        <text class="stat-number">{{categoryStats.voucher}}</text>
+      </view>
+
+      <view class="stat-card {{currentCategory === 'product' ? 'active' : ''}}" bind:tap="onCategoryChange"
+        data-category="product">
+        <view class="stat-header">
+          <text class="stat-icon">📱</text>
+          <text class="stat-label">实物商品</text>
+        </view>
+        <text class="stat-number">{{categoryStats.product}}</text>
+      </view>
+
+      <view class="stat-card {{currentCategory === 'service' ? 'active' : ''}}" bind:tap="onCategoryChange"
+        data-category="service">
+        <view class="stat-header">
+          <text class="stat-icon">🎁</text>
+          <text class="stat-label">服务权益</text>
+        </view>
+        <text class="stat-number">{{categoryStats.service}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 🔴 搜索和筛选工具栏 - 现代化设计 -->
+  <view class="toolbar-section">
+    <view class="toolbar-content">
+      <view class="search-container">
+        <view class="search-box">
+          <text class="search-icon">🔍</text>
+          <input class="search-input" placeholder="搜索物品名称..." value="{{searchKeyword}}" bind:input="onSearchInput" />
+        </view>
+      </view>
+      <button class="filter-btn" bind:tap="onShowFilter">
+        <text class="btn-icon">⚙️</text>
+        <text class="btn-text">筛选</text>
+      </button>
+    </view>
+  </view>
+
+  <!-- 🔴 库存物品列表区域 -->
+  <view class="inventory-section">
+
+    <!-- 加载状态 -->
+    <view class="loading-container" wx:if="{{loading}}">
+      <view class="loading-content">
+        <view class="loading-spinner"></view>
+        <text class="loading-text">加载中...</text>
+      </view>
+    </view>
+
+    <!-- 库存物品列表 -->
+    <view class="inventory-list" wx:else>
+      <block wx:if="{{!loading && filteredItems.length > 0}}">
+        <view class="inventory-card" wx:for="{{filteredItems}}" wx:key="id">
+          <!-- 物品头部信息 -->
+          <view class="item-header">
+            <view class="item-left">
+              <view class="item-icon-wrapper">
+                <text class="item-icon">{{item.icon || '📦'}}</text>
+              </view>
+              <view class="item-basic">
+                <text class="item-name">{{item.name}}</text>
+                <text class="item-desc">{{item.description}}</text>
+              </view>
+            </view>
+            <view class="item-right">
+              <view class="status-badge status-{{item.status}}">
+                <text class="status-text">{{getStatusText(item.status)}}</text>
+              </view>
+              <text class="item-value" wx:if="{{item.value}}">{{item.value}}积分</text>
+            </view>
+          </view>
+
+          <!-- 物品详细信息 -->
+          <view class="item-details"
+            wx:if="{{item.sourceType || item.acquiredAt || item.expiresAt || item.verificationCode}}">
+            <view class="details-grid">
+              <view class="detail-item" wx:if="{{item.sourceType}}">
+                <text class="detail-label">获得方式</text>
+                <text class="detail-value">{{item.sourceType}}</text>
+              </view>
+              <view class="detail-item" wx:if="{{item.acquiredAt}}">
+                <text class="detail-label">获得时间</text>
+                <text class="detail-value">{{item.acquiredAt}}</text>
+              </view>
+              <view class="detail-item" wx:if="{{item.expiresAt}}">
+                <text class="detail-label">过期时间</text>
+                <text
+                  class="detail-value {{isExpiringSoon(item.expiresAt) ? 'expiring' : ''}}">{{item.expiresAt}}</text>
+              </view>
+              <view class="detail-item" wx:if="{{item.verificationCode}}">
+                <text class="detail-label">核销码</text>
+                <text class="detail-value verification-code">{{item.verificationCode}}</text>
+              </view>
+            </view>
+          </view>
+
+          <!-- 操作按钮 -->
+          <view class="item-actions">
+            <button class="action-btn primary" wx:if="{{item.actions && item.actions.includes('use')}}"
+              bind:tap="onUseItem" data-item="{{item}}">
+              <text class="btn-icon">✨</text>
+              <text class="btn-text">立即使用</text>
+            </button>
+
+            <button class="action-btn secondary" wx:if="{{item.actions && item.actions.includes('verify')}}"
+              bind:tap="onGenerateCode" data-item="{{item}}">
+              <text class="btn-icon">🔑</text>
+              <text class="btn-text">生成核销码</text>
+            </button>
+
+            <button class="action-btn warning" wx:if="{{item.actions && item.actions.includes('transfer')}}"
+              bind:tap="onTransferItem" data-item="{{item}}">
+              <text class="btn-icon">👥</text>
+              <text class="btn-text">转让好友</text>
+            </button>
+
+            <button class="action-btn outline" bind:tap="onViewItem" data-item="{{item}}">
+              <text class="btn-icon">📋</text>
+              <text class="btn-text">查看详情</text>
+            </button>
+
+            <button class="action-btn outline" wx:if="{{item.actions && item.actions.includes('contact')}}"
+              bind:tap="onContactService">
+              <text class="btn-icon">💬</text>
+              <text class="btn-text">联系客服</text>
+            </button>
+          </view>
+        </view>
+      </block>
+
+      <!-- 🎨 全新空状态设计 -->
+      <view class="empty-state" wx:if="{{!loading && filteredItems.length === 0}}">
+        <view class="empty-illustration">
+          <view class="empty-treasure-box">
+            <view class="treasure-box">
+              <view class="box-lid"></view>
+              <view class="box-body">
+                <view class="box-shine"></view>
+              </view>
+              <view class="box-gems">
+                <text class="gem gem-1">💎</text>
+                <text class="gem gem-2">🎁</text>
+                <text class="gem gem-3">🎫</text>
+              </view>
+            </view>
+            <view class="empty-sparkles">
+              <text class="sparkle sparkle-1">✨</text>
+              <text class="sparkle sparkle-2">⭐</text>
+              <text class="sparkle sparkle-3">💫</text>
+            </view>
+          </view>
+
+          <view class="empty-content">
+            <text class="empty-title">库存空空如也</text>
+            <text class="empty-subtitle">快去参与活动获得奖品吧！</text>
+
+            <view class="empty-features">
+              <view class="feature-item">
+                <text class="feature-icon">🎰</text>
+                <text class="feature-text">参与抽奖</text>
+              </view>
+              <view class="feature-arrow">→</view>
+              <view class="feature-item">
+                <text class="feature-icon">🏆</text>
+                <text class="feature-text">赢取奖品</text>
+              </view>
+              <view class="feature-arrow">→</view>
+              <view class="feature-item">
+                <text class="feature-icon">🎒</text>
+                <text class="feature-text">库存管理</text>
+              </view>
+            </view>
+
+            <button class="treasure-action-btn" bind:tap="goToLottery">
+              <view class="btn-content">
+                <text class="btn-icon">🎉</text>
+                <text class="btn-text">立即抽奖</text>
+              </view>
+              <view class="btn-glow"></view>
+            </button>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 🔴 操作提示区域 -->
+  <view class="tips-section" wx:if="{{!loading && filteredItems.length > 0}}">
+    <view class="tips-card">
+      <view class="tips-header">
+        <text class="tips-icon">💡</text>
+        <text class="tips-title">使用提示</text>
+      </view>
+      <view class="tips-content">
+        <view class="tip-item">
+          <text class="tip-icon">⏰</text>
+          <text class="tip-text">优惠券7天内有效，过期自动失效</text>
+        </view>
+        <view class="tip-item">
+          <text class="tip-icon">🤝</text>
+          <text class="tip-text">实物奖品可转让给好友，每件限转让1次</text>
+        </view>
+        <view class="tip-item">
+          <text class="tip-icon">🔑</text>
+          <text class="tip-text">核销码生成后24小时内有效</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 🔴 高级筛选面板 -->
+  <view class="filter-panel {{showFilterPanel ? 'show' : ''}}" wx:if="{{showFilterPanel}}">
+    <view class="filter-mask" bind:tap="onHideFilter"></view>
+    <view class="filter-content-panel">
+      <view class="filter-header">
+        <text class="filter-title">筛选条件</text>
+        <text class="filter-close" bind:tap="onHideFilter">✕</text>
+      </view>
+
+      <view class="filter-body">
+        <!-- 状态筛选 -->
+        <view class="filter-group">
+          <text class="filter-group-title">状态筛选</text>
+          <view class="filter-options">
+            <view class="filter-option {{currentStatus === 'all' ? 'active' : ''}}" bind:tap="onStatusFilter"
+              data-status="all">
+              <text>全部</text>
+            </view>
+            <view class="filter-option {{currentStatus === 'available' ? 'active' : ''}}" bind:tap="onStatusFilter"
+              data-status="available">
+              <text>可用</text>
+            </view>
+            <view class="filter-option {{currentStatus === 'pending' ? 'active' : ''}}" bind:tap="onStatusFilter"
+              data-status="pending">
+              <text>待核销</text>
+            </view>
+            <view class="filter-option {{currentStatus === 'used' ? 'active' : ''}}" bind:tap="onStatusFilter"
+              data-status="used">
+              <text>已使用</text>
+            </view>
+            <view class="filter-option {{currentStatus === 'expired' ? 'active' : ''}}" bind:tap="onStatusFilter"
+              data-status="expired">
+              <text>已过期</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 排序方式 -->
+        <view class="filter-group">
+          <text class="filter-group-title">排序方式</text>
+          <view class="filter-options">
+            <view class="filter-option {{currentSort === 'newest' ? 'active' : ''}}" bind:tap="onSortChange"
+              data-sort="newest">
+              <text>最新获得</text>
+            </view>
+            <view class="filter-option {{currentSort === 'value_high' ? 'active' : ''}}" bind:tap="onSortChange"
+              data-sort="value_high">
+              <text>价值从高到低</text>
+            </view>
+            <view class="filter-option {{currentSort === 'expire_soon' ? 'active' : ''}}" bind:tap="onSortChange"
+              data-sort="expire_soon">
+              <text>即将过期</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

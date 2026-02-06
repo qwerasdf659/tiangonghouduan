@@ -14,6 +14,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
+import { API_PREFIX } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/index.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
 import { DashboardAPI } from '../../../api/dashboard.js'
@@ -366,7 +367,7 @@ function dashboardPanelPage() {
      */
     async fetchHealthScore() {
       try {
-        const response = await fetch('/api/v4/console/dashboard/business-health', {
+        const response = await fetch(`${API_PREFIX}/console/dashboard/business-health`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}`
           }
@@ -432,9 +433,9 @@ function dashboardPanelPage() {
     getSimulatedSlowApis() {
       // 模拟数据 - 实际应从后端获取
       const apis = [
-        { path: '/api/v4/lottery/draw', avg_time: 1200, status: 'normal' },
-        { path: '/api/v4/console/statistics', avg_time: 2800, status: 'warning' },
-        { path: '/api/v4/console/export', avg_time: 4500, status: 'critical' }
+        { path: `${API_PREFIX}/lottery/draw`, avg_time: 1200, status: 'normal' },
+        { path: `${API_PREFIX}/console/statistics`, avg_time: 2800, status: 'warning' },
+        { path: `${API_PREFIX}/console/export`, avg_time: 4500, status: 'critical' }
       ]
 
       // 过滤出超过1秒的接口
@@ -565,7 +566,7 @@ function dashboardPanelPage() {
      */
     async fetchComparison() {
       try {
-        const response = await fetch('/api/v4/console/dashboard/time-comparison', {
+        const response = await fetch(`${API_PREFIX}/console/dashboard/time-comparison`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}`
           }
@@ -1139,7 +1140,7 @@ function dashboardPanelPage() {
     async loadAssetRatio() {
       try {
         // 使用今日统计API获取发放和消耗数据
-        const response = await fetch('/api/v4/console/analytics/stats/today', {
+        const response = await fetch(`${API_PREFIX}/console/analytics/stats/today`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}` }
         })
         
@@ -1214,7 +1215,7 @@ function dashboardPanelPage() {
     
     async fetchLotteryStats() {
       try {
-        const response = await fetch(`/api/v4/console/lottery/stats?range=${this.lotteryAnalysis.chart_range}`, {
+        const response = await fetch(`${API_PREFIX}/console/lottery/stats?range=${this.lotteryAnalysis.chart_range}`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}` }
         })
         if (response.ok) {
@@ -1231,7 +1232,7 @@ function dashboardPanelPage() {
     
     async fetchLotteryTrendData() {
       try {
-        const response = await fetch(`/api/v4/console/lottery/trend?range=${this.lotteryAnalysis.chart_range}`, {
+        const response = await fetch(`${API_PREFIX}/console/lottery/trend?range=${this.lotteryAnalysis.chart_range}`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}` }
         })
         if (response.ok) {
@@ -1255,7 +1256,7 @@ function dashboardPanelPage() {
     
     async fetchPrizeDistribution() {
       try {
-        const response = await fetch(`/api/v4/console/lottery/prize-distribution?range=${this.lotteryAnalysis.chart_range}`, {
+        const response = await fetch(`${API_PREFIX}/console/lottery/prize-distribution?range=${this.lotteryAnalysis.chart_range}`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}` }
         })
         if (response.ok) {
@@ -1284,7 +1285,7 @@ function dashboardPanelPage() {
     
     async fetchCampaignRanking() {
       try {
-        const response = await fetch(`/api/v4/console/lottery/campaign-ranking?range=${this.lotteryAnalysis.chart_range}&limit=10`, {
+        const response = await fetch(`${API_PREFIX}/console/lottery/campaign-ranking?range=${this.lotteryAnalysis.chart_range}&limit=10`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}` }
         })
         if (response.ok) {
@@ -1447,7 +1448,7 @@ function dashboardPanelPage() {
     async fetchUserStats() {
       try {
         // 使用后端实际存在的API: /api/v4/console/users/segments
-        const response = await fetch('/api/v4/console/users/segments', {
+        const response = await fetch(`${API_PREFIX}/console/users/segments`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}` }
         })
         if (response.ok) {
@@ -1500,7 +1501,7 @@ function dashboardPanelPage() {
     async fetchUserGrowth() {
       try {
         // 尝试从系统概览获取基础数据
-        const response = await fetch('/api/v4/system/admin/overview', {
+        const response = await fetch(`${API_PREFIX}/system/admin/overview`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}` }
         })
         if (response.ok) {
@@ -1547,7 +1548,7 @@ function dashboardPanelPage() {
     async fetchUserTierDistribution() {
       try {
         // 使用后端实际存在的API: /api/v4/console/users/segments
-        const response = await fetch('/api/v4/console/users/segments', {
+        const response = await fetch(`${API_PREFIX}/console/users/segments`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}` }
         })
         if (response.ok) {
@@ -1590,7 +1591,7 @@ function dashboardPanelPage() {
     async fetchActiveRanking() {
       try {
         // 使用后端实际存在的API: /api/v4/console/users/segments/high_value 获取高价值用户
-        const response = await fetch('/api/v4/console/users/segments/high_value?page_size=10', {
+        const response = await fetch(`${API_PREFIX}/console/users/segments/high_value?page_size=10`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}` }
         })
         if (response.ok) {
@@ -1721,7 +1722,7 @@ function dashboardPanelPage() {
     async fetchAssetSummary() {
       try {
         // 使用后端实际存在的API: /api/v4/console/assets/stats
-        const response = await fetch('/api/v4/console/assets/stats', {
+        const response = await fetch(`${API_PREFIX}/console/assets/stats`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}` }
         })
         if (response.ok) {
@@ -1732,7 +1733,7 @@ function dashboardPanelPage() {
             
             // 计算主要资产（POINTS类型）的数据
             const pointsAsset = asset_stats?.find(a => a.asset_code === 'POINTS') || {}
-            const diamondAsset = asset_stats?.find(a => a.asset_code === 'DIAMOND') || {}
+            const _diamondAsset = asset_stats?.find(a => a.asset_code === 'DIAMOND') || {}
             
             return {
               // 系统余额 = 总流通量
@@ -1765,7 +1766,7 @@ function dashboardPanelPage() {
     async fetchAssetFlowDetails() {
       try {
         // 使用今日统计API获取资产流动数据
-        const response = await fetch('/api/v4/console/analytics/stats/today', {
+        const response = await fetch(`${API_PREFIX}/console/analytics/stats/today`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}` }
         })
         if (response.ok) {
@@ -1827,7 +1828,7 @@ function dashboardPanelPage() {
     async fetchAssetTrend() {
       try {
         // 使用时间对比API获取趋势参考数据
-        const response = await fetch('/api/v4/console/dashboard/time-comparison', {
+        const response = await fetch(`${API_PREFIX}/console/dashboard/time-comparison`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}` }
         })
         if (response.ok) {
@@ -2076,7 +2077,7 @@ function dashboardPanelPage() {
       try {
         // 使用后端正确的API路径: /api/v4/console/users/funnel
         const days = this.funnelData.range === '90d' ? '90' : this.funnelData.range === '30d' ? '30' : '7'
-        const response = await fetch(`/api/v4/console/users/funnel?days=${days}`, {
+        const response = await fetch(`${API_PREFIX}/console/users/funnel?days=${days}`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}` }
         })
         if (response.ok) {
@@ -2096,7 +2097,7 @@ function dashboardPanelPage() {
       // 后端已实现漏斗趋势 API: /api/v4/console/users/funnel/trend
       try {
         const response = await this.apiGet(
-          '/api/v4/console/users/funnel/trend',
+          `${API_PREFIX}/console/users/funnel/trend`,
           { days: 7 },
           { showLoading: false }
         )
@@ -2313,8 +2314,8 @@ function dashboardPanelPage() {
         
         // 并行获取门店统计和贡献度数据
         const [storesRes, contributionRes] = await Promise.all([
-          fetch('/api/v4/console/stores/stats', { headers }),
-          fetch('/api/v4/console/stores/contribution?days=30&limit=100', { headers })
+          fetch(`${API_PREFIX}/console/stores/stats`, { headers }),
+          fetch(`${API_PREFIX}/console/stores/contribution?days=30&limit=100`, { headers })
         ])
         
         let total_merchants = 0
@@ -2359,7 +2360,7 @@ function dashboardPanelPage() {
         const days = this.merchantData.range === '30d' ? 30 : 7
         const headers = { 'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}` }
         
-        const response = await fetch(`/api/v4/console/stores/contribution?days=${days}&limit=20`, { headers })
+        const response = await fetch(`${API_PREFIX}/console/stores/contribution?days=${days}&limit=20`, { headers })
         if (!response.ok) {
           return []
         }
@@ -2376,14 +2377,14 @@ function dashboardPanelPage() {
           rankings.map(async (merchant) => {
             let healthScore = null
             try {
-              const healthResponse = await fetch(`/api/v4/console/stores/${merchant.merchant_id}/health-score`, { headers })
+              const healthResponse = await fetch(`${API_PREFIX}/console/stores/${merchant.merchant_id}/health-score`, { headers })
               if (healthResponse.ok) {
                 const healthResult = await healthResponse.json()
                 if (healthResult.success && healthResult.data) {
                   healthScore = healthResult.data.score
                 }
               }
-            } catch (e) {
+            } catch (_e) {
               // 单个商户健康度获取失败不影响整体
             }
             return {
@@ -2405,7 +2406,7 @@ function dashboardPanelPage() {
       // 注意: 后端 /api/v4/console/stores/:store_id/trend 是单店趋势，不是全平台趋势
       // 全平台消费趋势需要后端实现新的 API，暂时使用 time-comparison 数据
       try {
-        const response = await fetch('/api/v4/console/dashboard/time-comparison?dimension=consumption', {
+        const response = await fetch(`${API_PREFIX}/console/dashboard/time-comparison?dimension=consumption`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}` }
         })
         if (response.ok) {
@@ -2443,7 +2444,7 @@ function dashboardPanelPage() {
         const headers = { 'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}` }
         
         // 先获取商户列表
-        const listResponse = await fetch(`/api/v4/console/stores/contribution?days=${days}&limit=5`, { headers })
+        const listResponse = await fetch(`${API_PREFIX}/console/stores/contribution?days=${days}&limit=5`, { headers })
         if (!listResponse.ok) {
           logger.warn('[DashboardPanel] fetchMerchantComparison: 获取商户列表失败')
           return []
@@ -2465,7 +2466,7 @@ function dashboardPanelPage() {
             
             // 获取环比数据
             try {
-              const compResponse = await fetch(`/api/v4/console/stores/${merchantId}/comparison`, { headers })
+              const compResponse = await fetch(`${API_PREFIX}/console/stores/${merchantId}/comparison`, { headers })
               if (compResponse.ok) {
                 const compResult = await compResponse.json()
                 if (compResult.success && compResult.data) {
@@ -2478,7 +2479,7 @@ function dashboardPanelPage() {
             
             // 获取健康度评分
             try {
-              const healthResponse = await fetch(`/api/v4/console/stores/${merchantId}/health-score`, { headers })
+              const healthResponse = await fetch(`${API_PREFIX}/console/stores/${merchantId}/health-score`, { headers })
               if (healthResponse.ok) {
                 const healthResult = await healthResponse.json()
                 if (healthResult.success && healthResult.data) {

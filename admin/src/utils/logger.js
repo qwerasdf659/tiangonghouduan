@@ -70,7 +70,7 @@ const getCurrentLevel = () => {
     if (typeof import.meta !== 'undefined' && import.meta.env) {
       return import.meta.env.PROD ? LOG_LEVELS.WARN : LOG_LEVELS.DEBUG
     }
-  } catch (e) {
+  } catch (_e) {
     // 忽略错误
   }
 

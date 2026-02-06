@@ -9,7 +9,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
-import { buildURL } from '../../../api/base.js'
+import { API_PREFIX, buildURL } from '../../../api/base.js'
 
 /**
  * 用户管理状态
@@ -140,7 +140,7 @@ export function useUsersMethods() {
      */
     async loadUserStats() {
       // 调用后端 API: GET /api/v4/console/user-management/stats
-      const response = await this.apiGet('/api/v4/console/user-management/stats')
+      const response = await this.apiGet(`${API_PREFIX}/console/user-management/stats`)
 
       if (!response?.success) {
         throw new Error(response?.message || '获取用户统计失败')

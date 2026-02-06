@@ -1,0 +1,87 @@
+{
+  "compileType": "miniprogram",
+  "libVersion": "3.8.8",
+  "packOptions": {
+    "ignore": [
+      {
+        "value": ".cursor",
+        "type": "folder"
+      },
+      {
+        "value": ".vscode",
+        "type": "folder"
+      },
+      {
+        "value": "docs",
+        "type": "folder"
+      },
+      {
+        "value": "node_modules",
+        "type": "folder"
+      },
+      {
+        "value": ".git",
+        "type": "folder"
+      },
+      {
+        "value": ".gitignore",
+        "type": "file"
+      },
+      {
+        "value": ".eslintrc.js",
+        "type": "file"
+      },
+      {
+        "value": ".prettierrc",
+        "type": "file"
+      },
+      {
+        "value": ".md",
+        "type": "suffix"
+      },
+      {
+        "value": ".log",
+        "type": "suffix"
+      },
+      {
+        "value": ".backup",
+        "type": "suffix"
+      }
+    ],
+    "include": []
+  },
+  "setting": {
+    "coverView": true,
+    "es6": true,
+    "postcss": true,
+    "minified": true,
+    "enhance": true,
+    "showShadowRootInWxmlPanel": true,
+    "packNpmRelationList": [],
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    },
+    "compileWorklet": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "packNpmManually": false,
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "condition": false,
+    "swc": false,
+    "disableSWC": true,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "lazyCodeLoading": "requiredComponents"
+  },
+  "condition": {},
+  "editorSetting": {
+    "tabIndent": "auto",
+    "tabSize": 2
+  },
+  "appid": "wx0db69ddd264f9b81",
+  "simulatorPluginLibVersion": {}
+}

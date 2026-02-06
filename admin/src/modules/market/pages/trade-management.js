@@ -218,7 +218,7 @@ document.addEventListener('alpine:init', () => {
       this.loadPageData()
 
       // 监听页面切换
-      window.addEventListener('trade-page-changed', e => {
+      window.addEventListener('trade-page-changed', _e => {
         this.loadPageData()
       })
     },
@@ -842,7 +842,7 @@ document.addEventListener('alpine:init', () => {
           minute: '2-digit',
           second: '2-digit'
         })
-      } catch (e) {
+      } catch (_e) {
         return String(dateStr)
       }
     },

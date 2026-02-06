@@ -7,6 +7,7 @@
  */
 
 import { hasMenuAccess, getUserRoleLevel } from '../../config/permission-rules.js'
+import { API_PREFIX, request, getToken } from '../../api/base.js'
 import { logger } from '../../utils/logger.js'
 
 /**
@@ -216,14 +217,12 @@ export function sidebarNav() {
       this.highlightCurrentPage()
 
       // 监听 Tab 打开/切换事件，更新菜单高亮状态
-      window.addEventListener('open-tab', e => {
-        this.setActiveItem(e.detail.id, e.detail.url)
-      })
+      this._openTabHandler = e => this.setActiveItem(e.detail.id, e.detail.url)
+      window.addEventListener('open-tab', this._openTabHandler)
 
       // 监听 Tab 切换事件
-      window.addEventListener('switch-tab', e => {
-        this.setActiveItem(e.detail.id, e.detail.url)
-      })
+      this._switchTabHandler = e => this.setActiveItem(e.detail.id, e.detail.url)
+      window.addEventListener('switch-tab', this._switchTabHandler)
 
       // 从 localStorage 恢复当前激活的 Tab 状态
       this.restoreActiveItemFromTabs()
@@ -235,7 +234,7 @@ export function sidebarNav() {
       this.fetchHealthStatus()
 
       // 每5分钟刷新一次徽标数量和健康度
-      setInterval(
+      this._badgeInterval = setInterval(
         () => {
           this.fetchAllBadgeCounts()
           this.fetchHealthStatus()
@@ -245,36 +244,42 @@ export function sidebarNav() {
     },
 
     /**
+     * 清理事件监听器和定时器
+     */
+    destroy() {
+      if (this._openTabHandler) {
+        window.removeEventListener('open-tab', this._openTabHandler)
+      }
+      if (this._switchTabHandler) {
+        window.removeEventListener('switch-tab', this._switchTabHandler)
+      }
+      if (this._badgeInterval) {
+        clearInterval(this._badgeInterval)
+      }
+      logger.debug('[SidebarNav] 事件监听器和定时器已清理')
+    },
+
+    /**
      * P0-5: 获取健康度状态
      */
     async fetchHealthStatus() {
       try {
-        const token = localStorage.getItem('admin_token')
-        if (!token) return
+        if (!getToken()) return
 
-        const response = await fetch('/api/v4/console/dashboard/business-health', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
+        const data = await request({ url: `${API_PREFIX}/console/dashboard/business-health` })
+        if (data.success && data.data) {
+          this.healthScore = data.data.score || 0
+          this.healthStatus = data.data.status || 'normal'
+          
+          // 将 'normal' 映射为 'healthy'
+          if (this.healthStatus === 'normal') {
+            this.healthStatus = 'healthy'
           }
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success && data.data) {
-            this.healthScore = data.data.score || 0
-            this.healthStatus = data.data.status || 'normal'
-            
-            // 将 'normal' 映射为 'healthy'
-            if (this.healthStatus === 'normal') {
-              this.healthStatus = 'healthy'
-            }
-            
-            logger.debug('[SidebarNav] 健康度状态已更新', {
-              score: this.healthScore,
-              status: this.healthStatus
-            })
-          }
+          
+          logger.debug('[SidebarNav] 健康度状态已更新', {
+            score: this.healthScore,
+            status: this.healthStatus
+          })
         }
       } catch (error) {
         logger.warn('获取健康度状态失败:', error.message)
@@ -319,34 +324,24 @@ export function sidebarNav() {
      */
     async fetchAllBadgeCounts() {
       try {
-        const token = localStorage.getItem('admin_token')
-        if (!token) return
+        if (!getToken()) return
 
-        const response = await fetch('/api/v4/console/nav/badges', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        })
+        const data = await request({ url: `${API_PREFIX}/console/nav/badges` })
+        if (data.success && data.data) {
+          // 直接使用后端字段名
+          this.totalPendingCount = data.data.total || 0
+          this.consumptionPendingCount = data.data.badges?.consumption || 0
+          this.customerPendingCount = data.data.badges?.customer_service || 0
+          this.pendingAlertCount = data.data.badges?.risk_alert || 0
+          this.lotteryAlertCount = data.data.badges?.lottery_alert || 0
 
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success && data.data) {
-            // 直接使用后端字段名
-            this.totalPendingCount = data.data.total || 0
-            this.consumptionPendingCount = data.data.badges?.consumption || 0
-            this.customerPendingCount = data.data.badges?.customer_service || 0
-            this.pendingAlertCount = data.data.badges?.risk_alert || 0
-            this.lotteryAlertCount = data.data.badges?.lottery_alert || 0
-
-            logger.debug('[SidebarNav] 徽标数量已更新', {
-              total: this.totalPendingCount,
-              consumption: this.consumptionPendingCount,
-              customer: this.customerPendingCount,
-              risk: this.pendingAlertCount,
-              lottery: this.lotteryAlertCount
-            })
-          }
+          logger.debug('[SidebarNav] 徽标数量已更新', {
+            total: this.totalPendingCount,
+            consumption: this.consumptionPendingCount,
+            customer: this.customerPendingCount,
+            risk: this.pendingAlertCount,
+            lottery: this.lotteryAlertCount
+          })
         }
       } catch (error) {
         logger.warn('获取徽标数量失败:', error.message)
@@ -361,21 +356,14 @@ export function sidebarNav() {
      */
     async fetchPendingAlertCount() {
       try {
-        const token = localStorage.getItem('admin_token')
-        if (!token) return
+        if (!getToken()) return
 
-        const response = await fetch('/api/v4/shop/risk/alerts?status=pending&page_size=1', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+        const data = await request({
+          url: `${API_PREFIX}/shop/risk/alerts`,
+          params: { status: 'pending', page_size: 1 }
         })
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success && data.data) {
-            this.pendingAlertCount = data.data.total || 0
-          }
+        if (data.success && data.data) {
+          this.pendingAlertCount = data.data.total || 0
         }
       } catch (error) {
         logger.warn('获取风控告警数量失败:', error.message)
@@ -387,26 +375,16 @@ export function sidebarNav() {
      */
     async fetchLotteryAlertCount() {
       try {
-        const token = localStorage.getItem('admin_token')
-        if (!token) return
+        if (!getToken()) return
 
-        const response = await fetch(
-          '/api/v4/console/lottery-realtime/alerts?status=active&page_size=1',
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        )
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success && data.data) {
-            // 从 summary 获取 danger + warning 数量
-            const summary = data.data.summary || {}
-            this.lotteryAlertCount = (summary.danger || 0) + (summary.warning || 0)
-          }
+        const data = await request({
+          url: `${API_PREFIX}/console/lottery-realtime/alerts`,
+          params: { status: 'active', page_size: 1 }
+        })
+        if (data.success && data.data) {
+          // 从 summary 获取 danger + warning 数量
+          const summary = data.data.summary || {}
+          this.lotteryAlertCount = (summary.danger || 0) + (summary.warning || 0)
         }
       } catch (error) {
         logger.warn('获取抽奖告警数量失败:', error.message)
@@ -443,7 +421,7 @@ export function sidebarNav() {
      * @param {string} itemId - 菜单项ID
      * @param {string} url - 菜单项URL
      */
-    setActiveItem(itemId, url) {
+    setActiveItem(itemId, _url) {
       this.activeItemId = itemId
       // 展开对应的分组
       this.expandGroupForItem(itemId)

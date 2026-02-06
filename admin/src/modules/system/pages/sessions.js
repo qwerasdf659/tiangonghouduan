@@ -398,7 +398,7 @@ function sessionsPage() {
 
       try {
         let successCount = 0
-        let failCount = 0
+        let _failCount = 0
 
         for (const sessionId of selected) {
           try {
@@ -408,11 +408,11 @@ function sessionsPage() {
             if (response && response.success) {
               successCount++
             } else {
-              failCount++
+              _failCount++
               logger.warn('[Sessions] 撤销失败:', sessionId, response?.message)
             }
           } catch (e) {
-            failCount++
+            _failCount++
             logger.error(`[Sessions] 撤销会话 ${sessionId} 异常:`, e.message)
           }
         }
@@ -652,7 +652,7 @@ function sessionsPage() {
       logger.info('[Sessions] 用户点击刷新')
 
       // 保存刷新前的会话数量
-      const prevCount = this.sessions?.length || 0
+      const _prevCount = this.sessions?.length || 0
 
       try {
         await this.loadData()

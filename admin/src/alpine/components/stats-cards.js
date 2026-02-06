@@ -19,7 +19,7 @@ import { logger } from '../../utils/logger.js'
  * @param {Array} config.stats - 统计卡片配置数组
  * @param {Object} config.data - 统计数据
  */
-function statsCards(config = {}) {
+export function statsCards(config = {}) {
   return {
     stats: config.stats || [],
     data: config.data || {},
@@ -118,7 +118,7 @@ function statsCards(config = {}) {
 /**
  * 单个统计卡片组件
  */
-function statCard(config = {}) {
+export function statCard(config = {}) {
   return {
     label: config.label || '统计项',
     value: config.value || '-',

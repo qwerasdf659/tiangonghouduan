@@ -8,6 +8,7 @@
 
 import Alpine from 'alpinejs'
 import { logger } from '../../../utils/logger.js'
+import { API_PREFIX } from '../../../api/base.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
 import { useAuditLogsState, useAuditLogsMethods } from '../composables/audit-logs.js'
 import { loadECharts } from '../../../utils/echarts-lazy.js'
@@ -183,7 +184,7 @@ function auditLogsPage() {
     async loadTrendStats() {
       try {
         const response = await this.apiGet(
-          `/api/v4/console/audit-rollback/stats/trend?days=${this.trendDays}`,
+          `${API_PREFIX}/console/audit-rollback/stats/trend?days=${this.trendDays}`,
           {},
           { showLoading: false }
         )
@@ -214,7 +215,7 @@ function auditLogsPage() {
         if (this.logFilters.end_date) params.append('end_time', this.logFilters.end_date)
 
         const response = await this.apiGet(
-          `/api/v4/console/audit-rollback/stats/by-target-type?${params}`,
+          `${API_PREFIX}/console/audit-rollback/stats/by-target-type?${params}`,
           {},
           { showLoading: false }
         )
@@ -258,11 +259,12 @@ function auditLogsPage() {
           this.renderTargetTypeChart()
         }
 
-        // 窗口大小变化时自适应
-        window.addEventListener('resize', () => {
+        // 窗口大小变化时自适应（使用命名引用以便清理）
+        this._chartResizeHandler = () => {
           this.trendChart?.resize()
           this.targetTypeChart?.resize()
-        })
+        }
+        window.addEventListener('resize', this._chartResizeHandler)
 
         logger.info('[AuditLogs] 图表初始化完成')
       } catch (error) {
@@ -577,13 +579,14 @@ function auditLogsPage() {
           this.renderReportRiskLevelChart()
         }
 
-        // 窗口大小变化时自适应
-        window.addEventListener('resize', () => {
+        // 窗口大小变化时自适应（使用命名引用以便清理）
+        this._reportResizeHandler = () => {
           this.reportOperationChart?.resize()
           this.reportTargetChart?.resize()
           this.reportTrendChart?.resize()
           this.reportRiskLevelChart?.resize()
-        })
+        }
+        window.addEventListener('resize', this._reportResizeHandler)
 
         logger.info('[AuditLogs] 报告图表初始化完成')
       } catch (error) {
@@ -856,7 +859,7 @@ function auditLogsPage() {
         if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
 
         const response = await this.apiGet(
-          `/api/v4/console/system/audit-logs?${params}`,
+          `${API_PREFIX}/console/system/audit-logs?${params}`,
           {},
           { showLoading: false }
         )
@@ -963,7 +966,7 @@ function auditLogsPage() {
       if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
       params.append('format', 'csv')
 
-      const exportUrl = `/api/v4/console/system/audit-logs/export?${params.toString()}`
+      const exportUrl = `${API_PREFIX}/console/system/audit-logs/export?${params.toString()}`
       window.open(exportUrl, '_blank')
       
       this.showSuccess('正在导出审计日志...')

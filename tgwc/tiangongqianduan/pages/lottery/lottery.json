@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "🎰 幸运抽奖",
+  "navigationBarBackgroundColor": "#667eea",
+  "navigationBarTextStyle": "white",
+  "enablePullDownRefresh": true,
+  "onReachBottomDistance": 50,
+  "backgroundTextStyle": "light",
+  "backgroundColor": "#667eea"
+}

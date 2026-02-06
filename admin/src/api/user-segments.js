@@ -1,11 +1,12 @@
 /**
  * 用户画像分析 API
  * @description 用户分层、活跃度分析、行为漏斗
- * @version 1.0.0
+ * @version 1.1.0
  * @date 2026-02-01
+ * @updated 2026-02-06 - 统一使用 request() 替代原生 fetch
  */
 
-import { API_PREFIX, authHeaders, handleResponse, buildURL } from './base.js'
+import { API_PREFIX, request } from './base.js'
 
 // 用户画像端点（后端挂载在 /console/users 下）
 export const USER_SEGMENTS_ENDPOINTS = {
@@ -25,10 +26,7 @@ export const UserSegmentsAPI = {
    * @returns {Promise<Object>} 分层统计数据
    */
   async getSegments() {
-    const response = await fetch(USER_SEGMENTS_ENDPOINTS.SEGMENTS, {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: USER_SEGMENTS_ENDPOINTS.SEGMENTS })
   },
 
   /**
@@ -38,11 +36,7 @@ export const UserSegmentsAPI = {
    * @returns {Promise<Object>} 用户列表
    */
   async getSegmentUsers(segmentType, params = {}) {
-    const url = buildURL(USER_SEGMENTS_ENDPOINTS.SEGMENT_USERS(segmentType), params)
-    const response = await fetch(url, {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: USER_SEGMENTS_ENDPOINTS.SEGMENT_USERS(segmentType), params })
   },
 
   /**
@@ -52,11 +46,7 @@ export const UserSegmentsAPI = {
    * @returns {Promise<Object>} 热力图数据
    */
   async getActivityHeatmap(params = {}) {
-    const url = buildURL(USER_SEGMENTS_ENDPOINTS.ACTIVITY_HEATMAP, params)
-    const response = await fetch(url, {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: USER_SEGMENTS_ENDPOINTS.ACTIVITY_HEATMAP, params })
   },
 
   /**
@@ -66,11 +56,7 @@ export const UserSegmentsAPI = {
    * @returns {Promise<Object>} 偏好数据
    */
   async getExchangePreferences(params = {}) {
-    const url = buildURL(USER_SEGMENTS_ENDPOINTS.EXCHANGE_PREFERENCES, params)
-    const response = await fetch(url, {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: USER_SEGMENTS_ENDPOINTS.EXCHANGE_PREFERENCES, params })
   },
 
   /**
@@ -81,10 +67,6 @@ export const UserSegmentsAPI = {
    * @returns {Promise<Object>} 漏斗数据
    */
   async getFunnel(params = {}) {
-    const url = buildURL(USER_SEGMENTS_ENDPOINTS.FUNNEL, params)
-    const response = await fetch(url, {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: USER_SEGMENTS_ENDPOINTS.FUNNEL, params })
   }
 }

@@ -1,0 +1,2408 @@
+/* pages/lottery/lottery.wxss - 抽奖页面样式 - 根据迁移文档v1.0.0重构 + 按钮尺寸优化 */
+
+/* 🎨 优化整体容器设计 */
+.lottery-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20rpx 20rpx 20rpx 20rpx;
+  position: relative;
+  /* 🔴 修复顶部白色空缺问题 */
+  padding-top: calc(env(safe-area-inset-top) + 20rpx);
+}
+
+.lottery-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255, 107, 53, 0.08) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.lottery-container.showing-result {
+  overflow: hidden;
+}
+
+/* 🎨 优化页面头部设计 - 融入背景 */
+.header {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 24rpx;
+  padding: 0 24rpx;
+  margin: 0 0 25rpx 0;
+  box-shadow:
+    0 4rpx 20rpx rgba(255, 255, 255, 0.1),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(25rpx);
+  border: 1rpx solid rgba(255, 255, 255, 0.25);
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2rpx;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.6) 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0.6) 100%
+  );
+}
+
+/* 旧样式已由整合布局替代 */
+
+/* ========================================
+   🆕 整合布局样式（用户信息 + 二维码横向排列）
+   ======================================== */
+
+/* 头部内容容器 - 横向布局（上下居中对齐） */
+.header-content {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  /* 🔴 改为center，实现上下居中对齐 */
+  gap: 24rpx;
+}
+
+/* 左侧：用户信息区域 */
+.user-info-section {
+  width: 400rpx;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  justify-content: center;
+}
+
+/* 欢迎语 */
+.welcome-text {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.3);
+  margin-bottom: 8rpx;
+}
+
+/* 积分横向容器 */
+.points-row {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  align-items: flex-start;
+}
+
+/* 积分项 - 纯文本展示 */
+.points-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+  flex: 1;
+}
+
+/* 积分标签 */
+.points-label {
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.2);
+}
+
+/* 积分数值容器 */
+.points-value {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+}
+
+/* 积分数字 - 多级响应式字体（支持超长数字） */
+.points-number {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #ffd700;
+  text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.3);
+  transition: font-size 0.2s ease;
+  /* 平滑过渡效果 */
+}
+
+/* 🆕 8-10位数字：中等缩小 */
+.points-number.medium-number {
+  font-size: 26rpx;
+}
+
+/* 🆕 11-13位数字：较大缩小 */
+.points-number.small-number {
+  font-size: 22rpx;
+}
+
+/* 🆕 14位及以上：最小字体 */
+.points-number.tiny-number {
+  font-size: 18rpx;
+}
+
+/* 积分图标 */
+.points-icon {
+  font-size: 24rpx;
+  opacity: 0.9;
+}
+
+/* 二维码标题样式已删除（纯净版无需文字） */
+
+/* 右侧：二维码区域（纯净版，无额外文字） */
+.qrcode-section-inline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* 二维码容器 - 浅蓝色，与紫色背景完美融合 - ✅ 正方形容器（完美适配正方形二维码） */
+.qrcode-container {
+  width: 180rpx;
+  height: 180rpx;
+  background: rgba(220, 230, 255, 0.95);
+  /* 浅蓝色调更明显，与紫色背景同色系，视觉协调且扫描性能优秀 */
+  border-radius: 16rpx;
+  padding: 2rpx;
+  box-shadow:
+    0 8rpx 24rpx rgba(0, 0, 0, 0.15),
+    0 4rpx 12rpx rgba(0, 0, 0, 0.1),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.4);
+  /* 添加内阴影，增强立体感 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10rpx);
+  /* 毛玻璃效果，与页面整体风格保持一致 */
+  border: 1rpx solid rgba(200, 215, 255, 0.5);
+  /* 浅蓝色边框，与背景色协调 */
+}
+
+/* 二维码图片 - ✅ 正方形图片区域（180-4=176，完美填充无留白） */
+.qrcode-image {
+  width: 176rpx;
+  height: 176rpx;
+  border-radius: 8rpx;
+}
+
+/* 二维码加载状态 - ✅ 正方形加载区域 */
+.qrcode-loading {
+  width: 176rpx;
+  height: 176rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+}
+
+.loading-icon {
+  font-size: 40rpx;
+  animation: rotate 2s linear infinite;
+}
+
+.loading-text {
+  font-size: 24rpx;
+  color: #999;
+  font-weight: 500;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 二维码提示文字样式已删除（纯净版无需文字） */
+
+/* 二维码光晕效果 */
+.qrcode-container::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+  animation: qrGlow 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes qrGlow {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+/* 🆕 点击提示图标 */
+.qrcode-hint {
+  position: absolute;
+  bottom: 8rpx;
+  right: 8rpx;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  width: 32rpx;
+  height: 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: hintPulse 2s ease-in-out infinite;
+}
+
+.hint-icon {
+  font-size: 18rpx;
+  line-height: 1;
+}
+
+@keyframes hintPulse {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+/* ========================================
+   🆕 放大二维码弹窗样式
+   ======================================== */
+
+/* 弹窗蒙层 */
+.qrcode-enlarged-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* 放大二维码容器 */
+.qrcode-enlarged-container {
+  position: relative;
+  width: 90%;
+  max-width: 600rpx;
+  background: linear-gradient(135deg, rgba(240, 242, 255, 0.98) 0%, rgba(220, 230, 255, 0.98) 100%);
+  /* 浅蓝白色渐变，与页面紫色主题协调 */
+  border-radius: 32rpx;
+  /* 增加圆角，更现代化 */
+  padding: 48rpx;
+  box-shadow:
+    0 20rpx 60rpx rgba(102, 126, 234, 0.3),
+    0 8rpx 32rpx rgba(0, 0, 0, 0.2),
+    inset 0 2rpx 0 rgba(255, 255, 255, 0.6);
+  /* 增强阴影效果，添加内阴影高光 */
+  backdrop-filter: blur(20rpx);
+  /* 毛玻璃效果 */
+  border: 2rpx solid rgba(255, 255, 255, 0.5);
+  /* 白色边框，精致感 */
+  animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 关闭按钮 - 优雅的紫色主题 */
+.qrcode-close-btn {
+  position: absolute;
+  top: 16rpx;
+  right: 16rpx;
+  width: 56rpx;
+  height: 56rpx;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  /* 使用页面主题紫色渐变 */
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: all 0.3s ease;
+  box-shadow:
+    0 4rpx 16rpx rgba(102, 126, 234, 0.4),
+    0 2rpx 8rpx rgba(0, 0, 0, 0.2);
+  /* 紫色阴影，增强立体感 */
+  border: 2rpx solid rgba(255, 255, 255, 0.3);
+  /* 白色边框 */
+}
+
+.qrcode-close-btn:active {
+  transform: scale(0.92);
+  box-shadow:
+    0 2rpx 8rpx rgba(102, 126, 234, 0.5),
+    0 1rpx 4rpx rgba(0, 0, 0, 0.3);
+}
+
+.qrcode-close-btn .close-icon {
+  font-size: 32rpx;
+  color: #ffffff;
+  font-weight: 300;
+  line-height: 1;
+}
+
+/* 放大二维码内容 */
+.qrcode-enlarged-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32rpx;
+}
+
+/* 放大的二维码图片 - 正方形显示 */
+.qrcode-enlarged-image {
+  width: 500rpx;
+  /* 🔴 正方形：宽度500rpx */
+  height: 500rpx;
+  /* 🔴 正方形：高度500rpx */
+  border-radius: 20rpx;
+  /* 增加圆角 */
+  box-shadow:
+    0 12rpx 40rpx rgba(102, 126, 234, 0.2),
+    0 6rpx 20rpx rgba(0, 0, 0, 0.15),
+    inset 0 0 0 1rpx rgba(255, 255, 255, 0.3);
+  /* 增强阴影效果，添加内边框高光 */
+  padding: 16rpx;
+  /* 内边距，让二维码有呼吸感 */
+  background: rgba(255, 255, 255, 0.9);
+  /* 半透明白色背景，确保二维码清晰 */
+  /* 🔴 确保图片正确显示 */
+  display: block;
+}
+
+/* 放大二维码提示文字 - 增强视觉效果 */
+.qrcode-enlarged-tips {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+  padding: 24rpx 32rpx;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 20rpx;
+  width: 100%;
+  box-shadow:
+    0 8rpx 24rpx rgba(102, 126, 234, 0.3),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.2);
+  /* 增强阴影和内高光 */
+  border: 1rpx solid rgba(255, 255, 255, 0.2);
+  /* 半透明边框 */
+}
+
+.enlarged-tip {
+  font-size: 28rpx;
+  /* 稍微增大字号 */
+  color: #ffffff;
+  font-weight: 500;
+  text-align: center;
+  text-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.3);
+  /* 增强文字阴影 */
+  letter-spacing: 1rpx;
+  /* 增加字间距，更优雅 */
+}
+
+/* 响应式：小屏幕优化 */
+@media (max-width: 750rpx) {
+  .qrcode-enlarged-container {
+    width: 85%;
+    padding: 32rpx;
+  }
+
+  .qrcode-enlarged-image {
+    width: 400rpx;
+    /* 🔴 小屏幕正方形：400×400rpx */
+    height: 400rpx;
+  }
+
+  .enlarged-tip {
+    font-size: 24rpx;
+  }
+}
+
+/* 🔴 响应式优化（整合布局 - 小屏幕切换为纵向） */
+@media (max-width: 750rpx) {
+  .header-content {
+    flex-direction: column;
+    align-items: center;
+    gap: 20rpx;
+  }
+
+  .user-info-section {
+    width: 100%;
+    max-width: 400rpx;
+    align-items: flex-start;
+  }
+
+  .qrcode-section-inline {
+    flex-direction: column;
+    align-items: center;
+    margin-top: 8rpx;
+  }
+
+  .qrcode-container {
+    width: 160rpx;
+    height: 160rpx;
+  }
+
+  .qrcode-image {
+    width: 156rpx;
+    height: 156rpx;
+  }
+
+  .qrcode-loading {
+    width: 156rpx;
+    height: 156rpx;
+  }
+
+  .points-number {
+    font-size: 28rpx;
+  }
+}
+
+/* 🎨 放大的抽奖网格区域 - 更突出的视觉表现 */
+.lottery-grid-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 40rpx;
+  position: relative;
+  z-index: 1;
+}
+
+/* 🎨 放大的3x3抽奖盘容器 - 提升用户体验 */
+.lottery-grid {
+  width: 680rpx;
+  height: 680rpx;
+  /* 🔧 降级背景色，确保真机兼容 */
+  background: #ffffff;
+  background: linear-gradient(145deg, #ffffff 0%, #f8f9ff 30%, #ffffff 70%, #f0f7ff 100%);
+  border-radius: 35rpx;
+  box-shadow:
+    0 20rpx 40rpx rgba(102, 126, 234, 0.15),
+    0 8rpx 25rpx rgba(102, 126, 234, 0.1),
+    0 0 0 5rpx rgba(255, 255, 255, 0.8),
+    0 0 0 8rpx rgba(102, 126, 234, 0.1);
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  /* 🔧 简化背景图，提高真机兼容性 */
+}
+
+.lottery-grid.animating {
+  animation: pulse 0.3s ease-in-out;
+}
+
+/* 🎨 放大的奖品区域网格布局 - 优化间距 */
+.prize-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-content: space-between;
+  width: 100%;
+  height: 100%;
+  padding: 20rpx;
+  box-sizing: border-box;
+  /* 🎨 确保每行正好3个元素，间距更加协调 */
+}
+
+/* 🎨 放大的奖品区域 - 每个元素占据更大空间 */
+.prize-area:nth-child(1),
+.prize-area:nth-child(2),
+.prize-area:nth-child(3),
+.prize-area:nth-child(7),
+.prize-area:nth-child(8),
+.prize-area:nth-child(9) {
+  width: 200rpx;
+  height: 200rpx;
+}
+
+/* 🎨 放大第二行侧边元素和中央按钮 */
+.prize-area:nth-child(4),
+.prize-area:nth-child(6) {
+  width: 200rpx;
+  height: 200rpx;
+}
+
+.lottery-center-button:nth-child(5) {
+  width: 200rpx;
+  height: 200rpx;
+}
+
+/* 🎨 放大的奖品区域基础样式 - 提升视觉效果 */
+.prize-area {
+  background: linear-gradient(145deg, #ffffff 0%, #f8f9ff 50%, #ffffff 100%);
+  border: 2rpx solid rgba(102, 126, 234, 0.1);
+  border-radius: 20rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  box-shadow:
+    0 8rpx 25rpx rgba(0, 0, 0, 0.1),
+    0 3rpx 12rpx rgba(0, 0, 0, 0.06);
+  /* 🎨 放大尺寸，提升用户体验 */
+  width: 200rpx;
+  height: 200rpx;
+  box-sizing: border-box;
+  overflow: hidden;
+  margin-bottom: 8rpx;
+}
+
+/* 高亮状态 */
+.prize-area.highlighted {
+  background: linear-gradient(145deg, #ff6b35 0%, #ff8a65 50%, #ffab91 100%);
+  border: 3rpx solid #ff4444;
+  box-shadow:
+    0 0 40rpx rgba(255, 107, 53, 0.9),
+    0 0 80rpx rgba(255, 107, 53, 0.6),
+    0 15rpx 35rpx rgba(255, 107, 53, 0.4);
+  transform: translateY(-8rpx) scale(1.05);
+  animation: highlightPulse 0.6s ease-in-out;
+}
+
+.prize-area.highlighted .prize-content {
+  color: white;
+}
+
+/* 中奖状态 */
+.prize-area.winning {
+  background: linear-gradient(145deg, #ffd700 0%, #ffed4a 30%, #fff176 70%, #ffd700 100%);
+  border: 4rpx solid #f59e0b;
+  box-shadow:
+    0 0 60rpx rgba(255, 215, 0, 1),
+    0 0 120rpx rgba(255, 215, 0, 0.8),
+    0 20rpx 40rpx rgba(255, 215, 0, 0.5);
+  transform: translateY(-12rpx) scale(1.1);
+  animation: winningPulse 1.5s ease-in-out infinite;
+}
+
+.prize-area.winning .prize-content {
+  color: #333;
+}
+
+.prize-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+  text-align: center;
+  justify-content: center;
+  height: 100%;
+  /* ✅ 布局优化：确保图标和文字合理分布 */
+}
+
+.prize-icon {
+  font-size: 32rpx;
+  margin-bottom: 4rpx;
+  display: block;
+  flex-shrink: 0;
+  /* ✅ 图标优化：为两行文字预留更多空间 */
+}
+
+/* 🔴 文字容器：支持动态单行/双行切换 */
+.prize-text-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  text-align: center;
+}
+
+/* 🔴 单行显示模式 */
+.prize-text-container.single-line .prize-name {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.2;
+  text-align: center;
+  max-width: 95%;
+  word-break: keep-all;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  /* ✅ 单行显示：保持原有效果，避免截断时的布局问题 */
+}
+
+/* 🔴 双行显示模式 */
+.prize-text-container.double-line .prize-name-multiline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rpx;
+  width: 100%;
+}
+
+.prize-text-container.double-line .prize-line {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.1;
+  text-align: center;
+  white-space: nowrap;
+  /* ✅ 双行显示：每行字数相等，完美对齐 */
+}
+
+/* 🔴 兼容性：默认单行样式（向后兼容） */
+.prize-name {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.2;
+  text-align: center;
+  max-width: 95%;
+  word-break: keep-all;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 🎨 放大的中央抽奖按钮容器 */
+.lottery-center-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 200rpx;
+  height: 200rpx;
+  box-sizing: border-box;
+  margin-bottom: 8rpx;
+}
+
+/* 🎨 放大的中央抽奖按钮 - 更佳视觉体验 */
+.center-draw-btn {
+  width: 175rpx;
+  height: 175rpx;
+  /* 🔧 降级背景色，确保真机兼容 */
+  background: #ff6b35;
+  background: linear-gradient(145deg, #ff6b35 0%, #ff8c42 50%, #ff6b35 100%);
+  color: white;
+  border: 4rpx solid white;
+  border-radius: 90rpx;
+  font-size: 24rpx;
+  font-weight: 800;
+  box-shadow:
+    0 8rpx 25rpx rgba(255, 107, 53, 0.4),
+    0 4rpx 15rpx rgba(255, 107, 53, 0.2),
+    0 0 0 4rpx rgba(255, 107, 53, 0.15);
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  position: relative;
+  z-index: 10;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  outline: none !important;
+  box-sizing: border-box;
+  /* 🔧 简化动画，提高性能 */
+  animation: buttonGlow 4s ease-in-out infinite;
+}
+
+.center-draw-btn:active {
+  animation: buttonPress 0.2s ease-in-out;
+}
+
+.center-draw-btn.drawing {
+  background: linear-gradient(145deg, #ccc 0%, #999 50%, #ccc 100%);
+  animation: spin 1s linear infinite;
+}
+
+.center-draw-btn.drawing .btn-text {
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.btn-text {
+  font-size: 22rpx;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.2;
+  text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.3);
+  max-width: 100%;
+  word-break: keep-all;
+  white-space: nowrap;
+}
+
+/* 🎨 放大的多连抽按钮组 - 提升视觉占比 */
+.multi-draw-section {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 25rpx;
+  padding: 35rpx 30rpx;
+  margin-bottom: 30rpx;
+  box-shadow:
+    0 8rpx 30rpx rgba(0, 0, 0, 0.12),
+    0 4rpx 15rpx rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(15rpx);
+}
+
+.multi-draw-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.grid-row {
+  display: flex;
+  gap: 20rpx;
+}
+
+.grid-draw-btn {
+  flex: 1;
+  height: 140rpx;
+  border: none;
+  border-radius: 20rpx;
+  padding: 20rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  box-shadow:
+    0 8rpx 20rpx rgba(0, 0, 0, 0.2),
+    0 4rpx 12rpx rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.grid-draw-btn:active {
+  transform: translateY(-4rpx) scale(0.98);
+  box-shadow:
+    0 12rpx 30rpx rgba(0, 0, 0, 0.25),
+    0 6rpx 15rpx rgba(0, 0, 0, 0.2);
+}
+
+.grid-draw-btn:disabled {
+  opacity: 0.6;
+  transform: none !important;
+}
+
+.triple-btn {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}
+
+.five-btn {
+  background: linear-gradient(135deg, #f093fb, #f5576c);
+  color: white;
+}
+
+.ten-btn {
+  background: linear-gradient(135deg, #4facfe, #00f2fe);
+  color: white;
+}
+
+.ten-btn.full-width {
+  width: 100%;
+}
+
+.ten-btn.special {
+  position: relative;
+  overflow: hidden;
+}
+
+.ten-btn.special::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+
+  100% {
+    left: 100%;
+  }
+}
+
+.btn-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+}
+
+.btn-main-text {
+  font-size: 32rpx;
+  font-weight: 700;
+  text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.3);
+}
+
+.btn-sub-text {
+  font-size: 24rpx;
+  opacity: 0.9;
+  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.2);
+}
+
+.btn-guarantee {
+  font-size: 20rpx;
+  opacity: 0.9;
+  background: rgba(255, 255, 255, 0.25);
+  padding: 4rpx 12rpx;
+  border-radius: 12rpx;
+  margin-top: 4rpx;
+  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.2);
+}
+
+/* 抽奖结果弹窗 */
+.result-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 🔴 移除：不再需要遮罩层样式 */
+
+/* 🔴 新增：错误状态弹窗样式 */
+.error-title {
+  color: #ff4757 !important;
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.error-subtitle {
+  color: #ff6b7a !important;
+  font-size: 24rpx;
+  margin-top: 10rpx;
+}
+
+.error-info {
+  padding: 30rpx;
+  text-align: center;
+}
+
+.error-icon {
+  font-size: 80rpx;
+  display: block;
+  margin-bottom: 20rpx;
+}
+
+.error-message {
+  font-size: 28rpx;
+  color: #ff4757;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 15rpx;
+}
+
+.error-suggestion {
+  font-size: 24rpx;
+  color: #666;
+  display: block;
+}
+
+/* 🔴 旧弹窗样式已被卡片渐变方案替代 */
+
+/* 响应式优化 */
+/* 小屏幕设备优化 */
+@media (max-width: 750rpx) {
+  .lottery-grid {
+    width: 580rpx;
+    height: 580rpx;
+  }
+
+  .center-draw-btn {
+    width: 200rpx;
+    height: 160rpx;
+    font-size: 24rpx;
+  }
+}
+
+/* 大屏幕设备优化 */
+@media (min-width: 1000rpx) {
+  .lottery-grid {
+    width: 700rpx;
+    height: 700rpx;
+  }
+
+  .center-draw-btn {
+    width: 240rpx;
+    height: 200rpx;
+    font-size: 28rpx;
+  }
+}
+
+/* 加载状态 */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 120rpx 40rpx;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* 动画定义 */
+@keyframes highlightPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 40rpx rgba(255, 107, 53, 0.9);
+    transform: translateY(-8rpx) scale(1.05);
+  }
+
+  50% {
+    box-shadow: 0 0 60rpx rgba(255, 107, 53, 1);
+    transform: translateY(-8rpx) scale(1.08);
+  }
+}
+
+@keyframes winningPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 60rpx rgba(255, 215, 0, 1);
+    transform: translateY(-12rpx) scale(1.1);
+  }
+
+  50% {
+    box-shadow: 0 0 80rpx rgba(255, 215, 0, 1);
+    transform: translateY(-12rpx) scale(1.15);
+  }
+}
+
+@keyframes buttonGlow {
+  0%,
+  100% {
+    box-shadow:
+      0 15rpx 30rpx rgba(255, 107, 53, 0.4),
+      0 8rpx 20rpx rgba(255, 107, 53, 0.25);
+  }
+
+  50% {
+    box-shadow:
+      0 20rpx 40rpx rgba(255, 107, 53, 0.6),
+      0 12rpx 30rpx rgba(255, 107, 53, 0.4);
+  }
+}
+
+@keyframes drawingRotate {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes modalShow {
+  from {
+    opacity: 0;
+    transform: scale(0.7) translateY(-50rpx);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* 🎨 真机兼容性补充规则 - 放大版本优化 */
+
+/* 确保在不支持flex gap的真机上也能正常显示 */
+.prize-grid {
+  gap: 0;
+}
+
+/* 🎨 为放大版本提供固定尺寸 */
+.prize-area,
+.lottery-center-button {
+  min-width: 200rpx;
+  min-height: 200rpx;
+  max-width: 200rpx;
+  max-height: 200rpx;
+}
+
+/* 简化复杂的box-shadow，提高真机性能 */
+.prize-area {
+  box-shadow: 0 6rpx 18rpx rgba(0, 0, 0, 0.12);
+}
+
+.lottery-grid {
+  box-shadow: 0 12rpx 30rpx rgba(102, 126, 234, 0.18);
+}
+
+/* 🎨 确保放大后的文字在各种屏幕上都可读 */
+.prize-name {
+  min-height: 40rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-text {
+  min-height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 🎨 多连抽按钮兼容性 */
+.grid-draw-btn {
+  min-height: 140rpx;
+}
+
+.btn-main-text {
+  min-height: 36rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-sub-text {
+  min-height: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 🌟 卡片渐变方案 - 中奖弹窗美化样式 */
+
+/* 🎨 整体弹窗容器 - 渐变背景 */
+.gradient-card-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    135deg,
+    rgba(102, 126, 234, 0.15) 0%,
+    rgba(118, 75, 162, 0.15) 50%,
+    rgba(255, 107, 53, 0.15) 100%
+  );
+  backdrop-filter: blur(20rpx);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: modalFadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.gradient-card-container {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%);
+  border-radius: 32rpx;
+  width: 92%;
+  max-width: 540rpx;
+  max-height: 85vh;
+  position: relative;
+  animation: cardSlideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+  /* 现代化阴影系统 */
+  box-shadow:
+    0 32rpx 64rpx rgba(0, 0, 0, 0.12),
+    0 16rpx 32rpx rgba(0, 0, 0, 0.08),
+    0 8rpx 16rpx rgba(0, 0, 0, 0.04),
+    inset 0 2rpx 4rpx rgba(255, 255, 255, 0.6);
+  border: 2rpx solid rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(40rpx);
+}
+
+/* 🎯 关闭按钮 - 渐变设计 */
+.gradient-close {
+  position: absolute;
+  top: 24rpx;
+  right: 24rpx;
+  width: 64rpx;
+  height: 64rpx;
+  background: linear-gradient(135deg, #ff6b7a, #c44569);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  box-shadow: 0 8rpx 24rpx rgba(196, 69, 105, 0.3);
+}
+
+.close-icon {
+  color: white;
+  font-size: 28rpx;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.gradient-close:active {
+  transform: scale(0.9);
+  box-shadow: 0 4rpx 12rpx rgba(196, 69, 105, 0.4);
+}
+
+/* 🎨 弹窗头部 - 卡片式标题 */
+.gradient-header-card {
+  padding: 40rpx 32rpx 24rpx;
+  background: transparent;
+}
+
+.title-card {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 32rpx;
+  border-radius: 24rpx;
+  position: relative;
+  overflow: hidden;
+}
+
+.success-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 16rpx 32rpx rgba(102, 126, 234, 0.25);
+}
+
+.error-card {
+  background: linear-gradient(135deg, #ff6b7a 0%, #c44569 100%);
+  box-shadow: 0 16rpx 32rpx rgba(255, 107, 122, 0.25);
+}
+
+.not-winning-card {
+  background: linear-gradient(135deg, #a8a8a8 0%, #7a7a7a 100%);
+  box-shadow: 0 16rpx 32rpx rgba(168, 168, 168, 0.25);
+}
+
+.title-icon {
+  font-size: 48rpx;
+  flex-shrink: 0;
+  animation: iconPulse 2s ease-in-out infinite;
+}
+
+.not-winning-icon {
+  font-size: 48rpx;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.title-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.result-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.2);
+}
+
+.result-subtitle {
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.1);
+}
+
+.not-winning-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.2);
+}
+
+.not-winning-subtitle {
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.1);
+}
+
+/* 🎁 弹窗主体 - 渐变卡片容器 */
+.gradient-body-container {
+  padding: 0 32rpx 24rpx;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* 🌟 单次抽奖奖品卡片 */
+.single-prize-card {
+  margin-bottom: 24rpx;
+}
+
+.prize-card-bg {
+  position: relative;
+  background: linear-gradient(145deg, #667eea, #764ba2);
+  border-radius: 28rpx;
+  padding: 4rpx;
+  box-shadow: 0 20rpx 40rpx rgba(102, 126, 234, 0.3);
+}
+
+.prize-card-shine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, transparent 100%);
+  border-radius: 28rpx 28rpx 0 0;
+  pointer-events: none;
+}
+
+.prize-card-content {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 24rpx;
+  padding: 40rpx 32rpx;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24rpx;
+  text-align: center;
+}
+
+.winning-icon-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.winning-icon {
+  font-size: 80rpx;
+  animation: prizeFloat 3s ease-in-out infinite;
+}
+
+.icon-glow {
+  position: absolute;
+  width: 120rpx;
+  height: 120rpx;
+  background: radial-gradient(circle, rgba(102, 126, 234, 0.2) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+.winning-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  align-items: center;
+}
+
+.winning-name {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #2c3e50;
+  text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.1);
+}
+
+.winning-desc {
+  font-size: 28rpx;
+  color: #7f8c8d;
+  line-height: 1.4;
+}
+
+.prize-card-decoration {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 16rpx;
+}
+
+.decoration-dot {
+  width: 12rpx;
+  height: 12rpx;
+  background: linear-gradient(45deg, #667eea, #764ba2);
+  border-radius: 50%;
+  animation: dotBounce 1.5s ease-in-out infinite;
+}
+
+/* 💨 未中奖卡片样式 */
+.not-winning-card-bg {
+  position: relative;
+  background: linear-gradient(145deg, #a8a8a8, #7a7a7a);
+  border-radius: 28rpx;
+  padding: 4rpx;
+  box-shadow: 0 20rpx 40rpx rgba(168, 168, 168, 0.3);
+}
+
+.not-winning-icon-container {
+  text-align: center;
+  padding: 40rpx 0 24rpx;
+}
+
+.not-winning-icon-large {
+  font-size: 100rpx;
+  opacity: 0.6;
+}
+
+.not-winning-info {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 24rpx;
+  padding: 32rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16rpx;
+  text-align: center;
+}
+
+.not-winning-message {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #7a7a7a;
+}
+
+.not-winning-encourage {
+  font-size: 26rpx;
+  color: #a8a8a8;
+  line-height: 1.4;
+}
+
+.decoration-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.decoration-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* 🎊 多连抽奖品网格 */
+.multi-prize-grid {
+  margin-bottom: 24rpx;
+}
+
+.prize-grid-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24rpx;
+  padding: 0 8rpx;
+}
+
+.grid-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.grid-count {
+  font-size: 24rpx;
+  color: #7f8c8d;
+  background: rgba(102, 126, 234, 0.1);
+  padding: 8rpx 16rpx;
+  border-radius: 16rpx;
+}
+
+.prize-cards-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+  justify-items: center;
+  max-height: 600rpx;
+  overflow-y: auto;
+  padding-right: 8rpx;
+}
+
+/* 🎨 美化滚动条 */
+.prize-cards-container::-webkit-scrollbar {
+  width: 6rpx;
+}
+
+.prize-cards-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 6rpx;
+}
+
+.prize-cards-container::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.3);
+  border-radius: 6rpx;
+}
+
+.prize-cards-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.5);
+}
+
+/* 🔍 滚动提示样式 */
+.scroll-hint {
+  text-align: center;
+  margin: 8rpx 0 16rpx 0;
+  padding: 12rpx;
+  background: rgba(102, 126, 234, 0.08);
+  border-radius: 16rpx;
+  animation: hintPulse 2s ease-in-out infinite;
+}
+
+.scroll-hint-text {
+  font-size: 24rpx;
+  color: rgba(102, 126, 234, 0.8);
+  font-weight: 500;
+}
+
+@keyframes hintPulse {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+.prize-item-card {
+  animation: cardFadeIn 0.6s ease-out forwards;
+  opacity: 0;
+  transform: translateY(20rpx);
+}
+
+/* 🎬 2x2网格动画延迟优化 - 按行展示 */
+.prize-item-card:nth-child(1) {
+  animation-delay: 0.1s;
+}
+
+.prize-item-card:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.prize-item-card:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.prize-item-card:nth-child(4) {
+  animation-delay: 0.35s;
+}
+
+.prize-item-card:nth-child(5) {
+  animation-delay: 0.5s;
+}
+
+.prize-item-card:nth-child(6) {
+  animation-delay: 0.55s;
+}
+
+.prize-item-card:nth-child(7) {
+  animation-delay: 0.7s;
+}
+
+.prize-item-card:nth-child(8) {
+  animation-delay: 0.75s;
+}
+
+.prize-item-card:nth-child(9) {
+  animation-delay: 0.9s;
+}
+
+.prize-item-card:nth-child(10) {
+  animation-delay: 0.95s;
+}
+
+/* 🌈 渐变色彩系统 - 4种交替渐变 */
+.gradient-prize-1 {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 12rpx 24rpx rgba(102, 126, 234, 0.2);
+}
+
+.gradient-prize-2 {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  box-shadow: 0 12rpx 24rpx rgba(240, 147, 251, 0.2);
+}
+
+.gradient-prize-3 {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  box-shadow: 0 12rpx 24rpx rgba(79, 172, 254, 0.2);
+}
+
+.gradient-prize-4 {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  box-shadow: 0 12rpx 24rpx rgba(67, 233, 123, 0.2);
+}
+
+.prize-card-wrapper {
+  border-radius: 20rpx;
+  padding: 3rpx;
+  transition: all 0.3s ease;
+  width: 100%;
+  max-width: 320rpx;
+}
+
+.prize-card-wrapper:active {
+  transform: scale(0.98);
+}
+
+.prize-card-inner {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 17rpx;
+  padding: 24rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16rpx;
+  position: relative;
+  overflow: hidden;
+  min-height: 180rpx;
+}
+
+.prize-number-badge {
+  width: 48rpx;
+  height: 48rpx;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.prize-number {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.prize-card-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+  flex: 1;
+  text-align: center;
+}
+
+.prize-icon-area {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prize-icon {
+  font-size: 36rpx;
+  animation: iconRotate 4s linear infinite;
+}
+
+.prize-sparkle {
+  position: absolute;
+  width: 48rpx;
+  height: 48rpx;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.5) 0%, transparent 60%);
+  border-radius: 50%;
+  animation: sparkle 2s ease-in-out infinite;
+}
+
+.prize-text-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+  flex: 1;
+  text-align: center;
+}
+
+.prize-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #2c3e50;
+  line-height: 1.2;
+}
+
+.prize-subtitle {
+  font-size: 22rpx;
+  color: #7f8c8d;
+  line-height: 1.3;
+}
+
+.prize-card-accent {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 6rpx;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 0 17rpx 17rpx 0;
+}
+
+/* ❌ 错误信息卡片 */
+.error-info-card {
+  margin-bottom: 24rpx;
+}
+
+.error-card-bg {
+  background: linear-gradient(135deg, #ff6b7a 0%, #c44569 100%);
+  border-radius: 24rpx;
+  padding: 32rpx;
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  box-shadow: 0 16rpx 32rpx rgba(255, 107, 122, 0.25);
+}
+
+.error-icon-container {
+  flex-shrink: 0;
+}
+
+.error-icon {
+  font-size: 48rpx;
+  animation: errorShake 1s ease-in-out infinite;
+}
+
+.error-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  flex: 1;
+}
+
+.error-message {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: white;
+  text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.2);
+}
+
+.error-suggestion {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.1);
+}
+
+/* 🎨 底部按钮 - 渐变设计 */
+.gradient-footer {
+  padding: 24rpx 32rpx 40rpx;
+  background: transparent;
+}
+
+.gradient-confirm-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 20rpx;
+  padding: 0;
+  font-size: 32rpx;
+  font-weight: 600;
+  box-shadow: 0 16rpx 32rpx rgba(102, 126, 234, 0.3);
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+  overflow: hidden;
+}
+
+.gradient-confirm-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.6s ease;
+}
+
+.gradient-confirm-btn:active::before {
+  left: 100%;
+}
+
+.gradient-confirm-btn:active {
+  transform: scale(0.98);
+  box-shadow: 0 8rpx 16rpx rgba(102, 126, 234, 0.4);
+}
+
+.btn-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  padding: 28rpx 40rpx;
+}
+
+.btn-text {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: white;
+  text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.2);
+}
+
+.btn-icon {
+  font-size: 28rpx;
+  animation: sparkleRotate 2s linear infinite;
+}
+
+/* 🎭 动画定义 */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cardSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(60rpx) scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes cardFadeIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes iconPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes prizeFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10rpx);
+  }
+}
+
+@keyframes glowPulse {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.6;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes dotBounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8rpx);
+  }
+}
+
+@keyframes iconRotate {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sparkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes sparkleRotate {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes errorShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-4rpx);
+  }
+
+  75% {
+    transform: translateX(4rpx);
+  }
+}
+
+/* 🔴 保留原有基础样式兼容性 */
+.result-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+/* ========================================
+ * 🆕 管理员专属功能条样式
+ * ========================================
+ * 说明：
+ * - 仅管理员可见（通过wx:if="{{isAdmin}}"控制）
+ * - 横向布局：左侧静态文字 + 中间扫一扫按钮 + 右侧审核详情按钮
+ * - 设计风格：现代简洁、操作明确、视觉层次清晰
+ * ======================================== */
+
+/* 🔴 管理员功能条容器 */
+.admin-scan-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 120rpx;
+  padding: 0 40rpx;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 4rpx 16rpx rgba(102, 126, 234, 0.3);
+  position: relative;
+  margin-bottom: 20rpx;
+}
+
+/* 🔴 左侧：静态标签文字 */
+.admin-scan-label {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #ffffff;
+  letter-spacing: 2rpx;
+}
+
+/* 🔴 中间：扫一扫按钮容器 */
+.admin-scan-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  background-color: #ffffff;
+  padding: 20rpx 40rpx;
+  border-radius: 60rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.admin-scan-button:active {
+  transform: scale(0.95);
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.15);
+}
+
+/* 🔴 扫一扫图标 */
+.scan-icon {
+  font-size: 40rpx;
+  line-height: 1;
+}
+
+/* 🔴 扫一扫文字 */
+.scan-text {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #667eea;
+  letter-spacing: 1rpx;
+}
+
+/* 🔴 右侧：审核详情按钮容器 */
+.admin-audit-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 20rpx 32rpx;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 60rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.5);
+  transition: all 0.3s ease;
+}
+
+.admin-audit-button:active {
+  background-color: rgba(255, 255, 255, 0.3);
+  transform: scale(0.95);
+}
+
+/* 🔴 审核详情文字 */
+.audit-text {
+  font-size: 26rpx;
+  font-weight: 500;
+  color: #ffffff;
+  letter-spacing: 1rpx;
+}
+
+/* 🔴 箭头图标 */
+.arrow-icon {
+  font-size: 28rpx;
+  color: #ffffff;
+  font-weight: bold;
+}
+
+/* ========================================
+   🆕 积分审核记录查询功能样式 - 紫色主题美化版
+   ======================================== */
+
+/* 🔴 徽章容器 */
+.audit-badge-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  flex-shrink: 0;
+}
+
+.audit-badge-container:active {
+  transform: scale(0.92);
+}
+
+/* 🔴 圆形徽章 - 符合项目紫色主题 */
+.audit-badge {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 有记录状态 - 紫色渐变 + 光环效果 + 脉冲动画 */
+.audit-badge.has-records {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 
+    0 4rpx 16rpx rgba(102, 126, 234, 0.4),
+    0 2rpx 8rpx rgba(118, 75, 162, 0.3),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.2);
+  animation: auditPulse 2.5s ease-in-out infinite;
+}
+
+/* 无记录状态 - 半透明白色，融入背景 */
+.audit-badge.no-records {
+  background: rgba(255, 255, 255, 0.25);
+  box-shadow: 
+    0 2rpx 8rpx rgba(0, 0, 0, 0.1),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(8rpx);
+}
+
+/* 徽章光晕效果（仅有记录时） */
+.audit-badge.has-records::before {
+  content: '';
+  position: absolute;
+  top: -2rpx;
+  left: -2rpx;
+  right: -2rpx;
+  bottom: -2rpx;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  opacity: 0.3;
+  filter: blur(8rpx);
+  z-index: -1;
+  animation: glowPulse 2.5s ease-in-out infinite;
+}
+
+/* 徽章图标 */
+.badge-icon {
+  font-size: 26rpx;
+  color: #ffffff;
+  line-height: 1;
+  filter: drop-shadow(0 1rpx 2rpx rgba(0, 0, 0, 0.2));
+}
+
+/* 数字角标 - 渐变紫色 */
+.badge-number {
+  position: absolute;
+  top: -4rpx;
+  right: -4rpx;
+  min-width: 36rpx;
+  height: 36rpx;
+  background: linear-gradient(135deg, #ff6b35 0%, #ff8a65 100%);
+  border-radius: 18rpx;
+  border: 3rpx solid #ffffff;
+  font-size: 22rpx;
+  color: #ffffff;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8rpx;
+  box-shadow: 
+    0 4rpx 12rpx rgba(255, 107, 53, 0.4),
+    0 2rpx 4rpx rgba(0, 0, 0, 0.2);
+  animation: numberBounce 2.5s ease-in-out infinite;
+}
+
+/* 脉冲动画 - 柔和的呼吸效果 */
+@keyframes auditPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 
+      0 4rpx 16rpx rgba(102, 126, 234, 0.4),
+      0 2rpx 8rpx rgba(118, 75, 162, 0.3),
+      inset 0 1rpx 0 rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 
+      0 6rpx 24rpx rgba(102, 126, 234, 0.6),
+      0 3rpx 12rpx rgba(118, 75, 162, 0.5),
+      inset 0 1rpx 0 rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* 光晕脉冲动画 */
+@keyframes glowPulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.15);
+  }
+}
+
+/* 数字角标弹跳动画 */
+@keyframes numberBounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  10% {
+    transform: scale(1.15);
+  }
+  20% {
+    transform: scale(1);
+  }
+}
+
+/* 响应式适配 */
+@media (max-width: 320px) {
+  .audit-badge {
+    width: 44rpx;
+    height: 44rpx;
+  }
+  
+  .badge-icon {
+    font-size: 22rpx;
+  }
+  
+  .badge-number {
+    min-width: 32rpx;
+    height: 32rpx;
+    font-size: 20rpx;
+  }
+}
+
+/* ========================================
+   🆕 审核记录弹窗样式
+   ======================================== */
+
+/* 弹窗遮罩 */
+.audit-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-end;
+  z-index: 9999;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 弹窗内容容器 */
+.audit-modal-content {
+  width: 100%;
+  max-height: 80vh;
+  background: #ffffff;
+  border-radius: 32rpx 32rpx 0 0;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* 关闭按钮 - 半透明白色 */
+.audit-modal-close {
+  position: absolute;
+  top: 20rpx;
+  right: 20rpx;
+  width: 60rpx;
+  height: 60rpx;
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(8rpx);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: all 0.3s ease;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
+}
+
+.audit-modal-close:active {
+  transform: scale(0.9);
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.close-icon {
+  font-size: 32rpx;
+  color: #ffffff;
+  font-weight: bold;
+  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.2);
+}
+
+/* 弹窗标题 - 渐变紫色 */
+.audit-modal-header {
+  padding: 40rpx 30rpx 20rpx 30rpx;
+  border-bottom: 2rpx solid #f0f0f0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 32rpx 32rpx 0 0;
+}
+
+.modal-title {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #ffffff;
+  text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.2);
+}
+
+/* 记录列表容器 */
+.audit-records-list {
+  flex: 1;
+  padding: 20rpx 30rpx;
+  overflow-y: auto;
+}
+
+/* 记录卡片 - 渐变边框设计 */
+.audit-record-card {
+  background: linear-gradient(145deg, #ffffff 0%, #f8f9ff 50%, #ffffff 100%);
+  border-radius: 20rpx;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+  border-left: 6rpx solid #667eea;
+  box-shadow: 
+    0 4rpx 16rpx rgba(102, 126, 234, 0.08),
+    0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.audit-record-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6rpx;
+  border-radius: 6rpx 0 0 6rpx;
+  background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+}
+
+.audit-record-card.approved {
+  border-left-color: #4CAF50;
+}
+
+.audit-record-card.approved::before {
+  background: linear-gradient(180deg, #4CAF50 0%, #66BB6A 100%);
+}
+
+.audit-record-card.rejected {
+  border-left-color: #F44336;
+}
+
+.audit-record-card.rejected::before {
+  background: linear-gradient(180deg, #F44336 0%, #EF5350 100%);
+}
+
+.audit-record-card.pending {
+  border-left-color: #FF9800;
+}
+
+.audit-record-card.pending::before {
+  background: linear-gradient(180deg, #FF9800 0%, #FFA726 100%);
+}
+
+/* 记录头部（编号+状态） */
+.record-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+  padding-bottom: 16rpx;
+  border-bottom: 1rpx dashed #e0e0e0;
+}
+
+.record-number {
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #333333;
+}
+
+.record-status {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 8rpx 16rpx;
+  border-radius: 20rpx;
+}
+
+.status-icon {
+  font-size: 24rpx;
+}
+
+.status-text {
+  font-size: 24rpx;
+  font-weight: bold;
+}
+
+/* 记录行 */
+.record-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.record-row:last-child {
+  margin-bottom: 0;
+}
+
+.row-icon {
+  font-size: 28rpx;
+  margin-right: 12rpx;
+}
+
+.row-label {
+  font-size: 26rpx;
+  color: #666666;
+  margin-right: 8rpx;
+}
+
+.row-value {
+  font-size: 28rpx;
+  color: #333333;
+  flex: 1;
+}
+
+.row-value.amount {
+  color: #ff6b6b;
+  font-weight: bold;
+  font-size: 32rpx;
+}
+
+.row-value.points {
+  color: #4CAF50;
+  font-weight: bold;
+}
+
+.row-value.time {
+  color: #999999;
+  font-size: 24rpx;
+}
+
+/* 弹窗底部 */
+.audit-modal-footer {
+  padding: 20rpx 30rpx 40rpx 30rpx;
+  border-top: 2rpx solid #f0f0f0;
+}
+
+.modal-close-btn {
+  width: 100%;
+  height: 88rpx;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: bold;
+  border-radius: 44rpx;
+  border: none;
+}

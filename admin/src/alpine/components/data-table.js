@@ -22,7 +22,7 @@ import { logger } from '../../utils/logger.js'
  * @param {boolean} config.selectable - 是否可选择
  * @param {boolean} config.sortable - 是否可排序
  */
-function dataTable(config = {}) {
+export function dataTable(config = {}) {
   return {
     columns: config.columns || [],
     data: config.data || [],
@@ -145,10 +145,11 @@ function dataTable(config = {}) {
       switch (column.type) {
         case 'code':
           return `<code>${this.escapeHtml(value)}</code>`
-        case 'badge':
+        case 'badge': {
           const badgeClass = column.badgeMap?.[value] || 'secondary'
           const badgeText = column.labelMap?.[value] || value
           return `<span class="badge bg-${badgeClass}">${badgeText}</span>`
+        }
         case 'status':
           return this.renderStatusBadge(value, column.statusMap)
         case 'date':

@@ -19,7 +19,7 @@
  */
 
 import { logger } from '../../utils/logger.js'
-import { request, buildURL, buildQueryString } from '../../api/base.js'
+import { API_PREFIX, request, buildURL, buildQueryString } from '../../api/base.js'
 import { USER_ENDPOINTS } from '../../api/user.js'
 import { ASSET_ENDPOINTS } from '../../api/asset.js'
 import { LOTTERY_CORE_ENDPOINTS } from '../../api/lottery/core.js'
@@ -42,7 +42,7 @@ const USER_DRAWER_ENDPOINTS = {
  * 用户360°视图抽屉组件
  * @param {Object} config - 配置选项
  */
-export function userDrawer(config = {}) {
+export function userDrawer(_config = {}) {
   return {
     // ==================== 状态 ====================
     isOpen: false,
@@ -101,15 +101,28 @@ export function userDrawer(config = {}) {
 
     // ==================== 初始化 ====================
 
+    _escHandler: null,
+
     init() {
       logger.debug('[UserDrawer] 初始化用户360°视图抽屉')
 
       // 监听 ESC 键关闭
-      document.addEventListener('keydown', e => {
+      this._escHandler = e => {
         if (e.key === 'Escape' && this.isOpen) {
           this.close()
         }
-      })
+      }
+      document.addEventListener('keydown', this._escHandler)
+    },
+
+    /**
+     * 清理事件监听器
+     */
+    destroy() {
+      if (this._escHandler) {
+        document.removeEventListener('keydown', this._escHandler)
+      }
+      logger.debug('[UserDrawer] 事件监听器已清理')
     },
 
     // ==================== 打开/关闭 ====================
@@ -336,7 +349,7 @@ export function userDrawer(config = {}) {
       try {
         const { page, page_size } = this.behaviorPagination
         const response = await this.apiGet(
-          '/api/v4/console/user-behavior-tracks',
+          `${API_PREFIX}/console/user-behavior-tracks`,
           { 
             user_id: this.user_id,
             page,

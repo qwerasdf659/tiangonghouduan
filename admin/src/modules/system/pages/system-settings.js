@@ -16,6 +16,7 @@
 
 // ES Module 导入（替代 window.xxx 全局变量）
 import { logger } from '../../../utils/logger.js'
+import { API_PREFIX } from '../../../api/base.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 
 // 导入 composables 模块（方案A：只导入系统配置和审计日志）
@@ -27,7 +28,7 @@ import {
 } from '../composables/index.js'
 
 // 导入提醒规则 API (P2-1)
-import { ReminderRulesAPI, ReminderHistoryAPI } from '../../../api/reminder.js'
+import { ReminderRulesAPI } from '../../../api/reminder.js'
 
 // 注意：SYSTEM_ENDPOINTS 导入已移除（F-59 审计报告功能因后端未实现而被移除）
 
@@ -203,7 +204,7 @@ function registerSystemSettingsComponents() {
 
       try {
         this.saving = true
-        const response = await this.apiPost(`/api/v4/console/operations/${log.id}/rollback`, {})
+        const response = await this.apiPost(`${API_PREFIX}/console/operations/${log.id}/rollback`, {})
         if (response?.success) {
           this.showSuccess('操作已回滚')
           await this.loadAuditLogs()

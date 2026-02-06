@@ -7,7 +7,7 @@
  * @date 2026-01-29
  */
 
-import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
+import { API_PREFIX, request, buildURL } from '../base.js'
 
 // ========== API 端点 ==========
 
@@ -22,7 +22,7 @@ export const SYSTEM_CORE_ENDPOINTS = {
   TODAY_STATS: `${API_PREFIX}/console/analytics/stats/today`,
   STATISTIC_EXPORT: `${API_PREFIX}/system/statistics/export`,
   HEALTH: '/health',
-  VERSION: '/api/v4',
+  VERSION: API_PREFIX,
 
   // 系统设置
   SETTING_LIST: `${API_PREFIX}/console/settings`,

@@ -1,0 +1,150 @@
+<!--pages/feedback/feedback.wxml - 客服反馈提交页面-->
+<view class="feedback-container">
+  <!-- 页面头部 -->
+  <view class="page-header">
+    <view class="header-title">
+      <text class="title">联系客服</text>
+      <text class="subtitle">我们将在24小时内回复您的问题</text>
+    </view>
+    <view class="header-actions">
+      <button class="history-btn" bindtap="onShowHistoryModal">
+        <text class="icon">📋</text>
+        <text class="text">我的反馈</text>
+      </button>
+    </view>
+  </view>
+
+  <!-- 反馈分类选择 -->
+  <view class="section">
+    <view class="section-title">
+      <text class="title">问题分类</text>
+      <text class="required">*</text>
+    </view>
+    <view class="category-grid">
+      <view wx:for="{{categories}}" wx:key="value"
+        class="category-item {{selectedCategory === item.value ? 'selected' : ''}}" data-category="{{item.value}}"
+        bindtap="onCategoryChange">
+        <text class="icon">{{item.icon}}</text>
+        <text class="label">{{item.label}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 反馈内容 -->
+  <view class="section">
+    <view class="section-title">
+      <text class="title">详细描述</text>
+      <text class="required">*</text>
+    </view>
+    <view class="content-input-container">
+      <textarea class="content-input" placeholder="请详细描述您遇到的问题或建议，至少10个字符" maxlength="{{maxLength}}"
+        value="{{feedbackContent}}" bindinput="onContentInput" auto-height show-confirm-bar="{{false}}"></textarea>
+      <view class="input-footer">
+        <text class="char-count {{currentLength >= maxLength ? 'limit' : ''}}">
+          {{currentLength}}/{{maxLength}}
+        </text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 图片附件 -->
+  <view class="section">
+    <view class="section-title">
+      <text class="title">图片附件</text>
+      <text class="optional">（选填，最多3张）</text>
+    </view>
+    <view class="image-upload-container">
+      <view wx:for="{{attachedImages}}" wx:key="index" class="image-item">
+        <image class="image" src="{{item.path}}" mode="aspectFill" data-index="{{index}}" bindtap="onPreviewImage">
+        </image>
+        <view class="delete-btn" data-index="{{index}}" bindtap="onDeleteImage">
+          <text class="icon">×</text>
+        </view>
+      </view>
+
+      <view wx:if="{{attachedImages.length < 3}}" class="add-image-btn" bindtap="onAddImage">
+        <text class="icon">📷</text>
+        <text class="text">添加图片</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 提交按钮 -->
+  <view class="submit-section">
+    <button class="submit-btn {{canSubmit ? 'enabled' : 'disabled'}}" disabled="{{!canSubmit || submitting}}"
+      bindtap="onSubmitFeedback">
+      <text wx:if="{{submitting}}">提交中...</text>
+      <text wx:else>提交反馈</text>
+    </button>
+
+    <view class="submit-tips">
+      <text class="tip">💡 提交后您将收到实时回复通知</text>
+    </view>
+  </view>
+
+  <!-- 最近反馈记录预览 -->
+  <view class="section" wx:if="{{myFeedbacks.length > 0}}">
+    <view class="section-title">
+      <text class="title">最近反馈</text>
+      <text class="more" bindtap="onViewHistory">查看更多 ></text>
+    </view>
+    <view class="feedback-history-preview">
+      <view wx:for="{{myFeedbacks}}" wx:key="feedbackId" class="history-item" data-feedback-id="{{item.feedbackId}}"
+        bindtap="onHistoryItemTap">
+        <view class="item-header">
+          <text class="category">{{item.category}}</text>
+          <text class="status {{item.status}}">
+            {{item.status === 'pending' ? '待处理' :
+            item.status === 'replied' ? '已回复' :
+            item.status === 'closed' ? '已关闭' : '处理中'}}
+          </text>
+        </view>
+        <text class="content">{{item.content}}</text>
+        <text class="time">{{item.submittedAt}}</text>
+      </view>
+    </view>
+  </view>
+</view>
+
+<!-- 历史记录模态框 -->
+<view class="modal-overlay {{showHistoryModal ? 'show' : ''}}" bindtap="onHideHistoryModal">
+  <view class="modal-content" catchtap="">
+    <view class="modal-header">
+      <text class="modal-title">我的反馈记录</text>
+      <view class="close-btn" bindtap="onHideHistoryModal">×</view>
+    </view>
+
+    <view class="modal-body">
+      <view wx:if="{{loadingHistory}}" class="loading-state">
+        <text>加载中...</text>
+      </view>
+
+      <view wx:elif="{{myFeedbacks.length === 0}}" class="empty-state">
+        <text class="icon">📝</text>
+        <text class="message">暂无反馈记录</text>
+      </view>
+
+      <view wx:else class="feedback-list">
+        <view wx:for="{{myFeedbacks}}" wx:key="feedbackId" class="feedback-item" data-feedback-id="{{item.feedbackId}}"
+          bindtap="onHistoryItemTap">
+          <view class="item-status">
+            <text class="status-badge {{item.status}}">
+              {{item.status === 'pending' ? '待处理' :
+              item.status === 'replied' ? '已回复' :
+              item.status === 'closed' ? '已关闭' : '处理中'}}
+            </text>
+          </view>
+          <view class="item-content">
+            <text class="content">{{item.content}}</text>
+            <text class="time">{{item.submittedAt}}</text>
+          </view>
+          <view class="item-arrow">></view>
+        </view>
+      </view>
+    </view>
+
+    <view class="modal-footer">
+      <button class="view-all-btn" bindtap="onViewHistory">查看全部记录</button>
+    </view>
+  </view>
+</view>

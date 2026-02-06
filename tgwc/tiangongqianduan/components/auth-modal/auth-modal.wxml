@@ -1,0 +1,123 @@
+<!-- components/auth-modal/auth-modal.wxml - 权限验证弹窗组件 -->
+<view class="auth-modal" wx:if="{{visible}}">
+  <view class="modal-mask" bindtap="onCancel"></view>
+  <view class="modal-content">
+    <!-- 标题区域 -->
+    <view class="modal-header">
+      <text class="modal-title">🔐 {{title || '身份验证'}}</text>
+      <view class="close-btn" bindtap="onCancel">×</view>
+    </view>
+
+    <!-- 验证方式选择 -->
+    <view class="auth-tabs">
+      <button
+        class="tab-btn {{authType === 'phone' ? 'active' : ''}}"
+        bindtap="onAuthTypeChange"
+        data-type="phone"
+      >
+        📱 手机验证
+      </button>
+      <button
+        class="tab-btn {{authType === 'password' ? 'active' : ''}}"
+        bindtap="onAuthTypeChange"
+        data-type="password"
+      >
+        🔑 密码验证
+      </button>
+    </view>
+
+    <!-- 手机验证码验证 -->
+    <view class="phone-auth" wx:if="{{authType === 'phone'}}">
+      <view class="input-group">
+        <text class="input-label">手机号码</text>
+        <input
+          class="auth-input"
+          type="number"
+          placeholder="请输入手机号码"
+          value="{{phoneNumber}}"
+          bindinput="onPhoneInput"
+          maxlength="11"
+        />
+      </view>
+
+      <view class="input-group">
+        <text class="input-label">验证码</text>
+        <view class="code-input-container">
+          <input
+            class="auth-input code-input"
+            type="number"
+            placeholder="请输入验证码"
+            value="{{verificationCode}}"
+            bindinput="onCodeInput"
+            maxlength="6"
+          />
+          <button
+            class="send-code-btn {{codeSending || countdown > 0 ? 'disabled' : ''}}"
+            bindtap="onSendCode"
+            disabled="{{codeSending || countdown > 0}}"
+          >
+            {{codeSending ? '发送中...' : (countdown > 0 ? countdown + 's' : '获取验证码')}}
+          </button>
+        </view>
+      </view>
+
+      <view class="tips-text">
+        <text>验证码将发送至您的手机，请注意查收</text>
+      </view>
+    </view>
+
+    <!-- 密码验证 -->
+    <view class="password-auth" wx:if="{{authType === 'password'}}">
+      <view class="input-group">
+        <text class="input-label">账号</text>
+        <input
+          class="auth-input"
+          placeholder="请输入账号/手机号"
+          value="{{username}}"
+          bindinput="onUsernameInput"
+        />
+      </view>
+
+      <view class="input-group">
+        <text class="input-label">密码</text>
+        <view class="password-input-container">
+          <input
+            class="auth-input password-input"
+            type="{{showPassword ? 'text' : 'password'}}"
+            placeholder="请输入密码"
+            value="{{password}}"
+            bindinput="onPasswordInput"
+          />
+          <text class="password-toggle" bindtap="onTogglePassword">
+            {{showPassword ? '👁️' : '👁️‍🗨️'}}
+          </text>
+        </view>
+      </view>
+
+      <view class="forgot-password" bindtap="onForgotPassword">
+        <text>忘记密码？</text>
+      </view>
+    </view>
+
+    <!-- 操作按钮 -->
+    <view class="modal-footer">
+      <button class="cancel-btn" bindtap="onCancel">取消</button>
+      <button
+        class="confirm-btn {{!canSubmit ? 'disabled' : ''}}"
+        bindtap="onConfirm"
+        disabled="{{!canSubmit || submitting}}"
+      >
+        {{submitting ? '验证中...' : '确认验证'}}
+      </button>
+    </view>
+
+    <!-- 首次使用提示 -->
+    <view class="first-use-tips" wx:if="{{isFirstUse}}">
+      <view class="tips-icon">💡</view>
+      <text class="tips-title">首次使用提示</text>
+      <text class="tips-content"
+        >为了您的账户安全，首次使用商家功能需要绑定手机号码进行身份验证</text
+      >
+    </view>
+  </view>
+</view>

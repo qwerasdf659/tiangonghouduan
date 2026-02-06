@@ -31,7 +31,7 @@ import { logger } from '../../utils/logger.js'
  * @param {Array} config.stats - 统计卡片配置
  * @param {number} config.page_size - 每页条数
  */
-function adminPage(config = {}) {
+export function adminPage(config = {}) {
   return {
     // ========== 基础配置 ==========
     pageId: config.pageId || 'page',
@@ -302,10 +302,11 @@ function adminPage(config = {}) {
       switch (column.type) {
         case 'code':
           return `<code>${this.escapeHtml(value)}</code>`
-        case 'badge':
+        case 'badge': {
           const badgeClass = column.badgeMap?.[value] || 'secondary'
           const badgeText = column.labelMap?.[value] || value
           return `<span class="badge bg-${badgeClass}">${badgeText}</span>`
+        }
         case 'status':
           return this.renderStatusBadge(value, column.statusMap)
         case 'date':

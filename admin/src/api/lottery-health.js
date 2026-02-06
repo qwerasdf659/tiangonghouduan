@@ -1,11 +1,12 @@
 /**
  * 抽奖健康度分析 API
  * @description 获取抽奖活动健康度评分和诊断信息
- * @version 1.0.0
+ * @version 1.1.0
  * @date 2026-02-01
+ * @updated 2026-02-06 - 统一使用 request() 替代原生 fetch
  */
 
-import { API_PREFIX, authHeaders, handleResponse } from './base.js'
+import { API_PREFIX, request } from './base.js'
 
 // 健康度端点（与后端 routes/v4/console/lottery-health.js 对齐）
 export const LOTTERY_HEALTH_ENDPOINTS = {
@@ -34,10 +35,7 @@ export const LotteryHealthAPI = {
     if (!campaignId) {
       throw new Error('campaign_id 是必需的')
     }
-    const response = await fetch(LOTTERY_HEALTH_ENDPOINTS.CAMPAIGN(campaignId), {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: LOTTERY_HEALTH_ENDPOINTS.CAMPAIGN(campaignId) })
   },
 
   /**
@@ -49,10 +47,7 @@ export const LotteryHealthAPI = {
     if (!campaignId) {
       throw new Error('campaign_id 是必需的')
     }
-    const response = await fetch(LOTTERY_HEALTH_ENDPOINTS.TIER_DISTRIBUTION(campaignId), {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: LOTTERY_HEALTH_ENDPOINTS.TIER_DISTRIBUTION(campaignId) })
   },
 
   /**
@@ -64,10 +59,7 @@ export const LotteryHealthAPI = {
     if (!campaignId) {
       throw new Error('campaign_id 是必需的')
     }
-    const response = await fetch(LOTTERY_HEALTH_ENDPOINTS.DIAGNOSE(campaignId), {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: LOTTERY_HEALTH_ENDPOINTS.DIAGNOSE(campaignId) })
   },
 
   /**
@@ -79,9 +71,6 @@ export const LotteryHealthAPI = {
     if (!campaignId) {
       throw new Error('campaign_id 是必需的')
     }
-    const response = await fetch(LOTTERY_HEALTH_ENDPOINTS.BUDGET_RATE(campaignId), {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: LOTTERY_HEALTH_ENDPOINTS.BUDGET_RATE(campaignId) })
   }
 }

@@ -7,6 +7,7 @@
  */
 
 import { logger } from '../../utils/logger.js'
+import { API_PREFIX, request } from '../../api/base.js'
 import { io } from 'socket.io-client'
 
 /**
@@ -159,15 +160,10 @@ export function notificationCenter() {
     async loadNotifications() {
       this.loading = true
       try {
-        const token = localStorage.getItem('admin_token')
-        // 🔄 修正：通知API在system域，不是console域
-        const response = await fetch('/api/v4/system/notifications?limit=20', {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        const result = await request({
+          url: `${API_PREFIX}/system/notifications`,
+          params: { limit: 20 }
         })
-
-        if (!response.ok) throw new Error('获取通知列表失败')
-
-        const result = await response.json()
         if (result.data) {
           const oldUnreadCount = this.unreadCount
           // 安全处理：确保 notifications 始终是数组
@@ -223,11 +219,9 @@ export function notificationCenter() {
       if (notification.is_read) return
 
       try {
-        const token = localStorage.getItem('admin_token')
-        // 🔄 修正：通知API在system域
-        await fetch(`/api/v4/system/notifications/${notification.id}/read`, {
-          method: 'POST',
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        await request({
+          url: `${API_PREFIX}/system/notifications/${notification.id}/read`,
+          method: 'POST'
         })
 
         notification.is_read = true
@@ -245,11 +239,9 @@ export function notificationCenter() {
      */
     async markAllAsRead() {
       try {
-        const token = localStorage.getItem('admin_token')
-        // 🔄 修正：通知API在system域
-        await fetch('/api/v4/system/notifications/read-all', {
-          method: 'POST',
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        await request({
+          url: `${API_PREFIX}/system/notifications/read-all`,
+          method: 'POST'
         })
 
         this.notifications.forEach(n => (n.is_read = true))

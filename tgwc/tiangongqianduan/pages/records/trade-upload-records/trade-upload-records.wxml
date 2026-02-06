@@ -1,0 +1,310 @@
+<!--pages/records/trade-upload-records/trade-upload-records.wxml - 积分活动记录页面（交易+上传合并）-->
+<view class="trade-upload-records-container">
+
+  <!-- 🔴 Tab切换栏 -->
+  <view class="tab-section">
+    <view class="tab-list">
+      <block wx:for="{{tabs}}" wx:key="id">
+        <view class="tab-item {{activeTab === item.id ? 'active' : ''}}" bind:tap="onTabChange" data-id="{{item.id}}">
+          <text class="tab-icon">{{item.icon}}</text>
+          <text class="tab-name">{{item.name}}</text>
+          <view class="tab-indicator" wx:if="{{activeTab === item.id}}"></view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <!-- 🔴 加载状态 -->
+  <view class="loading-container" wx:if="{{loading}}">
+    <view class="loading-content">
+      <view class="loading-spinner"></view>
+      <text class="loading-text">加载中...</text>
+    </view>
+  </view>
+
+  <!-- ============================================================================ -->
+  <!-- 💰 交易记录Tab内容 -->
+  <!-- ============================================================================ -->
+  <view class="trade-tab-content" wx:if="{{activeTab === 0 && !loading}}">
+
+    <!-- 统计面板 -->
+    <view class="statistics-section">
+      <view class="main-stats-grid">
+        <view class="main-stat-card income">
+          <view class="stat-header">
+            <text class="stat-icon">📈</text>
+            <text class="stat-label">总收入</text>
+          </view>
+          <text class="stat-value">+{{monthlyStats.totalIncome}}</text>
+        </view>
+
+        <view class="main-stat-card expense">
+          <view class="stat-header">
+            <text class="stat-icon">📉</text>
+            <text class="stat-label">总支出</text>
+          </view>
+          <text class="stat-value">{{monthlyStats.totalExpense}}</text>
+        </view>
+
+        <view class="main-stat-card net">
+          <view class="stat-header">
+            <text class="stat-icon">💎</text>
+            <text class="stat-label">净收益</text>
+          </view>
+          <text class="stat-value">{{monthlyStats.netIncome > 0 ? '+' : ''}}{{monthlyStats.netIncome}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 筛选工具栏 -->
+    <view class="filter-section">
+      <view class="filter-content">
+        <view class="time-filters">
+          <view class="filter-chip {{currentTimeFilter === 'all' ? 'active' : ''}}" bind:tap="onTimeFilter"
+            data-filter="all">
+            <text class="chip-text">全部</text>
+          </view>
+          <view class="filter-chip {{currentTimeFilter === 'today' ? 'active' : ''}}" bind:tap="onTimeFilter"
+            data-filter="today">
+            <text class="chip-text">今天</text>
+          </view>
+          <view class="filter-chip {{currentTimeFilter === 'week' ? 'active' : ''}}" bind:tap="onTimeFilter"
+            data-filter="week">
+            <text class="chip-text">本周</text>
+          </view>
+          <view class="filter-chip {{currentTimeFilter === 'month' ? 'active' : ''}}" bind:tap="onTimeFilter"
+            data-filter="month">
+            <text class="chip-text">本月</text>
+          </view>
+        </view>
+
+        <view class="filter-actions">
+          <button class="filter-btn" bind:tap="onToggleFilter">
+            <text class="btn-icon">🔍</text>
+            <text class="btn-text">筛选</text>
+          </button>
+          <button class="filter-btn secondary" bind:tap="onResetFilters">
+            <text class="btn-icon">🔄</text>
+            <text class="btn-text">重置</text>
+          </button>
+        </view>
+      </view>
+    </view>
+
+    <!-- 搜索框 -->
+    <view class="search-section">
+      <view class="search-container">
+        <view class="search-box">
+          <text class="search-icon">🔍</text>
+          <input class="search-input" placeholder="搜索交易ID、描述..." value="{{searchKeyword}}" bind:input="onSearchInput" />
+        </view>
+      </view>
+    </view>
+
+    <!-- 交易记录列表 -->
+    <view class="records-section">
+      <view class="transaction-list">
+        <block wx:if="{{filteredRecords.length > 0}}" wx:for="{{filteredRecords}}" wx:key="id">
+          <view class="transaction-card">
+            <view class="transaction-header">
+              <view class="transaction-left">
+                <view class="transaction-icon-wrapper">
+                  <text class="transaction-icon">{{getTypeIcon(item.type)}}</text>
+                </view>
+                <view class="transaction-info">
+                  <text class="transaction-title">{{item.title}}</text>
+                  <text class="transaction-desc">{{item.description}}</text>
+                  <text class="transaction-time">{{formatTime(item.created_at)}}</text>
+                </view>
+              </view>
+              <view class="transaction-right">
+                <text class="amount-value {{item.category}}">{{formatAmount(item.amount)}}积分</text>
+              </view>
+            </view>
+
+            <!-- 操作按钮 -->
+            <view class="transaction-actions">
+              <button class="action-btn primary" bind:tap="onViewDetail" data-record="{{item}}">
+                <text class="btn-icon">📋</text>
+                <text class="btn-text">详情</text>
+              </button>
+            </view>
+          </view>
+        </block>
+
+        <!-- 空状态 -->
+        <view class="empty-state" wx:if="{{filteredRecords.length === 0}}">
+          <view class="empty-content">
+            <text class="empty-icon">📊</text>
+            <text class="empty-title">暂无交易记录</text>
+            <text class="empty-subtitle">快去参与活动赚取积分吧！</text>
+            <button class="activity-action-btn" bind:tap="goToActivity">
+              <text class="btn-icon">🎉</text>
+              <text class="btn-text">开始赚取积分</text>
+            </button>
+          </view>
+        </view>
+      </view>
+    </view>
+
+  </view>
+
+  <!-- ============================================================================ -->
+  <!-- 📷 上传记录Tab内容 -->
+  <!-- ============================================================================ -->
+  <view class="upload-tab-content" wx:if="{{activeTab === 1 && !loading}}">
+
+    <!-- 统计信息卡片 -->
+    <view class="statistics-section">
+      <view class="stats-grid">
+        <view class="stat-card total">
+          <view class="stat-icon">📋</view>
+          <view class="stat-content">
+            <text class="stat-number">{{uploadStatistics.totalCount}}</text>
+            <text class="stat-label">总上传</text>
+          </view>
+        </view>
+        <view class="stat-card approved">
+          <view class="stat-icon">✅</view>
+          <view class="stat-content">
+            <text class="stat-number">{{uploadStatistics.approvedCount}}</text>
+            <text class="stat-label">已通过</text>
+          </view>
+        </view>
+        <view class="stat-card pending">
+          <view class="stat-icon">⏳</view>
+          <view class="stat-content">
+            <text class="stat-number">{{uploadStatistics.pendingCount}}</text>
+            <text class="stat-label">待审核</text>
+          </view>
+        </view>
+        <view class="stat-card points">
+          <view class="stat-icon">💎</view>
+          <view class="stat-content">
+            <text class="stat-number">{{uploadStatistics.totalEarnedPoints}}</text>
+            <text class="stat-label">获得积分</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 筛选标签 -->
+    <view class="filter-section">
+      <view class="filter-tabs">
+        <block wx:for="{{uploadFilterOptions}}" wx:key="key">
+          <button class="filter-tab {{uploadFilter === item.key ? 'active' : ''}}" bind:tap="switchUploadFilter"
+            data-filter="{{item.key}}">
+            <text class="filter-icon">{{item.icon}}</text>
+            <text class="filter-name">{{item.name}}</text>
+          </button>
+        </block>
+      </view>
+    </view>
+
+    <!-- 上传记录列表 -->
+    <view class="records-section">
+      <view class="records-list">
+        <block wx:if="{{uploadRecords.length > 0}}" wx:for="{{uploadRecords}}" wx:key="id">
+          <view class="record-card">
+            <view class="record-header">
+              <view class="record-meta">
+                <text class="record-time">{{formatTime(item.created_at)}}</text>
+              </view>
+              <view class="record-status {{formatReviewStatus(item.review_status).color}}">
+                <text class="status-icon">{{formatReviewStatus(item.review_status).icon}}</text>
+                <text class="status-text">{{formatReviewStatus(item.review_status).text}}</text>
+              </view>
+            </view>
+
+            <view class="record-content">
+              <view class="image-section">
+                <view class="image-preview" bind:tap="previewImage" data-url="{{item.image_url}}">
+                  <image src="{{item.image_url}}" mode="aspectFill" class="preview-image" />
+                  <view class="preview-overlay">
+                    <text class="preview-icon">🔍</text>
+                    <text class="preview-text">点击预览</text>
+                  </view>
+                </view>
+              </view>
+
+              <view class="upload-info">
+                <text class="upload-desc" wx:if="{{item.description}}">{{item.description}}</text>
+                <view class="points-info" wx:if="{{item.earned_points && item.review_status === 'approved'}}">
+                  <view class="points-badge">
+                    <text class="points-icon">💰</text>
+                    <text class="points-earned">+{{item.earned_points}}积分</text>
+                  </view>
+                </view>
+                <view class="reject-reason" wx:if="{{item.reject_reason && item.review_status === 'rejected'}}">
+                  <view class="reason-header">
+                    <text class="reason-icon">⚠️</text>
+                    <text class="reason-label">拒绝原因</text>
+                  </view>
+                  <text class="reason-text">{{item.reject_reason}}</text>
+                </view>
+              </view>
+            </view>
+
+            <view class="record-actions">
+              <button class="action-btn primary" bind:tap="viewReviewDetail" data-record="{{item}}">
+                <text class="btn-icon">📝</text>
+                <text class="btn-text">查看详情</text>
+              </button>
+              <button class="action-btn warning" bind:tap="reuploadImage" data-id="{{item.id}}"
+                wx:if="{{item.review_status === 'rejected'}}">
+                <text class="btn-icon">🔄</text>
+                <text class="btn-text">重新上传</text>
+              </button>
+              <button class="action-btn danger" bind:tap="deleteRecord" data-id="{{item.id}}"
+                wx:if="{{item.review_status === 'rejected'}}">
+                <text class="btn-icon">🗑️</text>
+                <text class="btn-text">删除</text>
+              </button>
+            </view>
+          </view>
+        </block>
+
+        <!-- 空状态 -->
+        <view class="empty-state" wx:if="{{uploadRecords.length === 0}}">
+          <view class="empty-content">
+            <text class="empty-icon">📷</text>
+            <text class="empty-title">还没有上传记录</text>
+            <text class="empty-subtitle">拍摄消费照片，轻松获得积分奖励</text>
+            <button class="upload-action-btn" bind:tap="goToCamera">
+              <text class="btn-icon">📷</text>
+              <text class="btn-text">立即上传照片</text>
+            </button>
+          </view>
+        </view>
+
+        <!-- 加载更多 -->
+        <view class="load-more-section" wx:if="{{uploadHasMore && uploadRecords.length > 0}}">
+          <view class="load-more-content" wx:if="{{loadingMore}}">
+            <view class="loading-spinner small"></view>
+            <text class="loading-text">加载更多...</text>
+          </view>
+          <view class="load-more-content" wx:else>
+            <text class="load-more-text">上拉加载更多</text>
+          </view>
+        </view>
+
+        <!-- 没有更多 -->
+        <view class="no-more-section" wx:if="{{!uploadHasMore && uploadRecords.length > 0}}">
+          <view class="no-more-line"></view>
+          <text class="no-more-text">已显示全部记录</text>
+          <view class="no-more-line"></view>
+        </view>
+      </view>
+    </view>
+
+  </view>
+
+  <!-- 🔴 刷新提示 -->
+  <view class="refresh-hint" wx:if="{{refreshing}}">
+    <view class="refresh-content">
+      <view class="refresh-spinner"></view>
+      <text class="refresh-text">刷新中...</text>
+    </view>
+  </view>
+
+</view>

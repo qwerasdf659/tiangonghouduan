@@ -968,7 +968,7 @@ function riskAlertsPage() {
      * @description 从选中告警的审核信息构建时间线记录
      * @returns {Promise<void>}
      */
-    async loadAlertTimeline(alertId) {
+    async loadAlertTimeline(_alertId) {
       // 后端返回 reviewed_at 可能是对象或字符串
       const reviewedAt = this.selectedAlert?.reviewed_at
       if (this.selectedAlert && reviewedAt) {
@@ -1510,8 +1510,6 @@ function riskAlertsPage() {
      * @param {string} level - 升级级别 'warning'|'urgent'|'admin_notify'
      */
     escalateAlert(alert, level) {
-      const severityText = this.getSeverityLabel(alert.severity)
-
       switch (level) {
         case 'warning':
           // 30分钟未处理 - 弹窗+徽标闪烁
@@ -1523,7 +1521,7 @@ function riskAlertsPage() {
           }, 3000)
           break
 
-        case 'urgent':
+        case 'urgent': {
           // 1小时未处理 - 置顶+音效
           this.showError(`🚨 紧急告警: "${alert.message}" 已超过1小时未处理！`)
           this.playAlertSound('critical')
@@ -1536,6 +1534,7 @@ function riskAlertsPage() {
             this.alerts.unshift(escalatedAlert)
           }
           break
+        }
 
         case 'admin_notify':
           // 2小时未处理 - 通知管理员

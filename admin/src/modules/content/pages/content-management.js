@@ -26,9 +26,10 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { buildURL, request, getToken } from '../../../api/base.js'
+import { buildURL, getToken } from '../../../api/base.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
+
 document.addEventListener('alpine:init', () => {
   logger.info('[ContentManagement] 注册 Alpine 组件...')
 
@@ -641,7 +642,7 @@ document.addEventListener('alpine:init', () => {
           this.showSuccess(`轮播图已${newStatus ? '启用' : '禁用'}`)
           await this.loadBanners()
         }
-      } catch (error) {
+      } catch (_error) {
         this.showError('切换状态失败')
       }
     },

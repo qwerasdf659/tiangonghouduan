@@ -17,7 +17,6 @@
  * import { AuthAPI } from '@/api/index.js'
  */
 
-import { logger } from '../utils/logger.js'
 import { API_PREFIX, request, getToken, setToken, clearToken } from './base.js'
 
 // ========== API 端点 ==========

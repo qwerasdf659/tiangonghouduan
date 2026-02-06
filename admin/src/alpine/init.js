@@ -10,14 +10,13 @@
  */
 
 import { logger } from '../utils/logger.js'
-import { createToastStore, TOAST_TYPES } from './components/toast.js'
+import { createToastStore } from './components/toast.js'
 import {
   hasMenuAccess,
   hasPageAccess,
   checkCurrentPageAccess,
   getAccessibleMenuIds,
-  getUserRoleLevelDescription,
-  ROLE_LEVEL_THRESHOLDS
+  getUserRoleLevelDescription
 } from '../config/permission-rules.js'
 
 document.addEventListener('alpine:init', () => {
@@ -474,7 +473,7 @@ export function showLoading(message = '加载中...') {
   if (typeof Alpine !== 'undefined' && Alpine.store) {
     try {
       Alpine.store('ui').setLoading(true)
-    } catch (e) {
+    } catch (_e) {
       // Alpine 未完全初始化时忽略
     }
   }
@@ -493,7 +492,7 @@ export function hideLoading() {
   if (typeof Alpine !== 'undefined' && Alpine.store) {
     try {
       Alpine.store('ui').setLoading(false)
-    } catch (e) {
+    } catch (_e) {
       // Alpine 未完全初始化时忽略
     }
   }

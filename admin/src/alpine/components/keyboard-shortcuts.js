@@ -122,8 +122,11 @@ export function shortcutsStore() {
     /**
      * 初始化全局快捷键监听
      */
+    _globalKeyHandler: null,
+
     init() {
-      document.addEventListener('keydown', this.handleGlobalKey.bind(this))
+      this._globalKeyHandler = this.handleGlobalKey.bind(this)
+      document.addEventListener('keydown', this._globalKeyHandler)
       logger.info('[Shortcuts] 全局快捷键系统已初始化')
       logger.info('[Shortcuts] G键组合: G+P=待处理, G+D=仪表盘, G+U=用户, G+L=抽奖, G+S=设置')
     },
@@ -532,6 +535,19 @@ export function shortcutsStore() {
         logger.info('[Shortcuts] 快捷键帮助:')
         help.forEach(item => logger.info(`  ${item.key}: ${item.description}`))
       }
+    },
+
+    /**
+     * 清理事件监听器
+     */
+    destroy() {
+      if (this._globalKeyHandler) {
+        document.removeEventListener('keydown', this._globalKeyHandler)
+      }
+      if (this.gKeyTimeout) {
+        clearTimeout(this.gKeyTimeout)
+      }
+      logger.debug('[Shortcuts] 事件监听器已清理')
     }
   }
 }

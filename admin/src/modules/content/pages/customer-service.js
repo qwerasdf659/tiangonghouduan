@@ -29,7 +29,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { buildURL, request } from '../../../api/base.js'
+import { buildURL } from '../../../api/base.js'
 import { CONTENT_ENDPOINTS } from '../../../api/content.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'

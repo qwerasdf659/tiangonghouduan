@@ -23,19 +23,23 @@ export function workspaceTabs() {
     /**
      * 初始化
      */
+    // 事件处理器引用（用于 destroy 清理）
+    _openTabHandler: null,
+    _popstateHandler: null,
+
     init() {
       // 恢复 Tab 状态
       this.loadState()
 
       // 监听侧边栏导航事件
-      window.addEventListener('open-tab', e => {
-        this.openTab(e.detail)
-      })
+      this._openTabHandler = e => this.openTab(e.detail)
+      window.addEventListener('open-tab', this._openTabHandler)
 
       // 监听浏览器前进/后退
-      window.addEventListener('popstate', () => {
+      this._popstateHandler = () => {
         // 可选：根据 URL 切换 Tab
-      })
+      }
+      window.addEventListener('popstate', this._popstateHandler)
 
       // 默认打开待处理中心和运营仪表盘（待处理中心为默认激活）
       if (this.tabs.length === 0) {
@@ -270,6 +274,18 @@ export function workspaceTabs() {
         // 清理可能损坏的状态
         localStorage.removeItem('workspace_tabs')
       }
+    },
+    /**
+     * 清理事件监听器
+     */
+    destroy() {
+      if (this._openTabHandler) {
+        window.removeEventListener('open-tab', this._openTabHandler)
+      }
+      if (this._popstateHandler) {
+        window.removeEventListener('popstate', this._popstateHandler)
+      }
+      logger.debug('[WorkspaceTabs] 事件监听器已清理')
     }
   }
 }

@@ -20,12 +20,11 @@
  */
 
 import { logger } from '../../utils/logger.js'
-import { getToken, clearToken } from '@/api/base.js'
+import { API_PREFIX, getToken, clearToken } from '@/api/base.js'
 import {
   hasPageAccess,
   checkCurrentPageAccess,
-  getUserRoleLevel,
-  getCurrentPageRule
+  getUserRoleLevel
 } from '../../config/permission-rules.js'
 
 export function authGuardMixin() {
@@ -232,7 +231,7 @@ export function authGuardMixin() {
      */
     async refreshUserInfo() {
       try {
-        const response = await fetch('/api/v4/auth/me', {
+        const response = await fetch(`${API_PREFIX}/auth/me`, {
           headers: { Authorization: `Bearer ${getToken()}` }
         })
 

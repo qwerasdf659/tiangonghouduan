@@ -124,7 +124,7 @@ function filterBar(config = {}) {
 /**
  * 高级筛选组件（支持展开/收起）
  */
-function advancedFilter(config = {}) {
+export function advancedFilter(config = {}) {
   return {
     ...filterBar(config),
 

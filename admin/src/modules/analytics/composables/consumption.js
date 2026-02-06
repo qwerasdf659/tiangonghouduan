@@ -9,7 +9,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { STORE_ENDPOINTS } from '../../../api/store.js'
-import { buildURL } from '../../../api/base.js'
+import { API_PREFIX, buildURL } from '../../../api/base.js'
 
 /**
  * 消费记录状态
@@ -402,7 +402,7 @@ export function useConsumptionMethods() {
         async () => {
           this.batchProcessing = true
           try {
-            const response = await this.apiCall('/api/v4/console/consumption/batch-review', {
+            const response = await this.apiCall(`${API_PREFIX}/console/consumption/batch-review`, {
               method: 'POST',
               data: {
                 record_ids: this.selectedIds,
@@ -452,7 +452,7 @@ export function useConsumptionMethods() {
         async () => {
           this.batchProcessing = true
           try {
-            const response = await this.apiCall('/api/v4/console/consumption/batch-review', {
+            const response = await this.apiCall(`${API_PREFIX}/console/consumption/batch-review`, {
               method: 'POST',
               data: {
                 record_ids: this.selectedIds,
@@ -701,7 +701,7 @@ export function useConsumptionMethods() {
       try {
         // 调用后端用户审核率 API（已实现）
         const response = await this.apiGet(
-          `/api/v4/console/users/${userId}/approval-rate`,
+          `${API_PREFIX}/console/users/${userId}/approval-rate`,
           { days: 90 },
           { showLoading: false }
         )
@@ -837,7 +837,7 @@ export function useConsumptionMethods() {
         async () => {
           this.batchProcessing = true
           try {
-            const response = await this.apiCall('/api/v4/console/consumption/batch-review', {
+            const response = await this.apiCall(`${API_PREFIX}/console/consumption/batch-review`, {
               method: 'POST',
               data: {
                 record_ids: recordIds,

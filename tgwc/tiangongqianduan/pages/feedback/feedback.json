@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "联系客服",
+  "navigationBarBackgroundColor": "#667eea",
+  "navigationBarTextStyle": "white",
+  "backgroundColor": "#f8f9fa",
+  "enablePullDownRefresh": true,
+  "onReachBottomDistance": 50,
+  "backgroundTextStyle": "dark"
+}

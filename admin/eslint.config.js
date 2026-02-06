@@ -152,7 +152,11 @@ export default [
       // ==================== 基础规则 ====================
       // Alpine.js 项目中有些函数是动态注册的，使用 warn 而非 error
       'no-undef': 'warn',
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'no-unused-vars': ['warn', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_'
+      }],
       'no-console': 'off', // 允许 console（Logger 会处理）
       'no-debugger': 'warn',
       'prefer-const': 'warn',

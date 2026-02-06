@@ -1,0 +1,423 @@
+/* pages/camera/camera.wxss - 发现页面（活动聚合入口 - 方案C：标签页分类） */
+
+.discover-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding-bottom: 80rpx;
+}
+
+/* ========== 顶部搜索栏 ========== */
+.search-bar {
+  padding: 20rpx;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10rpx);
+}
+
+.search-input-wrapper {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 50rpx;
+  padding: 0 30rpx;
+  height: 80rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.1);
+}
+
+.search-icon {
+  font-size: 32rpx;
+  margin-right: 15rpx;
+  color: #999;
+}
+
+.search-input {
+  flex: 1;
+  font-size: 28rpx;
+  color: #333;
+}
+
+.clear-icon {
+  font-size: 32rpx;
+  color: #999;
+  padding: 10rpx;
+  margin-left: 10rpx;
+}
+
+/* ========== Tab分类导航 ========== */
+.tab-bar {
+  padding: 20rpx 0;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tab-scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.tab-list {
+  display: inline-flex;
+  padding: 0 20rpx;
+  gap: 20rpx;
+}
+
+.tab-item {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 120rpx;
+  padding: 20rpx 30rpx;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 16rpx;
+  transition: all 0.3s ease;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.08);
+}
+
+.tab-item.active {
+  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+  transform: scale(1.05);
+  box-shadow: 0 6rpx 20rpx rgba(255, 107, 53, 0.4);
+}
+
+.tab-icon {
+  font-size: 36rpx;
+  margin-bottom: 8rpx;
+}
+
+.tab-name {
+  font-size: 26rpx;
+  color: #333;
+  font-weight: 500;
+}
+
+.tab-item.active .tab-name {
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ========== 活动列表 ========== */
+.activity-list {
+  padding: 20rpx;
+}
+
+/* ========== 加载状态 ========== */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 100rpx 0;
+  gap: 20rpx;
+}
+
+.loading-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border: 4rpx solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* ========== 空状态 ========== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 40rpx;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 20rpx;
+  gap: 20rpx;
+}
+
+.empty-icon {
+  font-size: 120rpx;
+  opacity: 0.6;
+}
+
+.empty-text {
+  font-size: 32rpx;
+  color: #666;
+  font-weight: 500;
+}
+
+.empty-hint {
+  font-size: 26rpx;
+  color: #999;
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* ========== 错误状态 ========== */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 40rpx;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 20rpx;
+  gap: 30rpx;
+}
+
+.error-icon {
+  font-size: 120rpx;
+}
+
+.error-text {
+  font-size: 28rpx;
+  color: #e74c3c;
+  font-weight: 500;
+}
+
+.retry-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border: none;
+  border-radius: 50rpx;
+  padding: 20rpx 60rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+/* ========== 活动卡片 ========== */
+.activity-items {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.activity-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 20rpx;
+  overflow: hidden;
+  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.15);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.activity-card:active {
+  transform: scale(0.98);
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.2);
+}
+
+/* 活动封面 */
+.card-cover {
+  position: relative;
+  width: 100%;
+  height: 360rpx;
+  overflow: hidden;
+}
+
+.cover-image {
+  width: 100%;
+  height: 100%;
+}
+
+/* 状态标签 */
+.status-badge {
+  position: absolute;
+  top: 20rpx;
+  right: 20rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 50rpx;
+  font-size: 24rpx;
+  color: #fff;
+  font-weight: 600;
+  backdrop-filter: blur(10rpx);
+}
+
+.status-badge.status-ongoing {
+  background: rgba(39, 174, 96, 0.9);
+}
+
+.status-badge.status-upcoming {
+  background: rgba(243, 156, 18, 0.9);
+}
+
+.status-badge.status-ended {
+  background: rgba(149, 165, 166, 0.9);
+}
+
+/* 热门标签 */
+.hot-badge {
+  position: absolute;
+  top: 20rpx;
+  left: 20rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 50rpx;
+  font-size: 24rpx;
+  color: #fff;
+  font-weight: 600;
+  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+  box-shadow: 0 4rpx 12rpx rgba(255, 107, 53, 0.4);
+}
+
+/* 活动内容 */
+.card-content {
+  padding: 30rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+/* 标题区域 */
+.card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.card-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #333;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.card-subtitle {
+  font-size: 26rpx;
+  color: #666;
+  line-height: 1.5;
+}
+
+/* 活动数据 */
+.card-data {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20rpx;
+}
+
+.data-item {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 8rpx 16rpx;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 20rpx;
+}
+
+.data-icon {
+  font-size: 24rpx;
+}
+
+.data-text {
+  font-size: 24rpx;
+  color: #667eea;
+  font-weight: 500;
+}
+
+/* 标签 */
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.tag {
+  padding: 6rpx 16rpx;
+  background: rgba(255, 107, 53, 0.1);
+  border-radius: 20rpx;
+  font-size: 22rpx;
+  color: #ff6b35;
+  border: 1rpx solid rgba(255, 107, 53, 0.3);
+}
+
+/* CTA按钮 */
+.card-footer {
+  padding-top: 10rpx;
+  border-top: 1rpx dashed rgba(0, 0, 0, 0.1);
+}
+
+.cta-btn {
+  width: 100%;
+  border-radius: 50rpx;
+  padding: 24rpx 0;
+  font-size: 28rpx;
+  font-weight: 600;
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.cta-btn.primary {
+  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+  color: #fff;
+  box-shadow: 0 4rpx 12rpx rgba(255, 107, 53, 0.3);
+}
+
+.cta-btn.primary:active {
+  opacity: 0.8;
+  transform: translateY(2rpx);
+}
+
+.cta-btn.secondary {
+  background: rgba(149, 165, 166, 0.2);
+  color: #666;
+}
+
+.cta-btn.secondary:active {
+  background: rgba(149, 165, 166, 0.3);
+}
+
+/* ========== 加载更多提示 ========== */
+.load-more-tip {
+  text-align: center;
+  padding: 40rpx 0;
+}
+
+.tip-text {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ========== 底部提示 ========== */
+.bottom-tip {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 20rpx;
+  padding: 30rpx;
+  margin: 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15rpx;
+  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.15);
+}
+
+.bottom-tip .tip-icon {
+  font-size: 32rpx;
+}
+
+.bottom-tip .tip-text {
+  font-size: 26rpx;
+  color: #667eea;
+  font-weight: 500;
+}
+
+/* ========== 响应式适配 ========== */
+@media screen and (max-width: 375px) {
+  .activity-card {
+    margin: 0 10rpx;
+  }
+
+  .card-title {
+    font-size: 30rpx;
+  }
+
+  .card-subtitle {
+    font-size: 24rpx;
+  }
+}

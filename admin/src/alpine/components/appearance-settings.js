@@ -324,7 +324,7 @@ export function appearanceSettings() {
             'data-theme',
             themeId
           )
-        } catch (e) {
+        } catch (_e) {
           // 跨域iframe通过广播同步
         }
       })
@@ -390,7 +390,7 @@ export function appearanceSettings() {
             'data-font',
             fontId
           )
-        } catch (e) {
+        } catch (_e) {
           // 跨域iframe通过广播同步
         }
       })

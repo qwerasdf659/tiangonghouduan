@@ -25,10 +25,11 @@
  */
 
 import { logger } from '../../../utils/logger.js'
+import { API_PREFIX } from '../../../api/base.js'
 import { Alpine, createCrudMixin } from '../../../alpine/index.js'
 
 // API基础地址
-const API_BASE_URL = '/api/v4'
+const API_BASE_URL = API_PREFIX
 /**
  * @typedef {Object} AssetBalance
  * @property {string} asset_code - 资产代码

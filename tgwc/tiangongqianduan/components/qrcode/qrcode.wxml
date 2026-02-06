@@ -1,0 +1,45 @@
+<!-- components/qrcode/qrcode.wxml - 用户身份二维码组件模板 -->
+
+<view class="qrcode-container">
+  <!-- 二维码标题 -->
+  <view class="qrcode-header" wx:if="{{showTitle}}">
+    <text class="qrcode-title">{{title}}</text>
+  </view>
+
+  <!-- 二维码显示区域 -->
+  <view class="qrcode-wrapper">
+    <!-- 加载中状态 -->
+    <view class="qrcode-loading" wx:if="{{loading}}">
+      <text class="loading-text">生成中...</text>
+    </view>
+
+    <!-- 二维码图片（生成成功后显示） -->
+    <image class="qrcode-image" src="{{qrCodeImage}}" mode="aspectFit" wx:if="{{!loading && qrCodeImage}}"></image>
+
+    <!-- Canvas画布（用于生成二维码，生成后隐藏） -->
+    <canvas canvas-id="qrCanvas" id="qrCanvas" class="qrcode-canvas"
+      style="width: {{size}}px; height: {{size}}px;"></canvas>
+
+    <!-- 错误提示 -->
+    <view class="qrcode-error" wx:if="{{!loading && errorMessage}}">
+      <text class="error-icon">⚠️</text>
+      <text class="error-text">{{errorMessage}}</text>
+    </view>
+  </view>
+
+  <!-- 用户信息显示（可选） -->
+  <view class="qrcode-info" wx:if="{{showUserInfo && userInfo}}">
+    <text class="info-item">用户：{{userInfo.nickname}}</text>
+    <text class="info-item">积分：{{userInfo.points}}</text>
+  </view>
+
+  <!-- 操作按钮 -->
+  <view class="qrcode-actions" wx:if="{{showActions && qrCodeImage}}">
+    <button class="action-btn refresh-btn" bindtap="handleRefresh" size="mini">
+      <text>🔄 刷新</text>
+    </button>
+    <button class="action-btn save-btn" bindtap="handleSave" size="mini">
+      <text>💾 保存</text>
+    </button>
+  </view>
+</view>

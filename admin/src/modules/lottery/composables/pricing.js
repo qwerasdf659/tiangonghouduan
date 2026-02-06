@@ -77,7 +77,7 @@ export function usePricingMethods() {
           if (typeof pricing_config === 'string') {
             try {
               pricing_config = JSON.parse(pricing_config)
-            } catch (e) {
+            } catch (_e) {
               logger.warn(`[Pricing] 活动 ${config.campaign_code} pricing_config 解析失败`)
               pricing_config = {}
             }

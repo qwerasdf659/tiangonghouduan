@@ -21,7 +21,7 @@ import { logger } from '../../utils/logger.js'
  * @param {number} config.current - 当前页码
  * @param {number} config.maxPages - 最大显示页码数
  */
-function pagination(config = {}) {
+export function pagination(config = {}) {
   return {
     total: config.total || 0,
     page_size: config.page_size || 20,

@@ -1,0 +1,200 @@
+# Base64编码处理标准 - 天工小程序项目
+
+## 🎯 目的
+
+确保项目中所有Base64编码处理符合标准规范，避免编码格式混淆导致的问题。
+
+---
+
+## 📊 Base64编码标准对比
+
+### 标准Base64（RFC 4648）
+
+**字符集**：`A-Z`, `a-z`, `0-9`, `+`, `/`  
+**填充字符**：`=`  
+**适用场景**：邮件附件、XML、一般数据传输
+
+**示例**：
+```
+原文：Hello, World!
+编码：SGVsbG8sIFdvcmxkIQ==
+```
+
+### Base64 URL编码（RFC 4648 Section 5）
+
+**字符集**：`A-Z`, `a-z`, `0-9`, `-`, `_`  
+**填充字符**：通常省略  
+**适用场景**：URL参数、文件名、JWT Token
+
+**示例**：
+```
+原文：Hello, World!
+编码：SGVsbG8sIFdvcmxkIQ（无填充）
+```
+
+### 关键差异
+
+| 特性 | 标准Base64 | Base64 URL |
+|-----|-----------|-----------|
+| + 字符 | ✅ 使用 | ❌ 用 - 代替 |
+| / 字符 | ✅ 使用 | ❌ 用 _ 代替 |
+| = 填充 | ✅ 必须 | ❌ 通常省略 |
+| URL安全 | ❌ 需要转义 | ✅ 直接使用 |
+
+---
+
+## 🔴 强制规范
+
+### 1. JWT Token处理
+
+**必须使用Base64 URL编码标准**
+
+```javascript
+// ✅ 正确：Base64 URL字符集
+const base64UrlPattern = /^[A-Za-z0-9_-]*$/
+
+// ❌ 错误：标准Base64字符集
+const base64Pattern = /^[A-Za-z0-9+/]*={0,2}$/
+```
+
+### 2. Token解码转换
+
+```javascript
+// ✅ 正确：Base64 URL → 标准Base64
+let payload = tokenParts[1]
+payload = payload.replace(/-/g, '+').replace(/_/g, '/')
+
+// 添加填充字符
+while (payload.length % 4) {
+  payload += '='
+}
+
+// 然后使用标准Base64解码
+const decoded = base64Decode(payload)
+```
+
+### 3. 验证规则
+
+```javascript
+/**
+ * JWT Token完整性验证
+ * 必须使用Base64 URL字符集验证
+ */
+function validateJWTTokenIntegrity(token) {
+  const [header, payload, signature] = token.split('.')
+  
+  // 🔴 关键：使用Base64 URL模式
+  const base64UrlPattern = /^[A-Za-z0-9_-]*$/
+  
+  if (!base64UrlPattern.test(header) ||
+      !base64UrlPattern.test(payload) ||
+      !base64UrlPattern.test(signature)) {
+    return {
+      isValid: false,
+      error: 'JWT Token包含无效的Base64 URL字符'
+    }
+  }
+  
+  return { isValid: true }
+}
+```
+
+---
+
+## ✅ 检查清单
+
+### 编码前检查
+
+- [ ] 明确数据用途（URL/文件名/一般传输）
+- [ ] 选择正确的编码标准（Base64 or Base64 URL）
+- [ ] 查阅相关RFC标准文档
+
+### 编码后检查
+
+- [ ] 验证字符集是否正确（- _ vs + /）
+- [ ] 确认填充字符处理（= 的使用）
+- [ ] 测试边界情况（空字符串、特殊字符）
+
+### 解码前检查
+
+- [ ] 识别编码类型（Base64 or Base64 URL）
+- [ ] 执行必要的字符转换
+- [ ] 处理填充字符
+
+---
+
+## 🐛 常见错误模式
+
+### 错误1：混用编码标准
+
+```javascript
+// ❌ 错误：JWT使用Base64 URL，却用标准Base64验证
+const base64Pattern = /^[A-Za-z0-9+/]*={0,2}$/
+if (!base64Pattern.test(jwtPayload)) {
+  // 会错误拒绝有效的JWT Token
+}
+```
+
+**修复**：
+```javascript
+// ✅ 正确：使用Base64 URL模式
+const base64UrlPattern = /^[A-Za-z0-9_-]*$/
+if (!base64UrlPattern.test(jwtPayload)) {
+  // 正确验证
+}
+```
+
+### 错误2：忘记字符转换
+
+```javascript
+// ❌ 错误：直接解码Base64 URL编码的数据
+const decoded = atob(base64UrlString)
+// 会因为 - 和 _ 字符而失败
+```
+
+**修复**：
+```javascript
+// ✅ 正确：先转换为标准Base64
+let base64String = base64UrlString
+  .replace(/-/g, '+')
+  .replace(/_/g, '/')
+
+// 添加填充
+while (base64String.length % 4) {
+  base64String += '='
+}
+
+const decoded = atob(base64String)
+```
+
+### 错误3：填充字符处理不当
+
+```javascript
+// ❌ 错误：Base64 URL编码时添加了填充
+const base64UrlEncoded = btoa(data) // 包含 = 填充
+// JWT不应该有 = 字符
+```
+
+**修复**：
+```javascript
+// ✅ 正确：移除填充字符
+const base64UrlEncoded = btoa(data)
+  .replace(/\+/g, '-')
+  .replace(/\//g, '_')
+  .replace(/=/g, '') // 移除填充
+```
+
+---
+
+## 📚 参考资料
+
+- RFC 4648: The Base16, Base32, and Base64 Data Encodings
+- RFC 7519: JSON Web Token (JWT)
+- MDN: WindowOrWorkerGlobalScope.atob()
+- MDN: WindowOrWorkerGlobalScope.btoa()
+
+---
+
+**创建时间**：2025-11-08  
+**适用范围**：天工小程序项目所有Base64编码处理  
+**强制执行**：所有新增代码必须符合此标准

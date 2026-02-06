@@ -7,7 +7,6 @@
  * @date 2026-01-23
  */
 
-import { logger } from '../utils/logger.js'
 import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
 
 // ========== 类型定义 ==========

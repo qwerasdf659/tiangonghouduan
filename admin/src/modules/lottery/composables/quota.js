@@ -286,7 +286,7 @@ export function useQuotaMethods() {
         )
         this.showSuccess('规则已禁用')
         await this.loadQuotas()
-      } catch (error) {
+      } catch (_error) {
         this.showError('切换规则状态失败')
       }
     },

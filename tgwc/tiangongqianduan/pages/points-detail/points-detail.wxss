@@ -1,0 +1,723 @@
+/* pages/points-detail/points-detail.wxss - 积分详情页面样式（基于旧项目UI设计重新实现） */
+
+/* 🔧 CSS变量定义 */
+page {
+  --primary-color: #667eea;
+  --primary-gradient: linear-gradient(135deg, #667eea, #764ba2);
+  --success-color: #4caf50;
+  --error-color: #f44336;
+  --warning-color: #ff9800;
+  --text-color: #333333;
+  --text-secondary: #666666;
+  --text-light: #999999;
+  --bg-primary: #f8f9fa;
+  --bg-card: #ffffff;
+  --border-color: #e0e0e0;
+  --shadow-light: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
+  --shadow-medium: 0 4rpx 16rpx rgba(0, 0, 0, 0.12);
+  --border-radius: 16rpx;
+  --border-radius-large: 24rpx;
+}
+
+.points-detail-container {
+  min-height: 100vh;
+  background: var(--primary-gradient);
+  padding: 20rpx;
+}
+
+/* 🎨 积分余额卡片样式 - 与旧项目一致 */
+.points-balance-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.92));
+  border-radius: 28rpx;
+  padding: 50rpx 40rpx;
+  margin-bottom: 30rpx;
+  text-align: center;
+  position: relative;
+  backdrop-filter: blur(15rpx);
+  box-shadow:
+    0 12rpx 48rpx rgba(102, 126, 234, 0.12),
+    0 4rpx 24rpx rgba(102, 126, 234, 0.08),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.8);
+  border: 1rpx solid rgba(255, 255, 255, 0.4);
+  overflow: hidden;
+}
+
+/* 🌟 添加装饰性光效 */
+.points-balance-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(102, 126, 234, 0.05) 50%,
+    transparent 70%
+  );
+  animation: shimmer 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  }
+
+  50% {
+    transform: translateX(100%) translateY(100%) rotate(45deg);
+  }
+}
+
+/* 🎯 积分余额头部 */
+.balance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30rpx;
+  position: relative;
+  z-index: 2;
+}
+
+.balance-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--text-color);
+  background: linear-gradient(135deg, var(--primary-color), #764ba2);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.balance-tips {
+  font-size: 28rpx;
+  color: var(--text-secondary);
+  padding: 8rpx;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 50%;
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.balance-tips:hover {
+  background: rgba(102, 126, 234, 0.2);
+  transform: scale(1.1);
+}
+
+/* 🔢 积分数字展示 */
+.balance-amount {
+  margin-bottom: 20rpx;
+  position: relative;
+  z-index: 2;
+}
+
+.balance-number {
+  font-size: 88rpx;
+  font-weight: 800;
+  margin-right: 16rpx;
+  background: var(--primary-gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2rpx 4rpx rgba(0, 0, 0, 0.1));
+  animation: pulse-glow 3s ease-in-out infinite;
+  line-height: 1.2;
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 2rpx 4rpx rgba(0, 0, 0, 0.1));
+  }
+
+  50% {
+    filter: drop-shadow(0 4rpx 8rpx rgba(102, 126, 234, 0.3));
+  }
+}
+
+.balance-unit {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.balance-desc {
+  font-size: 26rpx;
+  color: var(--text-light);
+  position: relative;
+  z-index: 2;
+}
+
+/* 🎨 筛选功能样式 - 与旧项目一致的筛选设计 */
+.filter-section {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.92));
+  border-radius: var(--border-radius-large);
+  padding: 30rpx;
+  margin-bottom: 30rpx;
+  backdrop-filter: blur(15rpx);
+  box-shadow: var(--shadow-medium);
+  border: 1rpx solid rgba(255, 255, 255, 0.4);
+}
+
+.filter-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 24rpx;
+  text-align: center;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 12rpx;
+  justify-content: space-between;
+}
+
+/* 🏷️ 筛选标签样式 */
+.filter-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20rpx 16rpx;
+  background: var(--bg-primary);
+  border-radius: var(--border-radius);
+  border: 2rpx solid transparent;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.filter-tab::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--primary-gradient);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  border-radius: var(--border-radius);
+}
+
+.filter-tab:hover::before {
+  opacity: 0.1;
+}
+
+.filter-tab.active {
+  background: var(--primary-gradient);
+  color: white;
+  transform: translateY(-4rpx) scale(1.05);
+  box-shadow:
+    0 12rpx 32rpx rgba(102, 126, 234, 0.25),
+    0 6rpx 16rpx rgba(102, 126, 234, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.filter-tab.active::before {
+  opacity: 0;
+}
+
+.filter-icon {
+  font-size: 32rpx;
+  margin-bottom: 8rpx;
+  position: relative;
+  z-index: 2;
+  transition: all 0.3s ease;
+}
+
+.filter-tab.active .filter-icon {
+  transform: scale(1.2);
+  filter: drop-shadow(0 2rpx 4rpx rgba(255, 255, 255, 0.3));
+}
+
+.filter-text {
+  font-size: 24rpx;
+  font-weight: 500;
+  position: relative;
+  z-index: 2;
+  color: inherit;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.filter-tab.active .filter-text {
+  font-weight: 600;
+  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.1);
+}
+
+/* 🎨 记录列表区域样式 */
+.records-section {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.92));
+  border-radius: var(--border-radius-large);
+  padding: 30rpx;
+  margin-bottom: 30rpx;
+  backdrop-filter: blur(15rpx);
+  box-shadow: var(--shadow-medium);
+  border: 1rpx solid rgba(255, 255, 255, 0.4);
+}
+
+/* 📊 记录头部信息 */
+.records-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30rpx;
+  padding-bottom: 20rpx;
+  border-bottom: 2rpx solid rgba(102, 126, 234, 0.1);
+}
+
+.records-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.records-count {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+  background: rgba(102, 126, 234, 0.1);
+  padding: 6rpx 12rpx;
+  border-radius: 12rpx;
+  font-weight: 500;
+}
+
+/* 📋 记录列表样式 */
+.records-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+/* 📄 单条记录样式 - 基于旧项目设计 */
+.record-item {
+  display: flex;
+  align-items: center;
+  padding: 24rpx;
+  background: var(--bg-card);
+  border-radius: var(--border-radius);
+  border: 2rpx solid transparent;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.record-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4rpx;
+  background: var(--primary-gradient);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.record-item:hover {
+  transform: translateX(8rpx);
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.12);
+  border-color: rgba(102, 126, 234, 0.2);
+}
+
+.record-item:hover::before {
+  opacity: 1;
+}
+
+/* 🔴 获得积分记录样式 */
+.record-item.earn-type::before {
+  background: linear-gradient(135deg, var(--success-color), #66bb6a);
+}
+
+.record-item.earn-type:hover {
+  border-color: rgba(76, 175, 80, 0.2);
+}
+
+/* 🔴 消费积分记录样式 */
+.record-item.consume-type::before {
+  background: linear-gradient(135deg, var(--error-color), #ef5350);
+}
+
+.record-item.consume-type:hover {
+  border-color: rgba(244, 67, 54, 0.2);
+}
+
+/* 🎯 记录图标样式 */
+.record-icon {
+  margin-right: 20rpx;
+}
+
+.icon-bg {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.earn-bg {
+  background: linear-gradient(135deg, var(--success-color), #66bb6a);
+  box-shadow: 0 4rpx 12rpx rgba(76, 175, 80, 0.3);
+}
+
+.consume-bg {
+  background: linear-gradient(135deg, var(--error-color), #ef5350);
+  box-shadow: 0 4rpx 12rpx rgba(244, 67, 54, 0.3);
+}
+
+.icon-symbol {
+  color: white;
+  font-size: 28rpx;
+  font-weight: 700;
+  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.2);
+}
+
+/* 📝 记录详情样式 */
+.record-detail {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.record-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.record-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--text-color);
+  flex: 1;
+  margin-right: 16rpx;
+  line-height: 1.3;
+}
+
+/* 💰 积分数字样式 */
+.record-points {
+  font-size: 32rpx;
+  font-weight: 700;
+  min-width: 80rpx;
+  text-align: right;
+}
+
+.earn-points {
+  color: var(--success-color);
+  text-shadow: 0 1rpx 2rpx rgba(76, 175, 80, 0.2);
+}
+
+.consume-points {
+  color: var(--error-color);
+  text-shadow: 0 1rpx 2rpx rgba(244, 67, 54, 0.2);
+}
+
+/* 🕒 记录元信息样式 */
+.record-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.record-time {
+  font-size: 24rpx;
+  color: var(--text-light);
+}
+
+/* 🔥 新增：交易描述样式 */
+.record-desc {
+  font-size: 22rpx;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin-top: 4rpx;
+  opacity: 0.85;
+}
+
+.record-type {
+  font-size: 20rpx;
+  color: var(--text-secondary);
+  background: rgba(102, 126, 234, 0.1);
+  padding: 4rpx 8rpx;
+  border-radius: 8rpx;
+}
+
+/* 🎨 空状态样式 - 与旧项目一致 */
+.empty-state {
+  text-align: center;
+  padding: 80rpx 40rpx;
+  color: var(--text-light);
+}
+
+.empty-icon {
+  font-size: 120rpx;
+  margin-bottom: 30rpx;
+  opacity: 0.6;
+  filter: grayscale(0.5);
+}
+
+.empty-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 16rpx;
+}
+
+.empty-desc {
+  font-size: 26rpx;
+  color: var(--text-light);
+  line-height: 1.5;
+  margin-bottom: 40rpx;
+}
+
+.empty-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.empty-btn {
+  background: var(--primary-gradient);
+  color: white;
+  padding: 16rpx 32rpx;
+  border-radius: var(--border-radius);
+  font-size: 26rpx;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4rpx 12rpx rgba(102, 126, 234, 0.3);
+}
+
+.empty-btn:hover {
+  transform: translateY(-2rpx);
+  box-shadow: 0 6rpx 16rpx rgba(102, 126, 234, 0.4);
+}
+
+/* 📄 加载更多样式 */
+.load-more-section {
+  text-align: center;
+  margin-top: 30rpx;
+  padding-top: 20rpx;
+  border-top: 2rpx solid rgba(102, 126, 234, 0.1);
+}
+
+.load-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 12rpx;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  padding: 16rpx 32rpx;
+  border-radius: var(--border-radius);
+  font-size: 26rpx;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2rpx solid transparent;
+}
+
+.load-more-btn:hover {
+  background: var(--primary-gradient);
+  color: white;
+  transform: translateY(-2rpx);
+  box-shadow: 0 4rpx 12rpx rgba(102, 126, 234, 0.3);
+}
+
+.load-more-icon {
+  font-size: 20rpx;
+}
+
+/* 🔄 加载状态样式 */
+.loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  color: var(--text-light);
+  font-size: 24rpx;
+}
+
+.loading-spinner {
+  width: 32rpx;
+  height: 32rpx;
+  border: 3rpx solid rgba(102, 126, 234, 0.2);
+  border-top: 3rpx solid var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* 🏁 没有更多记录样式 */
+.no-more-section {
+  display: flex;
+  align-items: center;
+  margin-top: 30rpx;
+  gap: 16rpx;
+}
+
+.no-more-line {
+  flex: 1;
+  height: 2rpx;
+  background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.2), transparent);
+}
+
+.no-more-text {
+  font-size: 22rpx;
+  color: var(--text-light);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* 🕒 更新信息样式 */
+.update-info {
+  text-align: center;
+  margin-bottom: 20rpx;
+  padding: 20rpx;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: var(--border-radius);
+}
+
+.update-time {
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+/* 🧪 测试功能样式（开发阶段） */
+.test-section {
+  text-align: center;
+  margin-top: 20rpx;
+}
+
+.test-btn {
+  display: inline-block;
+  background: linear-gradient(135deg, #ff6b35, #f7931e);
+  color: white;
+  padding: 16rpx 32rpx;
+  border-radius: var(--border-radius);
+  font-size: 24rpx;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4rpx 12rpx rgba(255, 107, 53, 0.3);
+}
+
+.test-btn:hover {
+  transform: translateY(-2rpx);
+  box-shadow: 0 6rpx 16rpx rgba(255, 107, 53, 0.4);
+}
+
+/* 🎨 全屏加载状态样式 */
+.fullscreen-loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(102, 126, 234, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(10rpx);
+}
+
+.loading-content {
+  text-align: center;
+  color: white;
+}
+
+.loading-spinner-large {
+  width: 80rpx;
+  height: 80rpx;
+  border: 6rpx solid rgba(255, 255, 255, 0.3);
+  border-top: 6rpx solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 30rpx;
+}
+
+.loading-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  margin-bottom: 16rpx;
+  text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.3);
+}
+
+.loading-desc {
+  font-size: 26rpx;
+  opacity: 0.9;
+  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.2);
+}
+
+/* 🔥 响应式适配 */
+@media (max-width: 400px) {
+  .points-balance-card {
+    padding: 40rpx 30rpx;
+  }
+
+  .balance-number {
+    font-size: 72rpx;
+  }
+
+  .balance-unit {
+    font-size: 30rpx;
+  }
+
+  .filter-tabs {
+    gap: 8rpx;
+  }
+
+  .filter-tab {
+    padding: 16rpx 12rpx;
+  }
+
+  .filter-icon {
+    font-size: 28rpx;
+  }
+
+  .filter-text {
+    font-size: 20rpx;
+  }
+
+  .record-item {
+    padding: 20rpx;
+  }
+
+  .record-title {
+    font-size: 26rpx;
+  }
+
+  .record-points {
+    font-size: 28rpx;
+  }
+
+  .icon-bg {
+    width: 48rpx;
+    height: 48rpx;
+  }
+
+  .icon-symbol {
+    font-size: 24rpx;
+  }
+}

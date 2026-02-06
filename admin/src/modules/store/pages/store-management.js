@@ -305,7 +305,7 @@ function registerStoreManagementComponents() {
             todayRevenue: stats.today_revenue ?? 0
           }
         }
-      } catch (error) {
+      } catch (_error) {
         // 使用本地数据计算
         this.storeStats = {
           total: this.stores.length,

@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "审核列表",
+  "navigationBarBackgroundColor": "#667eea",
+  "navigationBarTextStyle": "white",
+  "enablePullDownRefresh": true,
+  "usingComponents": {}
+}
+
+

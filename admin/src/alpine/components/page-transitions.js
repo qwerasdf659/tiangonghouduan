@@ -347,7 +347,7 @@ function staggerTransition(config = {}) {
     },
 
     // 获取项的 CSS 类
-    getItemClass(index) {
+    getItemClass(_index) {
       const preset = TRANSITION_PRESETS[this.transitionType]
       return {
         [preset.enter]: true,

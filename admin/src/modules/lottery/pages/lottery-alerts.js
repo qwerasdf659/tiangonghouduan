@@ -24,14 +24,11 @@
 import { logger } from '../../../utils/logger.js'
 import { LOTTERY_ADVANCED_ENDPOINTS } from '../../../api/lottery/advanced.js'
 import { LOTTERY_CORE_ENDPOINTS } from '../../../api/lottery/core.js'
-import { LOTTERY_HEALTH_ENDPOINTS, LotteryHealthAPI } from '../../../api/lottery-health.js'
+import { LotteryHealthAPI } from '../../../api/lottery-health.js'
 import { SYSTEM_CORE_ENDPOINTS } from '../../../api/system/core.js'
 import { buildURL, request, buildQueryString } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/index.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
-
-/** 获取认证Token */
-const getToken = () => localStorage.getItem('admin_token')
 
 // API请求封装
 const apiRequest = async (url, options = {}) => {

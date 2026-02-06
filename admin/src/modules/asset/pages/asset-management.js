@@ -412,7 +412,7 @@ document.addEventListener('alpine:init', () => {
         this.$refs.materialTypeModal?.hide()
         await this.loadMaterialTypes()
         this.showSuccess(this.editingMaterialType ? '材料类型已更新' : '材料类型已创建')
-      } catch (error) {
+      } catch (_error) {
         this.showError('保存失败')
       } finally {
         this.saving = false

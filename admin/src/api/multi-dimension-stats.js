@@ -1,11 +1,12 @@
 /**
  * 多维度统计分析 API
  * @description 支持多维度筛选的统计分析
- * @version 1.0.0
+ * @version 1.1.0
  * @date 2026-02-01
+ * @updated 2026-02-06 - 统一使用 request() 替代原生 fetch
  */
 
-import { API_PREFIX, authHeaders, handleResponse, buildQueryString } from './base.js'
+import { API_PREFIX, request } from './base.js'
 
 // 多维度统计端点（后端挂载在 /console/statistics 下）
 export const MULTI_DIMENSION_ENDPOINTS = {
@@ -35,12 +36,7 @@ export const MultiDimensionStatsAPI = {
     if (!params.metrics) {
       params.metrics = 'draws,win_rate' // 默认指标
     }
-    // 使用 buildQueryString 构建查询参数，而不是 buildURL
-    const url = MULTI_DIMENSION_ENDPOINTS.STATS + buildQueryString(params)
-    const response = await fetch(url, {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: MULTI_DIMENSION_ENDPOINTS.STATS, params })
   },
 
   /**
@@ -56,11 +52,6 @@ export const MultiDimensionStatsAPI = {
    * @returns {Promise<Object>} 明细数据
    */
   async getDrillDown(params = {}) {
-    // 使用 buildQueryString 构建查询参数
-    const url = MULTI_DIMENSION_ENDPOINTS.DRILL_DOWN + buildQueryString(params)
-    const response = await fetch(url, {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: MULTI_DIMENSION_ENDPOINTS.DRILL_DOWN, params })
   }
 }

@@ -33,32 +33,9 @@
  */
 
 import { logger } from '../../../utils/logger.js'
+import { request } from '../../../api/base.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
-// 注意：使用本地 apiRequest 函数而非 request，以便更好地处理错误
 import { Alpine, createBatchOperationMixin, createPageMixin } from '../../../alpine/index.js'
-
-// API请求辅助函数
-async function apiRequest(url, options = {}) {
-  const method = options.method || 'GET'
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers
-  }
-
-  // 添加认证token
-  const token = localStorage.getItem('admin_token')
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-
-  const fetchOptions = { method, headers }
-  if (options.body) {
-    fetchOptions.body = options.body
-  }
-
-  const response = await fetch(url, fetchOptions)
-  return await response.json()
-}
 /**
  * 孤儿冻结项目对象类型
  * @typedef {Object} OrphanItem
@@ -232,8 +209,8 @@ function orphanFrozenPage() {
 
         // 并行获取检测结果和统计数据
         const [detectResponse, statsResponse] = await Promise.all([
-          apiRequest(detectUrl),
-          apiRequest(statsUrl)
+          request({ url: detectUrl }),
+          request({ url: statsUrl })
         ])
 
         logger.debug('📨 [orphanFrozenPage] API响应', {
@@ -340,9 +317,7 @@ function orphanFrozenPage() {
       this.scanning = true
 
       try {
-        const response = await apiRequest(ASSET_ENDPOINTS.ORPHAN_FROZEN_DETECT, {
-          method: 'GET'
-        })
+        const response = await request({ url: ASSET_ENDPOINTS.ORPHAN_FROZEN_DETECT })
 
         logger.debug('📡 [orphanFrozenPage] scanOrphans 响应', response)
 
@@ -454,13 +429,14 @@ function orphanFrozenPage() {
       this.cleaning = true
 
       try {
-        const response = await apiRequest(ASSET_ENDPOINTS.ORPHAN_FROZEN_CLEANUP, {
+        const response = await request({
+          url: ASSET_ENDPOINTS.ORPHAN_FROZEN_CLEANUP,
           method: 'POST',
-          body: JSON.stringify({
+          data: {
             dry_run: false,
             reason: this.cleanReason.trim(),
             operator_name: this.current_user?.nickname || '管理员'
-          })
+          }
         })
 
         if (response && response.success) {

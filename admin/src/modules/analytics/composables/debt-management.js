@@ -12,7 +12,6 @@
 import { logger } from '../../../utils/logger.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 import { LOTTERY_CORE_ENDPOINTS } from '../../../api/lottery/core.js'
-import { buildURL } from '../../../api/base.js'
 
 /**
  * 债务管理状态

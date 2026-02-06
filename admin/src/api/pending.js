@@ -1,11 +1,12 @@
 /**
  * 待处理中心 API
  * @description 待处理事项汇总和列表查询
- * @version 1.1.0
+ * @version 1.2.0
  * @date 2026-02-03
+ * @updated 2026-02-06 - 统一使用 request() 替代原生 fetch
  */
 
-import { API_PREFIX, authHeaders, handleResponse } from './base.js'
+import { API_PREFIX, request } from './base.js'
 
 // 待处理中心端点（以后端实际路由为准）
 export const PENDING_ENDPOINTS = {
@@ -26,10 +27,7 @@ export const PendingAPI = {
    * @returns {Promise<Object>} 汇总数据
    */
   async getSummary() {
-    const response = await fetch(PENDING_ENDPOINTS.SUMMARY, {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: PENDING_ENDPOINTS.SUMMARY })
   },
 
   /**
@@ -43,18 +41,7 @@ export const PendingAPI = {
    * @returns {Promise<Object>} 列表数据
    */
   async getList(params = {}) {
-    const query = new URLSearchParams()
-    if (params.category) query.append('category', params.category)
-    if (params.priority) query.append('priority', params.priority)
-    if (params.urgent_only) query.append('urgent_only', 'true')
-    if (params.page) query.append('page', params.page)
-    if (params.page_size) query.append('page_size', params.page_size)
-
-    const url = `${PENDING_ENDPOINTS.LIST}?${query.toString()}`
-    const response = await fetch(url, {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    return request({ url: PENDING_ENDPOINTS.LIST, params })
   },
 
   /**
@@ -66,11 +53,8 @@ export const PendingAPI = {
    * @returns {Object} data.components - 各维度得分明细
    */
   async getHealthScore() {
-    // 使用后端实际端点: /api/v4/console/dashboard/business-health
-    const response = await fetch(`${API_PREFIX}/console/dashboard/business-health`, {
-      headers: authHeaders()
-    })
-    return handleResponse(response)
+    // 使用后端实际端点
+    return request({ url: `${API_PREFIX}/console/dashboard/business-health` })
   },
 
   /**
@@ -82,15 +66,7 @@ export const PendingAPI = {
    * @returns {Promise<Object>} 操作结果
    */
   async batch(params) {
-    const response = await fetch(PENDING_ENDPOINTS.BATCH, {
-      method: 'POST',
-      headers: {
-        ...authHeaders(),
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(params)
-    })
-    return handleResponse(response)
+    return request({ url: PENDING_ENDPOINTS.BATCH, method: 'POST', data: params })
   }
 }
 

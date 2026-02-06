@@ -8,6 +8,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
+import { API_PREFIX } from '../../../api/base.js'
 import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
 import { loadECharts } from '../../../utils/echarts-lazy.js'
 
@@ -133,17 +134,17 @@ export function useMetricsMethods() {
             { showLoading: false, showError: false }
           ),
           this.apiGet(
-            `/api/v4/console/lottery/stats?range=${range}`,
+            `${API_PREFIX}/console/lottery/stats?range=${range}`,
             {},
             { showLoading: false, showError: false }
           ),
           this.apiGet(
-            `/api/v4/console/lottery/trend?range=${range}`,
+            `${API_PREFIX}/console/lottery/trend?range=${range}`,
             {},
             { showLoading: false, showError: false }
           ),
           this.apiGet(
-            `/api/v4/console/lottery/prize-distribution?range=${range}`,
+            `${API_PREFIX}/console/lottery/prize-distribution?range=${range}`,
             {},
             { showLoading: false, showError: false }
           )
@@ -1124,7 +1125,7 @@ export function useMetricsMethods() {
       try {
         // 调用 activity-heatmap API（该API基于LotteryDraw统计）
         const response = await this.apiGet(
-          `/api/v4/console/users/activity-heatmap?days=${days}`,
+          `${API_PREFIX}/console/users/activity-heatmap?days=${days}`,
           {},
           { showLoading: false }
         )

@@ -96,7 +96,7 @@ function functionCard(config = {}) {
  * @param {Array} config.cards - 卡片配置数组
  * @param {number} config.columns - 列数 (默认 4)
  */
-function functionCardGrid(config = {}) {
+export function functionCardGrid(config = {}) {
   return {
     cards: config.cards || [],
     columns: config.columns || 4,
@@ -150,7 +150,7 @@ function functionCardGrid(config = {}) {
  * 快捷功能卡片组件（简化版）
  * 用于简单的图标 + 文字 + 链接场景
  */
-function quickCard(config = {}) {
+export function quickCard(config = {}) {
   return {
     text: config.text || '功能',
     icon: config.icon || 'bi-grid',
@@ -171,7 +171,7 @@ function quickCard(config = {}) {
 /**
  * 统计卡片组件（带数值和趋势）
  */
-function statFunctionCard(config = {}) {
+export function statFunctionCard(config = {}) {
   return {
     ...functionCard(config),
 

@@ -44,7 +44,7 @@ function showLoading() {
   if (typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('ui')) {
     try {
       Alpine.store('ui').setLoading(true)
-    } catch (e) {
+    } catch (_e) {
       // 忽略
     }
   }
@@ -54,7 +54,7 @@ function hideLoading() {
   if (typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('ui')) {
     try {
       Alpine.store('ui').setLoading(false)
-    } catch (e) {
+    } catch (_e) {
       // 忽略
     }
   }
@@ -351,7 +351,7 @@ document.addEventListener('alpine:init', () => {
         if (this.form.meta && this.form.meta.trim()) {
           meta = JSON.parse(this.form.meta)
         }
-      } catch (e) {
+      } catch (_e) {
         this.showError('格式错误', '扩展属性JSON格式错误')
         return
       }

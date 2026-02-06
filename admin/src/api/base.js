@@ -481,7 +481,7 @@ export async function handleResponse(response) {
       if (window.self !== window.top) {
         try {
           window.top.location.href = '/admin/login.html'
-        } catch (e) {
+        } catch (_e) {
           window.parent.postMessage({ type: 'AUTH_EXPIRED', redirect: '/admin/login.html' }, '*')
         }
       } else {

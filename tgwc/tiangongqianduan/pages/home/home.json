@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "首页",
+  "enablePullDownRefresh": true,
+  "onReachBottomDistance": 50,
+  "backgroundTextStyle": "light",
+  "usingComponents": {
+    "qrcode": "/components/qrcode/qrcode"
+  }
+}

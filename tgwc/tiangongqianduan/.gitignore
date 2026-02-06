@@ -1,0 +1,52 @@
+# 微信小程序开发工具生成的文件
+project.private.config.json
+
+# 日志文件
+*.log
+logs/
+
+# 依赖包（如果使用npm）
+node_modules/
+
+# 构建输出
+dist/
+build/
+
+# 开发工具配置
+.vscode/
+.idea/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.temp
+
+# 环境配置文件
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 调试文件
+*.debug
+
+# 微信开发者工具生成的临时文件
+*.map
+
+# ESLint检查报告（临时文件）
+eslint-*.json
+eslint-*.txt
+
+# 测试和备份文件
+*.backup
+*.bak
+*-old.*
+*-backup.*
+
+# 优化方案文档（可选，根据需要调整）
+docs/*方案*.md
+docs/*执行文档*.md 
