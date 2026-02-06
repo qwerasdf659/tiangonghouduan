@@ -23,7 +23,7 @@ export function useRedemptionState() {
     /** @type {Object} 核销码统计 */
     redemptionStats: { total: 0, pending: 0, fulfilled: 0, expired: 0 },
     /** @type {Object} 核销码筛选条件 */
-    redemptionFilters: { status: '', prize_type: '', code: '', user_id: '' },
+    redemptionFilters: { status: '', prize_type: '', code: '', mobile: '' },
     /** @type {Array} 选中的核销码ID */
     redemptionSelectedIds: [],
     /** @type {Object|null} 核销码详情 */
@@ -127,9 +127,15 @@ export function useRedemptionMethods() {
         if (this.redemptionFilters?.code) {
           params.append('code', this.redemptionFilters.code)
         }
-        if (this.redemptionFilters?.user_id) {
-          // 使用后端期望的参数名 redeemer_user_id（不是 user_id）
-          params.append('redeemer_user_id', this.redemptionFilters.user_id)
+        if (this.redemptionFilters?.mobile) {
+          // 手机号 → resolve 获取 user_id，再传给后端 redeemer_user_id
+          const user = await this.resolveUserByMobile(this.redemptionFilters.mobile)
+          if (user) {
+            params.append('redeemer_user_id', user.user_id)
+          } else {
+            this.redemptionCodes = []
+            return
+          }
         }
 
         const url = `${LOTTERY_ENDPOINTS.BUSINESS_RECORD_REDEMPTION_ORDER}?${params}`

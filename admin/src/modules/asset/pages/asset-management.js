@@ -58,7 +58,7 @@ document.addEventListener('alpine:init', () => {
 
   // 注册主组件（HTML 使用 assetManagement()）
   Alpine.data('assetManagement', () => ({
-    ...createPageMixin(),
+    ...createPageMixin({ userResolver: true }),
 
     // 子页面导航
     current_page: 'material-types',
@@ -101,41 +101,41 @@ document.addEventListener('alpine:init', () => {
 
     // 材料账户
     materialAccounts: [],
-    materialAccountFilters: { user_id: '', asset_code: '' },
+    materialAccountFilters: { mobile: '', asset_code: '' },
     materialAccountPagination: { total: 0, total_pages: 1, current_page: 1 },
 
     // 材料交易
     materialTransactions: [],
-    materialTxFilters: { user_id: '', asset_code: '', type: '' },
+    materialTxFilters: { mobile: '', asset_code: '', type: '' },
     materialTxPagination: { total: 0, total_pages: 1, current_page: 1 },
 
     // 物品实例
     itemInstances: [],
-    itemInstanceFilters: { user_id: '', template_code: '', status: '' },
+    itemInstanceFilters: { mobile: '', template_code: '', status: '' },
     itemInstancePagination: { total: 0, total_pages: 1, current_page: 1 },
     instanceDetail: null,
 
     // 虚拟账户
     virtualAccounts: [],
-    virtualAccountFilters: { user_id: '', account_type: '' },
+    virtualAccountFilters: { mobile: '', account_type: '' },
     virtualAccountPagination: { total: 0, total_pages: 1, current_page: 1 },
 
     // 虚拟交易
     virtualTransactions: [],
-    virtualTxFilters: { user_id: '', account_type: '', direction: '' },
+    virtualTxFilters: { mobile: '', account_type: '', direction: '' },
     virtualTxPagination: { total: 0, total_pages: 1, current_page: 1 },
 
     // 资产统计
     assetStats: { totalMaterialValue: 0, totalVirtualValue: 0, totalItemCount: 0 },
 
     // 资产日志相关
-    logFilters: { user_id: '', asset_code: '', start_date: '' },
+    logFilters: { mobile: '', asset_code: '', start_date: '' },
     assetLogs: [],
     assetTypes: [],
     userAssets: [],
 
     // 用户资产筛选条件
-    userAssetFilters: { user_id: '', asset_code: '' },
+    userAssetFilters: { mobile: '', asset_code: '' },
 
     // 通用状态
     saving: false,
@@ -205,15 +205,19 @@ document.addEventListener('alpine:init', () => {
 
     async loadMaterialAccounts() {
       try {
-        // 检查是否有 user_id，后端 API 需要 user_id 参数
-        if (!this.materialAccountFilters.user_id) {
+        // 检查是否有手机号，后端 API 需要 user_id 参数
+        if (!this.materialAccountFilters.mobile) {
           this.materialAccounts = []
-          logger.info('[AssetManagement] 请输入用户ID查询资产')
+          logger.info('[AssetManagement] 请输入手机号查询资产')
           return
         }
+        // 手机号 → resolve 获取 user_id
+        const user = await this.resolveUserByMobile(this.materialAccountFilters.mobile)
+        if (!user) return
+
         // 使用正确的资产组合接口，转换参数名为后端格式
         const response = await this.apiGet(ASSET_ENDPOINTS.PORTFOLIO, {
-          user_id: this.materialAccountFilters.user_id,
+          user_id: user.user_id,
           asset_code: this.materialAccountFilters.asset_code || undefined
         })
         logger.debug('[AssetManagement] loadMaterialAccounts response:', response)
@@ -227,7 +231,7 @@ document.addEventListener('alpine:init', () => {
           this.materialAccounts = Array.isArray(matAcctData)
             ? matAcctData.map(item => ({
                 ...item,
-                user_id: response.data?.user_id || this.materialAccountFilters.user_id,
+                user_id: response.data?.user_id || user.user_id,
                 balance: item.available_amount || item.balance || 0,
                 updated_at: item.updated_at || new Date().toISOString()
               }))
@@ -243,13 +247,17 @@ document.addEventListener('alpine:init', () => {
     async loadMaterialTransactions() {
       try {
         // 后端 API 要求 user_id 是必填参数，没有时显示提示
-        if (!this.logFilters.user_id) {
+        if (!this.logFilters.mobile) {
           this.materialTransactions = []
-          logger.info('请输入用户ID进行查询')
+          logger.info('请输入手机号进行查询')
           return
         }
+        // 手机号 → resolve 获取 user_id
+        const user = await this.resolveUserByMobile(this.logFilters.mobile)
+        if (!user) return
+
         const response = await this.apiGet(ASSET_ENDPOINTS.TRANSACTIONS, {
-          user_id: this.logFilters.user_id,
+          user_id: user.user_id,
           asset_code: this.logFilters.asset_code
         })
         logger.debug('[AssetManagement] loadMaterialTransactions response:', response)
@@ -293,14 +301,18 @@ document.addEventListener('alpine:init', () => {
     async loadVirtualAccounts() {
       try {
         // 后端 API 要求 user_id 是必填参数，没有时显示提示
-        if (!this.virtualAccountFilters.user_id) {
+        if (!this.virtualAccountFilters.mobile) {
           this.virtualAccounts = []
-          logger.info('请输入用户ID进行查询')
+          logger.info('请输入手机号进行查询')
           return
         }
+        // 手机号 → resolve 获取 user_id
+        const user = await this.resolveUserByMobile(this.virtualAccountFilters.mobile)
+        if (!user) return
+
         // 使用 ASSET_ENDPOINTS.ADJUSTMENT_USER_BALANCES 端点
         const url = buildURL(ASSET_ENDPOINTS.ADJUSTMENT_USER_BALANCES, {
-          user_id: this.virtualAccountFilters.user_id
+          user_id: user.user_id
         })
         const response = await this.apiGet(url)
         if (response.success && response.data) {
@@ -319,13 +331,17 @@ document.addEventListener('alpine:init', () => {
     async loadVirtualTransactions() {
       try {
         // 后端 API 要求 user_id 是必填参数，没有时显示提示
-        if (!this.virtualTxFilters.user_id) {
+        if (!this.virtualTxFilters.mobile) {
           this.virtualTransactions = []
-          logger.info('请输入用户ID进行查询')
+          logger.info('请输入手机号进行查询')
           return
         }
+        // 手机号 → resolve 获取 user_id
+        const user = await this.resolveUserByMobile(this.virtualTxFilters.mobile)
+        if (!user) return
+
         const response = await this.apiGet(ASSET_ENDPOINTS.TRANSACTIONS, {
-          user_id: this.virtualTxFilters.user_id,
+          user_id: user.user_id,
           account_type: this.virtualTxFilters.account_type,
           type: 'virtual'
         })

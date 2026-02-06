@@ -59,19 +59,28 @@
       if (!confirm('确定要退出登录吗？')) return
       
       try {
+        const token = sessionStorage.getItem('admin_token') || localStorage.getItem('admin_token')
         const response = await fetch('/api/v4/auth/logout', {
           method: 'POST',
-          credentials: 'include'
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          }
         })
         
-        if (response.ok) {
-          localStorage.removeItem('admin_token')
-          localStorage.removeItem('admin_user_info')
-          window.location.href = '/admin/login.html'
-        }
+        // 无论后端结果如何，都清除本地状态并跳转
+        sessionStorage.removeItem('admin_token')
+        localStorage.removeItem('admin_token')
+        localStorage.removeItem('admin_user_info')
+        localStorage.removeItem('user_info')
+        window.location.href = '/admin/login.html'
       } catch (error) {
-        logger.error('退出登录失败:', error)
-        alert('退出登录失败，请重试')
+        // 网络错误也要清除本地状态
+        sessionStorage.removeItem('admin_token')
+        localStorage.removeItem('admin_token')
+        localStorage.removeItem('admin_user_info')
+        localStorage.removeItem('user_info')
+        window.location.href = '/admin/login.html'
       }
     }
   </script>

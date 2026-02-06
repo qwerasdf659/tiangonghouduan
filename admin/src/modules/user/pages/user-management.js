@@ -19,7 +19,7 @@
 import { logger } from '../../../utils/logger.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import { loadECharts } from '../../../utils/index.js'
-import { API_PREFIX, authHeaders, handleResponse } from '../../../api/base.js'
+import { API_PREFIX, request } from '../../../api/base.js'
 
 // 导入所有 composables 模块
 import {
@@ -85,8 +85,8 @@ document.addEventListener('alpine:init', () => {
    * 用户管理页面内容组件 - 使用 composables 组合
    */
   Alpine.data('userPageContent', () => ({
-    // 基础混入
-    ...createPageMixin({ pagination: { page_size: 20 } }),
+    // 基础混入（启用用户解析 mixin）
+    ...createPageMixin({ pagination: { page_size: 20 }, userResolver: true }),
 
     // ==================== 备用默认值（防止展开失败）====================
     // 放在 composables 之前，会被 composables 的值覆盖
@@ -461,10 +461,10 @@ document.addEventListener('alpine:init', () => {
       if (!userId) return
 
       try {
-        const response = await fetch(`${API_PREFIX}/console/users/${userId}/activities?limit=10`, {
-          headers: authHeaders()
+        const data = await request({
+          url: `${API_PREFIX}/console/users/${userId}/activities`,
+          params: { limit: 10 }
         })
-        const data = await handleResponse(response)
         if (data?.success) {
           this.userActivities = data.data?.activities || data.data || []
         }
@@ -519,17 +519,18 @@ document.addEventListener('alpine:init', () => {
         // 并行获取多个分析数据
         const [profileRes, activitiesRes, assetsRes] = await Promise.allSettled([
           // 获取用户抽奖档案
-          fetch(`${API_PREFIX}/console/lottery-user-analysis/profile/${user.user_id}`, {
-            headers: authHeaders()
-          }).then(res => res.json()),
+          request({
+            url: `${API_PREFIX}/console/lottery-user-analysis/profile/${user.user_id}`
+          }),
           // 获取用户行为轨迹
-          fetch(`${API_PREFIX}/console/users/${user.user_id}/activities?limit=20`, {
-            headers: authHeaders()
-          }).then(res => res.json()),
+          request({
+            url: `${API_PREFIX}/console/users/${user.user_id}/activities`,
+            params: { limit: 20 }
+          }),
           // 获取用户资产汇总
-          fetch(`${API_PREFIX}/console/assets/user/${user.user_id}/summary`, {
-            headers: authHeaders()
-          }).then(res => res.json())
+          request({
+            url: `${API_PREFIX}/console/assets/user/${user.user_id}/summary`
+          })
         ])
 
         // 组装分析报告

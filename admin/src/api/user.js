@@ -187,6 +187,8 @@ import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
  * @property {string} SESSION_ONLINE_USERS - [GET] 获取在线用户
  */
 export const USER_ENDPOINTS = {
+  /** @type {string} [GET] 根据手机号解析用户 - Query: { mobile } */
+  RESOLVE: `${API_PREFIX}/console/user-management/users/resolve`,
   /** @type {string} [GET] 获取用户列表 - Query: { page?, limit?, search?, role_filter? } */
   LIST: `${API_PREFIX}/console/user-management/users`,
   /** @type {string} [GET] 获取用户详情 - Path: :user_id */
@@ -336,6 +338,19 @@ export const USER_ENDPOINTS = {
 // ========== API 调用方法 ==========
 
 export const UserAPI = {
+  /**
+   * 根据手机号解析用户
+   * @async
+   * @param {Object} params - 查询参数
+   * @param {string} params.mobile - 手机号（11位数字，1开头）
+   * @returns {Promise<ApiResponse>} 用户解析响应，data 包含 { user_id, mobile, nickname, status, avatar_url, user_level }
+   * @throws {Error} 手机号格式错误或用户不存在时抛出
+   */
+  async resolveUser(params) {
+    const url = USER_ENDPOINTS.RESOLVE + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
   /**
    * 获取用户列表
    * @async

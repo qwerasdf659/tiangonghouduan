@@ -194,17 +194,21 @@ function lotteryAlertsPage() {
         this.refreshTimer = setInterval(() => this.loadAlerts(), 60000)
       }
 
-      // 窗口大小改变时重绘图表
-      window.addEventListener('resize', () => {
+      // 窗口大小改变时重绘图表（命名引用以便清理）
+      this._resizeHandler = () => {
         if (this.severityDistChart) this.severityDistChart.resize()
         if (this.typeDistChart) this.typeDistChart.resize()
-      })
+      }
+      window.addEventListener('resize', this._resizeHandler)
     },
 
     /**
      * 组件销毁时清理资源
      */
     destroy() {
+      if (this._resizeHandler) {
+        window.removeEventListener('resize', this._resizeHandler)
+      }
       if (this.refreshTimer) {
         clearInterval(this.refreshTimer)
       }
@@ -868,7 +872,7 @@ function lotteryAlertsPage() {
         // 并行请求：系统状态（需认证）+ 健康检查（公开）
         const [statusResult, healthResult] = await Promise.allSettled([
           apiRequest(SYSTEM_CORE_ENDPOINTS.STATUS),
-          fetch('/health').then(r => r.json()).catch(() => null)
+          request({ url: '/health' }).catch(() => null)
         ])
 
         const responseTime = Date.now() - startTime

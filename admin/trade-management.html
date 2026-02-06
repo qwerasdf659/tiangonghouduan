@@ -81,11 +81,11 @@
           </div>
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">买家ID</label>
-            <input type="text" x-model="tradeFilters.buyer_user_id" placeholder="买家ID" class="w-full px-3 py-2 border rounded-lg">
+            <input type="text" x-model="tradeFilters.buyer_mobile" maxlength="11" placeholder="买家手机号" class="w-full px-3 py-2 border rounded-lg">
           </div>
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">卖家ID</label>
-            <input type="text" x-model="tradeFilters.seller_user_id" placeholder="卖家ID" class="w-full px-3 py-2 border rounded-lg">
+            <input type="text" x-model="tradeFilters.seller_mobile" maxlength="11" placeholder="卖家手机号" class="w-full px-3 py-2 border rounded-lg">
           </div>
           <div>
             <button @click="loadTradeOrders()" class="w-full px-4 py-2 themed-btn-primary rounded-lg">
@@ -93,7 +93,7 @@
             </button>
           </div>
           <div>
-            <button @click="tradeFilters = { status: '', buyer_user_id: '', seller_user_id: '', listing_id: '' }; loadTradeOrders()" class="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+            <button @click="tradeFilters = { status: '', buyer_mobile: '', seller_mobile: '', listing_id: '' }; loadTradeOrders()" class="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
               🔄 重置
             </button>
           </div>

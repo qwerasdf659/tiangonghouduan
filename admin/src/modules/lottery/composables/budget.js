@@ -332,10 +332,11 @@ export function useBudgetMethods() {
         this.budgetTrendChart = echarts.init(container)
         this.updateBudgetTrendChart()
 
-        // 监听窗口大小变化
-        window.addEventListener('resize', () => {
+        // 监听窗口大小变化（命名引用以便清理）
+        this._budgetResizeHandler = () => {
           this.budgetTrendChart?.resize()
-        })
+        }
+        window.addEventListener('resize', this._budgetResizeHandler)
 
         logger.info('[Budget] 趋势图表初始化完成')
       } catch (error) {

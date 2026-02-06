@@ -1056,6 +1056,27 @@ function auditLogsPage() {
     getTargetTypeName(target_type) {
       // 直接返回后端数据，不做映射
       return target_type || '-'
+    },
+
+    /**
+     * 组件销毁时清理资源
+     */
+    destroy() {
+      // 清理图表 resize 监听
+      if (this._chartResizeHandler) {
+        window.removeEventListener('resize', this._chartResizeHandler)
+      }
+      if (this._reportResizeHandler) {
+        window.removeEventListener('resize', this._reportResizeHandler)
+      }
+      // 销毁 ECharts 实例
+      if (this.trendChart) this.trendChart.dispose()
+      if (this.targetTypeChart) this.targetTypeChart.dispose()
+      if (this.reportOperationChart) this.reportOperationChart.dispose()
+      if (this.reportTargetChart) this.reportTargetChart.dispose()
+      if (this.reportTrendChart) this.reportTrendChart.dispose()
+      if (this.reportRiskLevelChart) this.reportRiskLevelChart.dispose()
+      logger.info('[AuditLogs] 资源已清理')
     }
   }
 }

@@ -161,7 +161,7 @@ class BudgetProvider {
   /**
    * 记录日志
    *
-   * @param {string} level - 日志级别
+   * @param {string} level - 日志级别（error/warn/info/debug）
    * @param {string} message - 日志消息
    * @param {Object} data - 附加数据
    * @returns {void}
@@ -173,11 +173,7 @@ class BudgetProvider {
       ...data
     }
 
-    if (logger && typeof logger[level] === 'function') {
-      logger[level](`[BudgetProvider:${this.mode}] ${message}`, log_data)
-    } else {
-      console.log(`[${level.toUpperCase()}] [BudgetProvider:${this.mode}] ${message}`, log_data)
-    }
+    logger[level](`[BudgetProvider:${this.mode}] ${message}`, log_data)
   }
 
   /**

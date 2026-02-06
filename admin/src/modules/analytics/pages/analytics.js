@@ -192,10 +192,11 @@ function analyticsPage() {
         this.initCharts()
         this.loadAllData()
 
-        // 监听窗口大小变化
-        window.addEventListener('resize', () => {
+        // 监听窗口大小变化（命名引用以便清理）
+        this._resizeHandler = () => {
           this.resizeCharts()
-        })
+        }
+        window.addEventListener('resize', this._resizeHandler)
       })
     },
 
@@ -815,6 +816,20 @@ function analyticsPage() {
     formatNumber(num) {
       if (num === undefined || num === null) return '-'
       return num.toLocaleString()
+    },
+
+    /**
+     * 组件销毁时清理资源
+     */
+    destroy() {
+      if (this._resizeHandler) {
+        window.removeEventListener('resize', this._resizeHandler)
+      }
+      // 销毁 ECharts 实例
+      ;['_userTrendChart', '_lotteryTrendChart', '_pointsFlowChart', '_userSourceChart'].forEach(key => {
+        if (this[key]) this[key].dispose()
+      })
+      logger.info('[Analytics] 资源已清理')
     }
   }
 }

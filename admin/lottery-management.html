@@ -851,8 +851,9 @@
               <input 
                 type="text" 
                 class="flex-1 max-w-xs px-3 py-2 border rounded-lg text-sm"
-                placeholder="输入用户ID..." 
-                x-model="searchUserId"
+                placeholder="输入手机号..." 
+                maxlength="11"
+                x-model="searchMobile"
                 @keyup.enter="searchUserProfile()"
               >
               <select 
@@ -2279,11 +2280,18 @@
                   </select>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium mb-1">用户ID列表 <span class="text-red-500">*</span></label>
-                  <textarea x-model="batchQuotaGrantForm.user_ids" 
+                  <label class="block text-sm font-medium mb-1">用户手机号列表 <span class="text-red-500">*</span></label>
+                  <textarea x-model="batchQuotaGrantForm.mobiles" 
                             class="themed-input w-full rounded px-3 py-2 h-24"
-                            placeholder="输入用户ID，支持逗号、换行、空格分隔&#10;例如：1001, 1002, 1003&#10;或每行一个ID"></textarea>
-                  <p class="text-xs themed-text-muted mt-1">单次最多支持100个用户</p>
+                            placeholder="输入手机号，支持逗号、换行分隔&#10;例如：13800001111, 13800002222&#10;或每行一个手机号"></textarea>
+                  <p class="text-xs themed-text-muted mt-1">单次最多支持100个用户，解析失败的手机号将被跳过</p>
+                  <!-- 批量解析结果提示 -->
+                  <template x-if="batchResolveResult">
+                    <div class="mt-2 text-xs">
+                      <span class="text-green-600" x-show="batchResolveResult.success_count > 0" x-text="'✅ 成功 ' + batchResolveResult.success_count + ' 个'"></span>
+                      <span class="text-red-500 ml-2" x-show="batchResolveResult.failed_count > 0" x-text="'❌ 失败 ' + batchResolveResult.failed_count + ' 个: ' + batchResolveResult.failed_mobiles.join(', ')"></span>
+                    </div>
+                  </template>
                 </div>
                 <div>
                   <label class="block text-sm font-medium mb-1">赠送次数 <span class="text-red-500">*</span></label>
@@ -2490,8 +2498,8 @@
                 <option value="paused">暂停</option>
                 <option value="exhausted">耗尽</option>
               </select>
-              <input type="text" class="px-3 py-2 border rounded" placeholder="用户ID..." 
-                     x-model="presetFilters.user_id" @keyup.enter="searchPresets()">
+              <input type="text" class="px-3 py-2 border rounded" placeholder="手机号..." 
+                     maxlength="11" x-model="presetFilters.mobile" @keyup.enter="searchPresets()">
               <button class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary" @click="searchPresets()">
                 🔍 搜索
               </button>
@@ -2867,9 +2875,15 @@
           </div>
           <div class="p-6">
             <div class="mb-4">
-              <label class="block text-sm font-medium mb-1">目标用户ID *</label>
-              <input type="number" class="w-full px-3 py-2 border rounded" 
-                     placeholder="请输入用户ID" x-model="createPresetForm.user_id">
+              <label class="block text-sm font-medium mb-1">目标用户手机号 *</label>
+              <input type="text" class="w-full px-3 py-2 border rounded" 
+                     placeholder="请输入手机号" maxlength="11" x-model="createPresetForm.mobile">
+              <template x-if="resolvedUser">
+                <p class="text-xs text-green-600 mt-1">✅ <span x-text="resolvedUser.nickname"></span> (<span x-text="resolvedUser.mobile"></span>)</p>
+              </template>
+              <template x-if="resolveError">
+                <p class="text-xs text-red-500 mt-1" x-text="resolveError"></p>
+              </template>
             </div>
             <div class="mb-4">
               <label class="block text-sm font-medium mb-2">预设列表 *</label>
@@ -3223,8 +3237,8 @@
               <input type="text" class="w-full px-3 py-2 border rounded" x-model="redemptionFilters.code" placeholder="输入核销码搜索..." @keyup.enter="searchRedemptionCodes()">
             </div>
             <div>
-              <label class="block text-sm themed-text-muted mb-1">用户ID</label>
-              <input type="number" class="w-full px-3 py-2 border rounded" x-model="redemptionFilters.user_id" placeholder="输入用户ID..." @keyup.enter="searchRedemptionCodes()">
+              <label class="block text-sm themed-text-muted mb-1">手机号</label>
+              <input type="text" class="w-full px-3 py-2 border rounded" x-model="redemptionFilters.mobile" maxlength="11" placeholder="输入手机号..." @keyup.enter="searchRedemptionCodes()">
             </div>
             <div class="flex gap-2">
               <button class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary" @click="searchRedemptionCodes()">
@@ -3844,10 +3858,16 @@
             <input type="text" class="w-full px-3 py-2 border rounded" x-model="quotaForm.role_uuid" placeholder="输入角色UUID">
           </div>
           
-          <!-- 目标用户ID（user类型时显示） -->
+          <!-- 目标用户手机号（user类型时显示） -->
           <div x-show="quotaForm.rule_type === 'user'">
-            <label class="block text-sm font-medium themed-text-secondary mb-1">目标用户ID <span class="text-red-500">*</span></label>
-            <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="quotaForm.target_user_id" placeholder="输入用户ID">
+            <label class="block text-sm font-medium themed-text-secondary mb-1">目标用户手机号 <span class="text-red-500">*</span></label>
+            <input type="text" class="w-full px-3 py-2 border rounded" x-model="quotaForm.target_mobile" maxlength="11" placeholder="输入手机号">
+            <template x-if="resolvedUser && quotaForm.rule_type === 'user'">
+              <p class="text-xs text-green-600 mt-1">✅ <span x-text="resolvedUser.nickname"></span> (<span x-text="resolvedUser.mobile"></span>)</p>
+            </template>
+            <template x-if="resolveError && quotaForm.rule_type === 'user'">
+              <p class="text-xs text-red-500 mt-1" x-text="resolveError"></p>
+            </template>
           </div>
           
           <!-- 每日抽奖次数限制 -->

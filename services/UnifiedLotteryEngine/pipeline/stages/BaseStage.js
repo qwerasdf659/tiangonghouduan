@@ -140,7 +140,7 @@ class BaseStage {
   /**
    * 记录日志
    *
-   * @param {string} level - 日志级别
+   * @param {string} level - 日志级别（error/warn/info/debug）
    * @param {string} message - 日志消息
    * @param {Object} data - 附加数据
    * @returns {void}
@@ -153,11 +153,7 @@ class BaseStage {
       ...data
     }
 
-    if (logger && typeof logger[level] === 'function') {
-      logger[level](`[Stage:${this.stage_name}] ${message}`, log_data)
-    } else {
-      console.log(`[${level.toUpperCase()}] [Stage:${this.stage_name}] ${message}`, log_data)
-    }
+    logger[level](`[Stage:${this.stage_name}] ${message}`, log_data)
   }
 
   /**

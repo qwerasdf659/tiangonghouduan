@@ -16,7 +16,7 @@ import { loadECharts } from '../../../utils/index.js'
 function assetsPortfolioPage() {
   return {
     // ==================== Mixin 组合 ====================
-    ...createPageMixin({ pagination: true }),
+    ...createPageMixin({ pagination: true, userResolver: true }),
 
     // ==================== 页面特有状态 ====================
 
@@ -34,9 +34,9 @@ function assetsPortfolioPage() {
     /** 资产类型列表 */
     assetTypes: [],
 
-    /** 搜索表单 - 匹配HTML模板 */
+    /** 搜索表单 - 匹配HTML模板（手机号主导搜索） */
     searchForm: {
-      user_id: '',
+      mobile: '',
       asset_type: '',
       min_value: null
     },
@@ -202,22 +202,26 @@ function assetsPortfolioPage() {
      * 加载资产列表（用户资产明细）
      *
      * 注意：后端没有"所有用户资产列表"API
-     * - 如果指定了用户ID，使用 asset-adjustment 获取该用户资产余额
-     * - 如果没有指定用户ID，显示提示信息
+     * - 如果指定了手机号，先 resolve 获取 user_id，再获取该用户资产余额
+     * - 如果没有指定手机号，显示提示信息
      */
     async loadAssets() {
       try {
-        // 必须指定用户ID才能查询资产
-        if (!this.searchForm.user_id) {
-          logger.debug('[AssetsPortfolioPage] 未指定用户ID，显示空列表')
+        // 必须指定手机号才能查询资产
+        if (!this.searchForm.mobile) {
+          logger.debug('[AssetsPortfolioPage] 未指定手机号，显示空列表')
           this.assets = []
           this.total_records = 0
           this.total_pages = 0
           return
         }
 
+        // 手机号 → resolve 获取 user_id
+        const user = await this.resolveUserByMobile(this.searchForm.mobile)
+        if (!user) return
+
         // 使用资产调整API获取指定用户的资产余额
-        const userId = this.searchForm.user_id
+        const userId = user.user_id
         const url = buildURL(ASSET_ENDPOINTS.ADJUSTMENT_USER_BALANCES, { user_id: userId })
         const response = await request({ url, method: 'GET' })
 
@@ -272,7 +276,7 @@ function assetsPortfolioPage() {
       } catch (error) {
         logger.error('[AssetsPortfolioPage] 加载资产列表失败:', error)
         this.assets = []
-        this.showError(`加载用户 ${this.searchForm.user_id} 资产失败`)
+        this.showError(`加载用户资产失败`)
       }
     },
 
@@ -309,8 +313,8 @@ function assetsPortfolioPage() {
           if (this.searchForm.asset_type) {
             params.type = this.searchForm.asset_type
           }
-          if (this.searchForm.user_id) {
-            params.user_id = this.searchForm.user_id
+          if (this.searchForm.mobile) {
+            // resolve 阶段已获取 user_id，无需再传
           }
 
           logger.info('[AssetsPortfolioPage] 导出资产', params)
@@ -616,13 +620,14 @@ function assetsPortfolioPage() {
 
       this.valueTrendChart.setOption(option)
 
-      // 监听窗口 resize 事件（iframe 场景下重要）
+      // 监听窗口 resize 事件（命名引用以便清理）
       if (!this._resizeHandlerBound) {
         this._resizeHandlerBound = true
-        window.addEventListener('resize', () => {
+        this._resizeHandler = () => {
           if (this.assetTypeChart) this.assetTypeChart.resize()
           if (this.valueTrendChart) this.valueTrendChart.resize()
-        })
+        }
+        window.addEventListener('resize', this._resizeHandler)
       }
     },
 
@@ -670,6 +675,18 @@ function assetsPortfolioPage() {
      * 获取资产类型显示文本
      */
     // ✅ 已删除 getAssetTypeText 映射函数 - 改用后端 _display 字段（P2 中文化）
+
+    /**
+     * 组件销毁时清理资源
+     */
+    destroy() {
+      if (this._resizeHandler) {
+        window.removeEventListener('resize', this._resizeHandler)
+      }
+      if (this.assetTypeChart) this.assetTypeChart.dispose()
+      if (this.valueTrendChart) this.valueTrendChart.dispose()
+      logger.info('[AssetsPortfolio] 资源已清理')
+    }
   }
 }
 

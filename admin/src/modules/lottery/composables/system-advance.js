@@ -329,8 +329,9 @@ export function useSystemAdvanceMethods() {
 
       chart.setOption(option)
 
-      // 响应式调整
-      window.addEventListener('resize', () => chart.resize())
+      // 响应式调整（命名引用以便清理）
+      this._advanceChartResizeHandler = () => chart.resize()
+      window.addEventListener('resize', this._advanceChartResizeHandler)
     },
 
     /**

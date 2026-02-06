@@ -20,8 +20,8 @@ export function useAdvancedStatusState() {
     // ==================== 高级状态 ====================
     /** @type {Array} 高级状态用户列表 */
     premiumUsers: [],
-    /** @type {Object} 高级状态筛选条件 */
-    premiumFilters: { user_id: '', is_valid: '', unlock_method: '' },
+    /** @type {Object} 高级状态筛选条件（手机号主导搜索） */
+    premiumFilters: { mobile: '', is_valid: '', unlock_method: '' },
     /** @type {Object} 高级状态分页 - 单一对象模式 */
     premiumPagination: {
       page: 1,
@@ -62,8 +62,8 @@ export function useAdvancedStatusState() {
     // ==================== 变更历史 ====================
     /** @type {Array} 角色变更历史 */
     roleChangeHistory: [],
-    /** @type {Object} 角色历史筛选条件 */
-    roleHistoryFilters: { user_id: '', operator_id: '', start_date: '', end_date: '' },
+    /** @type {Object} 角色历史筛选条件（手机号主导搜索） */
+    roleHistoryFilters: { mobile: '', operator_id: '', start_date: '', end_date: '' },
     /** @type {Object} 角色历史分页 - 单一对象模式 */
     roleHistoryPagination: {
       page: 1,
@@ -72,8 +72,8 @@ export function useAdvancedStatusState() {
     },
     /** @type {Array} 状态变更历史 */
     statusChangeHistory: [],
-    /** @type {Object} 状态历史筛选条件 */
-    statusHistoryFilters: { user_id: '', operator_id: '', start_date: '', end_date: '' },
+    /** @type {Object} 状态历史筛选条件（手机号主导搜索） */
+    statusHistoryFilters: { mobile: '', operator_id: '', start_date: '', end_date: '' },
     /** @type {Object} 状态历史分页 - 单一对象模式 */
     statusHistoryPagination: {
       page: 1,
@@ -112,7 +112,12 @@ export function useAdvancedStatusMethods() {
         const params = new URLSearchParams()
         params.append('page', this.premiumPagination.page)
         params.append('page_size', this.premiumPagination.page_size)
-        if (this.premiumFilters.user_id) params.append('user_id', this.premiumFilters.user_id)
+        // 手机号 → resolve 获取 user_id
+        if (this.premiumFilters.mobile) {
+          const user = await this.resolveUserByMobile(this.premiumFilters.mobile)
+          if (!user) return
+          params.append('user_id', user.user_id)
+        }
         if (this.premiumFilters.is_valid) params.append('is_valid', this.premiumFilters.is_valid)
         if (this.premiumFilters.unlock_method)
           params.append('unlock_method', this.premiumFilters.unlock_method)
@@ -418,8 +423,11 @@ export function useAdvancedStatusMethods() {
         const params = new URLSearchParams()
         params.append('page', this.roleHistoryPagination.page)
         params.append('page_size', this.roleHistoryPagination.page_size)
-        if (this.roleHistoryFilters.user_id)
-          params.append('user_id', this.roleHistoryFilters.user_id)
+        // 手机号 → resolve 获取 user_id
+        if (this.roleHistoryFilters.mobile) {
+          const user = await this.resolveUserByMobile(this.roleHistoryFilters.mobile)
+          if (user) params.append('user_id', user.user_id)
+        }
         if (this.roleHistoryFilters.operator_id)
           params.append('operator_id', this.roleHistoryFilters.operator_id)
         if (this.roleHistoryFilters.start_date)
@@ -486,8 +494,11 @@ export function useAdvancedStatusMethods() {
         const params = new URLSearchParams()
         params.append('page', this.statusHistoryPagination.page)
         params.append('page_size', this.statusHistoryPagination.page_size)
-        if (this.statusHistoryFilters.user_id)
-          params.append('user_id', this.statusHistoryFilters.user_id)
+        // 手机号 → resolve 获取 user_id
+        if (this.statusHistoryFilters.mobile) {
+          const user = await this.resolveUserByMobile(this.statusHistoryFilters.mobile)
+          if (user) params.append('user_id', user.user_id)
+        }
         if (this.statusHistoryFilters.operator_id)
           params.append('operator_id', this.statusHistoryFilters.operator_id)
         if (this.statusHistoryFilters.start_date)

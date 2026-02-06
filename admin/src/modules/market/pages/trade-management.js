@@ -30,6 +30,7 @@ import { logger } from '../../../utils/logger.js'
 import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
 import { buildURL, request } from '../../../api/base.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
+import { UserAPI } from '../../../api/user.js'
 
 document.addEventListener('alpine:init', () => {
   logger.info('[TradeManagement] 注册 Alpine 组件 (Mixin v3.0)...')
@@ -114,7 +115,7 @@ document.addEventListener('alpine:init', () => {
    * @property {Array} redemptionOrders - 兑换订单列表
    */
   Alpine.data('tradePageContent', () => ({
-    ...createPageMixin(),
+    ...createPageMixin({ userResolver: true }),
 
     // ========== C2C交易订单数据 ==========
     /** @type {Array<Object>} C2C交易订单列表 */
@@ -132,13 +133,13 @@ document.addEventListener('alpine:init', () => {
       completed: 0
     },
     /**
-     * 交易订单筛选条件
-     * @type {{status: string, buyer_user_id: string, seller_user_id: string, listing_id: string}}
+     * 交易订单筛选条件（手机号主导搜索）
+     * @type {{status: string, buyer_mobile: string, seller_mobile: string, listing_id: string}}
      */
     tradeFilters: {
       status: '',
-      buyer_user_id: '',
-      seller_user_id: '',
+      buyer_mobile: '',
+      seller_mobile: '',
       listing_id: ''
     },
     /** @type {number} 交易订单当前页码 */
@@ -217,10 +218,11 @@ document.addEventListener('alpine:init', () => {
       // 根据当前页面加载数据
       this.loadPageData()
 
-      // 监听页面切换
-      window.addEventListener('trade-page-changed', _e => {
+      // 监听页面切换（命名引用以便清理）
+      this._tradePageChangedHandler = _e => {
         this.loadPageData()
-      })
+      }
+      window.addEventListener('trade-page-changed', this._tradePageChangedHandler)
     },
 
     /**
@@ -261,15 +263,29 @@ document.addEventListener('alpine:init', () => {
         this.loading = true
         const params = {
           page: this.tradeCurrentPage,
-          page_size: this.tradePageSize, // 后端使用 snake_case
-          ...this.tradeFilters
+          page_size: this.tradePageSize,
+          status: this.tradeFilters.status,
+          listing_id: this.tradeFilters.listing_id
+        }
+
+        // 买家手机号 → resolve 获取 buyer_user_id
+        if (this.tradeFilters.buyer_mobile) {
+          const buyer = await this.resolveUserByMobile(this.tradeFilters.buyer_mobile)
+          if (buyer) params.buyer_user_id = buyer.user_id
+          else { this.tradeOrders = []; this.loading = false; return }
+        }
+        // 卖家手机号 → resolve 获取 seller_user_id
+        if (this.tradeFilters.seller_mobile) {
+          const seller = await this.resolveUserByMobile(this.tradeFilters.seller_mobile)
+          if (seller) params.seller_user_id = seller.user_id
+          else { this.tradeOrders = []; this.loading = false; return }
         }
 
         // 移除空值
         Object.keys(params).forEach(k => !params[k] && delete params[k])
 
         const res = await request({
-          url: MARKET_ENDPOINTS.TRADE_ORDER_LIST, // 使用正确的后端端点
+          url: MARKET_ENDPOINTS.TRADE_ORDER_LIST,
           method: 'GET',
           params
         })
@@ -588,7 +604,7 @@ document.addEventListener('alpine:init', () => {
    * </div>
    */
   Alpine.data('tradeManagementPage', () => ({
-    ...createPageMixin(),
+    ...createPageMixin({ userResolver: true }),
 
     // 子页面导航
     /** @type {string} 当前页面ID */
@@ -611,8 +627,8 @@ document.addEventListener('alpine:init', () => {
     tradeStats: { total: 0, created: 0, frozen: 0, completed: 0 },
     /** @type {{totalTrades: number, completedTrades: number, pendingTrades: number, totalVolume: number}} HTML 统计卡片使用 */
     stats: { totalTrades: 0, completedTrades: 0, pendingTrades: 0, totalVolume: 0 },
-    /** @type {Object} 交易订单筛选条件 */
-    tradeFilters: { status: '', buyer_user_id: '', seller_user_id: '', listing_id: '' },
+    /** @type {Object} 交易订单筛选条件（手机号主导搜索） */
+    tradeFilters: { status: '', buyer_mobile: '', seller_mobile: '', listing_id: '' },
     /** @type {number} 交易订单当前页码 */
     tradeCurrentPage: 1,
     /** @type {number} 交易订单每页数量 */
@@ -705,12 +721,29 @@ document.addEventListener('alpine:init', () => {
     async loadTradeOrders() {
       try {
         logger.info('[TradeManagement] 加载交易订单...', this.tradeFilters)
-        // apiGet 返回 { success, data } 结构
-        const result = await this.apiGet(MARKET_ENDPOINTS.TRADE_ORDER_LIST, {
-          ...this.tradeFilters,
+
+        // 构建查询参数（手机号 → resolve 获取 user_id）
+        const queryParams = {
+          status: this.tradeFilters.status,
+          listing_id: this.tradeFilters.listing_id,
           page: this.tradeCurrentPage,
-          page_size: this.tradePageSize // 后端使用 snake_case
-        })
+          page_size: this.tradePageSize
+        }
+        if (this.tradeFilters.buyer_mobile) {
+          const buyer = await this.resolveUserByMobile(this.tradeFilters.buyer_mobile)
+          if (buyer) queryParams.buyer_user_id = buyer.user_id
+          else { this.tradeOrders = []; return }
+        }
+        if (this.tradeFilters.seller_mobile) {
+          const seller = await this.resolveUserByMobile(this.tradeFilters.seller_mobile)
+          if (seller) queryParams.seller_user_id = seller.user_id
+          else { this.tradeOrders = []; return }
+        }
+        // 移除空值
+        Object.keys(queryParams).forEach(k => !queryParams[k] && delete queryParams[k])
+
+        // apiGet 返回 { success, data } 结构
+        const result = await this.apiGet(MARKET_ENDPOINTS.TRADE_ORDER_LIST, queryParams)
 
         logger.info('[TradeManagement] API 响应:', result)
 

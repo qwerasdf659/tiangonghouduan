@@ -571,11 +571,12 @@ export function useMetricsMethods() {
           this.updateTierChart()
         }
 
-        // 窗口大小变化时重绘图表
-        window.addEventListener('resize', () => {
+        // 窗口大小变化时重绘图表（命名引用以便清理）
+        this._monitoringResizeHandler = () => {
           this.monitoringCharts.trendChart?.resize()
           this.monitoringCharts.tierChart?.resize()
-        })
+        }
+        window.addEventListener('resize', this._monitoringResizeHandler)
 
         logger.info('监控图表初始化完成')
       } catch (error) {
@@ -1256,10 +1257,11 @@ export function useMetricsMethods() {
         this.lotteryHeatmapChart.setOption(option)
         logger.info('[Metrics] 抽奖时段热力图渲染完成')
 
-        // 响应式调整
-        window.addEventListener('resize', () => {
+        // 响应式调整（命名引用以便清理）
+        this._heatmapResizeHandler = () => {
           this.lotteryHeatmapChart?.resize()
-        })
+        }
+        window.addEventListener('resize', this._heatmapResizeHandler)
       } catch (error) {
         logger.error('[Metrics] 渲染抽奖时段热力图失败:', error)
       }
@@ -1279,6 +1281,21 @@ export function useMetricsMethods() {
       if (ratio >= 0.4) return 'bg-blue-500 text-white'
       if (ratio >= 0.2) return 'bg-blue-300'
       return 'bg-blue-100'
+    },
+
+    /**
+     * 清理 metrics composable 注册的事件监听和图表
+     */
+    destroyMetricsCharts() {
+      if (this._monitoringResizeHandler) {
+        window.removeEventListener('resize', this._monitoringResizeHandler)
+      }
+      if (this._heatmapResizeHandler) {
+        window.removeEventListener('resize', this._heatmapResizeHandler)
+      }
+      if (this.monitoringCharts?.trendChart) this.monitoringCharts.trendChart.dispose()
+      if (this.monitoringCharts?.tierChart) this.monitoringCharts.tierChart.dispose()
+      if (this.lotteryHeatmapChart) this.lotteryHeatmapChart.dispose()
     }
   }
 }

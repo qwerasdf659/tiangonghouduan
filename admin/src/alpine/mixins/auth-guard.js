@@ -20,7 +20,7 @@
  */
 
 import { logger } from '../../utils/logger.js'
-import { API_PREFIX, getToken, clearToken } from '@/api/base.js'
+import { API_PREFIX, getToken, clearToken, request } from '@/api/base.js'
 import {
   hasPageAccess,
   checkCurrentPageAccess,
@@ -231,15 +231,9 @@ export function authGuardMixin() {
      */
     async refreshUserInfo() {
       try {
-        const response = await fetch(`${API_PREFIX}/auth/me`, {
-          headers: { Authorization: `Bearer ${getToken()}` }
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success && data.data) {
-            this.setCurrentUser(data.data)
-          }
+        const result = await request({ url: `${API_PREFIX}/auth/me` })
+        if (result.success && result.data) {
+          this.setCurrentUser(result.data)
         }
       } catch (error) {
         logger.error('[AuthGuard] 刷新用户信息失败:', error)

@@ -215,7 +215,7 @@ class PipelineRunner {
   /**
    * 记录日志
    *
-   * @param {string} level - 日志级别
+   * @param {string} level - 日志级别（error/warn/info/debug）
    * @param {string} message - 日志消息
    * @param {Object} data - 附加数据
    * @returns {void}
@@ -229,11 +229,7 @@ class PipelineRunner {
       ...data
     }
 
-    if (logger && typeof logger[level] === 'function') {
-      logger[level](`[Pipeline] ${message}`, log_data)
-    } else {
-      console.log(`[${level.toUpperCase()}] [Pipeline] ${message}`, log_data)
-    }
+    logger[level](`[Pipeline] ${message}`, log_data)
   }
 
   /**

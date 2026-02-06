@@ -33,10 +33,10 @@ export function usePresetVisualizationState() {
       exhausted_count: 0, // 耗尽
       expired_count: 0 // 过期
     },
-    /** @type {Object} 预设筛选条件 */
+    /** @type {Object} 预设筛选条件（手机号主导搜索） */
     presetFilters: {
       status: '', // pending/used/all
-      user_id: ''
+      mobile: ''
     },
     /** @type {Object} 预设分页 */
     presetPagination: {
@@ -48,9 +48,9 @@ export function usePresetVisualizationState() {
     selectedPreset: null,
     /** @type {boolean} 显示创建预设模态框 */
     showCreatePresetModal: false,
-    /** @type {Object} 创建预设表单 */
+    /** @type {Object} 创建预设表单（手机号主导搜索） */
     createPresetForm: {
-      user_id: '',
+      mobile: '',
       presets: []
     },
     /** @type {Array} 奖品选项（供创建预设使用） */
@@ -73,7 +73,12 @@ export function usePresetVisualizationMethods() {
         params.append('page', this.presetPagination?.page || 1)
         params.append('page_size', this.presetPagination?.page_size || 20)
         if (this.presetFilters.status) params.append('status', this.presetFilters.status)
-        if (this.presetFilters.user_id) params.append('user_id', this.presetFilters.user_id)
+        // 手机号 → resolve 获取 user_id
+        if (this.presetFilters.mobile) {
+          const user = await this.resolveUserByMobile(this.presetFilters.mobile)
+          if (user) params.append('user_id', user.user_id)
+          else { this.presets = []; return }
+        }
 
         const response = await this.apiGet(
           `${LOTTERY_CORE_ENDPOINTS.PRESET_LIST}?${params}`,
@@ -140,7 +145,7 @@ export function usePresetVisualizationMethods() {
     resetPresetFilters() {
       this.presetFilters = {
         status: '',
-        user_id: ''
+        mobile: ''
       }
       this.presetPagination.page = 1
       this.loadPresets()
@@ -179,7 +184,7 @@ export function usePresetVisualizationMethods() {
      */
     openCreatePresetModal() {
       this.createPresetForm = {
-        user_id: '',
+        mobile: '',
         presets: [{ lottery_prize_id: '', queue_order: 1 }]
       }
       this.showCreatePresetModal = true

@@ -200,7 +200,18 @@ router.get('/', (req, res) => {
       },
       user_management: {
         description: '用户管理',
-        endpoints: ['/users', '/points/adjust']
+        endpoints: [
+          '/users/resolve',
+          '/users',
+          '/users/:user_id',
+          '/users/:user_id/role',
+          '/users/:user_id/status',
+          '/roles',
+          '/roles/:role_id',
+          '/permission-resources',
+          '/stats'
+        ],
+        note: '用户CRUD管理、角色权限管理、手机号解析（2026-02-06 手机号主导搜索改造）'
       },
       lottery_management: {
         description: '抽奖管理',

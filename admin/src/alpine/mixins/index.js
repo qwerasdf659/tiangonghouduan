@@ -35,6 +35,7 @@ import { tableSelectionMixin } from './table-selection.js'
 import { formValidationMixin } from './form-validation.js'
 import { authGuardMixin } from './auth-guard.js'
 import { drillDownMixin } from './drill-down.js'
+import { userResolverMixin } from './user-resolver.js'
 
 // 导入统一的日期格式化函数（北京时间）
 import {
@@ -58,6 +59,7 @@ export { formValidationMixin } from './form-validation.js'
 export { authGuardMixin } from './auth-guard.js'
 export { withDraftAutoSave, createDraftFormMixin } from './draft-auto-save.js'
 export { drillDownMixin, DRILL_DOWN_SIZES, DRILL_DOWN_TYPES } from './drill-down.js'
+export { userResolverMixin } from './user-resolver.js'
 
 /**
  * 创建页面 Mixin
@@ -112,7 +114,8 @@ export function createPageMixin(mixinConfig = {}, customProps = {}) {
     tableSelection = false,
     formValidation = false,
     authGuard = true, // 默认启用认证守卫（管理后台页面通常需要）
-    drillDown = false // P1-15: 数据下钻支持
+    drillDown = false, // P1-15: 数据下钻支持
+    userResolver = false // 手机号主导搜索：用户解析能力
   } = mixinConfig
 
   const composed = {
@@ -218,7 +221,12 @@ export function createPageMixin(mixinConfig = {}, customProps = {}) {
     Object.assign(composed, drillDownMixin())
   }
 
-  // 8. 合并自定义属性（自定义优先级最高）
+  // 8. 用户解析（手机号主导搜索改造）
+  if (userResolver) {
+    Object.assign(composed, userResolverMixin())
+  }
+
+  // 9. 合并自定义属性（自定义优先级最高）
   Object.assign(composed, customProps)
 
   return composed
@@ -375,12 +383,10 @@ export function createCrudPageMixin(config, customProps = {}) {
         const result = await this.confirmAndExecute(
           `确定要删除选中的 ${this.selectedCount} 条记录吗？`,
           async () => {
-            const response = await fetch(`${apiBase}/batch`, {
+            return await this.apiCall(`${apiBase}/batch`, {
               method: 'DELETE',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ids: this.selectedIds })
+              data: { ids: this.selectedIds }
             })
-            return response.json()
           },
           { successMessage: '批量删除成功' }
         )
@@ -514,6 +520,7 @@ export default {
   formValidationMixin,
   authGuardMixin,
   drillDownMixin,
+  userResolverMixin,
   createPageMixin,
   createCrudPageMixin,
   createCrudMixin,

@@ -37,8 +37,8 @@ export function useUserProfileState() {
     },
     /** @type {boolean} 是否正在加载用户档案 */
     loadingUserProfile: false,
-    /** @type {string} 搜索的用户ID */
-    searchUserId: '',
+    /** @type {string} 搜索的手机号 */
+    searchMobile: '',
     /** @type {string} 搜索的活动ID（可选） */
     searchCampaignId: '',
     /** @type {boolean} 是否显示用户档案模态框 */
@@ -137,19 +137,23 @@ export function useUserProfileMethods() {
     },
 
     /**
-     * 搜索用户档案
-     * 根据输入的用户ID加载档案
+     * 搜索用户档案（手机号主导）
+     * 输入手机号 → resolve → 加载档案
      */
     async searchUserProfile() {
-      const userId = this.searchUserId?.toString().trim()
-      if (!userId) {
+      const mobile = this.searchMobile?.toString().trim()
+      if (!mobile) {
         if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
-          Alpine.store('notification').warning('请输入用户ID')
+          Alpine.store('notification').warning('请输入手机号')
         }
         return
       }
 
-      await this.loadUserProfile(userId, this.searchCampaignId || null)
+      // 手机号 → resolve 获取 user_id
+      const user = await this.resolveUserByMobile(mobile)
+      if (!user) return
+
+      await this.loadUserProfile(user.user_id, this.searchCampaignId || null)
 
       if (this.userProfile) {
         this.showUserProfileModal = true
@@ -158,10 +162,10 @@ export function useUserProfileMethods() {
 
     /**
      * 打开用户档案模态框
-     * @param {number|string} userId - 用户 ID
+     * @param {number|string} userId - 用户 ID（从表格行点击传入）
      */
     async openUserProfileModal(userId) {
-      this.searchUserId = userId?.toString() || ''
+      this.searchMobile = ''
       await this.loadUserProfile(userId)
       this.showUserProfileModal = true
     },

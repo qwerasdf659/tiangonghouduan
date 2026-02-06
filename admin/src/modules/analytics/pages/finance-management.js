@@ -92,7 +92,8 @@ document.addEventListener('alpine:init', () => {
     const pageMixin = createPageMixin({
       pageTitle: '财务管理',
       loadDataOnInit: false,
-      pagination: { page_size: 20 } // 启用分页功能，为各子模块提供 page/page_size
+      pagination: { page_size: 20 }, // 启用分页功能，为各子模块提供 page/page_size
+      userResolver: true // 手机号主导搜索：启用用户解析能力
     })
 
     return {
@@ -147,7 +148,7 @@ document.addEventListener('alpine:init', () => {
 
       // ========== 消费筛选（fallback，composable 会覆盖） ==========
       consumptionFilters: {
-        user_id: '',
+        mobile: '',
         status: '',
         start_date: '',
         end_date: ''

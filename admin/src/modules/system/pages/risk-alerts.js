@@ -267,11 +267,12 @@ function riskAlertsPage() {
         this.refreshTimer = setInterval(() => this.loadAlerts(), 60000)
       }
 
-      // 窗口大小改变时重绘图表
-      window.addEventListener('resize', () => {
+      // 窗口大小改变时重绘图表（命名引用以便清理）
+      this._resizeHandler = () => {
         if (this.levelDistChart) this.levelDistChart.resize()
         if (this.typeDistChart) this.typeDistChart.resize()
-      })
+      }
+      window.addEventListener('resize', this._resizeHandler)
 
       // 初始化WebSocket实时推送
       this.initWebSocket()
@@ -279,12 +280,13 @@ function riskAlertsPage() {
       // 请求浏览器通知权限
       this.requestNotificationPermission()
 
-      // 页面卸载时断开WebSocket
-      window.addEventListener('beforeunload', () => {
+      // 页面卸载时断开WebSocket（命名引用以便清理）
+      this._beforeUnloadHandler = () => {
         if (this.wsConnection) {
           this.wsConnection.disconnect()
         }
-      })
+      }
+      window.addEventListener('beforeunload', this._beforeUnloadHandler)
 
       // P2-8: 启动告警升级检查（每分钟检查一次）
       this.startEscalationChecker()
@@ -297,6 +299,12 @@ function riskAlertsPage() {
      * @returns {void}
      */
     destroy() {
+      if (this._resizeHandler) {
+        window.removeEventListener('resize', this._resizeHandler)
+      }
+      if (this._beforeUnloadHandler) {
+        window.removeEventListener('beforeunload', this._beforeUnloadHandler)
+      }
       if (this.refreshTimer) {
         clearInterval(this.refreshTimer)
       }

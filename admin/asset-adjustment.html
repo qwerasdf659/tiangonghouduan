@@ -69,8 +69,8 @@
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">用户ID</label>
               <div class="flex space-x-2">
-                <input type="text" x-model="form.user_id" class="flex-1 px-3 py-2 border rounded-lg" placeholder="输入用户ID" @keyup.enter="searchUser()">
-                <button type="button" @click="searchUser()" :disabled="searching" class="px-3 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                <input type="text" x-model="searchMobile" maxlength="11" class="flex-1 px-3 py-2 border rounded-lg" placeholder="请输入手机号" @keyup.enter="handleMobileSearch()">
+                <button type="button" @click="handleMobileSearch()" :disabled="searching" class="px-3 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                   <span x-show="!searching">🔍 查找</span>
                   <span x-show="searching" class="flex items-center">
                     <svg class="animate-spin -ml-1 mr-1 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

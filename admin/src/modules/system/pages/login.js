@@ -37,7 +37,8 @@ import {
   clearToken,
   setUser,
   clearUser,
-  checkBrowserSession
+  checkBrowserSession,
+  request
 } from '../../../api/base.js'
 
 /**
@@ -110,24 +111,8 @@ function loginPage() {
       logger.info('检测到现有token，验证有效性...')
 
       try {
-        // 调用后端验证接口
-        const response = await fetch(AUTH_ENDPOINTS.VERIFY, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          }
-        })
-
-        const result = await response.json()
-
-        // 检查token是否有效
-        if (!response.ok || !result.success) {
-          logger.warn('Token验证失败，清除无效token')
-          clearToken()
-          clearUser()
-          return
-        }
+        // 调用后端验证接口（使用统一 request()，自动注入 Token）
+        const result = await request({ url: AUTH_ENDPOINTS.VERIFY })
 
         // 检查用户是否有管理员权限
         const userData = result.data
@@ -233,39 +218,18 @@ function loginPage() {
       this.loading = true
 
       try {
-        // 发送登录请求
-        const response = await fetch(USER_ENDPOINTS.AUTH_LOGIN, {
+        // 发送登录请求（使用统一 request()）
+        const result = await request({
+          url: USER_ENDPOINTS.AUTH_LOGIN,
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
+          data: {
             mobile: this.phone,
             verification_code: this.code
-          })
+          }
         })
 
-        // 解析响应（增加错误处理）
-        let result
-        try {
-          result = await response.json()
-        } catch (parseError) {
-          logger.error('响应解析失败:', parseError)
-          throw new Error('服务器响应异常，请稍后重试')
-        }
-
-        // 处理业务错误
-        if (!response.ok || !result.success) {
-          // 根据错误码提供友好提示
-          const errorMessages = {
-            USER_NOT_FOUND: '该手机号未注册',
-            INSUFFICIENT_PERMISSION: '您没有管理后台访问权限',
-            USER_INACTIVE: '账户已被禁用，请联系管理员',
-            INVALID_VERIFICATION_CODE: '验证码错误',
-            MOBILE_REQUIRED: '请输入手机号'
-          }
-          const friendlyMessage = errorMessages[result.code] || result.message || '登录失败'
-          throw new Error(friendlyMessage)
+        if (!result.success) {
+          throw new Error(result.message || '登录失败')
         }
 
         // 登录成功

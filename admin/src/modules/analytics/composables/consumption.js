@@ -21,7 +21,7 @@ export function useConsumptionState() {
     consumptions: [],
     /** @type {Object} 消费记录筛选条件 */
     consumptionFilters: {
-      user_id: '',
+      mobile: '',
       status: '',
       payment_method: '',
       start_date: '',
@@ -81,9 +81,15 @@ export function useConsumptionMethods() {
         const params = new URLSearchParams()
         params.append('page', this.financePagination?.page || 1)
         params.append('page_size', this.financePagination?.page_size || 20)
-        // 使用后端字段名 user_id
-        if (this.consumptionFilters.user_id) {
-          params.append('search', this.consumptionFilters.user_id) // 后端使用 search 参数
+        // 手机号搜索：先 resolve 获取 user_id，再传给后端 search 参数
+        if (this.consumptionFilters.mobile) {
+          const user = await this.resolveUserByMobile(this.consumptionFilters.mobile)
+          if (user) {
+            params.append('search', user.user_id)
+          } else {
+            this.consumptions = []
+            return
+          }
         }
         if (this.consumptionFilters.status) params.append('status', this.consumptionFilters.status)
         if (this.consumptionFilters.start_date) {
@@ -494,7 +500,7 @@ export function useConsumptionMethods() {
      */
     resetConsumptionFilters() {
       this.consumptionFilters = {
-        user_id: '',
+        mobile: '',
         status: '',
         payment_method: '',
         start_date: '',

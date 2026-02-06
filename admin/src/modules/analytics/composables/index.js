@@ -25,12 +25,16 @@ import { useCampaignBudgetState, useCampaignBudgetMethods } from './campaign-bud
 // 商户操作日志模块
 import { useMerchantLogsState, useMerchantLogsMethods } from './merchant-logs.js'
 
+// 仪表盘运营大盘模块
+import { useDashboardOverviewState, useDashboardOverviewMethods } from './dashboard-overview.js'
+
 export { useConsumptionState, useConsumptionMethods }
 export { useDiamondAccountsState, useDiamondAccountsMethods }
 export { useMerchantPointsState, useMerchantPointsMethods }
 export { useDebtManagementState, useDebtManagementMethods }
 export { useCampaignBudgetState, useCampaignBudgetMethods }
 export { useMerchantLogsState, useMerchantLogsMethods }
+export { useDashboardOverviewState, useDashboardOverviewMethods }
 
 // 默认导出（现在可以使用本地绑定）
 export default {
@@ -45,5 +49,7 @@ export default {
   useCampaignBudgetState,
   useCampaignBudgetMethods,
   useMerchantLogsState,
-  useMerchantLogsMethods
+  useMerchantLogsMethods,
+  useDashboardOverviewState,
+  useDashboardOverviewMethods
 }

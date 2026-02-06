@@ -21,8 +21,8 @@ export function useMerchantPointsState() {
   return {
     /** @type {Array} 商户积分申请列表 */
     merchantPoints: [],
-    /** @type {Object} 商户积分筛选条件 - user_id对应后端API参数 */
-    merchantFilters: { user_id: '', keyword: '' },
+    /** @type {Object} 商户积分筛选条件 - mobile 用于手机号搜索 */
+    merchantFilters: { mobile: '', keyword: '' },
     /**
      * 商户积分审核统计 - 与后端API字段一致
      * @property {number} pending_count - 待审核数量
@@ -54,9 +54,16 @@ export function useMerchantPointsMethods() {
         const params = new URLSearchParams()
         params.append('page', this.financePagination?.page || 1)
         params.append('page_size', this.financePagination?.page_size || 20)
-        // user_id 对应后端 API 的筛选参数
-        if (this.merchantFilters.user_id) {
-          params.append('user_id', this.merchantFilters.user_id)
+        // 手机号搜索：先 resolve 获取 user_id，再传给后端
+        if (this.merchantFilters.mobile) {
+          const user = await this.resolveUserByMobile(this.merchantFilters.mobile)
+          if (user) {
+            params.append('user_id', user.user_id)
+          } else {
+            // resolve 失败，不继续请求
+            this.merchantPoints = []
+            return
+          }
         }
         if (this.merchantFilters.keyword) {
           params.append('keyword', this.merchantFilters.keyword)

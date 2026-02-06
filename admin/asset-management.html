@@ -115,7 +115,7 @@
         </div>
         <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input type="text" x-model="materialAccountFilters.user_id" placeholder="用户ID" class="px-3 py-2 border rounded">
+            <input type="text" x-model="materialAccountFilters.mobile" placeholder="手机号" maxlength="11" class="px-3 py-2 border rounded">
             <select x-model="materialAccountFilters.asset_code" class="px-3 py-2 border rounded">
               <option value="">全部资产类型</option>
               <template x-for="asset in materialTypes" :key="asset.asset_code">
@@ -153,9 +153,9 @@
               <tr x-show="!loading && materialAccounts.length === 0">
                 <td colspan="5" class="px-4 py-12">
                   <div class="flex flex-col items-center justify-center text-center">
-                    <div class="text-5xl mb-4" x-text="!materialAccountFilters.user_id ? '🔍' : '📭'"></div>
-                    <h3 class="text-lg font-medium themed-text mb-2" x-text="!materialAccountFilters.user_id ? '请输入用户ID' : '暂无数据'"></h3>
-                    <p class="themed-text-muted text-sm" x-text="!materialAccountFilters.user_id ? '输入用户ID后点击搜索查看资产信息' : '该用户暂无资产记录'"></p>
+                    <div class="text-5xl mb-4" x-text="!materialAccountFilters.mobile ? '🔍' : '📭'"></div>
+                    <h3 class="text-lg font-medium themed-text mb-2" x-text="!materialAccountFilters.mobile ? '请输入手机号' : '暂无数据'"></h3>
+                    <p class="themed-text-muted text-sm" x-text="!materialAccountFilters.mobile ? '输入手机号后点击搜索查看资产信息' : '该用户暂无资产记录'"></p>
                   </div>
                 </td>
               </tr>
@@ -185,7 +185,7 @@
         </div>
         <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <input type="text" x-model="logFilters.user_id" placeholder="用户ID" class="px-3 py-2 border rounded">
+            <input type="text" x-model="logFilters.mobile" placeholder="手机号" maxlength="11" class="px-3 py-2 border rounded">
             <select x-model="logFilters.asset_code" class="px-3 py-2 border rounded">
               <option value="">全部资产类型</option>
               <template x-for="asset in materialTypes" :key="asset.asset_code">
@@ -212,8 +212,8 @@
             <tbody class="divide-y">
               <tr x-show="materialTransactions.length === 0">
                 <td colspan="7" class="px-4 py-8 text-center themed-text-muted">
-                  <div x-show="!logFilters.user_id">💡 请输入用户ID后点击搜索</div>
-                  <div x-show="logFilters.user_id">暂无数据</div>
+                  <div x-show="!logFilters.mobile">💡 请输入手机号后点击搜索</div>
+                  <div x-show="logFilters.mobile">暂无数据</div>
                 </td>
               </tr>
               <template x-for="log in materialTransactions" :key="log.asset_transaction_id">
@@ -301,7 +301,7 @@
         </div>
         <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input type="text" x-model="virtualAccountFilters.user_id" placeholder="用户ID" class="px-3 py-2 border rounded">
+            <input type="text" x-model="virtualAccountFilters.mobile" placeholder="手机号" maxlength="11" class="px-3 py-2 border rounded">
             <select x-model="virtualAccountFilters.account_type" class="px-3 py-2 border rounded">
               <option value="">全部账户类型</option>
               <option value="DIAMOND">钻石</option>
@@ -325,13 +325,13 @@
             <tbody class="divide-y">
               <tr x-show="virtualAccounts.length === 0">
                 <td colspan="5" class="px-4 py-8 text-center themed-text-muted">
-                  <div x-show="!virtualAccountFilters.user_id">💡 请输入用户ID后点击搜索</div>
-                  <div x-show="virtualAccountFilters.user_id">暂无数据</div>
+                  <div x-show="!virtualAccountFilters.mobile">💡 请输入手机号后点击搜索</div>
+                  <div x-show="virtualAccountFilters.mobile">暂无数据</div>
                 </td>
               </tr>
               <template x-for="va in virtualAccounts" :key="va.asset_code">
                 <tr class="themed-hover-bg">
-                  <td class="px-4 py-3 text-sm" x-text="virtualAccountFilters.user_id"></td>
+                  <td class="px-4 py-3 text-sm" x-text="resolvedUser?.user_id || '-'"></td>
                   <td class="px-4 py-3 text-sm" x-text="va.asset_code"></td>
                   <td class="px-4 py-3 text-sm font-mono text-green-600" x-text="va.available_amount"></td>
                   <td class="px-4 py-3 text-sm font-mono text-orange-600" x-text="va.frozen_amount"></td>
@@ -352,7 +352,7 @@
         </div>
         <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <input type="text" x-model="virtualTxFilters.user_id" placeholder="用户ID（必填）" class="px-3 py-2 border rounded">
+            <input type="text" x-model="virtualTxFilters.mobile" placeholder="手机号（必填）" maxlength="11" class="px-3 py-2 border rounded">
             <select x-model="virtualTxFilters.account_type" class="px-3 py-2 border rounded">
               <option value="">全部账户类型</option>
               <option value="DIAMOND">钻石</option>
@@ -382,8 +382,8 @@
             <tbody class="divide-y">
               <tr x-show="virtualTransactions.length === 0">
                 <td colspan="6" class="px-4 py-8 text-center themed-text-muted">
-                  <div x-show="!virtualTxFilters.user_id">💡 请输入用户ID后点击搜索</div>
-                  <div x-show="virtualTxFilters.user_id">暂无数据</div>
+                  <div x-show="!virtualTxFilters.mobile">💡 请输入手机号后点击搜索</div>
+                  <div x-show="virtualTxFilters.mobile">暂无数据</div>
                 </td>
               </tr>
               <template x-for="tx in virtualTransactions" :key="tx.asset_transaction_id">

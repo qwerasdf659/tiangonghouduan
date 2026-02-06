@@ -257,12 +257,13 @@ function statisticsPage() {
         this.loadReportTemplates()
       })
 
-      // 监听窗口大小变化
-      window.addEventListener('resize', () => {
+      // 监听窗口大小变化（命名引用以便清理）
+      this._resizeHandler = () => {
         this._charts.trend?.resize()
         this._charts.userType?.resize()
         this._charts.multiDimension?.resize()
-      })
+      }
+      window.addEventListener('resize', this._resizeHandler)
     },
 
     // ==================== 图表初始化 ====================
@@ -1190,6 +1191,20 @@ function statisticsPage() {
       } finally {
         this.exporting = false
       }
+    },
+
+    /**
+     * 组件销毁时清理资源
+     */
+    destroy() {
+      if (this._resizeHandler) {
+        window.removeEventListener('resize', this._resizeHandler)
+      }
+      // 销毁 ECharts 实例
+      if (this._charts) {
+        Object.values(this._charts).forEach(chart => chart?.dispose())
+      }
+      logger.info('[Statistics] 资源已清理')
     }
   }
 }

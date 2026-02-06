@@ -217,8 +217,9 @@ export function useExchangeStatsMethods() {
 
         this.orderStatusChart.setOption(option)
 
-        // 响应式
-        window.addEventListener('resize', () => this.orderStatusChart?.resize())
+        // 响应式（命名引用以便清理）
+        this._orderStatusResizeHandler = () => this.orderStatusChart?.resize()
+        window.addEventListener('resize', this._orderStatusResizeHandler)
       } catch (e) {
         logger.error('[ExchangeStats] 初始化订单状态图表失败:', e)
       }

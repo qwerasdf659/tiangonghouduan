@@ -1,0 +1,33 @@
+/**
+ * 资产管理模块 - Composables 导出汇总
+ *
+ * @file admin/src/modules/asset/composables/index.js
+ * @description 导出所有子模块，便于主模块组合使用
+ * @version 1.0.0
+ * @date 2026-02-06
+ */
+
+// 资产调整模块
+import { useAdjustmentState, useAdjustmentMethods } from './adjustment.js'
+
+export { useAdjustmentState, useAdjustmentMethods }
+
+/**
+ * 组合所有状态
+ * @returns {Object} 合并后的状态对象
+ */
+export function useAllAssetState() {
+  return {
+    ...useAdjustmentState()
+  }
+}
+
+/**
+ * 组合所有方法
+ * @returns {Object} 合并后的方法对象
+ */
+export function useAllAssetMethods() {
+  return {
+    ...useAdjustmentMethods()
+  }
+}

@@ -94,7 +94,7 @@
         </div>
         <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <input type="text" x-model="consumptionFilters.user_id" placeholder="用户ID" class="px-3 py-2 border rounded">
+            <input type="text" x-model="consumptionFilters.mobile" placeholder="手机号" maxlength="11" class="px-3 py-2 border rounded">
             <select x-model="consumptionFilters.status" class="px-3 py-2 border rounded">
               <option value="">全部状态</option>
               <option value="pending">待审核</option>
@@ -291,12 +291,13 @@
         <div class="p-4 border-b themed-bg-base">
           <div class="flex items-center gap-4">
             <div class="flex-1 max-w-md">
-              <label class="block text-sm font-medium themed-text-secondary mb-1">用户ID</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">手机号</label>
               <div class="flex gap-2">
                 <input 
-                  type="number" 
-                  x-model="diamondFilters.user_id" 
-                  placeholder="请输入用户ID"
+                  type="text" 
+                  x-model="diamondFilters.mobile" 
+                  placeholder="请输入手机号"
+                  maxlength="11"
                   @keyup.enter="searchDiamondAccounts()"
                   class="flex-1 px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
                 >
@@ -309,7 +310,7 @@
                 <button 
                   @click="clearDiamondSearch()" 
                   class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300"
-                  x-show="diamondFilters.user_id"
+                  x-show="diamondFilters.mobile"
                 >
                   清空
                 </button>
@@ -317,20 +318,20 @@
             </div>
           </div>
           <p class="text-sm themed-text-muted mt-2">
-            💡 后端API需要指定用户ID查询，请输入用户ID后点击查询
+            💡 请输入手机号后点击查询
           </p>
         </div>
 
         <!-- 搜索结果 -->
         <div class="p-4">
           <!-- 未搜索提示 -->
-          <div x-show="!diamondSearched && !diamondFilters.user_id" class="text-center py-8 themed-text-muted">
+          <div x-show="!diamondSearched && !diamondFilters.mobile" class="text-center py-8 themed-text-muted">
             <div class="text-4xl mb-2">💎</div>
             <p x-text="diamondSearchTip"></p>
           </div>
 
           <!-- 搜索中/搜索结果 -->
-          <div x-show="diamondSearched || diamondFilters.user_id">
+          <div x-show="diamondSearched || diamondFilters.mobile">
             <!-- 无结果 -->
             <template x-if="diamondAccounts.length === 0 && diamondSearched">
               <div class="text-center py-8 themed-text-muted">
@@ -412,13 +413,13 @@
         <div class="p-4 border-b">
           <h5 class="font-semibold">🪙 商户积分申请列表</h5>
         </div>
-        <!-- 筛选区域 - user_id 对应后端 API 参数 -->
+        <!-- 筛选区域 -->
         <div class="p-4 border-b themed-bg-base">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <input type="text" x-model="merchantFilters.user_id" placeholder="用户ID" class="px-3 py-2 border rounded">
+            <input type="text" x-model="merchantFilters.mobile" placeholder="手机号" maxlength="11" class="px-3 py-2 border rounded">
             <input type="text" x-model="merchantFilters.keyword" placeholder="关键词搜索" class="px-3 py-2 border rounded">
             <button @click="searchMerchants()" class="px-4 py-2 themed-btn-primary rounded">🔍 搜索</button>
-            <button @click="merchantFilters = { user_id: '', keyword: '' }; loadMerchantPoints()" class="px-4 py-2 bg-gray-300 themed-text-secondary rounded hover:bg-gray-400">重置</button>
+            <button @click="merchantFilters = { mobile: '', keyword: '' }; clearResolvedUser(); loadMerchantPoints()" class="px-4 py-2 bg-gray-300 themed-text-secondary rounded hover:bg-gray-400">重置</button>
           </div>
         </div>
         <div class="overflow-x-auto">
@@ -977,16 +978,23 @@
         </div>
         <form @submit.prevent="submitDiamondAdjust()">
           <div class="p-6 space-y-4">
-            <!-- 用户ID输入 -->
+            <!-- 手机号输入 -->
             <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">用户ID <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">手机号 <span class="text-red-500">*</span></label>
               <input 
-                type="number" 
-                x-model.number="diamondAdjustForm.user_id" 
+                type="text" 
+                x-model="diamondAdjustForm.mobile" 
                 class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
                 required
-                placeholder="请输入用户ID"
+                maxlength="11"
+                placeholder="请输入手机号"
               >
+              <template x-if="resolvedUser">
+                <p class="mt-1 text-xs text-green-600">✅ <span x-text="resolvedUser.nickname"></span> (<span x-text="resolvedUser.mobile"></span>)</p>
+              </template>
+              <template x-if="resolveError">
+                <p class="mt-1 text-xs text-red-500" x-text="resolveError"></p>
+              </template>
             </div>
 
             <!-- 当前余额显示（如有） -->
@@ -1029,8 +1037,8 @@
             <!-- 预览 -->
             <div class="themed-bg-base rounded p-3 text-sm">
               <p class="themed-text-muted">
-                <span x-show="diamondAdjustForm.type === 'add'">将为用户 <span class="font-mono" x-text="diamondAdjustForm.user_id || '?'"></span> <span class="text-green-600 font-medium">增加</span></span>
-                <span x-show="diamondAdjustForm.type === 'subtract'">将为用户 <span class="font-mono" x-text="diamondAdjustForm.user_id || '?'"></span> <span class="text-red-600 font-medium">扣除</span></span>
+                <span x-show="diamondAdjustForm.type === 'add'">将为用户 <span class="font-mono" x-text="diamondAdjustForm.mobile || '?'"></span> <span class="text-green-600 font-medium">增加</span></span>
+                <span x-show="diamondAdjustForm.type === 'subtract'">将为用户 <span class="font-mono" x-text="diamondAdjustForm.mobile || '?'"></span> <span class="text-red-600 font-medium">扣除</span></span>
                 <span class="font-bold" x-text="diamondAdjustForm.amount || 0"></span> 钻石
               </p>
             </div>

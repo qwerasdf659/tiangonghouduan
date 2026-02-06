@@ -10,6 +10,7 @@
 import { logger } from '../../../utils/logger.js'
 import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
 import { buildQueryString } from '../../../api/base.js'
+import { UserAPI } from '../../../api/user.js'
 
 /**
  * 批量操作状态
@@ -25,14 +26,16 @@ export function useBatchOperationsState() {
     /** @type {boolean} 正在执行批量操作 */
     executingBatchOperation: false,
 
-    // 批量赠送抽奖次数
+    // 批量赠送抽奖次数（手机号主导）
     /** @type {Object} 批量赠送表单 */
     batchQuotaGrantForm: {
       campaign_id: '',
-      user_ids: '',
+      mobiles: '',
       bonus_count: 1,
       reason: ''
     },
+    /** @type {Object|null} 批量手机号解析结果 */
+    batchResolveResult: null,
 
     // 批量活动状态切换
     /** @type {Object} 批量状态切换表单 */
@@ -102,10 +105,11 @@ export function useBatchOperationsMethods() {
     resetBatchForms() {
       this.batchQuotaGrantForm = {
         campaign_id: '',
-        user_ids: '',
+        mobiles: '',
         bonus_count: 1,
         reason: ''
       }
+      this.batchResolveResult = null
       this.batchCampaignStatusForm = {
         campaign_ids: [],
         target_status: 'active',
@@ -130,8 +134,8 @@ export function useBatchOperationsMethods() {
         this.showError('请选择活动')
         return
       }
-      if (!form.user_ids.trim()) {
-        this.showError('请输入用户ID列表')
+      if (!form.mobiles.trim()) {
+        this.showError('请输入手机号列表')
         return
       }
       if (!form.bonus_count || form.bonus_count < 1) {
@@ -143,29 +147,65 @@ export function useBatchOperationsMethods() {
         return
       }
 
-      // 解析用户ID列表（支持逗号、换行、空格分隔）
-      const userIds = form.user_ids
-        .split(/[,\n\s]+/)
-        .map(id => parseInt(id.trim()))
-        .filter(id => !isNaN(id) && id > 0)
+      // 解析手机号列表（支持逗号、换行分隔）
+      const mobiles = form.mobiles
+        .split(/[,\n]+/)
+        .map(m => m.trim())
+        .filter(m => m.length > 0)
 
-      if (userIds.length === 0) {
-        this.showError('用户ID列表格式不正确')
+      if (mobiles.length === 0) {
+        this.showError('手机号列表不能为空')
         return
       }
 
-      if (userIds.length > 100) {
+      if (mobiles.length > 100) {
         this.showError('单次最多支持100个用户')
         return
       }
 
+      // 逐个 resolve 手机号 → user_id（跳过失败项）
       this.executingBatchOperation = true
+      this.batchResolveResult = null
+
       try {
+        const resolvedUserIds = []
+        const failedMobiles = []
+
+        for (const mobile of mobiles) {
+          if (!/^1\d{10}$/.test(mobile)) {
+            failedMobiles.push(mobile)
+            continue
+          }
+          try {
+            const result = await UserAPI.resolveUser({ mobile })
+            if (result.success && result.data?.user_id) {
+              resolvedUserIds.push(result.data.user_id)
+            } else {
+              failedMobiles.push(mobile)
+            }
+          } catch {
+            failedMobiles.push(mobile)
+          }
+        }
+
+        // 显示解析结果
+        this.batchResolveResult = {
+          success_count: resolvedUserIds.length,
+          failed_count: failedMobiles.length,
+          failed_mobiles: failedMobiles
+        }
+
+        if (resolvedUserIds.length === 0) {
+          this.showError('所有手机号解析失败，无法执行赠送')
+          return
+        }
+
+        // 提交成功解析的 user_ids
         const response = await this.apiPost(
           LOTTERY_ENDPOINTS.BATCH_QUOTA_GRANT,
           {
             campaign_id: parseInt(form.campaign_id),
-            user_ids: userIds,
+            user_ids: resolvedUserIds,
             bonus_count: parseInt(form.bonus_count),
             reason: form.reason.trim()
           },
@@ -174,9 +214,10 @@ export function useBatchOperationsMethods() {
 
         if (response?.success) {
           this.batchOperationResult = response.data
-          this.showSuccess(
-            `批量赠送完成：成功 ${response.data.success_count}/${response.data.total_count}`
-          )
+          const msg = failedMobiles.length > 0
+            ? `批量赠送完成：成功 ${response.data.success_count}/${mobiles.length}（跳过 ${failedMobiles.length} 个无效手机号）`
+            : `批量赠送完成：成功 ${response.data.success_count}/${response.data.total_count}`
+          this.showSuccess(msg)
           logger.info('[BatchOps] 批量赠送成功', response.data)
         } else {
           this.showError('批量赠送失败: ' + (response?.message || '未知错误'))

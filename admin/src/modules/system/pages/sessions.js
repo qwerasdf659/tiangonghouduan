@@ -34,6 +34,7 @@ import { logger } from '../../../utils/logger.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
 import { buildURL, request } from '../../../api/base.js'
 import { createBatchOperationMixin, createPageMixin } from '../../../alpine/mixins/index.js'
+import { userResolverMixin } from '../../../alpine/mixins/user-resolver.js'
 
 /**
  * API请求封装 - 带错误处理
@@ -89,6 +90,7 @@ function sessionsPage() {
       page_size: 20,
       primaryKey: 'user_session_id'
     }),
+    ...userResolverMixin(),
 
     // ==================== 页面特有状态 ====================
 
@@ -124,7 +126,7 @@ function sessionsPage() {
     filters: {
       status: '',
       user_type: '',
-      user_id: '',
+      mobile: '',
       sort_by: 'last_activity'
     },
 
@@ -226,8 +228,17 @@ function sessionsPage() {
           params.append('user_type', this.filters.user_type)
         }
 
-        if (this.filters.user_id) {
-          params.append('user_id', this.filters.user_id)
+        // 手机号 → resolve 获取 user_id
+        if (this.filters.mobile) {
+          const user = await this.resolveUserByMobile(this.filters.mobile)
+          if (user) {
+            params.append('user_id', user.user_id)
+          } else {
+            this.sessions = []
+            this.total = 0
+            this.loading = false
+            return
+          }
         }
 
         const url = USER_ENDPOINTS.SESSION_LIST + '?' + params.toString()

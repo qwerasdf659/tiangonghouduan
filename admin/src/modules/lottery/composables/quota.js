@@ -35,7 +35,7 @@ export function useQuotaState() {
       rule_type: 'campaign', // global/campaign/role/user
       campaign_id: '', // 活动ID（campaign类型必填，从下拉选择）
       role_uuid: '', // 角色UUID（role类型必填）
-      target_user_id: '', // 目标用户ID（user类型必填）
+      target_mobile: '', // 目标用户手机号（user类型必填，resolve后传user_id给后端）
       limit_value: 10, // 每日抽奖次数上限
       reason: '' // 创建原因
     },
@@ -179,7 +179,7 @@ export function useQuotaMethods() {
         rule_type: 'campaign',
         campaign_id: this.campaigns?.[0]?.lottery_campaign_id || '',
         role_uuid: '',
-        target_user_id: '',
+        target_mobile: '',
         limit_value: 10,
         reason: ''
       }
@@ -208,8 +208,8 @@ export function useQuotaMethods() {
         this.showError('请输入角色UUID')
         return
       }
-      if (ruleType === 'user' && !this.quotaForm.target_user_id) {
-        this.showError('请输入目标用户ID')
+      if (ruleType === 'user' && !this.quotaForm.target_mobile) {
+        this.showError('请输入目标用户手机号')
         return
       }
 
@@ -228,7 +228,10 @@ export function useQuotaMethods() {
         } else if (ruleType === 'role') {
           submitData.role_uuid = this.quotaForm.role_uuid
         } else if (ruleType === 'user') {
-          submitData.target_user_id = parseInt(this.quotaForm.target_user_id)
+          // 手机号 → resolve 获取 user_id
+          const user = await this.resolveUserByMobile(this.quotaForm.target_mobile)
+          if (!user) return
+          submitData.target_user_id = user.user_id
         }
 
         if (this.quotaForm.reason) {

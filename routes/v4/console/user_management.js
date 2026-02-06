@@ -73,6 +73,87 @@ router.get('/stats', async (req, res) => {
 })
 
 /**
+ * 🔍 根据手机号解析用户
+ * GET /api/v4/console/user-management/users/resolve?mobile=13800138000
+ *
+ * 业务场景：
+ * - 管理后台所有页面的「手机号搜索用户」统一入口
+ * - 运营输入手机号 → 解析出 user_id → 前端用 user_id 调后续业务 API
+ * - 替代原来 23 个页面要求运营输入 user_id 的设计
+ *
+ * 数据库查询：
+ * - UserService.findByMobile(mobile) → User.findOne({ where: { mobile } })
+ * - 查询条件：users.mobile（UNIQUE INDEX，精确匹配）
+ * - 不过滤 status：管理员需要能搜到 inactive/banned 用户（查看状态、解封等操作）
+ *
+ * 缓存：
+ * - UserService.findByMobile() 内置 Redis 缓存（BusinessCacheHelper, 120s TTL）
+ * - 无需额外缓存代码
+ *
+ * 权限：authenticateToken + requireRoleLevel(100)（已在 router.use() 全局挂载）
+ *
+ * 响应格式：标准 ApiResponse（res.apiSuccess / res.apiError）
+ *
+ * @since 2026-02-06（手机号主导搜索改造）
+ */
+router.get('/users/resolve', async (req, res) => {
+  try {
+    const { mobile } = req.query
+
+    // 参数校验：手机号不能为空
+    if (!mobile) {
+      return res.apiError('请提供手机号参数', 'MISSING_PARAM', null, 400)
+    }
+
+    // 手机号格式校验（11位数字，1开头）
+    if (!/^1\d{10}$/.test(mobile)) {
+      return res.apiError('手机号格式错误，请输入11位手机号', 'INVALID_MOBILE', null, 400)
+    }
+
+    // 通过 ServiceManager 获取 UserService（静态类，注册键为 'user'）
+    const UserService = req.app.locals.services.getService('user')
+
+    /*
+     * 复用 UserService.findByMobile()（内置 Redis 缓存，120s TTL）
+     * 注意：该方法查询 User.findOne({ where: { mobile } })，不过滤 status
+     * 管理员需要能搜到所有状态的用户（active/inactive/banned）
+     */
+    const user = await UserService.findByMobile(mobile)
+
+    if (!user) {
+      return res.apiError('未找到该手机号对应的用户', 'USER_NOT_FOUND', null, 404)
+    }
+
+    // 转换为普通对象（缓存命中时已是普通对象，DB 查询时是 Sequelize 实例）
+    const userData = user.get ? user.get({ plain: true }) : user
+
+    /*
+     * 返回字段说明（全部对齐 users 表字段名）：
+     * - user_id:    users.user_id (INT, PK) — 后续业务 API 所需的内部标识
+     * - mobile:     users.mobile (VARCHAR(20), UNIQUE) — 脱敏返回，格式 138****8000
+     * - nickname:   users.nickname (VARCHAR(50), NULL) — 可能为空，空时用「用户+后4位」兜底
+     * - status:     users.status (ENUM: active/inactive/banned) — 管理员需看到用户当前状态
+     * - avatar_url: users.avatar_url (VARCHAR(500), NULL) — 用户头像
+     * - user_level: users.user_level (ENUM: normal/vip/merchant) — 用户等级
+     */
+    return res.apiSuccess(
+      {
+        user_id: userData.user_id,
+        mobile: userData.mobile.substring(0, 3) + '****' + userData.mobile.substring(7),
+        nickname: userData.nickname || `用户${userData.mobile.slice(-4)}`,
+        status: userData.status,
+        avatar_url: userData.avatar_url || null,
+        user_level: userData.user_level || 'normal'
+      },
+      '用户解析成功'
+    )
+  } catch (error) {
+    logger.error('❌ 用户解析失败:', error.message)
+    return res.apiError('用户解析失败', 'RESOLVE_USER_FAILED', { error: error.message }, 500)
+  }
+})
+
+/**
  * 🛡️ 获取用户列表（基于UUID角色系统）
  * GET /api/v4/console/user_management/users
  */
