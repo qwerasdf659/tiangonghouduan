@@ -82,8 +82,8 @@ export function useRolesPermissionsState() {
     permissions: [],
     /** @type {Array} 用户角色分配列表 */
     userRoles: [],
-    /** @type {Object} 用户角色筛选条件（后端使用 role_name） */
-    userRoleFilters: { user_id: '', role_name: '' },
+    /** @type {Object} 用户角色筛选条件（手机号主导搜索） */
+    userRoleFilters: { mobile: '', role_name: '' },
     /** @type {Object} 角色表单 */
     roleForm: {
       role_id: null,
@@ -93,8 +93,8 @@ export function useRolesPermissionsState() {
       permissions: {},
       is_active: true
     },
-    /** @type {Object} 用户角色分配表单（使用 UPDATE_ROLE API，需要 role_name） */
-    userRoleForm: { user_id: '', role_name: '', reason: '' },
+    /** @type {Object} 用户角色分配表单（手机号主导搜索） */
+    userRoleForm: { mobile: '', role_name: '', reason: '' },
     /** @type {Object|null} 待删除的角色 */
     roleToDelete: null,
     /** @type {Object|null} 选中的角色（用于权限查看） */
@@ -480,7 +480,11 @@ export function useRolesPermissionsMethods() {
         const params = new URLSearchParams()
         params.append('page', this.page || 1)
         params.append('page_size', this.page_size || 20)
-        if (this.userRoleFilters.user_id) params.append('user_id', this.userRoleFilters.user_id)
+        // 手机号 → resolve 获取 user_id
+        if (this.userRoleFilters.mobile) {
+          const user = await this.resolveUserByMobile(this.userRoleFilters.mobile)
+          if (user) params.append('user_id', user.user_id)
+        }
         if (this.userRoleFilters.role_name)
           params.append('role_name', this.userRoleFilters.role_name)
 

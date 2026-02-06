@@ -220,8 +220,8 @@ export function usePresetVisualizationMethods() {
      * 提交创建预设
      */
     async submitCreatePreset() {
-      if (!this.createPresetForm.user_id) {
-        this.showError('请输入用户ID')
+      if (!this.createPresetForm.mobile) {
+        this.showError('请输入手机号')
         return
       }
       if (this.createPresetForm.presets.some((p) => !p.lottery_prize_id)) {
@@ -229,10 +229,14 @@ export function usePresetVisualizationMethods() {
         return
       }
 
+      // 手机号 → resolve 获取 user_id
+      const user = await this.resolveUserByMobile(this.createPresetForm.mobile)
+      if (!user) return
+
       try {
         this.saving = true
         const response = await this.apiPost(LOTTERY_CORE_ENDPOINTS.PRESET_CREATE, {
-          user_id: parseInt(this.createPresetForm.user_id),
+          user_id: user.user_id,
           presets: this.createPresetForm.presets.map((p) => ({
             lottery_prize_id: parseInt(p.lottery_prize_id),
             queue_order: p.queue_order
