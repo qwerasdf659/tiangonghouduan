@@ -53,7 +53,7 @@ const asyncHandler = fn => (req, res, next) => {
  *   "data": {
  *     "banners": [
  *       {
- *         "banner_id": 1,
+ *         "popup_banner_id": 1,
  *         "title": "新年活动",
  *         "image_url": "https://xxx.sealos.run/popup-banners/xxx.jpg",
  *         "link_url": "/pages/activity/index",

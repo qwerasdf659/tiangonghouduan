@@ -215,7 +215,7 @@ export function useBannersMethods() {
         const newStatus = !banner.is_active
         const response = await this.apiCall(
           buildURL(SYSTEM_ENDPOINTS.POPUP_BANNER_TOGGLE, { id: banner.popup_banner_id }),
-          { method: 'POST', data: { is_active: newStatus } }
+          { method: 'PATCH', data: { is_active: newStatus } }
         )
         if (response?.success) {
           this.showSuccess(`轮播图已${newStatus ? '启用' : '禁用'}`)
@@ -248,6 +248,8 @@ export function useBannersMethods() {
     }
   }
 }
+
+
 
 
 

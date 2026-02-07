@@ -841,7 +841,7 @@ function statisticsPage() {
       const value = this.displayStats[key]
       if (value === undefined || value === null) return '-'
 
-      if (key === 'winRate') {
+      if (key === 'win_rate') {
         return value.toFixed(2)
       }
       return Math.round(value).toLocaleString()

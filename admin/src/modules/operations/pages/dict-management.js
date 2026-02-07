@@ -27,6 +27,13 @@ const DICT_TYPE_ENDPOINTS = {
   'asset-groups': SYSTEM_ENDPOINTS.DICT_ASSET_GROUP_LIST
 }
 
+// 模块级字典类型唯一标识字段映射（用于 data-table 的 primaryKey）
+const DICT_TYPE_ID_FIELDS = {
+  categories: 'category_code',
+  rarities: 'rarity_code',
+  'asset-groups': 'group_code'
+}
+
 // 模块级当前字典类型（供 fetchTableData 闭包使用）
 let _currentDictType = 'categories'
 
@@ -141,6 +148,14 @@ function registerDictManagementComponents() {
           response.data?.items ||
           response.data?.list ||
           (Array.isArray(response.data) ? response.data : [])
+
+        // 为每行添加 _row_id：使用当前字典类型的唯一标识字段
+        // 避免 display_name 重复导致 x-for :key 冲突（如两个稀有度都叫"普通"）
+        const idField = DICT_TYPE_ID_FIELDS[_currentDictType] || 'display_name'
+        items.forEach((item) => {
+          item._row_id = item[idField] || item.display_name || ''
+        })
+
         return { items, total: items.length }
       }
       throw new Error(response?.message || '加载字典失败')

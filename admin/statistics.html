@@ -85,14 +85,14 @@
           <div class="flex justify-between items-center">
             <div class="flex-1">
               <p class="themed-text-muted text-sm">总用户数</p>
-              <h3 class="text-2xl font-bold themed-text tabular-nums" x-text="getAnimatedValue('totalUsers')">-</h3>
+              <h3 class="text-2xl font-bold themed-text tabular-nums" x-text="getAnimatedValue('total_users')">-</h3>
               <span :class="stats.user_trend >= 0 ? 'text-green-500' : 'text-red-500'" class="text-sm flex items-center gap-1">
                 <span x-text="stats.user_trend >= 0 ? '📈' : '📉'"></span>
                 <span x-text="Math.abs(stats.user_trend).toFixed(1) + '%'"></span>
               </span>
             </div>
             <!-- 迷你趋势图 -->
-            <div class="w-20 h-10" x-data="trendLine({ data: stats.user_trendData || [10, 15, 12, 18, 22, 25, 30], color: '#818cf8' })"></div>
+            <div class="w-20 h-10" x-data="trendLine({ data: stats.user_trend_data || [10, 15, 12, 18, 22, 25, 30], color: '#818cf8' })"></div>
           </div>
         </div>
       </template>
@@ -101,14 +101,14 @@
           <div class="flex justify-between items-center">
             <div class="flex-1">
               <p class="themed-text-muted text-sm">抽奖次数</p>
-              <h3 class="text-2xl font-bold themed-text tabular-nums" x-text="getAnimatedValue('totalDraws')">-</h3>
+              <h3 class="text-2xl font-bold themed-text tabular-nums" x-text="getAnimatedValue('total_draws')">-</h3>
               <span :class="stats.draw_trend >= 0 ? 'text-green-500' : 'text-red-500'" class="text-sm flex items-center gap-1">
                 <span x-text="stats.draw_trend >= 0 ? '📈' : '📉'"></span>
                 <span x-text="Math.abs(stats.draw_trend).toFixed(1) + '%'"></span>
               </span>
             </div>
             <!-- 迷你柱状图 -->
-            <div class="w-20 h-10" x-data="trendBar({ data: stats.draw_trendData || [5, 8, 12, 6, 15, 10, 18], color: '#22c55e' })"></div>
+            <div class="w-20 h-10" x-data="trendBar({ data: stats.draw_trend_data || [5, 8, 12, 6, 15, 10, 18], color: '#22c55e' })"></div>
           </div>
         </div>
       </template>
@@ -118,7 +118,7 @@
             <div class="flex-1">
               <p class="themed-text-muted text-sm">中奖率</p>
               <h3 class="text-2xl font-bold themed-text tabular-nums">
-                <span x-text="getAnimatedValue('winRate')">-</span>%
+                <span x-text="getAnimatedValue('win_rate')">-</span>%
               </h3>
               <span :class="stats.win_rate_trend >= 0 ? 'text-green-500' : 'text-red-500'" class="text-sm flex items-center gap-1">
                 <span x-text="stats.win_rate_trend >= 0 ? '📈' : '📉'"></span>
@@ -135,14 +135,14 @@
           <div class="flex justify-between items-center">
             <div class="flex-1">
               <p class="themed-text-muted text-sm">积分发放</p>
-              <h3 class="text-2xl font-bold themed-text tabular-nums" x-text="getAnimatedValue('totalRevenue')">-</h3>
+              <h3 class="text-2xl font-bold themed-text tabular-nums" x-text="getAnimatedValue('total_revenue')">-</h3>
               <span :class="stats.revenue_trend >= 0 ? 'text-green-500' : 'text-red-500'" class="text-sm flex items-center gap-1">
                 <span x-text="stats.revenue_trend >= 0 ? '📈' : '📉'"></span>
                 <span x-text="Math.abs(stats.revenue_trend).toFixed(1) + '%'"></span>
               </span>
             </div>
             <!-- 迷你趋势图 -->
-            <div class="w-20 h-10" x-data="trendLine({ data: stats.revenue_trendData || [100, 120, 110, 150, 180, 160, 200], color: '#f97316' })"></div>
+            <div class="w-20 h-10" x-data="trendLine({ data: stats.revenue_trend_data || [100, 120, 110, 150, 180, 160, 200], color: '#f97316' })"></div>
           </div>
         </div>
       </template>
@@ -166,11 +166,11 @@
           </div>
           <div class="text-center p-3 bg-purple-50 rounded">
             <p class="themed-text-muted text-sm">管理员</p>
-            <h4 class="text-xl font-bold text-purple-600" x-text="userStats.adminUsers">0</h4>
+            <h4 class="text-xl font-bold text-purple-600" x-text="userStats.admin_users">0</h4>
           </div>
           <div class="text-center p-3 themed-bg-base rounded">
             <p class="themed-text-muted text-sm">普通用户</p>
-            <h4 class="text-xl font-bold themed-text-muted" x-text="userStats.regularUsers">0</h4>
+            <h4 class="text-xl font-bold themed-text-muted" x-text="userStats.regular_users">0</h4>
           </div>
         </div>
       </div>
@@ -187,11 +187,11 @@
           </div>
           <div class="text-center p-3 bg-yellow-50 rounded">
             <p class="themed-text-muted text-sm">高档奖励</p>
-            <h4 class="text-xl font-bold text-yellow-600" x-text="lotteryStats.highTierWins">0</h4>
+            <h4 class="text-xl font-bold text-yellow-600" x-text="lotteryStats.high_tier_wins">0</h4>
           </div>
           <div class="text-center p-3 bg-green-50 rounded">
             <p class="themed-text-muted text-sm">普通奖励</p>
-            <h4 class="text-xl font-bold text-green-600" x-text="lotteryStats.regularWins">0</h4>
+            <h4 class="text-xl font-bold text-green-600" x-text="lotteryStats.regular_wins">0</h4>
           </div>
           <div class="text-center p-3 bg-red-50 rounded">
             <p class="themed-text-muted text-sm">中奖率</p>

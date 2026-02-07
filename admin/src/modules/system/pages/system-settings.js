@@ -32,7 +32,6 @@ import {
 // 导入提醒规则 API (P2-1)
 import { ReminderRulesAPI } from '../../../api/reminder.js'
 
-// 注意：SYSTEM_ENDPOINTS 导入已移除（F-59 审计报告功能因后端未实现而被移除）
 
 /**
  * 注册系统设置相关的 Alpine.js 组件
@@ -444,10 +443,10 @@ function registerSystemSettingsComponents() {
         { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
       ],
       dataSource: async (params) => {
-        const res = await request({ url: `${API_PREFIX}/console/system/audit-logs`, method: 'GET', params })
+        const res = await request({ url: `${API_PREFIX}/console/admin-audit-logs`, method: 'GET', params })
         return {
-          items: res.data?.logs || res.data?.list || [],
-          total: res.data?.pagination?.total || res.data?.total || 0
+          items: res.data?.logs || [],
+          total: res.data?.pagination?.total || 0
         }
       },
       primaryKey: 'id',

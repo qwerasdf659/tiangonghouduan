@@ -40,7 +40,18 @@
     </div>
 
     <!-- 页面内容区域 -->
-    <div x-data="lotteryPageContent()" x-init="init()">
+    <div x-data="lotteryPageContent()" x-init="init()"
+         @edit-campaign="editCampaign($event.detail)"
+         @view-campaign="viewCampaignDetail($event.detail)"
+         @toggle-campaign="toggleCampaign($event.detail)"
+         @edit-prize="editPrize($event.detail)"
+         @view-budget="viewBudgetDetail($event.detail)"
+         @edit-budget="openEditBudgetModal($event.detail)"
+         @edit-strategy="editStrategy($event.detail)"
+         @toggle-strategy="toggleStrategy($event.detail)"
+         @edit-quota="editQuotaRule($event.detail)"
+         @delete-quota="deleteQuotaRule($event.detail)"
+         @view-abnormal-user="viewAbnormalUserDetail($event.detail)">
       
       <!-- ==================== 活动管理页 ==================== -->
       <div x-show="current_page === 'campaigns'" x-cloak>
@@ -379,52 +390,73 @@
               </button>
             </div>
           </div>
-          <!-- 预算列表表格 -->
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="themed-bg-base">
-                <tr>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">活动名称</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">预算模式</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">预算金额</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">已使用</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">使用率</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y">
-
-                <tr x-show="budgetCampaigns.length === 0">
-                  <td colspan="7" class="px-4 py-8 text-center themed-text-muted">暂无预算数据</td>
-                </tr>
-                <template x-for="campaign in budgetCampaigns" :key="campaign.lottery_campaign_id">
-                  <tr class="themed-hover-bg">
-                    <td class="px-4 py-3 text-sm" x-text="campaign.campaign_name"></td>
-                    <td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded bg-cyan-100 text-cyan-700" x-text="campaign.budget_mode_display || campaign.budget_mode"></span></td>
-                    <td class="px-4 py-3 text-sm" x-text="'¥' + (campaign.pool_budget?.total || 0).toLocaleString()"></td>
-                    <td class="px-4 py-3 text-sm" x-text="'¥' + (campaign.pool_budget?.used || 0).toLocaleString()"></td>
-                    <td class="px-4 py-3">
-                      <div class="w-full themed-bg-muted rounded-full h-4">
-                        <div class="h-4 rounded-full text-xs text-white text-center" 
-                             :class="getBudgetUsageClass(campaign)"
-                             :style="'width: ' + Math.min(getBudgetUsageRate(campaign), 100) + '%'"
-                             x-text="getBudgetUsageRate(campaign) + '%'"></div>
-                      </div>
-                    </td>
-                    <td class="px-4 py-3">
-                      <span class="px-2 py-1 text-xs rounded" 
-                            :class="getBudgetUsageRate(campaign) >= 100 ? 'bg-red-100 text-red-700' : (getBudgetUsageRate(campaign) >= 80 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 themed-text-success')"
-                            x-text="getBudgetUsageRate(campaign) >= 100 ? '超支' : (getBudgetUsageRate(campaign) >= 80 ? '预警' : '正常')"></span>
-                    </td>
-                    <td class="px-4 py-3 space-x-2">
-                      <button class="themed-text-primary hover:text-blue-700 text-sm" @click="openSetBudgetModal(campaign.lottery_campaign_id)">设置</button>
-                      <button class="text-cyan-600 hover:text-cyan-800 text-sm" @click="viewBudgetTrend(campaign)">📈 趋势</button>
-                    </td>
+          <!-- 预算列表表格 - data-table 组件 (#9) -->
+          <div x-data="dataTable({ page_size: 50 })" x-effect="setData(budgetCampaigns, budgetCampaigns.length)">
+            <!-- 空状态 -->
+            <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+              <div class="text-4xl mb-2">📭</div>
+              <p>暂无预算数据</p>
+            </div>
+            <!-- 错误状态 -->
+            <div x-show="hasError" class="p-8 text-center">
+              <div class="text-4xl mb-2">❌</div>
+              <p class="text-red-500 mb-2" x-text="error"></p>
+              <button @click="loadBudgetData()" class="px-4 py-2 themed-btn-primary rounded text-sm">🔄 重试</button>
+            </div>
+            <!-- 表格 -->
+            <div x-show="hasData" class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">活动名称</th>
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">预算模式</th>
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">预算金额</th>
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">已使用</th>
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">使用率</th>
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
                   </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="campaign in data" :key="campaign.lottery_campaign_id">
+                    <tr class="themed-hover-bg">
+                      <td class="px-4 py-3 text-sm" x-text="campaign.campaign_name"></td>
+                      <td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded bg-cyan-100 text-cyan-700" x-text="campaign.budget_mode_display || campaign.budget_mode"></span></td>
+                      <td class="px-4 py-3 text-sm" x-text="'¥' + (campaign.pool_budget?.total || 0).toLocaleString()"></td>
+                      <td class="px-4 py-3 text-sm" x-text="'¥' + (campaign.pool_budget?.used || 0).toLocaleString()"></td>
+                      <td class="px-4 py-3">
+                        <div class="w-full themed-bg-muted rounded-full h-4">
+                          <div class="h-4 rounded-full text-xs text-white text-center" 
+                               :class="getBudgetUsageClass(campaign)"
+                               :style="'width: ' + Math.min(getBudgetUsageRate(campaign), 100) + '%'"
+                               x-text="getBudgetUsageRate(campaign) + '%'"></div>
+                        </div>
+                      </td>
+                      <td class="px-4 py-3">
+                        <span class="px-2 py-1 text-xs rounded" 
+                              :class="getBudgetUsageRate(campaign) >= 100 ? 'bg-red-100 text-red-700' : (getBudgetUsageRate(campaign) >= 80 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 themed-text-success')"
+                              x-text="getBudgetUsageRate(campaign) >= 100 ? '超支' : (getBudgetUsageRate(campaign) >= 80 ? '预警' : '正常')"></span>
+                      </td>
+                      <td class="px-4 py-3 space-x-2">
+                        <button class="themed-text-primary hover:text-blue-700 text-sm" @click="openSetBudgetModal(campaign.lottery_campaign_id)">设置</button>
+                        <button class="text-cyan-600 hover:text-cyan-800 text-sm" @click="viewBudgetTrend(campaign)">📈 趋势</button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <!-- 分页 -->
+            <div x-show="total_pages > 1" class="p-4 border-t flex justify-between items-center">
+              <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+              <div class="flex gap-1">
+                <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 rounded themed-btn-secondary text-sm disabled:opacity-50">上一页</button>
+                <template x-for="p in visiblePages" :key="'bp-'+p">
+                  <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 border rounded text-sm" :disabled="p === '...'" x-text="p"></button>
                 </template>
-              </tbody>
-            </table>
+                <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 rounded themed-btn-secondary text-sm disabled:opacity-50">下一页</button>
+              </div>
+            </div>
           </div>
         </div>
 

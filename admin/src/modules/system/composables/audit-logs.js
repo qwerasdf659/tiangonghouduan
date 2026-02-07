@@ -73,13 +73,10 @@ export function useAuditLogsMethods() {
         )
 
         if (response?.success) {
-          // 后端返回 items 数组，需要适配多种格式
-          this.auditLogs = response.data?.items || response.data?.logs || response.data?.list || []
+          this.auditLogs = response.data?.logs || []
           logger.debug('[AuditLogs] 加载到日志数量:', this.auditLogs.length)
-          if (response.data?.pagination) {
-            this.logPagination.total = response.data.pagination.total || 0
-            this.logPagination.total_pages = response.data.pagination.total_pages || 1
-          }
+          this.logPagination.total = response.data?.pagination?.total || 0
+          this.logPagination.total_pages = response.data?.pagination?.total_pages || 1
         }
       } catch (error) {
         logger.error('加载审计日志失败:', error)

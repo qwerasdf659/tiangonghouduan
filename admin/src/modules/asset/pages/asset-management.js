@@ -31,7 +31,8 @@
 import { logger } from '../../../utils/logger.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 import { buildURL } from '../../../api/base.js'
-import { Alpine, createPageMixin } from '../../../alpine/index.js'
+import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
+import { request, API_PREFIX } from '../../../api/base.js'
 /**
  * @typedef {Object} MaterialType
  * @property {string} asset_code - 资产代码
@@ -443,5 +444,138 @@ document.addEventListener('alpine:init', () => {
     // ✅ 已删除 getStatusText 映射函数，使用后端返回的 status_display 字段
   }))
 
-  logger.info('[AssetManagementPage] Alpine 组件已注册 (Mixin v3.0)')
+  // ==================== data-table 组件注册 ====================
+
+  /** 资产类型列表 */
+  Alpine.data('assetTypesDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'asset_code', label: '资产代码', sortable: true },
+        { key: 'display_name', label: '显示名称', sortable: true },
+        { key: 'group_code', label: '分组' },
+        { key: 'form', label: '形态' },
+        { key: 'is_enabled', label: '状态', type: 'status', statusMap: { true: { class: 'green', label: '启用' }, false: { class: 'gray', label: '禁用' } } }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES, method: 'GET', params })
+        const types = res.data?.asset_types || res.data?.list || res.data || []
+        return { items: types, total: types.length }
+      },
+      primaryKey: 'asset_code', sortable: true, page_size: 50
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-asset-types', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 资产账户列表 */
+  Alpine.data('assetAccountsDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'user_id', label: '用户ID', sortable: true },
+        { key: 'nickname', label: '用户', render: (val, row) => val || row.user_nickname || '-' },
+        { key: 'asset_code', label: '资产类型' },
+        { key: 'balance', label: '余额', type: 'number', sortable: true },
+        { key: 'updated_at', label: '更新时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: ASSET_ENDPOINTS.MATERIAL_USERS, method: 'GET', params })
+        return { items: res.data?.list || res.data?.rows || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      },
+      primaryKey: 'user_id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-asset-accounts', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 资产交易记录 */
+  Alpine.data('assetTransactionsDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'transaction_id', label: '交易ID', sortable: true },
+        { key: 'user_id', label: '用户ID' },
+        { key: 'asset_code', label: '资产类型' },
+        { key: 'amount', label: '金额', type: 'number', sortable: true },
+        { key: 'transaction_type', label: '类型', render: (val, row) => row.transaction_type_display || val || '-' },
+        { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: ASSET_ENDPOINTS.MATERIAL_TRANSACTIONS, method: 'GET', params })
+        return { items: res.data?.list || res.data?.transactions || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      },
+      primaryKey: 'transaction_id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-asset-transactions', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 物品实例列表 */
+  Alpine.data('itemInstancesDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'item_instance_id', label: '实例ID', sortable: true },
+        { key: 'item_name', label: '物品名称', render: (val, row) => val || row.template_name || '-' },
+        { key: 'owner_user_id', label: '持有者' },
+        { key: 'status', label: '状态', type: 'status' },
+        { key: 'source', label: '来源', render: (val, row) => row.source_display || val || '-' },
+        { key: 'created_at', label: '获取时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: ASSET_ENDPOINTS.ITEM_INSTANCE_LIST, method: 'GET', params })
+        return { items: res.data?.list || res.data?.instances || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      },
+      primaryKey: 'item_instance_id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-item-instances', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 虚拟账户列表 */
+  Alpine.data('virtualAccountsDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'user_id', label: '用户ID', sortable: true },
+        { key: 'nickname', label: '用户', render: (val, row) => val || row.user_nickname || '-' },
+        { key: 'diamond_balance', label: '钻石余额', type: 'number', sortable: true },
+        { key: 'points_balance', label: '积分余额', type: 'number', sortable: true },
+        { key: 'updated_at', label: '更新时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: ASSET_ENDPOINTS.DIAMOND_USERS || `${API_PREFIX}/console/diamond/users`, method: 'GET', params })
+        return { items: res.data?.list || res.data?.rows || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      },
+      primaryKey: 'user_id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-virtual-accounts', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 虚拟交易记录 */
+  Alpine.data('virtualTransactionsDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'transaction_id', label: '交易ID', sortable: true },
+        { key: 'user_id', label: '用户ID' },
+        { key: 'type', label: '类型', render: (val, row) => row.type_display || val || '-' },
+        { key: 'amount', label: '金额', type: 'number', sortable: true },
+        { key: 'balance_after', label: '交易后余额', type: 'number' },
+        { key: 'description', label: '说明', type: 'truncate', maxLength: 30 },
+        { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: ASSET_ENDPOINTS.TRANSACTIONS, method: 'GET', params })
+        return { items: res.data?.list || res.data?.transactions || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      },
+      primaryKey: 'transaction_id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-virtual-transactions', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  logger.info('[AssetManagementPage] Alpine 组件已注册 (Mixin v3.0 + 6 data-table)')
 })

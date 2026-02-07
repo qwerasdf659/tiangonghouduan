@@ -93,7 +93,7 @@ app.use(
           'https://unpkg.com',
           'https://cdn.jsdelivr.net'
         ],
-        imgSrc: ["'self'", 'data:', 'https:'],
+        imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
         baseUri: ["'self'"],
         fontSrc: ["'self'", 'https:', 'data:'],
         formAction: ["'self'"],

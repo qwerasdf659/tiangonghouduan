@@ -138,13 +138,13 @@ function auditLogsPage() {
       if (params.end_date) queryParams.append('end_date', params.end_date)
 
       const response = await this.apiGet(
-        `${SYSTEM_ENDPOINTS.AUDIT_LOG_LIST}?${queryParams}`,
+        `${API_PREFIX}/console/admin-audit-logs?${queryParams}`,
         {},
         { showLoading: false }
       )
       if (response?.success) {
-        const items = response.data?.items || response.data?.logs || response.data?.list || []
-        const total = response.data?.pagination?.total || items.length
+        const items = response.data?.logs || []
+        const total = response.data?.pagination?.total || 0
         this.auditLogs = items
         return { items, total }
       }
@@ -937,23 +937,17 @@ function auditLogsPage() {
         if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
 
         const response = await this.apiGet(
-          `${API_PREFIX}/console/system/audit-logs?${params}`,
+          `${API_PREFIX}/console/admin-audit-logs?${params}`,
           {},
           { showLoading: false }
         )
 
         if (response?.success) {
-          // 适配多种后端返回格式
-          this.auditLogs = response.data?.items || response.data?.logs || response.data?.list || []
+          this.auditLogs = response.data?.logs || []
           logger.debug('[AuditLogs] 加载到日志数量:', this.auditLogs.length)
           
-          if (response.data?.pagination) {
-            this.logPagination.total = response.data.pagination.total || 0
-            this.logPagination.total_pages = response.data.pagination.total_pages || 1
-          } else if (response.data?.total) {
-            this.logPagination.total = response.data.total
-            this.logPagination.total_pages = Math.ceil(response.data.total / this.logPageSize)
-          }
+          this.logPagination.total = response.data?.pagination?.total || 0
+          this.logPagination.total_pages = response.data?.pagination?.total_pages || 1
         }
       } catch (error) {
         logger.error('[AuditLogs] 加载审计日志失败:', error)
@@ -1044,7 +1038,7 @@ function auditLogsPage() {
       if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
       params.append('format', 'csv')
 
-      const exportUrl = `${API_PREFIX}/console/system/audit-logs/export?${params.toString()}`
+      const exportUrl = `${API_PREFIX}/console/admin-audit-logs/export?${params.toString()}`
       window.open(exportUrl, '_blank')
       
       this.showSuccess('正在导出审计日志...')

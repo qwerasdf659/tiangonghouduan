@@ -63,7 +63,7 @@ async function main() {
     if (listResult.banners.length > 0) {
       console.log('\n   📋 弹窗列表:')
       listResult.banners.forEach((banner, index) => {
-        console.log(`   ${index + 1}. [ID:${banner.banner_id}] ${banner.title}`)
+        console.log(`   ${index + 1}. [ID:${banner.popup_banner_id}] ${banner.title}`)
         console.log(`      位置: ${banner.position}, 状态: ${banner.is_active ? '启用' : '禁用'}`)
         console.log(`      图片: ${banner.image_url?.substring(0, 50)}...`)
       })
@@ -98,7 +98,7 @@ async function main() {
         )
 
         console.log('✅ 测试弹窗创建成功')
-        console.log('   ID:', testBanner.banner_id)
+        console.log('   ID:', testBanner.popup_banner_id)
         console.log('   标题:', testBanner.title)
       } else {
         console.log('⚠️ 未找到管理员用户，跳过创建测试数据')

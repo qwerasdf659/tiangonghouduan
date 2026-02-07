@@ -41,7 +41,21 @@
     </div>
 
     <!-- 页面内容区域 -->
-    <div x-data="userPageContent()" x-init="init()">
+    <div x-data="userPageContent()" x-init="init()"
+         @view-user="viewUserDetail($event.detail)"
+         @edit-user="editUser($event.detail)"
+         @toggle-user-status="toggleUserStatus($event.detail)"
+         @manage-user-role="manageUserRole($event.detail)"
+         @open-probability="openProbabilityModal($event.detail)"
+         @analyze-user="analyzeUser($event.detail)"
+         @edit-role="editRole($event.detail)"
+         @manage-role-permissions="manageRolePermissions($event.detail)"
+         @confirm-delete-role="confirmDeleteRole($event.detail)"
+         @change-user-role-event="changeUserRole($event.detail.ur, $event.detail.value)"
+         @view-premium-detail="viewPremiumDetail($event.detail)"
+         @open-risk-modal="openRiskModal($event.detail)"
+         @freeze-user="freezeUser($event.detail)"
+         @unfreeze-user="unfreezeUser($event.detail)">
       
       <!-- 用户列表页 -->
       <div x-show="current_page === 'user-list'" x-cloak>
@@ -53,108 +67,82 @@
             </button>
           </div>
           
-          <!-- 筛选区域 -->
-          <div class="p-4 border-b themed-bg-base">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <input type="text" x-model="userFilters.phone" placeholder="手机号" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-              <input type="text" x-model="userFilters.nickname" placeholder="昵称" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-              <select x-model="userFilters.status" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-                <option value="">全部状态</option>
-                <option value="active">正常</option>
-                <option value="inactive">禁用</option>
-              </select>
-              <button @click="loadUsers()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">
-                🔍 搜索
-              </button>
+          <!-- data-table: 用户列表 -->
+          <div x-data="usersDataTable()" x-init="init()">
+            <div class="p-4 border-b themed-bg-base">
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <input type="text" x-model="activeFilters.phone" placeholder="手机号" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <input type="text" x-model="activeFilters.nickname" placeholder="昵称" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <select x-model="activeFilters.status" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">全部状态</option>
+                  <option value="active">正常</option>
+                  <option value="inactive">禁用</option>
+                </select>
+                <div class="flex space-x-2">
+                  <button @click="search()" class="flex-1 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">🔍 搜索</button>
+                  <button @click="handleFilterReset()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">🔄</button>
+                </div>
+              </div>
             </div>
-          </div>
-          
-          <!-- 用户列表表格 -->
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="themed-bg-base">
-                <tr>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">ID</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">手机号</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">昵称</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">注册时间</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y">
-                <!-- 骨架屏加载状态 -->
-                <template x-if="loading">
-                  <template x-for="i in 5" :key="'skeleton-user-' + i">
-                    <tr class="animate-pulse">
-                      <td class="px-4 py-3"><div class="skeleton-text w-12"></div></td>
-                      <td class="px-4 py-3"><div class="skeleton-text w-28"></div></td>
-                      <td class="px-4 py-3"><div class="skeleton-text w-20"></div></td>
-                      <td class="px-4 py-3"><div class="skeleton-button-sm w-14"></div></td>
-                      <td class="px-4 py-3"><div class="skeleton-text w-32"></div></td>
-                      <td class="px-4 py-3"><div class="flex space-x-2"><div class="skeleton-text-xs w-8"></div><div class="skeleton-text-xs w-8"></div><div class="skeleton-text-xs w-8"></div></div></td>
+            <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+            <div x-show="hasError" class="p-8 text-center">
+              <p class="text-red-500 mb-2" x-text="error"></p>
+              <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+            </div>
+            <div x-show="hasData" class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <template x-for="col in columns" :key="col.key">
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                          :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                          @click="sort(col)">
+                        <span x-text="col.label"></span>
+                        <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                      </th>
+                    </template>
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(row, idx) in data" :key="row.user_id || idx">
+                    <tr class="themed-hover-bg">
+                      <template x-for="col in columns" :key="col.key">
+                        <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                      </template>
+                      <td class="px-4 py-3">
+                        <div class="flex space-x-2 flex-wrap gap-1">
+                          <button @click="$dispatch('view-user', row)" class="themed-text-primary hover:text-blue-700 text-sm">查看</button>
+                          <button @click="$dispatch('edit-user', row)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                          <button @click="$dispatch('toggle-user-status', row)" class="text-yellow-500 hover:text-yellow-700 text-sm" x-text="row.status === 'active' ? '禁用' : '启用'"></button>
+                          <button @click="$dispatch('manage-user-role', row)" class="text-purple-500 hover:text-purple-700 text-sm">角色</button>
+                          <button @click="$dispatch('open-probability', row)" class="text-orange-500 hover:text-orange-700 text-sm">概率</button>
+                          <button @click="$dispatch('analyze-user', row)" class="text-cyan-500 hover:text-cyan-700 text-sm">📊分析</button>
+                        </div>
+                      </td>
                     </tr>
                   </template>
-                </template>
-                <!-- 空状态组件 -->
-
-                  <tr x-show="!loading && users.length === 0">
-                    <td colspan="6" class="px-4 py-12">
-                      <div class="flex flex-col items-center justify-center text-center">
-                        <div class="text-6xl mb-4">👥</div>
-                        <h3 class="text-lg font-medium themed-text mb-2">暂无用户数据</h3>
-                        <p class="themed-text-muted text-sm mb-4">当前筛选条件下没有找到用户</p>
-                        <button @click="userFilters = { phone: '', nickname: '', status: '' }; loadUsers()" class="px-4 py-2 themed-bg-primary text-white rounded-lg hover:opacity-90 transition-opacity">
-                          🔄 重置筛选条件
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-
-                <template x-for="user in users" :key="user.user_id">
-                  <tr class="themed-hover-bg">
-                    <td class="px-4 py-3 text-sm" x-text="user.user_id"></td>
-                    <td class="px-4 py-3 text-sm" x-text="user.phone"></td>
-                    <td class="px-4 py-3 text-sm" x-text="user.nickname || '-'"></td>
-                    <td class="px-4 py-3">
-                      <span 
-                        :class="getUserStatusClass(user.status)"
-                        class="px-2 py-1 text-xs rounded text-white"
-                        x-text="user.status_display || user.status"
-                      ></span>
-                    </td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(user.created_at)"></td>
-                    <td class="px-4 py-3">
-                      <div class="flex space-x-2 flex-wrap gap-1">
-                        <button @click="viewUserDetail(user)" class="themed-text-primary hover:text-blue-700 text-sm">查看</button>
-                        <button @click="editUser(user)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
-                        <button @click="toggleUserStatus(user)" class="text-yellow-500 hover:text-yellow-700 text-sm" x-text="user.status === 'active' ? '禁用' : '启用'"></button>
-                        <button @click="manageUserRole(user)" class="text-purple-500 hover:text-purple-700 text-sm">角色</button>
-                        <button @click="openProbabilityModal(user)" class="text-orange-500 hover:text-orange-700 text-sm">概率</button>
-                        <!-- P2-9: 一键分析按钮 -->
-                        <button 
-                          @click="analyzeUser(user)" 
-                          :disabled="generatingReport"
-                          class="text-cyan-500 hover:text-cyan-700 text-sm disabled:opacity-50"
-                        >
-                          <span x-show="!generatingReport">📊分析</span>
-                          <span x-show="generatingReport">⏳...</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-          
-          <!-- 分页 -->
-          <div class="p-4 border-t flex justify-between items-center">
-            <span class="text-sm themed-text-muted">共 <span x-text="pagination.total"></span> 条记录</span>
-            <div class="flex space-x-2">
-              <button @click="prevPage()" :disabled="pagination.page <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-              <span class="px-3 py-1">第 <span x-text="pagination.page"></span> / <span x-text="total_pages"></span> 页</span>
-              <button @click="nextPage()" :disabled="pagination.page >= total_pages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+              <div class="text-4xl mb-4">👥</div>
+              <p>暂无用户数据</p>
+            </div>
+            <template x-if="total_pages > 1">
+              <div class="p-4 border-t flex justify-between items-center">
+                <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+                <div class="flex space-x-1">
+                  <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                  <template x-for="p in visiblePages" :key="'pu'+p">
+                    <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                  </template>
+                  <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+                </div>
+              </div>
+            </template>
+            <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+              最后更新: <span x-text="lastUpdateTime"></span>
             </div>
           </div>
         </div>
@@ -169,70 +157,54 @@
               ➕ 新增角色
             </button>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="themed-bg-base">
-                <tr>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">角色代码</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">角色名称</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">权限等级</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">描述</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y">
-                <!-- 骨架屏加载状态 -->
-                <template x-if="loading">
-                  <template x-for="i in 4" :key="'skeleton-role-' + i">
-                    <tr class="animate-pulse">
-                      <td class="px-4 py-3"><div class="skeleton-text w-16"></div></td>
-                      <td class="px-4 py-3"><div class="skeleton-text w-24"></div></td>
-                      <td class="px-4 py-3"><div class="skeleton-button-sm w-12"></div></td>
-                      <td class="px-4 py-3"><div class="skeleton-text w-32"></div></td>
-                      <td class="px-4 py-3"><div class="flex space-x-2"><div class="skeleton-text-xs w-8"></div><div class="skeleton-text-xs w-8"></div></div></td>
+          <!-- data-table: 角色列表 -->
+          <div x-data="rolesDataTable()" x-init="init()">
+            <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+            <div x-show="hasError" class="p-8 text-center">
+              <p class="text-red-500 mb-2" x-text="error"></p>
+              <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+            </div>
+            <div x-show="hasData" class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <template x-for="col in columns" :key="col.key">
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                          :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                          @click="sort(col)">
+                        <span x-text="col.label"></span>
+                        <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                      </th>
+                    </template>
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(row, idx) in data" :key="row.role_id || idx">
+                    <tr class="themed-hover-bg">
+                      <template x-for="col in columns" :key="col.key">
+                        <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                      </template>
+                      <td class="px-4 py-3">
+                        <div class="flex space-x-2">
+                          <button @click="$dispatch('edit-role', row)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                          <button @click="$dispatch('manage-role-permissions', row)" class="text-purple-500 hover:text-purple-700 text-sm">权限</button>
+                          <button x-show="!['super_admin','admin','operator','user'].includes(row.role_name)" @click="$dispatch('confirm-delete-role', row)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
+                          <span x-show="['super_admin','admin','operator','user'].includes(row.role_name)" class="text-gray-400 text-sm cursor-not-allowed" title="系统内置角色不可删除">🔒</span>
+                        </div>
+                      </td>
                     </tr>
                   </template>
-                </template>
-                <!-- 空状态 -->
-
-                  <tr x-show="!loading && roles.length === 0">
-                    <td colspan="5" class="px-4 py-12">
-                      <div class="flex flex-col items-center justify-center text-center">
-                        <div class="text-6xl mb-4">🛡️</div>
-                        <h3 class="text-lg font-medium themed-text mb-2">暂无角色数据</h3>
-                        <p class="themed-text-muted text-sm mb-4">点击上方按钮创建新角色</p>
-                      </div>
-                    </td>
-                  </tr>
-
-                <!-- 数据列表 -->
-                <template x-for="role in roles" :key="role.role_id">
-                  <tr class="themed-hover-bg transition-colors">
-                    <td class="px-4 py-3 text-sm font-mono" x-text="role.role_id"></td>
-                    <td class="px-4 py-3 text-sm" x-text="role.role_name"></td>
-                    <td class="px-4 py-3">
-                      <span class="px-2 py-1 text-xs rounded text-white" 
-                            :class="role.role_level >= 80 ? 'bg-red-500' : (role.role_level >= 40 ? 'bg-yellow-500' : 'bg-gray-400')"
-                            x-text="'Lv.' + role.role_level"></span>
-                    </td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="role.description || '-'"></td>
-                    <td class="px-4 py-3">
-                      <div class="flex space-x-2">
-                        <button @click="editRole(role)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
-                        <button @click="manageRolePermissions(role)" class="text-purple-500 hover:text-purple-700 text-sm">权限</button>
-                        <!-- 删除按钮（仅对非系统内置角色显示） -->
-                        <template x-if="!isSystemRole(role.role_name)">
-                          <button @click="confirmDeleteRole(role)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
-                        </template>
-                        <template x-if="isSystemRole(role.role_name)">
-                          <span class="text-gray-400 text-sm cursor-not-allowed" title="系统内置角色不可删除">🔒</span>
-                        </template>
-                      </div>
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+              <div class="text-4xl mb-4">🛡️</div>
+              <p>暂无角色数据</p>
+            </div>
+            <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+              最后更新: <span x-text="lastUpdateTime"></span>
+            </div>
           </div>
         </div>
       </div>
@@ -251,37 +223,45 @@
               💡 系统权限嵌入在角色配置中。如需修改权限，请编辑对应角色的权限配置。
             </p>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="themed-bg-base">
-                <tr>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">权限代码</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">权限名称</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">描述</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">拥有角色</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y">
-
-                <tr x-show="!loading && permissions.length === 0">
-                  <td colspan="4" class="px-4 py-8 text-center themed-text-muted">暂无权限数据</td>
-                </tr>
-                <template x-for="perm in permissions" :key="perm.permission_code">
-                  <tr class="themed-hover-bg">
-                    <td class="px-4 py-3 text-sm font-mono themed-bg-base" x-text="perm.permission_code"></td>
-                    <td class="px-4 py-3 text-sm font-medium" x-text="perm.permission_name"></td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="perm.description || '-'"></td>
-                    <td class="px-4 py-3">
-                      <div class="flex flex-wrap gap-1">
-                        <template x-for="role in (perm.roles || [])" :key="role">
-                          <span class="px-2 py-0.5 text-xs themed-bg-primary-light themed-text-primary rounded" x-text="role"></span>
-                        </template>
-                      </div>
-                    </td>
+          <!-- data-table: 权限列表 -->
+          <div x-data="permissionsDataTable()" x-init="init()">
+            <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+            <div x-show="hasError" class="p-8 text-center">
+              <p class="text-red-500 mb-2" x-text="error"></p>
+              <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+            </div>
+            <div x-show="hasData" class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <template x-for="col in columns" :key="col.key">
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                          :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                          @click="sort(col)">
+                        <span x-text="col.label"></span>
+                        <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                      </th>
+                    </template>
                   </tr>
-                </template>
-              </tbody>
-            </table>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(row, idx) in data" :key="row.permission_key || idx">
+                    <tr class="themed-hover-bg">
+                      <template x-for="col in columns" :key="col.key">
+                        <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                      </template>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+              <div class="text-4xl mb-4">🔑</div>
+              <p>暂无权限数据</p>
+            </div>
+            <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+              最后更新: <span x-text="lastUpdateTime"></span>
+            </div>
           </div>
         </div>
       </div>
@@ -295,49 +275,61 @@
               ➕ 分配角色
             </button>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="themed-bg-base">
-                <tr>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户ID</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户昵称</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">手机号</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">角色</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">分配时间</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y">
-                <template x-for="(ur, index) in userRoles" :key="`${ur.user_id}_${ur.role_id}_${index}`">
-                  <tr class="themed-hover-bg">
-                    <td class="px-4 py-3 text-sm" x-text="ur.user_id"></td>
-                    <td class="px-4 py-3 text-sm" x-text="ur.user?.nickname || '-'"></td>
-                    <td class="px-4 py-3 text-sm" x-text="ur.user?.mobile || '-'"></td>
-                    <td class="px-4 py-3 text-sm">
-                      <span class="px-2 py-1 rounded text-xs" 
-                            :class="ur.role?.role_level >= 100 ? 'bg-red-100 text-red-700' : ur.role?.role_level >= 50 ? 'themed-bg-primary-light themed-text-primary' : 'themed-bg-subtle themed-text-secondary'"
-                            x-text="ur.role?.role_name || ur.role_name || '-'"></span>
-                    </td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(ur.assigned_at || ur.created_at)"></td>
-                    <td class="px-4 py-3">
-                      <select @change="changeUserRole(ur, $event.target.value); $event.target.value=''" 
-                              class="text-sm border rounded px-2 py-1">
-                        <option value="">更改角色...</option>
-                        <template x-for="role in roles" :key="role.role_id">
-                          <option :value="role.role_name" x-text="role.role_name" 
-                                  :disabled="role.role_name === (ur.role?.role_name || ur.role_name)"></option>
-                        </template>
-                      </select>
-                    </td>
-                  </tr>
-                </template>
-                <template x-if="!userRoles || userRoles.length === 0">
+          <!-- data-table: 用户角色列表 -->
+          <div x-data="userRolesDataTable()" x-init="init()">
+            <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+            <div x-show="hasError" class="p-8 text-center">
+              <p class="text-red-500 mb-2" x-text="error"></p>
+              <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+            </div>
+            <div x-show="hasData" class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="themed-bg-base">
                   <tr>
-                    <td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无用户角色数据</td>
+                    <template x-for="col in columns" :key="col.key">
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                          :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                          @click="sort(col)">
+                        <span x-text="col.label"></span>
+                        <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                      </th>
+                    </template>
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
                   </tr>
-                </template>
-              </tbody>
-            </table>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(row, idx) in data" :key="row.user_id + '_' + idx">
+                    <tr class="themed-hover-bg">
+                      <template x-for="col in columns" :key="col.key">
+                        <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                      </template>
+                      <td class="px-4 py-3">
+                        <button @click="$dispatch('change-user-role-event', { ur: row, value: '' })" class="text-purple-500 hover:text-purple-700 text-sm">更改角色</button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+              <div class="text-4xl mb-4">👤</div>
+              <p>暂无用户角色数据</p>
+            </div>
+            <template x-if="total_pages > 1">
+              <div class="p-4 border-t flex justify-between items-center">
+                <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+                <div class="flex space-x-1">
+                  <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                  <template x-for="p in visiblePages" :key="'ur'+p">
+                    <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                  </template>
+                  <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+                </div>
+              </div>
+            </template>
+            <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+              最后更新: <span x-text="lastUpdateTime"></span>
+            </div>
           </div>
         </div>
       </div>
@@ -372,80 +364,81 @@
             </button>
           </div>
           
-          <!-- 筛选区域 -->
-          <div class="p-4 border-b themed-bg-base">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <input type="text" x-model="premiumFilters.mobile" maxlength="11" placeholder="手机号" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-              <select x-model="premiumFilters.is_valid" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-                <option value="">全部状态</option>
-                <option value="true">有效</option>
-                <option value="false">无效/过期</option>
-              </select>
-              <select x-model="premiumFilters.unlock_method" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-                <option value="">全部解锁方式</option>
-                <option value="purchase">购买解锁</option>
-                <option value="admin_grant">管理员授权</option>
-                <option value="promotion">活动赠送</option>
-                <option value="referral">推荐奖励</option>
-              </select>
-              <button @click="loadPremiumUsers()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">
-                🔍 搜索
-              </button>
+          <!-- data-table: 高级用户列表 -->
+          <div x-data="premiumDataTable()" x-init="init()">
+            <div class="p-4 border-b themed-bg-base">
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <input type="text" x-model="activeFilters.mobile" maxlength="11" placeholder="手机号" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <select x-model="activeFilters.is_valid" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">全部状态</option>
+                  <option value="true">有效</option>
+                  <option value="false">无效/过期</option>
+                </select>
+                <select x-model="activeFilters.unlock_method" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">全部解锁方式</option>
+                  <option value="purchase">购买解锁</option>
+                  <option value="admin_grant">管理员授权</option>
+                  <option value="promotion">活动赠送</option>
+                  <option value="referral">推荐奖励</option>
+                </select>
+                <div class="flex space-x-2">
+                  <button @click="search()" class="flex-1 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">🔍 搜索</button>
+                  <button @click="handleFilterReset()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">🔄</button>
+                </div>
+              </div>
             </div>
-          </div>
-          
-          <!-- 高级状态列表表格 -->
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="themed-bg-base">
-                <tr>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户ID</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">昵称</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">解锁方式</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">解锁时间</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">过期时间</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y">
-                <template x-if="loading">
-                  <tr><td colspan="7" class="px-4 py-8 text-center themed-text-muted">加载中...</td></tr>
-                </template>
-
-                <tr x-show="!loading && premiumUsers.length === 0">
-                  <td colspan="7" class="px-4 py-8 text-center themed-text-muted">暂无高级用户数据</td>
-                </tr>
-                <template x-for="user in premiumUsers" :key="user.user_id">
-                  <tr class="themed-hover-bg">
-                    <td class="px-4 py-3 text-sm" x-text="user.user_id"></td>
-                    <td class="px-4 py-3 text-sm" x-text="user.nickname || user.user?.nickname || '-'"></td>
-                    <td class="px-4 py-3">
-                      <span 
-                        :class="user.is_valid ? 'bg-green-100 themed-text-success' : 'bg-red-100 text-red-700'"
-                        class="px-2 py-1 text-xs rounded"
-                        x-text="user.is_valid ? '有效' : '无效/过期'"
-                      ></span>
-                    </td>
-                    <td class="px-4 py-3 text-sm" x-text="user.unlock_method_display || user.unlock_method"></td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(user.unlock_time || user.created_at)"></td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="user.expires_at ? formatDateTimeShort(user.expires_at) : '永久'"></td>
-                    <td class="px-4 py-3">
-                      <button @click="viewPremiumDetail(user)" class="themed-text-primary hover:text-blue-700 text-sm">查看详情</button>
-                    </td>
+            <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+            <div x-show="hasError" class="p-8 text-center">
+              <p class="text-red-500 mb-2" x-text="error"></p>
+              <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+            </div>
+            <div x-show="hasData" class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <template x-for="col in columns" :key="col.key">
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                          :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                          @click="sort(col)">
+                        <span x-text="col.label"></span>
+                        <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                      </th>
+                    </template>
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
                   </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-          
-          <!-- 分页 -->
-          <div class="p-4 border-t flex justify-between items-center">
-            <span class="text-sm themed-text-muted">共 <span x-text="premiumPagination.total"></span> 条记录</span>
-            <div class="flex space-x-2">
-              <button @click="changePremiumPage(premiumPagination.page - 1)" :disabled="premiumPagination.page <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-              <span class="px-3 py-1">第 <span x-text="premiumPagination.page"></span> / <span x-text="premiumTotalPages"></span> 页</span>
-              <button @click="changePremiumPage(premiumPagination.page + 1)" :disabled="premiumPagination.page >= premiumTotalPages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(row, idx) in data" :key="row.user_id || idx">
+                    <tr class="themed-hover-bg">
+                      <template x-for="col in columns" :key="col.key">
+                        <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                      </template>
+                      <td class="px-4 py-3">
+                        <button @click="$dispatch('view-premium-detail', row)" class="themed-text-primary hover:text-blue-700 text-sm">查看详情</button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+              <div class="text-4xl mb-4">⭐</div>
+              <p>暂无高级用户数据</p>
+            </div>
+            <template x-if="total_pages > 1">
+              <div class="p-4 border-t flex justify-between items-center">
+                <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+                <div class="flex space-x-1">
+                  <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                  <template x-for="p in visiblePages" :key="'pm'+p">
+                    <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                  </template>
+                  <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+                </div>
+              </div>
+            </template>
+            <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+              最后更新: <span x-text="lastUpdateTime"></span>
             </div>
           </div>
         </div>
@@ -463,119 +456,90 @@
             </div>
           </div>
           
-          <!-- 筛选区域 -->
-          <div class="p-4 border-b themed-bg-base">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <select x-model="riskFilters.config_type" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-                <option value="">全部配置类型</option>
-                <option value="global">全局配置</option>
-                <option value="user_level">等级配置</option>
-                <option value="individual">个人配置</option>
-              </select>
-              <select x-model="riskFilters.user_level" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-                <option value="">全部用户等级</option>
-                <option value="normal">普通用户</option>
-                <option value="vip">VIP用户</option>
-                <option value="premium">高级用户</option>
-              </select>
-              <select x-model="riskFilters.is_frozen" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-                <option value="">全部冻结状态</option>
-                <option value="true">已冻结</option>
-                <option value="false">未冻结</option>
-              </select>
-              <button @click="loadRiskProfiles()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">
-                🔍 搜索
-              </button>
-            </div>
-          </div>
-
-          <!-- 冻结用户快速查看 -->
-          <template x-if="frozenUsers.length > 0">
-            <div class="p-4 border-b bg-red-50">
-              <h6 class="text-red-700 font-medium mb-2">⚠️ 冻结用户 (<span x-text="frozenUsers.length"></span>)</h6>
-              <div class="flex flex-wrap gap-2">
-                <template x-for="fuser in frozenUsers.slice(0, 10)" :key="fuser.user_id">
-                  <span class="px-2 py-1 bg-red-200 text-red-800 rounded text-sm">
-                    <span x-text="fuser.user_id"></span>
-                    <button @click="unfreezeUser(fuser)" class="ml-1 text-red-600 hover:text-red-800">✕</button>
-                  </span>
-                </template>
-                <template x-if="frozenUsers.length > 10">
-                  <span class="text-sm text-red-600">...还有 <span x-text="frozenUsers.length - 10"></span> 人</span>
-                </template>
+          <!-- data-table: 风控配置列表 -->
+          <div x-data="riskProfilesDataTable()" x-init="init()">
+            <div class="p-4 border-b themed-bg-base">
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <select x-model="activeFilters.config_type" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">全部配置类型</option>
+                  <option value="global">全局配置</option>
+                  <option value="user_level">等级配置</option>
+                  <option value="individual">个人配置</option>
+                </select>
+                <select x-model="activeFilters.user_level" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">全部用户等级</option>
+                  <option value="normal">普通用户</option>
+                  <option value="vip">VIP用户</option>
+                  <option value="premium">高级用户</option>
+                </select>
+                <select x-model="activeFilters.is_frozen" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">全部冻结状态</option>
+                  <option value="true">已冻结</option>
+                  <option value="false">未冻结</option>
+                </select>
+                <div class="flex space-x-2">
+                  <button @click="search()" class="flex-1 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">🔍 搜索</button>
+                  <button @click="handleFilterReset()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">🔄</button>
+                </div>
               </div>
             </div>
-          </template>
-          
-          <!-- 风控配置列表表格 -->
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="themed-bg-base">
-                <tr>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户ID</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户等级</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">日积分限额</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">单笔限额</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">日抽奖限制</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">冻结状态</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y">
-                <template x-if="loading">
-                  <tr><td colspan="7" class="px-4 py-8 text-center themed-text-muted">加载中...</td></tr>
-                </template>
-
-                <tr x-show="!loading && riskProfiles.length === 0">
-                  <td colspan="7" class="px-4 py-8 text-center themed-text-muted">暂无风控画像数据</td>
-                </tr>
-                <template x-for="(profile, index) in riskProfiles" :key="profile.risk_profile_id || `risk_${index}`">
-                  <tr class="themed-hover-bg">
-                    <td class="px-4 py-3 text-sm">
-                      <template x-if="profile.user_id">
-                        <span x-text="profile.user_id"></span>
-                      </template>
-                      <template x-if="!profile.user_id">
-                        <span class="text-gray-400 text-xs">[等级默认]</span>
-                      </template>
-                    </td>
-                    <td class="px-4 py-3 text-sm" x-text="profile.user_level || '默认'"></td>
-                    <td class="px-4 py-3 text-sm" x-text="profile.thresholds?.daily_points_limit || profile.daily_points_limit || '-'"></td>
-                    <td class="px-4 py-3 text-sm" x-text="profile.thresholds?.single_transaction_limit || profile.single_transaction_limit || '-'"></td>
-                    <td class="px-4 py-3 text-sm" x-text="profile.thresholds?.daily_lottery_limit || profile.daily_lottery_limit || '-'"></td>
-                    <td class="px-4 py-3">
-                      <span 
-                        :class="profile.is_frozen ? 'bg-red-100 text-red-700' : 'bg-green-100 themed-text-success'"
-                        class="px-2 py-1 text-xs rounded"
-                        x-text="profile.is_frozen ? '已冻结' : '正常'"
-                      ></span>
-                    </td>
-                    <td class="px-4 py-3">
-                      <div class="flex space-x-2">
-                        <button @click="openRiskModal(profile)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
-                        <template x-if="profile.user_id">
-                          <button 
-                            @click="profile.is_frozen ? unfreezeUser(profile) : freezeUser(profile)" 
-                            :class="profile.is_frozen ? 'themed-text-primary hover:text-blue-700' : 'text-red-500 hover:text-red-700'"
-                            class="text-sm"
-                            x-text="profile.is_frozen ? '解冻' : '冻结'"
-                          ></button>
-                        </template>
-                      </div>
-                    </td>
+            <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+            <div x-show="hasError" class="p-8 text-center">
+              <p class="text-red-500 mb-2" x-text="error"></p>
+              <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+            </div>
+            <div x-show="hasData" class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <template x-for="col in columns" :key="col.key">
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                          :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                          @click="sort(col)">
+                        <span x-text="col.label"></span>
+                        <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                      </th>
+                    </template>
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
                   </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-          
-          <!-- 分页 -->
-          <div class="p-4 border-t flex justify-between items-center">
-            <span class="text-sm themed-text-muted">共 <span x-text="riskPagination.total"></span> 条记录</span>
-            <div class="flex space-x-2">
-              <button @click="changeRiskPage(riskPagination.page - 1)" :disabled="riskPagination.page <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-              <span class="px-3 py-1">第 <span x-text="riskPagination.page"></span> / <span x-text="riskTotalPages"></span> 页</span>
-              <button @click="changeRiskPage(riskPagination.page + 1)" :disabled="riskPagination.page >= riskTotalPages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(row, idx) in data" :key="row.user_id || idx">
+                    <tr class="themed-hover-bg">
+                      <template x-for="col in columns" :key="col.key">
+                        <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                      </template>
+                      <td class="px-4 py-3">
+                        <div class="flex space-x-2">
+                          <button @click="$dispatch('open-risk-modal', row)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                          <button x-show="row.user_id" @click="$dispatch(row.is_frozen ? 'unfreeze-user' : 'freeze-user', row)"
+                            :class="row.is_frozen ? 'themed-text-primary hover:text-blue-700' : 'text-red-500 hover:text-red-700'"
+                            class="text-sm" x-text="row.is_frozen ? '解冻' : '冻结'"></button>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+              <div class="text-4xl mb-4">🛡️</div>
+              <p>暂无风控画像数据</p>
+            </div>
+            <template x-if="total_pages > 1">
+              <div class="p-4 border-t flex justify-between items-center">
+                <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+                <div class="flex space-x-1">
+                  <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                  <template x-for="p in visiblePages" :key="'rk'+p">
+                    <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                  </template>
+                  <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+                </div>
+              </div>
+            </template>
+            <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+              最后更新: <span x-text="lastUpdateTime"></span>
             </div>
           </div>
         </div>
@@ -594,63 +558,68 @@
             </button>
           </div>
           
-          <!-- 筛选区域 -->
-          <div class="p-4 border-b themed-bg-base">
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <input type="text" x-model="roleHistoryFilters.mobile" maxlength="11" placeholder="手机号" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-              <input type="text" x-model="roleHistoryFilters.operator_id" placeholder="操作人ID" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-              <input type="date" x-model="roleHistoryFilters.start_date" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-              <input type="date" x-model="roleHistoryFilters.end_date" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-              <button @click="loadRoleChangeHistory()" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary transition-colors">
-                🔍 搜索
-              </button>
+          <!-- data-table: 角色变更历史 -->
+          <div x-data="roleHistoryDataTable()" x-init="init()">
+            <div class="p-4 border-b themed-bg-base">
+              <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <input type="text" x-model="activeFilters.mobile" maxlength="11" placeholder="手机号" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <input type="text" x-model="activeFilters.operator_id" placeholder="操作人ID" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <input type="date" x-model="activeFilters.start_date" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <input type="date" x-model="activeFilters.end_date" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <div class="flex space-x-2">
+                  <button @click="search()" class="flex-1 px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary transition-colors">🔍 搜索</button>
+                  <button @click="handleFilterReset()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">🔄</button>
+                </div>
+              </div>
             </div>
-          </div>
-
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="themed-bg-base">
-                <tr>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户ID</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户昵称</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">原角色</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">新角色</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">变更原因</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作人</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">变更时间</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y">
-
-                <tr x-show="!roleChangeHistory || roleChangeHistory.length === 0">
-                  <td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无角色变更记录</td>
-                </tr>
-                <template x-for="(record, index) in roleChangeHistory" :key="`role-change-${record.id || index}`">
-                  <tr class="themed-hover-bg">
-                    <td class="px-4 py-3 text-sm" x-text="record.user_id"></td>
-                    <td class="px-4 py-3 text-sm" x-text="record.user?.nickname || record.nickname || '-'"></td>
-                    <td class="px-4 py-3 text-sm">
-                      <span class="px-2 py-1 themed-bg-subtle themed-text-secondary rounded text-xs" x-text="record.old_role || record.old_role_name || '-'"></span>
-                    </td>
-                    <td class="px-4 py-3 text-sm">
-                      <span class="px-2 py-1 themed-bg-primary-light themed-text-primary rounded text-xs" x-text="record.new_role || record.new_role_name || '-'"></span>
-                    </td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="record.reason || record.change_reason || '-'"></td>
-                    <td class="px-4 py-3 text-sm" x-text="record.operator?.nickname || record.operator_id || '-'"></td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(record.created_at || record.change_time)"></td>
+            <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+            <div x-show="hasError" class="p-8 text-center">
+              <p class="text-red-500 mb-2" x-text="error"></p>
+              <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+            </div>
+            <div x-show="hasData" class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <template x-for="col in columns" :key="col.key">
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                          :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                          @click="sort(col)">
+                        <span x-text="col.label"></span>
+                        <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                      </th>
+                    </template>
                   </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- 分页 -->
-          <div class="p-4 border-t flex justify-between items-center">
-            <span class="text-sm themed-text-muted">共 <span x-text="roleHistoryPagination.total || 0"></span> 条记录</span>
-            <div class="flex space-x-2">
-              <button @click="goToRoleHistoryPage(roleHistoryPagination.page - 1)" :disabled="roleHistoryPagination.page <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-              <span class="px-3 py-1">第 <span x-text="roleHistoryPagination.page"></span> / <span x-text="roleHistoryTotalPages"></span> 页</span>
-              <button @click="goToRoleHistoryPage(roleHistoryPagination.page + 1)" :disabled="roleHistoryPagination.page >= roleHistoryTotalPages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(row, idx) in data" :key="row.id || idx">
+                    <tr class="themed-hover-bg">
+                      <template x-for="col in columns" :key="col.key">
+                        <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                      </template>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+              <div class="text-4xl mb-4">📜</div>
+              <p>暂无角色变更记录</p>
+            </div>
+            <template x-if="total_pages > 1">
+              <div class="p-4 border-t flex justify-between items-center">
+                <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+                <div class="flex space-x-1">
+                  <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                  <template x-for="p in visiblePages" :key="'rh'+p">
+                    <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                  </template>
+                  <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+                </div>
+              </div>
+            </template>
+            <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+              最后更新: <span x-text="lastUpdateTime"></span>
             </div>
           </div>
         </div>
@@ -669,67 +638,68 @@
             </button>
           </div>
           
-          <!-- 筛选区域 -->
-          <div class="p-4 border-b themed-bg-base">
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <input type="text" x-model="statusHistoryFilters.mobile" maxlength="11" placeholder="手机号" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-              <input type="text" x-model="statusHistoryFilters.operator_id" placeholder="操作人ID" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-              <input type="date" x-model="statusHistoryFilters.start_date" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-              <input type="date" x-model="statusHistoryFilters.end_date" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-              <button @click="loadStatusChangeHistory()" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary transition-colors">
-                🔍 搜索
-              </button>
+          <!-- data-table: 状态变更历史 -->
+          <div x-data="statusHistoryDataTable()" x-init="init()">
+            <div class="p-4 border-b themed-bg-base">
+              <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <input type="text" x-model="activeFilters.mobile" maxlength="11" placeholder="手机号" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <input type="text" x-model="activeFilters.operator_id" placeholder="操作人ID" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <input type="date" x-model="activeFilters.start_date" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <input type="date" x-model="activeFilters.end_date" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <div class="flex space-x-2">
+                  <button @click="search()" class="flex-1 px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary transition-colors">🔍 搜索</button>
+                  <button @click="handleFilterReset()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">🔄</button>
+                </div>
+              </div>
             </div>
-          </div>
-
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="themed-bg-base">
-                <tr>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户ID</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户昵称</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">原状态</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">新状态</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">变更原因</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作人</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">变更时间</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y">
-
-                <tr x-show="!statusChangeHistory || statusChangeHistory.length === 0">
-                  <td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无状态变更记录</td>
-                </tr>
-                <template x-for="(record, index) in statusChangeHistory" :key="`status-change-${record.id || index}`">
-                  <tr class="themed-hover-bg">
-                    <td class="px-4 py-3 text-sm" x-text="record.user_id"></td>
-                    <td class="px-4 py-3 text-sm" x-text="record.user?.nickname || record.nickname || '-'"></td>
-                    <td class="px-4 py-3 text-sm">
-                      <span class="px-2 py-1 rounded text-xs"
-                            :class="record.old_status === 'active' ? 'bg-green-100 themed-text-success' : 'themed-bg-subtle themed-text-secondary'"
-                            x-text="record.old_status || '-'"></span>
-                    </td>
-                    <td class="px-4 py-3 text-sm">
-                      <span class="px-2 py-1 rounded text-xs"
-                            :class="record.new_status === 'active' ? 'bg-green-100 themed-text-success' : record.new_status === 'frozen' ? 'bg-red-100 text-red-700' : 'themed-bg-subtle themed-text-secondary'"
-                            x-text="record.new_status || '-'"></span>
-                    </td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="record.reason || record.change_reason || '-'"></td>
-                    <td class="px-4 py-3 text-sm" x-text="record.operator?.nickname || record.operator_id || '-'"></td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDateTimeShort(record.created_at || record.change_time)"></td>
+            <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+            <div x-show="hasError" class="p-8 text-center">
+              <p class="text-red-500 mb-2" x-text="error"></p>
+              <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+            </div>
+            <div x-show="hasData" class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <template x-for="col in columns" :key="col.key">
+                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                          :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                          @click="sort(col)">
+                        <span x-text="col.label"></span>
+                        <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                      </th>
+                    </template>
                   </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- 分页 -->
-          <div class="p-4 border-t flex justify-between items-center">
-            <span class="text-sm themed-text-muted">共 <span x-text="statusHistoryPagination.total || 0"></span> 条记录</span>
-            <div class="flex space-x-2">
-              <button @click="goToStatusHistoryPage(statusHistoryPagination.page - 1)" :disabled="statusHistoryPagination.page <= 1" class="px-3 py-1 border rounded disabled:opacity-50">上一页</button>
-              <span class="px-3 py-1">第 <span x-text="statusHistoryPagination.page"></span> / <span x-text="statusHistoryTotalPages"></span> 页</span>
-              <button @click="goToStatusHistoryPage(statusHistoryPagination.page + 1)" :disabled="statusHistoryPagination.page >= statusHistoryTotalPages" class="px-3 py-1 border rounded disabled:opacity-50">下一页</button>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(row, idx) in data" :key="row.id || idx">
+                    <tr class="themed-hover-bg">
+                      <template x-for="col in columns" :key="col.key">
+                        <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                      </template>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+              <div class="text-4xl mb-4">📋</div>
+              <p>暂无状态变更记录</p>
+            </div>
+            <template x-if="total_pages > 1">
+              <div class="p-4 border-t flex justify-between items-center">
+                <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+                <div class="flex space-x-1">
+                  <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                  <template x-for="p in visiblePages" :key="'sh'+p">
+                    <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                  </template>
+                  <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+                </div>
+              </div>
+            </template>
+            <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
+              最后更新: <span x-text="lastUpdateTime"></span>
             </div>
           </div>
         </div>

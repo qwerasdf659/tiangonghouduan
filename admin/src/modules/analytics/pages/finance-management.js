@@ -23,7 +23,8 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { Alpine, createPageMixin } from '../../../alpine/index.js'
+import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
+import { request, API_PREFIX } from '../../../api/base.js'
 import {
   useConsumptionState,
   useConsumptionMethods,
@@ -294,7 +295,163 @@ document.addEventListener('alpine:init', () => {
     }
   })
 
-  logger.info('[FinanceManagement] Alpine 组件注册完成')
+  // ==================== data-table 组件注册 ====================
+
+  /** 消费记录 */
+  Alpine.data('consumptionDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'id', label: 'ID', sortable: true },
+        { key: 'user_id', label: '用户ID' },
+        { key: 'store_name', label: '门店', render: (val, row) => val || row.store?.name || '-' },
+        { key: 'amount', label: '消费金额', type: 'currency', sortable: true },
+        { key: 'status', label: '状态', type: 'status', statusMap: { pending: { class: 'yellow', label: '待审核' }, approved: { class: 'green', label: '已通过' }, rejected: { class: 'red', label: '已拒绝' } } },
+        { key: 'created_at', label: '消费时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: `${API_PREFIX}/console/consumption/records`, method: 'GET', params })
+        return { items: res.data?.records || res.data?.list || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      },
+      primaryKey: 'id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-consumption', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 钻石账户 */
+  Alpine.data('diamondAccountsDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'user_id', label: '用户ID', sortable: true },
+        { key: 'nickname', label: '昵称', render: (val, row) => val || row.user_nickname || '-' },
+        { key: 'balance', label: '钻石余额', type: 'number', sortable: true },
+        { key: 'total_earned', label: '累计获得', type: 'number' },
+        { key: 'total_spent', label: '累计消耗', type: 'number' },
+        { key: 'updated_at', label: '更新时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: `${API_PREFIX}/console/diamond/users`, method: 'GET', params })
+        return { items: res.data?.list || res.data?.accounts || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      },
+      primaryKey: 'user_id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-diamond-accounts', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 商户积分 */
+  Alpine.data('merchantPointsDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'id', label: 'ID', sortable: true },
+        { key: 'store_name', label: '门店', render: (val, row) => val || row.store?.name || '-' },
+        { key: 'points', label: '积分', type: 'number', sortable: true },
+        { key: 'status', label: '状态', type: 'status' },
+        { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: `${API_PREFIX}/console/merchant-points`, method: 'GET', params })
+        return { items: res.data?.list || res.data?.records || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      },
+      primaryKey: 'id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-merchant-points', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 债务管理 */
+  Alpine.data('debtDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'debt_id', label: '债务ID', sortable: true },
+        { key: 'user_id', label: '用户ID' },
+        { key: 'amount', label: '金额', type: 'currency', sortable: true },
+        { key: 'paid_amount', label: '已还', type: 'currency' },
+        { key: 'status', label: '状态', type: 'status', statusMap: { pending: { class: 'yellow', label: '待还款' }, partial: { class: 'blue', label: '部分还款' }, paid: { class: 'green', label: '已还清' }, cancelled: { class: 'gray', label: '已核销' } } },
+        { key: 'created_at', label: '创建时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: `${API_PREFIX}/console/debt-management`, method: 'GET', params })
+        return { items: res.data?.list || res.data?.debts || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      },
+      primaryKey: 'debt_id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-debts', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 活动预算 */
+  Alpine.data('budgetDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'budget_id', label: '预算ID', sortable: true },
+        { key: 'campaign_name', label: '活动名称', render: (val, row) => val || row.lottery_campaign?.name || '-' },
+        { key: 'budget_amount', label: '预算金额', type: 'currency', sortable: true },
+        { key: 'used_amount', label: '已使用', type: 'currency' },
+        { key: 'usage_rate', label: '使用率', render: (val) => val != null ? Number(val).toFixed(1) + '%' : '-' },
+        { key: 'status', label: '状态', type: 'status' }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: `${API_PREFIX}/console/campaign-budget`, method: 'GET', params })
+        return { items: res.data?.list || res.data?.budgets || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      },
+      primaryKey: 'budget_id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-budgets', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 商户操作日志 */
+  Alpine.data('merchantLogsDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'id', label: '日志ID', sortable: true },
+        { key: 'operator_name', label: '操作人', render: (val, row) => val || row.operator?.nickname || '-' },
+        { key: 'operation_type', label: '操作类型', render: (val, row) => row.operation_type_display || val || '-' },
+        { key: 'store_name', label: '门店', render: (val, row) => val || row.store?.name || '-' },
+        { key: 'description', label: '描述', type: 'truncate', maxLength: 40 },
+        { key: 'created_at', label: '操作时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: `${API_PREFIX}/console/audit-logs`, method: 'GET', params })
+        return { items: res.data?.logs || res.data?.list || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      },
+      primaryKey: 'id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-merchant-logs', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  /** 钻石交易明细 */
+  Alpine.data('diamondTransactionsDataTable', () => {
+    const table = dataTable({
+      columns: [
+        { key: 'transaction_id', label: '交易ID', sortable: true },
+        { key: 'user_id', label: '用户ID' },
+        { key: 'type', label: '类型', render: (val, row) => row.type_display || val || '-' },
+        { key: 'amount', label: '金额', type: 'number', sortable: true },
+        { key: 'balance_after', label: '余额', type: 'number' },
+        { key: 'description', label: '说明', type: 'truncate', maxLength: 30 },
+        { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
+      ],
+      dataSource: async (params) => {
+        const res = await request({ url: `${API_PREFIX}/console/assets/transactions`, method: 'GET', params: { ...params, asset_type: 'diamond' } })
+        return { items: res.data?.list || res.data?.transactions || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      },
+      primaryKey: 'transaction_id', sortable: true, page_size: 20
+    })
+    const origInit = table.init
+    table.init = async function () { window.addEventListener('refresh-diamond-transactions', () => this.loadData()); if (origInit) await origInit.call(this) }
+    return table
+  })
+
+  logger.info('[FinanceManagement] Alpine 组件注册完成（含 7 data-table）')
 })
 
 export { SUB_PAGES }

@@ -54,7 +54,7 @@ export function useExchangeStatsMethods() {
           request({
             url: MARKET_ENDPOINTS.EXCHANGE_ORDERS,
             method: 'GET',
-            params: { page: 1, page_size: 1000 }
+            params: { page: 1, page_size: 100 }
           })
         ])
 
@@ -116,7 +116,7 @@ export function useExchangeStatsMethods() {
           const ordersRes = await request({
             url: MARKET_ENDPOINTS.EXCHANGE_ORDERS,
             method: 'GET',
-            params: { page: 1, page_size: 1000 }
+            params: { page: 1, page_size: 100 }
           })
           this.orders = ordersRes.success ? ordersRes.data?.orders || [] : []
         }

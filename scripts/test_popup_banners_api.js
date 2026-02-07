@@ -188,7 +188,7 @@ async function testListAPI() {
         console.log('\n   📋 弹窗列表:')
         data.banners.forEach((banner, index) => {
           console.log(
-            `   ${index + 1}. [${banner.banner_id}] ${banner.title} - ${banner.is_active ? '启用' : '禁用'}`
+            `   ${index + 1}. [${banner.popup_banner_id}] ${banner.title} - ${banner.is_active ? '启用' : '禁用'}`
           )
         })
       } else {

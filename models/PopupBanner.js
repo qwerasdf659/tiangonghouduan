@@ -371,7 +371,7 @@ module.exports = sequelize => {
         ['created_at', 'DESC']
       ],
       limit,
-      attributes: ['banner_id', 'title', 'image_url', 'link_url', 'link_type']
+      attributes: ['popup_banner_id', 'title', 'image_url', 'link_url', 'link_type']
     })
   }
 

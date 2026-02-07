@@ -21,7 +21,8 @@
 
 // ES Module 导入（替代 window.xxx 全局变量）
 import { logger } from '../../../utils/logger.js'
-import { Alpine, createPageMixin } from '../../../alpine/index.js'
+import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
+import { request, API_PREFIX } from '../../../api/base.js'
 
 // 导入所有 composables 模块
 import {
@@ -475,7 +476,163 @@ function registerLotteryManagementComponents() {
     return returnObj
   })
 
-  logger.info('[LotteryManagement] Alpine 组件注册完成')
+  // ==================== data-table 组件注册 ====================
+
+  /** 活动列表 */
+  Alpine.data('campaignsDataTable', () => {
+    const t = dataTable({ columns: [
+      { key: 'lottery_campaign_id', label: '活动ID', sortable: true },
+      { key: 'name', label: '活动名称', sortable: true },
+      { key: 'campaign_code', label: '活动代码' },
+      { key: 'status', label: '状态', type: 'status', statusMap: { active: { class: 'green', label: '进行中' }, inactive: { class: 'gray', label: '未激活' }, ended: { class: 'red', label: '已结束' } } },
+      { key: 'start_time', label: '开始时间', type: 'datetime', sortable: true },
+      { key: 'end_time', label: '结束时间', type: 'datetime' }
+    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/lottery-campaigns`, method: 'GET', params: p }); return { items: r.data?.campaigns || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'lottery_campaign_id', page_size: 20 })
+    const o = t.init; t.init = async function () { window.addEventListener('refresh-campaigns', () => this.loadData()); if (o) await o.call(this) }; return t
+  })
+
+  /** 奖品池 */
+  Alpine.data('prizesDataTable', () => {
+    const t = dataTable({ columns: [
+      { key: 'prize_id', label: '奖品ID', sortable: true },
+      { key: 'prize_name', label: '奖品名称', sortable: true },
+      { key: 'tier', label: '等级', render: (v, r) => r.tier_display || v || '-' },
+      { key: 'probability', label: '概率', render: (v) => v != null ? (Number(v) * 100).toFixed(2) + '%' : '-' },
+      { key: 'stock', label: '库存', type: 'number', sortable: true },
+      { key: 'status', label: '状态', type: 'status' }
+    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/prize-pool/list`, method: 'GET', params: p }); return { items: r.data?.prizes || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'prize_id', page_size: 20 })
+    const o = t.init; t.init = async function () { window.addEventListener('refresh-prizes', () => this.loadData()); if (o) await o.call(this) }; return t
+  })
+
+  /** 活动预算 */
+  Alpine.data('campaignBudgetDataTable', () => {
+    const t = dataTable({ columns: [
+      { key: 'budget_id', label: '预算ID', sortable: true },
+      { key: 'campaign_name', label: '活动名称', render: (v, r) => v || r.campaign?.name || '-' },
+      { key: 'total_budget', label: '总预算', type: 'currency', sortable: true },
+      { key: 'used_budget', label: '已使用', type: 'currency' },
+      { key: 'usage_rate', label: '使用率', render: (v) => v != null ? Number(v).toFixed(1) + '%' : '-' },
+      { key: 'status', label: '状态', type: 'status' }
+    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/campaign-budget`, method: 'GET', params: p }); return { items: r.data?.list || r.data?.budgets || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'budget_id', page_size: 20 })
+    const o = t.init; t.init = async function () { window.addEventListener('refresh-campaign-budgets', () => this.loadData()); if (o) await o.call(this) }; return t
+  })
+
+  /** 策略配置 */
+  Alpine.data('strategiesDataTable', () => {
+    const t = dataTable({ columns: [
+      { key: 'id', label: 'ID', sortable: true },
+      { key: 'strategy_name', label: '策略名称', sortable: true },
+      { key: 'strategy_type', label: '类型', render: (v, r) => r.strategy_type_display || v || '-' },
+      { key: 'priority', label: '优先级', type: 'number', sortable: true },
+      { key: 'is_enabled', label: '状态', type: 'status', statusMap: { true: { class: 'green', label: '启用' }, false: { class: 'gray', label: '禁用' } } }
+    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/lottery-configs/strategies`, method: 'GET', params: p }); return { items: r.data?.strategies || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'id', page_size: 20 })
+    const o = t.init; t.init = async function () { window.addEventListener('refresh-strategies', () => this.loadData()); if (o) await o.call(this) }; return t
+  })
+
+  /** 配额规则 */
+  Alpine.data('quotaRulesDataTable', () => {
+    const t = dataTable({ columns: [
+      { key: 'id', label: 'ID', sortable: true },
+      { key: 'rule_name', label: '规则名称' },
+      { key: 'rule_type', label: '规则类型', render: (v, r) => r.rule_type_display || v || '-' },
+      { key: 'quota_limit', label: '限额', type: 'number' },
+      { key: 'is_enabled', label: '状态', type: 'status', statusMap: { true: { class: 'green', label: '启用' }, false: { class: 'gray', label: '禁用' } } }
+    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/lottery-quota/rules`, method: 'GET', params: p }); return { items: r.data?.rules || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'id', page_size: 20 })
+    const o = t.init; t.init = async function () { window.addEventListener('refresh-quota-rules', () => this.loadData()); if (o) await o.call(this) }; return t
+  })
+
+  /** 定价配置 */
+  Alpine.data('pricingDataTable', () => {
+    const t = dataTable({ columns: [
+      { key: 'pricing_id', label: '定价ID', sortable: true },
+      { key: 'name', label: '定价名称' },
+      { key: 'base_price', label: '基础价格', type: 'currency' },
+      { key: 'asset_code', label: '资产类型' },
+      { key: 'is_active', label: '状态', type: 'status', statusMap: { true: { class: 'green', label: '启用' }, false: { class: 'gray', label: '禁用' } } }
+    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/lottery-configs/pricing`, method: 'GET', params: p }); return { items: r.data?.pricing_configs || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'pricing_id', page_size: 20 })
+    const o = t.init; t.init = async function () { window.addEventListener('refresh-pricing', () => this.loadData()); if (o) await o.call(this) }; return t
+  })
+
+  /** 阶梯规则 */
+  Alpine.data('tierRulesDataTable', () => {
+    const t = dataTable({ columns: [
+      { key: 'id', label: 'ID', sortable: true },
+      { key: 'rule_name', label: '规则名称' },
+      { key: 'tier_level', label: '阶梯等级', type: 'number' },
+      { key: 'min_draws', label: '最小次数', type: 'number' },
+      { key: 'probability_boost', label: '概率提升', render: (v) => v != null ? Number(v).toFixed(2) + '%' : '-' },
+      { key: 'is_enabled', label: '状态', type: 'status', statusMap: { true: { class: 'green', label: '启用' }, false: { class: 'gray', label: '禁用' } } }
+    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/lottery-tier-rules`, method: 'GET', params: p }); return { items: r.data?.rules || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'id', page_size: 20 })
+    const o = t.init; t.init = async function () { window.addEventListener('refresh-tier-rules', () => this.loadData()); if (o) await o.call(this) }; return t
+  })
+
+  /** 干预记录 */
+  Alpine.data('interventionsDataTable', () => {
+    const t = dataTable({ columns: [
+      { key: 'id', label: 'ID', sortable: true },
+      { key: 'user_id', label: '用户ID' },
+      { key: 'intervention_type', label: '干预类型', render: (v, r) => r.intervention_type_display || v || '-' },
+      { key: 'target_prize', label: '目标奖品', render: (v, r) => r.prize_name || v || '-' },
+      { key: 'status', label: '状态', type: 'status', statusMap: { pending: { class: 'yellow', label: '待执行' }, executed: { class: 'green', label: '已执行' }, cancelled: { class: 'gray', label: '已取消' }, expired: { class: 'red', label: '已过期' } } },
+      { key: 'created_at', label: '创建时间', type: 'datetime', sortable: true }
+    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/lottery-management/interventions`, method: 'GET', params: p }); return { items: r.data?.interventions || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'id', page_size: 20 })
+    const o = t.init; t.init = async function () { window.addEventListener('refresh-interventions', () => this.loadData()); if (o) await o.call(this) }; return t
+  })
+
+  /** 概率矩阵 */
+  Alpine.data('matrixDataTable', () => {
+    const t = dataTable({ columns: [
+      { key: 'id', label: 'ID', sortable: true },
+      { key: 'matrix_name', label: '矩阵名称', render: (v, r) => v || r.name || '-' },
+      { key: 'campaign_name', label: '关联活动', render: (v, r) => v || r.campaign?.name || '-' },
+      { key: 'version', label: '版本', type: 'number' },
+      { key: 'is_active', label: '状态', type: 'status', statusMap: { true: { class: 'green', label: '激活' }, false: { class: 'gray', label: '未激活' } } },
+      { key: 'updated_at', label: '更新时间', type: 'datetime', sortable: true }
+    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/lottery-configs/matrix`, method: 'GET', params: p }); return { items: r.data?.matrix_configs || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'id', page_size: 20 })
+    const o = t.init; t.init = async function () { window.addEventListener('refresh-matrix', () => this.loadData()); if (o) await o.call(this) }; return t
+  })
+
+  /** 核销码列表 */
+  Alpine.data('redemptionCodesDataTable', () => {
+    const t = dataTable({ columns: [
+      { key: 'code', label: '核销码', sortable: true },
+      { key: 'prize_name', label: '奖品名称' },
+      { key: 'user_id', label: '用户ID' },
+      { key: 'status', label: '状态', type: 'status', statusMap: { pending: { class: 'yellow', label: '待核销' }, redeemed: { class: 'green', label: '已核销' }, expired: { class: 'red', label: '已过期' } } },
+      { key: 'created_at', label: '创建时间', type: 'datetime', sortable: true },
+      { key: 'redeemed_at', label: '核销时间', type: 'datetime' }
+    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/lottery-management/redemption-codes`, method: 'GET', params: p }); return { items: r.data?.codes || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'code', page_size: 20 })
+    const o = t.init; t.init = async function () { window.addEventListener('refresh-redemption-codes', () => this.loadData()); if (o) await o.call(this) }; return t
+  })
+
+  /** 抽奖记录 */
+  Alpine.data('drawHistoryDataTable', () => {
+    const t = dataTable({ columns: [
+      { key: 'draw_id', label: '抽奖ID', sortable: true },
+      { key: 'user_id', label: '用户ID' },
+      { key: 'campaign_name', label: '活动' },
+      { key: 'prize_name', label: '奖品', render: (v, r) => v || r.result?.prize_name || '未中奖' },
+      { key: 'cost_amount', label: '消耗', type: 'number' },
+      { key: 'is_winner', label: '中奖', type: 'boolean' },
+      { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
+    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/lottery-statistics`, method: 'GET', params: p }); return { items: r.data?.draws || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'draw_id', page_size: 20 })
+    const o = t.init; t.init = async function () { window.addEventListener('refresh-draw-history', () => this.loadData()); if (o) await o.call(this) }; return t
+  })
+
+  /** 异常用户列表 */
+  Alpine.data('abnormalUsersDataTable', () => {
+    const t = dataTable({ columns: [
+      { key: 'user_id', label: '用户ID', sortable: true },
+      { key: 'nickname', label: '用户', render: (v, r) => v || r.user_nickname || '-' },
+      { key: 'total_draws', label: '抽奖次数', type: 'number', sortable: true },
+      { key: 'total_wins', label: '中奖次数', type: 'number' },
+      { key: 'win_rate', label: '中奖率', render: (v) => v != null ? Number(v).toFixed(2) + '%' : '-' },
+      { key: 'risk_level', label: '风险等级', type: 'status', statusMap: { high: { class: 'red', label: '高' }, medium: { class: 'yellow', label: '中' }, low: { class: 'green', label: '低' } } }
+    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/lottery-user-analysis/abnormal`, method: 'GET', params: p }); return { items: r.data?.users || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'user_id', page_size: 20 })
+    const o = t.init; t.init = async function () { window.addEventListener('refresh-abnormal-users', () => this.loadData()); if (o) await o.call(this) }; return t
+  })
+
+  logger.info('[LotteryManagement] Alpine 组件注册完成（含 data-table）')
 }
 
 // ==================== 组件注册 ====================

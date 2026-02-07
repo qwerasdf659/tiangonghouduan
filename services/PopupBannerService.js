@@ -535,7 +535,7 @@ class PopupBannerService {
 
       return await PopupBannerService.getBannerById(bannerId)
     } catch (error) {
-      logger.error('切换弹窗启用状态失败', { error: error.message, banner_id: bannerId })
+      logger.error('切换弹窗启用状态失败', { error: error.message, popup_banner_id: bannerId })
       throw error
     }
   }

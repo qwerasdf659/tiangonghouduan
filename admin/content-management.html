@@ -136,11 +136,11 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4" x-show="banners.length > 0">
           <template x-for="banner in banners" :key="banner.popup_banner_id">
             <div class="border rounded-lg overflow-hidden">
-              <div class="h-32 themed-bg-muted flex items-center justify-center img-blur-load" x-show="banner.image_url">
-                <img :data-src="banner.image_url" alt="" class="w-full h-full object-cover img-lazy"
+              <div class="h-48 themed-bg-muted flex items-center justify-center img-blur-load cursor-pointer" x-show="banner.image_url" @click="previewBanner(banner)">
+                <img :data-src="banner.image_url" alt="" class="max-w-full max-h-full object-contain img-lazy"
                      x-init="$nextTick(() => { if(banner.image_url) { $el.src = banner.image_url; $el.classList.add('loaded') } })">
               </div>
-              <div class="h-32 themed-bg-muted flex items-center justify-center" x-show="!banner.image_url">
+              <div class="h-48 themed-bg-muted flex items-center justify-center" x-show="!banner.image_url">
                 <span class="text-gray-400">无图片</span>
               </div>
               <div class="p-3">
@@ -311,7 +311,7 @@
               <label class="block text-sm font-medium themed-text-secondary mb-1">轮播图片</label>
               <!-- 图片预览区域（新选择的文件预览 或 已保存的图片URL） -->
               <div x-show="bannerImagePreview || bannerForm.image_url" class="mb-2 relative">
-                <img :src="bannerImagePreview || bannerForm.image_url" alt="预览" class="w-full h-32 object-cover rounded border">
+                <img :src="bannerImagePreview || bannerForm.image_url" alt="预览" class="max-w-full max-h-48 object-contain rounded border mx-auto">
                 <button type="button" @click="clearBannerImage()" class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600">×</button>
               </div>
               <!-- 选择图片区域 -->

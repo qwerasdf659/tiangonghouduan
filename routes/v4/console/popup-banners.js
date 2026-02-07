@@ -213,7 +213,7 @@ router.post(
 
       sharedComponents.logger.info('管理员创建弹窗Banner', {
         admin_id: req.user.user_id,
-        banner_id: banner.banner_id,
+        popup_banner_id: banner.popup_banner_id,
         title: banner.title,
         position: banner.position
       })
@@ -262,7 +262,7 @@ router.put(
 
       sharedComponents.logger.info('管理员更新弹窗Banner', {
         admin_id: req.user.user_id,
-        banner_id: id,
+        popup_banner_id: id,
         updated_fields: Object.keys(updateData)
       })
 
@@ -297,7 +297,7 @@ router.delete(
 
       sharedComponents.logger.info('管理员删除弹窗Banner', {
         admin_id: req.user.user_id,
-        banner_id: id
+        popup_banner_id: id
       })
 
       return res.apiSuccess({}, '删除弹窗成功')
@@ -331,7 +331,7 @@ router.patch(
 
       sharedComponents.logger.info('管理员切换弹窗状态', {
         admin_id: req.user.user_id,
-        banner_id: id,
+        popup_banner_id: id,
         is_active: banner.is_active
       })
 
@@ -356,7 +356,7 @@ router.patch(
  * @route PATCH /api/v4/console/popup-banners/order
  * @access Private (需要管理员权限)
  *
- * @body {Array<{banner_id: number, display_order: number}>} order_list - 排序列表
+ * @body {Array<{popup_banner_id: number, display_order: number}>} order_list - 排序列表
  */
 router.patch(
   '/order',

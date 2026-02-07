@@ -60,76 +60,71 @@
         </template>
       </tr>
     </thead>
-    <tbody class="divide-y themed-divide">
+    <!-- 状态行（加载/错误/空）独立 tbody，避免与 x-for 在同一 tbody 导致 Alpine.js DOM 引用丢失 -->
+    <tbody x-show="loading || hasError || isEmpty" class="divide-y themed-divide">
       <!-- 加载状态 -->
-      <template x-if="loading">
-        <tr>
-          <td :colspan="colSpan" class="px-4 py-12 text-center">
-            <div class="flex flex-col items-center gap-2">
-              <div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-              <span class="text-sm themed-text-muted">加载中...</span>
-            </div>
-          </td>
-        </tr>
-      </template>
+      <tr x-show="loading">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+            <span class="text-sm themed-text-muted">加载中...</span>
+          </div>
+        </td>
+      </tr>
       <!-- 错误状态（#5） -->
-      <template x-if="hasError">
-        <tr>
-          <td :colspan="colSpan" class="px-4 py-12 text-center">
-            <div class="flex flex-col items-center gap-3">
-              <span class="text-4xl">❌</span>
-              <div class="text-red-600 font-medium">加载失败</div>
-              <div class="text-sm text-gray-500" x-text="error"></div>
-              <button @click="loadData()" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">🔄 重试</button>
-            </div>
-          </td>
-        </tr>
-      </template>
+      <tr x-show="hasError">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-3">
+            <span class="text-4xl">❌</span>
+            <div class="text-red-600 font-medium">加载失败</div>
+            <div class="text-sm text-gray-500" x-text="error"></div>
+            <button @click="loadData()" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">🔄 重试</button>
+          </div>
+        </td>
+      </tr>
       <!-- 空状态 -->
-      <template x-if="isEmpty">
-        <tr>
-          <td :colspan="colSpan" class="px-4 py-12 text-center">
-            <div class="flex flex-col items-center gap-2">
-              <span class="text-4xl">📭</span>
-              <div class="themed-text-muted" x-text="emptyText"></div>
-            </div>
-          </td>
+      <tr x-show="isEmpty">
+        <td :colspan="colSpan" class="px-4 py-12 text-center">
+          <div class="flex flex-col items-center gap-2">
+            <span class="text-4xl">📭</span>
+            <div class="themed-text-muted" x-text="emptyText"></div>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+    <!-- 数据行独立 tbody，x-for 是唯一模板，避免 Alpine.js x-for + x-if 嵌套 DOM 引用 bug -->
+    <tbody x-show="hasData" class="divide-y themed-divide">
+      <template x-for="(row, rowIndex) in data" :key="String(row[primaryKey] || '') + '_' + rowIndex">
+        <tr class="themed-hover-bg transition-colors" @click="handleRowClick(row, rowIndex)">
+          <!-- 选择列 -->
+          <template x-if="selectable">
+            <td class="px-4 py-3 text-center" @click.stop>
+              <input type="checkbox"
+                :checked="isSelected(row[primaryKey])"
+                @change="toggleSelect(row[primaryKey])"
+                class="rounded border-gray-300">
+            </td>
+          </template>
+          <!-- 数据列 -->
+          <template x-for="col in columns" :key="col.key">
+            <td class="px-4 py-3 text-sm" :class="col.type === 'actions' ? '' : 'themed-text-primary'">
+              <!-- 普通列：使用 renderCell -->
+              <span x-show="col.type !== 'actions'" x-html="renderCell(row, col)"></span>
+              <!-- 操作列：使用 Alpine 指令（支持 @click） -->
+              <div x-show="col.type === 'actions'" class="flex items-center gap-1" @click.stop>
+                <template x-for="action in (col.actions || [])" :key="action.name">
+                  <button
+                    x-show="!action.condition || action.condition(row)"
+                    @click="$dispatch('table-action', { action: action.name, row: JSON.parse(JSON.stringify(row)) })"
+                    class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
+                    :class="action.class || 'text-blue-600 hover:text-blue-800'"
+                    x-html="(action.icon ? action.icon + ' ' : '') + action.label">
+                  </button>
+                </template>
+              </div>
+            </td>
+          </template>
         </tr>
-      </template>
-      <!-- 数据行 -->
-      <template x-if="hasData">
-        <template x-for="(row, rowIndex) in data" :key="row[primaryKey] || rowIndex">
-          <tr class="themed-hover-bg transition-colors" @click="handleRowClick(row, rowIndex)">
-            <!-- 选择列 -->
-            <template x-if="selectable">
-              <td class="px-4 py-3 text-center" @click.stop>
-                <input type="checkbox"
-                  :checked="isSelected(row[primaryKey])"
-                  @change="toggleSelect(row[primaryKey])"
-                  class="rounded border-gray-300">
-              </td>
-            </template>
-            <!-- 数据列 -->
-            <template x-for="col in columns" :key="col.key">
-              <td class="px-4 py-3 text-sm" :class="col.type === 'actions' ? '' : 'themed-text-primary'">
-                <!-- 普通列：使用 renderCell -->
-                <span x-show="col.type !== 'actions'" x-html="renderCell(row, col)"></span>
-                <!-- 操作列：使用 Alpine 指令（支持 @click） -->
-                <div x-show="col.type === 'actions'" class="flex items-center gap-1" @click.stop>
-                  <template x-for="action in (col.actions || [])" :key="action.name">
-                    <button
-                      x-show="!action.condition || action.condition(row)"
-                      @click="$dispatch('table-action', { action: action.name, row: JSON.parse(JSON.stringify(row)) })"
-                      class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
-                      :class="action.class || 'text-blue-600 hover:text-blue-800'"
-                      x-html="(action.icon ? action.icon + ' ' : '') + action.label">
-                    </button>
-                  </template>
-                </div>
-              </td>
-            </template>
-          </tr>
-        </template>
       </template>
     </tbody>
   </table>
