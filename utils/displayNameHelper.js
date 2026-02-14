@@ -349,6 +349,7 @@ const DICT_TYPES = {
   // ==================== P2 中文化新增（2026-02-06） ====================
   BANNER_POSITION: 'banner_position', // 弹窗广告位置（home/lottery/activity/profile）
   BANNER_LINK_TYPE: 'banner_link_type', // 弹窗链接类型（none/page/miniprogram/webview）
+  BANNER_DISPLAY_MODE: 'banner_display_mode', // 弹窗显示模式（wide/horizontal/square/tall/slim/full_image）
   ADVANCE_MODE: 'advance_mode', // 预设垫付模式（none/inventory/budget/both）
   PAYMENT_METHOD: 'payment_method', // 支付方式（wechat/alipay/cash/card）
   SCOPE_TYPE: 'scope_type', // 配额范围类型（global/campaign/rule）

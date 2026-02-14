@@ -229,6 +229,8 @@ router.post(
             name: prize.prize?.name || '奖励',
             type: prize.prize?.type,
             sort_order: prize.prize?.sort_order, // 🎯 前端用于计算索引（index = sort_order - 1）
+            /** 稀有度代码（来自 rarity_defs 外键，前端直接使用此字段名显示对应颜色光效） */
+            rarity_code: prize.prize?.rarity_code || 'common',
             icon: DataSanitizer.getPrizeIcon(prize.prize?.type),
             rarity: DataSanitizer.calculateRarity(prize.prize?.type),
             display_points:

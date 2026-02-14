@@ -89,6 +89,7 @@ async function main() {
           {
             title: '测试弹窗 - ' + new Date().toLocaleTimeString('zh-CN'),
             image_url: 'popup-banners/test-placeholder.jpg',
+            display_mode: 'square', // 必填：显示模式（2026-02-08 新增）
             link_type: 'none',
             position: 'home',
             is_active: true,

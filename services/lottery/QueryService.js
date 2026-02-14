@@ -82,6 +82,7 @@ class LotteryQueryService {
           'daily_win_count',
           'status',
           'sort_order',
+          'rarity_code', // 2026-02-15: 稀有度代码（前端视觉光效等级，外键关联 rarity_defs）
           'created_at'
         ],
         order: [
@@ -141,7 +142,6 @@ class LotteryQueryService {
           'campaign_name',
           'campaign_code',
           'campaign_type',
-          'cost_per_draw',
           'max_draws_per_user_daily',
           'max_draws_per_user_total',
           'status',
@@ -345,13 +345,16 @@ class LotteryQueryService {
           'campaign_name',
           'campaign_code',
           'campaign_type',
-          'cost_per_draw',
           'max_draws_per_user_daily',
           'status',
           'start_time',
           'end_time',
           'total_prize_pool',
-          'remaining_prize_pool'
+          'remaining_prize_pool',
+          // 2026-02-15: 前端展示配置字段（多活动抽奖系统）
+          'display_mode',
+          'effect_theme',
+          'banner_image_url'
         ],
         order: [
           ['status', 'DESC'], // active优先
@@ -398,24 +401,52 @@ class LotteryQueryService {
         cache_used: !user_id
       })
 
-      // ========== 构建返回数据 ==========
-      const result = campaigns.map(campaign => ({
-        lottery_campaign_id: campaign.lottery_campaign_id,
-        campaign_name: campaign.campaign_name,
-        campaign_code: campaign.campaign_code,
-        campaign_type: campaign.campaign_type,
-        cost_per_draw: campaign.cost_per_draw,
-        max_draws_per_day: campaign.max_draws_per_user_daily,
-        status: campaign.status,
-        start_time: campaign.start_time,
-        end_time: campaign.end_time,
-        total_prize_pool: campaign.total_prize_pool,
-        remaining_prize_pool: campaign.remaining_prize_pool,
-        user_today_draws: user_id ? userDrawCounts[campaign.lottery_campaign_id] || 0 : undefined,
-        can_draw: user_id
-          ? (userDrawCounts[campaign.lottery_campaign_id] || 0) < campaign.max_draws_per_user_daily
-          : undefined
-      }))
+      // ========== 批量补充定价信息（LotteryPricingService 有 60s Redis 缓存，性能安全）==========
+      const LotteryPricingService = require('../lottery/LotteryPricingService')
+
+      const result = await Promise.all(
+        campaigns.map(async campaign => {
+          const campaignData = {
+            lottery_campaign_id: campaign.lottery_campaign_id,
+            campaign_name: campaign.campaign_name,
+            campaign_code: campaign.campaign_code,
+            campaign_type: campaign.campaign_type,
+            max_draws_per_day: campaign.max_draws_per_user_daily,
+            status: campaign.status,
+            start_time: campaign.start_time,
+            end_time: campaign.end_time,
+            total_prize_pool: campaign.total_prize_pool,
+            remaining_prize_pool: campaign.remaining_prize_pool,
+            user_today_draws: user_id
+              ? userDrawCounts[campaign.lottery_campaign_id] || 0
+              : undefined,
+            can_draw: user_id
+              ? (userDrawCounts[campaign.lottery_campaign_id] || 0) <
+                campaign.max_draws_per_user_daily
+              : undefined
+          }
+
+          // 从 LotteryPricingService 获取定价（缓存 60s，活跃活动通常 1-5 个）
+          try {
+            const pricing = await LotteryPricingService.getDrawPricing(
+              1,
+              campaign.lottery_campaign_id
+            )
+            campaignData.base_cost = pricing.base_cost // 折扣前基础价
+            campaignData.per_draw_cost = pricing.per_draw // 折扣后单抽实际价
+          } catch (err) {
+            // 定价配置缺失时不阻断列表，标记为 null
+            logger.warn('[LotteryQueryService] 活动定价获取失败', {
+              lottery_campaign_id: campaign.lottery_campaign_id,
+              error: err.message
+            })
+            campaignData.base_cost = null
+            campaignData.per_draw_cost = null
+          }
+
+          return campaignData
+        })
+      )
 
       // 附加中文显示名称（status/campaign_type → _display/_color）
       await attachDisplayNames(result, [

@@ -2,7 +2,7 @@
  * 批量操作模块
  *
  * @file admin/src/modules/lottery/composables/batch-operations.js
- * @description P3优先级 - 批量操作工具（赠送次数、状态切换、预算调整等）
+ * @description P3优先级 - 批量操作工具（配额赠送、状态切换、预算调整等）
  * @version 1.0.0
  * @date 2026-01-29
  */
@@ -26,13 +26,14 @@ export function useBatchOperationsState() {
     /** @type {boolean} 正在执行批量操作 */
     executingBatchOperation: false,
 
-    // 批量赠送抽奖次数（手机号主导）
+    // 批量赠送每日配额（手机号主导，对应后端 bonus_draw_count）
     /** @type {Object} 批量赠送表单 */
     batchQuotaGrantForm: {
-      campaign_id: '',
+      lottery_campaign_id: '',
       mobiles: '',
       bonus_count: 1,
-      reason: ''
+      reason: '',
+      _custom_reason: ''
     },
     /** @type {Object|null} 批量手机号解析结果 */
     batchResolveResult: null,
@@ -40,7 +41,7 @@ export function useBatchOperationsState() {
     // 批量活动状态切换
     /** @type {Object} 批量状态切换表单 */
     batchCampaignStatusForm: {
-      campaign_ids: [],
+      lottery_campaign_ids: [],
       target_status: 'active', // active, paused, ended
       reason: ''
     },
@@ -48,8 +49,8 @@ export function useBatchOperationsState() {
     // 批量预算调整
     /** @type {Object} 批量预算调整表单 */
     batchBudgetAdjustForm: {
-      campaign_ids: [],
-      adjust_type: 'add', // add, set
+      lottery_campaign_ids: [],
+      adjustment_type: 'increase', // increase, decrease, set
       amount: 0,
       reason: ''
     },
@@ -104,33 +105,35 @@ export function useBatchOperationsMethods() {
      */
     resetBatchForms() {
       this.batchQuotaGrantForm = {
-        campaign_id: '',
+        lottery_campaign_id: '',
         mobiles: '',
         bonus_count: 1,
-        reason: ''
+        reason: '',
+        _custom_reason: ''
       }
       this.batchResolveResult = null
       this.batchCampaignStatusForm = {
-        campaign_ids: [],
+        lottery_campaign_ids: [],
         target_status: 'active',
         reason: ''
       }
       this.batchBudgetAdjustForm = {
-        campaign_ids: [],
-        adjust_type: 'add',
+        lottery_campaign_ids: [],
+        adjustment_type: 'increase',
         amount: 0,
         reason: ''
       }
     },
 
     /**
-     * 执行批量赠送抽奖次数
+     * 执行批量赠送每日配额（调用后端 B6 quota-grant 接口）
+     * 后端实际操作：LotteryQuotaService.addBonusDrawCount → 更新 bonus_draw_count
      */
     async executeBatchQuotaGrant() {
       const form = this.batchQuotaGrantForm
 
       // 验证
-      if (!form.campaign_id) {
+      if (!form.lottery_campaign_id) {
         this.showError('请选择活动')
         return
       }
@@ -142,8 +145,13 @@ export function useBatchOperationsMethods() {
         this.showError('请输入有效的赠送次数')
         return
       }
-      if (!form.reason.trim()) {
-        this.showError('请输入赠送原因')
+      // 处理自定义原因
+      const reason = form.reason === '__custom__'
+        ? (form._custom_reason || '').trim()
+        : form.reason.trim()
+
+      if (!reason) {
+        this.showError('请选择或输入赠送原因')
         return
       }
 
@@ -200,14 +208,14 @@ export function useBatchOperationsMethods() {
           return
         }
 
-        // 提交成功解析的 user_ids
+        // 提交成功解析的 user_ids（后端字段名: lottery_campaign_id）
         const response = await this.apiPost(
           LOTTERY_ENDPOINTS.BATCH_QUOTA_GRANT,
           {
-            campaign_id: parseInt(form.campaign_id),
+            lottery_campaign_id: parseInt(form.lottery_campaign_id),
             user_ids: resolvedUserIds,
             bonus_count: parseInt(form.bonus_count),
-            reason: form.reason.trim()
+            reason
           },
           { showLoading: true }
         )
@@ -236,7 +244,7 @@ export function useBatchOperationsMethods() {
     async executeBatchCampaignStatus() {
       const form = this.batchCampaignStatusForm
 
-      if (!form.campaign_ids || form.campaign_ids.length === 0) {
+      if (!form.lottery_campaign_ids || form.lottery_campaign_ids.length === 0) {
         this.showError('请选择至少一个活动')
         return
       }
@@ -254,7 +262,7 @@ export function useBatchOperationsMethods() {
         const response = await this.apiPost(
           LOTTERY_ENDPOINTS.BATCH_CAMPAIGN_STATUS,
           {
-            campaign_ids: form.campaign_ids.map(id => parseInt(id)),
+            lottery_campaign_ids: form.lottery_campaign_ids.map(id => parseInt(id)),
             target_status: form.target_status,
             reason: form.reason.trim()
           },
@@ -286,11 +294,11 @@ export function useBatchOperationsMethods() {
     async executeBatchBudgetAdjust() {
       const form = this.batchBudgetAdjustForm
 
-      if (!form.campaign_ids || form.campaign_ids.length === 0) {
+      if (!form.lottery_campaign_ids || form.lottery_campaign_ids.length === 0) {
         this.showError('请选择至少一个活动')
         return
       }
-      if (!form.adjust_type) {
+      if (!form.adjustment_type) {
         this.showError('请选择调整类型')
         return
       }
@@ -303,14 +311,19 @@ export function useBatchOperationsMethods() {
         return
       }
 
+      // 后端期望 adjustments 数组：每个活动一条调整记录
+      const adjustments = form.lottery_campaign_ids.map(id => ({
+        lottery_campaign_id: parseInt(id),
+        adjustment_type: form.adjustment_type,
+        amount: parseFloat(form.amount)
+      }))
+
       this.executingBatchOperation = true
       try {
         const response = await this.apiPost(
           LOTTERY_ENDPOINTS.BATCH_BUDGET_ADJUST,
           {
-            campaign_ids: form.campaign_ids.map(id => parseInt(id)),
-            adjust_type: form.adjust_type,
-            amount: parseFloat(form.amount),
+            adjustments,
             reason: form.reason.trim()
           },
           { showLoading: true }
@@ -370,14 +383,14 @@ export function useBatchOperationsMethods() {
      * @param {number} campaignId - 活动ID
      */
     toggleCampaignSelection(campaignId) {
-      const index = this.batchCampaignStatusForm.campaign_ids.indexOf(campaignId)
+      const index = this.batchCampaignStatusForm.lottery_campaign_ids.indexOf(campaignId)
       if (index > -1) {
-        this.batchCampaignStatusForm.campaign_ids.splice(index, 1)
+        this.batchCampaignStatusForm.lottery_campaign_ids.splice(index, 1)
       } else {
-        this.batchCampaignStatusForm.campaign_ids.push(campaignId)
+        this.batchCampaignStatusForm.lottery_campaign_ids.push(campaignId)
       }
       // 同步到预算调整表单
-      this.batchBudgetAdjustForm.campaign_ids = [...this.batchCampaignStatusForm.campaign_ids]
+      this.batchBudgetAdjustForm.lottery_campaign_ids = [...this.batchCampaignStatusForm.lottery_campaign_ids]
     },
 
     /**
@@ -386,12 +399,12 @@ export function useBatchOperationsMethods() {
      */
     toggleAllCampaignsSelection(selectAll) {
       if (selectAll) {
-        const allIds = this.campaigns.map(c => c.campaign_id)
-        this.batchCampaignStatusForm.campaign_ids = allIds
-        this.batchBudgetAdjustForm.campaign_ids = [...allIds]
+        const allIds = this.campaigns.map(c => c.lottery_campaign_id)
+        this.batchCampaignStatusForm.lottery_campaign_ids = allIds
+        this.batchBudgetAdjustForm.lottery_campaign_ids = [...allIds]
       } else {
-        this.batchCampaignStatusForm.campaign_ids = []
-        this.batchBudgetAdjustForm.campaign_ids = []
+        this.batchCampaignStatusForm.lottery_campaign_ids = []
+        this.batchBudgetAdjustForm.lottery_campaign_ids = []
       }
     },
 
@@ -401,18 +414,26 @@ export function useBatchOperationsMethods() {
      * @returns {boolean} 是否选中
      */
     isCampaignSelected(campaignId) {
-      return this.batchCampaignStatusForm.campaign_ids.includes(campaignId)
+      return this.batchCampaignStatusForm.lottery_campaign_ids.includes(campaignId)
     },
 
     /**
-     * 获取批量操作类型文本
-     * @param {string} type - 操作类型
-     * @returns {string} 文本
+     * 获取批量操作类型的中文显示名称
+     * 对应后端 BatchOperationLog.OPERATION_TYPE_NAMES 字典
+     * @param {string} operation_type - 后端字段 operation_type 值
+     * @returns {string} 中文显示名
      */
-    // ✅ 已删除 getBatchOperationTypeText 映射函数 - 改用后端 _display 字段（P2 中文化）
-
-    // ✅ 已删除 getCampaignStatusText 映射函数
-    // 中文显示名称由后端 attachDisplayNames 统一返回 status_display 字段
+    getBatchOperationTypeDisplay(operation_type) {
+      // 与后端 BatchOperationLog.OPERATION_TYPE_NAMES 保持一致
+      const names = {
+        quota_grant_batch: '批量赠送每日配额',
+        preset_batch: '批量设置干预规则',
+        redemption_verify_batch: '批量核销确认',
+        campaign_status_batch: '批量活动状态切换',
+        budget_adjust_batch: '批量预算调整'
+      }
+      return names[operation_type] || operation_type
+    },
 
     /**
      * 格式化批量操作时间

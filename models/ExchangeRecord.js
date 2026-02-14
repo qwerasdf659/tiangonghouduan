@@ -174,6 +174,18 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: true,
         comment: '发货时间'
+      },
+
+      /**
+       * 来源标识（决策10：区分普通兑换和竞价中标）
+       * - exchange: 普通兑换（默认值）
+       * - bid: 竞价中标
+       */
+      source: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
+        defaultValue: 'exchange',
+        comment: '来源：exchange=普通兑换, bid=竞价中标'
       }
     },
     {

@@ -24,8 +24,8 @@ const TestCoordinator = require('../api/TestCoordinator')
  * @returns {Promise<number>} 用户可用积分余额
  *
  * 数据来源：GET /api/v4/backpack
- * - 从背包双轨架构的 assets[] 中筛选 asset_code === 'POINTS'
- * - 返回 available_balance（可用余额）
+ * - 从背包接口的 assets[] 中筛选 asset_code === 'POINTS'
+ * - 返回 available_amount（可用余额，与数据库字段名一致）
  *
  * 设计说明：
  * - 决策8已决定不提供 /api/v4/points/* 接口
@@ -48,8 +48,8 @@ async function getUserPoints(tester, user_id) {
   const assets = response.data.data?.assets || []
   const pointsAsset = assets.find(asset => asset.asset_code === 'POINTS')
 
-  // 返回可用余额（available_balance），如果没有则返回 0
-  return pointsAsset?.available_balance || pointsAsset?.balance || 0
+  // 返回可用余额（available_amount），字段名与数据库 account_asset_balances 表一致
+  return pointsAsset?.available_amount || pointsAsset?.total_amount || 0
 }
 
 /**
@@ -142,7 +142,7 @@ describe('🧮 核心业务逻辑测试', () => {
       // 获取今日抽奖记录
       const historyResponse = await tester.make_authenticated_request(
         'GET',
-        `/api/v4/lottery/history/${test_user_id}`,
+        `/api/v4/lottery/history`,
         null,
         'regular'
       )
@@ -191,7 +191,15 @@ describe('🧮 核心业务逻辑测试', () => {
         return
       }
 
-      const requiredPoints = parseFloat(campaign.cost_per_draw) || 50
+      // 从 LotteryPricingService 获取真实单抽成本
+      const LotteryPricingService = require('../../services/lottery/LotteryPricingService')
+      let requiredPoints = 50
+      try {
+        const pricing = await LotteryPricingService.getDrawPricing(1, campaign.lottery_campaign_id)
+        requiredPoints = pricing.per_draw || pricing.base_cost
+      } catch (err) {
+        console.warn('⚠️ 获取定价失败，使用默认值:', err.message)
+      }
       console.log(`📊 抽奖所需积分: ${requiredPoints}`)
 
       /**
@@ -280,7 +288,7 @@ describe('🧮 核心业务逻辑测试', () => {
         // 验证抽奖记录存在
         const historyResponse = await tester.make_authenticated_request(
           'GET',
-          `/api/v4/lottery/history/${test_user_id}`,
+          `/api/v4/lottery/history`,
           null,
           'regular'
         )
@@ -350,7 +358,7 @@ describe('🧮 核心业务逻辑测试', () => {
           // ✅ V4.0验证：数据库记录使用reward_tier字段（通过抽奖历史接口）
           const historyResponse = await tester.make_authenticated_request(
             'GET',
-            `/api/v4/lottery/history/${test_user_id}`,
+            `/api/v4/lottery/history`,
             null,
             'regular'
           )
@@ -376,7 +384,7 @@ describe('🧮 核心业务逻辑测试', () => {
         // 获取多条抽奖历史记录验证业务语义
         const historyResponse = await tester.make_authenticated_request(
           'GET',
-          `/api/v4/lottery/history/${test_user_id}`,
+          `/api/v4/lottery/history`,
           null,
           'regular'
         )

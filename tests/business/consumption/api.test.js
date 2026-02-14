@@ -6,7 +6,7 @@
  * 使用模型：Claude Sonnet 4.5
  *
  * 测试覆盖：
- * 1. 生成用户二维码 GET /api/v4/shop/consumption/qrcode/:user_id
+ * 1. 生成用户二维码 GET /api/v4/shop/consumption/qrcode
  * 2. 验证二维码并获取用户信息 GET /api/v4/shop/consumption/user-info
  * 3. 商家提交消费记录 POST /api/v4/shop/consumption/submit
  * 4. 用户查询消费记录 GET /api/v4/shop/consumption/user/:user_id
@@ -77,7 +77,7 @@ describe('消费记录API测试套件', () => {
       // 生成测试二维码（用于后续测试）
       const qrResponse = await tester.make_authenticated_request(
         'GET',
-        `/api/v4/shop/consumption/qrcode/${test_account.user_id}`,
+        `/api/v4/shop/consumption/qrcode`,
         {},
         'regular'
       )
@@ -105,12 +105,12 @@ describe('消费记录API测试套件', () => {
    * ================================
    */
   describe('二维码生成和验证', () => {
-    test('GET /api/v4/shop/consumption/qrcode/:user_id - 生成用户固定身份二维码', async () => {
-      console.log('\n🔐 测试：生成用户固定身份二维码')
+    test('GET /api/v4/shop/consumption/qrcode - 生成用户动态身份二维码', async () => {
+      console.log('\n🔐 测试：生成用户动态身份二维码')
 
       const response = await tester.make_authenticated_request(
         'GET',
-        `/api/v4/shop/consumption/qrcode/${test_account.user_id}`,
+        `/api/v4/shop/consumption/qrcode`,
         {},
         'regular'
       )

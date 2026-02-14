@@ -188,14 +188,14 @@ describe('API契约测试 - 抽奖模块 (/api/v4/lottery)', () => {
     })
   })
 
-  // ==================== GET /api/v4/lottery/history/:user_id ====================
-  describe('GET /history/:user_id - 抽奖历史', () => {
+  // ==================== GET /api/v4/lottery/history ====================
+  describe('GET /history - 抽奖历史（用户端，从JWT Token取身份）', () => {
     /**
-     * Case 1: 正常获取历史记录
+     * Case 1: 正常获取历史记录（路由分离方案 V4.8.0：不含 :user_id，从Token取身份）
      */
     test('应该返回抽奖历史契约格式', async () => {
       const response = await request(app)
-        .get(`/api/v4/lottery/history/${testUserId}`)
+        .get('/api/v4/lottery/history')
         .set('Authorization', `Bearer ${accessToken}`)
         .query({ page: 1, page_size: 10 })
 
@@ -214,7 +214,7 @@ describe('API契约测试 - 抽奖模块 (/api/v4/lottery)', () => {
      * Case 2: 无 Token 应该返回 401
      */
     test('无 Authorization 应该返回 401', async () => {
-      const response = await request(app).get(`/api/v4/lottery/history/${testUserId}`)
+      const response = await request(app).get('/api/v4/lottery/history')
 
       expect(response.status).toBe(401)
       validateApiContract(response.body, false)

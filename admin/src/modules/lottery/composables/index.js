@@ -58,6 +58,9 @@ export {
 // P1-10: 系统垫付看板模块
 export { useSystemAdvanceState, useSystemAdvanceMethods } from './system-advance.js'
 
+// 活动投放位置配置模块
+export { usePlacementState, usePlacementMethods } from './placement.js'
+
 /**
  * 组合所有状态
  * @returns {Object} 合并后的状态对象
@@ -79,7 +82,8 @@ export function useAllLotteryState() {
     ...useDailyReportState(),
     ...useBatchOperationsState(),
     ...usePresetVisualizationState(),
-    ...useSystemAdvanceState()
+    ...useSystemAdvanceState(),
+    ...usePlacementState()
   }
 }
 
@@ -104,6 +108,7 @@ export function useAllLotteryMethods() {
     ...useDailyReportMethods(),
     ...useBatchOperationsMethods(),
     ...usePresetVisualizationMethods(),
-    ...useSystemAdvanceMethods()
+    ...useSystemAdvanceMethods(),
+    ...usePlacementMethods()
   }
 }

@@ -32,6 +32,7 @@ const { Op } = require('sequelize')
 const EXCHANGE_MARKET_ATTRIBUTES = {
   /**
    * 市场商品列表视图（用户浏览）
+   * 包含臻选空间/幸运空间扩展字段（决策12：9个新字段）
    */
   marketItemView: [
     'exchange_item_id',
@@ -40,14 +41,26 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'cost_asset_code',
     'cost_amount',
     'stock',
+    'sold_count',
     'sort_order',
     'status',
     'primary_image_id',
+    // 臻选空间/幸运空间扩展字段（9个）
+    'space',
+    'original_price',
+    'tags',
+    'is_new',
+    'is_hot',
+    'is_lucky',
+    'has_warranty',
+    'free_shipping',
+    'sell_point',
     'created_at'
   ],
 
   /**
    * 商品详情视图
+   * 包含臻选空间/幸运空间扩展字段
    */
   marketItemDetailView: [
     'exchange_item_id',
@@ -60,6 +73,16 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'sort_order',
     'status',
     'primary_image_id',
+    // 臻选空间/幸运空间扩展字段（9个）
+    'space',
+    'original_price',
+    'tags',
+    'is_new',
+    'is_hot',
+    'is_lucky',
+    'has_warranty',
+    'free_shipping',
+    'sell_point',
     'created_at',
     'updated_at'
   ],
@@ -141,6 +164,12 @@ class QueryService {
     const {
       status = 'active',
       asset_code = null,
+      space = null,
+      keyword = null,
+      category = null,
+      min_cost = null,
+      max_cost = null,
+      stock_status = null,
       page = 1,
       page_size = 20,
       sort_by = 'sort_order',
@@ -153,6 +182,8 @@ class QueryService {
       const cacheParams = {
         status,
         asset_code: asset_code || 'all',
+        space: space || 'all',
+        keyword: keyword || '',
         page,
         page_size,
         sort_by,
@@ -166,12 +197,52 @@ class QueryService {
         }
       }
 
-      logger.info('[兑换市场] 查询商品列表', { status, asset_code, page, page_size })
+      logger.info('[兑换市场] 查询商品列表', {
+        status,
+        asset_code,
+        space,
+        keyword,
+        page,
+        page_size
+      })
 
       // 构建查询条件
       const where = { status }
+
+      // 材料资产类型筛选
       if (asset_code) {
         where.cost_asset_code = asset_code
+      }
+
+      // 空间筛选（lucky/premium）— 臻选空间/幸运空间核心逻辑
+      if (space) {
+        // space='lucky' 时查 lucky 和 both；space='premium' 时查 premium 和 both
+        where.space = { [Op.in]: [space, 'both'] }
+      }
+
+      // 关键词搜索（匹配 item_name）
+      if (keyword) {
+        where.item_name = { [Op.like]: `%${keyword}%` }
+      }
+
+      // 分类筛选
+      if (category) {
+        where.category = category
+      }
+
+      // 价格范围筛选
+      if (min_cost !== null) {
+        where.cost_amount = { ...where.cost_amount, [Op.gte]: parseInt(min_cost, 10) }
+      }
+      if (max_cost !== null) {
+        where.cost_amount = { ...where.cost_amount, [Op.lte]: parseInt(max_cost, 10) }
+      }
+
+      // 库存状态筛选
+      if (stock_status === 'in_stock') {
+        where.stock = { [Op.gt]: 5 }
+      } else if (stock_status === 'low_stock') {
+        where.stock = { [Op.between]: [1, 5] }
       }
 
       const offset = (page - 1) * page_size
@@ -540,6 +611,75 @@ class QueryService {
     } catch (error) {
       logger.error('[兑换市场] 查询统计数据失败:', error.message)
       throw new Error(`查询统计数据失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 获取空间统计数据（臻选空间/幸运空间）
+   *
+   * @param {string} space - 空间类型（lucky / premium）
+   * @returns {Promise<Object>} 空间统计数据
+   * @returns {string} returns.space - 空间类型
+   * @returns {number} returns.total_products - 商品总数
+   * @returns {number} returns.new_count - 新品数量
+   * @returns {number} returns.hot_count - 热门数量
+   * @returns {Object} returns.asset_code_distribution - 资产类型分布
+   */
+  async getSpaceStats(space) {
+    try {
+      logger.info('[兑换市场] 查询空间统计', { space })
+
+      // 空间筛选条件：space='lucky' 查 lucky+both；space='premium' 查 premium+both
+      const spaceCondition = { [Op.in]: [space, 'both'] }
+
+      const [totalProducts, newCount, hotCount, assetDistribution] = await Promise.all([
+        // 该空间商品总数（仅 active）
+        this.ExchangeItem.count({
+          where: { space: spaceCondition, status: 'active' }
+        }),
+        // 新品数量
+        this.ExchangeItem.count({
+          where: { space: spaceCondition, status: 'active', is_new: true }
+        }),
+        // 热门数量
+        this.ExchangeItem.count({
+          where: { space: spaceCondition, status: 'active', is_hot: true }
+        }),
+        // 资产类型分布
+        this.ExchangeItem.findAll({
+          attributes: [
+            'cost_asset_code',
+            [this.sequelize.fn('COUNT', this.sequelize.col('exchange_item_id')), 'count']
+          ],
+          where: { space: spaceCondition, status: 'active' },
+          group: ['cost_asset_code'],
+          raw: true
+        })
+      ])
+
+      // 转换资产分布为对象格式
+      const assetCodeDistribution = {}
+      assetDistribution.forEach(row => {
+        assetCodeDistribution[row.cost_asset_code] = parseInt(row.count, 10)
+      })
+
+      logger.info('[兑换市场] 空间统计完成', {
+        space,
+        total_products: totalProducts,
+        new_count: newCount,
+        hot_count: hotCount
+      })
+
+      return {
+        space,
+        total_products: totalProducts,
+        new_count: newCount,
+        hot_count: hotCount,
+        asset_code_distribution: assetCodeDistribution
+      }
+    } catch (error) {
+      logger.error(`[兑换市场] 查询空间统计失败(space:${space}):`, error.message)
+      throw error
     }
   }
 }

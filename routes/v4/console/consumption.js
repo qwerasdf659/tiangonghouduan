@@ -14,6 +14,7 @@
  * - GET /records - 管理员查询所有消费记录（支持筛选、搜索、统计）
  * - POST /approve/:record_id - 管理员审核通过消费记录
  * - POST /reject/:record_id - 管理员审核拒绝消费记录
+ * - GET /qrcode/:user_id - 管理员生成指定用户的动态二维码（2026-02-12 路由分离）
  *
  * 业务场景：
  * - 审核通过后自动奖励积分（1元=1分）
@@ -359,6 +360,91 @@ router.post('/reject/:id', authenticateToken, requireRoleLevel(100), async (req,
   } catch (error) {
     logger.error('审核拒绝失败', { error: error.message })
     return handleServiceError(error, res, '审核拒绝失败')
+  }
+})
+
+/**
+ * @route GET /api/v4/console/consumption/qrcode/:user_id
+ * @desc 管理员生成指定用户的动态身份二维码（v2版本）
+ * @access Private (管理员，role_level >= 100)
+ *
+ * 路由分离（2026-02-12）：
+ * - 用户端：GET /api/v4/shop/consumption/qrcode（从JWT Token取身份）
+ * - 管理端：GET /api/v4/console/consumption/qrcode/:user_id（admin专用，带审计日志）
+ *
+ * @param {number} user_id - 目标用户ID
+ *
+ * @returns {Object} 二维码信息
+ * @returns {string} data.qr_code - 二维码字符串
+ * @returns {number} data.user_id - 用户ID
+ * @returns {string} data.user_uuid - 用户UUID
+ * @returns {string} data.nonce - 一次性随机数
+ * @returns {string} data.expires_at - 过期时间（北京时间）
+ * @returns {string} data.generated_at - 生成时间（北京时间）
+ * @returns {string} data.validity - 有效期描述
+ * @returns {string} data.algorithm - 签名算法
+ * @returns {string} data.note - 使用说明
+ * @returns {string} data.usage - 使用方式
+ */
+router.get('/qrcode/:user_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const user_id = parseInt(req.params.user_id, 10)
+    if (isNaN(user_id) || user_id <= 0) {
+      return res.apiError('无效的用户ID，必须是正整数', 'BAD_REQUEST', null, 400)
+    }
+
+    const admin_id = req.user.user_id
+
+    logger.info('管理员生成用户动态二维码', { admin_id, target_user_id: user_id })
+
+    // 通过 ServiceManager 获取 UserService
+    const UserService = req.app.locals.services.getService('user')
+    let user
+    try {
+      user = await UserService.getUserById(user_id)
+    } catch (error) {
+      if (error.code === 'USER_NOT_FOUND') {
+        return res.apiError('用户不存在', 'NOT_FOUND', null, 404)
+      }
+      throw error
+    }
+
+    // 使用UUID生成v2动态二维码
+    const QRCodeValidator = require('../../../utils/QRCodeValidator')
+    const qrCodeInfo = await QRCodeValidator.generateQRCodeInfo(user.user_uuid)
+
+    // 记录审计日志（非阻断）
+    const AuditLogService = require('../../../services/AuditLogService')
+    const { OPERATION_TYPES } = require('../../../constants/AuditOperationTypes')
+    AuditLogService.logOperation({
+      admin_id,
+      operation_type: OPERATION_TYPES.ADMIN_VIEW_USER_DATA,
+      action: 'generate_user_qrcode',
+      target_user_id: user_id,
+      details: { target_user_uuid: user.user_uuid },
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+      timestamp: BeijingTimeHelper.now()
+    }).catch(err => logger.error('审计日志记录失败（非阻断）', { error: err.message }))
+
+    return res.apiSuccess(
+      {
+        qr_code: qrCodeInfo.qr_code,
+        user_id: user.user_id,
+        user_uuid: qrCodeInfo.user_uuid,
+        nonce: qrCodeInfo.nonce,
+        expires_at: qrCodeInfo.expires_at,
+        generated_at: qrCodeInfo.generated_at,
+        validity: qrCodeInfo.validity,
+        algorithm: qrCodeInfo.algorithm,
+        note: qrCodeInfo.note,
+        usage: '管理员为用户生成的动态二维码'
+      },
+      '动态二维码生成成功'
+    )
+  } catch (error) {
+    logger.error('管理员生成用户二维码失败', { error: error.message })
+    return handleServiceError(error, res, '生成动态二维码失败')
   }
 })
 

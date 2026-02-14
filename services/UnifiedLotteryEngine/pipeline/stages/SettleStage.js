@@ -239,6 +239,13 @@ class SettleStage extends BaseStage {
         transaction
       })
 
+      /**
+       * 🔴 2026-02-15 修复：获取档位选择元数据用于审计
+       * 之前 original_tier, final_tier, pick_method, downgrade_count 等字段全部为 NULL
+       * 现在从 TierPickStage 的结果中提取并写入 lottery_draws 记录
+       */
+      const tier_pick_data = this.getContextData(context, 'TierPickStage.data') || {}
+
       // 5. 创建抽奖记录（使用单次抽奖成本 per_draw_cost）
       const draw_record = await this._createDrawRecord({
         lottery_draw_id,
@@ -256,6 +263,7 @@ class SettleStage extends BaseStage {
         draw_count, // 🆕 传递抽奖次数
         batch_id, // 🆕 Phase 2：连抽批次ID
         asset_transaction_id, // 🆕 关联资产流水ID（必填字段）
+        tier_pick_data, // 🔴 2026-02-15 修复：传递档位选择元数据
         transaction
       })
 
@@ -339,6 +347,8 @@ class SettleStage extends BaseStage {
           lottery_draw_id,
           lottery_prize_id: final_prize.lottery_prize_id,
           prize_name: final_prize.prize_name,
+          prize_type: final_prize.prize_type,
+          prize_value: final_prize.prize_value,
           prize_value_points: final_prize.prize_value_points,
           reward_tier: final_tier,
           guarantee_triggered,
@@ -347,7 +357,14 @@ class SettleStage extends BaseStage {
           // 🆕 增加积分扣减信息
           draw_cost,
           points_deducted,
-          skip_points_deduction
+          skip_points_deduction,
+          /**
+           * 前端展示所需字段（多活动抽奖系统）
+           * sort_order: 九宫格位置编号（顺时针 1-8），来自 lottery_prizes 表
+           * rarity_code: 稀有度代码（来自 rarity_defs 外键），前端直接使用此字段名显示光效
+           */
+          sort_order: final_prize.sort_order,
+          rarity_code: final_prize.rarity_code || 'common'
         }
       }
 
@@ -631,6 +648,7 @@ class SettleStage extends BaseStage {
       draw_count = 1, // 🆕 Phase 2：抽奖次数
       batch_id = null, // 🆕 Phase 2：连抽批次ID
       asset_transaction_id = null, // 🆕 关联资产流水ID（用于对账）
+      tier_pick_data = {}, // 🔴 2026-02-15 修复：档位选择元数据
       transaction
     } = params
 
@@ -675,6 +693,23 @@ class SettleStage extends BaseStage {
         budget_points_before: budget_data.budget_before || null,
         budget_points_after: (budget_data.budget_before || 0) - budget_deducted,
         points_deducted, // 🆕 记录实际积分扣减金额
+        /**
+         * 🔴 2026-02-15 修复：写入档位选择审计字段
+         * 之前这些字段全部为 NULL，导致无法事后追踪中奖率异常
+         */
+        pipeline_type: 'normal',
+        pick_method: tier_pick_data.weight_scale ? 'tier_first' : null,
+        /**
+         * original_tier 字段类型为 ENUM('high','mid','low')，不含 'fallback'
+         * 当 _pickTier 原始选中 'fallback' 时，写入 null 避免 ENUM 溢出错误
+         */
+        original_tier: ['high', 'mid', 'low'].includes(tier_pick_data.original_tier)
+          ? tier_pick_data.original_tier
+          : null,
+        final_tier: final_tier || null,
+        downgrade_count: Math.max(0, (tier_pick_data.tier_downgrade_path?.length || 1) - 1),
+        fallback_triggered:
+          final_tier === 'fallback' && tier_pick_data.original_tier !== 'fallback',
         created_at: BeijingTimeHelper.createBeijingTime()
       },
       { transaction }

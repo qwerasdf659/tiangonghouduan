@@ -41,8 +41,24 @@ export function usePrizesState() {
       stock_quantity: 100, // 默认库存100，后端要求正整数
       status: 'active',
       image_id: null,
-      prize_description: ''
+      prize_description: '',
+      /**
+       * 稀有度代码（面向前端的视觉稀有度等级）
+       * 外键关联 rarity_defs.rarity_code，前端直接使用此字段名
+       * 枚举值：common/uncommon/rare/epic/legendary
+       */
+      rarity_code: 'common'
+      // sort_order 不在表单中设置，由后端自动分配唯一递增值
+      // 编辑模式下通过 editPrize() 从后端数据中获取
     },
+    /** @type {Array} 稀有度选项（来自 rarity_defs 表，5级） */
+    rarityOptions: [
+      { value: 'common', label: '普通', color: '#9E9E9E' },
+      { value: 'uncommon', label: '稀有', color: '#4CAF50' },
+      { value: 'rare', label: '精良', color: '#2196F3' },
+      { value: 'epic', label: '史诗', color: '#9C27B0' },
+      { value: 'legendary', label: '传说', color: '#FF9800' }
+    ],
     /** @type {number|string|null} 当前编辑的奖品ID - 使用后端字段名 */
     editingLotteryPrizeId: null,
     /** @type {Object} 库存补充表单 - 使用后端字段名 */
@@ -139,7 +155,9 @@ export function usePrizesMethods() {
         stock_quantity: 100, // 默认库存100，后端要求正整数
         status: 'active',
         image_id: null,
-        prize_description: ''
+        prize_description: '',
+        rarity_code: 'common' // 稀有度默认普通
+        // sort_order 不设置，由后端自动分配唯一递增值
       }
       this.showModal('prizeModal')
     },
@@ -162,7 +180,9 @@ export function usePrizesMethods() {
         stock_quantity: prize.stock_quantity || 100,
         status: prize.status || 'active',
         image_id: prize.image_id || null,
-        prize_description: prize.prize_description || ''
+        prize_description: prize.prize_description || '',
+        rarity_code: prize.rarity_code || 'common', // 稀有度（来自后端 rarity_defs 外键）
+        sort_order: prize.sort_order || 1
       }
       this.showModal('prizeModal')
     },
@@ -237,18 +257,21 @@ export function usePrizesMethods() {
           // 中奖概率：前端表单是百分比(0-100)，后端需要小数(0-1)
           const winProbability = (this.prizeForm.win_probability || 0) / 100
           const url = buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, { prize_id: this.editingLotteryPrizeId })
-          await this.apiCall(url, {
-            method: 'PUT',
-            data: {
+          const updateData = {
               prize_name: this.prizeForm.prize_name,
               prize_type: this.prizeForm.prize_type,
               win_probability: winProbability,
               stock_quantity: this.prizeForm.stock_quantity,
               status: this.prizeForm.status,
               image_id: this.prizeForm.image_id,
-              prize_description: this.prizeForm.prize_description
+              prize_description: this.prizeForm.prize_description,
+              rarity_code: this.prizeForm.rarity_code || 'common'
             }
-          })
+          // 编辑模式下保留原有 sort_order（来自后端数据）
+          if (this.prizeForm.sort_order !== undefined) {
+            updateData.sort_order = parseInt(this.prizeForm.sort_order)
+          }
+          await this.apiCall(url, { method: 'PUT', data: updateData })
         } else {
           // 新增模式：使用batch-add端点，传入活动ID和奖品数组
           // 后端要求 quantity 必须是正整数，-1(前端无限库存)需转换为大数值999999
@@ -271,6 +294,7 @@ export function usePrizesMethods() {
           }
 
           // 2026-01-29 技术债务清理：直接使用后端字段名，无需映射
+          // sort_order 不传，由后端自动分配唯一递增值（避免 SORT_ORDER_DUPLICATE 错误）
           await this.apiCall(LOTTERY_ENDPOINTS.PRIZE_BATCH_ADD, {
             method: 'POST',
             data: {
@@ -281,7 +305,8 @@ export function usePrizesMethods() {
                   prize_type: this.prizeForm.prize_type,
                   win_probability: winProbability,
                   stock_quantity: stockQuantity,
-                  prize_description: this.prizeForm.prize_description
+                  prize_description: this.prizeForm.prize_description,
+                  rarity_code: this.prizeForm.rarity_code || 'common'
                 }
               ]
             }
@@ -450,34 +475,39 @@ export function usePrizesMethods() {
     openBatchPrizeModal() {
       this.batchLotteryCampaignId = this.campaigns?.[0]?.lottery_campaign_id || null
       // 初始化一个包含多个奖品槽位的模板（直接使用后端字段名）
+      // sort_order 不设置，由后端自动分配唯一递增值
       this.batchPrizes = [
         {
           prize_name: '一等奖',
           prize_type: 'physical',
           win_probability: 0.05,
           stock_quantity: 10,
-          prize_description: ''
+          prize_description: '',
+          rarity_code: 'legendary'
         },
         {
           prize_name: '二等奖',
           prize_type: 'virtual',
           win_probability: 0.15,
           stock_quantity: 50,
-          prize_description: ''
+          prize_description: '',
+          rarity_code: 'epic'
         },
         {
           prize_name: '三等奖',
           prize_type: 'points',
           win_probability: 0.3,
           stock_quantity: 200,
-          prize_description: ''
+          prize_description: '',
+          rarity_code: 'rare'
         },
         {
-          prize_name: '谢谢参与',
-          prize_type: 'empty',
+          prize_name: '参与奖',
+          prize_type: 'points',
           win_probability: 0.5,
           stock_quantity: 999999,
-          prize_description: ''
+          prize_description: '',
+          rarity_code: 'common'
         }
       ]
       this.updateBatchProbabilitySum()
@@ -489,12 +519,14 @@ export function usePrizesMethods() {
      */
     addBatchPrizeSlot() {
       this.batchPrizes.push({
-        prize_name: '',
-        prize_type: 'virtual',
-        win_probability: 0,
-        stock_quantity: 100,
-        prize_description: ''
-      })
+          prize_name: '',
+          prize_type: 'virtual',
+          win_probability: 0,
+          stock_quantity: 100,
+          prize_description: '',
+          rarity_code: 'common'
+          // sort_order 不设置，由后端自动分配
+        })
     },
 
     /**
@@ -574,13 +606,15 @@ export function usePrizesMethods() {
         this.saving = true
 
         // 直接使用后端字段名，无需映射
-        const prizesData = this.batchPrizes.map(prize => ({
+        // sort_order 不传，由后端自动分配唯一递增值（避免 SORT_ORDER_DUPLICATE 错误）
+        const prizesData = this.batchPrizes.map((prize) => ({
           prize_name: prize.prize_name.trim(),
           prize_type: prize.prize_type,
           win_probability: parseFloat(prize.win_probability) || 0,
           stock_quantity:
             prize.stock_quantity === -1 ? 999999 : parseInt(prize.stock_quantity) || 100,
-          prize_description: prize.prize_description || ''
+          prize_description: prize.prize_description || '',
+          rarity_code: prize.rarity_code || 'common'
         }))
 
         await this.apiCall(LOTTERY_ENDPOINTS.PRIZE_BATCH_ADD, {

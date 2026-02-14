@@ -328,8 +328,8 @@ router.post('/chat/sessions/:id/messages', authenticateToken, async (req, res) =
 
     return res.apiSuccess(
       {
-        message_id: message.chat_message_id,
-        session_id: message.customer_service_session_id,
+        chat_message_id: message.chat_message_id,
+        customer_service_session_id: message.customer_service_session_id,
         content: message.content,
         message_type: message.message_type,
         sent_at: message.created_at

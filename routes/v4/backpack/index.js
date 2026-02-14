@@ -58,9 +58,9 @@ function asyncHandler(fn) {
  *     {
  *       asset_code: 'MATERIAL_001',
  *       display_name: '蓝色碎片',
- *       balance: 100,
- *       frozen_balance: 10,
- *       available_balance: 90
+ *       total_amount: 100,
+ *       frozen_amount: 10,
+ *       available_amount: 90
  *     }
  *   ],
  *   items: [       // 不可叠加物品
@@ -371,5 +371,14 @@ router.post(
  */
 const exchangeRoutes = require('./exchange')
 router.use('/exchange', exchangeRoutes)
+
+/*
+ * ========================================
+ * 竞价子路由挂载
+ * 用户端竞价功能（臻选空间/幸运空间竞价 2026-02-16）
+ * ========================================
+ */
+const bidRoutes = require('./bid')
+router.use('/bid', bidRoutes)
 
 module.exports = router

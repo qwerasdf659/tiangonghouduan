@@ -89,8 +89,10 @@ const {
  */
 const {
   CoreService: ExchangeCoreService, // 核心兑换操作（~450行）
-  QueryService: ExchangeQueryService, // 查询服务（~550行）
-  AdminService: ExchangeAdminService // 管理后台操作（~700行）
+  QueryService: ExchangeQueryService, // 查询服务（~650行，含空间统计）
+  AdminService: ExchangeAdminService, // 管理后台操作（~700行）
+  BidService: ExchangeBidService, // 竞价核心服务（出价/结算/取消）
+  BidQueryService: ExchangeBidQueryService // 竞价查询服务（列表/详情/历史）
 } = require('./exchange')
 
 /*
@@ -366,8 +368,8 @@ class ServiceManager {
       this._services.set('exchange_core', new ExchangeCoreService(this.models)) // 核心兑换操作（需实例化）
       this._services.set('exchange_query', new ExchangeQueryService(this.models)) // 查询服务（需实例化）
       this._services.set('exchange_admin', new ExchangeAdminService(this.models)) // 管理后台操作（需实例化）
-
-      // [已移除] exchange_market 向后兼容别名 - 请使用 exchange_core/exchange_query/exchange_admin
+      this._services.set('exchange_bid_core', new ExchangeBidService(this.models)) // 竞价核心服务（出价/结算/取消）
+      this._services.set('exchange_bid_query', new ExchangeBidQueryService(this.models)) // 竞价查询服务（列表/详情/历史）
       this._services.set('content_audit', ContentAuditEngine)
       this._services.set('announcement', AnnouncementService)
       this._services.set('notification', NotificationService)

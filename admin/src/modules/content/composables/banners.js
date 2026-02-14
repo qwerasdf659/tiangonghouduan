@@ -23,8 +23,9 @@ export function useBannersState() {
     bannerForm: {
       popup_banner_id: null,
       title: '',
+      display_mode: '',
       position: 'home',
-      sort_order: 0,
+      display_order: 0,
       is_active: true,
       image_url: '',
       link_url: '',
@@ -40,7 +41,20 @@ export function useBannersState() {
     /** 轮播图统计 */
     bannerStats: { total: 0, active: 0, positions: {} },
     /** 上传中状态 */
-    uploadingBannerImage: false
+    uploadingBannerImage: false,
+    /** 纯图模式二次确认标记 */
+    _fullImageConfirmed: false,
+    /** 显示模式选项列表（对应后端 6 种 ENUM 值） */
+    displayModes: [
+      { value: 'wide', label: '宽屏模式', hint: '16:9 · 推荐 750×420', ratio: '16:9' },
+      { value: 'horizontal', label: '横版模式', hint: '3:2 · 推荐 750×500', ratio: '3:2' },
+      { value: 'square', label: '方图模式', hint: '1:1 · 推荐 750×750', ratio: '1:1' },
+      { value: 'tall', label: '竖图模式', hint: '3:4 · 推荐 750×1000', ratio: '3:4' },
+      { value: 'slim', label: '窄长图模式', hint: '9:16 · 推荐 420×750', ratio: '9:16' },
+      { value: 'full_image', label: '纯图模式', hint: '不限比例 · 图片即弹窗', ratio: '不限' }
+    ],
+    /** 图片比例警告信息 */
+    ratioWarning: ''
   }
 }
 
@@ -80,17 +94,19 @@ export function useBannersMethods() {
       this.isEditMode = false
       this.bannerImageFile = null
       this.bannerImagePreview = ''
+      this.ratioWarning = ''
+      this._fullImageConfirmed = false
       this.bannerForm = {
         popup_banner_id: null,
         title: '',
+        display_mode: '',
         position: 'home',
-        sort_order: 0,
+        display_order: 0,
         is_active: true,
         image_url: '',
         link_url: '',
         start_time: '',
-        end_time: '',
-        description: ''
+        end_time: ''
       }
       this.showModal('bannerModal')
     },
@@ -99,34 +115,74 @@ export function useBannersMethods() {
       this.isEditMode = true
       this.bannerImageFile = null
       this.bannerImagePreview = ''
+      this.ratioWarning = ''
+      this._fullImageConfirmed = false
       this.bannerForm = {
         popup_banner_id: banner.popup_banner_id,
         title: banner.title || '',
+        display_mode: banner.display_mode || '',
         position: banner.position || 'home',
-        sort_order: banner.display_order || banner.sort_order || 0,
+        display_order: banner.display_order || 0,
         is_active: banner.is_active !== false,
         image_url: banner.image_url || '',
         link_url: banner.link_url || '',
         start_time: this.formatDateTimeLocal(banner.start_time),
-        end_time: this.formatDateTimeLocal(banner.end_time),
-        description: banner.description || ''
+        end_time: this.formatDateTimeLocal(banner.end_time)
       }
       this.showModal('bannerModal')
+    },
+
+    /**
+     * 校验图片比例与所选模板的匹配度（前端侧，与后端一致的范围定义）
+     * @param {string} displayMode - 显示模式
+     * @param {number} width - 图片宽度
+     * @param {number} height - 图片高度
+     * @returns {string} 警告信息，空字符串表示匹配
+     */
+    checkImageRatio(displayMode, width, height) {
+      if (!displayMode || !width || !height) return ''
+      const ranges = {
+        wide: { min: 1.6, max: 2.0, label: '16:9 宽屏' },
+        horizontal: { min: 1.3, max: 1.6, label: '3:2 横版' },
+        square: { min: 0.85, max: 1.3, label: '1:1 方图' },
+        tall: { min: 0.5, max: 0.85, label: '3:4 竖图' },
+        slim: { min: 0.4, max: 0.6, label: '9:16 窄长图' },
+        full_image: null
+      }
+      const range = ranges[displayMode]
+      if (!range) return ''
+      const ratio = width / height
+      if (ratio >= range.min && ratio <= range.max) return ''
+      return `当前图片比例 ${ratio.toFixed(2)}:1，与${range.label}模板有偏差，展示时可能被裁切`
+    },
+
+    /**
+     * 当 display_mode 变更时，如果已有图片预览则重新校验比例
+     */
+    onDisplayModeChange() {
+      if (!this.bannerImagePreview) return
+      this._fullImageConfirmed = false
+      const img = new Image()
+      img.onload = () => {
+        this.ratioWarning = this.checkImageRatio(this.bannerForm.display_mode, img.width, img.height)
+      }
+      img.src = this.bannerImagePreview
     },
 
     selectBannerImage(event) {
       const file = event.target.files?.[0]
       if (!file) return
 
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+      const allowedTypes = ['image/jpeg', 'image/png']
       if (!allowedTypes.includes(file.type)) {
-        this.showError('不支持的图片格式，请选择 JPG/PNG/GIF/WebP')
+        this.showError('仅支持 JPG/PNG 格式的图片')
         event.target.value = ''
         return
       }
 
-      if (file.size > 5 * 1024 * 1024) {
-        this.showError('图片大小不能超过 5MB')
+      if (file.size > 400 * 1024) {
+        const sizeKB = Math.round(file.size / 1024)
+        this.showError(`图片大小 ${sizeKB}KB，超过 400KB 限制，请压缩后重新上传`)
         event.target.value = ''
         return
       }
@@ -134,6 +190,17 @@ export function useBannersMethods() {
       this.bannerImageFile = file
       this.bannerImagePreview = URL.createObjectURL(file)
       logger.info('轮播图图片已选择:', file.name)
+
+      // 读取图片宽高，校验与所选模板的比例匹配度
+      const img = new Image()
+      img.onload = () => {
+        const warning = this.checkImageRatio(this.bannerForm.display_mode, img.width, img.height)
+        this.ratioWarning = warning
+        if (warning) {
+          logger.warn('[Banner] 图片比例警告:', warning)
+        }
+      }
+      img.src = this.bannerImagePreview
     },
 
     clearBannerImage() {
@@ -143,11 +210,17 @@ export function useBannersMethods() {
         this.bannerImagePreview = ''
       }
       this.bannerForm.image_url = ''
+      this.ratioWarning = ''
     },
 
     async saveBanner() {
       if (this.isEditMode && !this.bannerForm.popup_banner_id) {
         this.showError('轮播图 ID 缺失')
+        return
+      }
+
+      if (!this.bannerForm.display_mode) {
+        this.showError('请选择显示模式')
         return
       }
 
@@ -166,6 +239,15 @@ export function useBannersMethods() {
         return
       }
 
+      // 纯图模式二次确认
+      if (this.bannerForm.display_mode === 'full_image' && !this._fullImageConfirmed) {
+        const confirmed = confirm(
+          '纯图模式不校验比例，图片将直接作为弹窗展示（无标题栏、无白色卡片壳），请确认图片已包含所有设计元素。确定继续？'
+        )
+        if (!confirmed) return
+        this._fullImageConfirmed = true
+      }
+
       this.saving = true
       try {
         const url = this.isEditMode
@@ -175,8 +257,9 @@ export function useBannersMethods() {
 
         const formData = new FormData()
         formData.append('title', this.bannerForm.title?.trim() || '')
+        formData.append('display_mode', this.bannerForm.display_mode)
         formData.append('position', this.bannerForm.position || 'home')
-        formData.append('display_order', String(this.bannerForm.sort_order || 0))
+        formData.append('display_order', String(this.bannerForm.display_order || 0))
         formData.append('is_active', String(this.bannerForm.is_active))
         formData.append('link_url', this.bannerForm.link_url || '')
         if (this.bannerForm.start_time) formData.append('start_time', this.bannerForm.start_time)
@@ -195,8 +278,14 @@ export function useBannersMethods() {
 
         const result = await response.json()
         if (result.success) {
+          // 显示后端返回的比例警告（如果有）
+          if (result.data?.ratio_warning) {
+            this.showWarning?.('保存成功，但后端提示：' + result.data.ratio_warning) ||
+              logger.warn('[Banner] 后端比例警告:', result.data.ratio_warning)
+          }
           this.hideModal('bannerModal')
           this.clearBannerImage()
+          this._fullImageConfirmed = false
           await this.loadBanners()
           this.showSuccess(this.isEditMode ? '轮播图已更新' : '轮播图已创建')
         } else {
@@ -226,6 +315,25 @@ export function useBannersMethods() {
       }
     },
 
+    /**
+     * 根据 display_mode 返回对应的 CSS aspect-ratio 值
+     * 用于轮播图列表卡片的图片容器
+     * @param {string} displayMode
+     * @returns {string} inline style
+     */
+    getBannerAspectStyle(displayMode) {
+      const ratios = {
+        wide: '16/9',
+        horizontal: '3/2',
+        square: '1/1',
+        tall: '3/4',
+        slim: '9/16',
+        full_image: 'auto'
+      }
+      const ratio = ratios[displayMode] || '16/9'
+      return `aspect-ratio: ${ratio}; max-height: 320px;`
+    },
+
     previewBanner(banner) {
       if (banner.image_url) window.open(banner.image_url, '_blank')
     },
@@ -248,10 +356,6 @@ export function useBannersMethods() {
     }
   }
 }
-
-
-
-
 
 
 

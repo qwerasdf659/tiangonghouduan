@@ -85,7 +85,7 @@ router.get(
 
       /*
        * 通过 Service 层获取批量预算状态（符合路由层规范）
-       * 支持按活动状态筛选（status: active/draft/completed/paused）
+       * 支持按活动状态筛选（status: active/draft/paused/ended/cancelled）
        */
       const { campaigns: results, summary } = await ActivityService.getBatchBudgetStatus({
         lottery_campaign_ids: targetIds,

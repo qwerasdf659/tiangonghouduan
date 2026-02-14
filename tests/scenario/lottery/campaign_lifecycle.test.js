@@ -295,7 +295,9 @@ describe('📊 任务11.2：活动全生命周期测试', () => {
           if (testActivity) {
             console.log(`   📌 测试活动: ${testActivity.campaign_name}`)
             console.log(`   📌 活动状态: active（可参与）`)
-            console.log(`   📌 每次消耗: ${testActivity.cost_per_draw || '未知'}`)
+            console.log(
+              `   📌 每次消耗: ${testActivity.per_draw_cost || testActivity.base_cost || '未知'}`
+            )
             console.log(`   📌 今日剩余次数: ${testActivity.remaining_draws_today || '未知'}`)
 
             // 更新活动代码

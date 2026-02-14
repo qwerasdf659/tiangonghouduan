@@ -260,8 +260,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       today_earned: 100,
       draw_cost: 100,
       earning_rules: { daily_login: 10, share: 50 },
-      discount_rate: 0.8,
-      cost_per_draw: 100
+      discount_rate: 0.8
     }
 
     test('B-5-4-1 普通用户（public）不可见 earning_rules', () => {

@@ -106,7 +106,8 @@ class DataSanitizer {
       name: prize.prize_name,
       type: prize.prize_type,
       icon: this.getPrizeIcon(prize.prize_type),
-      rarity: this.calculateRarity(prize.prize_type), // 用稀有度替代概率
+      rarity_code: prize.rarity_code || 'common', // 稀有度代码（来自 rarity_defs 表，前端直接使用此字段名显示光效）
+      rarity: this.calculateRarity(prize.prize_type), // 兼容字段：用稀有度替代概率（前端新代码使用 rarity_code）
       available: prize.stock_quantity > 0, // 简化库存状态
       /**
        * ✅ 展示积分（用户可见）
@@ -285,7 +286,7 @@ class DataSanitizer {
    * 脱敏规则：
    * - 管理员（dataLevel='full'）：返回完整积分数据
    * - 普通用户（dataLevel='public'）：移除earning_rules（获取规则详情）、discount_rate（折扣率）、
-   *   cost_per_draw（抽奖成本详情）等敏感字段
+   *   等敏感字段
    * - 只返回业务必需的基础信息：余额、今日获得、是否可以抽奖、可抽奖次数
    *
    * @param {Object} pointsData - 积分数据对象，包含balance、today_earned、earning_rules、discount_rate等字段
@@ -299,7 +300,7 @@ class DataSanitizer {
    * @example
    * // 管理员查看完整数据
    * const adminPoints = DataSanitizer.sanitizePoints(pointsData, 'full')
-   * // 返回：包含earning_rules、discount_rate、cost_per_draw等完整字段
+   * // 返回：包含earning_rules、discount_rate等完整字段
    *
    * // 普通用户查看脱敏数据
    * const publicPoints = DataSanitizer.sanitizePoints(pointsData, 'public')
@@ -315,7 +316,7 @@ class DataSanitizer {
       today_earned: pointsData.today_earned,
       can_draw: pointsData.balance >= (pointsData.draw_cost || 100),
       draw_available: Math.floor(pointsData.balance / (pointsData.draw_cost || 100))
-      // ❌ 移除敏感字段：earning_rules, discount_rate, cost_per_draw详情
+      // ❌ 移除敏感字段：earning_rules, discount_rate 详情
     }
   }
 

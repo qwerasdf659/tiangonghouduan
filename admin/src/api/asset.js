@@ -39,19 +39,12 @@ export const ASSET_ENDPOINTS = {
   MATERIAL_CONVERSION_RULES: `${API_PREFIX}/console/material/conversion-rules`,
   MATERIAL_CONVERSION_RULE_DETAIL: `${API_PREFIX}/console/material/conversion-rules/:rule_id`,
   MATERIAL_CONVERSION_RULE_DISABLE: `${API_PREFIX}/console/material/conversion-rules/:rule_id/disable`,
-  MATERIAL_USER_BALANCE: `${API_PREFIX}/console/material/users/:user_id/balance`,
-  MATERIAL_USER_ADJUST: `${API_PREFIX}/console/material/users/:user_id/adjust`,
-  MATERIAL_USERS: `${API_PREFIX}/console/material/users`,
-  MATERIAL_TRANSACTIONS: `${API_PREFIX}/console/material/transactions`,
+  // 材料用户余额查询通过 ADJUSTMENT_USER_BALANCES 统一接口
+  // 材料交易记录通过 TRANSACTIONS（需要 user_id）统一接口
 
-  // 钻石账户
-  DIAMOND_LIST: `${API_PREFIX}/console/diamond-accounts`,
-  DIAMOND_DETAIL: `${API_PREFIX}/console/diamond-accounts/:user_id`,
-  DIAMOND_ADJUST: `${API_PREFIX}/console/diamond-accounts/adjust`,
-  DIAMOND_USER_BALANCE: `${API_PREFIX}/console/diamond/users/:user_id/balance`,
-  DIAMOND_USER_ADJUST: `${API_PREFIX}/console/diamond/users/:user_id/adjust`,
-  DIAMOND_USERS: `${API_PREFIX}/console/diamond/users`,
-  DIAMOND_ACCOUNTS: `${API_PREFIX}/console/diamond/accounts`,
+  // 系统账户（用户资产账户列表查询）
+  SYSTEM_ACCOUNTS: `${API_PREFIX}/console/system-data/accounts`,
+  SYSTEM_ACCOUNT_DETAIL: `${API_PREFIX}/console/system-data/accounts/:account_id`,
 
   // 物品模板
   ITEM_TEMPLATE_LIST: `${API_PREFIX}/console/item-templates`,
@@ -74,11 +67,10 @@ export const ASSET_ENDPOINTS = {
   ORPHAN_FROZEN_CLEANUP: `${API_PREFIX}/console/orphan-frozen/cleanup`,
   ORPHAN_FROZEN_STATS: `${API_PREFIX}/console/orphan-frozen/stats`,
 
-  // 钻石账户（已合并至 asset-adjustment 统一管理）
-  DIAMOND_ACCOUNT_LIST: `${API_PREFIX}/console/asset-adjustment/asset-types`, // 获取资产类型列表
-  DIAMOND_ACCOUNT_DETAIL: `${API_PREFIX}/console/asset-adjustment/user/:user_id/balances`, // 获取用户资产余额
-  DIAMOND_ACCOUNT_STATS: `${API_PREFIX}/console/assets/stats`, // 资产统计（通用）
-  DIAMOND_ACCOUNT_ADJUST: `${API_PREFIX}/console/asset-adjustment/adjust`, // 资产调整（统一入口）
+  // 资产调整（统一入口，已合并原钻石/材料调整）
+  // 资产类型列表: ADJUSTMENT_ASSET_TYPES
+  // 用户余额查询: ADJUSTMENT_USER_BALANCES
+  // 资产调整操作: ADJUSTMENT_ADJUST
 
   // 债务管理 - 适配后端 debt-management 路由
   DEBT_LIST: `${API_PREFIX}/console/debt-management/pending`, // 待冲销欠账列表
@@ -425,49 +417,31 @@ export const AssetAPI = {
     return await request({ url, method: 'GET' })
   },
 
-  /**
-   * 获取用户材料余额
-   * @param {number} userId - 用户 ID
-   * @async
-   * @returns {Promise<Object>}
-   */
-  async getUserMaterialBalance(userId) {
-    const url = buildURL(ASSET_ENDPOINTS.MATERIAL_USER_BALANCE, { user_id: userId })
-    return await request({ url, method: 'GET' })
-  },
+  // 用户材料余额：通过 getUserBalances(userId) 统一查询
+  // 材料交易记录：通过 getTransactions({ user_id }) 统一查询
+
+  // ===== 系统账户 =====
 
   /**
-   * 获取材料交易记录
-   * @param {Object} params - 查询参数
+   * 获取系统账户列表（分页）
+   *
+   * @description 获取用户资产账户列表，支持分页查询
    * @async
-   * @returns {Promise<Object>}
+   * @function getSystemAccounts
+   *
+   * @param {Object} [params] - 查询参数
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @param {number} [params.user_id] - 用户ID筛选
+   * @param {string} [params.account_type] - 账户类型筛选
+   * @param {string} [params.status] - 状态筛选
+   *
+   * @returns {Promise<Object>} 响应对象
+   *
+   * @see GET /api/v4/console/system-data/accounts
    */
-  async getMaterialTransactions(params = {}) {
-    const url = ASSET_ENDPOINTS.MATERIAL_TRANSACTIONS + buildQueryString(params)
-    return await request({ url, method: 'GET' })
-  },
-
-  // ===== 钻石账户 =====
-
-  /**
-   * 获取钻石账户列表
-   * @param {Object} params - 查询参数
-   * @async
-   * @returns {Promise<Object>}
-   */
-  async getDiamondAccounts(params = {}) {
-    const url = ASSET_ENDPOINTS.DIAMOND_LIST + buildQueryString(params)
-    return await request({ url, method: 'GET' })
-  },
-
-  /**
-   * 获取用户钻石详情
-   * @param {number} userId - 用户 ID
-   * @async
-   * @returns {Promise<Object>}
-   */
-  async getDiamondDetail(userId) {
-    const url = buildURL(ASSET_ENDPOINTS.DIAMOND_DETAIL, { user_id: userId })
+  async getSystemAccounts(params = {}) {
+    const url = ASSET_ENDPOINTS.SYSTEM_ACCOUNTS + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 

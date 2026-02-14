@@ -188,7 +188,7 @@ class CustomerServiceSessionService {
           limit: 1,
           order: [['created_at', 'DESC']],
           required: false,
-          attributes: ['message_id', 'content', 'sender_type', 'created_at']
+          attributes: ['chat_message_id', 'content', 'sender_type', 'created_at']
         })
       }
 
@@ -581,11 +581,11 @@ class CustomerServiceSessionService {
       { transaction }
     )
 
-    logger.info(`✅ 消息发送成功，消息ID: ${message.message_id}`)
+    logger.info(`✅ 消息发送成功，消息ID: ${message.chat_message_id}`)
 
     // ✅ 9. 返回结果（WebSocket推送由入口层事务提交后处理）
     return {
-      message_id: message.message_id,
+      chat_message_id: message.chat_message_id,
       content: sanitized_content,
       sender_type: message.sender_type,
       message_type: message.message_type,
@@ -669,11 +669,11 @@ class CustomerServiceSessionService {
       { transaction }
     )
 
-    logger.info(`✅ 用户消息发送成功，消息ID: ${message.message_id}`)
+    logger.info(`✅ 用户消息发送成功，消息ID: ${message.chat_message_id}`)
 
     // ✅ 5. 返回消息数据（供入口层WebSocket推送使用）
     return {
-      message_id: message.message_id,
+      chat_message_id: message.chat_message_id,
       customer_service_session_id: session_id,
       sender_id: user_id,
       sender_type: 'user',
@@ -826,7 +826,7 @@ class CustomerServiceSessionService {
       customer_service_session_id: session_id,
       new_admin_id: target_admin_id,
       new_admin_name: targetAdmin.nickname,
-      system_message_id: systemMessage.message_id
+      system_message_id: systemMessage.chat_message_id
     }
   }
 

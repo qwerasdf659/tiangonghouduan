@@ -44,6 +44,9 @@ const popupBannersRoutes = require('./popup-banners')
 // 系统字典路由（2026-01-22 新增 - 中文化显示名称系统）
 const dictionariesRoutes = require('./dictionaries')
 
+// 系统公开配置路由（2026-02-15 新增 - 活动位置配置，无需登录）
+const configRoutes = require('./config')
+
 // 挂载公告路由
 router.use('/', announcementsRoutes)
 
@@ -70,5 +73,8 @@ router.use('/', popupBannersRoutes)
 
 // 挂载系统字典路由（2026-01-22 新增 - 中文化显示名称系统）
 router.use('/dictionaries', dictionariesRoutes)
+
+// 挂载系统公开配置路由（2026-02-15 新增 - 活动位置配置，前端直接调用获取最新配置）
+router.use('/config', configRoutes)
 
 module.exports = router

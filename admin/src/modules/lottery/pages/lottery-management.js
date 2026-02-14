@@ -60,7 +60,10 @@ import {
   usePresetVisualizationMethods,
   // P1-10: 系统垫付看板模块
   useSystemAdvanceState,
-  useSystemAdvanceMethods
+  useSystemAdvanceMethods,
+  // 活动投放位置配置模块（多活动抽奖系统 2026-02-15）
+  usePlacementState,
+  usePlacementMethods
 } from '../composables/index.js'
 
 /**
@@ -119,7 +122,8 @@ function registerLotteryManagementComponents() {
       activity: [
         { id: 'campaigns', title: '活动管理', icon: '🎁' },
         { id: 'prizes', title: '奖品管理', icon: '🏆' },
-        { id: 'campaign-budget', title: '预算管理', icon: '💰' }
+        { id: 'campaign-budget', title: '预算管理', icon: '💰' },
+        { id: 'campaign-placement', title: '投放位置', icon: '📍' }
       ],
       strategy: [
         { id: 'lottery-strategy', title: '策略配置', icon: '⚙️' },
@@ -143,6 +147,7 @@ function registerLotteryManagementComponents() {
       'campaigns': 'activity',
       'prizes': 'activity',
       'campaign-budget': 'activity',
+      'campaign-placement': 'activity',
       'lottery-strategy': 'strategy',
       'lottery-quota': 'strategy',
       'lottery-pricing': 'strategy',
@@ -210,6 +215,8 @@ function registerLotteryManagementComponents() {
     // P1-3 & P1-10 模块状态
     const presetVisualizationState = usePresetVisualizationState()
     const systemAdvanceState = useSystemAdvanceState()
+    // 活动投放位置配置状态
+    const placementState = usePlacementState()
 
     // 预先调用所有方法 composables
     const campaignsMethods = useCampaignsMethods()
@@ -230,6 +237,8 @@ function registerLotteryManagementComponents() {
     // P1-3 & P1-10 模块方法
     const presetVisualizationMethods = usePresetVisualizationMethods()
     const systemAdvanceMethods = useSystemAdvanceMethods()
+    // 活动投放位置配置方法
+    const placementMethods = usePlacementMethods()
 
     // 合并所有状态和方法到返回对象
     const returnObj = {
@@ -250,6 +259,7 @@ function registerLotteryManagementComponents() {
       ...batchOperationsState,
       ...presetVisualizationState,
       ...systemAdvanceState,
+      ...placementState,
 
       // ==================== 通用状态 ====================
       page: 1,
@@ -429,6 +439,15 @@ function registerLotteryManagementComponents() {
                   await this.loadCampaigns()
                 }
                 break
+              // 活动投放位置配置
+              case 'campaign-placement':
+                logger.debug('📍 [LotteryPage] 进入活动投放位置配置页面')
+                await this.loadPlacements()
+                // 加载活动列表供选择活动代码
+                if (!this.campaigns || this.campaigns.length === 0) {
+                  await this.loadCampaigns()
+                }
+                break
             }
           },
           { loadingText: '加载数据...' }
@@ -454,6 +473,8 @@ function registerLotteryManagementComponents() {
       // P1-3 & P1-10 模块方法
       ...presetVisualizationMethods,
       ...systemAdvanceMethods,
+      // 活动投放位置配置方法
+      ...placementMethods,
 
       // ==================== 工具方法 ====================
 

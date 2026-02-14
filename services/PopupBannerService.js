@@ -24,6 +24,57 @@ const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 // 🎯 2026-01-08 图片存储架构核查：统一尺寸限制常量（与 ImageService 保持一致）
 const MAX_IMAGE_DIMENSION = 4096 // 最大图片尺寸（宽或高）
 
+// 🎯 2026-02-08 弹窗Banner专属：文件限制（拍板决策1：严格执行）
+const BANNER_MAX_FILE_SIZE = 400 * 1024 // 400KB
+const BANNER_ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png'] // 仅 JPG、PNG
+
+/**
+ * 弹窗显示模式 ENUM 有效值
+ * @constant {string[]}
+ */
+const VALID_DISPLAY_MODES = ['wide', 'horizontal', 'square', 'tall', 'slim', 'full_image']
+
+/**
+ * 模板对应的期望比例范围（ratio = width / height）
+ *
+ * 用于上传图片后校验比例与所选模板的匹配度。
+ * 校验原则：警告但不阻止（运营有最终决定权）。
+ *
+ * @constant {Object.<string, {min: number, max: number, label: string}|null>}
+ */
+const DISPLAY_MODE_RATIO_RANGES = {
+  wide: { min: 1.6, max: 2.0, label: '16:9 宽屏' },
+  horizontal: { min: 1.3, max: 1.6, label: '3:2 横版' },
+  square: { min: 0.85, max: 1.3, label: '1:1 方图' },
+  tall: { min: 0.5, max: 0.85, label: '3:4 竖图' },
+  slim: { min: 0.4, max: 0.6, label: '9:16 窄长图' },
+  full_image: null // 纯图模式不校验比例
+}
+
+/**
+ * 校验图片比例与模板的匹配度
+ *
+ * @param {string} displayMode - 显示模式（ENUM值）
+ * @param {number} width - 图片宽度(px)
+ * @param {number} height - 图片高度(px)
+ * @returns {Object} 校验结果（status: 'match' 或 'warning'，warning 时包含 message）
+ */
+function validateImageRatio(displayMode, width, height) {
+  const range = DISPLAY_MODE_RATIO_RANGES[displayMode]
+  // 纯图模式不校验比例
+  if (!range) return { status: 'match' }
+
+  const ratio = width / height
+  if (ratio >= range.min && ratio <= range.max) {
+    return { status: 'match' }
+  }
+
+  return {
+    status: 'warning',
+    message: `当前图片比例 ${ratio.toFixed(2)}:1，与${range.label}模板有偏差，展示时可能被裁切`
+  }
+}
+
 /**
  * 弹窗Banner服务类
  *
@@ -68,8 +119,19 @@ class PopupBannerService {
           ['created_at', 'DESC']
         ],
         limit: parseInt(limit) || 10,
-        // 仅返回小程序需要的字段（数据脱敏）
-        attributes: ['popup_banner_id', 'title', 'image_url', 'link_url', 'link_type']
+        /*
+         * 仅返回小程序需要的字段（数据脱敏）
+         * title 仅供后台管理识别，不下发给小程序端
+         */
+        attributes: [
+          'popup_banner_id',
+          'image_url',
+          'display_mode',
+          'image_width',
+          'image_height',
+          'link_url',
+          'link_type'
+        ]
       })
 
       logger.info('获取有效弹窗成功', {
@@ -121,11 +183,14 @@ class PopupBannerService {
           ['created_at', 'DESC']
         ],
         limit: parseInt(limit) || 10,
-        // 返回更多字段供管理员查看
+        // 返回更多字段供管理员查看（含显示模式）
         attributes: [
           'popup_banner_id',
           'title',
           'image_url',
+          'display_mode',
+          'image_width',
+          'image_height',
           'link_url',
           'link_type',
           'is_active',
@@ -192,10 +257,11 @@ class PopupBannerService {
         return PopupBannerService._transformBannerImageUrl(plain)
       })
 
-      // 附加中文显示名称（position/link_type → _display/_color）
+      // 附加中文显示名称（position/link_type/display_mode → _display/_color）
       await attachDisplayNames(bannersWithStatus, [
         { field: 'position', dictType: DICT_TYPES.BANNER_POSITION },
-        { field: 'link_type', dictType: DICT_TYPES.BANNER_LINK_TYPE }
+        { field: 'link_type', dictType: DICT_TYPES.BANNER_LINK_TYPE },
+        { field: 'display_mode', dictType: DICT_TYPES.BANNER_DISPLAY_MODE }
       ])
 
       logger.info('获取管理后台弹窗列表成功', {
@@ -240,10 +306,11 @@ class PopupBannerService {
       // 🔴 转换 image_url：对象 key → 完整 CDN URL
       const result = PopupBannerService._transformBannerImageUrl(plain)
 
-      // 附加中文显示名称（position/link_type → _display/_color）
+      // 附加中文显示名称（position/link_type/display_mode → _display/_color）
       await attachDisplayNames(result, [
         { field: 'position', dictType: DICT_TYPES.BANNER_POSITION },
-        { field: 'link_type', dictType: DICT_TYPES.BANNER_LINK_TYPE }
+        { field: 'link_type', dictType: DICT_TYPES.BANNER_LINK_TYPE },
+        { field: 'display_mode', dictType: DICT_TYPES.BANNER_DISPLAY_MODE }
       ])
 
       return result
@@ -258,7 +325,10 @@ class PopupBannerService {
    *
    * @param {Object} data - 弹窗数据
    * @param {string} data.title - 弹窗标题
-   * @param {string} data.image_url - 图片URL
+   * @param {string} data.image_url - 图片URL（对象 key）
+   * @param {string} data.display_mode - 显示模式（必填，wide/horizontal/square/tall/slim/full_image）
+   * @param {number|null} data.image_width - 原图宽度(px)
+   * @param {number|null} data.image_height - 原图高度(px)
    * @param {string|null} data.link_url - 跳转链接
    * @param {string} data.link_type - 跳转类型
    * @param {string} data.position - 显示位置
@@ -274,6 +344,9 @@ class PopupBannerService {
       const {
         title,
         image_url,
+        display_mode,
+        image_width = null,
+        image_height = null,
         link_url = null,
         link_type = 'none',
         position = 'home',
@@ -286,6 +359,9 @@ class PopupBannerService {
       const banner = await PopupBanner.create({
         title,
         image_url,
+        display_mode,
+        image_width: image_width ? parseInt(image_width) : null,
+        image_height: image_height ? parseInt(image_height) : null,
         link_url,
         link_type,
         position,
@@ -325,10 +401,21 @@ class PopupBannerService {
    *
    * @param {Buffer} fileBuffer - 文件缓冲区
    * @param {string} originalName - 原始文件名
+   * @param {string} mimeType - 文件 MIME 类型（如 image/jpeg）
+   * @param {number} fileSize - 文件大小（字节）
    * @returns {Promise<{objectKey: string, publicUrl: string, dimensions: {width: number, height: number}}>} 对象 key、公网 URL 和尺寸信息
    */
-  static async uploadBannerImage(fileBuffer, originalName) {
+  static async uploadBannerImage(fileBuffer, originalName, mimeType, fileSize) {
     try {
+      // 🎯 2026-02-08 弹窗图片专属限制（拍板决策1：400KB + 仅 JPG/PNG，严格执行）
+      if (mimeType && !BANNER_ALLOWED_MIME_TYPES.includes(mimeType)) {
+        throw new Error(`仅支持 JPG、PNG 格式，当前格式为 ${mimeType}`)
+      }
+      if (fileSize && fileSize > BANNER_MAX_FILE_SIZE) {
+        const sizeKB = Math.round(fileSize / 1024)
+        throw new Error(`图片大小 ${sizeKB}KB，超过 400KB 限制，请压缩后重新上传`)
+      }
+
       // 🎯 2026-01-08 图片存储架构核查：添加尺寸校验（与 ImageService 保持一致）
       const metadata = await sharp(fileBuffer).metadata()
       const { width, height } = metadata
@@ -339,8 +426,10 @@ class PopupBannerService {
         )
       }
 
-      logger.info('弹窗图片尺寸校验通过', {
+      logger.info('弹窗图片校验通过', {
         original_name: originalName,
+        mime_type: mimeType,
+        file_size_kb: fileSize ? Math.round(fileSize / 1024) : null,
         width,
         height
       })
@@ -404,10 +493,13 @@ class PopupBannerService {
       const banner = await PopupBanner.findByPk(bannerId)
       if (!banner) return null
 
-      // 允许更新的字段
+      // 允许更新的字段（含 display_mode / image_width / image_height）
       const allowedFields = [
         'title',
         'image_url',
+        'display_mode',
+        'image_width',
+        'image_height',
         'link_url',
         'link_type',
         'position',
@@ -423,8 +515,12 @@ class PopupBannerService {
           // 时间字段特殊处理
           if (field === 'start_time' || field === 'end_time') {
             updateData[field] = data[field] ? new Date(data[field]) : null
-          } else if (field === 'display_order') {
-            updateData[field] = parseInt(data[field]) || 0
+          } else if (
+            field === 'display_order' ||
+            field === 'image_width' ||
+            field === 'image_height'
+          ) {
+            updateData[field] = data[field] !== null ? parseInt(data[field]) || 0 : null
           } else if (field === 'is_active') {
             updateData[field] = data[field] === 'true' || data[field] === true
           } else {
@@ -630,4 +726,9 @@ class PopupBannerService {
   }
 }
 
+// 导出服务类和常量（供路由层使用）
 module.exports = PopupBannerService
+module.exports.validateImageRatio = validateImageRatio
+module.exports.VALID_DISPLAY_MODES = VALID_DISPLAY_MODES
+module.exports.BANNER_MAX_FILE_SIZE = BANNER_MAX_FILE_SIZE
+module.exports.BANNER_ALLOWED_MIME_TYPES = BANNER_ALLOWED_MIME_TYPES

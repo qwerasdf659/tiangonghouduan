@@ -53,7 +53,6 @@ class LotteryCampaignCRUDService {
    * @param {string} [campaignData.status='draft'] - 活动状态
    * @param {string} [campaignData.rules_text] - 活动规则文本
    * @param {string} [campaignData.budget_mode='user'] - 预算模式
-   * @param {number} [campaignData.cost_per_draw=10] - 单次抽奖消耗积分
    * @param {number} [campaignData.max_draws_per_user_daily=3] - 每日最大抽奖次数
    * @param {number} [campaignData.max_draws_per_user_total] - 总最大抽奖次数
    * @param {number} [campaignData.total_prize_pool=0] - 总奖池
@@ -127,7 +126,7 @@ class LotteryCampaignCRUDService {
       throw error
     }
 
-    // 创建活动
+    // 创建活动（含前端展示配置字段 - 2026-02-15 多活动抽奖系统）
     const campaign = await LotteryCampaign.create(
       {
         campaign_name,
@@ -139,12 +138,21 @@ class LotteryCampaignCRUDService {
         status: campaignData.status || 'draft',
         rules_text: campaignData.rules_text || '',
         budget_mode: campaignData.budget_mode || 'user',
-        cost_per_draw: campaignData.cost_per_draw || 10,
         max_draws_per_user_daily: campaignData.max_draws_per_user_daily || 3,
         max_draws_per_user_total: campaignData.max_draws_per_user_total || null,
         total_prize_pool: campaignData.total_prize_pool || 0,
         remaining_prize_pool: campaignData.remaining_prize_pool || 0,
         prize_distribution_config: campaignData.prize_distribution_config || { tiers: [] },
+        // 前端展示配置字段（多活动抽奖系统）
+        display_mode: campaignData.display_mode || 'grid_3x3',
+        grid_cols: campaignData.grid_cols || 3,
+        effect_theme: campaignData.effect_theme || 'default',
+        rarity_effects_enabled:
+          campaignData.rarity_effects_enabled !== undefined
+            ? campaignData.rarity_effects_enabled
+            : true,
+        win_animation: campaignData.win_animation || 'simple',
+        background_image_url: campaignData.background_image_url || null,
         created_by: operator_user_id
       },
       { transaction }
@@ -156,6 +164,59 @@ class LotteryCampaignCRUDService {
       campaign_code,
       operator_user_id
     })
+
+    // ✅ 自动生成默认定价配置（决策 3：创建即可用，运营可后续修改）
+    try {
+      const AdminSystemService = require('../AdminSystemService')
+      const { LotteryCampaignPricingConfig } = require('../../models')
+
+      // 从 system_settings 读取全局单抽成本（运营可动态调整，非硬编码）
+      let defaultBaseCost
+      try {
+        defaultBaseCost = await AdminSystemService.getSettingValue(
+          'points',
+          'lottery_cost_points',
+          null,
+          { strict: true }
+        )
+        defaultBaseCost = parseInt(defaultBaseCost, 10)
+      } catch (err) {
+        // 全局配置也缺失时使用安全兜底（此值仅在 system_settings 表完全为空时生效）
+        logger.warn('全局 lottery_cost_points 未配置，使用兜底值 100', { error: err.message })
+        defaultBaseCost = 100
+      }
+
+      // 默认档位配置（结构跟随 lottery_campaign_pricing_config.draw_buttons 规范）
+      const defaultPricingConfig = {
+        base_cost: defaultBaseCost,
+        draw_buttons: [
+          { count: 1, label: '单抽', discount: 1.0, enabled: true, sort_order: 1 },
+          { count: 3, label: '3连抽', discount: 1.0, enabled: true, sort_order: 3 },
+          { count: 5, label: '5连抽', discount: 1.0, enabled: true, sort_order: 5 },
+          { count: 10, label: '10连抽', discount: 1.0, enabled: true, sort_order: 10 }
+        ]
+      }
+
+      await LotteryCampaignPricingConfig.createNewVersion(
+        campaign.lottery_campaign_id,
+        defaultPricingConfig,
+        operator_user_id,
+        { transaction, status: 'active' } // 直接激活，创建即可用
+      )
+
+      logger.info('自动创建默认定价配置', {
+        lottery_campaign_id: campaign.lottery_campaign_id,
+        base_cost: defaultBaseCost,
+        draw_buttons_count: defaultPricingConfig.draw_buttons.length,
+        operator_user_id
+      })
+    } catch (pricingError) {
+      // 定价创建失败不阻断活动创建（运营可手动补配）
+      logger.error('自动创建默认定价配置失败', {
+        lottery_campaign_id: campaign.lottery_campaign_id,
+        error: pricingError.message
+      })
+    }
 
     return campaign
   }
@@ -221,12 +282,18 @@ class LotteryCampaignCRUDService {
       'status',
       'rules_text',
       'budget_mode',
-      'cost_per_draw',
       'max_draws_per_user_daily',
       'max_draws_per_user_total',
       'total_prize_pool',
       'remaining_prize_pool',
-      'prize_distribution_config'
+      'prize_distribution_config',
+      // 前端展示配置字段（2026-02-15 多活动抽奖系统）
+      'display_mode',
+      'grid_cols',
+      'effect_theme',
+      'rarity_effects_enabled',
+      'win_animation',
+      'background_image_url'
     ]
 
     const filteredData = {}
@@ -307,8 +374,8 @@ class LotteryCampaignCRUDService {
       throw new Error('operator_user_id 是必填参数')
     }
 
-    // 验证状态值
-    const validStatuses = ['draft', 'active', 'paused', 'ended']
+    // 验证状态值（与数据库 ENUM 对齐：draft/active/paused/ended/cancelled）
+    const validStatuses = ['draft', 'active', 'paused', 'ended', 'cancelled']
     if (!status || !validStatuses.includes(status)) {
       const error = new Error(`无效的状态值：${status}（允许值：${validStatuses.join('/')}）`)
       error.code = 'VALIDATION_ERROR'

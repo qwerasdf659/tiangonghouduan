@@ -67,6 +67,7 @@ const lotteryHealthRoutes = require('./lottery-health') // 🆕 抽奖健康度�
 const consumptionAnomalyRoutes = require('./consumption-anomaly') // 🆕 消费异常检测（2026-01-31 P1 B-25~B-30）
 const userSegmentsRoutes = require('./user-segments') // 🆕 用户分层（2026-01-31 P1 B-19~B-24）
 const itemsRoutes = require('./items') // 🆕 物品监控（2026-02-03 运营后台优化 §5.4）
+const itemInstancesRoutes = require('./item-instances') // 🆕 物品实例管理（2026-02-15 修复404缺失路由）
 const lotteryRoutes = require('./lottery') // 🆕 抽奖分析Dashboard（2026-02-04 运营仪表盘E2E测试）
 
 // P2新增路由（2026-01-31 第2阶段任务）
@@ -134,6 +135,7 @@ router.use('/lottery-health', lotteryHealthRoutes) // 🆕 抽奖健康度路由
 router.use('/consumption-anomaly', consumptionAnomalyRoutes) // 🆕 消费异常检测路由（2026-01-31 P1 B-25~B-30 风险评估）
 router.use('/users', userSegmentsRoutes) // 🆕 用户分层路由（2026-01-31 P1 B-19~B-24 用户画像）
 router.use('/items', itemsRoutes) // 🆕 物品监控路由（2026-02-03 运营后台优化 §5.4 锁定率监控）
+router.use('/item-instances', itemInstancesRoutes) // 🆕 物品实例管理路由（2026-02-15 管理员物品CRUD）
 router.use('/lottery', lotteryRoutes) // 🆕 抽奖分析Dashboard路由（2026-02-04 运营仪表盘E2E测试）
 
 // P2新增路由（2026-01-31 第2阶段任务）
@@ -353,7 +355,8 @@ router.get('/', (req, res) => {
           '/consumption/records',
           '/consumption/approve/:id', // 记录ID（事务实体）
           '/consumption/reject/:id', // 记录ID（事务实体）
-          '/consumption/batch-review' // 🆕 批量审核（2026-01-31 P0）
+          '/consumption/batch-review', // 🆕 批量审核（2026-01-31 P0）
+          '/consumption/qrcode/:user_id' // 🆕 管理员生成用户二维码（2026-02-12 路由分离）
         ],
         note: '仅限 admin（role_level >= 100）访问，不开放 ops/区域经理；商家员工使用 /api/v4/shop/* 提交消费记录'
       },
@@ -542,6 +545,18 @@ router.get('/', (req, res) => {
           '/lottery-presets/:id'
         ],
         note: '抽奖预设（lottery_presets）CRUD管理，为用户创建预设队列和统计；仅限 admin 访问'
+      },
+      item_instances: {
+        description: '物品实例管理（2026-02-15 管理员物品CRUD）',
+        endpoints: [
+          '/item-instances',
+          '/item-instances/user/:user_id',
+          '/item-instances/:id',
+          '/item-instances/:id/freeze',
+          '/item-instances/:id/unfreeze',
+          '/item-instances/:id/transfer'
+        ],
+        note: '管理员查看全平台物品实例列表、详情、冻结/解冻/转移操作；仅限 admin（role_level >= 100）访问'
       },
       lottery_monitoring: {
         description: '抽奖监控数据查询（2026-01-21 P2 API覆盖率补齐）',

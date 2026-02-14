@@ -23,10 +23,10 @@ export function usePricingState() {
     pricingVersions: [],
     /** @type {Object} 定价筛选条件 */
     pricingFilters: { campaign_code: '', status: '' },
-    /** @type {Object} 定价表单 */
+    /** @type {Object} 定价表单 - 直接使用后端字段名 base_cost */
     pricingForm: {
       campaign_code: '',
-      price_per_draw: 0,
+      base_cost: 0,
       discount_rate: 1.0,
       min_purchase: 1,
       max_purchase: 10,
@@ -158,7 +158,7 @@ export function usePricingMethods() {
       this.isEditPricing = false
       this.pricingForm = {
         campaign_code: '',
-        price_per_draw: 0,
+        base_cost: 0,
         discount_rate: 1.0,
         min_purchase: 1,
         max_purchase: 10,
@@ -190,12 +190,10 @@ export function usePricingMethods() {
         }
       }
 
-      // 提取基础价格：优先从 pricing_config.base_cost 获取
+      // 提取基础价格：直接使用后端字段 base_cost
       const baseCost =
         pricingConfig.base_cost ??
-        pricingConfig.baseCost ??
         pricing.base_cost ??
-        pricing.price_per_draw ??
         0
       logger.debug('💰 [Pricing] 提取的基础价格 base_cost:', baseCost)
 
@@ -210,7 +208,7 @@ export function usePricingMethods() {
 
       this.pricingForm = {
         campaign_code: pricing.campaign_code || '',
-        price_per_draw: baseCost,
+        base_cost: baseCost,
         discount_rate: discountRate,
         min_purchase: 1,
         max_purchase: 10,
@@ -232,8 +230,8 @@ export function usePricingMethods() {
         this.showError('请选择活动')
         return
       }
-      if (!this.pricingForm.price_per_draw || this.pricingForm.price_per_draw <= 0) {
-        this.showError('请输入有效的单次抽奖价格')
+      if (!this.pricingForm.base_cost || this.pricingForm.base_cost <= 0) {
+        this.showError('请输入有效的单抽基础价格')
         return
       }
 
@@ -245,7 +243,7 @@ export function usePricingMethods() {
 
         // 构建符合后端API期望的请求格式
         // 后端期望: { pricing_config: { base_cost, draw_buttons: [...] }, activate_immediately }
-        const baseCost = parseFloat(this.pricingForm.price_per_draw) || 100
+        const baseCost = parseFloat(this.pricingForm.base_cost) || 100
         const discountRate = parseFloat(this.pricingForm.discount_rate) || 1.0
 
         const requestData = {

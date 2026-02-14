@@ -3287,6 +3287,18 @@ class ScheduledTasks {
     })
 
     logger.info('✅ 定时任务已设置: 定时报表推送（每小时第5分钟执行，支持分布式锁，Task 32 B-39）')
+
+    // ====== Task 33: 竞价结算定时任务（每分钟，臻选空间/幸运空间竞价功能 2026-02-16）======
+    const BidSettlementJob = require('../../jobs/bid-settlement-job')
+    cron.schedule('* * * * *', async () => {
+      try {
+        await BidSettlementJob.execute()
+      } catch (error) {
+        logger.error('[竞价结算任务] 执行异常', { error: error.message })
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 竞价结算（每分钟执行，含 pending→active 激活 + 到期结算/流拍，Task 33）')
   }
 
   /**

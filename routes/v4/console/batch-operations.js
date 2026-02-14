@@ -125,7 +125,7 @@ function getActivityService(req) {
  *
  * 响应：
  * {
- *   batch_log_id: number,     // 批处理日志ID
+ *   batch_operation_log_id: number,     // 批处理日志ID
  *   status: string,           // 处理状态
  *   total_count: number,      // 总处理数量
  *   success_count: number,    // 成功数量
@@ -189,7 +189,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
           '操作已提交或正在处理中，请勿重复提交',
           'IDEMPOTENCY_CONFLICT',
           {
-            existing_batch_log_id: firstError.existing_log?.batch_log_id
+            existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
           },
           409
         )
@@ -248,7 +248,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
         })
 
         logger.warn('批量赠送单用户失败', {
-          batch_log_id: batchLog.batch_log_id,
+          batch_operation_log_id: batchLog.batch_operation_log_id,
           user_id,
           error: error.message
         })
@@ -256,7 +256,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
     }
 
     // ========== 更新批量操作日志 ==========
-    await getBatchOperationService(req).updateProgress(batchLog.batch_log_id, {
+    await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
       success_count: successItems.length,
       fail_count: failedItems.length,
       result_summary: {
@@ -269,10 +269,12 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
     })
 
     // 重新获取更新后的日志
-    const finalLog = await getBatchOperationService(req).getOperationDetail(batchLog.batch_log_id)
+    const finalLog = await getBatchOperationService(req).getOperationDetail(
+      batchLog.batch_operation_log_id
+    )
 
     logger.info('批量赠送抽奖次数完成', {
-      batch_log_id: batchLog.batch_log_id,
+      batch_operation_log_id: batchLog.batch_operation_log_id,
       operator_id,
       lottery_campaign_id,
       total_count: user_ids.length,
@@ -282,7 +284,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
 
     return res.apiSuccess(
       {
-        batch_log_id: finalLog.batch_log_id,
+        batch_operation_log_id: finalLog.batch_operation_log_id,
         status: finalLog.status,
         status_name: finalLog.status_name,
         total_count: finalLog.total_count,
@@ -367,7 +369,7 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
           '操作已提交或正在处理中',
           'IDEMPOTENCY_CONFLICT',
           {
-            existing_batch_log_id: firstError.existing_log?.batch_log_id
+            existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
           },
           409
         )
@@ -425,7 +427,7 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
         })
 
         logger.warn('批量切换单活动状态失败', {
-          batch_log_id: batchLog.batch_log_id,
+          batch_operation_log_id: batchLog.batch_operation_log_id,
           lottery_campaign_id,
           error: error.message
         })
@@ -433,7 +435,7 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
     }
 
     // ========== 更新批量操作日志 ==========
-    await getBatchOperationService(req).updateProgress(batchLog.batch_log_id, {
+    await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
       success_count: successItems.length,
       fail_count: failedItems.length,
       result_summary: {
@@ -444,10 +446,12 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
       }
     })
 
-    const finalLog = await getBatchOperationService(req).getOperationDetail(batchLog.batch_log_id)
+    const finalLog = await getBatchOperationService(req).getOperationDetail(
+      batchLog.batch_operation_log_id
+    )
 
     logger.info('批量活动状态切换完成', {
-      batch_log_id: batchLog.batch_log_id,
+      batch_operation_log_id: batchLog.batch_operation_log_id,
       operator_id,
       target_status,
       total_count: lottery_campaign_ids.length,
@@ -457,7 +461,7 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
 
     return res.apiSuccess(
       {
-        batch_log_id: finalLog.batch_log_id,
+        batch_operation_log_id: finalLog.batch_operation_log_id,
         status: finalLog.status,
         status_name: finalLog.status_name,
         total_count: finalLog.total_count,
@@ -555,7 +559,7 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
           '操作已提交或正在处理中',
           'IDEMPOTENCY_CONFLICT',
           {
-            existing_batch_log_id: firstError.existing_log?.batch_log_id
+            existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
           },
           409
         )
@@ -621,7 +625,7 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
         })
 
         logger.warn('批量创建单条干预规则失败', {
-          batch_log_id: batchLog.batch_log_id,
+          batch_operation_log_id: batchLog.batch_operation_log_id,
           rule_index: i,
           error: error.message
         })
@@ -629,7 +633,7 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
     }
 
     // ========== 更新批量操作日志 ==========
-    await getBatchOperationService(req).updateProgress(batchLog.batch_log_id, {
+    await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
       success_count: successItems.length,
       fail_count: failedItems.length,
       result_summary: {
@@ -639,10 +643,12 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
       }
     })
 
-    const finalLog = await getBatchOperationService(req).getOperationDetail(batchLog.batch_log_id)
+    const finalLog = await getBatchOperationService(req).getOperationDetail(
+      batchLog.batch_operation_log_id
+    )
 
     logger.info('批量设置干预规则完成', {
-      batch_log_id: batchLog.batch_log_id,
+      batch_operation_log_id: batchLog.batch_operation_log_id,
       operator_id,
       total_count: rules.length,
       success_count: successItems.length,
@@ -651,7 +657,7 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
 
     return res.apiSuccess(
       {
-        batch_log_id: finalLog.batch_log_id,
+        batch_operation_log_id: finalLog.batch_operation_log_id,
         status: finalLog.status,
         status_name: finalLog.status_name,
         total_count: finalLog.total_count,
@@ -725,7 +731,7 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
           '操作已提交或正在处理中',
           'IDEMPOTENCY_CONFLICT',
           {
-            existing_batch_log_id: firstError.existing_log?.batch_log_id
+            existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
           },
           409
         )
@@ -779,7 +785,7 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
         })
 
         logger.warn('批量核销单订单失败', {
-          batch_log_id: batchLog.batch_log_id,
+          batch_operation_log_id: batchLog.batch_operation_log_id,
           order_id,
           error: error.message
         })
@@ -787,7 +793,7 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
     }
 
     // ========== 更新批量操作日志 ==========
-    await getBatchOperationService(req).updateProgress(batchLog.batch_log_id, {
+    await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
       success_count: successItems.length,
       fail_count: failedItems.length,
       result_summary: {
@@ -797,10 +803,12 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
       }
     })
 
-    const finalLog = await getBatchOperationService(req).getOperationDetail(batchLog.batch_log_id)
+    const finalLog = await getBatchOperationService(req).getOperationDetail(
+      batchLog.batch_operation_log_id
+    )
 
     logger.info('批量核销确认完成', {
-      batch_log_id: batchLog.batch_log_id,
+      batch_operation_log_id: batchLog.batch_operation_log_id,
       operator_id,
       total_count: order_ids.length,
       success_count: successItems.length,
@@ -809,7 +817,7 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
 
     return res.apiSuccess(
       {
-        batch_log_id: finalLog.batch_log_id,
+        batch_operation_log_id: finalLog.batch_operation_log_id,
         status: finalLog.status,
         status_name: finalLog.status_name,
         total_count: finalLog.total_count,
@@ -914,7 +922,7 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
           '操作已提交或正在处理中',
           'IDEMPOTENCY_CONFLICT',
           {
-            existing_batch_log_id: firstError.existing_log?.batch_log_id
+            existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
           },
           409
         )
@@ -980,7 +988,7 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
         })
 
         logger.warn('批量调整单活动预算失败', {
-          batch_log_id: batchLog.batch_log_id,
+          batch_operation_log_id: batchLog.batch_operation_log_id,
           lottery_campaign_id: adj.lottery_campaign_id,
           error: error.message
         })
@@ -988,7 +996,7 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
     }
 
     // ========== 更新批量操作日志 ==========
-    await getBatchOperationService(req).updateProgress(batchLog.batch_log_id, {
+    await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
       success_count: successItems.length,
       fail_count: failedItems.length,
       result_summary: {
@@ -998,10 +1006,12 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
       }
     })
 
-    const finalLog = await getBatchOperationService(req).getOperationDetail(batchLog.batch_log_id)
+    const finalLog = await getBatchOperationService(req).getOperationDetail(
+      batchLog.batch_operation_log_id
+    )
 
     logger.info('批量预算调整完成', {
-      batch_log_id: batchLog.batch_log_id,
+      batch_operation_log_id: batchLog.batch_operation_log_id,
       operator_id,
       total_count: adjustments.length,
       success_count: successItems.length,
@@ -1010,7 +1020,7 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
 
     return res.apiSuccess(
       {
-        batch_log_id: finalLog.batch_log_id,
+        batch_operation_log_id: finalLog.batch_operation_log_id,
         status: finalLog.status,
         status_name: finalLog.status_name,
         total_count: finalLog.total_count,
@@ -1088,13 +1098,13 @@ router.get('/logs', authenticateToken, requireRoleLevel(100), async (req, res) =
  */
 router.get('/logs/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const batch_log_id = parseInt(req.params.id, 10)
+    const batch_operation_log_id = parseInt(req.params.id, 10)
 
-    if (isNaN(batch_log_id) || batch_log_id <= 0) {
+    if (isNaN(batch_operation_log_id) || batch_operation_log_id <= 0) {
       return res.apiError('无效的日志ID', 'INVALID_LOG_ID', null, 400)
     }
 
-    const detail = await getBatchOperationService(req).getOperationDetail(batch_log_id)
+    const detail = await getBatchOperationService(req).getOperationDetail(batch_operation_log_id)
 
     if (!detail) {
       return res.apiError('批量操作日志不存在', 'LOG_NOT_FOUND', null, 404)

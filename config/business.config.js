@@ -52,7 +52,7 @@ module.exports = {
     /**
      * 免费抽奖控制（固定规则）
      *
-     * @description 是否允许免费抽奖（cost_per_draw=0）
+     * @description 是否允许免费抽奖（pricing_config.base_cost=0）
      * @业务规则 禁止免费抽奖，所有抽奖必须消耗积分
      * @安全考量 防止刷奖行为，保护积分经济体系
      */

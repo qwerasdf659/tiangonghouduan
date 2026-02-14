@@ -106,7 +106,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
   let test_user_id
   let test_lottery_campaign_id
   let campaign_code
-  let cost_per_draw = 100 // 默认值，后续从活动配置获取
+  let per_draw_cost = 0 // 从 LotteryPricingService 动态获取
   let auth_token
   let BalanceService
   let MarketListingService
@@ -131,21 +131,31 @@ describe('阶段九：压力测试与高并发（P1）', () => {
     // 如果 campaign_code 仍为空，从数据库查询
     if (!campaign_code && test_lottery_campaign_id) {
       const campaign = await LotteryCampaign.findByPk(test_lottery_campaign_id, {
-        attributes: ['campaign_code', 'cost_per_draw']
+        attributes: ['campaign_code']
       })
       campaign_code = campaign?.campaign_code
-      cost_per_draw = parseFloat(campaign?.cost_per_draw) || 100
     }
 
-    // 如果有 campaign_code，获取 cost_per_draw
+    // 如果有 campaign_code，获取 lottery_campaign_id
     if (campaign_code && !test_lottery_campaign_id) {
       const campaign = await LotteryCampaign.findOne({
         where: { campaign_code },
-        attributes: ['lottery_campaign_id', 'cost_per_draw']
+        attributes: ['lottery_campaign_id']
       })
       if (campaign) {
         test_lottery_campaign_id = campaign.lottery_campaign_id
-        cost_per_draw = parseFloat(campaign.cost_per_draw) || 100
+      }
+    }
+
+    // 从 LotteryPricingService 获取真实单抽成本
+    if (test_lottery_campaign_id) {
+      try {
+        const LotteryPricingService = require('../../services/lottery/LotteryPricingService')
+        const pricing = await LotteryPricingService.getDrawPricing(1, test_lottery_campaign_id)
+        per_draw_cost = pricing.per_draw || pricing.base_cost || 100
+      } catch (err) {
+        console.warn('⚠️ 获取定价失败，使用默认值 100:', err.message)
+        per_draw_cost = 100
       }
     }
 
@@ -189,7 +199,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
       test_user_id,
       test_lottery_campaign_id,
       campaign_code,
-      cost_per_draw,
+      per_draw_cost,
       services_loaded: {
         BalanceService: !!BalanceService,
         MarketListingService: !!MarketListingService,
@@ -309,7 +319,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
         console.log(`   新增抽奖记录(实际): ${actual_new_draws}`)
         console.log(`   成功响应数: ${successful_draws}`)
         console.log(`   积分消耗: ${balance_diff}`)
-        console.log(`   单次抽奖成本: ${cost_per_draw}`)
+        console.log(`   单次抽奖成本: ${per_draw_cost}`)
 
         /*
          * 核心验证1：实际抽奖记录数必须 >= 响应成功数（请求去重可能使多个请求同时通过）
@@ -325,17 +335,17 @@ describe('阶段九：压力测试与高并发（P1）', () => {
         if (actual_new_draws > 0) {
           /*
            * 有抽奖记录时，积分应该有变化（扣除或因奖励而增加）
-           * 预期变化范围：最多扣除 = actual_new_draws * cost_per_draw
+           * 预期变化范围：最多扣除 = actual_new_draws * per_draw_cost
            * 最多增加 = 奖励可能很大，不做上限限制
            */
-          console.log(`   预期积分扣除(不考虑奖励): ${actual_new_draws * cost_per_draw}`)
+          console.log(`   预期积分扣除(不考虑奖励): ${actual_new_draws * per_draw_cost}`)
           console.log(
             `   实际积分变化: ${balance_diff > 0 ? '扣除' : '增加'} ${Math.abs(balance_diff)}`
           )
 
-          // 只验证变化的合理性：如果是扣除，不应超过 actual_new_draws * cost_per_draw
+          // 只验证变化的合理性：如果是扣除，不应超过 actual_new_draws * per_draw_cost
           if (balance_diff > 0) {
-            expect(balance_diff).toBeLessThanOrEqual(actual_new_draws * cost_per_draw)
+            expect(balance_diff).toBeLessThanOrEqual(actual_new_draws * per_draw_cost)
           }
           // 如果是增加（获得积分奖励），这是正常的业务行为
         }
@@ -950,7 +960,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
           .map(() => async () => {
             try {
               const response = await request(app)
-                .get(`/api/v4/lottery/history/${test_user_id}`)
+                .get('/api/v4/lottery/history')
                 .set('Authorization', `Bearer ${auth_token}`)
                 .query({ page: 1, limit: 10 })
               return { type: 'query', success: response.status === 200, status: response.status }

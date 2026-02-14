@@ -136,8 +136,12 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4" x-show="banners.length > 0">
           <template x-for="banner in banners" :key="banner.popup_banner_id">
             <div class="border rounded-lg overflow-hidden">
-              <div class="h-48 themed-bg-muted flex items-center justify-center img-blur-load cursor-pointer" x-show="banner.image_url" @click="previewBanner(banner)">
-                <img :data-src="banner.image_url" alt="" class="max-w-full max-h-full object-contain img-lazy"
+              <div class="themed-bg-muted flex items-center justify-center cursor-pointer overflow-hidden"
+                   :style="getBannerAspectStyle(banner.display_mode)"
+                   x-show="banner.image_url" @click="previewBanner(banner)">
+                <img :data-src="banner.image_url" alt=""
+                     class="w-full h-full img-lazy"
+                     style="object-fit: contain;"
                      x-init="$nextTick(() => { if(banner.image_url) { $el.src = banner.image_url; $el.classList.add('loaded') } })">
               </div>
               <div class="h-48 themed-bg-muted flex items-center justify-center" x-show="!banner.image_url">
@@ -145,7 +149,14 @@
               </div>
               <div class="p-3">
                 <h6 class="font-medium" x-text="banner.title"></h6>
-                <p class="text-sm themed-text-muted" x-text="'排序: ' + (banner.display_order || 0)"></p>
+                <div class="mt-1 flex flex-wrap items-center gap-1">
+                  <span class="text-xs px-2 py-0.5 rounded text-white"
+                        :class="banner.display_mode_color || 'bg-gray-400'"
+                        x-text="banner.display_mode_display || banner.display_mode || '未设置'"></span>
+                  <span class="text-xs themed-text-muted" x-show="banner.image_width"
+                        x-text="banner.image_width + '×' + banner.image_height"></span>
+                </div>
+                <p class="text-sm themed-text-muted mt-1" x-text="'排序: ' + (banner.display_order || 0)"></p>
                 <div class="mt-2 flex space-x-2">
                   <button @click="editBanner(banner)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
                   <button @click="deleteBanner(banner)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
@@ -281,8 +292,32 @@
         <form @submit.prevent="saveBanner()">
           <div class="p-6 space-y-4">
             <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">标题</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">标题 <span class="text-red-500">*</span></label>
               <input type="text" x-model="bannerForm.title" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <!-- 显示模式选择（必填，不预选） -->
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-2">
+                显示模式 <span class="text-red-500">*</span>
+              </label>
+              <div class="grid grid-cols-2 gap-2">
+                <template x-for="mode in displayModes" :key="mode.value">
+                  <label class="flex items-center p-2 border rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                         :class="bannerForm.display_mode === mode.value ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'themed-border'">
+                    <input type="radio" name="display_mode" :value="mode.value"
+                           x-model="bannerForm.display_mode" @change="onDisplayModeChange()" class="mr-2">
+                    <div>
+                      <span class="text-sm font-medium" x-text="mode.label"></span>
+                      <span class="text-xs themed-text-muted block" x-text="mode.hint"></span>
+                    </div>
+                  </label>
+                </template>
+              </div>
+              <p x-show="!bannerForm.display_mode" class="mt-1 text-xs text-red-500">请选择一个显示模式</p>
+              <!-- 比例警告 -->
+              <div x-show="ratioWarning" class="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded text-sm text-yellow-700 dark:text-yellow-300">
+                ⚠️ <span x-text="ratioWarning"></span>
+              </div>
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
@@ -316,7 +351,7 @@
               </div>
               <!-- 选择图片区域 -->
               <div x-show="!bannerImagePreview && !bannerForm.image_url" class="border-2 border-dashed themed-border rounded-lg p-4 text-center hover:border-indigo-400 transition-colors">
-                <input type="file" id="bannerImageInput" accept="image/jpeg,image/png,image/gif,image/webp" @change="selectBannerImage($event)" class="hidden">
+                <input type="file" id="bannerImageInput" accept="image/jpeg,image/png" @change="selectBannerImage($event)" class="hidden">
                 <label for="bannerImageInput" class="cursor-pointer">
                   <div class="text-gray-400 mb-2">
                     <svg class="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -324,7 +359,7 @@
                     </svg>
                   </div>
                   <span class="text-sm themed-text-muted">点击选择图片</span>
-                  <p class="text-xs text-gray-400 mt-1">支持 JPG/PNG/GIF/WebP，最大 5MB</p>
+                  <p class="text-xs text-gray-400 mt-1">仅支持 JPG/PNG，≤ 400KB</p>
                 </label>
               </div>
             </div>

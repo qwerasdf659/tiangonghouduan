@@ -106,13 +106,13 @@ describe('背包API测试 - P2优先级', () => {
         // 资产应该包含以下字段
         expect(asset).toHaveProperty('asset_code')
         expect(asset).toHaveProperty('display_name')
-        expect(asset).toHaveProperty('balance')
-        // 可选字段
-        if (asset.frozen_balance !== undefined) {
-          expect(typeof asset.frozen_balance).toBe('number')
+        expect(asset).toHaveProperty('total_amount')
+        // 余额字段（与数据库 account_asset_balances 表字段一致）
+        if (asset.frozen_amount !== undefined) {
+          expect(typeof asset.frozen_amount).toBe('number')
         }
-        if (asset.available_balance !== undefined) {
-          expect(typeof asset.available_balance).toBe('number')
+        if (asset.available_amount !== undefined) {
+          expect(typeof asset.available_amount).toBe('number')
         }
       }
     })

@@ -54,12 +54,12 @@ const asyncHandler = fn => (req, res, next) => {
  *     "banners": [
  *       {
  *         "popup_banner_id": 1,
- *         "title": "新年活动",
  *         "image_url": "https://xxx.sealos.run/popup-banners/xxx.jpg",
+ *         "display_mode": "square",
+ *         "image_width": 750,
+ *         "image_height": 750,
  *         "link_url": "/pages/activity/index",
- *         "link_type": "page",
- *         "status": "active",
- *         "position": "home"
+ *         "link_type": "page"
  *       }
  *     ]
  *   }

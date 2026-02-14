@@ -48,6 +48,16 @@ class LotteryPrize extends Model {
         as: 'image'
       })
     }
+
+    // 关联到稀有度字典（多活动抽奖系统 - 前端视觉稀有度等级）
+    if (models.RarityDef) {
+      LotteryPrize.belongsTo(models.RarityDef, {
+        foreignKey: 'rarity_code',
+        targetKey: 'rarity_code',
+        as: 'rarityDef',
+        comment: '稀有度定义（common/uncommon/rare/epic/legendary）'
+      })
+    }
   }
 
   /**
@@ -57,10 +67,12 @@ class LotteryPrize extends Model {
   getPrizeTypeName() {
     const types = {
       points: '积分奖励',
+      coupon: '优惠券',
       physical: '实物奖品',
       virtual: '虚拟商品',
-      coupon: '优惠券',
-      service: '服务体验'
+      service: '服务体验',
+      product: '商品',
+      special: '特殊奖品'
     }
     return types[this.prize_type] || '未知类型'
   }
@@ -72,9 +84,7 @@ class LotteryPrize extends Model {
   getStatusName() {
     const statuses = {
       active: '激活中',
-      inactive: '已停用',
-      out_of_stock: '缺货',
-      expired: '已过期'
+      inactive: '已停用'
     }
     return statuses[this.status] || '未知状态'
   }
@@ -123,7 +133,8 @@ class LotteryPrize extends Model {
     await this.update(
       {
         stock_quantity: newStock,
-        status: newStock <= 0 ? 'out_of_stock' : this.status
+        // 库存耗尽时将状态标记为 inactive（枚举已修正：仅 active/inactive）
+        status: newStock <= 0 ? 'inactive' : this.status
       },
       { transaction }
     )
@@ -181,7 +192,9 @@ class LotteryPrize extends Model {
 
     if (
       !data.prize_type ||
-      !['points', 'physical', 'virtual', 'coupon', 'service'].includes(data.prize_type)
+      !['points', 'coupon', 'physical', 'virtual', 'service', 'product', 'special'].includes(
+        data.prize_type
+      )
     ) {
       errors.push('奖品类型无效')
     }
@@ -547,10 +560,19 @@ module.exports = sequelize => {
         comment: '奖品名称'
       },
       prize_type: {
-        type: DataTypes.ENUM('points', 'physical', 'virtual', 'coupon', 'service'),
+        type: DataTypes.ENUM(
+          'points',
+          'coupon',
+          'physical',
+          'virtual',
+          'service',
+          'product',
+          'special'
+        ),
         allowNull: false,
         defaultValue: 'points',
-        comment: '奖品类型：积分/实物/虚拟/优惠券/服务'
+        comment:
+          '奖品类型: points=积分/coupon=优惠券/physical=实物/virtual=虚拟/service=服务/product=商品/special=特殊'
       },
       prize_value: {
         type: DataTypes.DECIMAL(10, 2),
@@ -648,10 +670,10 @@ module.exports = sequelize => {
         comment: '显示排序'
       },
       status: {
-        type: DataTypes.ENUM('active', 'inactive', 'out_of_stock', 'expired'),
+        type: DataTypes.ENUM('active', 'inactive'),
         allowNull: false,
         defaultValue: 'active',
-        comment: '奖品状态'
+        comment: '奖品状态: active=激活中, inactive=已停用'
       },
       /**
        * 奖品价值积分（双账户模型核心字段）
@@ -721,6 +743,29 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: false,
         comment: '是否VIP专属奖品（仅VIP用户可抽）'
+      },
+
+      // ======================== 稀有度字段（多活动抽奖系统） ========================
+
+      /**
+       * 稀有度代码（前端视觉稀有度等级）
+       * @type {string}
+       * @业务含义 控制前端奖品的视觉光效等级，与 reward_tier（后端概率档位）是完全独立的两个维度
+       * @枚举值 common（普通-灰色）/uncommon（稀有-绿色）/rare（精良-蓝色）/epic（史诗-紫色）/legendary（传说-金色）
+       * @外键关联 rarity_defs.rarity_code
+       * @前端效果 前端直接使用 rarity_code 字段名显示对应颜色光效
+       * @注意 rarity_code 是面向前端的视觉稀有度，reward_tier 是后端抽奖引擎的概率档位，两者独立配置
+       */
+      rarity_code: {
+        type: DataTypes.STRING(50),
+        allowNull: false,
+        defaultValue: 'common',
+        comment:
+          '稀有度代码（外键关联 rarity_defs.rarity_code）: common/uncommon/rare/epic/legendary',
+        references: {
+          model: 'rarity_defs',
+          key: 'rarity_code'
+        }
       },
 
       /**

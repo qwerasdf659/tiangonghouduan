@@ -32,8 +32,7 @@ export function useCampaignsState() {
       // 时间设置（后端必填）
       start_time: '',
       end_time: '',
-      // 抽奖配置（后端必填）
-      cost_per_draw: 10,
+      // 抽奖配置（后端必填，定价通过 pricing_config 管理，创建活动时自动生成默认定价）
       max_draws_per_user_daily: 3,
       max_draws_per_user_total: null,
       // 奖池配置
@@ -41,7 +40,20 @@ export function useCampaignsState() {
       remaining_prize_pool: 10000,
       // 状态和规则
       status: 'draft',
-      rules_text: ''
+      rules_text: '',
+      // ======== 前端展示配置（多活动抽奖系统 2026-02-15） ========
+      /** 前端展示方式（14种玩法） */
+      display_mode: 'grid_3x3',
+      /** 网格列数（仅 grid 模式有效） */
+      grid_cols: 3,
+      /** 特效主题（6套） */
+      effect_theme: 'default',
+      /** 是否启用稀有度光效 */
+      rarity_effects_enabled: true,
+      /** 中奖动画类型 */
+      win_animation: 'simple',
+      /** 活动背景图URL */
+      background_image_url: null
     },
     /** @type {Array} 活动类型选项 */
     campaignTypeOptions: [
@@ -49,6 +61,39 @@ export function useCampaignsState() {
       { value: 'weekly', label: '每周抽奖' },
       { value: 'event', label: '活动抽奖' },
       { value: 'permanent', label: '常驻抽奖' }
+    ],
+    /** @type {Array} 玩法类型选项（14种，对应 display_mode 字段） */
+    displayModeOptions: [
+      { value: 'grid_3x3', label: '九宫格 3×3', icon: '🎰' },
+      { value: 'grid_4x4', label: '九宫格 4×4', icon: '🎰' },
+      { value: 'wheel', label: '转盘', icon: '🎡' },
+      { value: 'card_flip', label: '卡牌翻转', icon: '🃏' },
+      { value: 'golden_egg', label: '砸金蛋', icon: '🥚' },
+      { value: 'scratch_card', label: '刮刮卡', icon: '🎫' },
+      { value: 'blind_box', label: '虚拟盲盒', icon: '📦' },
+      { value: 'gashapon', label: '扭蛋机', icon: '🎱' },
+      { value: 'lucky_bag', label: '福袋', icon: '🎒' },
+      { value: 'red_packet', label: '拆红包', icon: '🧧' },
+      { value: 'slot_machine', label: '老虎机', icon: '🎰' },
+      { value: 'whack_mole', label: '打地鼠', icon: '🔨' },
+      { value: 'pinball', label: '弹珠机', icon: '🎯' },
+      { value: 'card_collect', label: '集卡', icon: '🃏' },
+      { value: 'flash_sale', label: '限时秒杀', icon: '⚡' }
+    ],
+    /** @type {Array} 特效主题选项（6套，对应 effect_theme 字段） */
+    effectThemeOptions: [
+      { value: 'default', label: '默认', primary: '#e67e22', secondary: '#ffffff' },
+      { value: 'gold_luxury', label: '金色奢华', primary: '#f1c40f', secondary: '#2c3e50' },
+      { value: 'purple_mystery', label: '紫色神秘', primary: '#9b59b6', secondary: '#2c3e50' },
+      { value: 'spring_festival', label: '春节红色', primary: '#e74c3c', secondary: '#f1c40f' },
+      { value: 'christmas', label: '圣诞绿色', primary: '#27ae60', secondary: '#e74c3c' },
+      { value: 'summer', label: '夏日清凉', primary: '#3498db', secondary: '#ffffff' }
+    ],
+    /** @type {Array} 中奖动画选项（3种，对应 win_animation 字段） */
+    winAnimationOptions: [
+      { value: 'simple', label: '简单弹窗' },
+      { value: 'card_flip', label: '卡牌翻转' },
+      { value: 'fireworks', label: '烟花特效' }
     ],
     /** @type {number|string|null} 当前编辑的活动ID */
     editingCampaignId: null,
@@ -161,13 +206,19 @@ export function useCampaignsMethods(_context) {
         description: '',
         start_time: this.formatDateTimeLocal(startTime),
         end_time: this.formatDateTimeLocal(endTime),
-        cost_per_draw: 10,
         max_draws_per_user_daily: 3,
         max_draws_per_user_total: null,
         total_prize_pool: 10000,
         remaining_prize_pool: 10000,
         status: 'draft',
-        rules_text: ''
+        rules_text: '',
+        // 展示配置默认值
+        display_mode: 'grid_3x3',
+        grid_cols: 3,
+        effect_theme: 'default',
+        rarity_effects_enabled: true,
+        win_animation: 'simple',
+        background_image_url: null
       }
       this.showModal('campaignModal')
     },
@@ -187,13 +238,19 @@ export function useCampaignsMethods(_context) {
         description: campaign.description || '',
         start_time: this.formatDateTimeLocal(campaign.start_time),
         end_time: this.formatDateTimeLocal(campaign.end_time),
-        cost_per_draw: campaign.cost_per_draw || 10,
         max_draws_per_user_daily: campaign.max_draws_per_user_daily || 3,
         max_draws_per_user_total: campaign.max_draws_per_user_total || null,
         total_prize_pool: campaign.total_prize_pool || 10000,
         remaining_prize_pool: campaign.remaining_prize_pool || 10000,
         status: campaign.status || 'draft',
-        rules_text: campaign.rules_text || ''
+        rules_text: campaign.rules_text || '',
+        // 展示配置（从后端活动详情中回填）
+        display_mode: campaign.display_mode || 'grid_3x3',
+        grid_cols: campaign.grid_cols || 3,
+        effect_theme: campaign.effect_theme || 'default',
+        rarity_effects_enabled: campaign.rarity_effects_enabled !== false,
+        win_animation: campaign.win_animation || 'simple',
+        background_image_url: campaign.background_image_url || null
       }
       this.showModal('campaignModal')
     },
@@ -229,18 +286,15 @@ export function useCampaignsMethods(_context) {
         this.showError('请设置活动时间')
         return
       }
-      if (!this.campaignForm.cost_per_draw || this.campaignForm.cost_per_draw <= 0) {
-        this.showError('每次抽奖消耗积分必须大于0')
-        return
-      }
-
       try {
         this.saving = true
-        const url = this.isEditMode
-          ? `${LOTTERY_ENDPOINTS.CAMPAIGN_LIST}/${this.editingCampaignId}`
-          : LOTTERY_ENDPOINTS.CAMPAIGN_LIST
 
-        // 构建请求数据 - 直接使用后端字段名称
+        // 使用正确的后端 CRUD 端点（system-data 路由）
+        const url = this.isEditMode
+          ? `${LOTTERY_ENDPOINTS.CAMPAIGN_CREATE}/${this.editingCampaignId}`
+          : LOTTERY_ENDPOINTS.CAMPAIGN_CREATE
+
+        // 构建请求数据 - 直接使用后端 snake_case 字段名
         const requestData = {
           campaign_name: this.campaignForm.campaign_name,
           campaign_code: this.campaignForm.campaign_code,
@@ -248,7 +302,6 @@ export function useCampaignsMethods(_context) {
           description: this.campaignForm.description || '',
           start_time: this.campaignForm.start_time,
           end_time: this.campaignForm.end_time,
-          cost_per_draw: parseFloat(this.campaignForm.cost_per_draw) || 10,
           max_draws_per_user_daily: parseInt(this.campaignForm.max_draws_per_user_daily) || 3,
           max_draws_per_user_total: this.campaignForm.max_draws_per_user_total
             ? parseInt(this.campaignForm.max_draws_per_user_total)
@@ -266,7 +319,14 @@ export function useCampaignsMethods(_context) {
               { tier_id: 4, tier_name: '三等奖', weight: 400000 },
               { tier_id: 5, tier_name: '谢谢参与', weight: 500000 }
             ]
-          }
+          },
+          // ======== 前端展示配置（多活动抽奖系统 2026-02-15） ========
+          display_mode: this.campaignForm.display_mode || 'grid_3x3',
+          grid_cols: parseInt(this.campaignForm.grid_cols) || 3,
+          effect_theme: this.campaignForm.effect_theme || 'default',
+          rarity_effects_enabled: this.campaignForm.rarity_effects_enabled !== false,
+          win_animation: this.campaignForm.win_animation || 'simple',
+          background_image_url: this.campaignForm.background_image_url || null
         }
 
         logger.debug('提交活动数据:', requestData)
@@ -299,8 +359,8 @@ export function useCampaignsMethods(_context) {
       await this.confirmAndExecute(
         `确认删除活动「${campaign.campaign_name}」？此操作不可恢复`,
         async () => {
-          // apiCall 成功时返回 response.data，失败时抛出错误
-          await this.apiCall(`${LOTTERY_ENDPOINTS.CAMPAIGN_LIST}/${campaign.lottery_campaign_id}`, {
+          // 使用 system-data 路由删除活动
+          await this.apiCall(`${LOTTERY_ENDPOINTS.CAMPAIGN_CREATE}/${campaign.lottery_campaign_id}`, {
             method: 'DELETE'
           })
           // 如果没有抛出错误，则表示成功
@@ -321,9 +381,9 @@ export function useCampaignsMethods(_context) {
       await this.confirmAndExecute(
         `确认${newStatus === 'active' ? '启用' : '暂停'}活动「${campaign.campaign_name}」？`,
         async () => {
-          // apiCall 成功时返回 response.data，失败时抛出错误
+          // 使用 system-data 路由更新活动状态
           await this.apiCall(
-            `${LOTTERY_ENDPOINTS.CAMPAIGN_LIST}/${campaign.lottery_campaign_id}/status`,
+            `${LOTTERY_ENDPOINTS.CAMPAIGN_CREATE}/${campaign.lottery_campaign_id}/status`,
             {
               method: 'PUT',
               data: { status: newStatus }
@@ -344,12 +404,13 @@ export function useCampaignsMethods(_context) {
      */
     getCampaignStatusClass(status) {
       const map = {
-        active: 'bg-success',
-        inactive: 'bg-secondary',
-        pending: 'bg-warning',
-        ended: 'bg-dark'
+        draft: 'bg-gray-100 text-gray-700',
+        active: 'bg-green-100 text-green-700',
+        paused: 'bg-yellow-100 text-yellow-700',
+        ended: 'bg-gray-200 text-gray-600',
+        cancelled: 'bg-red-100 text-red-700'
       }
-      return map[status] || 'bg-secondary'
+      return map[status] || 'bg-gray-100 text-gray-600'
     },
 
     // ✅ 已删除 getCampaignStatusText 映射函数

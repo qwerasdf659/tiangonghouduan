@@ -509,6 +509,20 @@ module.exports = sequelize => {
           'lock_type: trade(交易锁3分钟)/redemption(兑换码锁30天)/security(风控锁无限期)'
       },
 
+      /**
+       * 来源标识（决策10：区分物品来源）
+       * - NULL: 历史数据（无法确定来源）
+       * - exchange: 普通兑换
+       * - bid_settlement: 竞价结算
+       * - lottery: 抽奖
+       */
+      source: {
+        type: DataTypes.STRING(20),
+        allowNull: true,
+        defaultValue: null,
+        comment: '来源：exchange=兑换, bid_settlement=竞价结算, lottery=抽奖（存量为 NULL）'
+      },
+
       // 创建时间（Created At）
       created_at: {
         type: DataTypes.DATE,

@@ -2,66 +2,44 @@
  * 餐厅积分抽奖系统 V4.0 - 用户积分和统计API路由
  *
  * 功能：
- * - 获取用户积分信息
- * - 获取用户抽奖统计
+ * - 获取当前登录用户的积分信息（从JWT Token取身份）
+ * - 获取当前登录用户的抽奖统计（从JWT Token取身份）
  * - 抽奖系统健康检查
  *
  * 路由前缀：/api/v4/lottery
  *
+ * 安全设计（路由分离方案 V4.8.0）：
+ * - 用户端路由不含 :user_id 参数，身份纯从 JWT Token 获取
+ * - 管理员查看他人数据走 /api/v4/console/lottery-user-analysis/
+ *
  * 创建时间：2025年12月22日
+ * 更新时间：2026年2月12日（路由分离方案 - 抽奖接口安全改造）
  */
 
 const express = require('express')
 const router = express.Router()
 const logger = require('../../../utils/logger').logger
-const { authenticateToken, getUserRoles } = require('../../../middleware/auth')
+const { authenticateToken } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { pointsRateLimiter } = require('./middleware')
 
 /**
- * @route GET /api/v4/lottery/points/:user_id
- * @desc 获取用户积分信息
- * @access Private (需要认证 + 限流保护60次/分钟)
- *
- * @param {number} user_id - 用户ID
+ * @route GET /api/v4/lottery/points
+ * @desc 获取当前登录用户的积分信息
+ * @access Private（JWT Token 认证 + 限流保护60次/分钟）
  *
  * @returns {Object} 用户积分信息
  *
- * 安全防护：
- * - 限流保护：60次/分钟/用户
- * - 审计日志：记录管理员查询他人积分的操作
+ * 安全设计（路由分离方案 V4.8.0）：
+ * - 用户端路由不含 :user_id 参数，身份纯从 JWT Token 获取
+ * - 管理员查看他人积分走 /api/v4/console/lottery-user-analysis/points/:user_id
  */
-router.get('/points/:user_id', authenticateToken, pointsRateLimiter, async (req, res) => {
+router.get('/points', authenticateToken, pointsRateLimiter, async (req, res) => {
   try {
-    const user_id = parseInt(req.params.user_id)
+    const user_id = req.user.user_id
 
-    // 🔴 P0优化：参数验证
-    if (isNaN(user_id) || user_id <= 0) {
-      return res.apiError('user_id参数无效，必须为正整数', 'INVALID_USER_ID', {}, 400)
-    }
-
-    // 🛡️ 权限检查：只能查看自己的积分，除非是超级管理员（role_level >= 100）
-    const currentUserRoles = await getUserRoles(req.user.user_id)
-    const hasAdminAccess = currentUserRoles.role_level >= 100
-    if (req.user.user_id !== user_id && !hasAdminAccess) {
-      return res.apiError('无权查看其他用户的积分信息', 'ACCESS_DENIED', {}, 403)
-    }
-
-    // ✅ 审计日志：记录管理员查询他人积分的操作（安全审计和合规性要求）
-    if (hasAdminAccess && req.user.user_id !== user_id) {
-      logger.warn('[Audit] 管理员查询他人积分', {
-        operator_id: req.user.user_id, // 操作者（管理员）
-        operator_mobile: req.user.mobile, // 操作者手机号
-        target_user_id: user_id, // 被查询的用户ID
-        action: 'query_user_points', // 操作类型
-        ip: req.ip, // 请求来源IP
-        user_agent: req.headers['user-agent'], // 请求客户端
-        timestamp: BeijingTimeHelper.now() // 北京时间
-      })
-    }
-
-    // ✅ 通过UserService验证用户和积分账户（不再直连models）
+    // 通过 ServiceManager 获取 UserService，验证用户和积分账户
     const UserService = req.app.locals.services.getService('user')
     const { user: _user, points_account: points_info } = await UserService.getUserWithPoints(
       user_id,
@@ -73,10 +51,8 @@ router.get('/points/:user_id', authenticateToken, pointsRateLimiter, async (req,
 
     return res.apiSuccess(points_info, '用户积分获取成功', 'POINTS_SUCCESS')
   } catch (error) {
-    // 详细错误日志（包含上下文信息，便于调试）
     logger.error('[Points API] 获取用户积分失败', {
-      user_id: req.params.user_id,
-      requester: req.user?.user_id,
+      user_id: req.user?.user_id,
       error: error.message,
       stack: error.stack,
       timestamp: BeijingTimeHelper.now()
@@ -86,58 +62,40 @@ router.get('/points/:user_id', authenticateToken, pointsRateLimiter, async (req,
 })
 
 /**
- * @route GET /api/v4/lottery/statistics/:user_id
- * @desc 获取用户抽奖统计
- * @access Private
- *
- * @param {number} user_id - 用户ID
+ * @route GET /api/v4/lottery/statistics
+ * @desc 获取当前登录用户的抽奖统计
+ * @access Private（JWT Token 认证）
  *
  * @returns {Object} 用户抽奖统计数据（V4.0语义）
  *
- * 返回数据结构（V4.0语义更新）：
+ * 返回数据结构：
  * - user_id: 用户ID
  * - total_draws: 总抽奖次数
- * - total_high_tier_wins: 总高档奖励次数（V4.0语义）
- * - guarantee_wins: 保底触发次数
- * - normal_high_tier_wins: 正常高档奖励次数
- * - high_tier_rate: 高档奖励率（百分比数字，V4.0语义）
+ * - total_high_tier_wins: 总高档奖励次数
+ * - high_tier_rate: 高档奖励率
  * - today_draws: 今日抽奖次数
- * - today_high_tier_wins: 今日高档奖励次数
- * - today_high_tier_rate: 今日高档奖励率（V4.0语义）
- * - total_points_cost: 总消耗积分
- * - reward_tier_distribution: 奖励档位分布（V4.0语义）
- * - last_high_tier_win: 最近一次高档奖励记录
+ * - reward_tier_distribution: 奖励档位分布
+ *
+ * 安全设计（路由分离方案 V4.8.0）：
+ * - 用户端路由不含 :user_id 参数，身份纯从 JWT Token 获取
+ * - 管理员查看他人统计走 /api/v4/console/lottery-user-analysis/statistics/:user_id
  */
-router.get('/statistics/:user_id', authenticateToken, async (req, res) => {
+router.get('/statistics', authenticateToken, async (req, res) => {
   try {
-    // 📊 解析用户ID参数（URL路径参数转换为整数）
-    const user_id = parseInt(req.params.user_id)
+    const user_id = req.user.user_id
 
-    /*
-     * 🛡️ 权限检查（Access Control - 严格权限验证）：
-     * 业务规则1：普通用户只能查看自己的统计（user_id必须匹配JWT token中的用户ID）
-     * 业务规则2：超级管理员admin（role_level >= 100）可以查看任何用户的统计（用于后台管理和数据分析）
-     * 安全保障：防止用户A查看用户B的统计数据，保护用户隐私
-     */
-    const currentUserRoles = await getUserRoles(req.user.user_id)
-    if (req.user.user_id !== user_id && currentUserRoles.role_level < 100) {
-      return res.apiError('无权查看其他用户的统计信息', 'ACCESS_DENIED', {}, 403)
-    }
-
-    /*
-     * 📡 调用 LotteryQueryService 的统计服务（读写分离架构）
-     * 服务层方法：LotteryQueryService.getUserStatistics(user_id)
-     */
+    // 通过 ServiceManager 获取 LotteryQueryService
     const LotteryQueryService = req.app.locals.services.getService('lottery_query')
     const statistics = await LotteryQueryService.getUserStatistics(user_id)
 
-    /*
-     * ✅ 成功返回统计数据（使用统一的API响应格式ApiResponse）
-     */
     return res.apiSuccess(statistics, '统计信息获取成功', 'STATISTICS_SUCCESS')
   } catch (error) {
-    // ❌ 错误处理（记录错误日志并返回友好的错误信息）
-    logger.error('获取统计信息失败:', error)
+    logger.error('获取统计信息失败', {
+      user_id: req.user?.user_id,
+      error: error.message,
+      stack: error.stack,
+      timestamp: BeijingTimeHelper.now()
+    })
     return handleServiceError(error, res, '获取统计信息失败')
   }
 })

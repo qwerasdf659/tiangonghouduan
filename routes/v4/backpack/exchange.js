@@ -49,11 +49,17 @@ function asyncHandler(fn) {
 /**
  * GET /api/v4/backpack/exchange/items
  *
- * @description 获取兑换商品列表（展示材料成本）
+ * @description 获取兑换商品列表（展示材料成本，支持空间筛选/搜索/价格范围）
  * @access Private（所有登录用户可访问）
  *
  * @query {string} status - 商品状态（active/inactive，默认 active）
  * @query {string} asset_code - 材料资产代码筛选（可选）
+ * @query {string} space - 空间筛选：lucky/premium（可选，不传返回全部）
+ * @query {string} keyword - 模糊搜索（匹配 item_name，可选）
+ * @query {string} category - 分类筛选（可选）
+ * @query {number} min_cost - 最低价格（可选）
+ * @query {number} max_cost - 最高价格（可选）
+ * @query {string} stock_status - 库存状态：in_stock(>5)/low_stock(1-5)（可选）
  * @query {number} page - 页码（默认 1）
  * @query {number} page_size - 每页数量（默认 20，最大 50）
  * @query {string} sort_by - 排序字段（默认 sort_order）
@@ -71,6 +77,12 @@ router.get(
     const {
       status = 'active',
       asset_code,
+      space,
+      keyword,
+      category,
+      min_cost,
+      max_cost,
+      stock_status,
       page = 1,
       page_size = 20,
       sort_by = 'sort_order',
@@ -81,6 +93,8 @@ router.get(
       user_id: req.user.user_id,
       status,
       asset_code,
+      space,
+      keyword,
       page,
       page_size
     })
@@ -100,6 +114,19 @@ router.get(
       )
     }
 
+    // 空间白名单验证
+    if (space) {
+      const validSpaces = ['lucky', 'premium']
+      if (!validSpaces.includes(space)) {
+        return res.apiError(
+          `无效的 space 参数，允许值：${validSpaces.join(', ')}`,
+          'BAD_REQUEST',
+          null,
+          400
+        )
+      }
+    }
+
     // 排序方向白名单验证
     const validSortOrders = ['ASC', 'DESC']
     const upperSortOrder = sort_order.toUpperCase()
@@ -112,10 +139,16 @@ router.get(
       )
     }
 
-    // 调用服务层
+    // 调用服务层（新增参数：space/keyword/category/min_cost/max_cost/stock_status）
     const result = await ExchangeQueryService.getMarketItems({
       status,
       asset_code,
+      space: space || null,
+      keyword: keyword || null,
+      category: category || null,
+      min_cost: min_cost ? parseInt(min_cost, 10) : null,
+      max_cost: max_cost ? parseInt(max_cost, 10) : null,
+      stock_status: stock_status || null,
       page: finalPage,
       page_size: finalPageSize,
       sort_by,
@@ -352,6 +385,162 @@ router.post(
         idempotency_key
       })
       return handleServiceError(error, res, '兑换失败')
+    }
+  })
+)
+
+/**
+ * GET /api/v4/backpack/exchange/space-stats
+ *
+ * @description 获取空间统计数据（臻选空间/幸运空间）
+ * @access Private（所有登录用户可访问）
+ *
+ * @query {string} space - 空间类型（必填）：lucky / premium
+ *
+ * @returns {Object} { space, total_products, new_count, hot_count, asset_code_distribution }
+ */
+router.get(
+  '/space-stats',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const ExchangeQueryService = req.app.locals.services.getService('exchange_query')
+
+    const { space } = req.query
+
+    // 参数验证：space 必填
+    if (!space) {
+      return res.apiError('space 参数不能为空', 'BAD_REQUEST', null, 400)
+    }
+
+    const validSpaces = ['lucky', 'premium']
+    if (!validSpaces.includes(space)) {
+      return res.apiError(
+        `无效的 space 参数，允许值：${validSpaces.join(', ')}`,
+        'BAD_REQUEST',
+        null,
+        400
+      )
+    }
+
+    logger.info('查询空间统计', { user_id: req.user.user_id, space })
+
+    const stats = await ExchangeQueryService.getSpaceStats(space)
+
+    return res.apiSuccess(stats, '获取空间统计成功')
+  })
+)
+
+/**
+ * GET /api/v4/backpack/exchange/premium-status
+ *
+ * @description 查询高级空间（臻选空间）状态
+ * @access Private（所有登录用户可访问）
+ *
+ * 复用 PremiumService.getPremiumStatus(user_id)
+ * 从 /api/v4/shop/premium/status 迁移到此路由（决策2）
+ *
+ * @returns {Object} 解锁状态和条件信息
+ */
+router.get(
+  '/premium-status',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const PremiumService = req.app.locals.services.getService('premium')
+    const userId = req.user.user_id
+
+    logger.info('查询高级空间状态', { user_id: userId })
+
+    try {
+      const status = await PremiumService.getPremiumStatus(userId)
+
+      // 业务常量（与 PremiumService 一致）
+      const UNLOCK_COST = 100
+      const VALIDITY_HOURS = 24
+
+      if (!status.unlocked || !status.is_valid) {
+        // 未解锁或已过期
+        return res.apiSuccess(
+          {
+            unlocked: false,
+            is_expired: status.is_expired || false,
+            can_unlock: status.can_unlock,
+            unlock_cost: UNLOCK_COST,
+            validity_hours: VALIDITY_HOURS,
+            conditions: status.conditions
+          },
+          status.is_expired ? '高级空间已过期' : '高级空间未解锁'
+        )
+      }
+
+      // 已解锁且在有效期内
+      return res.apiSuccess(
+        {
+          unlocked: true,
+          is_valid: true,
+          unlock_cost: UNLOCK_COST,
+          validity_hours: VALIDITY_HOURS,
+          remaining_hours: status.remaining_hours,
+          total_unlock_count: status.total_unlock_count
+        },
+        '高级空间访问中'
+      )
+    } catch (error) {
+      logger.error('查询高级空间状态失败', { user_id: userId, error: error.message })
+      return handleServiceError(error, res, '查询高级空间状态失败')
+    }
+  })
+)
+
+/**
+ * POST /api/v4/backpack/exchange/unlock-premium
+ *
+ * @description 解锁高级空间（臻选空间）
+ * @access Private（所有登录用户可访问，需满足解锁条件）
+ *
+ * 复用 PremiumService.unlockPremium(user_id, {transaction})
+ * 从 /api/v4/shop/premium/unlock 迁移到此路由（决策2）
+ *
+ * @returns {Object} 解锁结果
+ */
+router.post(
+  '/unlock-premium',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const PremiumService = req.app.locals.services.getService('premium')
+    const userId = req.user.user_id
+
+    logger.info('用户解锁高级空间', { user_id: userId })
+
+    try {
+      // 调用 PremiumService 处理解锁（Service 内部管理事务）
+      const result = await PremiumService.unlockPremium(userId)
+
+      logger.info('高级空间解锁成功', {
+        user_id: userId,
+        is_first_unlock: result.is_first_unlock,
+        unlock_cost: result.unlock_cost
+      })
+
+      return res.apiSuccess(
+        {
+          unlocked: true,
+          is_first_unlock: result.is_first_unlock,
+          unlock_cost: result.unlock_cost,
+          remaining_points: result.remaining_points,
+          validity_hours: result.validity_hours,
+          total_unlock_count: result.total_unlock_count
+        },
+        '高级空间解锁成功'
+      )
+    } catch (error) {
+      logger.error('高级空间解锁失败', { user_id: userId, error: error.message })
+
+      // 处理业务错误（来自 PremiumService）
+      if (error.code && error.statusCode) {
+        return res.apiError(error.message, error.code, error.data || null, error.statusCode)
+      }
+
+      return handleServiceError(error, res, '解锁失败')
     }
   })
 )

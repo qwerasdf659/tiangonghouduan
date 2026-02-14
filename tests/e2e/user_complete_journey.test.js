@@ -299,7 +299,7 @@ describe('E2E - 新用户完整旅程测试', () => {
      */
     test('应该能查看用户抽奖历史', async () => {
       const response = await request(app)
-        .get(`/api/v4/lottery/history/${testUserId}`)
+        .get('/api/v4/lottery/history')
         .set('Authorization', `Bearer ${accessToken}`)
         .query({ page: 1, page_size: 10 })
         .expect('Content-Type', /json/)

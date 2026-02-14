@@ -93,22 +93,22 @@ describe('BackpackService - 背包服务', () => {
         // 验证字段存在（2026-01-08 修正：icon字段不在material_asset_types表中，移除该断言）
         expect(asset).toHaveProperty('asset_code')
         expect(asset).toHaveProperty('display_name')
-        expect(asset).toHaveProperty('balance')
-        expect(asset).toHaveProperty('frozen_balance')
+        expect(asset).toHaveProperty('total_amount')
+        expect(asset).toHaveProperty('frozen_amount')
         /*
          * icon 字段当前不在 MaterialAssetType 模型中，跳过检查
          * expect(asset).toHaveProperty('icon')
          */
 
-        // 验证字段类型
+        // 验证字段类型（字段名与数据库 account_asset_balances 表一致）
         expect(typeof asset.asset_code).toBe('string')
         expect(typeof asset.display_name).toBe('string')
-        expect(typeof asset.balance).toBe('number')
-        expect(typeof asset.frozen_balance).toBe('number')
+        expect(typeof asset.total_amount).toBe('number')
+        expect(typeof asset.frozen_amount).toBe('number')
 
         // 验证余额逻辑
-        expect(asset.balance).toBeGreaterThanOrEqual(0)
-        expect(asset.frozen_balance).toBeGreaterThanOrEqual(0)
+        expect(asset.total_amount).toBeGreaterThanOrEqual(0)
+        expect(asset.frozen_amount).toBeGreaterThanOrEqual(0)
       }
     })
 
@@ -252,8 +252,8 @@ describe('BackpackService - 背包服务', () => {
       const result = await BackpackService.getUserBackpack(test_user.user_id, test_user.user_id)
 
       result.assets.forEach(asset => {
-        expect(asset.balance).toBeGreaterThanOrEqual(0)
-        expect(asset.frozen_balance).toBeGreaterThanOrEqual(0)
+        expect(asset.total_amount).toBeGreaterThanOrEqual(0)
+        expect(asset.frozen_amount).toBeGreaterThanOrEqual(0)
       })
     })
 

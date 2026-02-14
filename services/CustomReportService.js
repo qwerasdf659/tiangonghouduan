@@ -47,13 +47,13 @@ const DATA_SOURCE_CONFIG = {
    */
   points: {
     model: 'AccountAssetBalance',
-    defaultFields: ['user_id', 'asset_code', 'available_balance', 'frozen_balance'],
+    defaultFields: ['user_id', 'asset_code', 'available_amount', 'frozen_amount'],
     aggregateFields: {
-      total_points: 'SUM(available_balance)',
-      avg_points: 'AVG(available_balance)',
+      total_points: 'SUM(available_amount)',
+      avg_points: 'AVG(available_amount)',
       user_count: 'COUNT(DISTINCT user_id)'
     },
-    filter: { asset_code: 'points' }
+    filter: { asset_code: 'POINTS' }
   },
 
   /**

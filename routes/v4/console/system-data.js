@@ -405,12 +405,18 @@ router.put(
         status,
         rules_text,
         budget_mode,
-        cost_per_draw,
         max_draws_per_user_daily,
         max_draws_per_user_total,
         total_prize_pool,
         remaining_prize_pool,
-        prize_distribution_config
+        prize_distribution_config,
+        // 前端展示配置字段（多活动抽奖系统）
+        display_mode,
+        grid_cols,
+        effect_theme,
+        rarity_effects_enabled,
+        win_animation,
+        background_image_url
       } = req.body
 
       // 构建更新数据（campaign_code 不可修改）
@@ -423,7 +429,6 @@ router.put(
       if (status !== undefined) updateData.status = status
       if (rules_text !== undefined) updateData.rules_text = rules_text
       if (budget_mode !== undefined) updateData.budget_mode = budget_mode
-      if (cost_per_draw !== undefined) updateData.cost_per_draw = cost_per_draw
       if (max_draws_per_user_daily !== undefined) {
         updateData.max_draws_per_user_daily = max_draws_per_user_daily
       }
@@ -435,6 +440,15 @@ router.put(
       if (prize_distribution_config !== undefined) {
         updateData.prize_distribution_config = prize_distribution_config
       }
+      // 前端展示配置字段（多活动抽奖系统）
+      if (display_mode !== undefined) updateData.display_mode = display_mode
+      if (grid_cols !== undefined) updateData.grid_cols = grid_cols
+      if (effect_theme !== undefined) updateData.effect_theme = effect_theme
+      if (rarity_effects_enabled !== undefined) {
+        updateData.rarity_effects_enabled = rarity_effects_enabled
+      }
+      if (win_animation !== undefined) updateData.win_animation = win_animation
+      if (background_image_url !== undefined) updateData.background_image_url = background_image_url
 
       // 通过 ServiceManager 获取服务
       const LotteryCampaignCRUDService = req.app.locals.services.getService('lottery_campaign_crud')

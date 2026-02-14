@@ -69,6 +69,51 @@ function validateCampaignCode(code) {
 }
 
 /**
+ * @route GET /api/v4/lottery/campaigns/active
+ * @desc 获取所有进行中的活动列表（含 display 摘要）
+ * @access Private
+ *
+ * @returns {Array} 进行中的活动列表
+ *
+ * 业务场景：
+ * - 小程序前端需要展示多个同时进行的活动
+ * - 返回活动基本信息 + display 展示配置摘要
+ *
+ * ⚠️ 路由顺序注意：此路由必须定义在 /:code/* 之前，
+ * 否则 Express 会将 'active' 匹配为 :code 参数
+ *
+ * @see docs/后端与Web管理平台-对接需求总览.md Section 3.3 接口5
+ */
+router.get('/active', authenticateToken, async (req, res) => {
+  try {
+    const LotteryQueryService = req.app.locals.services.getService('lottery_query')
+
+    // 查询所有进行中的活动（status='active' 且在有效期内）
+    const activeCampaigns = await LotteryQueryService.getActiveCampaigns()
+
+    // 构造响应数据：仅包含前端需要的字段
+    const campaignList = activeCampaigns.map(campaign => ({
+      campaign_code: campaign.campaign_code,
+      campaign_name: campaign.campaign_name,
+      campaign_type: campaign.campaign_type,
+      status: campaign.status,
+      display: {
+        mode: campaign.display_mode || 'grid_3x3',
+        effect_theme: campaign.effect_theme || 'default'
+      },
+      banner_image_url: campaign.banner_image_url || null,
+      start_time: campaign.start_time,
+      end_time: campaign.end_time
+    }))
+
+    return res.apiSuccess(campaignList, '获取活动列表成功', 'ACTIVE_CAMPAIGNS_SUCCESS')
+  } catch (error) {
+    logger.error('获取进行中活动列表失败:', error)
+    return handleServiceError(error, res, '获取活动列表失败')
+  }
+})
+
+/**
  * @route GET /api/v4/lottery/campaigns/:code/prizes
  * @desc 获取活动的奖品列表 - 已应用数据脱敏
  * @access Private
@@ -201,12 +246,29 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
       )
     }
 
+    /**
+     * 前端展示配置对象 - 从 campaign 模型读取展示配置字段
+     * 前端根据此对象动态加载玩法组件、主题色、光效和动画
+     * @see docs/后端与Web管理平台-对接需求总览.md Section 3.2 接口1
+     */
+    const displayConfig = {
+      mode: campaign.display_mode || 'grid_3x3',
+      grid_cols: campaign.grid_cols || 3,
+      effect_theme: campaign.effect_theme || 'default',
+      rarity_effects_enabled: campaign.rarity_effects_enabled !== false,
+      win_animation: campaign.win_animation || 'simple',
+      background_image_url: campaign.background_image_url || null
+    }
+
     if (req.dataLevel === 'full') {
       // 管理员获取完整配置（返回 campaign_code 而不是 lottery_campaign_id）
       const adminConfig = {
         ...fullConfig,
         campaign_code: campaign.campaign_code,
-        draw_buttons: drawButtons // 2026-01-26: 统一使用数组格式
+        base_cost: drawButtons[0]?.original_cost ?? 0, // 折扣前基础定价（与用户端一致）
+        per_draw_cost: drawButtons.find(b => b.draw_count === 1)?.per_draw ?? 0, // 折扣后单抽实际价
+        draw_buttons: drawButtons, // 2026-01-26: 统一使用数组格式
+        display: displayConfig // 2026-02-15: 前端展示配置（多活动抽奖系统）
       }
 
       // 如果配置缺失，在响应中添加警告信息（仅管理员可见）
@@ -226,13 +288,15 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
         campaign_code: campaign.campaign_code,
         campaign_name: fullConfig.campaign_name,
         status: fullConfig.status,
-        cost_per_draw: fullConfig.cost_per_draw,
+        base_cost: drawButtons[0]?.original_cost ?? 0,
+        per_draw_cost: drawButtons.find(b => b.draw_count === 1)?.per_draw ?? 0,
         max_draws_per_user_daily: fullConfig.max_draws_per_user_daily,
         guarantee_info: {
           exists: !!fullConfig.guarantee_rule,
           description: '连续抽奖有惊喜哦~'
         },
-        draw_buttons: drawButtons // 2026-01-26: 统一使用数组格式
+        draw_buttons: drawButtons, // 2026-01-26: 统一使用数组格式
+        display: displayConfig // 2026-02-15: 前端展示配置（多活动抽奖系统）
       }
 
       return res.apiSuccess(sanitizedConfig, '抽奖配置获取成功')

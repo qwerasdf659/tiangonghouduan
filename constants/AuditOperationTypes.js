@@ -267,7 +267,18 @@ const OPERATION_TYPES = Object.freeze({
    * @description 管理员切换功能开关状态
    * @example FeatureFlagService.toggleFlag()
    */
-  FEATURE_FLAG_TOGGLE: 'feature_flag_toggle'
+  FEATURE_FLAG_TOGGLE: 'feature_flag_toggle',
+
+  // ==================== 管理员查看用户数据类（路由分离方案 V4.8.0 新增）====================
+  /**
+   * 管理员查看用户数据（只读查询）
+   * @description 管理员通过管理端接口查看用户的抽奖历史、积分、统计等数据
+   * @example 管理端路由 /api/v4/console/lottery-user-analysis/history/:user_id
+   * @example 管理端路由 /api/v4/console/lottery-user-analysis/points/:user_id
+   * @example 管理端路由 /api/v4/console/lottery-user-analysis/statistics/:user_id
+   * @since 2026-02-12（路由分离方案 - 抽奖接口安全改造）
+   */
+  ADMIN_VIEW_USER_DATA: 'admin_view_user_data'
 })
 
 /**
@@ -352,7 +363,10 @@ const OPERATION_TYPE_DESCRIPTIONS = Object.freeze({
   [OPERATION_TYPES.FEATURE_FLAG_TOGGLE]: '功能开关启用/禁用',
 
   // 员工管理类（V4.6.1 新增）
-  [OPERATION_TYPES.STAFF_PERMANENT_DELETE]: '员工记录删除'
+  [OPERATION_TYPES.STAFF_PERMANENT_DELETE]: '员工记录删除',
+
+  // 管理员查看用户数据类（路由分离方案 V4.8.0 新增）
+  [OPERATION_TYPES.ADMIN_VIEW_USER_DATA]: '管理员查看用户数据'
 })
 
 /**

@@ -2,13 +2,43 @@
  * 系统配置模块
  *
  * @file admin/src/modules/system/composables/config.js
- * @description 网站基本设置、功能开关、维护模式
- * @version 1.0.0
- * @date 2026-01-24
+ * @description 网站基本设置、全分类配置管理、活动下拉选择
+ * @version 2.0.0
+ * @date 2026-02-08
  */
 
 import { logger } from '../../../utils/logger.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
+import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
+import { buildURL } from '../../../api/base.js'
+
+/**
+ * 配置分类显示名映射
+ */
+const CATEGORY_DISPLAY = {
+  basic: { name: '基础设置', icon: '⚙️', description: '系统名称、客服信息、维护模式' },
+  points: { name: '积分设置', icon: '🪙', description: '抽奖消耗、签到积分、预算比例' },
+  notification: { name: '通知设置', icon: '🔔', description: '短信、邮件、APP推送开关' },
+  security: { name: '安全设置', icon: '🔐', description: '登录限制、密码策略、API限流' },
+  marketplace: { name: '市场设置', icon: '🏪', description: '上架数量、过期天数、价格阈值' }
+}
+
+/**
+ * 需要活动下拉选择器的配置项 key 集合
+ */
+const CAMPAIGN_SELECT_KEYS = new Set([
+  'merchant_review_campaign_id'
+])
+
+/**
+ * 布尔类型配置项 key 集合
+ */
+const BOOLEAN_KEYS = new Set([
+  'maintenance_mode',
+  'sms_enabled',
+  'email_enabled',
+  'app_notification_enabled'
+])
 
 /**
  * 系统配置状态
@@ -16,35 +46,41 @@ import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
  */
 export function useConfigState() {
   return {
-    /** @type {Object} 系统配置 */
-    systemConfig: {
-      site_name: '',
-      contact_email: '',
-      service_phone: '',
-      enable_lottery: true,
-      enable_market: true,
-      enable_notification: true,
-      maintenance_mode: false,
-      daily_lottery_limit: 10,
-      lottery_cost: 100,
-      max_login_attempts: 5,
-      session_timeout: 30
-    },
+    /** @type {Object} 分类显示配置 */
+    categoryDisplay: CATEGORY_DISPLAY,
+
+    /** @type {Array<string>} 所有分类 key 列表 */
+    allCategories: Object.keys(CATEGORY_DISPLAY),
+
+    /** @type {string} 当前展开的配置分类 */
+    activeCategory: 'basic',
+
+    /** @type {Object} 各分类的配置项列表 { basic: [...], points: [...], ... } */
+    categorySettings: {},
+
+    /** @type {Object} 各分类的可编辑配置值 { basic: { key: value }, ... } */
+    editableSettings: {},
+
+    /** @type {boolean} 分类配置加载中 */
+    categoryLoading: false,
+
+    /** @type {Object} 各分类配置项数量 */
+    categoryCounts: {},
+
+    /** @type {Array} 活动下拉选项列表 */
+    campaignOptions: [],
+
+    /** @type {boolean} 活动选项加载中 */
+    campaignOptionsLoading: false,
+
     /** @type {Object} 原始配置（用于比较变更） */
     originalConfig: null,
+
     /** @type {boolean} 配置已修改 */
     configModified: false,
-    /** @type {Array} 积分配置列表（原定价配置） */
-    pointsConfigs: [],
-    /** @type {Object} 编辑中的积分配置 */
-    editingPoints: null,
-    /** @type {Object} 积分配置默认值（使用后端字段名） */
-    pointsDefaults: {
-      lottery_cost_points: 100, // 抽奖消耗积分
-      daily_lottery_limit: 10, // 每日抽奖次数限制
-      sign_in_points: 10, // 签到积分
-      initial_points: 0 // 新用户初始积分
-    }
+
+    /** @type {boolean} 保存中 */
+    saving: false
   }
 }
 
@@ -55,272 +91,244 @@ export function useConfigState() {
 export function useConfigMethods() {
   return {
     /**
-     * 加载系统配置
-     * @description 从 /api/v4/console/settings/basic 加载基础设置
-     *              后端返回格式: { settings: [{ setting_key, setting_value, parsed_value, ... }, ...] }
+     * 加载所有分类的配置概览（获取各分类配置项数量）
+     */
+    async loadConfigSummary() {
+      try {
+        logger.debug('[SystemConfig] 加载配置概览')
+        const response = await this.apiGet(
+          SYSTEM_ENDPOINTS.SETTING_LIST,
+          {},
+          { showLoading: false }
+        )
+        if (response?.success && response.data) {
+          this.categoryCounts = response.data.categories || {}
+          logger.debug('[SystemConfig] 配置概览:', this.categoryCounts)
+        }
+      } catch (error) {
+        logger.error('[SystemConfig] 加载配置概览失败:', error)
+      }
+    },
+
+    /**
+     * 加载指定分类的全部配置项
+     * @param {string} category - 分类标识（basic/points/notification/security/marketplace）
+     */
+    async loadCategoryConfig(category) {
+      try {
+        this.categoryLoading = true
+        logger.debug('[SystemConfig] 加载分类配置:', category)
+
+        const url = buildURL(SYSTEM_ENDPOINTS.SETTING_CATEGORY, { category })
+        const response = await this.apiGet(url, {}, { showLoading: false })
+
+        if (response?.success && response.data) {
+          const settings = response.data.settings || []
+          this.categorySettings[category] = settings
+
+          // 初始化可编辑值
+          const editable = {}
+          settings.forEach(item => {
+            const key = item.setting_key
+            let value = item.parsed_value !== undefined ? item.parsed_value : item.setting_value
+            // JSON 类型转为字符串展示
+            if (item.value_type === 'json' && typeof value === 'object') {
+              value = JSON.stringify(value, null, 2)
+            }
+            editable[key] = value
+          })
+          this.editableSettings[category] = editable
+
+          logger.debug(`[SystemConfig] ${category} 加载完成, ${settings.length} 项配置`)
+        }
+      } catch (error) {
+        logger.error(`[SystemConfig] 加载 ${category} 配置失败:`, error)
+        this.categorySettings[category] = []
+        this.editableSettings[category] = {}
+      } finally {
+        this.categoryLoading = false
+      }
+    },
+
+    /**
+     * 切换当前展开的分类（手风琴模式）
+     * @param {string} category - 分类标识
+     */
+    async switchCategory(category) {
+      if (this.activeCategory === category) {
+        // 再次点击同一分类不做操作
+        return
+      }
+      this.activeCategory = category
+
+      // 如果该分类未加载过，则加载
+      if (!this.categorySettings[category] || this.categorySettings[category].length === 0) {
+        await this.loadCategoryConfig(category)
+      }
+    },
+
+    /**
+     * 加载活动下拉选项
+     * @description 从 /api/v4/console/lottery-campaigns 获取活动列表
+     */
+    async loadCampaignOptions() {
+      try {
+        this.campaignOptionsLoading = true
+        logger.debug('[SystemConfig] 加载活动选项列表')
+
+        const response = await this.apiGet(
+          `${LOTTERY_ENDPOINTS.CAMPAIGN_LIST}?page_size=100`,
+          {},
+          { showLoading: false }
+        )
+
+        const data = response?.success ? response.data : response
+        if (data) {
+          const campaigns = data.campaigns || data.list || []
+          this.campaignOptions = campaigns.map(c => ({
+            value: c.campaign_code || String(c.lottery_campaign_id),
+            label: `${c.campaign_name} (${c.campaign_code || c.lottery_campaign_id})`,
+            status: c.status,
+            lottery_campaign_id: c.lottery_campaign_id
+          }))
+          logger.debug(`[SystemConfig] 活动选项加载完成, ${this.campaignOptions.length} 个活动`)
+        }
+      } catch (error) {
+        logger.error('[SystemConfig] 加载活动选项失败:', error)
+        this.campaignOptions = []
+      } finally {
+        this.campaignOptionsLoading = false
+      }
+    },
+
+    /**
+     * 判断配置项是否需要活动下拉选择器
+     * @param {string} key - 配置项 key
+     * @returns {boolean}
+     */
+    isCampaignSelectKey(key) {
+      return CAMPAIGN_SELECT_KEYS.has(key)
+    },
+
+    /**
+     * 判断配置项是否为布尔类型
+     * @param {Object} setting - 配置项对象
+     * @returns {boolean}
+     */
+    isBooleanSetting(setting) {
+      if (setting.value_type === 'boolean') return true
+      return BOOLEAN_KEYS.has(setting.setting_key)
+    },
+
+    /**
+     * 判断配置项是否为数字类型
+     * @param {Object} setting - 配置项对象
+     * @returns {boolean}
+     */
+    isNumberSetting(setting) {
+      return setting.value_type === 'number'
+    },
+
+    /**
+     * 判断配置项是否为 JSON 类型
+     * @param {Object} setting - 配置项对象
+     * @returns {boolean}
+     */
+    isJsonSetting(setting) {
+      return setting.value_type === 'json'
+    },
+
+    /**
+     * 保存指定分类的配置
+     * @param {string} category - 分类标识
+     */
+    async saveCategoryConfig(category) {
+      const editable = this.editableSettings[category]
+      const settings = this.categorySettings[category]
+      if (!editable || !settings) {
+        this.showError('没有可保存的配置')
+        return
+      }
+
+      // 构建更新数据（排除只读项）
+      const settingsToUpdate = {}
+      let hasError = false
+
+      settings.forEach(setting => {
+        if (setting.is_readonly) return
+        const key = setting.setting_key
+        let value = editable[key]
+
+        // JSON 类型验证
+        if (setting.value_type === 'json' && typeof value === 'string') {
+          try {
+            value = JSON.parse(value)
+          } catch (_e) {
+            this.showError(`配置项 ${setting.display_name || key} 的 JSON 格式无效`)
+            hasError = true
+            return
+          }
+        }
+
+        // 布尔类型转换
+        if (this.isBooleanSetting(setting)) {
+          value = value === true || value === 'true'
+        }
+
+        // 数字类型转换
+        if (this.isNumberSetting(setting) && typeof value === 'string') {
+          value = parseFloat(value)
+          if (isNaN(value)) {
+            this.showError(`配置项 ${setting.display_name || key} 必须是有效数字`)
+            hasError = true
+            return
+          }
+        }
+
+        settingsToUpdate[key] = value
+      })
+
+      if (hasError || Object.keys(settingsToUpdate).length === 0) return
+
+      try {
+        this.saving = true
+        logger.debug(`[SystemConfig] 保存 ${category} 配置:`, settingsToUpdate)
+
+        const url = buildURL(SYSTEM_ENDPOINTS.SETTING_UPDATE, { category })
+        const response = await this.apiCall(url, {
+          method: 'PUT',
+          data: { settings: settingsToUpdate }
+        })
+
+        if (response?.success || response) {
+          this.showSuccess(`${CATEGORY_DISPLAY[category]?.name || category} 配置保存成功`)
+          // 重新加载该分类配置
+          await this.loadCategoryConfig(category)
+        }
+      } catch (error) {
+        logger.error(`[SystemConfig] 保存 ${category} 配置失败:`, error)
+        this.showError('保存配置失败: ' + (error.message || '未知错误'))
+      } finally {
+        this.saving = false
+      }
+    },
+
+    /**
+     * 初始化所有配置（加载默认分类 + 活动选项）
      */
     async loadSystemConfig() {
-      try {
-        logger.debug('[SystemConfig] 开始加载配置, 调用接口:', SYSTEM_ENDPOINTS.SYSTEM_CONFIG_GET)
-        const response = await this.apiGet(
-          SYSTEM_ENDPOINTS.SYSTEM_CONFIG_GET,
-          {},
-          { showLoading: false }
-        )
-        logger.debug('[SystemConfig] API 响应:', response)
-
-        if (response?.success && response.data) {
-          // 后端返回 settings 数组格式，转换为键值对
-          // 字段名: setting_key, setting_value (或 parsed_value)
-          const settingsArray = response.data.settings || []
-          logger.debug('[SystemConfig] settings 数组:', settingsArray)
-
-          const settingsMap = {}
-          settingsArray.forEach(item => {
-            // 后端字段名是 setting_key 和 parsed_value/setting_value
-            const key = item.setting_key || item.key
-            const value =
-              item.parsed_value !== undefined ? item.parsed_value : item.setting_value || item.value
-            if (key) {
-              settingsMap[key] = value
-            }
-          })
-
-          logger.debug('[SystemConfig] 解析后的配置映射:', settingsMap)
-
-          // 使用后端数据填充配置，保持默认值
-          this.systemConfig = {
-            site_name: settingsMap.system_name || settingsMap.site_name || '',
-            contact_email: settingsMap.contact_email || settingsMap.customer_email || '',
-            service_phone: settingsMap.customer_phone || settingsMap.service_phone || '',
-            enable_lottery:
-              settingsMap.enable_lottery !== false && settingsMap.enable_lottery !== 'false',
-            enable_market:
-              settingsMap.enable_market !== false && settingsMap.enable_market !== 'false',
-            enable_notification:
-              settingsMap.enable_notification !== false &&
-              settingsMap.enable_notification !== 'false',
-            maintenance_mode:
-              settingsMap.maintenance_mode === true || settingsMap.maintenance_mode === 'true',
-            daily_lottery_limit: parseInt(settingsMap.daily_lottery_limit) || 10,
-            lottery_cost: parseInt(settingsMap.lottery_cost) || 100,
-            max_login_attempts: parseInt(settingsMap.max_login_attempts) || 5,
-            session_timeout: parseInt(settingsMap.session_timeout) || 30
-          }
-          this.originalConfig = JSON.parse(JSON.stringify(this.systemConfig))
-          this.configModified = false
-          logger.debug('[SystemConfig] 最终 systemConfig:', this.systemConfig)
-        } else {
-          logger.warn('[SystemConfig] API 返回失败或无数据:', response)
-        }
-      } catch (error) {
-        logger.error('[SystemConfig] 加载系统配置失败:', error)
-      }
+      await Promise.all([
+        this.loadConfigSummary(),
+        this.loadCategoryConfig('basic'),
+        this.loadCampaignOptions()
+      ])
     },
 
     /**
-     * 保存系统配置
-     * @description PUT /api/v4/console/settings/basic
-     *              后端期望格式: { settings: { key: value, ... } }
+     * 保存系统配置（兼容旧接口）
      */
     async saveSystemConfig() {
-      try {
-        this.saving = true
-        // 转换为后端期望的格式
-        const settingsData = {
-          settings: {
-            system_name: this.systemConfig.site_name,
-            customer_phone: this.systemConfig.service_phone,
-            contact_email: this.systemConfig.contact_email,
-            maintenance_mode: this.systemConfig.maintenance_mode,
-            enable_lottery: this.systemConfig.enable_lottery,
-            enable_market: this.systemConfig.enable_market,
-            enable_notification: this.systemConfig.enable_notification,
-            daily_lottery_limit: this.systemConfig.daily_lottery_limit,
-            lottery_cost: this.systemConfig.lottery_cost,
-            max_login_attempts: this.systemConfig.max_login_attempts,
-            session_timeout: this.systemConfig.session_timeout
-          }
-        }
-
-        const response = await this.apiCall(SYSTEM_ENDPOINTS.SYSTEM_CONFIG_UPDATE, {
-          method: 'PUT',
-          data: settingsData
-        })
-
-        if (response?.success) {
-          this.showSuccess('系统配置保存成功')
-          this.originalConfig = JSON.parse(JSON.stringify(this.systemConfig))
-          this.configModified = false
-        }
-      } catch (error) {
-        this.showError('保存系统配置失败: ' + (error.message || '未知错误'))
-      } finally {
-        this.saving = false
-      }
-    },
-
-    /**
-     * 重置系统配置
-     */
-    resetSystemConfig() {
-      if (this.originalConfig) {
-        this.systemConfig = JSON.parse(JSON.stringify(this.originalConfig))
-        this.configModified = false
-        this.showSuccess('已恢复到上次保存的配置')
-      }
-    },
-
-    /**
-     * 检测配置变更
-     */
-    checkConfigModified() {
-      if (!this.originalConfig) return
-      this.configModified =
-        JSON.stringify(this.systemConfig) !== JSON.stringify(this.originalConfig)
-    },
-
-    /**
-     * 切换维护模式
-     * @description PUT /api/v4/console/settings/basic
-     *              后端期望格式: { settings: { maintenance_mode: boolean } }
-     */
-    async toggleMaintenanceMode() {
-      const newMode = !this.systemConfig.maintenance_mode
-      await this.confirmAndExecute(
-        `确定${newMode ? '开启' : '关闭'}维护模式？${newMode ? '开启后用户将无法访问系统' : ''}`,
-        async () => {
-          const response = await this.apiCall(SYSTEM_ENDPOINTS.SYSTEM_CONFIG_MAINTENANCE, {
-            method: 'PUT',
-            data: { settings: { maintenance_mode: newMode } }
-          })
-          if (response?.success) {
-            this.systemConfig.maintenance_mode = newMode
-            if (this.originalConfig) {
-              this.originalConfig.maintenance_mode = newMode
-            }
-          }
-        },
-        { successMessage: `维护模式已${newMode ? '开启' : '关闭'}` }
-      )
-    },
-
-    // ==================== 积分配置（定价配置）====================
-
-    /**
-     * 加载积分配置（从后端 points 分类）
-     * @description 后端返回格式: { settings: [{ setting_key, setting_value, parsed_value, display_name }, ...] }
-     */
-    async loadPointsConfigs() {
-      try {
-        logger.debug(
-          '[SystemConfig] 开始加载积分配置, 调用接口:',
-          SYSTEM_ENDPOINTS.SYSTEM_CONFIG_POINTS
-        )
-        const response = await this.apiGet(
-          SYSTEM_ENDPOINTS.SYSTEM_CONFIG_POINTS,
-          {},
-          { showLoading: false }
-        )
-        logger.debug('[SystemConfig] 积分配置 API 响应:', response)
-
-        if (response?.success && response.data) {
-          // 后端返回 settings 数组格式
-          const settingsArray = response.data.settings || []
-          this.pointsConfigs = settingsArray
-
-          // 将配置列表转换为 pointsDefaults 对象
-          settingsArray.forEach(config => {
-            const key = config.setting_key || config.key
-            const value =
-              config.parsed_value !== undefined ? config.parsed_value : config.setting_value
-            if (key && Object.hasOwn(this.pointsDefaults, key)) {
-              this.pointsDefaults[key] =
-                typeof value === 'number' ? value : parseInt(value) || this.pointsDefaults[key]
-            }
-          })
-
-          logger.debug('[SystemConfig] 解析后的积分配置:', this.pointsDefaults)
-        }
-      } catch (error) {
-        logger.error('[SystemConfig] 加载积分配置失败:', error)
-        this.pointsConfigs = []
-      }
-    },
-
-    /**
-     * 保存积分配置（批量保存到后端 points 分类）
-     * @description PUT /api/v4/console/settings/points { settings: { key: value, ... } }
-     */
-    async savePointsConfigs() {
-      try {
-        this.saving = true
-        // 构建后端期望的格式（使用后端字段名）
-        const settingsData = {
-          settings: {
-            lottery_cost_points: this.pointsDefaults.lottery_cost_points,
-            daily_lottery_limit: this.pointsDefaults.daily_lottery_limit,
-            sign_in_points: this.pointsDefaults.sign_in_points,
-            initial_points: this.pointsDefaults.initial_points
-          }
-        }
-
-        logger.debug('[SystemConfig] 保存积分配置, 数据:', settingsData)
-
-        const response = await this.apiCall(SYSTEM_ENDPOINTS.SYSTEM_CONFIG_UPDATE_POINTS, {
-          method: 'PUT',
-          data: settingsData
-        })
-
-        if (response?.success) {
-          this.showSuccess('积分配置保存成功')
-        }
-      } catch (error) {
-        this.showError('保存积分配置失败: ' + (error.message || '未知错误'))
-      } finally {
-        this.saving = false
-      }
-    },
-
-    /**
-     * 编辑积分配置
-     * @param {Object} config - 积分配置对象
-     */
-    editPointsConfig(config) {
-      this.editingPoints = { ...config }
-      this.showModal('pointsModal')
-    },
-
-    /**
-     * 保存单个积分配置项
-     */
-    async savePointsConfig() {
-      if (!this.editingPoints) return
-
-      try {
-        this.saving = true
-        // 使用 points 分类端点保存单个配置
-        const settingsData = {
-          settings: {
-            [this.editingPoints.setting_key]: this.editingPoints.setting_value
-          }
-        }
-
-        const response = await this.apiCall(SYSTEM_ENDPOINTS.SYSTEM_CONFIG_UPDATE_POINTS, {
-          method: 'PUT',
-          data: settingsData
-        })
-
-        if (response?.success) {
-          this.showSuccess('积分配置保存成功')
-          this.hideModal('pointsModal')
-          await this.loadPointsConfigs()
-        }
-      } catch (error) {
-        this.showError('保存积分配置失败: ' + (error.message || '未知错误'))
-      } finally {
-        this.saving = false
-      }
+      await this.saveCategoryConfig(this.activeCategory)
     }
   }
 }

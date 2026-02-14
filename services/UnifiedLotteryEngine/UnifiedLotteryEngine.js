@@ -339,7 +339,13 @@ class UnifiedLotteryEngine {
           reward_tier: drawRecord.reward_tier,
           guarantee_triggered: drawRecord.guarantee_triggered || false,
           points_cost: settleResult.draw_cost || 100,
-          sort_order: drawRecord.sort_order
+          /**
+           * 前端展示所需字段（多活动抽奖系统）
+           * sort_order: 九宫格位置（来自 settle_result，原始来源 lottery_prizes 表）
+           * rarity_code: 稀有度代码（来自 settle_result，原始来源 rarity_defs 外键）
+           */
+          sort_order: settleResult.sort_order,
+          rarity_code: settleResult.rarity_code || 'common'
         }
       },
       // 元数据
@@ -1109,7 +1115,9 @@ class UnifiedLotteryEngine {
                   name: drawResult.data.draw_result.prize_name,
                   type: drawResult.data.draw_result.prize_type,
                   value: drawResult.data.draw_result.prize_value,
-                  sort_order: drawResult.data.draw_result.sort_order // 🎯 方案3：传递sort_order给路由层
+                  sort_order: drawResult.data.draw_result.sort_order,
+                  /** 稀有度代码（前端直接使用此字段名显示对应颜色光效） */
+                  rarity_code: drawResult.data.draw_result.rarity_code || 'common'
                 }
               : null,
             points_cost: drawResult.data?.draw_result?.points_cost || 0

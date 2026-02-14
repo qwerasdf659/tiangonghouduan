@@ -12,7 +12,7 @@
  * 子模块划分（按业务职责）：
  * - submit.js  - 商家提交消费记录（POST /submit）
  * - query.js   - 用户查询自己的消费记录（GET /me, GET /detail/:id）
- * - qrcode.js  - 二维码相关（GET /qrcode/:user_id, GET /user-info）
+ * - qrcode.js  - 二维码相关（GET /qrcode, GET /user-info）
  * - merchant-query.js - 商家员工查询消费记录（GET /merchant/list, GET /merchant/detail/:id）
  *
  * 架构规范：

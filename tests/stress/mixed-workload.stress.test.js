@@ -20,7 +20,7 @@
  * - 浏览类（只读）：30%
  *   - 市场商品列表 GET /api/v4/market/listings
  *   - 背包查询 GET /api/v4/backpack
- *   - 抽奖历史 GET /api/v4/lottery/history/:user_id
+ *   - 抽奖历史 GET /api/v4/lottery/history
  *   - 用户信息 GET /api/v4/user/me
  * - 抽奖类（写入）：20%
  *   - 执行抽奖 POST /api/v4/lottery/draw
@@ -398,7 +398,7 @@ describe('【P2-2】混合负载压力测试', () => {
   /**
    * 模拟抽奖历史查询
    *
-   * @description 模拟 GET /api/v4/lottery/history/:user_id 请求
+   * @description 模拟 GET /api/v4/lottery/history 请求
    * @returns {Object} 查询结果
    */
   async function simulateLotteryHistoryQuery() {

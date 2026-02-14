@@ -3,25 +3,25 @@
  *
  * @file admin/src/modules/system/pages/system-settings.js
  * @module SystemSettingsPage
- * @version 4.1.0
- * @date 2026-01-24
+ * @version 5.0.0
+ * @date 2026-02-08
  *
  * @description
  * 系统设置整合页面，通过 composables 模块化管理：
- * - 系统配置 (config)
- * - 字典管理 (dict)
- * - 功能开关 (feature-flags)
- * - 审计日志 (audit-logs)
+ * - 系统配置 - 全5大分类（basic/points/notification/security/marketplace）
+ * - 活动关联配置项使用下拉选择器
+ * - 提醒规则
+ * - 审计日志
  */
 
-// ES Module 导入（替代 window.xxx 全局变量）
+// ES Module 导入
 import { logger } from '../../../utils/logger.js'
 import { API_PREFIX } from '../../../api/base.js'
 import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
 import { request } from '../../../api/base.js'
 import { $confirmDanger } from '../../../utils/index.js'
 
-// 导入 composables 模块（方案A：只导入系统配置和审计日志）
+// 导入 composables 模块
 import {
   useConfigState,
   useConfigMethods,
@@ -37,7 +37,7 @@ import { ReminderRulesAPI } from '../../../api/reminder.js'
  * 注册系统设置相关的 Alpine.js 组件
  */
 function registerSystemSettingsComponents() {
-  logger.debug('[SystemSettings] 注册 Alpine 组件 (ES Module v4.1)...')
+  logger.debug('[SystemSettings] 注册 Alpine 组件 (ES Module v5.0)...')
 
   if (!Alpine || typeof createPageMixin !== 'function') {
     logger.error('[SystemSettings] 关键依赖未加载')
@@ -48,39 +48,8 @@ function registerSystemSettingsComponents() {
   Alpine.store('systemPage', 'system-config')
 
   /**
-   * 系统设置导航组件（方案A：精简版，只保留系统配置和审计日志）
-   */
-  Alpine.data('systemNavigation', () => ({
-    ...createPageMixin(),
-
-    current_page: 'system-config',
-
-    // 方案A: 字典管理/定价配置/功能开关已分离为独立页面
-    subPages: [
-      { id: 'system-config', name: '系统配置', icon: 'bi-gear' },
-      { id: 'reminder-rules', name: '提醒规则', icon: 'bi-bell' },
-      { id: 'audit-logs', name: '审计日志', icon: 'bi-journal-text' }
-    ],
-
-    init() {
-      logger.debug('系统设置导航初始化 (方案A v5.0 - 精简版)')
-      if (!this.checkAuth()) return
-
-      const urlParams = new URLSearchParams(window.location.search)
-      this.current_page = urlParams.get('page') || 'system-config'
-      Alpine.store('systemPage', this.current_page)
-    },
-
-    switchPage(pageId) {
-      this.current_page = pageId
-      Alpine.store('systemPage', pageId)
-      window.history.pushState({}, '', `?page=${pageId}`)
-    }
-  }))
-
-  /**
    * 系统设置内容组件 - 使用 composables 组合
-   * 方案A: 字典管理/定价配置/功能开关已分离为独立页面
+   * 全5大分类配置 + 活动下拉选择器
    */
   Alpine.data('systemSettings', () => ({
     // 基础混入
@@ -93,8 +62,7 @@ function registerSystemSettingsComponents() {
     // ==================== 导航状态 ====================
     current_page: 'system-config',
 
-    // 子页面配置（方案A + P2-1提醒规则）
-    // 注意：审计报告(F-59)已移除（后端未实现 /api/v4/admin/operations/audit-report）
+    // 子页面配置
     subPages: [
       { id: 'system-config', name: '系统配置', icon: '⚙️' },
       { id: 'reminder-rules', name: '提醒规则', icon: '🔔' },
@@ -106,7 +74,6 @@ function registerSystemSettingsComponents() {
     page_size: 20,
     total_pages: 1,
     total: 0,
-    saving: false,
 
     // ==================== 提醒规则状态 (P2-1) ====================
     reminderRules: [],
@@ -126,7 +93,7 @@ function registerSystemSettingsComponents() {
     // ==================== 初始化和数据加载 ====================
 
     init() {
-      logger.debug('[SystemSettings] 组件初始化开始 (方案A v5.0 - 精简版)')
+      logger.debug('[SystemSettings] 组件初始化开始 (v5.0 - 全分类配置)')
 
       if (!this.checkAuth()) {
         logger.warn('[SystemSettings] 认证检查失败')
@@ -141,9 +108,6 @@ function registerSystemSettingsComponents() {
 
       // 立即加载数据
       this.loadPageData()
-
-      // 监控配置变更
-      this.$watch('systemConfig', () => this.checkConfigModified(), { deep: true })
     },
 
     switchPage(pageId) {
@@ -167,7 +131,6 @@ function registerSystemSettingsComponents() {
             case 'audit-logs':
               await this.loadAuditLogs()
               break
-            // 注意：audit-report case 已移除（后端未实现）
           }
         },
         { loadingText: '加载数据...' }
@@ -218,9 +181,6 @@ function registerSystemSettingsComponents() {
 
     // ==================== 提醒规则方法 (P2-1) ====================
 
-    /**
-     * 加载提醒规则列表
-     */
     async loadReminderRules() {
       try {
         const response = await ReminderRulesAPI.getRules()
@@ -233,9 +193,6 @@ function registerSystemSettingsComponents() {
       }
     },
 
-    /**
-     * 打开新增/编辑规则弹窗
-     */
     openReminderRuleModal(rule = null) {
       if (rule) {
         this.editingRuleId = rule.reminder_rule_id
@@ -265,9 +222,6 @@ function registerSystemSettingsComponents() {
       this.reminderRuleModalOpen = true
     },
 
-    /**
-     * 保存提醒规则
-     */
     async saveReminderRule() {
       try {
         this.saving = true
@@ -290,9 +244,6 @@ function registerSystemSettingsComponents() {
       }
     },
 
-    /**
-     * 切换规则启用状态
-     */
     async toggleReminderRule(rule) {
       try {
         const response = await ReminderRulesAPI.toggleRule(rule.reminder_rule_id)
@@ -306,9 +257,6 @@ function registerSystemSettingsComponents() {
       }
     },
 
-    /**
-     * 删除规则
-     */
     async deleteReminderRule(rule) {
       if (!(await $confirmDanger('确定要删除此提醒规则吗？'))) return
       try {
@@ -323,14 +271,8 @@ function registerSystemSettingsComponents() {
       }
     },
 
-    // ✅ 已删除 getRuleTypeName / getConditionTypeName 映射函数
-    // HTML 直接使用后端返回的 rule_type_display 字段
+    // ==================== 工具方法 ====================
 
-    // 注意：F-59 审计报告相关方法已移除（后端未实现 /api/v4/admin/operations/audit-report）
-
-    /**
-     * 获取操作类型颜色类
-     */
     getActionColor(action) {
       const colors = {
         create: 'bg-green-100 text-green-700',
@@ -342,9 +284,6 @@ function registerSystemSettingsComponents() {
       return colors[action] || 'bg-gray-100 text-gray-700'
     },
 
-    /**
-     * 获取风险等级颜色类
-     */
     getRiskColor(level) {
       const colors = {
         high: 'bg-red-500',
@@ -354,42 +293,24 @@ function registerSystemSettingsComponents() {
       return colors[level] || 'bg-gray-500'
     },
 
-    // ==================== 工具方法 ====================
-
-    /**
-     * 格式化日期时间
-     * @param {string|Object} dateValue - ISO日期字符串或后端返回的时间对象
-     * @returns {string} 格式化后的日期字符串
-     */
     formatDate(dateValue) {
       if (!dateValue) return '-'
       try {
-        // 如果是后端返回的时间对象格式 { iso, beijing, timestamp, relative }
         if (typeof dateValue === 'object' && dateValue !== null) {
-          // 优先使用 beijing 格式（北京时间）
           if (dateValue.beijing) return dateValue.beijing
-          // 或者使用 iso 格式
           if (dateValue.iso) {
             return new Date(dateValue.iso).toLocaleString('zh-CN', {
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit'
+              year: 'numeric', month: '2-digit', day: '2-digit',
+              hour: '2-digit', minute: '2-digit'
             })
           }
-          // 或者使用 relative 格式
           if (dateValue.relative) return dateValue.relative
         }
-        // 字符串格式
         const date = new Date(dateValue)
         if (isNaN(date.getTime())) return '-'
         return date.toLocaleString('zh-CN', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit'
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit'
         })
       } catch {
         return '-'

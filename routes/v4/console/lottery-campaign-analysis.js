@@ -28,6 +28,15 @@ function getCampaignAnalysisService(req) {
   return req.app.locals.services.getService('lottery_analytics_campaign')
 }
 
+/**
+ * 获取 ReportService 的辅助函数（getCampaignROI 方法在 ReportService 中）
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} ReportService 实例
+ */
+function getReportService(req) {
+  return req.app.locals.services.getService('lottery_analytics_report')
+}
+
 /*
  * ==========================================
  * 1. 活动 ROI 聚合 - /roi/:lottery_campaign_id
@@ -70,9 +79,9 @@ router.get(
         return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
       }
 
-      const campaignService = getCampaignAnalysisService(req)
+      const reportService = getReportService(req)
 
-      const roi = await campaignService.getCampaignROI(lottery_campaign_id, {
+      const roi = await reportService.getCampaignROI(lottery_campaign_id, {
         start_time,
         end_time
       })
@@ -80,8 +89,8 @@ router.get(
       logger.info('获取活动ROI成功', {
         admin_id: req.user.user_id,
         lottery_campaign_id,
-        roi_percentage: roi.financial.roi_percentage,
-        total_draws: roi.participation.total_draws
+        roi_percentage: roi.roi,
+        total_draws: roi.total_draws
       })
 
       return res.apiSuccess(roi, '获取活动ROI成功')

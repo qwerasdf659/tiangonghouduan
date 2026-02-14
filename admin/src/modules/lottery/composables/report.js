@@ -135,21 +135,18 @@ export function useReportMethods() {
      * @returns {string} HTML字符串
      */
     generatePrintableReport() {
-      const report = this.campaignReport
-      if (!report) return ''
+      const r = this.campaignReport
+      if (!r) return ''
 
-      const info = report.campaign_info || {}
-      const overview = report.overview || {}
-      const prizes = report.prize_analysis || {}
-      const users = report.user_analysis || {}
-      const experience = report.experience_metrics || {}
+      // 后端返回扁平结构，直接使用后端字段
+      const tierBreakdown = r.tier_cost_breakdown || {}
 
       return `
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>${info.campaign_name || '活动'} - 复盘报告</title>
+  <title>${r.campaign_name || '活动'} - 复盘报告</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #333; }
     h1 { text-align: center; border-bottom: 2px solid #3b82f6; padding-bottom: 16px; }
@@ -166,55 +163,56 @@ export function useReportMethods() {
   </style>
 </head>
 <body>
-  <h1>🎯 ${info.campaign_name || '活动'} 复盘报告</h1>
+  <h1>🎯 ${r.campaign_name || '活动'} 复盘报告</h1>
   
   <h2>📋 活动信息</h2>
   <table class="info-table">
-    <tr><th>活动名称</th><td>${info.campaign_name || '-'}</td></tr>
-    <tr><th>活动时间</th><td>${info.start_date || '-'} ~ ${info.end_date || '-'}</td></tr>
-    <tr><th>持续天数</th><td>${info.duration_days || 0}天</td></tr>
-    <tr><th>活动状态</th><td>${info.status || '-'}</td></tr>
+    <tr><th>活动名称</th><td>${r.campaign_name || '-'}</td></tr>
+    <tr><th>活动时间</th><td>${r.time_range?.start_time || '-'} ~ ${r.time_range?.end_time || '-'}</td></tr>
+    <tr><th>活动ID</th><td>${r.lottery_campaign_id || '-'}</td></tr>
   </table>
 
   <h2>📊 核心指标</h2>
   <div class="stats-grid">
     <div class="stat-card">
-      <div class="stat-value">${overview.total_draws?.toLocaleString() || 0}</div>
+      <div class="stat-value">${r.total_draws?.toLocaleString() || 0}</div>
       <div class="stat-label">抽奖次数</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">${overview.unique_users?.toLocaleString() || 0}</div>
+      <div class="stat-value">${r.unique_users?.toLocaleString() || 0}</div>
       <div class="stat-label">独立用户</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">${overview.total_cost?.toLocaleString() || 0}</div>
+      <div class="stat-value">${r.total_cost?.toLocaleString() || 0}</div>
       <div class="stat-label">成本(积分)</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">${(overview.roi * 100)?.toFixed(1) || 0}%</div>
+      <div class="stat-value">${r.roi || 0}%</div>
       <div class="stat-label">ROI</div>
     </div>
   </div>
 
-  <h2>🏆 奖品分析</h2>
+  <h2>💰 财务分析</h2>
   <table class="info-table">
-    <tr><th>总中奖次数</th><td>${prizes.total_wins?.toLocaleString() || 0}</td></tr>
-    <tr><th>中奖率</th><td>${(prizes.win_rate * 100)?.toFixed(2) || 0}%</td></tr>
-    <tr><th>最热门奖品</th><td>${prizes.top_prize?.name || '-'}</td></tr>
+    <tr><th>总收入</th><td>${r.total_revenue?.toLocaleString() || 0}</td></tr>
+    <tr><th>总成本</th><td>${r.total_cost?.toLocaleString() || 0}</td></tr>
+    <tr><th>利润</th><td>${r.profit?.toLocaleString() || 0}</td></tr>
   </table>
 
   <h2>👥 用户分析</h2>
   <table class="info-table">
-    <tr><th>新用户占比</th><td>${(users.new_user_ratio * 100)?.toFixed(1) || 0}%</td></tr>
-    <tr><th>人均抽奖次数</th><td>${users.avg_draws_per_user?.toFixed(2) || 0}</td></tr>
-    <tr><th>复购率</th><td>${(users.retention_rate * 100)?.toFixed(1) || 0}%</td></tr>
+    <tr><th>独立用户数</th><td>${r.unique_users || 0}</td></tr>
+    <tr><th>人均抽奖次数</th><td>${r.avg_draws_per_user || 0}</td></tr>
+    <tr><th>复购用户数</th><td>${r.repeat_users || 0}</td></tr>
+    <tr><th>复购率</th><td>${r.repeat_rate || 0}%</td></tr>
   </table>
 
-  <h2>🎯 体验指标</h2>
+  <h2>📊 档位成本分布</h2>
   <table class="info-table">
-    <tr><th>平均连空次数</th><td>${experience.avg_empty_streak?.toFixed(2) || 0}</td></tr>
-    <tr><th>Pity触发率</th><td>${(experience.pity_trigger_rate * 100)?.toFixed(2) || 0}%</td></tr>
-    <tr><th>AntiEmpty触发率</th><td>${(experience.anti_empty_trigger_rate * 100)?.toFixed(2) || 0}%</td></tr>
+    <tr><th>高档位</th><td>${tierBreakdown.high?.toLocaleString() || 0}</td></tr>
+    <tr><th>中档位</th><td>${tierBreakdown.mid?.toLocaleString() || 0}</td></tr>
+    <tr><th>低档位</th><td>${tierBreakdown.low?.toLocaleString() || 0}</td></tr>
+    <tr><th>兜底</th><td>${tierBreakdown.fallback?.toLocaleString() || 0}</td></tr>
   </table>
 
   <div class="footer">

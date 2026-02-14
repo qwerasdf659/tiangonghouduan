@@ -53,8 +53,12 @@ const redemptionRoutes = require('./redemption/index')
 // 消费记录路由（已拆分为子模块：submit.js, query.js, review.js, qrcode.js）
 const consumptionRoutes = require('./consumption/index')
 
-// 会员权益路由
-const premiumRoutes = require('./premium')
+/*
+ * [已迁移] 高级空间（臻选空间）路由
+ * 📌 2026-02-16 从 /api/v4/shop/premium 迁移到 /api/v4/backpack/exchange/premium-status 和 /unlock-premium
+ * 原因：高级空间是用户侧功能，不应被商家域准入中间件拦截（决策2）
+ * 迁移位置：routes/v4/backpack/exchange.js（premium-status + unlock-premium）
+ */
 
 // 资产管理路由（已拆分为子模块：convert.js, balance.js, transactions.js, rules.js）
 const assetsRoutes = require('./assets/index')
@@ -92,7 +96,7 @@ router.use(authenticateToken, requireMerchantDomainAccess())
  */
 router.use('/redemption', redemptionRoutes) // 核销系统（商家扫码核销，保留在 shop 域）
 router.use('/consumption', consumptionRoutes) // 消费记录
-router.use('/premium', premiumRoutes) // 会员权益
+// [已迁移] router.use('/premium', premiumRoutes) → /api/v4/backpack/exchange/（2026-02-16 决策2）
 router.use('/assets', assetsRoutes) // 资产余额和流水查询（替代旧 /points 路由）
 router.use('/staff', staffRoutes) // 员工管理（入职/调店/禁用/启用）
 router.use('/audit', auditRoutes) // 商家审计日志查询

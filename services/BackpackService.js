@@ -46,9 +46,9 @@ class BackpackService {
    *     {
    *       asset_code: 'MATERIAL_001',
    *       display_name: '蓝色碎片',
-   *       balance: 100,
-   *       frozen_balance: 10,
-   *       available_balance: 90
+   *       total_amount: 100,
+   *       frozen_amount: 10,
+   *       available_amount: 90
    *     }
    *   ],
    *   items: [       // 不可叠加物品
@@ -174,21 +174,21 @@ class BackpackService {
 
       /*
        * 3. 格式化资产数据（从 Map 中读取，避免重复查询）
-       * 字段映射：available_amount → available_balance, frozen_amount → frozen_balance
+       * 字段命名与数据库 account_asset_balances 表一致（available_amount / frozen_amount）
        * 注意：BIGINT 类型需要显式转换为数字类型，避免字符串拼接问题
        */
       const formattedAssets = validAssets.map(account => {
         const assetType = assetTypeMap.get(account.asset_code)
         const availableAmount = Number(account.available_amount) || 0
         const frozenAmount = Number(account.frozen_amount) || 0
-        const totalBalance = availableAmount + frozenAmount
+        const totalAmount = availableAmount + frozenAmount
 
         return {
           asset_code: account.asset_code,
           display_name: assetType?.display_name || account.asset_code,
-          balance: totalBalance, // 总余额（可用 + 冻结）
-          frozen_balance: frozenAmount, // 冻结余额
-          available_balance: availableAmount, // 可用余额
+          total_amount: totalAmount, // 总余额（可用 + 冻结）
+          frozen_amount: frozenAmount, // 冻结余额
+          available_amount: availableAmount, // 可用余额
           category: assetType?.category || 'unknown',
           rarity: assetType?.rarity || 'common'
         }

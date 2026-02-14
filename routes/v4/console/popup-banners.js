@@ -22,20 +22,26 @@ const router = express.Router()
 const multer = require('multer')
 const { sharedComponents, adminAuthMiddleware, asyncHandler } = require('./shared/middleware')
 
-// 配置 multer 内存存储（文件上传到内存，再上传到Sealos）
+/**
+ * multer 内存存储配置（弹窗Banner专属限制）
+ *
+ * 🎯 拍板决策1（2026-02-08）：400KB + 仅 JPG/PNG（严格执行，超限直接拒绝）
+ * - 文件大小：从 5MB 收紧至 400KB
+ * - 文件格式：从 JPG/PNG/GIF/WebP 收紧至仅 JPG/PNG
+ */
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 5 * 1024 * 1024, // 限制5MB
+    fileSize: 400 * 1024, // 400KB（从 5MB 收紧 — 拍板决策1）
     files: 1 // 单文件上传
   },
   fileFilter: (_req, file, cb) => {
-    // 仅允许图片类型
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    // 仅允许 JPG/PNG（拍板决策1：去掉 GIF/WebP）
+    const allowedTypes = ['image/jpeg', 'image/png']
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true)
     } else {
-      cb(new Error('只允许上传 JPG、PNG、GIF、WebP 格式的图片'), false)
+      cb(new Error('仅支持 JPG、PNG 格式的图片'), false)
     }
   }
 })
@@ -151,7 +157,8 @@ router.get(
  * @access Private (需要管理员权限)
  *
  * @body {string} title - 弹窗标题（必需）
- * @body {file} image - 弹窗图片文件（必需，JPG/PNG/GIF/WebP，最大5MB）
+ * @body {string} display_mode - 显示模式（必需，wide/horizontal/square/tall/slim/full_image）
+ * @body {file} image - 弹窗图片文件（必需，仅 JPG/PNG，最大 400KB）
  * @body {string} [link_url] - 跳转链接
  * @body {string} [link_type=none] - 跳转类型（none/page/miniprogram/webview）
  * @body {string} [position=home] - 显示位置
@@ -168,6 +175,7 @@ router.post(
     try {
       const {
         title,
+        display_mode,
         link_url = null,
         link_type = 'none',
         position = 'home',
@@ -177,9 +185,20 @@ router.post(
         end_time = null
       } = req.body
 
-      // 验证必需参数
+      // 验证必需参数：标题
       if (!title || title.trim() === '') {
         return res.apiError('弹窗标题不能为空', 'INVALID_PARAMETERS', null, 400)
+      }
+
+      // 🎯 拍板决策3：display_mode 必填，无默认值兜底
+      const VALID_DISPLAY_MODES = ['wide', 'horizontal', 'square', 'tall', 'slim', 'full_image']
+      if (!display_mode || !VALID_DISPLAY_MODES.includes(display_mode)) {
+        return res.apiError(
+          '请选择显示模式（wide/horizontal/square/tall/slim/full_image）',
+          'DISPLAY_MODE_REQUIRED',
+          null,
+          400
+        )
       }
 
       // 验证图片文件
@@ -189,17 +208,26 @@ router.post(
 
       const PopupBannerService = req.app.locals.services.getService('popup_banner')
 
-      // 上传图片到Sealos（返回对象 key 和公网 URL）
-      const { objectKey } = await PopupBannerService.uploadBannerImage(
+      // 上传图片到Sealos（传入 mimeType 和 fileSize 用于 400KB/JPG+PNG 校验）
+      const { objectKey, dimensions } = await PopupBannerService.uploadBannerImage(
         req.file.buffer,
-        req.file.originalname
+        req.file.originalname,
+        req.file.mimetype,
+        req.file.size
       )
+
+      // 🎯 拍板决策5：后端也校验比例，返回 ratio_warning
+      const { validateImageRatio } = require('../../../services/PopupBannerService')
+      const ratioCheck = validateImageRatio(display_mode, dimensions.width, dimensions.height)
 
       // 创建弹窗记录（存储对象 key，非完整 URL - 2026-01-08 拍板决策）
       const banner = await PopupBannerService.createBanner(
         {
           title: title.trim(),
           image_url: objectKey, // 存储对象 key
+          display_mode,
+          image_width: dimensions.width,
+          image_height: dimensions.height,
           link_url,
           link_type,
           position,
@@ -215,10 +243,20 @@ router.post(
         admin_id: req.user.user_id,
         popup_banner_id: banner.popup_banner_id,
         title: banner.title,
-        position: banner.position
+        display_mode,
+        position: banner.position,
+        ratio_warning: ratioCheck.status === 'warning' ? ratioCheck.message : null
       })
 
-      return res.apiSuccess({ banner }, '创建弹窗成功', 201)
+      // 响应数据中包含 ratio_warning（拍板决策5：前端+后端双重校验）
+      return res.apiSuccess(
+        {
+          banner,
+          ratio_warning: ratioCheck.status === 'warning' ? ratioCheck.message : null
+        },
+        '创建弹窗成功',
+        201
+      )
     } catch (error) {
       sharedComponents.logger.error('创建弹窗失败', { error: error.message })
       return res.apiInternalError('创建弹窗失败', error.message, 'POPUP_BANNER_CREATE_ERROR')
@@ -242,15 +280,44 @@ router.put(
       const { id } = req.params
       const updateData = { ...req.body }
 
+      // 如果传了 display_mode，校验有效值
+      if (updateData.display_mode) {
+        const VALID_DISPLAY_MODES = ['wide', 'horizontal', 'square', 'tall', 'slim', 'full_image']
+        if (!VALID_DISPLAY_MODES.includes(updateData.display_mode)) {
+          return res.apiError(
+            '显示模式无效（wide/horizontal/square/tall/slim/full_image）',
+            'INVALID_DISPLAY_MODE',
+            null,
+            400
+          )
+        }
+      }
+
       const PopupBannerService = req.app.locals.services.getService('popup_banner')
 
-      // 如果上传了新图片，先上传到Sealos
+      let ratioWarning = null
+
+      // 如果上传了新图片，先上传到Sealos（含 400KB/JPG+PNG 校验）
       if (req.file) {
-        const { objectKey } = await PopupBannerService.uploadBannerImage(
+        const { objectKey, dimensions } = await PopupBannerService.uploadBannerImage(
           req.file.buffer,
-          req.file.originalname
+          req.file.originalname,
+          req.file.mimetype,
+          req.file.size
         )
         updateData.image_url = objectKey // 存储对象 key
+        updateData.image_width = dimensions.width
+        updateData.image_height = dimensions.height
+
+        // 如果同时有 display_mode，校验比例匹配度
+        const targetMode = updateData.display_mode || null
+        if (targetMode) {
+          const { validateImageRatio } = require('../../../services/PopupBannerService')
+          const ratioCheck = validateImageRatio(targetMode, dimensions.width, dimensions.height)
+          if (ratioCheck.status === 'warning') {
+            ratioWarning = ratioCheck.message
+          }
+        }
       }
 
       // 更新弹窗记录
@@ -263,10 +330,11 @@ router.put(
       sharedComponents.logger.info('管理员更新弹窗Banner', {
         admin_id: req.user.user_id,
         popup_banner_id: id,
-        updated_fields: Object.keys(updateData)
+        updated_fields: Object.keys(updateData),
+        ratio_warning: ratioWarning
       })
 
-      return res.apiSuccess({ banner }, '更新弹窗成功')
+      return res.apiSuccess({ banner, ratio_warning: ratioWarning }, '更新弹窗成功')
     } catch (error) {
       sharedComponents.logger.error('更新弹窗失败', { error: error.message })
       return res.apiInternalError('更新弹窗失败', error.message, 'POPUP_BANNER_UPDATE_ERROR')

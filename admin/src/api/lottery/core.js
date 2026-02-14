@@ -36,6 +36,16 @@ export const LOTTERY_CORE_ENDPOINTS = {
   CAMPAIGN_LIST: `${API_PREFIX}/console/lottery-campaigns`,
   CAMPAIGN_DETAIL: `${API_PREFIX}/console/lottery-campaigns/:lottery_campaign_id`,
 
+  // 活动 CRUD（通过 system-data 路由，支持创建/编辑/删除/状态变更）
+  CAMPAIGN_CREATE: `${API_PREFIX}/console/system-data/lottery-campaigns`,
+  CAMPAIGN_UPDATE: `${API_PREFIX}/console/system-data/lottery-campaigns/:lottery_campaign_id`,
+  CAMPAIGN_STATUS: `${API_PREFIX}/console/system-data/lottery-campaigns/:lottery_campaign_id/status`,
+  CAMPAIGN_DELETE: `${API_PREFIX}/console/system-data/lottery-campaigns/:lottery_campaign_id`,
+
+  // 活动位置配置管理（控制活动在小程序中的展示位置和尺寸）
+  PLACEMENT_GET: `${API_PREFIX}/console/system/placement`,
+  PLACEMENT_UPDATE: `${API_PREFIX}/console/system/placement`,
+
   // 活动条件配置
   CAMPAIGN_CONDITIONS: `${API_PREFIX}/activities/:code/conditions`,
   CAMPAIGN_CONFIGURE_CONDITIONS: `${API_PREFIX}/activities/:code/configure-conditions`
@@ -215,6 +225,74 @@ export const LotteryCoreAPI = {
       lottery_campaign_id: lotteryCampaignId
     })
     return await request({ url, method: 'GET' })
+  },
+
+  // ===== 活动 CRUD =====
+
+  /**
+   * 创建活动（含展示配置 display_mode/effect_theme 等）
+   * @param {Object} data - 活动数据（直接使用后端 snake_case 字段名）
+   * @returns {Promise<Object>} 创建结果
+   */
+  async createCampaign(data) {
+    return await request({ url: LOTTERY_CORE_ENDPOINTS.CAMPAIGN_CREATE, method: 'POST', data })
+  },
+
+  /**
+   * 更新活动（含展示配置字段）
+   * @param {number} lotteryCampaignId - 活动 ID
+   * @param {Object} data - 更新数据
+   * @returns {Promise<Object>} 更新结果
+   */
+  async updateCampaign(lotteryCampaignId, data) {
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGN_UPDATE, {
+      lottery_campaign_id: lotteryCampaignId
+    })
+    return await request({ url, method: 'PUT', data })
+  },
+
+  /**
+   * 更新活动状态
+   * @param {number} lotteryCampaignId - 活动 ID
+   * @param {Object} data - 状态数据 { status: 'active'|'paused'|'ended'|'cancelled' }
+   * @returns {Promise<Object>} 更新结果
+   */
+  async updateCampaignStatus(lotteryCampaignId, data) {
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGN_STATUS, {
+      lottery_campaign_id: lotteryCampaignId
+    })
+    return await request({ url, method: 'PUT', data })
+  },
+
+  /**
+   * 删除活动
+   * @param {number} lotteryCampaignId - 活动 ID
+   * @returns {Promise<Object>} 删除结果
+   */
+  async deleteCampaign(lotteryCampaignId) {
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGN_DELETE, {
+      lottery_campaign_id: lotteryCampaignId
+    })
+    return await request({ url, method: 'DELETE' })
+  },
+
+  // ===== 活动位置配置 =====
+
+  /**
+   * 获取活动位置配置
+   * @returns {Promise<Object>} 位置配置 { placements: [...] }
+   */
+  async getPlacement() {
+    return await request({ url: LOTTERY_CORE_ENDPOINTS.PLACEMENT_GET, method: 'GET' })
+  },
+
+  /**
+   * 更新活动位置配置（保存后前端下次打开即生效）
+   * @param {Object} data - { placements: [...] }
+   * @returns {Promise<Object>} 更新结果
+   */
+  async updatePlacement(data) {
+    return await request({ url: LOTTERY_CORE_ENDPOINTS.PLACEMENT_UPDATE, method: 'PUT', data })
   },
 
   // ===== 活动条件 =====

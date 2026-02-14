@@ -448,7 +448,7 @@ class AdminSystemService {
     budget_allocation_ratio: '预算分配比例',
     daily_lottery_limit: '每日抽奖次数限制',
     merchant_review_budget_ratio: '商户审核预算比例',
-    merchant_review_lottery_campaign_id: '商户审核活动ID',
+    merchant_review_campaign_id: '商户审核活动ID',
 
     // ===== 通知设置 (notification) =====
     sms_enabled: '短信通知',

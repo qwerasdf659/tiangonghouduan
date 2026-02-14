@@ -151,7 +151,14 @@ class PrizePoolService {
           cost_points: prizeData.cost_points || 100,
           status: 'active',
           sort_order: sortOrder,
-          max_daily_wins: prizeData.max_daily_wins || null
+          max_daily_wins: prizeData.max_daily_wins || null,
+          /**
+           * 稀有度代码（面向前端的视觉稀有度等级）
+           * @外键关联 rarity_defs.rarity_code
+           * @枚举值 common/uncommon/rare/epic/legendary
+           * @注意 与 reward_tier（后端概率档位）是独立维度
+           */
+          rarity_code: prizeData.rarity_code || 'common'
         },
         { transaction }
       )
@@ -408,6 +415,7 @@ class PrizePoolService {
           'cost_points',
           'status',
           'sort_order',
+          'rarity_code',
           'created_at',
           'updated_at'
         ]
@@ -418,7 +426,7 @@ class PrizePoolService {
         total: prizes.length,
         active: prizes.filter(p => p.status === 'active').length,
         inactive: prizes.filter(p => p.status === 'inactive').length,
-        out_of_stock: prizes.filter(p => {
+        stock_depleted: prizes.filter(p => {
           const remaining = (p.stock_quantity || 0) - (p.total_win_count || 0)
           return remaining <= 0
         }).length,
@@ -452,6 +460,7 @@ class PrizePoolService {
         cost_points: prize.cost_points,
         status: prize.status,
         sort_order: prize.sort_order,
+        rarity_code: prize.rarity_code || 'common',
         created_at: prize.created_at,
         updated_at: prize.updated_at
       }))
@@ -540,7 +549,14 @@ class PrizePoolService {
       cost_points: 'cost_points',
       sort_order: 'sort_order',
       max_daily_wins: 'max_daily_wins',
-      status: 'status'
+      status: 'status',
+      /**
+       * 稀有度代码（面向前端的视觉稀有度等级）
+       * @外键关联 rarity_defs.rarity_code
+       * @枚举值 common/uncommon/rare/epic/legendary
+       * @注意 与 reward_tier（后端概率档位）是独立维度
+       */
+      rarity_code: 'rarity_code'
     }
 
     const filteredUpdateData = {}
@@ -784,8 +800,8 @@ class PrizePoolService {
     // 3. 更新库存
     await prize.update({ stock_quantity: newQuantity }, { transaction })
 
-    // 4. 如果之前是out_of_stock状态，自动恢复为active
-    if (prize.status === 'out_of_stock') {
+    // 4. 如果之前是 inactive 状态（如库存耗尽导致），补货后自动恢复为 active
+    if (prize.status === 'inactive' && newQuantity > 0) {
       await prize.update({ status: 'active' }, { transaction })
     }
 

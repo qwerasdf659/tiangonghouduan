@@ -112,7 +112,11 @@ class LotteryCampaign extends Model {
       daily: '每日抽奖',
       weekly: '每周抽奖',
       event: '活动抽奖',
-      permanent: '常驻抽奖'
+      permanent: '常驻抽奖',
+      pool_basic: '基础池抽奖',
+      pool_advanced: '进阶池抽奖',
+      pool_vip: 'VIP池抽奖',
+      pool_newbie: '新手池抽奖'
     }
     return typeNames[this.campaign_type] || '未知类型'
   }
@@ -246,22 +250,6 @@ class LotteryCampaign extends Model {
       remaining_draws_total: this.max_draws_per_user_total
         ? Math.max(0, this.max_draws_per_user_total - userDrawsTotal)
         : null
-    }
-  }
-
-  /**
-   * 计算抽奖成本是否足够
-   * @param {number} userPoints - 用户积分余额
-   * @returns {Object} 成本检查结果
-   */
-  checkDrawCost(userPoints) {
-    const cost = parseFloat(this.cost_per_draw)
-
-    return {
-      can_afford: userPoints >= cost,
-      cost,
-      user_points: userPoints,
-      shortage: Math.max(0, cost - userPoints)
     }
   }
 
@@ -540,7 +528,6 @@ class LotteryCampaign extends Model {
         progress_percent: this.getProgress()
       },
       participation: {
-        cost_per_draw: parseFloat(this.cost_per_draw),
         max_draws_daily: this.max_draws_per_user_daily,
         max_draws_total: this.max_draws_per_user_total,
         stats: participationStats
@@ -579,22 +566,19 @@ module.exports = sequelize => {
         comment: '活动代码(唯一)'
       },
       campaign_type: {
-        type: DataTypes.ENUM('daily', 'weekly', 'event', 'permanent'),
+        type: DataTypes.ENUM(
+          'daily',
+          'weekly',
+          'event',
+          'permanent',
+          'pool_basic',
+          'pool_advanced',
+          'pool_vip',
+          'pool_newbie'
+        ),
         allowNull: false,
-        comment: '活动类型'
-      },
-      cost_per_draw: {
-        type: DataTypes.DECIMAL(10, 2),
-        allowNull: false,
-        comment: '每次抽奖消耗积分',
-        /**
-         * 获取每次抽奖消耗积分（自动转换为浮点数）
-         * @returns {number} 抽奖消耗积分
-         */
-        get() {
-          const value = this.getDataValue('cost_per_draw')
-          return value ? parseFloat(value) : 0
-        }
+        comment:
+          '活动类型: daily=每日/weekly=每周/event=活动/permanent=常驻/pool_basic=基础池/pool_advanced=进阶池/pool_vip=VIP池/pool_newbie=新手池'
       },
       max_draws_per_user_daily: {
         type: DataTypes.INTEGER,
@@ -713,10 +697,11 @@ module.exports = sequelize => {
         comment: '活动规则说明'
       },
       status: {
-        type: DataTypes.ENUM('draft', 'active', 'paused', 'completed'),
+        type: DataTypes.ENUM('draft', 'active', 'paused', 'ended', 'cancelled'),
         allowNull: false,
         defaultValue: 'draft',
-        comment: '活动状态'
+        comment:
+          '活动状态: draft=草稿, active=进行中, paused=已暂停, ended=已结束, cancelled=已取消'
       },
       /**
        * 预算模式
@@ -1029,6 +1014,91 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: 0,
         comment: '总中奖次数'
+      },
+
+      // ======================== 前端展示配置字段（多活动抽奖系统） ========================
+
+      /**
+       * 前端展示方式（14种玩法）
+       * @type {string}
+       * @业务含义 控制小程序前端加载哪个玩法子组件
+       * @枚举值 grid_3x3/grid_4x4/wheel/card_flip/golden_egg/scratch_card/blind_box/
+       *         gashapon/lucky_bag/red_packet/slot_machine/whack_mole/pinball/card_collect/flash_sale
+       * @前端效果 前端根据此值动态加载对应子组件（九宫格/转盘/卡牌翻转/...）
+       */
+      display_mode: {
+        type: DataTypes.STRING(30),
+        allowNull: false,
+        defaultValue: 'grid_3x3',
+        comment:
+          '前端展示方式（14种玩法）: grid_3x3/grid_4x4/wheel/card_flip/golden_egg/scratch_card/blind_box/gashapon/lucky_bag/red_packet/slot_machine/whack_mole/pinball/card_collect/flash_sale'
+      },
+
+      /**
+       * 网格列数（仅 grid 模式有效）
+       * @type {number}
+       * @业务含义 控制九宫格的列数，决定奖品格位数量
+       * @取值范围 3/4/5
+       */
+      grid_cols: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 3,
+        comment: '网格列数（仅 grid 模式有效）: 3/4/5'
+      },
+
+      /**
+       * 特效主题（6套主题色）
+       * @type {string}
+       * @业务含义 控制前端整体颜色风格，通过CSS变量系统切换
+       * @枚举值 default/gold_luxury/purple_mystery/spring_festival/christmas/summer
+       * @前端效果 全局CSS变量切换颜色风格（如春节红金色/圣诞绿色等）
+       */
+      effect_theme: {
+        type: DataTypes.STRING(30),
+        allowNull: false,
+        defaultValue: 'default',
+        comment:
+          '特效主题（6套）: default/gold_luxury/purple_mystery/spring_festival/christmas/summer'
+      },
+
+      /**
+       * 是否启用稀有度光效
+       * @type {boolean}
+       * @业务含义 开关控制前端是否根据 rarity_code 显示不同颜色光效
+       * @前端效果 开启时奖品按 rarity_code 显示蓝色/紫色/橙色/金色光效；关闭时使用硬编码保底样式
+       */
+      rarity_effects_enabled: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
+        comment: '是否启用稀有度光效（前端根据 rarity_code 显示不同颜色光效）'
+      },
+
+      /**
+       * 中奖动画类型
+       * @type {string}
+       * @业务含义 控制中奖弹窗的揭晓动画方式
+       * @枚举值 simple（简单弹窗）/card_flip（卡牌翻转）/fireworks（烟花特效）
+       */
+      win_animation: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
+        defaultValue: 'simple',
+        comment: '中奖动画类型: simple（简单弹窗）/card_flip（卡牌翻转）/fireworks（烟花特效）'
+      },
+
+      /**
+       * 活动背景图URL
+       * @type {string|null}
+       * @业务含义 运营上传的活动背景图，可选
+       * @注意 与 banner_image_url（活动横幅图）用途不同
+       */
+      background_image_url: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+        defaultValue: null,
+        comment: '活动背景图URL（运营上传，可选，与 banner_image_url 横幅图用途不同）'
       }
     },
     {

@@ -49,7 +49,7 @@ async function verifyLotteryLedger() {
 
     // 3. 检查活动状态
     const [campaigns] = await sequelize.query(`
-      SELECT lottery_campaign_id, campaign_name, status, cost_per_draw
+      SELECT lottery_campaign_id, campaign_name, status
       FROM lottery_campaigns
       WHERE lottery_campaign_id = 1
     `)
@@ -57,7 +57,6 @@ async function verifyLotteryLedger() {
     console.log(`   - lottery_campaign_id: ${campaigns[0].lottery_campaign_id}`)
     console.log(`   - campaign_name: ${campaigns[0].campaign_name}`)
     console.log(`   - status: ${campaigns[0].status}`)
-    console.log(`   - cost_per_draw: ${campaigns[0].cost_per_draw}`)
 
     // 4. 检查用户账户
     const [accounts] = await sequelize.query(`

@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "strict": false,
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@templates/*": ["src/templates/*"],
+      "@partials/*": ["src/templates/partials/*"],
+      "@layouts/*": ["src/templates/layouts/*"]
+    }
+  },
+  "include": ["src/**/*.js"],
+  "exclude": ["node_modules", "dist", "test-results"]
+}
+

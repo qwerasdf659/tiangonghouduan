@@ -260,7 +260,7 @@ class AdminCustomerServiceService {
    * // 加载更多历史消息
    * const more = await AdminCustomerServiceService.getSessionMessages(123, {
    *   limit: 50,
-   *   before_message_id: result.messages[0].message_id
+   *   before_message_id: result.messages[0].chat_message_id
    * });
    */
   static async getSessionMessages(sessionId, options = {}) {
@@ -343,7 +343,7 @@ class AdminCustomerServiceService {
 
       logger.info('消息发送成功', {
         session_id: sessionId,
-        message_id: result.message.message_id
+        chat_message_id: result.message.chat_message_id
       })
 
       return result

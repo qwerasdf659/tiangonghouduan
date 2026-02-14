@@ -26,7 +26,7 @@
        @view-audit-detail="viewAuditLogDetail($event.detail)"
        @rollback-audit="rollbackOperation($event.detail)">
     
-    <!-- 子页面导航（方案A：只显示系统配置和审计日志） -->
+    <!-- 子页面导航 -->
     <div class="themed-card rounded-lg shadow mb-6">
       <div class="flex border-b overflow-x-auto">
         <template x-for="page in subPages" :key="page.id">
@@ -40,32 +40,162 @@
       </div>
     </div>
 
-    <!-- 系统配置 -->
+    <!-- ==================== 系统配置（全5大分类） ==================== -->
     <div x-show="current_page === 'system-config'" x-cloak>
-      <div class="themed-card rounded-lg shadow p-6">
-        <h5 class="font-semibold mb-4">系统配置</h5>
-        <div class="space-y-6">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-2">系统名称</label>
-              <input type="text" x-model="systemConfig.site_name" class="w-full px-3 py-2 border rounded">
-            </div>
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-2">维护模式</label>
-              <select x-model="systemConfig.maintenance_mode" class="w-full px-3 py-2 border rounded">
-                <option value="false">关闭</option>
-                <option value="true">开启</option>
-              </select>
-            </div>
+
+      <!-- 分类标签栏 -->
+      <div class="themed-card rounded-lg shadow mb-4">
+        <div class="flex border-b overflow-x-auto">
+          <template x-for="catKey in allCategories" :key="catKey">
+            <button 
+              @click="switchCategory(catKey)"
+              :class="activeCategory === catKey 
+                ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' 
+                : 'themed-text-muted themed-hover-bg'"
+              class="px-5 py-3 font-medium whitespace-nowrap transition-colors text-sm"
+            >
+              <span x-text="categoryDisplay[catKey]?.icon + ' ' + categoryDisplay[catKey]?.name"></span>
+              <template x-if="categoryCounts[catKey]">
+                <span class="ml-1 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full" x-text="categoryCounts[catKey]"></span>
+              </template>
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <!-- 当前分类配置内容 -->
+      <div class="themed-card rounded-lg shadow">
+        <!-- 分类标题 -->
+        <div class="p-4 border-b flex justify-between items-center">
+          <div>
+            <h5 class="font-semibold" x-text="(categoryDisplay[activeCategory]?.icon || '') + ' ' + (categoryDisplay[activeCategory]?.name || activeCategory)"></h5>
+            <p class="text-sm themed-text-muted mt-1" x-text="categoryDisplay[activeCategory]?.description || ''"></p>
           </div>
-          <div class="flex justify-end">
-            <button @click="saveSystemConfig()" class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">保存配置</button>
+          <button 
+            @click="saveCategoryConfig(activeCategory)" 
+            :disabled="saving"
+            class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 disabled:opacity-50"
+          >
+            <span x-show="!saving">💾 保存配置</span>
+            <span x-show="saving">保存中...</span>
+          </button>
+        </div>
+
+        <!-- 加载中 -->
+        <div x-show="categoryLoading" class="p-8 text-center themed-text-muted">
+          <div class="animate-spin inline-block w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mb-2"></div>
+          <p>加载配置中...</p>
+        </div>
+
+        <!-- 配置项列表 -->
+        <div x-show="!categoryLoading && categorySettings[activeCategory]?.length > 0" class="p-4">
+          <div class="space-y-4">
+            <template x-for="setting in (categorySettings[activeCategory] || [])" :key="setting.setting_key">
+              <div class="border rounded-lg p-4 themed-bg-base">
+                <div class="flex flex-col md:flex-row md:items-center gap-3">
+                  <!-- 左侧：标签和描述 -->
+                  <div class="md:w-1/3">
+                    <label class="block text-sm font-medium" x-text="setting.display_name || setting.setting_key"></label>
+                    <p class="text-xs themed-text-muted mt-0.5" x-text="setting.description || ''"></p>
+                    <template x-if="setting.is_readonly">
+                      <span class="inline-block mt-1 text-xs bg-gray-200 text-gray-500 px-2 py-0.5 rounded">只读</span>
+                    </template>
+                  </div>
+
+                  <!-- 右侧：输入控件 -->
+                  <div class="md:w-2/3">
+
+                    <!-- 只读值显示 -->
+                    <template x-if="setting.is_readonly">
+                      <div class="px-3 py-2 border rounded bg-gray-50 text-gray-500 text-sm" 
+                           x-text="editableSettings[activeCategory]?.[setting.setting_key] ?? '-'"></div>
+                    </template>
+
+                    <!-- 活动下拉选择器 -->
+                    <template x-if="!setting.is_readonly && isCampaignSelectKey(setting.setting_key)">
+                      <div>
+                        <select 
+                          x-model="editableSettings[activeCategory][setting.setting_key]"
+                          class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
+                        >
+                          <option value="">请选择活动</option>
+                          <template x-for="opt in campaignOptions" :key="opt.value">
+                            <option :value="opt.value" x-text="opt.label + (opt.status === 'active' ? ' ✅' : '')"></option>
+                          </template>
+                        </select>
+                        <p class="text-xs themed-text-muted mt-1" x-show="campaignOptionsLoading">活动列表加载中...</p>
+                        <p class="text-xs themed-text-muted mt-1" x-show="!campaignOptionsLoading && campaignOptions.length === 0">暂无可用活动</p>
+                      </div>
+                    </template>
+
+                    <!-- 布尔类型下拉 -->
+                    <template x-if="!setting.is_readonly && !isCampaignSelectKey(setting.setting_key) && isBooleanSetting(setting)">
+                      <select 
+                        x-model="editableSettings[activeCategory][setting.setting_key]"
+                        class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
+                      >
+                        <option :value="false">关闭</option>
+                        <option :value="true">开启</option>
+                      </select>
+                    </template>
+
+                    <!-- 数字类型输入 -->
+                    <template x-if="!setting.is_readonly && !isCampaignSelectKey(setting.setting_key) && !isBooleanSetting(setting) && isNumberSetting(setting)">
+                      <input 
+                        type="number"
+                        x-model="editableSettings[activeCategory][setting.setting_key]"
+                        class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
+                        :step="setting.value_type === 'number' && String(setting.setting_value).includes('.') ? '0.01' : '1'"
+                      >
+                    </template>
+
+                    <!-- JSON 类型文本域 -->
+                    <template x-if="!setting.is_readonly && !isCampaignSelectKey(setting.setting_key) && !isBooleanSetting(setting) && !isNumberSetting(setting) && isJsonSetting(setting)">
+                      <textarea 
+                        x-model="editableSettings[activeCategory][setting.setting_key]"
+                        class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-300 focus:border-blue-500 font-mono text-sm"
+                        rows="4"
+                        placeholder="JSON 格式"
+                      ></textarea>
+                    </template>
+
+                    <!-- 普通字符串输入（默认） -->
+                    <template x-if="!setting.is_readonly && !isCampaignSelectKey(setting.setting_key) && !isBooleanSetting(setting) && !isNumberSetting(setting) && !isJsonSetting(setting)">
+                      <input 
+                        type="text"
+                        x-model="editableSettings[activeCategory][setting.setting_key]"
+                        class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-300 focus:border-blue-500"
+                        :placeholder="setting.description || ''"
+                      >
+                    </template>
+
+                  </div>
+                </div>
+              </div>
+            </template>
           </div>
+
+          <!-- 底部保存按钮 -->
+          <div class="flex justify-end mt-4 pt-4 border-t">
+            <button 
+              @click="saveCategoryConfig(activeCategory)" 
+              :disabled="saving"
+              class="px-6 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 disabled:opacity-50"
+            >
+              <span x-show="!saving">💾 保存 <span x-text="categoryDisplay[activeCategory]?.name || ''"></span></span>
+              <span x-show="saving">保存中...</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 无配置项 -->
+        <div x-show="!categoryLoading && (!categorySettings[activeCategory] || categorySettings[activeCategory]?.length === 0)" class="p-8 text-center themed-text-muted">
+          暂无配置项
         </div>
       </div>
     </div>
 
-    <!-- 提醒规则配置 (P2-1) -->
+    <!-- ==================== 提醒规则配置 (P2-1) ==================== -->
     <div x-show="current_page === 'reminder-rules'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b flex justify-between items-center">
@@ -134,7 +264,7 @@
       </div>
     </div>
 
-    <!-- 审计日志 -->
+    <!-- ==================== 审计日志 ==================== -->
     <div x-show="current_page === 'audit-logs'" x-cloak>
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b">
@@ -214,7 +344,7 @@
       </div>
     </div>
 
-    <!-- ==================== Modal 组件区域（必须在 x-data 作用域内） ==================== -->
+    <!-- ==================== Modal 组件区域 ==================== -->
 
     <!-- 提醒规则编辑 Modal (P2-1) -->
     <div x-show="reminderRuleModalOpen"
@@ -350,8 +480,6 @@
   <!-- 页面专属逻辑 -->
   <%- include('partials/footer') %>
 
-
   <script type="module" src="./src/modules/system/pages/system-settings.js"></script>
 </body>
 </html>
-

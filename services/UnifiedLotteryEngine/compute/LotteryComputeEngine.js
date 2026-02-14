@@ -448,12 +448,27 @@ class LotteryComputeEngine {
         lottery_campaign_id
       })
 
+      /**
+       * 🔴 2026-02-15 严重BUG修复：字段名不匹配
+       *
+       * 问题根因：
+       * - AntiHighStreakHandler.handle() 返回 { tier_capped: true, final_tier: 'mid' }
+       * - 但此处原代码读取 anti_high_result.capped_tier（不存在该字段！）
+       * - 导致 final_tier = undefined → 下游 PrizePickStage 异常
+       * - 异常被 TierPickStage 的 try-catch 静默捕获 → AntiHigh 完全失效
+       *
+       * 影响范围：
+       * - 用户 13612227930 高价值中奖率从设计的 5% 飙升到 64.7%
+       * - 总计获得 2,083,900 积分的奖品价值
+       *
+       * 修复方案：使用正确的字段名 final_tier（与 AntiHighStreakHandler 返回一致）
+       */
       if (anti_high_result.tier_capped) {
-        final_tier = anti_high_result.capped_tier
+        final_tier = anti_high_result.final_tier
         applied_mechanisms.push({
           type: 'anti_high',
           recent_high_count: experience_state.recent_high_count,
-          capped_tier: final_tier
+          capped_tier: anti_high_result.final_tier
         })
       }
     }
@@ -1056,11 +1071,11 @@ class LotteryComputeEngine {
       })
 
       if (anti_high_result.tier_capped) {
-        final_tier = anti_high_result.capped_tier
+        final_tier = anti_high_result.final_tier
         applied_mechanisms.push({
           type: 'anti_high',
           recent_high_count: experience_state.recent_high_count,
-          capped_tier: final_tier,
+          capped_tier: anti_high_result.final_tier,
           grayscale_reason: anti_high_grayscale.reason
         })
       }
@@ -1208,11 +1223,11 @@ class LotteryComputeEngine {
       })
 
       if (anti_high_result.tier_capped) {
-        final_tier = anti_high_result.capped_tier
+        final_tier = anti_high_result.final_tier
         applied_mechanisms.push({
           type: 'anti_high',
           recent_high_count: experience_state.recent_high_count,
-          capped_tier: final_tier,
+          capped_tier: anti_high_result.final_tier,
           feature_flag_reason: anti_high_decision.reason
         })
       }

@@ -22,9 +22,13 @@
 const CoreService = require('./CoreService')
 const QueryService = require('./QueryService')
 const AdminService = require('./AdminService')
+const BidService = require('./BidService')
+const BidQueryService = require('./BidQueryService')
 
 module.exports = {
   CoreService,
   QueryService,
-  AdminService
+  AdminService,
+  BidService,
+  BidQueryService
 }

@@ -23,10 +23,12 @@ const router = express.Router()
 const monitoringRoutes = require('./monitoring')
 const announcementsRoutes = require('./announcements')
 const feedbacksRoutes = require('./feedbacks')
+const placementRoutes = require('./placement') // 2026-02-15: 活动投放位置配置管理
 
 // 挂载子模块路由
 router.use('/', monitoringRoutes) // 包含 /status, /dashboard, /management-status
 router.use('/announcements', announcementsRoutes) // 公告管理 CRUD
 router.use('/feedbacks', feedbacksRoutes) // 反馈管理
+router.use('/placement', placementRoutes) // 活动投放位置配置管理 GET+PUT
 
 module.exports = router

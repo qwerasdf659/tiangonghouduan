@@ -73,6 +73,13 @@ class LotteryDrawFormatter {
    * @returns {Object} 摘要格式数据
    */
   static formatToSummary(lotteryDraw) {
+    /**
+     * 获取关联奖品信息（用于输出 rarity_code 和 sort_order）
+     * rarity_code 来自 lottery_prizes 表，通过 prize 关联读取
+     * sort_order 来自 lottery_prizes 表，确定九宫格位置
+     */
+    const prize = lotteryDraw.prize || lotteryDraw.Prize || {}
+
     return {
       lottery_draw_id: lotteryDraw.lottery_draw_id,
       user_id: lotteryDraw.user_id,
@@ -82,6 +89,11 @@ class LotteryDrawFormatter {
       reward_tier: lotteryDraw.reward_tier,
       reward_tier_text: this.getRewardTierText(lotteryDraw.reward_tier),
       reward_tier_color: this.getRewardTierColor(lotteryDraw.reward_tier),
+      // 2026-02-15: 多活动抽奖系统 - 前端展示所需字段
+      prize_name: lotteryDraw.prize_name || prize.prize_name || null,
+      prize_type: lotteryDraw.prize_type || prize.prize_type || null,
+      rarity_code: lotteryDraw.rarity_code || prize.rarity_code || 'common',
+      sort_order: lotteryDraw.sort_order || prize.sort_order || null,
       prize_status: lotteryDraw.prize_status,
       prize_status_name: this.getPrizeStatusText(lotteryDraw.prize_status),
       draw_time: lotteryDraw.created_at,

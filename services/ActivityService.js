@@ -140,7 +140,6 @@ class ActivityService {
           'banner_image_url',
           'start_time',
           'end_time',
-          'cost_per_draw',
           'max_draws_per_user_daily',
           'participation_conditions',
           'condition_error_messages'
@@ -179,11 +178,30 @@ class ActivityService {
             activity.max_draws_per_user_daily - todayDrawCount
           )
 
+          // 从 LotteryPricingService 获取定价（决策 2：列表接口补上价格）
+          let base_cost = null
+          let per_draw_cost = null
+          try {
+            const LotteryPricingService = require('./lottery/LotteryPricingService')
+            const pricing = await LotteryPricingService.getDrawPricing(
+              1,
+              activity.lottery_campaign_id
+            )
+            base_cost = pricing.base_cost
+            per_draw_cost = pricing.per_draw
+          } catch (err) {
+            logger.warn('活动定价获取失败', {
+              lottery_campaign_id: activity.lottery_campaign_id,
+              error: err.message
+            })
+          }
+
           availableActivities.push({
             ...activity.toJSON(),
             conditions_met: true,
             remaining_draws_today: remainingDrawsToday,
-            cost_per_draw: parseFloat(activity.cost_per_draw),
+            base_cost, // 折扣前基础价
+            per_draw_cost, // 折扣后单抽实际价
             user_data: validation.userData
           })
         }
@@ -1023,6 +1041,177 @@ class ActivityService {
    */
   static async endCampaign(campaignId, options = {}) {
     return await this.updateCampaignStatus(campaignId, 'ended', options)
+  }
+
+  /**
+   * 调整活动预算（仅 budget_mode=pool 的活动）
+   *
+   * @description 批量预算调整接口（B10）调用的核心方法
+   *
+   * 业务规则：
+   * - 仅支持 budget_mode='pool' 的活动
+   * - increase：总预算和剩余预算同时增加
+   * - decrease：总预算和剩余预算同时减少（剩余不得低于0）
+   * - set：将总预算设定为新值，剩余预算按差额调整
+   *
+   * 安全约束：
+   * - 减少操作不能使 pool_budget_remaining < 0
+   * - 设置操作中，新总预算不能小于已消耗部分
+   * - 事务由外部传入（路由层 TransactionManager.execute 管理）
+   *
+   * @param {number} campaignId - 活动ID（lottery_campaign_id）
+   * @param {string} adjustmentType - 调整类型：increase（增加）/ decrease（减少）/ set（设定）
+   * @param {number} amount - 调整金额（increase/decrease）或目标总预算（set）
+   * @param {Object} options - 选项
+   * @param {string} [options.reason] - 调整原因（审计用）
+   * @param {number} [options.operator_id] - 操作者ID
+   * @param {Object} [options.transaction] - Sequelize 事务（由路由层传入，必需）
+   * @returns {Promise<Object>} 调整结果 { new_budget, old_budget, adjustment }
+   * @throws {Error} 活动不存在 / 非 pool 模式 / 余额不足 / 参数无效
+   *
+   * @example
+   * // 增加预算 1000
+   * const result = await ActivityService.adjustCampaignBudget(1, 'increase', 1000, {
+   *   reason: '季度追加预算',
+   *   operator_id: 31,
+   *   transaction
+   * })
+   * // result.new_budget => 11000
+   */
+  static async adjustCampaignBudget(campaignId, adjustmentType, amount, options = {}) {
+    const { reason, operator_id, transaction } = options
+    const parsedId = parseInt(campaignId)
+    const parsedAmount = parseFloat(amount)
+
+    // ========== 参数验证 ==========
+    const validTypes = ['increase', 'decrease', 'set']
+    if (!validTypes.includes(adjustmentType)) {
+      const error = new Error(`无效的调整类型: ${adjustmentType}，有效值：${validTypes.join('/')}`)
+      error.code = 'INVALID_ADJUSTMENT_TYPE'
+      error.statusCode = 400
+      throw error
+    }
+
+    if (isNaN(parsedAmount) || parsedAmount < 0) {
+      const error = new Error('调整金额必须为非负数值')
+      error.code = 'INVALID_AMOUNT'
+      error.statusCode = 400
+      throw error
+    }
+
+    // ========== 查找活动（加行锁防并发） ==========
+    const campaign = await models.LotteryCampaign.findByPk(parsedId, {
+      attributes: [
+        'lottery_campaign_id',
+        'campaign_name',
+        'campaign_code',
+        'budget_mode',
+        'pool_budget_total',
+        'pool_budget_remaining',
+        'status'
+      ],
+      lock: transaction ? transaction.LOCK.UPDATE : undefined,
+      transaction
+    })
+
+    if (!campaign) {
+      const error = new Error(`活动不存在: lottery_campaign_id=${parsedId}`)
+      error.code = 'CAMPAIGN_NOT_FOUND'
+      error.statusCode = 404
+      throw error
+    }
+
+    // ========== 预算模式检查 ==========
+    if (campaign.budget_mode !== 'pool') {
+      const error = new Error(
+        `活动 ${campaign.campaign_name} 的预算模式为 ${campaign.budget_mode}，` +
+          '仅 budget_mode=pool 的活动支持预算调整'
+      )
+      error.code = 'BUDGET_MODE_NOT_SUPPORTED'
+      error.statusCode = 400
+      throw error
+    }
+
+    // ========== 计算新预算 ==========
+    const oldTotal = Number(campaign.pool_budget_total) || 0
+    const oldRemaining = Number(campaign.pool_budget_remaining) || 0
+    const consumed = oldTotal - oldRemaining // 已消耗部分
+
+    let newTotal
+    let newRemaining
+
+    switch (adjustmentType) {
+      case 'increase':
+        // 增加：总预算和剩余同时增加
+        newTotal = oldTotal + parsedAmount
+        newRemaining = oldRemaining + parsedAmount
+        break
+
+      case 'decrease':
+        // 减少：总预算和剩余同时减少，剩余不得为负
+        if (parsedAmount > oldRemaining) {
+          const error = new Error(
+            `减少金额 ${parsedAmount} 超过剩余预算 ${oldRemaining}，无法执行减少操作`
+          )
+          error.code = 'INSUFFICIENT_REMAINING_BUDGET'
+          error.statusCode = 400
+          throw error
+        }
+        newTotal = oldTotal - parsedAmount
+        newRemaining = oldRemaining - parsedAmount
+        break
+
+      case 'set':
+        // 设定：总预算设为目标值，剩余 = 新总预算 - 已消耗
+        if (parsedAmount < consumed) {
+          const error = new Error(`目标总预算 ${parsedAmount} 不能小于已消耗金额 ${consumed}`)
+          error.code = 'SET_BELOW_CONSUMED'
+          error.statusCode = 400
+          throw error
+        }
+        newTotal = parsedAmount
+        newRemaining = parsedAmount - consumed
+        break
+
+      default:
+        // 不会到达，前面已验证
+        break
+    }
+
+    // ========== 执行更新 ==========
+    await campaign.update(
+      {
+        pool_budget_total: newTotal,
+        pool_budget_remaining: newRemaining
+      },
+      { transaction }
+    )
+
+    logger.info('[ActivityService] 活动预算已调整', {
+      lottery_campaign_id: parsedId,
+      campaign_code: campaign.campaign_code,
+      adjustment_type: adjustmentType,
+      amount: parsedAmount,
+      old_total: oldTotal,
+      old_remaining: oldRemaining,
+      new_total: newTotal,
+      new_remaining: newRemaining,
+      consumed,
+      operator_id,
+      reason
+    })
+
+    return {
+      new_budget: newTotal,
+      new_remaining: newRemaining,
+      old_budget: oldTotal,
+      old_remaining: oldRemaining,
+      consumed,
+      adjustment: {
+        type: adjustmentType,
+        amount: parsedAmount
+      }
+    }
   }
 }
 

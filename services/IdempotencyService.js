@@ -235,6 +235,11 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/assets/portfolio/items/': 'ADMIN_ASSET_ITEM_CREATE', // 创建资产组合项（尾斜杠）
   '/api/v4/console/assets/portfolio/items/:id': 'ADMIN_ASSET_ITEM_UPDATE', // 更新或删除资产组合项（PUT/DELETE）
 
+  // ===== 物品实例管理（2026-02-15 新增） =====
+  '/api/v4/console/item-instances/:id/freeze': 'ADMIN_ITEM_INSTANCE_FREEZE', // 管理员冻结物品
+  '/api/v4/console/item-instances/:id/unfreeze': 'ADMIN_ITEM_INSTANCE_UNFREEZE', // 管理员解冻物品
+  '/api/v4/console/item-instances/:id/transfer': 'ADMIN_ITEM_INSTANCE_TRANSFER', // 管理员转移物品
+
   // ===== 抽奖干预 =====
   '/api/v4/console/lottery-management/probability-adjust': 'ADMIN_LOTTERY_PROB_ADJUST', // 概率调整（canonical 路径）
   '/api/v4/console/lottery-management/user-specific-queue': 'ADMIN_LOTTERY_USER_QUEUE', // 用户队列（canonical 路径）

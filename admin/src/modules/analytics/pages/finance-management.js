@@ -319,22 +319,22 @@ document.addEventListener('alpine:init', () => {
     return table
   })
 
-  /** 钻石账户 */
+  /** 钻石账户 - 使用 /console/system-data/accounts */
   Alpine.data('diamondAccountsDataTable', () => {
     const table = dataTable({
       columns: [
+        { key: 'account_id', label: '账户ID', sortable: true },
         { key: 'user_id', label: '用户ID', sortable: true },
-        { key: 'nickname', label: '昵称', render: (val, row) => val || row.user_nickname || '-' },
-        { key: 'balance', label: '钻石余额', type: 'number', sortable: true },
-        { key: 'total_earned', label: '累计获得', type: 'number' },
-        { key: 'total_spent', label: '累计消耗', type: 'number' },
+        { key: 'nickname', label: '昵称', render: (val, row) => row.user?.nickname || val || '-' },
+        { key: 'account_type', label: '账户类型' },
+        { key: 'status', label: '状态', type: 'status', statusMap: { active: { class: 'green', label: '正常' }, frozen: { class: 'red', label: '冻结' } } },
         { key: 'updated_at', label: '更新时间', type: 'datetime', sortable: true }
       ],
       dataSource: async (params) => {
-        const res = await request({ url: `${API_PREFIX}/console/diamond/users`, method: 'GET', params })
-        return { items: res.data?.list || res.data?.accounts || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+        const res = await request({ url: `${API_PREFIX}/console/system-data/accounts`, method: 'GET', params })
+        return { items: res.data?.accounts || res.data?.list || [], total: res.data?.pagination?.total || 0 }
       },
-      primaryKey: 'user_id', sortable: true, page_size: 20
+      primaryKey: 'account_id', sortable: true, page_size: 20
     })
     const origInit = table.init
     table.init = async function () { window.addEventListener('refresh-diamond-accounts', () => this.loadData()); if (origInit) await origInit.call(this) }
@@ -362,20 +362,22 @@ document.addEventListener('alpine:init', () => {
     return table
   })
 
-  /** 债务管理 */
+  /** 债务管理 - 使用后端 /pending 端点（后端无根路径 GET） */
   Alpine.data('debtDataTable', () => {
     const table = dataTable({
       columns: [
         { key: 'debt_id', label: '债务ID', sortable: true },
-        { key: 'user_id', label: '用户ID' },
-        { key: 'amount', label: '金额', type: 'currency', sortable: true },
-        { key: 'paid_amount', label: '已还', type: 'currency' },
-        { key: 'status', label: '状态', type: 'status', statusMap: { pending: { class: 'yellow', label: '待还款' }, partial: { class: 'blue', label: '部分还款' }, paid: { class: 'green', label: '已还清' }, cancelled: { class: 'gray', label: '已核销' } } },
+        { key: 'debt_type', label: '类型', render: (val) => val === 'inventory' ? '库存欠账' : val === 'budget' ? '预算欠账' : val || '-' },
+        { key: 'campaign_name', label: '活动', render: (val, row) => val || ('ID: ' + (row.lottery_campaign_id || row.campaign_id || '-')) },
+        { key: 'owed_quantity', label: '欠账数量/金额', sortable: true, render: (val, row) => row.debt_type === 'budget' ? ('¥' + (row.owed_amount || val || 0)) : (val || 0) },
+        { key: 'remaining_quantity', label: '待清偿', render: (val, row) => row.debt_type === 'budget' ? ('¥' + (row.remaining_amount || val || 0)) : (val || 0) },
         { key: 'created_at', label: '创建时间', type: 'datetime', sortable: true }
       ],
       dataSource: async (params) => {
-        const res = await request({ url: `${API_PREFIX}/console/debt-management`, method: 'GET', params })
-        return { items: res.data?.list || res.data?.debts || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+        const res = await request({ url: `${API_PREFIX}/console/debt-management/pending`, method: 'GET', params })
+        const items = res.data?.items || res.data?.pending_debts || res.data?.list || res.data?.rows || []
+        const total = res.data?.pagination?.total || res.data?.total || res.data?.count || items.length
+        return { items, total }
       },
       primaryKey: 'debt_id', sortable: true, page_size: 20
     })
@@ -384,22 +386,24 @@ document.addEventListener('alpine:init', () => {
     return table
   })
 
-  /** 活动预算 */
+  /** 活动预算 - 使用后端 /batch-status 端点（后端无根路径 GET） */
   Alpine.data('budgetDataTable', () => {
     const table = dataTable({
       columns: [
-        { key: 'budget_id', label: '预算ID', sortable: true },
-        { key: 'campaign_name', label: '活动名称', render: (val, row) => val || row.lottery_campaign?.name || '-' },
-        { key: 'budget_amount', label: '预算金额', type: 'currency', sortable: true },
-        { key: 'used_amount', label: '已使用', type: 'currency' },
-        { key: 'usage_rate', label: '使用率', render: (val) => val != null ? Number(val).toFixed(1) + '%' : '-' },
-        { key: 'status', label: '状态', type: 'status' }
+        { key: 'lottery_campaign_id', label: '活动ID', sortable: true },
+        { key: 'campaign_name', label: '活动名称', render: (val, row) => val || row.name || '-' },
+        { key: 'budget_mode', label: '预算模式', render: (val) => val === 'pool' ? '活动池' : val === 'user' ? '用户预算' : val === 'none' ? '无预算' : val || '-' },
+        { key: 'pool_budget_total', label: '总预算', render: (val, row) => (row.pool_budget?.total ?? val ?? 0) },
+        { key: 'pool_budget_remaining', label: '剩余', render: (val, row) => (row.pool_budget?.remaining ?? val ?? 0) },
+        { key: 'status', label: '活动状态', type: 'status', statusMap: { active: { class: 'green', label: '运行中' }, draft: { class: 'gray', label: '草稿' }, paused: { class: 'yellow', label: '暂停' }, ended: { class: 'blue', label: '已结束' }, cancelled: { class: 'red', label: '已取消' } } }
       ],
       dataSource: async (params) => {
-        const res = await request({ url: `${API_PREFIX}/console/campaign-budget`, method: 'GET', params })
-        return { items: res.data?.list || res.data?.budgets || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+        const res = await request({ url: `${API_PREFIX}/console/campaign-budget/batch-status`, method: 'GET', params })
+        const items = res.data?.campaigns || res.data?.list || res.data?.budgets || []
+        const total = res.data?.total_count || res.data?.pagination?.total || items.length
+        return { items, total }
       },
-      primaryKey: 'budget_id', sortable: true, page_size: 20
+      primaryKey: 'lottery_campaign_id', sortable: true, page_size: 20
     })
     const origInit = table.init
     table.init = async function () { window.addEventListener('refresh-budgets', () => this.loadData()); if (origInit) await origInit.call(this) }
@@ -428,23 +432,27 @@ document.addEventListener('alpine:init', () => {
     return table
   })
 
-  /** 钻石交易明细 */
+  /** 钻石交易明细 - 需要 user_id（通过页面搜索功能提供） */
   Alpine.data('diamondTransactionsDataTable', () => {
     const table = dataTable({
       columns: [
-        { key: 'transaction_id', label: '交易ID', sortable: true },
-        { key: 'user_id', label: '用户ID' },
-        { key: 'type', label: '类型', render: (val, row) => row.type_display || val || '-' },
+        { key: 'asset_transaction_id', label: '交易ID', sortable: true },
+        { key: 'asset_code', label: '资产类型' },
+        { key: 'tx_type', label: '类型', render: (val, row) => row.tx_type_display || val || '-' },
         { key: 'amount', label: '金额', type: 'number', sortable: true },
         { key: 'balance_after', label: '余额', type: 'number' },
-        { key: 'description', label: '说明', type: 'truncate', maxLength: 30 },
+        { key: 'reason', label: '说明', type: 'truncate', maxLength: 30 },
         { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
       ],
       dataSource: async (params) => {
-        const res = await request({ url: `${API_PREFIX}/console/assets/transactions`, method: 'GET', params: { ...params, asset_type: 'diamond' } })
-        return { items: res.data?.list || res.data?.transactions || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+        // 后端 /console/assets/transactions 要求 user_id 必填
+        if (!params.user_id) {
+          return { items: [], total: 0 }
+        }
+        const res = await request({ url: `${API_PREFIX}/console/assets/transactions`, method: 'GET', params: { ...params, asset_code: 'DIAMOND' } })
+        return { items: res.data?.transactions || res.data?.list || [], total: res.data?.pagination?.total || 0 }
       },
-      primaryKey: 'transaction_id', sortable: true, page_size: 20
+      primaryKey: 'asset_transaction_id', sortable: true, page_size: 20
     })
     const origInit = table.init
     table.init = async function () { window.addEventListener('refresh-diamond-transactions', () => this.loadData()); if (origInit) await origInit.call(this) }

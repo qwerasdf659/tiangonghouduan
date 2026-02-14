@@ -116,7 +116,85 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: 0,
         comment: '排序序号'
+      },
+
+      // === 以下为新增字段（臻选空间/幸运空间/竞价功能需求，共 9 个 — 决策12） ===
+
+      /**
+       * 空间归属（核心业务字段）
+       * - lucky: 幸运空间（存量77条商品默认归入）
+       * - premium: 臻选空间（运营手动配置）
+       * - both: 两个空间都展示
+       */
+      space: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
+        defaultValue: 'lucky',
+        comment: '所属空间：lucky=幸运空间, premium=臻选空间, both=两者都展示'
+      },
+
+      /** 原价（材料数量），用于展示划线价对比，前端可计算折扣 */
+      original_price: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        comment: '原价（材料数量），用于展示划线价对比'
+      },
+
+      /** 商品标签数组，如 ["限量","新品"] */
+      tags: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: '商品标签数组，如 ["限量","新品"]'
+      },
+
+      /** 是否新品（角标展示） */
+      is_new: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否新品'
+      },
+
+      /** 是否热门（角标展示） */
+      is_hot: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否热门'
+      },
+
+      /** 是否幸运商品（特殊标识） */
+      is_lucky: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否幸运商品（特殊标识）'
+      },
+
+      /** 是否有质保 */
+      has_warranty: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否有质保'
+      },
+
+      /** 是否包邮 */
+      free_shipping: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否包邮'
+      },
+
+      /** 营销卖点文案 */
+      sell_point: {
+        type: DataTypes.STRING(200),
+        allowNull: true,
+        comment: '营销卖点文案'
       }
+
+      // ❌ 已砍掉（决策12）：discount（前端算）、rating（无评价系统）、sales（复用sold_count）、seller_info（自营非多商家）
     },
     {
       tableName: 'exchange_items',
@@ -124,8 +202,14 @@ module.exports = sequelize => {
       created_at: 'created_at',
       updated_at: 'updated_at',
       underscored: true,
-      indexes: [{ fields: ['status'] }, { fields: ['category'] }, { fields: ['cost_asset_code'] }],
-      comment: '兑换市场商品表（V4.5.0材料资产支付）'
+      indexes: [
+        { fields: ['status'] },
+        { fields: ['category'] },
+        { fields: ['cost_asset_code'] },
+        { fields: ['space'], name: 'idx_space' },
+        { fields: ['space', 'status'], name: 'idx_space_status' }
+      ],
+      comment: '兑换市场商品表（V4.5.0材料资产支付 + 臻选空间/幸运空间扩展）'
     }
   )
 
@@ -147,6 +231,14 @@ module.exports = sequelize => {
       foreignKey: 'primary_image_id',
       as: 'primaryImage'
     })
+
+    // 一对多：商品有多个竞价记录（臻选空间/幸运空间竞价功能）
+    if (models.BidProduct) {
+      ExchangeItem.hasMany(models.BidProduct, {
+        foreignKey: 'exchange_item_id',
+        as: 'bidProducts'
+      })
+    }
   }
 
   /**

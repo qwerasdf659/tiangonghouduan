@@ -287,11 +287,13 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
         'status',
         'start_time',
         'end_time',
-        'cost_per_draw',
         'daily_budget_limit',
         'pool_budget_total',
         'pool_budget_remaining',
         'budget_mode',
+        // 前端展示配置字段（多活动抽奖系统 - Web后台活动列表需要展示玩法和主题）
+        'display_mode',
+        'effect_theme',
         'created_at',
         'updated_at'
       ],

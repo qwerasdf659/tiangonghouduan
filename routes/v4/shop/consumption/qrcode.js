@@ -5,8 +5,12 @@
  * @description 用户二维码生成与验证 (v2动态二维码)
  *
  * API列表：
- * - GET /qrcode/:user_id - 生成用户动态身份二维码（v2版本，5分钟有效，一次性）
+ * - GET /qrcode - 生成当前用户动态身份二维码（v2版本，5分钟有效，一次性，从JWT Token取身份）
  * - GET /user-info - 验证二维码并获取用户详细信息（商家扫码后使用）
+ *
+ * 路由分离说明（2026-02-12）：
+ * - 用户端：GET /qrcode（从JWT Token取身份，无需传user_id）
+ * - 管理端：GET /api/v4/console/consumption/qrcode/:user_id（admin专用，带审计日志）
  *
  * 业务场景：
  * - 用户生成自己的动态二维码用于线下消费
@@ -35,11 +39,12 @@ const logger = require('../../../../utils/logger').logger
  */
 
 /**
- * @route GET /api/v4/shop/consumption/qrcode/:user_id
- * @desc 生成用户动态身份二维码（v2版本，5分钟有效，一次性）
- * @access Private (用户本人或管理员)
+ * @route GET /api/v4/shop/consumption/qrcode
+ * @desc 生成当前用户动态身份二维码（v2版本，5分钟有效，一次性）
+ * @access Private (用户本人，从JWT Token取身份)
  *
- * @param {number} user_id - 用户ID
+ * 路由分离（2026-02-12）：用户端不再传 :user_id，从 JWT Token 解析身份
+ * 管理员查看其他用户二维码请使用：GET /api/v4/console/consumption/qrcode/:user_id
  *
  * @returns {Object} 二维码信息
  * @returns {string} data.qr_code - 二维码字符串（格式：QRV2_{base64_payload}_{signature}）
@@ -54,7 +59,7 @@ const logger = require('../../../../utils/logger').logger
  * @returns {string} data.usage - 使用方式
  *
  * @example
- * GET /api/v4/shop/consumption/qrcode/123
+ * GET /api/v4/shop/consumption/qrcode
  * Response:
  * {
  *   "qr_code": "QRV2_eyJ1c2VyX3V1aWQ....",
@@ -69,25 +74,9 @@ const logger = require('../../../../utils/logger').logger
  *   "usage": "请商家扫描此二维码录入消费金额"
  * }
  */
-router.get('/qrcode/:user_id', authenticateToken, async (req, res) => {
+router.get('/qrcode', authenticateToken, async (req, res) => {
   try {
-    const { user_id } = req.params
-
-    // 参数验证：严格验证user_id，防止NaN绕过
-    const userId = parseInt(user_id, 10)
-    if (isNaN(userId) || userId <= 0) {
-      logger.warn('无效的用户ID参数', { user_id, requester: req.user.user_id })
-      return res.apiError('无效的用户ID，必须是正整数', 'BAD_REQUEST', null, 400)
-    }
-
-    // 权限检查：只能生成自己的二维码，或管理员(role_level >= 100)可生成任何用户
-    if (req.user.user_id !== userId && req.user.role_level < 100) {
-      logger.warn('权限验证失败', {
-        requester: req.user.user_id,
-        target: userId
-      })
-      return res.apiError('无权生成其他用户的二维码', 'FORBIDDEN', null, 403)
-    }
+    const userId = req.user.user_id
 
     logger.info('生成用户动态二维码（v2版本）', { user_id: userId })
 

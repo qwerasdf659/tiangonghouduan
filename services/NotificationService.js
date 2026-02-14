@@ -55,14 +55,14 @@ class NotificationService {
         user_id,
         type,
         title,
-        message_id: result.message_id,
+        chat_message_id: result.chat_message_id,
         pushed: result.pushed_to_websocket,
         content: content.substring(0, 100) // 限制日志长度
       })
 
       return {
         success: true,
-        notification_id: result.message_id,
+        notification_id: result.chat_message_id,
         user_id,
         type,
         title,
@@ -144,8 +144,8 @@ class NotificationService {
     let pushed = false
     try {
       const messageData = {
-        message_id: message.message_id,
-        session_id: session.customer_service_session_id,
+        chat_message_id: message.chat_message_id,
+        customer_service_session_id: session.customer_service_session_id,
         sender_id: null, // ✅ 系统消息sender_id为NULL
         sender_type: 'admin',
         sender_name: '系统通知',
@@ -171,8 +171,8 @@ class NotificationService {
     }
 
     return {
-      message_id: message.message_id,
-      session_id: session.customer_service_session_id,
+      chat_message_id: message.chat_message_id,
+      customer_service_session_id: session.customer_service_session_id,
       content: systemMessageContent,
       created_at: message.created_at,
       pushed_to_websocket: pushed

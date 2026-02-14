@@ -149,11 +149,14 @@ describe('阶段八：跨模块集成测试', () => {
         // 3. 查询活动配置获取单次抽奖费用
         const campaign = await LotteryCampaign.findByPk(test_lottery_campaign_id, { transaction })
         expect(campaign).not.toBeNull()
-        const cost_per_draw = Number(campaign.cost_per_draw) || 100
+        // 从 LotteryPricingService 获取真实单抽成本
+        const LotteryPricingService = require('../../services/lottery/LotteryPricingService')
+        const pricing = await LotteryPricingService.getDrawPricing(1, test_lottery_campaign_id)
+        const per_draw_cost = pricing.per_draw || pricing.base_cost || 100
 
         // 4. 如果积分不足，先充值（测试环境模拟）
-        if (initial_points < cost_per_draw) {
-          const recharge_amount = cost_per_draw * 2
+        if (initial_points < per_draw_cost) {
+          const recharge_amount = per_draw_cost * 2
           await BalanceService.changeBalance(
             {
               user_id: test_user_id,

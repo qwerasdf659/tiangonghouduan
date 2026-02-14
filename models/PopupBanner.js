@@ -55,7 +55,7 @@ module.exports = sequelize => {
         comment: '弹窗标题（便于后台管理识别）'
       },
 
-      /*
+      /**
        * 图片存储路径（Sealos对象存储 key）
        * 🎯 架构决策（2026-01-08 拍板 + 2026-01-14 图片缩略图架构兼容残留核查报告强化）：
        * - 只允许存储对象 key（如 popup-banners/xxx.jpg）
@@ -87,6 +87,60 @@ module.exports = sequelize => {
           }
         },
         comment: '图片存储路径（仅对象 key，如 popup-banners/xxx.jpg）'
+      },
+
+      /**
+       * 显示模式（运营选择的模板类型）
+       *
+       * 🎯 拍板决策（2026-02-08）：
+       * - 必填，无默认值：创建时必须显式传入
+       * - 前端表单不预选，运营必须主动选择模板才能提交
+       * - ENUM 类型，数据库层强约束（6种模式基于物理比例不会频繁变）
+       *
+       * 枚举值说明：
+       * - wide：宽屏模式（16:9），推荐 750×420px
+       * - horizontal：横版模式（3:2），推荐 750×500px
+       * - square：方图模式（1:1），推荐 750×750px
+       * - tall：竖图模式（3:4），推荐 750×1000px
+       * - slim：窄长图模式（9:16），推荐 420×750px
+       * - full_image：纯图模式，不限比例，无白色卡片壳
+       */
+      display_mode: {
+        type: DataTypes.ENUM('wide', 'horizontal', 'square', 'tall', 'slim', 'full_image'),
+        allowNull: false,
+        validate: {
+          notNull: {
+            msg: '显示模式不能为空，请选择一个模板'
+          },
+          isIn: {
+            args: [['wide', 'horizontal', 'square', 'tall', 'slim', 'full_image']],
+            msg: '显示模式必须是：wide, horizontal, square, tall, slim, full_image 之一'
+          }
+        },
+        comment:
+          '显示模式（必填，无默认值）：wide=宽屏16:9, horizontal=横版3:2, square=方图1:1, tall=竖图3:4, slim=窄长图9:16, full_image=纯图模式'
+      },
+
+      /**
+       * 原图宽度（上传时 sharp 自动检测并存储）
+       * 用于管理后台展示尺寸信息、前端比例校验
+       */
+      image_width: {
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: true,
+        defaultValue: null,
+        comment: '原图宽度(px)，上传时 sharp 自动存储'
+      },
+
+      /**
+       * 原图高度（上传时 sharp 自动检测并存储）
+       * 用于管理后台展示尺寸信息、前端比例校验
+       */
+      image_height: {
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: true,
+        defaultValue: null,
+        comment: '原图高度(px)，上传时 sharp 自动存储'
       },
 
       // 点击跳转链接（可选）
@@ -371,7 +425,16 @@ module.exports = sequelize => {
         ['created_at', 'DESC']
       ],
       limit,
-      attributes: ['popup_banner_id', 'title', 'image_url', 'link_url', 'link_type']
+      attributes: [
+        'popup_banner_id',
+        'title',
+        'image_url',
+        'display_mode',
+        'image_width',
+        'image_height',
+        'link_url',
+        'link_type'
+      ]
     })
   }
 

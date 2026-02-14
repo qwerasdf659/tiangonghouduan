@@ -177,15 +177,15 @@ describe('抽奖系统API测试（V4架构）', () => {
     })
 
     /*
-     * ✅ 修复：删除不存在的API测试 - /api/v4/lottery/statistics/:user_id 路由不存在
-     * 实际路由中没有这个统计接口
+     * ✅ 修复：路由分离后，用户端使用 /api/v4/lottery/statistics（从Token取身份）
+     * 管理员端使用 /api/v4/console/lottery-user-analysis/statistics/:user_id
      */
     test.skip('获取用户抽奖统计（普通用户查看自己）- API不存在', async () => {
       const target_user_id = test_user_id || testUser.user_id
 
       const response = await tester.make_authenticated_request(
         'GET',
-        `/api/v4/lottery/statistics/${target_user_id}`,
+        `/api/v4/lottery/statistics`,
         null,
         'regular'
       )
@@ -243,12 +243,12 @@ describe('抽奖系统API测试（V4架构）', () => {
       }
     })
 
-    test('获取用户抽奖统计（管理员查看其他用户）- GET /api/v4/lottery/statistics/:user_id', async () => {
+    test('获取用户抽奖统计（管理员查看其他用户）- GET /api/v4/lottery/statistics', async () => {
       const target_user_id = test_user_id || testUser.user_id
 
       const response = await tester.make_authenticated_request(
         'GET',
-        `/api/v4/lottery/statistics/${target_user_id}`,
+        `/api/v4/lottery/statistics`,
         null,
         'admin'
       )
@@ -271,7 +271,7 @@ describe('抽奖系统API测试（V4架构）', () => {
       }
     })
 
-    test('获取用户抽奖统计（权限验证逻辑测试）- GET /api/v4/lottery/statistics/:user_id', async () => {
+    test('获取用户抽奖统计（权限验证逻辑测试）- GET /api/v4/console/lottery-user-analysis/statistics/:user_id', async () => {
       /**
        * 测试说明：
        * 由于测试账号13612227930同时具有普通用户和管理员权限（role_level >= 100），
@@ -289,7 +289,7 @@ describe('抽奖系统API测试（V4架构）', () => {
 
       const response = await tester.make_authenticated_request(
         'GET',
-        `/api/v4/lottery/statistics/${non_existent_user_id}`,
+        `/api/v4/console/lottery-user-analysis/statistics/${non_existent_user_id}`,
         null,
         'regular' // 使用regular用户身份，但该用户具有管理员权限
       )

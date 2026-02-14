@@ -37,7 +37,8 @@
 
 const BaseStage = require('./BaseStage')
 const { SegmentResolver } = require('../../../../config/segment_rules')
-const { User, LotteryUserExperienceState } = require('../../../../models')
+const { User, LotteryUserExperienceState, LotteryDraw } = require('../../../../models')
+const { Op } = require('sequelize')
 
 /* 抽奖计算引擎 */
 const LotteryComputeEngine = require('../../compute/LotteryComputeEngine')
@@ -216,11 +217,68 @@ class TierPickStage extends BaseStage {
       const original_tier = this._pickTier(adjusted_weights, random_value)
 
       /* 5. 检查选中档位是否有可用奖品，必要时降级 */
-      const { selected_tier, downgrade_path } = this._applyDowngrade(
+      let { selected_tier, downgrade_path } = this._applyDowngrade(
         original_tier,
         prizes_by_tier,
         available_tiers
       )
+
+      /**
+       * 🛡️ 2026-02-15 新增：单用户每日高价值中奖硬上限保护
+       *
+       * 业务背景：
+       * - 即使所有概率机制正常工作，仍需要一个硬性安全网
+       * - 防止因代码缺陷、配置错误等导致单用户大量获取高价值奖品
+       * - 默认限制：每个用户每天最多 5 次 high 档位中奖
+       *
+       * 保护逻辑：
+       * - 如果用户今日 high 中奖次数 >= 限制值，强制降级到 mid 或 fallback
+       * - 此保护在体验平滑之前执行，是最终安全网
+       */
+      const DAILY_HIGH_TIER_CAP = 5 // 每用户每天最多5次高价值中奖
+      let daily_high_capped = false
+
+      if (selected_tier === 'high') {
+        try {
+          const today_start = new Date()
+          today_start.setHours(0, 0, 0, 0)
+
+          const today_high_count = await LotteryDraw.count({
+            where: {
+              user_id,
+              lottery_campaign_id,
+              reward_tier: 'high',
+              created_at: { [Op.gte]: today_start }
+            }
+          })
+
+          if (today_high_count >= DAILY_HIGH_TIER_CAP) {
+            this.log('warn', '🛡️ 触发每日高价值中奖硬上限保护', {
+              user_id,
+              lottery_campaign_id,
+              today_high_count,
+              daily_cap: DAILY_HIGH_TIER_CAP,
+              original_selected_tier: selected_tier,
+              capped_to: 'mid'
+            })
+
+            // 降级到 mid 档位（如果 mid 有奖品）
+            const mid_prizes = prizes_by_tier.mid || []
+            if (mid_prizes.length > 0) {
+              selected_tier = 'mid'
+            } else {
+              selected_tier = 'fallback'
+            }
+            daily_high_capped = true
+          }
+        } catch (cap_error) {
+          /* 硬上限检查失败不阻断抽奖，记录日志继续 */
+          this.log('warn', '每日高价值硬上限检查失败（非致命）', {
+            user_id,
+            error: cap_error.message
+          })
+        }
+      }
 
       /* 6. 应用体验平滑机制（Pity / AntiEmpty / AntiHigh） */
       let experience_state = null
@@ -282,6 +340,8 @@ class TierPickStage extends BaseStage {
         pressure_tier,
         effective_budget,
         empty_weight_multiplier: weight_adjustment.empty_weight_multiplier,
+        /* 每日高价值硬上限保护 */
+        daily_high_capped,
         /* 体验平滑信息 */
         experience_smoothing: smoothing_result
           ? {
@@ -379,6 +439,15 @@ class TierPickStage extends BaseStage {
   /**
    * 获取分群对应的档位权重
    *
+   * 🔴 2026-02-15 修复：增加分群回退逻辑
+   * 问题根因：
+   * - v1 segment resolver 返回 'regular_user'
+   * - 但 lottery_tier_rules 表只有 'default'/'new_user'/'vip_user' 分群
+   * - 导致匹配不到任何规则，使用代码硬编码的默认权重
+   * - 数据库配置的 tier_rules 完全失效
+   *
+   * 修复方案：当指定分群无规则时，回退到 'default' 分群的规则
+   *
    * @param {string} segment - 用户分群
    * @param {Array} tier_rules - 档位规则列表
    * @param {Object} _campaign - 活动配置（预留用于扩展权重计算）
@@ -395,10 +464,23 @@ class TierPickStage extends BaseStage {
     }
 
     // 从 tier_rules 中查找匹配的分群配置
-    const segment_rules = tier_rules.filter(r => r.segment_key === segment)
+    let segment_rules = tier_rules.filter(r => r.segment_key === segment)
+
+    /**
+     * 🔴 2026-02-15 修复：分群回退机制
+     * 当指定分群无匹配规则时，回退到 'default' 分群
+     * 确保数据库配置的 tier_rules 不会因为 segment 不匹配而被忽略
+     */
+    if (segment_rules.length === 0 && segment !== 'default') {
+      this.log('warn', '未找到指定分群配置，回退到 default 分群', {
+        original_segment: segment,
+        fallback_segment: 'default'
+      })
+      segment_rules = tier_rules.filter(r => r.segment_key === 'default')
+    }
 
     if (segment_rules.length === 0) {
-      this.log('debug', '未找到分群配置，使用默认权重', {
+      this.log('debug', '未找到任何分群配置，使用代码默认权重', {
         segment,
         default_weights
       })

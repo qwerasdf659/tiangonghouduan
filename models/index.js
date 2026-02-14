@@ -286,10 +286,29 @@ models.ExchangeRecord = require('./ExchangeRecord')(sequelize, DataTypes)
 /*
  * ✅ ExchangeRecord：B2C兑换订单记录表
  *    - 用途：记录用户在B2C官方商城的兑换订单
- *    - 特点：材料资产支付、订单管理、发货追踪
+ *    - 特点：材料资产支付、订单管理、发货追踪、来源标识(source)
  *    - 表名：exchange_records，主键：exchange_record_id
  *    - 业务场景：用户选择商品 → 扣除材料资产 → 创建订单 → 发货
- *    - API路由：/api/v4/shop/exchange（从 /api/v4/market 迁移）
+ *    - source字段：exchange(普通兑换) / bid(竞价中标)
+ */
+
+// 🔴 竞价系统模型（臻选空间/幸运空间/竞价功能 — 2026-02-16）
+models.BidProduct = require('./BidProduct')(sequelize, DataTypes)
+/*
+ * ✅ BidProduct：竞价商品表
+ *    - 用途：管理竞价活动（关联 exchange_items，含状态机 + 时间控制）
+ *    - 特点：7态状态机（pending/active/ended/cancelled/settled/settlement_failed/no_bid）
+ *    - 表名：bid_products，主键：bid_product_id
+ *    - 业务场景：管理员创建竞价 → 定时激活 → 用户出价 → 到期结算/流拍
+ */
+
+models.BidRecord = require('./BidRecord')(sequelize, DataTypes)
+/*
+ * ✅ BidRecord：竞价出价记录表
+ *    - 用途：记录用户出价（含冻结流水对账、幂等性控制）
+ *    - 特点：idempotency_key UNIQUE、is_winning 标记当前最高出价
+ *    - 表名：bid_records，主键：bid_record_id
+ *    - 业务场景：用户出价 → 冻结资产 → 记录出价 → 结算时标记 is_final_winner
  */
 
 /*
@@ -566,7 +585,7 @@ models.BatchOperationLog = require('./BatchOperationLog').initModel(sequelize)
  * ✅ BatchOperationLog：批量操作日志表（幂等性控制与操作审计）
  *    - 用途：记录所有批量操作的执行状态和结果，提供幂等性保障
  *    - 特点：idempotency_key唯一约束（美团幂等性方案）、部分成功模式、操作审计
- *    - 表名：batch_operation_logs，主键：batch_log_id
+ *    - 表名：batch_operation_logs，主键：batch_operation_log_id
  *    - 业务场景：批量赠送配额、批量设置干预规则、批量核销、批量状态切换、批量预算调整
  *    - 设计决策来源：需求文档阶段C技术决策（美团独立幂等表 + Redis/MySQL双重校验）
  */

@@ -306,7 +306,7 @@ class ChatWebSocketService {
       } catch (error) {
         wsLogger.error('推送消息给用户失败', {
           user_id,
-          message_id: message.message_id || 'unknown',
+          chat_message_id: message.chat_message_id || 'unknown',
           error: error.message,
           timestamp: BeijingTimeHelper.now()
         })
@@ -333,7 +333,7 @@ class ChatWebSocketService {
       } catch (error) {
         wsLogger.error('推送消息给客服失败', {
           admin_id,
-          message_id: message.message_id || 'unknown',
+          chat_message_id: message.chat_message_id || 'unknown',
           error: error.message,
           timestamp: BeijingTimeHelper.now()
         })
@@ -359,7 +359,7 @@ class ChatWebSocketService {
       } catch (error) {
         wsLogger.error('广播消息给客服失败', {
           admin_id,
-          message_id: message.message_id || 'unknown',
+          chat_message_id: message.chat_message_id || 'unknown',
           error: error.message
         })
       }

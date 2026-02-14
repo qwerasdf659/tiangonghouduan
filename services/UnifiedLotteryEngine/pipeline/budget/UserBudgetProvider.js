@@ -191,14 +191,14 @@ class UserBudgetProvider extends BudgetProvider {
         lottery_campaign_id,
         deduct_from_lottery_campaign_id: deduct_lottery_campaign_id,
         deducted: amount,
-        remaining: deduct_result.balance?.available_balance,
+        remaining: Number(deduct_result.balance?.available_amount) || 0,
         reference_id
       })
 
       return {
         success: true,
         deducted: amount,
-        remaining: deduct_result.balance?.available_balance || 0,
+        remaining: Number(deduct_result.balance?.available_amount) || 0,
         transaction_id: deduct_result.transaction_record?.transaction_id,
         deduct_from_lottery_campaign_id: deduct_lottery_campaign_id
       }
@@ -267,14 +267,14 @@ class UserBudgetProvider extends BudgetProvider {
         lottery_campaign_id,
         rollback_to_lottery_campaign_id: rollback_lottery_campaign_id,
         refunded: amount,
-        new_balance: refund_result.balance?.available_balance,
+        new_balance: Number(refund_result.balance?.available_amount) || 0,
         original_reference_id
       })
 
       return {
         success: true,
         refunded: amount,
-        new_balance: refund_result.balance?.available_balance || 0,
+        new_balance: Number(refund_result.balance?.available_amount) || 0,
         transaction_id: refund_result.transaction_record?.transaction_id,
         rollback_to_lottery_campaign_id: rollback_lottery_campaign_id
       }
