@@ -439,8 +439,17 @@ class LotteryComputeEngine {
 
     // 3. AntiHigh：连续高价值保护
     if (this.options.enable_anti_streak && experience_state) {
+      /**
+       * 🔴 2026-02-15 修复：传递 anti_high_cooldown 参数
+       *
+       * 修复根因：
+       * - 原代码未传递 experience_state.anti_high_cooldown 给 AntiHighStreakHandler
+       * - 导致冷却机制形同虚设（handler 内默认值 0 = 不在冷却期）
+       * - 用户触发降级后无法进入冷却期，每次抽奖都重新检测
+       */
       const anti_high_result = this._applyAntiHighStreak({
         recent_high_count: experience_state.recent_high_count || 0,
+        anti_high_cooldown: experience_state.anti_high_cooldown || 0,
         selected_tier: final_tier,
         tier_weights: final_weights,
         prizes_by_tier,
@@ -515,7 +524,7 @@ class LotteryComputeEngine {
       user_id,
       lottery_campaign_id,
       reward_tier,
-      prize_value_points,
+      prize_value_points: _prize_value_points, // eslint-disable-line no-unused-vars -- 保留参数完整性，不再用于 is_empty 判定
       is_empty_prize,
       transaction
     } = params
@@ -528,20 +537,19 @@ class LotteryComputeEngine {
     })
 
     try {
-      // 1. 更新活动级体验状态
-      const is_empty =
-        is_empty_prize ||
-        reward_tier === 'empty' ||
-        reward_tier === 'fallback' ||
-        prize_value_points === 0
-      const is_high = reward_tier === 'high'
+      /**
+       * 🔴 2026-02-15 修复：is_empty 判定逻辑
+       * 只有 'fallback' 和 'empty' 档位才是真正的空奖
+       * prize_value_points=0 的 low 档位奖品是"参与奖"，不计入空奖
+       */
+      const is_empty = is_empty_prize || reward_tier === 'empty' || reward_tier === 'fallback'
 
       const experience_state = await this.experienceStateManager.updateState(
         {
           user_id,
           lottery_campaign_id,
           is_empty,
-          is_high
+          draw_tier: reward_tier
         },
         { transaction }
       )
@@ -1066,6 +1074,7 @@ class LotteryComputeEngine {
     if (anti_high_grayscale.enabled && experience_state) {
       const anti_high_result = this._applyAntiHighStreak({
         recent_high_count: experience_state.recent_high_count || 0,
+        anti_high_cooldown: experience_state.anti_high_cooldown || 0,
         selected_tier: final_tier,
         tier_weights: final_weights
       })
@@ -1218,6 +1227,7 @@ class LotteryComputeEngine {
     if (anti_high_decision.enabled && experience_state) {
       const anti_high_result = this._applyAntiHighStreak({
         recent_high_count: experience_state.recent_high_count || 0,
+        anti_high_cooldown: experience_state.anti_high_cooldown || 0,
         selected_tier: final_tier,
         tier_weights: final_weights
       })

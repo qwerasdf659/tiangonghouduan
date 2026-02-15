@@ -256,6 +256,19 @@ class BuildPrizePoolStage extends BaseStage {
   /**
    * 按档位分组奖品
    *
+   * 🔴 2026-02-15 修复：严格按 reward_tier 字段分组，不再因 prize_value_points=0 强制归入 fallback
+   *
+   * 修复根因：
+   * - 原代码将所有 prize_value_points=0 的奖品强制归入 fallback 分组
+   * - 导致 low 档位（所有零值奖品）变成空池
+   * - low 的 80% 权重分配全部浪费（选中 low 后因无奖品被降级到 fallback）
+   * - 间接导致 high 档位中奖率从设计值 5% 飙升到 64.8%
+   *
+   * 修复方案：
+   * - 严格以数据库 reward_tier 字段为准进行分组
+   * - 仅当 reward_tier 明确为 'fallback' 时才归入 fallback 组
+   * - is_fallback 标记仅用于"当所有档位都无奖品时"的兜底识别，不改变分组归属
+   *
    * @param {Array} prizes - 奖品列表
    * @returns {Object} 按档位分组的奖品 { high: [], mid: [], low: [], fallback: [] }
    * @private
@@ -271,13 +284,11 @@ class BuildPrizePoolStage extends BaseStage {
     for (const prize of prizes) {
       const tier = prize.reward_tier || 'low'
 
-      // 判断是否为兜底奖品
-      if (prize.is_fallback === true || prize.prize_value_points === 0) {
-        grouped.fallback.push(prize)
-      } else if (TIER_ORDER.includes(tier)) {
+      if (TIER_ORDER.includes(tier)) {
+        /* 严格按 reward_tier 字段分组，不因 prize_value_points=0 而改变分组 */
         grouped[tier].push(prize)
       } else {
-        // 未知档位默认归入 low
+        /* 未知档位默认归入 low */
         grouped.low.push(prize)
       }
     }

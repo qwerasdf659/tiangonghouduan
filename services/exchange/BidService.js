@@ -1,3 +1,5 @@
+/* eslint-disable no-await-in-loop -- 结算/取消竞价需逐个用户处理资产操作，确保每个用户独立事务安全 */
+
 /**
  * 竞价核心服务 - BidService
  * 臻选空间/幸运空间竞价功能核心业务逻辑
@@ -253,7 +255,16 @@ class BidService {
       { transaction }
     )
 
-    // === Step 7: 更新之前最高出价记录的 is_winning = false ===
+    /*
+     * === Step 7: 更新之前最高出价记录的 is_winning = false ===
+     * 先查询被超越的出价者（用于事务提交后发送通知）
+     */
+    const outbidRecord = await this.BidRecord.findOne({
+      where: { bid_product_id: bidProductId, is_winning: true, user_id: { [Op.ne]: userId } },
+      attributes: ['bid_record_id', 'user_id', 'bid_amount'],
+      transaction
+    })
+
     await this.BidRecord.update(
       { is_winning: false },
       {
@@ -302,7 +313,17 @@ class BidService {
       previous_highest: currentPrice,
       remaining_available: freezeResult.balance?.available_amount ?? null,
       bid_count: Number(bidProduct.bid_count) + 1,
-      message: '出价成功，您当前为最高出价者！'
+      message: '出价成功，您当前为最高出价者！',
+      /**
+       * 被超越的出价者信息（用于路由层事务提交后发送 bid_outbid 通知）
+       * 若无人被超越（首次出价），值为 null
+       */
+      _outbid_info: outbidRecord
+        ? {
+            user_id: outbidRecord.user_id,
+            previous_bid_amount: Number(outbidRecord.bid_amount)
+          }
+        : null
     }
   }
 
@@ -516,7 +537,16 @@ class BidService {
       winner_user_id: winnerId,
       winning_amount: winningAmount,
       item_name: exchangeItem.item_name,
-      loser_count: loserMap.size
+      price_asset_code: assetCode,
+      loser_count: loserMap.size,
+      /**
+       * 落选用户列表（用于事务提交后发送 bid_lost 通知）
+       * 格式：[{ user_id, bid_amount }]
+       */
+      _losers: Array.from(loserMap).map(([uid, bid]) => ({
+        user_id: uid,
+        bid_amount: Number(bid.bid_amount)
+      }))
     }
   }
 

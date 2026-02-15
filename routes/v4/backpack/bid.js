@@ -204,6 +204,30 @@ router.post(
         bid_amount: amount
       })
 
+      // 🔔 事务提交后，异步发送被超越通知（fire-and-forget，不阻塞响应）
+      if (result._outbid_info) {
+        const NotificationService = require('../../../services/NotificationService')
+        const BidQueryService = req.app.locals.services.getService('exchange_bid_query')
+
+        // 查询商品名称用于通知内容
+        BidQueryService.getBidProductDetail(productId, {})
+          .then(detail => {
+            const itemName = detail?.exchangeItem?.item_name || '竞价商品'
+            const assetCode = detail?.price_asset_code || 'DIAMOND'
+            return NotificationService.notifyBidOutbid(result._outbid_info.user_id, {
+              bid_product_id: productId,
+              item_name: itemName,
+              my_bid_amount: result._outbid_info.previous_bid_amount,
+              new_highest: amount,
+              price_asset_code: assetCode
+            })
+          })
+          .catch(err => logger.error('发送竞价超越通知失败', { error: err.message }))
+      }
+
+      // 从响应中移除内部字段（不暴露给前端）
+      delete result._outbid_info
+
       return res.apiSuccess(result, result.message)
     } catch (error) {
       logger.error('出价失败', {

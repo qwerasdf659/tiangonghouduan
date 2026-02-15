@@ -324,6 +324,11 @@ class QueryService {
       )
 
       for (const balance of balances) {
+        // 跳过系统内部资产类型（BUDGET_POINTS 不暴露给前端）
+        if (balance.asset_code === 'BUDGET_POINTS') {
+          continue
+        }
+
         const materialInfo = materialTypeMap.get(balance.asset_code)
 
         // 🆕 方案C：从 POINTS 资产中提取积分数据

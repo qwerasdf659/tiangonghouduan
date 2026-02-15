@@ -142,11 +142,14 @@ class BackpackService {
       )
 
       /*
-       * 2. 过滤总余额 > 0 的资产
+       * 2. 过滤总余额 > 0 的资产 + 排除系统内部资产类型
        * 总余额 = available_amount + frozen_amount
+       * BUDGET_POINTS 是系统内部资产（活动预算积分），绝对不暴露给前端
        */
       const validAssets = assetAccounts.filter(
-        account => account.available_amount + account.frozen_amount > 0
+        account =>
+          account.available_amount + account.frozen_amount > 0 &&
+          account.asset_code !== 'BUDGET_POINTS'
       )
 
       // ✅ 修复N+1查询问题：批量查询所有资产类型信息
@@ -189,7 +192,7 @@ class BackpackService {
           total_amount: totalAmount, // 总余额（可用 + 冻结）
           frozen_amount: frozenAmount, // 冻结余额
           available_amount: availableAmount, // 可用余额
-          category: assetType?.category || 'unknown',
+          category: assetType?.group_code || 'unknown', // 修复：MaterialAssetType 实际字段为 group_code
           rarity: assetType?.rarity || 'common'
         }
       })
@@ -448,7 +451,7 @@ class BackpackService {
       return {
         total_assets: assets.length,
         total_items: items.length,
-        total_asset_value: assets.reduce((sum, asset) => sum + asset.balance, 0)
+        total_asset_value: assets.reduce((sum, asset) => sum + (asset.available_amount || 0), 0) // 修复：_getAssets() 返回 available_amount 而非 balance
       }
     } catch (error) {
       logger.error('获取背包统计失败', {

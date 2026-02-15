@@ -133,8 +133,8 @@ class LotteryDraw extends Model {
       errors.push('抽奖活动ID无效')
     }
 
-    if (!data.reward_tier || !['low', 'mid', 'high'].includes(data.reward_tier)) {
-      errors.push('奖励档位无效，必须是 low/mid/high 之一')
+    if (!data.reward_tier || !['low', 'mid', 'high', 'fallback'].includes(data.reward_tier)) {
+      errors.push('奖励档位无效，必须是 low/mid/high/fallback 之一')
     }
 
     return errors
@@ -563,6 +563,25 @@ module.exports = sequelize => {
         type: DataTypes.INTEGER,
         allowNull: true,
         comment: '抽奖后预算积分'
+      },
+
+      /**
+       * 实际积分扣减金额（审计字段）
+       *
+       * 与 cost_points 的区别：
+       * - cost_points：抽奖定价（配置值，每次抽奖的标准价格）
+       * - points_deducted：实际扣减金额（连抽子请求可能为 0，因为由外层统一扣减）
+       *
+       * 使用场景：
+       * - 单抽：points_deducted = cost_points（正常扣减）
+       * - 连抽子请求（skip_points_deduction=true）：points_deducted = 0
+       * - 免费抽奖：points_deducted = 0
+       */
+      points_deducted: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '实际积分扣减金额（连抽时子请求可能为0，由外层统一扣减）'
       },
 
       // 审计信息

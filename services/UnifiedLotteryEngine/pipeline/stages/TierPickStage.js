@@ -207,14 +207,29 @@ class TierPickStage extends BaseStage {
         user_id,
         budget_tier,
         pressure_tier,
-        base_fallback_weight: base_tier_weights.fallback,
-        adjusted_fallback_weight: adjusted_weights.fallback,
+        base_weights: base_tier_weights,
+        adjusted_weights,
         empty_weight_multiplier: weight_adjustment.empty_weight_multiplier
       })
 
-      /* 4. 执行档位抽取（使用调整后的权重） */
+      /**
+       * 🛡️ 4a. 强制概率硬上限（不可绕过的安全网 - 2026-02-15 新增）
+       *
+       * 业务背景：
+       * - 无论 BxPx 矩阵、体验平滑等机制如何调整权重
+       * - high 档位的最终概率不得超过 MAX_HIGH_TIER_PROBABILITY
+       * - 防止因配置错误、代码缺陷导致高价值奖品中奖率失控
+       *
+       * 实现方式：
+       * - 如果 adjusted_weights.high 占比 > 上限，强制压缩到上限
+       * - 被压缩的权重按比例分配给 low 和 mid
+       */
+      const MAX_HIGH_TIER_PROBABILITY = 0.08 // 最大 8% 高价值中奖率
+      const capped_weights = this._enforceHighTierCap(adjusted_weights, MAX_HIGH_TIER_PROBABILITY)
+
+      /* 4b. 执行档位抽取（使用限制后的权重） */
       const random_value = Math.random() * WEIGHT_SCALE
-      const original_tier = this._pickTier(adjusted_weights, random_value)
+      const original_tier = this._pickTier(capped_weights, random_value)
 
       /* 5. 检查选中档位是否有可用奖品，必要时降级 */
       let { selected_tier, downgrade_path } = this._applyDowngrade(
@@ -243,13 +258,24 @@ class TierPickStage extends BaseStage {
           const today_start = new Date()
           today_start.setHours(0, 0, 0, 0)
 
+          /**
+           * 🔴 2026-02-15 修复：count 查询必须包含 transaction
+           *
+           * 修复根因：
+           * - 原代码不传 transaction，导致在连抽事务内看不到同批次的未提交记录
+           * - 10 连抽时所有 10 次 count 都返回事务开始前的值
+           * - 每日高价值硬上限保护完全失效
+           *
+           * 修复方案：传入 context.transaction 确保读取同事务内的数据
+           */
           const today_high_count = await LotteryDraw.count({
             where: {
               user_id,
               lottery_campaign_id,
               reward_tier: 'high',
               created_at: { [Op.gte]: today_start }
-            }
+            },
+            transaction: context.transaction || undefined
           })
 
           if (today_high_count >= DAILY_HIGH_TIER_CAP) {
@@ -262,10 +288,13 @@ class TierPickStage extends BaseStage {
               capped_to: 'mid'
             })
 
-            // 降级到 mid 档位（如果 mid 有奖品）
+            // 降级到 mid 档位（如果 mid 有奖品），否则降级到 low
             const mid_prizes = prizes_by_tier.mid || []
+            const low_prizes = prizes_by_tier.low || []
             if (mid_prizes.length > 0) {
               selected_tier = 'mid'
+            } else if (low_prizes.length > 0) {
+              selected_tier = 'low'
             } else {
               selected_tier = 'fallback'
             }
@@ -332,7 +361,7 @@ class TierPickStage extends BaseStage {
         tier_downgrade_path: downgrade_path,
         random_value,
         tier_weights: base_tier_weights,
-        adjusted_weights,
+        adjusted_weights: capped_weights,
         user_segment,
         weight_scale: WEIGHT_SCALE,
         /* 策略引擎分层信息 */
@@ -455,12 +484,27 @@ class TierPickStage extends BaseStage {
    * @private
    */
   _getTierWeights(segment, tier_rules, _campaign) {
-    // 默认权重配置（已拍板0.10.2）
+    /**
+     * 默认权重配置
+     *
+     * 🔴 2026-02-15 修复：fallback 默认权重设为 0
+     *
+     * 修复根因：
+     * - 数据库 lottery_tier_rules.tier_name 是 ENUM('high','mid','low')，不含 'fallback'
+     * - 数据库中没有 reward_tier='fallback' 的奖品
+     * - 原代码 fallback=500000（50%）导致大量抽奖选中 fallback 但无奖品可发
+     * - fallback 降级路径是终点，无法向上回退，造成异常
+     *
+     * 修复方案：
+     * - fallback 默认权重设为 0，正常抽奖不会选中 fallback
+     * - B0 用户（预算不足）通过 BxPx 矩阵 _filterByAvailability 强制只能抽 fallback
+     * - 只有在数据库显式配置了 fallback 奖品时，才需要为 fallback 分配权重
+     */
     const default_weights = {
       high: 50000, // 5%
       mid: 150000, // 15%
-      low: 300000, // 30%
-      fallback: 500000 // 50%
+      low: 800000, // 80%（包含零值安慰奖品）
+      fallback: 0 // 0%（无 fallback 奖品时不分配权重）
     }
 
     // 从 tier_rules 中查找匹配的分群配置
@@ -533,6 +577,51 @@ class TierPickStage extends BaseStage {
   }
 
   /**
+   * 强制 high 档位概率硬上限（不可绕过的安全网）
+   *
+   * 无论权重如何计算，high 档位的占比不得超过 maxRatio
+   * 超出的权重按比例分配给 low 和 mid 档位
+   *
+   * @param {Object} weights - 档位权重 { high, mid, low, fallback }
+   * @param {number} maxRatio - high 档位最大概率（如 0.08 = 8%）
+   * @returns {Object} 限制后的权重
+   * @private
+   */
+  _enforceHighTierCap(weights, maxRatio) {
+    const total = Object.values(weights).reduce((sum, w) => sum + (w || 0), 0)
+    if (total === 0) return weights
+
+    const high_ratio = (weights.high || 0) / total
+
+    // 如果 high 档位未超限，直接返回
+    if (high_ratio <= maxRatio) {
+      return { ...weights }
+    }
+
+    // 计算 high 应有的最大权重
+    const max_high_weight = Math.round(total * maxRatio)
+    const excess_weight = (weights.high || 0) - max_high_weight
+
+    // 将超出的权重分配给 low（80%）和 mid（20%）
+    const capped = {
+      high: max_high_weight,
+      mid: (weights.mid || 0) + Math.round(excess_weight * 0.2),
+      low: (weights.low || 0) + Math.round(excess_weight * 0.8),
+      fallback: weights.fallback || 0
+    }
+
+    this.log('warn', '🛡️ 触发 high 档位概率硬上限保护', {
+      original_high_ratio: (high_ratio * 100).toFixed(2) + '%',
+      max_allowed: (maxRatio * 100).toFixed(2) + '%',
+      original_high_weight: weights.high,
+      capped_high_weight: capped.high,
+      excess_redistributed: excess_weight
+    })
+
+    return capped
+  }
+
+  /**
    * 应用档位降级逻辑
    *
    * 规则（已拍板0.10.2）：
@@ -581,11 +670,44 @@ class TierPickStage extends BaseStage {
       }
     }
 
-    // 如果所有档位都没有奖品（不应该发生），返回 fallback
+    /**
+     * 🔴 2026-02-15 修复：当所有下级档位无奖品时，尝试向上回退
+     *
+     * 修复根因：
+     * - 原代码只支持向下降级（high→mid→low→fallback）
+     * - 当 fallback 无奖品时死锁在空档位（降级路径终点无法回退）
+     * - 导致 PrizePickStage 收到空奖品列表
+     *
+     * 修复方案：
+     * - 穷尽向下降级后，从第一个有奖品的档位开始向上搜索
+     * - 优先选择低价值档位（low > mid > high）确保预算安全
+     */
     if (tier_index >= TIER_DOWNGRADE_PATH.length) {
-      current_tier = 'fallback'
-      if (downgrade_path[downgrade_path.length - 1] !== 'fallback') {
-        downgrade_path.push('fallback')
+      /* 向下降级失败，尝试从 low 向上搜索有奖品的档位 */
+      const reverse_path = [...TIER_DOWNGRADE_PATH].reverse() // ['fallback', 'low', 'mid', 'high']
+      let found = false
+
+      for (const reverse_tier of reverse_path) {
+        const reverse_prizes = prizes_by_tier[reverse_tier] || []
+        if (reverse_prizes.length > 0) {
+          current_tier = reverse_tier
+          downgrade_path.push(current_tier)
+          found = true
+
+          this.log('warn', '向下降级失败，反向搜索到有奖品的档位', {
+            original_tier: downgrade_path[0],
+            final_tier: current_tier,
+            reason: '所有下级档位无可用奖品'
+          })
+          break
+        }
+      }
+
+      if (!found) {
+        current_tier = 'fallback'
+        if (downgrade_path[downgrade_path.length - 1] !== 'fallback') {
+          downgrade_path.push('fallback')
+        }
       }
     }
 

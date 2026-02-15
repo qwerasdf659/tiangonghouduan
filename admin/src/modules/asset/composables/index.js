@@ -23,11 +23,11 @@ export function useAllAssetState() {
 }
 
 /**
- * 组合所有方法
+ * 组合所有方法（保留 getter 描述符）
  * @returns {Object} 合并后的方法对象
  */
 export function useAllAssetMethods() {
-  return {
-    ...useAdjustmentMethods()
-  }
+  const result = {}
+  Object.defineProperties(result, Object.getOwnPropertyDescriptors(useAdjustmentMethods()))
+  return result
 }

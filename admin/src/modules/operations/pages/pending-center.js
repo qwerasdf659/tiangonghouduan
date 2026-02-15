@@ -16,29 +16,37 @@ import { usePendingState, usePendingMethods } from '../composables/index.js'
  * @returns {Object} Alpine.js 组件配置对象
  */
 function pendingCenterPage() {
-  return {
+  const pendingMethods = usePendingMethods()
+
+  // 使用 Object.defineProperties 保留 getter 描述符
+  // （usePendingMethods 包含 get totalPages、get hasSelected 等计算属性）
+  const result = {
     // ==================== Mixin 组合 ====================
     ...createPageMixin(),
 
     // ==================== Composables ====================
-    ...usePendingState(),
-    ...usePendingMethods(),
-
-    /**
-     * 初始化页面
-     */
-    async init() {
-      logger.info('[PendingCenter] 初始化待处理中心')
-
-      // 并行加载数据
-      await Promise.all([this.loadHealthScore(), this.loadSummary(), this.loadPendingItems()])
-
-      // 启动自动刷新
-      this.startAutoRefresh()
-
-      logger.info('[PendingCenter] 初始化完成')
-    }
+    ...usePendingState()
   }
+
+  // 正确复制含 getter 的方法对象
+  Object.defineProperties(result, Object.getOwnPropertyDescriptors(pendingMethods))
+
+  /**
+   * 初始化页面
+   */
+  result.init = async function () {
+    logger.info('[PendingCenter] 初始化待处理中心')
+
+    // 并行加载数据
+    await Promise.all([this.loadHealthScore(), this.loadSummary(), this.loadPendingItems()])
+
+    // 启动自动刷新
+    this.startAutoRefresh()
+
+    logger.info('[PendingCenter] 初始化完成')
+  }
+
+  return result
 }
 
 // 注册 Alpine 组件

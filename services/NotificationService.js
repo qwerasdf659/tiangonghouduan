@@ -1000,6 +1000,105 @@ class NotificationService {
       }
     })
   }
+
+  // ==================== 竞价通知（臻选空间/幸运空间 2026-02-16）====================
+
+  /**
+   * 竞价被超越通知（被超越的出价者）
+   *
+   * 业务场景：用户 A 是当前最高出价者，用户 B 提交了更高出价，
+   * 系统通知用户 A 其出价已被超越，可考虑重新出价。
+   *
+   * @param {number} user_id - 被超越的出价者用户ID
+   * @param {Object} bidData - 竞价数据
+   * @param {number} bidData.bid_product_id - 竞价商品ID
+   * @param {string} bidData.item_name - 竞价商品名称
+   * @param {number} bidData.my_bid_amount - 用户之前的出价金额
+   * @param {number} bidData.new_highest - 新的最高出价金额
+   * @param {string} bidData.price_asset_code - 竞价资产类型
+   * @returns {Promise<Object>} 通知结果
+   */
+  static async notifyBidOutbid(user_id, bidData) {
+    const { bid_product_id, item_name, my_bid_amount, new_highest, price_asset_code } = bidData
+
+    return await this.send(user_id, {
+      type: 'bid_outbid',
+      title: '⚠️ 您的竞价已被超越',
+      content: `您对【${item_name}】的出价 ${my_bid_amount} ${price_asset_code} 已被超越，当前最高价 ${new_highest} ${price_asset_code}。如需继续竞拍，请提交更高出价。`,
+      data: {
+        bid_product_id,
+        item_name,
+        my_bid_amount,
+        new_highest,
+        price_asset_code,
+        action: 'bid_outbid'
+      }
+    })
+  }
+
+  /**
+   * 竞价中标通知（中标者/赢家）
+   *
+   * 业务场景：竞价结算完成后，通知中标用户其竞价成功，
+   * 商品已添加到背包，冻结资产已正式扣除。
+   *
+   * @param {number} user_id - 中标用户ID
+   * @param {Object} bidData - 竞价数据
+   * @param {number} bidData.bid_product_id - 竞价商品ID
+   * @param {string} bidData.item_name - 竞价商品名称
+   * @param {number} bidData.winning_amount - 中标金额
+   * @param {string} bidData.price_asset_code - 竞价资产类型
+   * @returns {Promise<Object>} 通知结果
+   */
+  static async notifyBidWon(user_id, bidData) {
+    const { bid_product_id, item_name, winning_amount, price_asset_code } = bidData
+
+    return await this.send(user_id, {
+      type: 'bid_won',
+      title: '🎉 恭喜中标',
+      content: `恭喜！您以 ${winning_amount} ${price_asset_code} 成功拍得【${item_name}】。商品已添加到您的背包，请前往查看。`,
+      data: {
+        bid_product_id,
+        item_name,
+        winning_amount,
+        price_asset_code,
+        action: 'bid_won'
+      }
+    })
+  }
+
+  /**
+   * 竞价落选通知（未中标者）
+   *
+   * 业务场景：竞价结算完成后，通知落选用户其竞价未成功，
+   * 冻结资产已解冻返还。
+   *
+   * @param {number} user_id - 落选用户ID
+   * @param {Object} bidData - 竞价数据
+   * @param {number} bidData.bid_product_id - 竞价商品ID
+   * @param {string} bidData.item_name - 竞价商品名称
+   * @param {number} bidData.my_bid_amount - 用户的出价金额
+   * @param {number} bidData.winning_amount - 中标金额
+   * @param {string} bidData.price_asset_code - 竞价资产类型
+   * @returns {Promise<Object>} 通知结果
+   */
+  static async notifyBidLost(user_id, bidData) {
+    const { bid_product_id, item_name, my_bid_amount, winning_amount, price_asset_code } = bidData
+
+    return await this.send(user_id, {
+      type: 'bid_lost',
+      title: '📤 竞价未中标',
+      content: `很遗憾，您对【${item_name}】的出价 ${my_bid_amount} ${price_asset_code} 未中标（中标价 ${winning_amount} ${price_asset_code}）。您的冻结资产已解冻返还。`,
+      data: {
+        bid_product_id,
+        item_name,
+        my_bid_amount,
+        winning_amount,
+        price_asset_code,
+        action: 'bid_lost'
+      }
+    })
+  }
 }
 
 module.exports = NotificationService

@@ -381,16 +381,23 @@ function presetsPage() {
     },
 
     /**
-     * 搜索用户
+     * 搜索用户（通过手机号）
      *
-     * @description 根据关键词搜索用户，用于创建干预规则时选择目标用户
+     * @description 根据手机号搜索用户，使用后端 RESOLVE 端点精确匹配
      * @async
      * @returns {Promise<void>}
-     * @throws {Error} 当搜索关键词为空时提示错误
+     * @throws {Error} 当手机号为空或格式错误时提示错误
      */
     async searchUser() {
-      if (!this.userSearchKeyword.trim()) {
-        this.showError('请输入搜索关键词')
+      const mobile = this.userSearchKeyword.trim()
+      if (!mobile) {
+        this.showError('请输入手机号码')
+        return
+      }
+
+      // 手机号格式校验（11位数字，1开头）
+      if (!/^1\d{10}$/.test(mobile)) {
+        this.showError('手机号格式错误，请输入11位手机号')
         return
       }
 
@@ -398,20 +405,22 @@ function presetsPage() {
       this.userSearched = false
 
       try {
-        // 使用正确的端点名称：USER_ENDPOINTS.LIST（不是 USER_LIST）
         const response = await apiRequest(
-          `${USER_ENDPOINTS.LIST}?search=${encodeURIComponent(this.userSearchKeyword.trim())}&page_size=10`
+          `${USER_ENDPOINTS.RESOLVE}?mobile=${encodeURIComponent(mobile)}`
         )
 
-        if (response && response.success) {
-          this.userSearchResults = response.data?.users || []
-          logger.debug('用户搜索结果', { count: this.userSearchResults.length })
+        if (response && response.success && response.data) {
+          // RESOLVE 端点返回单个用户对象，包装为数组供列表展示
+          this.userSearchResults = [response.data]
+          logger.debug('用户搜索结果', { user_id: response.data.user_id })
         } else {
-          logger.warn('用户搜索响应异常', response)
+          this.userSearchResults = []
+          this.showError(response?.message || '未找到该手机号对应的用户')
         }
       } catch (error) {
         logger.error('搜索用户失败:', error)
         this.userSearchResults = []
+        this.showError('搜索用户失败: ' + error.message)
       } finally {
         this.searchingUser = false
         this.userSearched = true

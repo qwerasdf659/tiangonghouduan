@@ -747,6 +747,74 @@ document.addEventListener('alpine:init', () => {
       { id: 'marketplace-stats', name: '上架统计', icon: '📊' }
     ],
 
+    // ========== data-table 列配置 ==========
+    tradeOrderTableColumns: [
+      { key: 'trade_order_id', label: '交易ID', sortable: true, type: 'code' },
+      {
+        key: 'buyer_user_id',
+        label: '买家',
+        render: (val, row) => row.buyer?.nickname || val || '-'
+      },
+      {
+        key: 'seller_user_id',
+        label: '卖家',
+        render: (val, row) => row.seller?.nickname || val || '-'
+      },
+      {
+        key: 'asset_code',
+        label: '商品',
+        render: (val, row) => row.listing?.offer_asset_code || val || '-'
+      },
+      {
+        key: 'gross_amount',
+        label: '成交价',
+        sortable: true,
+        render: (val, row) => {
+          const amount = val || row.price_amount || 0
+          return `<span class="font-mono text-green-600">${Number(amount).toLocaleString('zh-CN')}</span>`
+        }
+      },
+      {
+        key: 'status',
+        label: '状态',
+        type: 'status',
+        statusMap: {
+          created: { class: 'yellow', label: '已创建' },
+          pending: { class: 'yellow', label: '待处理' },
+          frozen: { class: 'blue', label: '已冻结' },
+          processing: { class: 'blue', label: '处理中' },
+          completed: { class: 'green', label: '已完成' },
+          cancelled: { class: 'gray', label: '已取消' },
+          disputed: { class: 'red', label: '争议中' }
+        }
+      },
+      { key: 'created_at', label: '时间', type: 'datetime', sortable: true },
+      {
+        key: '_actions',
+        label: '操作',
+        type: 'actions',
+        width: '80px',
+        actions: [
+          { name: 'detail', label: '详情', class: 'text-blue-600 hover:text-blue-800' }
+        ]
+      }
+    ],
+
+    marketplaceStatsTableColumns: [
+      { key: 'user_id', label: '用户ID', sortable: true },
+      { key: 'nickname', label: '用户昵称' },
+      { key: 'listing_count', label: '当前上架数', type: 'number', sortable: true },
+      { key: 'remaining_quota', label: '剩余配额', type: 'number' },
+      {
+        key: 'is_at_limit',
+        label: '状态',
+        render: (val) => {
+          if (val) return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">已达上限</span>'
+          return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">正常</span>'
+        }
+      }
+    ],
+
     // C2C交易订单
     /** @type {Array<Object>} C2C交易订单列表 */
     tradeOrders: [],
@@ -831,19 +899,19 @@ document.addEventListener('alpine:init', () => {
      * @returns {Promise<void>}
      */
     async loadPageData() {
-      await this.withLoading(async () => {
-        switch (this.current_page) {
-          case 'trade-orders':
-            await this.loadTradeOrders()
-            break
-          case 'marketplace-stats':
-            await this.loadMarketplaceStats()
-            break
-          case 'redemption-orders':
-            await this.loadRedemptionOrders()
-            break
-        }
-      })
+      // 注意：loadTradeOrders/loadMarketplaceStats 内部已自行管理 loading 状态
+      // 不再外层 withLoading，避免 loading 竞态
+      switch (this.current_page) {
+        case 'trade-orders':
+          await this.loadTradeOrders()
+          break
+        case 'marketplace-stats':
+          await this.loadMarketplaceStats()
+          break
+        case 'redemption-orders':
+          await this.loadRedemptionOrders()
+          break
+      }
     },
 
     /**
@@ -925,12 +993,22 @@ document.addEventListener('alpine:init', () => {
      */
     async loadMarketplaceStats() {
       try {
-        // apiGet 返回 { success, data } 结构
-        const result = await this.apiGet(MARKET_ENDPOINTS.C2C_MARKET_STATS)
-        if (result && result.success && result.data) {
+        const result = await request({
+          url: MARKET_ENDPOINTS.C2C_MARKET_STATS,
+          method: 'GET',
+          params: { page: 1, limit: 20 }
+        })
+        if (result?.success && result.data) {
           const data = result.data
-          const marketData = data?.list || data?.stats || data
-          this.marketplaceStats = Array.isArray(marketData) ? marketData : []
+          this.marketplaceStats = data.stats || data.list || data.users || []
+          // 更新摘要
+          if (data.summary) {
+            this.marketplaceSummary = {
+              total_users_with_listings: data.summary.total_users_with_listings || this.marketplaceStats.length,
+              users_near_limit: data.summary.users_near_limit || 0,
+              users_at_limit: data.summary.users_at_limit || 0
+            }
+          }
         }
       } catch (error) {
         logger.error('加载上架统计失败:', error)
@@ -1023,6 +1101,94 @@ document.addEventListener('alpine:init', () => {
       return Number(num).toLocaleString('zh-CN')
     },
 
+    // ========== data-table 数据源方法 ==========
+
+    /**
+     * data-table 数据源：交易订单
+     * @param {Object} params - 查询参数（由 data-table 组件传入）
+     * @returns {Promise<{items: Array, total: number}>}
+     */
+    async fetchTradeOrderTableData(params) {
+      const queryParams = {
+        page: params.page || 1,
+        page_size: params.page_size || 20
+      }
+      // 合并筛选条件
+      if (this.tradeFilters?.status) queryParams.status = this.tradeFilters.status
+      if (this.tradeFilters?.buyer_mobile) {
+        const buyer = await this.resolveUserByMobile(this.tradeFilters.buyer_mobile)
+        if (buyer) { queryParams.buyer_user_id = buyer.user_id; this.resolvedBuyer = buyer }
+        else { this.resolvedBuyer = null; return { items: [], total: 0 } }
+      }
+      if (this.tradeFilters?.seller_mobile) {
+        const seller = await this.resolveUserByMobile(this.tradeFilters.seller_mobile)
+        if (seller) { queryParams.seller_user_id = seller.user_id; this.resolvedSeller = seller }
+        else { this.resolvedSeller = null; return { items: [], total: 0 } }
+      }
+
+      Object.keys(queryParams).forEach(k => !queryParams[k] && delete queryParams[k])
+
+      const result = await request({
+        url: MARKET_ENDPOINTS.TRADE_ORDER_LIST,
+        method: 'GET',
+        params: queryParams
+      })
+
+      if (result?.success && result.data) {
+        const items = result.data.orders || result.data.list || result.data.items || []
+        const total = result.data.pagination?.total_count || result.data.pagination?.total || items.length
+        this.tradeOrders = items
+        this._updateStats()
+        return { items, total }
+      }
+      throw new Error(result?.message || '加载交易订单失败')
+    },
+
+    /**
+     * data-table 数据源：上架统计
+     * @param {Object} params - 查询参数
+     * @returns {Promise<{items: Array, total: number}>}
+     */
+    async fetchMarketplaceStatsTableData(params) {
+      const queryParams = {
+        page: params.page || 1,
+        limit: params.page_size || 20
+      }
+      if (this.marketplaceFilters?.status && this.marketplaceFilters.status !== 'all') {
+        queryParams.filter = this.marketplaceFilters.status
+      }
+
+      const result = await request({
+        url: MARKET_ENDPOINTS.C2C_MARKET_STATS,
+        method: 'GET',
+        params: queryParams
+      })
+
+      if (result?.success && result.data) {
+        const items = result.data.stats || result.data.users || result.data.list || []
+        const total = result.data.pagination?.total || items.length
+        // 更新摘要统计
+        if (result.data.summary) {
+          this.marketplaceSummary = {
+            total_users_with_listings: result.data.summary.total_users_with_listings || items.length,
+            users_near_limit: result.data.summary.users_near_limit || 0,
+            users_at_limit: result.data.summary.users_at_limit || 0
+          }
+        }
+        return { items, total }
+      }
+      throw new Error(result?.message || '加载上架统计失败')
+    },
+
+    /**
+     * 处理交易订单表格操作
+     * @param {{action: string, row: Object}} detail - 操作详情
+     */
+    handleTradeOrderTableAction(detail) {
+      const { action, row } = detail
+      if (action === 'detail') this.viewTradeOrderDetail(row)
+    },
+
     /**
      * 查看交易订单详情
      * @param {Object} trade - 交易订单对象
@@ -1057,10 +1223,10 @@ document.addEventListener('alpine:init', () => {
         pendingTrades: this.tradeOrders.filter(
           t => t.status === 'pending' || t.status === 'created' || t.status === 'frozen'
         ).length,
-        // 后端字段: gross_amount, price_amount 等
+        // 后端字段: gross_amount, price_amount 等（注意强制转数字，避免字符串拼接）
         totalVolume: this.tradeOrders
           .filter(t => t.status === 'completed')
-          .reduce((sum, t) => sum + (t.gross_amount || t.price_amount || t.price || 0), 0)
+          .reduce((sum, t) => sum + Number(t.gross_amount || t.price_amount || t.price || 0), 0)
       }
     }
   }))

@@ -7,7 +7,7 @@
  * @date 2026-02-06
  */
 
-import { logger, $confirm, formatDateTime } from '../../../utils/index.js'
+import { logger, $confirm, formatDateTime, formatDateTimeShort } from '../../../utils/index.js'
 import { API_PREFIX, request } from '../../../api/base.js'
 
 const API_BASE_URL = API_PREFIX
@@ -473,11 +473,11 @@ export function useAdjustmentMethods() {
 
     openAdjustModal() {
       this.adjustForm = {
-        assetCode: '',
-        adjustType: 'increase',
+        asset_code: '',
+        adjust_type: 'increase',
         amount: '',
         reason: '',
-        campaignId: ''
+        campaign_id: ''
       }
       this.showModal('adjustModal')
     },
@@ -563,6 +563,10 @@ export function useAdjustmentMethods() {
     formatNumber(num) {
       if (num === null || num === undefined) return '0'
       return Number(num).toLocaleString('zh-CN')
+    },
+
+    formatDateTimeShort(dateValue) {
+      return formatDateTimeShort(dateValue)
     },
 
     viewRecordDetail(record) {

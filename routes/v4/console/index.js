@@ -69,6 +69,7 @@ const userSegmentsRoutes = require('./user-segments') // 🆕 用户分层（202
 const itemsRoutes = require('./items') // 🆕 物品监控（2026-02-03 运营后台优化 §5.4）
 const itemInstancesRoutes = require('./item-instances') // 🆕 物品实例管理（2026-02-15 修复404缺失路由）
 const lotteryRoutes = require('./lottery') // 🆕 抽奖分析Dashboard（2026-02-04 运营仪表盘E2E测试）
+const bidManagementRoutes = require('./bid-management') // 🆕 竞价管理（2026-02-16 臻选空间/幸运空间/竞价功能 Phase 3.7）
 
 // P2新增路由（2026-01-31 第2阶段任务）
 const reminderRulesRoutes = require('./reminder-rules') // 🆕 智能提醒规则管理（B-31~B-35）
@@ -137,6 +138,7 @@ router.use('/users', userSegmentsRoutes) // 🆕 用户分层路由（2026-01-31
 router.use('/items', itemsRoutes) // 🆕 物品监控路由（2026-02-03 运营后台优化 §5.4 锁定率监控）
 router.use('/item-instances', itemInstancesRoutes) // 🆕 物品实例管理路由（2026-02-15 管理员物品CRUD）
 router.use('/lottery', lotteryRoutes) // 🆕 抽奖分析Dashboard路由（2026-02-04 运营仪表盘E2E测试）
+router.use('/bid-management', bidManagementRoutes) // 🆕 竞价管理路由（2026-02-16 臻选空间/幸运空间/竞价功能 Phase 3.7）
 
 // P2新增路由（2026-01-31 第2阶段任务）
 router.use('/reminder-rules', reminderRulesRoutes) // 🆕 智能提醒规则管理路由（B-31~B-35）

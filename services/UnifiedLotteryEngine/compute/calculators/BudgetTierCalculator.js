@@ -357,13 +357,31 @@ class BudgetTierCalculator {
       }
     }
 
-    // 计算各档位的最低成本
-    const getMinCost = costs => (costs.length > 0 ? Math.min(...costs) : 0)
+    /**
+     * 计算各档位的最低成本（排除 0 值奖品）
+     *
+     * 🔴 2026-02-15 修复：
+     * - 原代码 `getMinCost(...) || this.thresholds.high` 有 falsy 检查问题
+     * - 当档位内所有奖品 prize_value_points=0 时，Math.min(0)=0，被 || 跳到默认值
+     * - 导致 low 档位（全部 value=0）的阈值变成默认的 100 而非 0
+     * - 进而导致 B1 阈值=100、B2 阈值=100（全部变成相同值）
+     *
+     * 修复方案：使用 null 和 !== null 检查替代 falsy 检查
+     */
+    /**
+     * 获取奖品成本数组中的最小正值
+     * @param {number[]} costs - 奖品成本数组
+     * @returns {number|null} 最小正值成本，全部为0时返回null
+     */
+    const getMinPositiveCost = costs => {
+      const positive_costs = costs.filter(c => c > 0)
+      return positive_costs.length > 0 ? Math.min(...positive_costs) : null
+    }
 
     const dynamic_thresholds = {
-      high: getMinCost(prize_by_tier.high) || this.thresholds.high,
-      mid: getMinCost(prize_by_tier.mid) || this.thresholds.mid,
-      low: getMinCost(prize_by_tier.low) || this.thresholds.low
+      high: getMinPositiveCost(prize_by_tier.high) ?? this.thresholds.high,
+      mid: getMinPositiveCost(prize_by_tier.mid) ?? this.thresholds.mid,
+      low: getMinPositiveCost(prize_by_tier.low) ?? this.thresholds.low
     }
 
     // 确保阈值递减：high >= mid >= low

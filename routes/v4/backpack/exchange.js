@@ -86,7 +86,8 @@ router.get(
       page = 1,
       page_size = 20,
       sort_by = 'sort_order',
-      sort_order = 'ASC'
+      sort_order = 'ASC',
+      refresh
     } = req.query
 
     logger.info('用户浏览兑换商品列表', {
@@ -152,7 +153,8 @@ router.get(
       page: finalPage,
       page_size: finalPageSize,
       sort_by,
-      sort_order: upperSortOrder
+      sort_order: upperSortOrder,
+      refresh: refresh === 'true'
     })
 
     // 获取用户权限（role_level >= 100 为管理员）

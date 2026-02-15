@@ -116,6 +116,53 @@ class BidSettlementJob {
   }
 
   /**
+   * 发送竞价结算通知（中标 + 落选）
+   *
+   * 在事务提交后异步调用，fire-and-forget 方式，不影响结算结果。
+   *
+   * @param {Object} settleResult - 结算结果对象（来自 BidService.settleBidProduct）
+   * @returns {Promise<void>} 无返回值（fire-and-forget 异步通知）
+   * @private
+   */
+  static async _sendSettlementNotifications(settleResult) {
+    const NotificationService = require('../services/NotificationService')
+
+    const {
+      bid_product_id,
+      winner_user_id,
+      winning_amount,
+      item_name,
+      price_asset_code,
+      _losers = []
+    } = settleResult
+
+    // 1. 通知中标者（bid_won）
+    await NotificationService.notifyBidWon(winner_user_id, {
+      bid_product_id,
+      item_name,
+      winning_amount,
+      price_asset_code
+    })
+
+    // 2. 通知所有落选者（bid_lost）
+    for (const loser of _losers) {
+      await NotificationService.notifyBidLost(loser.user_id, {
+        bid_product_id,
+        item_name,
+        my_bid_amount: loser.bid_amount,
+        winning_amount,
+        price_asset_code
+      })
+    }
+
+    logger.info('[竞价定时任务] 结算通知发送完成', {
+      bid_product_id,
+      winner_notified: true,
+      losers_notified: _losers.length
+    })
+  }
+
+  /**
    * 阶段 B：结算到期的 active 竞价
    *
    * @returns {Promise<Object>} 结算结果统计
@@ -157,6 +204,11 @@ class BidSettlementJob {
             result.no_bid++
           } else if (settleResult.status === 'settled') {
             result.settled++
+
+            // 🔔 事务提交后，异步发送竞价结算通知（fire-and-forget）
+            BidSettlementJob._sendSettlementNotifications(settleResult).catch(err =>
+              logger.error('[竞价定时任务] 发送结算通知失败', { error: err.message })
+            )
           }
         } catch (error) {
           result.failed++

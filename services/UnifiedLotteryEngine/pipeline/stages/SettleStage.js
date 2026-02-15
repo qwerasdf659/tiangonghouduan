@@ -143,7 +143,27 @@ class SettleStage extends BaseStage {
 
     // 获取预算上下文
     const budget_data = this.getContextData(context, 'BudgetContextStage.data') || {}
-    const budget_provider = context.stage_data?.budget_provider
+    /**
+     * 🔴 2026-02-15 修复：budget_provider 获取逻辑加固
+     *
+     * 修复根因：
+     * - 原代码只从 context.stage_data?.budget_provider 获取
+     * - 但 BudgetContextStage 同时在 stage_results 和 stage_data 两处存储
+     * - 当 context.stage_data 为空时（如管线上下文初始化不完整），budget_provider 为 null
+     * - 导致高价值奖品的预算扣减被完全跳过
+     *
+     * 修复方案：双重取值 + 日志告警
+     */
+    const budget_provider = budget_data.budget_provider || context.stage_data?.budget_provider
+    if (!budget_provider && budget_data.budget_mode && budget_data.budget_mode !== 'none') {
+      this.log('error', '🔴 budget_provider 获取失败！预算扣减将被跳过', {
+        user_id,
+        lottery_campaign_id,
+        budget_mode: budget_data.budget_mode,
+        has_stage_data: !!context.stage_data,
+        has_budget_data_provider: !!budget_data.budget_provider
+      })
+    }
 
     // 使用外部事务或创建新事务
     const use_external_transaction = !!context.transaction
@@ -289,11 +309,27 @@ class SettleStage extends BaseStage {
        * - 非空奖：重置空奖连击，增加对应档位计数
        * - 全局状态：记录跨活动的抽奖统计
        */
+      /**
+       * 🔴 2026-02-15 修复：传递 anti_high_triggered 和 cooldown_draws
+       *
+       * 修复根因：
+       * - 原代码未传递体验平滑触发信息到 _updateExperienceState
+       * - 导致 AntiHigh 触发后冷却期从未设置
+       * - ExperienceStateManager 的 anti_high_cooldown 字段永远为 0
+       * - AntiHigh 在同一用户连续抽奖时无法正确进入冷却期
+       */
+      const experience_smoothing = tier_pick_data.experience_smoothing || {}
+      const anti_high_mechanism = (experience_smoothing.mechanisms || []).find(
+        m => m.type === 'anti_high'
+      )
+
       await this._updateExperienceState({
         user_id,
         lottery_campaign_id,
         final_tier,
         final_prize,
+        anti_high_triggered: !!anti_high_mechanism,
+        cooldown_draws: anti_high_mechanism ? 3 : 0, // AntiHigh 默认冷却 3 次
         transaction
       })
 
@@ -983,22 +1019,38 @@ class SettleStage extends BaseStage {
    * @private
    */
   async _updateExperienceState(params) {
-    const { user_id, lottery_campaign_id, final_tier, final_prize, transaction } = params
+    const {
+      user_id,
+      lottery_campaign_id,
+      final_tier,
+      final_prize: _final_prize, // eslint-disable-line no-unused-vars -- 保留参数完整性，用于未来扩展
+      anti_high_triggered = false,
+      cooldown_draws = 0,
+      transaction
+    } = params
 
     try {
       /*
        * 1. 更新活动级体验状态（用于 Pity / Anti-Empty / Anti-High）
        */
       const experience_manager = new ExperienceStateManager()
-      const is_empty =
-        final_tier === 'empty' || final_tier === 'fallback' || final_prize.prize_value_points === 0
+
+      /**
+       * 🔴 2026-02-15 严重BUG修复：is_empty 判定逻辑
+       *
+       * 修复方案：只有 'fallback' 和 'empty' 档位才算真正的空奖
+       * low 档位的零值奖品是"参与奖"，不计入空奖统计
+       */
+      const is_empty = final_tier === 'empty' || final_tier === 'fallback'
 
       await experience_manager.updateState(
         {
           user_id,
           lottery_campaign_id,
-          draw_tier: final_tier, // 传递实际档位而非 is_high 布尔值
-          is_empty
+          draw_tier: final_tier,
+          is_empty,
+          anti_high_triggered,
+          cooldown_draws
         },
         { transaction }
       )
@@ -1041,11 +1093,15 @@ class SettleStage extends BaseStage {
       /*
        * 体验状态更新失败不应该阻断结算
        * 记录错误日志，但继续执行
+       *
+       * 🔴 2026-02-15 增强：记录完整错误栈，便于排查 recent_high_count 不更新问题
        */
-      this.log('warn', '体验状态更新失败（非致命）', {
+      this.log('error', '体验状态更新失败（非致命但需关注）', {
         user_id,
         lottery_campaign_id,
-        error: error.message
+        final_tier,
+        error: error.message,
+        stack: error.stack
       })
     }
   }

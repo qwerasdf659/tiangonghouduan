@@ -161,24 +161,47 @@ class ExperienceStateManager {
       // 获取或创建状态记录
       const state = await Model.findOrCreateState(user_id, lottery_campaign_id, { transaction })
 
-      // 根据抽奖结果更新状态
-      if (is_empty || draw_tier === 'fallback' || draw_tier === 'empty') {
+      /**
+       * 🔴 2026-02-15 修复：空奖判定逻辑
+       * 只有显式传入 is_empty=true 或档位为 'fallback'/'empty' 才算空奖
+       * low 档位的零值奖品是"参与奖"，不增加 empty_streak
+       */
+      const is_actually_empty = is_empty || draw_tier === 'fallback' || draw_tier === 'empty'
+
+      if (is_actually_empty) {
         // 空奖：增加空奖连击计数
         await state.incrementEmptyStreak({ transaction })
       } else {
-        // 非空奖：重置空奖连击，更新其他状态
+        // 非空奖（包括 low 档位零值参与奖）：重置空奖连击，更新其他状态
         await state.resetEmptyStreak(draw_tier, pity_triggered, { transaction })
       }
 
       // 处理 AntiHigh 冷却设置
       if (anti_high_triggered && cooldown_draws > 0) {
-        await state.update({ anti_high_cooldown: cooldown_draws }, { transaction })
-      } else if (state.anti_high_cooldown > 0) {
-        // 递减冷却计数
+        /**
+         * 🔴 2026-02-15 修复：AntiHigh 触发时重置 recent_high_count 为 0
+         *
+         * 修复根因：
+         * - 原代码只设置冷却，不重置 recent_high_count
+         * - 冷却期结束后 recent_high_count 仍然 >= 阈值
+         * - 下一次 high 抽奖立即再次触发 AntiHigh，形成"永久封锁"
+         *
+         * 修复方案：
+         * - AntiHigh 触发时同时重置 recent_high_count = 0
+         * - 冷却期结束后从零开始统计，给用户公平的重新机会
+         */
         await state.update(
-          { anti_high_cooldown: Math.max(0, state.anti_high_cooldown - 1) },
+          { anti_high_cooldown: cooldown_draws, recent_high_count: 0 },
           { transaction }
         )
+      } else if (state.anti_high_cooldown > 0) {
+        // 递减冷却计数，冷却期最后一次归零时同时重置 recent_high_count
+        const new_cooldown = Math.max(0, state.anti_high_cooldown - 1)
+        const cooldown_updates = { anti_high_cooldown: new_cooldown }
+        if (new_cooldown === 0) {
+          cooldown_updates.recent_high_count = 0 // 冷却结束，重置计数
+        }
+        await state.update(cooldown_updates, { transaction })
       }
 
       // 重新加载获取最新状态

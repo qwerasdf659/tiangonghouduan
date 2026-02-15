@@ -51,6 +51,11 @@ router.get(
       return res.apiError('asset_code 是必填参数', 'BAD_REQUEST', null, 400)
     }
 
+    // BUDGET_POINTS 是系统内部资产，禁止前端直接查询
+    if (asset_code === 'BUDGET_POINTS') {
+      return res.apiError('无效的资产类型', 'BAD_REQUEST', null, 400)
+    }
+
     // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 BalanceService（2026-01-31）
     const BalanceService = req.app.locals.services.getService('asset_balance')
 
@@ -93,9 +98,15 @@ router.get(
 
     const balances = await BalanceService.getAllBalances({ user_id })
 
+    /*
+     * 过滤系统内部资产类型，BUDGET_POINTS 不暴露给前端
+     * BUDGET_POINTS 是活动预算积分，仅在抽奖引擎内部使用
+     */
+    const filteredBalances = balances.filter(b => b.asset_code !== 'BUDGET_POINTS')
+
     // 返回字段命名与 BalanceService.getBalance() 保持一致（全链路统一）
     return res.apiSuccess({
-      balances: balances.map(b => ({
+      balances: filteredBalances.map(b => ({
         asset_code: b.asset_code,
         available_amount: Number(b.available_amount),
         frozen_amount: Number(b.frozen_amount),

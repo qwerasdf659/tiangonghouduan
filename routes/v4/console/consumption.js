@@ -409,9 +409,53 @@ router.get('/qrcode/:user_id', authenticateToken, requireRoleLevel(100), async (
       throw error
     }
 
+    /*
+     * 防御性校验：确保 user_uuid 存在且为字符串类型
+     * 与用户端 /shop/consumption/qrcode 保持一致的自动修复逻辑
+     */
+    let userUuid = user.user_uuid
+    if (!userUuid || typeof userUuid !== 'string') {
+      logger.warn('目标用户缺少 user_uuid，执行自动修复', {
+        admin_id,
+        target_user_id: user_id,
+        current_uuid: userUuid,
+        current_type: typeof userUuid
+      })
+
+      const { v4: uuidv4 } = require('uuid')
+      userUuid = uuidv4()
+      try {
+        if (typeof user.update === 'function') {
+          await user.update({ user_uuid: userUuid })
+        } else {
+          const { sequelize } = require('../../../config/database')
+          await sequelize.models.User.update({ user_uuid: userUuid }, { where: { user_id } })
+        }
+
+        const BusinessCacheHelper = require('../../../utils/BusinessCacheHelper')
+        await BusinessCacheHelper.invalidateUser(
+          { user_id, mobile: user.mobile },
+          'admin_auto_repair_missing_uuid'
+        )
+
+        logger.info('管理员端自动修复用户 user_uuid 成功', {
+          admin_id,
+          target_user_id: user_id,
+          new_uuid: userUuid.substring(0, 8) + '...'
+        })
+      } catch (repairError) {
+        logger.error('管理员端自动修复 user_uuid 失败', {
+          admin_id,
+          target_user_id: user_id,
+          error: repairError.message
+        })
+        return res.apiError('目标用户身份信息异常，请联系技术支持', 'USER_UUID_MISSING', null, 500)
+      }
+    }
+
     // 使用UUID生成v2动态二维码
     const QRCodeValidator = require('../../../utils/QRCodeValidator')
-    const qrCodeInfo = await QRCodeValidator.generateQRCodeInfo(user.user_uuid)
+    const qrCodeInfo = QRCodeValidator.generateQRCodeInfo(userUuid)
 
     // 记录审计日志（非阻断）
     const AuditLogService = require('../../../services/AuditLogService')
@@ -421,7 +465,7 @@ router.get('/qrcode/:user_id', authenticateToken, requireRoleLevel(100), async (
       operation_type: OPERATION_TYPES.ADMIN_VIEW_USER_DATA,
       action: 'generate_user_qrcode',
       target_user_id: user_id,
-      details: { target_user_uuid: user.user_uuid },
+      details: { target_user_uuid: userUuid },
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
       timestamp: BeijingTimeHelper.now()

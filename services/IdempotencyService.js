@@ -133,8 +133,15 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/shop/consumption/:id': 'CONSUMPTION_DELETE', // 删除消费记录（canonical 路径）
   '/api/v4/shop/consumption/:id/restore': 'CONSUMPTION_RESTORE', // 恢复消费记录（canonical 路径）
 
-  // ===== 会员解锁 =====
-  '/api/v4/shop/premium/unlock': 'PREMIUM_UNLOCK', // 解锁高级会员（修复：shop/premium 子路由挂载）
+  // ===== 会员解锁（2026-02-16 从 shop/premium 迁移到 backpack/exchange，决策2） =====
+  '/api/v4/backpack/exchange/unlock-premium': 'PREMIUM_UNLOCK', // 解锁高级空间（新路径）
+  '/api/v4/shop/premium/unlock': 'PREMIUM_UNLOCK', // 解锁高级会员（旧路径保留映射，实际路由已删除）
+
+  // ===== 竞价系统（臻选空间/幸运空间竞价功能 2026-02-16） =====
+  '/api/v4/backpack/bid': 'BID_PLACE_BID', // 提交竞价出价
+  '/api/v4/console/bid-management': 'CONSOLE_BID_CREATE', // 管理后台创建竞价商品
+  '/api/v4/console/bid-management/:id/settle': 'CONSOLE_BID_SETTLE', // 管理后台手动结算竞价
+  '/api/v4/console/bid-management/:id/cancel': 'CONSOLE_BID_CANCEL', // 管理后台取消竞价
 
   // ===== 商户积分 =====
   '/api/v4/merchant-points': 'MERCHANT_POINTS_CREATE', // 商户积分申请（canonical 路径，去尾斜杠）

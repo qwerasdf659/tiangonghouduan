@@ -2,6 +2,16 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const DecimalConverter = require('../utils/formatters/DecimalConverter') // 🔧 DECIMAL字段类型转换工具
 
 /**
+ * 🔒 全局敏感资产类型黑名单（决策1：绝对禁止暴露给前端）
+ *
+ * BUDGET_POINTS 为系统内部资产，任何面向微信小程序前端的 API 响应中
+ * 禁止出现该资产类型的字段信息（包括 asset_code 值、余额、流水等）
+ *
+ * @constant {string[]}
+ */
+const FORBIDDEN_FRONTEND_ASSET_CODES = ['BUDGET_POINTS']
+
+/**
  * 统一数据脱敏服务（DataSanitizer）
  *
  * 业务场景：API响应数据安全防护 - 防止用户通过抓包分析数据库结构和商业逻辑
@@ -1307,19 +1317,34 @@ class DataSanitizer {
         cost_asset_code: item.cost_asset_code,
         cost_amount: item.cost_amount,
         stock: item.stock,
+        sold_count: item.sold_count, // 已售数量（用户端也可见，用于展示"已售N件"）
         status: item.status,
         sort_order: item.sort_order,
         created_at: item.created_at,
         // 🔧 2026-01-13 图片字段策略（统一规范）
         primary_image_id: item.primary_image_id || null, // 主图片ID
         primary_image: primaryImage, // 图片对象（缺失时为 null）
+
+        /*
+         * 臻选空间/幸运空间扩展字段（2026-02-16 决策12：9个新字段）
+         * ⚠️ BUDGET_POINTS 已在资产字段级别过滤（cost_asset_code 不会是 BUDGET_POINTS）
+         */
+        space: item.space || 'lucky', // 所属空间
+        original_price: item.original_price || null, // 原价（划线价，前端计算折扣）
+        tags: item.tags || null, // 商品标签数组
+        is_new: !!item.is_new, // 新品标记
+        is_hot: !!item.is_hot, // 热门标记
+        is_lucky: !!item.is_lucky, // 幸运商品标记
+        has_warranty: !!item.has_warranty, // 质保标记
+        free_shipping: !!item.free_shipping, // 包邮标记
+        sell_point: item.sell_point || null, // 营销卖点文案
+
         /*
          * 管理员额外字段
          * 🔧 2026-01-09 修复：字段名匹配数据库模型（sold_count，不是 total_exchange_count）
          */
         ...(dataLevel === 'full' && {
-          cost_price: item.cost_price,
-          sold_count: item.sold_count
+          cost_price: item.cost_price
         })
       }
     })
@@ -1392,6 +1417,35 @@ class DataSanitizer {
   static sanitizeExchangeMarketOrder(order, dataLevel) {
     const orders = this.sanitizeExchangeMarketOrders([order], dataLevel)
     return orders[0]
+  }
+
+  /**
+   * 🔒 全局敏感资产过滤：从数组中移除包含 BUDGET_POINTS 的记录
+   *
+   * 业务场景（决策1）：
+   * - BUDGET_POINTS 为系统内部资产，绝对禁止暴露给微信小程序前端
+   * - 用于过滤资产余额列表、资产类型列表、流水记录等任何包含 asset_code 的数组数据
+   *
+   * @param {Array<Object>} items - 包含 asset_code 字段的数组
+   * @param {string} [assetCodeField='asset_code'] - 资产代码字段名
+   * @returns {Array<Object>} 过滤后的数组（不含 BUDGET_POINTS 相关记录）
+   */
+  static filterForbiddenAssets(items, assetCodeField = 'asset_code') {
+    if (!Array.isArray(items)) return items
+    return items.filter(item => {
+      const code = item[assetCodeField]
+      return !FORBIDDEN_FRONTEND_ASSET_CODES.includes(code)
+    })
+  }
+
+  /**
+   * 🔒 检查单个资产代码是否为前端禁止暴露的敏感资产
+   *
+   * @param {string} assetCode - 资产代码
+   * @returns {boolean} 是否为敏感资产（true = 禁止暴露给前端）
+   */
+  static isForbiddenAsset(assetCode) {
+    return FORBIDDEN_FRONTEND_ASSET_CODES.includes(assetCode)
   }
 }
 

@@ -25,6 +25,7 @@
 
 const express = require('express')
 const router = express.Router()
+const { v4: uuidv4 } = require('uuid')
 const { authenticateToken, requireMerchantPermission } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const QRCodeValidator = require('../../../../utils/QRCodeValidator')
@@ -95,8 +96,61 @@ router.get('/qrcode', authenticateToken, async (req, res) => {
       throw error
     }
 
+    /*
+     * 防御性校验：确保 user_uuid 存在且为字符串类型
+     *
+     * 可能缺失的场景：
+     * 1. 用户数据来自 Redis 缓存，缓存中 user_uuid 字段丢失（缓存不一致）
+     * 2. 用户在 user_uuid 字段添加之前创建，数据库迁移未回填
+     * 3. 直接 SQL 插入的用户记录缺少 user_uuid
+     *
+     * 自动修复策略：生成 UUIDv4 并写入数据库，同时失效缓存
+     */
+    let userUuid = user.user_uuid
+    if (!userUuid || typeof userUuid !== 'string') {
+      logger.warn('用户缺少 user_uuid，执行自动修复', {
+        user_id: userId,
+        current_uuid: userUuid,
+        current_type: typeof userUuid
+      })
+
+      // 自动生成 UUIDv4 并持久化到数据库
+      userUuid = uuidv4()
+      try {
+        if (typeof user.update === 'function') {
+          // Sequelize 模型实例：直接调用 update
+          await user.update({ user_uuid: userUuid })
+        } else {
+          // 缓存返回的普通对象：通过 UserService 更新
+          const { sequelize } = require('../../../../config/database')
+          await sequelize.models.User.update(
+            { user_uuid: userUuid },
+            { where: { user_id: userId } }
+          )
+        }
+
+        // 失效用户缓存，确保下次读取到最新数据
+        const BusinessCacheHelper = require('../../../../utils/BusinessCacheHelper')
+        await BusinessCacheHelper.invalidateUser(
+          { user_id: userId, mobile: user.mobile },
+          'auto_repair_missing_uuid'
+        )
+
+        logger.info('用户 user_uuid 自动修复成功', {
+          user_id: userId,
+          new_uuid: userUuid.substring(0, 8) + '...'
+        })
+      } catch (repairError) {
+        logger.error('用户 user_uuid 自动修复失败', {
+          user_id: userId,
+          error: repairError.message
+        })
+        return res.apiError('用户身份信息异常，请联系客服处理', 'USER_UUID_MISSING', null, 500)
+      }
+    }
+
     // 使用UUID生成v2动态二维码
-    const qrCodeInfo = await QRCodeValidator.generateQRCodeInfo(user.user_uuid)
+    const qrCodeInfo = QRCodeValidator.generateQRCodeInfo(userUuid)
 
     return res.apiSuccess(
       {

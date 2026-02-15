@@ -100,7 +100,13 @@ class LotteryUserGlobalState extends Model {
   /**
    * 记录一次抽奖结果并更新全局统计
    *
-   * @param {string} tier - 抽奖档位（high/mid/low/empty）
+   * 档位处理规则：
+   * - high/mid/low：分别计入对应档位计数
+   * - empty/fallback：均计入 global_empty_count（fallback 本质是所有档位售罄的兜底，属于空奖）
+   *   fallback 不计入 global_empty_count 会导致 historical_empty_rate 永远为 0，
+   *   从而使 LuckDebt 运气债务补偿机制永远不触发
+   *
+   * @param {string} tier - 抽奖档位（high/mid/low/empty/fallback）
    * @param {number} lottery_campaign_id - 抽奖活动ID
    * @param {Object} options - 可选参数（如 transaction）
    * @returns {Promise<LotteryUserGlobalState>} 更新后的状态
@@ -115,6 +121,8 @@ class LotteryUserGlobalState extends Model {
     // 根据档位更新对应计数
     switch (tier) {
       case 'empty':
+      case 'fallback':
+        // fallback 本质是所有档位售罄后的兜底奖品，价值等同空奖，计入 global_empty_count
         updates.global_empty_count = this.global_empty_count + 1
         break
       case 'high':

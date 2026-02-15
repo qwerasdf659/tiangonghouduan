@@ -678,6 +678,85 @@ class AdminService {
       throw new Error(`查询统计数据失败: ${error.message}`)
     }
   }
+
+  /**
+   * 批量更新商品空间归属（臻选空间/幸运空间管理，决策4 + Phase 3.8）
+   *
+   * 业务场景：运营通过管理后台将商品设为 lucky/premium/both
+   *
+   * @param {number[]} exchangeItemIds - 商品ID数组
+   * @param {string} space - 目标空间：lucky/premium/both
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 事务对象（必填）
+   * @returns {Promise<Object>} 更新结果
+   */
+  async batchUpdateSpace(exchangeItemIds, space, options = {}) {
+    const { transaction } = assertAndGetTransaction(options)
+
+    const validSpaces = ['lucky', 'premium', 'both']
+    if (!validSpaces.includes(space)) {
+      throw new Error(`无效的空间类型：${space}，允许值：${validSpaces.join(', ')}`)
+    }
+
+    if (!Array.isArray(exchangeItemIds) || exchangeItemIds.length === 0) {
+      throw new Error('商品ID数组不能为空')
+    }
+
+    logger.info('[兑换市场-管理] 批量更新商品空间', {
+      count: exchangeItemIds.length,
+      target_space: space
+    })
+
+    const [affectedRows] = await this.ExchangeItem.update(
+      { space },
+      {
+        where: { exchange_item_id: { [Op.in]: exchangeItemIds } },
+        transaction
+      }
+    )
+
+    // 清除缓存
+    await BusinessCacheHelper.clearExchangeItems()
+
+    logger.info('[兑换市场-管理] 批量更新空间完成', {
+      requested: exchangeItemIds.length,
+      affected: affectedRows,
+      target_space: space
+    })
+
+    return { affected_rows: affectedRows, space }
+  }
+
+  /**
+   * 获取空间分布统计（管理后台用，Phase 3.8）
+   *
+   * @returns {Promise<Object>} 空间分布统计
+   */
+  async getSpaceDistribution() {
+    try {
+      const distribution = await this.ExchangeItem.findAll({
+        attributes: [
+          'space',
+          [this.sequelize.fn('COUNT', this.sequelize.col('exchange_item_id')), 'count']
+        ],
+        group: ['space'],
+        raw: true
+      })
+
+      const result = { lucky: 0, premium: 0, both: 0 }
+      distribution.forEach(row => {
+        result[row.space] = parseInt(row.count, 10)
+      })
+
+      return {
+        distribution: result,
+        total: Object.values(result).reduce((sum, v) => sum + v, 0)
+      }
+    } catch (error) {
+      logger.error('[兑换市场-管理] 查询空间分布失败:', error.message)
+      throw error
+    }
+  }
 }
 
 module.exports = AdminService

@@ -87,30 +87,52 @@ class LotteryUserExperienceState extends Model {
   /**
    * 更新空奖连击状态（抽到空奖时调用）
    *
+   * 🔴 2026-02-15 重构：使用原子 SQL INCREMENT 替代 ORM 读后写
+   * 根因：连抽事务中 Sequelize instance 值过期，导致计数器丢失递增
+   *
    * @param {Object} options - 可选参数（如 transaction）
    * @returns {Promise<LotteryUserExperienceState>} 更新后的状态
    */
   async incrementEmptyStreak(options = {}) {
-    const new_empty_streak = this.empty_streak + 1
-    const updates = {
-      empty_streak: new_empty_streak,
-      total_draw_count: this.total_draw_count + 1,
-      total_empty_count: this.total_empty_count + 1,
-      last_draw_at: new Date(),
-      last_draw_tier: 'empty'
-    }
+    const { sequelize } = this.constructor
+    const pk_field = 'lottery_user_experience_state_id'
+    const pk_value = this[pk_field]
 
-    // 更新历史最大连续空奖次数
-    if (new_empty_streak > this.max_empty_streak) {
-      updates.max_empty_streak = new_empty_streak
-    }
+    /**
+     * 原子 SQL INCREMENT：避免 ORM 读后写的并发/过期问题
+     * - empty_streak + 1
+     * - total_draw_count + 1
+     * - total_empty_count + 1
+     * - max_empty_streak = GREATEST(max_empty_streak, empty_streak + 1)
+     */
+    await sequelize.query(
+      `UPDATE \`lottery_user_experience_state\` SET
+        \`empty_streak\` = \`empty_streak\` + 1,
+        \`total_draw_count\` = \`total_draw_count\` + 1,
+        \`total_empty_count\` = \`total_empty_count\` + 1,
+        \`max_empty_streak\` = GREATEST(\`max_empty_streak\`, \`empty_streak\` + 1),
+        \`last_draw_at\` = NOW(),
+        \`last_draw_tier\` = 'empty',
+        \`updated_at\` = NOW()
+      WHERE \`${pk_field}\` = ?`,
+      {
+        replacements: [pk_value],
+        type: sequelize.constructor.QueryTypes.UPDATE,
+        ...(options.transaction ? { transaction: options.transaction } : {})
+      }
+    )
 
-    await this.update(updates, options)
+    /* 重新加载实例以获取最新值 */
+    await this.reload(options.transaction ? { transaction: options.transaction } : {})
     return this
   }
 
   /**
    * 重置空奖连击状态（抽到非空奖时调用）
+   *
+   * 🔴 2026-02-15 重构：使用原子 SQL UPDATE 替代 ORM 读后写
+   * 根因：连抽事务中 `this.recent_high_count + 1` 基于过期的 Sequelize instance 值，
+   *       导致 recent_high_count 永远停留在 0，AntiHigh 机制完全失效
    *
    * @param {string} tier - 抽到的档位（high/mid/low）
    * @param {boolean} pity_triggered - 是否触发了 Pity 系统
@@ -118,24 +140,38 @@ class LotteryUserExperienceState extends Model {
    * @returns {Promise<LotteryUserExperienceState>} 更新后的状态
    */
   async resetEmptyStreak(tier, pity_triggered = false, options = {}) {
-    const updates = {
-      empty_streak: 0,
-      total_draw_count: this.total_draw_count + 1,
-      last_draw_at: new Date(),
-      last_draw_tier: tier
-    }
+    const { sequelize } = this.constructor
+    const pk_field = 'lottery_user_experience_state_id'
+    const pk_value = this[pk_field]
 
-    // 如果是高价值档位，增加计数
-    if (tier === 'high') {
-      updates.recent_high_count = this.recent_high_count + 1
-    }
+    /**
+     * 原子 SQL UPDATE：
+     * - empty_streak 重置为 0
+     * - total_draw_count 原子递增
+     * - recent_high_count：high 档位时原子递增（关键修复）
+     * - pity_trigger_count：触发 Pity 时原子递增
+     */
+    const is_high = tier === 'high'
 
-    // 如果触发了 Pity 系统
-    if (pity_triggered) {
-      updates.pity_trigger_count = this.pity_trigger_count + 1
-    }
+    await sequelize.query(
+      `UPDATE \`lottery_user_experience_state\` SET
+        \`empty_streak\` = 0,
+        \`total_draw_count\` = \`total_draw_count\` + 1,
+        \`recent_high_count\` = ${is_high ? '`recent_high_count` + 1' : '`recent_high_count`'},
+        \`pity_trigger_count\` = ${pity_triggered ? '`pity_trigger_count` + 1' : '`pity_trigger_count`'},
+        \`last_draw_at\` = NOW(),
+        \`last_draw_tier\` = ?,
+        \`updated_at\` = NOW()
+      WHERE \`${pk_field}\` = ?`,
+      {
+        replacements: [tier, pk_value],
+        type: sequelize.constructor.QueryTypes.UPDATE,
+        ...(options.transaction ? { transaction: options.transaction } : {})
+      }
+    )
 
-    await this.update(updates, options)
+    /* 重新加载实例以获取最新值 */
+    await this.reload(options.transaction ? { transaction: options.transaction } : {})
     return this
   }
 
@@ -222,6 +258,18 @@ function initModel(sequelize) {
         allowNull: false,
         defaultValue: 0,
         comment: '近期高价值奖品次数（AntiHigh：统计窗口内high档位次数）'
+      },
+
+      /**
+       * AntiHigh 冷却剩余次数
+       * 触发降级后 N 次抽奖不再检测高价值，防止用户被长期锁定在中档
+       * 0 = 不在冷却期
+       */
+      anti_high_cooldown: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: 'AntiHigh冷却剩余次数（触发降级后N次抽奖不再检测，0=不在冷却期）'
       },
 
       /**
