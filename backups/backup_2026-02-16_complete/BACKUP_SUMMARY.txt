@@ -1,0 +1,106 @@
+# 数据库备份摘要报告
+## 备份信息
+- 备份日期（北京时间）: 2026-02-16
+- 备份时间: 2026/02/16 05:12:25
+- 数据库: restaurant_points_dev
+- 主机: dbconn.sealosbja.site:42569
+
+## 备份统计
+- 总表数: 80
+- 总行数: 130258
+- 空表数: 12
+- 错误表数: 0
+
+## 备份文件
+- JSON备份: complete_backup_2026-02-16_2026-02-16_05-12-25.json (90.92 MB)
+- SQL备份: complete_backup_2026-02-16_2026-02-16_05-12-25.sql (35.10 MB)
+- MD5校验: BACKUP_MD5.txt
+
+## 表详情
+✅ account_asset_balances: 42 行
+✅ accounts: 56 行
+✅ admin_notifications: 0 行
+✅ admin_operation_logs: 5540 行
+✅ administrative_regions: 44703 行
+✅ alert_silence_rules: 0 行
+✅ api_idempotency_requests: 29285 行
+✅ asset_group_defs: 8 行
+✅ asset_transactions: 24991 行
+✅ authentication_sessions: 0 行
+✅ batch_operation_logs: 11 行
+✅ bid_products: 1 行
+✅ bid_records: 0 行
+✅ category_defs: 9 行
+✅ chat_messages: 454 行
+✅ consumption_records: 48 行
+✅ content_review_records: 422 行
+✅ customer_service_sessions: 15 行
+✅ exchange_items: 77 行
+✅ exchange_records: 0 行
+✅ feature_flags: 7 行
+✅ feedbacks: 153 行
+✅ image_resources: 0 行
+✅ item_instance_events: 4796 行
+✅ item_instances: 6144 行
+✅ item_templates: 16 行
+✅ lottery_alerts: 3 行
+✅ lottery_campaign_pricing_config: 13 行
+✅ lottery_campaign_quota_grants: 0 行
+✅ lottery_campaign_user_quota: 0 行
+✅ lottery_campaigns: 4 行
+✅ lottery_clear_setting_records: 634 行
+✅ lottery_daily_metrics: 11 行
+✅ lottery_draw_decisions: 2177 行
+✅ lottery_draw_quota_rules: 11 行
+✅ lottery_draws: 2177 行
+✅ lottery_hourly_metrics: 64 行
+✅ lottery_management_settings: 2814 行
+✅ lottery_presets: 3 行
+✅ lottery_prizes: 30 行
+✅ lottery_strategy_config: 17 行
+✅ lottery_tier_matrix_config: 12 行
+✅ lottery_tier_rules: 9 行
+✅ lottery_user_daily_draw_quota: 16 行
+✅ lottery_user_experience_state: 1 行
+✅ lottery_user_global_state: 1 行
+✅ market_listings: 275 行
+✅ material_asset_types: 4 行
+✅ material_conversion_rules: 1 行
+✅ merchant_operation_logs: 97 行
+✅ popup_banners: 2 行
+✅ preset_budget_debt: 0 行
+✅ preset_debt_limits: 1 行
+✅ preset_inventory_debt: 0 行
+✅ products: 52 行
+✅ rarity_defs: 5 行
+✅ redemption_orders: 1184 行
+✅ reminder_history: 361 行
+✅ reminder_rules: 3 行
+✅ report_templates: 2 行
+✅ risk_alerts: 9 行
+✅ roles: 11 行
+✅ sequelizemeta: 332 行
+✅ store_staff: 3 行
+✅ stores: 5 行
+✅ system_announcements: 73 行
+✅ system_configs: 9 行
+✅ system_dictionaries: 369 行
+✅ system_dictionary_history: 0 行
+✅ system_settings: 42 行
+✅ trade_orders: 118 行
+✅ user_behavior_tracks: 0 行
+✅ user_hierarchy: 9 行
+✅ user_premium_status: 1 行
+✅ user_risk_profiles: 3 行
+✅ user_role_change_records: 237 行
+✅ user_roles: 53 行
+✅ user_status_change_records: 237 行
+✅ users: 60 行
+✅ websocket_startup_logs: 1925 行
+
+## 外键约束统计
+- 总外键数: 114
+- 涉及表数: 56
+
+## 备份完成
+✅ 备份已成功完成于 2026/02/16 05:12:25

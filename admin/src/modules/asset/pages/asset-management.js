@@ -689,9 +689,10 @@ document.addEventListener('alpine:init', () => {
         { key: 'asset_code', label: '资产类型' },
         { key: 'asset_name', label: '资产名称' },
         { key: 'tx_type', label: '类型', render: (val, row) => row.tx_type_display || val || '-' },
-        { key: 'amount', label: '金额', type: 'number', sortable: true },
-        { key: 'balance_after', label: '交易后余额', type: 'number' },
-        { key: 'reason', label: '说明', type: 'truncate', maxLength: 30 },
+        // delta_amount：与后端数据库字段名一致（正数=增加，负数=扣减）
+        { key: 'delta_amount', label: '变动金额', type: 'number', sortable: true },
+        { key: 'balance_after', label: '变动后余额', type: 'number' },
+        { key: 'description', label: '描述', render: (val) => val || '-' },
         { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
       ],
       dataSource: async (params) => {
