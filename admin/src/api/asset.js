@@ -122,14 +122,16 @@ export const AssetAPI = {
    * @returns {boolean} return.success - 请求是否成功
    * @returns {Object} return.data - 响应数据
    * @returns {Array<Object>} return.data.transactions - 流水记录数组
-   * @returns {number} return.data.transactions[].transaction_id - 交易ID
+   * @returns {number} return.data.transactions[].asset_transaction_id - 流水ID（主键）
    * @returns {string} return.data.transactions[].asset_code - 资产代码
    * @returns {string} return.data.transactions[].asset_name - 资产显示名称
-   * @returns {string} return.data.transactions[].tx_type - 业务类型
-   * @returns {number} return.data.transactions[].amount - 变动金额（正数增加，负数扣减）
+   * @returns {string} return.data.transactions[].tx_type - 业务类型（附带 tx_type_display 中文）
+   * @returns {number} return.data.transactions[].delta_amount - 变动金额（正数=增加，负数=扣减）
    * @returns {number} return.data.transactions[].balance_before - 变动前余额
    * @returns {number} return.data.transactions[].balance_after - 变动后余额
-   * @returns {string} return.data.transactions[].reason - 变动原因
+   * @returns {string|null} return.data.transactions[].description - 交易描述（来自 meta.description）
+   * @returns {string|null} return.data.transactions[].title - 交易标题（来自 meta.title）
+   * @returns {string|null} return.data.transactions[].reason - 变动原因（来自 meta.reason）
    * @returns {string} return.data.transactions[].created_at - 创建时间（ISO8601）
    * @returns {Object} return.data.pagination - 分页信息
    * @returns {number} return.data.pagination.page - 当前页码
