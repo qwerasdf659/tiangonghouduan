@@ -145,6 +145,12 @@ class LoadDecisionSourceStage extends BaseStage {
   /**
    * 检查是否有待使用的预设
    *
+   * 查询规则：
+   * 1. 匹配用户 user_id
+   * 2. 状态为 pending（等待使用）且审批已通过（approved）
+   * 3. 活动匹配：精确匹配 lottery_campaign_id，或预设未绑定活动（NULL 表示全局预设）
+   * 4. 按 queue_order 升序取第一个（队列顺序消耗）
+   *
    * @param {number} user_id - 用户ID
    * @param {number} lottery_campaign_id - 活动ID
    * @returns {Promise<Object|null>} 预设记录或 null
@@ -152,10 +158,22 @@ class LoadDecisionSourceStage extends BaseStage {
    */
   async _checkPreset(user_id, lottery_campaign_id) {
     try {
+      /*
+       * 2026-02-15 修复：支持全局预设（lottery_campaign_id 为 NULL）
+       *
+       * 修复根因：
+       * - 原代码要求 lottery_campaign_id 精确匹配
+       * - 但管理后台创建预设时未传入 lottery_campaign_id（字段值为 NULL）
+       * - 导致所有预设队列永远无法命中
+       *
+       * 修复方案：
+       * - lottery_campaign_id 精确匹配当前活动（活动级预设）
+       * - 或 lottery_campaign_id 为 NULL（全局预设，对所有活动生效）
+       */
       const preset = await LotteryPreset.findOne({
         where: {
           user_id,
-          lottery_campaign_id,
+          [Op.or]: [{ lottery_campaign_id }, { lottery_campaign_id: null }],
           status: 'pending',
           approval_status: 'approved'
         },
@@ -163,8 +181,8 @@ class LoadDecisionSourceStage extends BaseStage {
         include: [
           {
             model: User,
-            as: 'admin', // 关联到创建该预设的管理员（LotteryPreset.associate 中定义）
-            attributes: ['user_id', 'nickname'] // users 表没有 username 字段
+            as: 'admin',
+            attributes: ['user_id', 'nickname']
           }
         ]
       })
@@ -183,22 +201,35 @@ class LoadDecisionSourceStage extends BaseStage {
   /**
    * 检查是否有管理干预设置
    *
+   * 查询规则：
+   * 1. 匹配用户 user_id
+   * 2. 设置类型为 force_win 或 force_lose
+   * 3. 状态为 active（生效中）
+   * 4. 未过期：expires_at 为 NULL（永不过期）或 expires_at > 当前时间
+   *
    * @param {number} user_id - 用户ID
-   * @param {number} _lottery_campaign_id - 活动ID（当前未使用，表中没有此字段）
+   * @param {number} _lottery_campaign_id - 活动ID（管理干预不区分活动）
    * @returns {Promise<Object|null>} 干预设置或 null
    * @private
    */
   async _checkOverride(user_id, _lottery_campaign_id) {
     try {
       /*
-       * 注意：LotteryManagementSetting 表当前没有 lottery_campaign_id 字段
-       * 管理干预设置是针对用户的，不区分活动
+       * 2026-02-15 修复：增加过期时间实时检查
+       *
+       * 修复根因：
+       * - 原代码仅检查 status='active'，不检查 expires_at
+       * - 依赖定时任务将过期的 active 改为 expired，存在时间窗口
+       * - 在定时任务执行间隔内，已过期的干预仍会被命中
+       *
+       * 修复方案：查询时同时检查 expires_at，实时过滤已过期的干预
        */
       const override = await LotteryManagementSetting.findOne({
         where: {
           user_id,
           setting_type: { [Op.in]: ['force_win', 'force_lose'] },
-          status: 'active'
+          status: 'active',
+          [Op.or]: [{ expires_at: null }, { expires_at: { [Op.gt]: new Date() } }]
         }
       })
 

@@ -55,6 +55,7 @@ const pageConfigs = {
   'trade-management': { title: '交易管理', pageIcon: '💹', pageTitle: '交易管理' },
   'listing-management': { title: '上架管理', pageIcon: '📊', pageTitle: '上架管理' },
   'market-stats': { title: '市场统计', pageIcon: '📈', pageTitle: '市场统计' },
+  'bid-management': { title: '竞价管理', pageIcon: '🏷️', pageTitle: '竞价管理' },
   
   // 内容管理模块
   'announcement-list': { title: '公告管理', pageIcon: '📢', pageTitle: '公告管理' },

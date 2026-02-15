@@ -65,7 +65,7 @@ export const MENU_ACCESS_RULES = {
   'lottery-ops.lottery-prizes': { minLevel: 30, description: '奖品配置' },
   'lottery-ops.lottery-budget': { minLevel: 30, description: '预算控制' },
   'lottery-ops.lottery-strategy': { minLevel: 30, description: '策略配置' },
-  'lottery-ops.lottery-presets': { minLevel: 30, description: '干预预设' },
+  'lottery-ops.lottery-presets': { minLevel: 30, description: '抽奖干预管理' },
 
   // ========== 资产交易（role_level >= 30） ==========
   'asset-trade': { minLevel: 30, description: '资产交易（分组）' },

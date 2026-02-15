@@ -186,6 +186,33 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: 'exchange',
         comment: '来源：exchange=普通兑换, bid=竞价中标'
+      },
+
+      /**
+       * 用户评分（需求6：兑换商品统计字段）
+       * - 范围：1-5分
+       * - NULL 表示用户尚未评分
+       * - 用于聚合计算商品平均评分（avg_rating）
+       */
+      rating: {
+        type: DataTypes.TINYINT,
+        allowNull: true,
+        defaultValue: null,
+        comment: '用户评分（1-5分，NULL表示未评分）',
+        validate: {
+          min: 1,
+          max: 5
+        }
+      },
+
+      /**
+       * 评分时间
+       */
+      rated_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        defaultValue: null,
+        comment: '评分时间（用户提交评分的时间）'
       }
     },
     {

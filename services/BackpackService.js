@@ -145,6 +145,7 @@ class BackpackService {
        * 2. 过滤总余额 > 0 的资产 + 排除系统内部资产类型
        * 总余额 = available_amount + frozen_amount
        * BUDGET_POINTS 是系统内部资产（活动预算积分），绝对不暴露给前端
+       * is_enabled=false 的资产类型也不暴露给前端（如 POINTS 已禁用）
        */
       const validAssets = assetAccounts.filter(
         account =>
@@ -177,25 +178,34 @@ class BackpackService {
 
       /*
        * 3. 格式化资产数据（从 Map 中读取，避免重复查询）
-       * 字段命名与数据库 account_asset_balances 表一致（available_amount / frozen_amount）
-       * 注意：BIGINT 类型需要显式转换为数字类型，避免字符串拼接问题
+       * - 过滤掉 is_enabled=false 的资产类型（如 POINTS 已禁用，不展示给前端）
+       * - 字段命名与数据库 account_asset_balances 表一致（available_amount / frozen_amount）
+       * - BIGINT 类型需要显式转换为数字类型，避免字符串拼接问题
+       * - is_tradable 字段从 material_asset_types 表获取，用于前端控制"上架到市场"按钮显示
        */
-      const formattedAssets = validAssets.map(account => {
-        const assetType = assetTypeMap.get(account.asset_code)
-        const availableAmount = Number(account.available_amount) || 0
-        const frozenAmount = Number(account.frozen_amount) || 0
-        const totalAmount = availableAmount + frozenAmount
+      const formattedAssets = validAssets
+        .filter(account => {
+          const assetType = assetTypeMap.get(account.asset_code)
+          // 已配置且明确禁用的资产类型不展示（未配置的保留，避免遗漏新资产）
+          return !assetType || assetType.is_enabled !== false
+        })
+        .map(account => {
+          const assetType = assetTypeMap.get(account.asset_code)
+          const availableAmount = Number(account.available_amount) || 0
+          const frozenAmount = Number(account.frozen_amount) || 0
+          const totalAmount = availableAmount + frozenAmount
 
-        return {
-          asset_code: account.asset_code,
-          display_name: assetType?.display_name || account.asset_code,
-          total_amount: totalAmount, // 总余额（可用 + 冻结）
-          frozen_amount: frozenAmount, // 冻结余额
-          available_amount: availableAmount, // 可用余额
-          category: assetType?.group_code || 'unknown', // 修复：MaterialAssetType 实际字段为 group_code
-          rarity: assetType?.rarity || 'common'
-        }
-      })
+          return {
+            asset_code: account.asset_code,
+            display_name: assetType?.display_name || account.asset_code,
+            total_amount: totalAmount, // 总余额（可用 + 冻结）
+            frozen_amount: frozenAmount, // 冻结余额
+            available_amount: availableAmount, // 可用余额
+            category: assetType?.group_code || 'unknown', // MaterialAssetType 实际字段为 group_code
+            rarity: assetType?.rarity || 'common',
+            is_tradable: assetType?.is_tradable ?? false // 是否可在C2C市场交易（未配置默认不可交易）
+          }
+        })
 
       /*
        * 4. 附加中文显示名称
@@ -429,14 +439,19 @@ class BackpackService {
   /**
    * 获取背包统计信息
    *
+   * 业务场景：
+   * - 前端背包页面顶部统计面板展示
+   * - 包含资产种类数、物品数量、资产总价值、按物品类型分组统计
+   *
    * @param {number} user_id - 用户ID
    * @param {Object} [options] - 选项
    * @param {Object} [options.transaction] - Sequelize事务对象
    * @returns {Promise<Object>} 统计信息
    * {
-   *   total_assets: 5,          // 资产种类数量
-   *   total_items: 10,          // 物品数量
-   *   total_asset_value: 1000   // 资产总价值（按类型统计）
+   *   total_assets: 5,                          // 可叠加资产种类数量
+   *   total_items: 10,                           // 不可叠加物品数量（available 状态）
+   *   total_asset_value: 1000,                   // 资产可用余额总和
+   *   items_by_type: { voucher: 3, product: 7 }  // 按物品类型分组计数
    * }
    */
   static async getBackpackStats(user_id, options = {}) {
@@ -448,10 +463,22 @@ class BackpackService {
         BackpackService._getItems(user_id, { transaction })
       ])
 
+      /*
+       * 按物品类型分组统计（items_by_type）
+       * 遍历 items 数组，按 item_type 字段聚合计数
+       * 前端可据此展示分类统计面板（如：优惠券 3 张、实物商品 7 件）
+       */
+      const items_by_type = items.reduce((groups, item) => {
+        const type = item.item_type || 'unknown'
+        groups[type] = (groups[type] || 0) + 1
+        return groups
+      }, {})
+
       return {
         total_assets: assets.length,
         total_items: items.length,
-        total_asset_value: assets.reduce((sum, asset) => sum + (asset.available_amount || 0), 0) // 修复：_getAssets() 返回 available_amount 而非 balance
+        total_asset_value: assets.reduce((sum, asset) => sum + (asset.available_amount || 0), 0),
+        items_by_type
       }
     } catch (error) {
       logger.error('获取背包统计失败', {

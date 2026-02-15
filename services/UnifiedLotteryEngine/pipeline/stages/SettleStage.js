@@ -41,6 +41,8 @@ const {
   LotteryPrize: _LotteryPrize,
   LotteryCampaignUserQuota: _LotteryCampaignUserQuota,
   LotteryHourlyMetrics, // Phase P2：监控指标埋点
+  LotteryManagementSetting, // 管理干预设置（force_win 使用后标记为 used）
+  LotteryPreset, // 预设队列（使用后标记为 used）
   sequelize
 } = require('../../../../models')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
@@ -345,6 +347,20 @@ class SettleStage extends BaseStage {
         mechanisms: decision_snapshot.experience_smoothing || {},
         transaction
       })
+
+      /*
+       * ========== 2026-02-15 修复：消耗决策来源 ==========
+       * 抽奖完成后，将命中的预设/管理干预标记为已使用（status='used'）
+       *
+       * 修复根因：
+       * - 原代码没有在抽奖成功后消耗决策来源
+       * - 导致 force_win 管理干预永远不会变成 used 状态
+       * - 用户每次抽奖都会反复命中同一条 active 的 force_win 规则
+       * - 同理，预设队列也不会自动消耗
+       *
+       * 修复方案：在同一事务内将已使用的预设/干预标记为 used
+       */
+      await this._consumeDecisionSource(context, transaction)
 
       // 提交事务（如果是内部创建的事务）
       if (!use_external_transaction) {
@@ -1103,6 +1119,68 @@ class SettleStage extends BaseStage {
         error: error.message,
         stack: error.stack
       })
+    }
+  }
+
+  /**
+   * 消耗决策来源（标记预设/管理干预为已使用）
+   *
+   * 业务场景：
+   * - force_win 管理干预：使用后标记为 used，避免同一规则被反复命中
+   * - 预设队列（preset）：使用后标记为 used，队列自动推进到下一个
+   *
+   * 在同一事务中执行，确保与抽奖记录创建的原子性：
+   * - 如果抽奖失败回滚，决策来源状态也会回滚（不会误消耗）
+   * - 如果消耗失败，整个抽奖事务回滚（不会发奖但不消耗规则）
+   *
+   * @param {Object} context - 执行上下文
+   * @param {Object} transaction - Sequelize 事务对象
+   * @returns {Promise<void>} 无返回值
+   * @private
+   */
+  async _consumeDecisionSource(context, transaction) {
+    const decision_data = this.getContextData(context, 'LoadDecisionSourceStage.data')
+    if (!decision_data) return
+
+    const { decision_source } = decision_data
+
+    // 预设模式：标记 LotteryPreset 为已使用
+    if (decision_source === 'preset' && decision_data.preset) {
+      const lottery_preset_id = decision_data.preset.lottery_preset_id
+      if (lottery_preset_id) {
+        const [affected_rows] = await LotteryPreset.update(
+          { status: 'used' },
+          {
+            where: { lottery_preset_id, status: 'pending' },
+            transaction
+          }
+        )
+
+        this.log('info', '预设已标记为已使用', {
+          lottery_preset_id,
+          affected_rows
+        })
+      }
+    }
+
+    // 管理干预模式：标记 LotteryManagementSetting 为已使用
+    if (decision_source === 'override' && decision_data.override) {
+      const lottery_management_setting_id = decision_data.override.lottery_management_setting_id
+      if (lottery_management_setting_id) {
+        const [affected_rows] = await LotteryManagementSetting.update(
+          { status: 'used' },
+          {
+            where: { lottery_management_setting_id, status: 'active' },
+            transaction
+          }
+        )
+
+        this.log('info', '管理干预已标记为已使用', {
+          lottery_management_setting_id,
+          setting_type: decision_data.override.setting_type,
+          affected_rows
+        })
+      }
     }
   }
 

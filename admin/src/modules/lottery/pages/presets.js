@@ -1,10 +1,11 @@
 /**
- * 抽奖干预管理页面 - Alpine.js Mixin 重构版
+ * 抽奖干预管理页面（一站式 Tab 切换）
  *
- * @file public/admin/js/pages/presets.js
- * @description 抽奖干预规则管理（强制中奖、禁止中奖等）
- * @version 3.0.0 (Mixin 重构版)
- * @date 2026-01-23
+ * @file admin/src/modules/lottery/pages/presets.js
+ * @description 聚合两套干预机制到同一页面：
+ *              Tab 1 - 强制中奖管理：一次性强制用户中指定奖品（lottery_management_settings 表）
+ *              Tab 2 - 预设队列管理：为用户安排多次连续中奖剧本（lottery_presets 表）
+ * @version 4.0.0 (2026-02-15 合并强制中奖+预设队列到同一页面)
  * @module lottery/pages/presets
  */
 
@@ -13,6 +14,10 @@ import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
 import { buildURL, request } from '../../../api/base.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
 import { Alpine, createCrudMixin } from '../../../alpine/index.js'
+import {
+  usePresetVisualizationState,
+  usePresetVisualizationMethods
+} from '../composables/preset-visualization.js'
 
 // API 请求封装
 const apiRequest = async (url, options = {}) => {
@@ -27,7 +32,7 @@ const apiRequest = async (url, options = {}) => {
 
 /**
  * @typedef {Object} InterventionForm
- * @property {string|number} lottery_prize_id - 奖品ID
+ * @property {string|number} prize_id - 奖品ID
  * @property {string} expire_time - 过期时间
  * @property {string} reason - 干预原因
  * @property {string} note - 备注说明
@@ -38,7 +43,7 @@ const apiRequest = async (url, options = {}) => {
  * @property {number} id - 规则ID
  * @property {number} user_id - 用户ID
  * @property {string} setting_type - 设置类型（force_win/force_lose/probability_adjust等）
- * @property {number} lottery_prize_id - 奖品ID
+ * @property {number} prize_id - 奖品ID（对应后端 force-win API 的 prize_id 参数）
  * @property {string} status - 状态
  * @property {string} expire_time - 过期时间
  * @property {Object} user_info - 用户信息
@@ -46,9 +51,9 @@ const apiRequest = async (url, options = {}) => {
  */
 
 /**
- * 抽奖干预管理页面组件
+ * 强制中奖管理页面组件
  *
- * @description 用于管理抽奖干预规则，包含强制中奖、禁止中奖、概率调整等功能
+ * @description 管理强制中奖规则。设置后用户下一次抽奖命中指定奖品，使用后自动消耗（一次性生效）
  * @returns {Object} Alpine.js组件配置对象
  *
  * @property {boolean} globalLoading - 全局加载状态
@@ -79,7 +84,21 @@ const apiRequest = async (url, options = {}) => {
 function presetsPage() {
   return {
     // ==================== Mixin 组合（不需要 pagination/tableSelection，data-table 内置） ====================
-    ...createCrudMixin({ page_size: 10 }),
+    ...createCrudMixin({ page_size: 10, userResolver: true }),
+
+    // ==================== 预设队列 composable（Tab 2） ====================
+    ...usePresetVisualizationState(),
+    ...usePresetVisualizationMethods(),
+
+    // ==================== Tab 切换状态 ====================
+
+    /**
+     * 当前激活的 Tab 标识
+     * - force_win: 强制中奖管理（管理干预，一次性）
+     * - preset_queue: 预设队列管理（多次连续中奖剧本）
+     * @type {string}
+     */
+    activeTab: 'force_win',
 
     // ==================== 页面特有状态 ====================
 
@@ -253,7 +272,7 @@ function presetsPage() {
      * @type {InterventionForm}
      */
     interventionForm: {
-      lottery_prize_id: '',
+      prize_id: '',
       expire_time: '',
       reason: '',
       note: ''
@@ -275,7 +294,7 @@ function presetsPage() {
      * @returns {Promise<void>}
      */
     async init() {
-      logger.info('[PRESETS] 抽奖干预管理页面初始化 (Mixin v3.0)')
+      logger.info('[PRESETS] 抽奖干预管理页面初始化 (v4.0 - 强制中奖 + 预设队列)')
 
       // 验证关键属性
       logger.debug('组件状态检查:', {
@@ -292,16 +311,16 @@ function presetsPage() {
       }
       logger.debug('[PRESETS] 认证检查通过')
 
-      // 加载数据
+      // 加载 Tab 1 数据（强制中奖 + 奖品列表）
       try {
         logger.debug('[PRESETS] 开始加载奖品和干预列表...')
         await Promise.all([this.loadPrizes(), this.loadData()])
-        logger.info('[PRESETS] 页面初始化完成', {
+        logger.info('[PRESETS] Tab 1 初始化完成', {
           interventionsCount: this.interventions.length,
           prizesCount: this.allPrizes.length
         })
       } catch (error) {
-        logger.error('[PRESETS] 页面初始化失败:', error)
+        logger.error('[PRESETS] Tab 1 初始化失败:', error)
       }
     },
 
@@ -348,6 +367,30 @@ function presetsPage() {
       window.dispatchEvent(new CustomEvent('dt-refresh'))
     },
 
+    // ==================== Tab 2: 预设队列数据加载 ====================
+
+    /**
+     * 加载预设队列 Tab 数据（切换到 Tab 2 时调用）
+     *
+     * @description 首次切换到预设队列 Tab 时加载统计和列表数据，避免页面初始化时加载不必要的数据
+     */
+    async loadPresetTabData() {
+      // 只在首次切换时加载
+      if (this._presetTabLoaded) return
+      this._presetTabLoaded = true
+
+      try {
+        logger.debug('[PRESETS] 加载预设队列 Tab 数据...')
+        await Promise.all([this.loadPresetStats(), this.loadPresets()])
+        logger.info('[PRESETS] 预设队列 Tab 数据加载完成')
+      } catch (error) {
+        logger.error('[PRESETS] 预设队列数据加载失败:', error)
+      }
+    },
+
+    /** @type {boolean} 预设队列 Tab 数据是否已加载（懒加载标记） */
+    _presetTabLoaded: false,
+
     // ==================== 创建干预规则 ====================
 
     /**
@@ -369,7 +412,7 @@ function presetsPage() {
      */
     resetForm() {
       this.interventionForm = {
-        lottery_prize_id: '',
+        prize_id: '',
         expire_time: '',
         reason: '',
         note: ''
@@ -445,12 +488,12 @@ function presetsPage() {
     /**
      * 获取当前选中的奖品
      *
-     * @description 根据表单中的lottery_prize_id从奖品列表中查找对应奖品信息
+     * @description 根据表单中的prize_id从奖品列表中查找对应奖品信息
      * @returns {Object|null} 选中的奖品对象，未选中时返回null
      */
     getSelectedPrize() {
-      if (!this.interventionForm.lottery_prize_id) return null
-      return this.allPrizes.find(p => p.lottery_prize_id == this.interventionForm.lottery_prize_id)
+      if (!this.interventionForm.prize_id) return null
+      return this.allPrizes.find(p => p.lottery_prize_id == this.interventionForm.prize_id)
     },
 
     /**
@@ -467,7 +510,7 @@ function presetsPage() {
         return
       }
 
-      if (!this.interventionForm.lottery_prize_id) {
+      if (!this.interventionForm.prize_id) {
         this.showError('请选择预设奖品')
         return
       }
@@ -494,7 +537,7 @@ function presetsPage() {
           method: 'POST',
           data: {
             user_id: parseInt(this.selectedUser.user_id),
-            lottery_prize_id: parseInt(this.interventionForm.lottery_prize_id),
+            prize_id: parseInt(this.interventionForm.prize_id),
             duration_minutes: durationMinutes,
             reason: reason
           }
@@ -692,5 +735,5 @@ function presetsPage() {
 // Alpine.js 组件注册
 document.addEventListener('alpine:init', () => {
   Alpine.data('presetsPage', presetsPage)
-  logger.info('[PresetsPage] Alpine 组件已注册 (Mixin v3.0)')
+  logger.info('[PresetsPage] Alpine 组件已注册 (v4.0 - 强制中奖 + 预设队列)')
 })

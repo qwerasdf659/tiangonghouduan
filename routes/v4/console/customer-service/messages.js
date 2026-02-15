@@ -133,6 +133,24 @@ router.post('/:id/send', async (req, res) => {
       { description: 'sendMessage' }
     )
 
+    // ✅ 事务提交后，通过 WebSocket 实时推送消息给用户
+    try {
+      const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
+      const messageData = {
+        chat_message_id: result.chat_message_id,
+        customer_service_session_id: sessionId,
+        sender_id: req.user.user_id,
+        sender_type: 'admin',
+        content: result.content,
+        message_type: result.message_type,
+        created_at: result.created_at
+      }
+      ChatWebSocketService.pushMessageToUser(result.session_user_id, messageData)
+    } catch (wsError) {
+      // WebSocket 推送失败不影响消息发送（消息已持久化到数据库）
+      logger.error('WebSocket推送消息给用户失败:', wsError.message)
+    }
+
     return res.apiSuccess(result, '发送消息成功')
   } catch (error) {
     logger.error('发送消息失败:', error)

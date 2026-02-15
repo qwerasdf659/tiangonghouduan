@@ -231,9 +231,134 @@ class ChatWebSocketService {
         })
       })
 
+      // 🔌 连接建立确认（2026-02-15 新增 - 微信小程序前端适配）
+      socket.emit('connection_established', {
+        user_id: userId,
+        is_admin: isAdmin,
+        socket_id: socket.id,
+        server_time: BeijingTimeHelper.now(),
+        timestamp: Date.now()
+      })
+
       // 2. 心跳检测（保持连接活跃）
       socket.on('ping', () => {
         socket.emit('pong', { timestamp: BeijingTimeHelper.now() })
+      })
+
+      /**
+       * 2.1 用户通过WebSocket发送聊天消息
+       *
+       * 业务流程：
+       * 1. 参数校验（session_id、content 必填）
+       * 2. 通过 CustomerServiceSessionService.sendUserMessage() 写库（含事务）
+       * 3. 返回 message_sent 回执给发送者
+       * 4. 广播 new_message 给在线管理员
+       *
+       * 技术说明：
+       * - 延迟加载 Service 和 TransactionManager 避免循环依赖
+       * - 写操作收口到 Service 层，WebSocket handler 仅做入口编排
+       * - 事务边界由 TransactionManager.execute() 统一管理
+       */
+      socket.on('send_message', async data => {
+        try {
+          const senderId = socket.user.user_id
+          const { session_id, content, message_type = 'text' } = data
+
+          // ✅ 参数校验
+          if (!session_id || !content) {
+            socket.emit('message_error', {
+              error: 'INVALID_PARAMS',
+              message: '缺少 session_id 或 content',
+              timestamp: BeijingTimeHelper.now()
+            })
+            return
+          }
+
+          wsLogger.info('收到WebSocket聊天消息', {
+            user_id: senderId,
+            session_id,
+            message_type,
+            content_length: content.length
+          })
+
+          // ✅ 延迟加载 Service 和 TransactionManager 避免循环依赖
+          const message = await new Promise((resolve, reject) => {
+            setImmediate(async () => {
+              try {
+                const CustomerServiceSessionService = require('./CustomerServiceSessionService')
+                const TransactionManager = require('../utils/TransactionManager')
+
+                const result = await TransactionManager.execute(
+                  async transaction => {
+                    return await CustomerServiceSessionService.sendUserMessage(
+                      session_id,
+                      { user_id: senderId, content, message_type },
+                      { transaction }
+                    )
+                  },
+                  {
+                    description: `WebSocket send_message (user=${senderId}, session=${session_id})`
+                  }
+                )
+
+                resolve(result)
+              } catch (err) {
+                reject(err)
+              }
+            })
+          })
+
+          // ✅ 发送成功回执给发送者
+          socket.emit('message_sent', {
+            chat_message_id: message.chat_message_id,
+            session_id,
+            timestamp: BeijingTimeHelper.now()
+          })
+
+          // ✅ 构建 new_message 推送数据，广播给在线管理员
+          const msgData = {
+            chat_message_id: message.chat_message_id,
+            customer_service_session_id: message.customer_service_session_id,
+            sender_id: senderId,
+            sender_type: 'user',
+            content: message.content,
+            message_type: message.message_type,
+            created_at: message.created_at
+          }
+
+          this.broadcastToAllAdmins(msgData)
+
+          wsLogger.info('WebSocket聊天消息处理完成', {
+            user_id: senderId,
+            session_id,
+            chat_message_id: message.chat_message_id
+          })
+        } catch (error) {
+          wsLogger.error('处理WebSocket聊天消息失败', {
+            user_id: socket.user?.user_id,
+            error: error.message,
+            stack: error.stack
+          })
+
+          // ✅ 根据错误消息返回具体错误码，帮助前端区分原因
+          let errorCode = 'SEND_FAILED'
+          let errorMsg = '消息发送失败，请重试'
+
+          if (error.message.includes('不存在') || error.message.includes('无权限')) {
+            errorCode = 'SESSION_NOT_FOUND'
+            errorMsg = '会话不存在或无权限访问'
+          } else if (error.message.includes('已关闭')) {
+            errorCode = 'SESSION_CLOSED'
+            errorMsg = '会话已关闭，无法发送消息'
+          }
+
+          socket.emit('message_error', {
+            error: errorCode,
+            message: errorMsg,
+            session_id: data?.session_id,
+            timestamp: BeijingTimeHelper.now()
+          })
+        }
       })
 
       // 2.5 会话恢复请求（Task 7.3 - 2026-01-28新增）
@@ -848,6 +973,168 @@ class ChatWebSocketService {
     })
 
     return result
+  }
+
+  // ==================== 业务推送方法（2026-02-15 新增 - 微信小程序前端适配）====================
+
+  /**
+   * 推送商品更新通知给所有在线用户
+   *
+   * @description 管理员创建/修改/删除兑换商品后，实时通知所有在线用户刷新商品列表
+   *
+   * @param {Object} productData - 商品变更数据
+   * @param {string} productData.action - 操作类型（created/updated/deleted/status_changed）
+   * @param {number} productData.exchange_item_id - 商品ID
+   * @param {string} [productData.name] - 商品名称
+   * @param {number} [productData.stock] - 当前库存
+   * @param {string} [productData.status] - 当前状态
+   * @param {number} [productData.operator_id] - 操作人ID
+   * @returns {number} 成功推送的用户数量
+   */
+  broadcastProductUpdated(productData) {
+    if (!this.io) {
+      wsLogger.warn('WebSocket服务未初始化，无法推送商品更新')
+      return 0
+    }
+
+    const payload = {
+      ...productData,
+      timestamp: BeijingTimeHelper.now()
+    }
+
+    let successCount = 0
+
+    // 推送给所有在线普通用户
+    for (const [userId, socketId] of this.connectedUsers.entries()) {
+      try {
+        this.io.to(socketId).emit('product_updated', payload)
+        successCount++
+      } catch (error) {
+        wsLogger.error('推送商品更新给用户失败', { user_id: userId, error: error.message })
+      }
+    }
+
+    // 同时推送给管理员（管理后台也可能需要实时刷新）
+    for (const [adminId, socketId] of this.connectedAdmins.entries()) {
+      try {
+        this.io.to(socketId).emit('product_updated', payload)
+        successCount++
+      } catch (error) {
+        wsLogger.error('推送商品更新给管理员失败', { admin_id: adminId, error: error.message })
+      }
+    }
+
+    wsLogger.info('📦 商品更新通知已广播', {
+      action: productData.action,
+      exchange_item_id: productData.exchange_item_id,
+      pushed_count: successCount,
+      online_users: this.connectedUsers.size,
+      online_admins: this.connectedAdmins.size
+    })
+
+    return successCount
+  }
+
+  /**
+   * 推送兑换库存变更通知给所有在线用户
+   *
+   * @description 用户兑换商品导致库存减少时，实时通知其他在线用户库存变化
+   *
+   * @param {Object} stockData - 库存变更数据
+   * @param {number} stockData.exchange_item_id - 商品ID
+   * @param {string} [stockData.name] - 商品名称
+   * @param {number} stockData.remaining_stock - 剩余库存
+   * @param {number} stockData.changed_amount - 变更数量（负数表示减少）
+   * @param {string} stockData.reason - 变更原因（exchange/admin_adjust）
+   * @returns {number} 成功推送的用户数量
+   */
+  broadcastExchangeStockChanged(stockData) {
+    if (!this.io) {
+      wsLogger.warn('WebSocket服务未初始化，无法推送库存变更')
+      return 0
+    }
+
+    const payload = {
+      ...stockData,
+      timestamp: BeijingTimeHelper.now()
+    }
+
+    let successCount = 0
+
+    // 推送给所有在线普通用户
+    for (const [userId, socketId] of this.connectedUsers.entries()) {
+      try {
+        this.io.to(socketId).emit('exchange_stock_changed', payload)
+        successCount++
+      } catch (error) {
+        wsLogger.error('推送库存变更给用户失败', { user_id: userId, error: error.message })
+      }
+    }
+
+    // 同时推送给管理员
+    for (const [adminId, socketId] of this.connectedAdmins.entries()) {
+      try {
+        this.io.to(socketId).emit('exchange_stock_changed', payload)
+        successCount++
+      } catch (error) {
+        wsLogger.error('推送库存变更给管理员失败', { admin_id: adminId, error: error.message })
+      }
+    }
+
+    wsLogger.info('📦 兑换库存变更通知已广播', {
+      exchange_item_id: stockData.exchange_item_id,
+      remaining_stock: stockData.remaining_stock,
+      changed_amount: stockData.changed_amount,
+      pushed_count: successCount
+    })
+
+    return successCount
+  }
+
+  /**
+   * 推送系统广播消息给所有在线用户（通用方法）
+   *
+   * @param {string} eventName - 事件名称
+   * @param {Object} data - 推送数据
+   * @param {Object} [options] - 选项
+   * @param {boolean} [options.usersOnly=false] - 是否只推送给普通用户
+   * @param {boolean} [options.adminsOnly=false] - 是否只推送给管理员
+   * @returns {number} 成功推送的数量
+   */
+  broadcast(eventName, data, options = {}) {
+    if (!this.io) {
+      wsLogger.warn('WebSocket服务未初始化，无法广播')
+      return 0
+    }
+
+    const { usersOnly = false, adminsOnly = false } = options
+    const payload = { ...data, timestamp: BeijingTimeHelper.now() }
+    let successCount = 0
+
+    if (!adminsOnly) {
+      for (const [, socketId] of this.connectedUsers.entries()) {
+        try {
+          this.io.to(socketId).emit(eventName, payload)
+          successCount++
+        } catch (_) {
+          /* 忽略单个推送失败 */
+        }
+      }
+    }
+
+    if (!usersOnly) {
+      for (const [, socketId] of this.connectedAdmins.entries()) {
+        try {
+          this.io.to(socketId).emit(eventName, payload)
+          successCount++
+        } catch (_) {
+          /* 忽略单个推送失败 */
+        }
+      }
+    }
+
+    wsLogger.info(`📢 广播事件: ${eventName}`, { pushed_count: successCount })
+    return successCount
   }
 
   /**

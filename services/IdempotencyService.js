@@ -152,6 +152,7 @@ const CANONICAL_OPERATION_MAP = {
    * ===============================================================
    */
   '/api/v4/auth/login': 'AUTH_LOGIN', // 用户登录
+  '/api/v4/auth/send-code': 'AUTH_SEND_CODE', // 发送短信验证码
   '/api/v4/auth/decrypt-phone': 'AUTH_DECRYPT_PHONE', // 解密手机号
   '/api/v4/auth/quick-login': 'AUTH_QUICK_LOGIN', // 快速登录
   '/api/v4/auth/refresh': 'AUTH_TOKEN_REFRESH', // 刷新 Token
@@ -177,6 +178,8 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/system/feedback': 'SYSTEM_FEEDBACK_SUBMIT', // 提交反馈
   '/api/v4/system/chat/sessions': 'CHAT_SESSION_CREATE', // 创建聊天会话
   '/api/v4/system/chat/sessions/:id/messages': 'CHAT_MESSAGE_SEND', // 发送聊天消息
+  '/api/v4/system/chat/sessions/:id/upload': 'CHAT_IMAGE_UPLOAD', // 聊天图片上传
+  '/api/v4/backpack/exchange/orders/:id/rate': 'EXCHANGE_ORDER_RATE', // 兑换订单评分（需求6）
   '/api/v4/system/notifications/:id/read': 'NOTIFICATION_MARK_READ', // 标记通知已读（修复：system/:id/read → system/notifications/:id/read）
   '/api/v4/system/notifications/read-all': 'NOTIFICATION_READ_ALL', // 全部已读（修复：system/read-all → system/notifications/read-all）
   '/api/v4/system/notifications/clear': 'NOTIFICATION_CLEAR', // 清空通知（修复：system/clear → system/notifications/clear）

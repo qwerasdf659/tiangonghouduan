@@ -117,6 +117,40 @@ describe('背包API测试 - P2优先级', () => {
       }
     })
 
+    test('资产应该包含 is_tradable 字段（布尔类型）', async () => {
+      const response = await request(app)
+        .get('/api/v4/backpack')
+        .set('Authorization', `Bearer ${user_token}`)
+
+      expect(response.status).toBe(200)
+
+      const { assets } = response.body.data
+
+      // 每个资产都应该有 is_tradable 字段，用于前端控制"上架到市场"按钮
+      assets.forEach(asset => {
+        expect(asset).toHaveProperty('is_tradable')
+        expect(typeof asset.is_tradable).toBe('boolean')
+      })
+    })
+
+    test('不应该返回已禁用的资产类型（如 POINTS is_enabled=false）', async () => {
+      const response = await request(app)
+        .get('/api/v4/backpack')
+        .set('Authorization', `Bearer ${user_token}`)
+
+      expect(response.status).toBe(200)
+
+      const { assets } = response.body.data
+
+      // POINTS（is_enabled=0）不应出现在背包资产列表中
+      const hasPOINTS = assets.some(a => a.asset_code === 'POINTS')
+      expect(hasPOINTS).toBe(false)
+
+      // BUDGET_POINTS（系统内部资产）也不应出现
+      const hasBudgetPoints = assets.some(a => a.asset_code === 'BUDGET_POINTS')
+      expect(hasBudgetPoints).toBe(false)
+    })
+
     test('应该返回正确的物品数据结构', async () => {
       const response = await request(app)
         .get('/api/v4/backpack')
@@ -175,6 +209,10 @@ describe('背包API测试 - P2优先级', () => {
       expect(data).toHaveProperty('total_items')
       expect(typeof data.total_assets).toBe('number')
       expect(typeof data.total_items).toBe('number')
+
+      // items_by_type：按物品类型分组统计（前端分类面板使用）
+      expect(data).toHaveProperty('items_by_type')
+      expect(typeof data.items_by_type).toBe('object')
     })
 
     test('统计数量应该是非负数', async () => {

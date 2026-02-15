@@ -30,6 +30,55 @@ const TransactionManager = require('../../../utils/TransactionManager')
 // Phase 3 收口：AuthenticationSession 在路由内通过 ServiceManager 获取，避免顶部直连 models
 
 /**
+ * 📱 发送短信验证码
+ * POST /api/v4/auth/send-code
+ *
+ * 业务流程：
+ * 1. 验证手机号格式
+ * 2. 频率限制检查（同手机号60秒内仅发一次）
+ * 3. 每日次数限制（每天上限10次）
+ * 4. 生成6位验证码存入Redis（TTL 5分钟）
+ * 5. 调用SMS SDK发送短信（Phase 2 对接）
+ *
+ * @param {string} mobile - 手机号（11位中国大陆手机号）
+ */
+router.post('/send-code', async (req, res) => {
+  const { mobile } = req.body
+
+  // 手机号必填验证
+  if (!mobile) {
+    return res.apiError('手机号不能为空', 'MOBILE_REQUIRED', null, 400)
+  }
+
+  // 手机号格式验证（11位中国大陆手机号）
+  const mobileRegex = /^1[3-9]\d{9}$/
+  if (!mobileRegex.test(mobile)) {
+    return res.apiError('手机号格式不正确', 'INVALID_MOBILE_FORMAT', null, 400)
+  }
+
+  try {
+    // 通过 ServiceManager 获取 SmsService
+    const SmsService = req.app.locals.services.getService('sms')
+    const result = await SmsService.sendVerificationCode(mobile)
+
+    return res.apiSuccess(
+      {
+        expires_in: result.expires_in
+      },
+      result.message
+    )
+  } catch (error) {
+    // 频率限制或每日限制错误
+    if (error.code === 'SMS_RATE_LIMIT' || error.code === 'SMS_DAILY_LIMIT') {
+      return res.apiError(error.message, error.code, error.data, error.statusCode || 429)
+    }
+
+    logger.error('❌ 发送验证码失败:', error)
+    return res.apiError('验证码发送失败，请稍后重试', 'SMS_SEND_FAILED', null, 500)
+  }
+})
+
+/**
  * 🛡️ 用户登录（支持自动注册）
  * POST /api/v4/auth/login
  *
@@ -57,22 +106,11 @@ router.post('/login', async (req, res) => {
     return res.apiError('验证码不能为空', 'VERIFICATION_CODE_REQUIRED', null, 400)
   }
 
-  // 验证码验证逻辑
-  if (process.env.NODE_ENV === 'development') {
-    // 开发环境：使用万能验证码 123456
-    if (verification_code !== '123456') {
-      return res.apiError(
-        '验证码错误（开发环境使用123456）',
-        'INVALID_VERIFICATION_CODE',
-        null,
-        400
-      )
-    }
-  } else {
-    // 生产环境：目前开发阶段统一使用123456验证码
-    if (verification_code !== '123456') {
-      return res.apiError('验证码错误', 'INVALID_VERIFICATION_CODE', null, 401)
-    }
+  // 验证码验证逻辑：支持万能码123456 + Redis存储的真实验证码
+  const SmsService = req.app.locals.services.getService('sms')
+  const isCodeValid = await SmsService.verifyCode(mobile, verification_code)
+  if (!isCodeValid) {
+    return res.apiError('验证码错误或已过期', 'INVALID_VERIFICATION_CODE', null, 401)
   }
 
   // 通过ServiceManager获取UserService

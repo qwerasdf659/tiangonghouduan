@@ -264,6 +264,22 @@ module.exports = {
       enabled: true, // 强制启用XSS防护
       escape_html: true, // 转义HTML特殊字符
       allowed_tags: [] // 不允许任何HTML标签
+    },
+
+    /**
+     * 聊天图片上传配置
+     *
+     * @description 用户在聊天中上传图片的限制规则
+     * @业务规则
+     * - 最大文件大小：5MB
+     * - 允许的文件类型：jpg/png/gif/webp
+     * - 存储目录：chat-images/（Sealos对象存储）
+     * - 上传后返回图片 URL，前端通过消息接口发送 message_type: 'image'
+     */
+    image_upload: {
+      max_file_size: 5 * 1024 * 1024, // 5MB 限制
+      allowed_mime_types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], // 允许的MIME类型
+      storage_folder: 'chat-images' // Sealos对象存储目录
     }
   }
 }

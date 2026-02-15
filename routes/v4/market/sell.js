@@ -185,8 +185,8 @@ router.post(
       if (listingCountInfo.remaining_count <= 0) {
         await IdempotencyService.markAsFailed(idempotency_key, '上架数量已达上限')
         return res.apiError(
-          `上架数量已达上限（${listingCountInfo.max_count}件）`,
-          'LIMIT_EXCEEDED',
+          `已达到最大上架数量限制（${listingCountInfo.max_count}件）`,
+          'LISTING_LIMIT_EXCEEDED',
           {
             current: listingCountInfo.active_count,
             limit: listingCountInfo.max_count

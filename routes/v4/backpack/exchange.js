@@ -175,7 +175,9 @@ router.get(
     return res.apiSuccess(
       {
         items: sanitizedItems,
-        pagination: result.pagination
+        pagination: result.pagination,
+        /** 统计摘要（需求6 趋势销量 + 需求8 折扣率） */
+        summary: result.summary || null
       },
       '获取商品列表成功'
     )
@@ -387,6 +389,61 @@ router.post(
         idempotency_key
       })
       return handleServiceError(error, res, '兑换失败')
+    }
+  })
+)
+
+/**
+ * POST /api/v4/backpack/exchange/orders/:order_no/rate
+ *
+ * @description 用户对兑换订单评分（需求6：兑换商品统计字段）
+ * @access Private（订单归属用户）
+ *
+ * @param {string} order_no - 订单号（路由参数）
+ * @body {number} rating - 评分（1-5分，必填）
+ *
+ * @returns {Object} { order_no, rating, rated_at }
+ */
+router.post(
+  '/orders/:order_no/rate',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const ExchangeCoreService = req.app.locals.services.getService('exchange_core')
+    const user_id = req.user.user_id
+    const { order_no } = req.params
+    const { rating } = req.body
+
+    // 参数验证：rating 必填
+    if (rating === undefined || rating === null) {
+      return res.apiError('评分不能为空', 'BAD_REQUEST', null, 400)
+    }
+
+    const ratingNum = parseInt(rating, 10)
+    if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+      return res.apiError('评分必须为1-5的整数', 'INVALID_RATING', null, 400)
+    }
+
+    logger.info('用户评分请求', { user_id, order_no, rating: ratingNum })
+
+    try {
+      const result = await TransactionManager.execute(async transaction => {
+        return await ExchangeCoreService.rateOrder(user_id, order_no, ratingNum, { transaction })
+      })
+
+      return res.apiSuccess(
+        {
+          order_no: result.order_no,
+          rating: result.rating,
+          rated_at: result.rated_at
+        },
+        result.message
+      )
+    } catch (error) {
+      if (error.code && error.statusCode) {
+        return res.apiError(error.message, error.code, error.data || null, error.statusCode)
+      }
+      logger.error('评分失败', { user_id, order_no, error: error.message })
+      return handleServiceError(error, res, '评分失败')
     }
   })
 )

@@ -4,6 +4,7 @@
  * 业务范围：
  * - 转接会话
  * - 关闭会话
+ * - 管理员在线状态管理（online / busy / offline）
  *
  * 架构规范：
  * - 路由层不直连 models（通过 Service 层）
@@ -11,7 +12,7 @@
  * - 写操作使用 TransactionManager.execute 包裹事务
  *
  * 创建时间：2025-12-22
- * 最后更新：2026-01-09（事务边界修复）
+ * 最后更新：2026-02-15（新增管理员在线状态 API）
  */
 
 const express = require('express')
@@ -148,6 +149,94 @@ router.post('/:id/close', async (req, res) => {
     }
 
     return res.apiError(error.message, errorCode, null, statusCode)
+  }
+})
+
+/**
+ * POST /status - 更新管理员在线状态
+ *
+ * @description 管理员更新自身的客服在线状态（online / busy / offline）
+ * @route POST /api/v4/console/customer-service/sessions/status
+ * @access Admin
+ *
+ * 业务场景：
+ * - 管理员进入客服工作台时设置为 online
+ * - 管理员暂时离开时设置为 busy
+ * - 管理员退出客服工作台时设置为 offline
+ *
+ * @body {string} status - 在线状态（必填，枚举：online / busy / offline）
+ *
+ * @returns {Object} { admin_id, status, updated_at }
+ */
+router.post('/status', async (req, res) => {
+  try {
+    const admin_id = req.user.user_id
+    const { status } = req.body
+
+    if (!status) {
+      return res.apiError('status 是必填参数（online / busy / offline）', 'BAD_REQUEST', null, 400)
+    }
+
+    /* 通过 ServiceManager 获取 AdminCustomerServiceService */
+    const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
+
+    const result = await AdminCustomerServiceService.updateAdminOnlineStatus(admin_id, status)
+
+    return res.apiSuccess(result, '在线状态更新成功')
+  } catch (error) {
+    logger.error('更新管理员在线状态失败:', error)
+
+    if (error.code === 'BAD_REQUEST') {
+      return res.apiError(error.message, 'BAD_REQUEST', null, 400)
+    }
+
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * GET /status - 获取管理员在线状态列表
+ *
+ * @description 批量查询管理员的客服在线状态
+ * @route GET /api/v4/console/customer-service/sessions/status
+ * @access Admin
+ *
+ * @query {string} admin_ids - 管理员ID列表，逗号分隔（如 1,2,3）
+ *
+ * @returns {Array<{admin_id: number, status: string}>} 管理员状态列表
+ */
+router.get('/status', async (req, res) => {
+  try {
+    const { admin_ids } = req.query
+
+    if (!admin_ids) {
+      return res.apiError(
+        'admin_ids 是必填参数（逗号分隔的管理员ID列表）',
+        'BAD_REQUEST',
+        null,
+        400
+      )
+    }
+
+    /* 解析并验证 admin_ids 参数 */
+    const parsedIds = admin_ids
+      .split(',')
+      .map(id => parseInt(id.trim(), 10))
+      .filter(id => !isNaN(id) && id > 0)
+
+    if (parsedIds.length === 0) {
+      return res.apiError('admin_ids 参数无有效ID', 'BAD_REQUEST', null, 400)
+    }
+
+    /* 通过 ServiceManager 获取 AdminCustomerServiceService */
+    const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
+
+    const statuses = await AdminCustomerServiceService.getAdminOnlineStatuses(parsedIds)
+
+    return res.apiSuccess(statuses, '获取在线状态成功')
+  } catch (error) {
+    logger.error('获取管理员在线状态失败:', error)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 

@@ -36,6 +36,7 @@ export const ASSET_ENDPOINTS = {
   // 材料资产
   MATERIAL_ASSET_TYPES: `${API_PREFIX}/console/material/asset-types`,
   MATERIAL_ASSET_TYPE_DETAIL: `${API_PREFIX}/console/material/asset-types/:asset_code`,
+  MATERIAL_ASSET_TYPE_DISABLE: `${API_PREFIX}/console/material/asset-types/:asset_code/disable`,
   MATERIAL_CONVERSION_RULES: `${API_PREFIX}/console/material/conversion-rules`,
   MATERIAL_CONVERSION_RULE_DETAIL: `${API_PREFIX}/console/material/conversion-rules/:rule_id`,
   MATERIAL_CONVERSION_RULE_DISABLE: `${API_PREFIX}/console/material/conversion-rules/:rule_id/disable`,

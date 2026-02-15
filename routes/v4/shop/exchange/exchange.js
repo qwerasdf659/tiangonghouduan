@@ -160,6 +160,20 @@ router.post('/', authenticateToken, async (req, res) => {
       pay_amount: result.order.pay_amount
     })
 
+    // 🔌 WebSocket推送：通知所有在线用户库存变更（2026-02-15 新增）
+    try {
+      const ChatWebSocketService = require('../../../../services/ChatWebSocketService')
+      ChatWebSocketService.broadcastExchangeStockChanged({
+        exchange_item_id: itemId,
+        name: result.order.item_name || null,
+        remaining_stock: result.order.remaining_stock ?? null,
+        changed_amount: -exchangeQuantity,
+        reason: 'exchange'
+      })
+    } catch (wsError) {
+      logger.warn('WebSocket推送库存变更通知失败（非致命）', { error: wsError.message })
+    }
+
     return res.apiSuccess(responseData, result.message)
   } catch (error) {
     // 标记幂等请求失败（允许重试）

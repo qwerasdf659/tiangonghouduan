@@ -76,19 +76,21 @@ class LotteryManagementSetting extends Model {
   }
 
   /**
-   * 标记设置为已使用（用于force_win等一次性设置）
+   * 标记设置为已使用（用于 force_win 等一次性设置）
+   *
+   * 业务场景：用户抽奖命中 force_win 干预后，标记该干预为 used 防止反复命中
+   *
+   * @param {Object} [options={}] - 可选参数
+   * @param {Object} [options.transaction] - Sequelize 事务对象（Pipeline 结算阶段传入）
    * @returns {Promise<void>} 无返回值，保存状态变更到数据库
    *
    * @example
-   * // 用户抽奖时，如果有force_win设置，使用后标记为used
-   * const setting = await LotteryManagementSetting.findOne({ where: { user_id, setting_type: 'force_win', status: 'active' }})
-   * if (setting) {
-   *   await setting.markAsUsed()
-   * }
+   * // 在 SettleStage 事务中标记为已使用
+   * await setting.markAsUsed({ transaction })
    */
-  async markAsUsed() {
+  async markAsUsed(options = {}) {
     this.status = 'used'
-    await this.save()
+    await this.save(options)
   }
 
   /**

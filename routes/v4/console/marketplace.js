@@ -411,6 +411,21 @@ router.post(
       bound_image: transactionResult.bound_image
     })
 
+    // 🔌 WebSocket推送：通知所有在线用户商品已创建（2026-02-15 新增）
+    try {
+      const ChatWebSocketService = require('../../../services/ChatWebSocketService')
+      ChatWebSocketService.broadcastProductUpdated({
+        action: 'created',
+        exchange_item_id: transactionResult.item?.exchange_item_id,
+        name: transactionResult.item?.name,
+        stock: transactionResult.item?.stock,
+        status: transactionResult.item?.status,
+        operator_id: admin_id
+      })
+    } catch (wsError) {
+      logger.warn('WebSocket推送商品创建通知失败（非致命）', { error: wsError.message })
+    }
+
     return res.apiSuccess(
       {
         item: transactionResult.item,
@@ -509,6 +524,21 @@ router.put(
         image_changes: result.image_changes
       })
 
+      // 🔌 WebSocket推送：通知所有在线用户商品已更新（2026-02-15 新增）
+      try {
+        const ChatWebSocketService = require('../../../services/ChatWebSocketService')
+        ChatWebSocketService.broadcastProductUpdated({
+          action: 'updated',
+          exchange_item_id: itemId,
+          name: result.item.item_name || result.item.name,
+          stock: result.item.stock,
+          status: result.item.status,
+          operator_id: admin_id
+        })
+      } catch (wsError) {
+        logger.warn('WebSocket推送商品更新通知失败（非致命）', { error: wsError.message })
+      }
+
       return res.apiSuccess(result, '商品更新成功')
     } catch (error) {
       logger.error('更新兑换商品失败', {
@@ -589,6 +619,19 @@ router.delete(
         // 2026-02-01 主键命名规范化：使用完整前缀 image_resource_id
         deleted_image_resource_id: result.deleted_image_resource_id
       })
+
+      // 🔌 WebSocket推送：通知所有在线用户商品已删除/下架（2026-02-15 新增）
+      try {
+        const ChatWebSocketService = require('../../../services/ChatWebSocketService')
+        ChatWebSocketService.broadcastProductUpdated({
+          action: result.action === 'deactivated' ? 'status_changed' : 'deleted',
+          exchange_item_id: itemId,
+          status: result.action === 'deactivated' ? 'inactive' : 'deleted',
+          operator_id: admin_id
+        })
+      } catch (wsError) {
+        logger.warn('WebSocket推送商品删除通知失败（非致命）', { error: wsError.message })
+      }
 
       // 根据操作结果返回不同响应
       if (result.action === 'deactivated') {

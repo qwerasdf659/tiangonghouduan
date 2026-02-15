@@ -205,6 +205,7 @@ const LotteryQuotaService = require('./lottery/LotteryQuotaService') // 抽奖�
 const LotteryPricingService = require('./lottery/LotteryPricingService') // 抽奖定价服务
 const PerformanceMonitor = require('./UnifiedLotteryEngine/utils/PerformanceMonitor') // 性能监控服务
 const SealosStorageService = require('./sealosStorage') // Sealos 对象存储服务
+const SmsService = require('./SmsService') // 短信验证码服务（Phase 1：Redis存取 + 频率限制）
 
 /**
  * V4.6 管线编排器
@@ -496,6 +497,7 @@ class ServiceManager {
       this._services.set('lottery_quota', LotteryQuotaService)
       this._services.set('performance_monitor', new PerformanceMonitor()) // 性能监控服务（实例化）
       this._services.set('sealos_storage', SealosStorageService) // Sealos 对象存储服务（静态类，需 new 实例化）
+      this._services.set('sms', SmsService) // 短信验证码服务（静态方法类）
 
       // ========== 抽奖定价相关服务 ==========
 

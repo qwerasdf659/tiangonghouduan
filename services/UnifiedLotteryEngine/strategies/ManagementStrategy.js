@@ -92,9 +92,11 @@ class ManagementStrategy {
    * @param {number} prizeId - 奖品ID（要强制中奖的奖品）
    * @param {string} [reason='管理员操作'] - 操作原因（可选，默认为'管理员操作'）
    * @param {Date|null} [expiresAt=null] - 过期时间（可选，默认为null表示永不过期）
+   * @param {Object} [options={}] - 可选配置
+   * @param {Object} [options.transaction] - Sequelize事务对象（由外部事务边界传入）
    * @returns {Promise<Object>} 操作结果对象
    * @returns {boolean} return.success - 操作是否成功
-   * @returns {string} return.setting_id - 设置记录ID
+   * @returns {string} return.setting_id - 设置记录ID（lottery_management_setting_id）
    * @returns {string} return.result - 操作结果标识（'force_win'）
    * @returns {number} return.lottery_prize_id - 奖品ID
    * @returns {number} return.user_id - 目标用户ID
@@ -107,10 +109,17 @@ class ManagementStrategy {
    *
    * @example
    * const strategy = new ManagementStrategy()
-   * const result = await strategy.forceWin(10001, 20001, 30001, '测试补偿')
+   * const result = await strategy.forceWin(10001, 20001, 30001, '测试补偿', null, { transaction })
    * // 返回：{ success: true, setting_id: 'setting_...', result: 'force_win', lottery_prize_id: 30001, user_id: 20001, admin_id: 10001, reason: '测试补偿', timestamp: '2025-11-08 12:00:00' }
    */
-  async forceWin(adminId, targetUserId, prizeId, reason = '管理员操作', expiresAt = null) {
+  async forceWin(
+    adminId,
+    targetUserId,
+    prizeId,
+    reason = '管理员操作',
+    expiresAt = null,
+    options = {}
+  ) {
     try {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -132,19 +141,25 @@ class ManagementStrategy {
       const prize = await LotteryPrize.findByPk(prizeId)
       const prizeName = prize ? prize.prize_name : null
 
-      // 💾 创建数据库记录
-      const setting = await LotteryManagementSetting.create({
-        user_id: targetUserId,
-        setting_type: 'force_win',
-        setting_data: {
-          lottery_prize_id: prizeId,
-          prize_name: prizeName, // 保存奖品名称用于显示
-          reason
+      // 💾 创建数据库记录（传入事务，确保与外部事务一致）
+      const createOptions = {}
+      if (options.transaction) createOptions.transaction = options.transaction
+
+      const setting = await LotteryManagementSetting.create(
+        {
+          user_id: targetUserId,
+          setting_type: 'force_win',
+          setting_data: {
+            lottery_prize_id: prizeId,
+            prize_name: prizeName, // 保存奖品名称用于显示
+            reason
+          },
+          expires_at: expiresAt,
+          status: 'active',
+          created_by: adminId
         },
-        expires_at: expiresAt,
-        status: 'active',
-        created_by: adminId
-      })
+        createOptions
+      )
 
       // 🔄 更新内存缓存
       const cacheKey = `user_${targetUserId}_force_win`
@@ -154,7 +169,7 @@ class ManagementStrategy {
       })
 
       this.logger.info('管理员强制中奖（持久化）', {
-        setting_id: setting.setting_id,
+        lottery_management_setting_id: setting.lottery_management_setting_id,
         adminId,
         targetUserId,
         prizeId,
@@ -165,7 +180,7 @@ class ManagementStrategy {
 
       return {
         success: true,
-        setting_id: setting.setting_id,
+        setting_id: setting.lottery_management_setting_id,
         result: 'force_win',
         lottery_prize_id: prizeId,
         user_id: targetUserId,
@@ -202,9 +217,11 @@ class ManagementStrategy {
    * @param {number} [count=1] - 不中奖次数（可选，默认为1次）
    * @param {string} [reason='管理员操作'] - 操作原因（可选，默认为'管理员操作'）
    * @param {Date|null} [expiresAt=null] - 过期时间（可选，默认为null表示永不过期）
+   * @param {Object} [options={}] - 可选配置
+   * @param {Object} [options.transaction] - Sequelize事务对象（由外部事务边界传入）
    * @returns {Promise<Object>} 操作结果对象
    * @returns {boolean} return.success - 操作是否成功
-   * @returns {string} return.setting_id - 设置记录ID
+   * @returns {string} return.setting_id - 设置记录ID（lottery_management_setting_id）
    * @returns {string} return.result - 操作结果标识（'force_lose'）
    * @returns {number} return.user_id - 目标用户ID
    * @returns {number} return.admin_id - 管理员ID
@@ -217,10 +234,17 @@ class ManagementStrategy {
    *
    * @example
    * const strategy = new ManagementStrategy()
-   * const result = await strategy.forceLose(10001, 20001, 5, '防刷保护')
+   * const result = await strategy.forceLose(10001, 20001, 5, '防刷保护', null, { transaction })
    * // 返回：{ success: true, setting_id: 'setting_...', result: 'force_lose', user_id: 20001, admin_id: 10001, count: 5, remaining: 5, reason: '防刷保护', timestamp: '2025-11-08 12:00:00' }
    */
-  async forceLose(adminId, targetUserId, count = 1, reason = '管理员操作', expiresAt = null) {
+  async forceLose(
+    adminId,
+    targetUserId,
+    count = 1,
+    reason = '管理员操作',
+    expiresAt = null,
+    options = {}
+  ) {
     try {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -228,19 +252,25 @@ class ManagementStrategy {
         throw new Error(`管理员权限验证失败: ${adminValidation.reason}`)
       }
 
-      // 💾 创建数据库记录
-      const setting = await LotteryManagementSetting.create({
-        user_id: targetUserId,
-        setting_type: 'force_lose',
-        setting_data: {
-          count,
-          remaining: count,
-          reason
+      // 💾 创建数据库记录（传入事务，确保与外部事务一致）
+      const createOptions = {}
+      if (options.transaction) createOptions.transaction = options.transaction
+
+      const setting = await LotteryManagementSetting.create(
+        {
+          user_id: targetUserId,
+          setting_type: 'force_lose',
+          setting_data: {
+            count,
+            remaining: count,
+            reason
+          },
+          expires_at: expiresAt,
+          status: 'active',
+          created_by: adminId
         },
-        expires_at: expiresAt,
-        status: 'active',
-        created_by: adminId
-      })
+        createOptions
+      )
 
       // 🔄 更新内存缓存
       const cacheKey = `user_${targetUserId}_force_lose`
@@ -250,7 +280,7 @@ class ManagementStrategy {
       })
 
       this.logger.info('管理员强制不中奖（持久化）', {
-        setting_id: setting.setting_id,
+        lottery_management_setting_id: setting.lottery_management_setting_id,
         adminId,
         targetUserId,
         count,
@@ -262,7 +292,7 @@ class ManagementStrategy {
 
       return {
         success: true,
-        setting_id: setting.setting_id,
+        setting_id: setting.lottery_management_setting_id,
         result: 'force_lose',
         user_id: targetUserId,
         admin_id: adminId,
@@ -301,9 +331,11 @@ class ManagementStrategy {
    * @param {number} multiplier - 概率倍数（0.1-10倍，1.0表示正常概率）
    * @param {string} [reason='管理员操作'] - 操作原因（可选，默认为'管理员操作'）
    * @param {Date|null} [expiresAt=null] - 过期时间（可选，默认为null表示永不过期）
+   * @param {Object} [options={}] - 可选配置
+   * @param {Object} [options.transaction] - Sequelize事务对象（由外部事务边界传入）
    * @returns {Promise<Object>} 操作结果对象
    * @returns {boolean} return.success - 操作是否成功
-   * @returns {string} return.setting_id - 设置记录ID
+   * @returns {string} return.setting_id - 设置记录ID（lottery_management_setting_id）
    * @returns {string} return.result - 操作结果标识（'probability_adjust'）
    * @returns {number} return.user_id - 目标用户ID
    * @returns {number} return.admin_id - 管理员ID
@@ -317,7 +349,7 @@ class ManagementStrategy {
    * @example
    * const strategy = new ManagementStrategy()
    * // 提升用户中奖概率2倍
-   * const result = await strategy.adjustProbability(10001, 20001, 2.0, '用户挽留')
+   * const result = await strategy.adjustProbability(10001, 20001, 2.0, '用户挽留', null, { transaction })
    * // 返回：{ success: true, setting_id: 'setting_...', result: 'probability_adjust', user_id: 20001, admin_id: 10001, multiplier: 2.0, reason: '用户挽留', timestamp: '2025-11-08 12:00:00' }
    */
   async adjustProbability(
@@ -325,7 +357,8 @@ class ManagementStrategy {
     targetUserId,
     multiplier,
     reason = '管理员操作',
-    expiresAt = null
+    expiresAt = null,
+    options = {}
   ) {
     try {
       // 🛡️ 验证管理员权限
@@ -339,18 +372,24 @@ class ManagementStrategy {
         throw new Error('概率倍数必须在0.1-10倍之间')
       }
 
-      // 💾 创建数据库记录
-      const setting = await LotteryManagementSetting.create({
-        user_id: targetUserId,
-        setting_type: 'probability_adjust',
-        setting_data: {
-          multiplier,
-          reason
+      // 💾 创建数据库记录（传入事务，确保与外部事务一致）
+      const createOptions = {}
+      if (options.transaction) createOptions.transaction = options.transaction
+
+      const setting = await LotteryManagementSetting.create(
+        {
+          user_id: targetUserId,
+          setting_type: 'probability_adjust',
+          setting_data: {
+            multiplier,
+            reason
+          },
+          expires_at: expiresAt,
+          status: 'active',
+          created_by: adminId
         },
-        expires_at: expiresAt,
-        status: 'active',
-        created_by: adminId
-      })
+        createOptions
+      )
 
       // 🔄 更新内存缓存
       const cacheKey = `user_${targetUserId}_probability_adjust`
@@ -360,7 +399,7 @@ class ManagementStrategy {
       })
 
       this.logger.info('调整用户中奖概率（持久化）', {
-        setting_id: setting.setting_id,
+        lottery_management_setting_id: setting.lottery_management_setting_id,
         adminId,
         targetUserId,
         multiplier,
@@ -371,7 +410,7 @@ class ManagementStrategy {
 
       return {
         success: true,
-        setting_id: setting.setting_id,
+        setting_id: setting.lottery_management_setting_id,
         result: 'probability_adjust',
         user_id: targetUserId,
         admin_id: adminId,
@@ -415,9 +454,11 @@ class ManagementStrategy {
    * @param {Array<number>} queueConfig.prize_queue - 奖品ID队列（用户抽奖时按顺序返回）
    * @param {string} [reason='管理员操作'] - 操作原因（可选，默认为'管理员操作'）
    * @param {Date|null} [expiresAt=null] - 过期时间（可选，默认为null表示永不过期）
+   * @param {Object} [options={}] - 可选配置
+   * @param {Object} [options.transaction] - Sequelize事务对象（由外部事务边界传入）
    * @returns {Promise<Object>} 操作结果对象
    * @returns {boolean} return.success - 操作是否成功
-   * @returns {string} return.setting_id - 设置记录ID
+   * @returns {string} return.setting_id - 设置记录ID（lottery_management_setting_id）
    * @returns {string} return.result - 操作结果标识（'user_queue'）
    * @returns {number} return.user_id - 目标用户ID
    * @returns {number} return.admin_id - 管理员ID
@@ -434,10 +475,17 @@ class ManagementStrategy {
    *   queue_type: 'vip_experience',
    *   priority_level: 8,
    *   prize_queue: [101, 102, 103]
-   * }, 'VIP用户体验优化')
+   * }, 'VIP用户体验优化', null, { transaction })
    * // 返回：{ success: true, setting_id: 'setting_...', result: 'user_queue', user_id: 20001, admin_id: 10001, queue_config: {...}, reason: 'VIP用户体验优化', timestamp: '2025-11-08 12:00:00' }
    */
-  async setUserQueue(adminId, targetUserId, queueConfig, reason = '管理员操作', expiresAt = null) {
+  async setUserQueue(
+    adminId,
+    targetUserId,
+    queueConfig,
+    reason = '管理员操作',
+    expiresAt = null,
+    options = {}
+  ) {
     try {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
@@ -462,21 +510,27 @@ class ManagementStrategy {
         throw new Error('奖品队列不能为空')
       }
 
-      // 💾 创建数据库记录
-      const setting = await LotteryManagementSetting.create({
-        user_id: targetUserId,
-        setting_type: 'user_queue',
-        setting_data: {
-          queue_type: queueConfig.queue_type,
-          priority_level: queueConfig.priority_level,
-          prize_queue: queueConfig.prize_queue,
-          current_index: 0,
-          reason
+      // 💾 创建数据库记录（传入事务，确保与外部事务一致）
+      const createOptions = {}
+      if (options.transaction) createOptions.transaction = options.transaction
+
+      const setting = await LotteryManagementSetting.create(
+        {
+          user_id: targetUserId,
+          setting_type: 'user_queue',
+          setting_data: {
+            queue_type: queueConfig.queue_type,
+            priority_level: queueConfig.priority_level,
+            prize_queue: queueConfig.prize_queue,
+            current_index: 0,
+            reason
+          },
+          expires_at: expiresAt,
+          status: 'active',
+          created_by: adminId
         },
-        expires_at: expiresAt,
-        status: 'active',
-        created_by: adminId
-      })
+        createOptions
+      )
 
       // 🔄 更新内存缓存
       const cacheKey = `user_${targetUserId}_user_queue`
@@ -486,7 +540,7 @@ class ManagementStrategy {
       })
 
       this.logger.info('设置用户专属抽奖队列（持久化）', {
-        setting_id: setting.setting_id,
+        lottery_management_setting_id: setting.lottery_management_setting_id,
         adminId,
         targetUserId,
         queue_config: queueConfig,
@@ -497,7 +551,7 @@ class ManagementStrategy {
 
       return {
         success: true,
-        setting_id: setting.setting_id,
+        setting_id: setting.lottery_management_setting_id,
         result: 'user_queue',
         user_id: targetUserId,
         admin_id: adminId,

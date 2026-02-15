@@ -96,7 +96,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
         {
           model: ItemTemplate,
           as: 'itemTemplate',
-          attributes: ['item_template_id', 'name', 'item_type', 'rarity_code'],
+          attributes: ['item_template_id', 'display_name', 'item_type', 'rarity_code'],
           required: false
         }
       ],
@@ -112,8 +112,8 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
       return {
         ...json,
         /* 前端显示用字段 - 从 meta 或模板中提取 */
-        item_name: meta.name || json.itemTemplate?.name || '-',
-        template_name: json.itemTemplate?.name || null,
+        item_name: meta.name || json.itemTemplate?.display_name || '-',
+        template_name: json.itemTemplate?.display_name || null,
         rarity_code: json.itemTemplate?.rarity_code || null,
         /* 来源信息 */
         source: meta.source_type || null,
@@ -233,12 +233,18 @@ router.get('/:item_instance_id', authenticateToken, requireRoleLevel(100), async
         {
           model: User,
           as: 'owner',
-          attributes: ['user_id', 'nickname', 'phone']
+          attributes: ['user_id', 'nickname', 'mobile']
         },
         {
           model: ItemTemplate,
           as: 'itemTemplate',
-          attributes: ['item_template_id', 'name', 'item_type', 'rarity_code', 'description']
+          attributes: [
+            'item_template_id',
+            'display_name',
+            'item_type',
+            'rarity_code',
+            'description'
+          ]
         }
       ]
     })
@@ -269,8 +275,8 @@ router.get('/:item_instance_id', authenticateToken, requireRoleLevel(100), async
       {
         item: {
           ...itemJson,
-          item_name: meta.name || itemJson.itemTemplate?.name || '-',
-          template_name: itemJson.itemTemplate?.name || null,
+          item_name: meta.name || itemJson.itemTemplate?.display_name || '-',
+          template_name: itemJson.itemTemplate?.display_name || null,
           rarity_code: itemJson.itemTemplate?.rarity_code || null
         },
         events: events.map(e => (e.toJSON ? e.toJSON() : e))

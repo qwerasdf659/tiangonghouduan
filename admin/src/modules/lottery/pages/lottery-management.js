@@ -55,9 +55,7 @@ import {
   useDailyReportMethods,
   useBatchOperationsState,
   useBatchOperationsMethods,
-  // P1-3: 预设可视化模块
-  usePresetVisualizationState,
-  usePresetVisualizationMethods,
+  // P1-3: 预设可视化模块 → 已迁移到 presets.html（抽奖干预管理页面）
   // P1-10: 系统垫付看板模块
   useSystemAdvanceState,
   useSystemAdvanceMethods,
@@ -129,7 +127,6 @@ function registerLotteryManagementComponents() {
         { id: 'lottery-strategy', title: '策略配置', icon: '⚙️' },
         { id: 'lottery-quota', title: '配额管理', icon: '📊' },
         { id: 'lottery-pricing', title: '定价配置', icon: '💵' },
-        { id: 'preset-visualization', title: '预设可视化', icon: '🎯' },
         { id: 'strategy-effectiveness', title: '策略效果', icon: '📈' }
       ],
       tools: [
@@ -151,7 +148,6 @@ function registerLotteryManagementComponents() {
       'lottery-strategy': 'strategy',
       'lottery-quota': 'strategy',
       'lottery-pricing': 'strategy',
-      'preset-visualization': 'strategy',
       'strategy-effectiveness': 'strategy',
       'batch-operations': 'tools',
       'redemption-codes': 'tools'
@@ -212,8 +208,7 @@ function registerLotteryManagementComponents() {
     const reportState = useReportState()
     const dailyReportState = useDailyReportState()
     const batchOperationsState = useBatchOperationsState()
-    // P1-3 & P1-10 模块状态
-    const presetVisualizationState = usePresetVisualizationState()
+    // P1-10 系统垫付看板模块状态
     const systemAdvanceState = useSystemAdvanceState()
     // 活动投放位置配置状态
     const placementState = usePlacementState()
@@ -234,8 +229,7 @@ function registerLotteryManagementComponents() {
     const reportMethods = useReportMethods()
     const dailyReportMethods = useDailyReportMethods()
     const batchOperationsMethods = useBatchOperationsMethods()
-    // P1-3 & P1-10 模块方法
-    const presetVisualizationMethods = usePresetVisualizationMethods()
+    // P1-10 系统垫付看板模块方法
     const systemAdvanceMethods = useSystemAdvanceMethods()
     // 活动投放位置配置方法
     const placementMethods = usePlacementMethods()
@@ -257,7 +251,6 @@ function registerLotteryManagementComponents() {
       ...reportState,
       ...dailyReportState,
       ...batchOperationsState,
-      ...presetVisualizationState,
       ...systemAdvanceState,
       ...placementState,
 
@@ -415,21 +408,7 @@ function registerLotteryManagementComponents() {
                   await this.loadCampaigns()
                 }
                 break
-              // P1-3: 预设可视化
-              case 'preset-visualization':
-                logger.debug('🎯 [LotteryPage] 进入预设可视化页面')
-                await this.loadPresetStats()
-                await this.loadPresets()
-                // 加载奖品列表供创建预设选择
-                if (!this.prizes || this.prizes.length === 0) {
-                  await this.loadPrizes()
-                }
-                // 将奖品列表转换为选项格式
-                this.prizeOptions = (this.prizes || []).map(p => ({
-                  value: p.lottery_prize_id || p.id,
-                  label: p.name || p.prize_name || `奖品#${p.lottery_prize_id || p.id}`
-                }))
-                break
+              // P1-3: 预设可视化 → 已迁移到 presets.html（抽奖干预管理页面）
               // P1-10: 系统垫付看板
               case 'system-advance':
                 logger.debug('💳 [LotteryPage] 进入系统垫付看板页面')
@@ -470,8 +449,7 @@ function registerLotteryManagementComponents() {
       ...reportMethods,
       ...dailyReportMethods,
       ...batchOperationsMethods,
-      // P1-3 & P1-10 模块方法
-      ...presetVisualizationMethods,
+      // P1-10 系统垫付看板模块方法
       ...systemAdvanceMethods,
       // 活动投放位置配置方法
       ...placementMethods,

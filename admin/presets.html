@@ -23,77 +23,282 @@
   </nav>
 
   <div class="container mx-auto px-4 py-6">
-    <!-- 说明区域 -->
-    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-      <div class="flex items-start">
-        <span class="text-yellow-500 mr-2">⚠️</span>
-        <div>
-          <strong>抽奖干预说明：</strong>
-          <p class="text-sm themed-text-muted mt-1">此功能用于设置用户的强制中奖或禁止中奖规则。请谨慎操作，所有干预记录将被记录。</p>
-        </div>
+
+    <!-- ==================== Tab 切换栏 ==================== -->
+    <div class="themed-card rounded-lg shadow mb-6">
+      <div class="flex border-b">
+        <button @click="activeTab = 'force_win'"
+                :class="activeTab === 'force_win' ? 'border-b-2 border-blue-500 text-blue-600 font-semibold' : 'themed-text-muted hover:text-blue-500'"
+                class="px-6 py-3 text-sm transition-colors">
+          🎯 强制中奖管理
+        </button>
+        <button @click="activeTab = 'preset_queue'; loadPresetTabData()"
+                :class="activeTab === 'preset_queue' ? 'border-b-2 border-blue-500 text-blue-600 font-semibold' : 'themed-text-muted hover:text-blue-500'"
+                class="px-6 py-3 text-sm transition-colors">
+          📋 预设队列管理
+        </button>
       </div>
     </div>
 
-    <!-- 筛选栏 -->
-    <div class="themed-card rounded-lg shadow mb-6">
-      <div class="p-4">
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+    <!-- ==================== Tab 1: 强制中奖管理 ==================== -->
+    <div x-show="activeTab === 'force_win'" x-cloak>
+
+      <!-- 说明区域 -->
+      <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+        <div class="flex items-start">
+          <span class="text-yellow-500 mr-2">⚠️</span>
           <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
-            <select x-model="filters.status" class="w-full px-3 py-2 border rounded-lg" x-tooltip="'按干预规则的当前生效状态筛选'">
+            <strong>强制中奖说明：</strong>
+            <p class="text-sm themed-text-muted mt-1">给用户"塞一次"指定奖品（临时、一次性、应急）。设置后用户下一次抽奖将命中指定奖品，使用后自动失效。请谨慎操作，所有操作记录将被审计追溯。</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 筛选栏 -->
+      <div class="themed-card rounded-lg shadow mb-6">
+        <div class="p-4">
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
+              <select x-model="filters.status" class="w-full px-3 py-2 border rounded-lg" x-tooltip="'按干预规则的当前生效状态筛选'">
+                <option value="">全部状态</option>
+                <option value="active">生效中</option>
+                <option value="expired">已过期</option>
+                <option value="used">已使用</option>
+                <option value="cancelled">已取消</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">奖品类型</label>
+              <select x-model="filters.prize_type" class="w-full px-3 py-2 border rounded-lg" x-tooltip="'按目标奖品筛选干预规则'">
+                <option value="">全部类型</option>
+                <template x-for="prize in allPrizes" :key="prize.lottery_prize_id">
+                  <option :value="prize.lottery_prize_id" x-text="prize.prize_name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">用户搜索</label>
+              <input type="text" x-model="filters.user_search" placeholder="输入手机号码搜索" class="w-full px-3 py-2 border rounded-lg" x-tooltip="'支持按手机号码搜索用户'">
+            </div>
+            <div>
+              <button @click="searchTable()" class="w-full px-4 py-2 themed-btn-primary rounded-lg">
+                🔍 搜索
+              </button>
+            </div>
+            <div>
+              <button @click="openCreateModal()" class="w-full px-4 py-2 themed-btn-primary rounded-lg">
+                ➕ 新增强制中奖
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- data-table 标准表格组件 -->
+      <div x-data="dataTable({
+        columns: tableColumns,
+        dataSource: fetchTableData,
+        primaryKey: 'setting_id',
+        sortable: true,
+        selectable: false,
+        exportable: false,
+        serverSort: true,
+        page_size: 10,
+        emptyText: '暂无强制中奖规则'
+      })" x-init="init()"
+         @dt-refresh.window="refresh()"
+         @dt-search.window="handleFilterSearch($event.detail.filters)">
+        <%- include('components/data-table') %>
+      </div>
+
+    </div>
+
+    <!-- ==================== Tab 2: 预设队列管理 ==================== -->
+    <div x-show="activeTab === 'preset_queue'" x-cloak>
+
+      <!-- 说明区域 -->
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div class="flex items-start">
+          <span class="text-blue-500 mr-2">📋</span>
+          <div>
+            <strong>预设队列说明：</strong>
+            <p class="text-sm themed-text-muted mt-1">给用户"安排好接下来几次"的中奖剧本（计划性、多次、运营策略）。按 queue_order 顺序逐次消耗，队列用完后恢复正常抽奖。优先级高于强制中奖。</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 预设统计卡片 -->
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <div class="themed-card rounded-lg shadow p-6 text-center">
+          <div class="text-3xl mb-2">🎯</div>
+          <h6 class="themed-text-muted text-sm mb-1">总预设数</h6>
+          <h2 class="text-2xl font-bold themed-text-primary" x-text="presetStats.total_presets || 0"></h2>
+        </div>
+        <div class="themed-card rounded-lg shadow p-6 text-center cursor-pointer hover:shadow-lg transition-shadow"
+             @click="presetFilters.status = 'pending'; searchPresets()">
+          <div class="text-3xl text-green-500 mb-2">🟢</div>
+          <h6 class="themed-text-muted text-sm mb-1">待使用</h6>
+          <h2 class="text-2xl font-bold text-green-600" x-text="presetStats.pending_presets || 0"></h2>
+        </div>
+        <div class="themed-card rounded-lg shadow p-6 text-center cursor-pointer hover:shadow-lg transition-shadow"
+             @click="presetFilters.status = 'used'; searchPresets()">
+          <div class="text-3xl text-gray-400 mb-2">⚪</div>
+          <h6 class="themed-text-muted text-sm mb-1">已使用</h6>
+          <h2 class="text-2xl font-bold text-gray-600" x-text="presetStats.used_presets || 0"></h2>
+        </div>
+        <div class="themed-card rounded-lg shadow p-6 text-center">
+          <div class="text-3xl text-blue-500 mb-2">👥</div>
+          <h6 class="themed-text-muted text-sm mb-1">涉及用户</h6>
+          <h2 class="text-2xl font-bold text-blue-600" x-text="presetStats.total_users_with_presets || 0"></h2>
+        </div>
+        <div class="themed-card rounded-lg shadow p-6 text-center">
+          <div class="text-3xl text-purple-500 mb-2">📊</div>
+          <h6 class="themed-text-muted text-sm mb-1">使用率</h6>
+          <h2 class="text-2xl font-bold text-purple-600" x-text="(presetStats.usage_rate || '0') + '%'"></h2>
+        </div>
+      </div>
+
+      <!-- 预设列表 -->
+      <div class="themed-card rounded-lg shadow">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold">📋 预设队列列表</h5>
+          <button @click="openCreatePresetModal()" class="px-4 py-2 themed-btn-primary rounded hover:opacity-90 transition-colors">
+            ➕ 创建预设
+          </button>
+        </div>
+        
+        <!-- 筛选器 -->
+        <div class="p-4 border-b themed-bg-base">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <select class="px-3 py-2 border rounded" x-model="presetFilters.status" @change="searchPresets()">
               <option value="">全部状态</option>
-              <option value="active">生效中</option>
-              <option value="expired">已过期</option>
+              <option value="pending">待使用</option>
               <option value="used">已使用</option>
-              <option value="cancelled">已取消</option>
             </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">奖品类型</label>
-            <select x-model="filters.prize_type" class="w-full px-3 py-2 border rounded-lg" x-tooltip="'按目标奖品筛选干预规则'">
-              <option value="">全部类型</option>
-              <template x-for="prize in allPrizes" :key="prize.lottery_prize_id">
-                <option :value="prize.lottery_prize_id" x-text="prize.prize_name"></option>
-              </template>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">用户搜索</label>
-            <input type="text" x-model="filters.user_search" placeholder="输入用户ID或昵称搜索" class="w-full px-3 py-2 border rounded-lg" x-tooltip="'支持按用户ID或昵称模糊搜索'">
-          </div>
-          <div>
-            <button @click="searchTable()" class="w-full px-4 py-2 themed-btn-primary rounded-lg">
+            <input type="text" class="px-3 py-2 border rounded" placeholder="手机号..." 
+                   maxlength="11" x-model="presetFilters.mobile" @keyup.enter="searchPresets()">
+            <button class="px-4 py-2 themed-btn-primary rounded" @click="searchPresets()">
               🔍 搜索
             </button>
+            <button class="px-4 py-2 themed-btn-secondary rounded" @click="resetPresetFilters()">
+              🔄 重置
+            </button>
           </div>
-          <div>
-            <button @click="openCreateModal()" class="w-full px-4 py-2 themed-btn-primary rounded-lg">
-              ➕ 新增干预规则
+        </div>
+
+        <!-- 预设表格 -->
+        <div class="p-4 overflow-x-auto">
+          <table class="w-full">
+            <thead>
+              <tr class="border-b">
+                <th class="text-left py-3 px-2">ID</th>
+                <th class="text-left py-3 px-2">用户ID</th>
+                <th class="text-left py-3 px-2">奖品</th>
+                <th class="text-left py-3 px-2">队列顺序</th>
+                <th class="text-left py-3 px-2">状态</th>
+                <th class="text-left py-3 px-2">创建时间</th>
+                <th class="text-left py-3 px-2">使用时间</th>
+                <th class="text-left py-3 px-2">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- 骨架屏加载状态 -->
+              <template x-if="loading">
+                <template x-for="i in 5" :key="'skeleton-preset-' + i">
+                  <tr class="border-b animate-pulse">
+                    <td class="py-3 px-2"><div class="skeleton-text-sm w-12"></div></td>
+                    <td class="py-3 px-2"><div class="skeleton-text-sm w-16"></div></td>
+                    <td class="py-3 px-2"><div class="skeleton-text w-32"></div></td>
+                    <td class="py-3 px-2"><div class="skeleton-text-sm w-8"></div></td>
+                    <td class="py-3 px-2"><div class="skeleton-button-sm w-16"></div></td>
+                    <td class="py-3 px-2"><div class="skeleton-text-sm w-28"></div></td>
+                    <td class="py-3 px-2"><div class="skeleton-text-sm w-28"></div></td>
+                    <td class="py-3 px-2"><div class="skeleton-button-sm w-20"></div></td>
+                  </tr>
+                </template>
+              </template>
+              <!-- 数据行 -->
+              <template x-for="preset in presets" :key="preset.lottery_preset_id">
+                <tr class="border-b hover:bg-gray-50 transition-colors">
+                  <td class="py-3 px-2 text-sm font-mono text-xs" x-text="preset.lottery_preset_id"></td>
+                  <td class="py-3 px-2">
+                    <span class="text-blue-600 hover:underline cursor-pointer" 
+                          x-text="preset.target_user?.nickname || preset.user_id" 
+                          @click="viewUserProfile(preset.user_id)"></span>
+                  </td>
+                  <td class="py-3 px-2">
+                    <div class="text-sm font-medium" x-text="preset.prize?.prize_name || '-'"></div>
+                    <div class="text-xs themed-text-muted" x-text="'#' + (preset.lottery_prize_id || '')"></div>
+                  </td>
+                  <td class="py-3 px-2 text-center">
+                    <span class="inline-block px-2 py-1 rounded bg-blue-100 text-blue-800 text-sm font-medium" 
+                          x-text="preset.queue_order || '-'"></span>
+                  </td>
+                  <td class="py-3 px-2">
+                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
+                          :class="getPresetStatusClass(preset.status)">
+                      <span x-text="getPresetStatusIcon(preset.status)"></span>
+                      <span x-text="preset.status_display || preset.status"></span>
+                    </span>
+                  </td>
+                  <td class="py-3 px-2 text-sm themed-text-muted" x-text="formatDate(preset.created_at)"></td>
+                  <td class="py-3 px-2 text-sm themed-text-muted" x-text="preset.used_at ? formatDate(preset.used_at) : '-'"></td>
+                  <td class="py-3 px-2">
+                    <div class="flex gap-2">
+                      <button class="px-2 py-1 text-xs border border-blue-500 text-blue-500 rounded hover:bg-blue-50"
+                              @click="viewPresetDetail(preset)">
+                        👁️ 详情
+                      </button>
+                      <button x-show="preset.status === 'pending'"
+                              class="px-2 py-1 text-xs border border-red-500 text-red-500 rounded hover:bg-red-50"
+                              @click="deleteUserPresets(preset.user_id)">
+                        🗑️ 取消
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+              <!-- 空状态 -->
+              <template x-if="presets.length === 0 && !loading">
+                <tr>
+                  <td colspan="8" class="py-12 text-center">
+                    <div class="text-4xl mb-2">📋</div>
+                    <p class="themed-text-muted">暂无预设队列数据</p>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 分页 -->
+        <div class="p-4 border-t flex justify-between items-center" x-show="presets.length > 0">
+          <span class="text-sm themed-text-muted">
+            共 <span x-text="presetPagination.total"></span> 条
+          </span>
+          <div class="flex gap-2">
+            <button class="px-3 py-1 border rounded" 
+                    :disabled="presetPagination.page <= 1"
+                    @click="changePresetPage(presetPagination.page - 1)">
+              上一页
+            </button>
+            <span class="px-3 py-1">
+              <span x-text="presetPagination.page"></span> / <span x-text="getPresetTotalPages()"></span>
+            </span>
+            <button class="px-3 py-1 border rounded" 
+                    :disabled="presetPagination.page >= getPresetTotalPages()"
+                    @click="changePresetPage(presetPagination.page + 1)">
+              下一页
             </button>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- data-table 标准表格组件 -->
-    <div x-data="dataTable({
-      columns: tableColumns,
-      dataSource: fetchTableData,
-      primaryKey: 'setting_id',
-      sortable: true,
-      selectable: false,
-      exportable: false,
-      serverSort: true,
-      page_size: 10,
-      emptyText: '暂无预设干预数据'
-    })" x-init="init()"
-       @dt-refresh.window="refresh()"
-       @dt-search.window="handleFilterSearch($event.detail.filters)">
-      <%- include('components/data-table') %>
     </div>
   </div>
 
-  <!-- 新增干预规则 Modal (新架构) -->
+  <!-- ==================== 强制中奖 - 新增 Modal ==================== -->
   <div x-ref="createModal" 
        x-show="isModalOpen('createModal')" 
        x-cloak
@@ -101,7 +306,7 @@
     <div class="fixed inset-0 bg-black/50 z-40" @click="hideModal('createModal')"></div>
     <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 z-50" @click.stop>
       <div class="p-4 border-b flex justify-between items-center">
-        <h5 class="font-semibold">🎯 新增干预规则</h5>
+        <h5 class="font-semibold">🎯 新增强制中奖规则</h5>
         <button @click="hideModal('createModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
       </div>
       <div class="p-6 space-y-4">
@@ -109,7 +314,7 @@
         <div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">选择用户 <span class="text-red-500">*</span></label>
           <div class="flex space-x-2">
-            <input type="text" x-model="userSearchKeyword" placeholder="输入用户ID或昵称搜索" class="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+            <input type="text" x-model="userSearchKeyword" placeholder="输入手机号码搜索" class="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
             <button @click="searchUser()" :disabled="searchingUser" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
               搜索
             </button>
@@ -118,19 +323,19 @@
             <template x-for="user in userSearchResults" :key="user.user_id">
               <div @click="selectUser(user)" class="px-3 py-2 themed-hover-bg cursor-pointer" :class="selectedUser?.user_id === user.user_id ? 'themed-bg-primary-light' : ''">
                 <span x-text="user.nickname"></span>
-                <span class="themed-text-muted text-sm ml-2" x-text="'(' + user.user_id + ')'"></span>
+                <span class="themed-text-muted text-sm ml-2" x-text="'(' + user.mobile + ')'"></span>
               </div>
             </template>
           </div>
           <div x-show="selectedUser" class="mt-2 p-2 themed-bg-primary-light rounded flex justify-between items-center">
-            <span>已选择: <strong x-text="selectedUser?.nickname"></strong> (<span x-text="selectedUser?.user_id"></span>)</span>
+            <span>已选择: <strong x-text="selectedUser?.nickname"></strong> (<span x-text="selectedUser?.mobile"></span>)</span>
             <button @click="selectedUser = null" class="text-red-500 text-sm">取消</button>
           </div>
         </div>
         
         <div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">目标奖品 <span class="text-red-500">*</span></label>
-          <select x-model="interventionForm.lottery_prize_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+          <select x-model="interventionForm.prize_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
             <option value="">选择奖品</option>
             <template x-for="prize in allPrizes" :key="prize.lottery_prize_id">
               <option :value="prize.lottery_prize_id" x-text="prize.prize_name"></option>
@@ -156,7 +361,7 @@
     </div>
   </div>
 
-  <!-- 干预规则详情 Modal (新架构) -->
+  <!-- ==================== 强制中奖 - 详情 Modal ==================== -->
   <div x-ref="viewModal" 
        x-show="isModalOpen('viewModal')" 
        x-cloak
@@ -164,7 +369,7 @@
     <div class="fixed inset-0 bg-black/50 z-40" @click="hideModal('viewModal')"></div>
     <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-50" @click.stop>
       <div class="p-4 border-b flex justify-between items-center">
-        <h5 class="font-semibold">📋 干预规则详情</h5>
+        <h5 class="font-semibold">📋 强制中奖规则详情</h5>
         <button @click="hideModal('viewModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
       </div>
       <div class="p-6 space-y-3" x-show="viewData">
@@ -179,6 +384,80 @@
       </div>
       <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
         <button @click="hideModal('viewModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 预设队列 - 创建 Modal ==================== -->
+  <div x-ref="createPresetModal" 
+       x-show="isModalOpen('createPresetModal')" 
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="fixed inset-0 bg-black/50 z-40" @click="hideModal('createPresetModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 z-50" @click.stop>
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">📋 创建预设队列</h5>
+        <button @click="hideModal('createPresetModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">目标用户手机号 <span class="text-red-500">*</span></label>
+          <input type="text" x-model="createPresetForm.mobile" placeholder="输入手机号码" maxlength="11"
+                 class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">预设队列（按顺序消耗）</label>
+          <template x-for="(item, index) in createPresetForm.presets" :key="index">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-sm themed-text-muted w-8" x-text="'#' + item.queue_order"></span>
+              <select x-model="item.lottery_prize_id" class="flex-1 px-3 py-2 border rounded-lg">
+                <option value="">选择奖品</option>
+                <template x-for="prize in allPrizes" :key="'preset-prize-' + prize.lottery_prize_id">
+                  <option :value="prize.lottery_prize_id" x-text="prize.prize_name"></option>
+                </template>
+              </select>
+              <button x-show="createPresetForm.presets.length > 1"
+                      @click="removePresetItem(index)" 
+                      class="px-2 py-1 text-red-500 hover:bg-red-50 rounded">✕</button>
+            </div>
+          </template>
+          <button @click="addPresetItem()" class="text-sm text-blue-600 hover:text-blue-800">
+            ➕ 添加一项
+          </button>
+        </div>
+      </div>
+      <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+        <button @click="hideModal('createPresetModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+        <button @click="submitCreatePreset()" :disabled="saving" class="px-4 py-2 themed-btn-primary rounded disabled:opacity-50">
+          <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+          确认创建
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 预设队列 - 详情 Modal ==================== -->
+  <div x-ref="presetDetailModal" 
+       x-show="isModalOpen('presetDetailModal')" 
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="fixed inset-0 bg-black/50 z-40" @click="hideModal('presetDetailModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-50" @click.stop>
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">📋 预设详情</h5>
+        <button @click="hideModal('presetDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      <div class="p-6 space-y-3" x-show="selectedPreset">
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">预设ID:</span><span class="font-mono text-xs" x-text="selectedPreset?.lottery_preset_id"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">用户:</span><span x-text="selectedPreset?.target_user?.nickname || selectedPreset?.user_id"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">奖品:</span><span x-text="selectedPreset?.prize?.prize_name || '-'"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">队列顺序:</span><span x-text="selectedPreset?.queue_order"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">状态:</span><span x-text="selectedPreset?.status_display || selectedPreset?.status"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">审批状态:</span><span x-text="selectedPreset?.approval_status_display || selectedPreset?.approval_status"></span></div>
+        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">创建时间:</span><span x-text="formatDate(selectedPreset?.created_at)"></span></div>
+      </div>
+      <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
+        <button @click="hideModal('presetDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
       </div>
     </div>
   </div>

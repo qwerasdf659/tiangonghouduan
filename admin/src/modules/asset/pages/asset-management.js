@@ -30,9 +30,32 @@
 
 import { logger } from '../../../utils/logger.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
-import { buildURL } from '../../../api/base.js'
+import { buildURL, request } from '../../../api/base.js'
+import { UserAPI } from '../../../api/user.js'
 import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
-import { request } from '../../../api/base.js'
+
+/**
+ * 辅助函数：将 params 中的 mobile 解析为 user_id
+ * data-table dataSource 闭包内使用，无法访问父组件的 resolveUserByMobile
+ *
+ * @param {Object} params - 包含 mobile 字段的查询参数
+ * @returns {Promise<number|null>} 解析出的 user_id，失败返回 null
+ */
+async function resolveUserIdFromParams(params) {
+  if (params.user_id) return params.user_id
+  if (!params.mobile) return null
+  const mobile = params.mobile.trim()
+  if (!/^1\d{10}$/.test(mobile)) return null
+  try {
+    const result = await UserAPI.resolveUser({ mobile })
+    if (result.success && result.data?.user_id) {
+      return result.data.user_id
+    }
+  } catch (error) {
+    logger.error('[resolveUserIdFromParams] 解析失败:', error.message)
+  }
+  return null
+}
 /**
  * @typedef {Object} MaterialType
  * @property {string} asset_code - 资产代码
@@ -140,6 +163,7 @@ document.addEventListener('alpine:init', () => {
 
     // 通用状态
     saving: false,
+    materialTypeSubmitting: false,
 
     init() {
       logger.info('资产管理页面初始化 (合并组件)')
@@ -408,40 +432,129 @@ document.addEventListener('alpine:init', () => {
         sort_order: 0,
         is_enabled: '1'
       }
-      this.$refs.materialTypeModal?.show()
+      this.showModal('addMaterialTypeModal')
     },
 
     editMaterialType(type) {
       this.editingMaterialType = type
-      this.materialTypeEditForm = { ...type }
-      this.$refs.materialTypeModal?.show()
+      this.materialTypeEditForm = {
+        ...type,
+        is_enabled: type.is_enabled ? '1' : '0'
+      }
+      this.showModal('editMaterialTypeModal')
     },
 
-    async saveMaterialType() {
+    /** 提交新增材料类型 */
+    async submitAddMaterialType() {
       try {
-        this.saving = true
-        const form = this.editingMaterialType ? this.materialTypeEditForm : this.materialTypeAddForm
-        const endpoint = this.editingMaterialType
-          ? buildURL(ASSET_ENDPOINTS.MATERIAL_ASSET_TYPE_DETAIL, { asset_code: form.asset_code })
-          : ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES
-        const method = this.editingMaterialType ? 'apiPut' : 'apiPost'
-        await this[method](endpoint, form)
-        this.$refs.materialTypeModal?.hide()
+        this.materialTypeSubmitting = true
+        const form = { ...this.materialTypeAddForm }
+        form.is_enabled = form.is_enabled === '1' || form.is_enabled === true
+        form.tier = parseInt(form.tier, 10) || 1
+        form.sort_order = parseInt(form.sort_order, 10) || 0
+        form.visible_value_points = parseInt(form.visible_value_points, 10) || 0
+        form.budget_value_points = parseInt(form.budget_value_points, 10) || 0
+
+        await this.apiPost(ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES, form)
+        this.hideModal('addMaterialTypeModal')
         await this.loadMaterialTypes()
-        this.showSuccess(this.editingMaterialType ? '材料类型已更新' : '材料类型已创建')
-      } catch (_error) {
-        this.showError('保存失败')
+        window.dispatchEvent(new CustomEvent('refresh-asset-types'))
+        this.showSuccess('材料类型已创建')
+      } catch (error) {
+        this.showError('创建失败: ' + (error.message || '未知错误'))
       } finally {
-        this.saving = false
+        this.materialTypeSubmitting = false
       }
+    },
+
+    /** 提交编辑材料类型 */
+    async submitEditMaterialType() {
+      try {
+        this.materialTypeSubmitting = true
+        const form = { ...this.materialTypeEditForm }
+        form.is_enabled = form.is_enabled === '1' || form.is_enabled === true
+        form.tier = parseInt(form.tier, 10) || 1
+        form.sort_order = parseInt(form.sort_order, 10) || 0
+        form.visible_value_points = parseInt(form.visible_value_points, 10) || 0
+        form.budget_value_points = parseInt(form.budget_value_points, 10) || 0
+
+        const endpoint = buildURL(ASSET_ENDPOINTS.MATERIAL_ASSET_TYPE_DETAIL, {
+          asset_code: form.asset_code
+        })
+        await this.apiPut(endpoint, form)
+        this.hideModal('editMaterialTypeModal')
+        await this.loadMaterialTypes()
+        window.dispatchEvent(new CustomEvent('refresh-asset-types'))
+        this.showSuccess('材料类型已更新')
+      } catch (error) {
+        this.showError('更新失败: ' + (error.message || '未知错误'))
+      } finally {
+        this.materialTypeSubmitting = false
+      }
+    },
+
+    /** 切换材料类型启用/禁用状态 */
+    async toggleMaterialTypeStatus(assetCode, currentEnabled) {
+      const newEnabled = !currentEnabled
+      const actionText = newEnabled ? '启用' : '禁用'
+      if (!confirm(`确定要${actionText}资产类型 ${assetCode} 吗？`)) return
+
+      try {
+        if (!newEnabled) {
+          // 禁用 — 使用专用禁用端点
+          const endpoint = buildURL(ASSET_ENDPOINTS.MATERIAL_ASSET_TYPE_DISABLE, {
+            asset_code: assetCode
+          })
+          await this.apiPut(endpoint, {})
+        } else {
+          // 启用 — 使用通用更新端点
+          const endpoint = buildURL(ASSET_ENDPOINTS.MATERIAL_ASSET_TYPE_DETAIL, {
+            asset_code: assetCode
+          })
+          await this.apiPut(endpoint, { is_enabled: true })
+        }
+        await this.loadMaterialTypes()
+        window.dispatchEvent(new CustomEvent('refresh-asset-types'))
+        this.showSuccess(`${actionText}成功`)
+      } catch (error) {
+        this.showError(`${actionText}失败: ` + (error.message || '未知错误'))
+      }
+    },
+
+    /** 获取形态的中文标签 */
+    getFormLabel(form) {
+      const labels = { shard: '碎片（shard）', crystal: '水晶（crystal）', currency: '货币（currency）' }
+      return labels[form] || form || '-'
+    },
+
+    /** 物品实例状态样式 */
+    getInstanceStatusClass(status) {
+      const classMap = {
+        available: 'bg-green-100 text-green-700',
+        locked: 'bg-yellow-100 text-yellow-700',
+        consumed: 'bg-gray-100 text-gray-500',
+        expired: 'bg-red-100 text-red-700',
+        frozen: 'bg-blue-100 text-blue-700'
+      }
+      return classMap[status] || 'bg-gray-100 text-gray-500'
+    },
+
+    /** 物品实例状态文本 */
+    getInstanceStatusText(status) {
+      const textMap = {
+        available: '可用',
+        locked: '锁定',
+        consumed: '已消费',
+        expired: '已过期',
+        frozen: '冻结'
+      }
+      return textMap[status] || status || '-'
     },
 
     viewInstanceDetail(instance) {
       this.instanceDetail = instance
-      this.$refs.instanceDetailModal?.show()
+      this.showModal('instanceDetailModal')
     },
-
-    // ✅ 已删除 getStatusText 映射函数，使用后端返回的 status_display 字段
   }))
 
   // ==================== data-table 组件注册 ====================
@@ -504,11 +617,15 @@ document.addEventListener('alpine:init', () => {
       ],
       dataSource: async (params) => {
         // 后端 /console/assets/transactions 要求 user_id 必填
-        if (!params.user_id) {
-          logger.info('[AssetTransactions] 请先搜索用户再查看交易记录')
+        // 如果有 mobile，先解析为 user_id
+        const userId = await resolveUserIdFromParams(params)
+        if (!userId) {
+          logger.info('[AssetTransactions] 请先输入手机号搜索用户')
           return { items: [], total: 0 }
         }
-        const res = await request({ url: ASSET_ENDPOINTS.TRANSACTIONS, method: 'GET', params })
+        const queryParams = { ...params, user_id: userId }
+        delete queryParams.mobile // 后端不需要 mobile 参数
+        const res = await request({ url: ASSET_ENDPOINTS.TRANSACTIONS, method: 'GET', params: queryParams })
         return { items: res.data?.transactions || res.data?.list || [], total: res.data?.pagination?.total || 0 }
       },
       primaryKey: 'asset_transaction_id', sortable: true, page_size: 20
@@ -577,11 +694,15 @@ document.addEventListener('alpine:init', () => {
       ],
       dataSource: async (params) => {
         // 后端 /console/assets/transactions 要求 user_id 必填
-        if (!params.user_id) {
-          logger.info('[VirtualTransactions] 请先搜索用户再查看交易记录')
+        // 如果有 mobile，先解析为 user_id
+        const userId = await resolveUserIdFromParams(params)
+        if (!userId) {
+          logger.info('[VirtualTransactions] 请先输入手机号搜索用户')
           return { items: [], total: 0 }
         }
-        const res = await request({ url: ASSET_ENDPOINTS.TRANSACTIONS, method: 'GET', params })
+        const queryParams = { ...params, user_id: userId }
+        delete queryParams.mobile // 后端不需要 mobile 参数
+        const res = await request({ url: ASSET_ENDPOINTS.TRANSACTIONS, method: 'GET', params: queryParams })
         return { items: res.data?.transactions || res.data?.list || [], total: res.data?.pagination?.total || 0 }
       },
       primaryKey: 'asset_transaction_id', sortable: true, page_size: 20

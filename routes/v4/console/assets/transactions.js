@@ -17,7 +17,7 @@
  * - 路由层禁止直接 require models（所有数据库操作通过 Service 层）
  *
  * 创建时间：2026-01-09
- * 更新时间：2026-01-09（路由层规范治理）
+ * 更新时间：2026-02-16（统一字段名为数据库真实字段名，修复 description 从 meta 提取）
  */
 
 'use strict'
@@ -93,22 +93,29 @@ router.get(
       )
 
       /*
-       * 格式化返回数据（添加资产名称映射）
-       * 注意：Sequelize模型需要使用.get()或.toJSON()获取完整字段
+       * 格式化返回数据（管理员视角：展示所有字段供运营分析）
+       * 字段名统一使用数据库真实字段名（delta_amount/business_type），不做别名映射
+       * description/title 从 meta JSON 提取（模型无独立 description 字段）
        */
       const transactions = result.transactions.map(tx => {
         const plainTx = tx.get ? tx.get({ plain: true }) : tx
         return {
-          // 使用模型真实主键字段 asset_transaction_id
-          asset_transaction_id: plainTx.asset_transaction_id,
+          // 主键：BIGINT 转 Number（避免 bigNumberStrings 返回字符串）
+          asset_transaction_id: Number(plainTx.asset_transaction_id),
           asset_code: plainTx.asset_code,
           asset_name: getAssetDisplayName(plainTx.asset_code),
+          // 业务类型：使用 tx_type 别名（attachDisplayNames 会附加 tx_type_display）
           tx_type: plainTx.business_type,
-          amount: Number(plainTx.delta_amount),
+          // 变动金额：正数=增加，负数=扣减（与数据库 delta_amount 一致）
+          delta_amount: Number(plainTx.delta_amount),
           balance_before: Number(plainTx.balance_before),
           balance_after: Number(plainTx.balance_after),
-          description: plainTx.description || null,
-          reason: plainTx.meta?.reason || plainTx.description || null,
+          // 交易描述：从 meta JSON 提取（模型无独立 description 字段）
+          description: plainTx.meta?.description || plainTx.meta?.title || null,
+          // 交易标题：从 meta JSON 提取
+          title: plainTx.meta?.title || null,
+          // 变动原因：管理员调整时 meta.reason 有值
+          reason: plainTx.meta?.reason || plainTx.meta?.description || null,
           operator_name: plainTx.meta?.admin_id ? `管理员#${plainTx.meta.admin_id}` : null,
           idempotency_key: plainTx.idempotency_key,
           created_at: plainTx.created_at

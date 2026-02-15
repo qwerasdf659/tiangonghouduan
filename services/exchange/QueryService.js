@@ -272,6 +272,13 @@ class QueryService {
         [{ field: 'status', dictType: 'product_status' }]
       )
 
+      /**
+       * 计算统计摘要（需求6 + 需求8）
+       * - trending_count: 近7天销量（基于 exchange_records 近7天 COUNT）
+       * - avg_discount: 平均折扣率（cost_amount / original_price，仅计算 original_price > 0 的商品）
+       */
+      const summary = await this._calculateListSummary(where)
+
       const result = {
         success: true,
         items: itemsWithDisplayNames,
@@ -281,6 +288,7 @@ class QueryService {
           page_size,
           total_pages: Math.ceil(count / page_size)
         },
+        summary,
         timestamp: BeijingTimeHelper.now()
       }
 
@@ -680,6 +688,88 @@ class QueryService {
     } catch (error) {
       logger.error(`[兑换市场] 查询空间统计失败(space:${space}):`, error.message)
       throw error
+    }
+  }
+
+  /**
+   * 计算商品列表统计摘要（需求6 趋势销量 + 需求8 折扣率）
+   *
+   * 统计字段：
+   * - trending_count: 近7天总销量（基于当前筛选条件的商品在 exchange_records 中近7天的记录数）
+   * - avg_discount: 平均折扣率（cost_amount / original_price，仅计算 original_price > 0 的商品）
+   *
+   * @param {Object} where - 当前查询条件（从 getMarketItems 传入）
+   * @returns {Promise<Object>} 统计摘要
+   * @private
+   */
+  async _calculateListSummary(where) {
+    try {
+      const { sequelize } = this.ExchangeItem
+
+      // 1. 计算近7天趋势销量（trending_count）
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      const [trendingResult] = await sequelize.query(
+        `SELECT COUNT(*) AS trending_count
+         FROM exchange_records er
+         INNER JOIN exchange_items ei ON er.exchange_item_id = ei.exchange_item_id
+         WHERE er.created_at >= :seven_days_ago
+           AND er.status IN ('completed', 'shipped', 'pending')
+           AND ei.status = :item_status`,
+        {
+          replacements: {
+            seven_days_ago: sevenDaysAgo,
+            item_status: where.status || 'active'
+          },
+          type: sequelize.constructor.QueryTypes.SELECT
+        }
+      )
+
+      // 2. 计算平均折扣率（avg_discount）+ 平均评分（avg_rating）
+      const [discountAndRatingResult] = await sequelize.query(
+        `SELECT
+           AVG(CASE WHEN ei.original_price > 0 THEN ei.cost_amount / ei.original_price END) AS avg_discount,
+           COUNT(CASE WHEN ei.original_price > 0 THEN 1 END) AS has_original_price_count,
+           AVG(er.rating) AS avg_rating,
+           COUNT(er.rating) AS rated_order_count
+         FROM exchange_items ei
+         LEFT JOIN exchange_records er
+           ON er.exchange_item_id = ei.exchange_item_id AND er.rating IS NOT NULL
+         WHERE ei.status = :item_status`,
+        {
+          replacements: { item_status: where.status || 'active' },
+          type: sequelize.constructor.QueryTypes.SELECT
+        }
+      )
+
+      return {
+        /** 近7天总销量（所有在售商品） */
+        trending_count: parseInt(trendingResult?.trending_count || 0, 10),
+        /** 平均折扣率（0-1之间，如0.85表示85折，null表示无数据） */
+        avg_discount: discountAndRatingResult?.avg_discount
+          ? parseFloat(parseFloat(discountAndRatingResult.avg_discount).toFixed(4))
+          : null,
+        /** 有原价数据的商品数量 */
+        has_original_price_count: parseInt(
+          discountAndRatingResult?.has_original_price_count || 0,
+          10
+        ),
+        /** 平均评分（1-5分，null表示暂无评分数据） */
+        avg_rating: discountAndRatingResult?.avg_rating
+          ? parseFloat(parseFloat(discountAndRatingResult.avg_rating).toFixed(2))
+          : null,
+        /** 已评分订单数量 */
+        rated_order_count: parseInt(discountAndRatingResult?.rated_order_count || 0, 10)
+      }
+    } catch (error) {
+      logger.warn('[兑换市场] 统计摘要计算失败（非致命）:', error.message)
+      // 统计失败不影响列表返回
+      return {
+        trending_count: 0,
+        avg_discount: null,
+        has_original_price_count: 0,
+        avg_rating: null,
+        rated_order_count: 0
+      }
     }
   }
 }

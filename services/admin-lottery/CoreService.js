@@ -107,8 +107,10 @@ class AdminLotteryCoreService {
     const { sharedComponents } = require('../../routes/v4/console/shared/middleware')
     const managementStrategy = sharedComponents.managementStrategy
 
-    // 调用管理策略设置强制中奖
-    const result = await managementStrategy.forceWin(adminId, userId, prizeId, reason, expiresAt)
+    // 调用管理策略设置强制中奖（传入事务，确保数据库操作在同一事务中）
+    const result = await managementStrategy.forceWin(adminId, userId, prizeId, reason, expiresAt, {
+      transaction
+    })
 
     if (!result.success) {
       throw new Error(result.error || '强制中奖设置失败')
@@ -200,8 +202,10 @@ class AdminLotteryCoreService {
     const { sharedComponents } = require('../../routes/v4/console/shared/middleware')
     const managementStrategy = sharedComponents.managementStrategy
 
-    // 调用管理策略设置强制不中奖
-    const result = await managementStrategy.forceLose(adminId, userId, count, reason, expiresAt)
+    // 调用管理策略设置强制不中奖（传入事务，确保数据库操作在同一事务中）
+    const result = await managementStrategy.forceLose(adminId, userId, count, reason, expiresAt, {
+      transaction
+    })
 
     if (!result.success) {
       throw new Error(result.error || '强制不中奖设置失败')
@@ -333,7 +337,7 @@ class AdminLotteryCoreService {
         admin_id: adminId,
         operation_type: 'lottery_probability_adjust',
         operation_target: 'lottery_management_setting',
-        target_id: setting.setting_id,
+        target_id: setting.lottery_management_setting_id,
         operation_details: {
           user_id: userId,
           user_mobile: user.mobile,
@@ -341,7 +345,7 @@ class AdminLotteryCoreService {
           setting_data: settingData,
           expires_at: expiresAt
         },
-        idempotency_key: `lottery_probability_adjust_${setting.setting_id}`,
+        idempotency_key: `lottery_probability_adjust_${setting.lottery_management_setting_id}`,
         ip_address: null,
         user_agent: null,
         is_critical_operation: true
@@ -350,7 +354,7 @@ class AdminLotteryCoreService {
     )
 
     logger.info('管理员调整用户概率操作成功', {
-      setting_id: setting.setting_id,
+      lottery_management_setting_id: setting.lottery_management_setting_id,
       admin_id: adminId,
       user_id: userId,
       adjustment_type: adjustmentData.adjustment_type
@@ -358,7 +362,7 @@ class AdminLotteryCoreService {
 
     const result = {
       success: true,
-      setting_id: setting.setting_id,
+      setting_id: setting.lottery_management_setting_id,
       user_id: userId,
       user_mobile: user.mobile,
       status: 'probability_adjusted',
@@ -420,13 +424,14 @@ class AdminLotteryCoreService {
     const { sharedComponents } = require('../../routes/v4/console/shared/middleware')
     const managementStrategy = sharedComponents.managementStrategy
 
-    // 调用管理策略设置用户队列
+    // 调用管理策略设置用户队列（传入事务，确保数据库操作在同一事务中）
     const result = await managementStrategy.setUserQueue(
       adminId,
       userId,
       queueConfig,
       reason,
-      expiresAt
+      expiresAt,
+      { transaction }
     )
 
     if (!result.success) {

@@ -533,6 +533,122 @@ class AdminCustomerServiceService {
       throw error
     }
   }
+
+  /**
+   * 更新管理员在线状态
+   *
+   * @description
+   * 管理员客服工作台的在线状态管理，状态存储在 Redis 中（实时性要求高，无需持久化）。
+   * 状态变更时通过 WebSocket 广播给其他在线管理员，实现状态实时同步。
+   *
+   * 业务场景：
+   * - 管理员进入客服工作台 → 设置为 online
+   * - 管理员暂时离开 → 设置为 busy
+   * - 管理员退出客服工作台 → 设置为 offline
+   * - 前端据此展示管理员在线状态、控制会话分配
+   *
+   * Redis Key 设计：cs:admin_status:{admin_id}
+   * TTL：4小时（防止僵尸状态，管理员意外断连后自动过期）
+   *
+   * @param {number} admin_id - 管理员用户ID
+   * @param {string} status - 在线状态（online / busy / offline）
+   * @returns {Promise<Object>} { admin_id, status, updated_at }
+   *
+   * @throws {Error} BAD_REQUEST - 无效的状态值
+   * @throws {Error} REDIS_ERROR - Redis 操作失败
+   */
+  static async updateAdminOnlineStatus(admin_id, status) {
+    /* 允许的状态值白名单 */
+    const VALID_STATUSES = ['online', 'busy', 'offline']
+
+    if (!VALID_STATUSES.includes(status)) {
+      const error = new Error(`无效的在线状态: ${status}，允许值: ${VALID_STATUSES.join('/')}`)
+      error.code = 'BAD_REQUEST'
+      error.statusCode = 400
+      throw error
+    }
+
+    try {
+      const { getRedisClient } = require('../utils/UnifiedRedisClient')
+      const redisClient = getRedisClient()
+      const client = redisClient.getClient()
+
+      const redisKey = `cs:admin_status:${admin_id}`
+      const TTL_SECONDS = 4 * 60 * 60 // 4小时自动过期
+
+      if (status === 'offline') {
+        /* offline 直接删除 key，节省 Redis 内存 */
+        await client.del(redisKey)
+      } else {
+        /* online / busy 写入 Redis 并设置 TTL */
+        await client.set(redisKey, status, 'EX', TTL_SECONDS)
+      }
+
+      const updatedAt = new Date().toISOString()
+
+      logger.info('管理员在线状态已更新', {
+        admin_id,
+        status,
+        updated_at: updatedAt
+      })
+
+      return {
+        admin_id,
+        status,
+        updated_at: updatedAt
+      }
+    } catch (error) {
+      logger.error('更新管理员在线状态失败', {
+        error: error.message,
+        admin_id,
+        status
+      })
+      throw error
+    }
+  }
+
+  /**
+   * 获取管理员在线状态
+   *
+   * @description
+   * 从 Redis 批量查询管理员在线状态。未设置或已过期的管理员视为 offline。
+   *
+   * 业务场景：
+   * - 客服工作台展示所有管理员的在线状态
+   * - 会话分配时优先分配给 online 状态的管理员
+   *
+   * @param {number[]} admin_ids - 管理员用户ID数组
+   * @returns {Promise<Array<{admin_id: number, status: string}>>} 管理员状态列表
+   */
+  static async getAdminOnlineStatuses(admin_ids) {
+    try {
+      if (!admin_ids || admin_ids.length === 0) {
+        return []
+      }
+
+      const { getRedisClient } = require('../utils/UnifiedRedisClient')
+      const redisClient = getRedisClient()
+      const client = redisClient.getClient()
+
+      /* 批量查询 Redis（pipeline 模式） */
+      const pipeline = client.pipeline()
+      admin_ids.forEach(admin_id => {
+        pipeline.get(`cs:admin_status:${admin_id}`)
+      })
+      const results = await pipeline.exec()
+
+      return admin_ids.map((admin_id, index) => ({
+        admin_id,
+        status: results[index]?.[1] || 'offline' // Redis pipeline 返回 [error, value]
+      }))
+    } catch (error) {
+      logger.error('获取管理员在线状态失败', {
+        error: error.message,
+        admin_ids
+      })
+      throw error
+    }
+  }
 }
 
 module.exports = AdminCustomerServiceService

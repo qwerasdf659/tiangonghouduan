@@ -592,7 +592,7 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y">
-                  <template x-for="(row, idx) in data" :key="row.id || idx">
+                  <template x-for="(row, idx) in data" :key="row.user_role_change_record_id || idx">
                     <tr class="themed-hover-bg">
                       <template x-for="col in columns" :key="col.key">
                         <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
@@ -672,7 +672,7 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y">
-                  <template x-for="(row, idx) in data" :key="row.id || idx">
+                  <template x-for="(row, idx) in data" :key="row.user_status_change_record_id || idx">
                     <tr class="themed-hover-bg">
                       <template x-for="col in columns" :key="col.key">
                         <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>

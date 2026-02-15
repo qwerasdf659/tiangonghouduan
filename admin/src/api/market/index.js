@@ -18,21 +18,25 @@
 // 导入子模块
 import { ExchangeAPI, EXCHANGE_ENDPOINTS } from './exchange.js'
 import { TradeAPI, TRADE_ENDPOINTS } from './trade.js'
+import { BidAPI, BID_ENDPOINTS } from './bid.js'
 
 // 合并端点常量
 export const MARKET_ENDPOINTS = {
   ...EXCHANGE_ENDPOINTS,
-  ...TRADE_ENDPOINTS
+  ...TRADE_ENDPOINTS,
+  ...BID_ENDPOINTS
 }
 
 // 合并 API 对象
 export const MarketAPI = {
   ...ExchangeAPI,
-  ...TradeAPI
+  ...TradeAPI,
+  ...BidAPI
 }
 
 // 分模块导出
 export { ExchangeAPI, EXCHANGE_ENDPOINTS }
 export { TradeAPI, TRADE_ENDPOINTS }
+export { BidAPI, BID_ENDPOINTS }
 
 export default MarketAPI

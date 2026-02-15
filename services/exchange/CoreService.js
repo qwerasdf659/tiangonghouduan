@@ -423,6 +423,94 @@ class CoreService {
   }
 
   /**
+   * 用户对兑换订单评分（需求6：兑换商品统计字段）
+   *
+   * 业务规则：
+   * - 只能对自己的订单评分
+   * - 订单状态必须为 completed 或 shipped（已完成/已发货才能评分）
+   * - 每笔订单只能评分一次（rating 非空则不可重复评分）
+   * - 评分范围：1-5分
+   * - 评分后清除该商品的缓存（触发 avg_rating 重新计算）
+   *
+   * @param {number} user_id - 用户ID
+   * @param {string} order_no - 订单号
+   * @param {number} rating - 评分（1-5分）
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 外部事务对象（必填）
+   * @returns {Promise<Object>} 评分结果
+   */
+  async rateOrder(user_id, order_no, rating, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'rateOrder')
+
+    // 评分范围校验
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      const error = new Error('评分必须为1-5的整数')
+      error.statusCode = 400
+      error.code = 'INVALID_RATING'
+      throw error
+    }
+
+    // 查找订单
+    const order = await this.ExchangeRecord.findOne({
+      where: { order_no, user_id },
+      transaction
+    })
+
+    if (!order) {
+      const error = new Error('订单不存在或无权操作')
+      error.statusCode = 404
+      error.code = 'ORDER_NOT_FOUND'
+      throw error
+    }
+
+    // 订单状态校验：只有已完成/已发货的订单才能评分
+    if (!['completed', 'shipped'].includes(order.status)) {
+      const error = new Error('只有已完成或已发货的订单才能评分')
+      error.statusCode = 400
+      error.code = 'ORDER_STATUS_INVALID'
+      throw error
+    }
+
+    // 重复评分校验
+    if (order.rating !== null) {
+      const error = new Error('该订单已评分，不可重复评分')
+      error.statusCode = 409
+      error.code = 'ALREADY_RATED'
+      error.data = { existing_rating: order.rating }
+      throw error
+    }
+
+    // 更新评分
+    await order.update(
+      {
+        rating,
+        rated_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      { transaction }
+    )
+
+    // 清除该商品的列表缓存（触发 avg_rating 重新计算）
+    await BusinessCacheHelper.invalidateExchangeItems().catch(err => {
+      logger.warn('[兑换市场] 评分后清除缓存失败（非致命）:', err.message)
+    })
+
+    logger.info('[兑换市场] 用户评分成功', {
+      user_id,
+      order_no,
+      exchange_item_id: order.exchange_item_id,
+      rating
+    })
+
+    return {
+      success: true,
+      message: '评分成功',
+      order_no,
+      rating,
+      rated_at: BeijingTimeHelper.now()
+    }
+  }
+
+  /**
    * 生成订单号（私有方法）
    *
    * @returns {string} 订单号

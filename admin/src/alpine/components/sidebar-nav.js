@@ -93,7 +93,7 @@ export function sidebarNav() {
         url: '/admin/dashboard-panel.html'
       },
 
-      // 3️⃣ 抽奖运营 - 运营型命名（数据看板、活动运营、策略管理、批量工具、干预预设）
+      // 3️⃣ 抽奖运营 - 运营型命名（数据看板、活动运营、策略管理、批量工具、抽奖干预管理）
       {
         id: 'lottery-ops',
         name: '抽奖运营',
@@ -122,7 +122,7 @@ export function sidebarNav() {
           },
           {
             id: 'lottery-presets',
-            name: '🎯 干预预设',
+            name: '🎯 抽奖干预管理',
             url: '/admin/presets.html'
           }
         ]
@@ -138,7 +138,8 @@ export function sidebarNav() {
           { id: 'asset-adj', name: '资产调整', url: '/admin/asset-adjustment.html' },
           { id: 'orphan-frozen', name: '孤儿冻结清理', url: '/admin/orphan-frozen.html' },
           { id: 'exchange', name: '兑换市场', url: '/admin/exchange-market.html' },
-          { id: 'trade', name: 'C2C交易', url: '/admin/trade-management.html' }
+          { id: 'trade', name: 'C2C交易', url: '/admin/trade-management.html' },
+          { id: 'bid-mgmt', name: '竞价管理', url: '/admin/bid-management.html' }
         ]
       },
 

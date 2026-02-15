@@ -22,6 +22,7 @@
 
 const express = require('express')
 const router = express.Router()
+const multer = require('multer')
 const logger = require('../../../utils/logger').logger
 const { authenticateToken } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
@@ -31,6 +32,25 @@ const BeijingTimeHelper = require('../../../utils/timeHelper')
  * const ChatRateLimitService = require('../../../services/ChatRateLimitService')
  */
 const TransactionManager = require('../../../utils/TransactionManager')
+const businessConfig = require('../../../config/business.config')
+
+/**
+ * Multer 配置：内存存储模式（聊天图片上传专用）
+ * 文件暂存内存，直接上传到 Sealos 对象存储，不落本地磁盘
+ */
+const chatImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: businessConfig.chat.image_upload.max_file_size // 5MB 限制
+  },
+  fileFilter: (_req, file, cb) => {
+    if (businessConfig.chat.image_upload.allowed_mime_types.includes(file.mimetype)) {
+      cb(null, true)
+    } else {
+      cb(new Error(`不支持的文件类型：${file.mimetype}，仅支持 jpg/png/gif/webp`), false)
+    }
+  }
+})
 
 /**
  * @route POST /api/v4/system/chat/sessions
@@ -341,5 +361,146 @@ router.post('/chat/sessions/:id/messages', authenticateToken, async (req, res) =
     return handleServiceError(error, res, '发送消息失败')
   }
 })
+
+/**
+ * @route GET /api/v4/system/chat/sessions/search
+ * @desc 搜索聊天消息
+ * @access Private
+ *
+ * Canonical Path：GET /api/v4/system/chat/sessions/search
+ *
+ * 业务场景：
+ * - 用户在客服聊天界面搜索历史消息内容
+ * - 只搜索当前用户自己的会话消息（数据隔离）
+ *
+ * @query {string} keyword - 搜索关键词（必填）
+ * @query {number} page - 页码（默认1）
+ * @query {number} page_size - 每页数量（默认20，最大50）
+ *
+ * @returns {Object} { messages, pagination }
+ */
+router.get('/chat/sessions/search', authenticateToken, async (req, res) => {
+  try {
+    const { keyword, page = 1, page_size = 20 } = req.query
+
+    if (!keyword || keyword.trim().length === 0) {
+      return res.apiError('keyword 是必填参数', 'BAD_REQUEST', null, 400)
+    }
+
+    /* 通过 ServiceManager 获取服务 */
+    const CustomerServiceSessionService = req.app.locals.services.getService(
+      'customer_service_session'
+    )
+
+    const result = await CustomerServiceSessionService.searchMessages(req.user.user_id, keyword, {
+      page: parseInt(page),
+      page_size: parseInt(page_size)
+    })
+
+    return res.apiSuccess(result, '搜索成功')
+  } catch (error) {
+    logger.error('搜索聊天消息失败:', error)
+    return handleServiceError(error, res, '搜索聊天消息失败')
+  }
+})
+
+/**
+ * @route POST /api/v4/system/chat/sessions/:id/upload
+ * @desc 聊天图片上传（用户端）
+ * @access Private
+ *
+ * API路径参数设计规范 V2.2（2026-01-20）：
+ * - 会话是事务实体，使用数字ID（:id）作为标识符
+ *
+ * 业务流程：
+ * 1. 用户选择图片 → 调用此接口上传到 Sealos 对象存储
+ * 2. 接口返回图片 URL
+ * 3. 前端再通过 POST /chat/sessions/:id/messages 发送 message_type: 'image'，content 填图片 URL
+ *
+ * 安全策略：
+ * - authenticateToken 验证用户身份
+ * - 会话归属校验：用户只能上传到自己的会话
+ * - 文件大小限制：5MB
+ * - 文件类型限制：jpg/png/gif/webp
+ *
+ * @param {number} id - 会话ID（事务实体）
+ * @body {file} image - 图片文件（multipart/form-data，字段名 image）
+ *
+ * @returns {Object} { image_url, object_key }
+ */
+router.post(
+  '/chat/sessions/:id/upload',
+  authenticateToken,
+  chatImageUpload.single('image'),
+  async (req, res) => {
+    try {
+      const sessionId = parseInt(req.params.id)
+      const userId = req.user.user_id
+
+      // 参数验证：文件是否存在
+      if (!req.file) {
+        return res.apiError('请选择要上传的图片', 'FILE_REQUIRED', null, 400)
+      }
+
+      // 通过 ServiceManager 获取 CustomerServiceSessionService
+      const CustomerServiceSessionService = req.app.locals.services.getService(
+        'customer_service_session'
+      )
+
+      // 会话归属校验：验证用户只能上传到自己的会话
+      const session = await CustomerServiceSessionService.getSessionMessages(sessionId, {
+        user_id: userId,
+        page: 1,
+        limit: 1
+      })
+
+      if (!session) {
+        return res.apiError('会话不存在或无权操作', 'SESSION_NOT_FOUND', null, 404)
+      }
+
+      // 通过 ServiceManager 获取 SealosStorageService
+      const SealosStorageServiceClass = req.app.locals.services.getService('sealos_storage')
+      // sealos_storage 注册的是类本身，需要 new 实例化
+      const storageService =
+        SealosStorageServiceClass instanceof Function
+          ? new SealosStorageServiceClass()
+          : SealosStorageServiceClass
+
+      // 上传图片到 Sealos 对象存储（chat-images 目录）
+      const objectKey = await storageService.uploadImage(
+        req.file.buffer,
+        req.file.originalname,
+        businessConfig.chat.image_upload.storage_folder
+      )
+
+      // 生成公网访问 URL
+      const imageUrl = storageService.getPublicUrl(objectKey)
+
+      logger.info('📸 聊天图片上传成功', {
+        user_id: userId,
+        session_id: sessionId,
+        object_key: objectKey,
+        file_size: req.file.size,
+        mime_type: req.file.mimetype
+      })
+
+      return res.apiSuccess(
+        {
+          image_url: imageUrl,
+          object_key: objectKey
+        },
+        '图片上传成功'
+      )
+    } catch (error) {
+      // multer 文件大小超限错误
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        return res.apiError('图片大小不能超过5MB', 'FILE_TOO_LARGE', { max_size: '5MB' }, 413)
+      }
+
+      logger.error('❌ 聊天图片上传失败:', error)
+      return handleServiceError(error, res, '聊天图片上传失败')
+    }
+  }
+)
 
 module.exports = router

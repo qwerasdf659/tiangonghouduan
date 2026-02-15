@@ -1270,6 +1270,116 @@ class CustomerServiceSessionService {
       return 60 // 出错时返回默认值
     }
   }
+
+  /**
+   * 搜索聊天消息
+   *
+   * @description
+   * 在当前用户的聊天会话中搜索消息内容。
+   * 用户端专用：只在用户自己的会话范围内搜索，确保数据隔离。
+   *
+   * 业务场景：
+   * - 用户在客服聊天界面搜索历史消息
+   * - 支持模糊搜索消息文本内容
+   *
+   * @param {number} user_id - 当前用户ID（数据隔离：只搜索自己的会话）
+   * @param {string} keyword - 搜索关键词（必填，至少1个字符）
+   * @param {Object} [options] - 查询选项
+   * @param {number} [options.page=1] - 页码
+   * @param {number} [options.page_size=20] - 每页数量（最大50）
+   * @returns {Promise<Object>} { messages, pagination }
+   *
+   * @throws {Error} BAD_REQUEST - keyword 为空
+   */
+  static async searchMessages(user_id, keyword, options = {}) {
+    const { page = 1, page_size = 20 } = options
+    const finalPageSize = Math.min(parseInt(page_size) || 20, 50)
+    const finalPage = Math.max(parseInt(page) || 1, 1)
+    const offset = (finalPage - 1) * finalPageSize
+
+    if (!keyword || keyword.trim().length === 0) {
+      const error = new Error('搜索关键词不能为空')
+      error.code = 'BAD_REQUEST'
+      error.statusCode = 400
+      throw error
+    }
+
+    const trimmedKeyword = keyword.trim()
+
+    try {
+      logger.info('搜索聊天消息', { user_id, keyword: trimmedKeyword, page: finalPage })
+
+      /*
+       * 先查询用户拥有的所有会话ID（数据隔离）
+       * 然后在这些会话的消息中搜索内容
+       */
+      const userSessions = await CustomerServiceSession.findAll({
+        where: { user_id },
+        attributes: ['customer_service_session_id'],
+        raw: true
+      })
+
+      if (userSessions.length === 0) {
+        return {
+          messages: [],
+          pagination: { page: finalPage, page_size: finalPageSize, total: 0, total_pages: 0 }
+        }
+      }
+
+      const sessionIds = userSessions.map(s => s.customer_service_session_id)
+
+      /* 在用户的会话消息中搜索 keyword */
+      const { count, rows } = await ChatMessage.findAndCountAll({
+        where: {
+          customer_service_session_id: { [Op.in]: sessionIds },
+          content: { [Op.like]: `%${trimmedKeyword}%` }
+        },
+        attributes: [
+          'chat_message_id',
+          'customer_service_session_id',
+          'sender_type',
+          'content',
+          'message_type',
+          'created_at'
+        ],
+        order: [['created_at', 'DESC']],
+        limit: finalPageSize,
+        offset
+      })
+
+      const messages = rows.map(msg => ({
+        chat_message_id: msg.chat_message_id,
+        customer_service_session_id: msg.customer_service_session_id,
+        sender_type: msg.sender_type,
+        content: msg.content,
+        message_type: msg.message_type,
+        created_at: msg.created_at
+      }))
+
+      logger.info('搜索聊天消息完成', {
+        user_id,
+        keyword: trimmedKeyword,
+        result_count: count
+      })
+
+      return {
+        messages,
+        pagination: {
+          page: finalPage,
+          page_size: finalPageSize,
+          total: count,
+          total_pages: Math.ceil(count / finalPageSize)
+        }
+      }
+    } catch (error) {
+      logger.error('搜索聊天消息失败', {
+        error: error.message,
+        user_id,
+        keyword: trimmedKeyword
+      })
+      throw error
+    }
+  }
 }
 
 module.exports = CustomerServiceSessionService

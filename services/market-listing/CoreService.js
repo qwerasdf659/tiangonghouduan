@@ -837,7 +837,7 @@ class MarketListingCoreService {
       throw error
     }
     if (!assetType.is_tradable) {
-      const error = new Error(`该资产类型不可交易: ${offer_asset_code}`)
+      const error = new Error(`${assetType.display_name}不支持交易`)
       error.code = 'ASSET_NOT_TRADABLE'
       error.statusCode = 400
       throw error
@@ -850,7 +850,7 @@ class MarketListingCoreService {
     )
     if (balanceInfo.available_amount < offer_amount) {
       const error = new Error(
-        `可用余额不足：当前可用 ${balanceInfo.available_amount} 个 ${offer_asset_code}，需要 ${offer_amount} 个`
+        `可用余额不足：当前可用 ${balanceInfo.available_amount} 个 ${assetType.display_name}，需要 ${offer_amount} 个`
       )
       error.code = 'INSUFFICIENT_BALANCE'
       error.statusCode = 400

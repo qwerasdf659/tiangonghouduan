@@ -340,26 +340,49 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
       })
 
       /**
-       * Case 6: 验证交易流水记录结构
+       * Case 6: 验证交易流水记录结构（完整字段契约）
+       *
+       * 业务背景：前端积分明细页、交易记录页依赖此接口
+       * 必需字段：asset_transaction_id, asset_code, delta_amount, balance_before,
+       *           balance_after, business_type, description, title, created_at
        */
-      test('交易流水记录应包含必要字段', async () => {
+      test('交易流水记录应包含完整的必要字段', async () => {
         const response = await request(app)
           .get('/api/v4/assets/transactions')
           .set('Authorization', `Bearer ${access_token}`)
-          .query({ page_size: 1 })
+          .query({ asset_code: 'POINTS', page_size: 1 })
 
         expect(response.status).toBe(200)
         validateApiContract(response.body)
 
-        // 如果有数据，验证记录结构
-        if (response.body.data.transactions.length > 0) {
-          const tx = response.body.data.transactions[0]
-          expect(tx).toHaveProperty('asset_code')
-          expect(tx).toHaveProperty('delta_amount')
-          expect(tx).toHaveProperty('business_type')
-          expect(tx).toHaveProperty('created_at')
-          expect(typeof tx.delta_amount).toBe('number')
-        }
+        // 验证有数据返回（测试账号 13612227930 有 POINTS 流水）
+        expect(response.body.data.transactions.length).toBeGreaterThan(0)
+
+        const tx = response.body.data.transactions[0]
+
+        // 主键字段：asset_transaction_id（snake_case 规范，与模型主键一致）
+        expect(tx).toHaveProperty('asset_transaction_id')
+        expect(typeof tx.asset_transaction_id).toBe('number')
+
+        // 核心业务字段
+        expect(tx).toHaveProperty('asset_code')
+        expect(tx).toHaveProperty('delta_amount')
+        expect(tx).toHaveProperty('balance_before')
+        expect(tx).toHaveProperty('balance_after')
+        expect(tx).toHaveProperty('business_type')
+        expect(tx).toHaveProperty('created_at')
+
+        // 类型验证
+        expect(typeof tx.delta_amount).toBe('number')
+        expect(typeof tx.balance_before).toBe('number')
+        expect(typeof tx.balance_after).toBe('number')
+
+        // 新增字段：description 和 title（从 meta JSON 提取，可为 null）
+        expect(tx).toHaveProperty('description')
+        expect(tx).toHaveProperty('title')
+
+        // 旧字段 transaction_id 不应存在（已修正为 asset_transaction_id）
+        expect(tx).not.toHaveProperty('transaction_id')
       })
     })
 

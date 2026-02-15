@@ -856,20 +856,20 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('roleHistoryDataTable', () => {
     const table = dataTable({
       columns: [
-        { key: 'id', label: 'ID', sortable: true },
+        { key: 'user_role_change_record_id', label: 'ID', sortable: true },
         { key: 'user_id', label: '用户ID' },
-        { key: 'nickname', label: '用户', render: (val, row) => val || row.user_nickname || '-' },
-        { key: 'old_role', label: '原角色', render: (val, row) => row.old_role_display || val || '-' },
-        { key: 'new_role', label: '新角色', render: (val, row) => row.new_role_display || val || '-' },
+        { key: 'user.nickname', label: '用户', render: (val, row) => val || row.user?.mobile || '-' },
+        { key: 'old_role', label: '原角色' },
+        { key: 'new_role', label: '新角色' },
         { key: 'reason', label: '变更原因', type: 'truncate', maxLength: 30 },
-        { key: 'changed_by', label: '操作人', render: (val, row) => row.changed_by_name || val || '-' },
+        { key: 'operator.nickname', label: '操作人', render: (val, row) => val || row.operator?.mobile || String(row.operator_id || '-') },
         { key: 'created_at', label: '变更时间', type: 'datetime', sortable: true }
       ],
       dataSource: async (params) => {
-        const res = await request({ url: `${API_PREFIX}/console/user-management/users/role-changes`, method: 'GET', params })
-        return { items: res.data?.list || res.data?.rows || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+        const res = await request({ url: `${API_PREFIX}/console/business-records/user-role-changes`, method: 'GET', params })
+        return { items: res.data?.records || res.data?.list || [], total: res.data?.pagination?.total || 0 }
       },
-      primaryKey: 'id', sortable: true, page_size: 20
+      primaryKey: 'user_role_change_record_id', sortable: true, page_size: 20
     })
     const origInit = table.init
     table.init = async function () { window.addEventListener('refresh-role-history', () => this.loadData()); if (origInit) await origInit.call(this) }
@@ -880,20 +880,20 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('statusHistoryDataTable', () => {
     const table = dataTable({
       columns: [
-        { key: 'id', label: 'ID', sortable: true },
+        { key: 'user_status_change_record_id', label: 'ID', sortable: true },
         { key: 'user_id', label: '用户ID' },
-        { key: 'nickname', label: '用户', render: (val, row) => val || row.user_nickname || '-' },
-        { key: 'old_status', label: '原状态', type: 'status', statusMap: { active: { class: 'green', label: '正常' }, inactive: { class: 'gray', label: '停用' }, banned: { class: 'red', label: '封禁' } } },
-        { key: 'new_status', label: '新状态', type: 'status', statusMap: { active: { class: 'green', label: '正常' }, inactive: { class: 'gray', label: '停用' }, banned: { class: 'red', label: '封禁' } } },
+        { key: 'user.nickname', label: '用户', render: (val, row) => val || row.user?.mobile || '-' },
+        { key: 'old_status', label: '原状态', type: 'status', statusMap: { active: { class: 'green', label: '正常' }, inactive: { class: 'gray', label: '停用' }, banned: { class: 'red', label: '封禁' }, pending: { class: 'yellow', label: '待激活' } } },
+        { key: 'new_status', label: '新状态', type: 'status', statusMap: { active: { class: 'green', label: '正常' }, inactive: { class: 'gray', label: '停用' }, banned: { class: 'red', label: '封禁' }, pending: { class: 'yellow', label: '待激活' } } },
         { key: 'reason', label: '变更原因', type: 'truncate', maxLength: 30 },
-        { key: 'changed_by', label: '操作人', render: (val, row) => row.changed_by_name || val || '-' },
+        { key: 'operator.nickname', label: '操作人', render: (val, row) => val || row.operator?.mobile || String(row.operator_id || '-') },
         { key: 'created_at', label: '变更时间', type: 'datetime', sortable: true }
       ],
       dataSource: async (params) => {
-        const res = await request({ url: `${API_PREFIX}/console/user-management/users/status-changes`, method: 'GET', params })
-        return { items: res.data?.list || res.data?.rows || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+        const res = await request({ url: `${API_PREFIX}/console/business-records/user-status-changes`, method: 'GET', params })
+        return { items: res.data?.records || res.data?.list || [], total: res.data?.pagination?.total || 0 }
       },
-      primaryKey: 'id', sortable: true, page_size: 20
+      primaryKey: 'user_status_change_record_id', sortable: true, page_size: 20
     })
     const origInit = table.init
     table.init = async function () { window.addEventListener('refresh-status-history', () => this.loadData()); if (origInit) await origInit.call(this) }

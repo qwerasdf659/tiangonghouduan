@@ -234,19 +234,15 @@ export function useCustomerServiceMethods() {
 
         if (response && response.success) {
           this.messageInput = ''
+          // 将管理员消息追加到本地消息列表（后端事务提交后会通过 WebSocket 推送给用户）
           this.messages.push({
+            chat_message_id: response.data?.chat_message_id,
             sender_type: 'admin',
             content: content,
-            created_at: new Date().toISOString()
+            message_type: 'text',
+            created_at: response.data?.created_at || new Date().toISOString()
           })
           this.$nextTick(() => this.scrollToBottom())
-
-          if (this.wsConnection && this.wsConnection.connected) {
-            this.wsConnection.emit('send_message', {
-              session_id: this.currentSessionId,
-              content: content
-            })
-          }
         } else {
           this.showError(response?.message || '消息发送失败')
         }
