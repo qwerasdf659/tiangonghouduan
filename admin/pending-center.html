@@ -71,10 +71,12 @@
         >
           <option value="">全部类型</option>
           <option value="consumption">消耗审核</option>
+          <option value="redemption">兑换核销</option>
           <option value="customer_service">客服会话</option>
           <option value="lottery_alert">抽奖告警</option>
           <option value="risk_alert">风控告警</option>
           <option value="refund">退款申请</option>
+          <option value="feedback">用户反馈</option>
         </select>
         
         <!-- 紧急程度筛选 -->
@@ -140,11 +142,12 @@
     </div>
     
     <!-- 统计卡片 -->
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
       <!-- 消耗审核 -->
       <div 
         class="stat-card themed-card rounded-xl p-4 cursor-pointer border-l-4 border-orange-500"
-        @click="filter.type = 'consumption'; loadPendingItems()"
+        :class="filter.type === 'consumption' ? 'ring-2 ring-orange-400' : ''"
+        @click="filter.type = filter.type === 'consumption' ? '' : 'consumption'; loadPendingItems()"
       >
         <div class="flex items-center justify-between">
           <div class="text-2xl">📋</div>
@@ -153,10 +156,24 @@
         <div class="text-sm themed-text-muted mt-2">消耗审核</div>
       </div>
       
+      <!-- 🆕 兑换核销 -->
+      <div 
+        class="stat-card themed-card rounded-xl p-4 cursor-pointer border-l-4 border-teal-500"
+        :class="filter.type === 'redemption' ? 'ring-2 ring-teal-400' : ''"
+        @click="filter.type = filter.type === 'redemption' ? '' : 'redemption'; loadPendingItems()"
+      >
+        <div class="flex items-center justify-between">
+          <div class="text-2xl">🎫</div>
+          <div class="text-2xl font-bold text-teal-600" x-text="summary.redemption">0</div>
+        </div>
+        <div class="text-sm themed-text-muted mt-2">兑换核销</div>
+      </div>
+      
       <!-- 客服会话 -->
       <div 
         class="stat-card themed-card rounded-xl p-4 cursor-pointer border-l-4 border-blue-500"
-        @click="filter.type = 'customer_service'; loadPendingItems()"
+        :class="filter.type === 'customer_service' ? 'ring-2 ring-blue-400' : ''"
+        @click="filter.type = filter.type === 'customer_service' ? '' : 'customer_service'; loadPendingItems()"
       >
         <div class="flex items-center justify-between">
           <div class="text-2xl">💬</div>
@@ -168,7 +185,8 @@
       <!-- 抽奖告警 -->
       <div 
         class="stat-card themed-card rounded-xl p-4 cursor-pointer border-l-4 border-yellow-500"
-        @click="filter.type = 'lottery_alert'; loadPendingItems()"
+        :class="filter.type === 'lottery_alert' ? 'ring-2 ring-yellow-400' : ''"
+        @click="filter.type = filter.type === 'lottery_alert' ? '' : 'lottery_alert'; loadPendingItems()"
       >
         <div class="flex items-center justify-between">
           <div class="text-2xl">🎰</div>
@@ -180,7 +198,8 @@
       <!-- 风控告警 -->
       <div 
         class="stat-card themed-card rounded-xl p-4 cursor-pointer border-l-4 border-red-500"
-        @click="filter.type = 'risk_alert'; loadPendingItems()"
+        :class="filter.type === 'risk_alert' ? 'ring-2 ring-red-400' : ''"
+        @click="filter.type = filter.type === 'risk_alert' ? '' : 'risk_alert'; loadPendingItems()"
       >
         <div class="flex items-center justify-between">
           <div class="text-2xl">⚠️</div>
@@ -192,13 +211,27 @@
       <!-- 退款申请 -->
       <div 
         class="stat-card themed-card rounded-xl p-4 cursor-pointer border-l-4 border-purple-500"
-        @click="filter.type = 'refund'; loadPendingItems()"
+        :class="filter.type === 'refund' ? 'ring-2 ring-purple-400' : ''"
+        @click="filter.type = filter.type === 'refund' ? '' : 'refund'; loadPendingItems()"
       >
         <div class="flex items-center justify-between">
           <div class="text-2xl">💰</div>
           <div class="text-2xl font-bold text-purple-600" x-text="summary.refund">0</div>
         </div>
         <div class="text-sm themed-text-muted mt-2">退款申请</div>
+      </div>
+      
+      <!-- 🆕 用户反馈 -->
+      <div 
+        class="stat-card themed-card rounded-xl p-4 cursor-pointer border-l-4 border-indigo-500"
+        :class="filter.type === 'feedback' ? 'ring-2 ring-indigo-400' : ''"
+        @click="filter.type = filter.type === 'feedback' ? '' : 'feedback'; loadPendingItems()"
+      >
+        <div class="flex items-center justify-between">
+          <div class="text-2xl">📝</div>
+          <div class="text-2xl font-bold text-indigo-600" x-text="summary.feedback">0</div>
+        </div>
+        <div class="text-sm themed-text-muted mt-2">用户反馈</div>
       </div>
     </div>
     

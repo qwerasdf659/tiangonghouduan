@@ -50,7 +50,7 @@ const marketRiskMiddleware = getMarketRiskControlMiddleware()
  * @body {string} purchase_note - 购买备注（可选）
  *
  * @returns {Object} 购买结果
- * @returns {string} data.order_id - 订单ID
+ * @returns {number} data.trade_order_id - 交易订单ID
  * @returns {number} data.market_listing_id - 挂牌ID
  * @returns {number} data.seller_id - 卖家用户ID
  * @returns {string} data.asset_code - 支付资产类型
@@ -167,10 +167,10 @@ router.post(
             { transaction }
           )
 
-          // 完成订单
+          // 完成订单（createOrder 返回 trade_order_id，需用正确字段名传递）
           const completeResult = await TradeOrderService.completeOrder(
             {
-              order_id: orderResult.order_id,
+              trade_order_id: orderResult.trade_order_id,
               buyer_id
             },
             { transaction }

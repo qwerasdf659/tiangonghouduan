@@ -9,6 +9,8 @@
 
 import { logger } from '../../../utils/logger.js'
 import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
+import { loadECharts } from '../../../utils/echarts-lazy.js'
+import { API_PREFIX } from '../../../api/base.js'
 
 /**
  * 策略配置状态
@@ -299,6 +301,8 @@ export function useStrategyMethods() {
           logger.info('[Strategy] 策略效果分析加载成功', {
             period: response.data?.analysis_period
           })
+          // P2#12: 加载策略触发热力图
+          this.$nextTick(() => this.renderStrategyTriggerHeatmap())
         } else {
           this.showError('加载策略效果分析失败: ' + (response?.message || '未知错误'))
         }
@@ -403,6 +407,129 @@ export function useStrategyMethods() {
     formatStrategyPercentage(value) {
       if (value === null || value === undefined) return '-'
       return `${(value * 100).toFixed(2)}%`
+    },
+
+    /**
+     * P2#12: 渲染策略触发频率热力图
+     * @description 使用 ECharts 渲染 pity/anti_empty/anti_high/luck_debt 各日触发次数的堆叠柱状图
+     * 数据来源: lottery-strategy-stats/daily/:campaign_id API 返回的 lottery_daily_metrics 字段
+     */
+    async renderStrategyTriggerHeatmap() {
+      try {
+        const echarts = await loadECharts()
+        const chartDom = document.getElementById('strategyTriggerHeatmapChart')
+        if (!chartDom) {
+          logger.warn('[P2-12] 策略触发热力图容器不存在')
+          return
+        }
+
+        // 获取活动ID
+        const campaignId = this.strategyEffectivenessFilters?.campaign_id || this.selectedCampaignId
+        if (!campaignId) {
+          logger.info('[P2-12] 未选择活动，使用汇总数据展示')
+        }
+
+        // 尝试从 daily metrics API 加载数据
+        // 后端返回结构: { data: { lottery_campaign_id, data: [...] } } 或 { data: { data: { data: [...] } } }
+        let dailyData = []
+        if (campaignId) {
+          try {
+            const response = await this.apiGet(
+              `${API_PREFIX}/console/lottery-strategy-stats/daily/${campaignId}`,
+              {},
+              { showLoading: false }
+            )
+            if (response?.success && response.data?.data) {
+              let rawData = response.data.data
+              // 处理嵌套data结构
+              if (rawData && !Array.isArray(rawData) && rawData.data) {
+                rawData = rawData.data
+              }
+              dailyData = Array.isArray(rawData) ? rawData : []
+            }
+          } catch (e) {
+            logger.warn('[P2-12] 获取日级策略统计失败:', e.message)
+          }
+        }
+
+        // 准备图表数据
+        const dates = dailyData.map(d => d.metric_date || d.date || '')
+        const pityData = dailyData.map(d => d.pity_trigger_count || d.pity_triggered_count || 0)
+        const antiEmptyData = dailyData.map(d => d.anti_empty_trigger_count || d.anti_empty_triggered_count || 0)
+        const antiHighData = dailyData.map(d => d.anti_high_trigger_count || d.anti_high_triggered_count || 0)
+        const luckDebtData = dailyData.map(d => d.luck_debt_trigger_count || d.luck_debt_triggered_count || 0)
+
+        // 销毁旧实例
+        const existingChart = echarts.getInstanceByDom(chartDom)
+        if (existingChart) existingChart.dispose()
+
+        const chart = echarts.init(chartDom)
+
+        const option = {
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' }
+          },
+          legend: {
+            data: ['Pity(保底)', 'AntiEmpty(反连空)', 'AntiHigh(反连高)', 'LuckDebt(运气债务)'],
+            bottom: 0,
+            textStyle: { fontSize: 11 }
+          },
+          grid: {
+            left: '3%', right: '4%', bottom: '15%', top: '10%',
+            containLabel: true
+          },
+          xAxis: {
+            type: 'category',
+            data: dates.length > 0 ? dates : ['暂无数据'],
+            axisLabel: { fontSize: 10, rotate: dates.length > 10 ? 30 : 0 }
+          },
+          yAxis: {
+            type: 'value',
+            name: '触发次数',
+            nameTextStyle: { fontSize: 11 }
+          },
+          series: [
+            {
+              name: 'Pity(保底)',
+              type: 'bar',
+              stack: 'triggers',
+              data: pityData.length > 0 ? pityData : [0],
+              itemStyle: { color: '#8B5CF6' }
+            },
+            {
+              name: 'AntiEmpty(反连空)',
+              type: 'bar',
+              stack: 'triggers',
+              data: antiEmptyData.length > 0 ? antiEmptyData : [0],
+              itemStyle: { color: '#3B82F6' }
+            },
+            {
+              name: 'AntiHigh(反连高)',
+              type: 'bar',
+              stack: 'triggers',
+              data: antiHighData.length > 0 ? antiHighData : [0],
+              itemStyle: { color: '#F97316' }
+            },
+            {
+              name: 'LuckDebt(运气债务)',
+              type: 'bar',
+              stack: 'triggers',
+              data: luckDebtData.length > 0 ? luckDebtData : [0],
+              itemStyle: { color: '#22C55E' }
+            }
+          ]
+        }
+
+        chart.setOption(option)
+        
+        // 响应式
+        window.addEventListener('resize', () => chart.resize())
+        
+        logger.info('[P2-12] 策略触发热力图渲染完成', { dataPoints: dates.length })
+      } catch (error) {
+        logger.error('[P2-12] 渲染策略触发热力图失败:', error.message)
+      }
     }
   }
 }

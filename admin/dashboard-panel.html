@@ -91,6 +91,51 @@
       </div>
     </div>
     
+    <!-- P0-4: 今日待办摘要横幅 -->
+    <div x-show="todoPending.total > 0" class="themed-card rounded-xl p-4 bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">📋</span>
+          <div>
+            <h3 class="text-sm font-semibold text-orange-800">今日待办</h3>
+            <p class="text-xs text-orange-600">共 <span class="font-bold text-lg" x-text="todoPending.total">0</span> 项待处理</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-4 text-sm">
+          <template x-if="todoPending.consumption > 0">
+            <a href="/admin/finance-management.html" class="flex items-center gap-1 text-orange-700 hover:text-orange-900 cursor-pointer"
+               @click.prevent="$dispatch('open-tab', {id:'consumption-review', title:'消费记录审核', icon:'📋', url:'/admin/finance-management.html'})">
+              📋 消费审核 <span class="font-bold" x-text="todoPending.consumption">0</span>
+            </a>
+          </template>
+          <template x-if="todoPending.redemption > 0">
+            <a href="/admin/redemption-management.html" class="flex items-center gap-1 text-teal-700 hover:text-teal-900 cursor-pointer"
+               @click.prevent="$dispatch('open-tab', {id:'redemption-mgmt', title:'兑换核销管理', icon:'🎫', url:'/admin/redemption-management.html'})">
+              🎫 兑换核销 <span class="font-bold" x-text="todoPending.redemption">0</span>
+            </a>
+          </template>
+          <template x-if="todoPending.customer_service > 0">
+            <a href="/admin/customer-service.html" class="flex items-center gap-1 text-blue-700 hover:text-blue-900 cursor-pointer"
+               @click.prevent="$dispatch('open-tab', {id:'customer-service', title:'客服工作台', icon:'💬', url:'/admin/customer-service.html'})">
+              💬 客服 <span class="font-bold" x-text="todoPending.customer_service">0</span>
+            </a>
+          </template>
+          <template x-if="todoPending.risk_alert > 0">
+            <a href="/admin/risk-alerts.html" class="flex items-center gap-1 text-red-700 hover:text-red-900 cursor-pointer"
+               @click.prevent="$dispatch('open-tab', {id:'risk-alerts', title:'风控告警', icon:'⚠️', url:'/admin/risk-alerts.html'})">
+              ⚠️ 风控 <span class="font-bold" x-text="todoPending.risk_alert">0</span>
+            </a>
+          </template>
+          <template x-if="todoPending.lottery_alert > 0">
+            <a href="/admin/lottery-alerts.html" class="flex items-center gap-1 text-yellow-700 hover:text-yellow-900 cursor-pointer"
+               @click.prevent="$dispatch('open-tab', {id:'lottery-alerts', title:'抽奖告警', icon:'🎰', url:'/admin/lottery-alerts.html'})">
+              🎰 抽奖告警 <span class="font-bold" x-text="todoPending.lottery_alert">0</span>
+            </a>
+          </template>
+        </div>
+      </div>
+    </div>
+
     <!-- P2-2: Tab导航栏 -->
     <div class="themed-card rounded-xl overflow-hidden">
       <div class="flex themed-bg-base border-b themed-border overflow-x-auto">
@@ -325,6 +370,97 @@
           </div>
         </div>
         
+        <!-- P1-6: 运营扩展指标卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <!-- 兑换履约率 -->
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                <span class="text-xl">📦</span>
+              </div>
+              <div>
+                <h4 class="font-semibold themed-text text-sm">兑换履约率</h4>
+                <p class="text-xs themed-text-muted">fulfilled / total</p>
+              </div>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-3xl font-bold" :class="redemptionFulfillment.fulfillment_rate < 10 ? 'text-red-600' : redemptionFulfillment.fulfillment_rate < 50 ? 'text-yellow-600' : 'text-green-600'" x-text="redemptionFulfillment.fulfillment_rate + '%'">0%</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-3 text-xs">
+              <div class="flex justify-between"><span class="text-gray-500">待处理</span><span class="font-medium text-yellow-600" x-text="redemptionFulfillment.pending">0</span></div>
+              <div class="flex justify-between"><span class="text-gray-500">已完成</span><span class="font-medium text-green-600" x-text="redemptionFulfillment.fulfilled">0</span></div>
+              <div class="flex justify-between"><span class="text-gray-500">已取消</span><span class="font-medium text-red-600" x-text="redemptionFulfillment.cancelled">0</span></div>
+              <div class="flex justify-between"><span class="text-gray-500">总计</span><span class="font-medium" x-text="redemptionFulfillment.total">0</span></div>
+            </div>
+            <div x-show="redemptionFulfillment.fulfillment_rate < 5 && redemptionFulfillment.total > 0" class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+              ⚠️ 履约率严重偏低，建议关注兑换核销流程
+            </div>
+          </div>
+
+          <!-- 市场活跃度 -->
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <span class="text-xl">🏪</span>
+              </div>
+              <div>
+                <h4 class="font-semibold themed-text text-sm">市场活跃度</h4>
+                <p class="text-xs themed-text-muted">挂单 &amp; 成交</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mt-2">
+              <div class="text-center p-3 bg-blue-50 rounded-lg">
+                <p class="text-2xl font-bold text-blue-600" x-text="marketActivity.active_listings">0</p>
+                <p class="text-xs text-gray-500 mt-1">在售挂单</p>
+              </div>
+              <div class="text-center p-3 bg-green-50 rounded-lg">
+                <p class="text-2xl font-bold text-green-600" x-text="marketActivity.total_trades">0</p>
+                <p class="text-xs text-gray-500 mt-1">总成交量</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 用户留存/活跃度 -->
+          <div class="stat-card themed-card rounded-xl p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <span class="text-xl">👥</span>
+              </div>
+              <div>
+                <h4 class="font-semibold themed-text text-sm">用户活跃度</h4>
+                <p class="text-xs themed-text-muted">DAU / WAU / MAU</p>
+              </div>
+            </div>
+            <div class="space-y-2 mt-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-500">日活 (DAU)</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold" x-text="userRetention.dau">0</span>
+                  <span class="text-xs px-1.5 py-0.5 rounded" :class="userRetention.dau_rate < 10 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'" x-text="userRetention.dau_rate + '%'">0%</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-500">周活 (WAU)</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold" x-text="userRetention.wau">0</span>
+                  <span class="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700" x-text="userRetention.wau_rate + '%'">0%</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-500">月活 (MAU)</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold" x-text="userRetention.mau">0</span>
+                  <span class="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-700" x-text="userRetention.mau_rate + '%'">0%</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between pt-1 border-t">
+                <span class="text-xs text-gray-500">总用户</span>
+                <span class="text-sm font-bold" x-text="userRetention.total_users">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- P1-6: 时间对比卡片 -->
         <div class="themed-card rounded-xl p-5">
           <div class="flex items-center justify-between mb-4">

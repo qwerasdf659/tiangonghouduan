@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '用户反馈管理', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 顶部导航 -->
+  <nav class="bg-orange-600 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-2.5 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-white/80 text-sm flex items-center gap-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          返回工作台
+        </a>
+        <span class="text-lg font-semibold">📋 用户反馈管理</span>
+      </div>
+      <div class="flex items-center space-x-4 text-sm" x-data="{ now: '' }" x-init="setInterval(() => now = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', second: '2-digit' }), 1000)">
+        <span class="text-white/60" x-text="now"></span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="feedbackManagement()" x-init="init()">
+    
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      <div class="themed-card rounded-lg p-4 text-center">
+        <p class="text-2xl font-bold text-gray-800" x-text="feedbackStats.total || 0"></p>
+        <p class="text-sm text-gray-500">全部反馈</p>
+      </div>
+      <div class="themed-card rounded-lg p-4 text-center border-l-4 border-yellow-400">
+        <p class="text-2xl font-bold text-yellow-600" x-text="feedbackStats.pending || 0"></p>
+        <p class="text-sm text-gray-500">⏳ 待处理</p>
+      </div>
+      <div class="themed-card rounded-lg p-4 text-center border-l-4 border-blue-400">
+        <p class="text-2xl font-bold text-blue-600" x-text="feedbackStats.processing || 0"></p>
+        <p class="text-sm text-gray-500">🔄 处理中</p>
+      </div>
+      <div class="themed-card rounded-lg p-4 text-center border-l-4 border-green-400">
+        <p class="text-2xl font-bold text-green-600" x-text="feedbackStats.replied || 0"></p>
+        <p class="text-sm text-gray-500">💬 已回复</p>
+      </div>
+      <div class="themed-card rounded-lg p-4 text-center border-l-4 border-gray-400">
+        <p class="text-2xl font-bold text-gray-600" x-text="feedbackStats.closed || 0"></p>
+        <p class="text-sm text-gray-500">✅ 已关闭</p>
+      </div>
+    </div>
+
+    <!-- 筛选栏 -->
+    <div class="themed-card rounded-lg shadow mb-6 p-4">
+      <div class="flex flex-wrap gap-3 items-center">
+        <select x-model="feedbackFilters.status" @change="filterFeedbacks()" class="px-3 py-2 border rounded-lg text-sm themed-bg themed-text">
+          <option value="">全部状态</option>
+          <option value="pending">⏳ 待处理</option>
+          <option value="processing">🔄 处理中</option>
+          <option value="replied">💬 已回复</option>
+          <option value="closed">✅ 已关闭</option>
+        </select>
+        <select x-model="feedbackFilters.category" @change="filterFeedbacks()" class="px-3 py-2 border rounded-lg text-sm themed-bg themed-text">
+          <option value="">全部分类</option>
+          <option value="technical">🔧 技术问题</option>
+          <option value="feature">💡 功能建议</option>
+          <option value="bug">🐛 错误报告</option>
+          <option value="complaint">⚠️ 投诉</option>
+          <option value="suggestion">💭 建议</option>
+          <option value="other">📝 其他</option>
+        </select>
+        <select x-model="feedbackFilters.priority" @change="filterFeedbacks()" class="px-3 py-2 border rounded-lg text-sm themed-bg themed-text">
+          <option value="">全部优先级</option>
+          <option value="high">🔺 高</option>
+          <option value="medium">➡️ 中</option>
+          <option value="low">🔽 低</option>
+        </select>
+        <button @click="resetFeedbackFilters()" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border rounded-lg hover:bg-gray-50">
+          🔄 重置
+        </button>
+        <button @click="loadFeedbacks(); loadFeedbackStats()" class="px-4 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600">
+          🔍 刷新
+        </button>
+      </div>
+    </div>
+
+    <!-- 反馈列表 -->
+    <div class="themed-card rounded-lg shadow">
+      <!-- 加载中 -->
+      <div x-show="loadingFeedbacks" class="p-8 text-center themed-text-muted">
+        <div class="animate-spin inline-block w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full mb-2"></div>
+        <p>加载中...</p>
+      </div>
+
+      <!-- 列表 -->
+      <div x-show="!loadingFeedbacks && feedbacks.length > 0" class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">用户</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">分类</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">优先级</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">内容摘要</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">提交时间</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <template x-for="feedback in feedbacks" :key="feedback.feedback_id || feedback.id">
+              <tr class="hover:bg-gray-50 transition-colors">
+                <td class="px-4 py-3 text-sm" x-text="feedback.feedback_id || feedback.id"></td>
+                <td class="px-4 py-3 text-sm">
+                  <span x-text="feedback.user?.nickname || feedback.user_id || '-'"></span>
+                </td>
+                <td class="px-4 py-3 text-sm">
+                  <span class="px-2 py-1 rounded-full text-xs" :class="getFeedbackCategoryClass(feedback.category)" x-text="getFeedbackCategoryInfo(feedback.category).icon + ' ' + getFeedbackCategoryInfo(feedback.category).label"></span>
+                </td>
+                <td class="px-4 py-3 text-sm">
+                  <span class="px-2 py-1 rounded-full text-xs" :class="getFeedbackPriorityClass(feedback.priority)" x-text="getFeedbackPriorityInfo(feedback.priority).icon + ' ' + getFeedbackPriorityInfo(feedback.priority).label"></span>
+                </td>
+                <td class="px-4 py-3 text-sm max-w-xs truncate" :title="feedback.content" x-text="feedback.content ? (feedback.content.length > 50 ? feedback.content.substring(0, 50) + '...' : feedback.content) : '-'"></td>
+                <td class="px-4 py-3 text-sm">
+                  <span class="px-2 py-1 rounded-full text-xs font-medium" :class="getFeedbackStatusClass(feedback.status)" x-text="getFeedbackStatusInfo(feedback.status).icon + ' ' + getFeedbackStatusInfo(feedback.status).label"></span>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDateTime(feedback.created_at)"></td>
+                <td class="px-4 py-3 text-sm">
+                  <div class="flex gap-2">
+                    <button @click="viewFeedbackDetail(feedback)" class="text-blue-600 hover:text-blue-800 text-xs">📖 详情</button>
+                    <button x-show="feedback.status !== 'closed'" @click="openReplyModal(feedback)" class="text-green-600 hover:text-green-800 text-xs">💬 回复</button>
+                    <button x-show="feedback.status !== 'closed'" @click="openStatusModal(feedback)" class="text-orange-600 hover:text-orange-800 text-xs">🔄 状态</button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 空状态 -->
+      <div x-show="!loadingFeedbacks && feedbacks.length === 0" class="p-12 text-center">
+        <p class="text-gray-400 text-4xl mb-4">📋</p>
+        <p class="text-gray-500">暂无反馈数据</p>
+      </div>
+
+      <!-- 分页 -->
+      <div x-show="feedbackPagination.total > feedbackFilters.page_size" class="px-4 py-3 border-t flex justify-between items-center">
+        <span class="text-sm text-gray-500">
+          共 <span x-text="feedbackPagination.total"></span> 条，
+          第 <span x-text="feedbackFilters.page"></span> / <span x-text="feedbackTotalPages"></span> 页
+        </span>
+        <div class="flex gap-1">
+          <button @click="goToFeedbackPage(feedbackFilters.page - 1)" :disabled="feedbackFilters.page <= 1" class="px-3 py-1 border rounded text-sm disabled:opacity-50">上一页</button>
+          <button @click="goToFeedbackPage(feedbackFilters.page + 1)" :disabled="feedbackFilters.page >= feedbackTotalPages" class="px-3 py-1 border rounded text-sm disabled:opacity-50">下一页</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 反馈详情弹窗 -->
+    <div x-show="showFeedbackDetail" x-cloak class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" @click.self="showFeedbackDetail = false">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+        <div class="p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">📋 反馈详情</h3>
+            <button @click="showFeedbackDetail = false" class="text-gray-400 hover:text-gray-600">✕</button>
+          </div>
+
+          <template x-if="currentFeedback">
+            <div class="space-y-4">
+              <!-- 基本信息 -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <span class="text-sm text-gray-500">反馈ID</span>
+                  <p class="font-medium" x-text="currentFeedback.feedback_id || currentFeedback.id"></p>
+                </div>
+                <div>
+                  <span class="text-sm text-gray-500">用户ID</span>
+                  <p class="font-medium" x-text="currentFeedback.user_id"></p>
+                </div>
+                <div>
+                  <span class="text-sm text-gray-500">分类</span>
+                  <p><span class="px-2 py-1 rounded-full text-xs" :class="getFeedbackCategoryClass(currentFeedback.category)" x-text="getFeedbackCategoryInfo(currentFeedback.category).label"></span></p>
+                </div>
+                <div>
+                  <span class="text-sm text-gray-500">优先级</span>
+                  <p><span class="px-2 py-1 rounded-full text-xs" :class="getFeedbackPriorityClass(currentFeedback.priority)" x-text="getFeedbackPriorityInfo(currentFeedback.priority).label"></span></p>
+                </div>
+                <div>
+                  <span class="text-sm text-gray-500">状态</span>
+                  <p><span class="px-2 py-1 rounded-full text-xs font-medium" :class="getFeedbackStatusClass(currentFeedback.status)" x-text="getFeedbackStatusInfo(currentFeedback.status).label"></span></p>
+                </div>
+                <div>
+                  <span class="text-sm text-gray-500">提交时间</span>
+                  <p class="font-medium" x-text="formatDateTime(currentFeedback.created_at)"></p>
+                </div>
+              </div>
+
+              <!-- 反馈内容 -->
+              <div class="border-t pt-4">
+                <span class="text-sm text-gray-500 block mb-1">反馈内容</span>
+                <p class="text-gray-800 whitespace-pre-wrap bg-gray-50 p-3 rounded" x-text="currentFeedback.content"></p>
+              </div>
+
+              <!-- 回复内容（如果有） -->
+              <div x-show="currentFeedback.reply_content" class="border-t pt-4">
+                <span class="text-sm text-gray-500 block mb-1">💬 管理员回复</span>
+                <p class="text-gray-800 whitespace-pre-wrap bg-green-50 p-3 rounded" x-text="currentFeedback.reply_content"></p>
+                <p x-show="currentFeedback.replied_at" class="text-xs text-gray-400 mt-1" x-text="'回复时间: ' + formatDateTime(currentFeedback.replied_at)"></p>
+              </div>
+
+              <!-- 操作按钮 -->
+              <div class="flex gap-3 pt-4 border-t">
+                <button x-show="currentFeedback.status !== 'closed'" @click="showFeedbackDetail = false; openReplyModal(currentFeedback)" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm">💬 回复</button>
+                <button x-show="currentFeedback.status !== 'closed'" @click="showFeedbackDetail = false; openStatusModal(currentFeedback)" class="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm">🔄 更新状态</button>
+                <button @click="showFeedbackDetail = false" class="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">关闭</button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- 回复弹窗 -->
+    <div x-show="showReplyModal" x-cloak class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" @click.self="showReplyModal = false">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-lg">
+        <div class="p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">💬 回复反馈</h3>
+            <button @click="showReplyModal = false" class="text-gray-400 hover:text-gray-600">✕</button>
+          </div>
+
+          <div x-show="currentFeedback" class="mb-4 p-3 bg-gray-50 rounded text-sm">
+            <p class="text-gray-500 mb-1">用户反馈内容：</p>
+            <p class="text-gray-700" x-text="currentFeedback?.content ? (currentFeedback.content.length > 200 ? currentFeedback.content.substring(0, 200) + '...' : currentFeedback.content) : ''"></p>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">回复内容 <span class="text-red-500">*</span></label>
+              <textarea x-model="replyContent" rows="4" placeholder="请输入回复内容..." class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-orange-300 focus:border-orange-400"></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">内部备注（仅管理员可见）</label>
+              <textarea x-model="replyInternalNotes" rows="2" placeholder="内部备注..." class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-gray-300 focus:border-gray-400"></textarea>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-3 mt-6">
+            <button @click="showReplyModal = false" class="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">取消</button>
+            <button @click="submitReply()" :disabled="submittingReply || !replyContent.trim()" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm disabled:opacity-50">
+              <span x-show="!submittingReply">提交回复</span>
+              <span x-show="submittingReply">提交中...</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 状态更新弹窗 -->
+    <div x-show="showStatusModal" x-cloak class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" @click.self="showStatusModal = false">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+        <div class="p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">🔄 更新反馈状态</h3>
+            <button @click="showStatusModal = false" class="text-gray-400 hover:text-gray-600">✕</button>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">当前状态</label>
+              <span class="px-2 py-1 rounded-full text-xs font-medium" :class="getFeedbackStatusClass(currentFeedback?.status)" x-text="getFeedbackStatusInfo(currentFeedback?.status).label"></span>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">新状态 <span class="text-red-500">*</span></label>
+              <select x-model="newStatus" class="w-full px-3 py-2 border rounded-lg text-sm">
+                <option value="">请选择...</option>
+                <option value="pending">⏳ 待处理</option>
+                <option value="processing">🔄 处理中</option>
+                <option value="replied">💬 已回复</option>
+                <option value="closed">✅ 已关闭</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">状态备注</label>
+              <textarea x-model="statusNotes" rows="2" placeholder="选填..." class="w-full px-3 py-2 border rounded-lg text-sm"></textarea>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-3 mt-6">
+            <button @click="showStatusModal = false" class="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">取消</button>
+            <button @click="submitStatusUpdate()" :disabled="!newStatus" class="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:opacity-50">确认更新</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS 模块入口 -->
+  <script type="module" src="./src/modules/content/pages/feedback-management.js"></script>
+</body>
+</html>
+
+

@@ -968,6 +968,95 @@ export function useMetricsMethods() {
       return 'text-gray-500'
     },
 
+    // ========== P2#10新增: 运营日报自动推送方法 ==========
+
+    /**
+     * P2#10: 立即生成并推送今日日报
+     * @description 调用后端 lottery-report/daily API 生成日报，
+     * 然后通过 NotificationService 推送到消息中心
+     */
+    async generateAndPushDailyReport() {
+      try {
+        this.loadingDailyReport = true
+        const today = new Date()
+        const yesterday = new Date(today)
+        yesterday.setDate(yesterday.getDate() - 1)
+        const reportDate = yesterday.toISOString().split('T')[0]
+
+        logger.info('[P2-10] 开始生成并推送日报', { report_date: reportDate })
+
+        // 1. 生成日报
+        const response = await this.apiGet(
+          `${LOTTERY_ENDPOINTS.ANALYTICS_DAILY_REPORT}?report_date=${reportDate}`,
+          {},
+          { showLoading: true }
+        )
+
+        if (response?.success && response.data) {
+          this.dailyReportData = response.data
+          this.showSuccess(`日报已生成（日期: ${reportDate}，抽奖: ${response.data.summary?.total_draws || 0}次）`)
+          logger.info('[P2-10] 日报生成成功', {
+            report_date: reportDate,
+            total_draws: response.data.summary?.total_draws || 0
+          })
+        } else {
+          throw new Error(response?.message || '生成日报失败')
+        }
+      } catch (error) {
+        logger.error('[P2-10] 生成日报失败:', error.message)
+        this.showError('生成日报失败: ' + (error.message || '未知错误'))
+      } finally {
+        this.loadingDailyReport = false
+      }
+    },
+
+    /**
+     * P2#10: 导出当前日报为PDF（打印方式）
+     * @description 在新窗口中打开格式化的日报内容，用户可通过浏览器打印为PDF
+     */
+    exportDailyReportPDF() {
+      if (!this.dailyReportData) {
+        this.showError('请先加载日报数据')
+        return
+      }
+      const report = this.dailyReportData
+      const printWindow = window.open('', '_blank', 'width=800,height=600')
+      if (!printWindow) {
+        this.showError('弹窗被浏览器拦截，请允许弹窗')
+        return
+      }
+
+      printWindow.document.write(`<!DOCTYPE html>
+<html><head><title>运营日报 ${report.report_date || ''}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 40px; color: #333; }
+  h1 { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 20px 0; }
+  .kpi-card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; text-align: center; }
+  .kpi-value { font-size: 24px; font-weight: bold; color: #2563eb; }
+  .kpi-label { font-size: 12px; color: #666; margin-top: 4px; }
+  .section { margin-top: 24px; }
+  .section h3 { border-left: 4px solid #2563eb; padding-left: 8px; }
+  .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #999; }
+  @media print { body { padding: 20px; } }
+</style>
+</head><body>
+<h1>📋 运营日报 — ${report.report_date || ''}</h1>
+<div class="kpi-grid">
+  <div class="kpi-card"><div class="kpi-value">${(report.summary?.total_draws || 0).toLocaleString()}</div><div class="kpi-label">总抽奖次数</div></div>
+  <div class="kpi-card"><div class="kpi-value">${report.summary?.win_rate ? (report.summary.win_rate * 100).toFixed(1) + '%' : '-'}</div><div class="kpi-label">中奖率</div></div>
+  <div class="kpi-card"><div class="kpi-value">¥${(report.summary?.total_cost || 0).toFixed(0)}</div><div class="kpi-label">总成本</div></div>
+  <div class="kpi-card"><div class="kpi-value">¥${(report.summary?.total_revenue || 0).toFixed(0)}</div><div class="kpi-label">总收入</div></div>
+  <div class="kpi-card"><div class="kpi-value">${report.summary?.roi ? (report.summary.roi * 100).toFixed(1) + '%' : '-'}</div><div class="kpi-label">ROI</div></div>
+  <div class="kpi-card"><div class="kpi-value">${report.summary?.active_users || 0}</div><div class="kpi-label">活跃用户</div></div>
+</div>
+<div class="footer"><p>报告生成时间：${report.generated_at || new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</p><p>本报告由运营后台自动生成</p></div>
+</body></html>`)
+      printWindow.document.close()
+      setTimeout(() => { if (!printWindow.closed) printWindow.print() }, 1000)
+      logger.info('[P2-10] 日报PDF导出完成')
+    },
+
     // ========== P1新增: 单次抽奖详情方法 ==========
 
     /**

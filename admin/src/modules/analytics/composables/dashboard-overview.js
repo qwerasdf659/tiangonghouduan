@@ -74,6 +74,17 @@ export function useDashboardOverviewState() {
       trend_data: [], forecast_data: [], warning_level: 'normal'
     },
 
+    // 🆕 今日待办摘要（P0-4）
+    todoPending: {
+      consumption: 0,
+      redemption: 0,
+      customer_service: 0,
+      risk_alert: 0,
+      lottery_alert: 0,
+      feedback: 0,
+      total: 0
+    },
+
     // 系统健康
     systemHealth: {
       api: { status: 'loading', response_time: 0, last_check: null },
@@ -87,7 +98,34 @@ export function useDashboardOverviewState() {
     budgetTrendChart: null,
 
     // 今日核心事件
-    todayEvents: []
+    todayEvents: [],
+
+    // ==================== P1-6: 新增运营指标 ====================
+    // 兑换履约率（后端 ExchangeRecord 状态: pending/completed/shipped/cancelled）
+    redemptionFulfillment: {
+      total: 0,
+      pending: 0,
+      fulfilled: 0,
+      cancelled: 0,
+      fulfillment_rate: 0
+    },
+    // 市场活跃度
+    marketActivity: {
+      active_listings: 0,
+      total_trades: 0,
+      completed_trades: 0,
+      trade_completion_rate: 0
+    },
+    // 用户留存/活跃度
+    userRetention: {
+      total_users: 0,
+      dau: 0,
+      wau: 0,
+      mau: 0,
+      dau_rate: 0,
+      wau_rate: 0,
+      mau_rate: 0
+    }
   }
 }
 
@@ -102,7 +140,7 @@ export function useDashboardOverviewMethods() {
     async loadDashboardData() {
       this.loading = true
       try {
-        const [statsRes, trendRes, alertsRes, budgetRes, healthRes, comparisonRes, sysHealthRes] =
+        const [statsRes, trendRes, alertsRes, budgetRes, healthRes, comparisonRes, sysHealthRes, redemptionRes, marketRes, retentionRes, todoPendingRes] =
           await Promise.allSettled([
             this.fetchTodayStats(),
             this.fetchTrendData(),
@@ -110,7 +148,11 @@ export function useDashboardOverviewMethods() {
             this.fetchBudgetStatus(),
             this.fetchHealthScore(),
             this.fetchComparison(),
-            this.fetchSystemHealth()
+            this.fetchSystemHealth(),
+            this.fetchRedemptionFulfillment(),
+            this.fetchMarketActivity(),
+            this.fetchUserRetention(),
+            this.fetchTodoPending()
           ])
 
         if (statsRes.status === 'fulfilled' && statsRes.value) {
@@ -135,6 +177,20 @@ export function useDashboardOverviewMethods() {
         }
         if (sysHealthRes.status === 'fulfilled' && sysHealthRes.value) {
           this.systemHealth = sysHealthRes.value
+        }
+        // P1-6: 新增指标数据赋值
+        if (redemptionRes.status === 'fulfilled' && redemptionRes.value) {
+          this.redemptionFulfillment = redemptionRes.value
+        }
+        if (marketRes.status === 'fulfilled' && marketRes.value) {
+          this.marketActivity = marketRes.value
+        }
+        if (retentionRes.status === 'fulfilled' && retentionRes.value) {
+          this.userRetention = retentionRes.value
+        }
+        // P0-4: 今日待办摘要
+        if (todoPendingRes.status === 'fulfilled' && todoPendingRes.value) {
+          this.todoPending = todoPendingRes.value
         }
 
         this.lastUpdateTime = new Date().toLocaleTimeString('zh-CN', {
@@ -502,6 +558,127 @@ export function useDashboardOverviewMethods() {
       } catch (e) {
         logger.warn('[DashboardPanel] loadAssetRatio 失败:', e.message)
         this.assetRatio = { issued: 0, consumed: 0, ratio: 1.0 }
+      }
+    },
+
+    // ==================== P1-6: 兑换履约率 ====================
+    /**
+     * 获取兑换订单履约率数据
+     * 使用兑换市场统计和订单列表API计算
+     */
+    async fetchRedemptionFulfillment() {
+      try {
+        const result = await request({
+          url: `${API_PREFIX}/console/marketplace/exchange_market/orders`,
+          params: { page: 1, page_size: 1000 }
+        })
+        if (result.success && result.data) {
+          const orders = result.data.orders || []
+          const total = result.data.pagination?.total || orders.length
+          // 后端 ExchangeRecord 状态枚举: pending / completed / shipped / cancelled
+          const pending = orders.filter(o => o.status === 'pending').length
+          const fulfilled = orders.filter(o => o.status === 'completed' || o.status === 'shipped').length
+          const cancelled = orders.filter(o => o.status === 'cancelled').length
+          const fulfillment_rate = total > 0 ? Math.round((fulfilled / total) * 10000) / 100 : 0
+
+          return { total, pending, fulfilled, cancelled, fulfillment_rate }
+        }
+        return null
+      } catch (e) {
+        logger.warn('[DashboardPanel] fetchRedemptionFulfillment 失败:', e.message)
+        return null
+      }
+    },
+
+    // ==================== P1-6: 市场活跃度 ====================
+    /**
+     * 获取市场活跃度数据
+     * 使用兑换市场统计API
+     */
+    async fetchMarketActivity() {
+      try {
+        const result = await request({
+          url: `${API_PREFIX}/console/marketplace/exchange_market/statistics`
+        })
+        if (result.success && result.data) {
+          const data = result.data
+          return {
+            active_listings: data.active_items || 0,
+            total_trades: data.total_exchanges || 0,
+            completed_trades: data.completed_exchanges || data.total_exchanges || 0,
+            trade_completion_rate: data.total_exchanges > 0
+              ? Math.round((data.completed_exchanges || data.total_exchanges) / Math.max(data.total_exchanges, 1) * 100)
+              : 0
+          }
+        }
+        return null
+      } catch (e) {
+        logger.warn('[DashboardPanel] fetchMarketActivity 失败:', e.message)
+        return null
+      }
+    },
+
+    // ==================== P1-6: 用户留存/活跃度 ====================
+    /**
+     * 获取用户活跃度数据
+     * 使用今日统计API中的用户数据
+     */
+    async fetchUserRetention() {
+      try {
+        const result = await request({
+          url: `${API_PREFIX}/console/analytics/stats/today`
+        })
+        if (result.success && result.data) {
+          const userStats = result.data.user_stats || {}
+          const totalUsers = userStats.total_users || 0
+          // 后端 StatsService.getTodayStats 返回字段：
+          // total_users, new_users_today, active_users_today, active_rate, total_logins_today
+          // 注意：后端暂无 active_users_week / active_users_month，WAU/MAU 暂用 DAU 替代
+          const dau = userStats.active_users_today || 0
+
+          return {
+            total_users: totalUsers,
+            dau,
+            wau: dau, // 后端暂无 WAU 字段，待后端扩展后对接
+            mau: dau, // 后端暂无 MAU 字段，待后端扩展后对接
+            dau_rate: totalUsers > 0 ? Math.round((dau / totalUsers) * 10000) / 100 : 0,
+            wau_rate: totalUsers > 0 ? Math.round((dau / totalUsers) * 10000) / 100 : 0,
+            mau_rate: totalUsers > 0 ? Math.round((dau / totalUsers) * 10000) / 100 : 0
+          }
+        }
+        return null
+      } catch (e) {
+        logger.warn('[DashboardPanel] fetchUserRetention 失败:', e.message)
+        return null
+      }
+    },
+
+    // ==================== P0-4: 今日待办摘要 ====================
+    /**
+     * 获取今日待办摘要数据
+     * 复用 nav/badges API 获取各分类待处理数量
+     */
+    async fetchTodoPending() {
+      try {
+        const result = await request({
+          url: `${API_PREFIX}/console/nav/badges`
+        })
+        if (result.success && result.data) {
+          const badges = result.data.badges || {}
+          return {
+            consumption: badges.consumption || 0,
+            redemption: badges.redemption || 0,
+            customer_service: badges.customer_service || 0,
+            risk_alert: badges.risk_alert || 0,
+            lottery_alert: badges.lottery_alert || 0,
+            feedback: badges.feedback || 0,
+            total: result.data.total || 0
+          }
+        }
+        return null
+      } catch (e) {
+        logger.warn('[DashboardPanel] fetchTodoPending 失败:', e.message)
+        return null
       }
     }
   }

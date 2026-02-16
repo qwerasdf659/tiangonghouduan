@@ -32,7 +32,23 @@ export function useExchangeStatsState() {
     /** @type {Array} 趋势数据 */
     trendData: [],
     /** @type {string} 趋势时间范围 */
-    trendRange: '7d'
+    trendRange: '7d',
+    // ========== P1-8: 履约追踪看板 ==========
+    /**
+     * 履约追踪数据
+     * 后端 ExchangeRecord 状态枚举：pending / completed / shipped / cancelled
+     * 注意：exchange_records 表没有 expired 状态（expired 是 redemption_orders 表的）
+     * @type {Object}
+     */
+    fulfillmentTracking: {
+      total_orders: 0,
+      pending_count: 0,
+      shipped_count: 0,
+      completed_count: 0,
+      cancelled_count: 0,
+      fulfillment_rate: 0,
+      avg_fulfillment_time: 0 // 平均履约时间（小时）
+    }
   }
 }
 
@@ -91,6 +107,10 @@ export function useExchangeStatsMethods() {
             lowStockCount: stats.low_stock_items || 0
           }
         }
+
+        // P1-8: 缓存订单数据并计算履约追踪
+        this.orders = orders
+        this.calculateFulfillmentTracking()
       } catch (e) {
         logger.error('[ExchangeStats] 加载统计数据失败:', e)
         this.showError?.('加载统计数据失败')
@@ -346,6 +366,76 @@ export function useExchangeStatsMethods() {
     changeTrendRange(range) {
       this.trendRange = range
       this.loadTrendData()
+    },
+
+    // ==================== P1-8: 履约追踪看板 ====================
+    /**
+     * 计算履约追踪数据
+     * 从订单列表中聚合各状态的数量和履约率
+     */
+    calculateFulfillmentTracking() {
+      const orders = this.orders || []
+      const total = orders.length
+
+      // 后端 ExchangeRecord 状态枚举：pending / completed / shipped / cancelled
+      const pending = orders.filter(o => o.status === 'pending').length
+      const shipped = orders.filter(o => o.status === 'shipped').length
+      const completed = orders.filter(o => o.status === 'completed').length
+      const cancelled = orders.filter(o => o.status === 'cancelled').length
+
+      // 履约率 = (已完成 + 已发货) / (总数 - 已取消)
+      const validOrders = total - cancelled
+      const fulfilledOrders = completed + shipped
+      const fulfillment_rate = validOrders > 0 ? Math.round((fulfilledOrders / validOrders) * 10000) / 100 : 0
+
+      // 计算平均履约时间（从创建到完成/发货）
+      let totalFulfillmentHours = 0
+      let fulfilledCount = 0
+      orders.forEach(order => {
+        if ((order.status === 'completed' || order.status === 'shipped') && order.created_at && order.updated_at) {
+          const created = new Date(order.created_at)
+          const updated = new Date(order.updated_at)
+          const hours = (updated - created) / (1000 * 60 * 60)
+          if (hours > 0 && hours < 720) { // 排除异常数据（超过30天）
+            totalFulfillmentHours += hours
+            fulfilledCount++
+          }
+        }
+      })
+
+      this.fulfillmentTracking = {
+        total_orders: total,
+        pending_count: pending,
+        shipped_count: shipped,
+        completed_count: completed,
+        cancelled_count: cancelled,
+        fulfillment_rate,
+        avg_fulfillment_time: fulfilledCount > 0 ? Math.round(totalFulfillmentHours / fulfilledCount * 10) / 10 : 0
+      }
+
+      logger.info('[ExchangeStats] 履约追踪数据计算完成', this.fulfillmentTracking)
+    },
+
+    /**
+     * 获取履约率状态颜色
+     * @param {number} rate - 履约率百分比
+     * @returns {string} CSS类
+     */
+    getFulfillmentRateClass(rate) {
+      if (rate >= 80) return 'text-green-600'
+      if (rate >= 50) return 'text-yellow-600'
+      return 'text-red-600'
+    },
+
+    /**
+     * 获取履约率状态标签
+     * @param {number} rate - 履约率百分比
+     * @returns {string} 状态标签
+     */
+    getFulfillmentRateLabel(rate) {
+      if (rate >= 80) return '✅ 优秀'
+      if (rate >= 50) return '⚠️ 一般'
+      return '🔴 需关注'
     },
 
     /**

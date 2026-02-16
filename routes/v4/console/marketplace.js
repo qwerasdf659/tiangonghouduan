@@ -322,6 +322,16 @@ router.get(
  * @body {number} sort_order - 排序号（必填，默认100）
  * @body {string} status - 商品状态（必填：active/inactive）
  * @body {number} primary_image_id - 主图片ID（可选，关联 image_resources.image_resource_id）
+ * @body {string} space - 空间归属（可选，lucky=幸运空间, premium=臻选空间, both=两者都展示，默认lucky）
+ * @body {number} original_price - 原价材料数量（可选，用于展示划线价）
+ * @body {Array} tags - 商品标签数组（可选，如 ["限量","新品"]）
+ * @body {boolean} is_new - 是否新品（可选，默认false）
+ * @body {boolean} is_hot - 是否热门（可选，默认false）
+ * @body {boolean} is_lucky - 是否幸运商品（可选，默认false）
+ * @body {boolean} has_warranty - 是否有质保（可选，默认false）
+ * @body {boolean} free_shipping - 是否包邮（可选，默认false）
+ * @body {string} sell_point - 营销卖点文案（可选，最长200字符）
+ * @body {string} category - 商品分类（可选）
  */
 router.post(
   '/exchange_market/items',
@@ -338,7 +348,18 @@ router.post(
       sort_order = 100,
       status = 'active',
       // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_resource_id）
-      primary_image_id
+      primary_image_id,
+      // 臻选空间/幸运空间扩展字段（决策12：9个新字段）
+      space,
+      original_price,
+      tags,
+      is_new,
+      is_hot,
+      is_lucky,
+      has_warranty,
+      free_shipping,
+      sell_point,
+      category
     } = req.body
 
     const admin_id = req.user.user_id
@@ -357,7 +378,7 @@ router.post(
 
     // 🎯 2026-01-08 图片存储架构修复：使用 TransactionManager 包装事务
     const transactionResult = await TransactionManager.execute(async transaction => {
-      // 调用服务层方法创建商品（V4.5.0 材料资产支付 + 图片存储架构）
+      // 调用服务层方法创建商品（V4.5.0 材料资产支付 + 臻选空间/幸运空间扩展字段）
       const result = await ExchangeService.createExchangeItem(
         {
           name,
@@ -368,7 +389,18 @@ router.post(
           stock,
           sort_order,
           status,
-          primary_image_id
+          primary_image_id,
+          // 臻选空间/幸运空间扩展字段
+          space,
+          original_price,
+          tags,
+          is_new,
+          is_hot,
+          is_lucky,
+          has_warranty,
+          free_shipping,
+          sell_point,
+          category
         },
         admin_id,
         { transaction }
@@ -468,7 +500,18 @@ router.put(
         sort_order,
         status,
         // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_resource_id）
-        primary_image_id
+        primary_image_id,
+        // 臻选空间/幸运空间扩展字段（决策12：9个新字段）
+        space,
+        original_price,
+        tags,
+        is_new,
+        is_hot,
+        is_lucky,
+        has_warranty,
+        free_shipping,
+        sell_point,
+        category
       } = req.body
 
       const admin_id = req.user.user_id
@@ -478,7 +521,8 @@ router.put(
         exchange_item_id,
         cost_asset_code,
         primary_image_id,
-        cost_amount
+        cost_amount,
+        space
       })
 
       // 参数验证
@@ -504,7 +548,18 @@ router.put(
               stock,
               sort_order,
               status,
-              primary_image_id
+              primary_image_id,
+              // 臻选空间/幸运空间扩展字段
+              space,
+              original_price,
+              tags,
+              is_new,
+              is_hot,
+              is_lucky,
+              has_warranty,
+              free_shipping,
+              sell_point,
+              category
             },
             { transaction }
           )

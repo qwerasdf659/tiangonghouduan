@@ -176,6 +176,8 @@ document.addEventListener('alpine:init', () => {
               await this.loadRoles()
               await this.loadPermissions()
               await this.loadUserStats()
+              // P2#9: 加载用户活跃度分层和RFM分析数据
+              await this.loadUserSegments()
               break
             case 'user-segments':
               await this.loadUserSegments()

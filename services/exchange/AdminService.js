@@ -60,6 +60,16 @@ class AdminService {
    * @param {number} [itemData.sort_order=100] - 排序号
    * @param {string} [itemData.status='active'] - 商品状态
    * @param {number} [itemData.primary_image_id] - 主图片ID
+   * @param {string} [itemData.space='lucky'] - 空间归属（lucky=幸运空间, premium=臻选空间, both=两者都展示）
+   * @param {number} [itemData.original_price] - 原价（材料数量，用于展示划线价）
+   * @param {Array} [itemData.tags] - 商品标签数组，如 ["限量","新品"]
+   * @param {boolean} [itemData.is_new=false] - 是否新品
+   * @param {boolean} [itemData.is_hot=false] - 是否热门
+   * @param {boolean} [itemData.is_lucky=false] - 是否幸运商品
+   * @param {boolean} [itemData.has_warranty=false] - 是否有质保
+   * @param {boolean} [itemData.free_shipping=false] - 是否包邮
+   * @param {string} [itemData.sell_point] - 营销卖点文案
+   * @param {string} [itemData.category] - 商品分类
    * @param {number} created_by - 创建者ID
    * @param {Object} options - 选项
    * @param {Transaction} options.transaction - 外部事务对象（必填）
@@ -103,7 +113,13 @@ class AdminService {
       throw new Error(`无效的status参数，允许值：${validStatuses.join(', ')}`)
     }
 
-    // 创建商品
+    // 空间归属验证（决策12：臻选空间/幸运空间）
+    const validSpaces = ['lucky', 'premium', 'both']
+    if (itemData.space && !validSpaces.includes(itemData.space)) {
+      throw new Error(`无效的space参数，允许值：${validSpaces.join(', ')}`)
+    }
+
+    // 创建商品（包含臻选空间/幸运空间扩展字段）
     const item = await this.ExchangeItem.create(
       {
         item_name: name.trim(),
@@ -115,6 +131,17 @@ class AdminService {
         stock: parseInt(itemData.stock),
         sort_order: parseInt(itemData.sort_order) || 100,
         status: itemData.status || 'active',
+        category: itemData.category || null,
+        // 臻选空间/幸运空间扩展字段（决策12：9个新字段）
+        space: itemData.space || 'lucky',
+        original_price: itemData.original_price ? parseInt(itemData.original_price) : null,
+        tags: itemData.tags || null,
+        is_new: !!itemData.is_new,
+        is_hot: !!itemData.is_hot,
+        is_lucky: !!itemData.is_lucky,
+        has_warranty: !!itemData.has_warranty,
+        free_shipping: !!itemData.free_shipping,
+        sell_point: itemData.sell_point || null,
         created_at: BeijingTimeHelper.createDatabaseTime(),
         updated_at: BeijingTimeHelper.createDatabaseTime()
       },
@@ -241,6 +268,53 @@ class AdminService {
         throw new Error(`无效的status参数，允许值：${validStatuses.join(', ')}`)
       }
       finalUpdateData.status = updateData.status
+    }
+
+    // 臻选空间/幸运空间扩展字段更新（决策12：9个新字段）
+    if (updateData.space !== undefined) {
+      const validSpaces = ['lucky', 'premium', 'both']
+      if (!validSpaces.includes(updateData.space)) {
+        throw new Error(`无效的space参数，允许值：${validSpaces.join(', ')}`)
+      }
+      finalUpdateData.space = updateData.space
+    }
+
+    if (updateData.original_price !== undefined) {
+      finalUpdateData.original_price = updateData.original_price
+        ? parseInt(updateData.original_price)
+        : null
+    }
+
+    if (updateData.tags !== undefined) {
+      finalUpdateData.tags = updateData.tags
+    }
+
+    if (updateData.is_new !== undefined) {
+      finalUpdateData.is_new = !!updateData.is_new
+    }
+
+    if (updateData.is_hot !== undefined) {
+      finalUpdateData.is_hot = !!updateData.is_hot
+    }
+
+    if (updateData.is_lucky !== undefined) {
+      finalUpdateData.is_lucky = !!updateData.is_lucky
+    }
+
+    if (updateData.has_warranty !== undefined) {
+      finalUpdateData.has_warranty = !!updateData.has_warranty
+    }
+
+    if (updateData.free_shipping !== undefined) {
+      finalUpdateData.free_shipping = !!updateData.free_shipping
+    }
+
+    if (updateData.sell_point !== undefined) {
+      finalUpdateData.sell_point = updateData.sell_point || null
+    }
+
+    if (updateData.category !== undefined) {
+      finalUpdateData.category = updateData.category || null
     }
 
     // 处理图片更换

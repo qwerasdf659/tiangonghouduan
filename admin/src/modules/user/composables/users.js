@@ -39,6 +39,19 @@ export function useUsersState() {
       recent_registrations: [],
       generated_at: null
     },
+    /**
+     * 用户分层数据
+     * 后端返回结构: { segments: [{code, name, count, percentage, criteria, color}], total_users, segment_rules }
+     * segments.code 取值: high_value（高价值）、active（活跃）、silent（沉默）、churned（流失）
+     * @type {Object|null}
+     */
+    userSegments: null,
+    /** @type {boolean} 用户分层加载状态 */
+    loadingSegments: false,
+    /** @type {Object|null} 活跃时段热力图数据 - 后端 activity-heatmap API */
+    activityHeatmap: null,
+    /** @type {Object|null} 用户行为漏斗数据 - 后端 funnel API */
+    userFunnel: null,
     /** @type {Object} 用户表单 */
     userForm: {
       user_id: '',
@@ -201,6 +214,144 @@ export function useUsersMethods() {
         total_users: this.userStats.total_users,
         new_users_today: this.userStats.new_users_today
       })
+    },
+
+    /**
+     * 加载用户分层数据（活跃度分层 + RFM价值分层）
+     * @description 调用后端 GET /api/v4/console/users/segments 获取用户分层统计
+     * 返回数据包含：activity_segments（活跃度分层）和 value_segments（价值分层/RFM）
+     */
+    async loadUserSegments() {
+      this.loadingSegments = true
+      try {
+        // 后端路由: GET /api/v4/console/users/segments
+        // 返回: { segments: [{code, name, count, percentage, criteria, color}], total_users, segment_rules }
+        const response = await this.apiGet(
+          `${API_PREFIX}/console/users/segments`,
+          {},
+          { showLoading: false }
+        )
+        if (response?.success && response.data) {
+          this.userSegments = response.data
+          const segmentCodes = (response.data.segments || []).map(s => s.code)
+          logger.info('[P2-9] 用户分层加载完成', {
+            segments: segmentCodes,
+            total_users: response.data.total_users
+          })
+        }
+      } catch (error) {
+        logger.error('[P2-9] 加载用户分层失败:', error.message)
+        this.userSegments = null
+      } finally {
+        this.loadingSegments = false
+      }
+    },
+
+    /**
+     * 加载活跃时段热力图数据
+     * @description 调用后端 GET /api/v4/console/users/activity-heatmap
+     * @param {number} [days=7] - 统计天数
+     */
+    async loadActivityHeatmap(days = 7) {
+      try {
+        const response = await this.apiGet(
+          // 后端路由: /api/v4/console/users/activity-heatmap
+          `${API_PREFIX}/console/users/activity-heatmap?days=${days}`,
+          {},
+          { showLoading: false }
+        )
+        if (response?.success && response.data) {
+          this.activityHeatmap = response.data
+          logger.info('[P2-9] 活跃时段热力图加载完成')
+        }
+      } catch (error) {
+        logger.error('[P2-9] 加载活跃时段热力图失败:', error.message)
+        this.activityHeatmap = null
+      }
+    },
+
+    /**
+     * 加载用户行为漏斗数据
+     * @description 调用后端 GET /api/v4/console/users/funnel
+     */
+    async loadUserFunnel() {
+      try {
+        const response = await this.apiGet(
+          // 后端路由: /api/v4/console/users/funnel
+          `${API_PREFIX}/console/users/funnel`,
+          {},
+          { showLoading: false }
+        )
+        if (response?.success && response.data) {
+          this.userFunnel = response.data
+          logger.info('[P2-9] 用户行为漏斗加载完成')
+        }
+      } catch (error) {
+        logger.error('[P2-9] 加载用户行为漏斗失败:', error.message)
+        this.userFunnel = null
+      }
+    },
+
+    /**
+     * 获取分层的背景颜色CSS类
+     * 后端 segment.code: high_value / active / silent / churned
+     * 后端 segment.color: 十六进制颜色（#4CAF50 等），前端使用 Tailwind 映射
+     * @param {string} code - 后端分层代码
+     * @returns {string} Tailwind CSS 背景色类
+     */
+    getSegmentBgColor(code) {
+      const colors = {
+        high_value: 'bg-green-500',
+        active: 'bg-blue-500',
+        silent: 'bg-orange-500',
+        churned: 'bg-red-500'
+      }
+      return colors[code] || 'bg-gray-400'
+    },
+
+    /**
+     * 获取分层的文本颜色CSS类
+     * @param {string} code - 后端分层代码
+     * @returns {string} Tailwind CSS 文本色类
+     */
+    getSegmentTextColor(code) {
+      const colors = {
+        high_value: 'text-green-600',
+        active: 'text-blue-600',
+        silent: 'text-orange-600',
+        churned: 'text-red-600'
+      }
+      return colors[code] || 'text-gray-500'
+    },
+
+    /**
+     * 获取分层的边框颜色CSS类
+     * @param {string} code - 后端分层代码
+     * @returns {string} Tailwind CSS 边框色类
+     */
+    getSegmentBorderColor(code) {
+      const colors = {
+        high_value: 'border-green-500',
+        active: 'border-blue-500',
+        silent: 'border-orange-500',
+        churned: 'border-red-500'
+      }
+      return colors[code] || 'border-gray-400'
+    },
+
+    /**
+     * 获取分层的图标
+     * @param {string} code - 后端分层代码
+     * @returns {string} 图标 emoji
+     */
+    getSegmentIcon(code) {
+      const icons = {
+        high_value: '💎',
+        active: '🏃',
+        silent: '😴',
+        churned: '👻'
+      }
+      return icons[code] || '👤'
     },
 
     /**

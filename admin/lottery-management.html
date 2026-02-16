@@ -1948,6 +1948,62 @@
               </div>
             </div>
 
+            <!-- P2#12: 策略触发频率热力图 -->
+            <div class="themed-card rounded-lg shadow">
+              <div class="p-4 border-b">
+                <h6 class="font-semibold flex items-center gap-2">
+                  🔥 策略触发频率热力图
+                  <span class="text-xs themed-text-muted font-normal">Pity / AntiEmpty / AntiHigh / LuckDebt 各日触发次数分布</span>
+                </h6>
+              </div>
+              <div class="p-4">
+                <template x-if="strategyEffectiveness && strategyEffectiveness.experience_mechanism_analysis">
+                  <div>
+                    <!-- 触发次数汇总卡片 -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                      <div class="rounded-lg p-3 bg-purple-50 border border-purple-200 text-center">
+                        <p class="text-xs text-purple-500 mb-1">Pity(保底)触发</p>
+                        <p class="text-xl font-bold text-purple-700" 
+                           x-text="strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.trigger_count || 0"></p>
+                        <p class="text-xs text-purple-400" 
+                           x-text="'触发率 ' + (strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.trigger_rate || 0).toFixed(1) + '%'"></p>
+                      </div>
+                      <div class="rounded-lg p-3 bg-blue-50 border border-blue-200 text-center">
+                        <p class="text-xs text-blue-500 mb-1">AntiEmpty(反连空)</p>
+                        <p class="text-xl font-bold text-blue-700" 
+                           x-text="strategyEffectiveness.experience_mechanism_analysis.anti_empty_mechanism?.total_empty_count || 0"></p>
+                        <p class="text-xs text-blue-400">反空奖触发</p>
+                      </div>
+                      <div class="rounded-lg p-3 bg-orange-50 border border-orange-200 text-center">
+                        <p class="text-xs text-orange-500 mb-1">AntiHigh(反连高)</p>
+                        <p class="text-xl font-bold text-orange-700"
+                           x-text="strategyEffectiveness.tier_downgrade_analysis?.total_downgrades || 0"></p>
+                        <p class="text-xs text-orange-400">档位限制触发</p>
+                      </div>
+                      <div class="rounded-lg p-3 bg-green-50 border border-green-200 text-center">
+                        <p class="text-xs text-green-500 mb-1">LuckDebt(运气债务)</p>
+                        <p class="text-xl font-bold text-green-700"
+                           x-text="strategyEffectiveness.experience_mechanism_analysis.luck_debt_mechanism?.avg_empty_streak || 0"></p>
+                        <p class="text-xs text-green-400">平均连空数</p>
+                      </div>
+                    </div>
+                    <!-- 策略触发日级分布图表容器 -->
+                    <div id="strategyTriggerHeatmapChart" class="w-full" style="height: 320px;"></div>
+                    <p class="text-xs themed-text-muted text-center mt-2">
+                      数据来源: lottery_daily_metrics 表（pity_trigger_count / anti_empty_trigger_count / anti_high_trigger_count / luck_debt_trigger_count）
+                    </p>
+                  </div>
+                </template>
+                <template x-if="!strategyEffectiveness || !strategyEffectiveness.experience_mechanism_analysis">
+                  <div class="text-center py-8 themed-text-muted">
+                    <div class="text-4xl mb-2">📊</div>
+                    <p>暂无策略触发热力图数据</p>
+                    <p class="text-xs mt-1">请先在筛选中选择活动并加载数据</p>
+                  </div>
+                </template>
+              </div>
+            </div>
+
             <!-- 档位降级统计 -->
             <div class="themed-card rounded-lg shadow">
               <div class="p-4 border-b">
@@ -2195,6 +2251,70 @@
               </div>
             </div>
 
+            <!-- P1-7: 单用户高频预警 -->
+            <div class="themed-card rounded-lg shadow" x-show="highFrequencyWarnings.length > 0">
+              <div class="p-4 border-b bg-red-50">
+                <h6 class="font-semibold flex items-center gap-2 text-red-700">
+                  🚨 单用户高频预警
+                  <span class="text-xs bg-red-200 text-red-800 px-2 py-0.5 rounded" x-text="highFrequencyWarnings.length"></span>
+                </h6>
+              </div>
+              <div class="p-4 space-y-2">
+                <template x-for="(warning, index) in highFrequencyWarnings" :key="index">
+                  <div class="p-3 rounded border" :class="warning.level === 'danger' ? 'bg-red-50 border-red-300 text-red-700' : 'bg-yellow-50 border-yellow-300 text-yellow-700'">
+                    <div class="flex items-start gap-2">
+                      <span x-text="warning.level === 'danger' ? '🔴' : '🟡'"></span>
+                      <div class="flex-1">
+                        <p class="font-semibold text-sm" x-text="warning.title"></p>
+                        <p class="text-sm mt-1" x-text="warning.message"></p>
+                        <p x-show="warning.suggestion" class="text-xs mt-2 opacity-80" x-text="'💡 ' + warning.suggestion"></p>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- P1-7: 预算健康度可视化 -->
+            <div class="themed-card rounded-lg shadow">
+              <div class="p-4 border-b">
+                <h6 class="font-semibold flex items-center gap-2">
+                  📊 预算健康度
+                  <span class="text-xs px-2 py-0.5 rounded border" :class="getBudgetHealthClass(budgetHealthData.health_level)" x-text="getBudgetHealthLabel(budgetHealthData.health_level)"></span>
+                </h6>
+              </div>
+              <div class="p-4">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div class="text-center p-3 bg-green-50 rounded-lg">
+                    <p class="text-2xl font-bold text-green-600" x-text="budgetHealthData.b0_count">0</p>
+                    <p class="text-xs text-gray-500 mt-1">B0 (充裕)</p>
+                  </div>
+                  <div class="text-center p-3 bg-blue-50 rounded-lg">
+                    <p class="text-2xl font-bold text-blue-600" x-text="budgetHealthData.b1_count">0</p>
+                    <p class="text-xs text-gray-500 mt-1">B1 (正常)</p>
+                  </div>
+                  <div class="text-center p-3 bg-yellow-50 rounded-lg">
+                    <p class="text-2xl font-bold text-yellow-600" x-text="budgetHealthData.b2_count">0</p>
+                    <p class="text-xs text-gray-500 mt-1">B2 (偏低)</p>
+                  </div>
+                  <div class="text-center p-3 bg-red-50 rounded-lg">
+                    <p class="text-2xl font-bold text-red-600" x-text="budgetHealthData.b3_count">0</p>
+                    <p class="text-xs text-gray-500 mt-1">B3 (最低)</p>
+                  </div>
+                </div>
+                <!-- 进度条可视化 -->
+                <div x-show="budgetHealthData.total_days > 0" class="h-4 bg-gray-200 rounded-full overflow-hidden flex">
+                  <div class="bg-green-500 transition-all" :style="'width:' + (budgetHealthData.b0_count / budgetHealthData.total_days * 100) + '%'" :title="'B0: ' + budgetHealthData.b0_count + '天'"></div>
+                  <div class="bg-blue-500 transition-all" :style="'width:' + (budgetHealthData.b1_count / budgetHealthData.total_days * 100) + '%'" :title="'B1: ' + budgetHealthData.b1_count + '天'"></div>
+                  <div class="bg-yellow-500 transition-all" :style="'width:' + (budgetHealthData.b2_count / budgetHealthData.total_days * 100) + '%'" :title="'B2: ' + budgetHealthData.b2_count + '天'"></div>
+                  <div class="bg-red-500 transition-all" :style="'width:' + (budgetHealthData.b3_count / budgetHealthData.total_days * 100) + '%'" :title="'B3: ' + budgetHealthData.b3_count + '天'"></div>
+                </div>
+                <div x-show="budgetHealthData.health_level === 'critical'" class="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                  ⚠️ 预算健康度异常：B3（最低预算层）天数占比过高，建议检查预算配置和出奖策略
+                </div>
+              </div>
+            </div>
+
             <!-- 告警列表 -->
             <div class="themed-card rounded-lg shadow" x-show="dailyReport.alerts && dailyReport.alerts.length > 0">
               <div class="p-4 border-b">
@@ -2395,6 +2515,60 @@
                     <p class="font-semibold" 
                        :class="formatDailyReportChange(dailyReport.vs_last_week?.users_change).colorClass"
                        x-text="formatDailyReportChange(dailyReport.vs_last_week?.users_change).text"></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- P2#10: 运营日报自动推送配置 -->
+            <div class="themed-card rounded-lg shadow">
+              <div class="p-4 border-b flex justify-between items-center">
+                <h6 class="font-semibold flex items-center gap-2">
+                  🔔 运营日报自动推送
+                  <span class="text-xs themed-text-muted font-normal">复用 ReportTemplate + ReminderEngine + NotificationService</span>
+                </h6>
+              </div>
+              <div class="p-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <!-- 推送频率说明 -->
+                  <div class="rounded-lg p-4 themed-bg-base">
+                    <p class="text-sm font-medium mb-2">📅 推送配置</p>
+                    <div class="space-y-2 text-xs themed-text-muted">
+                      <p>推送频率: <span class="font-medium themed-text-primary">每日定时</span></p>
+                      <p>推送时间: <span class="font-medium">09:00（北京时间）</span></p>
+                      <p>推送渠道: <span class="font-medium">消息中心</span></p>
+                      <p class="mt-2">配置方式: 通过 <a href="/admin/reminder-rules.html" class="themed-text-primary underline">提醒规则管理</a> 页面创建定时提醒规则</p>
+                    </div>
+                  </div>
+                  <!-- 日报内容概要 -->
+                  <div class="rounded-lg p-4 themed-bg-base">
+                    <p class="text-sm font-medium mb-2">📊 日报内容</p>
+                    <div class="space-y-1 text-xs themed-text-muted">
+                      <p>• 今日待办汇总（待审核/待核销/待回复）</p>
+                      <p>• 昨日核心指标（抽奖次数/中奖率/成本/ROI）</p>
+                      <p>• 同比分析（昨日对比/上周同日对比）</p>
+                      <p>• 异常告警提醒（高频用户/预算异常/库存预警）</p>
+                    </div>
+                  </div>
+                  <!-- 快捷操作 -->
+                  <div class="rounded-lg p-4 themed-bg-base flex flex-col justify-between">
+                    <p class="text-sm font-medium mb-2">⚙️ 快捷操作</p>
+                    <div class="space-y-2">
+                      <button @click="generateAndPushDailyReport()" 
+                              class="w-full themed-btn-primary px-3 py-2 rounded text-sm"
+                              :disabled="loadingDailyReport">
+                        <span x-show="!loadingDailyReport">📤 立即生成并推送今日日报</span>
+                        <span x-show="loadingDailyReport">生成中...</span>
+                      </button>
+                      <button @click="exportDailyReportPDF()" 
+                              class="w-full themed-btn-secondary px-3 py-2 rounded text-sm"
+                              :disabled="!dailyReport">
+                        📥 导出当前日报为PDF
+                      </button>
+                      <p class="text-xs themed-text-muted text-center mt-1">
+                        后端: lottery-report/daily + NotificationService
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

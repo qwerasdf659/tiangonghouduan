@@ -35,7 +35,23 @@ export function useDailyReportState() {
     /** @type {string} 日报日期显示（HTML模板兼容） */
     dailyReportDate: '',
     /** @type {Array<Object>} 日报历史记录（可选扩展） */
-    dailyReportHistory: []
+    dailyReportHistory: [],
+    // ========== P1-7: 单用户高频预警 + 预算健康度 ==========
+    /** @type {Array<Object>} 高频用户预警列表 */
+    highFrequencyWarnings: [],
+    /** @type {boolean} 高频预警加载状态 */
+    loadingHighFrequency: false,
+    /** @type {Object} 预算健康度数据 */
+    budgetHealthData: {
+      b0_count: 0,
+      b1_count: 0,
+      b2_count: 0,
+      b3_count: 0,
+      total_days: 0,
+      health_level: 'unknown' // 'healthy' | 'warning' | 'critical'
+    },
+    /** @type {boolean} 预算健康度加载状态 */
+    loadingBudgetHealth: false
   }
 }
 
@@ -94,6 +110,11 @@ export function useDailyReportMethods() {
           this.dailyReport = response.data
           this.dailyReportData = response.data
           this.dailyReportDate = response.data?.report_date || ''
+
+          // P1-7: 加载完成后分析高频预警和预算健康度
+          this.analyzeHighFrequencyUsers()
+          this.analyzeBudgetHealth()
+
           logger.info('[DailyReport] 运营日报加载成功', {
             report_date: response.data?.report_date,
             total_draws: response.data?.summary?.total_draws
@@ -166,6 +187,128 @@ export function useDailyReportMethods() {
       logger.info('[DailyReport] 尝试导出日报', {
         report_date: this.dailyReport.report_date
       })
+    },
+
+    // ==================== P1-7: 单用户高频预警 ====================
+    /**
+     * 从日报数据中检测单用户高频预警
+     * 当 unique_users 极低而 total_draws 极高时触发预警
+     */
+    analyzeHighFrequencyUsers() {
+      if (!this.dailyReport?.summary) {
+        this.highFrequencyWarnings = []
+        return
+      }
+
+      const warnings = []
+      const summary = this.dailyReport.summary
+      const uniqueUsers = summary.unique_users || 0
+      const totalDraws = summary.total_draws || 0
+
+      // 当日活跃用户数极低但抽奖次数高时预警
+      if (uniqueUsers > 0 && uniqueUsers <= 3 && totalDraws > 50) {
+        const avgDrawsPerUser = Math.round(totalDraws / uniqueUsers)
+        warnings.push({
+          level: avgDrawsPerUser > 200 ? 'danger' : 'warning',
+          title: `单用户高频抽奖预警`,
+          message: `仅 ${uniqueUsers} 个用户产生 ${totalDraws} 次抽奖，人均 ${avgDrawsPerUser} 次/天`,
+          suggestion: '建议检查是否存在刷奖行为，或配置每日抽奖配额限制'
+        })
+      }
+
+      // 检查日报中的 alerts 字段
+      if (this.dailyReport.alerts && Array.isArray(this.dailyReport.alerts)) {
+        this.dailyReport.alerts.forEach(alert => {
+          if (alert.type === 'high_frequency' || alert.type === 'user_frequency') {
+            warnings.push({
+              level: alert.level || 'warning',
+              title: alert.title || '频率异常',
+              message: alert.message || alert.description || '',
+              suggestion: alert.suggestion || ''
+            })
+          }
+        })
+      }
+
+      this.highFrequencyWarnings = warnings
+      if (warnings.length > 0) {
+        logger.warn('[DailyReport] 检测到高频预警', { count: warnings.length })
+      }
+    },
+
+    // ==================== P1-7: 预算健康度可视化 ====================
+    /**
+     * 从日报数据中提取预算健康度分布
+     * B0-B3 分别代表预算层级（B3 最低预算层）
+     *
+     * 注意：B0-B3字段来自 lottery_daily_metrics 表，
+     * 后端日报API（ReportService.generateDailyReport）当前暂未包含这些字段。
+     * 如果后端扩展日报返回 b0_count~b3_count，此处自动生效。
+     * 若后端未返回则显示全零（通过 || 0 fallback）。
+     */
+    analyzeBudgetHealth() {
+      if (!this.dailyReport?.summary && !this.dailyReport?.budget) {
+        return
+      }
+
+      const summary = this.dailyReport.summary || {}
+      const budget = this.dailyReport.budget || {}
+
+      const b0 = summary.b0_count || budget.b0_count || 0
+      const b1 = summary.b1_count || budget.b1_count || 0
+      const b2 = summary.b2_count || budget.b2_count || 0
+      const b3 = summary.b3_count || budget.b3_count || 0
+      const total = b0 + b1 + b2 + b3
+
+      // 计算健康等级：如果 B3 占比过高则不健康
+      let health_level = 'healthy'
+      if (total > 0) {
+        const b3_ratio = b3 / total
+        if (b3_ratio >= 0.8) {
+          health_level = 'critical'
+        } else if (b3_ratio >= 0.5) {
+          health_level = 'warning'
+        }
+      }
+
+      this.budgetHealthData = {
+        b0_count: b0,
+        b1_count: b1,
+        b2_count: b2,
+        b3_count: b3,
+        total_days: total,
+        health_level
+      }
+
+      logger.info('[DailyReport] 预算健康度分析完成', this.budgetHealthData)
+    },
+
+    /**
+     * 获取预算健康度CSS类
+     * @param {string} level - 健康等级
+     * @returns {string} CSS类
+     */
+    getBudgetHealthClass(level) {
+      return {
+        healthy: 'text-green-600 bg-green-50 border-green-200',
+        warning: 'text-yellow-600 bg-yellow-50 border-yellow-200',
+        critical: 'text-red-600 bg-red-50 border-red-200',
+        unknown: 'text-gray-600 bg-gray-50 border-gray-200'
+      }[level] || 'text-gray-600 bg-gray-50 border-gray-200'
+    },
+
+    /**
+     * 获取预算健康度标签
+     * @param {string} level - 健康等级
+     * @returns {string} 标签文本
+     */
+    getBudgetHealthLabel(level) {
+      return {
+        healthy: '✅ 健康',
+        warning: '⚠️ 警告',
+        critical: '🔴 异常',
+        unknown: '❓ 未知'
+      }[level] || '❓ 未知'
     },
 
     /**

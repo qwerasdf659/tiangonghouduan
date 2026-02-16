@@ -19,10 +19,14 @@ import { useImagesState, useImagesMethods } from './images.js'
 // 客服工作台模块
 import { useCustomerServiceState, useCustomerServiceMethods } from './customer-service.js'
 
+// 反馈管理模块（P1-5）
+import { useFeedbackState, useFeedbackMethods } from './feedback.js'
+
 export { useAnnouncementsState, useAnnouncementsMethods }
 export { useBannersState, useBannersMethods }
 export { useImagesState, useImagesMethods }
 export { useCustomerServiceState, useCustomerServiceMethods }
+export { useFeedbackState, useFeedbackMethods }
 
 /**
  * 组合所有内容管理状态（content-management.js 使用）

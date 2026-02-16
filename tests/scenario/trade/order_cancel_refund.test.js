@@ -361,7 +361,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
           { transaction: transaction2 }
         )
         await transaction2.commit()
-        testOrderId = orderResult.order_id
+        testOrderId = orderResult.trade_order_id
         createdOrderIds.push(testOrderId)
       } catch (error) {
         await transaction2.rollback()
@@ -507,7 +507,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
           { transaction: transaction2 }
         )
         await transaction2.commit()
-        testOrderId = orderResult.order_id
+        testOrderId = orderResult.trade_order_id
         createdOrderIds.push(testOrderId)
       } catch (error) {
         await transaction2.rollback()
@@ -673,7 +673,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
           { transaction: transaction2 }
         )
         await transaction2.commit()
-        testOrderId = orderResult.order_id
+        testOrderId = orderResult.trade_order_id
         createdOrderIds.push(testOrderId)
       } catch (error) {
         await transaction2.rollback()
@@ -803,7 +803,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
           { transaction: transaction1 }
         )
         await transaction1.commit()
-        firstOrderId = orderResult.order_id
+        firstOrderId = orderResult.trade_order_id
         createdOrderIds.push(firstOrderId)
       } catch (error) {
         await transaction1.rollback()
@@ -847,7 +847,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
           { transaction: transaction3 }
         )
         await transaction3.commit()
-        secondOrderId = orderResult.order_id
+        secondOrderId = orderResult.trade_order_id
         createdOrderIds.push(secondOrderId)
       } catch (error) {
         await transaction3.rollback()
@@ -927,7 +927,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
           { transaction: transaction2 }
         )
         await transaction2.commit()
-        testOrderId = orderResult.order_id
+        testOrderId = orderResult.trade_order_id
         createdOrderIds.push(testOrderId)
       } catch (error) {
         await transaction2.rollback()

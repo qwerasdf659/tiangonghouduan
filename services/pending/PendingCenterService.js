@@ -41,7 +41,11 @@ const TIMEOUT_THRESHOLDS = {
   /** 风控告警超时阈值（1小时） */
   risk_alert: 60,
   /** 抽奖告警超时阈值（2小时） */
-  lottery_alert: 120
+  lottery_alert: 120,
+  /** 兑换核销超时阈值（48小时，核销码有30天有效期但运营应48小时内处理） */
+  redemption: 48 * 60,
+  /** 用户反馈超时阈值（72小时，SLA标准：低优先级72小时内响应） */
+  feedback: 72 * 60
 }
 
 /**
@@ -52,7 +56,11 @@ const PENDING_CATEGORIES = {
   CONSUMPTION: 'consumption',
   CUSTOMER_SERVICE: 'customer_service',
   RISK_ALERT: 'risk_alert',
-  LOTTERY_ALERT: 'lottery_alert'
+  LOTTERY_ALERT: 'lottery_alert',
+  /** 兑换核销待处理（redemption_orders 表 status=pending） */
+  REDEMPTION: 'redemption',
+  /** 用户反馈待处理（feedbacks 表 status=pending） */
+  FEEDBACK: 'feedback'
 }
 
 /**
@@ -94,13 +102,16 @@ class PendingCenterService {
         return cached
       }
 
-      // 2. 并行查询各分类统计
-      const [consumption, customerService, riskAlerts, lotteryAlerts] = await Promise.all([
-        this._getCategoryStats(PENDING_CATEGORIES.CONSUMPTION),
-        this._getCategoryStats(PENDING_CATEGORIES.CUSTOMER_SERVICE),
-        this._getCategoryStats(PENDING_CATEGORIES.RISK_ALERT),
-        this._getCategoryStats(PENDING_CATEGORIES.LOTTERY_ALERT)
-      ])
+      // 2. 并行查询各分类统计（6个数据源）
+      const [consumption, customerService, riskAlerts, lotteryAlerts, redemption, feedback] =
+        await Promise.all([
+          this._getCategoryStats(PENDING_CATEGORIES.CONSUMPTION),
+          this._getCategoryStats(PENDING_CATEGORIES.CUSTOMER_SERVICE),
+          this._getCategoryStats(PENDING_CATEGORIES.RISK_ALERT),
+          this._getCategoryStats(PENDING_CATEGORIES.LOTTERY_ALERT),
+          this._getCategoryStats(PENDING_CATEGORIES.REDEMPTION),
+          this._getCategoryStats(PENDING_CATEGORIES.FEEDBACK)
+        ])
 
       // 3. 组装返回结构
       const segments = [
@@ -127,6 +138,18 @@ class PendingCenterService {
           category_name: '抽奖告警',
           icon: 'trophy',
           ...lotteryAlerts
+        },
+        {
+          category: PENDING_CATEGORIES.REDEMPTION,
+          category_name: '兑换核销',
+          icon: 'ticket',
+          ...redemption
+        },
+        {
+          category: PENDING_CATEGORIES.FEEDBACK,
+          category_name: '用户反馈',
+          icon: 'feedback',
+          ...feedback
         }
       ]
 
@@ -182,15 +205,25 @@ class PendingCenterService {
         const categoryItems = await this._getCategoryItems(category, { urgent_only })
         items.push(...categoryItems)
       } else {
-        // 否则查询所有分类
-        const [consumption, customerService, riskAlerts, lotteryAlerts] = await Promise.all([
-          this._getCategoryItems(PENDING_CATEGORIES.CONSUMPTION, { urgent_only }),
-          this._getCategoryItems(PENDING_CATEGORIES.CUSTOMER_SERVICE, { urgent_only }),
-          this._getCategoryItems(PENDING_CATEGORIES.RISK_ALERT, { urgent_only }),
-          this._getCategoryItems(PENDING_CATEGORIES.LOTTERY_ALERT, { urgent_only })
-        ])
+        // 否则查询所有分类（6个数据源）
+        const [consumption, customerService, riskAlerts, lotteryAlerts, redemption, feedback] =
+          await Promise.all([
+            this._getCategoryItems(PENDING_CATEGORIES.CONSUMPTION, { urgent_only }),
+            this._getCategoryItems(PENDING_CATEGORIES.CUSTOMER_SERVICE, { urgent_only }),
+            this._getCategoryItems(PENDING_CATEGORIES.RISK_ALERT, { urgent_only }),
+            this._getCategoryItems(PENDING_CATEGORIES.LOTTERY_ALERT, { urgent_only }),
+            this._getCategoryItems(PENDING_CATEGORIES.REDEMPTION, { urgent_only }),
+            this._getCategoryItems(PENDING_CATEGORIES.FEEDBACK, { urgent_only })
+          ])
 
-        items.push(...consumption, ...customerService, ...riskAlerts, ...lotteryAlerts)
+        items.push(
+          ...consumption,
+          ...customerService,
+          ...riskAlerts,
+          ...lotteryAlerts,
+          ...redemption,
+          ...feedback
+        )
       }
 
       // 2. 按创建时间排序（紧急项优先，然后按时间升序）
@@ -249,6 +282,10 @@ class PendingCenterService {
           return await this._getRiskAlertStats()
         case PENDING_CATEGORIES.LOTTERY_ALERT:
           return await this._getLotteryAlertStats()
+        case PENDING_CATEGORIES.REDEMPTION:
+          return await this._getRedemptionStats()
+        case PENDING_CATEGORIES.FEEDBACK:
+          return await this._getFeedbackStats()
         default:
           return { count: 0, urgent_count: 0, oldest_minutes: 0 }
       }
@@ -277,6 +314,10 @@ class PendingCenterService {
           return await this._getRiskAlertItems(options)
         case PENDING_CATEGORIES.LOTTERY_ALERT:
           return await this._getLotteryAlertItems(options)
+        case PENDING_CATEGORIES.REDEMPTION:
+          return await this._getRedemptionItems(options)
+        case PENDING_CATEGORIES.FEEDBACK:
+          return await this._getFeedbackItems(options)
         default:
           return []
       }
@@ -644,6 +685,229 @@ class PendingCenterService {
         })
         .filter(item => (urgent_only ? item.is_urgent : true))
     } catch (error) {
+      return []
+    }
+  }
+
+  // ==================== 兑换核销 ====================
+
+  /**
+   * 获取兑换核销待处理统计（redemption_orders 表 status='pending'）
+   *
+   * @private
+   * @returns {Promise<Object>} 兑换核销统计信息
+   */
+  static async _getRedemptionStats() {
+    try {
+      const { RedemptionOrder } = require('../../models')
+
+      const pendingOrders = await RedemptionOrder.findAll({
+        where: { status: 'pending' },
+        attributes: ['redemption_order_id', 'created_at'],
+        raw: true
+      })
+
+      const now = new Date()
+      const threshold = TIMEOUT_THRESHOLDS.redemption
+      let urgentCount = 0
+      let oldestMinutes = 0
+
+      pendingOrders.forEach(order => {
+        const waitMinutes = Math.floor((now - new Date(order.created_at)) / 60000)
+        if (waitMinutes >= threshold) urgentCount++
+        if (waitMinutes > oldestMinutes) oldestMinutes = waitMinutes
+      })
+
+      return {
+        count: pendingOrders.length,
+        urgent_count: urgentCount,
+        oldest_minutes: oldestMinutes,
+        timeout_threshold_minutes: threshold
+      }
+    } catch (error) {
+      return { count: 0, urgent_count: 0, oldest_minutes: 0, error: error.message }
+    }
+  }
+
+  /**
+   * 获取兑换核销待处理列表项
+   *
+   * @private
+   * @param {Object} options - 查询选项
+   * @param {boolean} [options.urgent_only=false] - 是否只返回紧急项
+   * @returns {Promise<Array<Object>>} 兑换核销列表项
+   */
+  static async _getRedemptionItems(options = {}) {
+    try {
+      const { RedemptionOrder, User, ItemInstance } = require('../../models')
+      const { urgent_only = false } = options
+
+      const pendingOrders = await RedemptionOrder.findAll({
+        where: { status: 'pending' },
+        include: [
+          {
+            model: User,
+            as: 'redeemer',
+            attributes: ['user_id', 'nickname', 'mobile'],
+            required: false
+          },
+          {
+            model: ItemInstance,
+            as: 'item_instance',
+            attributes: ['item_instance_id', 'item_type', 'meta'],
+            required: false
+          }
+        ],
+        order: [['created_at', 'ASC']],
+        limit: 100
+      })
+
+      if (pendingOrders.length === 0) return []
+
+      const now = new Date()
+      const threshold = TIMEOUT_THRESHOLDS.redemption
+
+      return pendingOrders
+        .map(order => {
+          const orderData = order.toJSON()
+          const waitMinutes = Math.floor((now - new Date(order.created_at)) / 60000)
+          const isUrgent = waitMinutes >= threshold
+          const prizeName =
+            orderData.item_instance?.meta?.prize_name ||
+            orderData.item_instance?.meta?.name ||
+            orderData.item_instance?.item_type ||
+            '未知奖品'
+
+          return {
+            id: orderData.redemption_order_id,
+            category: PENDING_CATEGORIES.REDEMPTION,
+            category_name: '兑换核销',
+            title: `核销订单 - ${prizeName}`,
+            description: `用户${orderData.redeemer?.nickname || orderData.redeemer?.mobile || '未知'}的核销订单待处理`,
+            user_id: orderData.redeemer?.user_id || null,
+            created_at: BeijingTimeHelper.format(order.created_at),
+            waiting_time: this._formatWaitingTime(waitMinutes),
+            waiting_minutes: waitMinutes,
+            is_urgent: isUrgent,
+            action_url: `/admin/redemption-management.html`
+          }
+        })
+        .filter(item => (urgent_only ? item.is_urgent : true))
+    } catch (error) {
+      logger.warn('[待处理中心] 兑换核销列表查询失败', { error: error.message })
+      return []
+    }
+  }
+
+  // ==================== 用户反馈 ====================
+
+  /**
+   * 获取用户反馈待处理统计（feedbacks 表 status='pending'）
+   *
+   * @private
+   * @returns {Promise<Object>} 用户反馈统计信息
+   */
+  static async _getFeedbackStats() {
+    try {
+      const { Feedback } = require('../../models')
+
+      const pendingFeedbacks = await Feedback.findAll({
+        where: { status: 'pending' },
+        attributes: ['feedback_id', 'created_at'],
+        raw: true
+      })
+
+      const now = new Date()
+      const threshold = TIMEOUT_THRESHOLDS.feedback
+      let urgentCount = 0
+      let oldestMinutes = 0
+
+      pendingFeedbacks.forEach(fb => {
+        const waitMinutes = Math.floor((now - new Date(fb.created_at)) / 60000)
+        if (waitMinutes >= threshold) urgentCount++
+        if (waitMinutes > oldestMinutes) oldestMinutes = waitMinutes
+      })
+
+      return {
+        count: pendingFeedbacks.length,
+        urgent_count: urgentCount,
+        oldest_minutes: oldestMinutes,
+        timeout_threshold_minutes: threshold
+      }
+    } catch (error) {
+      return { count: 0, urgent_count: 0, oldest_minutes: 0, error: error.message }
+    }
+  }
+
+  /**
+   * 获取用户反馈待处理列表项
+   *
+   * @private
+   * @param {Object} options - 查询选项
+   * @param {boolean} [options.urgent_only=false] - 是否只返回紧急项
+   * @returns {Promise<Array<Object>>} 用户反馈列表项
+   */
+  static async _getFeedbackItems(options = {}) {
+    try {
+      const { Feedback, User } = require('../../models')
+      const { urgent_only = false } = options
+
+      const pendingFeedbacks = await Feedback.findAll({
+        where: { status: 'pending' },
+        include: [
+          {
+            model: User,
+            as: 'user',
+            attributes: ['user_id', 'nickname', 'mobile']
+          }
+        ],
+        order: [
+          ['priority', 'DESC'],
+          ['created_at', 'ASC']
+        ],
+        limit: 100
+      })
+
+      if (pendingFeedbacks.length === 0) return []
+
+      const now = new Date()
+      const threshold = TIMEOUT_THRESHOLDS.feedback
+
+      /** 反馈分类中文映射 */
+      const categoryMap = {
+        technical: '技术问题',
+        feature: '功能建议',
+        bug: '错误报告',
+        complaint: '投诉',
+        suggestion: '建议',
+        other: '其他'
+      }
+
+      return pendingFeedbacks
+        .map(fb => {
+          const fbData = fb.toJSON()
+          const waitMinutes = Math.floor((now - new Date(fb.created_at)) / 60000)
+          const isUrgent = waitMinutes >= threshold
+          const categoryLabel = categoryMap[fbData.category] || fbData.category
+
+          return {
+            id: fbData.feedback_id,
+            category: PENDING_CATEGORIES.FEEDBACK,
+            category_name: '用户反馈',
+            title: `[${categoryLabel}] ${fbData.content?.substring(0, 30) || '用户反馈'}`,
+            description: fbData.content?.substring(0, 80) || '待处理用户反馈',
+            user_id: fbData.user?.user_id || fbData.user_id,
+            priority: fbData.priority,
+            created_at: BeijingTimeHelper.format(fb.created_at),
+            waiting_time: this._formatWaitingTime(waitMinutes),
+            waiting_minutes: waitMinutes,
+            is_urgent: isUrgent,
+            action_url: `/admin/feedback-management.html`
+          }
+        })
+        .filter(item => (urgent_only ? item.is_urgent : true))
+    } catch (error) {
+      logger.warn('[待处理中心] 用户反馈列表查询失败', { error: error.message })
       return []
     }
   }

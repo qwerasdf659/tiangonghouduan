@@ -173,6 +173,12 @@ function riskAlertsPage() {
     /** @type {string|null} 上次数据更新时间（#2） */
     lastUpdateTime: null,
 
+    // ========== P2#11: 市场价格异常监控状态 ==========
+    /** @type {Object|null} 市场监控数据 */
+    marketMonitor: null,
+    /** @type {boolean} 市场监控加载状态 */
+    loadingMarketMonitor: false,
+
     /** @type {number|null} 自动刷新定时器ID */
     refreshTimer: null,
 
@@ -352,6 +358,9 @@ function riskAlertsPage() {
 
       // 加载告警
       await this.loadAlerts()
+
+      // P2#11: 加载市场价格监控数据
+      this.loadMarketPriceMonitor()
 
       // 自动刷新（60秒）
       if (this.autoRefresh) {
@@ -875,6 +884,78 @@ function riskAlertsPage() {
 
         // #2 更新上次刷新时间
         this.lastUpdateTime = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+      }
+    },
+
+    /**
+     * P2#11: 加载市场价格异常监控数据
+     * @description 从市场统计API和系统设置API获取市场健康指标和价格阈值配置
+     * 使用后端API:
+     * - GET /api/v4/console/marketplace/listing-stats (挂单统计)
+     * - GET /api/v4/console/settings/marketplace (市场阈值配置)
+     */
+    async loadMarketPriceMonitor() {
+      this.loadingMarketMonitor = true
+      try {
+        // 并行获取市场挂单统计和市场阈值配置
+        // 后端API: GET /api/v4/console/marketplace/listing-stats
+        // 后端API: GET /api/v4/console/settings/marketplace (SYSTEM_ENDPOINTS.SETTING_MARKETPLACE)
+        const marketplaceStatsUrl = `${SYSTEM_ENDPOINTS.RISK_ALERT_LIST}`.replace('/risk-alerts', '/marketplace/listing-stats')
+        const marketplaceSettingsUrl = SYSTEM_ENDPOINTS.SETTING_MARKETPLACE || `${SYSTEM_ENDPOINTS.RISK_ALERT_LIST}`.replace('/risk-alerts', '/settings/marketplace')
+        const [listingStatsRes, settingsRes] = await Promise.allSettled([
+          apiRequest(`${marketplaceStatsUrl}?page=1&limit=1`),
+          apiRequest(marketplaceSettingsUrl)
+        ])
+
+        const listingData = listingStatsRes.status === 'fulfilled' && listingStatsRes.value?.success
+          ? listingStatsRes.value.data : null
+        const settingsRaw = settingsRes.status === 'fulfilled' && settingsRes.value?.success
+          ? settingsRes.value.data : null
+
+        // 后端 settings/marketplace 返回结构: { category, count, settings: [{setting_key, setting_value, ...}] }
+        // 需要将 settings 数组转换为键值对
+        const settingsMap = {}
+        if (settingsRaw?.settings && Array.isArray(settingsRaw.settings)) {
+          settingsRaw.settings.forEach(s => {
+            settingsMap[s.setting_key] = s.parsed_value !== undefined ? s.parsed_value : s.setting_value
+          })
+        }
+
+        // 后端 listing-stats 返回结构:
+        // { summary: { total_users_with_listings, users_at_limit, users_near_limit, total_listings }, pagination }
+        const summary = listingData?.summary || {}
+
+        // 组装市场监控数据（直接使用后端字段名）
+        this.marketMonitor = {
+          // 从挂单统计获取（后端字段: summary.total_listings, summary.total_users_with_listings）
+          active_listings: summary.total_users_with_listings || 0,
+          total_listings: summary.total_listings || 0,
+          completed_deals: summary.users_at_limit || 0,
+          withdrawn_listings: summary.users_near_limit || 0,
+          // 成交率需要从其他API获取，暂用 0
+          deal_rate: 0,
+          c2c_completion_rate: 0,
+          price_anomaly_count: 0,
+          // 阈值配置（从 system_settings 键值对中获取）
+          thresholds: {
+            price_low: settingsMap.monitor_price_low_threshold || '未配置',
+            price_high: settingsMap.monitor_price_high_threshold || '未配置',
+            alert_enabled: settingsMap.monitor_alert_enabled === true || settingsMap.monitor_alert_enabled === 'true',
+            long_listing_days: settingsMap.monitor_long_listing_days || '未配置',
+            min_price: settingsMap.min_price_red_shard || '未配置',
+            max_price: settingsMap.max_price_red_shard || '未配置'
+          }
+        }
+
+        logger.info('[P2-11] 市场价格监控数据加载完成', {
+          active_listings: this.marketMonitor.active_listings,
+          deal_rate: this.marketMonitor.deal_rate
+        })
+      } catch (error) {
+        logger.error('[P2-11] 加载市场价格监控失败:', error.message)
+        this.marketMonitor = null
+      } finally {
+        this.loadingMarketMonitor = false
       }
     },
 

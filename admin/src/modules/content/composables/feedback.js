@@ -1,0 +1,381 @@
+/**
+ * 用户反馈管理模块
+ *
+ * @file admin/src/modules/content/composables/feedback.js
+ * @description P1-5 - 用户反馈管理状态和方法（复用客服工作台交互模式）
+ * @version 1.0.0
+ * @date 2026-02-17
+ */
+
+import { logger } from '../../../utils/logger.js'
+import { CONTENT_ENDPOINTS, ContentAPI } from '../../../api/content.js'
+import { request } from '../../../api/base.js'
+
+// ========== 反馈状态字典 ==========
+const FEEDBACK_STATUS_MAP = {
+  pending: { label: '待处理', color: 'yellow', icon: '⏳' },
+  processing: { label: '处理中', color: 'blue', icon: '🔄' },
+  replied: { label: '已回复', color: 'green', icon: '💬' },
+  closed: { label: '已关闭', color: 'gray', icon: '✅' }
+}
+
+const FEEDBACK_CATEGORY_MAP = {
+  technical: { label: '技术问题', color: 'red', icon: '🔧' },
+  feature: { label: '功能建议', color: 'purple', icon: '💡' },
+  bug: { label: '错误报告', color: 'red', icon: '🐛' },
+  complaint: { label: '投诉', color: 'orange', icon: '⚠️' },
+  suggestion: { label: '建议', color: 'blue', icon: '💭' },
+  other: { label: '其他', color: 'gray', icon: '📝' }
+}
+
+const FEEDBACK_PRIORITY_MAP = {
+  low: { label: '低', color: 'gray', icon: '🔽' },
+  medium: { label: '中', color: 'yellow', icon: '➡️' },
+  high: { label: '高', color: 'red', icon: '🔺' }
+}
+
+/**
+ * 反馈管理状态
+ * @returns {Object} 状态对象
+ */
+export function useFeedbackState() {
+  return {
+    /** @type {Array} 反馈列表 */
+    feedbacks: [],
+    /** @type {Object|null} 当前选中的反馈详情 */
+    currentFeedback: null,
+    /** @type {boolean} 加载状态 */
+    loadingFeedbacks: false,
+    /** @type {Object} 反馈统计 */
+    feedbackStats: {
+      total: 0,
+      pending: 0,
+      processing: 0,
+      replied: 0,
+      closed: 0
+    },
+    /** @type {Object} 筛选条件 */
+    feedbackFilters: {
+      status: '',
+      category: '',
+      priority: '',
+      page: 1,
+      page_size: 20
+    },
+    /** @type {Object} 分页信息 */
+    feedbackPagination: {
+      total: 0,
+      page: 1,
+      page_size: 20
+    },
+    /** @type {boolean} 显示回复弹窗 */
+    showReplyModal: false,
+    /** @type {string} 回复内容 */
+    replyContent: '',
+    /** @type {string} 内部备注 */
+    replyInternalNotes: '',
+    /** @type {boolean} 回复提交中 */
+    submittingReply: false,
+    /** @type {boolean} 显示详情面板 */
+    showFeedbackDetail: false,
+    /** @type {boolean} 显示状态更新弹窗 */
+    showStatusModal: false,
+    /** @type {string} 新状态 */
+    newStatus: '',
+    /** @type {string} 状态备注 */
+    statusNotes: '',
+    /** @type {Object} 状态字典 */
+    FEEDBACK_STATUS_MAP,
+    /** @type {Object} 分类字典 */
+    FEEDBACK_CATEGORY_MAP,
+    /** @type {Object} 优先级字典 */
+    FEEDBACK_PRIORITY_MAP
+  }
+}
+
+/**
+ * 反馈管理方法
+ * @returns {Object} 方法对象
+ */
+export function useFeedbackMethods() {
+  return {
+    /**
+     * 加载反馈列表
+     */
+    async loadFeedbacks() {
+      this.loadingFeedbacks = true
+      try {
+        const params = {}
+        if (this.feedbackFilters.status) params.status = this.feedbackFilters.status
+        if (this.feedbackFilters.category) params.category = this.feedbackFilters.category
+        if (this.feedbackFilters.priority) params.priority = this.feedbackFilters.priority
+        params.limit = this.feedbackFilters.page_size
+        params.offset = (this.feedbackFilters.page - 1) * this.feedbackFilters.page_size
+
+        const response = await ContentAPI.getFeedbacks(params)
+
+        if (response?.success) {
+          this.feedbacks = response.data?.feedbacks || response.data?.list || []
+          // 后端 FeedbackService.getFeedbackList 返回 { feedbacks, total, limit, offset }
+          // total 在 response.data 顶层，不在 pagination 对象中
+          this.feedbackPagination = {
+            total: response.data?.total || response.data?.pagination?.total || this.feedbacks.length,
+            page: this.feedbackFilters.page,
+            page_size: this.feedbackFilters.page_size
+          }
+          logger.info('[Feedback] 反馈列表加载成功', {
+            count: this.feedbacks.length,
+            total: this.feedbackPagination.total
+          })
+        } else {
+          this.showError?.('加载反馈列表失败: ' + (response?.message || '未知错误'))
+        }
+      } catch (error) {
+        logger.error('[Feedback] 加载反馈列表失败:', error)
+        this.showError?.('加载反馈列表失败: ' + (error.message || '网络错误'))
+      } finally {
+        this.loadingFeedbacks = false
+      }
+    },
+
+    /**
+     * 加载反馈统计
+     */
+    async loadFeedbackStats() {
+      try {
+        const url = CONTENT_ENDPOINTS.FEEDBACK_STATS
+        const response = await request({ url, method: 'GET' })
+
+        if (response?.success) {
+          this.feedbackStats = response.data || this.feedbackStats
+          logger.info('[Feedback] 反馈统计加载成功', this.feedbackStats)
+        }
+      } catch (error) {
+        logger.warn('[Feedback] 加载反馈统计失败:', error.message)
+      }
+    },
+
+    /**
+     * 查看反馈详情
+     * @param {Object} feedback - 反馈对象
+     */
+    async viewFeedbackDetail(feedback) {
+      try {
+        const response = await ContentAPI.getFeedbackDetail(feedback.feedback_id || feedback.id)
+        if (response?.success) {
+          this.currentFeedback = response.data?.feedback || response.data
+          this.showFeedbackDetail = true
+        } else {
+          this.showError?.('获取反馈详情失败')
+        }
+      } catch (error) {
+        logger.error('[Feedback] 获取反馈详情失败:', error)
+        this.showError?.('获取反馈详情失败: ' + error.message)
+      }
+    },
+
+    /**
+     * 打开回复弹窗
+     * @param {Object} feedback - 反馈对象
+     */
+    openReplyModal(feedback) {
+      this.currentFeedback = feedback
+      this.replyContent = ''
+      this.replyInternalNotes = ''
+      this.showReplyModal = true
+    },
+
+    /**
+     * 提交回复
+     */
+    async submitReply() {
+      if (!this.replyContent.trim()) {
+        this.showError?.('回复内容不能为空')
+        return
+      }
+
+      this.submittingReply = true
+      try {
+        const feedbackId = this.currentFeedback?.feedback_id || this.currentFeedback?.id
+        const response = await ContentAPI.replyFeedback(feedbackId, {
+          reply_content: this.replyContent.trim(),
+          internal_notes: this.replyInternalNotes.trim() || null
+        })
+
+        if (response?.success) {
+          this.showReplyModal = false
+          this.replyContent = ''
+          this.replyInternalNotes = ''
+          if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
+            Alpine.store('notification').success('回复成功')
+          }
+          // 刷新列表和统计
+          await Promise.all([this.loadFeedbacks(), this.loadFeedbackStats()])
+        } else {
+          this.showError?.('回复失败: ' + (response?.message || '未知错误'))
+        }
+      } catch (error) {
+        logger.error('[Feedback] 回复反馈失败:', error)
+        this.showError?.('回复失败: ' + (error.message || '网络错误'))
+      } finally {
+        this.submittingReply = false
+      }
+    },
+
+    /**
+     * 打开状态更新弹窗
+     * @param {Object} feedback - 反馈对象
+     */
+    openStatusModal(feedback) {
+      this.currentFeedback = feedback
+      this.newStatus = ''
+      this.statusNotes = ''
+      this.showStatusModal = true
+    },
+
+    /**
+     * 提交状态更新
+     */
+    async submitStatusUpdate() {
+      if (!this.newStatus) {
+        this.showError?.('请选择新状态')
+        return
+      }
+
+      try {
+        const feedbackId = this.currentFeedback?.feedback_id || this.currentFeedback?.id
+        const response = await ContentAPI.updateFeedbackStatus(feedbackId, {
+          status: this.newStatus,
+          internal_notes: this.statusNotes.trim() || null
+        })
+
+        if (response?.success) {
+          this.showStatusModal = false
+          if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
+            Alpine.store('notification').success('状态更新成功')
+          }
+          await Promise.all([this.loadFeedbacks(), this.loadFeedbackStats()])
+        } else {
+          this.showError?.('状态更新失败: ' + (response?.message || '未知错误'))
+        }
+      } catch (error) {
+        logger.error('[Feedback] 更新状态失败:', error)
+        this.showError?.('状态更新失败: ' + (error.message || '网络错误'))
+      }
+    },
+
+    /**
+     * 筛选反馈
+     */
+    filterFeedbacks() {
+      this.feedbackFilters.page = 1
+      this.loadFeedbacks()
+    },
+
+    /**
+     * 重置筛选
+     */
+    resetFeedbackFilters() {
+      this.feedbackFilters = {
+        status: '',
+        category: '',
+        priority: '',
+        page: 1,
+        page_size: 20
+      }
+      this.loadFeedbacks()
+    },
+
+    /**
+     * 反馈分页切换
+     * @param {number} page - 页码
+     */
+    goToFeedbackPage(page) {
+      if (page < 1 || page > this.feedbackTotalPages) return
+      this.feedbackFilters.page = page
+      this.loadFeedbacks()
+    },
+
+    /**
+     * 获取反馈总页数
+     */
+    get feedbackTotalPages() {
+      return Math.ceil(this.feedbackPagination.total / this.feedbackFilters.page_size) || 1
+    },
+
+    /**
+     * 获取状态标签
+     * @param {string} status - 状态值
+     * @returns {Object} 状态显示信息
+     */
+    getFeedbackStatusInfo(status) {
+      return FEEDBACK_STATUS_MAP[status] || { label: status, color: 'gray', icon: '❓' }
+    },
+
+    /**
+     * 获取分类标签
+     * @param {string} category - 分类值
+     * @returns {Object} 分类显示信息
+     */
+    getFeedbackCategoryInfo(category) {
+      return FEEDBACK_CATEGORY_MAP[category] || { label: category, color: 'gray', icon: '📝' }
+    },
+
+    /**
+     * 获取优先级标签
+     * @param {string} priority - 优先级值
+     * @returns {Object} 优先级显示信息
+     */
+    getFeedbackPriorityInfo(priority) {
+      return FEEDBACK_PRIORITY_MAP[priority] || { label: priority, color: 'gray', icon: '➡️' }
+    },
+
+    /**
+     * 获取状态 CSS 类
+     * @param {string} status - 状态值
+     * @returns {string} CSS 类名
+     */
+    getFeedbackStatusClass(status) {
+      const colorMap = {
+        pending: 'bg-yellow-100 text-yellow-800',
+        processing: 'bg-blue-100 text-blue-800',
+        replied: 'bg-green-100 text-green-800',
+        closed: 'bg-gray-100 text-gray-800'
+      }
+      return colorMap[status] || 'bg-gray-100 text-gray-800'
+    },
+
+    /**
+     * 获取优先级 CSS 类
+     * @param {string} priority - 优先级值
+     * @returns {string} CSS 类名
+     */
+    getFeedbackPriorityClass(priority) {
+      const colorMap = {
+        low: 'bg-gray-100 text-gray-600',
+        medium: 'bg-yellow-100 text-yellow-700',
+        high: 'bg-red-100 text-red-700'
+      }
+      return colorMap[priority] || 'bg-gray-100 text-gray-600'
+    },
+
+    /**
+     * 获取分类 CSS 类
+     * @param {string} category - 分类值
+     * @returns {string} CSS 类名
+     */
+    getFeedbackCategoryClass(category) {
+      const colorMap = {
+        technical: 'bg-blue-100 text-blue-700',
+        feature: 'bg-purple-100 text-purple-700',
+        bug: 'bg-red-100 text-red-700',
+        complaint: 'bg-orange-100 text-orange-700',
+        suggestion: 'bg-teal-100 text-teal-700',
+        other: 'bg-gray-100 text-gray-600'
+      }
+      return colorMap[category] || 'bg-gray-100 text-gray-600'
+    }
+  }
+}
+
+

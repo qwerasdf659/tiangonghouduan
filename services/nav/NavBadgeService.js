@@ -45,7 +45,11 @@ const BADGE_CATEGORIES = {
   /** 风控告警 */
   RISK_ALERT: 'risk_alert',
   /** 抽奖告警 */
-  LOTTERY_ALERT: 'lottery_alert'
+  LOTTERY_ALERT: 'lottery_alert',
+  /** 兑换核销待处理（redemption_orders 表 status=pending 的订单数） */
+  REDEMPTION: 'redemption',
+  /** 用户反馈待处理（feedbacks 表 status=pending 的反馈数） */
+  FEEDBACK: 'feedback'
 }
 
 /**
@@ -79,20 +83,25 @@ class NavBadgeService {
         return cached
       }
 
-      // 2. 并行查询各分类计数
-      const [consumption, customerService, riskAlerts, lotteryAlerts] = await Promise.all([
-        this._getConsumptionCount(),
-        this._getCustomerServiceCount(),
-        this._getRiskAlertCount(),
-        this._getLotteryAlertCount()
-      ])
+      // 2. 并行查询各分类计数（6个数据源）
+      const [consumption, customerService, riskAlerts, lotteryAlerts, redemption, feedback] =
+        await Promise.all([
+          this._getConsumptionCount(),
+          this._getCustomerServiceCount(),
+          this._getRiskAlertCount(),
+          this._getLotteryAlertCount(),
+          this._getRedemptionPendingCount(),
+          this._getFeedbackPendingCount()
+        ])
 
       // 3. 组装返回结构
       const badges = {
         [BADGE_CATEGORIES.CONSUMPTION]: consumption,
         [BADGE_CATEGORIES.CUSTOMER_SERVICE]: customerService,
         [BADGE_CATEGORIES.RISK_ALERT]: riskAlerts,
-        [BADGE_CATEGORIES.LOTTERY_ALERT]: lotteryAlerts
+        [BADGE_CATEGORIES.LOTTERY_ALERT]: lotteryAlerts,
+        [BADGE_CATEGORIES.REDEMPTION]: redemption,
+        [BADGE_CATEGORIES.FEEDBACK]: feedback
       }
 
       // 4. 计算总数
@@ -195,6 +204,44 @@ class NavBadgeService {
   }
 
   /**
+   * 获取兑换核销待处理数量（redemption_orders 表 status='pending' 的记录数）
+   *
+   * @private
+   * @returns {Promise<number>} 待核销订单数量
+   */
+  static async _getRedemptionPendingCount() {
+    try {
+      const { RedemptionOrder } = require('../../models')
+      const count = await RedemptionOrder.count({
+        where: { status: 'pending' }
+      })
+      return count
+    } catch (error) {
+      logger.warn('[导航徽标] 兑换核销计数失败', { error: error.message })
+      return 0
+    }
+  }
+
+  /**
+   * 获取用户反馈待处理数量（feedbacks 表 status='pending' 的记录数）
+   *
+   * @private
+   * @returns {Promise<number>} 待处理反馈数量
+   */
+  static async _getFeedbackPendingCount() {
+    try {
+      const { Feedback } = require('../../models')
+      const count = await Feedback.count({
+        where: { status: 'pending' }
+      })
+      return count
+    } catch (error) {
+      logger.warn('[导航徽标] 用户反馈计数失败', { error: error.message })
+      return 0
+    }
+  }
+
+  /**
    * 手动失效缓存
    *
    * @description 当待处理数据发生变化时调用此方法刷新缓存
@@ -229,6 +276,10 @@ class NavBadgeService {
         return await this._getRiskAlertCount()
       case BADGE_CATEGORIES.LOTTERY_ALERT:
         return await this._getLotteryAlertCount()
+      case BADGE_CATEGORIES.REDEMPTION:
+        return await this._getRedemptionPendingCount()
+      case BADGE_CATEGORIES.FEEDBACK:
+        return await this._getFeedbackPendingCount()
       default:
         logger.warn('[导航徽标] 未知分类', { category })
         return 0

@@ -244,6 +244,80 @@
         </div>
       </div>
 
+      <!-- P1-8: 履约追踪看板 -->
+      <div class="mt-6 themed-card rounded-lg shadow">
+        <div class="p-4 border-b bg-gradient-to-r from-green-50 to-blue-50">
+          <div class="flex items-center justify-between">
+            <h6 class="font-semibold text-green-800 flex items-center gap-2">
+              📦 履约追踪看板
+              <span class="text-xs px-2 py-0.5 rounded" :class="fulfillmentTracking.fulfillment_rate >= 80 ? 'bg-green-100 text-green-700' : fulfillmentTracking.fulfillment_rate >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'" x-text="getFulfillmentRateLabel(fulfillmentTracking.fulfillment_rate)"></span>
+            </h6>
+            <div class="text-sm text-gray-500">
+              总订单 <span class="font-bold" x-text="fulfillmentTracking.total_orders">0</span>
+            </div>
+          </div>
+        </div>
+        <div class="p-6">
+          <!-- 核心指标 -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="text-center p-4 border-2 rounded-lg" :class="fulfillmentTracking.fulfillment_rate >= 80 ? 'border-green-300 bg-green-50' : fulfillmentTracking.fulfillment_rate >= 50 ? 'border-yellow-300 bg-yellow-50' : 'border-red-300 bg-red-50'">
+              <p class="text-xs text-gray-500 mb-1">兑换完成率</p>
+              <p class="text-3xl font-bold" :class="getFulfillmentRateClass(fulfillmentTracking.fulfillment_rate)" x-text="fulfillmentTracking.fulfillment_rate + '%'">0%</p>
+            </div>
+            <div class="text-center p-4 border rounded-lg bg-yellow-50">
+              <p class="text-xs text-gray-500 mb-1">⏳ 待发货</p>
+              <p class="text-3xl font-bold text-yellow-600" x-text="fulfillmentTracking.pending_count">0</p>
+            </div>
+            <div class="text-center p-4 border rounded-lg bg-blue-50">
+              <p class="text-xs text-gray-500 mb-1">🚚 已发货</p>
+              <p class="text-3xl font-bold text-blue-600" x-text="fulfillmentTracking.shipped_count">0</p>
+            </div>
+            <div class="text-center p-4 border rounded-lg bg-green-50">
+              <p class="text-xs text-gray-500 mb-1">✅ 已完成</p>
+              <p class="text-3xl font-bold text-green-600" x-text="fulfillmentTracking.completed_count">0</p>
+            </div>
+          </div>
+          
+          <!-- 履约进度条 -->
+          <div class="mb-4">
+            <div class="flex justify-between text-xs text-gray-500 mb-1">
+              <span>履约进度</span>
+              <span x-text="fulfillmentTracking.completed_count + fulfillmentTracking.shipped_count + ' / ' + fulfillmentTracking.total_orders + ' 已处理'">0 / 0</span>
+            </div>
+            <!-- 后端 ExchangeRecord 状态枚举: pending / completed / shipped / cancelled -->
+            <div class="h-4 bg-gray-200 rounded-full overflow-hidden flex" x-show="fulfillmentTracking.total_orders > 0">
+              <div class="bg-green-500 transition-all" :style="'width:' + (fulfillmentTracking.completed_count / fulfillmentTracking.total_orders * 100) + '%'" title="已完成"></div>
+              <div class="bg-blue-500 transition-all" :style="'width:' + (fulfillmentTracking.shipped_count / fulfillmentTracking.total_orders * 100) + '%'" title="已发货"></div>
+              <div class="bg-yellow-500 transition-all" :style="'width:' + (fulfillmentTracking.pending_count / fulfillmentTracking.total_orders * 100) + '%'" title="待发货"></div>
+              <div class="bg-red-500 transition-all" :style="'width:' + (fulfillmentTracking.cancelled_count / fulfillmentTracking.total_orders * 100) + '%'" title="已取消"></div>
+            </div>
+            <div class="flex gap-4 mt-2 text-xs">
+              <span class="flex items-center gap-1"><span class="w-3 h-3 bg-green-500 rounded"></span>已完成</span>
+              <span class="flex items-center gap-1"><span class="w-3 h-3 bg-blue-500 rounded"></span>已发货</span>
+              <span class="flex items-center gap-1"><span class="w-3 h-3 bg-yellow-500 rounded"></span>待发货</span>
+              <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-500 rounded"></span>已取消</span>
+            </div>
+          </div>
+
+          <!-- 补充统计 -->
+          <div class="grid grid-cols-2 gap-4 mt-4">
+            <div class="p-3 bg-red-50 rounded text-center">
+              <p class="text-xs text-gray-500">已取消订单</p>
+              <p class="text-xl font-bold text-red-600" x-text="fulfillmentTracking.cancelled_count">0</p>
+            </div>
+            <div class="p-3 bg-indigo-50 rounded text-center">
+              <p class="text-xs text-gray-500">平均履约时间</p>
+              <p class="text-xl font-bold text-indigo-600" x-text="fulfillmentTracking.avg_fulfillment_time > 0 ? fulfillmentTracking.avg_fulfillment_time + 'h' : '-'">-</p>
+            </div>
+          </div>
+
+          <!-- 低履约率预警 -->
+          <div x-show="fulfillmentTracking.fulfillment_rate < 10 && fulfillmentTracking.total_orders > 0" class="mt-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+            ⚠️ 兑换完成率严重偏低 (<span x-text="fulfillmentTracking.fulfillment_rate">0</span>%)！建议：1.检查核销流程 2.处理积压的待发货订单 3.联系商户确认发货
+          </div>
+        </div>
+      </div>
+
       <!-- 详细统计表格 -->
       <div class="mt-6 themed-card rounded-lg shadow">
         <div class="p-4 border-b">

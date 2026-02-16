@@ -57,6 +57,7 @@ export const MENU_ACCESS_RULES = {
   'pending-center.customer-service': { minLevel: 1, description: '客服工作台' },
   'pending-center.risk-alerts': { minLevel: 30, description: '风控告警' },
   'pending-center.lottery-alerts': { minLevel: 30, description: '抽奖告警' },
+  'pending-center.feedback-mgmt': { minLevel: 30, description: '用户反馈处理' },
 
   // ========== 抽奖运营（role_level >= 30） ==========
   'lottery-ops': { minLevel: 30, description: '抽奖运营（分组）' },
@@ -112,6 +113,7 @@ export const PAGE_ACCESS_RULES = {
   // ========== 运营可访问（role_level >= 30，只读） ==========
   'finance-management.html': { minLevel: 30, menuId: 'operations.consumption' },
   'risk-alerts.html': { minLevel: 30, menuId: 'operations.risk' },
+  'feedback-management.html': { minLevel: 30, menuId: 'operations.feedback' },
 
   'lottery-management.html': { minLevel: 30, menuId: 'lottery.campaigns' },
   'presets.html': { minLevel: 30, menuId: 'lottery.presets' },

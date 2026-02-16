@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '兑换核销管理', 
+    pageStyle: `
+      [x-cloak] { display: none !important; }
+      
+      /* 统计卡片悬停 */
+      .stat-card { transition: all 0.3s ease; cursor: pointer; }
+      .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+      .stat-card.active { ring: 2px; box-shadow: 0 0 0 2px #3b82f6; }
+      
+      /* 表格行悬停 */
+      .order-row { transition: background-color 0.2s; }
+      .order-row:hover { background-color: #f8fafc; }
+    `
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  <div x-data="redemptionManagementPage()" x-init="init()" x-cloak class="p-6 space-y-6">
+
+    <!-- 顶部标题和操作栏 -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold themed-text">🎫 兑换核销管理</h1>
+        <p class="text-sm themed-text-muted mt-1">管理兑换核销订单 · 待核销 <span class="text-red-500 font-semibold" x-text="stats.pending">0</span> 笔</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <button @click="exportOrders()" class="px-4 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition">
+          📥 导出
+        </button>
+        <button @click="loadOrders(); loadStats()" class="px-4 py-2 text-sm themed-bg-base themed-text rounded-lg hover:themed-bg-subtle transition themed-border">
+          🔄 刷新
+        </button>
+      </div>
+    </div>
+
+    <!-- 统计卡片 4宫格 -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <!-- 待核销 -->
+      <div class="stat-card themed-card rounded-lg p-4 border-l-4 border-yellow-500" 
+           :class="filter.status === 'pending' ? 'ring-2 ring-yellow-400' : ''"
+           @click="filterByStatus(filter.status === 'pending' ? '' : 'pending')">
+        <div class="text-sm themed-text-muted">待核销</div>
+        <div class="text-2xl font-bold text-yellow-600" x-text="stats.pending">0</div>
+        <div class="text-xs themed-text-muted mt-1">需要处理</div>
+      </div>
+      <!-- 已核销 -->
+      <div class="stat-card themed-card rounded-lg p-4 border-l-4 border-green-500"
+           :class="filter.status === 'fulfilled' ? 'ring-2 ring-green-400' : ''"
+           @click="filterByStatus(filter.status === 'fulfilled' ? '' : 'fulfilled')">
+        <div class="text-sm themed-text-muted">已核销</div>
+        <div class="text-2xl font-bold text-green-600" x-text="stats.fulfilled">0</div>
+        <div class="text-xs themed-text-muted mt-1">已完成</div>
+      </div>
+      <!-- 已过期 -->
+      <div class="stat-card themed-card rounded-lg p-4 border-l-4 border-gray-400"
+           :class="filter.status === 'expired' ? 'ring-2 ring-gray-400' : ''"
+           @click="filterByStatus(filter.status === 'expired' ? '' : 'expired')">
+        <div class="text-sm themed-text-muted">已过期</div>
+        <div class="text-2xl font-bold text-gray-600" x-text="stats.expired">0</div>
+        <div class="text-xs themed-text-muted mt-1">已失效</div>
+      </div>
+      <!-- 已取消 -->
+      <div class="stat-card themed-card rounded-lg p-4 border-l-4 border-red-400"
+           :class="filter.status === 'cancelled' ? 'ring-2 ring-red-400' : ''"
+           @click="filterByStatus(filter.status === 'cancelled' ? '' : 'cancelled')">
+        <div class="text-sm themed-text-muted">已取消</div>
+        <div class="text-2xl font-bold text-red-600" x-text="stats.cancelled">0</div>
+        <div class="text-xs themed-text-muted mt-1">已撤销</div>
+      </div>
+    </div>
+
+    <!-- 筛选栏 -->
+    <div class="themed-card rounded-lg p-4">
+      <div class="flex flex-wrap items-end gap-4">
+        <div>
+          <label class="block text-xs themed-text-muted mb-1">用户ID</label>
+          <input type="text" x-model="filter.redeemer_user_id" placeholder="输入用户ID"
+                 class="w-36 px-3 py-2 text-sm themed-bg-base themed-border rounded-lg themed-text" />
+        </div>
+        <div>
+          <label class="block text-xs themed-text-muted mb-1">开始日期</label>
+          <input type="date" x-model="filter.start_date"
+                 class="px-3 py-2 text-sm themed-bg-base themed-border rounded-lg themed-text" />
+        </div>
+        <div>
+          <label class="block text-xs themed-text-muted mb-1">结束日期</label>
+          <input type="date" x-model="filter.end_date"
+                 class="px-3 py-2 text-sm themed-bg-base themed-border rounded-lg themed-text" />
+        </div>
+        <button @click="search()" class="px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">
+          🔍 搜索
+        </button>
+        <button @click="resetFilter()" class="px-4 py-2 text-sm themed-bg-base themed-text rounded-lg hover:themed-bg-subtle transition themed-border">
+          重置
+        </button>
+      </div>
+    </div>
+
+    <!-- 批量操作栏 -->
+    <div x-show="hasSelected" x-cloak class="themed-card rounded-lg p-3 bg-blue-50 flex items-center justify-between">
+      <span class="text-sm text-blue-700">已选中 <span class="font-semibold" x-text="selectedCount">0</span> 个订单</span>
+      <div class="flex gap-2">
+        <button @click="batchExpire()" class="px-3 py-1.5 text-xs bg-gray-500 text-white rounded hover:bg-gray-600">
+          批量过期
+        </button>
+        <button @click="clearSelection()" class="px-3 py-1.5 text-xs themed-bg-base themed-text rounded hover:themed-bg-subtle themed-border">
+          取消选择
+        </button>
+      </div>
+    </div>
+
+    <!-- 订单列表 -->
+    <div class="themed-card rounded-lg shadow overflow-hidden">
+      <!-- 加载状态 -->
+      <div x-show="loading" class="p-8 text-center themed-text-muted">
+        <span class="animate-spin inline-block mr-2">⏳</span> 加载中...
+      </div>
+
+      <!-- 空状态 -->
+      <div x-show="!loading && orders.length === 0" class="p-8 text-center">
+        <p class="text-gray-400 text-lg mb-2">📭</p>
+        <p class="themed-text-muted">暂无核销订单数据</p>
+      </div>
+
+      <!-- 表格 -->
+      <div x-show="!loading && orders.length > 0" class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="themed-bg-base">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted w-10">
+                <input type="checkbox" 
+                       :checked="isAllSelected" 
+                       @change="toggleAll(orders, 'redemption_order_id')"
+                       class="rounded" />
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted">订单ID</th>
+              <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted">奖品</th>
+              <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted">用户</th>
+              <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted">状态</th>
+              <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted">创建时间</th>
+              <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted">过期时间</th>
+              <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <template x-for="order in orders" :key="order.redemption_order_id || order.order_id">
+              <tr class="order-row">
+                <td class="px-4 py-3">
+                  <input type="checkbox"
+                         :value="order.redemption_order_id || order.order_id"
+                         :checked="isSelected(order.redemption_order_id || order.order_id)"
+                         @change="toggleItem(order.redemption_order_id || order.order_id)"
+                         class="rounded" />
+                </td>
+                <td class="px-4 py-3 text-sm themed-text">
+                  <span class="font-mono text-xs" x-text="(order.redemption_order_id || order.order_id || '').substring(0, 8) + '...'"></span>
+                </td>
+                <td class="px-4 py-3 text-sm themed-text" x-text="getPrizeName(order)"></td>
+                <td class="px-4 py-3 text-sm themed-text" x-text="getUserDisplay(order)"></td>
+                <td class="px-4 py-3">
+                  <span class="px-2 py-1 text-xs rounded-full" 
+                        :class="getStatusClass(order.status)"
+                        x-text="getStatusLabel(order.status)"></span>
+                </td>
+                <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(order.created_at)"></td>
+                <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatDate(order.expires_at)"></td>
+                <td class="px-4 py-3">
+                  <div class="flex gap-1">
+                    <button @click="viewDetail(order)" 
+                            class="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition"
+                            title="查看详情">详情</button>
+                    <template x-if="order.status === 'pending'">
+                      <button @click="openRedeemModal(order)" 
+                              class="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition"
+                              title="核销">核销</button>
+                    </template>
+                    <template x-if="order.status === 'pending'">
+                      <button @click="openCancelModal(order)" 
+                              class="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition"
+                              title="取消">取消</button>
+                    </template>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 分页 -->
+      <div x-show="!loading && orders.length > 0" class="px-4 py-3 flex items-center justify-between border-t themed-bg-base">
+        <span class="text-sm themed-text-muted">
+          共 <span x-text="pagination.total">0</span> 条记录，第 <span x-text="pagination.page">1</span> / <span x-text="totalPages">1</span> 页
+        </span>
+        <div class="flex gap-1">
+          <button @click="changePage(pagination.page - 1)" :disabled="pagination.page <= 1"
+                  class="px-3 py-1 text-sm rounded themed-border disabled:opacity-50 disabled:cursor-not-allowed hover:themed-bg-subtle">
+            上一页
+          </button>
+          <button @click="changePage(pagination.page + 1)" :disabled="pagination.page >= totalPages"
+                  class="px-3 py-1 text-sm rounded themed-border disabled:opacity-50 disabled:cursor-not-allowed hover:themed-bg-subtle">
+            下一页
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 核销弹窗 ==================== -->
+    <div x-show="modals.redeemModal" x-cloak 
+         class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+         @click.self="hideModal('redeemModal')">
+      <div class="themed-card rounded-lg shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-semibold themed-text mb-4">✅ 核销确认</h3>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm themed-text-muted mb-1">订单ID</label>
+            <input type="text" x-model="redeemForm.order_id" disabled
+                   class="w-full px-3 py-2 text-sm themed-bg-base themed-border rounded-lg themed-text opacity-70 font-mono" />
+          </div>
+          <div x-show="orderDetail">
+            <label class="block text-sm themed-text-muted mb-1">奖品</label>
+            <p class="text-sm themed-text font-medium" x-text="orderDetail ? getPrizeName(orderDetail) : ''"></p>
+          </div>
+          <div>
+            <label class="block text-sm themed-text-muted mb-1">核销门店（可选）</label>
+            <select x-model="redeemForm.store_id"
+                    class="w-full px-3 py-2 text-sm themed-bg-base themed-border rounded-lg themed-text">
+              <option value="">-- 不指定门店 --</option>
+              <template x-for="store in stores" :key="store.store_id">
+                <option :value="store.store_id" x-text="store.store_name || store.name"></option>
+              </template>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm themed-text-muted mb-1">备注（可选）</label>
+            <textarea x-model="redeemForm.remark" rows="2" placeholder="核销备注..."
+                      class="w-full px-3 py-2 text-sm themed-bg-base themed-border rounded-lg themed-text"></textarea>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 mt-6">
+          <button @click="hideModal('redeemModal')" class="px-4 py-2 text-sm themed-bg-base themed-text rounded-lg hover:themed-bg-subtle themed-border">
+            取消
+          </button>
+          <button @click="confirmRedeem()" :disabled="loading"
+                  class="px-4 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 transition">
+            确认核销
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 取消弹窗 ==================== -->
+    <div x-show="modals.cancelModal" x-cloak 
+         class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+         @click.self="hideModal('cancelModal')">
+      <div class="themed-card rounded-lg shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-semibold text-red-600 mb-4">❌ 取消订单</h3>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm themed-text-muted mb-1">订单ID</label>
+            <input type="text" x-model="cancelForm.order_id" disabled
+                   class="w-full px-3 py-2 text-sm themed-bg-base themed-border rounded-lg themed-text opacity-70 font-mono" />
+          </div>
+          <div>
+            <label class="block text-sm themed-text-muted mb-1">取消原因</label>
+            <textarea x-model="cancelForm.reason" rows="3" placeholder="请填写取消原因..."
+                      class="w-full px-3 py-2 text-sm themed-bg-base themed-border rounded-lg themed-text"></textarea>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 mt-6">
+          <button @click="hideModal('cancelModal')" class="px-4 py-2 text-sm themed-bg-base themed-text rounded-lg hover:themed-bg-subtle themed-border">
+            返回
+          </button>
+          <button @click="confirmCancel()" :disabled="loading"
+                  class="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 transition">
+            确认取消
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 详情弹窗 ==================== -->
+    <div x-show="modals.detailModal" x-cloak 
+         class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+         @click.self="hideModal('detailModal')">
+      <div class="themed-card rounded-lg shadow-xl w-full max-w-lg p-6">
+        <h3 class="text-lg font-semibold themed-text mb-4">📋 订单详情</h3>
+        <template x-if="orderDetail">
+          <div class="space-y-3">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <span class="text-xs themed-text-muted">订单ID</span>
+                <p class="text-sm themed-text font-mono" x-text="orderDetail.redemption_order_id || orderDetail.order_id"></p>
+              </div>
+              <div>
+                <span class="text-xs themed-text-muted">状态</span>
+                <p>
+                  <span class="px-2 py-0.5 text-xs rounded-full"
+                        :class="getStatusClass(orderDetail.status)"
+                        x-text="getStatusLabel(orderDetail.status)"></span>
+                </p>
+              </div>
+              <div>
+                <span class="text-xs themed-text-muted">奖品</span>
+                <p class="text-sm themed-text" x-text="getPrizeName(orderDetail)"></p>
+              </div>
+              <div>
+                <span class="text-xs themed-text-muted">用户</span>
+                <p class="text-sm themed-text" x-text="getUserDisplay(orderDetail)"></p>
+              </div>
+              <div>
+                <span class="text-xs themed-text-muted">创建时间</span>
+                <p class="text-sm themed-text" x-text="formatDate(orderDetail.created_at)"></p>
+              </div>
+              <div>
+                <span class="text-xs themed-text-muted">过期时间</span>
+                <p class="text-sm themed-text" x-text="formatDate(orderDetail.expires_at)"></p>
+              </div>
+              <div x-show="orderDetail.fulfilled_at">
+                <span class="text-xs themed-text-muted">核销时间</span>
+                <p class="text-sm themed-text" x-text="formatDate(orderDetail.fulfilled_at)"></p>
+              </div>
+              <div x-show="orderDetail.fulfilled_store_id">
+                <span class="text-xs themed-text-muted">核销门店</span>
+                <p class="text-sm themed-text" x-text="orderDetail.fulfilled_store_id"></p>
+              </div>
+            </div>
+            <div x-show="orderDetail.remark">
+              <span class="text-xs themed-text-muted">备注</span>
+              <p class="text-sm themed-text" x-text="orderDetail.remark"></p>
+            </div>
+          </div>
+        </template>
+        <div class="flex justify-end mt-6">
+          <button @click="hideModal('detailModal')" class="px-4 py-2 text-sm themed-bg-base themed-text rounded-lg hover:themed-bg-subtle themed-border">
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 引入页面模块 -->
+  <script type="module" src="./src/modules/operations/pages/redemption-management.js"></script>
+</body>
+</html>
+

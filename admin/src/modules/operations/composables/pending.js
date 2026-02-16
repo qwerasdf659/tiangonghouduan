@@ -45,6 +45,8 @@ export function usePendingState() {
       lottery_alert: 0,
       risk_alert: 0,
       refund: 0,
+      redemption: 0,
+      feedback: 0,
       total: 0,
       total_urgent: 0
     },
@@ -398,7 +400,9 @@ export function usePendingMethods() {
         customer_service: '/admin/customer-service.html',
         lottery_alert: '/admin/lottery-alerts.html',
         risk_alert: '/admin/risk-alerts.html',
-        refund: '/admin/finance-management.html'
+        refund: '/admin/finance-management.html',
+        redemption: '/admin/redemption-management.html',
+        feedback: '/admin/customer-service.html'
       }
 
       const url = urlMap[item.type] || '/admin/finance-management.html'
@@ -427,7 +431,9 @@ export function usePendingMethods() {
         customer_service: '💬',
         lottery_alert: '🎰',
         risk_alert: '⚠️',
-        refund: '💰'
+        refund: '💰',
+        redemption: '🎫',
+        feedback: '📝'
       }
       return icons[type] || '📄'
     },
@@ -438,7 +444,9 @@ export function usePendingMethods() {
         customer_service: '客服会话',
         lottery_alert: '抽奖告警',
         risk_alert: '风控告警',
-        refund: '退款申请'
+        refund: '退款申请',
+        redemption: '兑换核销',
+        feedback: '用户反馈'
       }
       return labels[type] || type
     },

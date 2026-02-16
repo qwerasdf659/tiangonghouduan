@@ -28,11 +28,17 @@ const logger = require('../../../../utils/logger').logger
 
 /**
  * @route GET /api/v4/shop/exchange/items
- * @desc 获取兑换市场商品列表
+ * @desc 获取兑换市场商品列表（支持按空间筛选：幸运空间/臻选空间）
  * @access Private (需要登录)
  *
  * @query {string} status - 商品状态（active/inactive，默认active）
  * @query {string} asset_code - 材料资产代码筛选（可选）
+ * @query {string} space - 空间筛选（lucky=幸运空间, premium=臻选空间，可选）
+ * @query {string} keyword - 商品名称关键词搜索（可选）
+ * @query {string} category - 商品分类筛选（可选）
+ * @query {number} min_cost - 最低价格筛选（可选）
+ * @query {number} max_cost - 最高价格筛选（可选）
+ * @query {string} stock_status - 库存状态（in_stock=有货, low_stock=即将售罄，可选）
  * @query {number} page - 页码（默认1）
  * @query {number} page_size - 每页数量（默认20，最大50）
  * @query {string} sort_by - 排序字段（默认sort_order）
@@ -41,6 +47,7 @@ const logger = require('../../../../utils/logger').logger
  * @returns {Object} 商品列表和分页信息
  * @returns {Array} data.items - 商品列表
  * @returns {Object} data.pagination - 分页信息
+ * @returns {Object} data.summary - 统计摘要（趋势销量、平均折扣、平均评分）
  */
 router.get('/items', authenticateToken, async (req, res) => {
   try {
@@ -50,6 +57,12 @@ router.get('/items', authenticateToken, async (req, res) => {
     const {
       status = 'active',
       asset_code,
+      space,
+      keyword,
+      category,
+      min_cost,
+      max_cost,
+      stock_status,
       page = 1,
       page_size = 20,
       sort_by = 'sort_order',
@@ -60,6 +73,8 @@ router.get('/items', authenticateToken, async (req, res) => {
       user_id: req.user.user_id,
       status,
       asset_code,
+      space,
+      keyword,
       page,
       page_size
     })
@@ -79,6 +94,19 @@ router.get('/items', authenticateToken, async (req, res) => {
       )
     }
 
+    // 空间参数白名单验证（可选参数）
+    if (space) {
+      const validSpaces = ['lucky', 'premium']
+      if (!validSpaces.includes(space)) {
+        return res.apiError(
+          `无效的space参数，允许值：${validSpaces.join(', ')}`,
+          'BAD_REQUEST',
+          null,
+          400
+        )
+      }
+    }
+
     // 排序方向白名单验证
     const validSortOrders = ['ASC', 'DESC']
     if (!validSortOrders.includes(sort_order.toUpperCase())) {
@@ -90,10 +118,16 @@ router.get('/items', authenticateToken, async (req, res) => {
       )
     }
 
-    // 调用服务层
+    // 调用服务层（传递所有筛选参数）
     const result = await ExchangeService.getMarketItems({
       status,
       asset_code,
+      space: space || null,
+      keyword: keyword || null,
+      category: category || null,
+      min_cost: min_cost || null,
+      max_cost: max_cost || null,
+      stock_status: stock_status || null,
       page: finalPage,
       page_size: finalPageSize,
       sort_by,

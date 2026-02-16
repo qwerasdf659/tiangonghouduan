@@ -966,6 +966,150 @@
             </div>
           </div>
         </div>
+
+        <!-- P2#9: 用户分层分析（以后端 /console/users/segments 数据为准） -->
+        <div class="mt-6 themed-card rounded-lg shadow">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h5 class="font-semibold">🎯 用户分层分析</h5>
+            <button @click="loadUserSegments()" class="text-sm themed-btn-secondary px-3 py-1 rounded"
+                    :disabled="loadingSegments">
+              <span x-show="!loadingSegments">🔄 刷新</span>
+              <span x-show="loadingSegments">加载中...</span>
+            </button>
+          </div>
+          <div class="p-6">
+            <!-- 加载状态 -->
+            <div x-show="loadingSegments" class="text-center py-8">
+              <div class="animate-spin inline-block w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full"></div>
+              <p class="themed-text-muted mt-2 text-sm">加载分层数据中...</p>
+            </div>
+            <!-- 后端返回: { segments: [{code, name, count, percentage, criteria, color}], total_users } -->
+            <template x-if="userSegments && userSegments.segments && userSegments.segments.length > 0 && !loadingSegments">
+              <div>
+                <!-- 分层卡片（直接使用后端字段: code, name, count, percentage, criteria） -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <template x-for="seg in userSegments.segments" :key="seg.code">
+                    <div class="rounded-lg p-4 border-l-4 themed-card shadow-sm"
+                         :class="getSegmentBorderColor(seg.code)">
+                      <div class="flex items-center gap-2 mb-2">
+                        <span class="text-xl" x-text="getSegmentIcon(seg.code)"></span>
+                        <h6 class="font-semibold text-sm" x-text="seg.name"></h6>
+                      </div>
+                      <p class="text-2xl font-bold" :class="getSegmentTextColor(seg.code)" x-text="seg.count"></p>
+                      <p class="text-xs themed-text-muted mt-1">
+                        占比 <span x-text="seg.percentage + '%'"></span>
+                      </p>
+                      <p class="text-xs themed-text-muted mt-1" x-text="seg.criteria"></p>
+                    </div>
+                  </template>
+                </div>
+                <!-- 分布条（使用后端 total_users 和各 segment.count 计算宽度） -->
+                <div class="mb-4">
+                  <p class="text-sm themed-text-muted mb-2">用户分层分布（总用户: <span x-text="userSegments.total_users"></span>）</p>
+                  <div class="w-full h-6 rounded-full overflow-hidden flex">
+                    <template x-for="seg in userSegments.segments" :key="'bar-' + seg.code">
+                      <div class="h-full transition-all duration-500 flex items-center justify-center text-white text-xs"
+                           :class="getSegmentBgColor(seg.code)"
+                           :style="'width: ' + (userSegments.total_users > 0 ? (seg.count / userSegments.total_users * 100) : 0) + '%'"
+                           :title="seg.name + ': ' + seg.count + '人'">
+                        <span x-show="seg.count / (userSegments.total_users || 1) > 0.08" 
+                              x-text="seg.count"></span>
+                      </div>
+                    </template>
+                  </div>
+                  <div class="flex flex-wrap gap-4 mt-2 text-xs">
+                    <template x-for="seg in userSegments.segments" :key="'legend-' + seg.code">
+                      <span class="flex items-center gap-1">
+                        <span class="w-3 h-3 rounded-full inline-block" :class="getSegmentBgColor(seg.code)"></span>
+                        <span x-text="seg.name"></span>
+                        <span class="themed-text-muted" x-text="'(' + seg.count + '人, ' + seg.percentage + '%)'"></span>
+                      </span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <!-- 无数据 -->
+            <div x-show="!loadingSegments && (!userSegments || !userSegments.segments || userSegments.segments.length === 0)" class="text-center py-8 themed-text-muted">
+              <i class="bi bi-bar-chart text-4xl mb-2"></i>
+              <p>暂无用户分层数据</p>
+              <p class="text-xs mt-1">后端 GET /api/v4/console/users/segments</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- P2#9: 用户生命周期标签 -->
+        <div class="mt-6 themed-card rounded-lg shadow">
+          <div class="p-4 border-b">
+            <h5 class="font-semibold">🔄 用户生命周期</h5>
+            <p class="text-xs themed-text-muted mt-1">基于 last_active_at 和 created_at 的用户生命周期分析</p>
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <!-- 新注册（7天内） -->
+              <div class="text-center p-4 rounded-lg themed-bg-base">
+                <div class="w-12 h-12 rounded-full bg-green-100 text-green-600 mx-auto mb-2 flex items-center justify-center text-xl">🌱</div>
+                <p class="text-sm font-medium">新注册</p>
+                <p class="text-xs themed-text-muted">7天内注册</p>
+                <p class="text-lg font-bold text-green-600 mt-1" x-text="userStats.new_users_last_7_days || 0"></p>
+              </div>
+              <!-- 活跃（7天内活跃） -->
+              <div class="text-center p-4 rounded-lg themed-bg-base">
+                <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 mx-auto mb-2 flex items-center justify-center text-xl">🏃</div>
+                <p class="text-sm font-medium">活跃</p>
+                <p class="text-xs themed-text-muted">7天内活跃</p>
+                <p class="text-lg font-bold text-blue-600 mt-1" x-text="userStats.active_users || 0"></p>
+              </div>
+              <!-- 今日活跃 -->
+              <div class="text-center p-4 rounded-lg themed-bg-base">
+                <div class="w-12 h-12 rounded-full bg-purple-100 text-purple-600 mx-auto mb-2 flex items-center justify-center text-xl">⚡</div>
+                <p class="text-sm font-medium">今日活跃</p>
+                <p class="text-xs themed-text-muted">今日有行为</p>
+                <p class="text-lg font-bold text-purple-600 mt-1" x-text="userStats.active_users_today || 0"></p>
+              </div>
+              <!-- 30天新增 -->
+              <div class="text-center p-4 rounded-lg themed-bg-base">
+                <div class="w-12 h-12 rounded-full bg-orange-100 text-orange-600 mx-auto mb-2 flex items-center justify-center text-xl">📈</div>
+                <p class="text-sm font-medium">月新增</p>
+                <p class="text-xs themed-text-muted">30天内注册</p>
+                <p class="text-lg font-bold text-orange-600 mt-1" x-text="userStats.new_users_last_30_days || 0"></p>
+              </div>
+              <!-- 沉默（非活跃） -->
+              <div class="text-center p-4 rounded-lg themed-bg-base">
+                <div class="w-12 h-12 rounded-full bg-gray-200 text-gray-500 mx-auto mb-2 flex items-center justify-center text-xl">😴</div>
+                <p class="text-sm font-medium">沉默</p>
+                <p class="text-xs themed-text-muted">7天+未活跃</p>
+                <p class="text-lg font-bold text-gray-500 mt-1" x-text="Math.max(0, (userStats.total_users || 0) - (userStats.active_users || 0))"></p>
+              </div>
+            </div>
+            <!-- 增长率指标 -->
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="rounded-lg p-4 border themed-border-light">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm themed-text-muted">日增长率</span>
+                  <span class="font-bold" 
+                        :class="(userStats.daily_growth_rate || 0) >= 0 ? 'text-green-600' : 'text-red-600'"
+                        x-text="((userStats.daily_growth_rate || 0) >= 0 ? '+' : '') + (userStats.daily_growth_rate || 0).toFixed(2) + '%'"></span>
+                </div>
+              </div>
+              <div class="rounded-lg p-4 border themed-border-light">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm themed-text-muted">周增长率</span>
+                  <span class="font-bold"
+                        :class="(userStats.weekly_growth_rate || 0) >= 0 ? 'text-green-600' : 'text-red-600'"
+                        x-text="((userStats.weekly_growth_rate || 0) >= 0 ? '+' : '') + (userStats.weekly_growth_rate || 0).toFixed(2) + '%'"></span>
+                </div>
+              </div>
+              <div class="rounded-lg p-4 border themed-border-light">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm themed-text-muted">活跃率</span>
+                  <span class="font-bold themed-text-primary"
+                        x-text="(userStats.active_rate || 0).toFixed(2) + '%'"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ==================== Modal 区域 ==================== -->

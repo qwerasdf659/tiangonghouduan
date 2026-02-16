@@ -17,8 +17,8 @@ import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
  */
 
 /**
- * 反馈状态枚举
- * @typedef {'pending'|'processing'|'resolved'|'closed'} FeedbackStatus
+ * 反馈状态枚举（与后端 Feedback 模型一致）
+ * @typedef {'pending'|'processing'|'replied'|'closed'} FeedbackStatus
  */
 
 /**
@@ -44,14 +44,18 @@ import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
  */
 
 /**
- * 反馈信息
+ * 反馈信息（与后端 Feedback 模型字段一致）
  * @typedef {Object} FeedbackInfo
- * @property {number} id - 反馈ID
+ * @property {number} feedback_id - 反馈ID（主键）
  * @property {number} user_id - 用户ID
+ * @property {string} category - 分类（technical/feature/bug/complaint/suggestion/other）
  * @property {string} content - 反馈内容
- * @property {string} [images] - 图片URL列表
+ * @property {string} priority - 优先级（high/medium/low）
+ * @property {string} [attachments] - 附件列表（JSON）
  * @property {FeedbackStatus} status - 处理状态
- * @property {string} [reply] - 回复内容
+ * @property {string} [reply_content] - 管理员回复内容
+ * @property {string} [replied_at] - 回复时间
+ * @property {string} [internal_notes] - 内部备注（仅管理员可见）
  * @property {string} created_at - 创建时间
  */
 
@@ -71,6 +75,7 @@ export const CONTENT_ENDPOINTS = {
 
   // 反馈管理
   FEEDBACK_LIST: `${API_PREFIX}/console/system/feedbacks`,
+  FEEDBACK_STATS: `${API_PREFIX}/console/system/feedbacks/stats`,
   FEEDBACK_DETAIL: `${API_PREFIX}/console/system/feedbacks/:id`,
   FEEDBACK_REPLY: `${API_PREFIX}/console/system/feedbacks/:id/reply`,
   FEEDBACK_STATUS: `${API_PREFIX}/console/system/feedbacks/:id/status`,
@@ -280,7 +285,8 @@ export const ContentAPI = {
    * @async
    * @param {number} id - 反馈 ID
    * @param {Object} data - 回复数据
-   * @param {string} data.content - 回复内容（必填）
+   * @param {string} data.reply_content - 回复内容（必填，后端字段名 reply_content）
+   * @param {string} [data.internal_notes] - 内部备注（仅管理员可见，可选）
    * @returns {Promise<Object>} 回复结果
    * @throws {Error} 反馈不存在
    * @throws {Error} 回复内容不能为空
@@ -290,7 +296,8 @@ export const ContentAPI = {
    * @example
    * // 回复用户反馈
    * const result = await ContentAPI.replyFeedback(123, {
-   *   content: '感谢您的反馈，我们会尽快处理。'
+   *   reply_content: '感谢您的反馈，我们会尽快处理。',
+   *   internal_notes: '已通知开发团队'
    * })
    */
   async replyFeedback(id, data) {
@@ -303,8 +310,8 @@ export const ContentAPI = {
    * @async
    * @param {number} id - 反馈 ID
    * @param {Object} data - 状态数据
-   * @param {FeedbackStatus} data.status - 新状态
-   * @param {string} [data.remark] - 状态变更备注
+   * @param {string} data.status - 新状态（pending/processing/replied/closed）
+   * @param {string} [data.internal_notes] - 内部备注（仅管理员可见，可选）
    * @returns {Promise<Object>} 更新结果
    * @throws {Error} 反馈不存在
    * @throws {Error} 状态值无效
@@ -312,10 +319,10 @@ export const ContentAPI = {
    * @throws {Error} 网络请求失败
    *
    * @example
-   * // 将反馈标记为已解决
+   * // 将反馈标记为已关闭
    * const result = await ContentAPI.updateFeedbackStatus(123, {
-   *   status: 'resolved',
-   *   remark: '已联系用户解决'
+   *   status: 'closed',
+   *   internal_notes: '已联系用户解决'
    * })
    */
   async updateFeedbackStatus(id, data) {

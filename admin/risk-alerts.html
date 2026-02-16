@@ -69,6 +69,110 @@
       </div>
     </div>
 
+    <!-- P2#11: 市场价格异常监控面板 -->
+    <div class="themed-card rounded-lg shadow mb-6">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold flex items-center gap-2">
+          💰 市场价格异常监控
+          <span class="text-xs themed-text-muted font-normal">阈值配置已在 system_settings 中定义</span>
+        </h5>
+        <button @click="loadMarketPriceMonitor()" class="themed-btn-secondary px-3 py-1 rounded text-sm"
+                :disabled="loadingMarketMonitor">
+          <span x-show="!loadingMarketMonitor">🔄 刷新</span>
+          <span x-show="loadingMarketMonitor">加载中...</span>
+        </button>
+      </div>
+      <div class="p-4">
+        <!-- 加载状态 -->
+        <div x-show="loadingMarketMonitor" class="text-center py-6">
+          <div class="animate-spin inline-block w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full"></div>
+          <p class="themed-text-muted mt-2 text-sm">加载市场监控数据...</p>
+        </div>
+        <!-- 市场健康指标 -->
+        <template x-if="marketMonitor && !loadingMarketMonitor">
+          <div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div class="p-3 rounded-lg border themed-border-light text-center">
+                <p class="text-xs themed-text-muted mb-1">在售挂单数</p>
+                <p class="text-xl font-bold themed-text-primary" x-text="marketMonitor.active_listings || 0"></p>
+              </div>
+              <div class="p-3 rounded-lg border themed-border-light text-center">
+                <p class="text-xs themed-text-muted mb-1">挂单成交率</p>
+                <p class="text-xl font-bold" 
+                   :class="(marketMonitor.deal_rate || 0) < 10 ? 'text-red-600' : 'text-green-600'"
+                   x-text="(marketMonitor.deal_rate || 0).toFixed(1) + '%'"></p>
+              </div>
+              <div class="p-3 rounded-lg border themed-border-light text-center">
+                <p class="text-xs themed-text-muted mb-1">C2C完成率</p>
+                <p class="text-xl font-bold"
+                   :class="(marketMonitor.c2c_completion_rate || 0) < 20 ? 'text-red-600' : 'text-green-600'"
+                   x-text="(marketMonitor.c2c_completion_rate || 0).toFixed(1) + '%'"></p>
+              </div>
+              <div class="p-3 rounded-lg border themed-border-light text-center">
+                <p class="text-xs themed-text-muted mb-1">价格异常告警</p>
+                <p class="text-xl font-bold" 
+                   :class="(marketMonitor.price_anomaly_count || 0) > 0 ? 'text-red-600' : 'text-green-600'"
+                   x-text="marketMonitor.price_anomaly_count || 0"></p>
+              </div>
+            </div>
+            <!-- 价格阈值配置显示 -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="rounded-lg p-4 themed-bg-base">
+                <h6 class="font-medium text-sm mb-2">📏 价格监控阈值（来自 system_settings）</h6>
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between">
+                    <span class="themed-text-muted">价格下限阈值</span>
+                    <span class="font-mono" x-text="marketMonitor.thresholds?.price_low || '未配置'"></span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="themed-text-muted">价格上限阈值</span>
+                    <span class="font-mono" x-text="marketMonitor.thresholds?.price_high || '未配置'"></span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="themed-text-muted">超长挂牌天数</span>
+                    <span class="font-mono" x-text="(marketMonitor.thresholds?.long_listing_days || '未配置') + '天'"></span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="themed-text-muted">告警启用状态</span>
+                    <span class="font-mono" :class="marketMonitor.thresholds?.alert_enabled ? 'text-green-600' : 'text-red-600'"
+                          x-text="marketMonitor.thresholds?.alert_enabled ? '已启用' : '已关闭'"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="rounded-lg p-4 themed-bg-base">
+                <h6 class="font-medium text-sm mb-2">📊 市场挂单概览</h6>
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between">
+                    <span class="themed-text-muted">总挂单数</span>
+                    <span class="font-mono" x-text="marketMonitor.total_listings || 0"></span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="themed-text-muted">有挂单的用户数</span>
+                    <span class="font-mono themed-text-primary" x-text="marketMonitor.active_listings || 0"></span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="themed-text-muted">达到上限用户</span>
+                    <span class="font-mono" :class="(marketMonitor.completed_deals || 0) > 0 ? 'text-red-600' : 'text-green-600'"
+                          x-text="marketMonitor.completed_deals || 0"></span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="themed-text-muted">接近上限用户</span>
+                    <span class="font-mono text-yellow-600" x-text="marketMonitor.withdrawn_listings || 0"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+        <!-- 无数据 -->
+        <div x-show="!loadingMarketMonitor && !marketMonitor" class="text-center py-6 themed-text-muted">
+          <i class="bi bi-graph-down text-4xl mb-2"></i>
+          <p>暂无市场监控数据</p>
+          <p class="text-xs mt-1">点击刷新按钮加载数据</p>
+        </div>
+      </div>
+    </div>
+
     <!-- 筛选栏 -->
     <div class="themed-card rounded-lg shadow mb-6">
       <div class="p-4">

@@ -38,6 +38,8 @@ export function sidebarNav() {
     pendingAlertCount: 0,
     // 抽奖告警待处理数量
     lotteryAlertCount: 0,
+    // 兑换核销待处理数量
+    redemptionPendingCount: 0,
 
     // ========== P0-5: 健康度指示灯 ==========
     healthStatus: 'loading', // 'healthy' | 'warning' | 'critical' | 'loading'
@@ -49,9 +51,9 @@ export function sidebarNav() {
     // 原始导航配置 - 过滤前的完整配置
     _originalNavGroups: null,
 
-    // 导航配置（已按文档要求重构）
+    // 导航配置（已按运营优化方案重构 - 8组）
     navGroups: [
-      // 1️⃣ 待处理中心 - 置顶最高优先级
+      // 1️⃣ 待处理中心 - 置顶最高优先级（补充兑换核销、用户反馈）
       {
         id: 'pending-center',
         name: '待处理中心',
@@ -62,6 +64,12 @@ export function sidebarNav() {
             name: '消费记录审核',
             url: '/admin/finance-management.html',
             badgeKey: 'consumptionPendingCount'
+          },
+          {
+            id: 'redemption-mgmt',
+            name: '兑换核销管理',
+            url: '/admin/redemption-management.html',
+            badgeKey: 'redemptionPendingCount'
           },
           {
             id: 'customer-service',
@@ -80,6 +88,11 @@ export function sidebarNav() {
             name: '抽奖告警',
             url: '/admin/lottery-alerts.html',
             badgeKey: 'lotteryAlertCount'
+          },
+          {
+            id: 'feedback-mgmt',
+            name: '用户反馈处理',
+            url: '/admin/feedback-management.html'
           }
         ]
       },
@@ -128,7 +141,7 @@ export function sidebarNav() {
         ]
       },
 
-      // 4️⃣ 资产交易 - 合并原「资产中心」和「市场交易」
+      // 4️⃣ 资产交易 - 合并原「资产中心」和「市场交易」（孤儿冻结移到末尾）
       {
         id: 'asset-trade',
         name: '资产交易',
@@ -136,10 +149,10 @@ export function sidebarNav() {
         items: [
           { id: 'asset-mgmt', name: '资产管理', url: '/admin/asset-management.html' },
           { id: 'asset-adj', name: '资产调整', url: '/admin/asset-adjustment.html' },
-          { id: 'orphan-frozen', name: '孤儿冻结清理', url: '/admin/orphan-frozen.html' },
           { id: 'exchange', name: '兑换市场', url: '/admin/exchange-market.html' },
           { id: 'trade', name: 'C2C交易', url: '/admin/trade-management.html' },
-          { id: 'bid-mgmt', name: '竞价管理', url: '/admin/bid-management.html' }
+          { id: 'bid-mgmt', name: '竞价管理', url: '/admin/bid-management.html' },
+          { id: 'orphan-frozen', name: '孤儿冻结清理', url: '/admin/orphan-frozen.html' }
         ]
       },
 
@@ -155,7 +168,18 @@ export function sidebarNav() {
         ]
       },
 
-      // 6️⃣ 数据分析
+      // 6️⃣ 内容运营 - 🆕新增分组（挂载已有的 content-management 和 message-center）
+      {
+        id: 'content-ops',
+        name: '内容运营',
+        icon: '📢',
+        items: [
+          { id: 'content-mgmt', name: '公告弹窗管理', url: '/admin/content-management.html' },
+          { id: 'message-center', name: '消息中心', url: '/admin/message-center.html' }
+        ]
+      },
+
+      // 7️⃣ 数据分析
       {
         id: 'analytics',
         name: '数据分析',
@@ -166,7 +190,7 @@ export function sidebarNav() {
         ]
       },
 
-      // 7️⃣ 系统设置 - 低频功能整合（改为二级菜单 + 页内Tab）
+      // 8️⃣ 系统设置 - 整合功能开关、物品模板、数据字典
       {
         id: 'system',
         name: '系统设置',
@@ -174,6 +198,9 @@ export function sidebarNav() {
         items: [
           { id: 'prize-config', name: '奖品配置', icon: '🎁', url: '/admin/prize-config.html' },
           { id: 'ops-rules', name: '运营规则', icon: '📊', url: '/admin/ops-rules.html' },
+          { id: 'feature-flags', name: '功能开关', icon: '🔀', url: '/admin/feature-flags.html' },
+          { id: 'item-templates', name: '物品模板', icon: '📦', url: '/admin/item-templates.html' },
+          { id: 'dict-mgmt', name: '数据字典', icon: '📖', url: '/admin/dict-management.html' },
           { id: 'sys-maintain', name: '系统维护', icon: '🔧', url: '/admin/sys-maintain.html' }
         ]
       }
@@ -335,6 +362,7 @@ export function sidebarNav() {
           this.customerPendingCount = data.data.badges?.customer_service || 0
           this.pendingAlertCount = data.data.badges?.risk_alert || 0
           this.lotteryAlertCount = data.data.badges?.lottery_alert || 0
+          this.redemptionPendingCount = data.data.badges?.redemption || 0
 
           logger.debug('[SidebarNav] 徽标数量已更新', {
             total: this.totalPendingCount,
