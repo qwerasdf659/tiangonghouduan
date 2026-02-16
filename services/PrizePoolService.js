@@ -520,14 +520,12 @@ class PrizePoolService {
       // 注意：virtual_amount 和 category 字段数据库不存在，已移除
       stock_quantity: prize.stock_quantity,
       win_probability: prize.win_probability,
-      probability: prize.probability,
       status: prize.status,
       image_resource_id: prize.image_resource_id // 记录旧的图片ID
     }
 
     /*
      * 2. 字段映射（前端字段 → 数据库字段）
-     * 2026-01-26 技术债务清理：移除旧字段兼容（value_points、budget_cost_points、probability）
      * 2026-02-01 主键命名规范化：image_id → image_resource_id
      */
     const allowedFields = {
@@ -657,7 +655,6 @@ class PrizePoolService {
       prize_value_points: prize.prize_value_points,
       stock_quantity: prize.stock_quantity,
       win_probability: prize.win_probability,
-      probability: prize.probability,
       status: prize.status
     }
 

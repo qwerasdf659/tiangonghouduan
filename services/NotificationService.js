@@ -627,38 +627,6 @@ class NotificationService {
   }
 
   /**
-   * 商品上新通知（发送给所有用户或特定用户）
-   *
-   * @param {number|null} user_id - 用户ID，null表示发送给所有管理员
-   * @param {Object} productData - 商品数据
-   * @param {string} productData.product_name - 商品名称
-   * @param {number} productData.exchange_points - 兑换积分
-   * @param {string} productData.product_category - 商品类别
-   * @returns {Promise<Object>} 通知结果
-   */
-  static async notifyNewProduct(user_id, productData) {
-    const { product_name, exchange_points, product_category } = productData
-
-    if (user_id) {
-      // 发送给特定用户
-      return await this.send(user_id, {
-        type: 'new_product',
-        title: '🎁 新品上架',
-        content: `新商品【${product_name}】已上架，仅需${exchange_points}积分即可兑换！类别：${product_category}`,
-        data: productData
-      })
-    } else {
-      // 发送给所有管理员（用于管理通知）
-      return await this.sendToAdmins({
-        type: 'new_product',
-        title: '新商品已上架',
-        content: `商品【${product_name}】已成功上架，兑换价格：${exchange_points}积分`,
-        data: productData
-      })
-    }
-  }
-
-  /**
    * 系统公告通知
    *
    * @param {number|null} user_id - 用户ID，null表示广播给所有管理员
@@ -1021,7 +989,8 @@ class NotificationService {
   static async notifyBidOutbid(user_id, bidData) {
     const { bid_product_id, item_name, my_bid_amount, new_highest, price_asset_code } = bidData
 
-    return await this.send(user_id, {
+    // 1. 通过聊天系统发送持久化通知（离线用户上线后可查看）
+    const chatResult = await this.send(user_id, {
       type: 'bid_outbid',
       title: '⚠️ 您的竞价已被超越',
       content: `您对【${item_name}】的出价 ${my_bid_amount} ${price_asset_code} 已被超越，当前最高价 ${new_highest} ${price_asset_code}。如需继续竞拍，请提交更高出价。`,
@@ -1034,6 +1003,22 @@ class NotificationService {
         action: 'bid_outbid'
       }
     })
+
+    // 2. 额外推送专用 WebSocket 事件（前端可独立监听 bid_outbid 事件）
+    try {
+      const ChatWebSocketService = require('./ChatWebSocketService')
+      ChatWebSocketService.pushBidOutbid(user_id, {
+        bid_product_id,
+        item_name,
+        my_bid_amount,
+        new_highest,
+        price_asset_code
+      })
+    } catch (wsError) {
+      logger.warn('[竞价通知] WebSocket推送 bid_outbid 失败（非致命）', { error: wsError.message })
+    }
+
+    return chatResult
   }
 
   /**
@@ -1053,7 +1038,8 @@ class NotificationService {
   static async notifyBidWon(user_id, bidData) {
     const { bid_product_id, item_name, winning_amount, price_asset_code } = bidData
 
-    return await this.send(user_id, {
+    // 1. 通过聊天系统发送持久化通知
+    const chatResult = await this.send(user_id, {
       type: 'bid_won',
       title: '🎉 恭喜中标',
       content: `恭喜！您以 ${winning_amount} ${price_asset_code} 成功拍得【${item_name}】。商品已添加到您的背包，请前往查看。`,
@@ -1065,6 +1051,21 @@ class NotificationService {
         action: 'bid_won'
       }
     })
+
+    // 2. 额外推送专用 WebSocket 事件（前端可独立监听 bid_won 事件）
+    try {
+      const ChatWebSocketService = require('./ChatWebSocketService')
+      ChatWebSocketService.pushBidWon(user_id, {
+        bid_product_id,
+        item_name,
+        winning_amount,
+        price_asset_code
+      })
+    } catch (wsError) {
+      logger.warn('[竞价通知] WebSocket推送 bid_won 失败（非致命）', { error: wsError.message })
+    }
+
+    return chatResult
   }
 
   /**
@@ -1085,7 +1086,8 @@ class NotificationService {
   static async notifyBidLost(user_id, bidData) {
     const { bid_product_id, item_name, my_bid_amount, winning_amount, price_asset_code } = bidData
 
-    return await this.send(user_id, {
+    // 1. 通过聊天系统发送持久化通知
+    const chatResult = await this.send(user_id, {
       type: 'bid_lost',
       title: '📤 竞价未中标',
       content: `很遗憾，您对【${item_name}】的出价 ${my_bid_amount} ${price_asset_code} 未中标（中标价 ${winning_amount} ${price_asset_code}）。您的冻结资产已解冻返还。`,
@@ -1098,6 +1100,22 @@ class NotificationService {
         action: 'bid_lost'
       }
     })
+
+    // 2. 额外推送专用 WebSocket 事件（前端可独立监听 bid_lost 事件）
+    try {
+      const ChatWebSocketService = require('./ChatWebSocketService')
+      ChatWebSocketService.pushBidLost(user_id, {
+        bid_product_id,
+        item_name,
+        my_bid_amount,
+        winning_amount,
+        price_asset_code
+      })
+    } catch (wsError) {
+      logger.warn('[竞价通知] WebSocket推送 bid_lost 失败（非致命）', { error: wsError.message })
+    }
+
+    return chatResult
   }
 }
 

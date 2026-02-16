@@ -165,15 +165,6 @@ models.LotteryUserDailyDrawQuota = require('./LotteryUserDailyDrawQuota')(sequel
  *    - 业务场景：抽奖前配额检查、原子扣减、连抽支持（10连抽一次扣减10次）
  */
 
-// 🔴 业务功能模型（商品和库存系统）
-models.Product = require('./Product')(sequelize, DataTypes)
-/*
- * ✅ Product：商品信息管理
- *    - 用途：管理可兑换的商品信息（实物、虚拟商品、服务等）
- *    - 特点：商品名称、价格、库存、状态、描述
- *    - 表名：products，主键：product_id
- */
-
 // 🔴 物品分类字典表（ItemTemplate 的依赖）
 models.CategoryDef = require('./CategoryDef')(sequelize, DataTypes)
 /*
@@ -716,9 +707,9 @@ models.Sequelize = Sequelize
 models.Op = Sequelize.Op
 
 console.log(
-  '✅ V15.0 Models loaded:',
+  '✅ V4.0 Models loaded:',
   Object.keys(models).filter(key => key !== 'sequelize' && key !== 'Sequelize').length,
-  'models (UUID角色系统集成版)'
+  'models'
 )
 
 module.exports = models

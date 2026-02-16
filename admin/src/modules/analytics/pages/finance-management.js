@@ -301,10 +301,10 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('consumptionDataTable', () => {
     const table = dataTable({
       columns: [
-        { key: 'id', label: 'ID', sortable: true },
+        { key: 'record_id', label: '记录ID', sortable: true },
         { key: 'user_id', label: '用户ID' },
-        { key: 'store_name', label: '门店', render: (val, row) => val || row.store?.name || '-' },
-        { key: 'amount', label: '消费金额', type: 'currency', sortable: true },
+        { key: 'store_name', label: '门店', render: (val, row) => val || row.merchant_nickname || `商户${row.merchant_id || '-'}` },
+        { key: 'consumption_amount', label: '消费金额', type: 'currency', sortable: true },
         { key: 'status', label: '状态', type: 'status', statusMap: { pending: { class: 'yellow', label: '待审核' }, approved: { class: 'green', label: '已通过' }, rejected: { class: 'red', label: '已拒绝' } } },
         { key: 'created_at', label: '消费时间', type: 'datetime', sortable: true }
       ],
@@ -312,7 +312,7 @@ document.addEventListener('alpine:init', () => {
         const res = await request({ url: `${API_PREFIX}/console/consumption/records`, method: 'GET', params })
         return { items: res.data?.records || res.data?.list || [], total: res.data?.pagination?.total || res.data?.count || 0 }
       },
-      primaryKey: 'id', sortable: true, page_size: 20
+      primaryKey: 'record_id', sortable: true, page_size: 20
     })
     const origInit = table.init
     table.init = async function () { window.addEventListener('refresh-consumption', () => this.loadData()); if (origInit) await origInit.call(this) }
@@ -341,21 +341,22 @@ document.addEventListener('alpine:init', () => {
     return table
   })
 
-  /** 商户积分 */
+  /** 商户积分 - 适配后端 /console/merchant-points API */
   Alpine.data('merchantPointsDataTable', () => {
     const table = dataTable({
       columns: [
-        { key: 'id', label: 'ID', sortable: true },
-        { key: 'store_name', label: '门店', render: (val, row) => val || row.store?.name || '-' },
-        { key: 'points', label: '积分', type: 'number', sortable: true },
-        { key: 'status', label: '状态', type: 'status' },
+        { key: 'audit_id', label: '审核ID', sortable: true },
+        { key: 'applicant', label: '申请人', render: (val, row) => val?.nickname || `用户${row.user_id || '-'}` },
+        { key: 'points_amount', label: '积分', type: 'number', sortable: true },
+        { key: 'description', label: '描述', type: 'truncate', maxLength: 30 },
+        { key: 'status', label: '状态', type: 'status', statusMap: { pending: { class: 'yellow', label: '待审核' }, approved: { class: 'green', label: '已通过' }, rejected: { class: 'red', label: '已拒绝' } } },
         { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
       ],
       dataSource: async (params) => {
         const res = await request({ url: `${API_PREFIX}/console/merchant-points`, method: 'GET', params })
-        return { items: res.data?.list || res.data?.records || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+        return { items: res.data?.rows || res.data?.list || [], total: res.data?.pagination?.total || res.data?.count || 0 }
       },
-      primaryKey: 'id', sortable: true, page_size: 20
+      primaryKey: 'audit_id', sortable: true, page_size: 20
     })
     const origInit = table.init
     table.init = async function () { window.addEventListener('refresh-merchant-points', () => this.loadData()); if (origInit) await origInit.call(this) }
@@ -410,20 +411,57 @@ document.addEventListener('alpine:init', () => {
     return table
   })
 
-  /** 商户操作日志 */
+  /** 商户操作日志 - 适配后端 /console/audit-logs API */
   Alpine.data('merchantLogsDataTable', () => {
     const table = dataTable({
       columns: [
         { key: 'id', label: '日志ID', sortable: true },
-        { key: 'operator_name', label: '操作人', render: (val, row) => val || row.operator?.nickname || '-' },
-        { key: 'operation_type', label: '操作类型', render: (val, row) => row.operation_type_display || val || '-' },
-        { key: 'store_name', label: '门店', render: (val, row) => val || row.store?.name || '-' },
-        { key: 'description', label: '描述', type: 'truncate', maxLength: 40 },
+        {
+          key: 'operator_info', label: '操作人',
+          render: (val, row) => {
+            const info = row.operator_info
+            if (!info) return '-'
+            const name = info.nickname || '-'
+            const mobile = info.mobile ? `<span class="text-xs themed-text-muted ml-1">${info.mobile}</span>` : ''
+            return `${name}${mobile}`
+          }
+        },
+        { key: 'operation_type_name', label: '操作类型', render: (val, row) => val || row.operation_type || '-' },
+        { key: 'store_info', label: '门店', render: (val, row) => row.store_info?.store_name || '-' },
+        {
+          key: 'result', label: '结果',
+          render: (val, row) => {
+            if (val === 'success') return '<span class="text-green-600">✅ 成功</span>'
+            if (val === 'failed') return '<span class="text-red-600">❌ 失败</span>'
+            if (val === 'blocked') return '<span class="text-yellow-600">⚠️ 被阻断</span>'
+            return row.result_name || val || '-'
+          }
+        },
         { key: 'created_at', label: '操作时间', type: 'datetime', sortable: true }
       ],
       dataSource: async (params) => {
-        const res = await request({ url: `${API_PREFIX}/console/audit-logs`, method: 'GET', params })
-        return { items: res.data?.logs || res.data?.list || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+        // 手机号搜索：解析为 operator_id（后端不支持直接按手机号筛选）
+        const queryParams = { ...params }
+        if (queryParams.operator_mobile) {
+          try {
+            const userRes = await request({
+              url: `${API_PREFIX}/console/user-management/users/resolve`,
+              method: 'GET',
+              params: { mobile: queryParams.operator_mobile }
+            })
+            if (userRes?.success && userRes?.data?.user_id) {
+              queryParams.operator_id = userRes.data.user_id
+            }
+          } catch (e) {
+            logger.warn('[MerchantLogs] 手机号解析失败:', e.message)
+          }
+          delete queryParams.operator_mobile
+        }
+        const res = await request({ url: `${API_PREFIX}/console/audit-logs`, method: 'GET', params: queryParams })
+        return {
+          items: res.data?.items || res.data?.logs || res.data?.list || [],
+          total: res.data?.pagination?.total || res.data?.count || 0
+        }
       },
       primaryKey: 'id', sortable: true, page_size: 20
     })
@@ -439,9 +477,10 @@ document.addEventListener('alpine:init', () => {
         { key: 'asset_transaction_id', label: '交易ID', sortable: true },
         { key: 'asset_code', label: '资产类型' },
         { key: 'tx_type', label: '类型', render: (val, row) => row.tx_type_display || val || '-' },
-        { key: 'amount', label: '金额', type: 'number', sortable: true },
-        { key: 'balance_after', label: '余额', type: 'number' },
-        { key: 'reason', label: '说明', type: 'truncate', maxLength: 30 },
+        // delta_amount：与后端数据库字段名一致（正数=增加，负数=扣减）
+        { key: 'delta_amount', label: '变动金额', type: 'number', sortable: true },
+        { key: 'balance_after', label: '变动后余额', type: 'number' },
+        { key: 'description', label: '描述', render: (val) => val || '-' },
         { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
       ],
       dataSource: async (params) => {

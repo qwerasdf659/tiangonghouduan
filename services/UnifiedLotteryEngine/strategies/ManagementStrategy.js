@@ -793,25 +793,6 @@ class ManagementStrategy {
   }
 
   /**
-   * [已废弃] 启动缓存清理定时器
-   *
-   * ⚠️ 2026-01-30 定时任务统一管理改进：
-   * - 此方法中的 setInterval 已被移除
-   * - 缓存清理现在由 ScheduledTasks.scheduleLotteryEngineCacheCleanup() 统一管理
-   * - 详见 scripts/maintenance/scheduled_tasks.js (Task 27)
-   *
-   * @deprecated 请使用 ScheduledTasks 中的 Task 27 替代
-   * @private
-   * @returns {void} 无返回值
-   */
-  startCacheCleanup() {
-    this.logger.warn(
-      'ManagementStrategy.startCacheCleanup() 已废弃，' +
-        '请使用 ScheduledTasks.scheduleLotteryEngineCacheCleanup() (Task 27) 替代'
-    )
-  }
-
-  /**
    * 清理内存缓存 - 供 ScheduledTasks 调用
    *
    * 业务场景：清理过期的内存缓存条目，由 ScheduledTasks (Task 27) 定时调度

@@ -46,7 +46,7 @@ class UserAnalysisService {
   }
 
   /**
-   * 查询用户体验状态列表（向后兼容原 LotteryAnalyticsService 签名）
+   * 查询用户体验状态列表
    *
    * @param {Object} options - 查询参数
    * @param {number} [options.lottery_campaign_id] - 活动ID
@@ -126,7 +126,7 @@ class UserAnalysisService {
   }
 
   /**
-   * 查询用户全局状态列表（向后兼容原 LotteryAnalyticsService 签名）
+   * 查询用户全局状态列表
    *
    * @param {Object} options - 查询参数
    * @param {number} [options.user_id] - 用户ID
@@ -195,7 +195,7 @@ class UserAnalysisService {
   }
 
   /**
-   * 查询配额赠送记录列表（向后兼容原 LotteryAnalyticsService 签名）
+   * 查询配额赠送记录列表
    *
    * @param {Object} options - 查询参数
    * @param {number} [options.lottery_campaign_id] - 活动ID
@@ -300,7 +300,7 @@ class UserAnalysisService {
   }
 
   /**
-   * 查询用户配额状态列表（向后兼容原 LotteryAnalyticsService 签名）
+   * 查询用户配额状态列表
    *
    * @param {Object} options - 查询参数
    * @param {number} [options.lottery_campaign_id] - 活动ID

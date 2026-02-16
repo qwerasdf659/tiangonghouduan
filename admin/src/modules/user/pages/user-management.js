@@ -223,14 +223,16 @@ document.addEventListener('alpine:init', () => {
 
     // ==================== 用户画像分析 (P1-2) ====================
 
-    /** @type {Object} 用户分层数据 */
+    /** @type {Object} 用户分层数据（以后端 segment code 为键） */
     userSegments: {
-      new_users: { count: 0, percentage: 0 },
-      active_users: { count: 0, percentage: 0 },
-      loyal_users: { count: 0, percentage: 0 },
-      dormant_users: { count: 0, percentage: 0 },
-      lost_users: { count: 0, percentage: 0 }
+      high_value: { count: 0, percentage: 0, name: '高价值用户', color: '#4CAF50' },
+      active: { count: 0, percentage: 0, name: '活跃用户', color: '#2196F3' },
+      silent: { count: 0, percentage: 0, name: '沉默用户', color: '#FF9800' },
+      churned: { count: 0, percentage: 0, name: '流失用户', color: '#F44336' }
     },
+
+    /** @type {number} 分层统计总用户数 */
+    totalSegmentUsers: 0,
 
     /** @type {Array} 活跃度热力图数据 */
     activityHeatmap: [],
@@ -273,24 +275,34 @@ document.addEventListener('alpine:init', () => {
       if (result.success) {
         const data = result.data
 
-        // 更新分层数据
+        // 更新分层数据（后端返回 segments 数组，按 code 转为对象供 HTML 直接访问）
         if (data.segments?.success && data.segments.data) {
-          this.userSegments = data.segments.data.segments || data.segments.data
+          const segmentsArray = data.segments.data.segments || []
+          const segmentsObj = {}
+          segmentsArray.forEach(seg => {
+            segmentsObj[seg.code] = seg
+          })
+          this.userSegments = segmentsObj
+          this.totalSegmentUsers = data.segments.data.total_users || 0
+          logger.info('[用户画像] 分层数据加载完成', {
+            total_users: this.totalSegmentUsers,
+            segments: segmentsArray.map(s => `${s.code}:${s.count}`)
+          })
         }
 
-        // 更新热力图数据
+        // 更新热力图数据（后端返回 data.heatmap 为 7×24 二维数组）
         if (data.heatmap?.success && data.heatmap.data) {
           this.activityHeatmap = data.heatmap.data.heatmap || data.heatmap.data
         }
 
-        // 更新兑换偏好
+        // 更新兑换偏好（后端返回 data.preferences + data.statistics）
         if (data.preferences?.success && data.preferences.data) {
           this.exchangePreferences = data.preferences.data
         }
 
-        // 更新漏斗数据
+        // 更新漏斗数据（后端字段名是 "funnel"，不是 "stages"）
         if (data.funnel?.success && data.funnel.data) {
-          this.behaviorFunnel = data.funnel.data.stages || data.funnel.data
+          this.behaviorFunnel = data.funnel.data.funnel || data.funnel.data.stages || []
         }
 
         // 初始化图表
@@ -307,15 +319,16 @@ document.addEventListener('alpine:init', () => {
       const echarts = await loadECharts()
       if (!echarts) return
 
-      // 分层饼图
+      // 分层饼图（后端分层对象: { high_value: {code, name, count, percentage, color}, ... }）
       const segmentContainer = document.getElementById('userSegmentChart')
       if (segmentContainer && !this.segmentChart) {
         this.segmentChart = echarts.init(segmentContainer)
 
         const segmentData = Object.entries(this.userSegments)
-          .map(([key, value]) => ({
-            name: this.getSegmentName(key),
-            value: value.count || value
+          .map(([_code, seg]) => ({
+            name: seg.name || _code,
+            value: seg.count || 0,
+            itemStyle: seg.color ? { color: seg.color } : undefined
           }))
           .filter(item => item.value > 0)
 
@@ -438,17 +451,18 @@ document.addEventListener('alpine:init', () => {
     },
 
     /**
-     * 获取分层名称
+     * 获取分层名称（以后端 segment code 为准）
+     * @param {string} code - 后端分层代码: high_value / active / silent / churned
+     * @returns {string} 分层中文名称
      */
-    getSegmentName(key) {
+    getSegmentName(code) {
       const map = {
-        new_users: '新用户',
-        active_users: '活跃用户',
-        loyal_users: '忠诚用户',
-        dormant_users: '沉睡用户',
-        lost_users: '流失用户'
+        high_value: '高价值用户',
+        active: '活跃用户',
+        silent: '沉默用户',
+        churned: '流失用户'
       }
-      return map[key] || key
+      return map[code] || code
     },
 
     // ==================== 用户行为轨迹方法 (P2-4) ====================

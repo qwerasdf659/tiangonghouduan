@@ -102,7 +102,7 @@ class ConsumptionBatchService {
     const { ConsumptionRecord } = require('../../models')
     const records = await ConsumptionRecord.findAll({
       where: {
-        record_id: { [Op.in]: record_ids },
+        consumption_record_id: { [Op.in]: record_ids },
         status: 'pending' // 只处理待审核的
       }
     })

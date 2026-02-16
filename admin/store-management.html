@@ -92,8 +92,10 @@
 
           <!-- 门店列表（卡片样式） -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-              <div x-show="stores.length === 0" class="col-span-3 text-center themed-text-muted py-12">
+            <!-- 空状态提示 -->
+            <div x-show="stores.length === 0" class="col-span-3 text-center themed-text-muted py-12">
+              暂无门店数据，请点击「添加门店」创建第一个门店
+            </div>
 
             <template x-for="store in stores" :key="store.store_id">
               <div class="store-card p-4 themed-card">

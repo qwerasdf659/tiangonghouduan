@@ -435,19 +435,21 @@ document.addEventListener('alpine:init', () => {
 
       /**
        * 判断竞价是否可结算
-       * @param {Object} bid - 竞价商品对象
+       * @param {Object|null} bid - 竞价商品对象（Alpine.js 初始化时可能为 null）
        * @returns {boolean}
        */
       canSettle(bid) {
+        if (!bid) return false
         return ['active', 'ended'].includes(bid.status)
       },
 
       /**
        * 判断竞价是否可取消
-       * @param {Object} bid - 竞价商品对象
+       * @param {Object|null} bid - 竞价商品对象（Alpine.js 初始化时可能为 null）
        * @returns {boolean}
        */
       canCancel(bid) {
+        if (!bid) return false
         return ['pending', 'active'].includes(bid.status)
       },
 

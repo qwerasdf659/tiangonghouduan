@@ -311,7 +311,7 @@ class QueryService {
   async getItemDetail(item_id) {
     try {
       const item = await this.ExchangeItem.findOne({
-        where: { item_id },
+        where: { exchange_item_id: item_id },
         attributes: EXCHANGE_MARKET_ATTRIBUTES.marketItemDetailView,
         include: [
           {

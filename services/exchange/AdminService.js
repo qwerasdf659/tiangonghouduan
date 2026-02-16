@@ -333,9 +333,9 @@ class AdminService {
 
     const associated_image_id = item.primary_image_id
 
-    // 检查是否有相关订单
+    // 检查是否有相关订单（通过 exchange_item_id 关联）
     const orderCount = await this.ExchangeRecord.count({
-      where: { item_id },
+      where: { exchange_item_id: item_id },
       transaction
     })
 
@@ -676,6 +676,150 @@ class AdminService {
     } catch (error) {
       logger.error('[兑换市场-管理] 查询统计数据失败:', error.message)
       throw new Error(`查询统计数据失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 批量绑定商品图片（运营批量上传图片后绑定）
+   *
+   * 业务场景：77条兑换商品的 primary_image_id 全为 NULL，
+   * 运营在管理后台上传图片后，通过此接口批量绑定图片到对应商品
+   *
+   * @param {Array<Object>} bindings - 绑定关系数组
+   * @param {number} bindings[].exchange_item_id - 商品ID
+   * @param {number} bindings[].image_resource_id - 图片资源ID
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 事务对象（必填）
+   * @returns {Promise<Object>} 绑定结果
+   */
+  async batchBindImages(bindings, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'AdminService.batchBindImages')
+
+    if (!Array.isArray(bindings) || bindings.length === 0) {
+      throw new Error('绑定关系数组不能为空')
+    }
+
+    // 参数格式验证
+    for (const binding of bindings) {
+      if (!binding.exchange_item_id || !binding.image_resource_id) {
+        throw new Error('每条绑定记录必须包含 exchange_item_id 和 image_resource_id')
+      }
+    }
+
+    logger.info('[兑换市场-管理] 批量绑定商品图片', { count: bindings.length })
+
+    const ImageService = require('../ImageService')
+    const results = { success: 0, failed: 0, details: [] }
+
+    for (const binding of bindings) {
+      try {
+        // 验证商品存在
+        const item = await this.ExchangeItem.findByPk(binding.exchange_item_id, { transaction })
+        if (!item) {
+          results.failed++
+          results.details.push({
+            exchange_item_id: binding.exchange_item_id,
+            success: false,
+            error: '商品不存在'
+          })
+          continue
+        }
+
+        // 更新商品的 primary_image_id
+        await item.update({ primary_image_id: binding.image_resource_id }, { transaction })
+
+        // 绑定图片的 context_id 到商品ID（防止24h清理误删）
+        await ImageService.updateImageContextId(
+          binding.image_resource_id,
+          binding.exchange_item_id,
+          transaction
+        )
+
+        results.success++
+        results.details.push({
+          exchange_item_id: binding.exchange_item_id,
+          image_resource_id: binding.image_resource_id,
+          success: true
+        })
+      } catch (bindError) {
+        results.failed++
+        results.details.push({
+          exchange_item_id: binding.exchange_item_id,
+          image_resource_id: binding.image_resource_id,
+          success: false,
+          error: bindError.message
+        })
+        logger.warn('[兑换市场-管理] 单条图片绑定失败', {
+          exchange_item_id: binding.exchange_item_id,
+          error: bindError.message
+        })
+      }
+    }
+
+    // 清除缓存
+    try {
+      await BusinessCacheHelper.invalidateExchangeItems('batch_image_bind')
+    } catch (cacheError) {
+      logger.warn('[兑换市场-管理] 缓存失效失败（非致命）:', cacheError.message)
+    }
+
+    logger.info('[兑换市场-管理] 批量绑定商品图片完成', {
+      total: bindings.length,
+      success: results.success,
+      failed: results.failed
+    })
+
+    return {
+      total: bindings.length,
+      success: results.success,
+      failed: results.failed,
+      details: results.details
+    }
+  }
+
+  /**
+   * 查询缺少图片的商品列表（运营排查工具）
+   *
+   * 业务场景：运营需要知道哪些商品还没有绑定图片，方便批量上传
+   *
+   * @param {Object} options - 查询选项
+   * @param {number} [options.page=1] - 页码
+   * @param {number} [options.page_size=50] - 每页数量（默认50，一次性查看更多）
+   * @returns {Promise<Object>} 缺图商品列表
+   */
+  async getMissingImageItems(options = {}) {
+    const { page = 1, page_size = 50 } = options
+
+    try {
+      const offset = (page - 1) * page_size
+      const limit = page_size
+
+      const { count, rows } = await this.ExchangeItem.findAndCountAll({
+        where: { primary_image_id: null },
+        attributes: ['exchange_item_id', 'item_name', 'category', 'status', 'space', 'stock'],
+        limit,
+        offset,
+        order: [['exchange_item_id', 'ASC']]
+      })
+
+      logger.info('[兑换市场-管理] 查询缺图商品列表', {
+        total: count,
+        page,
+        returned: rows.length
+      })
+
+      return {
+        items: rows.map(item => item.toJSON()),
+        pagination: {
+          total: count,
+          page,
+          page_size,
+          total_pages: Math.ceil(count / page_size)
+        }
+      }
+    } catch (error) {
+      logger.error('[兑换市场-管理] 查询缺图商品列表失败:', error.message)
+      throw error
     }
   }
 

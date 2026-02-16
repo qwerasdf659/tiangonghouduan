@@ -170,27 +170,6 @@ class ChatRateLimitService {
   }
 
   /**
-   * 初始化定期清理机制（已废弃）
-   *
-   * @deprecated 自 2026-01-30 起，清理任务已迁移至 ScheduledTasks 统一管理
-   *             请勿再调用此方法，改用 ScheduledTasks.scheduleChatRateLimitCleanup()
-   *
-   * 迁移说明：
-   * - 原有的三个独立 setInterval 已合并为 performCleanup() 方法
-   * - ScheduledTasks 每10分钟调用一次 performCleanup()
-   * - 使用 node-cron 替代 setInterval，支持更灵活的调度
-   *
-   * @static
-   * @returns {void} 仅打印警告日志，不再启动清理机制
-   */
-  static initCleanup() {
-    logger.warn(
-      '⚠️ ChatRateLimitService.initCleanup() 已废弃，清理任务已迁移至 ScheduledTasks 统一管理'
-    )
-    logger.info('💡 如需手动触发清理，请调用 ChatRateLimitService.performCleanup()')
-  }
-
-  /**
    * 检查消息发送频率
    *
    * 业务场景：
@@ -472,17 +451,5 @@ class ChatRateLimitService {
     }
   }
 }
-
-// ============================================================
-// 重要变更说明（2026-01-30 定时任务统一管理改进方案）
-// ============================================================
-// 原代码：ChatRateLimitService.initCleanup() - 服务加载时自动启动3个setInterval
-// 问题：setInterval 分散管理，难以监控，多实例部署时无法协调
-// 解决方案：迁移至 ScheduledTasks 统一管理
-//   - 清理任务由 ScheduledTasks.scheduleChatRateLimitCleanup() 调度
-//   - 使用 node-cron ('*/10 * * * *') 每10分钟执行一次
-//   - 调用 ChatRateLimitService.performCleanup() 执行实际清理
-//   - 不需要分布式锁（内存级操作，各实例独立清理）
-// ============================================================
 
 module.exports = ChatRateLimitService

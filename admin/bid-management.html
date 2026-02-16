@@ -327,7 +327,7 @@
                     x-text="'（共 ' + (detail_data?.all_bid_records?.length || 0) + ' 条）'">
               </span>
             </h4>
-            <div x-show="!detail_data?.all_bid_records || detail_data.all_bid_records.length === 0"
+            <div x-show="!detail_data?.all_bid_records || detail_data?.all_bid_records?.length === 0"
                  class="p-4 text-center themed-text-muted text-sm">
               暂无出价记录
             </div>
@@ -345,7 +345,7 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y">
-                  <template x-for="record in detail_data.all_bid_records" :key="record.bid_record_id">
+                  <template x-for="record in (detail_data?.all_bid_records || [])" :key="record.bid_record_id">
                     <tr class="themed-hover-bg"
                         :class="record.is_final_winner ? 'bg-amber-50' : ''">
                       <td class="px-3 py-2" x-text="record.bid_record_id"></td>

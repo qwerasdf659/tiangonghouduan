@@ -1088,6 +1088,143 @@ router.get(
 )
 
 /**
+ * 查询缺少图片的兑换商品列表（运营排查工具）
+ * GET /api/v4/console/marketplace/exchange_market/missing-images
+ *
+ * @description 运营用于快速定位哪些商品还没有绑定图片，方便批量上传处理
+ *
+ * @query {number} page - 页码（默认1）
+ * @query {number} page_size - 每页数量（默认50）
+ *
+ * @returns {Object} 缺图商品列表和分页信息
+ *
+ * @security JWT + Admin权限
+ *
+ * @created 2026-02-16（运营工具：商品图片批量绑定）
+ */
+router.get(
+  '/exchange_market/missing-images',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { page = 1, page_size = 50 } = req.query
+      const admin_id = req.user.user_id
+
+      logger.info('管理员查询缺图商品列表', { admin_id, page, page_size })
+
+      const ExchangeAdminService = req.app.locals.services.getService('exchange_admin')
+
+      const result = await ExchangeAdminService.getMissingImageItems({
+        page: parseInt(page),
+        page_size: parseInt(page_size)
+      })
+
+      logger.info('缺图商品列表查询成功', {
+        admin_id,
+        total: result.pagination.total,
+        page: result.pagination.page
+      })
+
+      return res.apiSuccess(result, `共 ${result.pagination.total} 个商品缺少图片`)
+    } catch (error) {
+      logger.error('查询缺图商品列表失败', {
+        error: error.message,
+        admin_id: req.user?.user_id
+      })
+      return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * 批量绑定兑换商品图片（运营批量操作）
+ * POST /api/v4/console/marketplace/exchange_market/batch-bind-images
+ *
+ * @description 运营上传图片后，通过此接口批量绑定图片到对应商品
+ *
+ * @body {Array<Object>} bindings - 绑定关系数组
+ * @body {number} bindings[].exchange_item_id - 商品ID
+ * @body {number} bindings[].image_resource_id - 图片资源ID（先通过图片上传API获取）
+ *
+ * @returns {Object} 批量绑定结果
+ * @returns {number} data.total - 总处理数
+ * @returns {number} data.success - 成功数
+ * @returns {number} data.failed - 失败数
+ * @returns {Array} data.details - 每条记录的处理详情
+ *
+ * @security JWT + Admin权限
+ *
+ * @created 2026-02-16（运营工具：商品图片批量绑定）
+ */
+router.post(
+  '/exchange_market/batch-bind-images',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { bindings } = req.body
+      const admin_id = req.user.user_id
+
+      // 参数验证
+      if (!Array.isArray(bindings) || bindings.length === 0) {
+        return res.apiError(
+          'bindings 必须是非空数组，每项包含 exchange_item_id 和 image_resource_id',
+          'BAD_REQUEST',
+          {
+            example: {
+              bindings: [
+                { exchange_item_id: 1, image_resource_id: 100 },
+                { exchange_item_id: 2, image_resource_id: 101 }
+              ]
+            }
+          },
+          400
+        )
+      }
+
+      // 数量限制（防止单次过多）
+      if (bindings.length > 100) {
+        return res.apiError('单次批量绑定最多100条，请分批操作', 'BAD_REQUEST', null, 400)
+      }
+
+      logger.info('管理员批量绑定商品图片', {
+        admin_id,
+        binding_count: bindings.length
+      })
+
+      const ExchangeAdminService = req.app.locals.services.getService('exchange_admin')
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await ExchangeAdminService.batchBindImages(bindings, { transaction })
+        },
+        {
+          description: `批量绑定商品图片 ${bindings.length} 条`,
+          maxRetries: 1
+        }
+      )
+
+      logger.info('批量绑定商品图片完成', {
+        admin_id,
+        total: result.total,
+        success: result.success,
+        failed: result.failed
+      })
+
+      return res.apiSuccess(result, `批量绑定完成：成功 ${result.success}，失败 ${result.failed}`)
+    } catch (error) {
+      logger.error('批量绑定商品图片失败', {
+        error: error.message,
+        stack: error.stack,
+        admin_id: req.user?.user_id
+      })
+      return res.apiError(error.message || '批量绑定失败', 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
  * 查看C2C可交易资产配置
  * GET /api/v4/console/marketplace/tradable-assets
  *

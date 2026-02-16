@@ -48,7 +48,6 @@ const appLogger = logger
 
 // 🔧 导入API响应统一中间件 - 解决API格式不一致问题
 const ApiResponse = require('./utils/ApiResponse')
-// const ApiStandardManager = require('./utils/ApiStandardManager') // 已合并到ApiResponse中，删除冗余引用
 
 /**
  * 统一 request_id 获取逻辑（与 ApiResponse.middleware 兼容）
@@ -553,7 +552,7 @@ app.get('/admin', (req, res) => {
 
 appLogger.info('✅ Web管理后台静态文件托管已配置', {
   mount: '/admin',
-  directory: 'public/admin',
+  directory: 'admin/dist',
   cache: '1h'
 })
 // ========================================
@@ -760,12 +759,6 @@ app.use('*', (req, res) => {
     request_id: getRequestId(req)
   })
 })
-
-/*
- * 🔧 API标准化中间件 - 统一所有API响应格式
- * const apiStandardManager = new ApiStandardManager() // 已合并到ApiResponse中，删除冗余引用
- * app.use(apiStandardManager.createStandardizationMiddleware())
- */
 
 /**
  * 🔧 全局错误处理

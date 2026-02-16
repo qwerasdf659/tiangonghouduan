@@ -255,7 +255,7 @@ export function useAdvancedStatusMethods() {
           // 后端返回 { list: [...], pagination: {...} }
           const list = response.data?.profiles || response.data?.list || []
           // 过滤掉可能的无效数据
-          this.riskProfiles = list.filter(item => item && (item.risk_profile_id || item.user_id))
+          this.riskProfiles = list.filter(item => item && (item.user_risk_profile_id || item.user_id))
           if (response.data?.pagination) {
             // 只更新 total，total_pages 由 getter 计算
             this.riskPagination.total =
@@ -334,15 +334,10 @@ export function useAdvancedStatusMethods() {
 
       try {
         this.saving = true
-        // 使用正确的主键字段名 risk_profile_id
-        const profileId = this.selectedRiskProfile?.risk_profile_id || this.selectedRiskProfile?.id
-        const url = this.selectedRiskProfile
-          ? buildURL(USER_ENDPOINTS.RISK_PROFILE_UPDATE, {
-              id: profileId
-            })
-          : USER_ENDPOINTS.RISK_PROFILE_CREATE
+        // 使用后端实际主键字段名 user_risk_profile_id
+        const profileId = this.selectedRiskProfile?.user_risk_profile_id
 
-        // 构建提交数据，使用 thresholds JSON 格式
+        // 构建提交数据，使用 thresholds JSON 格式（直接使用后端字段名）
         const submitData = {
           thresholds: {
             daily_points_limit: this.riskForm.daily_points_limit,
@@ -350,17 +345,33 @@ export function useAdvancedStatusMethods() {
             daily_lottery_limit: this.riskForm.daily_lottery_limit
           }
         }
-        // 用户配置需要 user_id
-        if (!isLevelConfig && resolvedUserId) {
-          submitData.user_id = resolvedUserId
+
+        // 根据操作类型选择正确的后端端点和HTTP方法
+        let url, method
+        if (this.selectedRiskProfile) {
+          // 编辑现有配置 → PUT /risk-profiles/:id（按记录ID更新）
+          url = buildURL(USER_ENDPOINTS.RISK_PROFILE_UPDATE_BY_ID, { id: profileId })
+          method = 'PUT'
+        } else if (isLevelConfig) {
+          // 创建等级默认配置 → POST /risk-profiles/levels
+          submitData.user_level = this.riskForm.user_level || 'normal'
+          url = USER_ENDPOINTS.RISK_PROFILE_LEVELS
+          method = 'POST'
+        } else {
+          // 创建用户风控配置 → POST /risk-profiles/user/:user_id
+          url = buildURL(USER_ENDPOINTS.RISK_PROFILE_USER, { user_id: resolvedUserId })
+          method = 'POST'
         }
-        // 等级配置需要 user_level
-        if (isLevelConfig) {
+
+        // 编辑等级配置时需要 user_level
+        if (isLevelConfig && this.selectedRiskProfile) {
           submitData.user_level = this.selectedRiskProfile.user_level
         }
 
+        logger.info('[RiskProfile] 提交风控配置:', { url, method, isLevelConfig, profileId })
+
         const response = await this.apiCall(url, {
-          method: this.selectedRiskProfile ? 'PUT' : 'POST',
+          method,
           data: submitData
         })
 

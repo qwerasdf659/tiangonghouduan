@@ -1091,6 +1091,127 @@ class ChatWebSocketService {
     return successCount
   }
 
+  // ==================== 竞价通知WebSocket事件（2026-02-16 前后端联调确认）====================
+
+  /**
+   * 推送竞价被超越通知给指定用户
+   *
+   * WebSocket事件名：bid_outbid
+   * 触发场景：用户 A 出价后，用户 B 提交更高出价，通知用户 A
+   *
+   * 前端监听示例：
+   *   socket.on('bid_outbid', (data) => {
+   *     // data.bid_product_id - 竞价商品ID
+   *     // data.item_name - 商品名称
+   *     // data.my_bid_amount - 被超越的出价金额
+   *     // data.new_highest - 新的最高出价
+   *     // data.price_asset_code - 竞价资产类型
+   *   })
+   *
+   * @param {number} userId - 被超越的出价者用户ID
+   * @param {Object} data - 竞价超越数据
+   * @param {number} data.bid_product_id - 竞价商品ID
+   * @param {string} data.item_name - 商品名称
+   * @param {number} data.my_bid_amount - 被超越的出价金额
+   * @param {number} data.new_highest - 新的最高出价金额
+   * @param {string} data.price_asset_code - 竞价资产类型
+   * @returns {boolean} 是否推送成功
+   */
+  pushBidOutbid(userId, data) {
+    return this._pushBidEvent(userId, 'bid_outbid', data)
+  }
+
+  /**
+   * 推送竞价中标通知给指定用户
+   *
+   * WebSocket事件名：bid_won
+   * 触发场景：竞价结算完成，通知中标用户
+   *
+   * 前端监听示例：
+   *   socket.on('bid_won', (data) => {
+   *     // data.bid_product_id - 竞价商品ID
+   *     // data.item_name - 商品名称
+   *     // data.winning_amount - 中标金额
+   *     // data.price_asset_code - 竞价资产类型
+   *   })
+   *
+   * @param {number} userId - 中标用户ID
+   * @param {Object} data - 中标数据
+   * @param {number} data.bid_product_id - 竞价商品ID
+   * @param {string} data.item_name - 商品名称
+   * @param {number} data.winning_amount - 中标金额
+   * @param {string} data.price_asset_code - 竞价资产类型
+   * @returns {boolean} 是否推送成功
+   */
+  pushBidWon(userId, data) {
+    return this._pushBidEvent(userId, 'bid_won', data)
+  }
+
+  /**
+   * 推送竞价落选通知给指定用户
+   *
+   * WebSocket事件名：bid_lost
+   * 触发场景：竞价结算完成，通知落选用户（冻结资产已解冻）
+   *
+   * 前端监听示例：
+   *   socket.on('bid_lost', (data) => {
+   *     // data.bid_product_id - 竞价商品ID
+   *     // data.item_name - 商品名称
+   *     // data.my_bid_amount - 用户的出价金额
+   *     // data.winning_amount - 中标金额
+   *     // data.price_asset_code - 竞价资产类型
+   *   })
+   *
+   * @param {number} userId - 落选用户ID
+   * @param {Object} data - 落选数据
+   * @param {number} data.bid_product_id - 竞价商品ID
+   * @param {string} data.item_name - 商品名称
+   * @param {number} data.my_bid_amount - 用户的出价金额
+   * @param {number} data.winning_amount - 中标金额
+   * @param {string} data.price_asset_code - 竞价资产类型
+   * @returns {boolean} 是否推送成功
+   */
+  pushBidLost(userId, data) {
+    return this._pushBidEvent(userId, 'bid_lost', data)
+  }
+
+  /**
+   * 竞价事件推送内部方法（统一处理竞价WebSocket推送）
+   *
+   * @param {number} userId - 目标用户ID
+   * @param {string} eventName - 事件名称（bid_outbid/bid_won/bid_lost）
+   * @param {Object} data - 事件数据
+   * @returns {boolean} 是否推送成功
+   * @private
+   */
+  _pushBidEvent(userId, eventName, data) {
+    const socketId = this.connectedUsers.get(userId)
+    if (!socketId) {
+      wsLogger.info(`📝 用户 ${userId} 不在线，竞价通知 ${eventName} 未推送（聊天消息已持久化）`)
+      return false
+    }
+
+    try {
+      const payload = {
+        ...data,
+        event_type: eventName,
+        timestamp: BeijingTimeHelper.now()
+      }
+      this.io.to(socketId).emit(eventName, payload)
+      wsLogger.info(`📤 竞价通知 ${eventName} 已推送给用户 ${userId}`, {
+        bid_product_id: data.bid_product_id,
+        event: eventName
+      })
+      return true
+    } catch (error) {
+      wsLogger.error(`推送竞价通知 ${eventName} 给用户失败`, {
+        user_id: userId,
+        error: error.message
+      })
+      return false
+    }
+  }
+
   /**
    * 推送系统广播消息给所有在线用户（通用方法）
    *

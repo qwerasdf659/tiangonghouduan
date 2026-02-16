@@ -860,22 +860,6 @@ class LotteryQueryService {
       throw error
     }
   }
-
-  /**
-   * ============================================
-   * getCampaigns 方法别名
-   * ============================================
-   *
-   * 兼容性别名：getActiveCampaigns 的别名
-   * 原方法名：get_campaigns（UnifiedLotteryEngine.js）
-   * 迁移后方法名：getActiveCampaigns/getCampaigns（LotteryQueryService）
-   *
-   * @param {Object} options - 查询选项
-   * @returns {Promise<Array>} 活动列表
-   */
-  static async getCampaigns(options = {}) {
-    return LotteryQueryService.getActiveCampaigns(options)
-  }
 }
 
 module.exports = LotteryQueryService

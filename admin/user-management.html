@@ -707,32 +707,27 @@
 
       <!-- 用户画像分析页 (P1-2) -->
       <div x-show="current_page === 'user-segments'" x-cloak>
-        <!-- 分层概览卡片 -->
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <!-- 分层概览卡片（后端4个分层: high_value / active / silent / churned） -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div class="themed-card rounded-lg shadow p-4 text-center">
-            <h6 class="themed-text-muted text-sm mb-2">🆕 新用户</h6>
-            <h2 class="text-2xl font-bold themed-text-primary" x-text="userSegments.new_users?.count || 0"></h2>
-            <span class="text-xs themed-text-muted" x-text="(userSegments.new_users?.percentage || 0) + '%'"></span>
+            <h6 class="themed-text-muted text-sm mb-2">💎 高价值用户</h6>
+            <h2 class="text-2xl font-bold text-green-600" x-text="userSegments.high_value?.count || 0"></h2>
+            <span class="text-xs themed-text-muted" x-text="(userSegments.high_value?.percentage || 0) + '%'"></span>
           </div>
           <div class="themed-card rounded-lg shadow p-4 text-center">
             <h6 class="themed-text-muted text-sm mb-2">🔥 活跃用户</h6>
-            <h2 class="text-2xl font-bold text-green-600" x-text="userSegments.active_users?.count || 0"></h2>
-            <span class="text-xs themed-text-muted" x-text="(userSegments.active_users?.percentage || 0) + '%'"></span>
+            <h2 class="text-2xl font-bold themed-text-primary" x-text="userSegments.active?.count || 0"></h2>
+            <span class="text-xs themed-text-muted" x-text="(userSegments.active?.percentage || 0) + '%'"></span>
           </div>
           <div class="themed-card rounded-lg shadow p-4 text-center">
-            <h6 class="themed-text-muted text-sm mb-2">💎 忠诚用户</h6>
-            <h2 class="text-2xl font-bold text-purple-600" x-text="userSegments.loyal_users?.count || 0"></h2>
-            <span class="text-xs themed-text-muted" x-text="(userSegments.loyal_users?.percentage || 0) + '%'"></span>
-          </div>
-          <div class="themed-card rounded-lg shadow p-4 text-center">
-            <h6 class="themed-text-muted text-sm mb-2">😴 沉睡用户</h6>
-            <h2 class="text-2xl font-bold text-yellow-600" x-text="userSegments.dormant_users?.count || 0"></h2>
-            <span class="text-xs themed-text-muted" x-text="(userSegments.dormant_users?.percentage || 0) + '%'"></span>
+            <h6 class="themed-text-muted text-sm mb-2">😴 沉默用户</h6>
+            <h2 class="text-2xl font-bold text-yellow-600" x-text="userSegments.silent?.count || 0"></h2>
+            <span class="text-xs themed-text-muted" x-text="(userSegments.silent?.percentage || 0) + '%'"></span>
           </div>
           <div class="themed-card rounded-lg shadow p-4 text-center">
             <h6 class="themed-text-muted text-sm mb-2">❌ 流失用户</h6>
-            <h2 class="text-2xl font-bold text-red-600" x-text="userSegments.lost_users?.count || 0"></h2>
-            <span class="text-xs themed-text-muted" x-text="(userSegments.lost_users?.percentage || 0) + '%'"></span>
+            <h2 class="text-2xl font-bold text-red-600" x-text="userSegments.churned?.count || 0"></h2>
+            <span class="text-xs themed-text-muted" x-text="(userSegments.churned?.percentage || 0) + '%'"></span>
           </div>
         </div>
 

@@ -316,24 +316,6 @@ module.exports = sequelize => {
     }, {})
   }
 
-  /**
-   * 🗑️ [已废弃] 定期清理任务方法
-   *
-   * ⚠️ 2026-01-30 定时任务统一管理改进：
-   * - 此方法中的 setInterval 已被移除
-   * - 过期会话清理现在由 ScheduledTasks.scheduleAuthSessionCleanup() 统一管理
-   * - 详见 scripts/maintenance/scheduled_tasks.js (Task 26)
-   *
-   * @deprecated 请使用 ScheduledTasks 中的 Task 26 替代
-   * @returns {void} 无返回值
-   */
-  AuthenticationSession.scheduleCleanup = function () {
-    console.warn(
-      '⚠️ AuthenticationSession.scheduleCleanup() 已废弃，' +
-        '请使用 ScheduledTasks.scheduleAuthSessionCleanup() (Task 26) 替代'
-    )
-  }
-
   // 关联关系
   AuthenticationSession.associate = function (models) {
     /*

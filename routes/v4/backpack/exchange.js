@@ -571,8 +571,10 @@ router.post(
     logger.info('用户解锁高级空间', { user_id: userId })
 
     try {
-      // 调用 PremiumService 处理解锁（Service 内部管理事务）
-      const result = await PremiumService.unlockPremium(userId)
+      // 通过 TransactionManager 统一管理事务边界（PremiumService 强制要求外部事务）
+      const result = await TransactionManager.execute(async transaction => {
+        return await PremiumService.unlockPremium(userId, { transaction })
+      })
 
       logger.info('高级空间解锁成功', {
         user_id: userId,
@@ -594,7 +596,7 @@ router.post(
     } catch (error) {
       logger.error('高级空间解锁失败', { user_id: userId, error: error.message })
 
-      // 处理业务错误（来自 PremiumService）
+      // 处理业务错误（来自 PremiumService，带有明确的 code + statusCode）
       if (error.code && error.statusCode) {
         return res.apiError(error.message, error.code, error.data || null, error.statusCode)
       }

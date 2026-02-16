@@ -176,8 +176,9 @@ import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
  * @property {string} PREMIUM_UNLOCK - [POST] 解锁高级功能 - Path: :user_id
  *
  * @property {string} RISK_PROFILE_LIST - [GET] 获取风控配置列表
- * @property {string} RISK_PROFILE_USER - [GET] 获取用户风控配置 - Path: :user_id
- * @property {string} RISK_PROFILE_UPDATE - [PUT] 更新风控配置 - Path: :user_id
+ * @property {string} RISK_PROFILE_LEVELS - [GET/POST] 等级默认配置
+ * @property {string} RISK_PROFILE_USER - [GET/POST] 获取/创建用户风控配置 - Path: :user_id
+ * @property {string} RISK_PROFILE_UPDATE_BY_ID - [PUT] 更新风控配置（按记录ID）- Path: :id
  *
  * @property {string} SESSION_LIST - [GET] 获取会话列表
  * @property {string} SESSION_STATS - [GET] 获取会话统计
@@ -252,13 +253,13 @@ export const USER_ENDPOINTS = {
   /** @type {string} [POST] 解锁高级功能 - Path: :user_id, Body: { feature } */
   PREMIUM_UNLOCK: `${API_PREFIX}/console/user-premium/:user_id/unlock`,
 
-  // 用户风控配置
-  /** @type {string} [GET] 获取风控配置列表 - Query: { page?, page_size?, risk_level? } */
+  // 用户风控配置 - 直接反映后端路由
+  /** @type {string} [GET] 获取风控配置列表 - Query: { config_type?, user_level?, is_frozen?, user_id?, page?, page_size? } */
   RISK_PROFILE_LIST: `${API_PREFIX}/console/risk-profiles`,
-  /** @type {string} [GET] 获取用户风控配置 - Path: :user_id */
+  /** @type {string} [GET/POST] 等级默认配置 - GET获取列表 / POST创建（Body: { user_level, thresholds, remarks? }） */
+  RISK_PROFILE_LEVELS: `${API_PREFIX}/console/risk-profiles/levels`,
+  /** @type {string} [GET/POST] 用户风控配置 - GET获取有效配置 / POST创建更新（Body: { thresholds, remarks? }）- Path: :user_id */
   RISK_PROFILE_USER: `${API_PREFIX}/console/risk-profiles/user/:user_id`,
-  /** @type {string} [PUT] 更新风控配置 - Path: :user_id, Body: { risk_level, limits, ... } */
-  RISK_PROFILE_UPDATE: `${API_PREFIX}/console/risk-profiles/user/:user_id`,
 
   // 会话管理
   /** @type {string} [GET] 获取会话列表 - Query: { page?, page_size?, user_id?, status? } */
@@ -324,15 +325,13 @@ export const USER_ENDPOINTS = {
   /** @type {string} [POST] 撤销高级状态 - Path: :user_id */
   PREMIUM_STATUS_REVOKE: `${API_PREFIX}/console/user-premium/:user_id/revoke`,
 
-  // 风控配置扩展
-  /** @type {string} [POST] 创建风控配置 - Body: { user_id, risk_level, limits } */
-  RISK_PROFILE_CREATE: `${API_PREFIX}/console/risk-profiles`,
-  /** @type {string} [PUT] 更新风控配置（按记录ID） - Path: :id */
+  // 风控配置扩展 - 直接反映后端路由
+  /** @type {string} [GET/PUT/DELETE] 风控配置记录操作（按记录ID）- Path: :id */
   RISK_PROFILE_UPDATE_BY_ID: `${API_PREFIX}/console/risk-profiles/:id`,
-  /** @type {string} [POST] 冻结用户 - Path: :user_id */
-  RISK_PROFILE_FREEZE: `${API_PREFIX}/console/risk-profiles/:user_id/freeze`,
+  /** @type {string} [POST] 冻结用户 - Path: :user_id, Body: { reason } */
+  RISK_PROFILE_FREEZE: `${API_PREFIX}/console/risk-profiles/user/:user_id/freeze`,
   /** @type {string} [POST] 解冻用户 - Path: :user_id */
-  RISK_PROFILE_UNFREEZE: `${API_PREFIX}/console/risk-profiles/:user_id/unfreeze`
+  RISK_PROFILE_UNFREEZE: `${API_PREFIX}/console/risk-profiles/user/:user_id/unfreeze`
 }
 
 // ========== API 调用方法 ==========
@@ -793,16 +792,33 @@ export const UserAPI = {
   },
 
   /**
-   * 更新用户风控配置
+   * 创建/更新用户风控配置（upsert，后端 POST /risk-profiles/user/:user_id）
    * @async
    * @param {number|string} userId - 用户 ID
    * @param {Object} data - 配置数据
-   * @param {string} [data.risk_level] - 风险级别
-   * @param {Object} [data.limits] - 限制配置
+   * @param {Object} data.thresholds - 风控阈值配置
+   * @param {number} [data.thresholds.daily_points_limit] - 日积分限额
+   * @param {number} [data.thresholds.single_transaction_limit] - 单笔交易限额
+   * @param {number} [data.thresholds.daily_lottery_limit] - 日抽奖次数限制
+   * @param {string} [data.remarks] - 备注
+   * @returns {Promise<ApiResponse>} 操作结果响应
+   */
+  async upsertUserRiskProfile(userId, data) {
+    const url = buildURL(USER_ENDPOINTS.RISK_PROFILE_USER, { user_id: userId })
+    return await request({ url, method: 'POST', data })
+  },
+
+  /**
+   * 更新风控配置（按记录ID，后端 PUT /risk-profiles/:id）
+   * @async
+   * @param {number|string} id - 风控配置记录 ID（user_risk_profile_id）
+   * @param {Object} data - 配置数据
+   * @param {Object} data.thresholds - 风控阈值配置
+   * @param {string} [data.remarks] - 备注
    * @returns {Promise<ApiResponse>} 更新结果响应
    */
-  async updateUserRiskProfile(userId, data) {
-    const url = buildURL(USER_ENDPOINTS.RISK_PROFILE_UPDATE, { user_id: userId })
+  async updateRiskProfileById(id, data) {
+    const url = buildURL(USER_ENDPOINTS.RISK_PROFILE_UPDATE_BY_ID, { id })
     return await request({ url, method: 'PUT', data })
   },
 

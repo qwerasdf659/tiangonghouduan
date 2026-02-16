@@ -223,12 +223,12 @@ export function useDiamondAccountsMethods() {
             frozen: account.frozen,
             asset_code: 'DIAMOND',
             transactions: transactions.map(tx => ({
-              transaction_id: tx.transaction_id,
-              amount: tx.amount,
+              asset_transaction_id: tx.asset_transaction_id,
+              delta_amount: tx.delta_amount,
               balance_before: tx.balance_before,
               balance_after: tx.balance_after,
               tx_type: tx.tx_type,
-              reason: tx.reason || tx.description,
+              description: tx.description || tx.title || '-',
               created_at: tx.created_at
             }))
           }

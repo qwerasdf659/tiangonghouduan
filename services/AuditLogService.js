@@ -681,41 +681,6 @@ class AuditLogService {
   }
 
   /**
-   * 记录商品配置操作
-   *
-   * @param {Object} params - 参数
-   * @param {number} params.operator_id - 操作员ID
-   * @param {number} params.product_id - 商品ID
-   * @param {string} params.action - 操作动作（create/update/delete）
-   * @param {Object} params.before_data - 操作前数据
-   * @param {Object} params.after_data - 操作后数据
-   * @param {string} params.reason - 操作原因
-   * @param {Object} params.transaction - 事务对象
-   * @returns {Promise<AdminOperationLog|null>} 审计日志记录（失败返回null，不阻塞业务流程）
-   */
-  static async logProductConfig(params) {
-    const { operator_id, product_id, action, before_data, after_data, reason, transaction } = params
-
-    const operationTypeMap = {
-      create: 'product_create',
-      update: 'product_update',
-      delete: 'product_delete'
-    }
-
-    return this.logOperation({
-      operator_id,
-      operation_type: operationTypeMap[action] || 'product_update',
-      target_type: 'Product',
-      target_id: product_id,
-      action,
-      before_data,
-      after_data,
-      reason,
-      transaction
-    })
-  }
-
-  /**
    * 记录资产调整操作（V4.5.0新增）
    *
    * @description 用于管理员资产调整路由的审计日志记录

@@ -117,7 +117,6 @@ class DataSanitizer {
       type: prize.prize_type,
       icon: this.getPrizeIcon(prize.prize_type),
       rarity_code: prize.rarity_code || 'common', // 稀有度代码（来自 rarity_defs 表，前端直接使用此字段名显示光效）
-      rarity: this.calculateRarity(prize.prize_type), // 兼容字段：用稀有度替代概率（前端新代码使用 rarity_code）
       available: prize.stock_quantity > 0, // 简化库存状态
       /**
        * ✅ 展示积分（用户可见）

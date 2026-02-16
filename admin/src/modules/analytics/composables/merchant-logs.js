@@ -20,11 +20,10 @@ export function useMerchantLogsState() {
   return {
     /** @type {Array} 商户日志列表 */
     merchantLogs: [],
-    /** @type {Object} 日志筛选条件 */
+    /** @type {Object} 日志筛选条件 - 与后端 /console/audit-logs 参数一致 */
     logFilters: {
-      merchant_id: '',
-      action_type: '',
       operator_id: '',
+      operation_type: '',
       start_time: '',
       end_time: ''
     },
@@ -32,18 +31,18 @@ export function useMerchantLogsState() {
     logStats: { totalLogs: 0, todayLogs: 0, warningLogs: 0, errorLogs: 0 },
     /** @type {Object|null} 选中的日志详情 */
     selectedLog: null,
-    /** @type {Array} 操作类型选项 */
-    actionTypeOptions: [
-      { value: 'login', label: '登录' },
-      { value: 'logout', label: '登出' },
-      { value: 'points_adjust', label: '积分调整' },
-      { value: 'order_create', label: '创建订单' },
-      { value: 'order_complete', label: '完成订单' },
-      { value: 'order_cancel', label: '取消订单' },
-      { value: 'prize_claim', label: '奖品领取' },
-      { value: 'config_change', label: '配置修改' },
-      { value: 'password_change', label: '密码修改' },
-      { value: 'other', label: '其他' }
+    /** @type {Array} 操作类型选项 - 与后端 MerchantOperationLog 枚举一致 */
+    operationTypeOptions: [
+      { value: 'scan_user', label: '扫码获取用户信息' },
+      { value: 'submit_consumption', label: '提交消费记录' },
+      { value: 'view_consumption_list', label: '查看消费记录列表' },
+      { value: 'view_consumption_detail', label: '查看消费记录详情' },
+      { value: 'staff_login', label: '员工登录' },
+      { value: 'staff_logout', label: '员工登出' },
+      { value: 'staff_add', label: '员工入职' },
+      { value: 'staff_transfer', label: '员工调店' },
+      { value: 'staff_disable', label: '员工禁用' },
+      { value: 'staff_enable', label: '员工启用' }
     ]
   }
 }
@@ -62,9 +61,9 @@ export function useMerchantLogsMethods() {
         const params = new URLSearchParams()
         params.append('page', this.financePagination?.page || 1)
         params.append('page_size', this.financePagination?.page_size || 20)
-        if (this.logFilters.merchant_id) params.append('merchant_id', this.logFilters.merchant_id)
-        if (this.logFilters.action_type) params.append('action_type', this.logFilters.action_type)
+        // 后端支持的筛选参数：operator_id, operation_type, start_time, end_time
         if (this.logFilters.operator_id) params.append('operator_id', this.logFilters.operator_id)
+        if (this.logFilters.operation_type) params.append('operation_type', this.logFilters.operation_type)
         // 后端期望完整时间格式 (YYYY-MM-DD HH:mm:ss)
         // 日期自动补全为当天开始/结束时间
         if (this.logFilters.start_time) {
@@ -88,8 +87,7 @@ export function useMerchantLogsMethods() {
 
         if (response?.success) {
           // 后端返回 items 字段
-          this.merchantLogs =
-            response.data?.items || response.data?.logs || response.data?.list || []
+          this.merchantLogs = response.data?.items || []
           if (response.data?.pagination) {
             // 只更新 total，total_pages 由 getter 计算
             this.financePagination.total = response.data.pagination.total || 0
@@ -137,9 +135,8 @@ export function useMerchantLogsMethods() {
      */
     resetLogFilters() {
       this.logFilters = {
-        merchant_id: '',
-        action_type: '',
         operator_id: '',
+        operation_type: '',
         start_time: '',
         end_time: ''
       }
@@ -162,8 +159,8 @@ export function useMerchantLogsMethods() {
     async exportLogs() {
       try {
         const params = new URLSearchParams()
-        if (this.logFilters.merchant_id) params.append('merchant_id', this.logFilters.merchant_id)
-        if (this.logFilters.action_type) params.append('action_type', this.logFilters.action_type)
+        if (this.logFilters.operator_id) params.append('operator_id', this.logFilters.operator_id)
+        if (this.logFilters.operation_type) params.append('operation_type', this.logFilters.operation_type)
         // 后端期望完整时间格式 (YYYY-MM-DD HH:mm:ss)
         if (this.logFilters.start_time) {
           const startTime = this.logFilters.start_time.includes(' ')

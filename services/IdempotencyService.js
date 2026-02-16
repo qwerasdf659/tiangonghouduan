@@ -311,6 +311,8 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 市场管理 =====
   '/api/v4/console/marketplace/exchange_market/items': 'ADMIN_EXCHANGE_ITEM_CREATE', // 创建兑换商品（修复：添加 marketplace 前缀）
   '/api/v4/console/marketplace/exchange_market/items/:id': 'ADMIN_EXCHANGE_ITEM_UPDATE', // 更新兑换商品（修复：添加 marketplace 前缀）或删除（DELETE）
+  '/api/v4/console/marketplace/exchange_market/batch-bind-images':
+    'ADMIN_EXCHANGE_BATCH_BIND_IMAGES', // 批量绑定商品图片
   '/api/v4/console/marketplace/listings/:id/force-withdraw': 'ADMIN_FORCE_WITHDRAW', // 强制下架
 
   // ===== 用户层级 =====

@@ -33,11 +33,6 @@ const router = express.Router()
 const loginRoutes = require('./login')
 const tokenRoutes = require('./token')
 const profileRoutes = require('./profile')
-/*
- * 🔧 2026-01-08：permissionRoutes 已独立挂载到 /api/v4/permissions，此处不再引入
- * const permissionRoutes = require('./permissions')
- */
-
 // 挂载路由
 router.use('/', loginRoutes) // POST /login, /quick-login, /decrypt-phone
 router.use('/', tokenRoutes) // GET /verify, POST /refresh, /logout

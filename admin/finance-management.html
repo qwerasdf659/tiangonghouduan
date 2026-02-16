@@ -178,7 +178,7 @@
                   <td class="px-4 py-3 text-sm" x-text="record.record_id"></td>
                   <td class="px-4 py-3 text-sm" x-text="record.user_name || record.user_id"></td>
                   <td class="px-4 py-3 text-sm" x-text="record.store_name"></td>
-                  <td class="px-4 py-3 text-sm font-mono" x-text="'¥' + (record.consumption_amount / 100).toFixed(2)"></td>
+                  <td class="px-4 py-3 text-sm font-mono" x-text="'¥' + Number(record.consumption_amount || 0).toFixed(2)"></td>
                   <!-- 风控标记列 (P1-4) + F-42: 异常详情提示 -->
                   <td class="px-4 py-3">
                     <template x-if="record.is_suspicious || record.risk_level === 'high'">
@@ -708,13 +708,19 @@
         <div x-data="merchantLogsDataTable()" x-init="init()">
           <div class="p-4 border-b themed-bg-base">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <input type="text" x-model="activeFilters.merchant_id" placeholder="商户ID" class="px-3 py-2 border rounded">
-              <select x-model="activeFilters.action_type" class="px-3 py-2 border rounded">
+              <input type="text" x-model="activeFilters.operator_mobile" placeholder="操作人手机号" maxlength="11" class="px-3 py-2 border rounded">
+              <select x-model="activeFilters.operation_type" class="px-3 py-2 border rounded">
                 <option value="">全部操作类型</option>
-                <option value="login">登录</option>
-                <option value="order">订单</option>
-                <option value="points">积分</option>
-                <option value="settlement">结算</option>
+                <option value="scan_user">扫码获取用户信息</option>
+                <option value="submit_consumption">提交消费记录</option>
+                <option value="view_consumption_list">查看消费记录列表</option>
+                <option value="view_consumption_detail">查看消费记录详情</option>
+                <option value="staff_login">员工登录</option>
+                <option value="staff_logout">员工登出</option>
+                <option value="staff_add">员工入职</option>
+                <option value="staff_transfer">员工调店</option>
+                <option value="staff_disable">员工禁用</option>
+                <option value="staff_enable">员工启用</option>
               </select>
               <div class="flex items-center gap-1">
                 <input type="date" x-model="activeFilters.start_time" class="px-3 py-2 border rounded" title="开始日期">
@@ -1136,15 +1142,15 @@
                       </tr>
                     </thead>
                     <tbody class="divide-y">
-                      <template x-for="tx in selectedDiamondAccount.transactions" :key="tx.transaction_id">
+                      <template x-for="tx in selectedDiamondAccount.transactions" :key="tx.asset_transaction_id">
                         <tr class="themed-hover-bg">
                           <td class="px-3 py-2 themed-text-muted" x-text="formatDateTimeShort(tx.created_at)"></td>
                           <td class="px-3 py-2" x-text="tx.tx_type || '-'"></td>
                           <td class="px-3 py-2 text-right font-mono" 
-                              :class="tx.amount > 0 ? 'text-green-600' : 'text-red-600'"
-                              x-text="(tx.amount > 0 ? '+' : '') + tx.amount"></td>
+                              :class="tx.delta_amount > 0 ? 'text-green-600' : 'text-red-600'"
+                              x-text="(tx.delta_amount > 0 ? '+' : '') + tx.delta_amount"></td>
                           <td class="px-3 py-2 text-right font-mono themed-text-muted" x-text="tx.balance_after"></td>
-                          <td class="px-3 py-2 themed-text-muted max-w-xs truncate" x-text="tx.reason || '-'" :title="tx.reason"></td>
+                          <td class="px-3 py-2 themed-text-muted max-w-xs truncate" x-text="tx.description || '-'" :title="tx.description"></td>
                         </tr>
                       </template>
                     </tbody>
