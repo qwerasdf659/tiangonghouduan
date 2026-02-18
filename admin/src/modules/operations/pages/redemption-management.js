@@ -120,11 +120,10 @@ function redemptionManagementPage() {
       this.loading = true
       try {
         const params = {
-          page: this.pagination.page,
-          page_size: this.pagination.page_size
+          page: this.current_page,
+          page_size: this.page_size
         }
 
-        // 应用筛选条件
         if (this.filter.status) params.status = this.filter.status
         if (this.filter.redeemer_user_id) params.redeemer_user_id = this.filter.redeemer_user_id
         if (this.filter.start_date) params.start_date = this.filter.start_date
@@ -134,16 +133,16 @@ function redemptionManagementPage() {
 
         if (result.success && result.data) {
           this.orders = result.data.orders || result.data.items || result.data.list || []
-          this.pagination.total = result.data.pagination?.total || result.data.total || 0
+          this.updatePagination(result.data)
           logger.debug('[RedemptionMgmt] 订单列表加载成功', {
             count: this.orders.length,
-            total: this.pagination.total
+            total: this.total_records
           })
         }
       } catch (error) {
         logger.error('[RedemptionMgmt] 加载订单列表失败:', error)
         this.orders = []
-        this.pagination.total = 0
+        this.total_records = 0
       } finally {
         this.loading = false
       }
@@ -172,7 +171,7 @@ function redemptionManagementPage() {
      */
     filterByStatus(status) {
       this.filter.status = status
-      this.pagination.page = 1
+      this.current_page = 1
       this.loadOrders()
     },
 
@@ -180,7 +179,7 @@ function redemptionManagementPage() {
      * 搜索
      */
     search() {
-      this.pagination.page = 1
+      this.current_page = 1
       this.loadOrders()
     },
 
@@ -189,7 +188,7 @@ function redemptionManagementPage() {
      */
     resetFilter() {
       this.filter = { status: '', redeemer_user_id: '', start_date: '', end_date: '' }
-      this.pagination.page = 1
+      this.current_page = 1
       this.loadOrders()
     },
 
@@ -365,19 +364,12 @@ function redemptionManagementPage() {
     // ==================== 分页 ====================
 
     /**
-     * 总页数（getter）
-     */
-    get totalPages() {
-      return Math.ceil(this.pagination.total / this.pagination.page_size) || 1
-    },
-
-    /**
-     * 切换页码
+     * 切换页码（覆盖 mixin 的 goToPage，加载订单而非 loadData）
      * @param {number} page - 页码
      */
     changePage(page) {
-      if (page < 1 || page > this.totalPages) return
-      this.pagination.page = page
+      if (page < 1 || page > this.total_pages) return
+      this.current_page = page
       this.loadOrders()
     },
 
@@ -421,7 +413,7 @@ function redemptionManagementPage() {
     getPrizeName(order) {
       if (order.item_instance) {
         const meta = order.item_instance.meta || {}
-        return meta.prize_name || meta.name || order.item_instance.item_type || '--'
+        return meta.prize_name || order.item_instance.item_type || '--'
       }
       return order.prize_name || '--'
     },

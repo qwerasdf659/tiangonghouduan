@@ -36,6 +36,38 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   POPUP_BANNER_UPDATE: `${API_PREFIX}/console/popup-banners/:id`,
   POPUP_BANNER_DELETE: `${API_PREFIX}/console/popup-banners/:id`,
   POPUP_BANNER_TOGGLE: `${API_PREFIX}/console/popup-banners/:id/toggle`,
+  POPUP_BANNER_ORDER: `${API_PREFIX}/console/popup-banners/order`,
+  POPUP_BANNER_SHOW_STATS: `${API_PREFIX}/console/ad-campaigns/popup-banners/:id/show-stats`,
+
+  // 轮播图管理（carousel_items 独立表）
+  CAROUSEL_ITEM_LIST: `${API_PREFIX}/console/carousel-items`,
+  CAROUSEL_ITEM_STATS: `${API_PREFIX}/console/carousel-items/statistics`,
+  CAROUSEL_ITEM_DETAIL: `${API_PREFIX}/console/carousel-items/:id`,
+  CAROUSEL_ITEM_CREATE: `${API_PREFIX}/console/carousel-items`,
+  CAROUSEL_ITEM_UPDATE: `${API_PREFIX}/console/carousel-items/:id`,
+  CAROUSEL_ITEM_DELETE: `${API_PREFIX}/console/carousel-items/:id`,
+  CAROUSEL_ITEM_TOGGLE: `${API_PREFIX}/console/carousel-items/:id/toggle`,
+  CAROUSEL_ITEM_ORDER: `${API_PREFIX}/console/carousel-items/order`,
+  CAROUSEL_ITEM_SHOW_STATS: `${API_PREFIX}/console/ad-campaigns/carousel-items/:id/show-stats`,
+
+  // 广告活动管理
+  AD_CAMPAIGN_LIST: `${API_PREFIX}/console/ad-campaigns`,
+  AD_CAMPAIGN_DETAIL: `${API_PREFIX}/console/ad-campaigns/:id`,
+  AD_CAMPAIGN_REVIEW: `${API_PREFIX}/console/ad-campaigns/:id/review`,
+  AD_CAMPAIGN_STATS: `${API_PREFIX}/console/ad-campaigns/statistics`,
+  AD_CAMPAIGN_DASHBOARD: `${API_PREFIX}/console/ad-campaigns/dashboard`,
+
+  // 广告位管理
+  AD_SLOT_LIST: `${API_PREFIX}/console/ad-slots`,
+  AD_SLOT_CREATE: `${API_PREFIX}/console/ad-slots`,
+  AD_SLOT_UPDATE: `${API_PREFIX}/console/ad-slots/:id`,
+  AD_SLOT_TOGGLE: `${API_PREFIX}/console/ad-slots/:id/toggle`,
+  AD_SLOT_STATS: `${API_PREFIX}/console/ad-slots/statistics`,
+
+  // 广告报表
+  AD_REPORT_OVERVIEW: `${API_PREFIX}/console/ad-reports/overview`,
+  AD_REPORT_CAMPAIGN: `${API_PREFIX}/console/ad-reports/campaigns/:id`,
+  AD_REPORT_SLOT: `${API_PREFIX}/console/ad-reports/slots/:id`,
 
   // 图片资源
   IMAGE_LIST: `${API_PREFIX}/console/images`,

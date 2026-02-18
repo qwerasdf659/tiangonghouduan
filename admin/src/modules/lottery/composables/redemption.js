@@ -441,7 +441,7 @@ export function useRedemptionMethods() {
       if (!item) return '-'
       const itemInfo = item.item_instance || {}
       const itemMeta = itemInfo.meta || {}
-      return itemMeta.prize_name || itemMeta.name || itemInfo.item_type || '-'
+      return itemMeta.prize_name || itemInfo.item_type || '-'
     },
 
     /**

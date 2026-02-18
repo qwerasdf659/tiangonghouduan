@@ -31,7 +31,8 @@ document.addEventListener('alpine:init', () => {
     current_page: 'announcements',
     subPages: [
       { id: 'announcements', name: '公告管理', icon: '📢' },
-      { id: 'popup-banners', name: '轮播图管理', icon: '🎨' },
+      { id: 'popup-banners', name: '弹窗管理', icon: '🔔' },
+      { id: 'carousel-items', name: '轮播图管理', icon: '🎨' },
       { id: 'image-resources', name: '图片资源', icon: '🖼️' }
     ],
 
@@ -67,6 +68,9 @@ document.addEventListener('alpine:init', () => {
         case 'popup-banners':
           await this.loadBanners()
           break
+        case 'carousel-items':
+          await this.loadCarouselItems()
+          break
         case 'image-resources':
           await this.loadImages()
           break
@@ -85,6 +89,7 @@ document.addEventListener('alpine:init', () => {
         const targetId =
           this.deleteTarget.system_announcement_id ||
           this.deleteTarget.popup_banner_id ||
+          this.deleteTarget.carousel_item_id ||
           this.deleteTarget.image_resource_id
 
         switch (this.deleteType) {
@@ -94,6 +99,10 @@ document.addEventListener('alpine:init', () => {
             break
           case 'banner':
             url = buildURL(SYSTEM_ENDPOINTS.POPUP_BANNER_DELETE, { id: targetId })
+            successMsg = '弹窗已删除'
+            break
+          case 'carousel':
+            url = buildURL(SYSTEM_ENDPOINTS.CAROUSEL_ITEM_DELETE, { id: targetId })
             successMsg = '轮播图已删除'
             break
           case 'image':

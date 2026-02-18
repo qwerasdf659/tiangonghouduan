@@ -213,6 +213,18 @@ router.post(
         idempotency_key
       })
 
+      // Phase 6: 广告归因追踪（非关键路径，错误不影响业务）
+      try {
+        const AdAttributionService = req.app.locals.services.getService('ad_attribution')
+        await AdAttributionService.checkConversion(
+          buyer_id,
+          'market_buy',
+          String(orderResult.trade_order_id)
+        )
+      } catch (attrError) {
+        logger.warn('[MarketBuy] 广告归因追踪失败（非关键）', { error: attrError.message })
+      }
+
       return res.apiSuccess(responseData, '购买成功')
     } catch (error) {
       // 标记幂等请求失败（允许重试）

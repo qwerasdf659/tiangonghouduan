@@ -31,6 +31,7 @@
 
 import { logger, $confirmDanger } from '../../../utils/index.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
+import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
 import { buildURL, request } from '../../../api/base.js'
 import { createCrudMixin } from '../../../alpine/mixins/index.js'
 
@@ -113,6 +114,10 @@ document.addEventListener('alpine:init', () => {
       meta: ''
     },
     is_submitting: false,
+    /** @type {string|null} 图片上传预览URL */
+    image_preview_url: null,
+    /** @type {boolean} 图片上传中 */
+    image_uploading: false,
     typeIcons: {
       voucher: '🎫',
       coupon: '🎫',
@@ -276,6 +281,7 @@ document.addEventListener('alpine:init', () => {
         description: '',
         meta: ''
       }
+      this.image_preview_url = null
       logger.info('[openCreateModal] 表单已初始化:', JSON.stringify(this.form))
       this.showModal('templateModal')
     },
@@ -309,6 +315,7 @@ document.addEventListener('alpine:init', () => {
             description: t.description || '',
             meta: t.meta ? JSON.stringify(t.meta, null, 2) : ''
           }
+          this.image_preview_url = t.image_url || null
           this.showModal('templateModal')
         } else {
           this.showError('加载失败', response?.message || '获取模板详情失败')
@@ -441,6 +448,71 @@ document.addEventListener('alpine:init', () => {
         this.loading = false
         hideLoading()
       }
+    },
+
+    /**
+     * 上传物品模板图片
+     *
+     * 上传成功后将 object_key 写入 form.image_url，
+     * 后端 ImageUrlHelper 在 API 响应时自动拼接为完整公网 URL。
+     *
+     * @param {Event} event - 文件选择事件
+     * @returns {Promise<void>}
+     */
+    async uploadTemplateImage(event) {
+      const file = event.target.files?.[0]
+      if (!file) return
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+      if (!allowedTypes.includes(file.type)) {
+        this.showError('格式错误', '仅支持 JPG/PNG/GIF/WebP 格式')
+        return
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        this.showError('文件过大', '图片大小不能超过 5MB')
+        return
+      }
+
+      try {
+        this.image_uploading = true
+
+        const formData = new FormData()
+        formData.append('image', file)
+        formData.append('business_type', 'uploads')
+        formData.append('category', 'items')
+
+        const token = localStorage.getItem('token')
+        const response = await fetch(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData
+        })
+        const res = await response.json()
+
+        if (res.success && res.data) {
+          this.form.image_url = res.data.object_key
+          this.image_preview_url = res.data.public_url || res.data.url || null
+          this.showSuccess('图片上传成功')
+          logger.info('[ItemTemplates] 图片上传成功:', res.data.object_key)
+        } else {
+          this.showError('上传失败', res.message || '图片上传失败')
+        }
+      } catch (e) {
+        logger.error('[ItemTemplates] 图片上传失败:', e)
+        this.showError('上传失败', '图片上传失败')
+      } finally {
+        this.image_uploading = false
+      }
+    },
+
+    /**
+     * 清除已上传的图片
+     * @returns {void}
+     */
+    clearTemplateImage() {
+      this.form.image_url = ''
+      this.image_preview_url = null
     },
 
     /**

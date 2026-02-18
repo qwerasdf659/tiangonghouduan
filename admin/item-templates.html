@@ -107,9 +107,13 @@
       <template x-for="t in templates" :key="t.item_template_id">
         <div class="template-card themed-card rounded-lg shadow p-4">
           <div class="flex justify-between items-start mb-3">
-            <div>
-              <span class="text-2xl" x-text="getTypeIcon(t.item_type)">📦</span>
-              <span class="ml-2 px-2 py-0.5 rounded text-xs text-white" 
+            <div class="flex items-center gap-2">
+              <!-- 优先显示模板图片，无图片时显示类型图标 -->
+              <div x-show="t.image_url" class="w-10 h-10 rounded overflow-hidden flex-shrink-0">
+                <img :src="t.image_url" class="w-full h-full object-cover" alt="">
+              </div>
+              <span x-show="!t.image_url" class="text-2xl" x-text="getTypeIcon(t.item_type)">📦</span>
+              <span class="px-2 py-0.5 rounded text-xs text-white" 
                     :class="'rarity-' + t.rarity_code"
                     x-text="getRarityLabel(t.rarity_code, t.rarity)"></span>
             </div>
@@ -197,8 +201,34 @@
               <input type="number" class="w-full px-3 py-2 border rounded-lg" x-model.number="form.reference_price_points" min="0" step="0.01">
             </div>
             <div class="md:col-span-2">
-              <label class="block text-sm font-medium themed-text-secondary mb-1">图标URL</label>
-              <input type="text" class="w-full px-3 py-2 border rounded-lg" x-model="form.image_url" placeholder="https://...">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">模板图片</label>
+              <div class="flex items-start gap-4">
+                <!-- 图片预览 -->
+                <div class="w-24 h-24 border-2 border-dashed rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0"
+                     :class="image_preview_url ? 'border-cyan-300' : 'border-gray-300'">
+                  <img x-show="image_preview_url" :src="image_preview_url" class="w-full h-full object-cover" alt="模板图片">
+                  <span x-show="!image_preview_url" class="text-3xl text-gray-300">📷</span>
+                </div>
+                <!-- 上传操作 -->
+                <div class="flex-1 space-y-2">
+                  <div class="flex items-center gap-2">
+                    <label class="px-3 py-1.5 text-sm themed-btn-primary rounded cursor-pointer inline-flex items-center gap-1"
+                           :class="image_uploading ? 'opacity-50 cursor-not-allowed' : ''">
+                      <span x-show="image_uploading" class="inline-block animate-spin">⏳</span>
+                      <span x-show="!image_uploading">📤</span>
+                      <span x-text="image_uploading ? '上传中...' : '选择图片'"></span>
+                      <input type="file" class="hidden" accept="image/jpeg,image/png,image/gif,image/webp"
+                             @change="uploadTemplateImage($event)" :disabled="image_uploading">
+                    </label>
+                    <button x-show="image_preview_url" type="button" @click="clearTemplateImage()"
+                            class="px-3 py-1.5 text-sm border border-red-300 text-red-500 rounded hover:bg-red-50">
+                      清除
+                    </button>
+                  </div>
+                  <p class="text-xs themed-text-muted">支持 JPG/PNG/GIF/WebP，最大 5MB</p>
+                  <p x-show="form.image_url" class="text-xs font-mono themed-text-muted break-all" x-text="'对象Key: ' + form.image_url"></p>
+                </div>
+              </div>
             </div>
             <div class="md:col-span-2">
               <label class="block text-sm font-medium themed-text-secondary mb-1">模板描述</label>

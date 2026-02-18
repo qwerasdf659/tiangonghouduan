@@ -254,9 +254,116 @@ models.PopupBanner = require('./PopupBanner')(sequelize, DataTypes)
 /*
  * ✅ PopupBanner：弹窗Banner配置（首页弹窗管理）
  *    - 用途：管理微信小程序首页弹窗图片和跳转链接
- *    - 特点：支持多弹窗位、时间范围控制、点击跳转、显示顺序
+ *    - 特点：支持多弹窗位、时间范围控制、点击跳转、显示顺序、频率控制、类型分级
+ *    - 表名：popup_banners，主键：popup_banner_id，外键：created_by
+ *    - Phase 1 新增：banner_type / frequency_rule / frequency_value / force_show / priority
+ */
+
+models.CarouselItem = require('./CarouselItem')(sequelize, DataTypes)
+/*
+ * ✅ CarouselItem：轮播图配置（页面内嵌 swiper 组件）
+ *    - 用途：管理微信小程序首页轮播图展示
+ *    - 特点：与弹窗（PopupBanner）独立管理，不需要频率控制
+ *    - 表名：carousel_items，主键：carousel_item_id，外键：created_by
+ *    - 拍板决策1：轮播图独立为 carousel_items 表
  *    - 表名：popup_banners，主键：banner_id，外键：created_by
  *    - 业务场景：首页活动弹窗、公告展示、运营推广
+ */
+
+// 🔴 Phase 2：服务端展示日志
+models.PopupShowLog = require('./PopupShowLog')(sequelize, DataTypes)
+/*
+ * ✅ PopupShowLog：弹窗展示日志
+ *    - 用途：记录每个弹窗的展示时长、关闭方式、队列位置
+ *    - 表名：popup_show_logs，主键：popup_show_log_id（BIGINT）
+ */
+
+models.CarouselShowLog = require('./CarouselShowLog')(sequelize, DataTypes)
+/*
+ * ✅ CarouselShowLog：轮播图曝光日志
+ *    - 用途：记录每张轮播图的曝光时长、手动滑入、点击情况
+ *    - 表名：carousel_show_logs，主键：carousel_show_log_id（BIGINT）
+ */
+
+// 🔴 Phase 3：广告基础版
+models.AdSlot = require('./AdSlot')(sequelize, DataTypes)
+/*
+ * ✅ AdSlot：广告位配置
+ *    - 用途：定义广告位（弹窗/轮播）的位置、日价、竞价门槛
+ *    - 表名：ad_slots，主键：ad_slot_id
+ */
+
+models.AdCampaign = require('./AdCampaign')(sequelize, DataTypes)
+/*
+ * ✅ AdCampaign：广告投放计划
+ *    - 用途：广告主创建的投放计划（固定包天/竞价排名）
+ *    - 表名：ad_campaigns，主键：ad_campaign_id
+ */
+
+models.AdCreative = require('./AdCreative')(sequelize, DataTypes)
+/*
+ * ✅ AdCreative：广告素材
+ *    - 用途：广告图片素材、跳转链接、审核状态管理
+ *    - 表名：ad_creatives，主键：ad_creative_id
+ */
+
+models.AdBillingRecord = require('./AdBillingRecord')(sequelize, DataTypes)
+/*
+ * ✅ AdBillingRecord：广告计费流水
+ *    - 用途：钻石冻结/扣款/退款/日扣费记录
+ *    - 表名：ad_billing_records，主键：ad_billing_record_id（BIGINT）
+ */
+
+// 🔴 Phase 4：竞价排名
+models.AdBidLog = require('./AdBidLog')(sequelize, DataTypes)
+/*
+ * ✅ AdBidLog：竞价记录
+ *    - 用途：记录每次竞价的参与方、出价、胜负
+ *    - 表名：ad_bid_logs，主键：ad_bid_log_id（BIGINT）
+ */
+
+// 🔴 Phase 5：DMP 人群定向 + 反作弊
+models.UserAdTag = require('./UserAdTag')(sequelize, DataTypes)
+/*
+ * ✅ UserAdTag：用户行为标签（DMP）
+ *    - 用途：定时从业务表聚合用户行为特征，用于广告定向投放
+ *    - 表名：user_ad_tags，主键：user_ad_tag_id（BIGINT）
+ */
+
+models.AdImpressionLog = require('./AdImpressionLog')(sequelize, DataTypes)
+/*
+ * ✅ AdImpressionLog：广告曝光日志
+ *    - 用途：记录广告有效/无效曝光（反作弊判定后）
+ *    - 表名：ad_impression_logs，主键：ad_impression_log_id（BIGINT）
+ */
+
+models.AdClickLog = require('./AdClickLog')(sequelize, DataTypes)
+/*
+ * ✅ AdClickLog：广告点击日志
+ *    - 用途：记录广告点击事件（归因追踪数据源）
+ *    - 表名：ad_click_logs，主键：ad_click_log_id（BIGINT）
+ */
+
+models.AdAntifraudLog = require('./AdAntifraudLog')(sequelize, DataTypes)
+/*
+ * ✅ AdAntifraudLog：反作弊判定日志
+ *    - 用途：记录反作弊规则触发情况和判定结果
+ *    - 表名：ad_antifraud_logs，主键：ad_antifraud_log_id（BIGINT）
+ */
+
+// 🔴 Phase 6：归因追踪 + 多维报表
+models.AdAttributionLog = require('./AdAttributionLog')(sequelize, DataTypes)
+/*
+ * ✅ AdAttributionLog：归因追踪日志
+ *    - 用途：关联广告点击与后续转化行为（24小时归因窗口）
+ *    - 表名：ad_attribution_logs，主键：ad_attribution_log_id（BIGINT）
+ */
+
+models.AdReportDailySnapshot = require('./AdReportDailySnapshot')(sequelize, DataTypes)
+/*
+ * ✅ AdReportDailySnapshot：每日报表快照
+ *    - 用途：凌晨4点聚合前一天的曝光/点击/转化/消耗数据
+ *    - 表名：ad_report_daily_snapshots，主键：snapshot_id（BIGINT）
  */
 
 // 🔴 图片和存储系统

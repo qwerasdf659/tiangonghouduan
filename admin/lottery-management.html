@@ -726,35 +726,78 @@
 
       <!-- ==================== 策略配置页 ==================== -->
       <div x-show="current_page === 'lottery-strategy'" x-cloak>
-        <div class="themed-card rounded-lg shadow p-6">
-          <h5 class="font-semibold mb-4">⚙️ 策略配置</h5>
-          
-          <!-- 数据加载状态提示 -->
-
-            <div x-show="Object.keys(strategyGroups).length === 0" class="text-center py-8 themed-text-muted">
-              <p>暂无策略配置数据</p>
-              <p class="text-sm mt-2">请先在后台添加策略配置</p>
+        <!-- 页面引导说明 -->
+        <div class="rounded-lg p-4 mb-6 bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg">
+          <div class="flex items-start gap-3">
+            <span class="text-2xl mt-0.5">💡</span>
+            <div>
+              <h5 class="font-semibold text-lg mb-1">策略配置中心</h5>
+              <p class="text-sm opacity-90">管理抽奖系统的核心策略参数。策略按功能分组，每个参数控制不同的出奖行为。修改后将实时影响用户抽奖体验。</p>
+              <div class="flex flex-wrap gap-3 mt-3 text-xs">
+                <span class="px-2 py-1 bg-white/20 rounded">🎲 概率 - 控制出奖概率</span>
+                <span class="px-2 py-1 bg-white/20 rounded">🛡️ 保护 - 防止极端体验</span>
+                <span class="px-2 py-1 bg-white/20 rounded">💰 预算 - 控制成本</span>
+                <span class="px-2 py-1 bg-white/20 rounded">👤 用户 - 个人限制</span>
+              </div>
             </div>
+          </div>
+        </div>
 
-          <!-- 策略组列表 - 使用后端 config_group, config_key, config_id 字段 -->
+        <div class="themed-card rounded-lg shadow p-6">
+          <div class="flex items-center justify-between mb-5">
+            <h5 class="font-semibold themed-text-primary flex items-center gap-2">
+              ⚙️ 策略参数配置
+              <span class="text-sm themed-text-muted font-normal" x-text="'共 ' + strategies.length + ' 项'"></span>
+            </h5>
+          </div>
+          
+          <!-- 空数据状态 -->
+          <div x-show="Object.keys(strategyGroups).length === 0" class="text-center py-12">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+              <span class="text-3xl">⚙️</span>
+            </div>
+            <p class="themed-text-muted font-medium mb-1">暂无策略配置数据</p>
+            <p class="text-sm themed-text-muted">请先在后台添加策略配置项</p>
+          </div>
+
+          <!-- 策略组列表 -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <template x-for="(strategies, groupName) in strategyGroups" :key="groupName">
-              <div class="border rounded-lg">
-                <div class="p-4 border-b themed-bg-base flex justify-between items-center">
-                  <h6 class="font-medium" x-text="getStrategyGroupName(groupName)"></h6>
-                  <span class="px-2 py-1 text-xs rounded themed-bg-primary-light themed-text-primary" x-text="strategies.length + ' 个配置'"></span>
+              <div class="rounded-lg overflow-hidden shadow-sm" :class="getStrategyGroupStyle(groupName).border">
+                <!-- 分组标题 -->
+                <div class="px-4 py-3 flex items-center justify-between" :class="getStrategyGroupStyle(groupName).bg">
+                  <div class="flex items-center gap-2">
+                    <span class="text-lg" x-text="getStrategyGroupIcon(groupName)"></span>
+                    <div>
+                      <h6 class="font-semibold text-sm" x-text="getStrategyGroupName(groupName)"></h6>
+                      <p class="text-xs opacity-60 mt-0.5" x-text="getStrategyGroupDescription(groupName)"></p>
+                    </div>
+                  </div>
+                  <span class="px-2 py-0.5 text-xs rounded-full font-medium" :class="getStrategyGroupStyle(groupName).badge" x-text="strategies.length + ' 项'"></span>
                 </div>
-                <div class="divide-y">
+                <!-- 配置项列表 -->
+                <div class="divide-y themed-border bg-white">
                   <template x-for="(strategy, idx) in strategies" :key="strategy.config_id || idx">
-                    <div class="p-4 flex justify-between items-center">
-                      <div>
-                        <div class="font-medium" x-text="strategy.config_key"></div>
-                        <small class="text-gray-400" x-text="strategy.description || '暂无描述'"></small>
-                        <div class="text-xs themed-text-primary mt-1">
-                          值: <span x-text="typeof strategy.parsed_value === 'object' ? JSON.stringify(strategy.parsed_value) : strategy.parsed_value"></span>
+                    <div class="px-4 py-3 hover:bg-gray-50 transition-colors group">
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="flex-1 min-w-0">
+                          <div class="flex items-center gap-2 mb-1">
+                            <span class="font-medium text-sm" x-text="getConfigKeyLabel(strategy.config_key)"></span>
+                            <span class="text-xs font-mono themed-text-muted opacity-0 group-hover:opacity-100 transition-opacity" x-text="strategy.config_key"></span>
+                          </div>
+                          <p class="text-xs themed-text-muted leading-relaxed" x-text="getConfigKeyDescription(strategy.config_key) || strategy.description || '暂无描述'"></p>
+                          <div class="mt-2 flex items-center gap-2">
+                            <span class="text-xs themed-text-muted">当前值:</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium bg-gray-100 themed-text-primary" x-text="formatStrategyValue(strategy.parsed_value, strategy.config_key)"></span>
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                          <span class="inline-flex items-center px-2 py-1 text-xs rounded-full font-medium" :class="strategy.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'">
+                            <span class="w-1.5 h-1.5 rounded-full mr-1.5" :class="strategy.is_active ? 'bg-green-500' : 'bg-gray-400'"></span>
+                            <span x-text="strategy.is_active ? '启用' : '禁用'"></span>
+                          </span>
                         </div>
                       </div>
-                      <span class="px-2 py-1 text-xs rounded" :class="strategy.is_active ? 'bg-green-100 themed-text-success' : 'themed-bg-subtle themed-text-secondary'" x-text="strategy.is_active ? '启用' : '禁用'"></span>
                     </div>
                   </template>
                 </div>
@@ -762,47 +805,91 @@
             </template>
           </div>
 
-          <!-- 层级矩阵配置 - 使用后端 B0/B1/B2/B3 和 P0/P1/P2 格式 -->
-          <div class="mt-6 border rounded-lg">
-            <div class="p-4 border-b themed-bg-base flex justify-between items-center">
-              <h6 class="font-medium">📊 层级矩阵配置</h6>
-              <span class="text-sm themed-text-muted" x-text="tierMatrix.length + ' 个配置'"></span>
+          <!-- 层级矩阵配置 -->
+          <div class="mt-6 rounded-lg overflow-hidden shadow-sm border-l-4 border-l-indigo-500">
+            <div class="px-4 py-3 bg-indigo-50 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="text-lg">📊</span>
+                <div>
+                  <h6 class="font-semibold text-sm">层级矩阵配置</h6>
+                  <p class="text-xs opacity-60 mt-0.5">预算层级(B0-B3) × 压力层级(P0-P2) 的档位权重乘数矩阵，点击单元格可编辑</p>
+                </div>
+              </div>
+              <span class="px-2 py-0.5 text-xs rounded-full font-medium bg-indigo-100 text-indigo-700" x-text="tierMatrix.length + ' 个配置'"></span>
             </div>
-            <div class="p-4 overflow-x-auto">
-              <div x-show="tierMatrix.length === 0" class="text-center py-4 themed-text-muted">暂无矩阵配置数据</div>
+            <div class="p-4 overflow-x-auto bg-white">
+              <div x-show="tierMatrix.length === 0" class="text-center py-8">
+                <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-50 mb-3">
+                  <span class="text-xl">📊</span>
+                </div>
+                <p class="themed-text-muted text-sm">暂无矩阵配置数据</p>
+              </div>
               <template x-if="tierMatrix.length > 0">
-                <table class="w-full border">
-                  <thead class="themed-bg-subtle">
-                    <tr>
-                      <th class="border px-4 py-2">预算/压力</th>
-                      <template x-for="pTier in pressureTiers" :key="pTier">
-                        <th class="border px-4 py-2 text-sm" x-text="getPressureTierName(pTier)"></th>
-                      </template>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <template x-for="bTier in budgetTiers" :key="bTier">
+                <div>
+                  <table class="w-full border-collapse">
+                    <thead>
                       <tr>
-                        <th class="border px-4 py-2 themed-bg-base text-sm" x-text="getBudgetTierName(bTier)"></th>
-                        <template x-for="pTier in pressureTiers" :key="bTier + '-' + pTier">
-                          <td class="border px-2 py-2 text-center cursor-pointer hover:bg-blue-50" @click="editMatrixCell(bTier, pTier)">
-                            <template x-if="getMatrixConfig(bTier, pTier)">
-                              <div class="text-xs space-y-0.5">
-                                <div class="flex justify-between"><span class="text-gray-500">H:</span><span x-text="getMatrixConfig(bTier, pTier).high_multiplier || 0"></span></div>
-                                <div class="flex justify-between"><span class="text-gray-500">M:</span><span x-text="getMatrixConfig(bTier, pTier).mid_multiplier || 0"></span></div>
-                                <div class="flex justify-between"><span class="text-gray-500">L:</span><span x-text="getMatrixConfig(bTier, pTier).low_multiplier || 0"></span></div>
-                                <div class="flex justify-between"><span class="text-gray-500">FB:</span><span x-text="getMatrixConfig(bTier, pTier).fallback_multiplier || 1"></span></div>
-                              </div>
-                            </template>
-                            <template x-if="!getMatrixConfig(bTier, pTier)">
-                              <span class="text-gray-400">-</span>
-                            </template>
-                          </td>
+                        <th class="px-4 py-3 text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-tl-lg">预算 \ 压力</th>
+                        <template x-for="pTier in pressureTiers" :key="pTier">
+                          <th class="px-4 py-3 text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-500 text-white">
+                            <span x-text="getPressureTierName(pTier)"></span>
+                            <span class="text-xs opacity-75 block" x-text="pTier"></span>
+                          </th>
                         </template>
                       </tr>
-                    </template>
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      <template x-for="(bTier, bIdx) in budgetTiers" :key="bTier">
+                        <tr :class="bIdx % 2 === 0 ? 'bg-gray-50/50' : ''">
+                          <th class="px-4 py-3 text-sm font-semibold text-left bg-gradient-to-b from-blue-50 to-indigo-50 border-r border-gray-200">
+                            <span x-text="getBudgetTierName(bTier)"></span>
+                            <span class="text-xs themed-text-muted block" x-text="bTier"></span>
+                          </th>
+                          <template x-for="pTier in pressureTiers" :key="bTier + '-' + pTier">
+                            <td class="px-2 py-2 text-center cursor-pointer border border-gray-100 transition-all hover:shadow-md hover:border-indigo-300 hover:bg-indigo-50/50 group" @click="editMatrixCell(bTier, pTier)">
+                              <template x-if="getMatrixConfig(bTier, pTier)">
+                                <div class="text-xs space-y-1 p-1">
+                                  <div class="flex justify-between items-center">
+                                    <span class="text-red-400 font-medium">高档:</span>
+                                    <span class="font-mono font-semibold" x-text="getMatrixConfig(bTier, pTier).high_multiplier || 0"></span>
+                                  </div>
+                                  <div class="flex justify-between items-center">
+                                    <span class="text-yellow-500 font-medium">中档:</span>
+                                    <span class="font-mono font-semibold" x-text="getMatrixConfig(bTier, pTier).mid_multiplier || 0"></span>
+                                  </div>
+                                  <div class="flex justify-between items-center">
+                                    <span class="text-blue-400 font-medium">低档:</span>
+                                    <span class="font-mono font-semibold" x-text="getMatrixConfig(bTier, pTier).low_multiplier || 0"></span>
+                                  </div>
+                                  <div class="flex justify-between items-center pt-0.5 border-t border-gray-200">
+                                    <span class="text-gray-400 font-medium">兜底:</span>
+                                    <span class="font-mono" x-text="getMatrixConfig(bTier, pTier).fallback_multiplier || 1"></span>
+                                  </div>
+                                  <div class="opacity-0 group-hover:opacity-100 transition-opacity text-center mt-1">
+                                    <span class="text-indigo-500 text-xs">点击编辑 ✏️</span>
+                                  </div>
+                                </div>
+                              </template>
+                              <template x-if="!getMatrixConfig(bTier, pTier)">
+                                <div class="py-3">
+                                  <span class="text-gray-300 text-lg">-</span>
+                                  <p class="text-xs themed-text-muted opacity-0 group-hover:opacity-100 transition-opacity mt-1">点击添加</p>
+                                </div>
+                              </template>
+                            </td>
+                          </template>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                  <!-- 矩阵图例 -->
+                  <div class="mt-3 flex items-center gap-4 text-xs themed-text-muted justify-center">
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-400"></span> 高档乘数</span>
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-yellow-500"></span> 中档乘数</span>
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-400"></span> 低档乘数</span>
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-400"></span> 兜底乘数</span>
+                  </div>
+                </div>
               </template>
             </div>
           </div>
@@ -1733,54 +1820,65 @@
       <div x-show="current_page === 'strategy-effectiveness'" x-cloak x-init="$nextTick(() => loadStrategyEffectiveness())">
         
         <!-- 页面标题和筛选 -->
-        <div class="themed-card rounded-lg shadow p-6 mb-6">
-          <div class="flex flex-wrap items-center justify-between gap-4">
-            <h5 class="font-semibold themed-text-primary flex items-center gap-2">
-              📈 策略效果分析
-              <span class="text-sm themed-text-muted font-normal">BxPx矩阵热力图 / Pity触发率 / 档位降级统计</span>
-            </h5>
-            <div class="flex items-center gap-3">
-              <select x-model="strategyEffectivenessFilters.campaign_id" 
-                      @change="applyStrategyEffectivenessFilters()"
-                      class="themed-input rounded px-3 py-2 text-sm w-40">
-                <option value="">全部活动</option>
-                <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
-                  <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
-                </template>
-              </select>
-              <input type="date" x-model="strategyEffectivenessFilters.start_date"
-                     @change="applyStrategyEffectivenessFilters()"
-                     class="themed-input rounded px-3 py-2 text-sm"
-                     placeholder="开始日期">
-              <input type="date" x-model="strategyEffectivenessFilters.end_date"
-                     @change="applyStrategyEffectivenessFilters()"
-                     class="themed-input rounded px-3 py-2 text-sm"
-                     placeholder="结束日期">
-              <button @click="resetStrategyEffectivenessFilters()" 
-                      class="themed-btn-secondary px-3 py-2 rounded text-sm">
-                重置
-              </button>
-              <button @click="refreshStrategyEffectiveness()" 
-                      class="themed-btn-primary px-4 py-2 rounded text-sm flex items-center gap-1"
-                      :disabled="loadingStrategyEffectiveness">
-                <span x-show="!loadingStrategyEffectiveness">🔄 刷新</span>
-                <span x-show="loadingStrategyEffectiveness">加载中...</span>
-              </button>
+        <div class="rounded-lg shadow-lg mb-6 overflow-hidden">
+          <div class="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 p-5">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h5 class="font-bold text-white text-lg flex items-center gap-2">
+                  📈 策略效果分析
+                </h5>
+                <p class="text-sm text-white/80 mt-1">实时分析各策略的触发频率、保护效果和矩阵命中分布，帮助运营优化出奖策略</p>
+              </div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <select x-model="strategyEffectivenessFilters.campaign_id" 
+                        @change="applyStrategyEffectivenessFilters()"
+                        class="rounded-lg px-3 py-2 text-sm w-40 bg-white/90 border-0 shadow-sm">
+                  <option value="">全部活动</option>
+                  <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
+                    <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
+                  </template>
+                </select>
+                <input type="date" x-model="strategyEffectivenessFilters.start_date"
+                       @change="applyStrategyEffectivenessFilters()"
+                       class="rounded-lg px-3 py-2 text-sm bg-white/90 border-0 shadow-sm">
+                <input type="date" x-model="strategyEffectivenessFilters.end_date"
+                       @change="applyStrategyEffectivenessFilters()"
+                       class="rounded-lg px-3 py-2 text-sm bg-white/90 border-0 shadow-sm">
+                <button @click="resetStrategyEffectivenessFilters()" 
+                        class="px-3 py-2 rounded-lg text-sm bg-white/20 text-white hover:bg-white/30 transition-colors">
+                  重置
+                </button>
+                <button @click="refreshStrategyEffectiveness()" 
+                        class="px-4 py-2 rounded-lg text-sm bg-white text-purple-700 font-medium hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-1"
+                        :disabled="loadingStrategyEffectiveness">
+                  <span x-show="!loadingStrategyEffectiveness">🔄 刷新数据</span>
+                  <span x-show="loadingStrategyEffectiveness" class="flex items-center gap-1">
+                    <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    加载中...
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
         <!-- 加载状态 -->
-        <div x-show="loadingStrategyEffectiveness" class="text-center py-12">
-          <div class="animate-spin inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mb-3"></div>
-          <p class="themed-text-muted">加载策略效果分析数据中...</p>
+        <div x-show="loadingStrategyEffectiveness" class="text-center py-16">
+          <div class="animate-spin inline-block w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full mb-4"></div>
+          <p class="themed-text-muted text-sm">正在加载策略效果分析数据...</p>
         </div>
 
         <!-- 无数据状态 -->
-        <div x-show="!loadingStrategyEffectiveness && !strategyEffectiveness" class="text-center py-12">
-          <div class="text-6xl mb-4">📊</div>
-          <p class="themed-text-muted">暂无策略效果数据</p>
-          <button @click="loadStrategyEffectiveness()" class="mt-4 themed-btn-primary px-4 py-2 rounded">
+        <div x-show="!loadingStrategyEffectiveness && !strategyEffectiveness" class="text-center py-16">
+          <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-purple-50 mb-4">
+            <span class="text-4xl">📊</span>
+          </div>
+          <p class="themed-text-muted font-medium mb-1">暂无策略效果数据</p>
+          <p class="text-sm themed-text-muted mb-4">请选择活动或调整时间范围后重新加载</p>
+          <button @click="loadStrategyEffectiveness()" class="px-6 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all shadow-md">
             重新加载
           </button>
         </div>
@@ -1789,68 +1887,105 @@
         <template x-if="strategyEffectiveness && !loadingStrategyEffectiveness">
           <div class="space-y-6">
             
-            <!-- 分析周期和整体评分 - 使用后端字段: analysis_period.start/end, overall_strategy_score, tier_downgrade_analysis, bxpx_matrix_analysis -->
+            <!-- 核心指标卡片 -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div class="themed-card rounded-lg shadow p-4 text-center">
-                <div class="text-3xl mb-2">📅</div>
-                <p class="text-xs themed-text-muted mb-1">分析周期</p>
-                <p class="font-semibold text-sm">
-                  <span x-text="strategyEffectiveness.analysis_period?.start ? formatDateOnly(strategyEffectiveness.analysis_period.start) : '-'"></span>
-                  至
-                  <span x-text="strategyEffectiveness.analysis_period?.end ? formatDateOnly(strategyEffectiveness.analysis_period.end) : '-'"></span>
-                </p>
+              <div class="rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-5">
+                  <div class="flex items-center justify-between mb-3">
+                    <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100">
+                      <span class="text-xl">📅</span>
+                    </span>
+                  </div>
+                  <p class="text-xs text-blue-600/70 font-medium mb-1">分析周期</p>
+                  <p class="font-semibold text-sm text-blue-900">
+                    <span x-text="strategyEffectiveness.analysis_period?.start ? formatDateOnly(strategyEffectiveness.analysis_period.start) : '-'"></span>
+                    <span class="text-blue-400 mx-1">→</span>
+                    <span x-text="strategyEffectiveness.analysis_period?.end ? formatDateOnly(strategyEffectiveness.analysis_period.end) : '-'"></span>
+                  </p>
+                </div>
               </div>
-              <div class="themed-card rounded-lg shadow p-4 text-center">
-                <div class="text-3xl mb-2">🎯</div>
-                <p class="text-xs themed-text-muted mb-1">整体策略评分</p>
-                <p class="text-2xl font-bold" 
-                   :class="getStrategyScoreColor(strategyEffectiveness.overall_strategy_score)"
-                   x-text="(strategyEffectiveness.overall_strategy_score || 0) + '分'"></p>
+              <div class="rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                <div class="bg-gradient-to-br from-emerald-50 to-green-50 p-5">
+                  <div class="flex items-center justify-between mb-3">
+                    <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-100">
+                      <span class="text-xl">🎯</span>
+                    </span>
+                  </div>
+                  <p class="text-xs text-emerald-600/70 font-medium mb-1">整体策略评分</p>
+                  <p class="text-2xl font-bold" 
+                     :class="getStrategyScoreColor(strategyEffectiveness.overall_strategy_score)"
+                     x-text="(strategyEffectiveness.overall_strategy_score || 0) + '分'"></p>
+                </div>
               </div>
-              <div class="themed-card rounded-lg shadow p-4 text-center">
-                <div class="text-3xl mb-2">📊</div>
-                <p class="text-xs themed-text-muted mb-1">BxPx矩阵评分</p>
-                <p class="text-2xl font-bold" x-text="(strategyEffectiveness.bxpx_matrix_analysis?.effectiveness_score || 0)"></p>
+              <div class="rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                <div class="bg-gradient-to-br from-violet-50 to-purple-50 p-5">
+                  <div class="flex items-center justify-between mb-3">
+                    <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-violet-100">
+                      <span class="text-xl">📊</span>
+                    </span>
+                  </div>
+                  <p class="text-xs text-violet-600/70 font-medium mb-1">BxPx矩阵评分</p>
+                  <p class="text-2xl font-bold text-violet-700" x-text="(strategyEffectiveness.bxpx_matrix_analysis?.effectiveness_score || 0)"></p>
+                </div>
               </div>
-              <div class="themed-card rounded-lg shadow p-4 text-center">
-                <div class="text-3xl mb-2">⬇️</div>
-                <p class="text-xs themed-text-muted mb-1">总降级次数</p>
-                <p class="text-2xl font-bold" x-text="(strategyEffectiveness.tier_downgrade_analysis?.total_downgrades || 0).toLocaleString()"></p>
+              <div class="rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                <div class="bg-gradient-to-br from-amber-50 to-orange-50 p-5">
+                  <div class="flex items-center justify-between mb-3">
+                    <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-amber-100">
+                      <span class="text-xl">⬇️</span>
+                    </span>
+                  </div>
+                  <p class="text-xs text-amber-600/70 font-medium mb-1">总降级次数</p>
+                  <p class="text-2xl font-bold text-amber-700" x-text="(strategyEffectiveness.tier_downgrade_analysis?.total_downgrades || 0).toLocaleString()"></p>
+                </div>
               </div>
             </div>
 
             <!-- BxPx矩阵热力图 -->
-            <div class="themed-card rounded-lg shadow">
-              <div class="p-4 border-b">
-                <h6 class="font-semibold flex items-center gap-2">
-                  🔥 BxPx 矩阵热力图
-                  <span class="text-xs themed-text-muted font-normal">预算层级 × 压力层级 命中率分布</span>
-                </h6>
+            <div class="rounded-xl shadow-sm overflow-hidden border border-gray-100">
+              <div class="px-5 py-4 bg-gradient-to-r from-slate-700 to-slate-800 flex items-center justify-between">
+                <div>
+                  <h6 class="font-semibold text-white flex items-center gap-2">
+                    🔥 BxPx 矩阵热力图
+                  </h6>
+                  <p class="text-xs text-slate-300 mt-1">预算层级(B) × 压力层级(P) 的命中率分布，颜色越深代表命中频率越高</p>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-slate-300">
+                  <span class="flex items-center gap-1"><span class="w-3 h-2 rounded bg-green-200"></span>低</span>
+                  <span class="flex items-center gap-1"><span class="w-3 h-2 rounded bg-yellow-300"></span>中</span>
+                  <span class="flex items-center gap-1"><span class="w-3 h-2 rounded bg-red-500"></span>高</span>
+                </div>
               </div>
-              <div class="p-4">
+              <div class="p-5 bg-white">
                 <template x-if="strategyEffectiveness.bxpx_matrix_analysis">
                   <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
+                    <table class="w-full text-sm border-separate" style="border-spacing: 4px;">
                       <thead>
                         <tr>
-                          <th class="p-2 text-center themed-text-muted">B \ P</th>
+                          <th class="p-3 text-center text-xs font-semibold themed-text-muted rounded-lg bg-gray-50">预算 \ 压力</th>
                           <template x-for="pTier in ['P0', 'P1', 'P2']" :key="pTier">
-                            <th class="p-2 text-center font-semibold" x-text="getPressureTierName(pTier) + ' (' + pTier + ')'"></th>
+                            <th class="p-3 text-center rounded-lg bg-slate-100">
+                              <span class="font-semibold text-slate-700 block" x-text="getPressureTierName(pTier)"></span>
+                              <span class="text-xs text-slate-400" x-text="pTier"></span>
+                            </th>
                           </template>
                         </tr>
                       </thead>
                       <tbody>
                         <template x-for="bTier in ['B0', 'B1', 'B2', 'B3']" :key="bTier">
                           <tr>
-                            <th class="p-2 text-center font-semibold" x-text="getBudgetTierName(bTier) + ' (' + bTier + ')'"></th>
+                            <th class="p-3 text-center rounded-lg bg-slate-100">
+                              <span class="font-semibold text-slate-700 block" x-text="getBudgetTierName(bTier)"></span>
+                              <span class="text-xs text-slate-400" x-text="bTier"></span>
+                            </th>
                             <template x-for="pTier in ['P0', 'P1', 'P2']" :key="pTier">
-                              <td class="p-2 text-center">
-                                <!-- 使用后端字段: hit_distribution[key].rate (百分比0-100) 和 .count -->
+                              <td class="p-1 text-center">
                                 <template x-if="strategyEffectiveness.bxpx_matrix_analysis.hit_distribution">
-                                  <div class="p-3 rounded"
-                                       :class="getBxPxHeatmapColor(strategyEffectiveness.bxpx_matrix_analysis.hit_distribution[bTier + '_' + pTier]?.rate || 0)">
-                                    <p class="font-bold" x-text="(strategyEffectiveness.bxpx_matrix_analysis.hit_distribution[bTier + '_' + pTier]?.rate || 0).toFixed(1) + '%'"></p>
-                                    <p class="text-xs opacity-75" x-text="(strategyEffectiveness.bxpx_matrix_analysis.hit_distribution[bTier + '_' + pTier]?.count || 0) + ' 次'"></p>
+                                  <div class="p-3 rounded-lg transition-transform hover:scale-105 cursor-default"
+                                       :class="getBxPxHeatmapColor(strategyEffectiveness.bxpx_matrix_analysis.hit_distribution[bTier + '_' + pTier]?.rate || 0)"
+                                       :title="bTier + ' × ' + pTier + ': ' + (strategyEffectiveness.bxpx_matrix_analysis.hit_distribution[bTier + '_' + pTier]?.rate || 0).toFixed(1) + '%'">
+                                    <p class="text-lg font-bold" x-text="(strategyEffectiveness.bxpx_matrix_analysis.hit_distribution[bTier + '_' + pTier]?.rate || 0).toFixed(1) + '%'"></p>
+                                    <p class="text-xs opacity-75 mt-0.5" x-text="(strategyEffectiveness.bxpx_matrix_analysis.hit_distribution[bTier + '_' + pTier]?.count || 0).toLocaleString() + ' 次'"></p>
                                   </div>
                                 </template>
                               </td>
@@ -1859,144 +1994,196 @@
                         </template>
                       </tbody>
                     </table>
-                    <!-- 热力图图例 -->
-                    <div class="mt-4 flex items-center justify-center gap-2 text-xs">
-                      <span class="themed-text-muted">命中率:</span>
-                      <span class="px-2 py-1 rounded bg-green-100">0-20%</span>
-                      <span class="px-2 py-1 rounded bg-green-300">20-40%</span>
-                      <span class="px-2 py-1 rounded bg-yellow-300">40-60%</span>
-                      <span class="px-2 py-1 rounded bg-orange-400 text-white">60-80%</span>
-                      <span class="px-2 py-1 rounded bg-red-500 text-white">80-100%</span>
-                    </div>
                   </div>
                 </template>
                 <template x-if="!strategyEffectiveness.bxpx_matrix_analysis || !strategyEffectiveness.bxpx_matrix_analysis.hit_distribution || Object.keys(strategyEffectiveness.bxpx_matrix_analysis.hit_distribution).length === 0">
-                  <p class="text-center themed-text-muted py-4">暂无BxPx矩阵数据</p>
+                  <div class="text-center py-8">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 mb-3">
+                      <span class="text-xl">📊</span>
+                    </div>
+                    <p class="themed-text-muted text-sm">暂无BxPx矩阵数据</p>
+                    <p class="text-xs themed-text-muted mt-1">数据将在有抽奖记录后自动生成</p>
+                  </div>
                 </template>
               </div>
             </div>
 
             <!-- 体验机制分析 -->
-            <div class="themed-card rounded-lg shadow">
-              <div class="p-4 border-b">
-                <h6 class="font-semibold flex items-center gap-2">
-                  🎮 体验机制分析
-                  <span class="text-xs themed-text-muted font-normal">Pity触发率 / 首次用户保护 / 体验优化</span>
+            <div class="rounded-xl shadow-sm overflow-hidden border border-gray-100">
+              <div class="px-5 py-4 bg-gradient-to-r from-emerald-600 to-teal-600">
+                <h6 class="font-semibold text-white flex items-center gap-2">
+                  🎮 体验保护机制
                 </h6>
+                <p class="text-xs text-emerald-100 mt-1">这些机制自动保护用户的抽奖体验，防止出现极端不佳情况</p>
               </div>
-              <div class="p-4">
-                <!-- 使用后端字段: pity_mechanism, anti_empty_mechanism, luck_debt_mechanism -->
+              <div class="p-5 bg-white">
                 <template x-if="strategyEffectiveness.experience_mechanism_analysis">
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <!-- Pity机制 - 后端字段: pity_mechanism.trigger_count/trigger_rate/effectiveness -->
-                    <div class="border rounded-lg p-4">
-                      <h6 class="font-semibold mb-3 flex items-center gap-2">💔 Pity机制</h6>
-                      <div class="space-y-2 text-sm">
-                        <div class="flex justify-between">
-                          <span class="themed-text-muted">触发次数</span>
-                          <span class="font-mono" x-text="strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.trigger_count || 0"></span>
+                    <!-- Pity（保底）机制 -->
+                    <div class="rounded-xl border-l-4 border-l-purple-500 bg-gradient-to-br from-purple-50 to-white p-5 hover:shadow-md transition-shadow">
+                      <div class="flex items-center gap-2 mb-4">
+                        <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-purple-100">
+                          <span class="text-lg">💔</span>
+                        </span>
+                        <div>
+                          <h6 class="font-semibold text-sm text-purple-800">保底机制</h6>
+                          <p class="text-xs text-purple-400">连续未中好奖时自动触发</p>
                         </div>
-                        <div class="flex justify-between">
-                          <span class="themed-text-muted">触发率</span>
-                          <span class="font-mono" x-text="(strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.trigger_rate || 0).toFixed(1) + '%'"></span>
+                      </div>
+                      <div class="space-y-3 text-sm">
+                        <div class="flex justify-between items-center">
+                          <span class="text-purple-600/70">触发次数</span>
+                          <span class="font-semibold text-purple-800 text-lg" x-text="(strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.trigger_count || 0).toLocaleString()"></span>
                         </div>
-                        <div class="flex justify-between">
-                          <span class="themed-text-muted">效果评估</span>
-                          <span class="font-mono" x-text="strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.effectiveness || '-'"></span>
+                        <div class="flex justify-between items-center">
+                          <span class="text-purple-600/70">触发率</span>
+                          <span class="font-semibold text-purple-800" x-text="(strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.trigger_rate || 0).toFixed(1) + '%'"></span>
+                        </div>
+                        <div class="pt-2 border-t border-purple-100">
+                          <div class="flex justify-between items-center">
+                            <span class="text-purple-600/70">效果评估</span>
+                            <span class="px-2 py-0.5 rounded text-xs font-medium" 
+                                  :class="(strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.effectiveness || '') === 'good' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
+                                  x-text="strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.effectiveness || '-'"></span>
+                          </div>
                         </div>
                       </div>
                     </div>
                     
-                    <!-- 防空奖机制 - 后端字段: anti_empty_mechanism.total_empty_count/max_empty_streak/effectiveness -->
-                    <div class="border rounded-lg p-4">
-                      <h6 class="font-semibold mb-3 flex items-center gap-2">🛡️ 防空奖机制</h6>
-                      <div class="space-y-2 text-sm">
-                        <div class="flex justify-between">
-                          <span class="themed-text-muted">总空奖次数</span>
-                          <span class="font-mono" x-text="strategyEffectiveness.experience_mechanism_analysis.anti_empty_mechanism?.total_empty_count || 0"></span>
+                    <!-- 防空奖机制 -->
+                    <div class="rounded-xl border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-white p-5 hover:shadow-md transition-shadow">
+                      <div class="flex items-center gap-2 mb-4">
+                        <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-blue-100">
+                          <span class="text-lg">🛡️</span>
+                        </span>
+                        <div>
+                          <h6 class="font-semibold text-sm text-blue-800">防空奖机制</h6>
+                          <p class="text-xs text-blue-400">防止连续多次空奖</p>
                         </div>
-                        <div class="flex justify-between">
-                          <span class="themed-text-muted">最大连空</span>
-                          <span class="font-mono" x-text="strategyEffectiveness.experience_mechanism_analysis.anti_empty_mechanism?.max_empty_streak || 0"></span>
+                      </div>
+                      <div class="space-y-3 text-sm">
+                        <div class="flex justify-between items-center">
+                          <span class="text-blue-600/70">总空奖次数</span>
+                          <span class="font-semibold text-blue-800 text-lg" x-text="(strategyEffectiveness.experience_mechanism_analysis.anti_empty_mechanism?.total_empty_count || 0).toLocaleString()"></span>
                         </div>
-                        <div class="flex justify-between">
-                          <span class="themed-text-muted">效果评估</span>
-                          <span class="font-mono" x-text="strategyEffectiveness.experience_mechanism_analysis.anti_empty_mechanism?.effectiveness || '-'"></span>
+                        <div class="flex justify-between items-center">
+                          <span class="text-blue-600/70">最大连空</span>
+                          <span class="font-semibold text-blue-800" x-text="(strategyEffectiveness.experience_mechanism_analysis.anti_empty_mechanism?.max_empty_streak || 0) + ' 次'"></span>
+                        </div>
+                        <div class="pt-2 border-t border-blue-100">
+                          <div class="flex justify-between items-center">
+                            <span class="text-blue-600/70">效果评估</span>
+                            <span class="px-2 py-0.5 rounded text-xs font-medium"
+                                  :class="(strategyEffectiveness.experience_mechanism_analysis.anti_empty_mechanism?.effectiveness || '') === 'good' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
+                                  x-text="strategyEffectiveness.experience_mechanism_analysis.anti_empty_mechanism?.effectiveness || '-'"></span>
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    <!-- 运气债务机制 - 后端字段: luck_debt_mechanism.avg_empty_streak/effectiveness -->
-                    <div class="border rounded-lg p-4">
-                      <h6 class="font-semibold mb-3 flex items-center gap-2">🎲 运气债务机制</h6>
-                      <div class="space-y-2 text-sm">
-                        <div class="flex justify-between">
-                          <span class="themed-text-muted">平均连空数</span>
-                          <span class="font-mono" x-text="strategyEffectiveness.experience_mechanism_analysis.luck_debt_mechanism?.avg_empty_streak || 0"></span>
+                    <!-- 运气债务机制 -->
+                    <div class="rounded-xl border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50 to-white p-5 hover:shadow-md transition-shadow">
+                      <div class="flex items-center gap-2 mb-4">
+                        <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-emerald-100">
+                          <span class="text-lg">🎲</span>
+                        </span>
+                        <div>
+                          <h6 class="font-semibold text-sm text-emerald-800">运气债务机制</h6>
+                          <p class="text-xs text-emerald-400">追踪运气偏差，自动回归均值</p>
                         </div>
-                        <div class="flex justify-between">
-                          <span class="themed-text-muted">效果评估</span>
-                          <span class="font-mono" x-text="strategyEffectiveness.experience_mechanism_analysis.luck_debt_mechanism?.effectiveness || '-'"></span>
+                      </div>
+                      <div class="space-y-3 text-sm">
+                        <div class="flex justify-between items-center">
+                          <span class="text-emerald-600/70">平均连空数</span>
+                          <span class="font-semibold text-emerald-800 text-lg" x-text="strategyEffectiveness.experience_mechanism_analysis.luck_debt_mechanism?.avg_empty_streak || 0"></span>
+                        </div>
+                        <div class="pt-2 border-t border-emerald-100">
+                          <div class="flex justify-between items-center">
+                            <span class="text-emerald-600/70">效果评估</span>
+                            <span class="px-2 py-0.5 rounded text-xs font-medium"
+                                  :class="(strategyEffectiveness.experience_mechanism_analysis.luck_debt_mechanism?.effectiveness || '') === 'good' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
+                                  x-text="strategyEffectiveness.experience_mechanism_analysis.luck_debt_mechanism?.effectiveness || '-'"></span>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 </template>
                 <template x-if="!strategyEffectiveness.experience_mechanism_analysis">
-                  <p class="text-center themed-text-muted py-4">暂无体验机制数据</p>
+                  <div class="text-center py-8">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-50 mb-3">
+                      <span class="text-xl">🎮</span>
+                    </div>
+                    <p class="themed-text-muted text-sm">暂无体验机制数据</p>
+                  </div>
                 </template>
               </div>
             </div>
 
             <!-- P2#12: 策略触发频率热力图 -->
-            <div class="themed-card rounded-lg shadow">
-              <div class="p-4 border-b">
-                <h6 class="font-semibold flex items-center gap-2">
-                  🔥 策略触发频率热力图
-                  <span class="text-xs themed-text-muted font-normal">Pity / AntiEmpty / AntiHigh / LuckDebt 各日触发次数分布</span>
+            <div class="rounded-xl shadow-sm overflow-hidden border border-gray-100">
+              <div class="px-5 py-4 bg-gradient-to-r from-amber-600 to-orange-600">
+                <h6 class="font-semibold text-white flex items-center gap-2">
+                  🔥 策略触发频率分布
                 </h6>
+                <p class="text-xs text-amber-100 mt-1">各保护机制的每日触发频次分布，帮助判断策略是否过于激进或过于保守</p>
               </div>
-              <div class="p-4">
+              <div class="p-5 bg-white">
                 <template x-if="strategyEffectiveness && strategyEffectiveness.experience_mechanism_analysis">
                   <div>
                     <!-- 触发次数汇总卡片 -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                      <div class="rounded-lg p-3 bg-purple-50 border border-purple-200 text-center">
-                        <p class="text-xs text-purple-500 mb-1">Pity(保底)触发</p>
-                        <p class="text-xl font-bold text-purple-700" 
-                           x-text="strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.trigger_count || 0"></p>
-                        <p class="text-xs text-purple-400" 
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                      <div class="rounded-xl p-4 bg-gradient-to-br from-purple-50 to-purple-100/50 border border-purple-200/50 text-center hover:shadow-sm transition-shadow">
+                        <div class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-purple-200/50 mb-2">
+                          <span class="text-sm">💔</span>
+                        </div>
+                        <p class="text-xs text-purple-600 font-medium mb-1">保底触发</p>
+                        <p class="text-2xl font-bold text-purple-700" 
+                           x-text="(strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.trigger_count || 0).toLocaleString()"></p>
+                        <p class="text-xs text-purple-400 mt-1" 
                            x-text="'触发率 ' + (strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.trigger_rate || 0).toFixed(1) + '%'"></p>
                       </div>
-                      <div class="rounded-lg p-3 bg-blue-50 border border-blue-200 text-center">
-                        <p class="text-xs text-blue-500 mb-1">AntiEmpty(反连空)</p>
-                        <p class="text-xl font-bold text-blue-700" 
-                           x-text="strategyEffectiveness.experience_mechanism_analysis.anti_empty_mechanism?.total_empty_count || 0"></p>
-                        <p class="text-xs text-blue-400">反空奖触发</p>
+                      <div class="rounded-xl p-4 bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200/50 text-center hover:shadow-sm transition-shadow">
+                        <div class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-200/50 mb-2">
+                          <span class="text-sm">🛡️</span>
+                        </div>
+                        <p class="text-xs text-blue-600 font-medium mb-1">反连空触发</p>
+                        <p class="text-2xl font-bold text-blue-700" 
+                           x-text="(strategyEffectiveness.experience_mechanism_analysis.anti_empty_mechanism?.total_empty_count || 0).toLocaleString()"></p>
+                        <p class="text-xs text-blue-400 mt-1">防空奖保护</p>
                       </div>
-                      <div class="rounded-lg p-3 bg-orange-50 border border-orange-200 text-center">
-                        <p class="text-xs text-orange-500 mb-1">AntiHigh(反连高)</p>
-                        <p class="text-xl font-bold text-orange-700"
-                           x-text="strategyEffectiveness.tier_downgrade_analysis?.total_downgrades || 0"></p>
-                        <p class="text-xs text-orange-400">档位限制触发</p>
+                      <div class="rounded-xl p-4 bg-gradient-to-br from-orange-50 to-orange-100/50 border border-orange-200/50 text-center hover:shadow-sm transition-shadow">
+                        <div class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-orange-200/50 mb-2">
+                          <span class="text-sm">⬇️</span>
+                        </div>
+                        <p class="text-xs text-orange-600 font-medium mb-1">反连高触发</p>
+                        <p class="text-2xl font-bold text-orange-700"
+                           x-text="(strategyEffectiveness.tier_downgrade_analysis?.total_downgrades || 0).toLocaleString()"></p>
+                        <p class="text-xs text-orange-400 mt-1">档位降级保护</p>
                       </div>
-                      <div class="rounded-lg p-3 bg-green-50 border border-green-200 text-center">
-                        <p class="text-xs text-green-500 mb-1">LuckDebt(运气债务)</p>
-                        <p class="text-xl font-bold text-green-700"
+                      <div class="rounded-xl p-4 bg-gradient-to-br from-emerald-50 to-emerald-100/50 border border-emerald-200/50 text-center hover:shadow-sm transition-shadow">
+                        <div class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-200/50 mb-2">
+                          <span class="text-sm">🎲</span>
+                        </div>
+                        <p class="text-xs text-emerald-600 font-medium mb-1">运气债务</p>
+                        <p class="text-2xl font-bold text-emerald-700"
                            x-text="strategyEffectiveness.experience_mechanism_analysis.luck_debt_mechanism?.avg_empty_streak || 0"></p>
-                        <p class="text-xs text-green-400">平均连空数</p>
+                        <p class="text-xs text-emerald-400 mt-1">平均连空数</p>
                       </div>
                     </div>
-                    <!-- 策略触发日级分布图表容器 -->
-                    <div id="strategyTriggerHeatmapChart" class="w-full" style="height: 320px;"></div>
-                    <p class="text-xs themed-text-muted text-center mt-2">
-                      数据来源: lottery_daily_metrics 表（pity_trigger_count / anti_empty_trigger_count / anti_high_trigger_count / luck_debt_trigger_count）
+                    <!-- 策略触发日级分布图表 -->
+                    <div class="rounded-lg bg-gray-50/50 p-3">
+                      <div id="strategyTriggerHeatmapChart" class="w-full" style="height: 320px;"></div>
+                    </div>
+                    <p class="text-xs themed-text-muted text-center mt-3 flex items-center justify-center gap-1">
+                      <span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
+                      数据来源: 每日抽奖指标统计
                     </p>
                   </div>
                 </template>
                 <template x-if="!strategyEffectiveness || !strategyEffectiveness.experience_mechanism_analysis">
                   <div class="text-center py-8 themed-text-muted">
-                    <div class="text-4xl mb-2">📊</div>
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-50 mb-3"><span class="text-xl">📊</span></div>
                     <p>暂无策略触发热力图数据</p>
                     <p class="text-xs mt-1">请先在筛选中选择活动并加载数据</p>
                   </div>
@@ -3040,7 +3227,7 @@
               <tbody>
                 <template x-for="item in advanceByPrize" :key="item.lottery_prize_id">
                   <tr class="border-b hover:bg-gray-50">
-                    <td class="py-3 px-2" x-text="item.prize_name || item.name || '-'"></td>
+                    <td class="py-3 px-2" x-text="item.prize_name || '-'"></td>
                     <td class="py-3 px-2 text-sm themed-text-muted" x-text="item.campaign_name || '-'"></td>
                     <td class="py-3 px-2">
                       <span class="text-yellow-600 font-medium" x-text="item.owed_quantity || 0"></span> 件

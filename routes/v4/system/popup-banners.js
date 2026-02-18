@@ -102,10 +102,11 @@ router.get(
       // 根据状态调用不同的服务方法
       let banners
       if (status === 'active') {
-        // 获取当前有效弹窗（原有逻辑，is_active=true + 时间范围内）
+        // 获取当前有效弹窗（is_active=true + 时间范围内 + 广告竞价定向匹配）
         banners = await PopupBannerService.getActiveBanners({
           position,
-          limit: maxLimit
+          limit: maxLimit,
+          user_id: req.user?.user_id || null
         })
       } else {
         // 管理员查询草稿/过期弹窗（需要服务层支持）

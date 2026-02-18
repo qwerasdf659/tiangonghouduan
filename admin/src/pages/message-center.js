@@ -14,7 +14,7 @@
 import Alpine from 'alpinejs'
 import { logger, $confirmDanger } from '../utils/index.js'
 import { createPageMixin } from '../alpine/mixins/index.js'
-import { request, buildURL, API_PREFIX } from '../api/base.js'
+import { request, API_PREFIX } from '../api/base.js'
 import { io } from 'socket.io-client'
 
 // API 端点 - 使用 system 域，添加 API_PREFIX 前缀
@@ -47,13 +47,12 @@ function messageCenterPage() {
     // 选中的消息ID
     selectedIds: [],
 
-    // 筛选条件（P1-4 增强：添加来源筛选）
+    // 筛选条件
     filter: {
       type: '',
       status: '',
       time_range: '',
-      keyword: '',
-      source: '' // P1-4: 新增来源筛选
+      keyword: ''
     },
 
     // 分页
@@ -81,8 +80,6 @@ function messageCenterPage() {
     /** @type {number|null} 轮询定时器 */
     pollTimer: null,
 
-    // 可用的消息来源列表
-    availableSources: ['系统', '抽奖模块', '客服系统', '风控系统', '财务系统', '用户管理'],
 
     async init() {
       logger.info('[MessageCenter] 初始化消息中心 (P1-4 WebSocket 增强版)')
@@ -95,7 +92,6 @@ function messageCenterPage() {
 
       // 监听筛选变化
       this.$watch('filter.type', () => this.loadMessages())
-      this.$watch('filter.source', () => this.loadMessages()) // P1-4: 监听来源筛选
 
       // 加载消息列表
       await this.loadMessages()
@@ -199,10 +195,10 @@ function messageCenterPage() {
         // 监听新消息（客服消息也作为通知）
         this.socket.on('new_message', (data) => {
           this.handleNewNotification({
-            type: 'info',
+            type: 'notice',
             title: '新客服消息',
-            message: data.content || '收到新消息',
-            source: '客服系统',
+            content: data.content || '收到新消息',
+            priority: 'medium',
             ...data
           })
         })
@@ -227,15 +223,14 @@ function messageCenterPage() {
     handleNewNotification(notification) {
       logger.debug('[MessageCenter] 收到新通知:', notification)
 
-      // 构造完整的消息对象
       const newMessage = {
         id: notification.id || Date.now(),
-        type: notification.type || 'info',
+        type: notification.type || 'notice',
         title: notification.title || '新消息',
-        message: notification.message || '',
+        content: notification.content || notification.message || '',
         is_read: false,
         created_at: notification.created_at || new Date().toISOString(),
-        source: notification.source || '系统'
+        priority: notification.priority || 'medium'
       }
 
       // 添加到列表顶部
@@ -296,73 +291,41 @@ function messageCenterPage() {
     async loadMessages() {
       this.loading = true
       try {
-        const params = {
-          page: this.pagination.page,
-          page_size: this.pagination.page_size
-        }
+        const params = {}
 
         if (this.filter.type) params.type = this.filter.type
-        if (this.filter.status) params.status = this.filter.status
-        if (this.filter.time_range) params.time_range = this.filter.time_range
-        if (this.filter.keyword) params.keyword = this.filter.keyword
-        if (this.filter.source) params.source = this.filter.source // P1-4: 来源筛选
+        params.limit = this.pagination.page_size
 
         const result = await request({
-          url: buildURL(MESSAGE_ENDPOINTS.LIST, params),
-          method: 'GET'
+          url: MESSAGE_ENDPOINTS.LIST,
+          method: 'GET',
+          params
         })
 
         if (result.data) {
-          this.messages = result.data.items || result.data || []
-          this.pagination.total = result.data.total || this.messages.length
-          this.unreadCount =
-            result.data.unread_count || this.messages.filter((m) => !m.is_read).length
-        }
-      } catch (e) {
-        logger.warn('[MessageCenter] loadMessages 失败:', e.message)
-        // 模拟数据
-        this.messages = this.generateMockMessages()
+          // 后端返回 { notifications: [...], statistics: {...} }
+          const notifications = result.data.notifications || []
+          const statistics = result.data.statistics || {}
 
-        // P1-4: 应用来源筛选到模拟数据
-        if (this.filter.source) {
-          this.messages = this.messages.filter((m) => m.source === this.filter.source)
+          this.messages = Array.isArray(notifications) ? notifications : []
+          this.pagination.total = statistics.total ?? this.messages.length
+          this.unreadCount = statistics.unread ?? this.messages.filter((m) => !m.is_read).length
+        } else {
+          this.messages = []
+          this.pagination.total = 0
+          this.unreadCount = 0
         }
 
-        this.pagination.total = this.messages.length + 50
-        this.unreadCount = this.messages.filter((m) => !m.is_read).length
-        // #2 更新上次刷新时间
         this.lastUpdateTime = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+      } catch (e) {
+        logger.error('[MessageCenter] loadMessages 失败:', e.message)
+        this.messages = []
+        this.pagination.total = 0
+        this.unreadCount = 0
+        Alpine.store('notification')?.show?.('加载消息失败：' + e.message, 'error')
       } finally {
         this.loading = false
       }
-    },
-
-    generateMockMessages() {
-      const types = ['alert', 'warning', 'info', 'success']
-      const titles = {
-        alert: ['新的消耗审核', '客服会话请求', '风控告警'],
-        warning: ['预算告警', '库存不足', '中奖率异常'],
-        info: ['系统通知', '活动上线', '数据报表'],
-        success: ['审核通过', '任务完成', '发放成功']
-      }
-
-      const messages = []
-      for (let i = 0; i < 20; i++) {
-        const type = types[Math.floor(Math.random() * types.length)]
-        const titleList = titles[type]
-
-        messages.push({
-          id: i + 1,
-          type: type,
-          title: titleList[Math.floor(Math.random() * titleList.length)] + ' #' + (1000 + i),
-          message: '这是一条系统通知消息的详细内容，描述了事件的具体情况和需要处理的事项。',
-          is_read: Math.random() > 0.4,
-          created_at: new Date(Date.now() - Math.random() * 86400000 * 7).toISOString(),
-          source: ['系统', '抽奖模块', '客服系统', '风控系统'][Math.floor(Math.random() * 4)]
-        })
-      }
-
-      return messages.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     },
 
     async refreshMessages() {
@@ -499,10 +462,10 @@ function messageCenterPage() {
 
     handleMessageAction(message) {
       const urlMap = {
-        alert: '/admin/pending-center.html',
-        warning: '/admin/lottery-alerts.html',
-        info: '/admin/system-settings.html',
-        success: '/admin/statistics.html'
+        system: '/admin/system-settings.html',
+        maintenance: '/admin/system-settings.html',
+        notice: '/admin/pending-center.html',
+        activity: '/admin/statistics.html'
       }
 
       const url = urlMap[message?.type] || '/admin/pending-center.html'
@@ -533,40 +496,46 @@ function messageCenterPage() {
 
     getTypeIcon(type) {
       const icons = {
-        alert: '🔔',
-        warning: '⚠️',
-        info: 'ℹ️',
-        success: '✅'
+        system: '🔔',
+        maintenance: '⚠️',
+        notice: 'ℹ️',
+        activity: '🎉',
+        high: '🔴',
+        medium: '🟡',
+        low: '🟢'
       }
       return icons[type] || '📬'
     },
 
     getTypeLabel(type) {
       const labels = {
-        alert: '告警',
-        warning: '预警',
-        info: '通知',
-        success: '成功'
+        system: '系统公告',
+        maintenance: '维护通知',
+        notice: '通知公告',
+        activity: '活动公告',
+        high: '高',
+        medium: '中',
+        low: '低'
       }
-      return labels[type] || '消息'
+      return labels[type] || type || '消息'
     },
 
     getTypeColorClass(type) {
       const colors = {
-        alert: 'text-red-500 bg-red-50',
-        warning: 'text-yellow-500 bg-yellow-50',
-        info: 'text-blue-500 bg-blue-50',
-        success: 'text-green-500 bg-green-50'
+        system: 'text-red-500 bg-red-50',
+        maintenance: 'text-yellow-500 bg-yellow-50',
+        notice: 'text-blue-500 bg-blue-50',
+        activity: 'text-green-500 bg-green-50'
       }
       return colors[type] || 'text-gray-500 bg-gray-50'
     },
 
     getTypeBadgeClass(type) {
       const classes = {
-        alert: 'bg-red-100 text-red-600',
-        warning: 'bg-yellow-100 text-yellow-600',
-        info: 'bg-blue-100 text-blue-600',
-        success: 'bg-green-100 text-green-600'
+        system: 'bg-red-100 text-red-600',
+        maintenance: 'bg-yellow-100 text-yellow-600',
+        notice: 'bg-blue-100 text-blue-600',
+        activity: 'bg-green-100 text-green-600'
       }
       return classes[type] || 'bg-gray-100 text-gray-600'
     },

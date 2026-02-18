@@ -3,15 +3,18 @@
  *
  * @file admin/src/modules/content/composables/index.js
  * @description 导出所有子模块，便于主模块组合使用
- * @version 1.0.0
- * @date 2026-02-06
+ * @version 2.0.0
+ * @date 2026-02-18
  */
 
 // 公告管理模块
 import { useAnnouncementsState, useAnnouncementsMethods } from './announcements.js'
 
-// 轮播图管理模块
+// 弹窗管理模块（popup_banners）
 import { useBannersState, useBannersMethods } from './banners.js'
+
+// 轮播图管理模块（carousel_items 独立表）
+import { useCarouselItemsState, useCarouselItemsMethods } from './carousel-items.js'
 
 // 图片资源管理模块
 import { useImagesState, useImagesMethods } from './images.js'
@@ -24,6 +27,7 @@ import { useFeedbackState, useFeedbackMethods } from './feedback.js'
 
 export { useAnnouncementsState, useAnnouncementsMethods }
 export { useBannersState, useBannersMethods }
+export { useCarouselItemsState, useCarouselItemsMethods }
 export { useImagesState, useImagesMethods }
 export { useCustomerServiceState, useCustomerServiceMethods }
 export { useFeedbackState, useFeedbackMethods }
@@ -36,6 +40,7 @@ export function useAllContentManagementState() {
   return {
     ...useAnnouncementsState(),
     ...useBannersState(),
+    ...useCarouselItemsState(),
     ...useImagesState()
   }
 }
@@ -48,6 +53,7 @@ export function useAllContentManagementMethods() {
   return {
     ...useAnnouncementsMethods(),
     ...useBannersMethods(),
+    ...useCarouselItemsMethods(),
     ...useImagesMethods()
   }
 }

@@ -271,6 +271,99 @@ router.get(
 )
 
 /**
+ * @route GET /api/v4/market/settlement-currencies
+ * @desc 获取允许的结算币种列表（用户端）
+ * @access Private (需要登录)
+ *
+ * @returns {Object} 结算币种列表
+ * @returns {Array} data.currencies - 币种列表 [{asset_code, display_name}]
+ *
+ * 业务场景：前端卖家上架商品时，需要知道可选的定价币种
+ * 数据来源：system_settings.allowed_settlement_assets + material_asset_types.display_name
+ */
+router.get('/settlement-currencies', authenticateToken, async (req, res) => {
+  try {
+    const MarketListingService = req.app.locals.services.getService('market_listing_query')
+
+    const currencies = await MarketListingService.getSettlementCurrencies()
+
+    logger.info('获取结算币种列表成功', {
+      user_id: req.user.user_id,
+      count: currencies.length
+    })
+
+    return res.apiSuccess({ currencies }, '获取结算币种列表成功')
+  } catch (error) {
+    logger.error('获取结算币种列表失败', {
+      error: error.message,
+      user_id: req.user?.user_id
+    })
+
+    return handleServiceError(error, res, '获取结算币种列表失败')
+  }
+})
+
+/**
+ * @route GET /api/v4/market/my-listings
+ * @desc 获取当前用户的挂单列表（我的挂单）
+ * @access Private (需要登录)
+ *
+ * @query {number} page - 页码（默认1）
+ * @query {number} limit - 每页数量（默认20）
+ * @query {string} status - 状态筛选（on_sale/locked/sold/withdrawn/admin_withdrawn，可选）
+ *
+ * @returns {Object} 用户挂单列表和分页信息
+ * @returns {Array} data.listings - 挂单列表
+ * @returns {Object} data.pagination - 分页信息
+ *
+ * 业务场景：用户查看自己在市场上架的所有挂单（含历史订单）
+ * Service层已完整实现（MarketListingQueryService.getUserListings），路由层仅做参数透传
+ */
+router.get('/my-listings', authenticateToken, async (req, res) => {
+  try {
+    const MarketListingService = req.app.locals.services.getService('market_listing_query')
+
+    const userId = req.user.user_id
+    const { page = 1, limit = 20, status } = req.query
+
+    const result = await MarketListingService.getUserListings({
+      seller_user_id: userId,
+      status: status || undefined,
+      page: parseInt(page, 10),
+      page_size: parseInt(limit, 10)
+    })
+
+    logger.info('获取用户挂单列表成功', {
+      user_id: userId,
+      status,
+      total: result.total,
+      returned: result.listings.length
+    })
+
+    return res.apiSuccess(
+      {
+        listings: result.listings,
+        pagination: {
+          total: result.total,
+          page: result.page,
+          limit: result.page_size,
+          total_pages: Math.ceil(result.total / result.page_size)
+        }
+      },
+      '获取我的挂单列表成功'
+    )
+  } catch (error) {
+    logger.error('获取用户挂单列表失败', {
+      error: error.message,
+      user_id: req.user?.user_id,
+      query: req.query
+    })
+
+    return handleServiceError(error, res, '获取我的挂单列表失败')
+  }
+})
+
+/**
  * @route GET /api/v4/market/listing-status
  * @desc 获取用户上架状态
  * @access Private (需要登录)

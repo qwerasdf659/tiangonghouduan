@@ -97,17 +97,33 @@ class PopupBannerService {
    * @returns {Promise<Array>} 有效弹窗列表（仅包含小程序需要的字段）
    */
   static async getActiveBanners(options = {}) {
-    const { position = 'home', limit = 10 } = options
+    const { position = 'home', limit = 10, user_id = null } = options
     const now = BeijingTimeHelper.createBeijingTime()
 
     try {
+      /**
+       * Phase 2 弹窗队列截断：从 system_configs 读取 popup_queue_max_count
+       * 拍板决策5：可配置，默认5个，热更新无需重启
+       */
+      let queueMaxCount = parseInt(limit) || 10
+      try {
+        const { SystemConfig } = require('../models')
+        const configRow = await SystemConfig.findOne({
+          where: { config_key: 'popup_queue_max_count' }
+        })
+        if (configRow && configRow.config_value) {
+          queueMaxCount = Math.min(parseInt(configRow.config_value) || 5, queueMaxCount)
+        }
+      } catch (configError) {
+        logger.warn('读取弹窗队列配置失败，使用默认值', { error: configError.message })
+      }
+
+      // 1. 获取运营弹窗
       const banners = await PopupBanner.findAll({
         where: {
           is_active: true,
           position,
-          // 开始时间：NULL 或 <= 当前时间
           [Op.or]: [{ start_time: null }, { start_time: { [Op.lte]: now } }],
-          // 结束时间：NULL 或 > 当前时间（嵌套在 [Op.and] 中）
           [Op.and]: [
             {
               [Op.or]: [{ end_time: null }, { end_time: { [Op.gt]: now } }]
@@ -115,32 +131,88 @@ class PopupBannerService {
           ]
         },
         order: [
+          ['priority', 'DESC'],
           ['display_order', 'ASC'],
           ['created_at', 'DESC']
         ],
-        limit: parseInt(limit) || 10,
-        /*
-         * 仅返回小程序需要的字段（数据脱敏）
-         * title 仅供后台管理识别，不下发给小程序端
+        limit: queueMaxCount,
+        /**
+         * 小程序需要的 12 个字段（Phase 1 新增 title + 5 个频率控制字段）
+         * title 用于 notice 类型展示标题
          */
         attributes: [
           'popup_banner_id',
+          'title',
           'image_url',
           'display_mode',
           'image_width',
           'image_height',
           'link_url',
-          'link_type'
+          'link_type',
+          'banner_type',
+          'frequency_rule',
+          'frequency_value',
+          'force_show',
+          'priority'
         ]
       })
 
+      // 2. Phase 4: 合并广告竞价结果到弹窗队列
+      const operationalResults = banners.map(banner =>
+        PopupBannerService._transformBannerImageUrl(banner.toJSON())
+      )
+
+      let adResults = []
+      try {
+        const AdBiddingService = require('./AdBiddingService')
+        const slotKey = `${position}_popup`
+        const adWinners = await AdBiddingService.selectWinners(slotKey, user_id)
+
+        adResults = adWinners
+          .filter(winner => winner.creative)
+          .map(winner => ({
+            popup_banner_id: null,
+            title: winner.creative.title || winner.campaign_name,
+            image_url: winner.creative.image_object_key
+              ? getImageUrl(winner.creative.image_object_key)
+              : null,
+            display_mode: 'wide',
+            image_width: null,
+            image_height: null,
+            link_url: winner.creative.link_url || null,
+            link_type: winner.creative.link_type || 'none',
+            banner_type: 'image',
+            frequency_rule: 'once_per_day',
+            frequency_value: 1,
+            force_show: false,
+            priority: 90,
+            _is_ad: true,
+            _ad_campaign_id: winner.ad_campaign_id,
+            _ad_creative_id: winner.creative.ad_creative_id
+          }))
+
+        logger.info('广告竞价弹窗合并', {
+          position,
+          slot_key: slotKey,
+          ad_count: adResults.length
+        })
+      } catch (adError) {
+        logger.warn('广告竞价弹窗合并失败（不影响运营弹窗）', { error: adError.message })
+      }
+
+      // 3. 合并：运营弹窗 + 广告弹窗，截断到队列上限
+      const merged = [...operationalResults, ...adResults]
+        .sort((a, b) => (b.priority || 0) - (a.priority || 0))
+        .slice(0, queueMaxCount)
+
       logger.info('获取有效弹窗成功', {
         position,
-        count: banners.length
+        operational_count: operationalResults.length,
+        ad_count: adResults.length,
+        merged_count: merged.length
       })
 
-      // 🔴 转换 image_url：对象 key → 完整 CDN URL
-      return banners.map(banner => PopupBannerService._transformBannerImageUrl(banner.toJSON()))
+      return merged
     } catch (error) {
       logger.error('获取有效弹窗失败', { error: error.message, position })
       throw error
@@ -225,12 +297,19 @@ class PopupBannerService {
    * @returns {Promise<Object>} { banners: Array, total: number }
    */
   static async getAdminBannerList(options = {}) {
-    const { position = null, is_active = null, limit = 20, offset = 0 } = options
+    const {
+      position = null,
+      is_active = null,
+      banner_type = null,
+      limit = 20,
+      offset = 0
+    } = options
 
     try {
       const whereClause = {}
       if (position) whereClause.position = position
       if (is_active !== null) whereClause.is_active = is_active === 'true' || is_active === true
+      if (banner_type) whereClause.banner_type = banner_type
 
       const { rows: banners, count: total } = await PopupBanner.findAndCountAll({
         where: whereClause,
@@ -257,11 +336,13 @@ class PopupBannerService {
         return PopupBannerService._transformBannerImageUrl(plain)
       })
 
-      // 附加中文显示名称（position/link_type/display_mode → _display/_color）
+      // 附加中文显示名称（含 Phase 1 新增的 banner_type / frequency_rule）
       await attachDisplayNames(bannersWithStatus, [
         { field: 'position', dictType: DICT_TYPES.BANNER_POSITION },
         { field: 'link_type', dictType: DICT_TYPES.BANNER_LINK_TYPE },
-        { field: 'display_mode', dictType: DICT_TYPES.BANNER_DISPLAY_MODE }
+        { field: 'display_mode', dictType: DICT_TYPES.BANNER_DISPLAY_MODE },
+        { field: 'banner_type', dictType: DICT_TYPES.BANNER_TYPE },
+        { field: 'frequency_rule', dictType: DICT_TYPES.BANNER_FREQUENCY }
       ])
 
       logger.info('获取管理后台弹窗列表成功', {
@@ -306,11 +387,12 @@ class PopupBannerService {
       // 🔴 转换 image_url：对象 key → 完整 CDN URL
       const result = PopupBannerService._transformBannerImageUrl(plain)
 
-      // 附加中文显示名称（position/link_type/display_mode → _display/_color）
       await attachDisplayNames(result, [
         { field: 'position', dictType: DICT_TYPES.BANNER_POSITION },
         { field: 'link_type', dictType: DICT_TYPES.BANNER_LINK_TYPE },
-        { field: 'display_mode', dictType: DICT_TYPES.BANNER_DISPLAY_MODE }
+        { field: 'display_mode', dictType: DICT_TYPES.BANNER_DISPLAY_MODE },
+        { field: 'banner_type', dictType: DICT_TYPES.BANNER_TYPE },
+        { field: 'frequency_rule', dictType: DICT_TYPES.BANNER_FREQUENCY }
       ])
 
       return result
@@ -353,8 +435,22 @@ class PopupBannerService {
         is_active = false,
         display_order = 0,
         start_time = null,
-        end_time = null
+        end_time = null,
+        banner_type = 'promo',
+        frequency_rule = 'once_per_day',
+        frequency_value = 1,
+        force_show = false,
+        priority = null
       } = data
+
+      /**
+       * Priority 自动分配（拍板决策6）：
+       * 如果未指定 priority，根据 banner_type 自动分配默认值
+       */
+      let resolvedPriority = priority
+      if (resolvedPriority === null || resolvedPriority === undefined) {
+        resolvedPriority = PopupBannerService._getDefaultPriority(banner_type)
+      }
 
       const banner = await PopupBanner.create({
         title,
@@ -369,6 +465,11 @@ class PopupBannerService {
         display_order: parseInt(display_order) || 0,
         start_time: start_time ? new Date(start_time) : null,
         end_time: end_time ? new Date(end_time) : null,
+        banner_type,
+        frequency_rule,
+        frequency_value: parseInt(frequency_value) || 1,
+        force_show: force_show === 'true' || force_show === true,
+        priority: parseInt(resolvedPriority) || 0,
         created_by: creatorId,
         created_at: BeijingTimeHelper.createBeijingTime(),
         updated_at: BeijingTimeHelper.createBeijingTime()
@@ -493,7 +594,6 @@ class PopupBannerService {
       const banner = await PopupBanner.findByPk(bannerId)
       if (!banner) return null
 
-      // 允许更新的字段（含 display_mode / image_width / image_height）
       const allowedFields = [
         'title',
         'image_url',
@@ -506,22 +606,28 @@ class PopupBannerService {
         'is_active',
         'display_order',
         'start_time',
-        'end_time'
+        'end_time',
+        'banner_type',
+        'frequency_rule',
+        'frequency_value',
+        'force_show',
+        'priority'
       ]
 
       const updateData = {}
       allowedFields.forEach(field => {
         if (data[field] !== undefined) {
-          // 时间字段特殊处理
           if (field === 'start_time' || field === 'end_time') {
             updateData[field] = data[field] ? new Date(data[field]) : null
           } else if (
             field === 'display_order' ||
             field === 'image_width' ||
-            field === 'image_height'
+            field === 'image_height' ||
+            field === 'frequency_value' ||
+            field === 'priority'
           ) {
             updateData[field] = data[field] !== null ? parseInt(data[field]) || 0 : null
-          } else if (field === 'is_active') {
+          } else if (field === 'is_active' || field === 'force_show') {
             updateData[field] = data[field] === 'true' || data[field] === true
           } else {
             updateData[field] = data[field]
@@ -643,17 +749,24 @@ class PopupBannerService {
    */
   static async getStatistics() {
     try {
-      const [totalCount, activeCount, inactiveCount, homeCount, profileCount] = await Promise.all([
-        // 总数
+      const [
+        totalCount,
+        activeCount,
+        inactiveCount,
+        homeCount,
+        profileCount,
+        noticeCount,
+        eventCount,
+        promoCount
+      ] = await Promise.all([
         PopupBanner.count(),
-        // 已启用
         PopupBanner.count({ where: { is_active: true } }),
-        // 已禁用
         PopupBanner.count({ where: { is_active: false } }),
-        // 首页弹窗
         PopupBanner.count({ where: { position: 'home' } }),
-        // 个人中心弹窗
-        PopupBanner.count({ where: { position: 'profile' } })
+        PopupBanner.count({ where: { position: 'profile' } }),
+        PopupBanner.count({ where: { banner_type: 'notice' } }),
+        PopupBanner.count({ where: { banner_type: 'event' } }),
+        PopupBanner.count({ where: { banner_type: 'promo' } })
       ])
 
       return {
@@ -663,6 +776,11 @@ class PopupBannerService {
         by_position: {
           home: homeCount,
           profile: profileCount
+        },
+        by_type: {
+          notice: noticeCount,
+          event: eventCount,
+          promo: promoCount
         }
       }
     } catch (error) {
@@ -702,6 +820,24 @@ class PopupBannerService {
       logger.error('批量更新显示顺序失败', { error: error.message })
       throw error
     }
+  }
+
+  /**
+   * 根据 banner_type 返回默认 priority 值（拍板决策6）
+   *
+   * | banner_type | 默认 priority | 允许范围 |
+   * |-------------|---------------|----------|
+   * | notice      | 950           | 900~999  |
+   * | event       | 700           | 500~899  |
+   * | promo       | 300           | 100~499  |
+   *
+   * @private
+   * @param {string} bannerType - 弹窗类型
+   * @returns {number} 默认优先级
+   */
+  static _getDefaultPriority(bannerType) {
+    const defaults = { notice: 950, event: 700, promo: 300 }
+    return defaults[bannerType] || 300
   }
 
   /**

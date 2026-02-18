@@ -212,19 +212,23 @@ export function useStrategyMethods() {
     },
 
     /**
-     * 获取策略分组图标
-     * @param {string} groupName - 分组名称
-     * @returns {string} Bootstrap图标类名
+     * 获取策略分组 Emoji 图标
+     * @param {string} groupName - 分组名称（后端的 config_group）
+     * @returns {string} Emoji 图标
      */
     getStrategyGroupIcon(groupName) {
       const icons = {
-        probability: 'bi-percent',
-        frequency: 'bi-clock',
-        budget: 'bi-cash',
-        user: 'bi-person',
-        other: 'bi-gear'
+        probability: '🎲',
+        frequency: '⏱️',
+        budget: '💰',
+        budget_tier: '📊',
+        pressure_tier: '🔥',
+        win_rate: '🎯',
+        empty_weight: '⚖️',
+        user: '👤',
+        other: '⚙️'
       }
-      return icons[groupName] || 'bi-gear'
+      return icons[groupName] || '⚙️'
     },
 
     /**
@@ -246,6 +250,120 @@ export function useStrategyMethods() {
         other: '其他策略'
       }
       return names[groupName] || groupName
+    },
+
+    /**
+     * 获取策略分组描述 - 帮助运营人员理解每个分组的用途
+     * @param {string} groupName - 分组名称（后端的 config_group）
+     * @returns {string} 分组用途描述
+     */
+    getStrategyGroupDescription(groupName) {
+      const descriptions = {
+        probability: '控制各档位奖品的基础概率分配',
+        frequency: '限制抽奖频率，防止异常高频操作',
+        budget: '控制奖品发放预算上限和速率',
+        budget_tier: '根据预算消耗情况动态调整策略',
+        pressure_tier: '根据系统压力自动调控出奖力度',
+        win_rate: '设置不同场景下的基础中奖概率',
+        empty_weight: '调节空奖权重，优化用户体验',
+        user: '针对单个用户的抽奖频次和额度限制',
+        other: '其他辅助性策略参数配置'
+      }
+      return descriptions[groupName] || ''
+    },
+
+    /**
+     * 获取策略分组样式 - 返回左边框颜色和背景色的 Tailwind 类
+     * @param {string} groupName - 分组名称（后端的 config_group）
+     * @returns {Object} { border: 边框色类, bg: 标题背景色类, badge: 徽章样式类 }
+     */
+    getStrategyGroupStyle(groupName) {
+      const styles = {
+        probability: { border: 'border-l-4 border-l-purple-500', bg: 'bg-purple-50', badge: 'bg-purple-100 text-purple-700' },
+        frequency: { border: 'border-l-4 border-l-amber-500', bg: 'bg-amber-50', badge: 'bg-amber-100 text-amber-700' },
+        budget: { border: 'border-l-4 border-l-emerald-500', bg: 'bg-emerald-50', badge: 'bg-emerald-100 text-emerald-700' },
+        budget_tier: { border: 'border-l-4 border-l-blue-500', bg: 'bg-blue-50', badge: 'bg-blue-100 text-blue-700' },
+        pressure_tier: { border: 'border-l-4 border-l-red-500', bg: 'bg-red-50', badge: 'bg-red-100 text-red-700' },
+        win_rate: { border: 'border-l-4 border-l-indigo-500', bg: 'bg-indigo-50', badge: 'bg-indigo-100 text-indigo-700' },
+        empty_weight: { border: 'border-l-4 border-l-teal-500', bg: 'bg-teal-50', badge: 'bg-teal-100 text-teal-700' },
+        user: { border: 'border-l-4 border-l-cyan-500', bg: 'bg-cyan-50', badge: 'bg-cyan-100 text-cyan-700' },
+        other: { border: 'border-l-4 border-l-gray-400', bg: 'bg-gray-50', badge: 'bg-gray-100 text-gray-600' }
+      }
+      return styles[groupName] || styles.other
+    },
+
+    /**
+     * 获取策略配置项的中文标签
+     * 将后端 config_key 转换为运营人员可理解的中文名称
+     * @param {string} configKey - 后端 config_key 字段
+     * @returns {string} 中文标签
+     */
+    getConfigKeyLabel(configKey) {
+      const labels = {
+        anti_empty: '防空奖保护',
+        anti_high: '防连高保护',
+        amt_high: '高档位金额阈值',
+        amt_low: '低档位金额阈值',
+        enabled: '启用状态',
+        threshold_high: '高档位触发阈值',
+        threshold_low: '低档位触发阈值',
+        threshold_mid: '中档位触发阈值',
+        pity: '保底机制',
+        luck_debt: '运气债务',
+        hard_guarantee_threshold: '硬保底阈值',
+        expected_empty_rate: '预期空奖率',
+        min_draw_count: '最少抽奖次数',
+        recent_draw_window: '近期抽奖窗口',
+        empty_streak_threshold: '连空触发阈值',
+        high_streak_threshold: '连高触发阈值'
+      }
+      return labels[configKey] || configKey
+    },
+
+    /**
+     * 获取策略配置项的描述说明
+     * @param {string} configKey - 后端 config_key 字段
+     * @returns {string} 描述说明
+     */
+    getConfigKeyDescription(configKey) {
+      const descriptions = {
+        anti_empty: '防止用户连续多次抽奖都不中奖，达到阈值后自动提升中奖概率',
+        anti_high: '防止用户连续获得高价值奖品，达到阈值后降低高档位概率',
+        amt_high: '金额达到此值及以上视为高档位奖品',
+        amt_low: '金额低于此值视为低档位奖品',
+        enabled: '是否启用此策略项',
+        threshold_high: '触发高档位调控的连续次数阈值',
+        threshold_low: '触发低档位调控的连续次数阈值',
+        threshold_mid: '触发中档位调控的连续次数阈值',
+        pity: '当用户连续未获得好奖品时，自动触发保底奖励',
+        luck_debt: '追踪用户的运气偏差度，自动回归均值',
+        hard_guarantee_threshold: '绝对保底次数，超过此次数必定中高档奖品',
+        expected_empty_rate: '系统预期的正常空奖概率比例',
+        min_draw_count: '策略生效所需的最少抽奖次数',
+        recent_draw_window: '参与策略计算的近期抽奖记录数量',
+        empty_streak_threshold: '连续空奖达到此次数后触发保护机制',
+        high_streak_threshold: '连续获得高奖品达到此次数后触发限制'
+      }
+      return descriptions[configKey] || ''
+    },
+
+    /**
+     * 格式化策略配置值的显示
+     * @param {*} value - 配置值（parsed_value）
+     * @param {string} configKey - 配置项键名
+     * @returns {string} 格式化后的显示文本
+     */
+    formatStrategyValue(value, configKey) {
+      if (value === null || value === undefined) return '-'
+      if (typeof value === 'boolean') return value ? '是' : '否'
+      if (typeof value === 'object') return JSON.stringify(value)
+      if (configKey && (configKey.includes('rate') || configKey.includes('weight'))) {
+        return (parseFloat(value) * 100).toFixed(1) + '%'
+      }
+      if (configKey && configKey.includes('amt')) {
+        return '¥' + parseFloat(value).toFixed(2)
+      }
+      return String(value)
     },
 
     /**

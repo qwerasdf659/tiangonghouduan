@@ -263,6 +263,17 @@ document.addEventListener('alpine:init', () => {
     const table = dataTable({
       columns: [
         { key: 'exchange_item_id', label: '商品ID', sortable: true },
+        {
+          key: 'primary_image',
+          label: '图片',
+          render: (val) => {
+            const url = val?.thumbnail_url || val?.url
+            if (url) {
+              return `<img src="${url}" alt="商品图片" class="w-10 h-10 object-cover rounded" />`
+            }
+            return '<span class="text-gray-400 text-xs">暂无图片</span>'
+          }
+        },
         { key: 'item_name', label: '商品名称', sortable: true },
         {
           key: 'cost_amount',

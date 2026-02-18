@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '广告系统管理', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
+        <span class="text-lg font-semibold">📣 广告系统管理</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="adManagement()" x-init="init()">
+    
+    <!-- 子页面导航 -->
+    <div class="themed-card rounded-lg shadow mb-6">
+      <div class="flex border-b overflow-x-auto">
+        <template x-for="page in subPages" :key="page.id">
+          <button 
+            @click="switchPage(page.id)"
+            :class="current_page === page.id ? 'border-b-2 themed-border-primary themed-text-primary themed-bg-primary-light' : 'themed-text-muted themed-hover-bg'"
+            class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
+            x-text="page.icon + ' ' + page.name"
+          ></button>
+        </template>
+      </div>
+    </div>
+
+    <!-- ===== 广告概览仪表板 ===== -->
+    <div x-show="current_page === 'dashboard'" x-cloak>
+      <div class="themed-card rounded-lg shadow p-6">
+        <h5 class="font-semibold mb-4">📊 广告概览</h5>
+        <div x-show="dashboardLoading" class="p-8 text-center themed-text-muted">加载中...</div>
+        <div x-show="!dashboardLoading">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="p-4 themed-bg-base rounded-lg text-center">
+              <p class="text-2xl font-bold themed-text-primary" x-text="dashboard.total_campaigns || 0"></p>
+              <p class="text-sm themed-text-muted">总广告计划</p>
+            </div>
+            <div class="p-4 themed-bg-base rounded-lg text-center">
+              <p class="text-2xl font-bold text-green-500" x-text="dashboard.active_campaigns || 0"></p>
+              <p class="text-sm themed-text-muted">投放中</p>
+            </div>
+            <div class="p-4 themed-bg-base rounded-lg text-center">
+              <p class="text-2xl font-bold text-orange-500" x-text="dashboard.pending_review || 0"></p>
+              <p class="text-sm themed-text-muted">待审核</p>
+            </div>
+            <div class="p-4 themed-bg-base rounded-lg text-center">
+              <p class="text-2xl font-bold text-blue-500" x-text="(dashboard.total_spend_diamond || 0) + ' 💎'"></p>
+              <p class="text-sm themed-text-muted">总消耗钻石</p>
+            </div>
+          </div>
+          <div x-show="dashboard.popup_queue_max_count" class="mb-4 p-3 themed-bg-base rounded-lg border border-indigo-200">
+            <div class="flex items-center justify-between">
+              <div>
+                <h6 class="font-medium text-sm">弹窗队列最大数量</h6>
+                <p class="text-xs themed-text-muted">每次用户打开页面最多弹出的弹窗数量（system_configs 配置）</p>
+              </div>
+              <span class="text-2xl font-bold themed-text-primary" x-text="dashboard.popup_queue_max_count || 5"></span>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="p-4 themed-bg-base rounded-lg">
+              <h6 class="font-medium mb-2">按状态分布</h6>
+              <div class="space-y-2">
+                <template x-for="(count, status) in (dashboard.by_status || {})" :key="status">
+                  <div class="flex justify-between text-sm">
+                    <span x-text="status"></span>
+                    <span class="font-medium" x-text="count"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+            <div class="p-4 themed-bg-base rounded-lg">
+              <h6 class="font-medium mb-2">按广告位分布</h6>
+              <div class="space-y-2">
+                <template x-for="(count, slot) in (dashboard.by_slot || {})" :key="slot">
+                  <div class="flex justify-between text-sm">
+                    <span x-text="slot"></span>
+                    <span class="font-medium" x-text="count"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 广告活动管理 ===== -->
+    <div x-show="current_page === 'campaigns'" x-cloak>
+      <div class="themed-card rounded-lg shadow">
+        <div class="p-4 border-b flex justify-between items-center flex-wrap gap-2">
+          <h5 class="font-semibold">📋 广告活动列表</h5>
+          <div class="flex items-center gap-2">
+            <select x-model="campaignFilters.status" @change="loadCampaigns()" class="px-2 py-1 text-sm border rounded themed-bg-base">
+              <option value="">全部状态</option>
+              <option value="draft">草稿</option>
+              <option value="pending_review">待审核</option>
+              <option value="approved">已批准</option>
+              <option value="active">投放中</option>
+              <option value="paused">已暂停</option>
+              <option value="completed">已完成</option>
+              <option value="rejected">已拒绝</option>
+              <option value="cancelled">已取消</option>
+            </select>
+            <select x-model="campaignFilters.billing_mode" @change="loadCampaigns()" class="px-2 py-1 text-sm border rounded themed-bg-base">
+              <option value="">全部计费</option>
+              <option value="fixed_daily">固定包天</option>
+              <option value="bidding">竞价排名</option>
+            </select>
+            <select x-model="campaignFilters.ad_slot_id" @change="loadCampaigns()" class="px-2 py-1 text-sm border rounded themed-bg-base">
+              <option value="">全部广告位</option>
+              <template x-for="slot in allSlotsList" :key="slot.ad_slot_id">
+                <option :value="slot.ad_slot_id" x-text="slot.slot_name"></option>
+              </template>
+            </select>
+          </div>
+        </div>
+
+        <div x-show="campaignsLoading" class="p-8 text-center themed-text-muted">加载中...</div>
+        <div x-show="campaigns.length === 0 && !campaignsLoading" class="p-8 text-center themed-text-muted">
+          <div class="text-4xl mb-4">📋</div>
+          <p>暂无广告活动数据</p>
+        </div>
+
+        <div x-show="campaigns.length > 0" class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="themed-bg-base">
+              <tr>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">ID</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">计划名称</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">广告主</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">计费模式</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">消耗/预算</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">投放日期</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <template x-for="c in campaigns" :key="c.ad_campaign_id">
+                <tr class="themed-hover-bg">
+                  <td class="px-4 py-3 text-sm" x-text="c.ad_campaign_id"></td>
+                  <td class="px-4 py-3 text-sm font-medium" x-text="c.campaign_name"></td>
+                  <td class="px-4 py-3 text-sm" x-text="'用户#' + c.advertiser_user_id"></td>
+                  <td class="px-4 py-3 text-sm">
+                    <span class="text-xs px-2 py-0.5 rounded text-white"
+                          :class="c.billing_mode === 'fixed_daily' ? 'bg-blue-500' : 'bg-purple-500'"
+                          x-text="c.billing_mode_display || c.billing_mode"></span>
+                  </td>
+                  <td class="px-4 py-3 text-sm">
+                    <span class="text-xs px-2 py-0.5 rounded text-white"
+                          :class="c.status_color || 'bg-gray-500'"
+                          x-text="c.status_display || c.status"></span>
+                  </td>
+                  <td class="px-4 py-3 text-sm">
+                    <span x-text="(c.budget_spent_diamond || 0) + ' / ' + (c.budget_total_diamond || c.fixed_total_diamond || '-') + ' 💎'"></span>
+                  </td>
+                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="(c.start_date || '-') + ' ~ ' + (c.end_date || '-')"></td>
+                  <td class="px-4 py-3">
+                    <div class="flex flex-wrap gap-1">
+                      <button @click="viewCampaign(c)" class="text-blue-500 hover:text-blue-700 text-sm">详情</button>
+                      <button @click="viewCampaignReport(c.ad_campaign_id)" class="text-indigo-500 hover:text-indigo-700 text-sm">报表</button>
+                      <button x-show="c.status === 'pending_review'" @click="reviewCampaign(c, 'approved')" class="text-green-500 hover:text-green-700 text-sm">通过</button>
+                      <button x-show="c.status === 'pending_review'" @click="reviewCampaign(c, 'rejected')" class="text-red-500 hover:text-red-700 text-sm">拒绝</button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 分页 -->
+        <template x-if="campaignPagination.total_pages > 1">
+          <div class="p-4 border-t flex justify-between items-center">
+            <span class="text-sm themed-text-muted" x-text="'共 ' + campaignPagination.total + ' 条'"></span>
+            <div class="flex space-x-1">
+              <button @click="campaignPage > 1 && (campaignPage--, loadCampaigns())" :disabled="campaignPage <= 1" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+              <span class="px-3 py-1 text-sm" x-text="campaignPage + ' / ' + campaignPagination.total_pages"></span>
+              <button @click="campaignPage < campaignPagination.total_pages && (campaignPage++, loadCampaigns())" :disabled="campaignPage >= campaignPagination.total_pages" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ===== 广告位管理 ===== -->
+    <div x-show="current_page === 'slots'" x-cloak>
+      <div class="themed-card rounded-lg shadow">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold">📍 广告位管理</h5>
+          <button @click="openCreateSlotModal()" class="px-4 py-2 themed-btn-primary rounded">➕ 新增广告位</button>
+        </div>
+
+        <div x-show="slotsLoading" class="p-8 text-center themed-text-muted">加载中...</div>
+        <div x-show="adSlots.length === 0 && !slotsLoading" class="p-8 text-center themed-text-muted">
+          <div class="text-4xl mb-4">📍</div>
+          <p>暂无广告位数据</p>
+        </div>
+
+        <div x-show="adSlots.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+          <template x-for="slot in adSlots" :key="slot.ad_slot_id">
+            <div class="border rounded-lg p-4">
+              <div class="flex justify-between items-start mb-2">
+                <h6 class="font-medium" x-text="slot.slot_name"></h6>
+                <span class="text-xs px-2 py-0.5 rounded text-white"
+                      :class="slot.is_active ? 'bg-green-500' : 'bg-gray-400'"
+                      x-text="slot.is_active ? '启用' : '禁用'"></span>
+              </div>
+              <div class="space-y-1 text-sm themed-text-muted">
+                <p x-text="'标识: ' + slot.slot_key"></p>
+                <p x-text="'类型: ' + (slot.slot_type_display || slot.slot_type)"></p>
+                <p x-text="'位置: ' + slot.position"></p>
+                <p x-text="'日价: ' + slot.daily_price_diamond + ' 💎'"></p>
+                <p x-text="'最低出价: ' + slot.min_bid_diamond + ' 💎'"></p>
+                <p x-text="'最大展示: ' + slot.max_display_count + ' 条'"></p>
+              </div>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button @click="editSlot(slot)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                <button @click="viewSlotReport(slot.ad_slot_id)" class="text-indigo-500 hover:text-indigo-700 text-sm">报表</button>
+                <button @click="toggleSlotStatus(slot)" class="text-sm"
+                        :class="slot.is_active ? 'text-yellow-500 hover:text-yellow-700' : 'text-green-500 hover:text-green-700'"
+                        x-text="slot.is_active ? '禁用' : '启用'"></button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 广告报表 ===== -->
+    <div x-show="current_page === 'reports'" x-cloak>
+      <div class="themed-card rounded-lg shadow p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h5 class="font-semibold">📈 广告报表</h5>
+          <div class="flex items-center gap-2">
+            <input type="date" x-model="reportFilters.start_date" class="px-2 py-1 text-sm border rounded themed-bg-base">
+            <span class="themed-text-muted">~</span>
+            <input type="date" x-model="reportFilters.end_date" class="px-2 py-1 text-sm border rounded themed-bg-base">
+            <button @click="loadReportOverview()" class="px-3 py-1 text-sm themed-btn-primary rounded">查询</button>
+          </div>
+        </div>
+        <div x-show="reportLoading" class="p-8 text-center themed-text-muted">加载中...</div>
+        <div x-show="!reportLoading">
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div class="p-3 themed-bg-base rounded-lg text-center">
+              <p class="text-xl font-bold" x-text="reportOverview.total_impressions || 0"></p>
+              <p class="text-xs themed-text-muted">总曝光</p>
+            </div>
+            <div class="p-3 themed-bg-base rounded-lg text-center">
+              <p class="text-xl font-bold" x-text="reportOverview.valid_impressions || 0"></p>
+              <p class="text-xs themed-text-muted">有效曝光</p>
+            </div>
+            <div class="p-3 themed-bg-base rounded-lg text-center">
+              <p class="text-xl font-bold" x-text="reportOverview.total_clicks || 0"></p>
+              <p class="text-xs themed-text-muted">总点击</p>
+            </div>
+            <div class="p-3 themed-bg-base rounded-lg text-center">
+              <p class="text-xl font-bold" x-text="reportOverview.total_conversions || 0"></p>
+              <p class="text-xs themed-text-muted">总转化</p>
+            </div>
+            <div class="p-3 themed-bg-base rounded-lg text-center">
+              <p class="text-xl font-bold" x-text="(reportOverview.total_spend_diamond || 0) + ' 💎'"></p>
+              <p class="text-xs themed-text-muted">总消耗</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 活动详情 Modal ===== -->
+    <div x-ref="campaignDetailModal" 
+         x-show="isModalOpen('campaignDetailModal')" 
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('campaignDetailModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-3xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
+          <h5 class="font-semibold">📋 广告活动详情</h5>
+          <button @click="hideModal('campaignDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+        </div>
+        <div class="p-6" x-show="campaignDetail">
+          <div class="grid grid-cols-2 gap-4 text-sm">
+            <div><span class="themed-text-muted">计划名称:</span> <span class="font-medium" x-text="campaignDetail?.campaign_name"></span></div>
+            <div><span class="themed-text-muted">状态:</span> <span x-text="campaignDetail?.status_display || campaignDetail?.status"></span></div>
+            <div><span class="themed-text-muted">广告主:</span> <span x-text="'用户#' + campaignDetail?.advertiser_user_id"></span></div>
+            <div><span class="themed-text-muted">计费模式:</span> <span x-text="campaignDetail?.billing_mode_display || campaignDetail?.billing_mode"></span></div>
+            <div><span class="themed-text-muted">预算:</span> <span x-text="(campaignDetail?.budget_total_diamond || campaignDetail?.fixed_total_diamond || 0) + ' 💎'"></span></div>
+            <div><span class="themed-text-muted">已消耗:</span> <span x-text="(campaignDetail?.budget_spent_diamond || 0) + ' 💎'"></span></div>
+            <div><span class="themed-text-muted">投放日期:</span> <span x-text="(campaignDetail?.start_date || '-') + ' ~ ' + (campaignDetail?.end_date || '-')"></span></div>
+            <div><span class="themed-text-muted">优先级:</span> <span x-text="campaignDetail?.priority || 0"></span></div>
+          </div>
+          <div x-show="campaignDetail?.review_note" class="mt-4 p-3 themed-bg-base rounded">
+            <p class="text-sm font-medium">审核备注:</p>
+            <p class="text-sm themed-text-muted" x-text="campaignDetail?.review_note"></p>
+          </div>
+          <!-- 素材列表 -->
+          <div x-show="campaignDetail?.creatives?.length > 0" class="mt-4">
+            <h6 class="font-medium mb-2">广告素材</h6>
+            <div class="grid grid-cols-2 gap-3">
+              <template x-for="cr in (campaignDetail?.creatives || [])" :key="cr.ad_creative_id">
+                <div class="border rounded p-2">
+                  <img :src="cr.image_url" alt="" class="w-full h-32 object-contain rounded mb-1" x-show="cr.image_url">
+                  <p class="text-xs font-medium" x-text="cr.title"></p>
+                  <span class="text-xs px-1 py-0.5 rounded"
+                        :class="cr.review_status === 'approved' ? 'bg-green-100 text-green-700' : cr.review_status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'"
+                        x-text="cr.review_status"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
+          <button type="button" @click="hideModal('campaignDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 广告位表单 Modal ===== -->
+    <div x-ref="slotModal" 
+         x-show="isModalOpen('slotModal')" 
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('slotModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 z-10 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
+          <h5 class="font-semibold">📍 <span x-text="slotEditMode ? '编辑广告位' : '新增广告位'"></span></h5>
+          <button @click="hideModal('slotModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+        </div>
+        <form @submit.prevent="saveSlot()">
+          <div class="p-6 space-y-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">广告位标识 <span class="text-red-500">*</span></label>
+              <input type="text" x-model="slotForm.slot_key" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500" placeholder="home_popup" :disabled="slotEditMode">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">广告位名称 <span class="text-red-500">*</span></label>
+              <input type="text" x-model="slotForm.slot_name" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500" placeholder="首页弹窗位">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">广告位类型</label>
+                <select x-model="slotForm.slot_type" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+                  <option value="popup">弹窗</option>
+                  <option value="carousel">轮播图</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">页面位置</label>
+                <select x-model="slotForm.position" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+                  <option value="home">首页</option>
+                  <option value="lottery">抽奖页</option>
+                  <option value="profile">个人中心</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">日价(💎)</label>
+                <input type="number" x-model.number="slotForm.daily_price_diamond" min="1" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">最低出价(💎)</label>
+                <input type="number" x-model.number="slotForm.min_bid_diamond" min="1" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">最大展示数</label>
+                <input type="number" x-model.number="slotForm.max_display_count" min="1" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">描述</label>
+              <textarea x-model="slotForm.description" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500" rows="2"></textarea>
+            </div>
+          </div>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2 sticky bottom-0">
+            <button type="button" @click="hideModal('slotModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+            <button type="submit" class="px-4 py-2 themed-btn-primary rounded" :disabled="saving">
+              <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+              <span x-text="slotEditMode ? '保存修改' : '新增广告位'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 审核 Modal -->
+    <div x-ref="reviewModal" 
+         x-show="isModalOpen('reviewModal')" 
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('reviewModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-sm mx-4 z-10">
+        <div class="p-4 border-b">
+          <h5 class="font-semibold" x-text="reviewAction === 'approved' ? '✅ 审核通过' : '❌ 审核拒绝'"></h5>
+        </div>
+        <div class="p-6">
+          <div x-show="reviewAction === 'rejected'" class="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+            <span class="font-medium">提示：</span>审核拒绝后，广告主冻结的钻石将自动退回。
+          </div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">审核备注</label>
+          <textarea x-model="reviewNote" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500" rows="3" placeholder="请输入审核意见..."></textarea>
+        </div>
+        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
+          <button type="button" @click="hideModal('reviewModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded">取消</button>
+          <button type="button" @click="submitReview()" class="px-4 py-2 rounded text-white" 
+                  :class="reviewAction === 'approved' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'"
+                  :disabled="saving">
+            <span x-text="reviewAction === 'approved' ? '确认通过' : '确认拒绝'"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 活动/广告位详细报表 Modal ===== -->
+    <div x-ref="reportDetailModal"
+         x-show="isModalOpen('reportDetailModal')"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('reportDetailModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-3xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
+          <h5 class="font-semibold" x-text="reportDetailType === 'campaign' ? '📊 活动详细报表 #' + reportDetailId : '📊 广告位详细报表 #' + reportDetailId"></h5>
+          <button @click="hideModal('reportDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+        </div>
+        <div class="p-6">
+          <!-- 活动报表 -->
+          <template x-if="reportDetailType === 'campaign'">
+            <div>
+              <div x-show="campaignReportLoading" class="p-8 text-center themed-text-muted">加载中...</div>
+              <div x-show="!campaignReportLoading && campaignReport">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div class="p-3 themed-bg-base rounded-lg text-center">
+                    <p class="text-xl font-bold" x-text="campaignReport?.impressions_total || 0"></p>
+                    <p class="text-xs themed-text-muted">总曝光</p>
+                  </div>
+                  <div class="p-3 themed-bg-base rounded-lg text-center">
+                    <p class="text-xl font-bold text-green-500" x-text="campaignReport?.impressions_valid || 0"></p>
+                    <p class="text-xs themed-text-muted">有效曝光</p>
+                  </div>
+                  <div class="p-3 themed-bg-base rounded-lg text-center">
+                    <p class="text-xl font-bold text-blue-500" x-text="campaignReport?.clicks_total || 0"></p>
+                    <p class="text-xs themed-text-muted">总点击</p>
+                  </div>
+                  <div class="p-3 themed-bg-base rounded-lg text-center">
+                    <p class="text-xl font-bold text-orange-500" x-text="campaignReport?.conversions || 0"></p>
+                    <p class="text-xs themed-text-muted">转化数</p>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                  <div class="p-3 themed-bg-base rounded-lg text-center">
+                    <p class="text-xl font-bold text-purple-500" x-text="(campaignReport?.spend_diamond || 0) + ' 💎'"></p>
+                    <p class="text-xs themed-text-muted">消耗钻石</p>
+                  </div>
+                  <div class="p-3 themed-bg-base rounded-lg text-center">
+                    <p class="text-xl font-bold" x-text="campaignReport?.clicks_total && campaignReport?.impressions_valid ? ((campaignReport.clicks_total / campaignReport.impressions_valid) * 100).toFixed(2) + '%' : '0%'"></p>
+                    <p class="text-xs themed-text-muted">点击率</p>
+                  </div>
+                </div>
+                <div x-show="campaignReport?.daily_snapshots?.length > 0">
+                  <h6 class="font-medium mb-2 text-sm">每日数据</h6>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                      <thead class="themed-bg-base">
+                        <tr>
+                          <th class="px-3 py-2 text-left">日期</th>
+                          <th class="px-3 py-2 text-right">曝光</th>
+                          <th class="px-3 py-2 text-right">有效曝光</th>
+                          <th class="px-3 py-2 text-right">点击</th>
+                          <th class="px-3 py-2 text-right">转化</th>
+                          <th class="px-3 py-2 text-right">消耗💎</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="snap in (campaignReport?.daily_snapshots || [])" :key="snap.snapshot_date">
+                          <tr class="border-t">
+                            <td class="px-3 py-2" x-text="snap.snapshot_date"></td>
+                            <td class="px-3 py-2 text-right" x-text="snap.impressions_total || 0"></td>
+                            <td class="px-3 py-2 text-right" x-text="snap.impressions_valid || 0"></td>
+                            <td class="px-3 py-2 text-right" x-text="snap.clicks_total || 0"></td>
+                            <td class="px-3 py-2 text-right" x-text="snap.conversions || 0"></td>
+                            <td class="px-3 py-2 text-right" x-text="snap.spend_diamond || 0"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              <div x-show="!campaignReportLoading && !campaignReport" class="p-8 text-center themed-text-muted">暂无报表数据</div>
+            </div>
+          </template>
+          <!-- 广告位报表 -->
+          <template x-if="reportDetailType === 'slot'">
+            <div>
+              <div x-show="slotReportLoading" class="p-8 text-center themed-text-muted">加载中...</div>
+              <div x-show="!slotReportLoading && slotReport">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div class="p-3 themed-bg-base rounded-lg text-center">
+                    <p class="text-xl font-bold" x-text="slotReport?.impressions_total || 0"></p>
+                    <p class="text-xs themed-text-muted">总曝光</p>
+                  </div>
+                  <div class="p-3 themed-bg-base rounded-lg text-center">
+                    <p class="text-xl font-bold text-green-500" x-text="slotReport?.impressions_valid || 0"></p>
+                    <p class="text-xs themed-text-muted">有效曝光</p>
+                  </div>
+                  <div class="p-3 themed-bg-base rounded-lg text-center">
+                    <p class="text-xl font-bold text-blue-500" x-text="slotReport?.clicks_total || 0"></p>
+                    <p class="text-xs themed-text-muted">总点击</p>
+                  </div>
+                  <div class="p-3 themed-bg-base rounded-lg text-center">
+                    <p class="text-xl font-bold text-orange-500" x-text="(slotReport?.total_spend_diamond || 0) + ' 💎'"></p>
+                    <p class="text-xs themed-text-muted">总收入</p>
+                  </div>
+                </div>
+                <div x-show="slotReport?.daily_snapshots?.length > 0">
+                  <h6 class="font-medium mb-2 text-sm">每日数据</h6>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                      <thead class="themed-bg-base">
+                        <tr>
+                          <th class="px-3 py-2 text-left">日期</th>
+                          <th class="px-3 py-2 text-right">曝光</th>
+                          <th class="px-3 py-2 text-right">点击</th>
+                          <th class="px-3 py-2 text-right">转化</th>
+                          <th class="px-3 py-2 text-right">收入💎</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="snap in (slotReport?.daily_snapshots || [])" :key="snap.snapshot_date">
+                          <tr class="border-t">
+                            <td class="px-3 py-2" x-text="snap.snapshot_date"></td>
+                            <td class="px-3 py-2 text-right" x-text="snap.impressions_total || 0"></td>
+                            <td class="px-3 py-2 text-right" x-text="snap.clicks_total || 0"></td>
+                            <td class="px-3 py-2 text-right" x-text="snap.conversions || 0"></td>
+                            <td class="px-3 py-2 text-right" x-text="snap.spend_diamond || 0"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              <div x-show="!slotReportLoading && !slotReport" class="p-8 text-center themed-text-muted">暂无报表数据</div>
+            </div>
+          </template>
+        </div>
+        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
+          <button type="button" @click="hideModal('reportDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <%- include('partials/footer') %>
+
+  <script type="module" src="./src/modules/content/pages/ad-management.js"></script>
+</body>
+</html>

@@ -55,6 +55,7 @@ const upload = multer({
  *
  * @query {string} [position] - 显示位置筛选
  * @query {string} [is_active] - 启用状态筛选（true/false）
+ * @query {string} [banner_type] - 弹窗类型筛选（notice/event/promo）
  * @query {number} [page=1] - 页码
  * @query {number} [limit=20] - 每页数量
  */
@@ -63,7 +64,13 @@ router.get(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { position = null, is_active = null, page = 1, limit = 20 } = req.query
+      const {
+        position = null,
+        is_active = null,
+        banner_type = null,
+        page = 1,
+        limit = 20
+      } = req.query
 
       const offset = (parseInt(page) - 1) * parseInt(limit)
 
@@ -74,6 +81,7 @@ router.get(
       const { banners, total } = await PopupBannerService.getAdminBannerList({
         position,
         is_active,
+        banner_type,
         limit: parseInt(limit),
         offset
       })
@@ -182,7 +190,12 @@ router.post(
         is_active = 'false',
         display_order = 0,
         start_time = null,
-        end_time = null
+        end_time = null,
+        banner_type,
+        frequency_rule,
+        frequency_value,
+        force_show,
+        priority
       } = req.body
 
       // 验证必需参数：标题
@@ -199,6 +212,23 @@ router.post(
           null,
           400
         )
+      }
+
+      // Phase 1 频率控制字段校验
+      const VALID_BANNER_TYPES = ['notice', 'event', 'promo']
+      if (banner_type && !VALID_BANNER_TYPES.includes(banner_type)) {
+        return res.apiError('弹窗类型无效（notice/event/promo）', 'INVALID_BANNER_TYPE', null, 400)
+      }
+      const VALID_FREQUENCY_RULES = [
+        'always',
+        'once',
+        'once_per_session',
+        'once_per_day',
+        'once_per_n_days',
+        'n_times_total'
+      ]
+      if (frequency_rule && !VALID_FREQUENCY_RULES.includes(frequency_rule)) {
+        return res.apiError('频率规则无效', 'INVALID_FREQUENCY_RULE', null, 400)
       }
 
       // 验证图片文件
@@ -234,7 +264,15 @@ router.post(
           is_active: is_active === 'true' || is_active === true,
           display_order: parseInt(display_order) || 0,
           start_time,
-          end_time
+          end_time,
+          banner_type: banner_type || 'promo',
+          frequency_rule: frequency_rule || 'once_per_day',
+          frequency_value: parseInt(frequency_value) || 1,
+          force_show: force_show === 'true' || force_show === true,
+          priority:
+            priority !== undefined && priority !== null && priority !== ''
+              ? parseInt(priority)
+              : null
         },
         req.user.user_id
       )
@@ -291,6 +329,37 @@ router.put(
             400
           )
         }
+      }
+
+      // Phase 1 频率控制字段校验
+      const VALID_BANNER_TYPES = ['notice', 'event', 'promo']
+      if (updateData.banner_type && !VALID_BANNER_TYPES.includes(updateData.banner_type)) {
+        return res.apiError('弹窗类型无效（notice/event/promo）', 'INVALID_BANNER_TYPE', null, 400)
+      }
+      const VALID_FREQUENCY_RULES = [
+        'always',
+        'once',
+        'once_per_session',
+        'once_per_day',
+        'once_per_n_days',
+        'n_times_total'
+      ]
+      if (updateData.frequency_rule && !VALID_FREQUENCY_RULES.includes(updateData.frequency_rule)) {
+        return res.apiError('频率规则无效', 'INVALID_FREQUENCY_RULE', null, 400)
+      }
+
+      // 处理频率控制字段的转换
+      if (updateData.frequency_value !== undefined) {
+        updateData.frequency_value = parseInt(updateData.frequency_value) || 1
+      }
+      if (updateData.force_show !== undefined) {
+        updateData.force_show = updateData.force_show === 'true' || updateData.force_show === true
+      }
+      if (updateData.priority !== undefined) {
+        updateData.priority =
+          updateData.priority !== null && updateData.priority !== ''
+            ? parseInt(updateData.priority)
+            : null
       }
 
       const PopupBannerService = req.app.locals.services.getService('popup_banner')

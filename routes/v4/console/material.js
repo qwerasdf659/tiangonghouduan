@@ -355,6 +355,7 @@ router.post('/asset-types', authenticateToken, requireRoleLevel(100), async (req
     const {
       asset_code,
       display_name,
+      icon_url,
       group_code,
       form,
       tier,
@@ -387,6 +388,7 @@ router.post('/asset-types', authenticateToken, requireRoleLevel(100), async (req
           {
             asset_code,
             display_name,
+            icon_url: icon_url || null,
             group_code,
             form,
             tier: parseInt(tier),
@@ -445,6 +447,7 @@ router.put('/asset-types/:code', authenticateToken, requireRoleLevel(100), async
     const asset_code = req.params.code
     const {
       display_name,
+      icon_url,
       group_code,
       form,
       tier,
@@ -469,6 +472,7 @@ router.put('/asset-types/:code', authenticateToken, requireRoleLevel(100), async
           asset_code,
           {
             display_name,
+            icon_url,
             group_code,
             form,
             tier,

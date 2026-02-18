@@ -94,22 +94,22 @@
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
               <div class="p-3 rounded-lg border themed-border-light text-center">
                 <p class="text-xs themed-text-muted mb-1">在售挂单数</p>
-                <p class="text-xl font-bold themed-text-primary" x-text="marketMonitor.active_listings || 0"></p>
+                <p class="text-xl font-bold themed-text-primary" x-text="marketMonitor.total_listings || 0"></p>
               </div>
               <div class="p-3 rounded-lg border themed-border-light text-center">
-                <p class="text-xs themed-text-muted mb-1">挂单成交率</p>
+                <p class="text-xs themed-text-muted mb-1">兑换成交率</p>
                 <p class="text-xl font-bold" 
-                   :class="(marketMonitor.deal_rate || 0) < 10 ? 'text-red-600' : 'text-green-600'"
-                   x-text="(marketMonitor.deal_rate || 0).toFixed(1) + '%'"></p>
+                   :class="marketMonitor.deal_rate > 0 ? 'text-green-600' : 'themed-text-muted'"
+                   x-text="marketMonitor.deal_rate.toFixed(1) + '%'"></p>
               </div>
               <div class="p-3 rounded-lg border themed-border-light text-center">
-                <p class="text-xs themed-text-muted mb-1">C2C完成率</p>
+                <p class="text-xs themed-text-muted mb-1">库存预警率</p>
                 <p class="text-xl font-bold"
-                   :class="(marketMonitor.c2c_completion_rate || 0) < 20 ? 'text-red-600' : 'text-green-600'"
-                   x-text="(marketMonitor.c2c_completion_rate || 0).toFixed(1) + '%'"></p>
+                   :class="marketMonitor.low_stock_rate > 10 ? 'text-red-600' : 'text-green-600'"
+                   x-text="marketMonitor.low_stock_rate.toFixed(1) + '%'"></p>
               </div>
               <div class="p-3 rounded-lg border themed-border-light text-center">
-                <p class="text-xs themed-text-muted mb-1">价格异常告警</p>
+                <p class="text-xs themed-text-muted mb-1">库存预警商品</p>
                 <p class="text-xl font-bold" 
                    :class="(marketMonitor.price_anomaly_count || 0) > 0 ? 'text-red-600' : 'text-green-600'"
                    x-text="marketMonitor.price_anomaly_count || 0"></p>
@@ -140,24 +140,36 @@
                 </div>
               </div>
               <div class="rounded-lg p-4 themed-bg-base">
-                <h6 class="font-medium text-sm mb-2">📊 市场挂单概览</h6>
+                <h6 class="font-medium text-sm mb-2">📊 市场概览</h6>
                 <div class="space-y-2 text-sm">
                   <div class="flex justify-between">
-                    <span class="themed-text-muted">总挂单数</span>
-                    <span class="font-mono" x-text="marketMonitor.total_listings || 0"></span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="themed-text-muted">有挂单的用户数</span>
-                    <span class="font-mono themed-text-primary" x-text="marketMonitor.active_listings || 0"></span>
+                    <span class="themed-text-muted">C2C挂单数 / 有挂单用户</span>
+                    <span class="font-mono">
+                      <span x-text="marketMonitor.total_listings || 0"></span>
+                      <span class="themed-text-muted"> / </span>
+                      <span class="themed-text-primary" x-text="marketMonitor.active_listings || 0"></span>
+                    </span>
                   </div>
                   <div class="flex justify-between">
                     <span class="themed-text-muted">达到上限用户</span>
-                    <span class="font-mono" :class="(marketMonitor.completed_deals || 0) > 0 ? 'text-red-600' : 'text-green-600'"
-                          x-text="marketMonitor.completed_deals || 0"></span>
+                    <span class="font-mono" :class="(marketMonitor.users_at_limit || 0) > 0 ? 'text-red-600' : 'text-green-600'"
+                          x-text="marketMonitor.users_at_limit || 0"></span>
                   </div>
                   <div class="flex justify-between">
                     <span class="themed-text-muted">接近上限用户</span>
-                    <span class="font-mono text-yellow-600" x-text="marketMonitor.withdrawn_listings || 0"></span>
+                    <span class="font-mono text-yellow-600" x-text="marketMonitor.users_near_limit || 0"></span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="themed-text-muted">兑换商品（上架/总计）</span>
+                    <span class="font-mono">
+                      <span class="text-green-600" x-text="marketMonitor.active_exchange_items || 0"></span>
+                      <span class="themed-text-muted"> / </span>
+                      <span x-text="marketMonitor.total_exchange_items || 0"></span>
+                    </span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="themed-text-muted">总兑换次数</span>
+                    <span class="font-mono" x-text="marketMonitor.total_exchanges || 0"></span>
                   </div>
                 </div>
               </div>

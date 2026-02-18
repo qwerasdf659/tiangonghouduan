@@ -25,6 +25,7 @@
 const express = require('express')
 const router = express.Router()
 const logger = require('../../../utils/logger').logger
+const ServiceManager = require('../../../services')
 
 /**
  * @route GET /api/v4/system/config/placement
@@ -234,6 +235,37 @@ router.get('/feedback', async (req, res) => {
     )
   } catch (error) {
     logger.error('获取反馈表单配置失败', { error: error.message, stack: error.stack })
+    return res.apiError('获取配置失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * @route GET /api/v4/system/config
+ * @desc 获取系统基础公开配置（含客服联系方式）
+ * @access Public（无需登录）
+ *
+ * @returns {Object} 基础配置
+ * @returns {string} data.system_name - 系统名称
+ * @returns {string} data.customer_phone - 客服电话
+ * @returns {string} data.customer_email - 客服邮箱
+ * @returns {string} data.customer_wechat - 客服微信号
+ *
+ * 业务场景：微信小程序联系客服页面、关于页面等需要读取运营配置的公开信息
+ * 数据来源：system_settings 表中 category='basic' 且 is_visible=1 的配置项
+ */
+router.get('/', async (req, res) => {
+  try {
+    const AdminSystemService = ServiceManager.get('admin_system')
+    const settingsData = await AdminSystemService.getSettingsByCategory('basic')
+
+    const configMap = {}
+    for (const s of settingsData) {
+      configMap[s.setting_key] = s.setting_value
+    }
+
+    return res.apiSuccess(configMap, '获取系统配置成功')
+  } catch (error) {
+    logger.error('获取系统基础配置失败', { error: error.message })
     return res.apiError('获取配置失败', 'INTERNAL_ERROR', null, 500)
   }
 })

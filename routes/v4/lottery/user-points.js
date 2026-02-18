@@ -39,17 +39,28 @@ router.get('/points', authenticateToken, pointsRateLimiter, async (req, res) => 
   try {
     const user_id = req.user.user_id
 
-    // 通过 ServiceManager 获取 UserService，验证用户和积分账户
     const UserService = req.app.locals.services.getService('user')
-    const { user: _user, points_account: points_info } = await UserService.getUserWithPoints(
-      user_id,
-      {
+    const AssetQueryService = req.app.locals.services.getService('asset_query')
+
+    // 并行查询积分账户 + 今日收支汇总，减少响应延迟
+    const [pointsResult, todaySummary] = await Promise.all([
+      UserService.getUserWithPoints(user_id, {
         checkPointsAccount: true,
         checkStatus: true
-      }
-    )
+      }),
+      AssetQueryService.getTodaySummary({ user_id, asset_code: 'POINTS' })
+    ])
 
-    return res.apiSuccess(points_info, '用户积分获取成功', 'POINTS_SUCCESS')
+    const responseData = {
+      ...pointsResult.points_account,
+      today_summary: {
+        today_earned: todaySummary.today_earned,
+        today_consumed: todaySummary.today_consumed,
+        transaction_count: todaySummary.transaction_count
+      }
+    }
+
+    return res.apiSuccess(responseData, '用户积分获取成功', 'POINTS_SUCCESS')
   } catch (error) {
     logger.error('[Points API] 获取用户积分失败', {
       user_id: req.user?.user_id,

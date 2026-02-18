@@ -568,6 +568,66 @@ class QueryService {
       retrieved_at: new Date().toISOString()
     }
   }
+
+  /**
+   * 获取用户今日资产变动汇总（基于北京时间）
+   *
+   * 从 asset_transactions 表聚合当天（北京时间 00:00:00 ~ 23:59:59）的收支数据
+   *
+   * @param {Object} params - 参数对象
+   * @param {number} params.user_id - 用户ID（必填）
+   * @param {string} [params.asset_code='POINTS'] - 资产代码（默认查询 POINTS）
+   * @returns {Promise<Object>} 今日汇总 {today_earned, today_consumed, transaction_count}
+   */
+  static async getTodaySummary(params) {
+    const { user_id, asset_code = 'POINTS' } = params
+
+    if (!user_id) {
+      throw new Error('getTodaySummary: user_id 参数必填')
+    }
+
+    const account = await Account.findOne({
+      where: { user_id, account_type: 'user' },
+      attributes: ['account_id']
+    })
+
+    if (!account) {
+      return { today_earned: 0, today_consumed: 0, transaction_count: 0 }
+    }
+
+    const { sequelize } = require('../../models')
+    const BeijingTimeHelper = require('../../utils/timeHelper')
+
+    const todayStart = BeijingTimeHelper.todayStart()
+    const todayEnd = BeijingTimeHelper.todayEnd()
+
+    const [result] = await sequelize.query(
+      `SELECT
+         COALESCE(SUM(CASE WHEN delta_amount > 0 THEN delta_amount ELSE 0 END), 0) AS today_earned,
+         COALESCE(SUM(CASE WHEN delta_amount < 0 THEN ABS(delta_amount) ELSE 0 END), 0) AS today_consumed,
+         COUNT(*) AS transaction_count
+       FROM asset_transactions
+       WHERE account_id = :account_id
+         AND asset_code = :asset_code
+         AND created_at >= :today_start
+         AND created_at < :today_end`,
+      {
+        replacements: {
+          account_id: account.account_id,
+          asset_code,
+          today_start: todayStart,
+          today_end: todayEnd
+        },
+        type: sequelize.QueryTypes.SELECT
+      }
+    )
+
+    return {
+      today_earned: Number(result?.today_earned) || 0,
+      today_consumed: Number(result?.today_consumed) || 0,
+      transaction_count: Number(result?.transaction_count) || 0
+    }
+  }
 }
 
 module.exports = QueryService

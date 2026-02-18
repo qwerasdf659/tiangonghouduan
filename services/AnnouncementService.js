@@ -187,8 +187,8 @@ class AnnouncementService {
    */
   static convertToNotificationFormat(announcements) {
     return announcements.map(ann => ({
-      notification_id: ann.announcement_id,
-      id: ann.announcement_id,
+      notification_id: ann.system_announcement_id,
+      id: ann.system_announcement_id,
       type: ann.type,
       title: ann.title,
       content: ann.content,

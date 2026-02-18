@@ -228,6 +228,7 @@ export function useDiamondAccountsMethods() {
               balance_before: tx.balance_before,
               balance_after: tx.balance_after,
               tx_type: tx.tx_type,
+              tx_type_display: tx.tx_type_display || tx.tx_type || '-',
               description: tx.description || tx.title || '-',
               created_at: tx.created_at
             }))

@@ -174,6 +174,14 @@ router.post('/', authenticateToken, async (req, res) => {
       logger.warn('WebSocket推送库存变更通知失败（非致命）', { error: wsError.message })
     }
 
+    // Phase 6: 广告归因追踪（非关键路径，错误不影响业务）
+    try {
+      const AdAttributionService = req.app.locals.services.getService('ad_attribution')
+      await AdAttributionService.checkConversion(user_id, 'exchange', String(result.order.order_no))
+    } catch (attrError) {
+      logger.warn('[Exchange] 广告归因追踪失败（非关键）', { error: attrError.message })
+    }
+
     return res.apiSuccess(responseData, result.message)
   } catch (error) {
     // 标记幂等请求失败（允许重试）

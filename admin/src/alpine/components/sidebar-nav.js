@@ -40,6 +40,8 @@ export function sidebarNav() {
     lotteryAlertCount: 0,
     // 兑换核销待处理数量
     redemptionPendingCount: 0,
+    // 广告待审核数量
+    adPendingReviewCount: 0,
 
     // ========== P0-5: 健康度指示灯 ==========
     healthStatus: 'loading', // 'healthy' | 'warning' | 'critical' | 'loading'
@@ -173,13 +175,14 @@ export function sidebarNav() {
         ]
       },
 
-      // 6️⃣ 内容运营 - 🆕新增分组（挂载已有的 content-management 和 message-center）
+      // 6️⃣ 内容运营 - 公告/弹窗/轮播/广告/消息
       {
         id: 'content-ops',
         name: '内容运营',
         icon: '📢',
         items: [
           { id: 'content-mgmt', name: '公告弹窗管理', url: '/admin/content-management.html' },
+          { id: 'ad-management', name: '广告系统', url: '/admin/ad-management.html', badgeKey: 'adPendingReviewCount' },
           { id: 'message-center', name: '消息中心', url: '/admin/message-center.html' }
         ]
       },
@@ -369,6 +372,7 @@ export function sidebarNav() {
           this.pendingAlertCount = data.data.badges?.risk_alert || 0
           this.lotteryAlertCount = data.data.badges?.lottery_alert || 0
           this.redemptionPendingCount = data.data.badges?.redemption || 0
+          this.adPendingReviewCount = data.data.badges?.ad_pending_review || 0
 
           logger.debug('[SidebarNav] 徽标数量已更新', {
             total: this.totalPendingCount,
@@ -383,6 +387,7 @@ export function sidebarNav() {
         // 降级：使用原有单独的API获取
         this.fetchPendingAlertCount()
         this.fetchLotteryAlertCount()
+        this.fetchAdPendingReviewCount()
       }
     },
 
@@ -423,6 +428,24 @@ export function sidebarNav() {
         }
       } catch (error) {
         logger.warn('获取抽奖告警数量失败:', error.message)
+      }
+    },
+
+    /**
+     * 获取广告待审核数量（降级方案）
+     */
+    async fetchAdPendingReviewCount() {
+      try {
+        if (!getToken()) return
+        const data = await request({
+          url: `${API_PREFIX}/console/ad-campaigns`,
+          params: { status: 'pending_review', limit: 1 }
+        })
+        if (data.success && data.data?.pagination) {
+          this.adPendingReviewCount = data.data.pagination.total || 0
+        }
+      } catch (error) {
+        logger.warn('获取广告待审核数量失败:', error.message)
       }
     },
 

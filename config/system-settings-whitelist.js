@@ -75,6 +75,17 @@ const SYSTEM_SETTINGS_WHITELIST = {
     businessImpact: 'LOW'
   },
 
+  'basic/customer_wechat': {
+    type: 'string',
+    minLength: 1,
+    maxLength: 50,
+    default: '',
+    readonly: false,
+    description: '客服微信号（显示在小程序联系页面）',
+    changeRequiresRestart: false,
+    businessImpact: 'LOW'
+  },
+
   // ===== 积分设置（运营策略）=====
   'points/points_expire_days': {
     type: 'number',

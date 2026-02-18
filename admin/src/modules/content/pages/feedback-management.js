@@ -20,7 +20,7 @@ document.addEventListener('alpine:init', () => {
 
   Alpine.data('feedbackManagement', () => ({
     ...createPageMixin({
-      pagination: false, // 使用 composable 自带分页
+      pagination: false,
       asyncData: true,
       modal: true,
       authGuard: true
@@ -31,13 +31,20 @@ document.addEventListener('alpine:init', () => {
     ...useFeedbackMethods(),
 
     /**
+     * 反馈总页数（getter 必须定义在组件对象上，不能放在 spread 的 composable 中，
+     * 因为 spread 会立即求值 getter，此时 this 不包含其他 composable 的属性）
+     */
+    get feedbackTotalPages() {
+      return Math.ceil((this.feedbackPagination?.total || 0) / (this.feedbackFilters?.page_size || 20)) || 1
+    },
+
+    /**
      * 页面初始化
      */
     async init() {
       logger.info('[FeedbackManagement] 页面初始化...')
       if (!this.checkAuth()) return
 
-      // 并行加载列表和统计
       await Promise.all([
         this.loadFeedbacks(),
         this.loadFeedbackStats()

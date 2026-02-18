@@ -71,6 +71,7 @@ class LotteryQueryService {
         },
         attributes: [
           'lottery_prize_id',
+          'lottery_campaign_id',
           'prize_name',
           'prize_type',
           'prize_value',
@@ -82,8 +83,12 @@ class LotteryQueryService {
           'daily_win_count',
           'status',
           'sort_order',
-          'rarity_code', // 2026-02-15: 稀有度代码（前端视觉光效等级，外键关联 rarity_defs）
-          'created_at'
+          'reward_tier',
+          'rarity_code',
+          'material_asset_code',
+          'material_amount',
+          'created_at',
+          'updated_at'
         ],
         order: [
           ['sort_order', 'ASC'],

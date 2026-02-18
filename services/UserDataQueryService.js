@@ -99,8 +99,25 @@ class UserDataQueryService {
         order: [['asset_code', 'ASC']]
       })
 
+      // 按 asset_code 聚合（同一资产可能存在多条活动维度记录，概览需要合并显示总量）
+      const aggregated = new Map()
+      for (const b of rawBalances) {
+        const code = b.asset_code
+        if (aggregated.has(code)) {
+          const existing = aggregated.get(code)
+          existing.available_amount += Number(b.available_amount)
+          existing.frozen_amount += Number(b.frozen_amount)
+        } else {
+          aggregated.set(code, {
+            asset_code: code,
+            available_amount: Number(b.available_amount),
+            frozen_amount: Number(b.frozen_amount)
+          })
+        }
+      }
+
       // 附加资产显示名称
-      const assetCodes = rawBalances.map(b => b.asset_code)
+      const assetCodes = [...aggregated.keys()]
       const assetTypes =
         assetCodes.length > 0
           ? await MaterialAssetType.findAll({
@@ -110,14 +127,14 @@ class UserDataQueryService {
           : []
       const typeMap = new Map(assetTypes.map(t => [t.asset_code, t]))
 
-      balances = rawBalances.map(b => {
+      balances = [...aggregated.values()].map(b => {
         const typeInfo = typeMap.get(b.asset_code)
         return {
           asset_code: b.asset_code,
           display_name: typeInfo?.display_name || b.asset_code,
           group_code: typeInfo?.group_code || 'unknown',
-          available_amount: Number(b.available_amount),
-          frozen_amount: Number(b.frozen_amount)
+          available_amount: b.available_amount,
+          frozen_amount: b.frozen_amount
         }
       })
     }

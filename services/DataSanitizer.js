@@ -80,20 +80,20 @@ class DataSanitizer {
    * - 管理员（dataLevel='full'）：返回完整奖品数据
    * - 普通用户（dataLevel='public'）：移除win_probability（中奖概率）、stock_quantity（库存数量）、
    *   prize_value（奖品价值）、cost_points（成本积分）等敏感字段
-   * - 使用rarity（稀有度）替代win_probability（概率），使用available（是否可用）替代stock_quantity（库存数）
+   * - 保持数据库原始字段名，仅过滤敏感字段（win_probability、stock_quantity 等）
    *
-   * @param {Array<Object>} prizes - 奖品数据数组，包含prize_id、prize_name、prize_type、win_probability等字段
+   * @param {Array<Object>} prizes - 奖品数据数组（来自 lottery_prizes 表的 Sequelize 查询结果）
    * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
-   * @returns {Array<Object>} 脱敏后的奖品数组
-   * @returns {number} return[].id - 奖品ID（通用id字段，防止数据库结构暴露）
-   * @returns {string} return[].name - 奖品名称
-   * @returns {string} return[].type - 奖品类型（points/physical/voucher/virtual/special）
-   * @returns {string} return[].icon - 奖品图标（emoji）
-   * @returns {string} return[].rarity - 稀有度（common/uncommon/rare/epic/legendary），替代win_probability
-   * @returns {boolean} return[].available - 是否可用（简化库存状态），替代stock_quantity
-   * @returns {string} return[].display_value - 显示价值（高价值/中价值/基础价值）
-   * @returns {string} return[].status - 奖品状态
+   * @returns {Array<Object>} 脱敏后的奖品数组（字段名与 lottery_prizes 表一致）
+   * @returns {number} return[].lottery_prize_id - 奖品ID（数据库主键）
+   * @returns {number} return[].lottery_campaign_id - 关联活动ID
+   * @returns {string} return[].prize_name - 奖品名称
+   * @returns {string} return[].prize_type - 奖品类型（points/coupon/physical/virtual/service/product/special）
+   * @returns {number} return[].prize_value - 展示价值（DECIMAL→number 转换）
+   * @returns {string} return[].rarity_code - 稀有度代码（FK→rarity_defs）
    * @returns {number} return[].sort_order - 排序顺序（前端转盘位置索引）
+   * @returns {string} return[].reward_tier - 档位（high/mid/low）
+   * @returns {string} return[].status - 奖品状态（active/inactive）
    *
    * @example
    * // 管理员查看完整数据
@@ -110,30 +110,32 @@ class DataSanitizer {
       return DecimalConverter.convertPrizeData(Array.isArray(prizes) ? prizes : [prizes])
     }
 
-    // 普通用户数据脱敏
+    // 普通用户数据脱敏 — 过滤敏感字段，输出统一 id（商业安全：防抓包推断表结构）
     const sanitized = prizes.map(prize => ({
       id: prize.lottery_prize_id,
-      name: prize.prize_name,
-      type: prize.prize_type,
-      icon: this.getPrizeIcon(prize.prize_type),
-      rarity_code: prize.rarity_code || 'common', // 稀有度代码（来自 rarity_defs 表，前端直接使用此字段名显示光效）
-      available: prize.stock_quantity > 0, // 简化库存状态
-      /**
-       * ✅ 展示积分（用户可见）
-       * 产品决策：允许用户看到每个奖品的展示积分，用于提升感知与解释成本降低
-       * 安全边界：仍不返回内部预算成本（prize_value_points），避免暴露控成本口径
-       */
-      display_points: DecimalConverter.toNumber(prize.prize_value, 0),
-      display_value: this.getDisplayValue(DecimalConverter.toNumber(prize.prize_value, 0)),
+      lottery_campaign_id: prize.lottery_campaign_id,
+      prize_name: prize.prize_name,
+      prize_type: prize.prize_type,
+      prize_value: DecimalConverter.toNumber(prize.prize_value, 0),
+      prize_description: prize.prize_description,
+      /** 稀有度代码（FK→rarity_defs，前端直接使用此字段名显示对应颜色光效） */
+      rarity_code: prize.rarity_code || 'common',
+      sort_order: prize.sort_order,
+      reward_tier: prize.reward_tier,
       status: prize.status,
-      sort_order: prize.sort_order // ✅ 前端需要此字段确定奖品在转盘上的位置索引
+      image_resource_id: prize.image_resource_id,
+      material_asset_code: prize.material_asset_code,
+      material_amount: prize.material_amount,
+      created_at: prize.created_at,
+      updated_at: prize.updated_at
       /*
-       * ❌ 移除敏感字段：win_probability, stock_quantity, prize_value,
-       * cost_points, max_daily_wins, daily_win_count, angle, color
+       * ❌ 移除敏感字段（禁止暴露给微信小程序前端）：
+       * win_probability, stock_quantity, win_weight, prize_value_points,
+       * cost_points, max_daily_wins, daily_win_count, total_win_count,
+       * is_fallback, reserved_for_vip, angle, color, is_activity
        */
     }))
 
-    // 即使是脱敏数据，也需要确保数字字段是数字类型（如果包含）
     return sanitized
   }
 
@@ -184,7 +186,7 @@ class DataSanitizer {
     // 普通用户数据脱敏（P0安全修复）
     return inventory.map(item => {
       const sanitized = {
-        inventory_id: item.inventory_id,
+        id: item.item_instance_id,
         name: item.name,
         description: item.description,
         icon: item.icon,
@@ -269,7 +271,7 @@ class DataSanitizer {
     }
 
     return {
-      id: user.id,
+      id: user.user_id,
       display_name: user.display_name || user.username,
       can_lottery: user.can_lottery !== false,
       can_exchange: user.can_exchange !== false,
@@ -599,7 +601,7 @@ class DataSanitizer {
     }
 
     return records.map(record => ({
-      id: record.id,
+      id: record.asset_transaction_id,
       type: record.type, // earn/consume
       points: record.points,
       balance_after: record.balance_after,
@@ -648,7 +650,7 @@ class DataSanitizer {
 
     // 脱敏处理：只保留公开可见的字段
     return products.map(product => ({
-      id: product.id,
+      id: product.market_listing_id,
       seller_id: product.seller_id,
       // seller_name字段可能不存在，仅在存在时进行脱敏处理
       ...(product.seller_name && { seller_name: this.maskUserName(product.seller_name) }),
@@ -855,7 +857,7 @@ class DataSanitizer {
     }
 
     return records.map(record => ({
-      id: record.id,
+      id: record.asset_transaction_id,
       user_id: record.user_id,
       type: record.type, // earn/consume/transfer
       amount: record.amount,

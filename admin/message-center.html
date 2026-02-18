@@ -83,25 +83,25 @@
               class="px-3 py-1.5 text-sm rounded-md transition"
             >全部</button>
             <button 
-              @click="filter.type = 'alert'"
-              :class="filter.type === 'alert' ? 'themed-card shadow-sm text-red-600' : ''"
+              @click="filter.type = 'system'"
+              :class="filter.type === 'system' ? 'themed-card shadow-sm text-red-600' : ''"
               class="px-3 py-1.5 text-sm rounded-md transition"
-            >🔔 告警</button>
+            >🔔 系统公告</button>
             <button 
-              @click="filter.type = 'warning'"
-              :class="filter.type === 'warning' ? 'themed-card shadow-sm text-yellow-600' : ''"
+              @click="filter.type = 'maintenance'"
+              :class="filter.type === 'maintenance' ? 'themed-card shadow-sm text-yellow-600' : ''"
               class="px-3 py-1.5 text-sm rounded-md transition"
-            >⚠️ 预警</button>
+            >⚠️ 维护通知</button>
             <button 
-              @click="filter.type = 'info'"
-              :class="filter.type === 'info' ? 'themed-card shadow-sm themed-text-primary' : ''"
+              @click="filter.type = 'notice'"
+              :class="filter.type === 'notice' ? 'themed-card shadow-sm themed-text-primary' : ''"
               class="px-3 py-1.5 text-sm rounded-md transition"
-            >ℹ️ 通知</button>
+            >ℹ️ 通知公告</button>
             <button 
-              @click="filter.type = 'success'"
-              :class="filter.type === 'success' ? 'themed-card shadow-sm text-green-600' : ''"
+              @click="filter.type = 'activity'"
+              :class="filter.type === 'activity' ? 'themed-card shadow-sm text-green-600' : ''"
               class="px-3 py-1.5 text-sm rounded-md transition"
-            >✅ 成功</button>
+            >🎉 活动公告</button>
           </div>
         </div>
         
@@ -116,21 +116,6 @@
             <option value="">全部状态</option>
             <option value="unread">未读</option>
             <option value="read">已读</option>
-          </select>
-        </div>
-        
-        <!-- P1-4: 来源筛选 -->
-        <div class="flex items-center gap-2">
-          <span class="text-sm themed-text-muted">来源:</span>
-          <select 
-            x-model="filter.source"
-            @change="loadMessages()"
-            class="px-3 py-1.5 themed-bg-base border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">全部来源</option>
-            <template x-for="src in availableSources" :key="src">
-              <option :value="src" x-text="src"></option>
-            </template>
           </select>
         </div>
         
@@ -261,10 +246,10 @@
                   class="w-2 h-2 bg-blue-500 rounded-full"
                 ></span>
               </div>
-              <div class="text-sm themed-text-secondary line-clamp-2" x-text="message.message"></div>
+              <div class="text-sm themed-text-secondary line-clamp-2" x-text="message.content"></div>
               <div class="flex items-center gap-4 mt-2 text-xs themed-text-muted">
                 <span x-text="formatTime(message.created_at)"></span>
-                <span x-show="message.source" x-text="'来源: ' + message.source"></span>
+                <span x-show="message.priority" x-text="'优先级: ' + getTypeLabel(message.priority)"></span>
               </div>
             </div>
             
@@ -379,7 +364,7 @@
         
         <!-- 模态框内容 -->
         <div class="p-6 overflow-y-auto max-h-[50vh]">
-          <p class="themed-text-secondary whitespace-pre-wrap" x-text="currentMessage?.message"></p>
+          <p class="themed-text-secondary whitespace-pre-wrap" x-text="currentMessage?.content"></p>
           
           <!-- 附加信息 -->
           <template x-if="currentMessage?.extra_data">
@@ -394,7 +379,7 @@
         <div class="px-6 py-4 border-t themed-divide flex items-center justify-between themed-bg-base">
           <div class="text-sm themed-text-muted">
             <span x-text="formatFullTime(currentMessage?.created_at)"></span>
-            <span x-show="currentMessage?.source" class="ml-2" x-text="'· 来源: ' + currentMessage?.source"></span>
+            <span x-show="currentMessage?.priority" class="ml-2" x-text="'· 优先级: ' + currentMessage?.priority"></span>
           </div>
           <div class="flex items-center gap-2">
             <button 

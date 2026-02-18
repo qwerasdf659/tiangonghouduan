@@ -470,6 +470,14 @@ class MarketListingCoreService {
       }
     }
 
+    /**
+     * 无模板时降级：从 item_instances.meta.name 获取显示名称
+     * 业务场景：早期物品实例未关联模板，但 meta JSON 中存储了名称
+     */
+    if (!snapshotFields.offer_item_display_name && item.meta?.name) {
+      snapshotFields.offer_item_display_name = item.meta.name
+    }
+
     // 7. 创建挂牌记录
     const listing = await MarketListing.create(
       {

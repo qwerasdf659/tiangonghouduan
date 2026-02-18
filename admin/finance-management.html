@@ -275,79 +275,108 @@
 
     <!-- 钻石账户 -->
     <div x-show="current_page === 'diamond-accounts'" x-cloak>
-      <!-- 统计卡片 -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <h6 class="themed-text-muted text-sm mb-1">持有用户数</h6>
-          <p class="text-2xl font-bold themed-text-primary" x-text="diamondStats.holder_count || 0"></p>
+      <!-- 统计卡片 - 使用项目统一的 border-l-4 彩色边框风格 -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="themed-card rounded-lg shadow p-5 border-l-4 border-blue-500">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm themed-text-muted mb-1">持有用户数</p>
+              <p class="text-2xl font-bold themed-text-primary" x-text="diamondStats.holder_count || 0"></p>
+            </div>
+            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-xl">👤</div>
+          </div>
+          <p class="text-xs themed-text-muted mt-2">已开通钻石账户的用户</p>
         </div>
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <h6 class="themed-text-muted text-sm mb-1">流通总量</h6>
-          <p class="text-2xl font-bold text-green-600" x-text="formatNumber(diamondStats.total_circulation || 0)"></p>
+        <div class="themed-card rounded-lg shadow p-5 border-l-4 border-green-500">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm themed-text-muted mb-1">流通总量</p>
+              <p class="text-2xl font-bold text-green-600" x-text="formatNumber(diamondStats.total_circulation || 0)"></p>
+            </div>
+            <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center text-xl">💎</div>
+          </div>
+          <p class="text-xs themed-text-muted mt-2">当前可自由使用的钻石</p>
         </div>
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <h6 class="themed-text-muted text-sm mb-1">冻结总量</h6>
-          <p class="text-2xl font-bold text-yellow-600" x-text="formatNumber(diamondStats.total_frozen || 0)"></p>
+        <div class="themed-card rounded-lg shadow p-5 border-l-4 border-yellow-500">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm themed-text-muted mb-1">冻结总量</p>
+              <p class="text-2xl font-bold text-yellow-600" x-text="formatNumber(diamondStats.total_frozen || 0)"></p>
+            </div>
+            <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center text-xl">🔒</div>
+          </div>
+          <p class="text-xs themed-text-muted mt-2">挂单交易中冻结的钻石</p>
+        </div>
+        <div class="themed-card rounded-lg shadow p-5 border-l-4 border-purple-500">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm themed-text-muted mb-1">累计发放</p>
+              <p class="text-2xl font-bold text-purple-600" x-text="formatNumber(diamondStats.total_issued || 0)"></p>
+            </div>
+            <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center text-xl">📊</div>
+          </div>
+          <p class="text-xs themed-text-muted mt-2">系统历史累计发放总量</p>
         </div>
       </div>
 
       <div class="themed-card rounded-lg shadow">
         <div class="p-4 border-b flex justify-between items-center">
-          <h5 class="font-semibold">💎 钻石账户查询</h5>
-          <button @click="openDiamondAdjustModal({})" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary text-sm">
-            ➕ 调整用户钻石
+          <div>
+            <h5 class="font-semibold text-lg">💎 钻石账户查询</h5>
+            <p class="text-xs themed-text-muted mt-0.5">输入用户手机号，查看钻石余额和交易流水</p>
+          </div>
+          <button @click="openDiamondAdjustModal({})" class="px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary text-sm flex items-center gap-1">
+            <span>➕</span> 调整用户钻石
           </button>
         </div>
         <!-- 搜索区域 -->
         <div class="p-4 border-b themed-bg-base">
-          <div class="flex items-center gap-4">
-            <div class="flex-1 max-w-md">
+          <div class="flex items-end gap-3">
+            <div class="flex-1 max-w-sm">
               <label class="block text-sm font-medium themed-text-secondary mb-1">手机号</label>
-              <div class="flex gap-2">
-                <input 
-                  type="text" 
-                  x-model="diamondFilters.mobile" 
-                  placeholder="请输入手机号"
-                  maxlength="11"
-                  @keyup.enter="searchDiamondAccounts()"
-                  class="flex-1 px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                >
-                <button 
-                  @click="searchDiamondAccounts()" 
-                  class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary"
-                >
-                  🔍 查询
-                </button>
-                <button 
-                  @click="clearDiamondSearch()" 
-                  class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300"
-                  x-show="diamondFilters.mobile"
-                >
-                  清空
-                </button>
-              </div>
+              <input 
+                type="text" 
+                x-model="diamondFilters.mobile" 
+                placeholder="请输入11位手机号"
+                maxlength="11"
+                @keyup.enter="searchDiamondAccounts()"
+                class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
             </div>
+            <button 
+              @click="searchDiamondAccounts()" 
+              class="px-5 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary flex items-center gap-1"
+            >
+              🔍 查询
+            </button>
+            <button 
+              @click="clearDiamondSearch()" 
+              class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300"
+              x-show="diamondFilters.mobile"
+              x-transition
+            >
+              清空
+            </button>
           </div>
-          <p class="text-sm themed-text-muted mt-2">
-            💡 请输入手机号后点击查询
-          </p>
         </div>
 
         <!-- 搜索结果 -->
         <div class="p-4">
           <!-- 未搜索提示 -->
-          <div x-show="!diamondSearched && !diamondFilters.mobile" class="text-center py-8 themed-text-muted">
-            <div class="text-4xl mb-2">💎</div>
-            <p x-text="diamondSearchTip"></p>
+          <div x-show="!diamondSearched && !diamondFilters.mobile" class="text-center py-12 themed-text-muted">
+            <div class="text-5xl mb-3">💎</div>
+            <p class="text-base font-medium themed-text-secondary mb-1">钻石账户查询</p>
+            <p class="text-sm" x-text="diamondSearchTip"></p>
           </div>
 
           <!-- 搜索中/搜索结果 -->
           <div x-show="diamondSearched || diamondFilters.mobile">
             <!-- 无结果 -->
             <template x-if="diamondAccounts.length === 0 && diamondSearched">
-              <div class="text-center py-8 themed-text-muted">
-                <div class="text-4xl mb-2">🔍</div>
-                <p x-text="diamondSearchTip || '未找到该用户的钻石账户信息'"></p>
+              <div class="text-center py-12 themed-text-muted">
+                <div class="text-5xl mb-3">🔍</div>
+                <p class="text-base font-medium themed-text-secondary mb-1">未找到结果</p>
+                <p class="text-sm" x-text="diamondSearchTip || '未找到该用户的钻石账户信息'"></p>
               </div>
             </template>
 
@@ -355,36 +384,40 @@
             <template x-if="diamondAccounts.length > 0">
               <div class="overflow-x-auto">
                 <table class="w-full">
-                  <thead class="themed-bg-base">
-                    <tr>
-                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">用户ID</th>
-                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">昵称</th>
-                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">手机号</th>
-                      <th class="px-4 py-3 text-right text-sm font-medium themed-text-muted">可用余额</th>
-                      <th class="px-4 py-3 text-right text-sm font-medium themed-text-muted">冻结余额</th>
-                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
-                      <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+                  <thead>
+                    <tr class="bg-gray-50 border-b-2 border-gray-200">
+                      <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">用户ID</th>
+                      <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">昵称</th>
+                      <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">手机号</th>
+                      <th class="px-4 py-3 text-right text-xs font-semibold themed-text-muted uppercase tracking-wider">可用余额</th>
+                      <th class="px-4 py-3 text-right text-xs font-semibold themed-text-muted uppercase tracking-wider">冻结余额</th>
+                      <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted uppercase tracking-wider">状态</th>
+                      <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted uppercase tracking-wider">操作</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y">
                     <template x-for="account in diamondAccounts" :key="account.user_id">
-                      <tr class="themed-hover-bg">
-                        <td class="px-4 py-3 text-sm font-mono" x-text="account.user_id"></td>
+                      <tr class="themed-hover-bg transition-colors">
+                        <td class="px-4 py-3 text-sm font-mono themed-text-primary font-medium" x-text="account.user_id"></td>
                         <td class="px-4 py-3 text-sm" x-text="account.nickname || '-'"></td>
-                        <td class="px-4 py-3 text-sm themed-text-muted" x-text="account.mobile || '-'"></td>
-                        <td class="px-4 py-3 text-sm font-mono text-right themed-text-primary" x-text="formatNumber(account.balance || 0)"></td>
-                        <td class="px-4 py-3 text-sm font-mono text-right text-yellow-600" x-text="formatNumber(account.frozen || 0)"></td>
-                        <td class="px-4 py-3">
+                        <td class="px-4 py-3 text-sm themed-text-muted font-mono" x-text="account.mobile || '-'"></td>
+                        <td class="px-4 py-3 text-sm font-mono text-right">
+                          <span class="text-green-600 font-semibold" x-text="formatNumber(account.balance || 0)"></span>
+                        </td>
+                        <td class="px-4 py-3 text-sm font-mono text-right">
+                          <span class="text-yellow-600" x-text="formatNumber(account.frozen || 0)"></span>
+                        </td>
+                        <td class="px-4 py-3 text-center">
                           <span 
-                            :class="account.has_diamond ? 'bg-green-100 themed-text-success' : 'themed-bg-subtle themed-text-muted'"
-                            class="px-2 py-1 text-xs rounded"
+                            :class="account.has_diamond ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 themed-text-muted border border-gray-200'"
+                            class="px-2.5 py-1 text-xs rounded-full font-medium"
                             x-text="account.has_diamond ? '已开通' : '未开通'"
                           ></span>
                         </td>
-                        <td class="px-4 py-3">
-                          <div class="flex space-x-2">
-                            <button @click="viewDiamondDetail(account)" class="themed-text-primary hover:text-blue-700 text-sm">查看流水</button>
-                            <button @click="openDiamondAdjustModal(account)" class="text-green-500 hover:text-green-700 text-sm">调整</button>
+                        <td class="px-4 py-3 text-center">
+                          <div class="flex justify-center space-x-1">
+                            <button @click="viewDiamondDetail(account)" class="px-3 py-1 text-xs bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors font-medium">查看流水</button>
+                            <button @click="openDiamondAdjustModal(account)" class="px-3 py-1 text-xs bg-green-50 text-green-600 rounded-md hover:bg-green-100 transition-colors font-medium">调整</button>
                           </div>
                         </td>
                       </tr>
@@ -1093,64 +1126,91 @@
          x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center"
          style="display: none;">
-      <div class="fixed inset-0 bg-black/50" @click="hideModal('diamondDetailModal')"></div>
-      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-3xl mx-4 z-10 max-h-[85vh] overflow-hidden flex flex-col">
-        <div class="p-4 border-b flex justify-between items-center">
-          <h5 class="font-semibold">💎 钻石账户详情</h5>
-          <button @click="hideModal('diamondDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('diamondDetailModal')"></div>
+      <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-3xl mx-4 z-10 max-h-[90vh] overflow-hidden flex flex-col">
+        <!-- 渐变色标题栏 -->
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center text-lg">💎</div>
+            <div>
+              <h5 class="font-semibold text-white text-lg">钻石账户详情</h5>
+              <p class="text-blue-100 text-xs" x-text="'用户 #' + (selectedDiamondAccount?.user_id || '') + ' · ' + (selectedDiamondAccount?.mobile || '')"></p>
+            </div>
+          </div>
+          <button @click="hideModal('diamondDetailModal')" class="text-white/70 hover:text-white text-xl transition-colors">✕</button>
         </div>
-        <div class="flex-1 overflow-y-auto p-4">
-          <div class="space-y-4" x-show="selectedDiamondAccount">
-            <!-- 账户信息 -->
-            <div class="grid grid-cols-3 gap-4">
-              <div class="themed-bg-primary-light rounded-lg p-4 text-center">
-                <p class="text-sm themed-text-muted">用户ID</p>
-                <p class="text-xl font-bold themed-text-primary" x-text="selectedDiamondAccount?.user_id || '-'"></p>
-              </div>
-              <div class="bg-green-50 rounded-lg p-4 text-center">
-                <p class="text-sm themed-text-muted">可用余额</p>
-                <p class="text-xl font-bold text-green-600" x-text="formatNumber(selectedDiamondAccount?.balance || 0)"></p>
-              </div>
-              <div class="bg-yellow-50 rounded-lg p-4 text-center">
-                <p class="text-sm themed-text-muted">冻结余额</p>
-                <p class="text-xl font-bold text-yellow-600" x-text="formatNumber(selectedDiamondAccount?.frozen || 0)"></p>
+
+        <div class="flex-1 overflow-y-auto">
+          <div x-show="selectedDiamondAccount">
+            <!-- 账户概览 - 带彩色边框和图标 -->
+            <div class="px-6 py-4 bg-gradient-to-b from-gray-50 to-white">
+              <div class="grid grid-cols-3 gap-4">
+                <div class="themed-card rounded-xl p-4 border border-blue-100 bg-blue-50/50">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="w-7 h-7 bg-blue-100 rounded-md flex items-center justify-center text-sm">👤</span>
+                    <span class="text-xs themed-text-muted font-medium">用户ID</span>
+                  </div>
+                  <p class="text-2xl font-bold themed-text-primary tabular-nums" x-text="selectedDiamondAccount?.user_id || '-'"></p>
+                  <p class="text-xs themed-text-muted mt-1" x-text="selectedDiamondAccount?.nickname || '昵称未设置'"></p>
+                </div>
+                <div class="themed-card rounded-xl p-4 border border-green-100 bg-green-50/50">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="w-7 h-7 bg-green-100 rounded-md flex items-center justify-center text-sm">💎</span>
+                    <span class="text-xs themed-text-muted font-medium">可用余额</span>
+                  </div>
+                  <p class="text-2xl font-bold text-green-600 tabular-nums" x-text="formatNumber(selectedDiamondAccount?.balance || 0)"></p>
+                  <p class="text-xs text-green-500 mt-1">可自由使用</p>
+                </div>
+                <div class="themed-card rounded-xl p-4 border border-yellow-100 bg-yellow-50/50">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="w-7 h-7 bg-yellow-100 rounded-md flex items-center justify-center text-sm">🔒</span>
+                    <span class="text-xs themed-text-muted font-medium">冻结余额</span>
+                  </div>
+                  <p class="text-2xl font-bold text-yellow-600 tabular-nums" x-text="formatNumber(selectedDiamondAccount?.frozen || 0)"></p>
+                  <p class="text-xs text-yellow-500 mt-1">交易中暂时冻结</p>
+                </div>
               </div>
             </div>
 
-            <!-- 用户信息 -->
-            <div class="border-t pt-4">
-              <h6 class="font-medium mb-2">用户信息</h6>
-              <div class="grid grid-cols-2 gap-2 text-sm themed-text-muted">
-                <p><span class="font-medium">昵称：</span><span x-text="selectedDiamondAccount?.nickname || '-'"></span></p>
-                <p><span class="font-medium">手机：</span><span x-text="selectedDiamondAccount?.mobile || '-'"></span></p>
+            <!-- 流水记录区域 -->
+            <div class="px-6 py-4">
+              <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2">
+                  <span class="w-1 h-5 bg-blue-500 rounded-full"></span>
+                  <h6 class="font-semibold text-sm themed-text">最近交易流水</h6>
+                  <span class="text-xs bg-gray-100 themed-text-muted px-2 py-0.5 rounded-full" 
+                        x-text="(selectedDiamondAccount?.transactions?.length || 0) + '条'"></span>
+                </div>
               </div>
-            </div>
 
-            <!-- 流水记录 -->
-            <div class="border-t pt-4">
-              <h6 class="font-medium mb-3">💫 最近流水记录</h6>
               <template x-if="selectedDiamondAccount?.transactions?.length > 0">
-                <div class="overflow-x-auto">
+                <div class="rounded-lg border overflow-hidden">
                   <table class="w-full text-sm">
-                    <thead class="themed-bg-base">
-                      <tr>
-                        <th class="px-3 py-2 text-left font-medium themed-text-muted">时间</th>
-                        <th class="px-3 py-2 text-left font-medium themed-text-muted">类型</th>
-                        <th class="px-3 py-2 text-right font-medium themed-text-muted">变动</th>
-                        <th class="px-3 py-2 text-right font-medium themed-text-muted">余额</th>
-                        <th class="px-3 py-2 text-left font-medium themed-text-muted">原因</th>
+                    <thead>
+                      <tr class="bg-gray-50 border-b">
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold themed-text-muted">时间</th>
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold themed-text-muted">交易类型</th>
+                        <th class="px-4 py-2.5 text-right text-xs font-semibold themed-text-muted">变动数量</th>
+                        <th class="px-4 py-2.5 text-right text-xs font-semibold themed-text-muted">变动后余额</th>
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold themed-text-muted">说明</th>
                       </tr>
                     </thead>
-                    <tbody class="divide-y">
+                    <tbody class="divide-y divide-gray-100">
                       <template x-for="tx in selectedDiamondAccount.transactions" :key="tx.asset_transaction_id">
-                        <tr class="themed-hover-bg">
-                          <td class="px-3 py-2 themed-text-muted" x-text="formatDateTimeShort(tx.created_at)"></td>
-                          <td class="px-3 py-2" x-text="tx.tx_type || '-'"></td>
-                          <td class="px-3 py-2 text-right font-mono" 
-                              :class="tx.delta_amount > 0 ? 'text-green-600' : 'text-red-600'"
-                              x-text="(tx.delta_amount > 0 ? '+' : '') + tx.delta_amount"></td>
-                          <td class="px-3 py-2 text-right font-mono themed-text-muted" x-text="tx.balance_after"></td>
-                          <td class="px-3 py-2 themed-text-muted max-w-xs truncate" x-text="tx.description || '-'" :title="tx.description"></td>
+                        <tr class="hover:bg-gray-50/80 transition-colors">
+                          <td class="px-4 py-2.5 text-xs themed-text-muted whitespace-nowrap" x-text="formatDateTimeShort(tx.created_at)"></td>
+                          <td class="px-4 py-2.5">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                                  :class="tx.delta_amount > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                                  x-text="tx.tx_type_display || tx.tx_type || '-'"></span>
+                          </td>
+                          <td class="px-4 py-2.5 text-right">
+                            <span class="font-mono font-semibold text-sm"
+                                  :class="tx.delta_amount > 0 ? 'text-green-600' : 'text-red-500'"
+                                  x-text="(tx.delta_amount > 0 ? '+' : '') + formatNumber(tx.delta_amount)"></span>
+                          </td>
+                          <td class="px-4 py-2.5 text-right font-mono text-sm themed-text-muted" x-text="formatNumber(tx.balance_after)"></td>
+                          <td class="px-4 py-2.5 themed-text-muted text-xs max-w-[180px] truncate" x-text="tx.description || '-'" :title="tx.description"></td>
                         </tr>
                       </template>
                     </tbody>
@@ -1158,14 +1218,25 @@
                 </div>
               </template>
               <template x-if="!selectedDiamondAccount?.transactions || selectedDiamondAccount.transactions.length === 0">
-                <p class="text-center text-gray-400 py-4">暂无流水记录</p>
+                <div class="text-center py-10 rounded-lg border-2 border-dashed border-gray-200">
+                  <div class="text-4xl mb-2">📭</div>
+                  <p class="themed-text-muted text-sm">暂无交易流水记录</p>
+                  <p class="themed-text-hint text-xs mt-1">该用户尚未产生钻石相关交易</p>
+                </div>
               </template>
             </div>
           </div>
         </div>
-        <div class="p-4 border-t themed-bg-base flex justify-end space-x-2">
-          <button @click="hideModal('diamondDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
-          <button @click="openDiamondAdjustModal(selectedDiamondAccount)" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">调整钻石</button>
+
+        <!-- 底部操作栏 -->
+        <div class="px-6 py-3 border-t bg-gray-50 flex justify-between items-center rounded-b-xl">
+          <p class="text-xs themed-text-muted">仅展示最近 20 条记录</p>
+          <div class="flex space-x-2">
+            <button @click="hideModal('diamondDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300 text-sm transition-colors">关闭</button>
+            <button @click="openDiamondAdjustModal(selectedDiamondAccount)" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm transition-colors flex items-center gap-1">
+              <span>✏️</span> 调整钻石
+            </button>
+          </div>
         </div>
       </div>
     </div>

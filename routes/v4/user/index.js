@@ -27,6 +27,9 @@ const { authenticateToken } = require('../../../middleware/auth')
 // 🔐 P0-1修复：导入手机号脱敏函数
 const { sanitize } = require('../../../utils/logger')
 
+// 🔴 广告系统路由（Phase 3: 广告主自助投放）
+const adCampaignsRoutes = require('./ad-campaigns')
+
 /**
  * GET /api/v4/user/me
  * @desc 获取当前用户基本信息（通过token识别）
@@ -54,5 +57,8 @@ router.get('/me', authenticateToken, async (req, res) => {
     return res.apiInternalError('获取用户信息失败')
   }
 })
+
+// 挂载广告计划管理路由（Phase 3 广告主自助投放）
+router.use('/ad-campaigns', adCampaignsRoutes)
 
 module.exports = router

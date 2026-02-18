@@ -95,21 +95,26 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       })
     })
 
-    test('B-5-1-4 普通用户（public）使用 rarity 替代 win_probability', () => {
+    test('B-5-1-4 普通用户（public）保留 rarity_code 字段', () => {
       const result = DataSanitizer.sanitizePrizes(mockPrizes, 'public')
 
       result.forEach(prize => {
-        expect(prize).toHaveProperty('rarity')
-        expect(['common', 'uncommon', 'rare', 'epic', 'legendary']).toContain(prize.rarity)
+        expect(prize).toHaveProperty('rarity_code')
       })
     })
 
-    test('B-5-1-5 普通用户（public）使用 available 替代 stock_quantity', () => {
+    test('B-5-1-5 普通用户（public）保留数据库原始字段名（不重命名）', () => {
       const result = DataSanitizer.sanitizePrizes(mockPrizes, 'public')
 
       result.forEach(prize => {
-        expect(prize).toHaveProperty('available')
-        expect(typeof prize.available).toBe('boolean')
+        // 保持数据库字段名，不再重命名为通用 id/name/type
+        expect(prize).toHaveProperty('lottery_prize_id')
+        expect(prize).toHaveProperty('prize_name')
+        expect(prize).toHaveProperty('prize_type')
+        expect(prize).toHaveProperty('prize_value')
+        expect(prize).not.toHaveProperty('id')
+        expect(prize).not.toHaveProperty('name')
+        expect(prize).not.toHaveProperty('type')
       })
     })
 
@@ -121,12 +126,13 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       expect(result.length).toBe(mockPrizes.length)
     })
 
-    test('B-5-1-7 使用通用 id 字段映射 prize_id（防止表结构暴露）', () => {
+    test('B-5-1-7 普通用户（public）字段名与数据库 lottery_prizes 表一致', () => {
       const result = DataSanitizer.sanitizePrizes(mockPrizes, 'public')
 
       result.forEach((prize, index) => {
-        expect(prize.id).toBe(mockPrizes[index].lottery_prize_id)
-        expect(prize).not.toHaveProperty('lottery_prize_id')
+        expect(prize.lottery_prize_id).toBe(mockPrizes[index].lottery_prize_id)
+        expect(prize.prize_name).toBe(mockPrizes[index].prize_name)
+        expect(prize.prize_type).toBe(mockPrizes[index].prize_type)
       })
     })
   })
@@ -342,7 +348,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
   describe('B-5-6 聊天会话数据脱敏（sanitizeChatSessions）', () => {
     const mockSessions = [
       {
-        session_id: 'session-001',
+        customer_service_session_id: 'session-001',
         status: 'active',
         messages: [],
         internal_notes: '用户反馈问题严重',
@@ -370,7 +376,8 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
     test('B-5-6-3 普通用户（public）可见基础会话信息', () => {
       const result = DataSanitizer.sanitizeChatSessions(mockSessions, 'public')
 
-      expect(result[0].session_id).toBe('session-001')
+      // sanitizeChatSessions 当前使用通用 id 字段（映射自 customer_service_session_id）
+      expect(result[0].id).toBe('session-001')
       expect(result[0].status).toBe('active')
     })
 
@@ -540,10 +547,11 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       expect(result[0]).not.toHaveProperty('cost_price')
     })
 
-    test('B-5-9-2 普通用户（public）不可见 sold_count', () => {
+    test('B-5-9-2 普通用户（public）可见 sold_count（业务决策：展示"已售N件"）', () => {
       const result = DataSanitizer.sanitizeExchangeMarketItems(mockItems, 'public')
 
-      expect(result[0]).not.toHaveProperty('sold_count')
+      // 产品决策：sold_count 对普通用户可见，用于前端展示"已售N件"
+      expect(result[0]).toHaveProperty('sold_count')
     })
 
     test('B-5-9-3 普通用户（public）使用通用 id 字段', () => {

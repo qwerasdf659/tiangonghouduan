@@ -18,6 +18,7 @@
 import { logger, $confirm } from '../../../utils/index.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import { AssetAPI } from '../../../api/asset.js'
+import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
 
 /**
  * 风险等级中文映射
@@ -142,12 +143,17 @@ document.addEventListener('alpine:init', () => {
       create_type_form: {
         asset_code: '',
         display_name: '',
+        icon_url: '',
         group_code: '',
         form: 'shard',
         tier: 1,
         sort_order: 0,
         is_enabled: true
       },
+      /** @type {string|null} 创建表单图标预览URL */
+      create_icon_preview: null,
+      /** @type {boolean} 创建表单图标上传中 */
+      create_icon_uploading: false,
 
       // ========== 编辑资产类型模态框 ==========
       show_edit_type_modal: false,
@@ -155,6 +161,7 @@ document.addEventListener('alpine:init', () => {
       edit_type_form: {
         asset_code: '',
         display_name: '',
+        icon_url: '',
         group_code: '',
         form: 'shard',
         tier: 1,
@@ -162,6 +169,10 @@ document.addEventListener('alpine:init', () => {
         is_enabled: true,
         is_tradable: true
       },
+      /** @type {string|null} 编辑表单图标预览URL */
+      edit_icon_preview: null,
+      /** @type {boolean} 编辑表单图标上传中 */
+      edit_icon_uploading: false,
 
       // ========== 初始化 ==========
       async init() {
@@ -449,12 +460,14 @@ document.addEventListener('alpine:init', () => {
         this.create_type_form = {
           asset_code: '',
           display_name: '',
+          icon_url: '',
           group_code: '',
           form: 'shard',
           tier: 1,
           sort_order: 0,
           is_enabled: true
         }
+        this.create_icon_preview = null
       },
 
       /**
@@ -473,6 +486,7 @@ document.addEventListener('alpine:init', () => {
           const data = {
             asset_code: f.asset_code.trim(),
             display_name: f.display_name.trim(),
+            icon_url: f.icon_url || null,
             group_code: f.group_code.trim(),
             form: f.form,
             tier: parseInt(f.tier),
@@ -507,6 +521,7 @@ document.addEventListener('alpine:init', () => {
         this.edit_type_form = {
           asset_code: assetType.asset_code,
           display_name: assetType.display_name,
+          icon_url: assetType.icon_url || '',
           group_code: assetType.group_code,
           form: assetType.form,
           tier: assetType.tier,
@@ -514,6 +529,7 @@ document.addEventListener('alpine:init', () => {
           is_enabled: assetType.is_enabled !== false,
           is_tradable: assetType.is_tradable !== false
         }
+        this.edit_icon_preview = assetType.icon_url || null
       },
 
       /**
@@ -531,6 +547,7 @@ document.addEventListener('alpine:init', () => {
         try {
           const data = {
             display_name: f.display_name.trim(),
+            icon_url: f.icon_url || null,
             group_code: f.group_code.trim(),
             form: f.form,
             tier: parseInt(f.tier),
@@ -582,6 +599,122 @@ document.addEventListener('alpine:init', () => {
           logger.error('[MaterialConversion] 禁用资产类型失败:', e)
           Alpine.store('notification').error('禁用资产类型失败: ' + e.message)
         }
+      },
+
+      // ==================== 图标上传方法 ====================
+
+      /**
+       * 上传材料资产图标（创建表单）
+       * @param {Event} event - 文件选择事件
+       */
+      async uploadCreateIcon(event) {
+        const file = event.target.files?.[0]
+        if (!file) return
+
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+        if (!allowedTypes.includes(file.type)) {
+          Alpine.store('notification').error('仅支持 JPG/PNG/GIF/WebP 格式')
+          return
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          Alpine.store('notification').error('图标大小不能超过 5MB')
+          return
+        }
+
+        try {
+          this.create_icon_uploading = true
+          const formData = new FormData()
+          formData.append('image', file)
+          formData.append('business_type', 'uploads')
+          formData.append('category', 'icons')
+
+          const token = localStorage.getItem('token')
+          const response = await fetch(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData
+          })
+          const res = await response.json()
+
+          if (res.success && res.data) {
+            this.create_type_form.icon_url = res.data.object_key
+            this.create_icon_preview = res.data.public_url || res.data.url || null
+            Alpine.store('notification').success('图标上传成功')
+            logger.info('[MaterialConversion] 创建表单图标上传成功:', res.data.object_key)
+          } else {
+            Alpine.store('notification').error(res.message || '图标上传失败')
+          }
+        } catch (e) {
+          logger.error('[MaterialConversion] 创建表单图标上传失败:', e)
+          Alpine.store('notification').error('图标上传失败')
+        } finally {
+          this.create_icon_uploading = false
+        }
+      },
+
+      /**
+       * 上传材料资产图标（编辑表单）
+       * @param {Event} event - 文件选择事件
+       */
+      async uploadEditIcon(event) {
+        const file = event.target.files?.[0]
+        if (!file) return
+
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+        if (!allowedTypes.includes(file.type)) {
+          Alpine.store('notification').error('仅支持 JPG/PNG/GIF/WebP 格式')
+          return
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          Alpine.store('notification').error('图标大小不能超过 5MB')
+          return
+        }
+
+        try {
+          this.edit_icon_uploading = true
+          const formData = new FormData()
+          formData.append('image', file)
+          formData.append('business_type', 'uploads')
+          formData.append('category', 'icons')
+
+          const token = localStorage.getItem('token')
+          const response = await fetch(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData
+          })
+          const res = await response.json()
+
+          if (res.success && res.data) {
+            this.edit_type_form.icon_url = res.data.object_key
+            this.edit_icon_preview = res.data.public_url || res.data.url || null
+            Alpine.store('notification').success('图标上传成功')
+            logger.info('[MaterialConversion] 编辑表单图标上传成功:', res.data.object_key)
+          } else {
+            Alpine.store('notification').error(res.message || '图标上传失败')
+          }
+        } catch (e) {
+          logger.error('[MaterialConversion] 编辑表单图标上传失败:', e)
+          Alpine.store('notification').error('图标上传失败')
+        } finally {
+          this.edit_icon_uploading = false
+        }
+      },
+
+      /**
+       * 清除创建表单图标
+       */
+      clearCreateIcon() {
+        this.create_type_form.icon_url = ''
+        this.create_icon_preview = null
+      },
+
+      /**
+       * 清除编辑表单图标
+       */
+      clearEditIcon() {
+        this.edit_type_form.icon_url = ''
+        this.edit_icon_preview = null
       },
 
       // ==================== 格式化辅助方法 ====================

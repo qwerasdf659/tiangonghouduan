@@ -239,6 +239,92 @@ module.exports = sequelize => {
         comment: '结束展示时间（NULL表示永不过期）'
       },
 
+      /**
+       * 弹窗类型分级
+       * - notice: 系统公告（priority 900~999，force_show=true）
+       * - event: 活动推广（priority 500~899）
+       * - promo: 日常促销（priority 100~499）
+       */
+      banner_type: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
+        defaultValue: 'promo',
+        validate: {
+          isIn: {
+            args: [['notice', 'event', 'promo']],
+            msg: '弹窗类型必须是：notice, event, promo 之一'
+          }
+        },
+        comment: '弹窗类型：notice=系统公告 / event=活动推广 / promo=日常促销'
+      },
+
+      /**
+       * 频率规则枚举（客户端执行，后端只存储和下发）
+       * @see docs/广告系统升级方案.md 2.2 节
+       */
+      frequency_rule: {
+        type: DataTypes.STRING(30),
+        allowNull: false,
+        defaultValue: 'once_per_day',
+        validate: {
+          isIn: {
+            args: [
+              [
+                'always',
+                'once',
+                'once_per_session',
+                'once_per_day',
+                'once_per_n_days',
+                'n_times_total'
+              ]
+            ],
+            msg: '频率规则必须是：always, once, once_per_session, once_per_day, once_per_n_days, n_times_total 之一'
+          }
+        },
+        comment:
+          '频率规则：always=每次弹 / once=只弹一次 / once_per_session=每次启动弹一次 / once_per_day=每天一次 / once_per_n_days=每N天一次 / n_times_total=累计N次'
+      },
+
+      /** 频率参数（配合 once_per_n_days 的 N 天数 或 n_times_total 的 N 次数） */
+      frequency_value: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: 1,
+        validate: {
+          min: {
+            args: [1],
+            msg: '频率参数必须 >= 1'
+          }
+        },
+        comment: '频率参数（配合 once_per_n_days 或 n_times_total 使用）'
+      },
+
+      /** 是否强制弹出（true=不可点遮罩关闭，需点"我知道了"按钮） */
+      force_show: {
+        type: DataTypes.BOOLEAN,
+        allowNull: true,
+        defaultValue: false,
+        comment: '是否强制弹出（1=不可点遮罩关闭）'
+      },
+
+      /**
+       * 弹出竞争优先级（数字越大越优先弹出）
+       * 与 display_order（管理后台列表排序，数字小的排前）职责不同
+       * @see docs/广告系统升级方案.md 2.3 节
+       */
+      priority: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: 0,
+        validate: {
+          min: {
+            args: [0],
+            msg: '优先级不能为负数'
+          }
+        },
+        comment: '弹出优先级（数字越大越优先，区别于 display_order 的管理排序）'
+      },
+
       // 创建人ID
       created_by: {
         type: DataTypes.INTEGER,
@@ -311,6 +397,14 @@ module.exports = sequelize => {
         {
           name: 'idx_popup_banners_time_range',
           fields: ['start_time', 'end_time']
+        },
+        {
+          name: 'idx_popup_banners_type_active',
+          fields: ['banner_type', 'is_active']
+        },
+        {
+          name: 'idx_popup_banners_priority',
+          fields: ['priority']
         }
       ],
 
@@ -327,6 +421,17 @@ module.exports = sequelize => {
         home: {
           where: {
             position: 'home'
+          }
+        },
+
+        /**
+         * 按弹窗类型筛选（notice / event / promo）
+         * @param {string} bannerType - 弹窗类型枚举值
+         * @returns {Object} Sequelize where 条件
+         */
+        byType(bannerType) {
+          return {
+            where: { banner_type: bannerType }
           }
         },
 
@@ -411,9 +516,7 @@ module.exports = sequelize => {
       where: {
         is_active: true,
         position,
-        // 开始时间：NULL 或 <= 当前时间
         [Op.or]: [{ start_time: null }, { start_time: { [Op.lte]: now } }],
-        // 结束时间：NULL 或 > 当前时间
         [Op.and]: [
           {
             [Op.or]: [{ end_time: null }, { end_time: { [Op.gt]: now } }]
@@ -421,6 +524,7 @@ module.exports = sequelize => {
         ]
       },
       order: [
+        ['priority', 'DESC'],
         ['display_order', 'ASC'],
         ['created_at', 'DESC']
       ],
@@ -433,7 +537,12 @@ module.exports = sequelize => {
         'image_width',
         'image_height',
         'link_url',
-        'link_type'
+        'link_type',
+        'banner_type',
+        'frequency_rule',
+        'frequency_value',
+        'force_show',
+        'priority'
       ]
     })
   }

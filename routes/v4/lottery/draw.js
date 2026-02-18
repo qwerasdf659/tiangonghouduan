@@ -222,26 +222,21 @@ router.post(
           const rewardTier =
             prize.reward_tier ||
             LotteryDrawFormatter.inferRewardTier(prize.prize?.prize_value_points || 0)
+          /** prize_value：DECIMAL→number 转换 */
+          const prizeValue =
+            typeof prize.prize?.prize_value === 'number'
+              ? prize.prize.prize_value
+              : parseFloat(prize.prize?.prize_value) || 0
           return {
             reward_tier: rewardTier,
             reward_tier_text: LotteryDrawFormatter.getRewardTierText(rewardTier),
-            id: prize.prize?.id,
-            name: prize.prize?.name || '奖励',
-            type: prize.prize?.type,
-            sort_order: prize.prize?.sort_order, // 🎯 前端用于计算索引（index = sort_order - 1）
-            /** 稀有度代码（来自 rarity_defs 外键，前端直接使用此字段名显示对应颜色光效） */
-            rarity_code: prize.prize?.rarity_code || 'common',
-            icon: DataSanitizer.getPrizeIcon(prize.prize?.type),
-            rarity: DataSanitizer.calculateRarity(prize.prize?.type),
-            display_points:
-              typeof prize.prize?.value === 'number'
-                ? prize.prize.value
-                : parseFloat(prize.prize?.value) || 0,
-            display_value: DataSanitizer.getDisplayValue(
-              typeof prize.prize?.value === 'number'
-                ? prize.prize.value
-                : parseFloat(prize.prize?.value) || 0
-            )
+            lottery_prize_id: prize.prize?.lottery_prize_id,
+            prize_name: prize.prize?.prize_name || '奖励',
+            prize_type: prize.prize?.prize_type,
+            prize_value: prizeValue,
+            sort_order: prize.prize?.sort_order,
+            /** 稀有度代码（FK→rarity_defs，前端直接使用此字段名显示对应颜色光效） */
+            rarity_code: prize.prize?.rarity_code || 'common'
           }
         }),
         total_points_cost: drawResult.total_points_cost, // 实际消耗积分（折后价）
@@ -288,9 +283,9 @@ router.post(
         const notificationPromises = sanitizedResult.prizes.map(prize =>
           NotificationService.notifyLotteryWin(user_id, {
             lottery_draw_id: sanitizedResult.lottery_session_id,
-            prize_name: prize.name,
-            prize_type: prize.type,
-            prize_value: prize.display_points,
+            prize_name: prize.prize_name,
+            prize_type: prize.prize_type,
+            prize_value: prize.prize_value,
             reward_tier: prize.reward_tier,
             campaign_code: sanitizedResult.campaign_code
           })
@@ -309,6 +304,18 @@ router.post(
           user_id,
           error: notifyError.message
         })
+      }
+
+      // Phase 6: 广告归因追踪（非关键路径，错误不影响业务）
+      try {
+        const AdAttributionService = req.app.locals.services.getService('ad_attribution')
+        await AdAttributionService.checkConversion(
+          user_id,
+          'lottery_draw',
+          String(drawResult.execution_id)
+        )
+      } catch (attrError) {
+        logger.warn('[LotteryDraw] 广告归因追踪失败（非关键）', { error: attrError.message })
       }
 
       return res.apiSuccess(sanitizedResult, '抽奖成功', 'DRAW_SUCCESS')

@@ -291,16 +291,10 @@ export function useFeedbackMethods() {
      * @param {number} page - 页码
      */
     goToFeedbackPage(page) {
-      if (page < 1 || page > this.feedbackTotalPages) return
+      const totalPages = Math.ceil((this.feedbackPagination?.total || 0) / (this.feedbackFilters?.page_size || 20)) || 1
+      if (page < 1 || page > totalPages) return
       this.feedbackFilters.page = page
       this.loadFeedbacks()
-    },
-
-    /**
-     * 获取反馈总页数
-     */
-    get feedbackTotalPages() {
-      return Math.ceil(this.feedbackPagination.total / this.feedbackFilters.page_size) || 1
     },
 
     /**

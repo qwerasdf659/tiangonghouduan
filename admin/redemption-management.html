@@ -193,14 +193,14 @@
       <!-- 分页 -->
       <div x-show="!loading && orders.length > 0" class="px-4 py-3 flex items-center justify-between border-t themed-bg-base">
         <span class="text-sm themed-text-muted">
-          共 <span x-text="pagination.total">0</span> 条记录，第 <span x-text="pagination.page">1</span> / <span x-text="totalPages">1</span> 页
+          共 <span x-text="total_records">0</span> 条记录，第 <span x-text="current_page">1</span> / <span x-text="total_pages">1</span> 页
         </span>
         <div class="flex gap-1">
-          <button @click="changePage(pagination.page - 1)" :disabled="pagination.page <= 1"
+          <button @click="changePage(current_page - 1)" :disabled="current_page <= 1"
                   class="px-3 py-1 text-sm rounded themed-border disabled:opacity-50 disabled:cursor-not-allowed hover:themed-bg-subtle">
             上一页
           </button>
-          <button @click="changePage(pagination.page + 1)" :disabled="pagination.page >= totalPages"
+          <button @click="changePage(current_page + 1)" :disabled="current_page >= total_pages"
                   class="px-3 py-1 text-sm rounded themed-border disabled:opacity-50 disabled:cursor-not-allowed hover:themed-bg-subtle">
             下一页
           </button>
@@ -209,7 +209,7 @@
     </div>
 
     <!-- ==================== 核销弹窗 ==================== -->
-    <div x-show="modals.redeemModal" x-cloak 
+    <div x-show="isModalOpen('redeemModal')" x-cloak 
          class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
          @click.self="hideModal('redeemModal')">
       <div class="themed-card rounded-lg shadow-xl w-full max-w-md p-6">
@@ -253,7 +253,7 @@
     </div>
 
     <!-- ==================== 取消弹窗 ==================== -->
-    <div x-show="modals.cancelModal" x-cloak 
+    <div x-show="isModalOpen('cancelModal')" x-cloak 
          class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
          @click.self="hideModal('cancelModal')">
       <div class="themed-card rounded-lg shadow-xl w-full max-w-md p-6">
@@ -283,7 +283,7 @@
     </div>
 
     <!-- ==================== 详情弹窗 ==================== -->
-    <div x-show="modals.detailModal" x-cloak 
+    <div x-show="isModalOpen('detailModal')" x-cloak 
          class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
          @click.self="hideModal('detailModal')">
       <div class="themed-card rounded-lg shadow-xl w-full max-w-lg p-6">

@@ -12,11 +12,19 @@
  * @module services/market-listing/QueryService
  */
 
-const { MarketListing, ItemInstance, MaterialAssetType, User, sequelize } = require('../../models')
+const {
+  MarketListing,
+  ItemInstance,
+  ItemTemplate,
+  MaterialAssetType,
+  User,
+  sequelize
+} = require('../../models')
 const { Op } = sequelize.Sequelize
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const logger = require('../../utils/logger').logger
 const { attachDisplayNames, DICT_TYPES } = require('../../utils/displayNameHelper')
+const { getImageUrl } = require('../../utils/ImageUrlHelper')
 
 /**
  * 市场挂牌查询服务类
@@ -40,6 +48,20 @@ class MarketListingQueryService {
         {
           model: ItemInstance,
           as: 'offerItem',
+          required: false,
+          include: [
+            {
+              model: ItemTemplate,
+              as: 'itemTemplate',
+              attributes: ['item_template_id', 'display_name', 'image_url', 'thumbnail_url'],
+              required: false
+            }
+          ]
+        },
+        {
+          model: ItemTemplate,
+          as: 'offerItemTemplate',
+          attributes: ['item_template_id', 'display_name', 'image_url', 'thumbnail_url'],
           required: false
         }
       ],
@@ -203,13 +225,27 @@ class MarketListingQueryService {
       {
         model: User,
         as: 'seller',
-        // V4.7.0: 恢复 avatar_url 字段（已通过迁移添加到数据库）
         attributes: ['user_id', 'nickname', 'avatar_url'],
         required: false
       },
       {
         model: ItemInstance,
         as: 'offerItem',
+        required: false,
+        include: [
+          {
+            model: ItemTemplate,
+            as: 'itemTemplate',
+            attributes: ['item_template_id', 'display_name', 'image_url', 'thumbnail_url'],
+            required: false
+          }
+        ]
+      },
+      {
+        /** 直接关联物品模板（通过 offer_item_template_id 快照字段） */
+        model: ItemTemplate,
+        as: 'offerItemTemplate',
+        attributes: ['item_template_id', 'display_name', 'image_url', 'thumbnail_url'],
         required: false
       }
     ]
@@ -255,9 +291,21 @@ class MarketListingQueryService {
 
       // 物品实例类型
       if (plain.listing_kind === 'item_instance') {
+        /**
+         * 图片 object key 优先级：
+         * 1. 直接关联的 offerItemTemplate（通过快照字段 offer_item_template_id）
+         * 2. 通过 offerItem.itemTemplate 间接获取
+         * 数据库存 object key，通过 ImageUrlHelper 拼接完整公网 URL
+         */
+        const templateImageKey =
+          plain.offerItemTemplate?.image_url ||
+          plain.offerItem?.itemTemplate?.image_url ||
+          null
+
         product.item_info = {
           item_instance_id: plain.offer_item_instance_id,
           display_name: plain.offer_item_display_name || plain.offerItem?.meta?.name,
+          image_url: templateImageKey ? getImageUrl(templateImageKey) : null,
           category_code: plain.offer_item_category_code,
           rarity_code: plain.offer_item_rarity,
           template_id: plain.offer_item_template_id
@@ -266,11 +314,14 @@ class MarketListingQueryService {
 
       // 可叠加资产类型
       if (plain.listing_kind === 'fungible_asset') {
+        /** icon_url 存储 object key，通过 ImageUrlHelper 拼接完整公网 URL */
+        const iconKey = plain.offerMaterialAsset?.icon_url || null
+
         product.asset_info = {
           asset_code: plain.offer_asset_code,
           amount: plain.offer_amount,
           display_name: plain.offerMaterialAsset?.display_name || plain.offer_asset_code,
-          icon_url: plain.offerMaterialAsset?.icon_url || null, // V4.7.0: 恢复图标字段
+          icon_url: iconKey ? getImageUrl(iconKey) : null,
           group_code: plain.offerMaterialAsset?.group_code
         }
       }
@@ -399,6 +450,46 @@ class MarketListingQueryService {
     })
 
     return count
+  }
+
+  /**
+   * 获取用户端结算币种列表
+   *
+   * 从 system_settings.allowed_settlement_assets 读取白名单，
+   * 再关联 material_asset_types 表获取 display_name。
+   *
+   * @returns {Promise<Object[]>} 结算币种列表 [{asset_code, display_name}]
+   */
+  static async getSettlementCurrencies() {
+    const AdminSystemService = require('../AdminSystemService')
+
+    const whitelist = await AdminSystemService.getSettingValue(
+      'marketplace',
+      'allowed_settlement_assets',
+      ['DIAMOND', 'red_shard']
+    )
+
+    let assetCodes = whitelist
+    if (typeof whitelist === 'string') {
+      try {
+        assetCodes = JSON.parse(whitelist)
+      } catch {
+        assetCodes = ['DIAMOND', 'red_shard']
+      }
+    }
+
+    const assetTypes = await MaterialAssetType.findAll({
+      where: { asset_code: { [Op.in]: assetCodes } },
+      attributes: ['asset_code', 'display_name'],
+      raw: true
+    })
+
+    const typeMap = new Map(assetTypes.map(t => [t.asset_code, t.display_name]))
+
+    return assetCodes.map(code => ({
+      asset_code: code,
+      display_name: typeMap.get(code) || code
+    }))
   }
 }
 

@@ -11,6 +11,7 @@ import { logger } from '../../../utils/logger.js'
 import { buildURL, request } from '../../../api/base.js'
 import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
+import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
 
 /**
  * 商品管理状态
@@ -41,10 +42,15 @@ export function useExchangeItemsState() {
       cost_price: 0,
       stock: 0,
       sort_order: 100,
-      status: 'active'
+      status: 'active',
+      primary_image_id: null
     },
     /** @type {number|null} 正在编辑的商品ID */
-    editingItemId: null
+    editingItemId: null,
+    /** @type {string|null} 商品图片预览 URL（上传后由后端返回） */
+    itemImagePreviewUrl: null,
+    /** @type {boolean} 图片上传中 */
+    imageUploading: false
   }
 }
 
@@ -158,8 +164,10 @@ export function useExchangeItemsMethods() {
         cost_price: 0,
         stock: 0,
         sort_order: 100,
-        status: 'active'
+        status: 'active',
+        primary_image_id: null
       }
+      this.itemImagePreviewUrl = null
       this.showModal('itemModal')
     },
 
@@ -177,8 +185,10 @@ export function useExchangeItemsMethods() {
         cost_price: item.cost_price || 0,
         stock: item.stock || 0,
         sort_order: item.sort_order || 100,
-        status: item.status || 'active'
+        status: item.status || 'active',
+        primary_image_id: item.primary_image_id || null
       }
+      this.itemImagePreviewUrl = item.primary_image?.thumbnail_url || item.primary_image?.url || null
       this.showModal('itemModal')
     },
 
@@ -223,6 +233,60 @@ export function useExchangeItemsMethods() {
         this.showError?.('操作失败')
       } finally {
         this.saving = false
+      }
+    },
+
+    /**
+     * 上传商品图片并绑定 primary_image_id
+     *
+     * @param {Event} event - 文件选择事件（input[type=file] change 事件）
+     * @description 上传图片到 Sealos 对象存储，返回 image_resource_id，
+     *              设置到 itemForm.primary_image_id 并更新预览 URL
+     */
+    async uploadItemImage(event) {
+      const file = event.target.files?.[0]
+      if (!file) return
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+      if (!allowedTypes.includes(file.type)) {
+        this.showError?.('仅支持 JPG/PNG/GIF/WebP 格式')
+        return
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        this.showError?.('图片大小不能超过 5MB')
+        return
+      }
+
+      try {
+        this.imageUploading = true
+
+        const formData = new FormData()
+        formData.append('image', file)
+        formData.append('business_type', 'exchange')
+        formData.append('category', 'products')
+
+        const token = localStorage.getItem('token')
+        const response = await fetch(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData
+        })
+        const res = await response.json()
+
+        if (res.success && res.data) {
+          this.itemForm.primary_image_id = res.data.image_resource_id
+          this.itemImagePreviewUrl = res.data.url || res.data.image_url || null
+          this.showSuccess?.('图片上传成功')
+          logger.info('[ExchangeItems] 图片上传成功:', res.data.image_resource_id)
+        } else {
+          this.showError?.(res.message || '图片上传失败')
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 图片上传失败:', e)
+        this.showError?.('图片上传失败')
+      } finally {
+        this.imageUploading = false
       }
     },
 

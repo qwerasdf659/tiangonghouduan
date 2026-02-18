@@ -115,27 +115,39 @@
       如需此功能，需要先在后端实现对应API
     -->
 
-    <!-- 轮播图管理 -->
+    <!-- 弹窗管理（popup_banners） -->
     <div x-show="current_page === 'popup-banners'" x-cloak>
       <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b flex justify-between items-center">
-          <h5 class="font-semibold">轮播图管理</h5>
-          <button @click="openCreateBannerModal()" class="px-4 py-2 themed-btn-primary rounded">
-            ➕ 新增轮播图
-          </button>
-        </div>
-        <!-- 空状态提示 -->
-
-          <div x-show="banners.length === 0" class="p-8 text-center themed-text-muted">
-            <div class="text-4xl mb-4">🎨</div>
-            <p>暂无轮播图数据</p>
-            <p class="text-sm mt-2">点击"新增轮播图"按钮添加第一个轮播图</p>
+        <div class="p-4 border-b flex justify-between items-center flex-wrap gap-2">
+          <h5 class="font-semibold">🔔 弹窗管理</h5>
+          <div class="flex items-center gap-2">
+            <select x-model="bannerFilters.banner_type" @change="loadBanners()" class="px-2 py-1 text-sm border rounded themed-bg-base">
+              <option value="">全部类型</option>
+              <template x-for="t in bannerTypes" :key="t.value">
+                <option :value="t.value" x-text="t.label"></option>
+              </template>
+            </select>
+            <button @click="openCreateBannerModal()" class="px-4 py-2 themed-btn-primary rounded">
+              ➕ 新增弹窗
+            </button>
           </div>
+        </div>
 
-        <!-- 轮播图列表 -->
+        <div x-show="banners.length === 0" class="p-8 text-center themed-text-muted">
+          <div class="text-4xl mb-4">🔔</div>
+          <p>暂无弹窗数据</p>
+          <p class="text-sm mt-2">点击"新增弹窗"按钮添加第一个弹窗</p>
+        </div>
+
+        <p class="px-4 pt-2 text-xs themed-text-muted" x-show="banners.length > 0">拖拽卡片可调整排序</p>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4" x-show="banners.length > 0">
-          <template x-for="banner in banners" :key="banner.popup_banner_id">
-            <div class="border rounded-lg overflow-hidden">
+          <template x-for="(banner, idx) in banners" :key="banner.popup_banner_id">
+            <div class="border rounded-lg overflow-hidden cursor-grab active:cursor-grabbing transition-shadow"
+                 :class="bannerDragging && bannerDragIndex === idx ? 'ring-2 ring-indigo-400 shadow-lg' : ''"
+                 draggable="true"
+                 @dragstart="bannerDragStart(idx)"
+                 @dragover="bannerDragOver($event, idx)"
+                 @dragend="bannerDragEnd()">
               <div class="themed-bg-muted flex items-center justify-center cursor-pointer overflow-hidden"
                    :style="getBannerAspectStyle(banner.display_mode)"
                    x-show="banner.image_url" @click="previewBanner(banner)">
@@ -151,15 +163,88 @@
                 <h6 class="font-medium" x-text="banner.title"></h6>
                 <div class="mt-1 flex flex-wrap items-center gap-1">
                   <span class="text-xs px-2 py-0.5 rounded text-white"
+                        :class="banner.banner_type_color || 'bg-gray-400'"
+                        x-text="banner.banner_type_display || banner.banner_type || '促销'"></span>
+                  <span class="text-xs px-2 py-0.5 rounded text-white"
                         :class="banner.display_mode_color || 'bg-gray-400'"
                         x-text="banner.display_mode_display || banner.display_mode || '未设置'"></span>
                   <span class="text-xs themed-text-muted" x-show="banner.image_width"
                         x-text="banner.image_width + '×' + banner.image_height"></span>
                 </div>
+                <div class="mt-1 flex flex-wrap items-center gap-1 text-xs themed-text-muted">
+                  <span x-text="'优先级: ' + (banner.priority || 0)"></span>
+                  <span>·</span>
+                  <span x-text="banner.frequency_rule_display || banner.frequency_rule || ''"></span>
+                  <span x-show="banner.force_show" class="text-red-500 font-medium">· 强制弹出</span>
+                </div>
                 <p class="text-sm themed-text-muted mt-1" x-text="'排序: ' + (banner.display_order || 0)"></p>
-                <div class="mt-2 flex space-x-2">
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <button @click="toggleBannerStatus(banner)" class="text-sm"
+                          :class="banner.is_active ? 'text-yellow-500 hover:text-yellow-700' : 'text-green-500 hover:text-green-700'"
+                          x-text="banner.is_active ? '禁用' : '启用'"></button>
                   <button @click="editBanner(banner)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                  <button @click="viewBannerShowStats(banner)" class="text-indigo-500 hover:text-indigo-700 text-sm">统计</button>
                   <button @click="deleteBanner(banner)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- 轮播图管理（carousel_items 独立表） -->
+    <div x-show="current_page === 'carousel-items'" x-cloak>
+      <div class="themed-card rounded-lg shadow">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold">🎨 轮播图管理</h5>
+          <button @click="openCreateCarouselModal()" class="px-4 py-2 themed-btn-primary rounded">
+            ➕ 新增轮播图
+          </button>
+        </div>
+
+        <div x-show="carouselItems.length === 0" class="p-8 text-center themed-text-muted">
+          <div class="text-4xl mb-4">🎨</div>
+          <p>暂无轮播图数据</p>
+          <p class="text-sm mt-2">点击"新增轮播图"按钮添加第一张轮播图</p>
+        </div>
+
+        <p class="px-4 pt-2 text-xs themed-text-muted" x-show="carouselItems.length > 0">拖拽卡片可调整排序</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4" x-show="carouselItems.length > 0">
+          <template x-for="(item, idx) in carouselItems" :key="item.carousel_item_id">
+            <div class="border rounded-lg overflow-hidden cursor-grab active:cursor-grabbing transition-shadow"
+                 :class="carouselDragging && carouselDragIndex === idx ? 'ring-2 ring-indigo-400 shadow-lg' : ''"
+                 draggable="true"
+                 @dragstart="carouselDragStart(idx)"
+                 @dragover="carouselDragOver($event, idx)"
+                 @dragend="carouselDragEnd()">
+              <div class="themed-bg-muted flex items-center justify-center cursor-pointer overflow-hidden"
+                   :style="getCarouselAspectStyle(item.display_mode)"
+                   x-show="item.image_url" @click="previewCarouselItem(item)">
+                <img :data-src="item.image_url" alt=""
+                     class="w-full h-full img-lazy"
+                     style="object-fit: contain;"
+                     x-init="$nextTick(() => { if(item.image_url) { $el.src = item.image_url; $el.classList.add('loaded') } })">
+              </div>
+              <div class="h-48 themed-bg-muted flex items-center justify-center" x-show="!item.image_url">
+                <span class="text-gray-400">无图片</span>
+              </div>
+              <div class="p-3">
+                <h6 class="font-medium" x-text="item.title"></h6>
+                <div class="mt-1 flex flex-wrap items-center gap-1">
+                  <span class="text-xs px-2 py-0.5 rounded bg-blue-500 text-white" x-text="item.display_mode || 'wide'"></span>
+                  <span class="text-xs themed-text-muted" x-show="item.image_width"
+                        x-text="item.image_width + '×' + item.image_height"></span>
+                  <span class="text-xs themed-text-muted" x-text="'间隔: ' + (item.slide_interval_ms || 3000) + 'ms'"></span>
+                </div>
+                <p class="text-sm themed-text-muted mt-1" x-text="'排序: ' + (item.display_order || 0)"></p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <button @click="toggleCarouselStatus(item)" class="text-sm"
+                          :class="item.is_active ? 'text-yellow-500 hover:text-yellow-700' : 'text-green-500 hover:text-green-700'"
+                          x-text="item.is_active ? '禁用' : '启用'"></button>
+                  <button @click="editCarouselItem(item)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                  <button @click="viewCarouselShowStats(item)" class="text-indigo-500 hover:text-indigo-700 text-sm">统计</button>
+                  <button @click="deleteCarouselItem(item)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
                 </div>
               </div>
             </div>
@@ -277,16 +362,16 @@
 
     <!-- 注意：通知相关Modal已移除，因为后端没有对应API -->
 
-    <!-- 4. 轮播图表单 Modal -->
+    <!-- 4. 弹窗表单 Modal -->
     <div x-ref="bannerModal" 
          x-show="isModalOpen('bannerModal')" 
          x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center"
          style="display: none;">
       <div class="fixed inset-0 bg-black/50" @click="hideModal('bannerModal')"></div>
-      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 z-10 max-h-[90vh] overflow-y-auto">
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
         <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
-          <h5 class="font-semibold">🖼️ <span x-text="isEditMode ? '编辑轮播图' : '添加轮播图'"></span></h5>
+          <h5 class="font-semibold">🔔 <span x-text="isEditMode ? '编辑弹窗' : '新增弹窗'"></span></h5>
           <button @click="hideModal('bannerModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
         </div>
         <form @submit.prevent="saveBanner()">
@@ -295,7 +380,38 @@
               <label class="block text-sm font-medium themed-text-secondary mb-1">标题 <span class="text-red-500">*</span></label>
               <input type="text" x-model="bannerForm.title" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
             </div>
-            <!-- 显示模式选择（必填，不预选） -->
+            <!-- 弹窗类型 + 频率控制 -->
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">弹窗类型</label>
+                <select x-model="bannerForm.banner_type" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+                  <template x-for="t in bannerTypes" :key="t.value">
+                    <option :value="t.value" x-text="t.label"></option>
+                  </template>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">弹出优先级</label>
+                <input type="number" x-model.number="bannerForm.priority" min="0" max="999" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+                <p class="text-xs themed-text-muted mt-1">数字越大越优先弹出（公告 900-999，活动 500-899，促销 100-499）</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">频率规则</label>
+                <select x-model="bannerForm.frequency_rule" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+                  <template x-for="r in frequencyRules" :key="r.value">
+                    <option :value="r.value" x-text="r.label"></option>
+                  </template>
+                </select>
+              </div>
+              <div x-show="needsFrequencyValue()">
+                <label class="block text-sm font-medium themed-text-secondary mb-1">频率参数值</label>
+                <input type="number" x-model.number="bannerForm.frequency_value" min="1" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+                <p class="text-xs themed-text-muted mt-1" x-text="bannerForm.frequency_rule === 'once_per_n_days' ? '每N天弹一次' : '累计最多弹N次'"></p>
+              </div>
+            </div>
+            <!-- 显示模式选择 -->
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-2">
                 显示模式 <span class="text-red-500">*</span>
@@ -314,7 +430,6 @@
                 </template>
               </div>
               <p x-show="!bannerForm.display_mode" class="mt-1 text-xs text-red-500">请选择一个显示模式</p>
-              <!-- 比例警告 -->
               <div x-show="ratioWarning" class="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded text-sm text-yellow-700 dark:text-yellow-300">
                 ⚠️ <span x-text="ratioWarning"></span>
               </div>
@@ -328,7 +443,7 @@
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium themed-text-secondary mb-1">排序</label>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">管理排序</label>
                 <input type="number" x-model.number="bannerForm.display_order" min="0" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
               </div>
             </div>
@@ -343,13 +458,11 @@
               </div>
             </div>
             <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">轮播图片</label>
-              <!-- 图片预览区域（新选择的文件预览 或 已保存的图片URL） -->
+              <label class="block text-sm font-medium themed-text-secondary mb-1">弹窗图片</label>
               <div x-show="bannerImagePreview || bannerForm.image_url" class="mb-2 relative">
                 <img :src="bannerImagePreview || bannerForm.image_url" alt="预览" class="max-w-full max-h-48 object-contain rounded border mx-auto">
                 <button type="button" @click="clearBannerImage()" class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600">×</button>
               </div>
-              <!-- 选择图片区域 -->
               <div x-show="!bannerImagePreview && !bannerForm.image_url" class="border-2 border-dashed themed-border rounded-lg p-4 text-center hover:border-indigo-400 transition-colors">
                 <input type="file" id="bannerImageInput" accept="image/jpeg,image/png" @change="selectBannerImage($event)" class="hidden">
                 <label for="bannerImageInput" class="cursor-pointer">
@@ -367,15 +480,121 @@
               <label class="block text-sm font-medium themed-text-secondary mb-1">跳转链接</label>
               <input type="text" x-model="bannerForm.link_url" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500" placeholder="https://...">
             </div>
-            <div>
+            <div class="flex items-center gap-6">
               <label class="flex items-center cursor-pointer">
                 <input type="checkbox" x-model="bannerForm.is_active" class="w-4 h-4 mr-2 rounded themed-border">
-                <span class="text-sm themed-text-secondary">启用轮播图</span>
+                <span class="text-sm themed-text-secondary">启用弹窗</span>
+              </label>
+              <label class="flex items-center cursor-pointer">
+                <input type="checkbox" x-model="bannerForm.force_show" class="w-4 h-4 mr-2 rounded themed-border">
+                <span class="text-sm themed-text-secondary">强制弹出（不可点遮罩关闭）</span>
               </label>
             </div>
           </div>
           <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2 sticky bottom-0">
             <button type="button" @click="hideModal('bannerModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+            <button type="submit" class="px-4 py-2 themed-btn-primary rounded" :disabled="saving">
+              <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+              <span x-text="isEditMode ? '保存修改' : '新增弹窗'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 5. 轮播图表单 Modal -->
+    <div x-ref="carouselModal" 
+         x-show="isModalOpen('carouselModal')" 
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('carouselModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 z-10 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
+          <h5 class="font-semibold">🎨 <span x-text="isEditMode ? '编辑轮播图' : '添加轮播图'"></span></h5>
+          <button @click="hideModal('carouselModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+        </div>
+        <form @submit.prevent="saveCarouselItem()">
+          <div class="p-6 space-y-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">标题 <span class="text-red-500">*</span></label>
+              <input type="text" x-model="carouselForm.title" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-2">显示模式 <span class="text-red-500">*</span></label>
+              <div class="grid grid-cols-3 gap-2">
+                <template x-for="mode in carouselDisplayModes" :key="mode.value">
+                  <label class="flex items-center p-2 border rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                         :class="carouselForm.display_mode === mode.value ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'themed-border'">
+                    <input type="radio" name="carousel_display_mode" :value="mode.value"
+                           x-model="carouselForm.display_mode" class="mr-2">
+                    <div>
+                      <span class="text-sm font-medium" x-text="mode.label"></span>
+                      <span class="text-xs themed-text-muted block" x-text="mode.hint"></span>
+                    </div>
+                  </label>
+                </template>
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">显示位置</label>
+                <select x-model="carouselForm.position" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+                  <option value="home">首页</option>
+                  <option value="profile">个人中心</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">排序</label>
+                <input type="number" x-model.number="carouselForm.display_order" min="0" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">轮播间隔(ms)</label>
+                <input type="number" x-model.number="carouselForm.slide_interval_ms" min="1000" step="500" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">开始时间</label>
+                <input type="datetime-local" x-model="carouselForm.start_time" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">结束时间</label>
+                <input type="datetime-local" x-model="carouselForm.end_time" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">轮播图片</label>
+              <div x-show="carouselImagePreview || carouselForm.image_url" class="mb-2 relative">
+                <img :src="carouselImagePreview || carouselForm.image_url" alt="预览" class="max-w-full max-h-48 object-contain rounded border mx-auto">
+                <button type="button" @click="clearCarouselImage()" class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600">×</button>
+              </div>
+              <div x-show="!carouselImagePreview && !carouselForm.image_url" class="border-2 border-dashed themed-border rounded-lg p-4 text-center hover:border-indigo-400 transition-colors">
+                <input type="file" id="carouselImageInput" accept="image/jpeg,image/png" @change="selectCarouselImage($event)" class="hidden">
+                <label for="carouselImageInput" class="cursor-pointer">
+                  <div class="text-gray-400 mb-2">
+                    <svg class="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                  </div>
+                  <span class="text-sm themed-text-muted">点击选择图片</span>
+                  <p class="text-xs text-gray-400 mt-1">仅支持 JPG/PNG，≤ 400KB</p>
+                </label>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">跳转链接</label>
+              <input type="text" x-model="carouselForm.link_url" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500" placeholder="https://...">
+            </div>
+            <div>
+              <label class="flex items-center cursor-pointer">
+                <input type="checkbox" x-model="carouselForm.is_active" class="w-4 h-4 mr-2 rounded themed-border">
+                <span class="text-sm themed-text-secondary">启用轮播图</span>
+              </label>
+            </div>
+          </div>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2 sticky bottom-0">
+            <button type="button" @click="hideModal('carouselModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
             <button type="submit" class="px-4 py-2 themed-btn-primary rounded" :disabled="saving">
               <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
               <span x-text="isEditMode ? '保存修改' : '添加轮播图'"></span>
@@ -420,7 +639,172 @@
       </div>
     </div>
 
-    <!-- 7. 删除确认 Modal -->
+    <!-- 7. 弹窗展示统计 Modal -->
+    <div x-ref="bannerShowStatsModal"
+         x-show="isModalOpen('bannerShowStatsModal')"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('bannerShowStatsModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
+          <h5 class="font-semibold">📊 弹窗展示统计 - <span x-text="bannerShowStatsTarget?.title"></span></h5>
+          <button @click="hideModal('bannerShowStatsModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+        </div>
+        <div class="p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <input type="date" x-model="bannerShowStatsDateRange.start_date" class="px-2 py-1 text-sm border rounded themed-bg-base">
+            <span class="themed-text-muted">~</span>
+            <input type="date" x-model="bannerShowStatsDateRange.end_date" class="px-2 py-1 text-sm border rounded themed-bg-base">
+            <button @click="loadBannerShowStats()" class="px-3 py-1 text-sm themed-btn-primary rounded">查询</button>
+          </div>
+          <div x-show="bannerShowStatsLoading" class="p-8 text-center themed-text-muted">加载中...</div>
+          <div x-show="!bannerShowStatsLoading && bannerShowStats">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div class="p-3 themed-bg-base rounded-lg text-center">
+                <p class="text-xl font-bold themed-text-primary" x-text="bannerShowStats?.total_shows || 0"></p>
+                <p class="text-xs themed-text-muted">总展示次数</p>
+              </div>
+              <div class="p-3 themed-bg-base rounded-lg text-center">
+                <p class="text-xl font-bold text-blue-500" x-text="bannerShowStats?.avg_duration_ms ? Math.round(bannerShowStats.avg_duration_ms / 1000 * 10) / 10 + 's' : '-'"></p>
+                <p class="text-xs themed-text-muted">平均展示时长</p>
+              </div>
+              <div class="p-3 themed-bg-base rounded-lg text-center">
+                <p class="text-xl font-bold text-green-500" x-text="bannerShowStats?.unique_users || 0"></p>
+                <p class="text-xs themed-text-muted">独立用户数</p>
+              </div>
+              <div class="p-3 themed-bg-base rounded-lg text-center">
+                <p class="text-xl font-bold text-orange-500" x-text="bannerShowStats?.avg_queue_position || '-'"></p>
+                <p class="text-xs themed-text-muted">平均队列位置</p>
+              </div>
+            </div>
+            <div x-show="bannerShowStats?.close_method_distribution" class="mb-4">
+              <h6 class="font-medium mb-2 text-sm">关闭方式分布</h6>
+              <div class="space-y-1">
+                <template x-for="(count, method) in (bannerShowStats?.close_method_distribution || {})" :key="method">
+                  <div class="flex justify-between items-center text-sm">
+                    <span x-text="method === 'close_btn' ? '关闭按钮' : method === 'overlay' ? '点击遮罩' : method === 'confirm_btn' ? '确认按钮' : method"></span>
+                    <span class="font-medium" x-text="count"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+            <div x-show="bannerShowStats?.daily_stats?.length > 0" class="mb-4">
+              <h6 class="font-medium mb-2 text-sm">每日趋势</h6>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="themed-bg-base">
+                    <tr>
+                      <th class="px-3 py-2 text-left">日期</th>
+                      <th class="px-3 py-2 text-right">展示次数</th>
+                      <th class="px-3 py-2 text-right">平均时长</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="day in (bannerShowStats?.daily_stats || [])" :key="day.date">
+                      <tr class="border-t">
+                        <td class="px-3 py-2" x-text="day.date"></td>
+                        <td class="px-3 py-2 text-right" x-text="day.show_count || 0"></td>
+                        <td class="px-3 py-2 text-right" x-text="day.avg_duration_ms ? Math.round(day.avg_duration_ms / 1000 * 10) / 10 + 's' : '-'"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div x-show="!bannerShowStatsLoading && !bannerShowStats" class="p-8 text-center themed-text-muted">暂无统计数据</div>
+        </div>
+        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
+          <button type="button" @click="hideModal('bannerShowStatsModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8. 轮播图展示统计 Modal -->
+    <div x-ref="carouselShowStatsModal"
+         x-show="isModalOpen('carouselShowStatsModal')"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('carouselShowStatsModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
+          <h5 class="font-semibold">📊 轮播图曝光统计 - <span x-text="carouselShowStatsTarget?.title"></span></h5>
+          <button @click="hideModal('carouselShowStatsModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+        </div>
+        <div class="p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <input type="date" x-model="carouselShowStatsDateRange.start_date" class="px-2 py-1 text-sm border rounded themed-bg-base">
+            <span class="themed-text-muted">~</span>
+            <input type="date" x-model="carouselShowStatsDateRange.end_date" class="px-2 py-1 text-sm border rounded themed-bg-base">
+            <button @click="loadCarouselShowStats()" class="px-3 py-1 text-sm themed-btn-primary rounded">查询</button>
+          </div>
+          <div x-show="carouselShowStatsLoading" class="p-8 text-center themed-text-muted">加载中...</div>
+          <div x-show="!carouselShowStatsLoading && carouselShowStats">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div class="p-3 themed-bg-base rounded-lg text-center">
+                <p class="text-xl font-bold themed-text-primary" x-text="carouselShowStats?.total_exposures || 0"></p>
+                <p class="text-xs themed-text-muted">总曝光次数</p>
+              </div>
+              <div class="p-3 themed-bg-base rounded-lg text-center">
+                <p class="text-xl font-bold text-blue-500" x-text="carouselShowStats?.avg_exposure_ms ? Math.round(carouselShowStats.avg_exposure_ms / 1000 * 10) / 10 + 's' : '-'"></p>
+                <p class="text-xs themed-text-muted">平均曝光时长</p>
+              </div>
+              <div class="p-3 themed-bg-base rounded-lg text-center">
+                <p class="text-xl font-bold text-green-500" x-text="carouselShowStats?.click_count || 0"></p>
+                <p class="text-xs themed-text-muted">点击次数</p>
+              </div>
+              <div class="p-3 themed-bg-base rounded-lg text-center">
+                <p class="text-xl font-bold text-orange-500" x-text="carouselShowStats?.click_rate ? (carouselShowStats.click_rate * 100).toFixed(1) + '%' : '0%'"></p>
+                <p class="text-xs themed-text-muted">点击率</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+              <div class="p-3 themed-bg-base rounded-lg text-center">
+                <p class="text-lg font-bold" x-text="carouselShowStats?.manual_swipe_count || 0"></p>
+                <p class="text-xs themed-text-muted">手动滑入次数</p>
+              </div>
+              <div class="p-3 themed-bg-base rounded-lg text-center">
+                <p class="text-lg font-bold" x-text="carouselShowStats?.manual_swipe_rate ? (carouselShowStats.manual_swipe_rate * 100).toFixed(1) + '%' : '0%'"></p>
+                <p class="text-xs themed-text-muted">手动滑入率</p>
+              </div>
+            </div>
+            <div x-show="carouselShowStats?.daily_stats?.length > 0">
+              <h6 class="font-medium mb-2 text-sm">每日趋势</h6>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="themed-bg-base">
+                    <tr>
+                      <th class="px-3 py-2 text-left">日期</th>
+                      <th class="px-3 py-2 text-right">曝光次数</th>
+                      <th class="px-3 py-2 text-right">点击数</th>
+                      <th class="px-3 py-2 text-right">点击率</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="day in (carouselShowStats?.daily_stats || [])" :key="day.date">
+                      <tr class="border-t">
+                        <td class="px-3 py-2" x-text="day.date"></td>
+                        <td class="px-3 py-2 text-right" x-text="day.exposure_count || 0"></td>
+                        <td class="px-3 py-2 text-right" x-text="day.click_count || 0"></td>
+                        <td class="px-3 py-2 text-right" x-text="day.exposure_count > 0 ? ((day.click_count / day.exposure_count) * 100).toFixed(1) + '%' : '0%'"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div x-show="!carouselShowStatsLoading && !carouselShowStats" class="p-8 text-center themed-text-muted">暂无统计数据</div>
+        </div>
+        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
+          <button type="button" @click="hideModal('carouselShowStatsModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 9. 删除确认 Modal -->
     <div x-ref="deleteModal" 
          x-show="isModalOpen('deleteModal')" 
          x-cloak

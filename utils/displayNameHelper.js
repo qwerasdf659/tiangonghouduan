@@ -350,6 +350,15 @@ const DICT_TYPES = {
   BANNER_POSITION: 'banner_position', // 弹窗广告位置（home/lottery/activity/profile）
   BANNER_LINK_TYPE: 'banner_link_type', // 弹窗链接类型（none/page/miniprogram/webview）
   BANNER_DISPLAY_MODE: 'banner_display_mode', // 弹窗显示模式（wide/horizontal/square/tall/slim/full_image）
+  BANNER_TYPE: 'banner_type', // 弹窗类型分级（notice=系统公告/event=活动推广/promo=日常促销）
+  BANNER_FREQUENCY: 'banner_frequency', // 弹窗频率规则（always/once/once_per_session/once_per_day/once_per_n_days/n_times_total）
+
+  // ==================== 广告系统相关（Phase 3-6） ====================
+  AD_CAMPAIGN_STATUS: 'ad_campaign_status', // 广告计划状态（draft/pending_review/approved/active/paused/completed/rejected/cancelled）
+  AD_BILLING_MODE: 'ad_billing_mode', // 广告计费模式（fixed_daily=固定包天/bidding=竞价排名）
+  AD_REVIEW_STATUS: 'ad_review_status', // 广告素材审核状态（pending/approved/rejected）
+  AD_SLOT_TYPE: 'ad_slot_type', // 广告位类型（popup=弹窗/carousel=轮播图）
+
   ADVANCE_MODE: 'advance_mode', // 预设垫付模式（none/inventory/budget/both）
   PAYMENT_METHOD: 'payment_method', // 支付方式（wechat/alipay/cash/card）
   SCOPE_TYPE: 'scope_type', // 配额范围类型（global/campaign/rule）

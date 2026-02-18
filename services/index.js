@@ -38,7 +38,21 @@ const AdminSystemService = require('./AdminSystemService') // 管理后台系统
 const AdminCustomerServiceService = require('./AdminCustomerServiceService') // 管理后台客服管理服务
 const MaterialManagementService = require('./MaterialManagementService') // 材料系统运营管理服务（V4.5.0）
 const PopupBannerService = require('./PopupBannerService') // 弹窗Banner管理服务（2025-12-22）
+const CarouselItemService = require('./CarouselItemService') // 轮播图管理服务（Phase 1 — 拍板决策1）
 const ImageService = require('./ImageService') // 通用图片上传服务（2026-01-08 图片存储架构）
+
+// 🔴 广告系统服务（Phase 2-6）
+const PopupShowLogService = require('./PopupShowLogService') // Phase 2: 弹窗展示日志服务
+const CarouselShowLogService = require('./CarouselShowLogService') // Phase 2: 轮播图曝光日志服务
+const AdSlotService = require('./AdSlotService') // Phase 3: 广告位管理服务
+const AdCampaignService = require('./AdCampaignService') // Phase 3: 广告计划管理服务
+const AdCreativeService = require('./AdCreativeService') // Phase 3: 广告素材管理服务
+const AdBillingService = require('./AdBillingService') // Phase 3: 广告计费服务
+const AdBiddingService = require('./AdBiddingService') // Phase 4: 竞价引擎服务
+const AdTagAggregationService = require('./AdTagAggregationService') // Phase 5: DMP 标签聚合服务
+const AdAntifraudService = require('./AdAntifraudService') // Phase 5: 反作弊服务
+const AdAttributionService = require('./AdAttributionService') // Phase 6: 归因追踪服务
+const AdReportService = require('./AdReportService') // Phase 6: 多维报表服务
 
 // V4 架构重构新增服务（2025-12-10）
 const LotteryPresetService = require('./LotteryPresetService') // 抽奖预设管理服务
@@ -382,7 +396,21 @@ class ServiceManager {
       this._services.set('admin_customer_service', AdminCustomerServiceService)
       this._services.set('material_management', MaterialManagementService)
       this._services.set('popup_banner', PopupBannerService)
+      this._services.set('carousel_item', CarouselItemService)
       this._services.set('image', ImageService)
+
+      // ========== 广告系统服务（Phase 2-6 广告平台） ==========
+      this._services.set('popup_show_log', PopupShowLogService) // Phase 2: 弹窗展示日志
+      this._services.set('carousel_show_log', CarouselShowLogService) // Phase 2: 轮播图曝光日志
+      this._services.set('ad_slot', AdSlotService) // Phase 3: 广告位管理
+      this._services.set('ad_campaign', AdCampaignService) // Phase 3: 广告计划管理
+      this._services.set('ad_creative', AdCreativeService) // Phase 3: 广告素材管理
+      this._services.set('ad_billing', AdBillingService) // Phase 3: 广告计费
+      this._services.set('ad_bidding', AdBiddingService) // Phase 4: 竞价引擎
+      this._services.set('ad_tag_aggregation', AdTagAggregationService) // Phase 5: DMP 标签聚合
+      this._services.set('ad_antifraud', AdAntifraudService) // Phase 5: 反作弊
+      this._services.set('ad_attribution', AdAttributionService) // Phase 6: 归因追踪
+      this._services.set('ad_report', AdReportService) // Phase 6: 多维报表
 
       // ========== 架构重构服务（使用 snake_case key） ==========
 

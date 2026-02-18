@@ -41,6 +41,17 @@ export default {
     'stats-card', 'stats-card-loading',
     // 动画类
     'animate-pulse', 'animate-spin', 'animate-bounce',
+    // 策略分组动态样式（JS 运行时返回，Tailwind 扫描可能遗漏）
+    'border-l-4',
+    'border-l-purple-500', 'bg-purple-50', 'bg-purple-100', 'text-purple-700',
+    'border-l-amber-500', 'bg-amber-50', 'bg-amber-100', 'text-amber-700',
+    'border-l-emerald-500', 'bg-emerald-50', 'bg-emerald-100', 'text-emerald-700',
+    'border-l-blue-500', 'bg-blue-50', 'bg-blue-100', 'text-blue-700',
+    'border-l-red-500', 'bg-red-50', 'bg-red-100', 'text-red-700',
+    'border-l-indigo-500', 'bg-indigo-50', 'bg-indigo-100', 'text-indigo-700',
+    'border-l-teal-500', 'bg-teal-50', 'bg-teal-100', 'text-teal-700',
+    'border-l-cyan-500', 'bg-cyan-50', 'bg-cyan-100', 'text-cyan-700',
+    'border-l-gray-400',
   ],
   theme: {
     extend: {

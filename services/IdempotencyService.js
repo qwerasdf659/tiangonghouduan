@@ -367,6 +367,36 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/popup-banners/:id/toggle': 'ADMIN_POPUP_BANNER_TOGGLE', // 切换弹窗 Banner 状态（新增）
   '/api/v4/console/popup-banners/order': 'ADMIN_POPUP_BANNER_ORDER', // 调整弹窗 Banner 排序（新增）
 
+  // ===== 轮播图管理（Phase 1 — 拍板决策1：轮播图独立表） =====
+  '/api/v4/console/carousel-items/': 'ADMIN_CAROUSEL_ITEM_CREATE', // 创建轮播图
+  '/api/v4/console/carousel-items/:id': 'ADMIN_CAROUSEL_ITEM_UPDATE', // 更新轮播图（PUT）或删除（DELETE）
+  '/api/v4/console/carousel-items/:id/toggle': 'ADMIN_CAROUSEL_ITEM_TOGGLE', // 切换轮播图启用状态
+  '/api/v4/console/carousel-items/order': 'ADMIN_CAROUSEL_ITEM_ORDER', // 调整轮播图排序
+
+  // ===== 广告系统（Phase 2-6 虚拟货币广告平台） =====
+
+  // Phase 2: 展示日志上报
+  '/api/v4/system/ad-events/popup-banners/show-log': 'AD_POPUP_SHOW_LOG_CREATE', // 弹窗展示日志上报
+  '/api/v4/system/ad-events/carousel-items/show-log': 'AD_CAROUSEL_SHOW_LOG_CREATE', // 轮播图曝光日志上报
+
+  // Phase 3: 广告计划管理（用户端）
+  '/api/v4/user/ad-campaigns/': 'USER_AD_CAMPAIGN_CREATE', // 创建广告计划
+  '/api/v4/user/ad-campaigns/:id': 'USER_AD_CAMPAIGN_UPDATE', // 更新广告计划
+  '/api/v4/user/ad-campaigns/:id/submit': 'USER_AD_CAMPAIGN_SUBMIT', // 提交审核（含钻石冻结）
+  '/api/v4/user/ad-campaigns/:id/cancel': 'USER_AD_CAMPAIGN_CANCEL', // 取消计划（含钻石退回）
+
+  // Phase 3: 广告计划管理（管理端）
+  '/api/v4/console/ad-campaigns/:id/review': 'ADMIN_AD_CAMPAIGN_REVIEW', // 审核广告计划
+
+  // Phase 3: 广告位管理（管理端）
+  '/api/v4/console/ad-slots/': 'ADMIN_AD_SLOT_CREATE', // 创建广告位
+  '/api/v4/console/ad-slots/:id': 'ADMIN_AD_SLOT_UPDATE', // 更新广告位
+  '/api/v4/console/ad-slots/:id/toggle': 'ADMIN_AD_SLOT_TOGGLE', // 切换广告位状态
+
+  // Phase 5: 广告事件上报
+  '/api/v4/system/ad-events/impression': 'AD_IMPRESSION_REPORT', // 广告曝光上报
+  '/api/v4/system/ad-events/click': 'AD_CLICK_REPORT', // 广告点击上报
+
   // ===== 欠账管理 =====
   '/api/v4/console/debt-management/clear': 'ADMIN_DEBT_CLEAR', // 清偿欠账
   '/api/v4/console/debt-management/limits/:id': 'ADMIN_DEBT_LIMITS_UPDATE', // 更新欠账上限
