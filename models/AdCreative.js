@@ -113,7 +113,8 @@ module.exports = sequelize => {
             msg: '链接类型必须是：none, external, internal, app_page 之一'
           }
         },
-        comment: '链接类型：none=无链接 / external=外部链接 / internal=内部页面 / app_page=应用内页面'
+        comment:
+          '链接类型：none=无链接 / external=外部链接 / internal=内部页面 / app_page=应用内页面'
       },
 
       review_status: {

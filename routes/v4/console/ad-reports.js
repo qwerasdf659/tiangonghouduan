@@ -86,10 +86,11 @@ router.get(
       }
 
       const AdReportService = req.app.locals.services.getService('ad_report')
-      const report = await AdReportService.getCampaignReport(campaignId, null, {
-        start_date,
-        end_date
-      })
+      const report = await AdReportService.getCampaignReport(
+        campaignId,
+        start_date || null,
+        end_date || null
+      )
 
       if (!report) {
         return res.apiError('报表数据不存在', 'REPORT_NOT_FOUND', null, 404)
@@ -132,10 +133,11 @@ router.get(
       }
 
       const AdReportService = req.app.locals.services.getService('ad_report')
-      const report = await AdReportService.getSlotReport(slotId, {
-        start_date,
-        end_date
-      })
+      const report = await AdReportService.getSlotReport(
+        slotId,
+        start_date || null,
+        end_date || null
+      )
 
       if (!report) {
         return res.apiError('报表数据不存在', 'REPORT_NOT_FOUND', null, 404)

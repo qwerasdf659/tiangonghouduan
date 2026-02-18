@@ -59,10 +59,13 @@
       
       <!-- 用户列表页 -->
       <div x-show="current_page === 'user-list'" x-cloak>
-        <div class="themed-card rounded-lg shadow">
-          <div class="p-4 border-b flex justify-between items-center">
-            <h5 class="font-semibold">用户列表</h5>
-            <button @click="openCreateModal('user')" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary transition-colors">
+        <div class="themed-card rounded-xl shadow-sm overflow-hidden">
+          <div class="p-5 border-b flex justify-between items-center bg-gradient-to-r from-blue-50 to-transparent">
+            <div>
+              <h5 class="font-semibold text-base">👥 用户列表</h5>
+              <p class="text-xs themed-text-muted mt-0.5">管理平台所有用户，查看角色和状态信息</p>
+            </div>
+            <button @click="openCreateModal('user')" class="px-4 py-2 themed-btn-primary rounded-lg shadow-sm hover:shadow transition-shadow text-sm">
               ➕ 新增用户
             </button>
           </div>
@@ -79,8 +82,8 @@
                   <option value="inactive">禁用</option>
                 </select>
                 <div class="flex space-x-2">
-                  <button @click="search()" class="flex-1 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">🔍 搜索</button>
-                  <button @click="handleFilterReset()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">🔄</button>
+                  <button @click="search()" class="flex-1 px-4 py-2 themed-bg-primary text-white rounded-lg hover:opacity-90 transition-all shadow-sm">🔍 搜索</button>
+                  <button @click="handleFilterReset()" class="px-4 py-2 bg-white border themed-text-secondary rounded-lg hover:bg-gray-50 transition-colors">🔄</button>
                 </div>
               </div>
             </div>
@@ -150,10 +153,13 @@
 
       <!-- 角色管理页 -->
       <div x-show="current_page === 'role-list'" x-cloak>
-        <div class="themed-card rounded-lg shadow">
-          <div class="p-4 border-b flex justify-between items-center">
-            <h5 class="font-semibold">角色管理</h5>
-            <button @click="openCreateModal('role')" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary transition-colors">
+        <div class="themed-card rounded-xl shadow-sm overflow-hidden">
+          <div class="p-5 border-b flex justify-between items-center bg-gradient-to-r from-purple-50 to-transparent">
+            <div>
+              <h5 class="font-semibold text-base">🎭 角色管理</h5>
+              <p class="text-xs themed-text-muted mt-0.5">配置系统角色与权限级别，控制功能访问范围</p>
+            </div>
+            <button @click="openCreateModal('role')" class="px-4 py-2 themed-btn-primary rounded-lg shadow-sm hover:shadow transition-shadow text-sm">
               ➕ 新增角色
             </button>
           </div>
@@ -211,16 +217,20 @@
 
       <!-- 权限管理页（只读展示 - 权限嵌入在角色中） -->
       <div x-show="current_page === 'permission-list'" x-cloak>
-        <div class="themed-card rounded-lg shadow">
-          <div class="p-4 border-b">
+        <div class="themed-card rounded-xl shadow-sm">
+          <div class="p-5 border-b bg-gradient-to-r from-emerald-50 to-teal-50 rounded-t-xl">
             <div class="flex justify-between items-center">
-              <h5 class="font-semibold">权限配置概览</h5>
-              <span class="text-sm themed-text-muted themed-bg-subtle px-3 py-1 rounded">
-                📋 权限由角色定义，请在"角色管理"中配置
+              <div>
+                <h5 class="font-semibold text-gray-800 flex items-center gap-2">
+                  <span class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600">🔑</span>
+                  权限配置概览
+                </h5>
+                <p class="text-sm text-gray-500 mt-1">系统权限嵌入在角色配置中，如需修改请编辑对应角色</p>
+              </div>
+              <span class="text-sm text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-lg font-medium">
+                📋 权限由角色定义
               </span>
             </div>
-            <p class="text-sm themed-text-muted mt-2">
-              💡 系统权限嵌入在角色配置中。如需修改权限，请编辑对应角色的权限配置。
             </p>
           </div>
           <!-- data-table: 权限列表 -->
@@ -268,10 +278,16 @@
 
       <!-- 用户角色分配页 -->
       <div x-show="current_page === 'user-roles'" x-cloak>
-        <div class="themed-card rounded-lg shadow">
-          <div class="p-4 border-b flex justify-between items-center">
-            <h5 class="font-semibold">用户角色分配</h5>
-            <button @click="openAssignRoleModal()" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary transition-colors">
+        <div class="themed-card rounded-xl shadow-sm">
+          <div class="p-5 border-b bg-gradient-to-r from-purple-50 to-indigo-50 rounded-t-xl flex justify-between items-center">
+            <div>
+              <h5 class="font-semibold text-gray-800 flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600">👤</span>
+                用户角色分配
+              </h5>
+              <p class="text-sm text-gray-500 mt-1">管理用户的角色分配和权限配置</p>
+            </div>
+            <button @click="openAssignRoleModal()" class="px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary transition-all shadow-sm hover:shadow-md">
               ➕ 分配角色
             </button>
           </div>
@@ -336,31 +352,41 @@
 
       <!-- 高级状态页 -->
       <div x-show="current_page === 'premium-status'" x-cloak>
-        <div class="themed-card rounded-lg shadow">
-          <!-- 统计卡片 -->
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border-b">
-            <div class="themed-bg-primary-light rounded-lg p-4 text-center">
-              <h6 class="themed-text-muted text-sm mb-1">总高级用户</h6>
-              <p class="text-2xl font-bold themed-text-primary" x-text="premiumStats.total || 0"></p>
+        <div class="themed-card rounded-xl shadow-sm">
+          <!-- 统计卡片 - 使用 stats-card 组件 -->
+          <div class="stats-grid stats-grid-4 p-5">
+            <div class="stats-card stats-primary stats-card-animate">
+              <div class="stats-card-icon">⭐</div>
+              <div class="stats-card-value" x-text="premiumStats.total || 0"></div>
+              <div class="stats-card-label">总高级用户</div>
             </div>
-            <div class="bg-green-50 rounded-lg p-4 text-center">
-              <h6 class="themed-text-muted text-sm mb-1">有效用户</h6>
-              <p class="text-2xl font-bold text-green-600" x-text="premiumStats.active || 0"></p>
+            <div class="stats-card stats-success stats-card-animate">
+              <div class="stats-card-icon">✅</div>
+              <div class="stats-card-value" x-text="premiumStats.active || 0"></div>
+              <div class="stats-card-label">有效用户</div>
             </div>
-            <div class="bg-yellow-50 rounded-lg p-4 text-center">
-              <h6 class="themed-text-muted text-sm mb-1">即将过期</h6>
-              <p class="text-2xl font-bold text-yellow-600" x-text="premiumStats.expiring_soon || 0"></p>
+            <div class="stats-card stats-warning stats-card-animate">
+              <div class="stats-card-icon">⏰</div>
+              <div class="stats-card-value" x-text="premiumStats.expiring_soon || 0"></div>
+              <div class="stats-card-label">即将过期</div>
             </div>
-            <div class="bg-red-50 rounded-lg p-4 text-center">
-              <h6 class="themed-text-muted text-sm mb-1">已过期</h6>
-              <p class="text-2xl font-bold text-red-600" x-text="premiumStats.expired || 0"></p>
+            <div class="stats-card stats-danger stats-card-animate">
+              <div class="stats-card-icon">📛</div>
+              <div class="stats-card-value" x-text="premiumStats.expired || 0"></div>
+              <div class="stats-card-label">已过期</div>
             </div>
           </div>
 
-          <div class="p-4 border-b flex justify-between items-center">
-            <h5 class="font-semibold">⭐ 高级用户状态</h5>
-            <button @click="loadPremiumUsers()" class="px-4 py-2 themed-bg-subtle themed-text-secondary rounded themed-hover-bg transition-colors">
-              🔄 刷新
+          <div class="p-5 border-b border-t bg-gradient-to-r from-amber-50 to-orange-50 flex justify-between items-center">
+            <div>
+              <h5 class="font-semibold text-gray-800 flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600">⭐</span>
+                高级用户状态
+              </h5>
+              <p class="text-sm text-gray-500 mt-1">查看和管理高级用户的解锁状态和有效期</p>
+            </div>
+            <button @click="loadPremiumUsers()" class="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-all shadow-sm hover:shadow-md">
+              🔄 刷新数据
             </button>
           </div>
           
@@ -382,8 +408,8 @@
                   <option value="referral">推荐奖励</option>
                 </select>
                 <div class="flex space-x-2">
-                  <button @click="search()" class="flex-1 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">🔍 搜索</button>
-                  <button @click="handleFilterReset()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">🔄</button>
+                  <button @click="search()" class="flex-1 px-4 py-2 themed-bg-primary text-white rounded-lg hover:opacity-90 transition-all shadow-sm">🔍 搜索</button>
+                  <button @click="handleFilterReset()" class="px-4 py-2 bg-white border themed-text-secondary rounded-lg hover:bg-gray-50 transition-colors">🔄</button>
                 </div>
               </div>
             </div>
@@ -446,12 +472,18 @@
 
       <!-- 风控配置页 -->
       <div x-show="current_page === 'risk-profiles'" x-cloak>
-        <div class="themed-card rounded-lg shadow">
-          <div class="p-4 border-b flex justify-between items-center">
-            <h5 class="font-semibold">🛡️ 风控配置管理</h5>
+        <div class="themed-card rounded-xl shadow-sm">
+          <div class="p-5 border-b bg-gradient-to-r from-red-50 to-orange-50 rounded-t-xl flex justify-between items-center">
+            <div>
+              <h5 class="font-semibold text-gray-800 flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center text-red-600">🛡️</span>
+                风控配置管理
+              </h5>
+              <p class="text-sm text-gray-500 mt-1">配置用户风控规则、积分限额和冻结策略</p>
+            </div>
             <div class="flex space-x-2">
-              <button @click="loadRiskProfiles()" class="px-4 py-2 themed-bg-subtle themed-text-secondary rounded themed-hover-bg transition-colors">
-                🔄 刷新
+              <button @click="loadRiskProfiles()" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all shadow-sm hover:shadow-md">
+                🔄 刷新数据
               </button>
             </div>
           </div>
@@ -478,8 +510,8 @@
                   <option value="false">未冻结</option>
                 </select>
                 <div class="flex space-x-2">
-                  <button @click="search()" class="flex-1 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">🔍 搜索</button>
-                  <button @click="handleFilterReset()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">🔄</button>
+                  <button @click="search()" class="flex-1 px-4 py-2 themed-bg-primary text-white rounded-lg hover:opacity-90 transition-all shadow-sm">🔍 搜索</button>
+                  <button @click="handleFilterReset()" class="px-4 py-2 bg-white border themed-text-secondary rounded-lg hover:bg-gray-50 transition-colors">🔄</button>
                 </div>
               </div>
             </div>
@@ -547,14 +579,20 @@
 
       <!-- 角色变更历史页 -->
       <div x-show="current_page === 'role-history'" x-cloak>
-        <div class="themed-card rounded-lg shadow">
-          <div class="p-4 border-b flex justify-between items-center">
-            <h5 class="font-semibold">📜 角色变更历史</h5>
+        <div class="themed-card rounded-xl shadow-sm">
+          <div class="p-5 border-b bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-xl flex justify-between items-center">
+            <div>
+              <h5 class="font-semibold text-gray-800 flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">📜</span>
+                角色变更历史
+              </h5>
+              <p class="text-sm text-gray-500 mt-1">记录所有用户角色变更操作的审计日志</p>
+            </div>
             <button @click="loadRoleChangeHistory(); showSuccess('数据已刷新')" 
-                    class="px-4 py-2 themed-bg-subtle themed-text-secondary rounded themed-hover-bg transition-colors"
+                    class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all shadow-sm hover:shadow-md"
                     :disabled="loading">
-              <span x-show="loading" class="inline-block w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin mr-1"></span>
-              🔄 刷新
+              <span x-show="loading" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+              🔄 刷新数据
             </button>
           </div>
           
@@ -627,14 +665,20 @@
 
       <!-- 状态变更历史页 -->
       <div x-show="current_page === 'status-history'" x-cloak>
-        <div class="themed-card rounded-lg shadow">
-          <div class="p-4 border-b flex justify-between items-center">
-            <h5 class="font-semibold">📋 状态变更历史</h5>
+        <div class="themed-card rounded-xl shadow-sm">
+          <div class="p-5 border-b bg-gradient-to-r from-cyan-50 to-sky-50 rounded-t-xl flex justify-between items-center">
+            <div>
+              <h5 class="font-semibold text-gray-800 flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-cyan-100 flex items-center justify-center text-cyan-600">📋</span>
+                状态变更历史
+              </h5>
+              <p class="text-sm text-gray-500 mt-1">记录所有用户账号状态变更操作的审计日志</p>
+            </div>
             <button @click="loadStatusChangeHistory(); showSuccess('数据已刷新')" 
-                    class="px-4 py-2 themed-bg-subtle themed-text-secondary rounded themed-hover-bg transition-colors"
+                    class="px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-all shadow-sm hover:shadow-md"
                     :disabled="loading">
-              <span x-show="loading" class="inline-block w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin mr-1"></span>
-              🔄 刷新
+              <span x-show="loading" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+              🔄 刷新数据
             </button>
           </div>
           
@@ -841,23 +885,31 @@
 
       <!-- 用户统计页 -->
       <div x-show="current_page === 'user-stats'" x-cloak>
-        <!-- 统计卡片 -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <div class="themed-card rounded-lg shadow p-6 text-center">
-            <h6 class="themed-text-muted mb-2">总用户数</h6>
-            <h2 class="text-3xl font-bold themed-text-primary" x-text="userStats.total_users"></h2>
+        <!-- 统计卡片 - 渐变风格 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div class="gradient-stat-card gradient-stat-blue stats-card-animate">
+            <div class="stat-icon">👥</div>
+            <div class="stat-value" x-text="userStats.total_users"></div>
+            <div class="stat-label">总用户数</div>
+            <div class="stat-trend" x-text="'今日新增 ' + (userStats.new_users_today || 0)"></div>
           </div>
-          <div class="themed-card rounded-lg shadow p-6 text-center">
-            <h6 class="themed-text-muted mb-2">活跃用户</h6>
-            <h2 class="text-3xl font-bold text-green-600" x-text="userStats.active_users"></h2>
+          <div class="gradient-stat-card gradient-stat-green stats-card-animate">
+            <div class="stat-icon">🟢</div>
+            <div class="stat-value" x-text="userStats.active_users"></div>
+            <div class="stat-label">活跃用户</div>
+            <div class="stat-trend" x-text="userStats.total_users > 0 ? '活跃率 ' + Math.round(userStats.active_users / userStats.total_users * 100) + '%' : '—'"></div>
           </div>
-          <div class="themed-card rounded-lg shadow p-6 text-center">
-            <h6 class="themed-text-muted mb-2">角色数量</h6>
-            <h2 class="text-3xl font-bold text-purple-600" x-text="userStats.total_roles"></h2>
+          <div class="gradient-stat-card gradient-stat-purple stats-card-animate">
+            <div class="stat-icon">🎭</div>
+            <div class="stat-value" x-text="userStats.total_roles"></div>
+            <div class="stat-label">角色数量</div>
+            <div class="stat-trend">系统权限模型</div>
           </div>
-          <div class="themed-card rounded-lg shadow p-6 text-center">
-            <h6 class="themed-text-muted mb-2">权限数量</h6>
-            <h2 class="text-3xl font-bold text-orange-600" x-text="userStats.total_permissions"></h2>
+          <div class="gradient-stat-card gradient-stat-orange stats-card-animate">
+            <div class="stat-icon">🔑</div>
+            <div class="stat-value" x-text="userStats.total_permissions"></div>
+            <div class="stat-label">权限数量</div>
+            <div class="stat-trend">细粒度控制</div>
           </div>
         </div>
 

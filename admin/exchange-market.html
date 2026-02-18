@@ -8,11 +8,11 @@
 </head>
 <body class="themed-bg-subtle min-h-screen">
   
-  <!-- 导航栏 -->
-  <nav class="bg-green-600 text-white shadow-lg">
+  <!-- 导航栏（深色渐变风格） -->
+  <nav class="page-navbar">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:text-green-200">← 返回工作台</a>
+        <a href="/admin/workspace.html" class="text-blue-200 hover:text-white transition-colors">← 返回工作台</a>
         <span class="text-lg font-semibold">🏪 兑换市场管理</span>
       </div>
     </div>
@@ -26,26 +26,33 @@
        @ship-order="shipOrder($event.detail)"
        @complete-order-action="completeOrder($event.detail)">
     
-    <!-- 子页面导航 -->
-    <div class="themed-card rounded-lg shadow mb-6">
-      <div class="flex border-b overflow-x-auto">
-        <template x-for="page in subPages" :key="page.id">
-          <button 
-            @click="switchPage(page.id)"
-            :class="current_page === page.id ? 'border-b-2 border-green-500 text-green-600 bg-green-50' : 'themed-text-muted themed-hover-bg'"
-            class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
-            x-text="page.icon + ' ' + page.name"
-          ></button>
-        </template>
-      </div>
+    <!-- 页面横幅 -->
+    <div class="page-banner mb-6">
+      <h1>🏪 兑换市场管理</h1>
+      <p>管理兑换商品上下架、库存、订单处理和运营数据分析</p>
+    </div>
+
+    <!-- 子页面导航（增强Tab样式） -->
+    <div class="enhanced-tabs">
+      <template x-for="page in subPages" :key="page.id">
+        <button 
+          @click="switchPage(page.id)"
+          :class="current_page === page.id ? 'active' : ''"
+          class="tab-item"
+          x-text="page.icon + ' ' + page.name"
+        ></button>
+      </template>
     </div>
 
     <!-- 商品列表 -->
     <div x-show="current_page === 'items'" x-cloak>
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b flex justify-between items-center">
-          <h5 class="font-semibold">兑换商品列表</h5>
-          <button @click="openAddItemModal()" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">
+      <div class="content-section">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">📦</span>
+            兑换商品列表
+          </div>
+          <button @click="openAddItemModal()" class="action-btn action-btn-primary">
             ➕ 新增商品
           </button>
         </div>

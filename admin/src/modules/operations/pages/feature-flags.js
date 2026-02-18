@@ -59,16 +59,21 @@ function registerFeatureFlagsComponents() {
 
     // ========== data-table 列配置 ==========
     tableColumns: [
-      { key: 'flag_key', label: '开关键名', sortable: true },
+      { key: 'flag_key', label: '开关键名', sortable: true, type: 'code' },
       { key: 'flag_name', label: '名称', sortable: true },
+      { key: 'description', label: '功能描述',
+        render: (val) => val
+          ? `<span class="text-gray-600 text-sm">${val.length > 40 ? val.slice(0, 40) + '...' : val}</span>`
+          : '<span class="text-gray-300">-</span>'
+      },
       {
         key: 'is_enabled',
         label: '状态',
         sortable: true,
         type: 'status',
         statusMap: {
-          true: { class: 'green', label: '✅ 启用' },
-          false: { class: 'gray', label: '⭕ 禁用' }
+          true: { class: 'green', label: '启用' },
+          false: { class: 'gray', label: '禁用' }
         }
       },
       {
@@ -98,6 +103,16 @@ function registerFeatureFlagsComponents() {
             return `<span class="font-semibold text-blue-600">${val || 100}%</span>`
           }
           return '<span class="text-gray-400">-</span>'
+        }
+      },
+      {
+        key: '_whitelist',
+        label: '白名单',
+        render: (_val, row) => {
+          const count = Array.isArray(row.whitelist_user_ids) ? row.whitelist_user_ids.length : 0
+          return count > 0
+            ? `<span class="text-blue-600 font-medium">${count}人</span>`
+            : '<span class="text-gray-300">0</span>'
         }
       },
       {

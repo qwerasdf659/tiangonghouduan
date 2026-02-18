@@ -8,10 +8,10 @@
 </head>
 <body class="themed-bg-subtle min-h-screen">
   
-  <nav class="themed-bg-primary text-white shadow-lg">
+  <nav class="page-navbar">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:text-stone-200">← 返回工作台</a>
+        <a href="/admin/workspace.html" class="text-white/70 hover:text-white transition-colors">← 返回工作台</a>
         <span class="text-lg font-semibold">🔐 会话管理</span>
       </div>
       <div class="flex items-center space-x-4">
@@ -23,31 +23,43 @@
   <div class="container mx-auto px-4 py-6" x-data="sessionsPage()" x-init="init()">
     
     <!-- 统计卡片 -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-      <div class="themed-card rounded-lg shadow p-6 text-center">
-        <i class="text-4xl themed-text-primary mb-2">📊</i>
-        <h6 class="themed-text-muted mt-2">总会话数</h6>
-        <h2 class="text-3xl font-bold themed-text-primary" x-text="total || sessions.length"></h2>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-5 mb-6">
+      <div class="gradient-stat-card gradient-stat-blue">
+        <div class="stat-icon">📊</div>
+        <div class="stat-value" x-text="total || sessions.length"></div>
+        <div class="stat-label">总会话数</div>
+        <div class="stat-trend">
+          <span>在线用户的所有会话记录</span>
+        </div>
       </div>
-      <div class="themed-card rounded-lg shadow p-6 text-center">
-        <i class="text-4xl text-green-500 mb-2">✅</i>
-        <h6 class="themed-text-muted mt-2">活跃会话</h6>
-        <h2 class="text-3xl font-bold text-green-600" x-text="statistics.activeSessions"></h2>
+      <div class="gradient-stat-card gradient-stat-green">
+        <div class="stat-icon">✅</div>
+        <div class="stat-value" x-text="statistics.activeSessions"></div>
+        <div class="stat-label">活跃会话</div>
+        <div class="stat-trend">
+          <span>当前正在使用系统的会话</span>
+        </div>
       </div>
-      <div class="themed-card rounded-lg shadow p-6 text-center">
-        <i class="text-4xl text-orange-500 mb-2">⏰</i>
-        <h6 class="themed-text-muted mt-2">已过期</h6>
-        <h2 class="text-3xl font-bold text-orange-600" x-text="statistics.expiredCount || 0"></h2>
+      <div class="gradient-stat-card gradient-stat-orange">
+        <div class="stat-icon">⏰</div>
+        <div class="stat-value" x-text="statistics.expiredCount || 0"></div>
+        <div class="stat-label">已过期</div>
+        <div class="stat-trend">
+          <span>超时未活动自动过期的会话</span>
+        </div>
       </div>
-      <div class="themed-card rounded-lg shadow p-6 text-center">
-        <i class="text-4xl text-purple-500 mb-2">🛡️</i>
-        <h6 class="themed-text-muted mt-2">管理员会话</h6>
-        <h2 class="text-3xl font-bold text-purple-600" x-text="statistics.adminSessions"></h2>
+      <div class="gradient-stat-card gradient-stat-purple">
+        <div class="stat-icon">🛡️</div>
+        <div class="stat-value" x-text="statistics.adminSessions"></div>
+        <div class="stat-label">管理员会话</div>
+        <div class="stat-trend">
+          <span>管理员账号的活跃会话数</span>
+        </div>
       </div>
     </div>
 
     <!-- 筛选栏 -->
-    <div class="themed-card rounded-lg shadow mb-6 p-4">
+    <div class="filter-toolbar">
       <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
         <div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>

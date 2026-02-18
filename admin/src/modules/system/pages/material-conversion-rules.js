@@ -82,6 +82,9 @@ function materialConversionRulesPage() {
 
     // ==================== 页面特有状态 ====================
 
+    /** @type {string} 当前激活的标签页 ('rules'|'assetTypes') */
+    activeTab: 'rules',
+
     /** @type {boolean} 提交操作加载状态 */
     submitting: false,
 
@@ -93,7 +96,7 @@ function materialConversionRulesPage() {
 
     // ========== data-table 列配置 ==========
     tableColumns: [
-      { key: 'rule_id', label: '规则ID', sortable: true, type: 'code' },
+      { key: 'material_conversion_rule_id', label: '规则ID', sortable: true, type: 'code' },
       {
         key: '_direction',
         label: '转换方向',
@@ -131,14 +134,14 @@ function materialConversionRulesPage() {
         type: 'actions',
         width: '200px',
         actions: [
-          { name: 'edit', label: '编辑', icon: '✏️', class: 'text-blue-600 hover:text-blue-800' },
+          { name: 'edit', label: '查看', icon: '👁️', class: 'text-blue-600 hover:text-blue-800' },
           {
             name: 'toggle',
-            label: '切换',
-            icon: '🔄',
-            class: 'text-green-600 hover:text-green-800'
-          },
-          { name: 'delete', label: '删除', icon: '🗑️', class: 'text-red-500 hover:text-red-700' }
+            label: '禁用',
+            icon: '⏸️',
+            class: 'text-orange-600 hover:text-orange-800',
+            condition: (row) => row.is_enabled
+          }
         ]
       }
     ],
@@ -162,14 +165,13 @@ function materialConversionRulesPage() {
       const { action, row } = detail
       switch (action) {
         case 'edit':
-          this.openEditModal(row)
+          this.openViewModal(row.material_conversion_rule_id)
           break
         case 'toggle':
-          this.toggleRule(row.rule_id, row.is_enabled)
+          this.disableRule(row.material_conversion_rule_id)
           break
-        case 'delete':
-          this.deleteRule(row.rule_id)
-          break
+        default:
+          logger.warn('[MaterialConversionRules] 未知操作:', action)
       }
     },
 
@@ -399,11 +401,11 @@ function materialConversionRulesPage() {
      * @returns {void}
      */
     openViewModal(ruleId) {
-      const rule = this.rules.find(r => r.rule_id === parseInt(ruleId))
+      const rule = this.rules.find(r => String(r.material_conversion_rule_id) === String(ruleId))
       if (!rule) return
 
       this.editForm = {
-        rule_id: rule.rule_id,
+        rule_id: rule.material_conversion_rule_id,
         direction: `${rule.from_asset_code} → ${rule.to_asset_code}`,
         from_amount: rule.from_amount,
         to_amount: rule.to_amount,
@@ -443,6 +445,46 @@ function materialConversionRulesPage() {
       if (result.success) {
         await this.loadRules()
       }
+    },
+
+    // ==================== 资产类型颜色映射 ====================
+
+    /**
+     * 根据资产类型的 group_code 获取对应的渐变色和图标
+     * @param {Object} assetType - 资产类型对象
+     * @returns {Object} { gradient, icon, ring } 颜色配置
+     */
+    getAssetTypeStyle(assetType) {
+      const styleMap = {
+        red: { gradient: 'from-red-500 to-rose-600', icon: '🔴', ring: 'ring-red-200', bg: 'bg-red-50' },
+        orange: { gradient: 'from-orange-500 to-amber-600', icon: '🟠', ring: 'ring-orange-200', bg: 'bg-orange-50' },
+        yellow: { gradient: 'from-yellow-500 to-amber-500', icon: '🟡', ring: 'ring-yellow-200', bg: 'bg-yellow-50' },
+        green: { gradient: 'from-green-500 to-emerald-600', icon: '🟢', ring: 'ring-green-200', bg: 'bg-green-50' },
+        blue: { gradient: 'from-blue-500 to-indigo-600', icon: '🔵', ring: 'ring-blue-200', bg: 'bg-blue-50' },
+        purple: { gradient: 'from-purple-500 to-violet-600', icon: '🟣', ring: 'ring-purple-200', bg: 'bg-purple-50' },
+        currency: { gradient: 'from-cyan-500 to-teal-600', icon: '💎', ring: 'ring-cyan-200', bg: 'bg-cyan-50' },
+        points: { gradient: 'from-slate-500 to-gray-600', icon: '⭐', ring: 'ring-slate-200', bg: 'bg-slate-50' }
+      }
+      return styleMap[assetType.group_code] || styleMap.points
+    },
+
+    /**
+     * 获取资产形态的中文显示名
+     * @param {string} form - 形态代码 (shard|crystal|currency)
+     * @returns {string} 中文形态名
+     */
+    getFormLabel(form) {
+      const formMap = { shard: '碎片', crystal: '水晶', currency: '货币' }
+      return formMap[form] || form
+    },
+
+    /**
+     * 获取可交易状态标签
+     * @param {Object} assetType - 资产类型对象
+     * @returns {string} 可交易状态文本
+     */
+    getTradableLabel(assetType) {
+      return assetType.is_tradable ? '可交易' : '不可交易'
     },
 
     // ==================== 辅助方法 ====================

@@ -10,16 +10,19 @@
  * - 路由层只负责：认证/鉴权、参数校验、调用Service、统一响应
  * - 使用统一响应 res.apiSuccess / res.apiError
  *
- * 会话管理（2026-01-21 新增）：
+ * 会话管理（2026-01-21 新增，2026-02-18 修复 P0 安全漏洞）：
+ * - Token 刷新时维持会话链路不中断（修复 session_token 丢失问题）
  * - 登出时失效对应的会话记录
- * - 支持强制登出时立即失效
+ * - 单设备登录策略：刷新时检测会话是否被覆盖
  *
  * 创建时间：2025-12-22
- * 更新时间：2026-01-21（新增登出时失效会话）
+ * 更新时间：2026-02-18（修复 Token 刷新绕过会话验证的 P0 安全漏洞）
  */
 
 const express = require('express')
 const router = express.Router()
+const jwt = require('jsonwebtoken')
+const { v4: uuidv4 } = require('uuid')
 const { logger, sanitize } = require('../../../utils/logger')
 const {
   generateTokens,
@@ -115,7 +118,6 @@ router.post('/refresh', async (req, res) => {
    */
   const refresh_token = req.cookies.refresh_token
 
-  // 验证必需参数
   if (!refresh_token) {
     return res.apiError(
       '刷新Token不能为空，请确保请求携带Cookie',
@@ -125,12 +127,10 @@ router.post('/refresh', async (req, res) => {
     )
   }
 
-  // 验证刷新Token
   const { verifyRefreshToken } = require('../../../middleware/auth')
   const verifyResult = await verifyRefreshToken(refresh_token)
 
   if (!verifyResult.valid) {
-    // 🔐 Token无效时清除Cookie
     res.clearCookie('refresh_token', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -140,16 +140,86 @@ router.post('/refresh', async (req, res) => {
     return res.apiError('刷新Token无效', 'INVALID_REFRESH_TOKEN', null, 401)
   }
 
-  // 通过ServiceManager获取UserService
   const UserService = req.app.locals.services.getService('user')
-
-  // 使用 UserService 获取用户信息并验证状态
   const user = await UserService.getUserWithValidation(verifyResult.user.user_id)
 
-  // 生成新的Token对
-  const tokens = await generateTokens(user)
+  /**
+   * 🔐 会话连续性保护（修复 P0 安全漏洞）
+   *
+   * Token 刷新时维持会话验证链路不中断：
+   * 1. 从旧 access_token（可能已过期）中提取 session_token
+   * 2. 会话有效 → 延长有效期，复用同一 session_token
+   * 3. 会话被新登录覆盖（is_active=false）→ 拒绝刷新，返回 SESSION_REPLACED
+   * 4. 会话不存在/过期/旧Token无session_token → 创建新会话
+   *
+   * @see docs/SESSION_INVALIDATED认证异常解决方案.md - 方案A
+   */
+  const { AuthenticationSession } = req.app.locals.models
+  const SESSION_TTL_MINUTES = 10080 // 7天，与 refresh_token 生命周期对齐
+  let sessionToken = null
 
-  // 获取用户角色信息
+  const authHeader = req.headers.authorization
+  const oldAccessToken = authHeader && authHeader.split(' ')[1]
+
+  if (oldAccessToken) {
+    try {
+      const oldDecoded = jwt.decode(oldAccessToken)
+      if (oldDecoded?.session_token) {
+        const existingSession = await AuthenticationSession.findOne({
+          where: { session_token: oldDecoded.session_token }
+        })
+
+        if (existingSession) {
+          if (!existingSession.is_active) {
+            res.clearCookie('refresh_token', {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'strict',
+              path: '/api/v4/auth'
+            })
+            return res.apiError(
+              '您的账号已在其他设备登录，请重新登录',
+              'SESSION_REPLACED',
+              null,
+              401
+            )
+          }
+
+          await existingSession.extendExpiry(SESSION_TTL_MINUTES)
+          sessionToken = oldDecoded.session_token
+          logger.info(
+            `🔄 [Auth] Token刷新复用会话: session=${sessionToken.substring(0, 8)}..., user_id=${user.user_id}`
+          )
+        }
+      }
+    } catch (decodeError) {
+      logger.debug(`🔄 [Auth] 旧Token解码跳过: ${decodeError.message}`)
+    }
+  }
+
+  if (!sessionToken) {
+    sessionToken = uuidv4()
+    const refreshUserRoles = await getUserRoles(user.user_id)
+    const userType = refreshUserRoles.role_level >= 100 ? 'admin' : 'user'
+    const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
+
+    try {
+      await AuthenticationSession.createSession({
+        session_token: sessionToken,
+        user_type: userType,
+        user_id: user.user_id,
+        login_ip: loginIp,
+        expires_in_minutes: SESSION_TTL_MINUTES
+      })
+      logger.info(
+        `🔐 [Auth] Token刷新创建新会话: session=${sessionToken.substring(0, 8)}..., user_id=${user.user_id}`
+      )
+    } catch (sessionError) {
+      logger.warn(`⚠️ [Auth] Token刷新会话创建失败（非致命）: ${sessionError.message}`)
+    }
+  }
+
+  const tokens = await generateTokens(user, { session_token: sessionToken })
   const userRoles = await getUserRoles(user.user_id)
 
   /**
@@ -160,21 +230,20 @@ router.post('/refresh', async (req, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7天（毫秒）
+    maxAge: 7 * 24 * 60 * 60 * 1000,
     path: '/api/v4/auth'
   })
 
   const responseData = {
     access_token: tokens.access_token,
-    // 🔐 安全升级：refresh_token不再通过响应体返回
     user: {
       user_id: user.user_id,
       mobile: user.mobile,
-      role_level: userRoles.role_level, // 角色级别（>= 100 为管理员）
+      role_level: userRoles.role_level,
       roles: userRoles.roles,
       status: user.status
     },
-    expires_in: 7 * 24 * 60 * 60, // 7天
+    expires_in: 7 * 24 * 60 * 60,
     timestamp: BeijingTimeHelper.apiTimestamp()
   }
 

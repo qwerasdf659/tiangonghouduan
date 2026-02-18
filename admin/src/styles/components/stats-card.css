@@ -10,15 +10,73 @@
 /* ========== 统计卡片基础 ========== */
 
 .stats-card {
-  @apply rounded-xl shadow-sm border p-5 transition-all duration-300;
+  @apply rounded-xl border p-5 transition-all duration-300 relative overflow-hidden;
   background-color: var(--card-bg, #ffffff);
-  border-color: var(--color-border-light, #f3f4f6);
+  border-color: var(--color-border, #dde1e9);
+  box-shadow: var(--shadow-card, 0 1px 3px 0 rgb(0 0 0 / 0.08));
 }
 
 .stats-card:hover {
-  @apply shadow-md;
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-card-hover, 0 8px 24px -4px rgb(59 130 246 / 0.12));
 }
+
+/* 顶部渐变色条 - 加深可见度 */
+.stats-card::before {
+  content: '';
+  @apply absolute top-0 left-0 right-0 h-1 rounded-t-xl;
+  background: linear-gradient(90deg, var(--color-primary, #3b82f6) 0%, var(--color-primary-hover, #2563eb) 100%);
+  opacity: 0.6;
+}
+
+/* 右下角装饰光晕 - 增强视觉丰富度 */
+.stats-card::after {
+  content: '';
+  @apply absolute -bottom-6 -right-6 w-24 h-24 rounded-full;
+  background: radial-gradient(circle, currentColor 0%, transparent 70%);
+  opacity: 0.06;
+  pointer-events: none;
+}
+
+.stats-card.stats-primary {
+  border-left: 4px solid #3b82f6;
+}
+.stats-card.stats-primary::before {
+  background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 50%, #93c5fd 100%);
+}
+.stats-card.stats-primary::after { color: #3b82f6; }
+
+.stats-card.stats-success {
+  border-left: 4px solid #10b981;
+}
+.stats-card.stats-success::before {
+  background: linear-gradient(90deg, #10b981 0%, #34d399 50%, #6ee7b7 100%);
+}
+.stats-card.stats-success::after { color: #10b981; }
+
+.stats-card.stats-warning {
+  border-left: 4px solid #f59e0b;
+}
+.stats-card.stats-warning::before {
+  background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 50%, #fcd34d 100%);
+}
+.stats-card.stats-warning::after { color: #f59e0b; }
+
+.stats-card.stats-danger {
+  border-left: 4px solid #ef4444;
+}
+.stats-card.stats-danger::before {
+  background: linear-gradient(90deg, #ef4444 0%, #f87171 50%, #fca5a5 100%);
+}
+.stats-card.stats-danger::after { color: #ef4444; }
+
+.stats-card.stats-info {
+  border-left: 4px solid #8b5cf6;
+}
+.stats-card.stats-info::before {
+  background: linear-gradient(90deg, #8b5cf6 0%, #a78bfa 50%, #c4b5fd 100%);
+}
+.stats-card.stats-info::after { color: #8b5cf6; }
 
 /* 紧凑版本 */
 .stats-card-compact {
@@ -44,27 +102,31 @@
   @apply w-14 h-14 text-3xl mb-4;
 }
 
-/* 图标颜色变体 - 使用主题变量 */
+/* 图标颜色变体 - 使用主题变量 + 微妙渐变 */
 .stats-card.stats-primary .stats-card-icon {
-  background-color: var(--color-primary-light, #dbeafe);
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
   color: var(--color-primary, #3b82f6);
 }
 
-/* 状态色图标 - 保持固定色 */
+/* 状态色图标 - 渐变背景 */
 .stats-card.stats-success .stats-card-icon {
-  @apply bg-green-100 text-green-600;
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  @apply text-green-600;
 }
 
 .stats-card.stats-warning .stats-card-icon {
-  @apply bg-orange-100 text-orange-600;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  @apply text-orange-600;
 }
 
 .stats-card.stats-danger .stats-card-icon {
-  @apply bg-red-100 text-red-600;
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  @apply text-red-600;
 }
 
 .stats-card.stats-info .stats-card-icon {
-  @apply bg-purple-100 text-purple-600;
+  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+  @apply text-purple-600;
 }
 
 /* ========== 统计卡片数值 ========== */

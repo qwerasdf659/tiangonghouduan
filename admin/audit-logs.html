@@ -9,10 +9,10 @@
 <body class="themed-bg-subtle min-h-screen">
   
   <!-- 导航栏 -->
-  <nav class="themed-bg-primary text-white shadow-lg">
+  <nav class="page-navbar">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:text-stone-200">← 返回工作台</a>
+        <a href="/admin/workspace.html" class="text-white/70 hover:text-white transition-colors">← 返回工作台</a>
         <span class="text-lg font-semibold">📋 操作审计</span>
       </div>
       <div class="flex items-center space-x-4">
@@ -72,39 +72,39 @@
       <div>
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-      <div class="themed-card rounded-lg shadow p-4 text-center">
-        <div class="text-3xl text-blue-500 mb-2">📊</div>
-        <div class="text-2xl font-bold themed-text-primary" x-text="logPagination.total || 0"></div>
-        <div class="text-sm themed-text-muted">总日志数</div>
+      <div class="gradient-stat-card gradient-stat-blue">
+        <div class="stat-icon">📊</div>
+        <div class="stat-value" x-text="logPagination.total || 0"></div>
+        <div class="stat-label">总日志数</div>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center">
-        <div class="text-3xl text-green-500 mb-2">➕</div>
-        <div class="text-2xl font-bold text-green-600" x-text="stats.create || 0"></div>
-        <div class="text-sm themed-text-muted">创建操作</div>
+      <div class="gradient-stat-card gradient-stat-green">
+        <div class="stat-icon">➕</div>
+        <div class="stat-value" x-text="stats.create || 0"></div>
+        <div class="stat-label">创建操作</div>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center">
-        <div class="text-3xl text-blue-500 mb-2">✏️</div>
-        <div class="text-2xl font-bold text-blue-600" x-text="stats.update || 0"></div>
-        <div class="text-sm themed-text-muted">更新操作</div>
+      <div class="gradient-stat-card gradient-stat-cyan">
+        <div class="stat-icon">✏️</div>
+        <div class="stat-value" x-text="stats.update || 0"></div>
+        <div class="stat-label">更新操作</div>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center">
-        <div class="text-3xl text-red-500 mb-2">🗑️</div>
-        <div class="text-2xl font-bold text-red-600" x-text="stats.delete || 0"></div>
-        <div class="text-sm themed-text-muted">删除操作</div>
+      <div class="gradient-stat-card gradient-stat-rose">
+        <div class="stat-icon">🗑️</div>
+        <div class="stat-value" x-text="stats.delete || 0"></div>
+        <div class="stat-label">删除操作</div>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center">
-        <div class="text-3xl text-purple-500 mb-2">🔐</div>
-        <div class="text-2xl font-bold text-purple-600" x-text="stats.login || 0"></div>
-        <div class="text-sm themed-text-muted">登录操作</div>
+      <div class="gradient-stat-card gradient-stat-purple">
+        <div class="stat-icon">🔐</div>
+        <div class="stat-value" x-text="stats.login || 0"></div>
+        <div class="stat-label">登录操作</div>
       </div>
     </div>
 
     <!-- 图表区域 -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
       <!-- 操作趋势图 -->
-      <div class="themed-card rounded-lg shadow p-4">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-base font-medium themed-text-primary">📈 操作趋势</h3>
+      <div class="chart-wrapper">
+        <div class="chart-wrapper-header">
+          <span>📈 操作趋势</span>
           <div class="flex gap-2">
             <button 
               @click="changeTrendDays(7)"
@@ -129,6 +129,7 @@
             </button>
           </div>
         </div>
+        <div class="chart-wrapper-body">
         <!-- 趋势图容器 -->
         <div id="trendChart" class="w-full h-64"></div>
         <!-- 趋势统计摘要 -->
@@ -154,19 +155,21 @@
         <div x-show="!chartsLoading && trendStats.items.length === 0" class="flex items-center justify-center h-64 text-gray-400">
           暂无趋势数据
         </div>
+        </div>
       </div>
 
       <!-- 目标类型分布图 -->
-      <div class="themed-card rounded-lg shadow p-4">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-base font-medium themed-text-primary">🎯 目标类型分布</h3>
+      <div class="chart-wrapper">
+        <div class="chart-wrapper-header">
+          <span>🎯 目标类型分布</span>
           <button 
             @click="refreshCharts()"
-            class="text-xs themed-text-muted hover:themed-text-primary transition"
+            class="text-xs text-gray-400 hover:text-gray-600 transition"
           >
             🔄 刷新
           </button>
         </div>
+        <div class="chart-wrapper-body">
         <!-- 目标类型图容器 -->
         <div id="targetTypeChart" class="w-full h-64"></div>
         <!-- 目标类型列表 -->
@@ -194,11 +197,12 @@
         <div x-show="!chartsLoading && targetTypeStats.items.length === 0" class="flex items-center justify-center h-64 text-gray-400">
           暂无类型数据
         </div>
+        </div>
       </div>
     </div>
 
     <!-- 筛选栏 -->
-    <div class="themed-card rounded-lg shadow mb-6 p-4">
+    <div class="filter-toolbar">
       <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
         <div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">操作人ID</label>
@@ -261,12 +265,10 @@
     </div>
 
     <!-- 加载状态 -->
-    <template x-if="loading">
-      <div class="text-center py-10">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 themed-border-primary mx-auto"></div>
-        <p class="mt-4 themed-text-muted">正在加载审计日志...</p>
-      </div>
-    </template>
+    <div x-show="loading" class="text-center py-10">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 themed-border-primary mx-auto"></div>
+      <p class="mt-4 themed-text-muted">正在加载审计日志...</p>
+    </div>
 
     <!-- 日志列表（data-table） -->
     <div class="themed-card rounded-lg shadow" x-show="!loading" @table-action="handleAuditTableAction($event.detail)">

@@ -88,7 +88,14 @@ function reminderRulesPage() {
           system: '系统提醒'
         }
       },
-      { key: 'priority', label: '优先级', sortable: true, type: 'number' },
+      {
+        key: 'notification_priority',
+        label: '优先级',
+        sortable: true,
+        type: 'badge',
+        badgeMap: { urgent: 'red', high: 'orange', medium: 'yellow', low: 'gray' },
+        labelMap: { urgent: '紧急', high: '高', medium: '中', low: '低' }
+      },
       {
         key: 'is_enabled',
         label: '状态',
@@ -99,9 +106,14 @@ function reminderRulesPage() {
         }
       },
       {
-        key: 'check_interval',
+        key: 'check_interval_minutes',
         label: '检查间隔',
-        render: (val) => val ? `${val}分钟` : '-'
+        render: (val) => {
+          if (!val) return '-'
+          if (val < 60) return `${val}分钟`
+          if (val < 1440) return `${Math.floor(val / 60)}小时`
+          return `${Math.floor(val / 1440)}天`
+        }
       },
       { key: 'updated_at', label: '更新时间', type: 'datetime', sortable: true },
       {
@@ -125,6 +137,7 @@ function reminderRulesPage() {
 
     /**
      * data-table 数据源
+     * 后端返回字段: rule_name, rule_type, notification_priority, check_interval_minutes, is_enabled
      */
     async fetchTableData(params) {
       const response = await request({
@@ -133,32 +146,41 @@ function reminderRulesPage() {
         params: params
       })
       if (response?.success) {
-        return {
-          items: response.data?.list || response.data?.items || [],
-          total: response.data?.total || 0
-        }
+        const items = response.data?.list || response.data?.items || []
+        const total = response.data?.total || 0
+
+        // 同步更新页面级统计数据
+        this.rules = items
+        this.pagination.total = total
+        this.stats.total = total
+        this.stats.enabled = items.filter(r => r.is_enabled).length
+        this.stats.disabled = items.filter(r => !r.is_enabled).length
+
+        return { items, total }
       }
       throw new Error(response?.message || '加载提醒规则失败')
     },
 
     /**
-     * 处理表格操作事件
+     * 处理表格操作事件 - 传递完整 row 对象（方法内部需要访问多个字段）
      */
     handleTableAction(detail) {
       const { action, row } = detail
       switch (action) {
         case 'edit':
-          this.editRule(row.reminder_rule_id || row.id)
+          this.openEditModal(row)
           break
         case 'toggle':
-          this.toggleRule(row.reminder_rule_id || row.id, row.is_enabled)
+          this.toggleRule(row)
           break
         case 'test':
-          this.testRule(row.reminder_rule_id || row.id)
+          this.testRule(row)
           break
         case 'delete':
-          this.deleteRule(row.reminder_rule_id || row.id)
+          this.deleteRule(row)
           break
+        default:
+          logger.warn('[ReminderRules] 未知操作:', action)
       }
     },
 
@@ -273,7 +295,9 @@ function reminderRulesPage() {
     },
 
     /**
-     * 保存规则
+     * 保存规则 - 字段映射到后端期望格式
+     * 后端期望: name, rule_type, description, trigger_conditions, action_config,
+     *           notification_priority, check_interval, is_enabled
      */
     async saveRule() {
       if (!this.form.rule_name) {
@@ -288,11 +312,19 @@ function reminderRulesPage() {
           : REMINDER_ENDPOINTS.CREATE
         const method = this.editMode ? 'PUT' : 'POST'
 
-        const response = await request({
-          url,
-          method,
-          data: this.form
-        })
+        const priorityMap = { 80: 'high', 50: 'medium', 20: 'low' }
+        const payload = {
+          name: this.form.rule_name,
+          rule_type: this.form.rule_type,
+          description: this.form.description,
+          trigger_conditions: this.form.conditions || {},
+          action_config: this.form.actions || {},
+          notification_priority: priorityMap[this.form.priority] || 'medium',
+          check_interval: this.form.check_interval,
+          is_enabled: this.form.is_enabled
+        }
+
+        const response = await request({ url, method, data: payload })
 
         if (response.success) {
           this.showSuccess(this.editMode ? '规则更新成功' : '规则创建成功')

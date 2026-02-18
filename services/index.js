@@ -55,6 +55,7 @@ const AdImpressionLogService = require('./AdImpressionLogService') // Phase 5: �
 const AdClickLogService = require('./AdClickLogService') // Phase 5: 广告点击日志服务
 const AdAttributionService = require('./AdAttributionService') // Phase 6: 归因追踪服务
 const AdReportService = require('./AdReportService') // Phase 6: 多维报表服务
+const { QueryService: AdCampaignQueryService } = require('./ad-campaign') // 广告活动日志查询服务（路由层合规治理）
 
 // V4 架构重构新增服务（2025-12-10）
 const LotteryPresetService = require('./LotteryPresetService') // 抽奖预设管理服务
@@ -415,6 +416,7 @@ class ServiceManager {
       this._services.set('ad_click_log', AdClickLogService) // Phase 5: 广告点击日志
       this._services.set('ad_attribution', AdAttributionService) // Phase 6: 归因追踪
       this._services.set('ad_report', AdReportService) // Phase 6: 多维报表
+      this._services.set('ad_campaign_query', AdCampaignQueryService) // 广告活动日志查询（路由层合规治理，静态类）
 
       // ========== 架构重构服务（使用 snake_case key） ==========
 

@@ -44,8 +44,9 @@
   --color-text: #1f2937;
   --color-text-secondary: #6b7280;
   --color-text-muted: #9ca3af;
-  --color-border: #e5e7eb;
-  --color-background: #f3f4f6;
+  --color-border: #dde1e9;
+  --color-border-accent: #c7d0e0;
+  --color-background: #eef1f8;
   --color-card: #ffffff;
 
   /* 间距 */
@@ -61,10 +62,10 @@
   --radius-lg: 0.5rem;
   --radius-full: 9999px;
 
-  /* 阴影 */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  /* 阴影 - 增强可见度 */
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 12px 28px -6px rgb(0 0 0 / 0.12), 0 4px 8px -2px rgb(0 0 0 / 0.05);
 }
 
 /* ========== 基础样式重置 ========== */
@@ -76,7 +77,8 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply text-gray-900;
+    background-color: var(--color-background, #eef1f8);
     line-height: 1.6;
   }
 
@@ -98,11 +100,20 @@
 @layer components {
   /* 卡片 */
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200;
+    @apply bg-white rounded-xl border;
+    border-color: var(--color-border, #dde1e9);
+    box-shadow: var(--shadow-card, 0 1px 3px 0 rgb(0 0 0 / 0.08));
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
+  }
+
+  .card:hover {
+    box-shadow: var(--shadow-card-hover, 0 8px 24px -4px rgb(59 130 246 / 0.12));
   }
 
   .card-header {
-    @apply px-6 py-4 border-b border-gray-200;
+    @apply px-6 py-4 border-b;
+    border-color: var(--color-border, #dde1e9);
+    background: linear-gradient(135deg, #f5f7fb 0%, #edf0f7 100%);
   }
 
   .card-body {
@@ -110,7 +121,9 @@
   }
 
   .card-footer {
-    @apply px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg;
+    @apply px-6 py-4 border-t rounded-b-xl;
+    border-color: var(--color-border, #dde1e9);
+    background: linear-gradient(to right, #f5f7fb, #edf0f8);
   }
 
   /* 按钮 */
@@ -197,48 +210,67 @@
   }
 
   .table thead {
-    @apply bg-gray-50;
+    background: var(--table-header-bg, linear-gradient(135deg, #eef2fb 0%, #e8edf7 100%));
   }
 
   .table th {
-    @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+    @apply px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider;
+    color: #475569;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid var(--color-border-accent, #c7d0e0);
   }
 
   .table td {
     @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
+    border-bottom: 1px solid #f0f2f7;
   }
 
   .table tbody tr {
-    @apply hover:bg-gray-50 transition-colors;
+    @apply hover:bg-blue-50/50 transition-colors duration-150;
   }
 
   .table tbody tr:nth-child(even) {
-    @apply bg-gray-50/50;
+    background-color: var(--table-stripe-bg, #f7f8fc);
+  }
+
+  .table tbody tr:hover td {
+    color: var(--color-text-primary, #111827);
   }
 
   /* 徽章/标签 */
   .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+    letter-spacing: 0.02em;
   }
 
   .badge-primary {
-    @apply badge bg-blue-100 text-blue-800;
+    @apply badge text-blue-700;
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
   }
 
   .badge-success {
-    @apply badge bg-green-100 text-green-800;
+    @apply badge text-emerald-700;
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
   }
 
   .badge-warning {
-    @apply badge bg-yellow-100 text-yellow-800;
+    @apply badge text-amber-700;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
   }
 
   .badge-danger {
-    @apply badge bg-red-100 text-red-800;
+    @apply badge text-red-700;
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
   }
 
   .badge-gray {
-    @apply badge bg-gray-100 text-gray-800;
+    @apply badge text-gray-600;
+    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  }
+
+  .badge-purple {
+    @apply badge text-purple-700;
+    background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
   }
 
   /* Modal 样式 */
@@ -279,7 +311,9 @@
   }
 
   .modal-footer {
-    @apply flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg;
+    @apply flex items-center justify-end gap-3 px-6 py-4 border-t rounded-b-lg;
+    border-color: var(--color-border, #dde1e9);
+    background: linear-gradient(to right, #f5f7fb, #edf0f8);
   }
 
   /* 侧边栏 */
@@ -326,7 +360,9 @@
   }
 
   .loading-overlay {
-    @apply absolute inset-0 bg-white/75 flex items-center justify-center z-10;
+    @apply absolute inset-0 flex items-center justify-center z-10;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(2px);
   }
 
   /* 空状态 */
@@ -405,6 +441,136 @@
     display: none;
   }
 }
+
+/* ========== 管理后台页面增强样式 ========== */
+
+/* 页面区块（替代纯白卡片） - 带品牌色微妙渐变 */
+.section-panel {
+  @apply rounded-xl border overflow-hidden;
+  background: linear-gradient(180deg, var(--card-bg, #ffffff) 0%, var(--card-bg-warm, #fafbff) 100%);
+  border-color: var(--color-border, #dde1e9);
+  box-shadow: var(--shadow-section, 0 2px 8px -2px rgb(0 0 0 / 0.06));
+}
+
+.section-panel-header {
+  @apply px-5 py-4 border-b flex justify-between items-center;
+  background: linear-gradient(135deg, #f0f3fa 0%, #e8ecf5 60%, #f5f7fb 100%);
+  border-color: var(--color-border, #dde1e9);
+}
+
+.section-panel-header h5,
+.section-panel-header .panel-title {
+  @apply font-semibold text-base flex items-center gap-2;
+  color: var(--color-text-primary, #1e293b);
+}
+
+.section-panel-header .panel-subtitle {
+  @apply text-xs mt-0.5;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+/* 页面内容区域背景增强 */
+.page-content {
+  @apply rounded-xl p-6;
+  background: linear-gradient(180deg, var(--content-bg, #eef1f8) 0%, #f4f6fb 100%);
+  min-height: calc(100vh - 120px);
+}
+
+/* 筛选器栏 */
+.filter-bar {
+  @apply flex flex-wrap gap-3 items-center p-4 rounded-lg mb-4;
+  background: linear-gradient(135deg, #f5f7fb 0%, #edf0f8 100%);
+  border: 1px solid var(--color-border, #dde1e9);
+}
+
+.filter-bar select,
+.filter-bar input[type="text"],
+.filter-bar input[type="date"],
+.filter-bar input[type="number"] {
+  @apply px-3 py-2 border rounded-lg text-sm bg-white shadow-sm;
+  border-color: var(--color-border, #d1d5db);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.filter-bar select:focus,
+.filter-bar input:focus {
+  @apply ring-2 ring-blue-500/20 border-blue-400 outline-none;
+}
+
+/* 数据表格容器增强 */
+.data-table-wrapper {
+  @apply rounded-xl border overflow-hidden;
+  background: var(--card-bg, #ffffff);
+  border-color: var(--color-border, #dde1e9);
+  box-shadow: var(--shadow-card, 0 1px 3px 0 rgb(0 0 0 / 0.08));
+}
+
+.data-table-wrapper .table thead {
+  background: var(--table-header-bg, linear-gradient(135deg, #eef2fb 0%, #e8edf7 100%));
+}
+
+.data-table-wrapper .table thead th {
+  @apply text-xs font-semibold tracking-wider py-3.5 border-b-2;
+  color: #475569;
+  border-color: var(--color-border-accent, #c7d0e0);
+}
+
+/* 页面标题栏 */
+.page-title-bar {
+  @apply mb-6 pb-4 border-b;
+  border-color: var(--color-border-light, #e5e7eb);
+}
+
+.page-title-bar h2 {
+  @apply text-xl font-bold flex items-center gap-2;
+  background: linear-gradient(135deg, var(--color-primary, #3b82f6) 0%, #1d4ed8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 操作按钮增强 */
+.action-btn {
+  @apply px-4 py-2 text-sm font-medium rounded-lg shadow-sm transition-all duration-200;
+}
+
+.action-btn:hover {
+  @apply shadow-md;
+  transform: translateY(-1px);
+}
+
+.action-btn:active {
+  transform: translateY(0);
+  @apply shadow-sm;
+}
+
+.action-btn-primary {
+  background: linear-gradient(135deg, var(--color-primary, #3b82f6) 0%, #2563eb 100%);
+  @apply text-white;
+}
+
+.action-btn-primary:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+/* 状态指示点 */
+.status-dot {
+  @apply inline-block w-2 h-2 rounded-full mr-2;
+}
+.status-dot-active { @apply bg-green-500; box-shadow: 0 0 6px rgba(16, 185, 129, 0.5); }
+.status-dot-inactive { @apply bg-gray-400; }
+.status-dot-warning { @apply bg-yellow-500; box-shadow: 0 0 6px rgba(245, 158, 11, 0.5); }
+.status-dot-danger { @apply bg-red-500; box-shadow: 0 0 6px rgba(239, 68, 68, 0.5); }
+
+/* 数值高亮 */
+.value-highlight {
+  @apply font-bold tabular-nums;
+  font-variant-numeric: tabular-nums;
+}
+
+.value-positive { @apply text-green-600; }
+.value-negative { @apply text-red-600; }
+.value-neutral { @apply text-gray-500; }
 
 /* ========== 动画 ========== */
 @keyframes fadeIn {
@@ -873,4 +1039,361 @@
     border-color 0.3s ease,
     color 0.3s ease,
     box-shadow 0.3s ease;
+}
+
+/* 渐变指标卡片样式 — 统一定义见下方「渐变统计卡片」区块，此处已合并 */
+
+/* ========== 增强型卡片标题条 ========== */
+
+.card-header-accent {
+  @apply px-6 py-3 border-b flex items-center gap-2 font-semibold;
+  border-color: var(--color-border, #e5e7eb);
+  background: linear-gradient(to right, rgba(59, 130, 246, 0.04), transparent);
+}
+.card-header-accent .header-icon {
+  @apply w-8 h-8 rounded-lg flex items-center justify-center text-sm;
+  background-color: var(--color-primary-light, #dbeafe);
+  color: var(--color-primary, #3b82f6);
+}
+
+/* ========== 页面头部渐变横幅 ========== */
+
+.page-banner {
+  @apply rounded-xl p-6 mb-6 text-white relative overflow-hidden;
+  background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 50%, #3b82f6 100%);
+}
+.page-banner h1 {
+  @apply text-2xl font-bold text-white;
+}
+.page-banner p {
+  @apply text-sm text-blue-100 mt-1;
+}
+.page-banner::after {
+  content: '';
+  @apply absolute -right-8 -top-8 w-40 h-40 rounded-full;
+  background: rgba(255, 255, 255, 0.06);
+}
+.page-banner::before {
+  content: '';
+  @apply absolute right-20 -bottom-10 w-32 h-32 rounded-full;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ========== 字典 Tab 切换增强 ========== */
+
+.dict-tab {
+  position: relative;
+}
+
+.dict-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 3px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 3px 3px 0 0;
+}
+
+/* ========== 消息列表增强 ========== */
+
+.message-row {
+  @apply flex items-start gap-4 p-4 border-b cursor-pointer;
+  transition:
+    background-color 0.15s ease,
+    transform 0.15s ease;
+  border-color: var(--color-border, #e5e7eb);
+}
+.message-row:hover {
+  background-color: rgba(59, 130, 246, 0.03);
+  transform: translateX(3px);
+}
+.message-row.unread {
+  background-color: rgba(59, 130, 246, 0.06);
+  border-left: 3px solid var(--color-primary, #3b82f6);
+}
+.message-row .msg-dot {
+  @apply w-2 h-2 rounded-full flex-shrink-0 mt-2;
+  background-color: var(--color-primary, #3b82f6);
+}
+
+/* ========== 筛选栏美化 ========== */
+
+.filter-bar {
+  @apply rounded-xl p-4 mb-6 border;
+  background: linear-gradient(to right, #f5f7fb, #edf0f8);
+  border-color: var(--color-border, #dde1e9);
+}
+
+/* ========== 空状态插图增强 ========== */
+
+.empty-state-enhanced {
+  @apply flex flex-col items-center justify-center py-16 px-6 text-center;
+}
+.empty-state-enhanced .empty-icon {
+  @apply w-24 h-24 mb-4 rounded-full flex items-center justify-center text-4xl;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  color: #3b82f6;
+}
+.empty-state-enhanced .empty-title {
+  @apply text-lg font-semibold text-gray-700 mt-2;
+}
+.empty-state-enhanced .empty-desc {
+  @apply text-sm text-gray-400 mt-1 max-w-sm;
+}
+
+/* =====================================================
+   渐变统计卡片 - 管理后台页面统一视觉组件
+   @description 带渐变背景的统计概览卡片，提升页面视觉层次
+   ===================================================== */
+
+.gradient-stat-card {
+  @apply relative overflow-hidden rounded-xl p-5 text-white transition-all duration-300;
+  box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.15);
+}
+.gradient-stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.2);
+}
+.gradient-stat-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -30%;
+  width: 200px;
+  height: 200px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.gradient-stat-card::after {
+  content: '';
+  position: absolute;
+  bottom: -30%;
+  left: -20%;
+  width: 150px;
+  height: 150px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.gradient-stat-card .stat-icon {
+  @apply text-3xl mb-2 opacity-90;
+}
+.gradient-stat-card .stat-value {
+  @apply text-3xl font-bold tabular-nums;
+}
+.gradient-stat-card .stat-label {
+  @apply text-sm mt-1 opacity-80;
+}
+.gradient-stat-card .stat-trend {
+  @apply text-xs mt-2 opacity-70 flex items-center gap-1;
+}
+
+/* 渐变配色变体 */
+.gradient-stat-blue {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+}
+.gradient-stat-green {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+.gradient-stat-orange {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+.gradient-stat-rose {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+}
+.gradient-stat-purple {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+.gradient-stat-indigo {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+}
+.gradient-stat-cyan {
+  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+}
+.gradient-stat-teal {
+  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+}
+
+/* ========== 增强内容卡片 ========== */
+
+.content-section {
+  @apply rounded-xl border overflow-hidden;
+  background-color: var(--card-bg, #ffffff);
+  border-color: var(--color-border, #dde1e9);
+  box-shadow: var(--shadow-card, 0 1px 3px 0 rgb(0 0 0 / 0.08));
+}
+.content-section-header {
+  @apply px-6 py-4 flex items-center justify-between;
+  background: linear-gradient(to right, #f0f3fa, #e8ecf5);
+  border-bottom: 1px solid var(--color-border, #dde1e9);
+}
+.content-section-header .section-title {
+  @apply text-base font-semibold flex items-center gap-2;
+  color: var(--color-text-primary, #1e293b);
+}
+.content-section-header .section-title .title-icon {
+  @apply w-8 h-8 rounded-lg flex items-center justify-center text-sm;
+  background: linear-gradient(
+    135deg,
+    var(--color-primary, #3b82f6),
+    var(--color-primary-hover, #2563eb)
+  );
+  color: white;
+}
+.content-section-body {
+  @apply p-6;
+}
+
+/* ========== 增强型 themed-card - 解决「全白」视觉问题 ========== */
+
+.themed-card {
+  background-color: var(--card-bg, #ffffff);
+  border: 1px solid var(--color-border-light, #e5e7eb);
+  @apply rounded-xl shadow-sm;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.themed-card:hover {
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.08);
+}
+
+/* 带色条的卡片变体 - 适用于各模块 */
+.themed-card-accent {
+  border-top: 3px solid var(--color-primary, #3b82f6);
+}
+.themed-card-accent-green {
+  border-top: 3px solid #10b981;
+}
+.themed-card-accent-orange {
+  border-top: 3px solid #f59e0b;
+}
+.themed-card-accent-rose {
+  border-top: 3px solid #f43f5e;
+}
+.themed-card-accent-purple {
+  border-top: 3px solid #8b5cf6;
+}
+
+/* ========== 页面背景增强 - 解决纯白背景问题 ========== */
+
+.themed-bg-subtle {
+  background-color: var(--content-bg, #f8fafc);
+  background-image:
+    radial-gradient(ellipse at top left, rgba(59, 130, 246, 0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom right, rgba(139, 92, 246, 0.02) 0%, transparent 50%);
+}
+
+/* ========== 数据面板 - 零值提示增强 ========== */
+
+.zero-value-hint {
+  @apply relative;
+}
+.zero-value-hint::after {
+  content: '暂无数据';
+  @apply absolute -bottom-4 left-1/2 text-xs text-gray-400 whitespace-nowrap;
+  transform: translateX(-50%);
+  display: none;
+}
+.zero-value-hint[data-value="0"]::after {
+  display: block;
+}
+
+/* ========== 增强筛选栏 ========== */
+
+.filter-toolbar {
+  @apply rounded-xl border p-4 mb-6;
+  background: linear-gradient(to right, #f8f9fe, #f0f3fa);
+  border-color: var(--color-border, #dde1e9);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+/* ========== 图表容器增强 ========== */
+
+.chart-wrapper {
+  @apply rounded-xl border overflow-hidden;
+  background-color: var(--card-bg, #ffffff);
+  border-color: var(--color-border, #dde1e9);
+  box-shadow: var(--shadow-card, 0 1px 3px 0 rgb(0 0 0 / 0.08));
+}
+.chart-wrapper-header {
+  @apply px-5 py-3 flex items-center justify-between text-sm font-medium border-b;
+  background: linear-gradient(to right, #f0f3fa, #e8ecf5);
+  border-color: var(--color-border, #dde1e9);
+  color: var(--color-text-primary, #1e293b);
+}
+.chart-wrapper-body {
+  @apply p-4;
+}
+
+/* ========== 页面导航栏增强 ========== */
+
+.page-navbar {
+  background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+  @apply text-white shadow-lg;
+}
+
+/* ========== Tab 栏增强 ========== */
+
+.enhanced-tabs {
+  @apply flex rounded-lg p-1 gap-1 mb-6;
+  background-color: #e5e9f2;
+  border: 1px solid #d5dae6;
+}
+.enhanced-tabs .tab-item {
+  @apply px-5 py-2.5 text-sm rounded-md transition-all duration-200 cursor-pointer font-medium;
+  color: #64748b;
+}
+.enhanced-tabs .tab-item:hover {
+  color: #334155;
+  background-color: rgba(255, 255, 255, 0.6);
+}
+.enhanced-tabs .tab-item.active {
+  @apply text-white shadow-sm;
+  background: linear-gradient(
+    135deg,
+    var(--color-primary, #3b82f6),
+    var(--color-primary-hover, #2563eb)
+  );
+}
+
+/* ========== 数据表格增强 ========== */
+
+.enhanced-table thead {
+  background: var(--table-header-bg, linear-gradient(135deg, #eef2fb 0%, #e8edf7 100%));
+}
+.enhanced-table th {
+  @apply px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider;
+  color: #475569;
+  border-bottom: 2px solid var(--color-border-accent, #c7d0e0);
+}
+.enhanced-table td {
+  @apply px-5 py-4 text-sm;
+  color: #334155;
+  border-bottom: 1px solid #eef0f5;
+}
+.enhanced-table tbody tr {
+  @apply transition-colors duration-150;
+}
+.enhanced-table tbody tr:hover {
+  background-color: #f3f5fb;
+}
+
+/* ========== 页面标题区增强 ========== */
+
+.page-header {
+  @apply flex items-center justify-between mb-6 pb-4;
+  border-bottom: 2px solid transparent;
+  border-image: linear-gradient(to right, var(--color-primary, #3b82f6), transparent) 1;
+}
+.page-header .page-title {
+  @apply text-2xl font-bold;
+  color: var(--color-text-primary, #1e293b);
+}
+.page-header .page-subtitle {
+  @apply text-sm mt-1;
+  color: var(--color-text-muted, #94a3b8);
 }

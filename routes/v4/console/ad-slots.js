@@ -340,7 +340,7 @@ router.patch(
       }
 
       const AdSlotService = req.app.locals.services.getService('ad_slot')
-      const slot = await AdSlotService.toggleSlotStatus(slotId)
+      const slot = await AdSlotService.toggleSlotActive(slotId)
 
       if (!slot) {
         return res.apiError('广告位不存在', 'AD_SLOT_NOT_FOUND', null, 404)

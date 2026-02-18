@@ -8,59 +8,63 @@
 </head>
 <body class="themed-bg-subtle min-h-screen" x-data="tradeManagementPage()" x-init="init()" x-cloak>
   
-  <!-- 导航栏 -->
-  <nav class="themed-bg-primary text-white shadow-lg">
+  <!-- 导航栏（深色渐变风格） -->
+  <nav class="page-navbar">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
+        <a href="/admin/workspace.html" class="text-blue-200 hover:text-white transition-colors">← 返回工作台</a>
         <span class="text-lg font-semibold">💱 交易管理</span>
       </div>
       <div class="flex items-center space-x-4">
         <span x-text="'欢迎，' + (current_user?.nickname || '管理员')"></span>
-        <button @click="logout()" class="px-3 py-1 border border-white/50 rounded hover:bg-white/10">退出登录</button>
+        <button @click="logout()" class="px-3 py-1 border border-white/30 rounded hover:bg-white/10 transition-colors">退出登录</button>
       </div>
     </div>
   </nav>
 
   <div class="container mx-auto px-4 py-6">
-    <!-- Tab导航 -->
-    <div class="themed-card rounded-lg shadow mb-6">
-      <div class="flex border-b overflow-x-auto">
-        <template x-for="page in subPages" :key="page.id">
-          <button
-            @click="switchPage(page.id)"
-            :class="current_page === page.id ? 'border-b-2 themed-border-primary themed-text-primary themed-bg-primary-light' : 'themed-text-muted themed-hover-bg'"
-            class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
-            x-text="page.icon + ' ' + page.name"
-          ></button>
-        </template>
-      </div>
+    <!-- 页面横幅 -->
+    <div class="page-banner mb-6">
+      <h1>💱 交易管理</h1>
+      <p>C2C交易订单监控、市场上架管理、核销记录追溯</p>
+    </div>
+
+    <!-- Tab导航（增强样式） -->
+    <div class="enhanced-tabs">
+      <template x-for="page in subPages" :key="page.id">
+        <button
+          @click="switchPage(page.id)"
+          :class="current_page === page.id ? 'active' : ''"
+          class="tab-item"
+          x-text="page.icon + ' ' + page.name"
+        ></button>
+      </template>
     </div>
 
     <!-- ==================== C2C交易订单 Tab ==================== -->
     <div x-show="current_page === 'trade-orders'">
 
-    <!-- 统计卡片 -->
+    <!-- 统计卡片（渐变样式） -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <div class="themed-card rounded-lg shadow p-4 text-center">
-        <div class="text-4xl text-blue-400 mb-2">📋</div>
-        <h4 class="text-2xl font-bold themed-text-primary" x-text="stats.totalTrades">0</h4>
-        <p class="themed-text-muted text-sm">总交易数</p>
+      <div class="gradient-stat-card gradient-stat-blue">
+        <div class="stat-icon">📋</div>
+        <div class="stat-value" x-text="stats.totalTrades">0</div>
+        <div class="stat-label">总交易数</div>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center">
-        <div class="text-4xl text-green-400 mb-2">✅</div>
-        <h4 class="text-2xl font-bold text-green-600" x-text="stats.completedTrades">0</h4>
-        <p class="themed-text-muted text-sm">已完成</p>
+      <div class="gradient-stat-card gradient-stat-green">
+        <div class="stat-icon">✅</div>
+        <div class="stat-value" x-text="stats.completedTrades">0</div>
+        <div class="stat-label">已完成</div>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center">
-        <div class="text-4xl text-yellow-400 mb-2">⏳</div>
-        <h4 class="text-2xl font-bold text-yellow-600" x-text="stats.pendingTrades">0</h4>
-        <p class="themed-text-muted text-sm">待处理</p>
+      <div class="gradient-stat-card gradient-stat-orange">
+        <div class="stat-icon">⏳</div>
+        <div class="stat-value" x-text="stats.pendingTrades">0</div>
+        <div class="stat-label">待处理</div>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center">
-        <div class="text-4xl text-orange-400 mb-2">💰</div>
-        <h4 class="text-2xl font-bold text-orange-600" x-text="formatNumber(stats.totalVolume)">0</h4>
-        <p class="themed-text-muted text-sm">总成交额</p>
+      <div class="gradient-stat-card gradient-stat-rose">
+        <div class="stat-icon">💰</div>
+        <div class="stat-value" x-text="formatNumber(stats.totalVolume)">0</div>
+        <div class="stat-label">总成交额</div>
       </div>
     </div>
 

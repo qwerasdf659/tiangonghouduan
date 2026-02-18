@@ -33,6 +33,57 @@ document.addEventListener('alpine:init', () => {
       { id: 'attribution', name: '归因追踪', icon: '🔗' }
     ],
 
+    // ==================== 中文映射字典 ====================
+    /** 广告活动状态 → 中文 */
+    STATUS_MAP: {
+      draft: '草稿',
+      pending_review: '待审核',
+      approved: '已批准',
+      active: '投放中',
+      paused: '已暂停',
+      completed: '已完成',
+      rejected: '已拒绝',
+      cancelled: '已取消'
+    },
+    /** 广告活动状态 → 颜色 */
+    STATUS_COLOR: {
+      draft: 'bg-gray-500',
+      pending_review: 'bg-yellow-500',
+      approved: 'bg-blue-500',
+      active: 'bg-green-500',
+      paused: 'bg-orange-500',
+      completed: 'bg-indigo-500',
+      rejected: 'bg-red-500',
+      cancelled: 'bg-gray-400'
+    },
+    /** 计费模式 → 中文 */
+    BILLING_MAP: {
+      fixed_daily: '固定包天',
+      bidding: '竞价排名'
+    },
+    /** 广告位类型 → 中文 */
+    SLOT_TYPE_MAP: {
+      popup: '弹窗',
+      carousel: '轮播图'
+    },
+    /** 页面位置 → 中文 */
+    POSITION_MAP: {
+      home: '首页',
+      lottery: '抽奖页',
+      profile: '个人中心'
+    },
+
+    /** 获取状态中文名 */
+    statusText(status) { return this.STATUS_MAP[status] || status },
+    /** 获取状态颜色 */
+    statusColor(status) { return this.STATUS_COLOR[status] || 'bg-gray-500' },
+    /** 获取计费模式中文名 */
+    billingText(mode) { return this.BILLING_MAP[mode] || mode },
+    /** 获取广告位类型中文名 */
+    slotTypeText(type) { return this.SLOT_TYPE_MAP[type] || type },
+    /** 获取位置中文名 */
+    positionText(pos) { return this.POSITION_MAP[pos] || pos },
+
     // ==================== 通用状态 ====================
     saving: false,
 
@@ -52,6 +103,20 @@ document.addEventListener('alpine:init', () => {
     campaignDetail: null,
     /** 广告位列表（用于筛选下拉） */
     allSlotsList: [],
+
+    // ==================== 创建广告活动 ====================
+    campaignForm: {
+      campaign_name: '',
+      ad_slot_id: '',
+      billing_mode: 'fixed_daily',
+      advertiser_user_id: '',
+      daily_bid_diamond: 50,
+      budget_total_diamond: 500,
+      fixed_days: 7,
+      start_date: '',
+      end_date: '',
+      priority: 50
+    },
 
     // ==================== 审核 ====================
     reviewTarget: null,
@@ -255,6 +320,103 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
+    openCreateCampaignModal() {
+      const today = new Date()
+      const nextWeek = new Date(today.getTime() + 7 * 24 * 3600 * 1000)
+      this.campaignForm = {
+        campaign_name: '',
+        ad_slot_id: this.allSlotsList.length > 0 ? this.allSlotsList[0].ad_slot_id : '',
+        billing_mode: 'fixed_daily',
+        advertiser_user_id: '',
+        daily_bid_diamond: 50,
+        budget_total_diamond: 500,
+        fixed_days: 7,
+        start_date: today.toISOString().slice(0, 10),
+        end_date: nextWeek.toISOString().slice(0, 10),
+        priority: 50
+      }
+      this.showModal('campaignCreateModal')
+    },
+
+    getSelectedSlotInfo() {
+      if (!this.campaignForm.ad_slot_id) return null
+      return this.allSlotsList.find(s => s.ad_slot_id === Number(this.campaignForm.ad_slot_id))
+    },
+
+    async saveCampaign() {
+      if (!this.campaignForm.campaign_name?.trim()) {
+        this.showError('请输入活动名称')
+        return
+      }
+      if (!this.campaignForm.ad_slot_id) {
+        this.showError('请选择广告位')
+        return
+      }
+      if (!this.campaignForm.billing_mode) {
+        this.showError('请选择计费模式')
+        return
+      }
+
+      if (this.campaignForm.billing_mode === 'fixed_daily') {
+        if (!this.campaignForm.fixed_days || this.campaignForm.fixed_days < 1) {
+          this.showError('固定包天模式必须填写天数（≥1天）')
+          return
+        }
+      } else if (this.campaignForm.billing_mode === 'bidding') {
+        const slotInfo = this.getSelectedSlotInfo()
+        const minBid = slotInfo?.min_bid_diamond || 50
+        const minBudget = slotInfo?.min_budget_diamond || 500
+        if (!this.campaignForm.daily_bid_diamond || this.campaignForm.daily_bid_diamond < minBid) {
+          this.showError(`竞价模式每日出价不能低于 ${minBid} 钻石`)
+          return
+        }
+        if (!this.campaignForm.budget_total_diamond || this.campaignForm.budget_total_diamond < minBudget) {
+          this.showError(`竞价模式总预算不能低于 ${minBudget} 钻石`)
+          return
+        }
+      }
+
+      this.saving = true
+      try {
+        const data = {
+          campaign_name: this.campaignForm.campaign_name.trim(),
+          ad_slot_id: Number(this.campaignForm.ad_slot_id),
+          billing_mode: this.campaignForm.billing_mode,
+          priority: Number(this.campaignForm.priority) || 50
+        }
+
+        if (this.campaignForm.advertiser_user_id) {
+          data.advertiser_user_id = Number(this.campaignForm.advertiser_user_id)
+        }
+
+        if (this.campaignForm.billing_mode === 'fixed_daily') {
+          data.fixed_days = Number(this.campaignForm.fixed_days)
+        } else {
+          data.daily_bid_diamond = Number(this.campaignForm.daily_bid_diamond)
+          data.budget_total_diamond = Number(this.campaignForm.budget_total_diamond)
+        }
+
+        if (this.campaignForm.start_date) data.start_date = this.campaignForm.start_date
+        if (this.campaignForm.end_date) data.end_date = this.campaignForm.end_date
+
+        const response = await request({
+          url: SYSTEM_ENDPOINTS.AD_CAMPAIGN_CREATE,
+          method: 'POST',
+          data
+        })
+        if (response?.success) {
+          this.hideModal('campaignCreateModal')
+          this.showSuccess('广告活动创建成功（草稿状态）')
+          await this.loadCampaigns()
+        }
+      } catch (error) {
+        logger.error('创建广告活动失败:', error)
+        this.showError('创建广告活动失败: ' + error.message)
+      } finally {
+        this.saving = false
+      }
+    },
+
     async viewCampaign(campaign) {
       try {
         const response = await request({
@@ -292,7 +454,7 @@ document.addEventListener('alpine:init', () => {
         })
         if (response?.success) {
           this.hideModal('reviewModal')
-          this.showSuccess(this.reviewAction === 'approved' ? '审核通过' : '审核拒绝')
+          this.showSuccess(this.reviewAction === 'approve' ? '审核通过' : '审核拒绝')
           await this.loadCampaigns()
         }
       } catch (error) {

@@ -208,7 +208,7 @@ class AdReportService {
     const spendStats = await AdBillingRecord.findAll({
       where: {
         ad_campaign_id: campaignId,
-        billing_at: {
+        billing_date: {
           [Op.gte]: dateStart,
           [Op.lte]: dateEnd
         }
@@ -220,11 +220,7 @@ class AdReportService {
 
     const totalSpendDiamond = parseInt(spendStats[0]?.total_spend_diamond || 0)
 
-    // 5. 计算指标
-    const ctr = validImpressions > 0 ? validClicks / validImpressions : 0
-    const cvr = validClicks > 0 ? conversions / validClicks : 0
-
-    // 6. UPSERT快照
+    // 5. UPSERT快照（仅写入数据库实际存在的字段，CTR/CVR 在查询时动态计算）
     await AdReportDailySnapshot.upsert(
       {
         snapshot_date: dateStr,
@@ -235,10 +231,7 @@ class AdReportService {
         clicks_total: totalClicks,
         clicks_valid: validClicks,
         conversions,
-        spend_diamond: totalSpendDiamond,
-        ctr: parseFloat(ctr.toFixed(4)),
-        cvr: parseFloat(cvr.toFixed(4)),
-        generated_at: BeijingTimeHelper.createDatabaseTime()
+        spend_diamond: totalSpendDiamond
       },
       {
         fields: [
@@ -247,10 +240,7 @@ class AdReportService {
           'clicks_total',
           'clicks_valid',
           'conversions',
-          'spend_diamond',
-          'ctr',
-          'cvr',
-          'generated_at'
+          'spend_diamond'
         ],
         transaction
       }
@@ -289,26 +279,26 @@ class AdReportService {
       // 计算总计
       const totals = snapshots.reduce(
         (acc, s) => {
-          acc.total_impressions += s.total_impressions
-          acc.valid_impressions += s.valid_impressions
-          acc.total_clicks += s.total_clicks
-          acc.valid_clicks += s.valid_clicks
-          acc.conversions += s.conversions
-          acc.total_spend_diamond += s.total_spend_diamond
+          acc.impressions_total += s.impressions_total || 0
+          acc.impressions_valid += s.impressions_valid || 0
+          acc.clicks_total += s.clicks_total || 0
+          acc.clicks_valid += s.clicks_valid || 0
+          acc.conversions += s.conversions || 0
+          acc.spend_diamond += s.spend_diamond || 0
           return acc
         },
         {
-          total_impressions: 0,
-          valid_impressions: 0,
-          total_clicks: 0,
-          valid_clicks: 0,
+          impressions_total: 0,
+          impressions_valid: 0,
+          clicks_total: 0,
+          clicks_valid: 0,
           conversions: 0,
-          total_spend_diamond: 0
+          spend_diamond: 0
         }
       )
 
-      totals.ctr = totals.valid_impressions > 0 ? totals.valid_clicks / totals.valid_impressions : 0
-      totals.cvr = totals.valid_clicks > 0 ? totals.conversions / totals.valid_clicks : 0
+      totals.ctr = totals.impressions_valid > 0 ? totals.clicks_valid / totals.impressions_valid : 0
+      totals.cvr = totals.clicks_valid > 0 ? totals.conversions / totals.clicks_valid : 0
 
       return {
         campaign_id: campaignId,

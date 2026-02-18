@@ -75,7 +75,8 @@ module.exports = sequelize => {
             msg: '失败原因必须是：outbid, targeting_mismatch, budget_exhausted 之一或为空'
           }
         },
-        comment: '未中标原因：outbid=被更高价击败 / targeting_mismatch=定向不匹配 / budget_exhausted=预算耗尽'
+        comment:
+          '未中标原因：outbid=被更高价击败 / targeting_mismatch=定向不匹配 / budget_exhausted=预算耗尽'
       },
 
       bid_at: {

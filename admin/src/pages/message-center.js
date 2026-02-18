@@ -543,6 +543,13 @@ function messageCenterPage() {
     formatTime(dateStr) {
       if (!dateStr) return '--'
       const date = new Date(dateStr)
+
+      // 后端可能返回已格式化的中文日期（如 "2026年2月19日星期四 12:33:37"），
+      // new Date() 无法解析此格式，直接返回原始字符串
+      if (isNaN(date.getTime())) {
+        return String(dateStr).replace(/\d{4}年/, '').replace(/星期./, '').trim()
+      }
+
       const now = new Date()
       const diff = now - date
 
@@ -551,7 +558,6 @@ function messageCenterPage() {
       if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前'
       if (diff < 604800000) return Math.floor(diff / 86400000) + '天前'
 
-      // 强制北京时区
       return date.toLocaleString('zh-CN', {
         timeZone: 'Asia/Shanghai',
         month: '2-digit',
@@ -563,8 +569,14 @@ function messageCenterPage() {
 
     formatFullTime(dateStr) {
       if (!dateStr) return '--'
-      // 强制北京时区
-      return new Date(dateStr).toLocaleString('zh-CN', {
+      const date = new Date(dateStr)
+
+      // 后端已格式化的中文日期，直接返回
+      if (isNaN(date.getTime())) {
+        return String(dateStr)
+      }
+
+      return date.toLocaleString('zh-CN', {
         timeZone: 'Asia/Shanghai',
         year: 'numeric',
         month: '2-digit',

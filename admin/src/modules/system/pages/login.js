@@ -84,9 +84,29 @@ function loginPage() {
      * x-init="init()"
      */
     init() {
-      logger.info('登录页面初始化 (v3.1)')
-      // 检查浏览器会话：如果是新的浏览器会话（浏览器曾被关闭），清除旧 token
+      logger.info('登录页面初始化 (v3.2)')
       checkBrowserSession()
+
+      // 检查 URL 参数中的会话失效原因（由 401 拦截器传递）
+      const urlParams = new URLSearchParams(window.location.search)
+      const reason = urlParams.get('reason')
+      if (reason) {
+        const reasonMessages = {
+          SESSION_REPLACED: '您的账号已在其他设备登录，请重新登录',
+          SESSION_EXPIRED: '登录会话已过期，请重新登录',
+          SESSION_NOT_FOUND: '登录状态已失效，请重新登录',
+          TOKEN_EXPIRED: '登录已过期，请重新登录',
+          INVALID_TOKEN: '登录凭证无效，请重新登录'
+        }
+        const msg = reasonMessages[reason]
+        if (msg) {
+          this.showMessage(msg, true)
+          logger.info(`登录页显示会话失效原因: ${reason}`)
+        }
+        // 清除 URL 参数，避免刷新页面重复显示
+        window.history.replaceState({}, '', '/admin/login.html')
+      }
+
       this.checkExistingSession()
     },
 

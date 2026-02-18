@@ -12,7 +12,7 @@
   <nav class="themed-bg-primary text-white shadow-lg">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
+        <a href="/admin/workspace.html" class="hover:text-blue-200 transition-colors">← 返回工作台</a>
         <span class="text-lg font-semibold">📄 内容管理中心</span>
       </div>
     </div>
@@ -22,15 +22,41 @@
   <div class="container mx-auto px-4 py-6" x-data="contentManagement()" x-init="init()"
        @edit-announcement="editAnnouncement($event.detail)"
        @delete-announcement="deleteAnnouncement($event.detail)">
-    
+
+    <!-- 统计概览卡片 -->
+    <div class="stats-grid stats-grid-4 mb-6">
+      <div class="stats-card stats-primary stats-card-animate">
+        <div class="stats-card-icon">📢</div>
+        <div class="stats-card-value" x-text="announcementStats?.total || 0"></div>
+        <div class="stats-card-label">公告总数</div>
+      </div>
+      <div class="stats-card stats-info stats-card-animate">
+        <div class="stats-card-icon">🔔</div>
+        <div class="stats-card-value" x-text="bannerStats?.total || 0"></div>
+        <div class="stats-card-label">弹窗数量 · <span class="text-green-500" x-text="(bannerStats?.active || 0) + '个启用'"></span></div>
+      </div>
+      <div class="stats-card stats-success stats-card-animate">
+        <div class="stats-card-icon">🎨</div>
+        <div class="stats-card-value" x-text="carouselStats?.total || 0"></div>
+        <div class="stats-card-label">轮播图数量 · <span class="text-green-500" x-text="(carouselStats?.active || 0) + '个启用'"></span></div>
+      </div>
+      <div class="stats-card stats-warning stats-card-animate">
+        <div class="stats-card-icon">🖼️</div>
+        <div class="stats-card-value" x-text="imageStats?.total || 0"></div>
+        <div class="stats-card-label">图片资源</div>
+      </div>
+    </div>
+
     <!-- 子页面导航 -->
-    <div class="themed-card rounded-lg shadow mb-6">
-      <div class="flex border-b overflow-x-auto">
+    <div class="themed-card rounded-xl shadow-sm mb-6 overflow-hidden">
+      <div class="flex overflow-x-auto" style="scrollbar-width: none;">
         <template x-for="page in subPages" :key="page.id">
           <button 
             @click="switchPage(page.id)"
-            :class="current_page === page.id ? 'border-b-2 themed-border-primary themed-text-primary themed-bg-primary-light' : 'themed-text-muted themed-hover-bg'"
-            class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
+            :class="current_page === page.id 
+              ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50/60 font-semibold dark:bg-blue-900/10 dark:text-blue-400' 
+              : 'themed-text-muted themed-hover-bg border-b-2 border-transparent'"
+            class="px-6 py-3.5 font-medium whitespace-nowrap transition-all duration-200 relative"
             x-text="page.icon + ' ' + page.name"
           ></button>
         </template>
@@ -39,16 +65,22 @@
 
     <!-- 公告管理 -->
     <div x-show="current_page === 'announcements'" x-cloak>
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b flex justify-between items-center">
-          <h5 class="font-semibold">公告管理</h5>
-          <button @click="openCreateAnnouncementModal()" class="px-4 py-2 themed-btn-primary rounded">
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden">
+        <div class="p-5 border-b flex justify-between items-center bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-900/10">
+          <div>
+            <h5 class="font-semibold text-base">📢 公告管理</h5>
+            <p class="text-xs themed-text-muted mt-0.5">管理系统公告、活动通知和维护公告</p>
+          </div>
+          <button @click="openCreateAnnouncementModal()" class="px-4 py-2 themed-btn-primary rounded-lg shadow-sm hover:shadow transition-shadow">
             ➕ 发布公告
           </button>
         </div>
         <!-- data-table: 公告列表 -->
         <div x-data="announcementsTable()" x-init="init()">
-          <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+          <div x-show="loading" class="p-12 text-center themed-text-muted">
+            <div class="inline-block w-8 h-8 border-3 border-blue-200 border-t-blue-500 rounded-full animate-spin mb-3"></div>
+            <p>加载中...</p>
+          </div>
           <div x-show="hasError" class="p-8 text-center">
             <p class="text-red-500 mb-2" x-text="error"></p>
             <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
@@ -58,26 +90,26 @@
               <thead class="themed-bg-base">
                 <tr>
                   <template x-for="col in columns" :key="col.key">
-                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider themed-text-muted"
                         :class="{ 'cursor-pointer hover:text-blue-600': col.sortable }"
                         @click="sort(col)">
                       <span x-text="col.label"></span>
                       <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
                     </th>
                   </template>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider themed-text-muted">操作</th>
                 </tr>
               </thead>
               <tbody class="divide-y">
                 <template x-for="(row, idx) in data" :key="row.system_announcement_id || idx">
-                  <tr class="themed-hover-bg">
+                  <tr class="themed-hover-bg transition-colors">
                     <template x-for="col in columns" :key="col.key">
                       <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
                     </template>
                     <td class="px-4 py-3">
-                      <div class="flex space-x-2">
-                        <button @click="$dispatch('edit-announcement', row)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
-                        <button @click="$dispatch('delete-announcement', row)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
+                      <div class="flex space-x-3">
+                        <button @click="$dispatch('edit-announcement', row)" class="text-blue-500 hover:text-blue-700 text-sm font-medium transition-colors">编辑</button>
+                        <button @click="$dispatch('delete-announcement', row)" class="text-red-500 hover:text-red-700 text-sm font-medium transition-colors">删除</button>
                       </div>
                     </td>
                   </tr>
@@ -85,10 +117,13 @@
               </tbody>
             </table>
           </div>
-          <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
-            <div class="text-4xl mb-4">📢</div>
-            <p>暂无公告数据</p>
-            <p class="text-sm mt-2">点击"发布公告"按钮创建第一条公告</p>
+          <div x-show="isEmpty" class="empty-state empty-state-compact">
+            <div class="empty-state-icon-circle">
+              <div class="empty-state-icon">📢</div>
+            </div>
+            <div class="empty-state-title">暂无公告数据</div>
+            <div class="empty-state-description">点击"发布公告"按钮创建第一条公告，向用户传达重要信息</div>
+            <button @click="openCreateAnnouncementModal()" class="empty-state-action">➕ 发布第一条公告</button>
           </div>
           <template x-if="total_pages > 1">
             <div class="p-4 border-t flex justify-between items-center">
@@ -117,184 +152,246 @@
 
     <!-- 弹窗管理（popup_banners） -->
     <div x-show="current_page === 'popup-banners'" x-cloak>
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b flex justify-between items-center flex-wrap gap-2">
-          <h5 class="font-semibold">🔔 弹窗管理</h5>
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden">
+        <div class="p-5 border-b flex justify-between items-center flex-wrap gap-3 bg-gradient-to-r from-purple-50 to-transparent dark:from-purple-900/10">
+          <div>
+            <h5 class="font-semibold text-base">🔔 弹窗管理</h5>
+            <p class="text-xs themed-text-muted mt-0.5">管理首页弹窗广告，支持拖拽排序和频率控制</p>
+          </div>
           <div class="flex items-center gap-2">
-            <select x-model="bannerFilters.banner_type" @change="loadBanners()" class="px-2 py-1 text-sm border rounded themed-bg-base">
+            <select x-model="bannerFilters.banner_type" @change="loadBanners()" class="px-3 py-2 text-sm border rounded-lg themed-bg-base focus:ring-2 focus:ring-indigo-300 transition-shadow">
               <option value="">全部类型</option>
               <template x-for="t in bannerTypes" :key="t.value">
                 <option :value="t.value" x-text="t.label"></option>
               </template>
             </select>
-            <button @click="openCreateBannerModal()" class="px-4 py-2 themed-btn-primary rounded">
+            <button @click="openCreateBannerModal()" class="px-4 py-2 themed-btn-primary rounded-lg shadow-sm hover:shadow transition-shadow">
               ➕ 新增弹窗
             </button>
           </div>
         </div>
 
-        <div x-show="banners.length === 0" class="p-8 text-center themed-text-muted">
-          <div class="text-4xl mb-4">🔔</div>
-          <p>暂无弹窗数据</p>
-          <p class="text-sm mt-2">点击"新增弹窗"按钮添加第一个弹窗</p>
+        <div x-show="banners.length === 0" class="empty-state">
+          <div class="empty-state-icon-circle">
+            <div class="empty-state-icon">🔔</div>
+          </div>
+          <div class="empty-state-title">暂无弹窗数据</div>
+          <div class="empty-state-description">创建弹窗向用户展示公告、活动和促销信息，支持定时投放和频率控制</div>
+          <button @click="openCreateBannerModal()" class="empty-state-action">➕ 创建第一个弹窗</button>
+          <div class="empty-state-tips">
+            <div class="empty-state-tips-title">💡 使用提示</div>
+            <div>· 支持系统公告、活动推广、日常促销三种类型</div>
+            <div>· 可设置强制弹出或按频率投放（每天/每次/仅一次）</div>
+            <div>· 拖拽卡片可调整弹窗优先级排序</div>
+          </div>
         </div>
 
-        <p class="px-4 pt-2 text-xs themed-text-muted" x-show="banners.length > 0">拖拽卡片可调整排序</p>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4" x-show="banners.length > 0">
-          <template x-for="(banner, idx) in banners" :key="banner.popup_banner_id">
-            <div class="border rounded-lg overflow-hidden cursor-grab active:cursor-grabbing transition-shadow"
-                 :class="bannerDragging && bannerDragIndex === idx ? 'ring-2 ring-indigo-400 shadow-lg' : ''"
-                 :data-banner-idx="idx"
-                 draggable="true"
-                 @dragstart="bannerDragStart(idx, $event)"
-                 @dragover="bannerDragOver($event, idx)"
-                 @dragend="bannerDragEnd()"
-                 @touchstart="bannerTouchStart(idx, $event)"
-                 @touchmove="bannerTouchMove($event)"
-                 @touchend="bannerTouchEnd()">
-              <div class="themed-bg-muted flex items-center justify-center cursor-pointer overflow-hidden"
-                   :style="getBannerAspectStyle(banner.display_mode)"
-                   x-show="banner.image_url" @click="previewBanner(banner)">
-                <img :data-src="banner.image_url" alt=""
-                     class="w-full h-full img-lazy"
-                     style="object-fit: contain;"
-                     x-init="$nextTick(() => { if(banner.image_url) { $el.src = banner.image_url; $el.classList.add('loaded') } })">
-              </div>
-              <div class="h-48 themed-bg-muted flex items-center justify-center" x-show="!banner.image_url">
-                <span class="text-gray-400">无图片</span>
-              </div>
-              <div class="p-3">
-                <h6 class="font-medium" x-text="banner.title"></h6>
-                <div class="mt-1 flex flex-wrap items-center gap-1">
-                  <span class="text-xs px-2 py-0.5 rounded text-white"
-                        :class="banner.banner_type_color || 'bg-gray-400'"
-                        x-text="banner.banner_type_display || banner.banner_type || '促销'"></span>
-                  <span class="text-xs px-2 py-0.5 rounded text-white"
-                        :class="banner.display_mode_color || 'bg-gray-400'"
-                        x-text="banner.display_mode_display || banner.display_mode || '未设置'"></span>
-                  <span class="text-xs themed-text-muted" x-show="banner.image_width"
-                        x-text="banner.image_width + '×' + banner.image_height"></span>
+        <div x-show="banners.length > 0" class="p-4">
+          <p class="text-xs themed-text-muted mb-3 flex items-center gap-1">
+            <span class="inline-block w-4 h-4 rounded bg-indigo-100 text-indigo-500 text-center text-xs leading-4">↕</span>
+            拖拽卡片可调整展示顺序
+          </p>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <template x-for="(banner, idx) in banners" :key="banner.popup_banner_id">
+              <div class="themed-card rounded-xl overflow-hidden cursor-grab active:cursor-grabbing transition-all duration-200 hover:shadow-md"
+                   :class="bannerDragging && bannerDragIndex === idx ? 'ring-2 ring-indigo-400 shadow-lg scale-[1.02]' : 'shadow-sm'"
+                   :data-banner-idx="idx"
+                   draggable="true"
+                   @dragstart="bannerDragStart(idx, $event)"
+                   @dragover="bannerDragOver($event, idx)"
+                   @dragend="bannerDragEnd()"
+                   @touchstart="bannerTouchStart(idx, $event)"
+                   @touchmove="bannerTouchMove($event)"
+                   @touchend="bannerTouchEnd()">
+                <!-- 状态指示条 -->
+                <div class="h-1" :class="banner.is_active ? 'bg-green-500' : 'bg-gray-300'"></div>
+                <div class="relative group">
+                  <div class="themed-bg-muted flex items-center justify-center cursor-pointer overflow-hidden"
+                       :style="getBannerAspectStyle(banner.display_mode)"
+                       x-show="banner.image_url" @click="previewBanner(banner)">
+                    <img :data-src="banner.image_url" alt=""
+                         class="w-full h-full img-lazy"
+                         style="object-fit: contain;"
+                         x-init="$nextTick(() => { if(banner.image_url) { $el.src = banner.image_url; $el.classList.add('loaded') } })">
+                  </div>
+                  <div class="h-40 themed-bg-muted flex items-center justify-center" x-show="!banner.image_url">
+                    <span class="themed-text-muted text-sm">暂无图片</span>
+                  </div>
+                  <!-- 状态角标 -->
+                  <div class="absolute top-2 right-2">
+                    <span class="text-xs px-2 py-1 rounded-full font-medium shadow-sm"
+                          :class="banner.is_active ? 'bg-green-500 text-white' : 'bg-gray-400 text-white'"
+                          x-text="banner.is_active ? '已启用' : '已禁用'"></span>
+                  </div>
                 </div>
-                <div class="mt-1 flex flex-wrap items-center gap-1 text-xs themed-text-muted">
-                  <span x-text="'优先级: ' + (banner.priority || 0)"></span>
-                  <span>·</span>
-                  <span x-text="banner.frequency_rule_display || banner.frequency_rule || ''"></span>
-                  <span x-show="banner.force_show" class="text-red-500 font-medium">· 强制弹出</span>
-                </div>
-                <p class="text-sm themed-text-muted mt-1" x-text="'排序: ' + (banner.display_order || 0)"></p>
-                <div class="mt-2 flex flex-wrap gap-2">
-                  <button @click="toggleBannerStatus(banner)" class="text-sm"
-                          :class="banner.is_active ? 'text-yellow-500 hover:text-yellow-700' : 'text-green-500 hover:text-green-700'"
-                          x-text="banner.is_active ? '禁用' : '启用'"></button>
-                  <button @click="editBanner(banner)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
-                  <button @click="viewBannerShowStats(banner)" class="text-indigo-500 hover:text-indigo-700 text-sm">统计</button>
-                  <button @click="deleteBanner(banner)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
+                <div class="p-4">
+                  <h6 class="font-semibold text-sm mb-2 truncate" x-text="banner.title"></h6>
+                  <div class="flex flex-wrap items-center gap-1.5 mb-2">
+                    <span class="text-xs px-2 py-0.5 rounded-full text-white"
+                          :class="banner.banner_type_color || (banner.banner_type === 'notice' ? 'bg-red-500' : banner.banner_type === 'event' ? 'bg-orange-500' : 'bg-blue-500')"
+                          x-text="banner.banner_type_display || (banner.banner_type === 'notice' ? '系统公告' : banner.banner_type === 'event' ? '活动推广' : '日常促销')"></span>
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                          x-text="banner.display_mode_display || banner.display_mode || '未设置'"></span>
+                    <span class="text-xs themed-text-muted" x-show="banner.image_width"
+                          x-text="banner.image_width + '×' + banner.image_height"></span>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-1 text-xs themed-text-muted mb-3">
+                    <span x-text="'优先级 ' + (banner.priority || 0)"></span>
+                    <span>·</span>
+                    <span x-text="banner.frequency_rule_display || banner.frequency_rule || ''"></span>
+                    <span x-show="banner.force_show" class="text-red-500 font-semibold">· 强制</span>
+                  </div>
+                  <div class="flex items-center gap-1 pt-3 border-t">
+                    <button @click="toggleBannerStatus(banner)" class="flex-1 text-xs py-1.5 rounded-md font-medium transition-colors"
+                            :class="banner.is_active ? 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100 dark:bg-yellow-900/20 dark:text-yellow-400' : 'bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400'"
+                            x-text="banner.is_active ? '禁用' : '启用'"></button>
+                    <button @click="editBanner(banner)" class="flex-1 text-xs py-1.5 rounded-md font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 transition-colors">编辑</button>
+                    <button @click="viewBannerShowStats(banner)" class="flex-1 text-xs py-1.5 rounded-md font-medium bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 transition-colors">统计</button>
+                    <button @click="deleteBanner(banner)" class="text-xs py-1.5 px-2 rounded-md font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">🗑</button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </template>
+            </template>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- 轮播图管理（carousel_items 独立表） -->
     <div x-show="current_page === 'carousel-items'" x-cloak>
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b flex justify-between items-center">
-          <h5 class="font-semibold">🎨 轮播图管理</h5>
-          <button @click="openCreateCarouselModal()" class="px-4 py-2 themed-btn-primary rounded">
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden">
+        <div class="p-5 border-b flex justify-between items-center bg-gradient-to-r from-emerald-50 to-transparent dark:from-emerald-900/10">
+          <div>
+            <h5 class="font-semibold text-base">🎨 轮播图管理</h5>
+            <p class="text-xs themed-text-muted mt-0.5">管理首页轮播图片，支持拖拽排序和定时投放</p>
+          </div>
+          <button @click="openCreateCarouselModal()" class="px-4 py-2 themed-btn-primary rounded-lg shadow-sm hover:shadow transition-shadow">
             ➕ 新增轮播图
           </button>
         </div>
 
-        <div x-show="carouselItems.length === 0" class="p-8 text-center themed-text-muted">
-          <div class="text-4xl mb-4">🎨</div>
-          <p>暂无轮播图数据</p>
-          <p class="text-sm mt-2">点击"新增轮播图"按钮添加第一张轮播图</p>
+        <div x-show="carouselItems.length === 0" class="empty-state">
+          <div class="empty-state-icon-circle">
+            <div class="empty-state-icon">🎨</div>
+          </div>
+          <div class="empty-state-title">暂无轮播图数据</div>
+          <div class="empty-state-description">创建轮播图在首页展示活动海报和品牌宣传内容，吸引用户关注最新活动和促销信息</div>
+          <button @click="openCreateCarouselModal()" class="empty-state-action">➕ 添加第一张轮播图</button>
+          <div class="empty-state-tips">
+            <div class="empty-state-tips-title">💡 使用提示</div>
+            <div>· 推荐尺寸：宽屏模式 750×420（16:9 比例）</div>
+            <div>· 支持 JPG/PNG 格式，单张不超过 400KB</div>
+            <div>· 创建后可拖拽排序，调整展示顺序</div>
+            <div>· 支持设置定时投放的开始和结束时间</div>
+          </div>
         </div>
 
-        <p class="px-4 pt-2 text-xs themed-text-muted" x-show="carouselItems.length > 0">拖拽卡片可调整排序</p>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4" x-show="carouselItems.length > 0">
-          <template x-for="(item, idx) in carouselItems" :key="item.carousel_item_id">
-            <div class="border rounded-lg overflow-hidden cursor-grab active:cursor-grabbing transition-shadow"
-                 :class="carouselDragging && carouselDragIndex === idx ? 'ring-2 ring-indigo-400 shadow-lg' : ''"
-                 :data-carousel-idx="idx"
-                 draggable="true"
-                 @dragstart="carouselDragStart(idx, $event)"
-                 @dragover="carouselDragOver($event, idx)"
-                 @dragend="carouselDragEnd()"
-                 @touchstart="carouselTouchStart(idx)"
-                 @touchmove="carouselTouchMove($event)"
-                 @touchend="carouselTouchEnd()">
-              <div class="themed-bg-muted flex items-center justify-center cursor-pointer overflow-hidden"
-                   :style="getCarouselAspectStyle(item.display_mode)"
-                   x-show="item.image_url" @click="previewCarouselItem(item)">
-                <img :data-src="item.image_url" alt=""
-                     class="w-full h-full img-lazy"
-                     style="object-fit: contain;"
-                     x-init="$nextTick(() => { if(item.image_url) { $el.src = item.image_url; $el.classList.add('loaded') } })">
-              </div>
-              <div class="h-48 themed-bg-muted flex items-center justify-center" x-show="!item.image_url">
-                <span class="text-gray-400">无图片</span>
-              </div>
-              <div class="p-3">
-                <h6 class="font-medium" x-text="item.title"></h6>
-                <div class="mt-1 flex flex-wrap items-center gap-1">
-                  <span class="text-xs px-2 py-0.5 rounded bg-blue-500 text-white" x-text="item.display_mode || 'wide'"></span>
-                  <span class="text-xs themed-text-muted" x-show="item.image_width"
-                        x-text="item.image_width + '×' + item.image_height"></span>
-                  <span class="text-xs themed-text-muted" x-text="'间隔: ' + (item.slide_interval_ms || 3000) + 'ms'"></span>
+        <div x-show="carouselItems.length > 0" class="p-4">
+          <p class="text-xs themed-text-muted mb-3 flex items-center gap-1">
+            <span class="inline-block w-4 h-4 rounded bg-emerald-100 text-emerald-500 text-center text-xs leading-4">↕</span>
+            拖拽卡片可调整展示顺序
+          </p>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <template x-for="(item, idx) in carouselItems" :key="item.carousel_item_id">
+              <div class="themed-card rounded-xl overflow-hidden cursor-grab active:cursor-grabbing transition-all duration-200 hover:shadow-md"
+                   :class="carouselDragging && carouselDragIndex === idx ? 'ring-2 ring-emerald-400 shadow-lg scale-[1.02]' : 'shadow-sm'"
+                   :data-carousel-idx="idx"
+                   draggable="true"
+                   @dragstart="carouselDragStart(idx, $event)"
+                   @dragover="carouselDragOver($event, idx)"
+                   @dragend="carouselDragEnd()"
+                   @touchstart="carouselTouchStart(idx)"
+                   @touchmove="carouselTouchMove($event)"
+                   @touchend="carouselTouchEnd()">
+                <!-- 状态指示条 -->
+                <div class="h-1" :class="item.is_active ? 'bg-emerald-500' : 'bg-gray-300'"></div>
+                <div class="relative group">
+                  <div class="themed-bg-muted flex items-center justify-center cursor-pointer overflow-hidden"
+                       :style="getCarouselAspectStyle(item.display_mode)"
+                       x-show="item.image_url" @click="previewCarouselItem(item)">
+                    <img :data-src="item.image_url" alt=""
+                         class="w-full h-full img-lazy"
+                         style="object-fit: contain;"
+                         x-init="$nextTick(() => { if(item.image_url) { $el.src = item.image_url; $el.classList.add('loaded') } })">
+                  </div>
+                  <div class="h-40 themed-bg-muted flex items-center justify-center" x-show="!item.image_url">
+                    <span class="themed-text-muted text-sm">暂无图片</span>
+                  </div>
+                  <!-- 状态角标 -->
+                  <div class="absolute top-2 right-2">
+                    <span class="text-xs px-2 py-1 rounded-full font-medium shadow-sm"
+                          :class="item.is_active ? 'bg-emerald-500 text-white' : 'bg-gray-400 text-white'"
+                          x-text="item.is_active ? '已启用' : '已禁用'"></span>
+                  </div>
                 </div>
-                <p class="text-sm themed-text-muted mt-1" x-text="'排序: ' + (item.display_order || 0)"></p>
-                <div class="mt-2 flex flex-wrap gap-2">
-                  <button @click="toggleCarouselStatus(item)" class="text-sm"
-                          :class="item.is_active ? 'text-yellow-500 hover:text-yellow-700' : 'text-green-500 hover:text-green-700'"
-                          x-text="item.is_active ? '禁用' : '启用'"></button>
-                  <button @click="editCarouselItem(item)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
-                  <button @click="viewCarouselShowStats(item)" class="text-indigo-500 hover:text-indigo-700 text-sm">统计</button>
-                  <button @click="deleteCarouselItem(item)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
+                <div class="p-4">
+                  <h6 class="font-semibold text-sm mb-2 truncate" x-text="item.title"></h6>
+                  <div class="flex flex-wrap items-center gap-1.5 mb-2">
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" x-text="item.display_mode || 'wide'"></span>
+                    <span class="text-xs themed-text-muted" x-show="item.image_width"
+                          x-text="item.image_width + '×' + item.image_height"></span>
+                    <span class="text-xs themed-text-muted" x-text="'轮播间隔 ' + ((item.slide_interval_ms || 3000) / 1000) + 's'"></span>
+                  </div>
+                  <div class="flex items-center gap-1 pt-3 border-t">
+                    <button @click="toggleCarouselStatus(item)" class="flex-1 text-xs py-1.5 rounded-md font-medium transition-colors"
+                            :class="item.is_active ? 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100 dark:bg-yellow-900/20 dark:text-yellow-400' : 'bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400'"
+                            x-text="item.is_active ? '禁用' : '启用'"></button>
+                    <button @click="editCarouselItem(item)" class="flex-1 text-xs py-1.5 rounded-md font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 transition-colors">编辑</button>
+                    <button @click="viewCarouselShowStats(item)" class="flex-1 text-xs py-1.5 rounded-md font-medium bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 transition-colors">统计</button>
+                    <button @click="deleteCarouselItem(item)" class="text-xs py-1.5 px-2 rounded-md font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">🗑</button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </template>
+            </template>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- 图片资源管理 -->
     <div x-show="current_page === 'image-resources'" x-cloak>
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b flex justify-between items-center">
-          <h5 class="font-semibold">图片资源</h5>
-          <button @click="showModal('uploadImageModal')" class="px-4 py-2 themed-btn-primary rounded">
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden">
+        <div class="p-5 border-b flex justify-between items-center bg-gradient-to-r from-amber-50 to-transparent dark:from-amber-900/10">
+          <div>
+            <h5 class="font-semibold text-base">🖼️ 图片资源</h5>
+            <p class="text-xs themed-text-muted mt-0.5">统一管理系统中的图片素材，支持分类筛选和批量操作</p>
+          </div>
+          <button @click="showModal('uploadImageModal')" class="px-4 py-2 themed-btn-primary rounded-lg shadow-sm hover:shadow transition-shadow">
             ➕ 上传图片
           </button>
         </div>
-        <!-- 空状态提示 -->
 
-          <div x-show="images.length === 0" class="p-8 text-center themed-text-muted">
-            <div class="text-4xl mb-4">🖼️</div>
-            <p>暂无图片资源</p>
-            <p class="text-sm mt-2">点击"上传图片"按钮添加图片资源</p>
+        <div x-show="images.length === 0" class="empty-state">
+          <div class="empty-state-icon-circle">
+            <div class="empty-state-icon">🖼️</div>
           </div>
+          <div class="empty-state-title">暂无图片资源</div>
+          <div class="empty-state-description">上传图片素材统一管理，所有轮播图、弹窗使用的图片都会在这里归档和检索</div>
+          <button @click="showModal('uploadImageModal')" class="empty-state-action">➕ 上传第一张图片</button>
+          <div class="empty-state-tips">
+            <div class="empty-state-tips-title">💡 使用提示</div>
+            <div>· 支持 JPG/PNG/GIF/WebP 格式，单张不超过 5MB</div>
+            <div>· 上传后自动生成 3 种缩略图尺寸（150/300/600px）</div>
+            <div>· 图片可绑定到具体业务（抽奖、交易、活动等）</div>
+            <div>· 点击图片可预览、复制链接或删除</div>
+          </div>
+        </div>
 
-        <!-- 图片列表 -->
         <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 p-4" x-show="images.length > 0">
           <template x-for="image in images" :key="image.image_resource_id">
-            <div class="border rounded-lg overflow-hidden group relative">
+            <div class="themed-card rounded-xl overflow-hidden group relative shadow-sm hover:shadow-md transition-all duration-200">
               <div class="aspect-square themed-bg-subtle flex items-center justify-center img-blur-load">
                 <img :data-src="image.url" :alt="image.original_filename" 
                      class="w-full h-full object-cover img-lazy"
                      x-init="$nextTick(() => { if(image.url) { $el.src = image.url; $el.classList.add('loaded') } })">
               </div>
-              <div class="p-2">
-                <p class="text-xs themed-text-muted truncate" x-text="image.original_filename || '未命名'"></p>
-                <p class="text-xs text-gray-400" x-text="formatFileSize(image.file_size)"></p>
+              <div class="p-2.5">
+                <p class="text-xs font-medium truncate" x-text="image.original_filename || '未命名'"></p>
+                <p class="text-xs themed-text-muted mt-0.5" x-text="formatFileSize(image.file_size)"></p>
               </div>
-              <!-- 悬停操作 -->
-              <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2">
-                <button @click="viewImage(image)" class="px-2 py-1 themed-card themed-text-secondary rounded text-xs btn-scale">查看</button>
-                <button @click="deleteImage(image)" class="px-2 py-1 bg-red-500 text-white rounded text-xs btn-scale">删除</button>
+              <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2 rounded-xl">
+                <button @click="viewImage(image)" class="px-3 py-1.5 bg-white text-gray-700 rounded-lg text-xs font-medium shadow-sm hover:bg-gray-50 transition-colors">查看</button>
+                <button @click="deleteImage(image)" class="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium shadow-sm hover:bg-red-600 transition-colors">删除</button>
               </div>
             </div>
           </template>

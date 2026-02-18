@@ -453,6 +453,64 @@ class ItemTemplateService {
   }
 
   /**
+   * 获取物品模板统计数据
+   *
+   * @description 统计物品模板的总数、类型分布、稀有度分布和启用状态
+   * @returns {Promise<Object>} 统计数据
+   */
+  async getTemplateStats() {
+    try {
+      const [totalCount, enabledCount, disabledCount] = await Promise.all([
+        this.ItemTemplate.count(),
+        this.ItemTemplate.count({ where: { is_enabled: true } }),
+        this.ItemTemplate.count({ where: { is_enabled: false } })
+      ])
+
+      const typeDistribution = await this.ItemTemplate.findAll({
+        attributes: [
+          'item_type',
+          [
+            this.models.Sequelize.fn('COUNT', this.models.Sequelize.col('item_template_id')),
+            'count'
+          ]
+        ],
+        group: ['item_type'],
+        raw: true
+      })
+
+      const rarityDistribution = await this.ItemTemplate.findAll({
+        attributes: [
+          'rarity_code',
+          [
+            this.models.Sequelize.fn('COUNT', this.models.Sequelize.col('item_template_id')),
+            'count'
+          ]
+        ],
+        group: ['rarity_code'],
+        raw: true
+      })
+
+      return {
+        total_count: totalCount,
+        enabled_count: enabledCount,
+        disabled_count: disabledCount,
+        item_type_count: typeDistribution.length,
+        type_distribution: typeDistribution.map(t => ({
+          item_type: t.item_type,
+          count: parseInt(t.count)
+        })),
+        rarity_distribution: rarityDistribution.map(r => ({
+          rarity_code: r.rarity_code || 'none',
+          count: parseInt(r.count)
+        }))
+      }
+    } catch (error) {
+      logger.error('获取物品模板统计失败:', error)
+      throw error
+    }
+  }
+
+  /**
    * 批量启用/禁用模板
    *
    * @param {Array<number>} item_template_ids - 模板ID列表

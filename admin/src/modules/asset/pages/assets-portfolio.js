@@ -194,9 +194,11 @@ function assetsPortfolioPage() {
       await this.withLoading(
         async () => {
           await Promise.all([this.loadAssetStats(), this.loadAssetTypes(), this.loadAssets()])
-          // 初始化图表（数据加载完成后）
+          // 初始化图表 - 使用 requestAnimationFrame 确保浏览器完成布局
           this.$nextTick(() => {
-            this.initCharts()
+            requestAnimationFrame(() => {
+              this.initCharts()
+            })
           })
         },
         { errorMessage: '加载资产数据失败' }
@@ -528,19 +530,25 @@ function assetsPortfolioPage() {
     initCharts() {
       const echarts = this._echarts
 
-      // 检查 ECharts 是否可用
       if (!echarts) {
         logger.warn('[AssetsPortfolioPage] ECharts 未加载，跳过图表初始化')
         return
       }
 
-      // 检查图表容器是否有尺寸（iframe 中可能还未可见）
       const chartDom = document.getElementById('assetTypeChart')
-      if (chartDom && chartDom.offsetWidth > 0) {
+      if (!chartDom) {
+        logger.warn('[AssetsPortfolioPage] 图表容器DOM不存在，跳过')
+        return
+      }
+
+      // 检查容器是否有尺寸（处理iframe/隐藏Tab场景）
+      // 注意：直接访问时 x-cloak 移除后容器应有尺寸
+      if (chartDom.offsetWidth > 0) {
+        logger.info('[AssetsPortfolioPage] 图表容器就绪，开始初始化图表')
         this.initAssetTypeChart()
         this.initValueTrendChart()
       } else {
-        // 容器尚无尺寸，延迟初始化并监听可见性变化
+        // 容器可能在 iframe 非活动 Tab 中，延迟到可见时初始化
         logger.info('[AssetsPortfolioPage] 图表容器暂无尺寸，延迟初始化...')
         this._scheduleChartInit()
       }
@@ -550,41 +558,47 @@ function assetsPortfolioPage() {
      * 延迟初始化图表（处理 iframe/隐藏 Tab 场景）
      */
     _scheduleChartInit() {
-      // 方案1：使用 ResizeObserver 监听容器尺寸变化
+      let initialized = false
+
+      const doInit = (source) => {
+        if (initialized) return
+        initialized = true
+        logger.info(`[AssetsPortfolioPage] 图表容器可见（${source}），开始初始化图表`)
+        this.initAssetTypeChart()
+        this.initValueTrendChart()
+      }
+
       const chartDom = document.getElementById('assetTypeChart')
+
+      // 方案1：ResizeObserver - iframe Tab 切换场景
       if (chartDom && typeof ResizeObserver !== 'undefined') {
         const observer = new ResizeObserver((entries) => {
           for (const entry of entries) {
             if (entry.contentRect.width > 0 && entry.contentRect.height > 0) {
-              logger.info('[AssetsPortfolioPage] 图表容器可见，开始初始化图表')
               observer.disconnect()
-              this.initAssetTypeChart()
-              this.initValueTrendChart()
+              doInit('ResizeObserver')
               return
             }
           }
         })
         observer.observe(chartDom)
-        // 安全超时：30秒后断开观察
         setTimeout(() => observer.disconnect(), 30000)
-      } else {
-        // 方案2：降级为定时重试
-        let retries = 0
-        const maxRetries = 10
-        const retryInterval = setInterval(() => {
-          retries++
-          const dom = document.getElementById('assetTypeChart')
-          if (dom && dom.offsetWidth > 0) {
-            clearInterval(retryInterval)
-            logger.info('[AssetsPortfolioPage] 图表容器就绪（重试' + retries + '次）')
-            this.initAssetTypeChart()
-            this.initValueTrendChart()
-          } else if (retries >= maxRetries) {
-            clearInterval(retryInterval)
-            logger.warn('[AssetsPortfolioPage] 图表容器始终无尺寸，放弃初始化')
-          }
-        }, 500)
       }
+
+      // 方案2：定时重试 - 处理 x-cloak 移除后布局延迟的场景
+      let retries = 0
+      const maxRetries = 15
+      const retryInterval = setInterval(() => {
+        retries++
+        const dom = document.getElementById('assetTypeChart')
+        if (dom && dom.offsetWidth > 0) {
+          clearInterval(retryInterval)
+          doInit(`重试${retries}次`)
+        } else if (retries >= maxRetries) {
+          clearInterval(retryInterval)
+          logger.warn('[AssetsPortfolioPage] 图表容器始终无尺寸，放弃初始化')
+        }
+      }, 300)
     },
 
     /**

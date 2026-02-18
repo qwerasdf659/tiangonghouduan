@@ -9,11 +9,11 @@
 <body class="themed-bg-subtle min-h-screen">
   
   <!-- 导航栏 -->
-  <nav class="bg-gray-700 text-white shadow-lg">
+  <nav class="themed-bg-primary text-white shadow-lg">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:text-gray-300">← 返回工作台</a>
-        <span class="text-lg font-semibold">🏪 管理后台 - 门店管理</span>
+        <a href="/admin/workspace.html" class="hover:text-blue-200 transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">🏪 门店管理</span>
       </div>
       <div class="flex items-center space-x-4">
         <span x-data x-text="$store.auth?.user?.nickname ? `欢迎，${$store.auth.user.nickname}` : '欢迎，管理员'">欢迎，管理员</span>
@@ -44,34 +44,41 @@
     
     <!-- ==================== 门店列表 ==================== -->
     <div x-show="current_page === 'stores'" x-cloak>
-      <!-- 统计卡片 -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <div class="text-3xl mb-2">🏪</div>
-          <div class="themed-text-muted text-sm">总门店数</div>
-          <div class="text-2xl font-bold themed-text-primary" x-text="storeStats.total || 0"></div>
+      <!-- 统计卡片 - 渐变风格 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="gradient-stat-card gradient-stat-blue stats-card-animate">
+          <div class="stat-icon">🏪</div>
+          <div class="stat-value" x-text="storeStats.total || 0"></div>
+          <div class="stat-label">总门店数</div>
+          <div class="stat-trend">较上月 —</div>
         </div>
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <div class="text-3xl mb-2">✅</div>
-          <div class="themed-text-muted text-sm">营业中</div>
-          <div class="text-2xl font-bold text-green-600" x-text="storeStats.active || 0"></div>
+        <div class="gradient-stat-card gradient-stat-green stats-card-animate">
+          <div class="stat-icon">✅</div>
+          <div class="stat-value" x-text="storeStats.active || 0"></div>
+          <div class="stat-label">营业中</div>
+          <div class="stat-trend" x-text="storeStats.total > 0 ? '占比 ' + Math.round(storeStats.active / storeStats.total * 100) + '%' : '—'"></div>
         </div>
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <div class="text-3xl mb-2">👥</div>
-          <div class="themed-text-muted text-sm">总员工数</div>
-          <div class="text-2xl font-bold text-cyan-600" x-text="storeStats.totalStaff || 0"></div>
+        <div class="gradient-stat-card gradient-stat-purple stats-card-animate">
+          <div class="stat-icon">👥</div>
+          <div class="stat-value" x-text="storeStats.totalStaff || 0"></div>
+          <div class="stat-label">总员工数</div>
+          <div class="stat-trend" x-text="storeStats.total > 0 ? '人均 ' + (storeStats.totalStaff / storeStats.total).toFixed(1) : '—'"></div>
         </div>
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <div class="text-3xl mb-2">📈</div>
-          <div class="themed-text-muted text-sm">今日营业额</div>
-          <div class="text-2xl font-bold text-amber-600" x-text="'¥' + (storeStats.todayRevenue || 0)"></div>
+        <div class="gradient-stat-card gradient-stat-orange stats-card-animate">
+          <div class="stat-icon">📈</div>
+          <div class="stat-value" x-text="'¥' + (storeStats.todayRevenue || 0)"></div>
+          <div class="stat-label">今日营业额</div>
+          <div class="stat-trend">实时更新</div>
         </div>
       </div>
 
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b flex justify-between items-center">
-          <h5 class="font-semibold text-lg">🏪 门店列表</h5>
-          <button @click="openCreateStoreModal()" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary text-sm">
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden">
+        <div class="p-5 border-b flex justify-between items-center bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-900/10">
+          <div>
+            <h5 class="font-semibold text-base">🏪 门店列表</h5>
+            <p class="text-xs themed-text-muted mt-0.5">管理所有门店信息，查看经营状态和员工配置</p>
+          </div>
+          <button @click="openCreateStoreModal()" class="px-4 py-2 themed-btn-primary rounded-lg shadow-sm hover:shadow transition-shadow text-sm">
             ➕ 添加门店
           </button>
         </div>

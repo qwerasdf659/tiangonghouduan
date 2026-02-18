@@ -9,42 +9,63 @@
 </head>
 <body class="themed-bg-subtle min-h-screen" x-data="assetsPortfolioPage()" x-init="init()" x-cloak>
   
-  <!-- 导航栏 -->
-  <nav class="themed-bg-primary text-white shadow-lg">
+  <!-- 导航栏（深色渐变风格） -->
+  <nav class="page-navbar">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
+        <a href="/admin/workspace.html" class="text-blue-200 hover:text-white transition-colors">← 返回工作台</a>
         <span class="text-lg font-semibold">💼 资产组合</span>
       </div>
       <div class="flex items-center space-x-4">
         <span x-text="'欢迎，' + (current_user?.nickname || '管理员')"></span>
-        <button @click="logout()" class="px-3 py-1 border border-white/50 rounded hover:bg-white/10">退出登录</button>
+        <button @click="logout()" class="px-3 py-1 border border-white/30 rounded hover:bg-white/10 transition-colors">退出登录</button>
       </div>
     </div>
   </nav>
 
   <div class="container mx-auto px-4 py-6">
+    <!-- 页面横幅 -->
+    <div class="page-banner mb-6">
+      <h1>💼 资产组合总览</h1>
+      <p>系统资产流通、持有分布、交易趋势全景视图</p>
+    </div>
     <!-- 总览卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-emerald-500 overflow-hidden">
-        <div class="text-4xl text-emerald-400 mb-2">💰</div>
-        <h4 class="text-xl font-bold text-emerald-600 truncate" x-text="formatCurrency(overview.total_circulation)" :title="overview.total_circulation">0</h4>
-        <p class="themed-text-muted text-sm">资产总流通量</p>
+      <div class="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg p-5 text-white overflow-hidden">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-emerald-100 text-sm">资产总流通量</p>
+            <p class="text-2xl font-bold mt-1 truncate" x-text="formatCurrency(overview.total_circulation)" :title="overview.total_circulation">0</p>
+          </div>
+          <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl">💰</div>
+        </div>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 themed-border-primary overflow-hidden">
-        <div class="text-4xl text-blue-400 mb-2">👥</div>
-        <h4 class="text-2xl font-bold themed-text-primary truncate" x-text="overview.total_holders">0</h4>
-        <p class="themed-text-muted text-sm">持有用户</p>
+      <div class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg p-5 text-white overflow-hidden">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-blue-100 text-sm">持有用户</p>
+            <p class="text-3xl font-bold mt-1" x-text="overview.total_holders">0</p>
+          </div>
+          <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl">👥</div>
+        </div>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-purple-500 overflow-hidden">
-        <div class="text-4xl text-purple-400 mb-2">📦</div>
-        <h4 class="text-2xl font-bold text-purple-600 truncate" x-text="overview.total_asset_types">0</h4>
-        <p class="themed-text-muted text-sm">资产种类</p>
+      <div class="bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl shadow-lg p-5 text-white overflow-hidden">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-purple-100 text-sm">资产种类</p>
+            <p class="text-3xl font-bold mt-1" x-text="overview.total_asset_types">0</p>
+          </div>
+          <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl">📦</div>
+        </div>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-orange-500 overflow-hidden">
-        <div class="text-4xl text-orange-400 mb-2">📈</div>
-        <h4 class="text-2xl font-bold text-orange-600 truncate" x-text="formatPercentage(overview.growth_rate)">0%</h4>
-        <p class="themed-text-muted text-sm">增长率</p>
+      <div class="bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl shadow-lg p-5 text-white overflow-hidden">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-orange-100 text-sm">增长率</p>
+            <p class="text-3xl font-bold mt-1" x-text="formatPercentage(overview.growth_rate)">0%</p>
+          </div>
+          <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl">📈</div>
+        </div>
       </div>
     </div>
 

@@ -10,10 +10,10 @@
 <body class="themed-bg-subtle min-h-screen" x-data="statisticsPage()" x-init="init()" x-cloak>
   
   <!-- 导航栏 -->
-  <nav class="themed-bg-primary text-white shadow-lg">
+  <nav class="page-navbar">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
+        <a href="/admin/workspace.html" class="text-white/70 hover:text-white transition-colors">← 返回工作台</a>
         <span class="text-lg font-semibold">📊 数据统计报表</span>
       </div>
       <div class="flex items-center space-x-4">
@@ -79,71 +79,71 @@
         </template>
       </template>
 
-      <!-- 实际统计卡片（带数字滚动动画 + 迷你图表） -->
+      <!-- 渐变指标卡片 — 数字滚动动画 + 迷你图表 -->
       <template x-if="!loading">
-        <div class="themed-card rounded-lg shadow p-4 stats-card-hover transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+        <div class="gradient-stat-card gradient-stat-blue">
           <div class="flex justify-between items-center">
             <div class="flex-1">
-              <p class="themed-text-muted text-sm">总用户数</p>
-              <h3 class="text-2xl font-bold themed-text tabular-nums" x-text="getAnimatedValue('total_users')">-</h3>
-              <span :class="stats.user_trend >= 0 ? 'text-green-500' : 'text-red-500'" class="text-sm flex items-center gap-1">
-                <span x-text="stats.user_trend >= 0 ? '📈' : '📉'"></span>
-                <span x-text="Math.abs(stats.user_trend).toFixed(1) + '%'"></span>
+              <p class="stat-label">总用户数</p>
+              <h3 class="stat-value" x-text="getAnimatedValue('total_users')">-</h3>
+              <span class="stat-trend">
+                <span x-text="stats.user_trend >= 0 ? '↑' : '↓'"></span>
+                <span x-text="Math.abs(stats.user_trend).toFixed(1) + '% 较上期'"></span>
               </span>
             </div>
-            <!-- 迷你趋势图 -->
-            <div class="w-20 h-10" x-data="trendLine({ data: stats.user_trend_data || [10, 15, 12, 18, 22, 25, 30], color: '#818cf8' })"></div>
+            <div class="w-20 h-10" x-data="trendLine({ data: stats.user_trend_data || [10, 15, 12, 18, 22, 25, 30], color: 'rgba(255,255,255,0.7)' })"></div>
           </div>
+          <span class="stat-icon">👥</span>
         </div>
       </template>
       <template x-if="!loading">
-        <div class="themed-card rounded-lg shadow p-4 stats-card-hover transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+        <div class="gradient-stat-card gradient-stat-green">
           <div class="flex justify-between items-center">
             <div class="flex-1">
-              <p class="themed-text-muted text-sm">抽奖次数</p>
-              <h3 class="text-2xl font-bold themed-text tabular-nums" x-text="getAnimatedValue('total_draws')">-</h3>
-              <span :class="stats.draw_trend >= 0 ? 'text-green-500' : 'text-red-500'" class="text-sm flex items-center gap-1">
-                <span x-text="stats.draw_trend >= 0 ? '📈' : '📉'"></span>
-                <span x-text="Math.abs(stats.draw_trend).toFixed(1) + '%'"></span>
+              <p class="stat-label">抽奖次数</p>
+              <h3 class="stat-value" x-text="getAnimatedValue('total_draws')">-</h3>
+              <span class="stat-trend">
+                <span x-text="stats.draw_trend >= 0 ? '↑' : '↓'"></span>
+                <span x-text="Math.abs(stats.draw_trend).toFixed(1) + '% 较上期'"></span>
               </span>
             </div>
-            <!-- 迷你柱状图 -->
-            <div class="w-20 h-10" x-data="trendBar({ data: stats.draw_trend_data || [5, 8, 12, 6, 15, 10, 18], color: '#22c55e' })"></div>
+            <div class="w-20 h-10" x-data="trendBar({ data: stats.draw_trend_data || [5, 8, 12, 6, 15, 10, 18], color: 'rgba(255,255,255,0.7)' })"></div>
           </div>
+          <span class="stat-icon">🎰</span>
         </div>
       </template>
       <template x-if="!loading">
-        <div class="themed-card rounded-lg shadow p-4 stats-card-hover transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+        <div class="gradient-stat-card gradient-stat-orange">
           <div class="flex justify-between items-center">
             <div class="flex-1">
-              <p class="themed-text-muted text-sm">中奖率</p>
-              <h3 class="text-2xl font-bold themed-text tabular-nums">
-                <span x-text="getAnimatedValue('win_rate')">-</span>%
+              <p class="stat-label">中奖率</p>
+              <h3 class="stat-value">
+                <span x-text="getAnimatedValue('win_rate')">-</span><span class="text-xl">%</span>
               </h3>
-              <span :class="stats.win_rate_trend >= 0 ? 'text-green-500' : 'text-red-500'" class="text-sm flex items-center gap-1">
-                <span x-text="stats.win_rate_trend >= 0 ? '📈' : '📉'"></span>
-                <span x-text="Math.abs(stats.win_rate_trend).toFixed(1) + '%'"></span>
+              <span class="stat-trend">
+                <span x-text="stats.win_rate_trend >= 0 ? '↑' : '↓'"></span>
+                <span x-text="Math.abs(stats.win_rate_trend).toFixed(1) + '% 较上期'"></span>
               </span>
             </div>
-            <!-- 进度环 -->
-            <div class="w-12 h-12" x-data="progressRing({ data: stats.win_rate || 45, color: '#eab308' })"></div>
+            <div class="w-12 h-12" x-data="progressRing({ data: stats.win_rate || 45, color: 'rgba(255,255,255,0.8)' })"></div>
           </div>
+          <span class="stat-icon">🏆</span>
         </div>
       </template>
       <template x-if="!loading">
-        <div class="themed-card rounded-lg shadow p-4 stats-card-hover transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+        <div class="gradient-stat-card gradient-stat-rose">
           <div class="flex justify-between items-center">
             <div class="flex-1">
-              <p class="themed-text-muted text-sm">积分发放</p>
-              <h3 class="text-2xl font-bold themed-text tabular-nums" x-text="getAnimatedValue('total_revenue')">-</h3>
-              <span :class="stats.revenue_trend >= 0 ? 'text-green-500' : 'text-red-500'" class="text-sm flex items-center gap-1">
-                <span x-text="stats.revenue_trend >= 0 ? '📈' : '📉'"></span>
-                <span x-text="Math.abs(stats.revenue_trend).toFixed(1) + '%'"></span>
+              <p class="stat-label">积分发放</p>
+              <h3 class="stat-value" x-text="getAnimatedValue('total_revenue')">-</h3>
+              <span class="stat-trend">
+                <span x-text="stats.revenue_trend >= 0 ? '↑' : '↓'"></span>
+                <span x-text="Math.abs(stats.revenue_trend).toFixed(1) + '% 较上期'"></span>
               </span>
             </div>
-            <!-- 迷你趋势图 -->
-            <div class="w-20 h-10" x-data="trendLine({ data: stats.revenue_trend_data || [100, 120, 110, 150, 180, 160, 200], color: '#f97316' })"></div>
+            <div class="w-20 h-10" x-data="trendLine({ data: stats.revenue_trend_data || [100, 120, 110, 150, 180, 160, 200], color: 'rgba(255,255,255,0.7)' })"></div>
           </div>
+          <span class="stat-icon">💰</span>
         </div>
       </template>
     </div>
@@ -151,51 +151,57 @@
     <!-- 详细统计区域 -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
       <!-- 用户统计 -->
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b">
-          <h5 class="font-semibold">👥 用户统计</h5>
-        </div>
-        <div class="p-4 grid grid-cols-2 gap-4">
-          <div class="text-center p-3 themed-bg-primary-light rounded">
-            <p class="themed-text-muted text-sm">新增用户</p>
-            <h4 class="text-xl font-bold themed-text-primary" x-text="userStats.new_users">0</h4>
+      <div class="content-section">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">👥</span>
+            用户统计
           </div>
-          <div class="text-center p-3 bg-green-50 rounded">
-            <p class="themed-text-muted text-sm">活跃用户</p>
+        </div>
+        <div class="content-section-body grid grid-cols-2 gap-4">
+          <div class="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
+            <p class="text-gray-500 text-sm">新增用户</p>
+            <h4 class="text-xl font-bold text-blue-600" x-text="userStats.new_users">0</h4>
+          </div>
+          <div class="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+            <p class="text-gray-500 text-sm">活跃用户</p>
             <h4 class="text-xl font-bold text-green-600" x-text="userStats.active_users">0</h4>
           </div>
-          <div class="text-center p-3 bg-purple-50 rounded">
-            <p class="themed-text-muted text-sm">管理员</p>
+          <div class="text-center p-3 bg-purple-50 rounded-lg border border-purple-100">
+            <p class="text-gray-500 text-sm">管理员</p>
             <h4 class="text-xl font-bold text-purple-600" x-text="userStats.admin_users">0</h4>
           </div>
-          <div class="text-center p-3 themed-bg-base rounded">
-            <p class="themed-text-muted text-sm">普通用户</p>
-            <h4 class="text-xl font-bold themed-text-muted" x-text="userStats.regular_users">0</h4>
+          <div class="text-center p-3 bg-gray-50 rounded-lg border border-gray-100">
+            <p class="text-gray-500 text-sm">普通用户</p>
+            <h4 class="text-xl font-bold text-gray-600" x-text="userStats.regular_users">0</h4>
           </div>
         </div>
       </div>
 
       <!-- 抽奖统计 -->
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b">
-          <h5 class="font-semibold">🎁 抽奖统计</h5>
-        </div>
-        <div class="p-4 grid grid-cols-2 gap-4">
-          <div class="text-center p-3 themed-bg-primary-light rounded">
-            <p class="themed-text-muted text-sm">总抽奖次数</p>
-            <h4 class="text-xl font-bold themed-text-primary" x-text="lotteryStats.total_draws">0</h4>
+      <div class="content-section">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">🎁</span>
+            抽奖统计
           </div>
-          <div class="text-center p-3 bg-yellow-50 rounded">
-            <p class="themed-text-muted text-sm">高档奖励</p>
+        </div>
+        <div class="content-section-body grid grid-cols-2 gap-4">
+          <div class="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
+            <p class="text-gray-500 text-sm">总抽奖次数</p>
+            <h4 class="text-xl font-bold text-blue-600" x-text="lotteryStats.total_draws">0</h4>
+          </div>
+          <div class="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-100">
+            <p class="text-gray-500 text-sm">高档奖励</p>
             <h4 class="text-xl font-bold text-yellow-600" x-text="lotteryStats.high_tier_wins">0</h4>
           </div>
-          <div class="text-center p-3 bg-green-50 rounded">
-            <p class="themed-text-muted text-sm">普通奖励</p>
+          <div class="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+            <p class="text-gray-500 text-sm">普通奖励</p>
             <h4 class="text-xl font-bold text-green-600" x-text="lotteryStats.regular_wins">0</h4>
           </div>
-          <div class="text-center p-3 bg-red-50 rounded">
-            <p class="themed-text-muted text-sm">中奖率</p>
-            <h4 class="text-xl font-bold text-red-600" x-text="lotteryStats.win_rate + '%'">0%</h4>
+          <div class="text-center p-3 bg-rose-50 rounded-lg border border-rose-100">
+            <p class="text-gray-500 text-sm">中奖率</p>
+            <h4 class="text-xl font-bold text-rose-600" x-text="lotteryStats.win_rate + '%'">0%</h4>
           </div>
         </div>
       </div>
@@ -203,19 +209,19 @@
 
     <!-- 图表区域 -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b">
-          <h5 class="font-semibold">📈 用户增长趋势</h5>
+      <div class="chart-wrapper">
+        <div class="chart-wrapper-header">
+          <span>📈 用户增长趋势</span>
         </div>
-        <div class="p-4">
+        <div class="chart-wrapper-body">
           <div x-ref="trendChart" class="chart-container"></div>
         </div>
       </div>
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b">
-          <h5 class="font-semibold">📊 用户类型分布</h5>
+      <div class="chart-wrapper">
+        <div class="chart-wrapper-header">
+          <span>📊 用户类型分布</span>
         </div>
-        <div class="p-4">
+        <div class="chart-wrapper-body">
           <div x-ref="userTypeChart" class="chart-container"></div>
         </div>
       </div>

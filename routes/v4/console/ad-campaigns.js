@@ -15,7 +15,9 @@
  * - 管理员创建广告活动
  *
  * 架构规范：
- * - 路由层不直连 models，通过 ServiceManager 获取 AdCampaignService
+ * - 路由层不直连 models，全部通过 ServiceManager 获取服务
+ * - 日志查询（竞价/标签/反作弊/归因）通过 ad_campaign_query 服务
+ * - 弹窗队列配置通过 system_config 服务
  * - 使用 res.apiSuccess / res.apiError 统一响应
  * - 审核操作使用 TransactionManager（涉及账单）
  *
@@ -26,6 +28,7 @@ const express = require('express')
 const router = express.Router()
 const { adminAuthMiddleware, asyncHandler } = require('./shared/middleware')
 const logger = require('../../../utils/logger').logger
+const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
  * GET / - 获取所有广告活动列表
@@ -322,14 +325,13 @@ router.get(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { SystemConfig } = req.app.locals.models
-      const config = await SystemConfig.findOne({
-        where: { config_key: 'popup_queue_max_count' }
-      })
+      const SystemConfigService = req.app.locals.services.getService('system_config')
+      const configValue = await SystemConfigService.getValue('popup_queue_max_count', 5)
+
       return res.apiSuccess({
         config_key: 'popup_queue_max_count',
-        config_value: config ? parseInt(config.config_value, 10) : 5,
-        description: config?.description || '弹窗队列最大数量'
+        config_value: parseInt(configValue, 10),
+        description: '弹窗队列最大数量'
       })
     } catch (error) {
       logger.error('获取弹窗队列配置失败', { error: error.message })
@@ -357,8 +359,8 @@ router.put(
         return res.apiError('弹窗队列最大数量必须为 1~20 的整数', 'INVALID_PARAM', null, 400)
       }
 
-      const { SystemConfig } = req.app.locals.models
-      await SystemConfig.upsert('popup_queue_max_count', String(value), {
+      const SystemConfigService = req.app.locals.services.getService('system_config')
+      await SystemConfigService.upsert('popup_queue_max_count', String(value), {
         description: '弹窗队列最大数量（每次用户打开页面最多弹出的弹窗个数）',
         config_category: 'ad_system',
         is_active: true
@@ -397,27 +399,17 @@ router.get(
   asyncHandler(async (req, res) => {
     try {
       const { ad_slot_id, ad_campaign_id, is_winner, page = 1, limit = 20 } = req.query
-      const { AdBidLog } = req.app.locals.models
-      const where = {}
-      if (ad_slot_id) where.ad_slot_id = parseInt(ad_slot_id)
-      if (ad_campaign_id) where.ad_campaign_id = parseInt(ad_campaign_id)
-      if (is_winner !== undefined && is_winner !== '') where.is_winner = is_winner === 'true'
-      const offset = (parseInt(page) - 1) * parseInt(limit)
-      const { count, rows } = await AdBidLog.findAndCountAll({
-        where,
-        order: [['bid_at', 'DESC']],
-        limit: parseInt(limit),
-        offset
+
+      const AdCampaignQueryService = req.app.locals.services.getService('ad_campaign_query')
+      const result = await AdCampaignQueryService.getBidLogs({
+        ad_slot_id,
+        ad_campaign_id,
+        is_winner,
+        page: parseInt(page),
+        pageSize: parseInt(limit)
       })
-      return res.apiSuccess({
-        bid_logs: rows,
-        pagination: {
-          total: count,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total_pages: Math.ceil(count / parseInt(limit))
-        }
-      })
+
+      return res.apiSuccess(result)
     } catch (error) {
       logger.error('获取竞价日志失败', { error: error.message })
       return res.apiInternalError('获取竞价日志失败', error.message)
@@ -441,26 +433,16 @@ router.get(
   asyncHandler(async (req, res) => {
     try {
       const { user_id, tag_key, page = 1, limit = 50 } = req.query
-      const { UserAdTag } = req.app.locals.models
-      const where = {}
-      if (user_id) where.user_id = parseInt(user_id)
-      if (tag_key) where.tag_key = tag_key
-      const offset = (parseInt(page) - 1) * parseInt(limit)
-      const { count, rows } = await UserAdTag.findAndCountAll({
-        where,
-        order: [['calculated_at', 'DESC']],
-        limit: parseInt(limit),
-        offset
+
+      const AdCampaignQueryService = req.app.locals.services.getService('ad_campaign_query')
+      const result = await AdCampaignQueryService.getUserAdTags({
+        user_id,
+        tag_key,
+        page: parseInt(page),
+        pageSize: parseInt(limit)
       })
-      return res.apiSuccess({
-        user_ad_tags: rows,
-        pagination: {
-          total: count,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total_pages: Math.ceil(count / parseInt(limit))
-        }
-      })
+
+      return res.apiSuccess(result)
     } catch (error) {
       logger.error('获取用户标签失败', { error: error.message })
       return res.apiInternalError('获取用户标签失败', error.message)
@@ -485,27 +467,17 @@ router.get(
   asyncHandler(async (req, res) => {
     try {
       const { ad_campaign_id, verdict, event_type, page = 1, limit = 20 } = req.query
-      const { AdAntifraudLog } = req.app.locals.models
-      const where = {}
-      if (ad_campaign_id) where.ad_campaign_id = parseInt(ad_campaign_id)
-      if (verdict) where.verdict = verdict
-      if (event_type) where.event_type = event_type
-      const offset = (parseInt(page) - 1) * parseInt(limit)
-      const { count, rows } = await AdAntifraudLog.findAndCountAll({
-        where,
-        order: [['created_at', 'DESC']],
-        limit: parseInt(limit),
-        offset
+
+      const AdCampaignQueryService = req.app.locals.services.getService('ad_campaign_query')
+      const result = await AdCampaignQueryService.getAntifraudLogs({
+        ad_campaign_id,
+        verdict,
+        event_type,
+        page: parseInt(page),
+        pageSize: parseInt(limit)
       })
-      return res.apiSuccess({
-        antifraud_logs: rows,
-        pagination: {
-          total: count,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total_pages: Math.ceil(count / parseInt(limit))
-        }
-      })
+
+      return res.apiSuccess(result)
     } catch (error) {
       logger.error('获取反作弊日志失败', { error: error.message })
       return res.apiInternalError('获取反作弊日志失败', error.message)
@@ -529,26 +501,16 @@ router.get(
   asyncHandler(async (req, res) => {
     try {
       const { ad_campaign_id, conversion_type, page = 1, limit = 20 } = req.query
-      const { AdAttributionLog } = req.app.locals.models
-      const where = {}
-      if (ad_campaign_id) where.ad_campaign_id = parseInt(ad_campaign_id)
-      if (conversion_type) where.conversion_type = conversion_type
-      const offset = (parseInt(page) - 1) * parseInt(limit)
-      const { count, rows } = await AdAttributionLog.findAndCountAll({
-        where,
-        order: [['created_at', 'DESC']],
-        limit: parseInt(limit),
-        offset
+
+      const AdCampaignQueryService = req.app.locals.services.getService('ad_campaign_query')
+      const result = await AdCampaignQueryService.getAttributionLogs({
+        ad_campaign_id,
+        conversion_type,
+        page: parseInt(page),
+        pageSize: parseInt(limit)
       })
-      return res.apiSuccess({
-        attribution_logs: rows,
-        pagination: {
-          total: count,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total_pages: Math.ceil(count / parseInt(limit))
-        }
-      })
+
+      return res.apiSuccess(result)
     } catch (error) {
       logger.error('获取归因日志失败', { error: error.message })
       return res.apiInternalError('获取归因日志失败', error.message)
@@ -612,9 +574,8 @@ router.patch(
 
       const AdCampaignService = req.app.locals.services.getService('ad_campaign')
       const AdBillingService = req.app.locals.services.getService('ad_billing')
-      const TransactionManager = req.app.locals.services.getService('transaction_manager')
 
-      const campaign = await TransactionManager.executeTransaction(async transaction => {
+      const campaign = await TransactionManager.execute(async transaction => {
         const reviewed = await AdCampaignService.reviewCampaign(
           id,
           req.user.user_id,

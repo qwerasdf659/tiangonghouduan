@@ -19,22 +19,38 @@
 /* ========== 空状态容器 ========== */
 
 .empty-state {
-  @apply flex flex-col items-center justify-center py-16 px-4 text-center;
+  @apply flex flex-col items-center justify-center py-16 px-4 text-center relative;
   animation: fadeIn 0.3s ease-out;
+  background: linear-gradient(180deg, rgba(248,250,252,0.8) 0%, var(--color-bg-muted, #f1f5f9) 100%);
+  min-height: 320px;
+  border-radius: 0.75rem;
+  border: 1px dashed var(--color-border, #d1d5db);
 }
 
 .empty-state-compact {
   @apply py-8;
+  min-height: 200px;
 }
 
 .empty-state-full {
   @apply min-h-[400px];
 }
 
+/* ========== 空状态装饰线 ========== */
+
+.empty-state::before {
+  content: '';
+  @apply absolute top-0 left-1/2 w-16 h-1 rounded-full;
+  transform: translateX(-50%);
+  background: var(--primary-gradient, linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%));
+  opacity: 0.5;
+}
+
 /* ========== 空状态图标 ========== */
 
 .empty-state-icon {
-  @apply text-6xl mb-4 opacity-80;
+  @apply text-6xl mb-4;
+  opacity: 0.9;
   animation: bounceIn 0.5s ease-out;
 }
 
@@ -46,21 +62,22 @@
   @apply text-8xl mb-6;
 }
 
-/* 图标背景圈 */
+/* 图标背景圈 - 渐变版 */
 .empty-state-icon-circle {
-  @apply w-24 h-24 rounded-full flex items-center justify-center mb-4;
-  background-color: var(--color-bg-muted, #f3f4f6);
+  @apply w-24 h-24 rounded-full flex items-center justify-center mb-4 shadow-inner;
+  background: linear-gradient(135deg, var(--color-bg-muted, #f3f4f6) 0%, #e5e7eb 100%);
 }
 
 .empty-state-icon-circle .empty-state-icon {
   @apply mb-0 text-4xl;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
 /* ========== 空状态标题 ========== */
 
 .empty-state-title {
-  @apply text-lg font-semibold mb-2;
-  color: var(--color-text-secondary, #6b7280);
+  @apply text-lg font-bold mb-2;
+  color: var(--color-text-primary, #374151);
 }
 
 .empty-state-title-sm {
@@ -74,42 +91,56 @@
 /* ========== 空状态描述 ========== */
 
 .empty-state-description {
-  @apply text-sm mb-6 max-w-sm;
+  @apply text-sm mb-6 max-w-md leading-relaxed;
   color: var(--color-text-muted, #9ca3af);
 }
 
 .empty-state-description-lg {
-  @apply text-base max-w-md;
+  @apply text-base max-w-lg;
+}
+
+/* ========== 空状态提示卡片 ========== */
+
+.empty-state-tips {
+  @apply mt-4 text-left max-w-sm mx-auto px-4 py-3 rounded-lg text-xs space-y-1.5;
+  background-color: var(--color-bg-muted, #f3f4f6);
+  color: var(--color-text-secondary, #6b7280);
+  border: 1px dashed var(--color-border, #e5e7eb);
+}
+
+.empty-state-tips-title {
+  @apply font-semibold text-xs mb-1.5;
+  color: var(--color-text-primary, #374151);
 }
 
 /* ========== 空状态操作按钮 ========== */
 
 .empty-state-action {
-  @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md transition-all duration-200;
-  background-color: var(--color-primary, #3b82f6);
+  @apply inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 shadow-sm;
+  background: var(--primary-gradient, linear-gradient(135deg, #3b82f6 0%, #2563eb 100%));
   color: white;
 }
 
 .empty-state-action:hover {
-  background-color: var(--color-primary-hover, #2563eb);
-  transform: translateY(-1px);
-  @apply shadow-md;
+  transform: translateY(-2px);
+  @apply shadow-lg;
+  filter: brightness(1.05);
 }
 
 .empty-state-action:active {
-  transform: scale(0.98);
+  transform: scale(0.98) translateY(0);
 }
 
 /* 次要操作按钮 */
 .empty-state-action-secondary {
-  @apply bg-transparent border;
+  @apply bg-transparent border ml-3;
   border-color: var(--color-border, #e5e7eb);
   color: var(--color-text-secondary, #6b7280);
 }
 
 .empty-state-action-secondary:hover {
   background-color: var(--color-bg-muted, #f3f4f6);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
 /* ========== 空状态类型变体 ========== */
@@ -179,5 +210,28 @@
 [data-theme='minimal-dark'] .empty-state-icon-circle,
 [data-theme='cyber'] .empty-state-icon-circle,
 [data-theme='neon'] .empty-state-icon-circle {
-  background-color: var(--color-bg-muted, #374151);
+  background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+}
+
+[data-theme='dark'] .empty-state,
+[data-theme='minimal-dark'] .empty-state,
+[data-theme='cyber'] .empty-state,
+[data-theme='neon'] .empty-state {
+  background: linear-gradient(180deg, transparent 0%, rgba(55, 65, 81, 0.3) 100%);
+}
+
+[data-theme='dark'] .empty-state-tips,
+[data-theme='minimal-dark'] .empty-state-tips,
+[data-theme='cyber'] .empty-state-tips,
+[data-theme='neon'] .empty-state-tips {
+  background-color: rgba(55, 65, 81, 0.5);
+  border-color: rgba(75, 85, 99, 0.5);
+  color: #9ca3af;
+}
+
+[data-theme='dark'] .empty-state-tips .empty-state-tips-title,
+[data-theme='minimal-dark'] .empty-state-tips .empty-state-tips-title,
+[data-theme='cyber'] .empty-state-tips .empty-state-tips-title,
+[data-theme='neon'] .empty-state-tips .empty-state-tips-title {
+  color: #e5e7eb;
 }

@@ -344,27 +344,34 @@ export async function request(options) {
   try {
     const response = await fetch(fullUrl, requestConfig)
 
-    // 处理 401 未授权
+    // 处理 401 未授权（区分会话失效原因）
     if (response.status === 401) {
+      let errorCode = 'UNAUTHORIZED'
+      let errorMessage = '未授权，请重新登录'
+      try {
+        const errorData = await response.clone().json()
+        errorCode = errorData.code || errorCode
+        errorMessage = errorData.message || errorMessage
+      } catch (_) {
+        // 响应体解析失败，使用默认值
+      }
+
       clearToken()
-      // 跳转到登录页 - 确保在顶层窗口跳转，避免在 iframe 内跳转导致侧边栏仍然显示
+
       if (window.location.pathname !== '/admin/login.html') {
-        // 检测是否在 iframe 中
+        const redirectUrl = `/admin/login.html?reason=${encodeURIComponent(errorCode)}`
         if (window.self !== window.top) {
-          // 在 iframe 中，通知顶层窗口跳转
           try {
-            window.top.location.href = '/admin/login.html'
+            window.top.location.href = redirectUrl
           } catch (e) {
-            // 跨域 iframe 的情况，尝试 postMessage
             logger.warn('[Auth] 无法直接跳转顶层窗口，尝试 postMessage', e)
-            window.parent.postMessage({ type: 'AUTH_EXPIRED', redirect: '/admin/login.html' }, '*')
+            window.parent.postMessage({ type: 'AUTH_EXPIRED', redirect: redirectUrl, code: errorCode }, '*')
           }
         } else {
-          // 不在 iframe 中，直接跳转
-          window.location.href = '/admin/login.html'
+          window.location.href = redirectUrl
         }
       }
-      throw new Error('未授权，请重新登录')
+      throw new Error(errorMessage)
     }
 
     // 解析响应
@@ -474,21 +481,32 @@ export function authHeaders() {
  * const data = await handleResponse(response)
  */
 export async function handleResponse(response) {
-  // 处理 401 未授权
+  // 处理 401 未授权（区分会话失效原因）
   if (response.status === 401) {
+    let errorCode = 'UNAUTHORIZED'
+    let errorMessage = '未授权，请重新登录'
+    try {
+      const errorData = await response.clone().json()
+      errorCode = errorData.code || errorCode
+      errorMessage = errorData.message || errorMessage
+    } catch (_) {
+      // 响应体解析失败
+    }
+
     clearToken()
     if (window.location.pathname !== '/admin/login.html') {
+      const redirectUrl = `/admin/login.html?reason=${encodeURIComponent(errorCode)}`
       if (window.self !== window.top) {
         try {
-          window.top.location.href = '/admin/login.html'
+          window.top.location.href = redirectUrl
         } catch (_e) {
-          window.parent.postMessage({ type: 'AUTH_EXPIRED', redirect: '/admin/login.html' }, '*')
+          window.parent.postMessage({ type: 'AUTH_EXPIRED', redirect: redirectUrl, code: errorCode }, '*')
         }
       } else {
-        window.location.href = '/admin/login.html'
+        window.location.href = redirectUrl
       }
     }
-    throw new Error('未授权，请重新登录')
+    throw new Error(errorMessage)
   }
 
   // 解析响应

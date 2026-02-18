@@ -8,24 +8,27 @@
 </head>
 <body class="themed-bg-subtle min-h-screen">
   
-  <!-- 导航栏 -->
-  <nav class="themed-bg-primary text-white shadow-lg">
-    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-      <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:text-yellow-200">← 返回工作台</a>
-        <span class="text-lg font-semibold">🎚️ 功能开关</span>
+  <!-- 页面顶部渐变横幅 -->
+  <div class="page-banner">
+    <div class="container mx-auto px-4 flex justify-between items-center">
+      <div>
+        <div class="flex items-center gap-3 mb-1">
+          <a href="/admin/workspace.html" class="text-blue-200 hover:text-white text-sm transition">← 返回工作台</a>
+        </div>
+        <h1>🎚️ 功能开关管理</h1>
+        <p>管理系统功能的灰度发布和开关控制，支持全量、百分比、名单等多种发布策略</p>
       </div>
+      <div class="text-6xl opacity-20">⚙️</div>
     </div>
-  </nav>
+  </div>
 
   <!-- 页面主体 -->
   <div class="container mx-auto px-4 py-6" x-data="featureFlags()" x-init="init()" @table-action="handleTableAction($event.detail)">
     
-    <!-- 页面标题和新增按钮 -->
-    <div class="flex justify-between items-center mb-4">
-      <h5 class="font-semibold text-lg">🎛️ 功能开关管理</h5>
-      <button @click="openCreateFlagModal()" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">
-        ➕ 新增开关
+    <!-- 操作栏 -->
+    <div class="flex justify-end items-center mb-4">
+      <button @click="openCreateFlagModal()" class="btn-primary px-5 py-2.5 rounded-lg shadow-md transition flex items-center gap-2">
+        <span>➕</span> 新增开关
       </button>
     </div>
 
@@ -44,28 +47,48 @@
     </div>
 
     <!-- 说明卡片 -->
-    <div class="themed-card rounded-lg shadow mt-6 p-4">
-      <h6 class="font-semibold mb-3">📖 发布策略说明</h6>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
-        <div class="flex items-center space-x-2">
-          <span class="px-2 py-1 text-xs rounded bg-green-100 text-green-700">全量发布</span>
-          <span class="themed-text-muted">所有用户立即生效</span>
-        </div>
-        <div class="flex items-center space-x-2">
-          <span class="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700">百分比灰度</span>
-          <span class="themed-text-muted">按比例随机选择用户</span>
-        </div>
-        <div class="flex items-center space-x-2">
-          <span class="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700">用户名单</span>
-          <span class="themed-text-muted">指定用户ID列表</span>
-        </div>
-        <div class="flex items-center space-x-2">
-          <span class="px-2 py-1 text-xs rounded bg-purple-100 text-purple-700">用户分群</span>
-          <span class="themed-text-muted">按用户分群条件</span>
-        </div>
-        <div class="flex items-center space-x-2">
-          <span class="px-2 py-1 text-xs rounded bg-orange-100 text-orange-700">定时发布</span>
-          <span class="themed-text-muted">定时自动启用</span>
+    <div class="themed-card rounded-xl shadow-sm mt-6 border border-gray-100 overflow-hidden">
+      <div class="card-header-accent">
+        <span class="header-icon">📖</span>
+        <span>发布策略说明</span>
+      </div>
+      <div class="p-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 text-sm">
+          <div class="flex items-center gap-3 p-3 rounded-lg bg-green-50 border border-green-100">
+            <span class="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-bold">全</span>
+            <div>
+              <div class="font-medium text-green-800">全量发布</div>
+              <div class="text-xs text-green-600 mt-0.5">所有用户立即生效</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 p-3 rounded-lg bg-blue-50 border border-blue-100">
+            <span class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold">%</span>
+            <div>
+              <div class="font-medium text-blue-800">百分比灰度</div>
+              <div class="text-xs text-blue-600 mt-0.5">按比例随机选择用户</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 p-3 rounded-lg bg-amber-50 border border-amber-100">
+            <span class="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">📋</span>
+            <div>
+              <div class="font-medium text-amber-800">用户名单</div>
+              <div class="text-xs text-amber-600 mt-0.5">指定用户ID列表</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 p-3 rounded-lg bg-purple-50 border border-purple-100">
+            <span class="w-8 h-8 rounded-full bg-purple-500 text-white flex items-center justify-center text-xs font-bold">👥</span>
+            <div>
+              <div class="font-medium text-purple-800">用户分群</div>
+              <div class="text-xs text-purple-600 mt-0.5">按用户分群条件</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 p-3 rounded-lg bg-orange-50 border border-orange-100">
+            <span class="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-bold">⏰</span>
+            <div>
+              <div class="font-medium text-orange-800">定时发布</div>
+              <div class="text-xs text-orange-600 mt-0.5">定时自动启用</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -75,11 +98,14 @@
          x-show="isModalOpen('featureFlagModal')" 
          x-cloak 
          class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="fixed inset-0 bg-black/50" @click="hideModal('featureFlagModal')"></div>
-      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
-        <div class="p-4 border-b flex justify-between items-center">
-          <h5 class="font-semibold">🎚️ <span x-text="editingFlagKey ? '编辑功能开关' : '新增功能开关'"></span></h5>
-          <button @click="hideModal('featureFlagModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('featureFlagModal')"></div>
+      <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-md mx-4 z-10 animate-slide-in-up">
+        <div class="p-5 border-b flex justify-between items-center bg-gradient-to-r from-blue-50 to-white rounded-t-xl">
+          <h5 class="font-semibold text-blue-900 flex items-center gap-2">
+            <span class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-sm">🎚️</span>
+            <span x-text="editingFlagKey ? '编辑功能开关' : '新增功能开关'"></span>
+          </h5>
+          <button @click="hideModal('featureFlagModal')" class="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">✕</button>
         </div>
         <form @submit.prevent="saveFeatureFlag()">
           <div class="p-6 space-y-4">

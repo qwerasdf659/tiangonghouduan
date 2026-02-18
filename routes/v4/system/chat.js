@@ -108,7 +108,7 @@ router.post('/chat/sessions', authenticateToken, async (req, res) => {
 
     return res.apiSuccess(
       {
-        session_id: session.session_id,
+        customer_service_session_id: session.customer_service_session_id,
         status: session.status,
         source: session.source,
         created_at: session.created_at

@@ -88,6 +88,28 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
 })
 
 /**
+ * GET /stats - 获取物品模板统计数据
+ *
+ * 返回：总数、启用数、类型数、稀有度分布
+ */
+router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const service = getItemTemplateService(req)
+    const stats = await service.getTemplateStats()
+
+    return res.apiSuccess(stats, '获取物品模板统计成功')
+  } catch (error) {
+    logger.error('获取物品模板统计失败:', error)
+    return res.apiError(
+      `获取物品模板统计失败: ${error.message}`,
+      'ITEM_TEMPLATE_STATS_FAILED',
+      null,
+      500
+    )
+  }
+})
+
+/**
  * GET /types - 获取物品类型列表（去重）
  */
 router.get('/types', authenticateToken, requireRoleLevel(100), async (req, res) => {

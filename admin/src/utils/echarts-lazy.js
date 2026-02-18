@@ -45,57 +45,35 @@ let loadingPromise = null
  * @returns {Promise<Object>} 配置好的 ECharts 实例
  */
 async function initEChartsCore() {
-  // ========== 核心模块（必需） ==========
-  const { use } = await import('echarts/core')
+  // 核心模块 — 只 import 一次，保证 use() 和 init() 在同一实例上
+  const echartsCore = await import('echarts/core')
 
-  // ========== 图表类型（按需） ==========
-  const { LineChart } = await import('echarts/charts')
-  const { BarChart } = await import('echarts/charts')
-  const { PieChart } = await import('echarts/charts')
-  const { ScatterChart } = await import('echarts/charts')
-  const { FunnelChart } = await import('echarts/charts')
-  const { SankeyChart } = await import('echarts/charts')
-
-  // ========== 组件（按需） ==========
-  const {
-    TitleComponent,
-    TooltipComponent,
-    GridComponent,
-    LegendComponent,
-    DatasetComponent,
-    TransformComponent,
-    MarkPointComponent,
-    MarkLineComponent
-  } = await import('echarts/components')
-
-  // ========== 渲染器 ==========
-  const { CanvasRenderer } = await import('echarts/renderers')
-
-  // ========== 注册组件 ==========
-  use([
-    // 图表类型
-    LineChart,
-    BarChart,
-    PieChart,
-    ScatterChart,
-    FunnelChart,
-    SankeyChart,
-    // 组件
-    TitleComponent,
-    TooltipComponent,
-    GridComponent,
-    LegendComponent,
-    DatasetComponent,
-    TransformComponent,
-    MarkPointComponent,
-    MarkLineComponent,
-    // 渲染器
-    CanvasRenderer
+  // 图表类型 + 组件 + 渲染器并行加载
+  const [charts, components, renderers] = await Promise.all([
+    import('echarts/charts'),
+    import('echarts/components'),
+    import('echarts/renderers')
   ])
 
-  // 返回完整的 echarts 对象
-  const echarts = await import('echarts/core')
-  return echarts
+  echartsCore.use([
+    charts.LineChart,
+    charts.BarChart,
+    charts.PieChart,
+    charts.ScatterChart,
+    charts.FunnelChart,
+    charts.SankeyChart,
+    components.TitleComponent,
+    components.TooltipComponent,
+    components.GridComponent,
+    components.LegendComponent,
+    components.DatasetComponent,
+    components.TransformComponent,
+    components.MarkPointComponent,
+    components.MarkLineComponent,
+    renderers.CanvasRenderer
+  ])
+
+  return echartsCore
 }
 
 /**

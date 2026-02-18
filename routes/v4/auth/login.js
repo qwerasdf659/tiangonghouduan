@@ -10,10 +10,11 @@
  * - 路由层只负责：认证/鉴权、参数校验、调用Service、统一响应
  * - 登录操作通过 UserService 处理
  *
- * 会话管理（2026-01-21 新增）：
+ * 会话管理（2026-01-21 新增，2026-02-18 优化 TTL）：
  * - 登录成功后创建 AuthenticationSession 记录
- * - 会话有效期：2小时（独立于JWT，可续期）
+ * - 会话有效期：7天（与 refresh_token 生命周期对齐）
  * - session_token 存入 JWT Payload，用于敏感操作验证
+ * - 单设备登录策略：新登录使旧会话失效
  *
  * 创建时间：2025-12-22
  * 更新时间：2026-01-21（新增会话存储功能）
@@ -168,9 +169,9 @@ router.post('/login', async (req, res) => {
    *
    * 业务规则：
    * - 生成唯一的 session_token (UUID v4)
-   * - 会话有效期：2小时（独立于JWT 7天有效期）
+   * - 会话有效期：7天（与 refresh_token 生命周期对齐）
    * - 敏感操作时自动续期30分钟
-   * - 强制登出时立即失效会话
+   * - 强制登出/其他设备登录时立即失效会话
    *
    * @see docs/会话管理功能补齐方案.md
    */
@@ -196,15 +197,22 @@ router.post('/login', async (req, res) => {
      *
      * @see docs/测试审计标准.md - P0-6 多设备登录冲突测试
      */
+    /**
+     * 多设备登录冲突处理
+     * - 默认在非测试环境执行（测试环境会导致并发测试互相干扰）
+     * - ENABLE_MULTI_DEVICE_CHECK=true 可在测试环境中强制启用（用于专项测试）
+     * - DISABLE_MULTI_DEVICE_CHECK=true 可在任何环境中关闭
+     */
     const isTestEnv = process.env.NODE_ENV === 'test'
     const disableMultiDeviceCheck = process.env.DISABLE_MULTI_DEVICE_CHECK === 'true'
+    const forceMultiDeviceCheck = process.env.ENABLE_MULTI_DEVICE_CHECK === 'true'
 
     let deactivatedCount = 0
-    if (!isTestEnv && !disableMultiDeviceCheck) {
+    if (forceMultiDeviceCheck || (!isTestEnv && !disableMultiDeviceCheck)) {
       deactivatedCount = await AuthenticationSession.deactivateUserSessions(
         userType,
         user.user_id,
-        null // 不排除任何 Token（因为新 Token 还未创建）
+        null
       )
     }
 
@@ -213,13 +221,6 @@ router.post('/login', async (req, res) => {
         `🔒 [Session] 多设备登录检测: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id})`
       )
 
-      /**
-       * 🆕 2026-01-29 WebSocket 断开通知（P0-6 验收标准）
-       *
-       * 业务规则：新设备登录后主动断开旧设备的 WebSocket 连接
-       * - 旧设备 App 端立即收到断开事件
-       * - 可触发客户端显示"您的账号在其他设备登录"提示
-       */
       try {
         const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
         ChatWebSocketService.disconnectUser(user.user_id, userType)
@@ -227,61 +228,50 @@ router.post('/login', async (req, res) => {
           `🔌 [Session] 已断开旧设备WebSocket连接: user_id=${user.user_id}, type=${userType}`
         )
       } catch (wsError) {
-        // WebSocket断开失败非致命（可能用户原本就没有连接）
         logger.debug(`🔌 [Session] WebSocket断开跳过: ${wsError.message}`)
       }
     }
 
-    // 创建新会话
+    // 创建新会话（TTL 与 refresh_token 7天生命周期对齐）
     await AuthenticationSession.createSession({
       session_token: sessionToken,
       user_type: userType,
       user_id: user.user_id,
       login_ip: loginIp,
-      expires_in_minutes: 120 // 2小时短期会话（可续期）
+      expires_in_minutes: 10080 // 7天（7 * 24 * 60），与 refresh_token 生命周期对齐
     })
     logger.info(
       `🔐 [Session] 会话创建成功: user_id=${user.user_id}, session_token=${sessionToken.substring(0, 8)}...`
     )
   } catch (sessionError) {
-    // 会话创建失败不阻塞登录流程，但记录警告日志
     logger.warn(`⚠️ [Session] 会话创建失败（非致命）: ${sessionError.message}`)
   }
 
   // 生成Token（传入 session_token 关联会话）
   const tokens = await generateTokens(user, { session_token: sessionToken })
 
-  /**
-   * 🔐 Token安全升级：通过HttpOnly Cookie设置refresh_token
-   * - httpOnly: true → JavaScript无法读取，防御XSS攻击
-   * - secure: 生产环境强制HTTPS
-   * - sameSite: 'strict' → 防御CSRF攻击
-   * - maxAge: 7天 → 与refresh_token有效期一致
-   * - path: '/api/v4/auth' → 仅在认证路径下携带
-   */
   res.cookie('refresh_token', tokens.refresh_token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7天（毫秒）
+    maxAge: 7 * 24 * 60 * 60 * 1000,
     path: '/api/v4/auth'
   })
 
   const responseData = {
     access_token: tokens.access_token,
-    // 🔐 安全升级：refresh_token不再通过响应体返回，改为HttpOnly Cookie
     user: {
       user_id: user.user_id,
       mobile: user.mobile,
       nickname: user.nickname,
-      role_level: userRoles.role_level, // 角色级别（>= 100 为管理员）
+      role_level: userRoles.role_level,
       roles: userRoles.roles,
       status: user.status,
       last_login: user.last_login,
       login_count: user.login_count
     },
     is_new_user: isNewUser,
-    expires_in: 7 * 24 * 60 * 60, // 7天
+    expires_in: 7 * 24 * 60 * 60,
     timestamp: BeijingTimeHelper.apiTimestamp()
   }
 
@@ -473,13 +463,14 @@ router.post('/quick-login', async (req, res) => {
      */
     const isTestEnv = process.env.NODE_ENV === 'test'
     const disableMultiDeviceCheck = process.env.DISABLE_MULTI_DEVICE_CHECK === 'true'
+    const forceMultiDeviceCheck = process.env.ENABLE_MULTI_DEVICE_CHECK === 'true'
 
     let deactivatedCount = 0
-    if (!isTestEnv && !disableMultiDeviceCheck) {
+    if (forceMultiDeviceCheck || (!isTestEnv && !disableMultiDeviceCheck)) {
       deactivatedCount = await AuthenticationSession.deactivateUserSessions(
         userType,
         user.user_id,
-        null // 不排除任何 Token（因为新 Token 还未创建）
+        null
       )
     }
 
@@ -488,13 +479,6 @@ router.post('/quick-login', async (req, res) => {
         `🔒 [Session] 快速登录多设备检测: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id})`
       )
 
-      /**
-       * 🆕 2026-01-29 WebSocket 断开通知（P0-6 验收标准）
-       *
-       * 业务规则：新设备登录后主动断开旧设备的 WebSocket 连接
-       * - 旧设备 App 端立即收到断开事件
-       * - 可触发客户端显示"您的账号在其他设备登录"提示
-       */
       try {
         const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
         ChatWebSocketService.disconnectUser(user.user_id, userType)
@@ -502,18 +486,17 @@ router.post('/quick-login', async (req, res) => {
           `🔌 [Session] 快速登录已断开旧设备WebSocket: user_id=${user.user_id}, type=${userType}`
         )
       } catch (wsError) {
-        // WebSocket断开失败非致命（可能用户原本就没有连接）
         logger.debug(`🔌 [Session] WebSocket断开跳过: ${wsError.message}`)
       }
     }
 
-    // 创建新会话
+    // 创建新会话（TTL 与 refresh_token 7天生命周期对齐）
     await AuthenticationSession.createSession({
       session_token: sessionToken,
       user_type: userType,
       user_id: user.user_id,
       login_ip: loginIp,
-      expires_in_minutes: 120 // 2小时短期会话（可续期）
+      expires_in_minutes: 10080 // 7天（7 * 24 * 60），与 refresh_token 生命周期对齐
     })
     logger.info(
       `🔐 [Session] 快速登录会话创建成功: user_id=${user.user_id}, session_token=${sessionToken.substring(0, 8)}...`

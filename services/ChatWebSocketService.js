@@ -120,9 +120,10 @@ class ChatWebSocketService {
       wsLogger.error('保存启动记录失败', { error: error.message })
     }
 
-    // 🔐 强制握手JWT鉴权（P0安全修复 - 2025年12月18日）
+    // 🔐 强制握手JWT鉴权 + 会话有效性检查（与REST API认证逻辑一致）
     const jwt = require('jsonwebtoken')
-    this.io.use((socket, next) => {
+    const { AuthenticationSession } = require('../models')
+    this.io.use(async (socket, next) => {
       const token = socket.handshake.auth?.token
 
       if (!token) {
@@ -135,7 +136,41 @@ class ChatWebSocketService {
 
       try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET)
-        socket.user = decoded // 将用户信息挂载到socket
+
+        /**
+         * 会话有效性检查（与 middleware/auth.js authenticateToken 保持一致）
+         * 防止已失效会话通过WebSocket绕过认证
+         *
+         * @see docs/SESSION_INVALIDATED认证异常解决方案.md - 方案D
+         */
+        if (decoded.session_token) {
+          const session = await AuthenticationSession.findValidByToken(decoded.session_token)
+          if (!session) {
+            const rawSession = await AuthenticationSession.findOne({
+              where: { session_token: decoded.session_token }
+            })
+            const reason = rawSession
+              ? rawSession.is_active
+                ? 'session_expired'
+                : 'session_replaced'
+              : 'session_not_found'
+            wsLogger.warn('WebSocket握手失败：会话已失效', {
+              user_id: decoded.user_id,
+              socket_id: socket.id,
+              reason
+            })
+            return next(new Error(`Authentication failed: ${reason}`))
+          }
+        } else {
+          wsLogger.warn('WebSocket握手失败：Token缺少session_token', {
+            user_id: decoded.user_id,
+            socket_id: socket.id
+          })
+          return next(new Error('Authentication failed: missing session_token'))
+        }
+
+        // eslint-disable-next-line require-atomic-updates
+        socket.user = decoded
 
         wsLogger.info('WebSocket握手鉴权成功', {
           user_id: decoded.user_id,

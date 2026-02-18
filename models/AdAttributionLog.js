@@ -61,7 +61,8 @@ module.exports = sequelize => {
             msg: '转化类型必须是：lottery_draw, exchange, market_buy, page_view 之一'
           }
         },
-        comment: '转化类型：lottery_draw=抽奖 / exchange=兑换 / market_buy=市场购买 / page_view=页面浏览'
+        comment:
+          '转化类型：lottery_draw=抽奖 / exchange=兑换 / market_buy=市场购买 / page_view=页面浏览'
       },
 
       conversion_entity_id: {

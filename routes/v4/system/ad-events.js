@@ -159,23 +159,26 @@ router.post(
       const AdAntifraudService = req.app.locals.services.getService('ad_antifraud')
       const AdImpressionLogService = req.app.locals.services.getService('ad_impression_log')
 
-      // 反作弊检查
-      const antifraudResult = await AdAntifraudService.checkImpression({
-        ad_campaign_id: parsedCampaignId,
-        ad_slot_id: parsedSlotId,
-        user_id: req.user.user_id,
-        ip: req.ip,
-        user_agent: req.get('user-agent')
-      })
+      // 反作弊检查（位置参数：userId, campaignId, adSlotId）
+      const antifraudResult = await AdAntifraudService.checkImpression(
+        req.user.user_id,
+        parsedCampaignId,
+        parsedSlotId
+      )
 
       if (!antifraudResult.is_valid) {
         logger.warn('广告曝光反作弊检查未通过', {
           ad_campaign_id: parsedCampaignId,
           ad_slot_id: parsedSlotId,
           user_id: req.user.user_id,
-          reason: antifraudResult.reason
+          reason: antifraudResult.invalid_reason
         })
-        return res.apiError('曝光事件无效', 'INVALID_IMPRESSION', antifraudResult.reason, 400)
+        return res.apiError(
+          '曝光事件无效',
+          'INVALID_IMPRESSION',
+          antifraudResult.invalid_reason,
+          400
+        )
       }
 
       // 创建曝光日志
@@ -232,23 +235,22 @@ router.post(
       const AdAntifraudService = req.app.locals.services.getService('ad_antifraud')
       const AdClickLogService = req.app.locals.services.getService('ad_click_log')
 
-      // 反作弊检查
-      const antifraudResult = await AdAntifraudService.checkClick({
-        ad_campaign_id: parsedCampaignId,
-        ad_slot_id: parsedSlotId,
-        user_id: req.user.user_id,
-        ip: req.ip,
-        user_agent: req.get('user-agent')
-      })
+      // 反作弊检查（位置参数：userId, campaignId, adSlotId, clickTarget）
+      const antifraudResult = await AdAntifraudService.checkClick(
+        req.user.user_id,
+        parsedCampaignId,
+        parsedSlotId,
+        click_target
+      )
 
       if (!antifraudResult.is_valid) {
         logger.warn('广告点击反作弊检查未通过', {
           ad_campaign_id: parsedCampaignId,
           ad_slot_id: parsedSlotId,
           user_id: req.user.user_id,
-          reason: antifraudResult.reason
+          reason: antifraudResult.invalid_reason
         })
-        return res.apiError('点击事件无效', 'INVALID_CLICK', antifraudResult.reason, 400)
+        return res.apiError('点击事件无效', 'INVALID_CLICK', antifraudResult.invalid_reason, 400)
       }
 
       // 创建点击日志

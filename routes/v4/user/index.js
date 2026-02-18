@@ -29,6 +29,7 @@ const { sanitize } = require('../../../utils/logger')
 
 // 🔴 广告系统路由（Phase 3: 广告主自助投放）
 const adCampaignsRoutes = require('./ad-campaigns')
+const adSlotsRoutes = require('./ad-slots')
 
 /**
  * GET /api/v4/user/me
@@ -57,6 +58,9 @@ router.get('/me', authenticateToken, async (req, res) => {
     return res.apiInternalError('获取用户信息失败')
   }
 })
+
+// 挂载广告位查询路由（Phase 3 广告主自助投放 - 用户端只读查询）
+router.use('/ad-slots', adSlotsRoutes)
 
 // 挂载广告计划管理路由（Phase 3 广告主自助投放）
 router.use('/ad-campaigns', adCampaignsRoutes)

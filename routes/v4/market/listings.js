@@ -348,7 +348,8 @@ router.get('/my-listings', authenticateToken, async (req, res) => {
           page: result.page,
           limit: result.page_size,
           total_pages: Math.ceil(result.total / result.page_size)
-        }
+        },
+        status_counts: result.status_counts
       },
       '获取我的挂单列表成功'
     )

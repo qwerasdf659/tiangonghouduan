@@ -48,12 +48,12 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
    * 验证返回的模块数量
    * 2026-01-21：API覆盖率补齐后新增多个模块（40个模块）
    */
-  test('应该返回49个已实现的模块', async () => {
+  test('应该返回55个已实现的模块', async () => {
     const response = await request(app).get('/api/v4/console/')
     const { modules } = response.body.data
 
     const moduleCount = Object.keys(modules).length
-    expect(moduleCount).toBe(49) // 实际挂载的路由数量（2026-02-05：配额统计修复后更新）
+    expect(moduleCount).toBe(55) // 实际挂载的路由数量（2026-02-18：广告系统6阶段新增6个路由模块后更新）
 
     // 验证必需的模块是否存在（原有8个）
     expect(modules).toHaveProperty('auth')

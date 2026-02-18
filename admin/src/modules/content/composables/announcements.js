@@ -19,6 +19,8 @@ export function useAnnouncementsState() {
   return {
     /** 公告列表 */
     announcements: [],
+    /** 公告统计 */
+    announcementStats: { total: 0 },
     /** 公告表单 */
     announcementForm: {
       announcement_id: null,
@@ -44,6 +46,7 @@ export function useAnnouncementsMethods() {
         const response = await this.apiGet(SYSTEM_ENDPOINTS.ANNOUNCEMENT_LIST)
         if (response?.success) {
           this.announcements = response.data?.announcements || []
+          this.announcementStats = { total: response.data?.total || this.announcements.length }
           logger.info('[ContentManagement] 公告数量:', this.announcements.length)
         }
       } catch (error) {

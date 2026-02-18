@@ -164,7 +164,7 @@ class AdBiddingService {
           creative: creative
             ? {
                 ad_creative_id: creative.ad_creative_id,
-                image_object_key: creative.image_object_key,
+                image_url: creative.image_url,
                 title: creative.title,
                 link_url: creative.link_url,
                 link_type: creative.link_type

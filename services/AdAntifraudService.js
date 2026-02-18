@@ -53,11 +53,10 @@ class AdAntifraudService {
           {
             user_id: userId,
             ad_campaign_id: campaignId,
-            ad_slot_id: adSlotId,
-            fraud_type: 'impression',
-            fraud_rule: 'self_view',
-            is_valid: false,
-            detected_at: BeijingTimeHelper.createDatabaseTime()
+            event_type: 'impression',
+            rule_triggered: 'self_view',
+            verdict: 'invalid',
+            raw_data: { ad_slot_id: adSlotId, advertiser_user_id: campaign.advertiser_user_id }
           },
           { transaction }
         )
@@ -88,11 +87,10 @@ class AdAntifraudService {
           {
             user_id: userId,
             ad_campaign_id: campaignId,
-            ad_slot_id: adSlotId,
-            fraud_type: 'impression',
-            fraud_rule: 'frequency_limit',
-            is_valid: false,
-            detected_at: BeijingTimeHelper.createDatabaseTime()
+            event_type: 'impression',
+            rule_triggered: 'frequency_limit',
+            verdict: 'invalid',
+            raw_data: { ad_slot_id: adSlotId, recent_count: recentImpressions }
           },
           { transaction }
         )
@@ -124,11 +122,10 @@ class AdAntifraudService {
           {
             user_id: userId,
             ad_campaign_id: campaignId,
-            ad_slot_id: adSlotId,
-            fraud_type: 'impression',
-            fraud_rule: 'batch_suspect',
-            is_valid: false,
-            detected_at: BeijingTimeHelper.createDatabaseTime()
+            event_type: 'impression',
+            rule_triggered: 'batch_suspect',
+            verdict: 'suspicious',
+            raw_data: { ad_slot_id: adSlotId, unique_users_count: uniqueUsersCount }
           },
           { transaction }
         )
@@ -190,11 +187,10 @@ class AdAntifraudService {
           {
             user_id: userId,
             ad_campaign_id: campaignId,
-            ad_slot_id: adSlotId,
-            fraud_type: 'click',
-            fraud_rule: 'self_click',
-            is_valid: false,
-            detected_at: BeijingTimeHelper.createDatabaseTime()
+            event_type: 'click',
+            rule_triggered: 'self_click',
+            verdict: 'invalid',
+            raw_data: { ad_slot_id: adSlotId, advertiser_user_id: campaign.advertiser_user_id }
           },
           { transaction }
         )
@@ -225,11 +221,10 @@ class AdAntifraudService {
           {
             user_id: userId,
             ad_campaign_id: campaignId,
-            ad_slot_id: adSlotId,
-            fraud_type: 'click',
-            fraud_rule: 'fake_click',
-            is_valid: false,
-            detected_at: BeijingTimeHelper.createDatabaseTime()
+            event_type: 'click',
+            rule_triggered: 'fake_click',
+            verdict: 'invalid',
+            raw_data: { ad_slot_id: adSlotId, today_clicks: todayClicks, click_target: clickTarget }
           },
           { transaction }
         )

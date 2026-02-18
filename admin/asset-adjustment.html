@@ -8,23 +8,45 @@
 </head>
 <body class="themed-bg-subtle min-h-screen" x-data="assetAdjustmentPage()" x-init="init()" x-cloak>
   
-  <!-- 导航栏 -->
-  <nav class="themed-bg-primary text-white shadow-lg">
+  <!-- 导航栏（深色渐变风格） -->
+  <nav class="page-navbar">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
+        <a href="/admin/workspace.html" class="text-blue-200 hover:text-white transition-colors">← 返回工作台</a>
         <span class="text-lg font-semibold">⚖️ 资产调账</span>
       </div>
       <div class="flex items-center space-x-4">
         <span x-text="'欢迎，' + (admin_user?.nickname || '管理员')"></span>
-        <button @click="logout()" class="px-3 py-1 border border-white/50 rounded hover:bg-white/10">退出登录</button>
+        <button @click="logout()" class="px-3 py-1 border border-white/30 rounded hover:bg-white/10 transition-colors">退出登录</button>
       </div>
     </div>
   </nav>
 
   <div class="container mx-auto px-4 py-6">
-    <!-- 警告说明 -->
-    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+    <!-- 页面横幅 -->
+    <div class="page-banner mb-6">
+      <h1>⚖️ 资产调账</h1>
+      <p>查询用户资产 → 选择调整类型 → 填写原因 → 提交调账（所有操作可追溯）</p>
+    </div>
+
+    <!-- 操作提示（未选择用户时显示操作引导） -->
+    <div x-show="!current_user" class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6 animate-fade-in">
+      <div class="flex items-start gap-3">
+        <span class="text-2xl">💡</span>
+        <div>
+          <strong class="text-blue-800 text-base">如何使用资产调账？</strong>
+          <ol class="text-sm text-blue-700 mt-2 space-y-1 list-decimal list-inside">
+            <li>在左侧表单中<strong>输入用户手机号</strong>并点击"查找"</li>
+            <li>系统会展示该用户的所有资产余额</li>
+            <li>选择需要调整的资产类型，填写金额和原因</li>
+            <li>统计数据和调账记录将在操作后自动更新</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <!-- 安全警告（选择用户后显示） -->
+    <div x-show="current_user" x-cloak class="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
       <div class="flex items-start">
         <span class="text-red-500 mr-2">⚠️</span>
         <div>
@@ -34,27 +56,28 @@
       </div>
     </div>
 
-    <!-- 统计卡片 -->
+    <!-- 统计卡片（渐变样式） -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 themed-border-primary">
-        <div class="text-4xl text-blue-400 mb-2">📋</div>
-        <h4 class="text-2xl font-bold themed-text-primary" x-text="stats.totalAdjustments">0</h4>
-        <p class="themed-text-muted text-sm">总调账次数</p>
+      <div class="gradient-stat-card gradient-stat-blue">
+        <div class="stat-icon">📋</div>
+        <div class="stat-value" x-text="stats.totalAdjustments">0</div>
+        <div class="stat-label">当前用户流水数</div>
+        <div class="stat-trend" x-show="!current_user">请先搜索用户</div>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-green-500">
-        <div class="text-4xl text-green-400 mb-2">➕</div>
-        <h4 class="text-2xl font-bold text-green-600" x-text="formatNumber(stats.totalIncrease)">0</h4>
-        <p class="themed-text-muted text-sm">总增加</p>
+      <div class="gradient-stat-card gradient-stat-green">
+        <div class="stat-icon">➕</div>
+        <div class="stat-value" x-text="formatNumber(stats.totalIncrease)">0</div>
+        <div class="stat-label">本页累计增加</div>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-red-500">
-        <div class="text-4xl text-red-400 mb-2">➖</div>
-        <h4 class="text-2xl font-bold text-red-600" x-text="formatNumber(stats.totalDecrease)">0</h4>
-        <p class="themed-text-muted text-sm">总减少</p>
+      <div class="gradient-stat-card gradient-stat-rose">
+        <div class="stat-icon">➖</div>
+        <div class="stat-value" x-text="formatNumber(stats.totalDecrease)">0</div>
+        <div class="stat-label">本页累计减少</div>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-orange-500">
-        <div class="text-4xl text-orange-400 mb-2">⏳</div>
-        <h4 class="text-2xl font-bold text-orange-600" x-text="stats.pendingApprovals">0</h4>
-        <p class="themed-text-muted text-sm">待审批</p>
+      <div class="gradient-stat-card gradient-stat-orange">
+        <div class="stat-icon">👤</div>
+        <div class="stat-value" x-text="balances.length || 0">0</div>
+        <div class="stat-label">资产种类数</div>
       </div>
     </div>
 

@@ -373,7 +373,7 @@ export function useBannersMethods() {
 
     /**
      * 根据 display_mode 返回对应的 CSS aspect-ratio 值
-     * 用于轮播图列表卡片的图片容器
+     * 用于弹窗列表卡片的图片容器
      * @param {string} displayMode
      * @returns {string} inline style
      */

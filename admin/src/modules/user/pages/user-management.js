@@ -754,7 +754,7 @@ document.addEventListener('alpine:init', () => {
       ],
       dataSource: async (params) => {
         const res = await request({ url: `${API_PREFIX}/console/user-management/users`, method: 'GET', params })
-        return { items: res.data?.rows || res.data?.list || res.data || [], total: res.data?.count || res.data?.pagination?.total || 0 }
+        return { items: res.data?.users || res.data?.rows || res.data?.list || [], total: res.data?.pagination?.total || res.data?.count || 0 }
       },
       primaryKey: 'user_id', sortable: true, page_size: 20
     })
@@ -775,7 +775,7 @@ document.addEventListener('alpine:init', () => {
       ],
       dataSource: async (params) => {
         const res = await request({ url: `${API_PREFIX}/console/user-management/roles`, method: 'GET', params })
-        return { items: res.data?.roles || res.data?.list || res.data || [], total: res.data?.total || 0 }
+        return { items: res.data?.roles || res.data?.list || [], total: res.data?.roles?.length || res.data?.total || 0 }
       },
       primaryKey: 'role_id', sortable: true, page_size: 20
     })
@@ -784,20 +784,21 @@ document.addEventListener('alpine:init', () => {
     return table
   })
 
-  /** 权限列表 */
+  /** 权限列表 - 后端返回 { resources: [{code, name, actions: [{code, name}]}] } */
   Alpine.data('permissionsDataTable', () => {
     const table = dataTable({
       columns: [
-        { key: 'permission_key', label: '权限标识', sortable: true },
-        { key: 'permission_name', label: '权限名称' },
-        { key: 'description', label: '描述' },
-        { key: 'module', label: '模块', render: (val) => val || '-' }
+        { key: 'code', label: '权限标识', sortable: true },
+        { key: 'name', label: '权限名称' },
+        { key: 'actions', label: '可用操作', render: (val) => Array.isArray(val) ? val.map(a => a.name || a.code).join('、') : '-' },
+        { key: 'actions', label: '操作数量', render: (val) => Array.isArray(val) ? `${val.length} 项` : '-' }
       ],
       dataSource: async (params) => {
         const res = await request({ url: `${API_PREFIX}/console/user-management/permission-resources`, method: 'GET', params })
-        return { items: res.data?.permissions || res.data?.list || res.data || [], total: res.data?.total || 0 }
+        const resources = res.data?.resources || res.data?.permissions || []
+        return { items: resources, total: resources.length }
       },
-      primaryKey: 'permission_key', sortable: true, page_size: 50
+      primaryKey: 'code', sortable: true, page_size: 50
     })
     const origInit = table.init
     table.init = async function () { window.addEventListener('refresh-permissions', () => this.loadData()); if (origInit) await origInit.call(this) }
@@ -816,7 +817,7 @@ document.addEventListener('alpine:init', () => {
       ],
       dataSource: async (params) => {
         const res = await request({ url: `${API_PREFIX}/console/user-management/users`, method: 'GET', params: { ...params, role_filter: 'all' } })
-        return { items: res.data?.rows || res.data?.list || [], total: res.data?.count || res.data?.pagination?.total || 0 }
+        return { items: res.data?.users || res.data?.rows || res.data?.list || [], total: res.data?.pagination?.total || res.data?.count || 0 }
       },
       primaryKey: 'user_id', sortable: true, page_size: 20
     })
@@ -825,19 +826,20 @@ document.addEventListener('alpine:init', () => {
     return table
   })
 
-  /** 高级用户状态 */
+  /** 高级用户状态 - 后端返回 { statuses: [...], pagination: { total_count } } */
   Alpine.data('premiumDataTable', () => {
     const table = dataTable({
       columns: [
         { key: 'user_id', label: '用户ID', sortable: true },
-        { key: 'nickname', label: '昵称', render: (val, row) => val || row.user_nickname || '-' },
-        { key: 'premium_level', label: '等级' },
-        { key: 'status', label: '状态', type: 'status' },
+        { key: 'nickname', label: '昵称', render: (val, row) => row.user?.nickname || row.user_nickname || val || '-' },
+        { key: 'is_unlocked', label: '状态', render: (val) => val ? '✅ 已解锁' : '🔒 未解锁' },
+        { key: 'unlock_method', label: '解锁方式', render: (val, row) => row.unlock_method_display || val || '-' },
+        { key: 'total_unlock_count', label: '解锁次数', type: 'number' },
         { key: 'expires_at', label: '到期时间', type: 'datetime', sortable: true }
       ],
       dataSource: async (params) => {
         const res = await request({ url: `${API_PREFIX}/console/user-premium`, method: 'GET', params })
-        return { items: res.data?.list || res.data?.rows || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+        return { items: res.data?.statuses || res.data?.list || [], total: res.data?.pagination?.total_count || res.data?.pagination?.total || 0 }
       },
       primaryKey: 'user_id', sortable: true, page_size: 20
     })
@@ -846,22 +848,22 @@ document.addEventListener('alpine:init', () => {
     return table
   })
 
-  /** 风控配置 */
+  /** 风控配置 - 后端返回 { profiles: [...], pagination: { total_count } } */
   Alpine.data('riskProfilesDataTable', () => {
     const table = dataTable({
       columns: [
         { key: 'user_id', label: '用户ID', sortable: true },
-        { key: 'nickname', label: '昵称', render: (val, row) => val || row.user_nickname || '-' },
-        { key: 'risk_level', label: '风险等级', type: 'status', statusMap: { high: { class: 'red', label: '高风险' }, medium: { class: 'yellow', label: '中风险' }, low: { class: 'green', label: '低风险' } } },
-        { key: 'total_draws', label: '抽奖次数', type: 'number', sortable: true },
-        { key: 'total_wins', label: '中奖次数', type: 'number' },
+        { key: 'config_type', label: '配置类型', render: (val) => val === 'level' ? '📊 等级默认' : '👤 用户自定义' },
+        { key: 'user_level', label: '用户等级', render: (val, row) => row.user_level_display || val || '-' },
+        { key: 'is_frozen', label: '冻结状态', render: (val) => val ? '🔒 已冻结' : '✅ 正常' },
+        { key: 'thresholds', label: '日积分限额', render: (val) => { try { const t = typeof val === 'string' ? JSON.parse(val) : val; return t?.daily_points_limit ?? '-' } catch { return '-' } } },
         { key: 'updated_at', label: '更新时间', type: 'datetime', sortable: true }
       ],
       dataSource: async (params) => {
         const res = await request({ url: `${API_PREFIX}/console/risk-profiles`, method: 'GET', params })
-        return { items: res.data?.list || res.data?.profiles || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+        return { items: res.data?.list || res.data?.profiles || [], total: res.data?.pagination?.total_count || res.data?.pagination?.total || 0 }
       },
-      primaryKey: 'user_id', sortable: true, page_size: 20
+      primaryKey: 'user_risk_profile_id', sortable: true, page_size: 20
     })
     const origInit = table.init
     table.init = async function () { window.addEventListener('refresh-risk-profiles', () => this.loadData()); if (origInit) await origInit.call(this) }

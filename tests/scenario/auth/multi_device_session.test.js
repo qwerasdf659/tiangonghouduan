@@ -3,7 +3,7 @@
  *
  * 测试目的：验证多设备登录时的安全策略
  * - 同账号在新设备登录时，旧设备的 Token 自动失效
- * - 旧设备使用失效 Token 访问 API 返回 401（SESSION_INVALIDATED）
+ * - 旧设备使用失效 Token 访问 API 返回 401（SESSION_REPLACED）
  * - 并发登录时数据一致性保证
  * - Redis 缓存正确更新
  *
@@ -34,9 +34,12 @@ describe('P0-6: 多设备登录冲突测试', () => {
   let skipTests = false // 标记是否跳过测试
 
   /**
-   * 测试前准备：获取测试用户信息
+   * 测试前准备：启用多设备登录检测 + 获取测试用户信息
    */
   beforeAll(async () => {
+    // 本测试套件需要多设备登录冲突检测生效（默认测试环境关闭）
+    process.env.ENABLE_MULTI_DEVICE_CHECK = 'true'
+
     console.log('\n===== P0-6: 多设备登录冲突测试 =====')
     console.log('📌 测试用户手机号:', TEST_MOBILE)
 
@@ -98,6 +101,9 @@ describe('P0-6: 多设备登录冲突测试', () => {
       }
     }
 
+    // 恢复环境变量
+    delete process.env.ENABLE_MULTI_DEVICE_CHECK
+
     // 关闭数据库连接
     await sequelize.close()
     console.log('✅ 数据库连接已关闭')
@@ -112,7 +118,7 @@ describe('P0-6: 多设备登录冲突测试', () => {
    * Step 3: 验证 access_token_A 调用 /api/v4/auth/profile 返回 401
    * Step 4: 验证 access_token_B 调用 /api/v4/auth/profile 返回 200
    */
-  test('场景1：设备B登录后，设备A的Token应失效（SESSION_INVALIDATED）', async () => {
+  test('场景1：设备B登录后，设备A的Token应失效（SESSION_REPLACED）', async () => {
     if (skipTests) {
       console.warn('⚠️ 跳过测试：环境未准备好')
       expect(true).toBe(true)
@@ -164,7 +170,7 @@ describe('P0-6: 多设备登录冲突测试', () => {
 
     expect(profileA2.status).toBe(401)
     expect(profileA2.body.success).toBe(false)
-    expect(profileA2.body.code).toBe('SESSION_INVALIDATED')
+    expect(profileA2.body.code).toBe('SESSION_REPLACED')
     console.log(`✅ 设备A旧Token已失效: code=${profileA2.body.code}`)
     console.log(`   错误消息: ${profileA2.body.message}`)
 
@@ -232,7 +238,7 @@ describe('P0-6: 多设备登录冲突测试', () => {
       .set('Authorization', `Bearer ${token1}`)
 
     expect(profile1.status).toBe(401)
-    expect(profile1.body.code).toBe('SESSION_INVALIDATED')
+    expect(profile1.body.code).toBe('SESSION_REPLACED')
     console.log('✅ 旧Token已失效')
 
     // Step 4: 验证新Token有效
@@ -378,7 +384,7 @@ describe('P0-6: 多设备登录冲突测试', () => {
       .set('Authorization', `Bearer ${token}`)
 
     expect(profile2.status).toBe(401)
-    expect(profile2.body.code).toBe('SESSION_INVALIDATED')
+    expect(profile2.body.code).toBe('SESSION_REPLACED')
     console.log('✅ Token已失效，强制登出成功')
   }, 30000)
 

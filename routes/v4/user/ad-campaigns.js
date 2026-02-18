@@ -31,6 +31,7 @@ const asyncHandler = fn => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next)
 }
 const logger = require('../../../utils/logger').logger
+const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
  * GET / - 获取我的广告活动列表
@@ -283,9 +284,8 @@ router.post(
 
       const AdCampaignService = req.app.locals.services.getService('ad_campaign')
       const AdBillingService = req.app.locals.services.getService('ad_billing')
-      const TransactionManager = req.app.locals.services.getService('transaction_manager')
 
-      const campaign = await TransactionManager.executeTransaction(async transaction => {
+      const campaign = await TransactionManager.execute(async transaction => {
         // 1. 更新状态为待审核
         const submitted = await AdCampaignService.submitForReview(id, req.user.user_id, {
           transaction
@@ -343,9 +343,8 @@ router.post(
 
       const AdCampaignService = req.app.locals.services.getService('ad_campaign')
       const AdBillingService = req.app.locals.services.getService('ad_billing')
-      const TransactionManager = req.app.locals.services.getService('transaction_manager')
 
-      const campaign = await TransactionManager.executeTransaction(async transaction => {
+      const campaign = await TransactionManager.execute(async transaction => {
         const cancelled = await AdCampaignService.cancelCampaign(id, req.user.user_id, {
           transaction
         })

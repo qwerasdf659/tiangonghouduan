@@ -51,7 +51,7 @@ router.get(
       const offset = (parseInt(page) - 1) * parseInt(limit)
 
       const CarouselItemService = req.app.locals.services.getService('carousel_item')
-      const { carouselItems, total } = await CarouselItemService.getAdminCarouselList({
+      const { carousels, total } = await CarouselItemService.getAdminCarouselList({
         position,
         is_active,
         limit: parseInt(limit),
@@ -60,7 +60,7 @@ router.get(
 
       return res.apiSuccess(
         {
-          carousel_items: carouselItems,
+          carousel_items: carousels,
           pagination: {
             total,
             page: parseInt(page),

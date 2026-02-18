@@ -2,7 +2,7 @@
  * 内容管理中心 - Alpine.js 组件
  *
  * @file admin/src/modules/content/pages/content-management.js
- * @description 内容管理中心页面，整合公告管理、轮播图管理、图片资源管理三个子模块
+ * @description 内容管理中心页面，整合公告管理、弹窗管理、轮播图管理、图片资源管理四个子模块
  * @version 4.1.0 (Composable 重构版)
  * @date 2026-02-06
  */
@@ -49,6 +49,32 @@ document.addEventListener('alpine:init', () => {
       const urlParams = new URLSearchParams(window.location.search)
       this.current_page = urlParams.get('page') || 'announcements'
       this.loadPageData()
+      this._loadAllStats()
+    },
+
+    /** 加载所有模块统计（用于概览卡片） */
+    async _loadAllStats() {
+      try {
+        const [bannersRes, carouselsRes, imagesRes] = await Promise.allSettled([
+          this.apiGet(SYSTEM_ENDPOINTS.POPUP_BANNER_LIST),
+          this.apiGet(SYSTEM_ENDPOINTS.CAROUSEL_ITEM_LIST),
+          this.apiGet(SYSTEM_ENDPOINTS.IMAGE_LIST)
+        ])
+        if (bannersRes.status === 'fulfilled' && bannersRes.value?.success) {
+          const banners = bannersRes.value.data?.banners || []
+          this.bannerStats = { total: banners.length, active: banners.filter(b => b.is_active).length }
+        }
+        if (carouselsRes.status === 'fulfilled' && carouselsRes.value?.success) {
+          const items = carouselsRes.value.data?.carousel_items || []
+          this.carouselStats = { total: items.length, active: items.filter(c => c.is_active).length }
+        }
+        if (imagesRes.status === 'fulfilled' && imagesRes.value?.success) {
+          const imgs = imagesRes.value.data?.images || []
+          this.imageStats = { total: imgs.length }
+        }
+      } catch (e) {
+        logger.warn('[ContentManagement] 加载统计概览失败:', e.message)
+      }
     },
 
     switchPage(pageId) {

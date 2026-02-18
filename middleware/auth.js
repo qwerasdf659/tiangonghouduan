@@ -477,19 +477,52 @@ async function authenticateToken(req, res, next) {
       const session = await AuthenticationSession.findValidByToken(decoded.session_token)
 
       if (!session) {
-        logger.warn(
-          `🔒 [Auth] 会话已失效或过期: session_token=${decoded.session_token.substring(0, 8)}..., user_id=${decoded.user_id}`
-        )
-        return res.apiUnauthorized
-          ? res.apiUnauthorized(
-              '会话已失效，请重新登录（可能是其他设备登录导致）',
-              'SESSION_INVALIDATED'
-            )
-          : res.status(401).json({
-              success: false,
-              code: 'SESSION_INVALIDATED',
-              message: '会话已失效，请重新登录（可能是其他设备登录导致）'
-            })
+        /**
+         * 会话无效时细分失效原因，便于前端精确处理
+         * - SESSION_REPLACED：被其他设备登录覆盖 → 前端弹窗提示
+         * - SESSION_EXPIRED：会话超时过期 → 前端尝试 Token 刷新
+         * - SESSION_NOT_FOUND：记录被清理任务删除 → 前端直接重新登录
+         *
+         * @see docs/SESSION_INVALIDATED认证异常解决方案.md - 方案C
+         */
+        const rawSession = await AuthenticationSession.findOne({
+          where: { session_token: decoded.session_token }
+        })
+
+        if (rawSession && !rawSession.is_active) {
+          logger.warn(
+            `🔒 [Auth] 会话被其他设备登录覆盖: session_token=${decoded.session_token.substring(0, 8)}..., user_id=${decoded.user_id}`
+          )
+          return res.apiUnauthorized
+            ? res.apiUnauthorized('您的账号已在其他设备登录', 'SESSION_REPLACED')
+            : res.status(401).json({
+                success: false,
+                code: 'SESSION_REPLACED',
+                message: '您的账号已在其他设备登录'
+              })
+        } else if (rawSession && rawSession.is_active) {
+          logger.warn(
+            `🔒 [Auth] 会话已过期: session_token=${decoded.session_token.substring(0, 8)}..., user_id=${decoded.user_id}`
+          )
+          return res.apiUnauthorized
+            ? res.apiUnauthorized('会话已过期，请重新登录', 'SESSION_EXPIRED')
+            : res.status(401).json({
+                success: false,
+                code: 'SESSION_EXPIRED',
+                message: '会话已过期，请重新登录'
+              })
+        } else {
+          logger.warn(
+            `🔒 [Auth] 会话记录不存在: session_token=${decoded.session_token.substring(0, 8)}..., user_id=${decoded.user_id}`
+          )
+          return res.apiUnauthorized
+            ? res.apiUnauthorized('登录状态已失效，请重新登录', 'SESSION_NOT_FOUND')
+            : res.status(401).json({
+                success: false,
+                code: 'SESSION_NOT_FOUND',
+                message: '登录状态已失效，请重新登录'
+              })
+        }
       }
 
       // 更新会话最后活动时间（异步，不阻塞请求）

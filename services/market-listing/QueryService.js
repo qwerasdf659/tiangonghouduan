@@ -109,11 +109,32 @@ class MarketListingQueryService {
       { field: 'status', dictType: DICT_TYPES.LISTING_STATUS }
     ])
 
+    /**
+     * 聚合该用户所有挂单的各状态数量（不受 status 筛选参数影响）
+     * 业务场景：前端"我的挂单"页面顶部状态标签页的计数徽标
+     */
+    const statusCountRows = await MarketListing.findAll({
+      where: { seller_user_id },
+      attributes: ['status', [sequelize.fn('COUNT', sequelize.col('market_listing_id')), 'cnt']],
+      group: ['status'],
+      raw: true
+    })
+
+    const ALL_STATUSES = ['on_sale', 'locked', 'sold', 'withdrawn', 'admin_withdrawn']
+    const status_counts = {}
+    ALL_STATUSES.forEach(s => {
+      status_counts[s] = 0
+    })
+    statusCountRows.forEach(row => {
+      status_counts[row.status] = parseInt(row.cnt, 10)
+    })
+
     return {
       listings: listingsData,
       total: count,
       page,
-      page_size
+      page_size,
+      status_counts
     }
   }
 
@@ -298,9 +319,7 @@ class MarketListingQueryService {
          * 数据库存 object key，通过 ImageUrlHelper 拼接完整公网 URL
          */
         const templateImageKey =
-          plain.offerItemTemplate?.image_url ||
-          plain.offerItem?.itemTemplate?.image_url ||
-          null
+          plain.offerItemTemplate?.image_url || plain.offerItem?.itemTemplate?.image_url || null
 
         product.item_info = {
           item_instance_id: plain.offer_item_instance_id,

@@ -548,7 +548,7 @@ function registerLotteryManagementComponents() {
       { key: 'base_price', label: '基础价格', type: 'currency' },
       { key: 'asset_code', label: '资产类型' },
       { key: 'is_active', label: '状态', type: 'status', statusMap: { true: { class: 'green', label: '启用' }, false: { class: 'gray', label: '禁用' } } }
-    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/lottery-configs/pricing`, method: 'GET', params: p }); return { items: r.data?.pricing_configs || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'pricing_id', page_size: 20 })
+    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/lottery-management/pricing-configs`, method: 'GET', params: p }); return { items: r.data?.configs || r.data?.pricing_configs || r.data?.list || [], total: r.data?.total || r.data?.pagination?.total || 0 } }, primaryKey: 'pricing_id', page_size: 20 })
     const o = t.init; t.init = async function () { window.addEventListener('refresh-pricing', () => this.loadData()); if (o) await o.call(this) }; return t
   })
 
@@ -591,16 +591,16 @@ function registerLotteryManagementComponents() {
     const o = t.init; t.init = async function () { window.addEventListener('refresh-matrix', () => this.loadData()); if (o) await o.call(this) }; return t
   })
 
-  /** 核销码列表 */
+  /** 核销码列表 - 对接 /console/business-records/redemption-orders */
   Alpine.data('redemptionCodesDataTable', () => {
     const t = dataTable({ columns: [
-      { key: 'code', label: '核销码', sortable: true },
-      { key: 'prize_name', label: '奖品名称' },
-      { key: 'user_id', label: '用户ID' },
-      { key: 'status', label: '状态', type: 'status', statusMap: { pending: { class: 'yellow', label: '待核销' }, redeemed: { class: 'green', label: '已核销' }, expired: { class: 'red', label: '已过期' } } },
+      { key: 'redemption_order_id', label: '核销码ID', sortable: true, render: (v) => v ? v.substring(0, 8) + '...' : '-' },
+      { key: 'item_instance', label: '奖品名称', render: (v) => v?.meta?.name || '-' },
+      { key: 'redeemer_user_id', label: '核销用户', render: (v) => v || '未核销' },
+      { key: 'status', label: '状态', type: 'status', statusMap: { pending: { class: 'yellow', label: '待核销' }, fulfilled: { class: 'green', label: '已核销' }, expired: { class: 'red', label: '已过期' }, cancelled: { class: 'gray', label: '已取消' } } },
       { key: 'created_at', label: '创建时间', type: 'datetime', sortable: true },
-      { key: 'redeemed_at', label: '核销时间', type: 'datetime' }
-    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/lottery-management/redemption-codes`, method: 'GET', params: p }); return { items: r.data?.codes || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'code', page_size: 20 })
+      { key: 'fulfilled_at', label: '核销时间', type: 'datetime' }
+    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/business-records/redemption-orders`, method: 'GET', params: p }); return { items: r.data?.orders || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'redemption_order_id', page_size: 20 })
     const o = t.init; t.init = async function () { window.addEventListener('refresh-redemption-codes', () => this.loadData()); if (o) await o.call(this) }; return t
   })
 
@@ -614,7 +614,7 @@ function registerLotteryManagementComponents() {
       { key: 'cost_amount', label: '消耗', type: 'number' },
       { key: 'is_winner', label: '中奖', type: 'boolean' },
       { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
-    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/lottery-statistics`, method: 'GET', params: p }); return { items: r.data?.draws || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'draw_id', page_size: 20 })
+    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/lottery-statistics/hourly`, method: 'GET', params: p }); return { items: r.data?.metrics || r.data?.draws || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'draw_id', page_size: 20 })
     const o = t.init; t.init = async function () { window.addEventListener('refresh-draw-history', () => this.loadData()); if (o) await o.call(this) }; return t
   })
 

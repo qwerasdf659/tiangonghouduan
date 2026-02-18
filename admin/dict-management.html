@@ -8,38 +8,60 @@
 </head>
 <body class="themed-bg-subtle min-h-screen">
   
-  <!-- 导航栏 -->
-  <nav class="themed-bg-primary text-white shadow-lg">
-    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-      <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:text-yellow-200">← 返回工作台</a>
-        <span class="text-lg font-semibold">📚 字典管理</span>
+  <!-- 页面顶部渐变横幅 -->
+  <div class="page-banner" style="background: linear-gradient(135deg, #312e81 0%, #4f46e5 50%, #7c3aed 100%);">
+    <div class="container mx-auto px-4 flex justify-between items-center">
+      <div>
+        <div class="flex items-center gap-3 mb-1">
+          <a href="/admin/workspace.html" class="text-indigo-200 hover:text-white text-sm transition">← 返回工作台</a>
+        </div>
+        <h1>📚 字典管理</h1>
+        <p class="text-indigo-100">管理系统基础数据字典，包含类目、稀有度和资产分组等配置</p>
       </div>
+      <div class="text-6xl opacity-20">📋</div>
     </div>
-  </nav>
+  </div>
 
   <!-- 页面主体 -->
   <div class="container mx-auto px-4 py-6" x-data="dictManagement()" @table-action="handleTableAction($event.detail)">
     
-    <!-- 字典类型切换 -->
-    <div class="themed-card rounded-lg shadow mb-6">
-      <div class="flex border-b overflow-x-auto">
-        <template x-for="(config, key) in dictTypes" :key="key">
-          <button 
-            @click="switchDictType(key)"
-            :class="currentDictType === key ? 'border-b-2 border-yellow-500 text-yellow-600 bg-yellow-50' : 'themed-text-muted themed-hover-bg'"
-            class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
-            x-text="config.name"
-          ></button>
-        </template>
-      </div>
+    <!-- 字典类型切换 - 卡片式 Tab -->
+    <div class="grid grid-cols-3 gap-4 mb-6">
+      <template x-for="(config, key) in dictTypes" :key="key">
+        <button 
+          @click="switchDictType(key)"
+          :class="currentDictType === key 
+            ? 'ring-2 ring-indigo-500 border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50' 
+            : 'border-gray-200 bg-white hover:border-indigo-200 hover:shadow-md'"
+          class="themed-card rounded-xl p-4 border transition-all duration-200 text-left group cursor-pointer"
+        >
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-2xl" x-text="key === 'categories' ? '📂' : key === 'rarities' ? '💎' : '📦'"></span>
+            <span :class="currentDictType === key ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'"
+                  class="text-xs font-medium px-2 py-0.5 rounded-full transition-colors"
+                  x-text="key"></span>
+          </div>
+          <h6 class="font-semibold text-sm" :class="currentDictType === key ? 'text-indigo-900' : 'text-gray-700'" x-text="config.name"></h6>
+          <p class="text-xs mt-1" :class="currentDictType === key ? 'text-indigo-500' : 'text-gray-400'"
+             x-text="key === 'categories' ? '商品类目分类定义' : key === 'rarities' ? '物品稀有度等级' : '资产分组归类'"></p>
+        </button>
+      </template>
     </div>
 
     <!-- 页面标题和新增按钮 -->
     <div class="flex justify-between items-center mb-4">
-      <h5 class="font-semibold text-lg" x-text="getCurrentDictConfig().name">字典管理</h5>
-      <button @click="openCreateDictModal()" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">
-        ➕ 新增字典
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg"
+             :class="currentDictType === 'categories' ? 'bg-blue-100 text-blue-600' : currentDictType === 'rarities' ? 'bg-purple-100 text-purple-600' : 'bg-emerald-100 text-emerald-600'">
+          <span x-text="currentDictType === 'categories' ? '📂' : currentDictType === 'rarities' ? '💎' : '📦'"></span>
+        </div>
+        <div>
+          <h5 class="font-semibold text-lg" x-text="getCurrentDictConfig().name">字典管理</h5>
+          <p class="text-xs themed-text-muted" x-text="'管理' + (getCurrentDictConfig().name || '数据字典') + '配置项'"></p>
+        </div>
+      </div>
+      <button @click="openCreateDictModal()" class="btn-primary px-5 py-2.5 rounded-lg shadow-sm flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white">
+        <span>➕</span> 新增字典
       </button>
     </div>
 
@@ -62,11 +84,14 @@
          x-show="isModalOpen('dictModal')" 
          x-cloak 
          class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="fixed inset-0 bg-black/50" @click="hideModal('dictModal')"></div>
-      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
-        <div class="p-4 border-b flex justify-between items-center">
-          <h5 class="font-semibold">📖 <span x-text="isEditDict ? '编辑字典' : '新增字典'"></span></h5>
-          <button @click="hideModal('dictModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('dictModal')"></div>
+      <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-md mx-4 z-10 animate-slide-in-up">
+        <div class="p-5 border-b flex justify-between items-center bg-gradient-to-r from-indigo-50 to-white rounded-t-xl">
+          <h5 class="font-semibold text-indigo-900 flex items-center gap-2">
+            <span class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-sm">📖</span>
+            <span x-text="isEditDict ? '编辑字典' : '新增字典'"></span>
+          </h5>
+          <button @click="hideModal('dictModal')" class="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">✕</button>
         </div>
         <form @submit.prevent="submitDictForm()">
           <div class="p-6 space-y-4">
