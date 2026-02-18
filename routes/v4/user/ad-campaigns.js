@@ -75,53 +75,88 @@ router.get(
   })
 )
 
+/** 计费模式枚举 */
+const VALID_BILLING_MODES = ['fixed_daily', 'bidding']
+
+/** 创建广告活动允许的字段白名单 */
+const ALLOWED_CAMPAIGN_CREATE_FIELDS = [
+  'campaign_name',
+  'ad_slot_id',
+  'billing_mode',
+  'daily_bid_diamond',
+  'budget_total_diamond',
+  'fixed_days',
+  'start_date',
+  'end_date',
+  'targeting_rules'
+]
+
+/** 更新广告活动允许的字段白名单（仅 draft 状态） */
+const ALLOWED_CAMPAIGN_UPDATE_FIELDS = [
+  'campaign_name',
+  'ad_slot_id',
+  'billing_mode',
+  'daily_bid_diamond',
+  'budget_total_diamond',
+  'fixed_days',
+  'start_date',
+  'end_date',
+  'targeting_rules'
+]
+
 /**
  * POST / - 创建广告活动
  * @route POST /api/v4/user/ad-campaigns
  * @access Private
  * @body {string} campaign_name - 活动名称
  * @body {number} ad_slot_id - 广告位ID
- * @body {string} billing_mode - 计费模式（cpc/cpm/cpa）
- * @body {number} budget_amount - 预算金额（分）
- * @body {Date} start_date - 开始日期
- * @body {Date} end_date - 结束日期
- * @body {Object} targeting_config - 定向配置
- * @body {Array} creatives - 创意列表
+ * @body {string} billing_mode - 计费模式（fixed_daily=固定包天 / bidding=竞价排名）
+ * @body {number} [daily_bid_diamond] - 竞价日出价（钻石，bidding 模式必填）
+ * @body {number} [budget_total_diamond] - 总预算（钻石，bidding 模式必填）
+ * @body {number} [fixed_days] - 固定包天天数（fixed_daily 模式必填）
+ * @body {string} [start_date] - 投放开始日期（YYYY-MM-DD）
+ * @body {string} [end_date] - 投放结束日期（YYYY-MM-DD）
+ * @body {Object} [targeting_rules] - 定向规则 JSON（Phase 5 启用）
  */
 router.post(
   '/',
   authenticateToken,
   asyncHandler(async (req, res) => {
     try {
-      const {
-        campaign_name,
-        ad_slot_id,
-        billing_mode,
-        budget_amount,
-        start_date,
-        end_date,
-        targeting_config,
-        creatives
-      } = req.body
+      const { campaign_name, ad_slot_id, billing_mode } = req.body
 
-      if (!campaign_name || !ad_slot_id || !billing_mode || !budget_amount) {
-        return res.apiBadRequest(
-          '缺少必需参数：campaign_name, ad_slot_id, billing_mode, budget_amount'
-        )
+      if (!campaign_name || !ad_slot_id || !billing_mode) {
+        return res.apiBadRequest('缺少必需参数：campaign_name, ad_slot_id, billing_mode')
+      }
+
+      if (!VALID_BILLING_MODES.includes(billing_mode)) {
+        return res.apiBadRequest(`billing_mode 必须是以下之一：${VALID_BILLING_MODES.join(', ')}`)
+      }
+
+      // 白名单字段提取
+      const createData = { advertiser_user_id: req.user.user_id }
+      ALLOWED_CAMPAIGN_CREATE_FIELDS.forEach(field => {
+        if (req.body[field] !== undefined) {
+          createData[field] = req.body[field]
+        }
+      })
+
+      // 数值类型转换
+      if (createData.ad_slot_id) {
+        createData.ad_slot_id = parseInt(createData.ad_slot_id)
+      }
+      if (createData.daily_bid_diamond) {
+        createData.daily_bid_diamond = parseInt(createData.daily_bid_diamond)
+      }
+      if (createData.budget_total_diamond) {
+        createData.budget_total_diamond = parseInt(createData.budget_total_diamond)
+      }
+      if (createData.fixed_days) {
+        createData.fixed_days = parseInt(createData.fixed_days)
       }
 
       const AdCampaignService = req.app.locals.services.getService('ad_campaign')
-      const campaign = await AdCampaignService.createCampaign({
-        advertiser_user_id: req.user.user_id,
-        campaign_name,
-        ad_slot_id,
-        billing_mode,
-        budget_amount,
-        start_date,
-        end_date,
-        targeting_config,
-        creatives
-      })
+      const campaign = await AdCampaignService.createCampaign(createData)
 
       logger.info('创建广告活动成功', {
         campaign_id: campaign.ad_campaign_id,
@@ -180,18 +215,40 @@ router.put(
   authenticateToken,
   asyncHandler(async (req, res) => {
     try {
-      const { id } = req.params
-      const updateData = req.body
+      const campaignId = parseInt(req.params.id)
+      if (isNaN(campaignId)) {
+        return res.apiBadRequest('广告活动 ID 必须是有效数字')
+      }
+
+      // 白名单字段提取
+      const updateData = {}
+      ALLOWED_CAMPAIGN_UPDATE_FIELDS.forEach(field => {
+        if (req.body[field] !== undefined) {
+          updateData[field] = req.body[field]
+        }
+      })
+
+      if (Object.keys(updateData).length === 0) {
+        return res.apiBadRequest('至少需要提供一个更新字段')
+      }
+
+      if (updateData.billing_mode && !VALID_BILLING_MODES.includes(updateData.billing_mode)) {
+        return res.apiBadRequest(`billing_mode 必须是以下之一：${VALID_BILLING_MODES.join(', ')}`)
+      }
 
       const AdCampaignService = req.app.locals.services.getService('ad_campaign')
-      const campaign = await AdCampaignService.updateCampaign(id, req.user.user_id, updateData)
+      const campaign = await AdCampaignService.updateCampaign(
+        campaignId,
+        req.user.user_id,
+        updateData
+      )
 
       if (!campaign) {
         return res.apiError('广告活动不存在或无权限修改', 'CAMPAIGN_NOT_FOUND', null, 404)
       }
 
       logger.info('更新广告活动成功', {
-        campaign_id: id,
+        campaign_id: campaignId,
         user_id: req.user.user_id
       })
 

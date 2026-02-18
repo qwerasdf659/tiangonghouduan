@@ -49,9 +49,14 @@ router.post(
         return res.apiBadRequest('缺少必需参数：popup_banner_id')
       }
 
+      const parsedBannerId = parseInt(popup_banner_id)
+      if (isNaN(parsedBannerId)) {
+        return res.apiBadRequest('popup_banner_id 必须是有效数字')
+      }
+
       const PopupShowLogService = req.app.locals.services.getService('popup_show_log')
-      const showLog = await PopupShowLogService.createShowLog({
-        popup_banner_id: parseInt(popup_banner_id),
+      const showLog = await PopupShowLogService.createLog({
+        popup_banner_id: parsedBannerId,
         user_id: req.user.user_id,
         show_duration_ms: show_duration_ms ? parseInt(show_duration_ms) : null,
         close_method,
@@ -95,12 +100,18 @@ router.post(
         return res.apiBadRequest('缺少必需参数：carousel_item_id')
       }
 
+      const parsedItemId = parseInt(carousel_item_id)
+      if (isNaN(parsedItemId)) {
+        return res.apiBadRequest('carousel_item_id 必须是有效数字')
+      }
+
       const CarouselShowLogService = req.app.locals.services.getService('carousel_show_log')
-      const showLog = await CarouselShowLogService.createShowLog({
-        carousel_item_id: parseInt(carousel_item_id),
+      const showLog = await CarouselShowLogService.createLog({
+        carousel_item_id: parsedItemId,
         user_id: req.user.user_id,
         exposure_duration_ms: exposure_duration_ms ? parseInt(exposure_duration_ms) : null,
-        is_manual_swipe: is_manual_swipe === true || is_manual_swipe === 'true' || is_manual_swipe === 1,
+        is_manual_swipe:
+          is_manual_swipe === true || is_manual_swipe === 'true' || is_manual_swipe === 1,
         is_clicked: is_clicked === true || is_clicked === 'true' || is_clicked === 1
       })
 
@@ -139,13 +150,19 @@ router.post(
         return res.apiBadRequest('缺少必需参数：ad_campaign_id, ad_slot_id')
       }
 
+      const parsedCampaignId = parseInt(ad_campaign_id)
+      const parsedSlotId = parseInt(ad_slot_id)
+      if (isNaN(parsedCampaignId) || isNaN(parsedSlotId)) {
+        return res.apiBadRequest('ad_campaign_id 和 ad_slot_id 必须是有效数字')
+      }
+
       const AdAntifraudService = req.app.locals.services.getService('ad_antifraud')
       const AdImpressionLogService = req.app.locals.services.getService('ad_impression_log')
 
       // 反作弊检查
       const antifraudResult = await AdAntifraudService.checkImpression({
-        ad_campaign_id: parseInt(ad_campaign_id),
-        ad_slot_id: parseInt(ad_slot_id),
+        ad_campaign_id: parsedCampaignId,
+        ad_slot_id: parsedSlotId,
         user_id: req.user.user_id,
         ip: req.ip,
         user_agent: req.get('user-agent')
@@ -153,8 +170,8 @@ router.post(
 
       if (!antifraudResult.is_valid) {
         logger.warn('广告曝光反作弊检查未通过', {
-          ad_campaign_id,
-          ad_slot_id,
+          ad_campaign_id: parsedCampaignId,
+          ad_slot_id: parsedSlotId,
           user_id: req.user.user_id,
           reason: antifraudResult.reason
         })
@@ -162,12 +179,10 @@ router.post(
       }
 
       // 创建曝光日志
-      const impressionLog = await AdImpressionLogService.createImpressionLog({
-        ad_campaign_id: parseInt(ad_campaign_id),
-        ad_slot_id: parseInt(ad_slot_id),
-        user_id: req.user.user_id,
-        ip: req.ip,
-        user_agent: req.get('user-agent')
+      const impressionLog = await AdImpressionLogService.createLog({
+        ad_campaign_id: parsedCampaignId,
+        ad_slot_id: parsedSlotId,
+        user_id: req.user.user_id
       })
 
       logger.info('广告曝光事件上报成功', {
@@ -208,13 +223,19 @@ router.post(
         return res.apiBadRequest('缺少必需参数：ad_campaign_id, ad_slot_id')
       }
 
+      const parsedCampaignId = parseInt(ad_campaign_id)
+      const parsedSlotId = parseInt(ad_slot_id)
+      if (isNaN(parsedCampaignId) || isNaN(parsedSlotId)) {
+        return res.apiBadRequest('ad_campaign_id 和 ad_slot_id 必须是有效数字')
+      }
+
       const AdAntifraudService = req.app.locals.services.getService('ad_antifraud')
       const AdClickLogService = req.app.locals.services.getService('ad_click_log')
 
       // 反作弊检查
       const antifraudResult = await AdAntifraudService.checkClick({
-        ad_campaign_id: parseInt(ad_campaign_id),
-        ad_slot_id: parseInt(ad_slot_id),
+        ad_campaign_id: parsedCampaignId,
+        ad_slot_id: parsedSlotId,
         user_id: req.user.user_id,
         ip: req.ip,
         user_agent: req.get('user-agent')
@@ -222,8 +243,8 @@ router.post(
 
       if (!antifraudResult.is_valid) {
         logger.warn('广告点击反作弊检查未通过', {
-          ad_campaign_id,
-          ad_slot_id,
+          ad_campaign_id: parsedCampaignId,
+          ad_slot_id: parsedSlotId,
           user_id: req.user.user_id,
           reason: antifraudResult.reason
         })
@@ -231,12 +252,10 @@ router.post(
       }
 
       // 创建点击日志
-      const clickLog = await AdClickLogService.createClickLog({
-        ad_campaign_id: parseInt(ad_campaign_id),
-        ad_slot_id: parseInt(ad_slot_id),
+      const clickLog = await AdClickLogService.createLog({
+        ad_campaign_id: parsedCampaignId,
+        ad_slot_id: parsedSlotId,
         user_id: req.user.user_id,
-        ip: req.ip,
-        user_agent: req.get('user-agent'),
         click_target
       })
 

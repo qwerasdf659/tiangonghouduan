@@ -10,6 +10,7 @@
 import { logger } from '../../../utils/logger.js'
 import { buildURL, getToken } from '../../../api/base.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
+import { loadECharts } from '../../../utils/echarts-lazy.js'
 
 /**
  * 轮播图管理状态
@@ -290,12 +291,49 @@ export function useCarouselItemsMethods() {
         this.showError('加载展示统计失败: ' + error.message)
       } finally {
         this.carouselShowStatsLoading = false
+        this.$nextTick(() => this.renderCarouselShowChart())
       }
     },
 
-    carouselDragStart(index) {
+    async renderCarouselShowChart() {
+      const stats = this.carouselShowStats
+      if (!stats?.daily_stats?.length) return
+      const container = document.getElementById('carouselShowStatsChart')
+      if (!container) return
+      try {
+        const echarts = await loadECharts()
+        let chart = echarts.getInstanceByDom(container)
+        if (!chart) chart = echarts.init(container)
+        chart.setOption({
+          tooltip: { trigger: 'axis' },
+          legend: { data: ['曝光次数', '点击次数'] },
+          grid: { left: 40, right: 20, top: 40, bottom: 30 },
+          xAxis: { type: 'category', data: stats.daily_stats.map(d => d.date) },
+          yAxis: { type: 'value', name: '次数' },
+          series: [
+            {
+              name: '曝光次数',
+              type: 'bar',
+              data: stats.daily_stats.map(d => d.exposure_count || 0),
+              itemStyle: { color: '#6366f1' }
+            },
+            {
+              name: '点击次数',
+              type: 'line',
+              data: stats.daily_stats.map(d => d.click_count || 0),
+              itemStyle: { color: '#f59e0b' }
+            }
+          ]
+        })
+      } catch (error) {
+        logger.warn('渲染轮播图曝光统计图表失败:', error.message)
+      }
+    },
+
+    carouselDragStart(index, event) {
       this.carouselDragIndex = index
       this.carouselDragging = true
+      if (event?.dataTransfer) event.dataTransfer.effectAllowed = 'move'
     },
 
     carouselDragOver(event, index) {
@@ -308,10 +346,43 @@ export function useCarouselItemsMethods() {
       this.carouselDragIndex = index
     },
 
+    carouselTouchStart(index) {
+      this._carouselTouchIdx = index
+      this.carouselDragging = true
+    },
+
+    carouselTouchMove(event) {
+      if (this._carouselTouchIdx === null || this._carouselTouchIdx === undefined) return
+      const touch = event.touches[0]
+      const el = document.elementFromPoint(touch.clientX, touch.clientY)
+      if (!el) return
+      const card = el.closest('[data-carousel-idx]')
+      if (!card) return
+      const targetIdx = parseInt(card.dataset.carouselIdx, 10)
+      if (isNaN(targetIdx) || targetIdx === this._carouselTouchIdx) return
+      const items = [...this.carouselItems]
+      const [moved] = items.splice(this._carouselTouchIdx, 1)
+      items.splice(targetIdx, 0, moved)
+      this.carouselItems = items
+      this._carouselTouchIdx = targetIdx
+      event.preventDefault()
+    },
+
+    carouselTouchEnd() {
+      this.carouselDragging = false
+      if (this._carouselTouchIdx === null || this._carouselTouchIdx === undefined) return
+      this._carouselTouchIdx = null
+      this._saveCarouselOrder()
+    },
+
     async carouselDragEnd() {
       this.carouselDragging = false
       if (this.carouselDragIndex === null) return
       this.carouselDragIndex = null
+      await this._saveCarouselOrder()
+    },
+
+    async _saveCarouselOrder() {
       const order_list = this.carouselItems.map((c, i) => ({
         carousel_item_id: c.carousel_item_id,
         display_order: i

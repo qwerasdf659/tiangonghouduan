@@ -372,7 +372,7 @@ export function sidebarNav() {
           this.pendingAlertCount = data.data.badges?.risk_alert || 0
           this.lotteryAlertCount = data.data.badges?.lottery_alert || 0
           this.redemptionPendingCount = data.data.badges?.redemption || 0
-          this.adPendingReviewCount = data.data.badges?.ad_pending_review || 0
+          this.adPendingReviewCount = data.data.badges?.ad_pending_review ?? 0
 
           logger.debug('[SidebarNav] 徽标数量已更新', {
             total: this.totalPendingCount,

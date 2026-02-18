@@ -49,7 +49,9 @@ const BADGE_CATEGORIES = {
   /** 兑换核销待处理（redemption_orders 表 status=pending 的订单数） */
   REDEMPTION: 'redemption',
   /** 用户反馈待处理（feedbacks 表 status=pending 的反馈数） */
-  FEEDBACK: 'feedback'
+  FEEDBACK: 'feedback',
+  /** 广告待审核（ad_campaigns 表 status=pending_review 的计划数） */
+  AD_PENDING_REVIEW: 'ad_pending_review'
 }
 
 /**
@@ -83,16 +85,24 @@ class NavBadgeService {
         return cached
       }
 
-      // 2. 并行查询各分类计数（6个数据源）
-      const [consumption, customerService, riskAlerts, lotteryAlerts, redemption, feedback] =
-        await Promise.all([
-          this._getConsumptionCount(),
-          this._getCustomerServiceCount(),
-          this._getRiskAlertCount(),
-          this._getLotteryAlertCount(),
-          this._getRedemptionPendingCount(),
-          this._getFeedbackPendingCount()
-        ])
+      // 2. 并行查询各分类计数（7个数据源）
+      const [
+        consumption,
+        customerService,
+        riskAlerts,
+        lotteryAlerts,
+        redemption,
+        feedback,
+        adPendingReview
+      ] = await Promise.all([
+        this._getConsumptionCount(),
+        this._getCustomerServiceCount(),
+        this._getRiskAlertCount(),
+        this._getLotteryAlertCount(),
+        this._getRedemptionPendingCount(),
+        this._getFeedbackPendingCount(),
+        this._getAdPendingReviewCount()
+      ])
 
       // 3. 组装返回结构
       const badges = {
@@ -101,7 +111,8 @@ class NavBadgeService {
         [BADGE_CATEGORIES.RISK_ALERT]: riskAlerts,
         [BADGE_CATEGORIES.LOTTERY_ALERT]: lotteryAlerts,
         [BADGE_CATEGORIES.REDEMPTION]: redemption,
-        [BADGE_CATEGORIES.FEEDBACK]: feedback
+        [BADGE_CATEGORIES.FEEDBACK]: feedback,
+        [BADGE_CATEGORIES.AD_PENDING_REVIEW]: adPendingReview
       }
 
       // 4. 计算总数
@@ -242,6 +253,25 @@ class NavBadgeService {
   }
 
   /**
+   * 获取广告待审核数量（ad_campaigns 表 status='pending_review' 的记录数）
+   *
+   * @private
+   * @returns {Promise<number>} 待审核广告计划数量
+   */
+  static async _getAdPendingReviewCount() {
+    try {
+      const { AdCampaign } = require('../../models')
+      const count = await AdCampaign.count({
+        where: { status: 'pending_review' }
+      })
+      return count
+    } catch (error) {
+      logger.warn('[导航徽标] 广告待审核计数失败', { error: error.message })
+      return 0
+    }
+  }
+
+  /**
    * 手动失效缓存
    *
    * @description 当待处理数据发生变化时调用此方法刷新缓存
@@ -280,6 +310,8 @@ class NavBadgeService {
         return await this._getRedemptionPendingCount()
       case BADGE_CATEGORIES.FEEDBACK:
         return await this._getFeedbackPendingCount()
+      case BADGE_CATEGORIES.AD_PENDING_REVIEW:
+        return await this._getAdPendingReviewCount()
       default:
         logger.warn('[导航徽标] 未知分类', { category })
         return 0

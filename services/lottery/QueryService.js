@@ -90,11 +90,18 @@ class LotteryQueryService {
           'created_at',
           'updated_at'
         ],
+        include: [
+          {
+            model: models.ImageResources,
+            as: 'image',
+            required: false,
+            attributes: ['image_resource_id', 'file_path', 'mime_type', 'thumbnail_paths']
+          }
+        ],
         order: [
           ['sort_order', 'ASC'],
           ['lottery_prize_id', 'ASC']
-        ],
-        raw: true // 返回普通JSON对象，而非Sequelize模型实例
+        ]
       })
 
       logger.info('[LotteryQueryService] 获取活动奖品列表', {

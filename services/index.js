@@ -51,6 +51,8 @@ const AdBillingService = require('./AdBillingService') // Phase 3: 广告计费�
 const AdBiddingService = require('./AdBiddingService') // Phase 4: 竞价引擎服务
 const AdTagAggregationService = require('./AdTagAggregationService') // Phase 5: DMP 标签聚合服务
 const AdAntifraudService = require('./AdAntifraudService') // Phase 5: 反作弊服务
+const AdImpressionLogService = require('./AdImpressionLogService') // Phase 5: 广告曝光日志服务
+const AdClickLogService = require('./AdClickLogService') // Phase 5: 广告点击日志服务
 const AdAttributionService = require('./AdAttributionService') // Phase 6: 归因追踪服务
 const AdReportService = require('./AdReportService') // Phase 6: 多维报表服务
 
@@ -409,6 +411,8 @@ class ServiceManager {
       this._services.set('ad_bidding', AdBiddingService) // Phase 4: 竞价引擎
       this._services.set('ad_tag_aggregation', AdTagAggregationService) // Phase 5: DMP 标签聚合
       this._services.set('ad_antifraud', AdAntifraudService) // Phase 5: 反作弊
+      this._services.set('ad_impression_log', AdImpressionLogService) // Phase 5: 广告曝光日志
+      this._services.set('ad_click_log', AdClickLogService) // Phase 5: 广告点击日志
       this._services.set('ad_attribution', AdAttributionService) // Phase 6: 归因追踪
       this._services.set('ad_report', AdReportService) // Phase 6: 多维报表
 

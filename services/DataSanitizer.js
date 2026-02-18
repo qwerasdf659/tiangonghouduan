@@ -1,5 +1,6 @@
 const BeijingTimeHelper = require('../utils/timeHelper')
 const DecimalConverter = require('../utils/formatters/DecimalConverter') // 🔧 DECIMAL字段类型转换工具
+const { getImageUrl } = require('../utils/ImageUrlHelper') // 🔧 Sealos 对象存储 URL 生成
 
 /**
  * 🔒 全局敏感资产类型黑名单（决策1：绝对禁止暴露给前端）
@@ -106,35 +107,72 @@ class DataSanitizer {
    */
   static sanitizePrizes(prizes, dataLevel) {
     if (dataLevel === 'full') {
-      // 管理员看完整数据，但需要转换DECIMAL字段为数字类型（修复前端TypeError）
-      return DecimalConverter.convertPrizeData(Array.isArray(prizes) ? prizes : [prizes])
+      /*
+       * 管理员看完整数据，但需要转换DECIMAL字段为数字类型（修复前端TypeError）
+       * Sequelize 模型实例需先转为普通对象，供 DecimalConverter 的 spread 操作正常工作
+       */
+      const plainPrizes = (Array.isArray(prizes) ? prizes : [prizes]).map(p =>
+        p.toJSON ? p.toJSON() : p
+      )
+      return DecimalConverter.convertPrizeData(plainPrizes)
     }
 
     // 普通用户数据脱敏 — 过滤敏感字段，输出统一 id（商业安全：防抓包推断表结构）
-    const sanitized = prizes.map(prize => ({
-      id: prize.lottery_prize_id,
-      lottery_campaign_id: prize.lottery_campaign_id,
-      prize_name: prize.prize_name,
-      prize_type: prize.prize_type,
-      prize_value: DecimalConverter.toNumber(prize.prize_value, 0),
-      prize_description: prize.prize_description,
-      /** 稀有度代码（FK→rarity_defs，前端直接使用此字段名显示对应颜色光效） */
-      rarity_code: prize.rarity_code || 'common',
-      sort_order: prize.sort_order,
-      reward_tier: prize.reward_tier,
-      status: prize.status,
-      image_resource_id: prize.image_resource_id,
-      material_asset_code: prize.material_asset_code,
-      material_amount: prize.material_amount,
-      created_at: prize.created_at,
-      updated_at: prize.updated_at
-      /*
-       * ❌ 移除敏感字段（禁止暴露给微信小程序前端）：
-       * win_probability, stock_quantity, win_weight, prize_value_points,
-       * cost_points, max_daily_wins, daily_win_count, total_win_count,
-       * is_fallback, reserved_for_vip, angle, color, is_activity
-       */
-    }))
+    const sanitized = prizes.map(prize => {
+      // 处理图片关联数据（Sequelize include 或缓存还原的普通对象）
+      const imageData = prize.image || (prize.toJSON ? prize.toJSON().image : null)
+      let image = null
+
+      if (imageData) {
+        if (typeof imageData.toSafeJSON === 'function') {
+          // Sequelize 模型实例：通过 toSafeJSON 生成 Sealos URL
+          const safeImage = imageData.toSafeJSON()
+          image = {
+            id: safeImage.image_resource_id,
+            url: safeImage.imageUrl,
+            mime: safeImage.mime_type,
+            thumbnail_url: safeImage.thumbnails?.small || safeImage.imageUrl
+          }
+        } else if (imageData.file_path) {
+          // 缓存还原的普通对象：直接用 ImageUrlHelper 生成 URL
+          image = {
+            id: imageData.image_resource_id,
+            url: getImageUrl(imageData.file_path),
+            mime: imageData.mime_type,
+            thumbnail_url: imageData.thumbnail_paths?.small
+              ? getImageUrl(imageData.thumbnail_paths.small)
+              : getImageUrl(imageData.file_path)
+          }
+        }
+      }
+
+      return {
+        id: prize.lottery_prize_id,
+        lottery_campaign_id: prize.lottery_campaign_id,
+        prize_name: prize.prize_name,
+        prize_type: prize.prize_type,
+        prize_value: DecimalConverter.toNumber(prize.prize_value, 0),
+        prize_description: prize.prize_description,
+        /** 稀有度代码（FK→rarity_defs，前端直接使用此字段名显示对应颜色光效） */
+        rarity_code: prize.rarity_code || 'common',
+        sort_order: prize.sort_order,
+        reward_tier: prize.reward_tier,
+        status: prize.status,
+        image_resource_id: prize.image_resource_id,
+        /** 图片对象（含 Sealos URL），image_resource_id 为 NULL 时此字段为 null，前端应 emoji 兜底 */
+        image,
+        material_asset_code: prize.material_asset_code,
+        material_amount: prize.material_amount,
+        created_at: prize.created_at,
+        updated_at: prize.updated_at
+        /*
+         * ❌ 移除敏感字段（禁止暴露给微信小程序前端）：
+         * win_probability, stock_quantity, win_weight, prize_value_points,
+         * cost_points, max_daily_wins, daily_win_count, total_win_count,
+         * is_fallback, reserved_for_vip, angle, color, is_activity
+         */
+      }
+    })
 
     return sanitized
   }

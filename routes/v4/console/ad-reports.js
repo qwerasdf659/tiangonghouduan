@@ -18,6 +18,9 @@ const router = express.Router()
 const { adminAuthMiddleware, asyncHandler } = require('./shared/middleware')
 const logger = require('../../../utils/logger').logger
 
+/** 日期格式校验（YYYY-MM-DD） */
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
+
 /**
  * GET /overview - 获取全局广告数据概览（Phase 6）
  * @route GET /api/v4/console/ad-reports/overview
@@ -31,6 +34,13 @@ router.get(
   asyncHandler(async (req, res) => {
     try {
       const { start_date, end_date } = req.query
+
+      if (start_date && !DATE_REGEX.test(start_date)) {
+        return res.apiBadRequest('start_date 格式必须为 YYYY-MM-DD')
+      }
+      if (end_date && !DATE_REGEX.test(end_date)) {
+        return res.apiBadRequest('end_date 格式必须为 YYYY-MM-DD')
+      }
 
       const AdReportService = req.app.locals.services.getService('ad_report')
       const overview = await AdReportService.getDashboardOverview(
@@ -63,11 +73,20 @@ router.get(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { id } = req.params
+      const campaignId = parseInt(req.params.id)
+      if (isNaN(campaignId)) {
+        return res.apiBadRequest('广告活动 ID 必须是有效数字')
+      }
       const { start_date, end_date } = req.query
+      if (start_date && !DATE_REGEX.test(start_date)) {
+        return res.apiBadRequest('start_date 格式必须为 YYYY-MM-DD')
+      }
+      if (end_date && !DATE_REGEX.test(end_date)) {
+        return res.apiBadRequest('end_date 格式必须为 YYYY-MM-DD')
+      }
 
       const AdReportService = req.app.locals.services.getService('ad_report')
-      const report = await AdReportService.getCampaignReport(id, null, {
+      const report = await AdReportService.getCampaignReport(campaignId, null, {
         start_date,
         end_date
       })
@@ -100,11 +119,20 @@ router.get(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { id } = req.params
+      const slotId = parseInt(req.params.id)
+      if (isNaN(slotId)) {
+        return res.apiBadRequest('广告位 ID 必须是有效数字')
+      }
       const { start_date, end_date } = req.query
+      if (start_date && !DATE_REGEX.test(start_date)) {
+        return res.apiBadRequest('start_date 格式必须为 YYYY-MM-DD')
+      }
+      if (end_date && !DATE_REGEX.test(end_date)) {
+        return res.apiBadRequest('end_date 格式必须为 YYYY-MM-DD')
+      }
 
       const AdReportService = req.app.locals.services.getService('ad_report')
-      const report = await AdReportService.getSlotReport(id, {
+      const report = await AdReportService.getSlotReport(slotId, {
         start_date,
         end_date
       })

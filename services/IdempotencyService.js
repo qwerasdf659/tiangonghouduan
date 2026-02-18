@@ -386,6 +386,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/user/ad-campaigns/:id/cancel': 'USER_AD_CAMPAIGN_CANCEL', // 取消计划（含钻石退回）
 
   // Phase 3: 广告计划管理（管理端）
+  '/api/v4/console/ad-campaigns/': 'ADMIN_AD_CAMPAIGN_CREATE', // 管理员创建广告计划
   '/api/v4/console/ad-campaigns/:id/review': 'ADMIN_AD_CAMPAIGN_REVIEW', // 审核广告计划
 
   // Phase 3: 广告位管理（管理端）

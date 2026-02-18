@@ -10,6 +10,7 @@
 import { logger } from '../../../utils/logger.js'
 import { buildURL, getToken } from '../../../api/base.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
+import { loadECharts } from '../../../utils/echarts-lazy.js'
 
 /**
  * 弹窗管理状态
@@ -29,6 +30,7 @@ export function useBannersState() {
       is_active: true,
       image_url: '',
       link_url: '',
+      link_type: 'none',
       start_time: '',
       end_time: '',
       banner_type: 'promo',
@@ -164,6 +166,7 @@ export function useBannersMethods() {
         is_active: banner.is_active !== false,
         image_url: banner.image_url || '',
         link_url: banner.link_url || '',
+        link_type: banner.link_type || 'none',
         start_time: this.formatDateTimeLocal(banner.start_time),
         end_time: this.formatDateTimeLocal(banner.end_time),
         banner_type: banner.banner_type || 'promo',
@@ -309,6 +312,7 @@ export function useBannersMethods() {
         formData.append('display_order', String(this.bannerForm.display_order || 0))
         formData.append('is_active', String(this.bannerForm.is_active))
         formData.append('link_url', this.bannerForm.link_url || '')
+        formData.append('link_type', this.bannerForm.link_type || 'none')
         if (this.bannerForm.start_time) formData.append('start_time', this.bannerForm.start_time)
         if (this.bannerForm.end_time) formData.append('end_time', this.bannerForm.end_time)
 
@@ -437,12 +441,40 @@ export function useBannersMethods() {
         this.showError('加载展示统计失败: ' + error.message)
       } finally {
         this.bannerShowStatsLoading = false
+        this.$nextTick(() => this.renderBannerShowChart())
       }
     },
 
-    bannerDragStart(index) {
+    async renderBannerShowChart() {
+      const stats = this.bannerShowStats
+      if (!stats?.daily_stats?.length) return
+      const container = document.getElementById('bannerShowStatsChart')
+      if (!container) return
+      try {
+        const echarts = await loadECharts()
+        let chart = echarts.getInstanceByDom(container)
+        if (!chart) chart = echarts.init(container)
+        chart.setOption({
+          tooltip: { trigger: 'axis' },
+          grid: { left: 40, right: 20, top: 30, bottom: 30 },
+          xAxis: { type: 'category', data: stats.daily_stats.map(d => d.date) },
+          yAxis: { type: 'value', name: '次数' },
+          series: [{
+            name: '展示次数',
+            type: 'bar',
+            data: stats.daily_stats.map(d => d.show_count || 0),
+            itemStyle: { color: '#6366f1' }
+          }]
+        })
+      } catch (error) {
+        logger.warn('渲染弹窗展示统计图表失败:', error.message)
+      }
+    },
+
+    bannerDragStart(index, event) {
       this.bannerDragIndex = index
       this.bannerDragging = true
+      if (event?.dataTransfer) event.dataTransfer.effectAllowed = 'move'
     },
 
     bannerDragOver(event, index) {
@@ -455,10 +487,47 @@ export function useBannersMethods() {
       this.bannerDragIndex = index
     },
 
+    /** 触摸设备：touchstart → 记录拖拽起始 */
+    bannerTouchStart(index, event) {
+      this._bannerTouchStartY = event.touches[0].clientY
+      this._bannerTouchIdx = index
+      this.bannerDragging = true
+    },
+
+    /** 触摸设备：touchmove → 判断交换位置 */
+    bannerTouchMove(event) {
+      if (this._bannerTouchIdx === null || this._bannerTouchIdx === undefined) return
+      const touch = event.touches[0]
+      const el = document.elementFromPoint(touch.clientX, touch.clientY)
+      if (!el) return
+      const card = el.closest('[data-banner-idx]')
+      if (!card) return
+      const targetIdx = parseInt(card.dataset.bannerIdx, 10)
+      if (isNaN(targetIdx) || targetIdx === this._bannerTouchIdx) return
+      const items = [...this.banners]
+      const [moved] = items.splice(this._bannerTouchIdx, 1)
+      items.splice(targetIdx, 0, moved)
+      this.banners = items
+      this._bannerTouchIdx = targetIdx
+      event.preventDefault()
+    },
+
+    /** 触摸设备：touchend → 保存排序 */
+    bannerTouchEnd() {
+      this.bannerDragging = false
+      if (this._bannerTouchIdx === null || this._bannerTouchIdx === undefined) return
+      this._bannerTouchIdx = null
+      this._saveBannerOrder()
+    },
+
     async bannerDragEnd() {
       this.bannerDragging = false
       if (this.bannerDragIndex === null) return
       this.bannerDragIndex = null
+      await this._saveBannerOrder()
+    },
+
+    async _saveBannerOrder() {
       const order_list = this.banners.map((b, i) => ({
         popup_banner_id: b.popup_banner_id,
         display_order: i

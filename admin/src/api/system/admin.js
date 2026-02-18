@@ -52,10 +52,16 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
 
   // 广告活动管理
   AD_CAMPAIGN_LIST: `${API_PREFIX}/console/ad-campaigns`,
+  AD_CAMPAIGN_CREATE: `${API_PREFIX}/console/ad-campaigns`,
   AD_CAMPAIGN_DETAIL: `${API_PREFIX}/console/ad-campaigns/:id`,
   AD_CAMPAIGN_REVIEW: `${API_PREFIX}/console/ad-campaigns/:id/review`,
   AD_CAMPAIGN_STATS: `${API_PREFIX}/console/ad-campaigns/statistics`,
   AD_CAMPAIGN_DASHBOARD: `${API_PREFIX}/console/ad-campaigns/dashboard`,
+  AD_POPUP_QUEUE_CONFIG: `${API_PREFIX}/console/ad-campaigns/popup-queue-config`,
+  AD_BID_LOGS: `${API_PREFIX}/console/ad-campaigns/bid-logs`,
+  AD_USER_TAGS: `${API_PREFIX}/console/ad-campaigns/user-ad-tags`,
+  AD_ANTIFRAUD_LOGS: `${API_PREFIX}/console/ad-campaigns/antifraud-logs`,
+  AD_ATTRIBUTION_LOGS: `${API_PREFIX}/console/ad-campaigns/attribution-logs`,
 
   // 广告位管理
   AD_SLOT_LIST: `${API_PREFIX}/console/ad-slots`,

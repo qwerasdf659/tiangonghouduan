@@ -23,15 +23,16 @@ export function usePricingState() {
     pricingVersions: [],
     /** @type {Object} 定价筛选条件 */
     pricingFilters: { campaign_code: '', status: '' },
-    /** @type {Object} 定价表单 - 直接使用后端字段名 base_cost */
+    /** @type {Object} 定价表单 - 直接使用后端 draw_buttons 结构，每个按钮独立折扣 */
     pricingForm: {
       campaign_code: '',
       base_cost: 0,
-      discount_rate: 1.0,
-      min_purchase: 1,
-      max_purchase: 10,
-      effective_from: '',
-      effective_to: ''
+      draw_buttons: [
+        { count: 1, discount: 1.0, label: '单抽', enabled: true, sort_order: 1 },
+        { count: 3, discount: 1.0, label: '3连抽', enabled: true, sort_order: 3 },
+        { count: 5, discount: 1.0, label: '5连抽', enabled: true, sort_order: 5 },
+        { count: 10, discount: 1.0, label: '10连抽', enabled: true, sort_order: 10 }
+      ]
     },
     /** @type {number|string|null} 当前编辑的定价ID */
     editingPricingId: null,
@@ -152,33 +153,32 @@ export function usePricingMethods() {
     },
 
     /**
-     * 打开创建定价模态框
+     * 打开创建定价模态框 - 初始化默认的 draw_buttons（每个按钮独立折扣）
      */
     openCreatePricingModal() {
       this.isEditPricing = false
       this.pricingForm = {
         campaign_code: '',
         base_cost: 0,
-        discount_rate: 1.0,
-        min_purchase: 1,
-        max_purchase: 10,
-        effective_from: '',
-        effective_to: ''
+        draw_buttons: [
+          { count: 1, discount: 1.0, label: '单抽', enabled: true, sort_order: 1 },
+          { count: 3, discount: 1.0, label: '3连抽', enabled: true, sort_order: 3 },
+          { count: 5, discount: 1.0, label: '5连抽', enabled: true, sort_order: 5 },
+          { count: 10, discount: 1.0, label: '10连抽', enabled: true, sort_order: 10 }
+        ]
       }
       this.showModal('pricingModal')
     },
 
     /**
-     * 编辑定价配置
-     * @param {Object} pricing - 定价配置对象
+     * 编辑定价配置 - 直接从后端 draw_buttons 填充表单，每个按钮独立折扣
+     * @param {Object} pricing - 后端返回的定价配置对象
      */
     editPricing(pricing) {
       logger.debug('✏️ [Pricing] editPricing 被调用', pricing)
       this.isEditPricing = true
       this.editingPricingId = pricing.lottery_campaign_id
 
-      // 从后端数据中提取定价信息
-      // 注意：pricing_config 可能是对象或 JSON 字符串
       let pricingConfig = pricing.pricing_config || {}
       if (typeof pricingConfig === 'string') {
         try {
@@ -190,40 +190,98 @@ export function usePricingMethods() {
         }
       }
 
-      // 提取基础价格：直接使用后端字段 base_cost
-      const baseCost =
-        pricingConfig.base_cost ??
-        pricing.base_cost ??
-        0
+      const baseCost = pricingConfig.base_cost ?? pricing.base_cost ?? 0
       logger.debug('💰 [Pricing] 提取的基础价格 base_cost:', baseCost)
 
-      // 提取折扣率：从 draw_buttons 中的10连抽获取折扣，或使用默认值
-      let discountRate = 1.0
-      if (pricingConfig.draw_buttons && Array.isArray(pricingConfig.draw_buttons)) {
-        const tenDraw = pricingConfig.draw_buttons.find(btn => btn.count === 10)
-        if (tenDraw && tenDraw.discount) {
-          discountRate = tenDraw.discount
-        }
+      // 直接使用后端 draw_buttons 数据，保留每个按钮的独立折扣
+      const defaultButtons = [
+        { count: 1, discount: 1.0, label: '单抽', enabled: true, sort_order: 1 },
+        { count: 3, discount: 1.0, label: '3连抽', enabled: true, sort_order: 3 },
+        { count: 5, discount: 1.0, label: '5连抽', enabled: true, sort_order: 5 },
+        { count: 10, discount: 1.0, label: '10连抽', enabled: true, sort_order: 10 }
+      ]
+
+      let drawButtons = defaultButtons
+      if (Array.isArray(pricingConfig.draw_buttons) && pricingConfig.draw_buttons.length > 0) {
+        drawButtons = pricingConfig.draw_buttons
+          .map(btn => ({
+            count: btn.count,
+            discount: btn.discount ?? 1.0,
+            label: btn.label || `${btn.count}连抽`,
+            enabled: btn.enabled !== false,
+            sort_order: btn.sort_order ?? btn.count
+          }))
+          .sort((a, b) => a.sort_order - b.sort_order)
       }
 
       this.pricingForm = {
         campaign_code: pricing.campaign_code || '',
         base_cost: baseCost,
-        discount_rate: discountRate,
-        min_purchase: 1,
-        max_purchase: 10,
-        effective_from: pricing.effective_at || '',
-        effective_to: pricing.expired_at || ''
+        draw_buttons: drawButtons
       }
       logger.debug('📝 [Pricing] 填充表单数据:', this.pricingForm)
       this.showModal('pricingModal')
     },
 
     /**
-     * 保存定价配置
+     * 自动生成按钮显示标签（根据折扣值）
+     * @param {Object} btn - draw_button 对象
+     * @returns {string} 显示标签
+     */
+    generateButtonLabel(btn) {
+      const baseLabel = btn.count === 1 ? '单抽' : `${btn.count}连抽`
+      if (btn.discount < 1) {
+        const discountDisplay = Math.round(btn.discount * 100) / 10
+        return `${baseLabel}(${discountDisplay}折)`
+      }
+      return baseLabel
+    },
+
+    /**
+     * 添加新的连抽档位按钮（后端支持 count 1-20）
+     */
+    addDrawButton() {
+      const existingCounts = this.pricingForm.draw_buttons.map(b => b.count)
+      const maxCount = Math.max(...existingCounts, 0)
+      let newCount = maxCount + 1
+      if (newCount > 20) {
+        this.showError('连抽次数最大支持20次')
+        return
+      }
+      while (existingCounts.includes(newCount) && newCount <= 20) {
+        newCount++
+      }
+      if (newCount > 20) {
+        this.showError('无法添加更多档位，已有的档位次数已覆盖可用范围')
+        return
+      }
+      this.pricingForm.draw_buttons.push({
+        count: newCount,
+        discount: 1.0,
+        label: `${newCount}连抽`,
+        enabled: true,
+        sort_order: newCount
+      })
+      this.pricingForm.draw_buttons.sort((a, b) => a.sort_order - b.sort_order)
+    },
+
+    /**
+     * 删除连抽档位按钮（至少保留单抽）
+     * @param {number} index - 按钮在 draw_buttons 数组中的索引
+     */
+    removeDrawButton(index) {
+      if (this.pricingForm.draw_buttons.length <= 1) {
+        this.showError('至少保留一个抽奖档位')
+        return
+      }
+      this.pricingForm.draw_buttons.splice(index, 1)
+    },
+
+    /**
+     * 保存定价配置 - 直接使用表单中的 draw_buttons 发送给后端
      *
      * 后端API设计：创建新版本（POST），不支持直接更新
-     * 请求格式要求：{ pricing_config: { draw_buttons: [...] }, activate_immediately: true }
+     * 请求格式要求：{ pricing_config: { base_cost, draw_buttons: [...] }, activate_immediately: true }
      */
     async savePricing() {
       if (!this.pricingForm.campaign_code) {
@@ -235,43 +293,54 @@ export function usePricingMethods() {
         return
       }
 
+      // 校验 draw_buttons
+      for (const btn of this.pricingForm.draw_buttons) {
+        if (btn.count < 1 || btn.count > 20) {
+          this.showError(`档位次数必须在 1-20 之间，当前: ${btn.count}`)
+          return
+        }
+        if (btn.discount <= 0 || btn.discount > 1) {
+          this.showError(`${btn.count}连抽的折扣率必须在 0.01-1.0 之间，当前: ${btn.discount}`)
+          return
+        }
+      }
+
+      // 检查 count 重复
+      const counts = this.pricingForm.draw_buttons.map(b => b.count)
+      if (new Set(counts).size !== counts.length) {
+        this.showError('存在重复的连抽次数，请检查')
+        return
+      }
+
       this.saving = true
       try {
         const endpoint = buildURL(LOTTERY_ENDPOINTS.PRICING_CREATE, {
           code: this.pricingForm.campaign_code
         })
 
-        // 构建符合后端API期望的请求格式
-        // 后端期望: { pricing_config: { base_cost, draw_buttons: [...] }, activate_immediately }
         const baseCost = parseFloat(this.pricingForm.base_cost) || 100
-        const discountRate = parseFloat(this.pricingForm.discount_rate) || 1.0
+
+        // 直接使用表单的 draw_buttons，自动生成 label
+        const drawButtons = this.pricingForm.draw_buttons.map(btn => ({
+          count: parseInt(btn.count, 10),
+          discount: parseFloat(btn.discount),
+          label: this.generateButtonLabel(btn),
+          enabled: btn.enabled !== false,
+          sort_order: btn.sort_order ?? btn.count
+        }))
 
         const requestData = {
           pricing_config: {
             base_cost: baseCost,
-            draw_buttons: [
-              { count: 1, discount: 1.0, label: '单抽', enabled: true, sort_order: 1 },
-              { count: 3, discount: 1.0, label: '3连抽', enabled: true, sort_order: 3 },
-              { count: 5, discount: 1.0, label: '5连抽', enabled: true, sort_order: 5 },
-              {
-                count: 10,
-                discount: discountRate,
-                label:
-                  discountRate < 1 ? `10连抽(${Math.round(discountRate * 100) / 10}折)` : '10连抽',
-                enabled: true,
-                sort_order: 10
-              }
-            ]
+            draw_buttons: drawButtons
           },
           activate_immediately: true
         }
 
         logger.debug('📤 [Pricing] 发送请求:', endpoint, requestData)
 
-        // apiPost 成功时返回 response.data，失败时抛出错误
         await this.apiPost(endpoint, requestData)
 
-        // 如果没有抛出错误，则表示成功
         this.showSuccess(this.isEditPricing ? '定价配置已更新（创建新版本）' : '定价配置创建成功')
         this.hideModal('pricingModal')
         await this.loadPricingConfigs()

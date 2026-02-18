@@ -12,6 +12,7 @@ import { buildURL } from '../../../api/base.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import { request } from '../../../api/base.js'
+import { loadECharts } from '../../../utils/echarts-lazy.js'
 
 document.addEventListener('alpine:init', () => {
   logger.info('[AdManagement] 注册 Alpine 组件...')
@@ -25,11 +26,18 @@ document.addEventListener('alpine:init', () => {
       { id: 'dashboard', name: '广告概览', icon: '📊' },
       { id: 'campaigns', name: '广告活动', icon: '📋' },
       { id: 'slots', name: '广告位', icon: '📍' },
-      { id: 'reports', name: '数据报表', icon: '📈' }
+      { id: 'reports', name: '数据报表', icon: '📈' },
+      { id: 'bid-logs', name: '竞价日志', icon: '🏷️' },
+      { id: 'user-tags', name: '用户标签', icon: '🏷️' },
+      { id: 'antifraud', name: '反作弊', icon: '🛡️' },
+      { id: 'attribution', name: '归因追踪', icon: '🔗' }
     ],
 
     // ==================== 通用状态 ====================
     saving: false,
+
+    // ==================== 弹窗队列配置 ====================
+    popupQueueMaxCount: 5,
 
     // ==================== 仪表板 ====================
     dashboard: {},
@@ -71,6 +79,28 @@ document.addEventListener('alpine:init', () => {
     reportOverview: {},
     reportLoading: false,
     reportFilters: { start_date: '', end_date: '' },
+    // ==================== Phase 4-6 数据查询 ====================
+    bidLogs: [],
+    bidLogsLoading: false,
+    bidLogsFilters: { ad_campaign_id: '', is_winner: '' },
+    bidLogsPagination: { total: 0, total_pages: 0 },
+    bidLogsPage: 1,
+    userAdTags: [],
+    userAdTagsLoading: false,
+    userAdTagsFilters: { user_id: '', tag_key: '' },
+    userAdTagsPagination: { total: 0, total_pages: 0 },
+    userAdTagsPage: 1,
+    antifraudLogs: [],
+    antifraudLogsLoading: false,
+    antifraudFilters: { ad_campaign_id: '', verdict: '', event_type: '' },
+    antifraudPagination: { total: 0, total_pages: 0 },
+    antifraudPage: 1,
+    attributionLogs: [],
+    attributionLogsLoading: false,
+    attributionFilters: { ad_campaign_id: '', conversion_type: '' },
+    attributionPagination: { total: 0, total_pages: 0 },
+    attributionPage: 1,
+
     /** 单活动/广告位详细报表 */
     campaignReport: null,
     campaignReportLoading: false,
@@ -131,6 +161,18 @@ document.addEventListener('alpine:init', () => {
         case 'reports':
           await this.loadReportOverview()
           break
+        case 'bid-logs':
+          await this.loadBidLogs()
+          break
+        case 'user-tags':
+          await this.loadUserAdTags()
+          break
+        case 'antifraud':
+          await this.loadAntifraudLogs()
+          break
+        case 'attribution':
+          await this.loadAttributionLogs()
+          break
       }
     },
 
@@ -145,11 +187,45 @@ document.addEventListener('alpine:init', () => {
         if (response?.success) {
           this.dashboard = response.data || {}
         }
+        await this.loadPopupQueueConfig()
       } catch (error) {
         logger.error('加载广告概览失败:', error)
         this.showError('加载广告概览失败: ' + error.message)
       } finally {
         this.dashboardLoading = false
+      }
+    },
+
+    async loadPopupQueueConfig() {
+      try {
+        const response = await request({
+          url: SYSTEM_ENDPOINTS.AD_POPUP_QUEUE_CONFIG,
+          method: 'GET'
+        })
+        if (response?.success) {
+          this.popupQueueMaxCount = response.data?.config_value || 5
+        }
+      } catch (error) {
+        logger.warn('加载弹窗队列配置失败:', error.message)
+      }
+    },
+
+    async savePopupQueueConfig() {
+      this.saving = true
+      try {
+        const response = await request({
+          url: SYSTEM_ENDPOINTS.AD_POPUP_QUEUE_CONFIG,
+          method: 'PUT',
+          data: { popup_queue_max_count: this.popupQueueMaxCount }
+        })
+        if (response?.success) {
+          this.showSuccess('弹窗队列配置已保存')
+        }
+      } catch (error) {
+        logger.error('保存弹窗队列配置失败:', error)
+        this.showError('保存失败: ' + error.message)
+      } finally {
+        this.saving = false
       }
     },
 
@@ -373,6 +449,7 @@ document.addEventListener('alpine:init', () => {
         this.showError('加载活动报表失败: ' + error.message)
       } finally {
         this.campaignReportLoading = false
+        this.$nextTick(() => this.renderReportDetailChart())
       }
     },
 
@@ -399,6 +476,115 @@ document.addEventListener('alpine:init', () => {
         this.showError('加载广告位报表失败: ' + error.message)
       } finally {
         this.slotReportLoading = false
+        this.$nextTick(() => this.renderReportDetailChart())
+      }
+    },
+
+    // ==================== Phase 4: 竞价日志 ====================
+    async loadBidLogs() {
+      this.bidLogsLoading = true
+      try {
+        const params = { page: this.bidLogsPage, limit: 20 }
+        if (this.bidLogsFilters.ad_campaign_id) params.ad_campaign_id = this.bidLogsFilters.ad_campaign_id
+        if (this.bidLogsFilters.is_winner) params.is_winner = this.bidLogsFilters.is_winner
+        const response = await request({ url: SYSTEM_ENDPOINTS.AD_BID_LOGS, method: 'GET', params })
+        if (response?.success) {
+          this.bidLogs = response.data?.bid_logs || []
+          this.bidLogsPagination = response.data?.pagination || { total: 0, total_pages: 0 }
+        }
+      } catch (error) {
+        logger.error('加载竞价日志失败:', error)
+        this.bidLogs = []
+      } finally {
+        this.bidLogsLoading = false
+      }
+    },
+
+    // ==================== Phase 5: 用户标签 ====================
+    async loadUserAdTags() {
+      this.userAdTagsLoading = true
+      try {
+        const params = { page: this.userAdTagsPage, limit: 50 }
+        if (this.userAdTagsFilters.user_id) params.user_id = this.userAdTagsFilters.user_id
+        if (this.userAdTagsFilters.tag_key) params.tag_key = this.userAdTagsFilters.tag_key
+        const response = await request({ url: SYSTEM_ENDPOINTS.AD_USER_TAGS, method: 'GET', params })
+        if (response?.success) {
+          this.userAdTags = response.data?.user_ad_tags || []
+          this.userAdTagsPagination = response.data?.pagination || { total: 0, total_pages: 0 }
+        }
+      } catch (error) {
+        logger.error('加载用户标签失败:', error)
+        this.userAdTags = []
+      } finally {
+        this.userAdTagsLoading = false
+      }
+    },
+
+    // ==================== Phase 5: 反作弊日志 ====================
+    async loadAntifraudLogs() {
+      this.antifraudLogsLoading = true
+      try {
+        const params = { page: this.antifraudPage, limit: 20 }
+        if (this.antifraudFilters.ad_campaign_id) params.ad_campaign_id = this.antifraudFilters.ad_campaign_id
+        if (this.antifraudFilters.verdict) params.verdict = this.antifraudFilters.verdict
+        if (this.antifraudFilters.event_type) params.event_type = this.antifraudFilters.event_type
+        const response = await request({ url: SYSTEM_ENDPOINTS.AD_ANTIFRAUD_LOGS, method: 'GET', params })
+        if (response?.success) {
+          this.antifraudLogs = response.data?.antifraud_logs || []
+          this.antifraudPagination = response.data?.pagination || { total: 0, total_pages: 0 }
+        }
+      } catch (error) {
+        logger.error('加载反作弊日志失败:', error)
+        this.antifraudLogs = []
+      } finally {
+        this.antifraudLogsLoading = false
+      }
+    },
+
+    // ==================== Phase 6: 归因追踪 ====================
+    async loadAttributionLogs() {
+      this.attributionLogsLoading = true
+      try {
+        const params = { page: this.attributionPage, limit: 20 }
+        if (this.attributionFilters.ad_campaign_id) params.ad_campaign_id = this.attributionFilters.ad_campaign_id
+        if (this.attributionFilters.conversion_type) params.conversion_type = this.attributionFilters.conversion_type
+        const response = await request({ url: SYSTEM_ENDPOINTS.AD_ATTRIBUTION_LOGS, method: 'GET', params })
+        if (response?.success) {
+          this.attributionLogs = response.data?.attribution_logs || []
+          this.attributionPagination = response.data?.pagination || { total: 0, total_pages: 0 }
+        }
+      } catch (error) {
+        logger.error('加载归因日志失败:', error)
+        this.attributionLogs = []
+      } finally {
+        this.attributionLogsLoading = false
+      }
+    },
+
+    async renderReportDetailChart() {
+      const report = this.reportDetailType === 'campaign' ? this.campaignReport : this.slotReport
+      if (!report?.daily_snapshots?.length) return
+      const container = document.getElementById('reportDetailChart')
+      if (!container) return
+      try {
+        const echarts = await loadECharts()
+        let chart = echarts.getInstanceByDom(container)
+        if (!chart) chart = echarts.init(container)
+        const days = report.daily_snapshots.map(s => s.snapshot_date)
+        chart.setOption({
+          tooltip: { trigger: 'axis' },
+          legend: { data: ['曝光', '点击', '转化'] },
+          grid: { left: 50, right: 20, top: 40, bottom: 30 },
+          xAxis: { type: 'category', data: days },
+          yAxis: { type: 'value' },
+          series: [
+            { name: '曝光', type: 'bar', data: report.daily_snapshots.map(s => s.impressions_total || 0), itemStyle: { color: '#6366f1' } },
+            { name: '点击', type: 'line', data: report.daily_snapshots.map(s => s.clicks_total || 0), itemStyle: { color: '#10b981' } },
+            { name: '转化', type: 'line', data: report.daily_snapshots.map(s => s.conversions || 0), itemStyle: { color: '#f59e0b' } }
+          ]
+        })
+      } catch (error) {
+        logger.warn('渲染报表图表失败:', error.message)
       }
     }
   }))

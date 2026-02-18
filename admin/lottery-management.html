@@ -4453,13 +4453,13 @@
   <!-- ==================== 定价配置编辑模态框 ==================== -->
   <div x-ref="pricingModal" x-show="isModalOpen('pricingModal')" class="fixed inset-0 z-50 flex items-center justify-center" x-cloak>
     <div class="fixed inset-0 bg-black bg-opacity-50" @click="hideModal('pricingModal')"></div>
-    <div class="relative themed-card rounded-lg shadow-xl max-w-lg w-full mx-4">
+    <div class="relative themed-card rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
       <div class="p-4 border-b flex justify-between items-center">
         <h5 class="font-semibold">💵 <span x-text="isEditPricing ? '编辑定价配置' : '创建定价配置'"></span></h5>
         <button @click="hideModal('pricingModal')" class="text-gray-400 hover:themed-text-muted">&times;</button>
       </div>
       <form @submit.prevent="savePricing()">
-        <div class="p-4 space-y-4">
+        <div class="p-4 space-y-4 overflow-y-auto flex-1">
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">活动代码 <span class="text-red-500">*</span></label>
             <select class="w-full px-3 py-2 border rounded" x-model="pricingForm.campaign_code" :disabled="isEditPricing" required>
@@ -4471,24 +4471,49 @@
           </div>
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">单抽基础价格 (base_cost) <span class="text-red-500">*</span></label>
-            <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="pricingForm.base_cost" min="0" step="0.01" required>
+            <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="pricingForm.base_cost" min="1" step="1" required>
             <p class="text-xs themed-text-muted mt-1">单位：积分，折扣前的基础定价</p>
           </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">折扣率</label>
-              <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="pricingForm.discount_rate" min="0" max="1" step="0.01">
-              <p class="text-xs themed-text-muted mt-1">1.0 = 无折扣，0.9 = 9折</p>
+
+          <!-- 连抽档位配置 - 每个按钮独立折扣 -->
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <label class="block text-sm font-medium themed-text-secondary">连抽档位配置 <span class="text-red-500">*</span></label>
+              <button type="button" class="text-xs px-2 py-1 themed-bg-primary text-white rounded themed-hover-primary" @click="addDrawButton()">+ 添加档位</button>
             </div>
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">最小购买次数</label>
-              <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="pricingForm.min_purchase" min="1">
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">最大购买次数</label>
-              <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="pricingForm.max_purchase" min="1">
+            <p class="text-xs themed-text-muted mb-3">每个档位可设置独立的折扣率，1.0=无折扣，0.95=九五折，0.9=九折</p>
+
+            <div class="space-y-2">
+              <div class="grid grid-cols-12 gap-2 text-xs font-medium themed-text-muted px-1">
+                <div class="col-span-2">次数</div>
+                <div class="col-span-3">折扣率</div>
+                <div class="col-span-3">折后单价</div>
+                <div class="col-span-2">启用</div>
+                <div class="col-span-2">操作</div>
+              </div>
+
+              <template x-for="(btn, index) in pricingForm.draw_buttons" :key="index">
+                <div class="grid grid-cols-12 gap-2 items-center border rounded p-2 themed-bg-base">
+                  <div class="col-span-2">
+                    <input type="number" class="w-full px-2 py-1 border rounded text-sm text-center" x-model.number="btn.count" min="1" max="20" required>
+                  </div>
+                  <div class="col-span-3">
+                    <input type="number" class="w-full px-2 py-1 border rounded text-sm" x-model.number="btn.discount" min="0.01" max="1" step="0.01" required>
+                  </div>
+                  <div class="col-span-3 text-sm text-center">
+                    <span class="font-medium" :class="btn.discount < 1 ? 'text-red-500' : 'themed-text-primary'" x-text="pricingForm.base_cost > 0 ? Math.floor(pricingForm.base_cost * btn.count * btn.discount) + ' 积分' : '-'"></span>
+                    <template x-if="btn.discount < 1 && pricingForm.base_cost > 0">
+                      <span class="text-xs themed-text-muted ml-1" x-text="'省' + (pricingForm.base_cost * btn.count - Math.floor(pricingForm.base_cost * btn.count * btn.discount))"></span>
+                    </template>
+                  </div>
+                  <div class="col-span-2 text-center">
+                    <input type="checkbox" class="rounded" x-model="btn.enabled">
+                  </div>
+                  <div class="col-span-2 text-center">
+                    <button type="button" class="text-red-400 hover:text-red-600 text-xs" @click="removeDrawButton(index)" :disabled="pricingForm.draw_buttons.length <= 1">✕ 删除</button>
+                  </div>
+                </div>
+              </template>
             </div>
           </div>
         </div>

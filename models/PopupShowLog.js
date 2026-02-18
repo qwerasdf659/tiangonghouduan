@@ -23,7 +23,7 @@ const BeijingTimeHelper = require('../utils/timeHelper')
  * 关闭方式有效值
  * @constant {string[]}
  */
-const VALID_CLOSE_METHODS = ['auto', 'manual', 'timeout', 'system']
+const VALID_CLOSE_METHODS = ['close_btn', 'overlay', 'confirm_btn', 'auto_timeout']
 
 /**
  * 定义 PopupShowLog 模型
@@ -72,10 +72,11 @@ module.exports = sequelize => {
           notEmpty: { msg: '关闭方式不能为空' },
           isIn: {
             args: [VALID_CLOSE_METHODS],
-            msg: '关闭方式必须是：auto, manual, timeout, system 之一'
+            msg: '关闭方式必须是：close_btn, overlay, confirm_btn, auto_timeout 之一'
           }
         },
-        comment: '关闭方式：auto=自动关闭 / manual=手动关闭 / timeout=超时关闭 / system=系统关闭'
+        comment:
+          '关闭方式：close_btn=点关闭按钮 / overlay=点遮罩关闭 / confirm_btn=点"我知道了" / auto_timeout=超时自动关闭'
       },
 
       queue_position: {

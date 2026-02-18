@@ -103,18 +103,16 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       })
     })
 
-    test('B-5-1-5 普通用户（public）保留数据库原始字段名（不重命名）', () => {
+    test('B-5-1-5 普通用户（public）输出统一 id 字段（商业安全：防抓包推断表结构）', () => {
       const result = DataSanitizer.sanitizePrizes(mockPrizes, 'public')
 
       result.forEach(prize => {
-        // 保持数据库字段名，不再重命名为通用 id/name/type
-        expect(prize).toHaveProperty('lottery_prize_id')
+        // 输出统一 id 字段，隐藏真实主键名 lottery_prize_id
+        expect(prize).toHaveProperty('id')
         expect(prize).toHaveProperty('prize_name')
         expect(prize).toHaveProperty('prize_type')
         expect(prize).toHaveProperty('prize_value')
-        expect(prize).not.toHaveProperty('id')
-        expect(prize).not.toHaveProperty('name')
-        expect(prize).not.toHaveProperty('type')
+        expect(prize).not.toHaveProperty('lottery_prize_id')
       })
     })
 
@@ -126,13 +124,22 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       expect(result.length).toBe(mockPrizes.length)
     })
 
-    test('B-5-1-7 普通用户（public）字段名与数据库 lottery_prizes 表一致', () => {
+    test('B-5-1-7 普通用户（public）id 映射自数据库 lottery_prize_id', () => {
       const result = DataSanitizer.sanitizePrizes(mockPrizes, 'public')
 
       result.forEach((prize, index) => {
-        expect(prize.lottery_prize_id).toBe(mockPrizes[index].lottery_prize_id)
+        expect(prize.id).toBe(mockPrizes[index].lottery_prize_id)
         expect(prize.prize_name).toBe(mockPrizes[index].prize_name)
         expect(prize.prize_type).toBe(mockPrizes[index].prize_type)
+      })
+    })
+
+    test('B-5-1-8 普通用户（public）image 字段为 null 当奖品无图片', () => {
+      const result = DataSanitizer.sanitizePrizes(mockPrizes, 'public')
+
+      result.forEach(prize => {
+        expect(prize).toHaveProperty('image')
+        expect(prize.image).toBeNull()
       })
     })
   })
@@ -146,7 +153,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
   describe('B-5-2 库存数据脱敏（sanitizeInventory）', () => {
     const mockInventory = [
       {
-        inventory_id: 1,
+        item_instance_id: 1,
         name: '测试券',
         description: '测试描述',
         icon: '🎫',
@@ -201,7 +208,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
    */
   describe('B-5-3 用户数据脱敏（sanitizeUser）', () => {
     const mockUser = {
-      id: 1,
+      user_id: 1,
       username: 'testuser',
       display_name: '测试用户',
       mobile: '13612227930',
