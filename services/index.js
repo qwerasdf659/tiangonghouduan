@@ -171,6 +171,7 @@ const ReminderEngineService = require('./ReminderEngineService') // 智能提醒
 const UserBehaviorTrackService = require('./UserBehaviorTrackService') // 用户行为轨迹服务（B-46~B-49）
 const AuditRollbackService = require('./AuditRollbackService') // 审计回滚服务（B-42~B-45）
 const CustomReportService = require('./CustomReportService') // 自定义报表服务（B-36~B-40）
+const UserDataQueryService = require('./UserDataQueryService') // 用户全维度数据查询服务（2026-02-18 管理后台用户数据看板）
 /*
  * 服务合并记录（2026-01-21）：
  * - LotteryMonitoringService + LotteryStrategyStatsService → LotteryAnalyticsService
@@ -520,6 +521,7 @@ class ServiceManager {
       this._services.set('user_behavior_track', UserBehaviorTrackService) // 用户行为轨迹服务（B-46~B-49，静态类）
       this._services.set('audit_rollback', AuditRollbackService) // 审计回滚服务（B-42~B-45，静态类）
       this._services.set('custom_report', CustomReportService) // 自定义报表服务（B-36~B-40，静态类）
+      this._services.set('user_data_query', UserDataQueryService) // 用户全维度数据查询服务（2026-02-18，静态类）
 
       /**
        * V4.6 管线编排器

@@ -154,12 +154,17 @@
       <!-- 筛选栏 -->
       <div class="themed-card rounded-lg shadow mb-6">
         <div class="p-4">
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">手机号搜索</label>
+              <input type="text" x-model="marketplaceFilters.mobile" placeholder="输入手机号搜索"
+                     class="w-full px-3 py-2 border rounded-lg"
+                     @keydown.enter="loadMarketplaceStats()">
+            </div>
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">上架状态</label>
               <select x-model="marketplaceFilters.status" class="w-full px-3 py-2 border rounded-lg">
                 <option value="all">全部状态</option>
-                <option value="normal">正常</option>
                 <option value="near_limit">接近上限</option>
                 <option value="at_limit">已达上限</option>
               </select>
@@ -170,7 +175,7 @@
               </button>
             </div>
             <div>
-              <button @click="marketplaceFilters.status = 'all'; loadMarketplaceStats()" class="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+              <button @click="marketplaceFilters = { status: 'all', mobile: '' }; loadMarketplaceStats()" class="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
                 🔄 重置
               </button>
             </div>
@@ -178,22 +183,67 @@
         </div>
       </div>
 
-      <!-- 上架统计列表（data-table） -->
+      <!-- 上架统计列表 -->
       <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b">
+        <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold">📊 用户上架统计</h5>
+          <span class="text-sm themed-text-muted">共 <span x-text="marketplacePagination.total"></span> 条</span>
         </div>
-        <div x-data="dataTable({
-          columns: marketplaceStatsTableColumns,
-          dataSource: fetchMarketplaceStatsTableData,
-          primaryKey: 'user_id',
-          sortable: true,
-          selectable: false,
-          exportable: false,
-          page_size: 20,
-          emptyText: '暂无市场统计数据'
-        })" x-init="init()" @dt-marketplace-refresh.window="refresh()">
-          <%- include('components/data-table') %>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="themed-bg-base">
+              <tr>
+                <th class="px-4 py-3 text-left font-medium themed-text-secondary">用户ID</th>
+                <th class="px-4 py-3 text-left font-medium themed-text-secondary">手机号</th>
+                <th class="px-4 py-3 text-left font-medium themed-text-secondary">用户昵称</th>
+                <th class="px-4 py-3 text-center font-medium themed-text-secondary">当前上架数</th>
+                <th class="px-4 py-3 text-center font-medium themed-text-secondary">上架上限</th>
+                <th class="px-4 py-3 text-center font-medium themed-text-secondary">剩余配额</th>
+                <th class="px-4 py-3 text-center font-medium themed-text-secondary">状态</th>
+                <th class="px-4 py-3 text-center font-medium themed-text-secondary">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr x-show="marketplaceStats.length === 0">
+                <td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无市场统计数据</td>
+              </tr>
+              <template x-for="row in marketplaceStats" :key="row.user_id">
+                <tr class="border-b hover:themed-bg-base transition-colors">
+                  <td class="px-4 py-3 font-mono" x-text="row.user_id"></td>
+                  <td class="px-4 py-3 font-mono" x-text="row.mobile"></td>
+                  <td class="px-4 py-3" x-text="row.nickname || '-'"></td>
+                  <td class="px-4 py-3 text-center font-bold" x-text="row.listing_count"></td>
+                  <td class="px-4 py-3 text-center">
+                    <span class="font-mono" x-text="row.max_active_listings"></span>
+                    <span x-show="row.is_custom_limit" class="text-xs text-purple-600 ml-1">自定义</span>
+                  </td>
+                  <td class="px-4 py-3 text-center" x-text="row.remaining_quota"></td>
+                  <td class="px-4 py-3 text-center">
+                    <span x-show="row.is_at_limit" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">已达上限</span>
+                    <span x-show="!row.is_at_limit" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">正常</span>
+                  </td>
+                  <td class="px-4 py-3 text-center">
+                    <div class="flex gap-1 justify-center">
+                      <button @click="viewUserListings(row)" class="px-2 py-1 text-xs themed-btn-primary rounded">查看上架</button>
+                      <button @click="openAdjustLimit(row)" class="px-2 py-1 text-xs bg-purple-500 text-white rounded hover:bg-purple-600">调整限制</button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <!-- 分页 -->
+        <div class="p-4 border-t flex justify-between items-center" x-show="marketplacePagination.total_pages > 1">
+          <span class="text-sm themed-text-muted">第 <span x-text="marketplaceCurrentPage"></span>/<span x-text="marketplacePagination.total_pages"></span> 页</span>
+          <div class="flex gap-1">
+            <button @click="marketplaceCurrentPage = Math.max(1, marketplaceCurrentPage - 1); loadMarketplaceStats()"
+                    :disabled="marketplaceCurrentPage <= 1"
+                    class="px-3 py-1 text-sm border rounded disabled:opacity-50">上一页</button>
+            <button @click="marketplaceCurrentPage = Math.min(marketplacePagination.total_pages, marketplaceCurrentPage + 1); loadMarketplaceStats()"
+                    :disabled="marketplaceCurrentPage >= marketplacePagination.total_pages"
+                    class="px-3 py-1 text-sm border rounded disabled:opacity-50">下一页</button>
+          </div>
         </div>
       </div>
 
@@ -236,6 +286,186 @@
       </div>
       <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
         <button @click="hideModal('tradeDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 用户上架商品列表 Modal -->
+  <div x-ref="userListingsModal"
+       x-show="isModalOpen('userListingsModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('userListingsModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-4xl mx-4 z-10 max-h-[85vh] overflow-y-auto">
+      <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card z-10">
+        <h5 class="font-semibold">📋 用户上架商品列表</h5>
+        <button @click="hideModal('userListingsModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+
+      <!-- 用户信息摘要 -->
+      <div class="p-4 border-b themed-bg-base" x-show="userListingsInfo.user">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div><span class="themed-text-muted">用户ID：</span><span class="font-mono" x-text="userListingsInfo.user?.user_id"></span></div>
+          <div><span class="themed-text-muted">手机号：</span><span class="font-mono" x-text="userListingsInfo.user?.mobile"></span></div>
+          <div><span class="themed-text-muted">昵称：</span><span x-text="userListingsInfo.user?.nickname || '-'"></span></div>
+          <div>
+            <span class="themed-text-muted">上架额度：</span>
+            <span class="font-bold" x-text="userListingsInfo.user?.active_listing_count + '/' + userListingsInfo.user?.max_active_listings"></span>
+            <span class="text-xs themed-text-muted" x-show="userListingsInfo.user?.is_custom_limit">（自定义）</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 状态筛选 -->
+      <div class="p-4 border-b flex gap-2 items-center flex-wrap">
+        <span class="text-sm themed-text-muted">筛选状态：</span>
+        <template x-for="s in [{value:'',label:'全部'},{value:'on_sale',label:'在售'},{value:'locked',label:'锁定中'},{value:'sold',label:'已售'},{value:'withdrawn',label:'已撤回'},{value:'admin_withdrawn',label:'管理员下架'}]" :key="s.value">
+          <button @click="userListingsFilter.status = s.value; loadUserListings(userListingsInfo.user?.user_id)"
+                  :class="userListingsFilter.status === s.value ? 'themed-btn-primary' : 'themed-bg-muted themed-text-secondary'"
+                  class="px-3 py-1 text-xs rounded-full" x-text="s.label"></button>
+        </template>
+      </div>
+
+      <!-- 商品列表 -->
+      <div class="p-4">
+        <div x-show="userListingsInfo.listings.length === 0" class="text-center py-8 themed-text-muted">
+          暂无上架商品
+        </div>
+        <div class="space-y-3" x-show="userListingsInfo.listings.length > 0">
+          <template x-for="listing in userListingsInfo.listings" :key="listing.market_listing_id">
+            <div class="border rounded-lg p-3 hover:shadow-md transition-shadow">
+              <div class="flex justify-between items-start">
+                <div class="flex-1 space-y-1">
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono text-xs themed-text-muted">#<span x-text="listing.market_listing_id"></span></span>
+                    <span class="px-2 py-0.5 text-xs rounded-full"
+                          :class="{
+                            'bg-green-100 text-green-700': listing.status === 'on_sale',
+                            'bg-yellow-100 text-yellow-700': listing.status === 'locked',
+                            'bg-blue-100 text-blue-700': listing.status === 'sold',
+                            'bg-gray-100 text-gray-600': listing.status === 'withdrawn',
+                            'bg-red-100 text-red-700': listing.status === 'admin_withdrawn'
+                          }"
+                          x-text="getListingStatusText(listing.status)"></span>
+                    <span class="text-xs themed-text-muted" x-text="listing.listing_kind === 'fungible_asset' ? '材料资产' : '物品实例'"></span>
+                  </div>
+                  <div class="text-sm">
+                    <span class="themed-text-muted">出售：</span>
+                    <span x-text="listing.offer_item_display_name || listing.offer_asset_code || '-'"></span>
+                    <span x-show="listing.offer_amount" class="text-xs themed-text-muted">×<span x-text="listing.offer_amount"></span></span>
+                  </div>
+                  <div class="text-sm">
+                    <span class="themed-text-muted">售价：</span>
+                    <span class="font-bold text-green-600" x-text="listing.price_amount"></span>
+                    <span class="text-xs" x-text="listing.price_asset_code"></span>
+                  </div>
+                  <div class="text-xs themed-text-muted" x-text="'上架时间：' + formatDate(listing.created_at)"></div>
+                </div>
+                <div class="flex-shrink-0 ml-3" x-show="listing.status === 'on_sale' || listing.status === 'locked'">
+                  <button @click="confirmForceWithdraw(listing)"
+                          class="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600">
+                    强制下架
+                  </button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- 分页 -->
+        <div class="mt-4 flex justify-between items-center" x-show="userListingsPagination.total_pages > 1">
+          <span class="text-sm themed-text-muted">共 <span x-text="userListingsPagination.total"></span> 条</span>
+          <div class="flex gap-1">
+            <button @click="changeUserListingsPage(userListingsCurrentPage - 1)" :disabled="userListingsCurrentPage <= 1"
+                    class="px-3 py-1 text-sm border rounded disabled:opacity-50">上一页</button>
+            <span class="px-3 py-1 text-sm" x-text="userListingsCurrentPage + '/' + userListingsPagination.total_pages"></span>
+            <button @click="changeUserListingsPage(userListingsCurrentPage + 1)" :disabled="userListingsCurrentPage >= userListingsPagination.total_pages"
+                    class="px-3 py-1 text-sm border rounded disabled:opacity-50">下一页</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 调整上架限制 Modal -->
+  <div x-ref="adjustLimitModal"
+       x-show="isModalOpen('adjustLimitModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('adjustLimitModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">⚙️ 调整上架数量限制</h5>
+        <button @click="hideModal('adjustLimitModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div class="text-sm space-y-1">
+          <div><span class="themed-text-muted">用户：</span><span x-text="adjustLimitForm.mobile"></span> (<span x-text="adjustLimitForm.nickname || '-'"></span>)</div>
+          <div><span class="themed-text-muted">当前限制：</span><span class="font-bold" x-text="adjustLimitForm.current_limit"></span>
+            <span class="text-xs themed-text-muted" x-text="adjustLimitForm.is_custom ? '（自定义）' : '（全局默认）'"></span>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">新的上架限制</label>
+          <input type="number" x-model.number="adjustLimitForm.new_limit" min="0" max="1000"
+                 class="w-full px-3 py-2 border rounded-lg" placeholder="输入新上限，留空恢复全局默认">
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="checkbox" x-model="adjustLimitForm.use_global" id="useGlobal" class="rounded">
+          <label for="useGlobal" class="text-sm themed-text-secondary">恢复使用全局默认值</label>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">调整原因</label>
+          <textarea x-model="adjustLimitForm.reason" rows="2"
+                    class="w-full px-3 py-2 border rounded-lg" placeholder="请填写调整原因（选填）"></textarea>
+        </div>
+      </div>
+      <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end gap-2">
+        <button @click="hideModal('adjustLimitModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+        <button @click="submitAdjustLimit()" :disabled="saving"
+                class="px-4 py-2 themed-btn-primary rounded disabled:opacity-50">
+          <span x-show="!saving">确认调整</span>
+          <span x-show="saving">调整中...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 强制下架确认 Modal -->
+  <div x-ref="forceWithdrawModal"
+       x-show="isModalOpen('forceWithdrawModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('forceWithdrawModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold text-red-600">⚠️ 确认强制下架</h5>
+        <button @click="hideModal('forceWithdrawModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div class="text-sm space-y-1">
+          <div><span class="themed-text-muted">挂牌ID：</span><span class="font-mono" x-text="forceWithdrawForm.market_listing_id"></span></div>
+          <div><span class="themed-text-muted">当前状态：</span><span x-text="getListingStatusText(forceWithdrawForm.status)"></span></div>
+        </div>
+        <div class="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-700">
+          强制下架操作将不可逆，卖家的冻结资产/物品将被解冻退还。
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">下架原因（必填）</label>
+          <textarea x-model="forceWithdrawForm.reason" rows="2"
+                    class="w-full px-3 py-2 border rounded-lg border-red-300" placeholder="请填写下架原因"></textarea>
+        </div>
+      </div>
+      <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end gap-2">
+        <button @click="hideModal('forceWithdrawModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+        <button @click="submitForceWithdraw()" :disabled="saving || !forceWithdrawForm.reason?.trim()"
+                class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50">
+          <span x-show="!saving">确认下架</span>
+          <span x-show="saving">处理中...</span>
+        </button>
       </div>
     </div>
   </div>

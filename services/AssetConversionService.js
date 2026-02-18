@@ -67,7 +67,7 @@
  *
  * 关键方法列表：
  * - convertMaterial() - 材料转换（核心方法，支持手续费三方记账）
- * - convertRedShardToDiamond() - 碎红水晶转钻石（便捷方法）
+ * - convertRedShardToDiamond() - 红水晶碎片转钻石（便捷方法）
  * - getConversionRules() - 获取可用转换规则列表
  *
  * 数据模型关联（Phase 4最终态）：
@@ -151,7 +151,7 @@ class AssetConversionService {
    *   to_balance: 5000,       // 转换后的目标资产余额
    *   is_duplicate: false,    // 是否为重复请求
    *   rule_id: 1,             // 使用的规则ID
-   *   title: '红晶片分解',    // 规则标题
+   *   title: '红水晶碎片分解',    // 规则标题
    *   fee_rate: 0.05,         // 手续费费率
    *   conversion_rate: 20,    // 转换比例
    *   display_icon: '💎'      // 显示图标
@@ -506,22 +506,22 @@ class AssetConversionService {
   }
 
   /**
-   * 碎红水晶转钻石（便捷方法）
+   * 红水晶碎片转钻石（便捷方法）
    *
    * 业务规则：
-   * - 1个碎红水晶（red_shard）= 20个钻石（DIAMOND）
+   * - 1个红水晶碎片（red_shard）= 20个钻石（DIAMOND）
    * - 这是convertMaterial()的便捷封装
    * - 固定转换类型：red_shard → DIAMOND
    *
    * @param {number} user_id - 用户ID（User ID）
-   * @param {number} red_shard_amount - 碎红水晶数量（Red Shard Amount）必须大于0
+   * @param {number} red_shard_amount - 红水晶碎片数量（Red Shard Amount）必须大于0
    * @param {Object} options - 选项参数（Options）
    * @param {string} options.idempotency_key - 业务唯一ID（Business ID）必填，用于幂等性控制
    * @returns {Promise<Object>} 转换结果（Conversion Result）
    *
    * 使用示例：
    * ```javascript
-   * // 将50个碎红水晶转换为1000个钻石
+   * // 将50个红水晶碎片转换为1000个钻石
    * const result = await AssetConversionService.convertRedShardToDiamond(
    *   1, // user_id
    *   50, // red_shard_amount
@@ -538,12 +538,12 @@ class AssetConversionService {
 
     return await this.convertMaterial(
       user_id,
-      'red_shard', // 固定源材料：碎红水晶
+      'red_shard', // 固定源材料：红水晶碎片
       'DIAMOND', // 固定目标资产：钻石
       red_shard_amount,
       {
         ...options,
-        title: options.title || '碎红水晶分解为钻石'
+        title: options.title || '红水晶碎片分解为钻石'
       }
     )
   }

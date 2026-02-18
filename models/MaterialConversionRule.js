@@ -235,7 +235,7 @@ module.exports = sequelize => {
         type: DataTypes.STRING(100),
         allowNull: true,
         defaultValue: null,
-        comment: '显示标题（Title）：前端展示的规则名称，如"红晶片分解"'
+        comment: '显示标题（Title）：前端展示的规则名称，如"红水晶碎片分解"'
       },
 
       description: {

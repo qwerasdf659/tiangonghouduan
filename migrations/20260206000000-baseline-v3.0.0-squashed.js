@@ -233,7 +233,7 @@ module.exports = {
     // 10/77 asset_transactions
     await queryInterface.sequelize.query(`CREATE TABLE IF NOT EXISTS \`asset_transactions\` (
   \`asset_transaction_id\` bigint NOT NULL AUTO_INCREMENT,
-  \`asset_code\` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '资产代码（Asset Code - 资产类型标识）：DIAMOND-钻石资产, red_shard-碎红水晶, 等',
+  \`asset_code\` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '资产代码（Asset Code - 资产类型标识）：DIAMOND-钻石资产, red_shard-红水晶碎片, 等',
   \`delta_amount\` bigint NOT NULL COMMENT '变动金额（Delta Amount - 资产变动数量，正数表示增加，负数表示扣减，单位：1个资产单位）',
   \`balance_after\` bigint NOT NULL COMMENT '变动后余额（Balance After - 本次变动后的资产余额，用于快速查询和对账）',
   \`business_type\` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '业务类型（Business Type - 业务场景分类）：market_purchase_buyer_debit-市场购买买家扣减, market_purchase_seller_credit-市场购买卖家入账, market_purchase_platform_fee_credit-市场购买平台手续费, exchange_debit-兑换扣减, material_convert_debit-材料转换扣减, material_convert_credit-材料转换入账',
@@ -1383,7 +1383,7 @@ module.exports = {
     await queryInterface.sequelize.query(`CREATE TABLE IF NOT EXISTS \`material_asset_types\` (
   \`material_asset_type_id\` bigint NOT NULL AUTO_INCREMENT COMMENT '材料资产类型ID（主键）',
   \`asset_code\` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '资产代码（Asset Code - 唯一标识）：如 red_shard/red_crystal/orange_shard，必须唯一，与 account_asset_balances.asset_code 关联',
-  \`display_name\` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '展示名称（Display Name - 用户可见名称）：如"红色碎片""红色水晶"',
+  \`display_name\` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '展示名称（Display Name - 用户可见名称）：如"红水晶碎片""红水晶"',
   \`group_code\` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '分组代码（Group Code - 材料分组）：如 red/orange/yellow/green/blue/purple，用于材料逐级转换的层级归类',
   \`form\` enum('shard','crystal','currency') COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '形态（Form）：shard-碎片，crystal-水晶，currency-货币',
   \`tier\` int NOT NULL COMMENT '层级（Tier - 材料层级）：数字越大层级越高，如 1-碎片层级，2-水晶层级，用于转换规则校验',
@@ -1422,7 +1422,7 @@ module.exports = {
   \`fee_rate\` decimal(5,4) NOT NULL DEFAULT '0.0000' COMMENT '手续费费率（Fee Rate）：如 0.05 = 5%，基于产出 to_amount 计算手续费',
   \`fee_min_amount\` bigint NOT NULL DEFAULT '0' COMMENT '最低手续费（Fee Min Amount）：手续费下限，计算结果低于此值时取此值，0 表示无最低限制',
   \`fee_asset_code\` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '手续费资产类型（Fee Asset Code）：手续费收取的资产类型，NULL 时默认与 to_asset_code 相同',
-  \`title\` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '显示标题（Title）：前端展示的规则名称，如"红晶片分解"',
+  \`title\` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '显示标题（Title）：前端展示的规则名称，如"红水晶碎片分解"',
   \`description\` text COLLATE utf8mb4_unicode_ci COMMENT '描述文案（Description）：前端展示的规则说明文案',
   \`display_icon\` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '显示图标（Display Icon）：图标 URL 或 icon-name，用于前端渲染',
   \`risk_level\` enum('low','medium','high') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'low' COMMENT '风险等级（Risk Level）：low-低风险（绿色）/medium-中风险（黄色）/high-高风险（红色），用于前端提示',

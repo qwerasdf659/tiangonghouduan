@@ -23,6 +23,9 @@ export const TRADE_ENDPOINTS = {
   LISTING_UPDATE: `${API_PREFIX}/console/marketplace/listings/:listing_id`,
   LISTING_DELETE: `${API_PREFIX}/console/marketplace/listings/:listing_id`,
   LISTING_STATS: `${API_PREFIX}/console/marketplace/listing-stats`,
+  LISTING_USER_LISTINGS: `${API_PREFIX}/console/marketplace/user-listings`,
+  LISTING_USER_LIMIT: `${API_PREFIX}/console/marketplace/user-listing-limit`,
+  LISTING_FORCE_WITHDRAW: `${API_PREFIX}/console/marketplace/listings/:market_listing_id/force-withdraw`,
 
   // 孤儿冻结检测
   ORPHAN_DETECT: `${API_PREFIX}/console/orphan-frozen/detect`,
@@ -159,11 +162,55 @@ export const TradeAPI = {
   },
 
   /**
-   * 获取上架统计
+   * 获取上架统计（支持手机号搜索）
+   * @param {Object} [params={}] - 查询参数
+   * @param {string} [params.mobile] - 手机号搜索
+   * @param {string} [params.filter] - 筛选条件（all/near_limit/at_limit）
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.limit=20] - 每页数量
    * @returns {Promise<Object>} API 响应
    */
-  async getListingStats() {
-    return await request({ url: TRADE_ENDPOINTS.LISTING_STATS, method: 'GET' })
+  async getListingStats(params = {}) {
+    const url = TRADE_ENDPOINTS.LISTING_STATS + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取指定用户的上架商品列表
+   * @param {Object} params - 查询参数
+   * @param {number} params.user_id - 用户ID（必填）
+   * @param {string} [params.status] - 挂牌状态筛选
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @returns {Promise<Object>} API 响应
+   */
+  async getUserListings(params = {}) {
+    const url = TRADE_ENDPOINTS.LISTING_USER_LISTINGS + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 调整用户上架数量限制
+   * @param {Object} data - 更新数据
+   * @param {number} data.user_id - 用户ID
+   * @param {number|null} data.max_active_listings - 新上限（null=恢复全局默认）
+   * @param {string} [data.reason] - 调整原因
+   * @returns {Promise<Object>} API 响应
+   */
+  async updateUserListingLimit(data) {
+    return await request({ url: TRADE_ENDPOINTS.LISTING_USER_LIMIT, method: 'PUT', data })
+  },
+
+  /**
+   * 管理员强制下架挂牌
+   * @param {number} marketListingId - 挂牌ID
+   * @param {Object} data - 下架数据
+   * @param {string} data.withdraw_reason - 下架原因（必填）
+   * @returns {Promise<Object>} API 响应
+   */
+  async forceWithdrawListing(marketListingId, data) {
+    const url = buildURL(TRADE_ENDPOINTS.LISTING_FORCE_WITHDRAW, { market_listing_id: marketListingId })
+    return await request({ url, method: 'POST', data })
   },
 
   // ===== 孤儿冻结检测 =====

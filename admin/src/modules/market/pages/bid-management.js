@@ -93,6 +93,19 @@ document.addEventListener('alpine:init', () => {
         return this.pagination.page < this.totalPages
       },
 
+      // ========== 统计计数（从当前列表数据派生） ==========
+      get activeCount() {
+        return this.bid_products.filter(b => b.status === 'active').length
+      },
+      get settledCount() {
+        return this.bid_products.filter(b => b.status === 'settled').length
+      },
+      get inactiveCount() {
+        return this.bid_products.filter(
+          b => b.status === 'no_bid' || b.status === 'cancelled'
+        ).length
+      },
+
       // ========== 筛选 ==========
       /** @type {string} 当前状态筛选 */
       filter_status: 'all',

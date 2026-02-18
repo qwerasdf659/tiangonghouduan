@@ -6,7 +6,7 @@
  * - 抽奖消耗与奖励（lottery_consume/lottery_reward）
  * - 交易市场购买（买家扣减、卖家入账、平台手续费）
  * - 兑换市场扣减（材料资产消耗）
- * - 材料转换（碎红水晶扣减、DIAMOND入账）
+ * - 材料转换（红水晶碎片扣减、DIAMOND入账）
  * - 管理员调整（资产增加/扣减）
  *
  * 设计特点：
@@ -158,7 +158,7 @@ module.exports = sequelize => {
       asset_code: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        comment: '资产代码（Asset Code - 资产类型标识）：DIAMOND-钻石资产, red_shard-碎红水晶, 等'
+        comment: '资产代码（Asset Code - 资产类型标识）：DIAMOND-钻石资产, red_shard-红水晶碎片, 等'
       },
 
       // 变动金额（Delta Amount - 资产变动数量）

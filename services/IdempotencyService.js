@@ -146,6 +146,10 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 商户积分 =====
   '/api/v4/merchant-points': 'MERCHANT_POINTS_CREATE', // 商户积分申请（canonical 路径，去尾斜杠）
 
+  // ===== 用户数据查询 - 兑换订单审核（2026-02-18） =====
+  '/api/v4/console/user-data-query/:id/exchange-records/:id/review':
+    'CONSOLE_EXCHANGE_ORDER_REVIEW', // 管理员审核兑换订单（完成/发货/取消）
+
   /*
    * ===============================================================
    * 认证系统 - 无状态操作，无需幂等重放但需要映射
@@ -314,6 +318,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/marketplace/exchange_market/batch-bind-images':
     'ADMIN_EXCHANGE_BATCH_BIND_IMAGES', // 批量绑定商品图片
   '/api/v4/console/marketplace/listings/:id/force-withdraw': 'ADMIN_FORCE_WITHDRAW', // 强制下架
+  '/api/v4/console/marketplace/user-listing-limit': 'ADMIN_UPDATE_USER_LISTING_LIMIT', // 调整用户上架限制
 
   // ===== 用户层级 =====
   '/api/v4/console/user-hierarchy/': 'ADMIN_USER_HIERARCHY_CREATE', // 创建用户层级关系（修复：尾斜杠）

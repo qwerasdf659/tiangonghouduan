@@ -802,8 +802,19 @@ document.addEventListener('alpine:init', () => {
 
     marketplaceStatsTableColumns: [
       { key: 'user_id', label: '用户ID', sortable: true },
+      { key: 'mobile', label: '手机号' },
       { key: 'nickname', label: '用户昵称' },
       { key: 'listing_count', label: '当前上架数', type: 'number', sortable: true },
+      {
+        key: 'max_active_listings',
+        label: '上架上限',
+        render: (val, row) => {
+          const tag = row.is_custom_limit
+            ? '<span class="text-xs text-purple-600 ml-1">自定义</span>'
+            : ''
+          return `<span class="font-mono">${val}</span>${tag}`
+        }
+      },
       { key: 'remaining_quota', label: '剩余配额', type: 'number' },
       {
         key: 'is_at_limit',
@@ -812,6 +823,22 @@ document.addEventListener('alpine:init', () => {
           if (val) return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">已达上限</span>'
           return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">正常</span>'
         }
+      },
+      {
+        key: '_actions',
+        label: '操作',
+        render: (_val, row) => `
+          <div class="flex gap-1">
+            <button class="px-2 py-1 text-xs themed-btn-primary rounded"
+                    onclick="document.dispatchEvent(new CustomEvent('listing-view-user', {detail: ${JSON.stringify({user_id: '__USER_ID__', mobile: '__MOBILE__', nickname: '__NICKNAME__'}).replace('__USER_ID__', `'+row.user_id+'`).replace('__MOBILE__', `'+row.mobile+'`).replace('__NICKNAME__', `'+(row.nickname||'-')+'`)}}))">
+              查看上架
+            </button>
+            <button class="px-2 py-1 text-xs bg-purple-500 text-white rounded hover:bg-purple-600"
+                    onclick="document.dispatchEvent(new CustomEvent('listing-adjust-limit', {detail: ${JSON.stringify({user_id: '__UID__'}).replace('__UID__', `'+row.user_id+'`)}}))">
+              调整限制
+            </button>
+          </div>
+        `
       }
     ],
 
@@ -842,8 +869,8 @@ document.addEventListener('alpine:init', () => {
     marketplaceStats: [],
     /** @type {{total_users_with_listings: number, users_near_limit: number, users_at_limit: number}} 上架摘要 */
     marketplaceSummary: { total_users_with_listings: 0, users_near_limit: 0, users_at_limit: 0 },
-    /** @type {{status: string}} 上架统计筛选条件 */
-    marketplaceFilters: { status: 'all' },
+    /** @type {{status: string, mobile: string}} 上架统计筛选条件 */
+    marketplaceFilters: { status: 'all', mobile: '' },
     /** @type {number} 上架统计当前页码 */
     marketplaceCurrentPage: 1,
     /** @type {number} 上架统计每页数量 */
@@ -852,6 +879,24 @@ document.addEventListener('alpine:init', () => {
     marketplacePagination: { total_pages: 1, total: 0 },
     /** @type {number} 最大上架数限制 */
     maxListings: 10,
+
+    // 用户上架商品列表
+    /** @type {{user: Object|null, listings: Array}} 用户上架商品信息 */
+    userListingsInfo: { user: null, listings: [] },
+    /** @type {{status: string}} 用户上架商品筛选 */
+    userListingsFilter: { status: '' },
+    /** @type {number} 用户上架商品当前页码 */
+    userListingsCurrentPage: 1,
+    /** @type {{total: number, total_pages: number}} 用户上架商品分页 */
+    userListingsPagination: { total: 0, total_pages: 0 },
+
+    // 调整上架限制表单
+    /** @type {Object} 调整限制表单数据 */
+    adjustLimitForm: { user_id: null, mobile: '', nickname: '', current_limit: 0, is_custom: false, new_limit: null, use_global: false, reason: '' },
+
+    // 强制下架表单
+    /** @type {Object} 强制下架表单数据 */
+    forceWithdrawForm: { market_listing_id: null, status: '', reason: '' },
 
     // 兑换订单
     /** @type {Array<Object>} 兑换订单列表 */
@@ -987,31 +1032,225 @@ document.addEventListener('alpine:init', () => {
     },
 
     /**
-     * 加载上架统计数据
+     * 加载上架统计数据（支持手机号搜索）
      * @async
      * @returns {Promise<void>}
      */
     async loadMarketplaceStats() {
       try {
+        this.loading = true
+        const params = {
+          page: this.marketplaceCurrentPage,
+          limit: this.marketplacePageSize
+        }
+        if (this.marketplaceFilters.status && this.marketplaceFilters.status !== 'all') {
+          params.filter = this.marketplaceFilters.status
+        }
+        if (this.marketplaceFilters.mobile?.trim()) {
+          params.mobile = this.marketplaceFilters.mobile.trim()
+        }
+
         const result = await request({
-          url: MARKET_ENDPOINTS.C2C_MARKET_STATS,
+          url: MARKET_ENDPOINTS.LISTING_STATS,
           method: 'GET',
-          params: { page: 1, limit: 20 }
+          params
         })
         if (result?.success && result.data) {
           const data = result.data
-          this.marketplaceStats = data.stats || data.list || data.users || []
-          // 更新摘要
+          this.marketplaceStats = data.stats || []
           if (data.summary) {
             this.marketplaceSummary = {
-              total_users_with_listings: data.summary.total_users_with_listings || this.marketplaceStats.length,
+              total_users_with_listings: data.summary.total_users_with_listings || 0,
               users_near_limit: data.summary.users_near_limit || 0,
               users_at_limit: data.summary.users_at_limit || 0
+            }
+          }
+          if (data.pagination) {
+            this.marketplacePagination = {
+              total: data.pagination.total || 0,
+              total_pages: data.pagination.total_pages || 1
             }
           }
         }
       } catch (error) {
         logger.error('加载上架统计失败:', error)
+        this.$toast?.error('加载上架统计失败')
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
+     * 查看用户上架商品列表
+     * @param {Object} userStat - 用户统计行数据
+     */
+    async viewUserListings(userStat) {
+      try {
+        this.userListingsFilter.status = ''
+        this.userListingsCurrentPage = 1
+        this.userListingsInfo = { user: null, listings: [] }
+        this.showModal('userListingsModal')
+        await this.loadUserListings(userStat.user_id)
+      } catch (error) {
+        logger.error('查看用户上架商品失败:', error)
+        this.$toast?.error('查看用户上架商品失败')
+      }
+    },
+
+    /**
+     * 加载指定用户的上架商品列表
+     * @param {number} userId - 用户ID
+     */
+    async loadUserListings(userId) {
+      try {
+        if (!userId) return
+        const params = {
+          user_id: userId,
+          page: this.userListingsCurrentPage,
+          page_size: 20
+        }
+        if (this.userListingsFilter.status) {
+          params.status = this.userListingsFilter.status
+        }
+        const result = await request({
+          url: MARKET_ENDPOINTS.LISTING_USER_LISTINGS,
+          method: 'GET',
+          params
+        })
+        if (result?.success && result.data) {
+          this.userListingsInfo = {
+            user: result.data.user,
+            listings: result.data.listings || []
+          }
+          this.userListingsPagination = {
+            total: result.data.pagination?.total || 0,
+            total_pages: result.data.pagination?.total_pages || 0
+          }
+        }
+      } catch (error) {
+        logger.error('加载用户上架商品失败:', error)
+        this.$toast?.error(error.message || '加载失败')
+      }
+    },
+
+    /**
+     * 用户上架商品列表翻页
+     * @param {number} page - 目标页码
+     */
+    changeUserListingsPage(page) {
+      if (page < 1 || page > this.userListingsPagination.total_pages) return
+      this.userListingsCurrentPage = page
+      this.loadUserListings(this.userListingsInfo.user?.user_id)
+    },
+
+    /**
+     * 挂牌状态中文映射
+     * @param {string} status - 状态码
+     * @returns {string} 中文状态名
+     */
+    getListingStatusText(status) {
+      const map = {
+        on_sale: '在售',
+        locked: '锁定中',
+        sold: '已售出',
+        withdrawn: '已撤回',
+        admin_withdrawn: '管理员下架'
+      }
+      return map[status] || status || '-'
+    },
+
+    /**
+     * 打开强制下架确认弹窗
+     * @param {Object} listing - 挂牌对象
+     */
+    confirmForceWithdraw(listing) {
+      this.forceWithdrawForm = {
+        market_listing_id: listing.market_listing_id,
+        status: listing.status,
+        reason: ''
+      }
+      this.showModal('forceWithdrawModal')
+    },
+
+    /**
+     * 提交强制下架
+     */
+    async submitForceWithdraw() {
+      if (!this.forceWithdrawForm.reason?.trim()) {
+        this.$toast?.error('请填写下架原因')
+        return
+      }
+      try {
+        this.saving = true
+        const result = await request({
+          url: buildURL(MARKET_ENDPOINTS.LISTING_FORCE_WITHDRAW, {
+            market_listing_id: this.forceWithdrawForm.market_listing_id
+          }),
+          method: 'POST',
+          data: { withdraw_reason: this.forceWithdrawForm.reason.trim() }
+        })
+        if (result?.success) {
+          this.$toast?.success('下架成功')
+          this.hideModal('forceWithdrawModal')
+          await this.loadUserListings(this.userListingsInfo.user?.user_id)
+          await this.loadMarketplaceStats()
+        } else {
+          this.$toast?.error(result?.message || '下架失败')
+        }
+      } catch (error) {
+        logger.error('强制下架失败:', error)
+        this.$toast?.error(error.message || '下架失败')
+      } finally {
+        this.saving = false
+      }
+    },
+
+    /**
+     * 打开调整上架限制弹窗
+     * @param {Object} userStat - 用户统计行数据
+     */
+    openAdjustLimit(userStat) {
+      this.adjustLimitForm = {
+        user_id: userStat.user_id,
+        mobile: userStat.mobile,
+        nickname: userStat.nickname || '-',
+        current_limit: userStat.max_active_listings,
+        is_custom: userStat.is_custom_limit,
+        new_limit: userStat.max_active_listings,
+        use_global: false,
+        reason: ''
+      }
+      this.showModal('adjustLimitModal')
+    },
+
+    /**
+     * 提交调整上架限制
+     */
+    async submitAdjustLimit() {
+      try {
+        this.saving = true
+        const data = {
+          user_id: this.adjustLimitForm.user_id,
+          max_active_listings: this.adjustLimitForm.use_global ? null : parseInt(this.adjustLimitForm.new_limit),
+          reason: this.adjustLimitForm.reason || ''
+        }
+        const result = await request({
+          url: MARKET_ENDPOINTS.LISTING_USER_LIMIT,
+          method: 'PUT',
+          data
+        })
+        if (result?.success) {
+          this.$toast?.success(`上架限制调整成功（生效值：${result.data?.effective_limit}）`)
+          this.hideModal('adjustLimitModal')
+          await this.loadMarketplaceStats()
+        } else {
+          this.$toast?.error(result?.message || '调整失败')
+        }
+      } catch (error) {
+        logger.error('调整上架限制失败:', error)
+        this.$toast?.error(error.message || '调整失败')
+      } finally {
+        this.saving = false
       }
     },
 

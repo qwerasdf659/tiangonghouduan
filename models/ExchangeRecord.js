@@ -61,7 +61,7 @@ module.exports = sequelize => {
         type: DataTypes.STRING(50),
         allowNull: false,
         comment:
-          '支付资产代码（Pay Asset Code - 兑换订单实际扣减的材料资产类型）：red_shard-碎红水晶、red_crystal-完整红水晶等；业务规则：必填字段；与exchange_items.cost_asset_code对应；用途：订单支付对账、材料消耗统计、成本核算依据'
+          '支付资产代码（Pay Asset Code - 兑换订单实际扣减的材料资产类型）：red_shard-红水晶碎片、red_crystal-红水晶等；业务规则：必填字段；与exchange_items.cost_asset_code对应；用途：订单支付对账、材料消耗统计、成本核算依据'
       },
       pay_amount: {
         type: DataTypes.BIGINT,

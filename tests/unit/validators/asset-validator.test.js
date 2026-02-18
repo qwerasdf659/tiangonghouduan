@@ -120,7 +120,7 @@ describe('P1-3.2: 资产API参数验证单元测试', () => {
       // 项目实际使用的资产代码
       const validCodes = [
         'DIAMOND', // 钻石
-        'red_shard', // 红色碎片
+        'red_shard', // 红水晶碎片
         'POINTS', // 积分
         'GOLD', // 金币
         'material_001', // 材料资产

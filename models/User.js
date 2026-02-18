@@ -109,6 +109,18 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: true,
         comment: '用户最后活跃时间（登录、抽奖等操作时更新，用于用户分群）'
+      },
+
+      /**
+       * 用户个性化最大上架数量限制（2026-02-18 运营精细化管理）
+       * NULL = 使用 system_settings 中的全局 max_active_listings 默认值
+       * 非 NULL = 该用户的个性化上架上限
+       */
+      max_active_listings: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+        comment: '用户个性化最大上架数量限制（NULL=使用全局默认值）'
       }
     },
     {

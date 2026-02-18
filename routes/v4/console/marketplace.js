@@ -53,17 +53,8 @@ const logger = require('../../../utils/logger').logger
  */
 router.get('/listing-stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { page = 1, limit = 20, filter = 'all' } = req.query
+    const { page = 1, limit = 20, filter = 'all', mobile } = req.query
 
-    /**
-     * 从数据库读取最大上架数量配置（2025-12-30 配置管理三层分离方案）
-     *
-     * 读取优先级：
-     * 1. DB system_settings.max_active_listings（全局配置）
-     * 2. 代码默认值 10（兜底降级）
-     *
-     * @see docs/配置管理三层分离与校验统一方案.md
-     */
     const AdminSystemService = req.app.locals.services.getService('admin_system')
     const maxListings = await AdminSystemService.getSettingValue(
       'marketplace',
@@ -75,18 +66,18 @@ router.get('/listing-stats', authenticateToken, requireRoleLevel(100), async (re
       admin_id: req.user.user_id,
       page,
       limit,
-      filter
+      filter,
+      mobile: mobile || null
     })
 
-    // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
     const ExchangeService = req.app.locals.services.getService('exchange_admin')
 
-    // 🎯 调用服务层方法获取用户上架统计
     const result = await ExchangeService.getUserListingStats({
       page,
       limit,
       filter,
-      max_listings: maxListings
+      max_listings: maxListings,
+      mobile
     })
 
     logger.info('查询用户上架状态成功', {
@@ -105,6 +96,127 @@ router.get('/listing-stats', authenticateToken, requireRoleLevel(100), async (re
     })
 
     return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * 查询指定用户的上架商品列表
+ * GET /api/v4/console/marketplace/user-listings
+ *
+ * @description 运营通过用户ID查看该用户的所有上架商品，支持状态筛选
+ *
+ * @query {number} user_id - 用户ID（必填）
+ * @query {string} [status] - 挂牌状态筛选（on_sale/locked/sold/withdrawn/admin_withdrawn）
+ * @query {number} [page=1] - 页码
+ * @query {number} [page_size=20] - 每页数量
+ *
+ * @returns {Object} 用户信息 + 挂牌列表 + 分页
+ *
+ * @security JWT + Admin权限
+ * @created 2026-02-18（运营精细化管理：按用户查看上架商品）
+ */
+router.get('/user-listings', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const { user_id, status, page = 1, page_size = 20 } = req.query
+    const admin_id = req.user.user_id
+
+    if (!user_id) {
+      return res.apiError('user_id 是必填参数', 'BAD_REQUEST', null, 400)
+    }
+
+    logger.info('管理员查询用户上架商品列表', { admin_id, user_id, status, page, page_size })
+
+    const ExchangeService = req.app.locals.services.getService('exchange_admin')
+
+    const result = await ExchangeService.getUserListings({
+      user_id: parseInt(user_id),
+      status: status || undefined,
+      page: parseInt(page),
+      page_size: parseInt(page_size)
+    })
+
+    logger.info('查询用户上架商品列表成功', {
+      admin_id,
+      user_id: parseInt(user_id),
+      total: result.pagination.total
+    })
+
+    return res.apiSuccess(result)
+  } catch (error) {
+    logger.error('查询用户上架商品列表失败', {
+      error: error.message,
+      admin_id: req.user?.user_id,
+      user_id: req.query.user_id
+    })
+
+    if (error.message.includes('用户不存在')) {
+      return res.apiError(error.message, 'NOT_FOUND', null, 404)
+    }
+    return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * 调整用户上架数量限制
+ * PUT /api/v4/console/marketplace/user-listing-limit
+ *
+ * @description 运营调整指定用户的上架数量上限，支持设为自定义值或恢复全局默认
+ *
+ * @body {number} user_id - 目标用户ID（必填）
+ * @body {number|null} max_active_listings - 新的上架限制（null=恢复全局默认）
+ * @body {string} [reason] - 调整原因（运营备注）
+ *
+ * @returns {Object} 调整结果（含新旧限制对比）
+ *
+ * @security JWT + Admin权限
+ * @created 2026-02-18（运营精细化管理：按用户调整上架限制）
+ */
+router.put('/user-listing-limit', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const { user_id, max_active_listings, reason } = req.body
+    const admin_id = req.user.user_id
+
+    if (!user_id) {
+      return res.apiError('user_id 是必填参数', 'BAD_REQUEST', null, 400)
+    }
+
+    logger.info('管理员调整用户上架限制', { admin_id, user_id, max_active_listings, reason })
+
+    const ExchangeService = req.app.locals.services.getService('exchange_admin')
+
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await ExchangeService.updateUserListingLimit(
+          { user_id: parseInt(user_id), max_active_listings, operator_id: admin_id, reason },
+          { transaction }
+        )
+      },
+      { description: `调整用户上架限制 user_id=${user_id}`, maxRetries: 1 }
+    )
+
+    logger.info('用户上架限制调整成功', {
+      admin_id,
+      user_id: parseInt(user_id),
+      old_limit: result.old_limit,
+      new_limit: result.new_limit,
+      effective_limit: result.effective_limit
+    })
+
+    return res.apiSuccess(result, '上架数量限制调整成功')
+  } catch (error) {
+    logger.error('调整用户上架限制失败', {
+      error: error.message,
+      admin_id: req.user?.user_id,
+      user_id: req.body?.user_id
+    })
+
+    if (error.message.includes('用户不存在')) {
+      return res.apiError(error.message, 'NOT_FOUND', null, 404)
+    }
+    if (error.message.includes('必须') || error.message.includes('必填')) {
+      return res.apiError(error.message, 'BAD_REQUEST', null, 400)
+    }
+    return res.apiError(error.message || '调整失败', 'INTERNAL_ERROR', null, 500)
   }
 })
 

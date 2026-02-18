@@ -97,8 +97,8 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
     testItem = await ExchangeItem.create({
       item_name: '【测试】幂等性测试商品',
       description: '用于测试兑换市场幂等性的测试商品（材料资产支付）',
-      cost_asset_code: 'red_shard', // 材料资产代码：碎红水晶
-      cost_amount: 100, // 成本数量：100个碎红水晶
+      cost_asset_code: 'red_shard', // 材料资产代码：红水晶碎片
+      cost_amount: 100, // 成本数量：100个红水晶碎片
       cost_price: 50,
       stock: 1000,
       sort_order: 1,

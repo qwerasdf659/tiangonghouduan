@@ -22,7 +22,7 @@
  *
  * 示例：
  * ```bash
- * # 重算账户6的红色碎片余额
+ * # 重算账户6的红水晶碎片余额
  * node scripts/admin-tools/recalculate-balance.js 6 red_shard
  *
  * # 重算账户6的所有资产
@@ -214,7 +214,7 @@ async function main() {
     console.error('用法: node recalculate-balance.js <account_id|all> <asset_code|all>')
     console.error('')
     console.error('示例:')
-    console.error('  node recalculate-balance.js 6 red_shard     # 重算账户6的红色碎片')
+    console.error('  node recalculate-balance.js 6 red_shard     # 重算账户6的红水晶碎片')
     console.error('  node recalculate-balance.js 6 all           # 重算账户6的所有资产')
     console.error('  node recalculate-balance.js all all         # 重算所有账户的所有资产')
     process.exit(1)

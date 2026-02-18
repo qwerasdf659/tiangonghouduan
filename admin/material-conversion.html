@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '材料转换管理', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+
+  <!-- 导航栏 -->
+  <nav class="bg-amber-600 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-amber-200">← 返回工作台</a>
+        <span class="text-lg font-semibold">🔄 材料转换管理</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="materialConversionPage()" x-init="init()">
+
+    <!-- ==================== Tab 导航 ==================== -->
+    <div class="themed-card rounded-lg shadow mb-6">
+      <div class="flex border-b">
+        <button @click="switchTab('rules')"
+                :class="active_tab === 'rules'
+                  ? 'border-b-2 border-amber-500 text-amber-600 font-semibold'
+                  : 'text-gray-500 hover:text-amber-500'"
+                class="px-6 py-3 text-sm transition-colors">
+          📋 转换规则
+        </button>
+        <button @click="switchTab('asset_types')"
+                :class="active_tab === 'asset_types'
+                  ? 'border-b-2 border-amber-500 text-amber-600 font-semibold'
+                  : 'text-gray-500 hover:text-amber-500'"
+                class="px-6 py-3 text-sm transition-colors">
+          💎 资产类型
+        </button>
+      </div>
+    </div>
+
+    <!-- ==================== 转换规则 Tab ==================== -->
+    <div x-show="active_tab === 'rules'">
+
+      <!-- 筛选与操作栏 -->
+      <div class="themed-card rounded-lg shadow mb-6">
+        <div class="p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div class="flex flex-wrap gap-2">
+            <button @click="filterRulesByEnabled('all')"
+                    :class="rules_filter_enabled === 'all'
+                      ? 'bg-amber-500 text-white shadow-sm'
+                      : 'themed-bg-base themed-text-muted hover:bg-amber-50 hover:text-amber-600'"
+                    class="px-4 py-1.5 rounded-full text-sm font-medium transition-all">
+              全部
+            </button>
+            <button @click="filterRulesByEnabled('enabled')"
+                    :class="rules_filter_enabled === 'enabled'
+                      ? 'bg-green-500 text-white shadow-sm'
+                      : 'themed-bg-base themed-text-muted hover:bg-green-50 hover:text-green-600'"
+                    class="px-4 py-1.5 rounded-full text-sm font-medium transition-all">
+              已启用
+            </button>
+            <button @click="filterRulesByEnabled('disabled')"
+                    :class="rules_filter_enabled === 'disabled'
+                      ? 'bg-gray-500 text-white shadow-sm'
+                      : 'themed-bg-base themed-text-muted hover:bg-gray-50 hover:text-gray-600'"
+                    class="px-4 py-1.5 rounded-full text-sm font-medium transition-all">
+              已禁用
+            </button>
+          </div>
+          <button @click="openCreateRuleModal()"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 font-medium shadow-sm transition-colors whitespace-nowrap">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            新增转换规则
+          </button>
+        </div>
+      </div>
+
+      <!-- 转换规则列表 -->
+      <div class="themed-card rounded-lg shadow">
+        <div class="p-4 border-b flex items-center justify-between">
+          <h5 class="font-semibold text-base">转换规则列表</h5>
+          <span class="text-xs themed-text-muted" x-text="'共 ' + rules_pagination.total + ' 条规则'"></span>
+        </div>
+
+        <!-- 加载中 -->
+        <div x-show="rules_loading" class="p-12 text-center themed-text-muted">
+          <div class="inline-block animate-spin w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full mb-2"></div>
+          <div class="text-sm">加载中...</div>
+        </div>
+
+        <!-- 错误 -->
+        <div x-show="rules_error && !rules_loading" class="p-12 text-center">
+          <div class="text-3xl mb-2">⚠️</div>
+          <p class="text-red-500 mb-3" x-text="rules_error"></p>
+          <button @click="loadConversionRules()"
+                  class="px-4 py-1.5 text-sm bg-amber-500 text-white rounded hover:bg-amber-600 transition-colors">
+            重新加载
+          </button>
+        </div>
+
+        <!-- 空状态 -->
+        <div x-show="!rules_loading && !rules_error && conversion_rules.length === 0" class="p-12 text-center themed-text-muted">
+          <div class="text-4xl mb-3">📭</div>
+          <div class="text-sm">暂无转换规则</div>
+        </div>
+
+        <!-- 数据表格 -->
+        <div x-show="!rules_loading && !rules_error && conversion_rules.length > 0" class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="themed-bg-base border-b">
+                <th class="px-4 py-3 text-left font-semibold themed-text-muted text-xs uppercase tracking-wider">ID</th>
+                <th class="px-4 py-3 text-left font-semibold themed-text-muted text-xs uppercase tracking-wider">规则标题</th>
+                <th class="px-4 py-3 text-left font-semibold themed-text-muted text-xs uppercase tracking-wider">源资产</th>
+                <th class="px-4 py-3 text-left font-semibold themed-text-muted text-xs uppercase tracking-wider">目标资产</th>
+                <th class="px-4 py-3 text-center font-semibold themed-text-muted text-xs uppercase tracking-wider">转换比例</th>
+                <th class="px-4 py-3 text-center font-semibold themed-text-muted text-xs uppercase tracking-wider">手续费</th>
+                <th class="px-4 py-3 text-center font-semibold themed-text-muted text-xs uppercase tracking-wider">风险等级</th>
+                <th class="px-4 py-3 text-center font-semibold themed-text-muted text-xs uppercase tracking-wider">状态</th>
+                <th class="px-4 py-3 text-left font-semibold themed-text-muted text-xs uppercase tracking-wider">生效时间</th>
+                <th class="px-4 py-3 text-center font-semibold themed-text-muted text-xs uppercase tracking-wider">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="rule in conversion_rules" :key="rule.material_conversion_rule_id || rule.rule_id">
+                <tr class="border-b themed-hover-bg transition-colors">
+                  <td class="px-4 py-3 font-mono text-xs themed-text-muted" x-text="rule.material_conversion_rule_id || rule.rule_id"></td>
+                  <td class="px-4 py-3">
+                    <div class="font-medium" x-text="rule.title || '-'"></div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <span class="inline-block px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-xs font-mono" x-text="rule.from_asset_code"></span>
+                  </td>
+                  <td class="px-4 py-3">
+                    <span class="inline-block px-2 py-0.5 rounded bg-purple-50 text-purple-700 text-xs font-mono" x-text="rule.to_asset_code"></span>
+                  </td>
+                  <td class="px-4 py-3 text-center font-semibold" x-text="formatConversionRatio(rule)"></td>
+                  <td class="px-4 py-3 text-center text-xs" x-text="formatFeeRate(rule.fee_rate)"></td>
+                  <td class="px-4 py-3 text-center">
+                    <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold"
+                          :class="getRiskColor(rule.risk_level)"
+                          x-text="getRiskLabel(rule.risk_level)">
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-center">
+                    <span class="inline-block px-2.5 py-1 rounded-full text-xs font-semibold"
+                          :class="rule.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+                          x-text="rule.is_enabled ? '启用' : '禁用'">
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-xs" x-text="formatDateTime(rule.effective_at)"></td>
+                  <td class="px-4 py-3 text-center">
+                    <div class="inline-flex gap-1.5">
+                      <button @click="viewRuleDetail(rule.material_conversion_rule_id || rule.rule_id)"
+                              class="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors">
+                        详情
+                      </button>
+                      <button x-show="rule.is_enabled"
+                              @click="disableRule(rule.material_conversion_rule_id || rule.rule_id)"
+                              class="px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded hover:bg-red-100 transition-colors">
+                        禁用
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 分页 -->
+        <div x-show="rules_pagination.total > 0" class="p-4 border-t flex items-center justify-between">
+          <span class="text-sm themed-text-muted"
+                x-text="'共 ' + rules_pagination.total + ' 条，第 ' + rules_pagination.page + ' / ' + rulesTotalPages + ' 页'">
+          </span>
+          <div class="flex gap-2">
+            <button @click="rulesGoToPage(rules_pagination.page - 1)"
+                    :disabled="!rulesHasPrev"
+                    :class="rulesHasPrev ? 'hover:bg-amber-50 hover:text-amber-600' : 'opacity-40 cursor-not-allowed'"
+                    class="px-3 py-1.5 border rounded-lg text-sm transition-colors">
+              上一页
+            </button>
+            <button @click="rulesGoToPage(rules_pagination.page + 1)"
+                    :disabled="!rulesHasNext"
+                    :class="rulesHasNext ? 'hover:bg-amber-50 hover:text-amber-600' : 'opacity-40 cursor-not-allowed'"
+                    class="px-3 py-1.5 border rounded-lg text-sm transition-colors">
+              下一页
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 资产类型 Tab ==================== -->
+    <div x-show="active_tab === 'asset_types'">
+
+      <!-- 操作栏 -->
+      <div class="themed-card rounded-lg shadow mb-6">
+        <div class="p-4 flex justify-between items-center">
+          <h5 class="font-semibold text-base">材料资产类型列表</h5>
+          <button @click="openCreateTypeModal()"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 font-medium shadow-sm transition-colors whitespace-nowrap">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            新增资产类型
+          </button>
+        </div>
+      </div>
+
+      <!-- 资产类型列表 -->
+      <div class="themed-card rounded-lg shadow">
+        <!-- 加载中 -->
+        <div x-show="types_loading" class="p-12 text-center themed-text-muted">
+          <div class="inline-block animate-spin w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full mb-2"></div>
+          <div class="text-sm">加载中...</div>
+        </div>
+
+        <!-- 错误 -->
+        <div x-show="types_error && !types_loading" class="p-12 text-center">
+          <div class="text-3xl mb-2">⚠️</div>
+          <p class="text-red-500 mb-3" x-text="types_error"></p>
+          <button @click="loadAssetTypes()"
+                  class="px-4 py-1.5 text-sm bg-amber-500 text-white rounded hover:bg-amber-600 transition-colors">
+            重新加载
+          </button>
+        </div>
+
+        <!-- 空状态 -->
+        <div x-show="!types_loading && !types_error && asset_types.length === 0" class="p-12 text-center themed-text-muted">
+          <div class="text-4xl mb-3">📭</div>
+          <div class="text-sm">暂无材料资产类型</div>
+        </div>
+
+        <!-- 卡片网格 -->
+        <div x-show="!types_loading && !types_error && asset_types.length > 0" class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <template x-for="assetType in asset_types" :key="assetType.asset_code">
+            <div class="rounded-lg border p-4 transition-shadow hover:shadow-md"
+                 :class="assetType.is_enabled ? '' : 'opacity-60'">
+              <div class="flex items-start justify-between mb-3">
+                <div>
+                  <div class="font-semibold text-base" x-text="assetType.display_name"></div>
+                  <div class="text-xs font-mono themed-text-muted mt-0.5" x-text="assetType.asset_code"></div>
+                </div>
+                <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold"
+                      :class="assetType.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+                      x-text="assetType.is_enabled ? '启用' : '禁用'">
+                </span>
+              </div>
+              <div class="space-y-1.5 text-sm">
+                <div class="flex justify-between">
+                  <span class="themed-text-muted">分组</span>
+                  <span x-text="assetType.group_code"></span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="themed-text-muted">形态</span>
+                  <span x-text="getFormLabel(assetType.form)"></span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="themed-text-muted">层级</span>
+                  <span x-text="'Tier ' + assetType.tier"></span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="themed-text-muted">可交易</span>
+                  <span :class="assetType.is_tradable ? 'text-green-600' : 'text-gray-400'"
+                        x-text="assetType.is_tradable ? '是' : '否'"></span>
+                </div>
+              </div>
+              <div class="mt-3 pt-3 border-t flex gap-2">
+                <button @click="openEditTypeModal(assetType)"
+                        class="flex-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors text-center">
+                  编辑
+                </button>
+                <button x-show="assetType.is_enabled"
+                        @click="disableAssetType(assetType.asset_code)"
+                        class="flex-1 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded hover:bg-red-100 transition-colors text-center">
+                  禁用
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 创建转换规则模态框 ==================== -->
+    <div x-show="show_create_rule_modal" x-cloak
+         class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+         @click.self="show_create_rule_modal = false"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0">
+      <div class="themed-card rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+           x-transition:enter="transition ease-out duration-200"
+           x-transition:enter-start="opacity-0 scale-95"
+           x-transition:enter-end="opacity-100 scale-100">
+        <div class="p-5 border-b flex justify-between items-center">
+          <h3 class="text-lg font-bold">新增转换规则</h3>
+          <button @click="show_create_rule_modal = false" class="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="p-5 space-y-5">
+          <div class="rounded-lg bg-amber-50 p-3 text-sm text-amber-700">
+            ⚠️ 转换规则采用版本化管理：改比例必须新增规则（禁止修改已有规则），通过生效时间控制规则切换。
+          </div>
+
+          <!-- 源资产与目标资产 -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-1.5">源资产类型 <span class="text-red-500">*</span></label>
+              <select x-model="create_rule_form.from_asset_code"
+                      class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+                <option value="">请选择</option>
+                <template x-for="t in asset_types" :key="t.asset_code">
+                  <option :value="t.asset_code" x-text="t.display_name + ' (' + t.asset_code + ')'"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1.5">目标资产类型 <span class="text-red-500">*</span></label>
+              <select x-model="create_rule_form.to_asset_code"
+                      class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+                <option value="">请选择</option>
+                <template x-for="t in asset_types" :key="t.asset_code">
+                  <option :value="t.asset_code" x-text="t.display_name + ' (' + t.asset_code + ')'"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+
+          <!-- 转换比例 -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-1.5">源资产数量 <span class="text-red-500">*</span></label>
+              <input type="number" x-model="create_rule_form.from_amount" min="1" placeholder="如 100"
+                     class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1.5">目标资产数量 <span class="text-red-500">*</span></label>
+              <input type="number" x-model="create_rule_form.to_amount" min="1" placeholder="如 1"
+                     class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+            </div>
+          </div>
+
+          <!-- 生效时间 -->
+          <div>
+            <label class="block text-sm font-medium mb-1.5">生效时间 <span class="text-red-500">*</span></label>
+            <input type="datetime-local" x-model="create_rule_form.effective_at"
+                   class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+          </div>
+
+          <!-- 规则标题 -->
+          <div>
+            <label class="block text-sm font-medium mb-1.5">规则标题（选填）</label>
+            <input type="text" x-model="create_rule_form.title" placeholder="如：红水晶碎片兑换钻石"
+                   class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+          </div>
+
+          <!-- 限额与费率 -->
+          <div class="grid grid-cols-3 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-1.5">最小转换量</label>
+              <input type="number" x-model="create_rule_form.min_from_amount" min="1"
+                     class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1.5">最大转换量</label>
+              <input type="number" x-model="create_rule_form.max_from_amount" placeholder="留空=无上限"
+                     class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1.5">手续费率</label>
+              <input type="number" x-model="create_rule_form.fee_rate" min="0" max="1" step="0.01" placeholder="0.05 = 5%"
+                     class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+            </div>
+          </div>
+
+          <!-- 风险等级与舍入模式 -->
+          <div class="grid grid-cols-3 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-1.5">风险等级</label>
+              <select x-model="create_rule_form.risk_level"
+                      class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+                <option value="low">低风险</option>
+                <option value="medium">中风险</option>
+                <option value="high">高风险</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1.5">舍入模式</label>
+              <select x-model="create_rule_form.rounding_mode"
+                      class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+                <option value="floor">向下取整</option>
+                <option value="ceil">向上取整</option>
+                <option value="round">四舍五入</option>
+              </select>
+            </div>
+            <div class="flex flex-col justify-end">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" x-model="create_rule_form.is_visible" class="rounded border-gray-300 text-amber-500 focus:ring-amber-500">
+                <span class="text-sm">前端可见</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer mt-2">
+                <input type="checkbox" x-model="create_rule_form.is_enabled" class="rounded border-gray-300 text-amber-500 focus:ring-amber-500">
+                <span class="text-sm">立即启用</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 描述 -->
+          <div>
+            <label class="block text-sm font-medium mb-1.5">描述（选填）</label>
+            <textarea x-model="create_rule_form.description" rows="2" placeholder="规则用途说明..."
+                      class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none transition-shadow">
+            </textarea>
+          </div>
+        </div>
+        <div class="p-5 border-t flex justify-end gap-3">
+          <button @click="show_create_rule_modal = false"
+                  class="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50 transition-colors">
+            取消
+          </button>
+          <button @click="submitCreateRule()" :disabled="creating_rule"
+                  class="px-5 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition-colors shadow-sm">
+            <span x-show="!creating_rule">确认创建</span>
+            <span x-show="creating_rule">创建中...</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 规则详情模态框 ==================== -->
+    <div x-show="show_rule_detail_modal" x-cloak
+         class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+         @click.self="show_rule_detail_modal = false"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100">
+      <div class="themed-card rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="p-5 border-b flex justify-between items-center">
+          <h3 class="text-lg font-bold">规则详情</h3>
+          <button @click="show_rule_detail_modal = false" class="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div x-show="rule_detail_loading" class="p-12 text-center themed-text-muted">
+          <div class="inline-block animate-spin w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full mb-2"></div>
+          <div class="text-sm">加载中...</div>
+        </div>
+
+        <div x-show="!rule_detail_loading && rule_detail" class="p-5 space-y-6">
+          <div class="rounded-lg border p-4">
+            <div class="flex items-center justify-between mb-4">
+              <h4 class="font-semibold text-amber-700">基本信息</h4>
+              <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold"
+                    :class="rule_detail?.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+                    x-text="rule_detail?.is_enabled ? '启用' : '禁用'">
+              </span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+              <div class="flex justify-between py-1 border-b border-dashed">
+                <span class="themed-text-muted">规则 ID</span>
+                <span class="font-mono" x-text="rule_detail?.material_conversion_rule_id || rule_detail?.rule_id"></span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-dashed">
+                <span class="themed-text-muted">标题</span>
+                <span x-text="rule_detail?.title || '-'"></span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-dashed">
+                <span class="themed-text-muted">源资产</span>
+                <span class="font-mono text-blue-600" x-text="rule_detail?.from_asset_code"></span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-dashed">
+                <span class="themed-text-muted">目标资产</span>
+                <span class="font-mono text-purple-600" x-text="rule_detail?.to_asset_code"></span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-dashed">
+                <span class="themed-text-muted">转换比例</span>
+                <span class="font-semibold" x-text="formatConversionRatio(rule_detail)"></span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-dashed">
+                <span class="themed-text-muted">手续费率</span>
+                <span x-text="formatFeeRate(rule_detail?.fee_rate)"></span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-dashed">
+                <span class="themed-text-muted">最小转换量</span>
+                <span x-text="rule_detail?.min_from_amount || 1"></span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-dashed">
+                <span class="themed-text-muted">最大转换量</span>
+                <span x-text="rule_detail?.max_from_amount || '无上限'"></span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-dashed">
+                <span class="themed-text-muted">风险等级</span>
+                <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold"
+                      :class="getRiskColor(rule_detail?.risk_level)"
+                      x-text="getRiskLabel(rule_detail?.risk_level)"></span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-dashed">
+                <span class="themed-text-muted">舍入模式</span>
+                <span x-text="getRoundingLabel(rule_detail?.rounding_mode)"></span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-dashed">
+                <span class="themed-text-muted">前端可见</span>
+                <span :class="rule_detail?.is_visible ? 'text-green-600' : 'text-gray-400'"
+                      x-text="rule_detail?.is_visible ? '可见' : '隐藏'"></span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-dashed">
+                <span class="themed-text-muted">生效时间</span>
+                <span x-text="formatDateTime(rule_detail?.effective_at)"></span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-dashed">
+                <span class="themed-text-muted">创建时间</span>
+                <span x-text="formatDateTime(rule_detail?.created_at)"></span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-dashed">
+                <span class="themed-text-muted">创建者 ID</span>
+                <span x-text="rule_detail?.created_by || '-'"></span>
+              </div>
+            </div>
+            <div x-show="rule_detail?.description" class="mt-4 text-sm">
+              <span class="themed-text-muted">描述：</span>
+              <span x-text="rule_detail?.description"></span>
+            </div>
+          </div>
+
+          <!-- 操作按钮 -->
+          <div x-show="rule_detail?.is_enabled" class="flex gap-3 pt-2 border-t">
+            <button @click="disableRule(rule_detail?.material_conversion_rule_id || rule_detail?.rule_id)"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors shadow-sm">
+              🚫 禁用此规则
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 创建资产类型模态框 ==================== -->
+    <div x-show="show_create_type_modal" x-cloak
+         class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+         @click.self="show_create_type_modal = false"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100">
+      <div class="themed-card rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div class="p-5 border-b flex justify-between items-center">
+          <h3 class="text-lg font-bold">新增资产类型</h3>
+          <button @click="show_create_type_modal = false" class="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="p-5 space-y-5">
+          <div>
+            <label class="block text-sm font-medium mb-1.5">资产代码 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="create_type_form.asset_code" placeholder="如 red_shard（唯一标识，创建后不可修改）"
+                   class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1.5">展示名称 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="create_type_form.display_name" placeholder="如 红水晶碎片"
+                   class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-1.5">分组代码 <span class="text-red-500">*</span></label>
+              <input type="text" x-model="create_type_form.group_code" placeholder="如 red"
+                     class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1.5">形态 <span class="text-red-500">*</span></label>
+              <select x-model="create_type_form.form"
+                      class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+                <option value="shard">碎片 (shard)</option>
+                <option value="crystal">水晶 (crystal)</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-1.5">层级 (Tier)</label>
+              <input type="number" x-model="create_type_form.tier" min="1"
+                     class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1.5">排序权重</label>
+              <input type="number" x-model="create_type_form.sort_order" min="0"
+                     class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+            </div>
+          </div>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" x-model="create_type_form.is_enabled" class="rounded border-gray-300 text-amber-500 focus:ring-amber-500">
+            <span class="text-sm">立即启用</span>
+          </label>
+        </div>
+        <div class="p-5 border-t flex justify-end gap-3">
+          <button @click="show_create_type_modal = false"
+                  class="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50 transition-colors">
+            取消
+          </button>
+          <button @click="submitCreateType()" :disabled="creating_type"
+                  class="px-5 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition-colors shadow-sm">
+            <span x-show="!creating_type">确认创建</span>
+            <span x-show="creating_type">创建中...</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 编辑资产类型模态框 ==================== -->
+    <div x-show="show_edit_type_modal" x-cloak
+         class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+         @click.self="show_edit_type_modal = false"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100">
+      <div class="themed-card rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div class="p-5 border-b flex justify-between items-center">
+          <h3 class="text-lg font-bold">编辑资产类型</h3>
+          <button @click="show_edit_type_modal = false" class="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="p-5 space-y-5">
+          <div>
+            <label class="block text-sm font-medium mb-1.5">资产代码（不可修改）</label>
+            <input type="text" :value="edit_type_form.asset_code" disabled
+                   class="w-full border rounded-lg px-3 py-2.5 text-sm bg-gray-100 text-gray-500 cursor-not-allowed">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1.5">展示名称 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="edit_type_form.display_name"
+                   class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-1.5">分组代码</label>
+              <input type="text" x-model="edit_type_form.group_code"
+                     class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1.5">形态</label>
+              <select x-model="edit_type_form.form"
+                      class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+                <option value="shard">碎片 (shard)</option>
+                <option value="crystal">水晶 (crystal)</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-1.5">层级 (Tier)</label>
+              <input type="number" x-model="edit_type_form.tier" min="1"
+                     class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1.5">排序权重</label>
+              <input type="number" x-model="edit_type_form.sort_order" min="0"
+                     class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-shadow">
+            </div>
+          </div>
+          <div class="flex gap-6">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" x-model="edit_type_form.is_enabled" class="rounded border-gray-300 text-amber-500 focus:ring-amber-500">
+              <span class="text-sm">启用</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" x-model="edit_type_form.is_tradable" class="rounded border-gray-300 text-amber-500 focus:ring-amber-500">
+              <span class="text-sm">可交易</span>
+            </label>
+          </div>
+        </div>
+        <div class="p-5 border-t flex justify-end gap-3">
+          <button @click="show_edit_type_modal = false"
+                  class="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50 transition-colors">
+            取消
+          </button>
+          <button @click="submitEditType()" :disabled="editing_type"
+                  class="px-5 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition-colors shadow-sm">
+            <span x-show="!editing_type">保存修改</span>
+            <span x-show="editing_type">保存中...</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 页面模块脚本 -->
+  <script type="module" src="./src/modules/asset/pages/material-conversion.js"></script>
+</body>
+</html>

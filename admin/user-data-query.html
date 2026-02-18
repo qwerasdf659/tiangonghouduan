@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '用户数据查询', 
+    pageStyle: `
+      [x-cloak] { display: none !important; }
+      .tab-btn { transition: all 0.2s ease; border-bottom: 3px solid transparent; }
+      .tab-btn:hover { background: rgba(59, 130, 246, 0.08); }
+      .tab-btn.active { border-bottom-color: #3b82f6; color: #3b82f6; font-weight: 600; }
+      .stat-card { transition: all 0.2s ease; }
+      .stat-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+      .balance-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 8px; font-size: 13px; }
+    `
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  <div x-data="userDataQueryPage()" x-init="init()" x-cloak class="p-6 space-y-5 max-w-[1440px] mx-auto">
+    
+    <!-- ======================== 顶部搜索区 ======================== -->
+    <div class="themed-card rounded-xl p-5 shadow-sm">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h1 class="text-xl font-bold themed-text flex items-center gap-2">
+            <span class="text-2xl">🔍</span> 用户数据查询
+          </h1>
+          <p class="text-sm themed-text-muted mt-1">输入用户 ID 或手机号，查询该用户全维度业务数据</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-3">
+        <div class="relative flex-1 max-w-md">
+          <input 
+            type="text" 
+            x-model="search_keyword"
+            @keydown.enter="searchUser()"
+            placeholder="请输入用户 ID 或手机号..."
+            class="w-full px-4 py-2.5 pl-10 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm themed-bg-base themed-border"
+          >
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔎</span>
+        </div>
+        <button 
+          @click="searchUser()"
+          :disabled="searching"
+          class="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition flex items-center gap-2"
+        >
+          <span x-show="searching" class="animate-spin">⏳</span>
+          <span x-text="searching ? '搜索中...' : '搜索'"></span>
+        </button>
+      </div>
+
+      <!-- 搜索结果下拉（多个匹配时） -->
+      <template x-if="search_results.length > 1">
+        <div class="mt-3 border rounded-lg overflow-hidden themed-bg-base themed-border">
+          <div class="px-4 py-2 bg-gray-50 text-sm font-medium themed-text-muted">
+            找到 <span x-text="search_results.length"></span> 个匹配用户，请选择：
+          </div>
+          <template x-for="u in search_results" :key="u.user_id">
+            <button 
+              @click="selectUser(u.user_id)"
+              class="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition text-left border-t themed-border"
+            >
+              <span class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold" x-text="u.user_id"></span>
+              <div>
+                <span class="text-sm font-medium themed-text" x-text="u.nickname || '未设置昵称'"></span>
+                <span class="text-xs themed-text-muted ml-2" x-text="u.mobile"></span>
+              </div>
+              <span class="ml-auto text-xs px-2 py-0.5 rounded-full" :class="statusBadgeClass(u.status)" x-text="u.status"></span>
+            </button>
+          </template>
+        </div>
+      </template>
+    </div>
+
+    <!-- ======================== 用户概览卡片 ======================== -->
+    <template x-if="user_overview">
+      <div class="themed-card rounded-xl p-5 shadow-sm">
+        <div class="flex flex-wrap items-start gap-6">
+          <!-- 用户基本信息 -->
+          <div class="flex items-center gap-4">
+            <div class="w-14 h-14 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-xl font-bold shadow"
+                 x-text="(user_overview.user?.nickname || 'U').charAt(0)"></div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-lg font-bold themed-text" x-text="user_overview.user?.nickname || '未设置昵称'"></span>
+                <span class="text-xs px-2 py-0.5 rounded-full" :class="statusBadgeClass(user_overview.user?.status)" x-text="user_overview.user?.status"></span>
+              </div>
+              <div class="flex items-center gap-4 text-sm themed-text-muted mt-1">
+                <span>ID: <strong x-text="user_overview.user?.user_id"></strong></span>
+                <span>📱 <span x-text="user_overview.user?.mobile"></span></span>
+                <span>等级: <span x-text="user_overview.user?.user_level || 'normal'"></span></span>
+                <span>注册: <span x-text="formatDateOnly(user_overview.user?.created_at)"></span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 保底计数 + 历史积分 -->
+          <div class="flex gap-3 ml-auto">
+            <div class="stat-card bg-orange-50 rounded-lg px-4 py-2.5 text-center border border-orange-100">
+              <div class="text-xs text-orange-600 mb-0.5">连续未中奖</div>
+              <div class="text-xl font-bold text-orange-700" x-text="user_overview.user?.consecutive_fail_count || 0"></div>
+            </div>
+            <div class="stat-card bg-purple-50 rounded-lg px-4 py-2.5 text-center border border-purple-100">
+              <div class="text-xs text-purple-600 mb-0.5">历史总积分</div>
+              <div class="text-xl font-bold text-purple-700" x-text="(user_overview.user?.history_total_points || 0).toLocaleString()"></div>
+            </div>
+            <div class="stat-card bg-blue-50 rounded-lg px-4 py-2.5 text-center border border-blue-100">
+              <div class="text-xs text-blue-600 mb-0.5">登录次数</div>
+              <div class="text-xl font-bold text-blue-700" x-text="user_overview.user?.login_count || 0"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 资产余额标签 -->
+        <template x-if="user_overview.balances && user_overview.balances.length > 0">
+          <div class="mt-4 pt-4 border-t themed-border">
+            <div class="text-xs themed-text-muted mb-2 font-medium">💎 资产余额</div>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="(b, idx) in (user_overview.balances || [])" :key="b.asset_code ? (b.asset_code + '_' + idx) : idx">
+                <div class="balance-tag bg-gray-50 border themed-border">
+                  <span class="text-xs themed-text-muted" x-text="b.display_name || b.asset_code || '-'"></span>
+                  <span class="font-semibold themed-text" x-text="(b.available_amount || 0).toLocaleString()"></span>
+                  <template x-if="(b.frozen_amount || 0) > 0">
+                    <span class="text-xs text-yellow-600">(冻结: <span x-text="(b.frozen_amount || 0).toLocaleString()"></span>)</span>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- ======================== 数据 Tab 区域 ======================== -->
+    <template x-if="selected_user_id">
+      <div>
+        <!-- Tab 导航 -->
+        <div class="themed-card rounded-xl overflow-hidden shadow-sm">
+          <div class="flex themed-bg-base border-b themed-border overflow-x-auto">
+            <button @click="switchTab('asset_transactions')" :class="{ 'active': active_tab === 'asset_transactions' }"
+              class="tab-btn flex items-center gap-2 px-5 py-3.5 text-sm themed-text whitespace-nowrap">
+              <span>💰</span><span>资产流水</span>
+            </button>
+            <button @click="switchTab('lottery_draws')" :class="{ 'active': active_tab === 'lottery_draws' }"
+              class="tab-btn flex items-center gap-2 px-5 py-3.5 text-sm themed-text whitespace-nowrap">
+              <span>🎰</span><span>抽奖记录</span>
+            </button>
+            <button @click="switchTab('exchange_records')" :class="{ 'active': active_tab === 'exchange_records' }"
+              class="tab-btn flex items-center gap-2 px-5 py-3.5 text-sm themed-text whitespace-nowrap">
+              <span>🎁</span><span>兑换记录</span>
+            </button>
+            <button @click="switchTab('trade_records')" :class="{ 'active': active_tab === 'trade_records' }"
+              class="tab-btn flex items-center gap-2 px-5 py-3.5 text-sm themed-text whitespace-nowrap">
+              <span>🤝</span><span>交易记录</span>
+            </button>
+            <button @click="switchTab('market_listings')" :class="{ 'active': active_tab === 'market_listings' }"
+              class="tab-btn flex items-center gap-2 px-5 py-3.5 text-sm themed-text whitespace-nowrap">
+              <span>🏪</span><span>市场挂牌</span>
+            </button>
+            <button @click="switchTab('conversions')" :class="{ 'active': active_tab === 'conversions' }"
+              class="tab-btn flex items-center gap-2 px-5 py-3.5 text-sm themed-text whitespace-nowrap">
+              <span>🔄</span><span>材料转换</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 筛选条件栏 -->
+        <div class="themed-card rounded-xl p-4 mt-4 shadow-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            <!-- 通用时间范围 -->
+            <div class="flex items-center gap-2">
+              <label class="text-xs themed-text-muted">起始:</label>
+              <input type="date" x-model="filters.start_date" class="px-2 py-1.5 border rounded text-sm themed-bg-base themed-border">
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs themed-text-muted">截止:</label>
+              <input type="date" x-model="filters.end_date" class="px-2 py-1.5 border rounded text-sm themed-bg-base themed-border">
+            </div>
+
+            <!-- 资产流水专属筛选 -->
+            <template x-if="active_tab === 'asset_transactions'">
+              <div class="flex items-center gap-3">
+                <select x-model="filters.direction" class="px-2 py-1.5 border rounded text-sm themed-bg-base themed-border">
+                  <option value="">全部方向</option>
+                  <option value="income">收入</option>
+                  <option value="expense">支出</option>
+                </select>
+                <select x-model="filters.business_type" class="px-2 py-1.5 border rounded text-sm themed-bg-base themed-border">
+                  <option value="">全部类型</option>
+                  <option value="lottery_consume">抽奖消耗</option>
+                  <option value="lottery_reward">抽奖奖励</option>
+                  <option value="exchange_debit">兑换扣减</option>
+                  <option value="material_convert_debit">材料转换扣减</option>
+                  <option value="material_convert_credit">材料转换入账</option>
+                  <option value="market_purchase_buyer_debit">市场购买(买家)</option>
+                  <option value="market_purchase_seller_credit">市场购买(卖家)</option>
+                  <option value="admin_adjust">管理员调整</option>
+                </select>
+              </div>
+            </template>
+
+            <!-- 抽奖记录专属筛选 -->
+            <template x-if="active_tab === 'lottery_draws'">
+              <select x-model="filters.reward_tier" class="px-2 py-1.5 border rounded text-sm themed-bg-base themed-border">
+                <option value="">全部档位</option>
+                <option value="low">普通奖</option>
+                <option value="mid">中等奖</option>
+                <option value="high">大奖</option>
+                <option value="fallback">保底奖</option>
+              </select>
+            </template>
+
+            <!-- 兑换记录专属筛选 -->
+            <template x-if="active_tab === 'exchange_records'">
+              <select x-model="filters.status" class="px-2 py-1.5 border rounded text-sm themed-bg-base themed-border">
+                <option value="">全部状态</option>
+                <option value="pending">待处理</option>
+                <option value="completed">已完成</option>
+                <option value="shipped">已发货</option>
+                <option value="cancelled">已取消</option>
+              </select>
+            </template>
+
+            <!-- 交易记录专属筛选 -->
+            <template x-if="active_tab === 'trade_records'">
+              <select x-model="filters.role" class="px-2 py-1.5 border rounded text-sm themed-bg-base themed-border">
+                <option value="all">全部角色</option>
+                <option value="buyer">买家</option>
+                <option value="seller">卖家</option>
+              </select>
+            </template>
+
+            <!-- 市场挂牌专属筛选 -->
+            <template x-if="active_tab === 'market_listings'">
+              <select x-model="filters.status" class="px-2 py-1.5 border rounded text-sm themed-bg-base themed-border">
+                <option value="">全部状态</option>
+                <option value="on_sale">在售</option>
+                <option value="sold">已售出</option>
+                <option value="withdrawn">已下架</option>
+                <option value="admin_withdrawn">管理员下架</option>
+              </select>
+            </template>
+
+            <button @click="applyFilter()" :disabled="tab_loading"
+              class="px-4 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50 transition">
+              查询
+            </button>
+          </div>
+        </div>
+
+        <!-- 汇总统计卡片 -->
+        <div class="mt-4">
+          <!-- 资产流水汇总 -->
+          <template x-if="active_tab === 'asset_transactions' && asset_transactions.summary">
+            <div class="grid grid-cols-3 gap-4">
+              <div class="stat-card themed-card rounded-lg p-4 text-center border-l-4 border-green-500">
+                <div class="text-xs themed-text-muted mb-1">总收入</div>
+                <div class="text-lg font-bold text-green-600" x-text="'+' + (asset_transactions.summary.total_income || 0).toLocaleString()"></div>
+              </div>
+              <div class="stat-card themed-card rounded-lg p-4 text-center border-l-4 border-red-500">
+                <div class="text-xs themed-text-muted mb-1">总支出</div>
+                <div class="text-lg font-bold text-red-600" x-text="'-' + (asset_transactions.summary.total_expense || 0).toLocaleString()"></div>
+              </div>
+              <div class="stat-card themed-card rounded-lg p-4 text-center border-l-4 border-blue-500">
+                <div class="text-xs themed-text-muted mb-1">净变动</div>
+                <div class="text-lg font-bold" :class="(asset_transactions.summary.net_change || 0) >= 0 ? 'text-green-600' : 'text-red-600'"
+                     x-text="formatAmount(asset_transactions.summary.net_change || 0)"></div>
+              </div>
+            </div>
+          </template>
+
+          <!-- 抽奖汇总 -->
+          <template x-if="active_tab === 'lottery_draws' && lottery_draws.summary">
+            <div class="grid grid-cols-5 gap-3">
+              <div class="stat-card themed-card rounded-lg p-3 text-center border-l-4 border-indigo-500">
+                <div class="text-xs themed-text-muted mb-0.5">总抽奖次数</div>
+                <div class="text-lg font-bold text-indigo-600" x-text="lottery_draws.summary.total_draws || 0"></div>
+              </div>
+              <template x-for="(count, tier) in (lottery_draws.summary.tier_distribution || {})" :key="tier">
+                <div class="stat-card themed-card rounded-lg p-3 text-center border-l-4"
+                     :class="tier === 'high' ? 'border-purple-500' : tier === 'mid' ? 'border-blue-500' : tier === 'fallback' ? 'border-yellow-500' : 'border-gray-400'">
+                  <div class="text-xs themed-text-muted mb-0.5" x-text="formatRewardTier(tier)"></div>
+                  <div class="text-lg font-bold themed-text" x-text="count"></div>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <!-- 兑换汇总 -->
+          <template x-if="active_tab === 'exchange_records' && exchange_records.summary">
+            <div class="grid grid-cols-2 gap-4">
+              <div class="stat-card themed-card rounded-lg p-4 border-l-4 border-amber-500">
+                <div class="text-xs themed-text-muted mb-1">总消耗材料</div>
+                <div class="text-lg font-bold text-amber-600" x-text="(exchange_records.summary.total_spent || 0).toLocaleString()"></div>
+              </div>
+              <div class="stat-card themed-card rounded-lg p-4">
+                <div class="text-xs themed-text-muted mb-2">状态分布</div>
+                <div class="flex flex-wrap gap-2">
+                  <template x-for="(count, status) in (exchange_records.summary.status_distribution || {})" :key="status">
+                    <span class="text-xs px-2 py-0.5 rounded-full" :class="statusBadgeClass(status)">
+                      <span x-text="formatExchangeStatus(status)"></span>: <span x-text="count"></span>
+                    </span>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- 交易汇总 -->
+          <template x-if="active_tab === 'trade_records' && trade_records.summary">
+            <div class="grid grid-cols-3 gap-4">
+              <div class="stat-card themed-card rounded-lg p-4 text-center border-l-4 border-green-500">
+                <div class="text-xs themed-text-muted mb-1">作为买家</div>
+                <div class="text-lg font-bold text-green-600" x-text="trade_records.summary.as_buyer_count || 0"></div>
+              </div>
+              <div class="stat-card themed-card rounded-lg p-4 text-center border-l-4 border-blue-500">
+                <div class="text-xs themed-text-muted mb-1">作为卖家</div>
+                <div class="text-lg font-bold text-blue-600" x-text="trade_records.summary.as_seller_count || 0"></div>
+              </div>
+              <div class="stat-card themed-card rounded-lg p-4 text-center border-l-4 border-purple-500">
+                <div class="text-xs themed-text-muted mb-1">交易总次数</div>
+                <div class="text-lg font-bold text-purple-600" x-text="trade_records.summary.total_trades || 0"></div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- 加载状态 -->
+        <div x-show="tab_loading" class="themed-card rounded-xl p-12 mt-4 text-center shadow-sm">
+          <div class="animate-spin text-4xl mb-3">⏳</div>
+          <p class="themed-text-muted text-sm">数据加载中...</p>
+        </div>
+
+        <!-- ====================== 数据表格区域 ====================== -->
+        <div x-show="!tab_loading" class="themed-card rounded-xl mt-4 shadow-sm overflow-hidden">
+
+          <!-- Tab1: 资产流水 -->
+          <template x-if="active_tab === 'asset_transactions'">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 themed-border border-b">
+                  <tr>
+                    <th class="px-4 py-3 text-left font-medium themed-text-muted">时间</th>
+                    <th class="px-4 py-3 text-left font-medium themed-text-muted">资产</th>
+                    <th class="px-4 py-3 text-right font-medium themed-text-muted">变动量</th>
+                    <th class="px-4 py-3 text-right font-medium themed-text-muted">变动前</th>
+                    <th class="px-4 py-3 text-right font-medium themed-text-muted">变动后</th>
+                    <th class="px-4 py-3 text-left font-medium themed-text-muted">业务类型</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y themed-border">
+                  <template x-for="row in asset_transactions.list" :key="row.asset_transaction_id">
+                    <tr class="hover:bg-gray-50 transition">
+                      <td class="px-4 py-3 text-xs themed-text-muted" x-text="formatDateTime(row.created_at)"></td>
+                      <td class="px-4 py-3 text-xs" x-text="row.asset_display_name"></td>
+                      <td class="px-4 py-3 text-right text-sm" :class="amountClass(row.delta_amount)" x-text="formatAmount(row.delta_amount)"></td>
+                      <td class="px-4 py-3 text-right text-xs themed-text-muted" x-text="row.balance_before?.toLocaleString()"></td>
+                      <td class="px-4 py-3 text-right text-xs themed-text-muted" x-text="row.balance_after?.toLocaleString()"></td>
+                      <td class="px-4 py-3 text-xs"><span class="px-2 py-0.5 bg-gray-100 rounded text-gray-700" x-text="formatBusinessType(row.business_type)"></span></td>
+                    </tr>
+                  </template>
+                  <template x-if="asset_transactions.list.length === 0">
+                    <tr><td colspan="6" class="px-4 py-12 text-center themed-text-muted">暂无资产流水记录</td></tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </template>
+
+          <!-- Tab2: 抽奖记录 -->
+          <template x-if="active_tab === 'lottery_draws'">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 themed-border border-b">
+                  <tr>
+                    <th class="px-4 py-3 text-left font-medium themed-text-muted">时间</th>
+                    <th class="px-4 py-3 text-left font-medium themed-text-muted">活动</th>
+                    <th class="px-4 py-3 text-left font-medium themed-text-muted">奖品</th>
+                    <th class="px-4 py-3 text-center font-medium themed-text-muted">档位</th>
+                    <th class="px-4 py-3 text-center font-medium themed-text-muted">发放状态</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y themed-border">
+                  <template x-for="row in lottery_draws.list" :key="row.lottery_draw_id">
+                    <tr class="hover:bg-gray-50 transition">
+                      <td class="px-4 py-3 text-xs themed-text-muted" x-text="formatDateTime(row.created_at)"></td>
+                      <td class="px-4 py-3 text-xs" x-text="row.campaign?.campaign_name || row.lottery_campaign_id || '-'"></td>
+                      <td class="px-4 py-3 text-xs font-medium themed-text" x-text="row.prize?.prize_name || '-'"></td>
+                      <td class="px-4 py-3 text-center">
+                        <span class="text-xs px-2 py-0.5 rounded-full" :class="tierBadgeClass(row.reward_tier)" x-text="formatRewardTier(row.reward_tier)"></span>
+                      </td>
+                      <td class="px-4 py-3 text-center">
+                        <span class="text-xs px-2 py-0.5 rounded-full" :class="statusBadgeClass(row.prize_status)" x-text="row.prize_status || '-'"></span>
+                      </td>
+                    </tr>
+                  </template>
+                  <template x-if="lottery_draws.list.length === 0">
+                    <tr><td colspan="5" class="px-4 py-12 text-center themed-text-muted">暂无抽奖记录</td></tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </template>
+
+          <!-- Tab3: 兑换记录（含审核操作） -->
+          <template x-if="active_tab === 'exchange_records'">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 themed-border border-b">
+                  <tr>
+                    <th class="px-4 py-3 text-left font-medium themed-text-muted">时间</th>
+                    <th class="px-4 py-3 text-left font-medium themed-text-muted">商品</th>
+                    <th class="px-4 py-3 text-right font-medium themed-text-muted">支付数量</th>
+                    <th class="px-4 py-3 text-left font-medium themed-text-muted">支付资产</th>
+                    <th class="px-4 py-3 text-center font-medium themed-text-muted">状态</th>
+                    <th class="px-4 py-3 text-left font-medium themed-text-muted">订单号</th>
+                    <th class="px-4 py-3 text-center font-medium themed-text-muted">审核操作</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y themed-border">
+                  <template x-for="row in exchange_records.list" :key="row.exchange_record_id">
+                    <tr class="hover:bg-gray-50 transition">
+                      <td class="px-4 py-3 text-xs themed-text-muted" x-text="formatDateTime(row.created_at)"></td>
+                      <td class="px-4 py-3 text-xs font-medium themed-text" x-text="row.exchange_item?.item_name || '-'"></td>
+                      <td class="px-4 py-3 text-right text-sm text-red-600 font-medium" x-text="'-' + (row.pay_amount || 0).toLocaleString()"></td>
+                      <td class="px-4 py-3 text-xs themed-text-muted" x-text="row.pay_asset_code"></td>
+                      <td class="px-4 py-3 text-center">
+                        <span class="text-xs px-2 py-0.5 rounded-full" :class="statusBadgeClass(row.status)" x-text="formatExchangeStatus(row.status)"></span>
+                      </td>
+                      <td class="px-4 py-3 text-xs font-mono themed-text-muted" x-text="row.order_no || '-'"></td>
+                      <td class="px-4 py-3 text-center">
+                        <div class="flex items-center justify-center gap-1 flex-wrap">
+                          <template x-if="canReview(row.status, 'completed')">
+                            <button @click="openReviewModal(row.order_no, row.status, 'completed')"
+                                    class="text-xs px-2 py-1 rounded bg-green-500 text-white hover:bg-green-600 transition">
+                              完成
+                            </button>
+                          </template>
+                          <template x-if="canReview(row.status, 'shipped')">
+                            <button @click="openReviewModal(row.order_no, row.status, 'shipped')"
+                                    class="text-xs px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition">
+                              发货
+                            </button>
+                          </template>
+                          <template x-if="canReview(row.status, 'cancelled')">
+                            <button @click="openReviewModal(row.order_no, row.status, 'cancelled')"
+                                    class="text-xs px-2 py-1 rounded bg-red-500 text-white hover:bg-red-600 transition">
+                              取消
+                            </button>
+                          </template>
+                          <template x-if="row.status === 'completed' || row.status === 'cancelled'">
+                            <span class="text-xs themed-text-muted">-</span>
+                          </template>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                  <template x-if="exchange_records.list.length === 0">
+                    <tr><td colspan="7" class="px-4 py-12 text-center themed-text-muted">暂无兑换记录</td></tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </template>
+
+          <!-- Tab4: 交易记录 -->
+          <template x-if="active_tab === 'trade_records'">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 themed-border border-b">
+                  <tr>
+                    <th class="px-4 py-3 text-left font-medium themed-text-muted">时间</th>
+                    <th class="px-4 py-3 text-center font-medium themed-text-muted">角色</th>
+                    <th class="px-4 py-3 text-center font-medium themed-text-muted">状态</th>
+                    <th class="px-4 py-3 text-left font-medium themed-text-muted">交易 ID</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y themed-border">
+                  <template x-for="row in trade_records.list" :key="row.trade_order_id">
+                    <tr class="hover:bg-gray-50 transition">
+                      <td class="px-4 py-3 text-xs themed-text-muted" x-text="formatDateTime(row.created_at)"></td>
+                      <td class="px-4 py-3 text-center">
+                        <span class="text-xs px-2 py-0.5 rounded-full"
+                              :class="row.user_role === 'buyer' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'"
+                              x-text="row.user_role === 'buyer' ? '买家' : '卖家'"></span>
+                      </td>
+                      <td class="px-4 py-3 text-center">
+                        <span class="text-xs px-2 py-0.5 rounded-full" :class="statusBadgeClass(row.status)" x-text="formatTradeStatus(row.status)"></span>
+                      </td>
+                      <td class="px-4 py-3 text-xs font-mono themed-text-muted" x-text="row.trade_order_id"></td>
+                    </tr>
+                  </template>
+                  <template x-if="trade_records.list.length === 0">
+                    <tr><td colspan="4" class="px-4 py-12 text-center themed-text-muted">暂无交易记录</td></tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </template>
+
+          <!-- Tab5: 市场挂牌 -->
+          <template x-if="active_tab === 'market_listings'">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 themed-border border-b">
+                  <tr>
+                    <th class="px-4 py-3 text-left font-medium themed-text-muted">时间</th>
+                    <th class="px-4 py-3 text-left font-medium themed-text-muted">商品</th>
+                    <th class="px-4 py-3 text-right font-medium themed-text-muted">数量</th>
+                    <th class="px-4 py-3 text-right font-medium themed-text-muted">价格</th>
+                    <th class="px-4 py-3 text-center font-medium themed-text-muted">状态</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y themed-border">
+                  <template x-for="row in market_listings.list" :key="row.market_listing_id">
+                    <tr class="hover:bg-gray-50 transition">
+                      <td class="px-4 py-3 text-xs themed-text-muted" x-text="formatDateTime(row.created_at)"></td>
+                      <td class="px-4 py-3 text-xs font-medium themed-text" x-text="row.offer_item_display_name || row.offer_asset_display_name || '-'"></td>
+                      <td class="px-4 py-3 text-right text-xs" x-text="row.offer_amount?.toLocaleString() || '-'"></td>
+                      <td class="px-4 py-3 text-right text-xs font-medium themed-text" x-text="row.price_amount?.toLocaleString() + ' ' + (row.price_asset_code || '')"></td>
+                      <td class="px-4 py-3 text-center">
+                        <span class="text-xs px-2 py-0.5 rounded-full" :class="statusBadgeClass(row.status)" x-text="formatListingStatus(row.status)"></span>
+                      </td>
+                    </tr>
+                  </template>
+                  <template x-if="market_listings.list.length === 0">
+                    <tr><td colspan="5" class="px-4 py-12 text-center themed-text-muted">暂无市场挂牌记录</td></tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </template>
+
+          <!-- Tab6: 材料转换 -->
+          <template x-if="active_tab === 'conversions'">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 themed-border border-b">
+                  <tr>
+                    <th class="px-4 py-3 text-left font-medium themed-text-muted">时间</th>
+                    <th class="px-4 py-3 text-left font-medium themed-text-muted">资产</th>
+                    <th class="px-4 py-3 text-right font-medium themed-text-muted">变动量</th>
+                    <th class="px-4 py-3 text-right font-medium themed-text-muted">变动前</th>
+                    <th class="px-4 py-3 text-right font-medium themed-text-muted">变动后</th>
+                    <th class="px-4 py-3 text-left font-medium themed-text-muted">类型</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y themed-border">
+                  <template x-for="row in conversions.list" :key="row.asset_transaction_id">
+                    <tr class="hover:bg-gray-50 transition">
+                      <td class="px-4 py-3 text-xs themed-text-muted" x-text="formatDateTime(row.created_at)"></td>
+                      <td class="px-4 py-3 text-xs" x-text="row.asset_display_name"></td>
+                      <td class="px-4 py-3 text-right text-sm" :class="amountClass(row.delta_amount)" x-text="formatAmount(row.delta_amount)"></td>
+                      <td class="px-4 py-3 text-right text-xs themed-text-muted" x-text="row.balance_before?.toLocaleString()"></td>
+                      <td class="px-4 py-3 text-right text-xs themed-text-muted" x-text="row.balance_after?.toLocaleString()"></td>
+                      <td class="px-4 py-3 text-xs"><span class="px-2 py-0.5 bg-gray-100 rounded text-gray-700" x-text="formatBusinessType(row.business_type)"></span></td>
+                    </tr>
+                  </template>
+                  <template x-if="conversions.list.length === 0">
+                    <tr><td colspan="6" class="px-4 py-12 text-center themed-text-muted">暂无材料转换记录</td></tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </template>
+
+          <!-- 分页控件（使用 paginationMixin 扁平属性：current_page, total_records, page_size） -->
+          <div class="px-4 py-3 border-t themed-border flex items-center justify-between bg-gray-50">
+            <span class="text-xs themed-text-muted">
+              共 <strong x-text="total_records || 0"></strong> 条记录
+            </span>
+            <div class="flex items-center gap-2">
+              <button @click="changePage(1)" :disabled="current_page <= 1" class="px-2.5 py-1 border rounded text-xs themed-hover-bg disabled:opacity-40">首页</button>
+              <button @click="changePage(current_page - 1)" :disabled="current_page <= 1" class="px-2.5 py-1 border rounded text-xs themed-hover-bg disabled:opacity-40">上一页</button>
+              <span class="px-3 py-1 text-xs themed-text">
+                第 <span x-text="current_page || 1"></span> / <span x-text="getTotalPages()"></span> 页
+              </span>
+              <button @click="changePage(current_page + 1)" :disabled="current_page >= getTotalPages()" class="px-2.5 py-1 border rounded text-xs themed-hover-bg disabled:opacity-40">下一页</button>
+              <button @click="changePage(getTotalPages())" :disabled="current_page >= getTotalPages()" class="px-2.5 py-1 border rounded text-xs themed-hover-bg disabled:opacity-40">末页</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- 未选择用户提示 -->
+    <template x-if="!selected_user_id">
+      <div class="themed-card rounded-xl p-16 text-center shadow-sm">
+        <div class="text-5xl mb-4 opacity-40">👤</div>
+        <p class="text-lg themed-text-muted">请先搜索并选择一个用户</p>
+        <p class="text-sm themed-text-muted mt-1">输入用户 ID 或手机号开始查询</p>
+      </div>
+    </template>
+  </div>
+
+  <!-- 兑换订单审核确认模态框 -->
+  <template x-if="review_modal.visible">
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="closeReviewModal()">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6" @click.stop>
+        <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+          <span class="text-xl">📋</span>
+          <span>兑换订单审核</span>
+        </h3>
+
+        <div class="space-y-3 text-sm">
+          <div class="flex justify-between items-center">
+            <span class="themed-text-muted">订单号</span>
+            <span class="font-mono text-xs" x-text="review_modal.order_no"></span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="themed-text-muted">当前状态</span>
+            <span class="text-xs px-2 py-0.5 rounded-full"
+                  :class="statusBadgeClass(review_modal.current_status)"
+                  x-text="formatExchangeStatus(review_modal.current_status)"></span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="themed-text-muted">目标状态</span>
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                  :class="{
+                    'bg-green-100 text-green-800': review_modal.target_status === 'completed',
+                    'bg-blue-100 text-blue-800': review_modal.target_status === 'shipped',
+                    'bg-red-100 text-red-800': review_modal.target_status === 'cancelled'
+                  }"
+                  x-text="reviewActionLabel(review_modal.target_status)"></span>
+          </div>
+
+          <div>
+            <label class="block text-xs themed-text-muted mb-1">审核备注（可选）</label>
+            <textarea x-model="review_modal.admin_remark"
+                      rows="3"
+                      class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"
+                      placeholder="请输入审核备注..."></textarea>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-3 mt-5">
+          <button @click="closeReviewModal()"
+                  class="px-4 py-2 text-sm border rounded-lg themed-hover-bg">
+            取消
+          </button>
+          <button @click="submitReview()"
+                  :disabled="review_modal.submitting"
+                  class="px-4 py-2 text-sm rounded-lg text-white transition disabled:opacity-50"
+                  :class="{
+                    'bg-green-500 hover:bg-green-600': review_modal.target_status === 'completed',
+                    'bg-blue-500 hover:bg-blue-600': review_modal.target_status === 'shipped',
+                    'bg-red-500 hover:bg-red-600': review_modal.target_status === 'cancelled'
+                  }">
+            <span x-show="!review_modal.submitting" x-text="'确认' + reviewActionLabel(review_modal.target_status)"></span>
+            <span x-show="review_modal.submitting">提交中...</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <%- include('partials/footer') %>
+  <script type="module" src="./src/modules/analytics/pages/user-data-query.js"></script>
+</body>
+</html>

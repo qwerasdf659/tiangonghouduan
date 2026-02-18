@@ -4,12 +4,12 @@
  * 测试范围（P0-3系列 任务编号55-59）：
  * - P0-3-6: 实现转换幂等性测试 - 相同幂等键重复请求
  * - P0-3-7: 实现手续费计算测试 - fee_rate 计算、fee_min_amount
- * - P0-3-8: 实现 convertRedShardToDiamond 便捷方法测试 - 碎红水晶→钻石
+ * - P0-3-8: 实现 convertRedShardToDiamond 便捷方法测试 - 红水晶碎片→钻石
  * - P0-3-9: 实现数量限制测试 - min_from_amount、max_from_amount
  * - P0-3-10: 运行测试并修复问题
  *
  * 业务场景：
- * - 材料转换（红晶片→钻石等）
+ * - 材料转换（红水晶碎片→钻石等）
  * - 幂等性保护（防止重复转换）
  * - 手续费三方记账（用户扣减 + 用户入账 + 系统手续费入账）
  *
@@ -667,10 +667,10 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
 
   // ==================== P0-3-8: convertRedShardToDiamond 便捷方法测试 ====================
 
-  describe('P0-3-8: convertRedShardToDiamond 便捷方法测试 - 碎红水晶→钻石', () => {
-    it('应该成功将碎红水晶转换为钻石', async () => {
+  describe('P0-3-8: convertRedShardToDiamond 便捷方法测试 - 红水晶碎片→钻石', () => {
+    it('应该成功将红水晶碎片转换为钻石', async () => {
       /*
-       * 业务场景：用户使用便捷方法将红晶片分解为钻石
+       * 业务场景：用户使用便捷方法将红水晶碎片分解为钻石
        * 期望行为：
        * 1. 调用内部 convertMaterial 方法
        * 2. 固定源材料：red_shard
@@ -1065,7 +1065,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const exact_amount = 5
       const prepare_key = generateIdempotencyKey('convert_prepare_exact')
 
-      // 增加精确数量的红晶片
+      // 增加精确数量的红水晶碎片
       await TransactionManager.execute(async transaction => {
         await BalanceService.changeBalance(
           {
@@ -1187,7 +1187,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         // 模拟事务中途失败的场景
         try {
           await TransactionManager.execute(async transaction => {
-            // 先增加一些红晶片
+            // 先增加一些红水晶碎片
             await BalanceService.changeBalance(
               {
                 user_id: test_user_id,
@@ -1312,7 +1312,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
 
         /*
          * 关键断言：余额应该正确变更
-         * 红晶片：初始 + 准备 - 转换
+         * 红水晶碎片：初始 + 准备 - 转换
          */
         expect(after_shard_amount).toBe(initial_shard_amount + prepare_amount - convert_amount)
         // 钻石：初始 + 转换产出

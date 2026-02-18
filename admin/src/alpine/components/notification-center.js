@@ -179,34 +179,8 @@ export function notificationCenter() {
         }
       } catch (e) {
         logger.warn('[NotificationCenter] 加载通知失败:', e.message)
-        // 模拟数据
-        this.notifications = [
-          {
-            id: 1,
-            type: 'alert',
-            title: '新的消耗审核',
-            message: '有3条消耗记录待审核',
-            is_read: false,
-            created_at: new Date().toISOString()
-          },
-          {
-            id: 2,
-            type: 'warning',
-            title: '预算告警',
-            message: '活动A预算消耗已达85%',
-            is_read: false,
-            created_at: new Date(Date.now() - 3600000).toISOString()
-          },
-          {
-            id: 3,
-            type: 'info',
-            title: '系统通知',
-            message: '系统将于今晚进行维护',
-            is_read: true,
-            created_at: new Date(Date.now() - 86400000).toISOString()
-          }
-        ]
-        this.unreadCount = this.notifications.filter(n => !n.is_read).length
+        this.notifications = []
+        this.unreadCount = 0
       } finally {
         this.loading = false
       }
@@ -393,17 +367,22 @@ export function notificationCenter() {
       logger.debug('[NotificationCenter] 收到 WebSocket 消息:', data)
 
       if (data.type === 'notification') {
-        // 添加新通知到列表顶部
-        this.notifications.unshift(data.payload)
+        const payload = data.payload
+        // 去重：如果通知 id 已存在则跳过，防止 Alpine x-for :key 重复
+        if (payload.id && this.notifications.some(n => n.id === payload.id)) {
+          logger.debug('[NotificationCenter] 忽略重复通知:', payload.id)
+          return
+        }
+        // 无 id 时生成临时唯一标识
+        if (!payload.id) {
+          payload.id = `ws_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+        }
+        this.notifications.unshift(payload)
         this.unreadCount++
 
-        // 播放提示音
         this.playNotificationSound()
-
-        // 显示浏览器通知（如果有权限）
-        this.showBrowserNotification(data.payload)
+        this.showBrowserNotification(payload)
       } else if (data.type === 'badge_update') {
-        // 更新徽章数量
         this.unreadCount = data.payload.unread_count || 0
       }
     },

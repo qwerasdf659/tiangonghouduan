@@ -508,249 +508,249 @@
       </div>
     </div>
 
-  </div>
+    <!-- ==================== Modal 组件区域（必须在 x-data 作用域内） ==================== -->
 
-  <!-- ==================== Modal 组件区域 ==================== -->
-
-  <!-- 1. 添加材料资产类型 Modal -->
-  <div x-ref="addMaterialTypeModal"
-       x-show="isModalOpen('addMaterialTypeModal')"
-       x-cloak
-       class="fixed inset-0 z-50 flex items-center justify-center"
-       style="display: none;">
-    <div class="fixed inset-0 bg-black/50" @click="hideModal('addMaterialTypeModal')"></div>
-    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
-      <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
-        <h5 class="font-semibold">➕ 添加资产类型</h5>
-        <button @click="hideModal('addMaterialTypeModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+    <!-- 1. 添加材料资产类型 Modal -->
+    <div x-ref="addMaterialTypeModal"
+         x-show="isModalOpen('addMaterialTypeModal')"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('addMaterialTypeModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
+          <h5 class="font-semibold">➕ 添加资产类型</h5>
+          <button @click="hideModal('addMaterialTypeModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+        </div>
+        <form @submit.prevent="submitAddMaterialType()">
+          <div class="p-6 space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">资产代码 <span class="text-red-500">*</span></label>
+                <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.asset_code" required placeholder="如: red_shard">
+                <p class="text-xs themed-text-muted mt-1">唯一标识，建议使用小写字母和下划线</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">显示名称 <span class="text-red-500">*</span></label>
+                <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.display_name" required placeholder="如: 红水晶碎片">
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">材料组 <span class="text-red-500">*</span></label>
+                <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.group_code" required placeholder="如: red">
+                <p class="text-xs themed-text-muted mt-1">用于分组，如: red, orange, purple</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">形态 <span class="text-red-500">*</span></label>
+                <select class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.form" required>
+                  <option value="">请选择</option>
+                  <option value="shard">碎片（shard）</option>
+                  <option value="crystal">水晶（crystal）</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">层级 <span class="text-red-500">*</span></label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.tier" required min="1" placeholder="如: 1">
+                <p class="text-xs themed-text-muted mt-1">层级越高价值越大</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">可见价值（积分） <span class="text-red-500">*</span></label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.visible_value_points" required min="0" placeholder="如: 10">
+                <p class="text-xs themed-text-muted mt-1">用于用户展示和说明</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">预算价值（积分） <span class="text-red-500">*</span></label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.budget_value_points" required min="0" placeholder="如: 10">
+                <p class="text-xs themed-text-muted mt-1">用于系统成本控制</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">排序权重</label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.sort_order" value="0">
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">启用状态</label>
+                <select class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.is_enabled">
+                  <option value="1">启用</option>
+                  <option value="0">禁用</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
+            <button type="button" @click="hideModal('addMaterialTypeModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300">取消</button>
+            <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary disabled:opacity-50" :disabled="materialTypeSubmitting">
+              <span x-show="materialTypeSubmitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+              确认添加
+            </button>
+          </div>
+        </form>
       </div>
-      <form @submit.prevent="submitAddMaterialType()">
-        <div class="p-6 space-y-4">
-          <div class="grid grid-cols-2 gap-4">
+    </div>
+
+    <!-- 2. 编辑材料资产类型 Modal -->
+    <div x-ref="editMaterialTypeModal"
+         x-show="isModalOpen('editMaterialTypeModal')"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('editMaterialTypeModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
+          <h5 class="font-semibold">✏️ 编辑资产类型</h5>
+          <button @click="hideModal('editMaterialTypeModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+        </div>
+        <form @submit.prevent="submitEditMaterialType()">
+          <div class="p-6 space-y-4">
             <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">资产代码 <span class="text-red-500">*</span></label>
-              <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.asset_code" required placeholder="如: red_shard">
-              <p class="text-xs themed-text-muted mt-1">唯一标识，建议使用小写字母和下划线</p>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">资产代码</label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg themed-bg-subtle" x-model="materialTypeEditForm.asset_code" disabled>
+              <p class="text-xs themed-text-muted mt-1">资产代码不可修改</p>
             </div>
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">显示名称 <span class="text-red-500">*</span></label>
-              <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.display_name" required placeholder="如: 碎红水晶">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">显示名称 <span class="text-red-500">*</span></label>
+                <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.display_name" required>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">材料组</label>
+                <input type="text" class="w-full px-3 py-2 border rounded-lg themed-bg-subtle" x-model="materialTypeEditForm.group_code" disabled>
+                <p class="text-xs themed-text-muted mt-1">材料组不可修改</p>
+              </div>
             </div>
-          </div>
-          <div class="grid grid-cols-3 gap-4">
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">材料组 <span class="text-red-500">*</span></label>
-              <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.group_code" required placeholder="如: red">
-              <p class="text-xs themed-text-muted mt-1">用于分组，如: red, orange, purple</p>
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">形态</label>
+                <input type="text" class="w-full px-3 py-2 border rounded-lg themed-bg-subtle" :value="getFormLabel(materialTypeEditForm.form)" disabled>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">层级</label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg themed-bg-subtle" x-model="materialTypeEditForm.tier" disabled>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">排序权重</label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.sort_order">
+              </div>
             </div>
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">形态 <span class="text-red-500">*</span></label>
-              <select class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.form" required>
-                <option value="">请选择</option>
-                <option value="shard">碎片（shard）</option>
-                <option value="crystal">水晶（crystal）</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">层级 <span class="text-red-500">*</span></label>
-              <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.tier" required min="1" placeholder="如: 1">
-              <p class="text-xs themed-text-muted mt-1">层级越高价值越大</p>
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">可见价值（积分） <span class="text-red-500">*</span></label>
-              <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.visible_value_points" required min="0" placeholder="如: 10">
-              <p class="text-xs themed-text-muted mt-1">用于用户展示和说明</p>
-            </div>
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">预算价值（积分） <span class="text-red-500">*</span></label>
-              <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.budget_value_points" required min="0" placeholder="如: 10">
-              <p class="text-xs themed-text-muted mt-1">用于系统成本控制</p>
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">排序权重</label>
-              <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.sort_order" value="0">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">可见价值（积分） <span class="text-red-500">*</span></label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.visible_value_points" required min="0">
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">预算价值（积分） <span class="text-red-500">*</span></label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.budget_value_points" required min="0">
+              </div>
             </div>
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">启用状态</label>
-              <select class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.is_enabled">
+              <select class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.is_enabled">
                 <option value="1">启用</option>
                 <option value="0">禁用</option>
               </select>
             </div>
           </div>
-        </div>
-        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
-          <button type="button" @click="hideModal('addMaterialTypeModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300">取消</button>
-          <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary disabled:opacity-50" :disabled="materialTypeSubmitting">
-            <span x-show="materialTypeSubmitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
-            确认添加
-          </button>
-        </div>
-      </form>
+          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
+            <button type="button" @click="hideModal('editMaterialTypeModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300">取消</button>
+            <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary disabled:opacity-50" :disabled="materialTypeSubmitting">
+              <span x-show="materialTypeSubmitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+              保存更新
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
-  </div>
 
-  <!-- 2. 编辑材料资产类型 Modal -->
-  <div x-ref="editMaterialTypeModal"
-       x-show="isModalOpen('editMaterialTypeModal')"
-       x-cloak
-       class="fixed inset-0 z-50 flex items-center justify-center"
-       style="display: none;">
-    <div class="fixed inset-0 bg-black/50" @click="hideModal('editMaterialTypeModal')"></div>
-    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
-      <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
-        <h5 class="font-semibold">✏️ 编辑资产类型</h5>
-        <button @click="hideModal('editMaterialTypeModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+    <!-- 3. 物品实例详情 Modal -->
+    <div x-ref="instanceDetailModal"
+         x-show="isModalOpen('instanceDetailModal')"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('instanceDetailModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
+          <h5 class="font-semibold">📦 物品实例详情</h5>
+          <button @click="hideModal('instanceDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+        </div>
+        <div class="p-6" x-show="instanceDetail">
+          <!-- 基本信息 -->
+          <div class="mb-6">
+            <h6 class="font-medium themed-text-secondary border-b pb-2 mb-3">ℹ️ 基本信息</h6>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">实例ID</label>
+                <div class="font-mono text-sm themed-bg-subtle px-2 py-1 rounded" x-text="instanceDetail?.instance_id"></div>
+              </div>
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">物品名称</label>
+                <div class="font-medium" x-text="instanceDetail?.item_name || instanceDetail?.template_id || '-'"></div>
+              </div>
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">模板ID</label>
+                <div class="font-mono text-sm" x-text="instanceDetail?.template_id || '-'"></div>
+              </div>
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">状态</label>
+                <span class="px-2 py-1 text-xs rounded" :class="getInstanceStatusClass(instanceDetail?.status)" x-text="getInstanceStatusText(instanceDetail?.status)"></span>
+              </div>
+            </div>
+          </div>
+          <!-- 所有者信息 -->
+          <div class="mb-6">
+            <h6 class="font-medium themed-text-secondary border-b pb-2 mb-3">👤 所有者信息</h6>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">用户ID</label>
+                <div x-text="instanceDetail?.owner_user_id || '-'"></div>
+              </div>
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">用户昵称</label>
+                <div x-text="instanceDetail?.owner_nickname || '-'"></div>
+              </div>
+            </div>
+          </div>
+          <!-- 来源和时间 -->
+          <div class="mb-6">
+            <h6 class="font-medium themed-text-secondary border-b pb-2 mb-3">🕐 来源和时间</h6>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">来源</label>
+                <div x-text="instanceDetail?.source || '-'"></div>
+              </div>
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">来源说明</label>
+                <div x-text="instanceDetail?.source_detail || '-'"></div>
+              </div>
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">创建时间</label>
+                <div x-text="formatDate(instanceDetail?.created_at)"></div>
+              </div>
+              <div>
+                <label class="block text-xs themed-text-muted mb-1">更新时间</label>
+                <div x-text="formatDate(instanceDetail?.updated_at)"></div>
+              </div>
+            </div>
+          </div>
+          <!-- 扩展信息 -->
+          <template x-if="instanceDetail?.metadata && Object.keys(instanceDetail.metadata).length > 0">
+            <div>
+              <h6 class="font-medium themed-text-secondary border-b pb-2 mb-3">📋 扩展信息</h6>
+              <pre class="themed-bg-subtle p-3 rounded text-xs overflow-x-auto" x-text="JSON.stringify(instanceDetail.metadata, null, 2)"></pre>
+            </div>
+          </template>
+        </div>
+        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
+          <button @click="hideModal('instanceDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300">关闭</button>
+        </div>
       </div>
-      <form @submit.prevent="submitEditMaterialType()">
-        <div class="p-6 space-y-4">
-          <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">资产代码</label>
-            <input type="text" class="w-full px-3 py-2 border rounded-lg themed-bg-subtle" x-model="materialTypeEditForm.asset_code" disabled>
-            <p class="text-xs themed-text-muted mt-1">资产代码不可修改</p>
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">显示名称 <span class="text-red-500">*</span></label>
-              <input type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.display_name" required>
-            </div>
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">材料组</label>
-              <input type="text" class="w-full px-3 py-2 border rounded-lg themed-bg-subtle" x-model="materialTypeEditForm.group_code" disabled>
-              <p class="text-xs themed-text-muted mt-1">材料组不可修改</p>
-            </div>
-          </div>
-          <div class="grid grid-cols-3 gap-4">
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">形态</label>
-              <input type="text" class="w-full px-3 py-2 border rounded-lg themed-bg-subtle" :value="getFormLabel(materialTypeEditForm.form)" disabled>
-            </div>
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">层级</label>
-              <input type="number" class="w-full px-3 py-2 border rounded-lg themed-bg-subtle" x-model="materialTypeEditForm.tier" disabled>
-            </div>
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">排序权重</label>
-              <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.sort_order">
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">可见价值（积分） <span class="text-red-500">*</span></label>
-              <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.visible_value_points" required min="0">
-            </div>
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">预算价值（积分） <span class="text-red-500">*</span></label>
-              <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.budget_value_points" required min="0">
-            </div>
-          </div>
-          <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">启用状态</label>
-            <select class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.is_enabled">
-              <option value="1">启用</option>
-              <option value="0">禁用</option>
-            </select>
-          </div>
-        </div>
-        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
-          <button type="button" @click="hideModal('editMaterialTypeModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300">取消</button>
-          <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary disabled:opacity-50" :disabled="materialTypeSubmitting">
-            <span x-show="materialTypeSubmitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
-            保存更新
-          </button>
-        </div>
-      </form>
     </div>
-  </div>
 
-  <!-- 3. 物品实例详情 Modal -->
-  <div x-ref="instanceDetailModal"
-       x-show="isModalOpen('instanceDetailModal')"
-       x-cloak
-       class="fixed inset-0 z-50 flex items-center justify-center"
-       style="display: none;">
-    <div class="fixed inset-0 bg-black/50" @click="hideModal('instanceDetailModal')"></div>
-    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
-      <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
-        <h5 class="font-semibold">📦 物品实例详情</h5>
-        <button @click="hideModal('instanceDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
-      </div>
-      <div class="p-6" x-show="instanceDetail">
-        <!-- 基本信息 -->
-        <div class="mb-6">
-          <h6 class="font-medium themed-text-secondary border-b pb-2 mb-3">ℹ️ 基本信息</h6>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs themed-text-muted mb-1">实例ID</label>
-              <div class="font-mono text-sm themed-bg-subtle px-2 py-1 rounded" x-text="instanceDetail?.instance_id"></div>
-            </div>
-            <div>
-              <label class="block text-xs themed-text-muted mb-1">物品名称</label>
-              <div class="font-medium" x-text="instanceDetail?.item_name || instanceDetail?.template_id || '-'"></div>
-            </div>
-            <div>
-              <label class="block text-xs themed-text-muted mb-1">模板ID</label>
-              <div class="font-mono text-sm" x-text="instanceDetail?.template_id || '-'"></div>
-            </div>
-            <div>
-              <label class="block text-xs themed-text-muted mb-1">状态</label>
-              <span class="px-2 py-1 text-xs rounded" :class="getInstanceStatusClass(instanceDetail?.status)" x-text="getInstanceStatusText(instanceDetail?.status)"></span>
-            </div>
-          </div>
-        </div>
-        <!-- 所有者信息 -->
-        <div class="mb-6">
-          <h6 class="font-medium themed-text-secondary border-b pb-2 mb-3">👤 所有者信息</h6>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs themed-text-muted mb-1">用户ID</label>
-              <div x-text="instanceDetail?.owner_user_id || '-'"></div>
-            </div>
-            <div>
-              <label class="block text-xs themed-text-muted mb-1">用户昵称</label>
-              <div x-text="instanceDetail?.owner_nickname || '-'"></div>
-            </div>
-          </div>
-        </div>
-        <!-- 来源和时间 -->
-        <div class="mb-6">
-          <h6 class="font-medium themed-text-secondary border-b pb-2 mb-3">🕐 来源和时间</h6>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs themed-text-muted mb-1">来源</label>
-              <div x-text="instanceDetail?.source || '-'"></div>
-            </div>
-            <div>
-              <label class="block text-xs themed-text-muted mb-1">来源说明</label>
-              <div x-text="instanceDetail?.source_detail || '-'"></div>
-            </div>
-            <div>
-              <label class="block text-xs themed-text-muted mb-1">创建时间</label>
-              <div x-text="formatDate(instanceDetail?.created_at)"></div>
-            </div>
-            <div>
-              <label class="block text-xs themed-text-muted mb-1">更新时间</label>
-              <div x-text="formatDate(instanceDetail?.updated_at)"></div>
-            </div>
-          </div>
-        </div>
-        <!-- 扩展信息 -->
-        <template x-if="instanceDetail?.metadata && Object.keys(instanceDetail.metadata).length > 0">
-          <div>
-            <h6 class="font-medium themed-text-secondary border-b pb-2 mb-3">📋 扩展信息</h6>
-            <pre class="themed-bg-subtle p-3 rounded text-xs overflow-x-auto" x-text="JSON.stringify(instanceDetail.metadata, null, 2)"></pre>
-          </div>
-        </template>
-      </div>
-      <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
-        <button @click="hideModal('instanceDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300">关闭</button>
-      </div>
-    </div>
-  </div>
+  </div><!-- 关闭 x-data="assetManagement()" 作用域 -->
 
   <!-- 页面专属逻辑 -->
   <%- include('partials/footer') %>

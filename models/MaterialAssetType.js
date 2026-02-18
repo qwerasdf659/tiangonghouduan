@@ -75,7 +75,7 @@ module.exports = sequelize => {
       display_name: {
         type: DataTypes.STRING(100),
         allowNull: false,
-        comment: '展示名称（Display Name - 用户可见名称）：如"红色碎片""红色水晶"'
+        comment: '展示名称（Display Name - 用户可见名称）：如"红水晶碎片""红水晶"'
       },
 
       // 图标URL（Icon URL - 资产图标）V4.7.0 新增

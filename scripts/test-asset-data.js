@@ -45,7 +45,7 @@ async function main() {
       const testTypes = [
         {
           asset_code: 'red_shard',
-          display_name: '红色碎片',
+          display_name: '红水晶碎片',
           group_code: 'red',
           form: 'shard',
           tier: 1,
@@ -56,7 +56,7 @@ async function main() {
         },
         {
           asset_code: 'red_crystal',
-          display_name: '红色水晶',
+          display_name: '红水晶',
           group_code: 'red',
           form: 'crystal',
           tier: 2,

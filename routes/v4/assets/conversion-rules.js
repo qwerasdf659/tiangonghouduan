@@ -49,7 +49,7 @@ const logger = require('../../../utils/logger').logger
  *         "enabled": true,
  *         "limits": { "min_from_amount": 1, "max_from_amount": null },
  *         "fee": { "fee_rate": 0.05, "fee_min_amount": 10 },
- *         "display": { "title": "红晶片分解", "description": "...", "risk_level": "low" }
+ *         "display": { "title": "红水晶碎片分解", "description": "...", "risk_level": "low" }
  *       }
  *     ],
  *     "total_rules": 1

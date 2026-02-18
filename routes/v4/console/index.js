@@ -70,6 +70,7 @@ const itemsRoutes = require('./items') // 🆕 物品监控（2026-02-03 运营�
 const itemInstancesRoutes = require('./item-instances') // 🆕 物品实例管理（2026-02-15 修复404缺失路由）
 const lotteryRoutes = require('./lottery') // 🆕 抽奖分析Dashboard（2026-02-04 运营仪表盘E2E测试）
 const bidManagementRoutes = require('./bid-management') // 🆕 竞价管理（2026-02-16 臻选空间/幸运空间/竞价功能 Phase 3.7）
+const userDataQueryRoutes = require('./user-data-query') // 🆕 用户数据查询（2026-02-18 用户全维度数据检索看板）
 
 // P2新增路由（2026-01-31 第2阶段任务）
 const reminderRulesRoutes = require('./reminder-rules') // 🆕 智能提醒规则管理（B-31~B-35）
@@ -139,6 +140,7 @@ router.use('/items', itemsRoutes) // 🆕 物品监控路由（2026-02-03 运营
 router.use('/item-instances', itemInstancesRoutes) // 🆕 物品实例管理路由（2026-02-15 管理员物品CRUD）
 router.use('/lottery', lotteryRoutes) // 🆕 抽奖分析Dashboard路由（2026-02-04 运营仪表盘E2E测试）
 router.use('/bid-management', bidManagementRoutes) // 🆕 竞价管理路由（2026-02-16 臻选空间/幸运空间/竞价功能 Phase 3.7）
+router.use('/user-data-query', userDataQueryRoutes) // 🆕 用户数据查询路由（2026-02-18 用户全维度数据检索看板）
 
 // P2新增路由（2026-01-31 第2阶段任务）
 router.use('/reminder-rules', reminderRulesRoutes) // 🆕 智能提醒规则管理路由（B-31~B-35）
@@ -668,6 +670,20 @@ router.get('/', (req, res) => {
         description: '抽奖分析（2026-01-28 P2 运营日报聚合）',
         endpoints: ['/lottery-analytics/daily-report'],
         note: '运营日报聚合：当日汇总、昨日/上周对比、告警、小时分布、档位分布、热门奖品、活动分布；仅限 admin 访问'
+      },
+      user_data_query: {
+        description: '用户数据查询（2026-02-18 用户全维度数据检索）',
+        endpoints: [
+          '/user-data-query/search',
+          '/user-data-query/:user_id/overview',
+          '/user-data-query/:user_id/asset-transactions',
+          '/user-data-query/:user_id/lottery-draws',
+          '/user-data-query/:user_id/exchange-records',
+          '/user-data-query/:user_id/trade-records',
+          '/user-data-query/:user_id/market-listings',
+          '/user-data-query/:user_id/conversions'
+        ],
+        note: '用户全维度数据检索：资产流水、抽奖记录、兑换记录、交易记录、市场挂牌、材料转换；仅限 admin 访问'
       }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },

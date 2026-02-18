@@ -49,8 +49,8 @@ const logger = require('../../../../utils/logger').logger
  *           "fee_asset_code": "DIAMOND"
  *         },
  *         "display": {
- *           "title": "红晶片分解",
- *           "description": "将红晶片分解为钻石",
+ *           "title": "红水晶碎片分解",
+ *           "description": "将红水晶碎片分解为钻石",
  *           "display_icon": "/icons/red-shard.png",
  *           "risk_level": "low"
  *         }

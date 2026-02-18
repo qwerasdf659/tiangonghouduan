@@ -341,7 +341,7 @@ router.get('/asset-types/:code', authenticateToken, requireRoleLevel(100), async
  *
  * Body参数（必填）：
  * - asset_code: 资产代码（如 'red_shard'，必须唯一）
- * - display_name: 展示名称（如 '红色碎片'）
+ * - display_name: 展示名称（如 '红水晶碎片'）
  * - group_code: 分组代码（如 'red'）
  * - form: 形态（'shard' 或 'crystal'）
  * - tier: 层级（数字，如 1）

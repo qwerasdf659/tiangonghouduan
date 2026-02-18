@@ -3,7 +3,7 @@
  * 材料资产支付兑换市场核心表（V4.5.0统一版）
  *
  * 业务场景：
- * - 用户通过抽奖、转换等途径获得材料资产（碎红水晶、完整红水晶等）
+ * - 用户通过抽奖、转换等途径获得材料资产（红水晶碎片、红水晶等）
  * - 材料资产存入统一账本（Account + AccountAssetBalance）
  * - 用户使用材料资产兑换商品（通过 BalanceService.changeBalance() 扣减）
  *
@@ -63,13 +63,13 @@ module.exports = sequelize => {
         type: DataTypes.STRING(50),
         allowNull: false,
         comment:
-          '成本资产代码（Cost Asset Code - 兑换商品消耗的材料资产类型）：red_shard-碎红水晶、red_crystal-完整红水晶等；业务规则：必填字段；支持多种材料资产扩展；用途：兑换支付资产类型、库存扣减依据、成本核算基础'
+          '成本资产代码（Cost Asset Code - 兑换商品消耗的材料资产类型）：red_shard-红水晶碎片、red_crystal-红水晶等；业务规则：必填字段；支持多种材料资产扩展；用途：兑换支付资产类型、库存扣减依据、成本核算基础'
       },
       cost_amount: {
         type: DataTypes.BIGINT,
         allowNull: false,
         comment:
-          '成本数量（Cost Amount - 兑换单件商品需要的材料数量）：单位根据cost_asset_code确定（如10个碎红水晶）；业务规则：必填字段；使用BIGINT避免浮点精度问题；数据范围：1-1000000；用途：兑换扣减材料数量、成本核算、商品定价参考'
+          '成本数量（Cost Amount - 兑换单件商品需要的材料数量）：单位根据cost_asset_code确定（如10个红水晶碎片）；业务规则：必填字段；使用BIGINT避免浮点精度问题；数据范围：1-1000000；用途：兑换扣减材料数量、成本核算、商品定价参考'
       },
 
       // 成本和库存

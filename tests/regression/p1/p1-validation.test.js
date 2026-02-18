@@ -31,7 +31,7 @@ describe('P1 修复验证测试', () => {
     const testMaterials = [
       {
         asset_code: 'test_red_shard',
-        display_name: '测试红色碎片',
+        display_name: '测试红水晶碎片',
         group_code: 'red',
         form: 'shard',
         tier: 1,
@@ -53,7 +53,7 @@ describe('P1 修复验证测试', () => {
       },
       {
         asset_code: 'test_red_crystal',
-        display_name: '测试红色水晶',
+        display_name: '测试红水晶',
         group_code: 'red',
         form: 'crystal',
         tier: 1,

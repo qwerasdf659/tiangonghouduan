@@ -322,7 +322,7 @@
  *
  * @typedef {Object} MaterialAssetType
  * @property {string} asset_code - 资产代码（如 'red_shard'）
- * @property {string} display_name - 显示名称（如 '红色碎片'）
+ * @property {string} display_name - 显示名称（如 '红水晶碎片'）
  * @property {string} group_code - 分组代码（如 'red', 'blue'）
  * @property {string} form - 形态（'shard' 碎片 / 'crystal' 水晶）
  * @property {number} tier - 层级

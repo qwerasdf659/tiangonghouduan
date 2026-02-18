@@ -48,7 +48,7 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * POST /api/v4/shop/assets/convert
  *
  * 业务场景：
- * - 用户主动进行材料转换（如碎红水晶分解为钻石）
+ * - 用户主动进行材料转换（如红水晶碎片分解为钻石）
  * - 支持强幂等性，防止重复转换
  * - 规则驱动：支持任意在 material_conversion_rules 表中配置的转换规则
  * - 支持手续费机制（三方记账）
@@ -78,8 +78,8 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  *     "is_duplicate": false,
  *     "conversion_info": {
  *       "rule_id": 1,
- *       "title": "红晶片分解",
- *       "rate_description": "1碎红水晶 = 20钻石",
+ *       "title": "红水晶碎片分解",
+ *       "rate_description": "1红水晶碎片 = 20钻石",
  *       "fee_rate": 0,
  *       "fee_description": "无手续费"
  *     }
@@ -215,7 +215,7 @@ router.post('/convert', authenticateToken, async (req, res) => {
           parsedAmount,
           {
             idempotency_key,
-            title: '碎红水晶分解为钻石',
+            title: '红水晶碎片分解为钻石',
             meta: {
               source: 'api',
               endpoint: '/api/v4/shop/assets/convert',
@@ -335,7 +335,7 @@ router.post('/convert', authenticateToken, async (req, res) => {
         'INSUFFICIENT_BALANCE',
         {
           error: error.message,
-          hint: '请先获取足够的碎红水晶再进行转换'
+          hint: '请先获取足够的红水晶碎片再进行转换'
         },
         403
       )

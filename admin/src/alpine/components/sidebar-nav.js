@@ -137,6 +137,11 @@ export function sidebarNav() {
             id: 'lottery-presets',
             name: '🎯 抽奖干预管理',
             url: '/admin/presets.html'
+          },
+          {
+            id: 'material-conversion',
+            name: '🔄 材料转换管理',
+            url: '/admin/material-conversion.html'
           }
         ]
       },
@@ -186,7 +191,8 @@ export function sidebarNav() {
         icon: '📈',
         items: [
           { id: 'stats', name: '统计报表', url: '/admin/statistics.html' },
-          { id: 'analytics', name: '运营分析', url: '/admin/analytics.html' }
+          { id: 'analytics', name: '运营分析', url: '/admin/analytics.html' },
+          { id: 'user-data-query', name: '用户数据查询', url: '/admin/user-data-query.html' }
         ]
       },
 

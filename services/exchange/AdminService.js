@@ -6,7 +6,9 @@
  * - createExchangeItem(): 创建兑换商品
  * - updateExchangeItem(): 更新兑换商品
  * - deleteExchangeItem(): 删除兑换商品
- * - getUserListingStats(): 获取用户上架统计
+ * - getUserListingStats(): 获取用户上架统计（支持手机号搜索）
+ * - getUserListings(): 查询指定用户的上架商品列表
+ * - updateUserListingLimit(): 更新用户个性化上架数量限制
  * - checkTimeoutAndAlert(): 检查超时订单并告警
  * - getAdminMarketItems(): 管理后台获取商品列表
  * - getMarketItemStatistics(): 获取商品统计数据
@@ -496,13 +498,48 @@ class AdminService {
    */
   async getUserListingStats(options) {
     try {
-      const { page = 1, limit = 20, filter = 'all', max_listings = 3 } = options
+      const { page = 1, limit = 20, filter = 'all', max_listings = 3, mobile } = options
 
-      logger.info('[兑换市场] 管理员获取用户上架统计', { page, limit, filter, max_listings })
+      logger.info('[兑换市场] 管理员获取用户上架统计', {
+        page,
+        limit,
+        filter,
+        max_listings,
+        mobile
+      })
 
-      // 查询所有用户的在售商品数量
+      // 手机号搜索：先查找匹配的用户
+      let mobileFilterUserIds = null
+      if (mobile && mobile.trim()) {
+        const matchedUsers = await this.User.findAll({
+          where: { mobile: { [Op.like]: `%${mobile.trim()}%` } },
+          attributes: ['user_id'],
+          raw: true
+        })
+        mobileFilterUserIds = matchedUsers.map(u => u.user_id)
+
+        if (mobileFilterUserIds.length === 0) {
+          return {
+            stats: [],
+            pagination: { page, limit, total: 0, total_pages: 0 },
+            summary: {
+              total_users_with_listings: 0,
+              users_at_limit: 0,
+              users_near_limit: 0,
+              total_listings: 0
+            }
+          }
+        }
+      }
+
+      // 查询在售商品数量（如有手机号筛选则限定卖家范围）
+      const listingWhere = { status: 'on_sale' }
+      if (mobileFilterUserIds) {
+        listingWhere.seller_user_id = mobileFilterUserIds
+      }
+
       const listingCounts = await this.MarketListing.findAll({
-        where: { status: 'on_sale' },
+        where: listingWhere,
         attributes: [
           'seller_user_id',
           [this.sequelize.fn('COUNT', this.sequelize.col('market_listing_id')), 'count']
@@ -511,74 +548,81 @@ class AdminService {
         raw: true
       })
 
-      // 根据筛选条件过滤用户
-      let filteredUserIds = []
-      if (filter === 'at_limit') {
-        filteredUserIds = listingCounts
-          .filter(item => parseInt(item.count) >= max_listings)
-          .map(item => item.seller_user_id)
-      } else if (filter === 'near_limit') {
-        filteredUserIds = listingCounts
-          .filter(item => {
-            const count = parseInt(item.count)
-            return count >= max_listings * 0.8 && count < max_listings
-          })
-          .map(item => item.seller_user_id)
-      } else {
-        filteredUserIds = listingCounts.map(item => item.seller_user_id)
-      }
+      // 查询所有相关用户（含 max_active_listings 个性化配置）
+      const allUserIds = listingCounts.map(item => item.seller_user_id)
+      const allUsers =
+        allUserIds.length > 0
+          ? await this.User.findAll({
+              where: { user_id: allUserIds },
+              attributes: ['user_id', 'mobile', 'nickname', 'status', 'max_active_listings'],
+              raw: true
+            })
+          : []
+      const userMap = new Map(allUsers.map(u => [u.user_id, u]))
 
-      // 分页处理
-      const total = filteredUserIds.length
-      const offset = (page - 1) * limit
-      const paginatedUserIds = filteredUserIds.slice(offset, offset + limit)
-
-      // 查询用户详情
-      const users = await this.User.findAll({
-        where: { user_id: paginatedUserIds },
-        attributes: ['user_id', 'mobile', 'nickname', 'status']
+      // 为每个用户计算实际上限（个性化优先，全局兜底）
+      const enrichedCounts = listingCounts.map(item => {
+        const user = userMap.get(item.seller_user_id)
+        const userLimit = user?.max_active_listings ?? max_listings
+        const count = parseInt(item.count)
+        return { ...item, count, user_limit: userLimit }
       })
 
-      // 构建统计结果
-      const stats = users.map(user => {
-        const count = listingCounts.find(item => item.seller_user_id === user.user_id)
-        const listingCount = count ? parseInt(count.count) : 0
+      // 根据筛选条件过滤
+      let filteredItems = []
+      if (filter === 'at_limit') {
+        filteredItems = enrichedCounts.filter(item => item.count >= item.user_limit)
+      } else if (filter === 'near_limit') {
+        filteredItems = enrichedCounts.filter(item => {
+          return item.count >= item.user_limit * 0.8 && item.count < item.user_limit
+        })
+      } else {
+        filteredItems = enrichedCounts
+      }
+
+      // 分页
+      const total = filteredItems.length
+      const offset = (page - 1) * limit
+      const paginatedItems = filteredItems.slice(offset, offset + limit)
+
+      // 构建统计结果（含个性化上限信息）
+      const stats = paginatedItems.map(item => {
+        const user = userMap.get(item.seller_user_id)
+        const userLimit = item.user_limit
         return {
-          user_id: user.user_id,
-          mobile: user.mobile,
-          nickname: user.nickname,
-          status: user.status,
-          listing_count: listingCount,
-          remaining_quota: Math.max(0, max_listings - listingCount),
-          is_at_limit: listingCount >= max_listings
+          user_id: item.seller_user_id,
+          mobile: user?.mobile || '',
+          nickname: user?.nickname || '',
+          status: user?.status || '',
+          listing_count: item.count,
+          max_active_listings: userLimit,
+          is_custom_limit:
+            user?.max_active_listings !== null && user?.max_active_listings !== undefined,
+          remaining_quota: Math.max(0, userLimit - item.count),
+          is_at_limit: item.count >= userLimit
         }
       })
 
       // 汇总统计
       const summary = {
         total_users_with_listings: listingCounts.length,
-        users_at_limit: listingCounts.filter(item => parseInt(item.count) >= max_listings).length,
-        users_near_limit: listingCounts.filter(item => {
-          const count = parseInt(item.count)
-          return count >= max_listings * 0.8 && count < max_listings
+        users_at_limit: enrichedCounts.filter(item => item.count >= item.user_limit).length,
+        users_near_limit: enrichedCounts.filter(item => {
+          return item.count >= item.user_limit * 0.8 && item.count < item.user_limit
         }).length,
-        total_listings: listingCounts.reduce((sum, item) => sum + parseInt(item.count), 0)
+        total_listings: enrichedCounts.reduce((sum, item) => sum + item.count, 0)
       }
 
       const result = {
         stats,
-        pagination: {
-          page,
-          limit,
-          total,
-          total_pages: Math.ceil(total / limit)
-        },
+        pagination: { page, limit, total, total_pages: Math.ceil(total / limit) },
         summary
       }
 
       logger.info('[兑换市场] 用户上架统计查询成功', {
         total_users: result.summary.total_users_with_listings,
-        filtered_count: result.pagination.total
+        filtered_count: result.pagination.total,
+        mobile_filter: mobile || null
       })
 
       return result
@@ -589,6 +633,164 @@ class AdminService {
         options
       })
       throw error
+    }
+  }
+
+  /**
+   * 查询指定用户的上架商品列表（管理员操作）
+   *
+   * @param {Object} options - 查询选项
+   * @param {number} options.user_id - 用户ID
+   * @param {string} [options.status] - 挂牌状态筛选（on_sale/locked/sold/withdrawn/admin_withdrawn）
+   * @param {number} [options.page=1] - 页码
+   * @param {number} [options.page_size=20] - 每页数量
+   * @returns {Promise<Object>} 用户挂牌列表和用户信息
+   */
+  async getUserListings(options) {
+    try {
+      const { user_id, status, page = 1, page_size = 20 } = options
+
+      if (!user_id) throw new Error('user_id 是必填参数')
+
+      logger.info('[兑换市场] 管理员查询用户上架列表', { user_id, status, page, page_size })
+
+      // 查询用户信息
+      const user = await this.User.findByPk(user_id, {
+        attributes: ['user_id', 'mobile', 'nickname', 'status', 'max_active_listings']
+      })
+      if (!user) throw new Error(`用户不存在: ${user_id}`)
+
+      // 构建查询条件
+      const where = { seller_user_id: user_id }
+      if (status) where.status = status
+
+      // 查询挂牌列表
+      const { count, rows } = await this.MarketListing.findAndCountAll({
+        where,
+        order: [['created_at', 'DESC']],
+        limit: parseInt(page_size),
+        offset: (parseInt(page) - 1) * parseInt(page_size)
+      })
+
+      // 获取全局默认上限
+      const AdminSystemService = require('../AdminSystemService')
+      const globalMaxListings = await AdminSystemService.getSettingValue(
+        'marketplace',
+        'max_active_listings',
+        10
+      )
+
+      const userMaxListings = user.max_active_listings ?? globalMaxListings
+      const activeCount = await this.MarketListing.count({
+        where: { seller_user_id: user_id, status: 'on_sale' }
+      })
+
+      return {
+        user: {
+          user_id: user.user_id,
+          mobile: user.mobile,
+          nickname: user.nickname,
+          status: user.status,
+          max_active_listings: userMaxListings,
+          is_custom_limit: user.max_active_listings !== null,
+          active_listing_count: activeCount,
+          remaining_quota: Math.max(0, userMaxListings - activeCount)
+        },
+        listings: rows.map(listing => listing.toJSON()),
+        pagination: {
+          page: parseInt(page),
+          page_size: parseInt(page_size),
+          total: count,
+          total_pages: Math.ceil(count / parseInt(page_size))
+        }
+      }
+    } catch (error) {
+      logger.error('[兑换市场] 查询用户上架列表失败:', {
+        error: error.message,
+        options
+      })
+      throw error
+    }
+  }
+
+  /**
+   * 更新指定用户的上架数量限制（管理员操作）
+   *
+   * @param {Object} params - 更新参数
+   * @param {number} params.user_id - 目标用户ID
+   * @param {number|null} params.max_active_listings - 新的上架数量限制（null=恢复使用全局默认）
+   * @param {number} params.operator_id - 操作员（管理员）ID
+   * @param {string} [params.reason] - 调整原因
+   * @param {Object} options - 事务选项
+   * @param {Transaction} options.transaction - 外部事务对象（必填）
+   * @returns {Promise<Object>} 更新结果
+   */
+  async updateUserListingLimit(params, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'AdminService.updateUserListingLimit')
+    const { user_id, max_active_listings, operator_id, reason = '' } = params
+
+    if (!user_id) throw new Error('user_id 是必填参数')
+    if (!operator_id) throw new Error('operator_id 是必填参数')
+
+    // max_active_listings 可以是 null（恢复全局默认）或正整数
+    if (max_active_listings !== null && max_active_listings !== undefined) {
+      const parsed = parseInt(max_active_listings)
+      if (isNaN(parsed) || parsed < 0 || parsed > 1000) {
+        throw new Error('max_active_listings 必须是 0~1000 之间的整数，或为 null（恢复全局默认）')
+      }
+    }
+
+    logger.info('[兑换市场] 管理员调整用户上架限制', {
+      user_id,
+      max_active_listings,
+      operator_id,
+      reason
+    })
+
+    const user = await this.User.findByPk(user_id, {
+      attributes: ['user_id', 'mobile', 'nickname', 'max_active_listings'],
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
+    if (!user) throw new Error(`用户不存在: ${user_id}`)
+
+    const oldLimit = user.max_active_listings
+    const newLimit =
+      max_active_listings === null || max_active_listings === undefined
+        ? null
+        : parseInt(max_active_listings)
+
+    await user.update({ max_active_listings: newLimit }, { transaction })
+
+    // 获取全局默认值用于响应
+    const AdminSystemService = require('../AdminSystemService')
+    const globalMaxListings = await AdminSystemService.getSettingValue(
+      'marketplace',
+      'max_active_listings',
+      10
+    )
+
+    const effectiveLimit = newLimit ?? globalMaxListings
+
+    logger.info('[兑换市场] 用户上架限制调整成功', {
+      user_id,
+      old_limit: oldLimit,
+      new_limit: newLimit,
+      effective_limit: effectiveLimit,
+      operator_id,
+      reason
+    })
+
+    return {
+      user_id: user.user_id,
+      mobile: user.mobile,
+      nickname: user.nickname,
+      old_limit: oldLimit,
+      new_limit: newLimit,
+      effective_limit: effectiveLimit,
+      is_custom_limit: newLimit !== null,
+      global_default: globalMaxListings,
+      reason
     }
   }
 

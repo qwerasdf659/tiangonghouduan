@@ -760,12 +760,17 @@ class MarketListingCoreService {
       'MarketListingCoreService.createFungibleAssetListing'
     )
 
-    // 挂牌数量限制检查
+    // 挂牌数量限制检查（优先使用用户个性化配置，兜底全局默认值）
     const activeListingCount = await MarketListing.count({
       where: { seller_user_id, status: 'on_sale' },
       transaction
     })
-    const maxActiveListings = await MarketListingCoreService.getListingConfig('max_active_listings')
+    const sellerUser = await User.findByPk(seller_user_id, {
+      attributes: ['max_active_listings'],
+      transaction
+    })
+    const globalMaxListings = await MarketListingCoreService.getListingConfig('max_active_listings')
+    const maxActiveListings = sellerUser?.max_active_listings ?? globalMaxListings
     if (activeListingCount >= maxActiveListings) {
       const error = new Error(
         `超出挂牌数量限制：当前已有 ${activeListingCount} 个活跃挂牌，最多允许 ${maxActiveListings} 个`

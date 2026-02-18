@@ -406,7 +406,7 @@ export const AssetAPI = {
    * // 查询所有启用的转换规则
    * const result = await AssetAPI.getConversionRules({ is_enabled: true })
    *
-   * // 查询红色碎片的转换规则
+   * // 查询红水晶碎片的转换规则
    * const result2 = await AssetAPI.getConversionRules({
    *   from_asset_code: 'red_shard',
    *   page: 1,
@@ -418,6 +418,112 @@ export const AssetAPI = {
   async getConversionRules(params = {}) {
     const url = ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULES + buildQueryString(params)
     return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取单个材料转换规则详情（管理员）
+   *
+   * @async
+   * @function getConversionRuleDetail
+   * @param {number} ruleId - 转换规则ID（事务实体，使用数字ID）
+   * @returns {Promise<Object>} 规则详情
+   * @see GET /api/v4/console/material/conversion-rules/:id
+   */
+  async getConversionRuleDetail(ruleId) {
+    const url = buildURL(ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULE_DETAIL, { rule_id: ruleId })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 创建材料转换规则（管理员，版本化：改比例必须新增规则）
+   *
+   * @async
+   * @function createConversionRule
+   * @param {Object} data - 规则参数
+   * @param {string} data.from_asset_code - 源资产代码（如 'red_shard'）
+   * @param {string} data.to_asset_code - 目标资产代码（如 'DIAMOND'）
+   * @param {number} data.from_amount - 源资产数量
+   * @param {number} data.to_amount - 目标资产数量
+   * @param {string} data.effective_at - 生效时间（ISO8601，含 +08:00 时区）
+   * @param {boolean} [data.is_enabled=true] - 是否启用
+   * @param {number} [data.min_from_amount] - 最小转换数量
+   * @param {number} [data.max_from_amount] - 最大转换数量（null=无上限）
+   * @param {number} [data.fee_rate] - 手续费费率（如 0.05 = 5%）
+   * @param {number} [data.fee_min_amount] - 最低手续费
+   * @param {string} [data.fee_asset_code] - 手续费资产类型
+   * @param {string} [data.title] - 规则标题
+   * @param {string} [data.description] - 规则描述
+   * @param {string} [data.risk_level] - 风险等级（low/medium/high）
+   * @param {boolean} [data.is_visible=true] - 前端是否可见
+   * @param {string} [data.rounding_mode='floor'] - 舍入模式（floor/ceil/round）
+   * @returns {Promise<Object>} 创建结果
+   * @see POST /api/v4/console/material/conversion-rules
+   */
+  async createConversionRule(data) {
+    return await request({ url: ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULES, method: 'POST', data })
+  },
+
+  /**
+   * 禁用材料转换规则（管理员，不可删除/修改，仅禁用）
+   *
+   * @async
+   * @function disableConversionRule
+   * @param {number} ruleId - 转换规则ID
+   * @returns {Promise<Object>} 禁用结果
+   * @see PUT /api/v4/console/material/conversion-rules/:id/disable
+   */
+  async disableConversionRule(ruleId) {
+    const url = buildURL(ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULE_DISABLE, { rule_id: ruleId })
+    return await request({ url, method: 'PUT' })
+  },
+
+  /**
+   * 创建材料资产类型（管理员）
+   *
+   * @async
+   * @function createAssetType
+   * @param {Object} data - 资产类型参数
+   * @param {string} data.asset_code - 资产代码（唯一，如 'red_shard'）
+   * @param {string} data.display_name - 展示名称
+   * @param {string} data.group_code - 分组代码（如 'red'、'orange'）
+   * @param {string} data.form - 形态（'shard' 或 'crystal'）
+   * @param {number} data.tier - 层级
+   * @param {number} [data.sort_order=0] - 排序权重
+   * @param {boolean} [data.is_enabled=true] - 是否启用
+   * @returns {Promise<Object>} 创建结果
+   * @see POST /api/v4/console/material/asset-types
+   */
+  async createAssetType(data) {
+    return await request({ url: ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES, method: 'POST', data })
+  },
+
+  /**
+   * 更新材料资产类型（管理员，asset_code 不可更新）
+   *
+   * @async
+   * @function updateAssetType
+   * @param {string} assetCode - 资产类型代码（配置实体，使用业务码）
+   * @param {Object} data - 可更新字段
+   * @returns {Promise<Object>} 更新结果
+   * @see PUT /api/v4/console/material/asset-types/:code
+   */
+  async updateAssetType(assetCode, data) {
+    const url = buildURL(ASSET_ENDPOINTS.MATERIAL_ASSET_TYPE_DETAIL, { asset_code: assetCode })
+    return await request({ url, method: 'PUT', data })
+  },
+
+  /**
+   * 禁用材料资产类型（管理员）
+   *
+   * @async
+   * @function disableAssetType
+   * @param {string} assetCode - 资产类型代码
+   * @returns {Promise<Object>} 禁用结果
+   * @see PUT /api/v4/console/material/asset-types/:code/disable
+   */
+  async disableAssetType(assetCode) {
+    const url = buildURL(ASSET_ENDPOINTS.MATERIAL_ASSET_TYPE_DISABLE, { asset_code: assetCode })
+    return await request({ url, method: 'PUT' })
   },
 
   // 用户材料余额：通过 getUserBalances(userId) 统一查询
