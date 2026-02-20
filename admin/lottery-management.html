@@ -3357,17 +3357,29 @@
       <div x-show="current_page === 'strategy-simulation'" x-cloak>
 
         <!-- 页面引导说明 -->
-        <div class="rounded-lg p-4 mb-6 bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg">
-          <div class="flex items-start gap-3">
-            <span class="text-2xl mt-0.5">🧪</span>
-            <div>
-              <h5 class="font-semibold text-lg mb-1">策略效果模拟分析</h5>
-              <p class="text-sm opacity-90">通过 Monte Carlo 模拟引擎预览参数调整效果，在不影响线上的情况下评估不同配置方案。</p>
-              <div class="flex flex-wrap gap-3 mt-3 text-xs">
-                <span class="px-2 py-1 bg-white/20 rounded">🎯 参数沙盒 — 安全调参</span>
-                <span class="px-2 py-1 bg-white/20 rounded">📊 对比分析 — 当前 vs 模拟</span>
-                <span class="px-2 py-1 bg-white/20 rounded">👤 用户旅程 — 逐次透视</span>
-                <span class="px-2 py-1 bg-white/20 rounded">📈 灵敏度 — 参数扫射</span>
+        <div class="rounded-xl p-5 mb-6 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-lg">
+          <div class="flex items-start gap-4">
+            <div class="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-2xl flex-shrink-0">🧪</div>
+            <div class="flex-1">
+              <h5 class="font-bold text-lg mb-1">策略效果模拟分析</h5>
+              <p class="text-sm opacity-90 mb-3">通过 Monte Carlo 模拟引擎预览参数调整效果，在不影响线上的情况下评估不同配置方案。所有数据均来自真实数据库。</p>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                <div class="flex items-center gap-2 px-3 py-2 bg-white/15 rounded-lg backdrop-blur-sm">
+                  <span class="w-6 h-6 rounded-full bg-white/25 flex items-center justify-center font-bold">1</span>
+                  <span>参数沙盒 — 调整参数</span>
+                </div>
+                <div class="flex items-center gap-2 px-3 py-2 bg-white/15 rounded-lg backdrop-blur-sm">
+                  <span class="w-6 h-6 rounded-full bg-white/25 flex items-center justify-center font-bold">2</span>
+                  <span>运行模拟 — 预测效果</span>
+                </div>
+                <div class="flex items-center gap-2 px-3 py-2 bg-white/15 rounded-lg backdrop-blur-sm">
+                  <span class="w-6 h-6 rounded-full bg-white/25 flex items-center justify-center font-bold">3</span>
+                  <span>对比分析 — 评估差异</span>
+                </div>
+                <div class="flex items-center gap-2 px-3 py-2 bg-white/15 rounded-lg backdrop-blur-sm">
+                  <span class="w-6 h-6 rounded-full bg-white/25 flex items-center justify-center font-bold">4</span>
+                  <span>确认应用 — 上线生效</span>
+                </div>
               </div>
             </div>
           </div>
@@ -3375,217 +3387,391 @@
 
         <!-- 加载中状态 -->
         <template x-if="loading_baseline">
-          <div class="flex justify-center items-center py-16">
-            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500"></div>
-            <span class="ml-3 text-gray-500">加载基线数据...</span>
+          <div class="flex flex-col justify-center items-center py-20">
+            <div class="animate-spin rounded-full h-12 w-12 border-4 border-emerald-200 border-t-emerald-600"></div>
+            <span class="mt-4 text-gray-500 text-sm">正在加载基线数据，请稍候...</span>
           </div>
         </template>
 
         <!-- 主内容区域 -->
         <template x-if="simulation_baseline && !loading_baseline">
           <div>
+            <!-- 当前活动概览条 -->
+            <div class="themed-card rounded-xl shadow-sm p-4 mb-5 border-l-4 border-emerald-500">
+              <div class="flex items-center justify-between flex-wrap gap-3">
+                <div class="flex items-center gap-4">
+                  <div class="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+                    <span class="text-emerald-600 font-bold text-sm" x-text="'#' + simulation_baseline.campaign?.lottery_campaign_id"></span>
+                  </div>
+                  <div>
+                    <h6 class="font-semibold text-sm" x-text="simulation_baseline.campaign?.campaign_name"></h6>
+                    <div class="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
+                      <span>累计抽奖: <span class="font-bold text-gray-700" x-text="(simulation_baseline.actual_distribution?.total_draws || 0).toLocaleString()"></span> 次</span>
+                      <span>|</span>
+                      <span>奖品: <span class="font-bold text-gray-700" x-text="simulation_baseline.prizes?.length || 0"></span> 个</span>
+                      <span>|</span>
+                      <span>矩阵: <span class="font-bold text-gray-700" x-text="simulation_baseline.matrix_config?.length || 0"></span> 格</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-4 text-xs">
+                  <div class="text-center px-3 py-1.5 rounded-lg bg-yellow-50">
+                    <div class="text-yellow-600 font-bold text-base" x-text="(simulation_baseline.actual_distribution?.tier_distribution?.high || 0).toFixed(1) + '%'"></div>
+                    <div class="text-yellow-500 mt-0.5">高档率</div>
+                  </div>
+                  <div class="text-center px-3 py-1.5 rounded-lg bg-blue-50">
+                    <div class="text-blue-600 font-bold text-base" x-text="(simulation_baseline.actual_distribution?.tier_distribution?.mid || 0).toFixed(1) + '%'"></div>
+                    <div class="text-blue-500 mt-0.5">中档率</div>
+                  </div>
+                  <div class="text-center px-3 py-1.5 rounded-lg bg-green-50">
+                    <div class="text-green-600 font-bold text-base" x-text="(simulation_baseline.actual_distribution?.tier_distribution?.low || 0).toFixed(1) + '%'"></div>
+                    <div class="text-green-500 mt-0.5">低档率</div>
+                  </div>
+                  <div class="text-center px-3 py-1.5 rounded-lg bg-gray-100">
+                    <div class="text-gray-600 font-bold text-base" x-text="(simulation_baseline.actual_distribution?.tier_distribution?.fallback || 0).toFixed(1) + '%'"></div>
+                    <div class="text-gray-500 mt-0.5">空奖率</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- 子Tab切换 -->
-            <div class="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 overflow-x-auto">
+            <div class="flex gap-1 mb-5 themed-card rounded-xl shadow-sm p-1.5 overflow-x-auto">
               <template x-for="tab in [
-                {id:'sandbox', label:'参数沙盒', icon:'🎯'},
-                {id:'comparison', label:'对比分析', icon:'📊'},
-                {id:'journey', label:'用户旅程', icon:'👤'},
-                {id:'sensitivity', label:'灵敏度', icon:'📈'},
-                {id:'recommend', label:'目标反推', icon:'🎯'},
-                {id:'operations', label:'运维闭环', icon:'🔧'},
-                {id:'history', label:'模拟历史', icon:'📋'}
+                {id:'sandbox', label:'参数沙盒', icon:'🎯', desc:'调整模拟参数'},
+                {id:'comparison', label:'对比分析', icon:'📊', desc:'查看模拟结果'},
+                {id:'journey', label:'用户旅程', icon:'👤', desc:'模拟单用户体验'},
+                {id:'sensitivity', label:'灵敏度', icon:'📈', desc:'参数敏感性分析'},
+                {id:'recommend', label:'目标反推', icon:'🔍', desc:'智能推荐参数'},
+                {id:'operations', label:'运维闭环', icon:'🔧', desc:'版本管理与监控'},
+                {id:'history', label:'模拟历史', icon:'📋', desc:'历史记录查询'}
               ]" :key="tab.id">
                 <button
                   @click="simulation_sub_tab = tab.id"
-                  :class="simulation_sub_tab === tab.id ? 'bg-white shadow text-emerald-600 font-medium' : 'text-gray-500 hover:text-gray-700'"
-                  class="px-4 py-2 rounded-md text-sm transition-all"
-                  x-text="tab.icon + ' ' + tab.label"
-                ></button>
+                  :class="simulation_sub_tab === tab.id
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
+                  class="px-4 py-2.5 rounded-lg text-sm transition-all whitespace-nowrap"
+                >
+                  <span x-text="tab.icon + ' ' + tab.label"></span>
+                </button>
               </template>
             </div>
 
             <!-- ========== 参数沙盒 Sub-Tab ========== -->
             <div x-show="simulation_sub_tab === 'sandbox'">
-              <!-- 活动信息条 -->
-              <div class="flex items-center justify-between bg-gray-50 rounded-lg p-3 mb-4">
-                <div class="text-sm text-gray-600">
-                  <span class="font-medium" x-text="simulation_baseline.campaign?.campaign_name"></span>
-                  <span class="text-gray-400 ml-2">|</span>
-                  <span class="ml-2">累计抽奖: <span class="font-semibold" x-text="simulation_baseline.actual_distribution?.total_draws?.toLocaleString()"></span> 次</span>
-                </div>
-                <div class="flex gap-2">
-                  <select x-model.number="simulation_count" class="text-sm border rounded px-2 py-1">
-                    <option value="1000">快速(1K次)</option>
-                    <option value="5000">标准(5K次)</option>
-                    <option value="10000" selected>精确(10K次)</option>
-                    <option value="50000">高精度(50K次)</option>
-                  </select>
-                  <button
-                    @click="runMonteCarlo()"
-                    :disabled="running_simulation"
-                    class="px-4 py-1.5 bg-emerald-600 text-white text-sm rounded hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-wait"
-                  >
-                    <span x-show="!running_simulation">🚀 运行模拟</span>
-                    <span x-show="running_simulation" class="flex items-center gap-1">
-                      <span class="animate-spin">⏳</span> 模拟中...
+              <!-- 操作栏 -->
+              <div class="themed-card rounded-xl shadow-sm p-4 mb-5">
+                <div class="flex items-center justify-between flex-wrap gap-3">
+                  <div class="flex items-center gap-3 text-sm text-gray-500">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium">
+                      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> 沙盒模式（不影响线上）
                     </span>
-                  </button>
+                    <span>修改下方参数后点击「运行模拟」查看预测效果</span>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <select x-model.number="simulation_count" class="text-sm border rounded-lg px-3 py-2 themed-input">
+                      <option value="1000">快速模拟 (1,000次)</option>
+                      <option value="5000">标准模拟 (5,000次)</option>
+                      <option value="10000" selected>精确模拟 (10,000次)</option>
+                      <option value="50000">高精度 (50,000次)</option>
+                    </select>
+                    <button
+                      @click="runMonteCarlo()"
+                      :disabled="running_simulation"
+                      class="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-sm font-medium rounded-lg hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 disabled:cursor-wait shadow-sm transition-all"
+                    >
+                      <span x-show="!running_simulation">🚀 运行模拟</span>
+                      <span x-show="running_simulation" class="flex items-center gap-2">
+                        <span class="animate-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
+                        模拟计算中...
+                      </span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
               <!-- 场景预设选择 -->
-              <div class="mb-4">
-                <h6 class="text-sm font-medium text-gray-700 mb-2">场景预设</h6>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div class="themed-card rounded-xl shadow-sm p-5 mb-5">
+                <div class="flex items-center gap-2 mb-3">
+                  <h6 class="text-sm font-semibold text-gray-800">场景预设</h6>
+                  <span class="text-xs text-gray-400">选择一个预设场景，或直接修改下方矩阵参数</span>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <template x-for="(preset, key) in preset_scenarios" :key="key">
                     <button
                       @click="applyPresetScenario(key)"
-                      :class="selected_preset === key ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 hover:border-gray-300'"
-                      class="border rounded-lg p-3 text-left text-sm transition-all"
+                      :class="selected_preset === key
+                        ? 'border-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-sm ring-1 ring-emerald-200'
+                        : 'border-gray-200 hover:border-emerald-300 hover:bg-gray-50'"
+                      class="border-2 rounded-xl p-4 text-left text-sm transition-all"
                     >
-                      <div class="font-medium" x-text="preset.name"></div>
-                      <div class="text-xs text-gray-400 mt-1" x-text="preset.description"></div>
+                      <div class="font-semibold text-gray-800" x-text="preset.name"></div>
+                      <div class="text-xs text-gray-400 mt-1.5 leading-relaxed" x-text="preset.description"></div>
+                      <div x-show="selected_preset === key" class="mt-2 text-xs text-emerald-600 font-medium">✓ 当前选中</div>
                     </button>
                   </template>
                 </div>
               </div>
 
-              <!-- BxPx 矩阵编辑（表格模式） -->
-              <div class="mb-4">
-                <h6 class="text-sm font-medium text-gray-700 mb-2">BxPx 矩阵配置 <span class="text-gray-400 text-xs">（修改的值高亮黄色）</span></h6>
-                <div class="overflow-x-auto">
-                  <table class="w-full text-xs border-collapse">
-                    <thead>
-                      <tr class="bg-gray-50">
-                        <th class="border p-1.5">格子</th>
-                        <th class="border p-1.5">high 乘数</th>
-                        <th class="border p-1.5">mid 乘数</th>
-                        <th class="border p-1.5">low 乘数</th>
-                        <th class="border p-1.5">fallback 乘数</th>
-                        <th class="border p-1.5">空奖权重</th>
-                        <th class="border p-1.5">预算上限</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <template x-for="mc in proposed_config.matrix_config" :key="mc.budget_tier+'_'+mc.pressure_tier">
-                        <tr>
-                          <td class="border p-1.5 font-medium bg-gray-50" x-text="mc.budget_tier + '×' + mc.pressure_tier"></td>
-                          <template x-for="field in ['high_multiplier','mid_multiplier','low_multiplier','fallback_multiplier','empty_weight_multiplier','cap_multiplier']" :key="field">
-                            <td class="border p-0.5"
-                                :class="isMatrixValueChanged(mc.budget_tier, mc.pressure_tier, field) ? 'bg-yellow-50' : ''">
-                              <input type="number" step="0.1" min="0" max="10"
-                                     :value="mc[field]"
-                                     @change="updateProposedMatrixValue(mc.budget_tier, mc.pressure_tier, field, $event.target.value)"
-                                     class="w-full text-center text-xs border-0 p-1 bg-transparent focus:ring-1 focus:ring-emerald-300 rounded">
-                            </td>
-                          </template>
-                        </tr>
-                      </template>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <!-- 策略参数编辑 -->
-              <div class="mb-4">
-                <h6 class="text-sm font-medium text-gray-700 mb-2">策略参数</h6>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  <template x-for="(values, group) in proposed_config.strategy_config" :key="group">
-                    <div class="border rounded-lg p-3">
-                      <div class="font-medium text-sm mb-2 capitalize" x-text="group.replace(/_/g, ' ')"></div>
-                      <template x-for="(val, key) in values" :key="key">
-                        <div class="flex items-center justify-between text-xs mb-1">
-                          <span class="text-gray-500" x-text="key"></span>
-                          <template x-if="typeof val === 'boolean'">
-                            <input type="checkbox" :checked="val" @change="proposed_config.strategy_config[group][key] = $event.target.checked">
-                          </template>
-                          <template x-if="typeof val === 'number'">
-                            <input type="number" step="0.1" :value="val"
-                                   @change="proposed_config.strategy_config[group][key] = parseFloat($event.target.value)"
-                                   class="w-20 text-center text-xs border rounded p-0.5">
-                          </template>
-                          <template x-if="typeof val === 'object'">
-                            <span class="text-gray-400">JSON</span>
-                          </template>
-                          <template x-if="typeof val === 'string'">
-                            <span class="text-gray-600" x-text="val"></span>
-                          </template>
-                        </div>
-                      </template>
-                    </div>
-                  </template>
-                </div>
-              </div>
-            </div>
-
-            <!-- ========== 对比分析 Sub-Tab ========== -->
-            <div x-show="simulation_sub_tab === 'comparison'">
-              <template x-if="!simulation_result">
-                <div class="text-center py-16 text-gray-400">
-                  <span class="text-4xl mb-3 block">📊</span>
-                  <p>请先在「参数沙盒」中运行模拟</p>
-                </div>
-              </template>
-              <template x-if="simulation_result">
-                <div>
-                  <!-- 风险评估红绿灯 -->
-                  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                    <template x-for="(risk, key) in simulation_result.risk_assessment" :key="key">
-                      <div class="rounded-lg p-3 text-center" :class="getRiskClass(risk)">
-                        <div class="text-xs opacity-70" x-text="key.replace(/_/g, ' ')"></div>
-                        <div class="font-bold text-lg mt-1" x-text="getRiskLabel(risk)"></div>
-                      </div>
-                    </template>
+              <!-- BxPx 矩阵编辑 -->
+              <div class="themed-card rounded-xl shadow-sm p-5 mb-5">
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex items-center gap-2">
+                    <h6 class="text-sm font-semibold text-gray-800">预算×压力 矩阵配置</h6>
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">修改的值高亮显示</span>
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700"
+                          x-text="'共 ' + (proposed_config.matrix_config?.length || 0) + ' 个格子'"></span>
                   </div>
+                  <span class="text-xs text-gray-400">B=预算档位（B0无~B3高） P=压力档位（P0低~P2高）</span>
+                </div>
 
-                  <!-- 档位分布对比图表 -->
-                  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-                    <div class="border rounded-lg p-4">
-                      <div id="simulation-tier-chart" style="height: 300px;"></div>
-                    </div>
-                    <div class="border rounded-lg p-4">
-                      <h6 class="font-medium text-sm mb-3">档位分布数值对比</h6>
-                      <table class="w-full text-sm">
-                        <thead><tr class="bg-gray-50"><th class="p-2">档位</th><th class="p-2">当前实际</th><th class="p-2">模拟预测</th><th class="p-2">变化</th></tr></thead>
+                <!-- 矩阵数据为空时的提示 -->
+                <template x-if="!proposed_config.matrix_config || proposed_config.matrix_config.length === 0">
+                  <div class="rounded-lg border-2 border-dashed border-gray-200 p-8 text-center">
+                    <div class="text-gray-400 mb-2 text-2xl">📋</div>
+                    <p class="text-sm text-gray-500">矩阵配置正在加载...</p>
+                    <p class="text-xs text-gray-400 mt-1">如果长时间无数据，请检查当前活动是否有矩阵配置</p>
+                  </div>
+                </template>
+
+                <!-- 矩阵数据表格 -->
+                <template x-if="proposed_config.matrix_config && proposed_config.matrix_config.length > 0">
+                  <div>
+                    <div class="overflow-x-auto rounded-lg border">
+                      <table class="w-full text-xs border-collapse">
+                        <thead>
+                          <tr class="bg-gradient-to-r from-gray-50 to-gray-100">
+                            <th class="border-b border-r p-2 text-left font-semibold text-gray-600 bg-gray-50">预算×压力</th>
+                            <th class="border-b border-r p-2 text-center font-semibold text-yellow-700 bg-yellow-50/50">高档乘数</th>
+                            <th class="border-b border-r p-2 text-center font-semibold text-blue-700 bg-blue-50/50">中档乘数</th>
+                            <th class="border-b border-r p-2 text-center font-semibold text-green-700 bg-green-50/50">低档乘数</th>
+                            <th class="border-b border-r p-2 text-center font-semibold text-gray-600">兜底乘数</th>
+                            <th class="border-b border-r p-2 text-center font-semibold text-gray-600">空奖权重</th>
+                            <th class="border-b p-2 text-center font-semibold text-gray-600">预算上限</th>
+                          </tr>
+                        </thead>
                         <tbody>
-                          <template x-for="tier in ['high','mid','low','fallback']" :key="tier">
-                            <tr class="border-t">
-                              <td class="p-2 font-medium" x-text="tier"></td>
-                              <td class="p-2" x-text="(simulation_baseline?.actual_distribution?.tier_distribution?.[tier] || 0).toFixed(2) + '%'"></td>
-                              <td class="p-2" x-text="(simulation_result?.simulation_result?.tier_distribution?.[tier] || 0).toFixed(2) + '%'"></td>
-                              <td class="p-2"
-                                  :class="(simulation_result?.comparison?.tier_delta?.[tier] || 0) > 0 ? 'text-red-600' : 'text-green-600'"
-                                  x-text="((simulation_result?.comparison?.tier_delta?.[tier] || 0) > 0 ? '+' : '') + (simulation_result?.comparison?.tier_delta?.[tier] || 0).toFixed(2) + '%'">
+                          <template x-for="mc in proposed_config.matrix_config" :key="mc.budget_tier+'_'+mc.pressure_tier">
+                            <tr class="border-b hover:bg-blue-50/30 transition-colors">
+                              <td class="border-r p-2 font-bold text-gray-700 bg-gray-50 whitespace-nowrap" x-text="mc.budget_tier + ' × ' + mc.pressure_tier"></td>
+                              <td class="border-r p-0.5"
+                                  :class="isMatrixValueChanged(mc.budget_tier, mc.pressure_tier, 'high_multiplier') ? 'bg-yellow-50 ring-1 ring-inset ring-yellow-200' : ''">
+                                <input type="number" step="0.1" min="0" max="10"
+                                       :value="mc.high_multiplier"
+                                       @change="updateProposedMatrixValue(mc.budget_tier, mc.pressure_tier, 'high_multiplier', $event.target.value)"
+                                       class="w-full text-center text-xs border rounded p-1.5 focus:ring-2 focus:ring-emerald-300 transition-shadow"
+                                       :class="mc.high_multiplier > 0 ? 'font-bold text-yellow-700 bg-yellow-50 border-yellow-200' : 'text-gray-400 bg-gray-50 border-gray-200'">
+                              </td>
+                              <td class="border-r p-0.5"
+                                  :class="isMatrixValueChanged(mc.budget_tier, mc.pressure_tier, 'mid_multiplier') ? 'bg-yellow-50 ring-1 ring-inset ring-yellow-200' : ''">
+                                <input type="number" step="0.1" min="0" max="10"
+                                       :value="mc.mid_multiplier"
+                                       @change="updateProposedMatrixValue(mc.budget_tier, mc.pressure_tier, 'mid_multiplier', $event.target.value)"
+                                       class="w-full text-center text-xs border rounded p-1.5 focus:ring-2 focus:ring-emerald-300 transition-shadow"
+                                       :class="mc.mid_multiplier > 0 ? 'font-bold text-blue-700 bg-blue-50 border-blue-200' : 'text-gray-400 bg-gray-50 border-gray-200'">
+                              </td>
+                              <td class="border-r p-0.5"
+                                  :class="isMatrixValueChanged(mc.budget_tier, mc.pressure_tier, 'low_multiplier') ? 'bg-yellow-50 ring-1 ring-inset ring-yellow-200' : ''">
+                                <input type="number" step="0.1" min="0" max="10"
+                                       :value="mc.low_multiplier"
+                                       @change="updateProposedMatrixValue(mc.budget_tier, mc.pressure_tier, 'low_multiplier', $event.target.value)"
+                                       class="w-full text-center text-xs border rounded p-1.5 focus:ring-2 focus:ring-emerald-300 transition-shadow"
+                                       :class="mc.low_multiplier > 0 ? 'font-bold text-green-700 bg-green-50 border-green-200' : 'text-gray-400 bg-gray-50 border-gray-200'">
+                              </td>
+                              <td class="border-r p-0.5"
+                                  :class="isMatrixValueChanged(mc.budget_tier, mc.pressure_tier, 'fallback_multiplier') ? 'bg-yellow-50 ring-1 ring-inset ring-yellow-200' : ''">
+                                <input type="number" step="0.1" min="0" max="10"
+                                       :value="mc.fallback_multiplier"
+                                       @change="updateProposedMatrixValue(mc.budget_tier, mc.pressure_tier, 'fallback_multiplier', $event.target.value)"
+                                       class="w-full text-center text-xs border rounded p-1.5 focus:ring-2 focus:ring-emerald-300 transition-shadow"
+                                       :class="mc.fallback_multiplier > 0 ? 'font-medium text-gray-700 bg-white border-gray-200' : 'text-gray-400 bg-gray-50 border-gray-200'">
+                              </td>
+                              <td class="border-r p-0.5"
+                                  :class="isMatrixValueChanged(mc.budget_tier, mc.pressure_tier, 'empty_weight_multiplier') ? 'bg-yellow-50 ring-1 ring-inset ring-yellow-200' : ''">
+                                <input type="number" step="0.1" min="0" max="10"
+                                       :value="mc.empty_weight_multiplier"
+                                       @change="updateProposedMatrixValue(mc.budget_tier, mc.pressure_tier, 'empty_weight_multiplier', $event.target.value)"
+                                       class="w-full text-center text-xs border rounded p-1.5 focus:ring-2 focus:ring-emerald-300 transition-shadow"
+                                       :class="mc.empty_weight_multiplier > 0 ? 'font-medium text-gray-700 bg-white border-gray-200' : 'text-gray-400 bg-gray-50 border-gray-200'">
+                              </td>
+                              <td class="p-0.5"
+                                  :class="isMatrixValueChanged(mc.budget_tier, mc.pressure_tier, 'cap_multiplier') ? 'bg-yellow-50 ring-1 ring-inset ring-yellow-200' : ''">
+                                <input type="number" step="0.1" min="0" max="10"
+                                       :value="mc.cap_multiplier"
+                                       @change="updateProposedMatrixValue(mc.budget_tier, mc.pressure_tier, 'cap_multiplier', $event.target.value)"
+                                       class="w-full text-center text-xs border rounded p-1.5 focus:ring-2 focus:ring-emerald-300 transition-shadow"
+                                       :class="mc.cap_multiplier > 0 ? 'font-medium text-gray-700 bg-white border-gray-200' : 'text-gray-400 bg-gray-50 border-gray-200'">
                               </td>
                             </tr>
                           </template>
                         </tbody>
                       </table>
                     </div>
+                    <p class="mt-2 text-xs text-gray-400">提示：乘数为0表示该档位在此格子不参与抽奖（显示为灰色）。有色彩的输入框表示该参数生效中。点击数字可直接修改。</p>
+                  </div>
+                </template>
+              </div>
+
+              <!-- 策略参数编辑 -->
+              <div class="themed-card rounded-xl shadow-sm p-5 mb-5">
+                <div class="flex items-center gap-2 mb-3">
+                  <h6 class="text-sm font-semibold text-gray-800">体验策略参数</h6>
+                  <span class="text-xs text-gray-400">Pity保底、防连空、防连高等体验保障机制</span>
+                  <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700"
+                        x-text="'共 ' + Object.keys(proposed_config.strategy_config || {}).length + ' 组'"></span>
+                </div>
+
+                <!-- 策略参数为空时的提示 -->
+                <template x-if="!proposed_config.strategy_config || Object.keys(proposed_config.strategy_config).length === 0">
+                  <div class="rounded-lg border-2 border-dashed border-gray-200 p-8 text-center">
+                    <div class="text-gray-400 mb-2 text-2xl">⚙️</div>
+                    <p class="text-sm text-gray-500">策略参数正在加载...</p>
+                  </div>
+                </template>
+
+                <!-- 策略参数卡片组 -->
+                <template x-if="proposed_config.strategy_config && Object.keys(proposed_config.strategy_config).length > 0">
+                  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <template x-for="(values, group) in proposed_config.strategy_config" :key="group">
+                      <div class="rounded-xl border-2 p-4 transition-colors"
+                           :class="group === 'pity' ? 'border-purple-200 bg-purple-50/30' : group === 'anti_empty' ? 'border-orange-200 bg-orange-50/30' : group === 'anti_high' ? 'border-red-200 bg-red-50/30' : 'border-gray-200 bg-gray-50/30'">
+                        <div class="flex items-center gap-2 mb-3 pb-2 border-b"
+                             :class="group === 'pity' ? 'border-purple-100' : group === 'anti_empty' ? 'border-orange-100' : group === 'anti_high' ? 'border-red-100' : 'border-gray-100'">
+                          <span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
+                                :class="group === 'pity' ? 'bg-purple-200' : group === 'anti_empty' ? 'bg-orange-200' : group === 'anti_high' ? 'bg-red-200' : 'bg-gray-200'"
+                                x-text="group === 'pity' ? '🛡️' : group === 'anti_empty' ? '🔄' : group === 'anti_high' ? '⚖️' : '⚙️'"></span>
+                          <div class="font-semibold text-sm text-gray-800"
+                               x-text="group === 'pity' ? '保底机制(Pity)' : group === 'anti_empty' ? '防连空保护' : group === 'anti_high' ? '防连高限制' : group === 'budget_tier' ? '预算分层' : group === 'pressure_tier' ? '压力分层' : group.replace(/_/g, ' ')"></div>
+                        </div>
+                        <template x-for="(val, key) in values" :key="key">
+                          <div class="flex items-center justify-between text-xs mb-2.5 py-1">
+                            <span class="text-gray-600 font-medium"
+                                  x-text="key === 'enabled' ? '是否启用' : key === 'hard_guarantee_threshold' ? '硬保底阈值' : key === 'empty_streak_threshold' ? '连空触发阈值' : key === 'high_streak_threshold' ? '连高触发阈值' : key === 'multiplier_table' ? '加权倍率表' : key === 'threshold_high' ? '高预算线' : key === 'threshold_mid' ? '中预算线' : key === 'threshold_low' ? '低预算线' : key"></span>
+                            <template x-if="typeof val === 'boolean'">
+                              <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" :checked="val" @change="proposed_config.strategy_config[group][key] = $event.target.checked" class="sr-only peer">
+                                <div class="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                              </label>
+                            </template>
+                            <template x-if="typeof val === 'number'">
+                              <input type="number" step="0.1" :value="val"
+                                     @change="proposed_config.strategy_config[group][key] = parseFloat($event.target.value)"
+                                     class="w-20 text-center text-xs border rounded-lg p-1.5 font-bold bg-white border-gray-300 focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400">
+                            </template>
+                            <template x-if="typeof val === 'object'">
+                              <span class="px-2 py-1 rounded-md bg-gray-200 text-gray-600 text-xs font-medium">JSON配置</span>
+                            </template>
+                            <template x-if="typeof val === 'string'">
+                              <span class="text-gray-800 font-bold" x-text="val"></span>
+                            </template>
+                          </div>
+                        </template>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- ========== 对比分析 Sub-Tab ========== -->
+            <div x-show="simulation_sub_tab === 'comparison'">
+              <template x-if="!simulation_result">
+                <div class="themed-card rounded-xl shadow-sm text-center py-20">
+                  <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center mb-4">
+                    <span class="text-3xl">📊</span>
+                  </div>
+                  <h6 class="font-semibold text-gray-700 mb-2">暂无模拟结果</h6>
+                  <p class="text-sm text-gray-400 mb-4">请先在「参数沙盒」中调整参数，然后点击「运行模拟」</p>
+                  <button @click="simulation_sub_tab = 'sandbox'"
+                          class="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-all">
+                    前往参数沙盒 →
+                  </button>
+                </div>
+              </template>
+              <template x-if="simulation_result">
+                <div>
+                  <!-- 风险评估红绿灯 -->
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <template x-for="(risk, key) in simulation_result.risk_assessment" :key="key">
+                      <div class="rounded-xl p-4 text-center shadow-sm transition-transform hover:scale-105"
+                           :class="risk === 'green' ? 'bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200' : risk === 'yellow' ? 'bg-gradient-to-br from-yellow-50 to-amber-50 border border-yellow-200' : 'bg-gradient-to-br from-red-50 to-rose-50 border border-red-200'">
+                        <div class="text-xs font-medium mb-1"
+                             :class="risk === 'green' ? 'text-green-600' : risk === 'yellow' ? 'text-yellow-600' : 'text-red-600'"
+                             x-text="key === 'high_tier_risk' ? '高档率风险' : key === 'empty_rate_risk' ? '空奖率风险' : key === 'budget_depletion_risk' ? '预算耗尽风险' : key === 'prize_cost_rate_risk' ? '奖品成本风险' : key.replace(/_/g, ' ')"></div>
+                        <div class="font-bold text-2xl mt-1"
+                             :class="risk === 'green' ? 'text-green-700' : risk === 'yellow' ? 'text-yellow-700' : 'text-red-700'"
+                             x-text="getRiskLabel(risk)">
+                        </div>
+                        <div class="mt-1 text-lg" x-text="risk === 'green' ? '✅' : risk === 'yellow' ? '⚠️' : '🔴'"></div>
+                      </div>
+                    </template>
+                  </div>
+
+                  <!-- 档位分布对比 -->
+                  <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
+                    <div class="themed-card rounded-xl shadow-sm p-5">
+                      <h6 class="font-semibold text-sm text-gray-800 mb-3">档位分布对比图表</h6>
+                      <div id="simulation-tier-chart" style="height: 300px;"></div>
+                    </div>
+                    <div class="themed-card rounded-xl shadow-sm p-5">
+                      <h6 class="font-semibold text-sm text-gray-800 mb-3">档位分布数值对比</h6>
+                      <div class="overflow-hidden rounded-lg border">
+                        <table class="w-full text-sm">
+                          <thead>
+                            <tr class="bg-gradient-to-r from-gray-50 to-gray-100">
+                              <th class="p-3 text-left font-semibold text-gray-600">档位</th>
+                              <th class="p-3 text-center font-semibold text-gray-600">当前实际</th>
+                              <th class="p-3 text-center font-semibold text-gray-600">模拟预测</th>
+                              <th class="p-3 text-center font-semibold text-gray-600">变化</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <template x-for="tier in ['high','mid','low','fallback']" :key="tier">
+                              <tr class="border-t hover:bg-gray-50/50 transition-colors">
+                                <td class="p-3 font-semibold"
+                                    :class="tier === 'high' ? 'text-yellow-700' : tier === 'mid' ? 'text-blue-700' : tier === 'low' ? 'text-green-700' : 'text-gray-500'"
+                                    x-text="tier === 'high' ? '🏆 高档' : tier === 'mid' ? '🎯 中档' : tier === 'low' ? '📦 低档' : '⬜ 空奖'"></td>
+                                <td class="p-3 text-center font-medium" x-text="(simulation_baseline?.actual_distribution?.tier_distribution?.[tier] || 0).toFixed(2) + '%'"></td>
+                                <td class="p-3 text-center font-bold" x-text="(simulation_result?.simulation_result?.tier_distribution?.[tier] || 0).toFixed(2) + '%'"></td>
+                                <td class="p-3 text-center font-bold"
+                                    :class="(simulation_result?.comparison?.tier_delta?.[tier] || 0) > 0 ? 'text-red-600' : (simulation_result?.comparison?.tier_delta?.[tier] || 0) < 0 ? 'text-green-600' : 'text-gray-400'"
+                                    x-text="((simulation_result?.comparison?.tier_delta?.[tier] || 0) > 0 ? '↑+' : (simulation_result?.comparison?.tier_delta?.[tier] || 0) < 0 ? '↓' : '') + (simulation_result?.comparison?.tier_delta?.[tier] || 0).toFixed(2) + '%'">
+                                </td>
+                              </tr>
+                            </template>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
 
                   <!-- 体验机制指标卡片 -->
-                  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                    <div class="border rounded-lg p-3 text-center">
-                      <div class="text-xs text-gray-500">Pity 触发率</div>
-                      <div class="text-xl font-bold mt-1" x-text="(simulation_result?.simulation_result?.experience_metrics?.pity_trigger_rate || 0).toFixed(2) + '%'"></div>
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="themed-card rounded-xl shadow-sm p-4 text-center border-l-4 border-purple-400">
+                      <div class="text-xs text-gray-500 mb-1">保底触发率</div>
+                      <div class="text-2xl font-bold text-purple-600" x-text="(simulation_result?.simulation_result?.experience_metrics?.pity_trigger_rate || 0).toFixed(2) + '%'"></div>
+                      <div class="text-xs text-gray-400 mt-1">Pity机制保护触发</div>
                     </div>
-                    <div class="border rounded-lg p-3 text-center">
-                      <div class="text-xs text-gray-500">AntiEmpty 触发</div>
-                      <div class="text-xl font-bold mt-1" x-text="simulation_result?.simulation_result?.experience_metrics?.anti_empty_trigger_count || 0"></div>
+                    <div class="themed-card rounded-xl shadow-sm p-4 text-center border-l-4 border-orange-400">
+                      <div class="text-xs text-gray-500 mb-1">防连空触发</div>
+                      <div class="text-2xl font-bold text-orange-600" x-text="(simulation_result?.simulation_result?.experience_metrics?.anti_empty_trigger_count || 0).toLocaleString()"></div>
+                      <div class="text-xs text-gray-400 mt-1">连续空奖保护次数</div>
                     </div>
-                    <div class="border rounded-lg p-3 text-center">
-                      <div class="text-xs text-gray-500">AntiHigh 触发</div>
-                      <div class="text-xl font-bold mt-1" x-text="simulation_result?.simulation_result?.experience_metrics?.anti_high_trigger_count || 0"></div>
+                    <div class="themed-card rounded-xl shadow-sm p-4 text-center border-l-4 border-red-400">
+                      <div class="text-xs text-gray-500 mb-1">防连高触发</div>
+                      <div class="text-2xl font-bold text-red-600" x-text="(simulation_result?.simulation_result?.experience_metrics?.anti_high_trigger_count || 0).toLocaleString()"></div>
+                      <div class="text-xs text-gray-400 mt-1">连续高档限制次数</div>
                     </div>
-                    <div class="border rounded-lg p-3 text-center">
-                      <div class="text-xs text-gray-500">平均首次非空抽数</div>
-                      <div class="text-xl font-bold mt-1" x-text="(simulation_result?.simulation_result?.experience_metrics?.avg_draws_to_first_non_empty || 0).toFixed(1)"></div>
+                    <div class="themed-card rounded-xl shadow-sm p-4 text-center border-l-4 border-teal-400">
+                      <div class="text-xs text-gray-500 mb-1">平均首次获奖抽数</div>
+                      <div class="text-2xl font-bold text-teal-600" x-text="(simulation_result?.simulation_result?.experience_metrics?.avg_draws_to_first_non_empty || 0).toFixed(1)"></div>
+                      <div class="text-xs text-gray-400 mt-1">用户平均多少次获奖</div>
                     </div>
                   </div>
 
-                  <!-- 操作按钮组（保存方案 + 应用到线上） -->
-                  <div class="flex gap-3 mt-4 pt-4 border-t">
+                  <!-- 操作按钮组（保存方案 + 应用到线上 + 导出报告） -->
+                  <div class="flex flex-wrap gap-3 mt-4 pt-4 border-t">
                     <button @click="saveCurrentAsScenario()"
                             class="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
                       💾 保存为方案 (<span x-text="saved_scenarios.length"></span>/5)
@@ -3594,6 +3780,23 @@
                             class="px-4 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700">
                       🚀 应用此配置到线上
                     </button>
+                    <div class="relative" x-data="{ export_open: false }">
+                      <button @click="export_open = !export_open"
+                              class="px-4 py-2 bg-gray-700 text-white text-sm rounded hover:bg-gray-800 flex items-center gap-1">
+                        📄 导出报告 <span class="text-xs">▼</span>
+                      </button>
+                      <div x-show="export_open" @click.outside="export_open = false" x-cloak
+                           class="absolute bottom-full mb-1 left-0 bg-white border rounded-lg shadow-lg py-1 z-20 min-w-[140px]">
+                        <button @click="exportReportAsPDF(); export_open = false"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center gap-2">
+                          📕 导出 PDF
+                        </button>
+                        <button @click="exportReportAsExcel(); export_open = false"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center gap-2">
+                          📗 导出 Excel
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   <!-- 多方案并排对比区（Phase 6） -->
@@ -3653,146 +3856,233 @@
 
             <!-- ========== 用户旅程 Sub-Tab ========== -->
             <div x-show="simulation_sub_tab === 'journey'">
-              <div class="flex items-end gap-4 mb-4">
-                <div>
-                  <label class="block text-xs text-gray-500 mb-1">用户预算</label>
-                  <input type="number" x-model.number="journey_profile.budget" class="border rounded px-3 py-1.5 text-sm w-24">
+              <!-- 旅程配置面板 -->
+              <div class="themed-card rounded-xl shadow-sm p-5 mb-5">
+                <div class="flex items-center gap-2 mb-4">
+                  <h6 class="text-sm font-semibold text-gray-800">用户画像配置</h6>
+                  <span class="text-xs text-gray-400">模拟一个特定用户的连续抽奖体验，观察每次抽奖的权重变化和策略触发</span>
                 </div>
-                <div>
-                  <label class="block text-xs text-gray-500 mb-1">用户分群</label>
-                  <select x-model="journey_profile.segment_key" class="border rounded px-3 py-1.5 text-sm">
-                    <option value="default">default</option>
-                    <option value="new_user">new_user</option>
-                    <option value="vip_user">vip_user</option>
-                  </select>
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 items-end">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1.5">用户预算（积分）</label>
+                    <input type="number" x-model.number="journey_profile.budget" class="w-full border rounded-lg px-3 py-2 text-sm themed-input"
+                           placeholder="如: 2000">
+                    <span class="text-xs text-gray-400 mt-0.5 block">决定预算档位B0~B3</span>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1.5">用户分群</label>
+                    <select x-model="journey_profile.segment_key" class="w-full border rounded-lg px-3 py-2 text-sm themed-select">
+                      <option value="default">普通用户</option>
+                      <option value="new_user">新用户</option>
+                      <option value="vip_user">VIP用户</option>
+                    </select>
+                    <span class="text-xs text-gray-400 mt-0.5 block">不同分群有不同权重</span>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1.5">起始连空次数</label>
+                    <input type="number" x-model.number="journey_profile.initial_empty_streak" min="0" max="20"
+                           class="w-full border rounded-lg px-3 py-2 text-sm themed-input">
+                    <span class="text-xs text-gray-400 mt-0.5 block">模拟已连续空奖N次</span>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1.5">模拟抽奖次数</label>
+                    <input type="number" x-model.number="journey_draw_count" min="5" max="100"
+                           class="w-full border rounded-lg px-3 py-2 text-sm themed-input">
+                    <span class="text-xs text-gray-400 mt-0.5 block">连续抽奖的总次数</span>
+                  </div>
+                  <div>
+                    <button @click="runUserJourney()" :disabled="running_journey"
+                            class="w-full px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-medium rounded-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-wait shadow-sm transition-all">
+                      <span x-show="!running_journey">▶ 开始模拟旅程</span>
+                      <span x-show="running_journey" class="flex items-center justify-center gap-2">
+                        <span class="animate-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
+                        模拟中...
+                      </span>
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label class="block text-xs text-gray-500 mb-1">起始连空</label>
-                  <input type="number" x-model.number="journey_profile.initial_empty_streak" min="0" max="20" class="border rounded px-3 py-1.5 text-sm w-16">
-                </div>
-                <div>
-                  <label class="block text-xs text-gray-500 mb-1">模拟次数</label>
-                  <input type="number" x-model.number="journey_draw_count" min="5" max="100" class="border rounded px-3 py-1.5 text-sm w-16">
-                </div>
-                <button @click="runUserJourney()" :disabled="running_journey"
-                        class="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 disabled:opacity-50">
-                  <span x-show="!running_journey">▶ 模拟旅程</span>
-                  <span x-show="running_journey">⏳ 运行中...</span>
-                </button>
               </div>
 
+              <!-- 旅程结果 -->
               <template x-if="journey_result?.draws?.length > 0">
-                <div class="space-y-2 max-h-[600px] overflow-y-auto">
-                  <template x-for="draw in journey_result.draws" :key="draw.draw_number">
-                    <div class="border rounded-lg p-3 text-xs"
-                         :class="draw.final_tier === 'high' ? 'border-yellow-300 bg-yellow-50' : draw.final_tier === 'fallback' ? 'border-gray-200 bg-gray-50' : 'border-blue-200'">
-                      <div class="flex items-center justify-between mb-2">
-                        <span class="font-bold">第 <span x-text="draw.draw_number"></span> 次</span>
-                        <span class="px-2 py-0.5 rounded text-xs font-medium"
-                              :class="draw.final_tier === 'high' ? 'bg-yellow-200 text-yellow-800' : draw.final_tier === 'mid' ? 'bg-blue-200 text-blue-800' : draw.final_tier === 'low' ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-500'"
-                              x-text="draw.final_tier"></span>
-                      </div>
-                      <div class="text-gray-500">
-                        <span x-text="draw.budget_tier + '/' + draw.pressure_tier"></span>
-                        <template x-if="draw.triggers?.length > 0">
-                          <span class="ml-2 text-orange-600 font-medium">⚡ <span x-text="draw.triggers.join(', ')"></span></span>
-                        </template>
-                      </div>
-                      <div class="mt-1 text-gray-400">
-                        连空: <span x-text="draw.user_state_after?.empty_streak"></span>
-                        | 近期high: <span x-text="draw.user_state_after?.recent_high_count"></span>
-                      </div>
+                <div>
+                  <!-- 旅程统计概览 -->
+                  <div class="grid grid-cols-4 gap-3 mb-4">
+                    <div class="themed-card rounded-lg shadow-sm p-3 text-center border-t-2 border-yellow-400">
+                      <div class="text-xs text-gray-500">高档</div>
+                      <div class="text-lg font-bold text-yellow-600" x-text="journey_result.draws.filter(d => d.final_tier === 'high').length"></div>
                     </div>
-                  </template>
+                    <div class="themed-card rounded-lg shadow-sm p-3 text-center border-t-2 border-blue-400">
+                      <div class="text-xs text-gray-500">中档</div>
+                      <div class="text-lg font-bold text-blue-600" x-text="journey_result.draws.filter(d => d.final_tier === 'mid').length"></div>
+                    </div>
+                    <div class="themed-card rounded-lg shadow-sm p-3 text-center border-t-2 border-green-400">
+                      <div class="text-xs text-gray-500">低档</div>
+                      <div class="text-lg font-bold text-green-600" x-text="journey_result.draws.filter(d => d.final_tier === 'low').length"></div>
+                    </div>
+                    <div class="themed-card rounded-lg shadow-sm p-3 text-center border-t-2 border-gray-300">
+                      <div class="text-xs text-gray-500">空奖</div>
+                      <div class="text-lg font-bold text-gray-500" x-text="journey_result.draws.filter(d => d.final_tier === 'fallback').length"></div>
+                    </div>
+                  </div>
+
+                  <!-- 抽奖时间线 -->
+                  <div class="themed-card rounded-xl shadow-sm p-4">
+                    <h6 class="font-semibold text-sm text-gray-800 mb-3">抽奖旅程时间线</h6>
+                    <div class="space-y-2 max-h-[550px] overflow-y-auto pr-1">
+                      <template x-for="draw in journey_result.draws" :key="draw.draw_number">
+                        <div class="flex items-stretch gap-3 rounded-lg p-3 transition-all hover:shadow-sm"
+                             :class="draw.final_tier === 'high' ? 'bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200' : draw.final_tier === 'mid' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200' : draw.final_tier === 'low' ? 'bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200' : 'bg-gray-50 border border-gray-200'">
+                          <!-- 序号 -->
+                          <div class="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold"
+                               :class="draw.final_tier === 'high' ? 'bg-yellow-200 text-yellow-800' : draw.final_tier === 'mid' ? 'bg-blue-200 text-blue-800' : draw.final_tier === 'low' ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-600'"
+                               x-text="'#' + draw.draw_number"></div>
+                          <!-- 内容 -->
+                          <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1">
+                              <span class="px-2 py-0.5 rounded-md text-xs font-bold"
+                                    :class="draw.final_tier === 'high' ? 'bg-yellow-200 text-yellow-800' : draw.final_tier === 'mid' ? 'bg-blue-200 text-blue-800' : draw.final_tier === 'low' ? 'bg-green-200 text-green-700' : 'bg-gray-200 text-gray-500'"
+                                    x-text="draw.final_tier === 'high' ? '🏆 高档' : draw.final_tier === 'mid' ? '🎯 中档' : draw.final_tier === 'low' ? '📦 低档' : '⬜ 空奖'"></span>
+                              <span class="text-xs text-gray-400" x-text="'预算' + draw.budget_tier + ' / 压力' + draw.pressure_tier"></span>
+                              <template x-if="draw.triggers?.length > 0">
+                                <span class="px-2 py-0.5 rounded-md text-xs font-medium bg-orange-100 text-orange-700">⚡ <span x-text="draw.triggers.join(', ')"></span></span>
+                              </template>
+                            </div>
+                            <div class="text-xs text-gray-400">
+                              当前连空: <span class="font-medium text-gray-600" x-text="draw.user_state_after?.empty_streak"></span>
+                              &nbsp;|&nbsp; 近期高档: <span class="font-medium text-gray-600" x-text="draw.user_state_after?.recent_high_count"></span>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
                 </div>
               </template>
 
               <template x-if="!journey_result">
-                <div class="text-center py-12 text-gray-400">
-                  <span class="text-3xl mb-2 block">👤</span>
-                  <p>配置用户画像后点击「模拟旅程」</p>
+                <div class="themed-card rounded-xl shadow-sm text-center py-16">
+                  <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center mb-4">
+                    <span class="text-3xl">👤</span>
+                  </div>
+                  <h6 class="font-semibold text-gray-700 mb-2">模拟单用户抽奖体验</h6>
+                  <p class="text-sm text-gray-400 max-w-md mx-auto">设置用户预算和分群后，点击「开始模拟旅程」可以看到每次抽奖的详细权重计算过程和策略触发情况</p>
                 </div>
               </template>
             </div>
 
             <!-- ========== 灵敏度分析 Sub-Tab ========== -->
             <div x-show="simulation_sub_tab === 'sensitivity'">
-              <div class="flex items-end gap-3 mb-4">
-                <div>
-                  <label class="block text-xs text-gray-500 mb-1">目标参数</label>
-                  <select x-model.number="sensitivity_config.selected_index" class="border rounded px-3 py-1.5 text-sm">
-                    <template x-for="(param, idx) in sensitivity_params" :key="param.key">
-                      <option :value="idx" x-text="param.label"></option>
-                    </template>
-                  </select>
+              <!-- 配置面板 -->
+              <div class="themed-card rounded-xl shadow-sm p-5 mb-5">
+                <div class="flex items-center gap-2 mb-4">
+                  <h6 class="text-sm font-semibold text-gray-800">灵敏度分析配置</h6>
+                  <span class="text-xs text-gray-400">选择一个参数，在指定范围内逐步扫射，观察该参数变化对各档位分布的影响</span>
                 </div>
-                <div>
-                  <label class="block text-xs text-gray-500 mb-1">范围</label>
-                  <div class="flex gap-1">
-                    <input type="number" x-model.number="sensitivity_config.range_min" step="0.1" class="border rounded px-2 py-1.5 text-sm w-16">
-                    <span class="py-1.5">~</span>
-                    <input type="number" x-model.number="sensitivity_config.range_max" step="0.1" class="border rounded px-2 py-1.5 text-sm w-16">
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 items-end">
+                  <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-gray-600 mb-1.5">扫射参数</label>
+                    <select x-model.number="sensitivity_config.selected_index" class="w-full border rounded-lg px-3 py-2 text-sm themed-select">
+                      <template x-for="(param, idx) in sensitivity_params" :key="param.key">
+                        <option :value="idx" x-text="param.label"></option>
+                      </template>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1.5">扫射范围</label>
+                    <div class="flex items-center gap-1">
+                      <input type="number" x-model.number="sensitivity_config.range_min" step="0.1" class="w-full border rounded-lg px-2 py-2 text-sm themed-input text-center">
+                      <span class="text-gray-400 px-1">~</span>
+                      <input type="number" x-model.number="sensitivity_config.range_max" step="0.1" class="w-full border rounded-lg px-2 py-2 text-sm themed-input text-center">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1.5">步数</label>
+                    <input type="number" x-model.number="sensitivity_config.steps" min="5" max="20" class="w-full border rounded-lg px-3 py-2 text-sm themed-input">
+                  </div>
+                  <div>
+                    <button @click="runSensitivityFromPanel()" :disabled="running_sensitivity"
+                            class="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-medium rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-wait shadow-sm transition-all">
+                      <span x-show="!running_sensitivity">📈 运行分析</span>
+                      <span x-show="running_sensitivity" class="flex items-center justify-center gap-2">
+                        <span class="animate-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
+                        分析中...
+                      </span>
+                    </button>
                   </div>
                 </div>
-                <div>
-                  <label class="block text-xs text-gray-500 mb-1">步数</label>
-                  <input type="number" x-model.number="sensitivity_config.steps" min="5" max="20" class="border rounded px-2 py-1.5 text-sm w-16">
-                </div>
-                <button @click="runSensitivityFromPanel()" :disabled="running_sensitivity"
-                        class="px-4 py-1.5 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 disabled:opacity-50">
-                  <span x-show="!running_sensitivity">📈 运行分析</span>
-                  <span x-show="running_sensitivity">⏳ 分析中...</span>
-                </button>
               </div>
-              <div id="sensitivity-chart" style="height: 350px;" class="border rounded-lg"></div>
+
+              <!-- 图表区 -->
+              <template x-if="sensitivity_result">
+                <div class="themed-card rounded-xl shadow-sm p-5">
+                  <h6 class="font-semibold text-sm text-gray-800 mb-3">灵敏度曲线</h6>
+                  <div id="sensitivity-chart" style="height: 380px;"></div>
+                </div>
+              </template>
               <template x-if="!sensitivity_result">
-                <div class="text-center py-12 text-gray-400">
-                  <span class="text-3xl mb-2 block">📈</span>
-                  <p>选择参数和范围后点击「运行分析」</p>
+                <div class="themed-card rounded-xl shadow-sm text-center py-16">
+                  <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-purple-100 to-indigo-100 flex items-center justify-center mb-4">
+                    <span class="text-3xl">📈</span>
+                  </div>
+                  <h6 class="font-semibold text-gray-700 mb-2">参数灵敏度分析</h6>
+                  <p class="text-sm text-gray-400 max-w-md mx-auto">选择要分析的参数及范围后，系统将生成该参数在不同取值下的档位分布变化曲线</p>
+                  <div id="sensitivity-chart" style="height: 0; overflow: hidden;"></div>
                 </div>
               </template>
             </div>
 
             <!-- ========== 目标反推 Sub-Tab (Phase 5) ========== -->
             <div x-show="simulation_sub_tab === 'recommend'">
-              <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-4">
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
                 <!-- 约束条件面板 -->
-                <div class="border rounded-lg p-4">
-                  <h6 class="font-medium text-sm mb-3">🎯 约束条件</h6>
-                  <div class="space-y-3">
+                <div class="themed-card rounded-xl shadow-sm p-5">
+                  <div class="flex items-center gap-2 mb-4">
+                    <h6 class="text-sm font-semibold text-gray-800">约束条件设置</h6>
+                    <span class="text-xs text-gray-400">设定目标指标范围，系统自动搜索满足条件的参数组合</span>
+                  </div>
+                  <div class="space-y-4">
                     <div>
-                      <label class="block text-xs text-gray-500 mb-1">high 档位比例范围</label>
-                      <div class="flex gap-2 items-center">
+                      <label class="block text-xs font-medium text-gray-600 mb-1.5">高档比例范围（0~1，如0.02表示2%）</label>
+                      <div class="flex items-center gap-2">
                         <input type="number" step="0.01" min="0" max="1" x-model.number="recommend_constraints.high_rate_min"
-                               class="border rounded px-2 py-1 text-sm w-20">
-                        <span class="text-gray-400">~</span>
+                               class="w-full border rounded-lg px-3 py-2 text-sm themed-input" placeholder="最低">
+                        <span class="text-gray-400 font-medium">~</span>
                         <input type="number" step="0.01" min="0" max="1" x-model.number="recommend_constraints.high_rate_max"
-                               class="border rounded px-2 py-1 text-sm w-20">
+                               class="w-full border rounded-lg px-3 py-2 text-sm themed-input" placeholder="最高">
                       </div>
                     </div>
                     <div>
-                      <label class="block text-xs text-gray-500 mb-1">空奖率上限</label>
+                      <label class="block text-xs font-medium text-gray-600 mb-1.5">空奖率上限（0~1，如0.30表示最高30%空奖）</label>
                       <input type="number" step="0.01" min="0" max="1" x-model.number="recommend_constraints.empty_rate_max"
-                             class="border rounded px-2 py-1 text-sm w-20">
+                             class="w-full border rounded-lg px-3 py-2 text-sm themed-input" placeholder="空奖率上限">
                     </div>
                     <div>
-                      <label class="block text-xs text-gray-500 mb-1">奖品成本率上限</label>
+                      <label class="block text-xs font-medium text-gray-600 mb-1.5">奖品成本率上限（0~2，如0.80表示成本不超过80%）</label>
                       <input type="number" step="0.01" min="0" max="2" x-model.number="recommend_constraints.prize_cost_rate_max"
-                             class="border rounded px-2 py-1 text-sm w-20">
+                             class="w-full border rounded-lg px-3 py-2 text-sm themed-input" placeholder="成本率上限">
                     </div>
                   </div>
                   <button @click="runRecommendFromPanel()" :disabled="running_recommend"
-                          class="mt-4 px-4 py-2 bg-teal-600 text-white text-sm rounded hover:bg-teal-700 disabled:opacity-50 w-full">
-                    <span x-show="!running_recommend">🔍 搜索推荐方案</span>
-                    <span x-show="running_recommend">⏳ 搜索中（可能需要30秒）...</span>
+                          class="mt-5 w-full px-4 py-2.5 bg-gradient-to-r from-teal-600 to-cyan-600 text-white text-sm font-medium rounded-lg hover:from-teal-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-wait shadow-sm transition-all">
+                    <span x-show="!running_recommend">🔍 智能搜索推荐方案</span>
+                    <span x-show="running_recommend" class="flex items-center justify-center gap-2">
+                      <span class="animate-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
+                      搜索中（预计30秒）...
+                    </span>
                   </button>
                 </div>
 
                 <!-- 推荐结果 -->
-                <div class="border rounded-lg p-4">
-                  <h6 class="font-medium text-sm mb-3">📋 推荐方案</h6>
+                <div class="themed-card rounded-xl shadow-sm p-5">
+                  <h6 class="text-sm font-semibold text-gray-800 mb-3">推荐方案结果</h6>
                   <template x-if="!recommend_result">
-                    <div class="text-center py-8 text-gray-400 text-sm">设置约束后点击搜索</div>
+                    <div class="text-center py-10">
+                      <div class="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-teal-100 to-cyan-100 flex items-center justify-center mb-3">
+                        <span class="text-2xl">🔍</span>
+                      </div>
+                      <p class="text-sm text-gray-400">设置约束条件后点击搜索</p>
+                    </div>
                   </template>
                   <template x-if="recommend_result">
                     <div>

@@ -84,13 +84,62 @@ const PRESET_SCENARIOS = {
 
 /** 灵敏度可扫射参数定义 */
 const SENSITIVITY_PARAMS = [
-  { group: 'matrix_config', key: 'B3_P1.high_multiplier', label: 'B3×P1 高档乘数', min: 0, max: 2, step_default: 10 },
-  { group: 'matrix_config', key: 'B3_P1.empty_weight_multiplier', label: 'B3×P1 空奖权重乘数', min: 0, max: 2, step_default: 10 },
-  { group: 'matrix_config', key: 'B3_P2.high_multiplier', label: 'B3×P2 高档乘数', min: 0, max: 2, step_default: 10 },
-  { group: 'matrix_config', key: 'B3_P1.mid_multiplier', label: 'B3×P1 中档乘数', min: 0, max: 2, step_default: 10 },
-  { group: 'strategy_config', key: 'pity.hard_guarantee_threshold', label: 'Pity 硬保底阈值', min: 3, max: 20, step_default: 8 },
-  { group: 'strategy_config', key: 'anti_empty.empty_streak_threshold', label: '防连空阈值', min: 1, max: 10, step_default: 9 },
-  { group: 'strategy_config', key: 'anti_high.high_streak_threshold', label: '防连高阈值', min: 1, max: 5, step_default: 4 }
+  {
+    group: 'matrix_config',
+    key: 'B3_P1.high_multiplier',
+    label: 'B3×P1 高档乘数',
+    min: 0,
+    max: 2,
+    step_default: 10
+  },
+  {
+    group: 'matrix_config',
+    key: 'B3_P1.empty_weight_multiplier',
+    label: 'B3×P1 空奖权重乘数',
+    min: 0,
+    max: 2,
+    step_default: 10
+  },
+  {
+    group: 'matrix_config',
+    key: 'B3_P2.high_multiplier',
+    label: 'B3×P2 高档乘数',
+    min: 0,
+    max: 2,
+    step_default: 10
+  },
+  {
+    group: 'matrix_config',
+    key: 'B3_P1.mid_multiplier',
+    label: 'B3×P1 中档乘数',
+    min: 0,
+    max: 2,
+    step_default: 10
+  },
+  {
+    group: 'strategy_config',
+    key: 'pity.hard_guarantee_threshold',
+    label: 'Pity 硬保底阈值',
+    min: 3,
+    max: 20,
+    step_default: 8
+  },
+  {
+    group: 'strategy_config',
+    key: 'anti_empty.empty_streak_threshold',
+    label: '防连空阈值',
+    min: 1,
+    max: 10,
+    step_default: 9
+  },
+  {
+    group: 'strategy_config',
+    key: 'anti_high.high_streak_threshold',
+    label: '防连高阈值',
+    min: 1,
+    max: 5,
+    step_default: 4
+  }
 ]
 
 /**
@@ -151,8 +200,8 @@ export function useStrategySimulationState() {
     recommend_constraints: {
       high_rate_min: 0.02,
       high_rate_max: 0.08,
-      empty_rate_max: 0.30,
-      prize_cost_rate_max: 0.80
+      empty_rate_max: 0.3,
+      prize_cost_rate_max: 0.8
     },
     /** @type {Array<string>} 目标反推可调参数 */
     recommend_adjustable_params: [
@@ -225,18 +274,32 @@ export function useStrategySimulationMethods() {
     async loadSimulationBaseline() {
       this.loading_baseline = true
       try {
-        const data = await this.apiGet(
-          `${SIMULATION_ENDPOINTS.BASELINE}/${this.simulation_campaign_id}`
+        // apiGet → apiCall → withLoading 返回 { success, data }，需要解包
+        const response = await this.apiGet(
+          `${SIMULATION_ENDPOINTS.BASELINE}/${this.simulation_campaign_id}`,
+          {},
+          { showLoading: false }
         )
-        this.simulation_baseline = data
-        this.proposed_config = {
-          tier_rules: JSON.parse(JSON.stringify(data.tier_rules || [])),
-          matrix_config: JSON.parse(JSON.stringify(data.matrix_config || [])),
-          strategy_config: JSON.parse(JSON.stringify(data.strategy_config || {}))
+        const data = response?.success ? response.data : response
+
+        if (!data || !data.campaign) {
+          throw new Error('基线数据格式异常')
         }
+
+        // 先填充 proposed_config（确保 x-if 渲染时数据已就绪）
+        this.proposed_config.tier_rules = JSON.parse(JSON.stringify(data.tier_rules || []))
+        this.proposed_config.matrix_config = JSON.parse(JSON.stringify(data.matrix_config || []))
+        this.proposed_config.strategy_config = JSON.parse(
+          JSON.stringify(data.strategy_config || {})
+        )
+
+        // 最后设置 simulation_baseline（触发 x-if 模板渲染）
+        this.simulation_baseline = data
+
         logger.info('[策略模拟] 基线数据加载完成', {
-          tier_rules: data.tier_rules?.length,
-          matrix_config: data.matrix_config?.length,
+          tier_rules: this.proposed_config.tier_rules.length,
+          matrix_config: this.proposed_config.matrix_config.length,
+          strategy_groups: Object.keys(this.proposed_config.strategy_config),
           total_draws: data.actual_distribution?.total_draws
         })
       } catch (error) {
@@ -266,12 +329,14 @@ export function useStrategySimulationMethods() {
       this.running_simulation = true
       this.simulation_result = null
       try {
-        const data = await this.apiCall(SIMULATION_ENDPOINTS.RUN, {
+        const response = await this.apiCall(SIMULATION_ENDPOINTS.RUN, {
           method: 'POST',
           data: {
             lottery_campaign_id: this.simulation_campaign_id,
             simulation_count: this.simulation_count,
-            simulation_name: this.simulation_name || `模拟-${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`,
+            simulation_name:
+              this.simulation_name ||
+              `模拟-${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`,
             proposed_config: this.proposed_config,
             scenario: {
               budget_distribution: this.simulation_scenario.budget_distribution,
@@ -280,13 +345,17 @@ export function useStrategySimulationMethods() {
             }
           }
         })
+        const data = response?.success ? response.data : response
         this.simulation_result = data
         this.simulation_sub_tab = 'comparison'
         logger.info('[策略模拟] Monte Carlo 模拟完成', {
-          tier_dist: data.simulation_result?.tier_distribution,
-          record_id: data.lottery_simulation_record_id
+          tier_dist: data?.simulation_result?.tier_distribution,
+          record_id: data?.lottery_simulation_record_id
         })
-        Alpine.store('notification')?.show?.(`模拟完成（${this.simulation_count} 次迭代）`, 'success')
+        Alpine.store('notification')?.show?.(
+          `模拟完成（${this.simulation_count} 次迭代）`,
+          'success'
+        )
         this.$nextTick(() => this.renderSimulationCharts())
       } catch (error) {
         logger.error('[策略模拟] 模拟运行失败:', error.message)
@@ -301,7 +370,7 @@ export function useStrategySimulationMethods() {
       this.running_journey = true
       this.journey_result = null
       try {
-        const data = await this.apiCall(SIMULATION_ENDPOINTS.USER_JOURNEY, {
+        const response = await this.apiCall(SIMULATION_ENDPOINTS.USER_JOURNEY, {
           method: 'POST',
           data: {
             lottery_campaign_id: this.simulation_campaign_id,
@@ -310,8 +379,9 @@ export function useStrategySimulationMethods() {
             draw_count: this.journey_draw_count
           }
         })
+        const data = response?.success ? response.data : response
         this.journey_result = data
-        logger.info('[策略模拟] 用户旅程模拟完成', { draws: data.draws?.length })
+        logger.info('[策略模拟] 用户旅程模拟完成', { draws: data?.draws?.length })
       } catch (error) {
         logger.error('[策略模拟] 用户旅程模拟失败:', error.message)
         Alpine.store('notification')?.show?.('用户旅程模拟失败: ' + error.message, 'error')
@@ -341,7 +411,7 @@ export function useStrategySimulationMethods() {
       this.running_sensitivity = true
       this.sensitivity_result = null
       try {
-        const data = await this.apiCall(SIMULATION_ENDPOINTS.SENSITIVITY, {
+        const response = await this.apiCall(SIMULATION_ENDPOINTS.SENSITIVITY, {
           method: 'POST',
           data: {
             lottery_campaign_id: this.simulation_campaign_id,
@@ -355,8 +425,9 @@ export function useStrategySimulationMethods() {
             }
           }
         })
+        const data = response?.success ? response.data : response
         this.sensitivity_result = data
-        logger.info('[策略模拟] 灵敏度分析完成', { points: data.data_points?.length })
+        logger.info('[策略模拟] 灵敏度分析完成', { points: data?.data_points?.length })
         this.$nextTick(() => this.renderSensitivityChart())
       } catch (error) {
         logger.error('[策略模拟] 灵敏度分析失败:', error.message)
@@ -384,7 +455,7 @@ export function useStrategySimulationMethods() {
       this.running_recommend = true
       this.recommend_result = null
       try {
-        const data = await this.apiCall(SIMULATION_ENDPOINTS.RECOMMEND, {
+        const response = await this.apiCall(SIMULATION_ENDPOINTS.RECOMMEND, {
           method: 'POST',
           data: {
             lottery_campaign_id: this.simulation_campaign_id,
@@ -397,10 +468,11 @@ export function useStrategySimulationMethods() {
             }
           }
         })
+        const data = response?.success ? response.data : response
         this.recommend_result = data
         logger.info('[策略模拟] 目标反推完成', {
-          recommendations: data.recommendations?.length,
-          elapsed: data.search_stats?.elapsed_ms
+          recommendations: data?.recommendations?.length,
+          elapsed: data?.search_stats?.elapsed_ms
         })
       } catch (error) {
         logger.error('[策略模拟] 目标反推失败:', error.message)
@@ -486,16 +558,21 @@ export function useStrategySimulationMethods() {
       this.applying_config = true
       try {
         if (this.apply_mode === 'scheduled' && this.schedule_datetime) {
-          const data = await this.apiCall(`${SIMULATION_ENDPOINTS.SCHEDULE}/${recordId}`, {
+          const response = await this.apiCall(`${SIMULATION_ENDPOINTS.SCHEDULE}/${recordId}`, {
             method: 'POST',
             data: { scheduled_at: this.schedule_datetime }
           })
-          Alpine.store('notification')?.show?.(`配置已设置定时生效: ${this.schedule_datetime}`, 'success')
+          const data = response?.success ? response.data : response
+          Alpine.store('notification')?.show?.(
+            `配置已设置定时生效: ${this.schedule_datetime}`,
+            'success'
+          )
           logger.info('[策略模拟] 定时应用设置成功', data)
         } else {
-          const data = await this.apiCall(`${SIMULATION_ENDPOINTS.APPLY}/${recordId}`, {
+          const response = await this.apiCall(`${SIMULATION_ENDPOINTS.APPLY}/${recordId}`, {
             method: 'POST'
           })
+          const data = response?.success ? response.data : response
           Alpine.store('notification')?.show?.('配置已成功应用到线上', 'success')
           logger.info('[策略模拟] 一键应用成功', data)
         }
@@ -516,7 +593,9 @@ export function useStrategySimulationMethods() {
       const recordId = this.simulation_result?.lottery_simulation_record_id
       if (!recordId) return
       try {
-        await this.apiCall(`${SIMULATION_ENDPOINTS.CIRCUIT_BREAKER}/${recordId}`, { method: 'POST' })
+        await this.apiCall(`${SIMULATION_ENDPOINTS.CIRCUIT_BREAKER}/${recordId}`, {
+          method: 'POST'
+        })
         Alpine.store('notification')?.show?.('熔断监控规则已创建', 'success')
         await this.loadCircuitBreakerStatus()
       } catch (error) {
@@ -529,7 +608,10 @@ export function useStrategySimulationMethods() {
     /** 计算指定模拟记录的偏差 */
     async calculateDrift(record_id) {
       try {
-        const data = await this.apiCall(`${SIMULATION_ENDPOINTS.DRIFT}/${record_id}`, { method: 'POST' })
+        const response = await this.apiCall(`${SIMULATION_ENDPOINTS.DRIFT}/${record_id}`, {
+          method: 'POST'
+        })
+        const data = response?.success ? response.data : response
         const idx = this.simulation_history.findIndex(
           h => (h.lottery_simulation_record_id || h.id) === record_id
         )
@@ -558,13 +640,15 @@ export function useStrategySimulationMethods() {
     async loadVersionHistory() {
       this.loading_version_history = true
       try {
-        const data = await this.apiGet(
+        const response = await this.apiGet(
           `${SIMULATION_ENDPOINTS.VERSION_HISTORY}/${this.simulation_campaign_id}`,
-          { limit: 50, offset: 0 }
+          { limit: 50, offset: 0 },
+          { showLoading: false }
         )
-        this.version_history = data.records || []
-        this.version_history_total = data.total || 0
-        logger.info('[策略模拟] 版本历史加载完成', { total: data.total })
+        const data = response?.success ? response.data : response
+        this.version_history = data?.records || []
+        this.version_history_total = data?.total || 0
+        logger.info('[策略模拟] 版本历史加载完成', { total: data?.total })
       } catch (error) {
         logger.error('[策略模拟] 版本历史加载失败:', error.message)
       } finally {
@@ -577,7 +661,10 @@ export function useStrategySimulationMethods() {
       if (!confirm('确认回滚到此版本？这将覆盖当前线上配置。')) return
       this.rolling_back = true
       try {
-        const data = await this.apiCall(`${SIMULATION_ENDPOINTS.ROLLBACK}/${log_id}`, { method: 'POST' })
+        const response = await this.apiCall(`${SIMULATION_ENDPOINTS.ROLLBACK}/${log_id}`, {
+          method: 'POST'
+        })
+        const data = response?.success ? response.data : response
         Alpine.store('notification')?.show?.('配置回滚成功', 'success')
         logger.info('[策略模拟] 版本回滚成功', data)
         await this.loadSimulationBaseline()
@@ -595,13 +682,16 @@ export function useStrategySimulationMethods() {
     async loadBudgetPacing() {
       this.loading_budget_pacing = true
       try {
-        const data = await this.apiGet(
-          `${SIMULATION_ENDPOINTS.BUDGET_PACING}/${this.simulation_campaign_id}`
+        const response = await this.apiGet(
+          `${SIMULATION_ENDPOINTS.BUDGET_PACING}/${this.simulation_campaign_id}`,
+          {},
+          { showLoading: false }
         )
+        const data = response?.success ? response.data : response
         this.budget_pacing = data
         logger.info('[策略模拟] 预算节奏预测加载完成', {
-          depletion_days: data.estimated_depletion_days,
-          trend_points: data.daily_trend?.length
+          depletion_days: data?.estimated_depletion_days,
+          trend_points: data?.daily_trend?.length
         })
         this.$nextTick(() => this.renderBudgetPacingChart())
       } catch (error) {
@@ -617,11 +707,14 @@ export function useStrategySimulationMethods() {
     async loadCircuitBreakerStatus() {
       this.loading_circuit_breaker = true
       try {
-        const data = await this.apiGet(
-          `${SIMULATION_ENDPOINTS.CIRCUIT_BREAKER_STATUS}/${this.simulation_campaign_id}`
+        const response = await this.apiGet(
+          `${SIMULATION_ENDPOINTS.CIRCUIT_BREAKER_STATUS}/${this.simulation_campaign_id}`,
+          {},
+          { showLoading: false }
         )
+        const data = response?.success ? response.data : response
         this.circuit_breaker_status = data
-        logger.info('[策略模拟] 熔断状态加载完成', { status: data.status })
+        logger.info('[策略模拟] 熔断状态加载完成', { status: data?.status })
       } catch (error) {
         logger.error('[策略模拟] 熔断状态加载失败:', error.message)
       } finally {
@@ -632,10 +725,12 @@ export function useStrategySimulationMethods() {
     /** 获取熔断状态样式 */
     getCircuitBreakerBadge() {
       const status = this.circuit_breaker_status?.status
-      if (!status || status === 'no_rules') return { text: '未配置', class: 'bg-gray-100 text-gray-600' }
+      if (!status || status === 'no_rules')
+        return { text: '未配置', class: 'bg-gray-100 text-gray-600' }
       if (status === 'normal') return { text: '监控中', class: 'bg-green-100 text-green-800' }
       if (status === 'breached') return { text: '已偏离', class: 'bg-red-100 text-red-800' }
-      if (status === 'no_recent_data') return { text: '无近期数据', class: 'bg-yellow-100 text-yellow-800' }
+      if (status === 'no_recent_data')
+        return { text: '无近期数据', class: 'bg-yellow-100 text-yellow-800' }
       return { text: status, class: 'bg-gray-100 text-gray-600' }
     },
 
@@ -644,13 +739,15 @@ export function useStrategySimulationMethods() {
     /** 加载模拟历史列表 */
     async loadSimulationHistory() {
       try {
-        const data = await this.apiGet(
+        const response = await this.apiGet(
           `${SIMULATION_ENDPOINTS.HISTORY}/${this.simulation_campaign_id}`,
-          { limit: 20, offset: 0 }
+          { limit: 20, offset: 0 },
+          { showLoading: false }
         )
-        this.simulation_history = data.records || []
-        this.simulation_history_total = data.total || 0
-        logger.info('[策略模拟] 历史记录加载完成', { count: data.total })
+        const data = response?.success ? response.data : response
+        this.simulation_history = data?.records || []
+        this.simulation_history_total = data?.total || 0
+        logger.info('[策略模拟] 历史记录加载完成', { count: data?.total })
       } catch (error) {
         logger.error('[策略模拟] 历史记录加载失败:', error.message)
       }
@@ -737,12 +834,14 @@ export function useStrategySimulationMethods() {
             yAxis: { type: 'value', axisLabel: { formatter: '{value}%' } },
             series: [
               {
-                name: '当前实际', type: 'bar',
+                name: '当前实际',
+                type: 'bar',
                 data: ['high', 'mid', 'low', 'fallback'].map(t => actDist[t] || 0),
                 itemStyle: { color: '#6366f1' }
               },
               {
-                name: '模拟预测', type: 'bar',
+                name: '模拟预测',
+                type: 'bar',
                 data: ['high', 'mid', 'low', 'fallback'].map(t => simDist[t] || 0),
                 itemStyle: { color: '#f59e0b' }
               }
@@ -766,20 +865,284 @@ export function useStrategySimulationMethods() {
 
         const chart = echarts.init(chartDom)
         chart.setOption({
-          title: { text: `灵敏度分析: ${this.sensitivity_result.param_path}`, left: 'center', textStyle: { fontSize: 14 } },
+          title: {
+            text: `灵敏度分析: ${this.sensitivity_result.param_path}`,
+            left: 'center',
+            textStyle: { fontSize: 14 }
+          },
           tooltip: { trigger: 'axis' },
           legend: { bottom: 0 },
           xAxis: { type: 'category', data: points.map(p => p.param_value), name: '参数值' },
           yAxis: { type: 'value', axisLabel: { formatter: '{value}%' } },
           series: [
-            { name: 'high%', type: 'line', data: points.map(p => p.tier_distribution?.high || 0), smooth: true },
-            { name: 'mid%', type: 'line', data: points.map(p => p.tier_distribution?.mid || 0), smooth: true },
-            { name: 'low%', type: 'line', data: points.map(p => p.tier_distribution?.low || 0), smooth: true },
-            { name: '空奖率%', type: 'line', data: points.map(p => p.empty_rate || 0), smooth: true, lineStyle: { type: 'dashed' } }
+            {
+              name: 'high%',
+              type: 'line',
+              data: points.map(p => p.tier_distribution?.high || 0),
+              smooth: true
+            },
+            {
+              name: 'mid%',
+              type: 'line',
+              data: points.map(p => p.tier_distribution?.mid || 0),
+              smooth: true
+            },
+            {
+              name: 'low%',
+              type: 'line',
+              data: points.map(p => p.tier_distribution?.low || 0),
+              smooth: true
+            },
+            {
+              name: '空奖率%',
+              type: 'line',
+              data: points.map(p => p.empty_rate || 0),
+              smooth: true,
+              lineStyle: { type: 'dashed' }
+            }
           ]
         })
       } catch (error) {
         logger.error('[策略模拟] 灵敏度图表渲染失败:', error.message)
+      }
+    },
+
+    // ===== Module 15：模拟报告导出 =====
+
+    /**
+     * 导出模拟报告为 PDF
+     * 截取对比分析面板图表区域，生成包含参数变更、分布对比、风险评估的完整报告
+     */
+    async exportReportAsPDF() {
+      if (!this.simulation_result) {
+        Alpine.store('notification')?.show?.('请先运行模拟后再导出', 'warning')
+        return
+      }
+
+      try {
+        const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+          import('html2canvas'),
+          import('jspdf')
+        ])
+
+        const pdf = new jsPDF('p', 'mm', 'a4')
+        const pageWidth = pdf.internal.pageSize.getWidth()
+        const margin = 15
+
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(18)
+        pdf.text('策略效果模拟分析报告', pageWidth / 2, 25, { align: 'center' })
+
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(10)
+        const campaignName = this.simulation_baseline?.campaign?.campaign_name || '-'
+        const now = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+        pdf.text(`活动名称: ${campaignName}`, margin, 38)
+        pdf.text(`模拟名称: ${this.simulation_result.simulation_name || '未命名'}`, margin, 45)
+        pdf.text(`模拟次数: ${this.simulation_result.simulation_count || '-'}`, margin, 52)
+        pdf.text(`生成时间: ${now}`, margin, 59)
+
+        let yPos = 70
+
+        pdf.setFontSize(13)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('档位分布对比', margin, yPos)
+        yPos += 8
+
+        const dist = this.simulation_result.simulation_result?.tier_distribution || {}
+        const actDist = this.simulation_baseline?.actual_distribution?.tier_distribution || {}
+        const delta = this.simulation_result.comparison?.tier_delta || {}
+
+        pdf.setFontSize(9)
+        pdf.setFont('helvetica', 'normal')
+        const tierLabels = {
+          high: '高档(high)',
+          mid: '中档(mid)',
+          low: '低档(low)',
+          fallback: '空奖(fallback)'
+        }
+        for (const tier of ['high', 'mid', 'low', 'fallback']) {
+          const actual = (actDist[tier] || 0).toFixed(2)
+          const sim = (dist[tier] || 0).toFixed(2)
+          const d = (delta[tier] || 0).toFixed(2)
+          pdf.text(
+            `${tierLabels[tier]}: 实际 ${actual}%  →  模拟 ${sim}%  (${d > 0 ? '+' : ''}${d}%)`,
+            margin + 5,
+            yPos
+          )
+          yPos += 6
+        }
+
+        yPos += 5
+        pdf.setFontSize(13)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('风险评估', margin, yPos)
+        yPos += 8
+
+        pdf.setFontSize(9)
+        pdf.setFont('helvetica', 'normal')
+        const risk = this.simulation_result.risk_assessment || {}
+        const riskLabels = {
+          high_tier_risk: '高档率风险',
+          empty_rate_risk: '空奖率风险',
+          budget_depletion_risk: '预算耗尽风险',
+          prize_cost_rate_risk: '奖品成本风险'
+        }
+        for (const [key, label] of Object.entries(riskLabels)) {
+          const level = risk[key] || 'unknown'
+          const levelText =
+            level === 'green'
+              ? '安全'
+              : level === 'yellow'
+                ? '关注'
+                : level === 'red'
+                  ? '危险'
+                  : '未知'
+          pdf.text(`${label}: ${levelText}`, margin + 5, yPos)
+          yPos += 6
+        }
+
+        yPos += 5
+        pdf.setFontSize(13)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('体验机制指标', margin, yPos)
+        yPos += 8
+
+        pdf.setFontSize(9)
+        pdf.setFont('helvetica', 'normal')
+        const exp = this.simulation_result.simulation_result?.experience_metrics || {}
+        pdf.text(`保底触发率: ${(exp.pity_trigger_rate || 0).toFixed(2)}%`, margin + 5, yPos)
+        yPos += 6
+        pdf.text(`防连空触发: ${exp.anti_empty_trigger_count || 0} 次`, margin + 5, yPos)
+        yPos += 6
+        pdf.text(`防连高触发: ${exp.anti_high_trigger_count || 0} 次`, margin + 5, yPos)
+        yPos += 6
+        pdf.text(
+          `平均首次获奖抽数: ${(exp.avg_draws_to_first_non_empty || 0).toFixed(1)}`,
+          margin + 5,
+          yPos
+        )
+
+        const chartDom = document.getElementById('simulation-tier-chart')
+        if (chartDom) {
+          try {
+            const canvas = await html2canvas(chartDom, { scale: 2, useCORS: true })
+            const imgData = canvas.toDataURL('image/png')
+            pdf.addPage()
+            pdf.setFontSize(13)
+            pdf.setFont('helvetica', 'bold')
+            pdf.text('档位分布对比图表', margin, 20)
+            const imgWidth = pageWidth - margin * 2
+            const imgHeight = (canvas.height * imgWidth) / canvas.width
+            pdf.addImage(imgData, 'PNG', margin, 28, imgWidth, Math.min(imgHeight, 200))
+          } catch {
+            logger.warn('[策略模拟] 图表截图失败，跳过图表页')
+          }
+        }
+
+        pdf.setFontSize(7)
+        pdf.setTextColor(150)
+        pdf.text(
+          '本报告由策略模拟系统自动生成',
+          pageWidth / 2,
+          pdf.internal.pageSize.getHeight() - 10,
+          { align: 'center' }
+        )
+
+        pdf.save(`模拟报告_${campaignName}_${new Date().toISOString().slice(0, 10)}.pdf`)
+        Alpine.store('notification')?.show?.('PDF 报告已导出', 'success')
+        logger.info('[策略模拟] PDF报告导出成功')
+      } catch (error) {
+        logger.error('[策略模拟] PDF导出失败:', error.message)
+        Alpine.store('notification')?.show?.(`PDF导出失败: ${error.message}`, 'error')
+      }
+    },
+
+    /**
+     * 导出模拟报告为 Excel
+     * 生成包含模拟参数、模拟结果、当前配置对比的多 Sheet 工作簿
+     */
+    async exportReportAsExcel() {
+      if (!this.simulation_result) {
+        Alpine.store('notification')?.show?.('请先运行模拟后再导出', 'warning')
+        return
+      }
+
+      try {
+        const XLSX = await import('xlsx')
+
+        const paramRows = []
+        paramRows.push(['参数组', '参数项', '当前值', '模拟值'])
+        const baseline = this.simulation_baseline || {}
+        const proposed = this.simulation_result.proposed_config || this.proposed_config || {}
+
+        if (baseline.strategy_config) {
+          for (const [group, config] of Object.entries(baseline.strategy_config)) {
+            for (const [key, val] of Object.entries(config || {})) {
+              const simVal = proposed.strategy_config?.[group]?.[key]
+              paramRows.push([
+                group,
+                key,
+                JSON.stringify(val),
+                simVal !== undefined ? JSON.stringify(simVal) : '(未修改)'
+              ])
+            }
+          }
+        }
+        const paramSheet = XLSX.utils.aoa_to_sheet(paramRows)
+
+        const resultRows = []
+        resultRows.push(['指标', '值'])
+        const dist = this.simulation_result.simulation_result?.tier_distribution || {}
+        resultRows.push(['high 占比(%)', dist.high || 0])
+        resultRows.push(['mid 占比(%)', dist.mid || 0])
+        resultRows.push(['low 占比(%)', dist.low || 0])
+        resultRows.push(['fallback 占比(%)', dist.fallback || 0])
+        resultRows.push(['空奖率(%)', this.simulation_result.simulation_result?.empty_rate || 0])
+
+        const exp = this.simulation_result.simulation_result?.experience_metrics || {}
+        resultRows.push(['保底触发率(%)', exp.pity_trigger_rate || 0])
+        resultRows.push(['防连空触发次数', exp.anti_empty_trigger_count || 0])
+        resultRows.push(['防连高触发次数', exp.anti_high_trigger_count || 0])
+        resultRows.push(['平均首次获奖抽数', exp.avg_draws_to_first_non_empty || 0])
+
+        const cost = this.simulation_result.simulation_result?.cost_metrics || {}
+        resultRows.push(['每千次奖品发放价值', cost.prize_value_per_1000_draws || 0])
+        resultRows.push(['奖品成本率', cost.prize_cost_rate || 0])
+        const resultSheet = XLSX.utils.aoa_to_sheet(resultRows)
+
+        const compareRows = []
+        compareRows.push(['指标', '当前实际', '模拟预测', '变化'])
+        const actDist = baseline.actual_distribution?.tier_distribution || {}
+        const delta = this.simulation_result.comparison?.tier_delta || {}
+        for (const tier of ['high', 'mid', 'low', 'fallback']) {
+          compareRows.push([
+            `${tier} 占比(%)`,
+            actDist[tier] || 0,
+            dist[tier] || 0,
+            delta[tier] || 0
+          ])
+        }
+        compareRows.push([
+          '空奖率(%)',
+          actDist.fallback || 0,
+          this.simulation_result.simulation_result?.empty_rate || 0,
+          this.simulation_result.comparison?.empty_rate_delta || 0
+        ])
+        const compareSheet = XLSX.utils.aoa_to_sheet(compareRows)
+
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, paramSheet, '模拟参数')
+        XLSX.utils.book_append_sheet(wb, resultSheet, '模拟结果')
+        XLSX.utils.book_append_sheet(wb, compareSheet, '对比分析')
+
+        const campaignName = baseline.campaign?.campaign_name || '模拟'
+        XLSX.writeFile(wb, `模拟报告_${campaignName}_${new Date().toISOString().slice(0, 10)}.xlsx`)
+        Alpine.store('notification')?.show?.('Excel 报告已导出', 'success')
+        logger.info('[策略模拟] Excel报告导出成功')
+      } catch (error) {
+        logger.error('[策略模拟] Excel导出失败:', error.message)
+        Alpine.store('notification')?.show?.(`Excel导出失败: ${error.message}`, 'error')
       }
     },
 
@@ -805,12 +1168,15 @@ export function useStrategySimulationMethods() {
           ],
           series: [
             {
-              name: '日预算消耗', type: 'bar',
+              name: '日预算消耗',
+              type: 'bar',
               data: trend.map(d => d.budget_consumed),
               itemStyle: { color: '#6366f1' }
             },
             {
-              name: '日抽奖次数', type: 'line', yAxisIndex: 1,
+              name: '日抽奖次数',
+              type: 'line',
+              yAxisIndex: 1,
               data: trend.map(d => d.draws),
               itemStyle: { color: '#10b981' },
               smooth: true
