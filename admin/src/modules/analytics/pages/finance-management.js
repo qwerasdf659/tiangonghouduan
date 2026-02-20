@@ -217,7 +217,11 @@ document.addEventListener('alpine:init', () => {
               break
             case 'debt-management':
               // 加载活动列表供下拉框使用 + 债务数据 + 统计
-              await Promise.all([this.loadCampaignOptions(), this.loadDebts(), this.loadDebtStats()])
+              await Promise.all([
+                this.loadCampaignOptions(),
+                this.loadDebts(),
+                this.loadDebtStats()
+              ])
               break
             case 'campaign-budget':
               await Promise.all([this.loadBudgets(), this.loadBudgetStats()])
@@ -303,19 +307,44 @@ document.addEventListener('alpine:init', () => {
       columns: [
         { key: 'record_id', label: '记录ID', sortable: true },
         { key: 'user_id', label: '用户ID' },
-        { key: 'store_name', label: '门店', render: (val, row) => val || row.merchant_nickname || `商户${row.merchant_id || '-'}` },
+        {
+          key: 'store_name',
+          label: '门店',
+          render: (val, row) => val || row.merchant_nickname || `商户${row.merchant_id || '-'}`
+        },
         { key: 'consumption_amount', label: '消费金额', type: 'currency', sortable: true },
-        { key: 'status', label: '状态', type: 'status', statusMap: { pending: { class: 'yellow', label: '待审核' }, approved: { class: 'green', label: '已通过' }, rejected: { class: 'red', label: '已拒绝' } } },
+        {
+          key: 'status',
+          label: '状态',
+          type: 'status',
+          statusMap: {
+            pending: { class: 'yellow', label: '待审核' },
+            approved: { class: 'green', label: '已通过' },
+            rejected: { class: 'red', label: '已拒绝' }
+          }
+        },
         { key: 'created_at', label: '消费时间', type: 'datetime', sortable: true }
       ],
-      dataSource: async (params) => {
-        const res = await request({ url: `${API_PREFIX}/console/consumption/records`, method: 'GET', params })
-        return { items: res.data?.records || res.data?.list || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      dataSource: async params => {
+        const res = await request({
+          url: `${API_PREFIX}/console/consumption/records`,
+          method: 'GET',
+          params
+        })
+        return {
+          items: res.data?.records || res.data?.list || [],
+          total: res.data?.pagination?.total || res.data?.count || 0
+        }
       },
-      primaryKey: 'record_id', sortable: true, page_size: 20
+      primaryKey: 'record_id',
+      sortable: true,
+      page_size: 20
     })
     const origInit = table.init
-    table.init = async function () { window.addEventListener('refresh-consumption', () => this.loadData()); if (origInit) await origInit.call(this) }
+    table.init = async function () {
+      window.addEventListener('refresh-consumption', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
     return table
   })
 
@@ -327,39 +356,98 @@ document.addEventListener('alpine:init', () => {
         { key: 'user_id', label: '用户ID', sortable: true },
         { key: 'nickname', label: '昵称', render: (val, row) => row.user?.nickname || val || '-' },
         { key: 'account_type', label: '账户类型' },
-        { key: 'status', label: '状态', type: 'status', statusMap: { active: { class: 'green', label: '正常' }, frozen: { class: 'red', label: '冻结' } } },
+        {
+          key: 'status',
+          label: '状态',
+          type: 'status',
+          statusMap: {
+            active: { class: 'green', label: '正常' },
+            frozen: { class: 'red', label: '冻结' }
+          }
+        },
         { key: 'updated_at', label: '更新时间', type: 'datetime', sortable: true }
       ],
-      dataSource: async (params) => {
-        const res = await request({ url: `${API_PREFIX}/console/system-data/accounts`, method: 'GET', params })
-        return { items: res.data?.accounts || res.data?.list || [], total: res.data?.pagination?.total || 0 }
+      dataSource: async params => {
+        const res = await request({
+          url: `${API_PREFIX}/console/system-data/accounts`,
+          method: 'GET',
+          params
+        })
+        return {
+          items: res.data?.accounts || res.data?.list || [],
+          total: res.data?.pagination?.total || 0
+        }
       },
-      primaryKey: 'account_id', sortable: true, page_size: 20
+      primaryKey: 'account_id',
+      sortable: true,
+      page_size: 20
     })
     const origInit = table.init
-    table.init = async function () { window.addEventListener('refresh-diamond-accounts', () => this.loadData()); if (origInit) await origInit.call(this) }
+    table.init = async function () {
+      window.addEventListener('refresh-diamond-accounts', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
     return table
   })
 
-  /** 商户积分 - 适配后端 /console/merchant-points API */
+  /** 商户积分 - 适配后端 /console/merchant-points API，启用行选择支持批量审核 */
   Alpine.data('merchantPointsDataTable', () => {
     const table = dataTable({
       columns: [
         { key: 'audit_id', label: '审核ID', sortable: true },
-        { key: 'applicant', label: '申请人', render: (val, row) => val?.nickname || `用户${row.user_id || '-'}` },
-        { key: 'points_amount', label: '积分', type: 'number', sortable: true },
-        { key: 'description', label: '描述', type: 'truncate', maxLength: 30 },
-        { key: 'status', label: '状态', type: 'status', statusMap: { pending: { class: 'yellow', label: '待审核' }, approved: { class: 'green', label: '已通过' }, rejected: { class: 'red', label: '已拒绝' } } },
-        { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
+        {
+          key: 'applicant',
+          label: '申请人',
+          render: (val, row) => {
+            const name = val?.nickname || `用户${row.user_id || '-'}`
+            const mobile = val?.mobile
+              ? `<span class="text-xs text-gray-400 ml-1">${val.mobile}</span>`
+              : ''
+            return `<span class="font-medium">${name}</span>${mobile}`
+          }
+        },
+        {
+          key: 'points_amount',
+          label: '积分数量',
+          sortable: true,
+          render: val =>
+            `<span class="font-semibold text-blue-600">${Number(val || 0).toLocaleString()}</span>`
+        },
+        { key: 'description', label: '申请说明', type: 'truncate', maxLength: 30 },
+        {
+          key: 'status',
+          label: '审核状态',
+          type: 'status',
+          statusMap: {
+            pending: { class: 'yellow', label: '⏳ 待审核' },
+            approved: { class: 'green', label: '✅ 已通过' },
+            rejected: { class: 'red', label: '❌ 已拒绝' },
+            cancelled: { class: 'gray', label: '🚫 已取消' }
+          }
+        },
+        { key: 'submitted_at', label: '申请时间', type: 'datetime', sortable: true }
       ],
-      dataSource: async (params) => {
-        const res = await request({ url: `${API_PREFIX}/console/merchant-points`, method: 'GET', params })
-        return { items: res.data?.rows || res.data?.list || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+      dataSource: async params => {
+        const res = await request({
+          url: `${API_PREFIX}/console/merchant-points`,
+          method: 'GET',
+          params
+        })
+        return {
+          items: res.data?.rows || res.data?.list || [],
+          total: res.data?.pagination?.total || res.data?.count || 0
+        }
       },
-      primaryKey: 'audit_id', sortable: true, page_size: 20
+      primaryKey: 'audit_id',
+      selectable: true,
+      sortable: true,
+      page_size: 20
     })
     const origInit = table.init
-    table.init = async function () { window.addEventListener('refresh-merchant-points', () => this.loadData()); if (origInit) await origInit.call(this) }
+    table.init = async function () {
+      window.addEventListener('refresh-merchant-points', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
     return table
   })
 
@@ -368,22 +456,53 @@ document.addEventListener('alpine:init', () => {
     const table = dataTable({
       columns: [
         { key: 'debt_id', label: '债务ID', sortable: true },
-        { key: 'debt_type', label: '类型', render: (val) => val === 'inventory' ? '库存欠账' : val === 'budget' ? '预算欠账' : val || '-' },
-        { key: 'campaign_name', label: '活动', render: (val, row) => val || ('ID: ' + (row.lottery_campaign_id || row.campaign_id || '-')) },
-        { key: 'owed_quantity', label: '欠账数量/金额', sortable: true, render: (val, row) => row.debt_type === 'budget' ? ('¥' + (row.owed_amount || val || 0)) : (val || 0) },
-        { key: 'remaining_quantity', label: '待清偿', render: (val, row) => row.debt_type === 'budget' ? ('¥' + (row.remaining_amount || val || 0)) : (val || 0) },
+        {
+          key: 'debt_type',
+          label: '类型',
+          render: val =>
+            val === 'inventory' ? '库存欠账' : val === 'budget' ? '预算欠账' : val || '-'
+        },
+        {
+          key: 'campaign_name',
+          label: '活动',
+          render: (val, row) => val || 'ID: ' + (row.lottery_campaign_id || row.campaign_id || '-')
+        },
+        {
+          key: 'owed_quantity',
+          label: '欠账数量/金额',
+          sortable: true,
+          render: (val, row) =>
+            row.debt_type === 'budget' ? '¥' + (row.owed_amount || val || 0) : val || 0
+        },
+        {
+          key: 'remaining_quantity',
+          label: '待清偿',
+          render: (val, row) =>
+            row.debt_type === 'budget' ? '¥' + (row.remaining_amount || val || 0) : val || 0
+        },
         { key: 'created_at', label: '创建时间', type: 'datetime', sortable: true }
       ],
-      dataSource: async (params) => {
-        const res = await request({ url: `${API_PREFIX}/console/debt-management/pending`, method: 'GET', params })
-        const items = res.data?.items || res.data?.pending_debts || res.data?.list || res.data?.rows || []
-        const total = res.data?.pagination?.total || res.data?.total || res.data?.count || items.length
+      dataSource: async params => {
+        const res = await request({
+          url: `${API_PREFIX}/console/debt-management/pending`,
+          method: 'GET',
+          params
+        })
+        const items =
+          res.data?.items || res.data?.pending_debts || res.data?.list || res.data?.rows || []
+        const total =
+          res.data?.pagination?.total || res.data?.total || res.data?.count || items.length
         return { items, total }
       },
-      primaryKey: 'debt_id', sortable: true, page_size: 20
+      primaryKey: 'debt_id',
+      sortable: true,
+      page_size: 20
     })
     const origInit = table.init
-    table.init = async function () { window.addEventListener('refresh-debts', () => this.loadData()); if (origInit) await origInit.call(this) }
+    table.init = async function () {
+      window.addEventListener('refresh-debts', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
     return table
   })
 
@@ -393,21 +512,60 @@ document.addEventListener('alpine:init', () => {
       columns: [
         { key: 'lottery_campaign_id', label: '活动ID', sortable: true },
         { key: 'campaign_name', label: '活动名称', render: (val, row) => val || row.name || '-' },
-        { key: 'budget_mode', label: '预算模式', render: (val) => val === 'pool' ? '活动池' : val === 'user' ? '用户预算' : val === 'none' ? '无预算' : val || '-' },
-        { key: 'pool_budget_total', label: '总预算', render: (val, row) => (row.pool_budget?.total ?? val ?? 0) },
-        { key: 'pool_budget_remaining', label: '剩余', render: (val, row) => (row.pool_budget?.remaining ?? val ?? 0) },
-        { key: 'status', label: '活动状态', type: 'status', statusMap: { active: { class: 'green', label: '运行中' }, draft: { class: 'gray', label: '草稿' }, paused: { class: 'yellow', label: '暂停' }, ended: { class: 'blue', label: '已结束' }, cancelled: { class: 'red', label: '已取消' } } }
+        {
+          key: 'budget_mode',
+          label: '预算模式',
+          render: val =>
+            val === 'pool'
+              ? '活动池'
+              : val === 'user'
+                ? '用户预算'
+                : val === 'none'
+                  ? '无预算'
+                  : val || '-'
+        },
+        {
+          key: 'pool_budget_total',
+          label: '总预算',
+          render: (val, row) => row.pool_budget?.total ?? val ?? 0
+        },
+        {
+          key: 'pool_budget_remaining',
+          label: '剩余',
+          render: (val, row) => row.pool_budget?.remaining ?? val ?? 0
+        },
+        {
+          key: 'status',
+          label: '活动状态',
+          type: 'status',
+          statusMap: {
+            active: { class: 'green', label: '运行中' },
+            draft: { class: 'gray', label: '草稿' },
+            paused: { class: 'yellow', label: '暂停' },
+            ended: { class: 'blue', label: '已结束' },
+            cancelled: { class: 'red', label: '已取消' }
+          }
+        }
       ],
-      dataSource: async (params) => {
-        const res = await request({ url: `${API_PREFIX}/console/campaign-budget/batch-status`, method: 'GET', params })
+      dataSource: async params => {
+        const res = await request({
+          url: `${API_PREFIX}/console/campaign-budget/batch-status`,
+          method: 'GET',
+          params
+        })
         const items = res.data?.campaigns || res.data?.list || res.data?.budgets || []
         const total = res.data?.total_count || res.data?.pagination?.total || items.length
         return { items, total }
       },
-      primaryKey: 'lottery_campaign_id', sortable: true, page_size: 20
+      primaryKey: 'lottery_campaign_id',
+      sortable: true,
+      page_size: 20
     })
     const origInit = table.init
-    table.init = async function () { window.addEventListener('refresh-budgets', () => this.loadData()); if (origInit) await origInit.call(this) }
+    table.init = async function () {
+      window.addEventListener('refresh-budgets', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
     return table
   })
 
@@ -417,19 +575,31 @@ document.addEventListener('alpine:init', () => {
       columns: [
         { key: 'id', label: '日志ID', sortable: true },
         {
-          key: 'operator_info', label: '操作人',
+          key: 'operator_info',
+          label: '操作人',
           render: (val, row) => {
             const info = row.operator_info
             if (!info) return '-'
             const name = info.nickname || '-'
-            const mobile = info.mobile ? `<span class="text-xs themed-text-muted ml-1">${info.mobile}</span>` : ''
+            const mobile = info.mobile
+              ? `<span class="text-xs themed-text-muted ml-1">${info.mobile}</span>`
+              : ''
             return `${name}${mobile}`
           }
         },
-        { key: 'operation_type_name', label: '操作类型', render: (val, row) => val || row.operation_type || '-' },
-        { key: 'store_info', label: '门店', render: (val, row) => row.store_info?.store_name || '-' },
         {
-          key: 'result', label: '结果',
+          key: 'operation_type_name',
+          label: '操作类型',
+          render: (val, row) => val || row.operation_type || '-'
+        },
+        {
+          key: 'store_info',
+          label: '门店',
+          render: (val, row) => row.store_info?.store_name || '-'
+        },
+        {
+          key: 'result',
+          label: '结果',
           render: (val, row) => {
             if (val === 'success') return '<span class="text-green-600">✅ 成功</span>'
             if (val === 'failed') return '<span class="text-red-600">❌ 失败</span>'
@@ -439,7 +609,7 @@ document.addEventListener('alpine:init', () => {
         },
         { key: 'created_at', label: '操作时间', type: 'datetime', sortable: true }
       ],
-      dataSource: async (params) => {
+      dataSource: async params => {
         // 手机号搜索：解析为 operator_id（后端不支持直接按手机号筛选）
         const queryParams = { ...params }
         if (queryParams.operator_mobile) {
@@ -457,16 +627,25 @@ document.addEventListener('alpine:init', () => {
           }
           delete queryParams.operator_mobile
         }
-        const res = await request({ url: `${API_PREFIX}/console/audit-logs`, method: 'GET', params: queryParams })
+        const res = await request({
+          url: `${API_PREFIX}/console/audit-logs`,
+          method: 'GET',
+          params: queryParams
+        })
         return {
           items: res.data?.items || res.data?.logs || res.data?.list || [],
           total: res.data?.pagination?.total || res.data?.count || 0
         }
       },
-      primaryKey: 'id', sortable: true, page_size: 20
+      primaryKey: 'id',
+      sortable: true,
+      page_size: 20
     })
     const origInit = table.init
-    table.init = async function () { window.addEventListener('refresh-merchant-logs', () => this.loadData()); if (origInit) await origInit.call(this) }
+    table.init = async function () {
+      window.addEventListener('refresh-merchant-logs', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
     return table
   })
 
@@ -480,21 +659,33 @@ document.addEventListener('alpine:init', () => {
         // delta_amount：与后端数据库字段名一致（正数=增加，负数=扣减）
         { key: 'delta_amount', label: '变动金额', type: 'number', sortable: true },
         { key: 'balance_after', label: '变动后余额', type: 'number' },
-        { key: 'description', label: '描述', render: (val) => val || '-' },
+        { key: 'description', label: '描述', render: val => val || '-' },
         { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
       ],
-      dataSource: async (params) => {
+      dataSource: async params => {
         // 后端 /console/assets/transactions 要求 user_id 必填
         if (!params.user_id) {
           return { items: [], total: 0 }
         }
-        const res = await request({ url: `${API_PREFIX}/console/assets/transactions`, method: 'GET', params: { ...params, asset_code: 'DIAMOND' } })
-        return { items: res.data?.transactions || res.data?.list || [], total: res.data?.pagination?.total || 0 }
+        const res = await request({
+          url: `${API_PREFIX}/console/assets/transactions`,
+          method: 'GET',
+          params: { ...params, asset_code: 'DIAMOND' }
+        })
+        return {
+          items: res.data?.transactions || res.data?.list || [],
+          total: res.data?.pagination?.total || 0
+        }
       },
-      primaryKey: 'asset_transaction_id', sortable: true, page_size: 20
+      primaryKey: 'asset_transaction_id',
+      sortable: true,
+      page_size: 20
     })
     const origInit = table.init
-    table.init = async function () { window.addEventListener('refresh-diamond-transactions', () => this.loadData()); if (origInit) await origInit.call(this) }
+    table.init = async function () {
+      window.addEventListener('refresh-diamond-transactions', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
     return table
   })
 

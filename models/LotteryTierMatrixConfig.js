@@ -235,16 +235,16 @@ module.exports = (sequelize, DataTypes) => {
      */
     getFormattedConfig() {
       return {
-        lottery_tier_matrix_config_id: this.lottery_tier_matrix_config_id, // 添加主键ID，用于前端更新
+        lottery_tier_matrix_config_id: this.lottery_tier_matrix_config_id,
         budget_tier: this.budget_tier,
         pressure_tier: this.pressure_tier,
         cap_multiplier: parseFloat(this.cap_multiplier),
         empty_weight_multiplier: parseFloat(this.empty_weight_multiplier),
-        // 新增档位权重字段（P0修复 - 2026-01-30）
         high_multiplier: parseFloat(this.high_multiplier),
         mid_multiplier: parseFloat(this.mid_multiplier),
         low_multiplier: parseFloat(this.low_multiplier),
         fallback_multiplier: parseFloat(this.fallback_multiplier),
+        is_active: this.is_active,
         description: this.description
       }
     }

@@ -27,6 +27,7 @@ const { logger, sanitize } = require('../../../utils/logger')
 const { generateTokens, getUserRoles } = require('../../../middleware/auth')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const TransactionManager = require('../../../utils/TransactionManager')
+const { detectLoginPlatform } = require('../../../utils/platformDetector')
 
 // Phase 3 收口：AuthenticationSession 在路由内通过 ServiceManager 获取，避免顶部直连 models
 
@@ -178,30 +179,25 @@ router.post('/login', async (req, res) => {
   const sessionToken = uuidv4()
   const userType = userRoles.role_level >= 100 ? 'admin' : 'user'
   const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
+  const platform = detectLoginPlatform(req)
 
   // 通过 app.locals.models 获取 AuthenticationSession（app.js 中注入）
   const { AuthenticationSession } = req.app.locals.models
 
   try {
     /**
-     * 🆕 2026-01-29 多设备登录冲突处理（P0-6 安全审计）
+     * 多平台会话隔离策略（2026-02-19 升级）
      *
-     * 业务规则：新设备登录时，使该用户的其他活跃会话失效
-     * - 实现"单设备登录"安全策略
-     * - 旧设备的 Token 将被认证中间件拒绝
-     * - 旧设备的 WebSocket 连接将自动断开
+     * 仅失效同平台的旧会话，跨平台共存：
+     *   Web 登录 → 只踢 Web 旧会话，微信/抖音小程序不受影响
+     *   微信小程序登录 → 只踢微信旧会话，Web/抖音不受影响
      *
-     * 🔧 2026-02-01 测试环境优化：
-     * - 测试环境跳过多设备登录检测，避免并发测试时Token互相失效
-     * - 通过 NODE_ENV=test 或 DISABLE_MULTI_DEVICE_CHECK=true 控制
+     * 测试环境控制逻辑不变：
+     * - 默认测试环境跳过（避免并发测试互相干扰）
+     * - ENABLE_MULTI_DEVICE_CHECK=true 可在测试环境强制启用
+     * - DISABLE_MULTI_DEVICE_CHECK=true 可在任何环境关闭
      *
-     * @see docs/测试审计标准.md - P0-6 多设备登录冲突测试
-     */
-    /**
-     * 多设备登录冲突处理
-     * - 默认在非测试环境执行（测试环境会导致并发测试互相干扰）
-     * - ENABLE_MULTI_DEVICE_CHECK=true 可在测试环境中强制启用（用于专项测试）
-     * - DISABLE_MULTI_DEVICE_CHECK=true 可在任何环境中关闭
+     * @see docs/multi-platform-session-design.md
      */
     const isTestEnv = process.env.NODE_ENV === 'test'
     const disableMultiDeviceCheck = process.env.DISABLE_MULTI_DEVICE_CHECK === 'true'
@@ -212,13 +208,14 @@ router.post('/login', async (req, res) => {
       deactivatedCount = await AuthenticationSession.deactivateUserSessions(
         userType,
         user.user_id,
-        null
+        null,
+        platform
       )
     }
 
     if (deactivatedCount > 0) {
       logger.info(
-        `🔒 [Session] 多设备登录检测: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id})`
+        `🔒 [Session] 同平台会话替换: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id}, platform=${platform})`
       )
 
       try {
@@ -238,10 +235,11 @@ router.post('/login', async (req, res) => {
       user_type: userType,
       user_id: user.user_id,
       login_ip: loginIp,
+      login_platform: platform,
       expires_in_minutes: 10080 // 7天（7 * 24 * 60），与 refresh_token 生命周期对齐
     })
     logger.info(
-      `🔐 [Session] 会话创建成功: user_id=${user.user_id}, session_token=${sessionToken.substring(0, 8)}...`
+      `🔐 [Session] 会话创建成功: user_id=${user.user_id}, platform=${platform}, session=${sessionToken.substring(0, 8)}...`
     )
   } catch (sessionError) {
     logger.warn(`⚠️ [Session] 会话创建失败（非致命）: ${sessionError.message}`)
@@ -438,28 +436,24 @@ router.post('/quick-login', async (req, res) => {
   )
 
   /**
-   * 🆕 2026-01-21 会话管理功能：创建认证会话记录（快速登录）
+   * 会话管理：创建认证会话记录（快速登录 = 微信小程序专用）
    *
-   * 与普通登录相同的会话管理逻辑
-   * @see docs/会话管理功能补齐方案.md
+   * quick-login 端点固定识别为 wechat_mp：
+   *   该端点仅微信小程序调用，无需通过 UA 检测
+   *
+   * @see docs/multi-platform-session-design.md
    */
   const sessionToken = uuidv4()
   const userType = userRoles.role_level >= 100 ? 'admin' : 'user'
   const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
+  const platform = 'wechat_mp' // quick-login 端点固定为微信小程序
 
   try {
-    // Phase 3 收口：通过 ServiceManager 获取 AuthenticationSession（快速登录流程）
     const { AuthenticationSession } = req.app.locals.models
 
     /**
-     * 🆕 2026-01-29 多设备登录冲突处理（P0-6 安全审计）- 快速登录
-     *
-     * 与普通登录相同的会话管理逻辑：新设备登录时使旧会话失效
-     *
-     * 🔧 2026-02-01 测试环境优化：
-     * - 测试环境跳过多设备登录检测，避免并发测试时Token互相失效
-     *
-     * @see docs/测试审计标准.md - P0-6 多设备登录冲突测试
+     * 多平台会话隔离（快速登录）
+     * 仅失效 wechat_mp 平台的旧会话，Web 端不受影响
      */
     const isTestEnv = process.env.NODE_ENV === 'test'
     const disableMultiDeviceCheck = process.env.DISABLE_MULTI_DEVICE_CHECK === 'true'
@@ -470,13 +464,14 @@ router.post('/quick-login', async (req, res) => {
       deactivatedCount = await AuthenticationSession.deactivateUserSessions(
         userType,
         user.user_id,
-        null
+        null,
+        platform
       )
     }
 
     if (deactivatedCount > 0) {
       logger.info(
-        `🔒 [Session] 快速登录多设备检测: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id})`
+        `🔒 [Session] 快速登录同平台会话替换: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id}, platform=${platform})`
       )
 
       try {
@@ -490,16 +485,16 @@ router.post('/quick-login', async (req, res) => {
       }
     }
 
-    // 创建新会话（TTL 与 refresh_token 7天生命周期对齐）
     await AuthenticationSession.createSession({
       session_token: sessionToken,
       user_type: userType,
       user_id: user.user_id,
       login_ip: loginIp,
-      expires_in_minutes: 10080 // 7天（7 * 24 * 60），与 refresh_token 生命周期对齐
+      login_platform: platform,
+      expires_in_minutes: 10080 // 7天
     })
     logger.info(
-      `🔐 [Session] 快速登录会话创建成功: user_id=${user.user_id}, session_token=${sessionToken.substring(0, 8)}...`
+      `🔐 [Session] 快速登录会话创建成功: user_id=${user.user_id}, platform=${platform}, session=${sessionToken.substring(0, 8)}...`
     )
   } catch (sessionError) {
     logger.warn(`⚠️ [Session] 快速登录会话创建失败（非致命）: ${sessionError.message}`)

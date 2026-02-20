@@ -143,6 +143,7 @@ class BusinessRecordQueryService {
    * @param {Object} options - 查询选项
    * @param {string} [options.status] - 订单状态
    * @param {number} [options.redeemer_user_id] - 核销用户ID
+   * @param {string} [options.mobile] - 用户手机号（模糊搜索）
    * @param {string} [options.start_date] - 开始日期
    * @param {string} [options.end_date] - 结束日期
    * @param {number} [options.page=1] - 页码
@@ -152,7 +153,7 @@ class BusinessRecordQueryService {
   static async getRedemptionOrders(options = {}) {
     const { RedemptionOrder, User, ItemInstance } = require('../../models')
 
-    const { status, redeemer_user_id, start_date, end_date } = options
+    const { status, redeemer_user_id, mobile, start_date, end_date } = options
     const pagination = buildPaginationOptions(options)
 
     // 构建查询条件
@@ -165,6 +166,14 @@ class BusinessRecordQueryService {
       if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
     }
 
+    // 手机号搜索：通过关联 User 表的 mobile 字段过滤
+    const userWhere = {}
+    let userRequired = false
+    if (mobile) {
+      userWhere.mobile = { [Op.like]: `%${mobile}%` }
+      userRequired = true
+    }
+
     const { count, rows } = await RedemptionOrder.findAndCountAll({
       where,
       include: [
@@ -172,7 +181,8 @@ class BusinessRecordQueryService {
           model: User,
           as: 'redeemer',
           attributes: ['user_id', 'nickname', 'mobile'],
-          required: false
+          where: Object.keys(userWhere).length > 0 ? userWhere : undefined,
+          required: userRequired
         },
         {
           model: ItemInstance,

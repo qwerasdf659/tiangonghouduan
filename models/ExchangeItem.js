@@ -187,6 +187,14 @@ module.exports = sequelize => {
         comment: '是否包邮'
       },
 
+      /** 是否限量商品（管理员手动控制，触发小程序旋转彩虹边框） */
+      is_limited: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否限量商品（管理员手动控制，触发小程序旋转彩虹边框）'
+      },
+
       /** 营销卖点文案 */
       sell_point: {
         type: DataTypes.STRING(200),

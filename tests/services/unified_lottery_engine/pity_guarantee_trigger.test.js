@@ -718,13 +718,15 @@ describe('保底触发完整流程测试（任务8.4）', () => {
         return
       }
 
-      // 先设置一些状态
-      await experience_state_manager.updateState({
-        user_id: test_user.user_id,
-        lottery_campaign_id: test_campaign.lottery_campaign_id,
-        empty_streak: 5,
-        total_draw_count: 20
-      })
+      // 先模拟5次空奖来设置体验状态
+      for (let i = 0; i < 5; i++) {
+        await experience_state_manager.updateState({
+          user_id: test_user.user_id,
+          lottery_campaign_id: test_campaign.lottery_campaign_id,
+          draw_tier: 'fallback',
+          is_empty: true
+        })
+      }
 
       // 重置状态
       const reset_result = await experience_state_manager.resetState({

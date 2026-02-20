@@ -238,6 +238,27 @@ models.ChatMessage = require('./ChatMessage')(sequelize, DataTypes)
  *    - 表名：chat_messages，外键：customer_service_session_id
  */
 
+models.CustomerServiceAgent = require('./CustomerServiceAgent')(sequelize, DataTypes)
+/*
+ * ✅ CustomerServiceAgent：客服座席管理
+ *    - 用途：记录哪些用户是客服座席、配置最大并发会话数、分配优先级、在岗状态
+ *    - 特点：座席状态管理、自动分配配置、工作负载跟踪、满意度统计
+ *    - 表名：customer_service_agents，主键：customer_service_agent_id，外键：user_id
+ *    - 业务场景：管理员注册客服座席→配置并发上限→开启自动分配→监控工作负载
+ */
+
+models.CustomerServiceUserAssignment = require('./CustomerServiceUserAssignment')(
+  sequelize,
+  DataTypes
+)
+/*
+ * ✅ CustomerServiceUserAssignment：客服用户分配
+ *    - 用途：记录用户被分配给哪个客服座席，实现持久化的用户-客服绑定关系
+ *    - 特点：支持分配/转移/过期、保留分配历史、同一用户同时只有一条 active 分配
+ *    - 表名：customer_service_user_assignments，主键：customer_service_user_assignment_id
+ *    - 业务场景：管理员分配用户到客服→用户下次咨询自动路由→客服间转移用户
+ */
+
 // V4.0新增：系统公告和反馈系统
 models.SystemAnnouncement = require('./SystemAnnouncement')(sequelize, DataTypes)
 models.Feedback = require('./Feedback')(sequelize, DataTypes)

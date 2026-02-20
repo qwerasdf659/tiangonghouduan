@@ -140,6 +140,7 @@ router.get(
  *
  * @query {string} [status] - 订单状态（pending/fulfilled/cancelled/expired）
  * @query {number} [redeemer_user_id] - 核销用户ID
+ * @query {string} [mobile] - 用户手机号（模糊搜索）
  * @query {string} [start_date] - 开始日期
  * @query {string} [end_date] - 结束日期
  * @query {number} [page=1] - 页码
@@ -317,7 +318,7 @@ router.post(
       const adminUserId = req.user.user_id
 
       // 通过 ServiceManager 获取服务（避免直连 models）
-      const RedemptionService = req.app.locals.services.getService('redemption')
+      const RedemptionService = req.app.locals.services.getService('redemption_order')
 
       // 使用 TransactionManager 管理事务边界
       const order = await TransactionManager.execute(
@@ -371,7 +372,7 @@ router.post(
       const adminUserId = req.user.user_id
 
       // 通过 ServiceManager 获取服务（避免直连 models）
-      const RedemptionService = req.app.locals.services.getService('redemption')
+      const RedemptionService = req.app.locals.services.getService('redemption_order')
 
       // 使用 TransactionManager 管理事务边界
       const order = await TransactionManager.execute(
@@ -405,6 +406,67 @@ router.post(
 )
 
 /**
+ * POST /api/v4/console/business-records/redemption-orders/batch-redeem
+ * @desc 批量核销订单（仅处理 pending 状态）
+ * @access Admin only (role_level >= 30)
+ *
+ * @body {string[]} order_ids - 订单ID数组
+ * @body {number} [store_id] - 核销门店ID（可选，批量统一指定）
+ * @body {string} [remark] - 备注（可选）
+ */
+router.post(
+  '/redemption-orders/batch-redeem',
+  authenticateToken,
+  requireRoleLevel(30),
+  async (req, res) => {
+    try {
+      const { order_ids, store_id, remark } = req.body
+      const adminUserId = req.user.user_id
+
+      if (!order_ids || !Array.isArray(order_ids) || order_ids.length === 0) {
+        return res.apiError('请提供要核销的订单ID列表', 'INVALID_PARAMS', null, 400)
+      }
+
+      if (order_ids.length > 100) {
+        return res.apiError('单次批量核销不超过100个订单', 'INVALID_PARAMS', null, 400)
+      }
+
+      const RedemptionService = req.app.locals.services.getService('redemption_order')
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return RedemptionService.adminBatchFulfillOrders(order_ids, {
+            transaction,
+            admin_user_id: adminUserId,
+            store_id,
+            remark
+          })
+        },
+        { description: '批量核销订单' }
+      )
+
+      logger.info('批量核销订单成功', {
+        admin_id: adminUserId,
+        requested_count: order_ids.length,
+        fulfilled_count: result.fulfilled_count,
+        failed_count: result.failed_orders?.length || 0
+      })
+
+      return res.apiSuccess(
+        {
+          requested_count: order_ids.length,
+          fulfilled_count: result.fulfilled_count,
+          failed_orders: result.failed_orders
+        },
+        `成功核销 ${result.fulfilled_count} 个订单`
+      )
+    } catch (error) {
+      return handleServiceError(error, res, '批量核销订单')
+    }
+  }
+)
+
+/**
  * POST /api/v4/console/business-records/redemption-orders/batch-expire
  * @desc 批量将核销码设为过期
  * @access Admin only (role_level >= 30)
@@ -425,7 +487,7 @@ router.post(
       }
 
       // 通过 ServiceManager 获取服务（避免直连 models）
-      const RedemptionService = req.app.locals.services.getService('redemption')
+      const RedemptionService = req.app.locals.services.getService('redemption_order')
 
       // 使用 TransactionManager 管理事务边界
       const result = await TransactionManager.execute(
@@ -455,6 +517,65 @@ router.post(
       )
     } catch (error) {
       return handleServiceError(error, res, '批量过期核销码')
+    }
+  }
+)
+
+/**
+ * POST /api/v4/console/business-records/redemption-orders/batch-cancel
+ * @desc 批量取消核销订单（仅处理 pending 状态）
+ * @access Admin only (role_level >= 30)
+ *
+ * @body {string[]} order_ids - 订单ID数组
+ * @body {string} [reason] - 取消原因（可选）
+ */
+router.post(
+  '/redemption-orders/batch-cancel',
+  authenticateToken,
+  requireRoleLevel(30),
+  async (req, res) => {
+    try {
+      const { order_ids, reason } = req.body
+      const adminUserId = req.user.user_id
+
+      if (!order_ids || !Array.isArray(order_ids) || order_ids.length === 0) {
+        return res.apiError('请提供要取消的订单ID列表', 'INVALID_PARAMS', null, 400)
+      }
+
+      if (order_ids.length > 100) {
+        return res.apiError('单次批量取消不超过100个订单', 'INVALID_PARAMS', null, 400)
+      }
+
+      const RedemptionService = req.app.locals.services.getService('redemption_order')
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return RedemptionService.adminBatchCancelOrders(order_ids, {
+            transaction,
+            admin_user_id: adminUserId,
+            reason: reason || '管理员批量取消'
+          })
+        },
+        { description: '批量取消核销订单' }
+      )
+
+      logger.info('批量取消核销订单成功', {
+        admin_id: adminUserId,
+        requested_count: order_ids.length,
+        cancelled_count: result.cancelled_count,
+        failed_count: result.failed_orders?.length || 0
+      })
+
+      return res.apiSuccess(
+        {
+          requested_count: order_ids.length,
+          cancelled_count: result.cancelled_count,
+          failed_orders: result.failed_orders
+        },
+        `成功取消 ${result.cancelled_count} 个订单`
+      )
+    } catch (error) {
+      return handleServiceError(error, res, '批量取消核销订单')
     }
   }
 )

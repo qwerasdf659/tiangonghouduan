@@ -84,6 +84,19 @@ export function useFeedbackState() {
     newStatus: '',
     /** @type {string} 状态备注 */
     statusNotes: '',
+
+    // ========== 批量操作状态 ==========
+    /** @type {Set<number>} 已选中的反馈ID集合 */
+    selectedFeedbackIds: new Set(),
+    /** @type {boolean} 显示批量状态更新弹窗 */
+    showBatchStatusModal: false,
+    /** @type {string} 批量更新的目标状态 */
+    batchStatus: '',
+    /** @type {string} 批量更新的备注 */
+    batchNotes: '',
+    /** @type {boolean} 批量操作提交中 */
+    submittingBatch: false,
+
     /** @type {Object} 状态字典 */
     FEEDBACK_STATUS_MAP,
     /** @type {Object} 分类字典 */
@@ -119,7 +132,8 @@ export function useFeedbackMethods() {
           // 后端 FeedbackService.getFeedbackList 返回 { feedbacks, total, limit, offset }
           // total 在 response.data 顶层，不在 pagination 对象中
           this.feedbackPagination = {
-            total: response.data?.total || response.data?.pagination?.total || this.feedbacks.length,
+            total:
+              response.data?.total || response.data?.pagination?.total || this.feedbacks.length,
             page: this.feedbackFilters.page,
             page_size: this.feedbackFilters.page_size
           }
@@ -291,7 +305,10 @@ export function useFeedbackMethods() {
      * @param {number} page - 页码
      */
     goToFeedbackPage(page) {
-      const totalPages = Math.ceil((this.feedbackPagination?.total || 0) / (this.feedbackFilters?.page_size || 20)) || 1
+      const totalPages =
+        Math.ceil(
+          (this.feedbackPagination?.total || 0) / (this.feedbackFilters?.page_size || 20)
+        ) || 1
       if (page < 1 || page > totalPages) return
       this.feedbackFilters.page = page
       this.loadFeedbacks()
@@ -368,8 +385,136 @@ export function useFeedbackMethods() {
         other: 'bg-gray-100 text-gray-600'
       }
       return colorMap[category] || 'bg-gray-100 text-gray-600'
+    },
+
+    // ========== 批量操作方法 ==========
+
+    /**
+     * 切换单条反馈的选中状态
+     * @param {number} feedbackId - 反馈ID
+     */
+    toggleFeedbackSelection(feedbackId) {
+      if (this.selectedFeedbackIds.has(feedbackId)) {
+        this.selectedFeedbackIds.delete(feedbackId)
+      } else {
+        this.selectedFeedbackIds.add(feedbackId)
+      }
+    },
+
+    /**
+     * 当前反馈是否被选中
+     * @param {number} feedbackId - 反馈ID
+     * @returns {boolean}
+     */
+    isFeedbackSelected(feedbackId) {
+      return this.selectedFeedbackIds.has(feedbackId)
+    },
+
+    /**
+     * 全选/取消全选当前页的反馈
+     */
+    toggleSelectAllFeedbacks() {
+      const currentPageIds = this.feedbacks.map(f => f.feedback_id || f.id).filter(Boolean)
+
+      const allSelected =
+        currentPageIds.length > 0 && currentPageIds.every(id => this.selectedFeedbackIds.has(id))
+
+      if (allSelected) {
+        currentPageIds.forEach(id => this.selectedFeedbackIds.delete(id))
+      } else {
+        currentPageIds.forEach(id => this.selectedFeedbackIds.add(id))
+      }
+    },
+
+    /**
+     * 检查当前页是否全部选中
+     * @returns {boolean}
+     */
+    isAllFeedbacksSelected() {
+      const currentPageIds = this.feedbacks?.map(f => f.feedback_id || f.id).filter(Boolean) || []
+      return (
+        currentPageIds.length > 0 && currentPageIds.every(id => this.selectedFeedbackIds.has(id))
+      )
+    },
+
+    /**
+     * 获取已选中数量
+     * @returns {number}
+     */
+    getSelectedFeedbackCount() {
+      return this.selectedFeedbackIds.size
+    },
+
+    /**
+     * 清空选中状态
+     */
+    clearFeedbackSelection() {
+      this.selectedFeedbackIds = new Set()
+    },
+
+    /**
+     * 打开批量状态更新弹窗
+     */
+    openBatchStatusModal() {
+      if (this.selectedFeedbackIds.size === 0) {
+        this.showError?.('请先勾选要批量操作的反馈')
+        return
+      }
+      this.batchStatus = ''
+      this.batchNotes = ''
+      this.showBatchStatusModal = true
+    },
+
+    /**
+     * 提交批量状态更新
+     */
+    async submitBatchStatusUpdate() {
+      if (!this.batchStatus) {
+        this.showError?.('请选择目标状态')
+        return
+      }
+
+      if (this.selectedFeedbackIds.size === 0) {
+        this.showError?.('没有选中的反馈')
+        return
+      }
+
+      this.submittingBatch = true
+      try {
+        const response = await ContentAPI.batchUpdateFeedbackStatus({
+          feedback_ids: Array.from(this.selectedFeedbackIds),
+          status: this.batchStatus,
+          internal_notes: this.batchNotes.trim() || null
+        })
+
+        if (response?.success) {
+          const count = response.data?.updated_count || 0
+          this.showBatchStatusModal = false
+          this.clearFeedbackSelection()
+          if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
+            Alpine.store('notification').success(`批量更新成功，共更新 ${count} 条反馈`)
+          }
+          await Promise.all([this.loadFeedbacks(), this.loadFeedbackStats()])
+        } else {
+          this.showError?.('批量更新失败: ' + (response?.message || '未知错误'))
+        }
+      } catch (error) {
+        logger.error('[Feedback] 批量更新状态失败:', error)
+        this.showError?.('批量更新失败: ' + (error.message || '网络错误'))
+      } finally {
+        this.submittingBatch = false
+      }
+    },
+
+    /**
+     * 按状态快速筛选（点击统计卡片）
+     * @param {string} status - 状态值（空字符串表示全部）
+     */
+    filterByStatus(status) {
+      this.feedbackFilters.status = status
+      this.feedbackFilters.page = 1
+      this.clearFeedbackSelection()
+      this.loadFeedbacks()
     }
   }
 }
-
-

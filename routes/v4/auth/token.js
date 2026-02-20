@@ -32,6 +32,7 @@ const {
 } = require('../../../middleware/auth')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { getRateLimiter } = require('../../../middleware/RateLimiterMiddleware')
+const { detectLoginPlatform } = require('../../../utils/platformDetector')
 
 // Phase 3 收口：AuthenticationSession 在路由内通过 ServiceManager 获取，避免顶部直连 models
 
@@ -202,6 +203,7 @@ router.post('/refresh', async (req, res) => {
     const refreshUserRoles = await getUserRoles(user.user_id)
     const userType = refreshUserRoles.role_level >= 100 ? 'admin' : 'user'
     const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
+    const platform = detectLoginPlatform(req)
 
     try {
       await AuthenticationSession.createSession({
@@ -209,10 +211,11 @@ router.post('/refresh', async (req, res) => {
         user_type: userType,
         user_id: user.user_id,
         login_ip: loginIp,
+        login_platform: platform,
         expires_in_minutes: SESSION_TTL_MINUTES
       })
       logger.info(
-        `🔐 [Auth] Token刷新创建新会话: session=${sessionToken.substring(0, 8)}..., user_id=${user.user_id}`
+        `🔐 [Auth] Token刷新创建新会话: session=${sessionToken.substring(0, 8)}..., user_id=${user.user_id}, platform=${platform}`
       )
     } catch (sessionError) {
       logger.warn(`⚠️ [Auth] Token刷新会话创建失败（非致命）: ${sessionError.message}`)

@@ -635,8 +635,8 @@ describe('NormalDrawPipeline 管线测试（任务2.2）', () => {
       expect(result.data).toBeDefined()
       expect(result.data.decision_source).toBeDefined()
 
-      // 正常情况下应该是 normal
-      const valid_sources = ['normal', 'preset', 'override']
+      // 有效的决策来源：normal/preset/override/guarantee
+      const valid_sources = ['normal', 'preset', 'override', 'guarantee']
       expect(valid_sources).toContain(result.data.decision_source)
 
       console.log(`✅ LoadDecisionSourceStage: 决策来源 = ${result.data.decision_source}`)

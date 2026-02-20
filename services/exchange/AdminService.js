@@ -70,6 +70,7 @@ class AdminService {
    * @param {boolean} [itemData.is_lucky=false] - 是否幸运商品
    * @param {boolean} [itemData.has_warranty=false] - 是否有质保
    * @param {boolean} [itemData.free_shipping=false] - 是否包邮
+   * @param {boolean} [itemData.is_limited=false] - 是否限量商品（前端触发旋转彩虹边框等视觉强调）
    * @param {string} [itemData.sell_point] - 营销卖点文案
    * @param {string} [itemData.category] - 商品分类
    * @param {number} created_by - 创建者ID
@@ -143,6 +144,7 @@ class AdminService {
         is_lucky: !!itemData.is_lucky,
         has_warranty: !!itemData.has_warranty,
         free_shipping: !!itemData.free_shipping,
+        is_limited: !!itemData.is_limited,
         sell_point: itemData.sell_point || null,
         created_at: BeijingTimeHelper.createDatabaseTime(),
         updated_at: BeijingTimeHelper.createDatabaseTime()
@@ -309,6 +311,10 @@ class AdminService {
 
     if (updateData.free_shipping !== undefined) {
       finalUpdateData.free_shipping = !!updateData.free_shipping
+    }
+
+    if (updateData.is_limited !== undefined) {
+      finalUpdateData.is_limited = !!updateData.is_limited
     }
 
     if (updateData.sell_point !== undefined) {

@@ -80,6 +80,11 @@ export function sidebarNav() {
             badgeKey: 'customerPendingCount'
           },
           {
+            id: 'cs-agent-management',
+            name: '客服管理',
+            url: '/admin/cs-agent-management.html'
+          },
+          {
             id: 'risk-alerts',
             name: '风控告警',
             url: '/admin/risk-alerts.html',
@@ -144,6 +149,11 @@ export function sidebarNav() {
             id: 'material-conversion',
             name: '🔄 材料转换管理',
             url: '/admin/material-conversion.html'
+          },
+          {
+            id: 'exchange-page-config',
+            name: '🛍️ 兑换页面配置',
+            url: '/admin/exchange-page-config.html'
           }
         ]
       },
@@ -175,13 +185,14 @@ export function sidebarNav() {
         ]
       },
 
-      // 6️⃣ 内容运营 - 公告/弹窗/轮播/广告/消息
+      // 6️⃣ 内容运营 - 公告/弹窗/轮播/广告/消息/字典
       {
         id: 'content-ops',
         name: '内容运营',
         icon: '📢',
         items: [
           { id: 'content-mgmt', name: '公告弹窗管理', url: '/admin/content-management.html' },
+          { id: 'dict-mgmt', name: '字典管理', url: '/admin/dict-management.html' },
           { id: 'ad-management', name: '广告系统', url: '/admin/ad-management.html', badgeKey: 'adPendingReviewCount' },
           { id: 'message-center', name: '消息中心', url: '/admin/message-center.html' }
         ]

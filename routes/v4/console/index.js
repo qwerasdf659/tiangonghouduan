@@ -724,23 +724,14 @@ router.get('/', (req, res) => {
       },
       ad_slots: {
         description: '广告位管理（Phase 3 动态广告位配置）',
-        endpoints: [
-          '/ad-slots',
-          '/ad-slots/:id',
-          '/ad-slots/:id/toggle',
-          '/ad-slots/statistics'
-        ],
+        endpoints: ['/ad-slots', '/ad-slots/:id', '/ad-slots/:id/toggle', '/ad-slots/statistics'],
         note: '广告位 CRUD、开关控制（popup/carousel 两种类型）；仅限 admin 访问'
       },
       ad_reports: {
         description: '广告报表（Phase 6 多维分析）',
-        endpoints: [
-          '/ad-reports/overview',
-          '/ad-reports/campaigns/:id',
-          '/ad-reports/slots/:id'
-        ],
+        endpoints: ['/ad-reports/overview', '/ad-reports/campaigns/:id', '/ad-reports/slots/:id'],
         note: '全局广告数据总览、单计划/单广告位详细报表；仅限 admin 访问'
-      },
+      }
       // ⚠️ campaign_permissions模块暂未实现，待实现后再添加到此列表
     },
     documentation: '请参考各模块的API文档',

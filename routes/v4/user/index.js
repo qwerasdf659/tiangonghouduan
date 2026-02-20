@@ -8,6 +8,7 @@
  * - 用户个人信息管理
  * - 用户设置
  * - 用户数据查询（/me端点）
+ * - 消费二维码生成（DB-3 迁移，2026-02-20）
  *
  * 📌 遵循规范：
  * - 用户端禁止/:id参数（使用/me端点）
@@ -27,7 +28,10 @@ const { authenticateToken } = require('../../../middleware/auth')
 // 🔐 P0-1修复：导入手机号脱敏函数
 const { sanitize } = require('../../../utils/logger')
 
-// 🔴 广告系统路由（Phase 3: 广告主自助投放）
+// 消费二维码路由（DB-3 迁移：从 /shop/consumption/qrcode 迁入，2026-02-20）
+const consumptionQrcodeRoutes = require('./consumption-qrcode')
+
+// 广告系统路由（Phase 3: 广告主自助投放）
 const adCampaignsRoutes = require('./ad-campaigns')
 const adSlotsRoutes = require('./ad-slots')
 
@@ -58,6 +62,9 @@ router.get('/me', authenticateToken, async (req, res) => {
     return res.apiInternalError('获取用户信息失败')
   }
 })
+
+// 消费二维码（用户生成码供商家扫描，仅需 authenticateToken，DB-3 迁移 2026-02-20）
+router.use('/consumption', authenticateToken, consumptionQrcodeRoutes)
 
 // 挂载广告位查询路由（Phase 3 广告主自助投放 - 用户端只读查询）
 router.use('/ad-slots', adSlotsRoutes)

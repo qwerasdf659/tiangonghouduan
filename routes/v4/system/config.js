@@ -240,6 +240,135 @@ router.get('/feedback', async (req, res) => {
 })
 
 /**
+ * @route GET /api/v4/system/config/exchange-page
+ * @desc 获取兑换页面配置 - 公开接口（无需登录）
+ * @access Public
+ *
+ * 业务场景：
+ * - 小程序兑换页面启动时拉取 Tab/空间/筛选/卡片主题/运营参数配置
+ * - 配置由运营通过管理后台维护（system_configs 表 config_key = 'exchange_page'）
+ * - 替代前端硬编码，运营无需前端发版即可调整兑换页面呈现
+ * - 前端使用 4 层降级缓存策略，本接口不可用时降级到本地缓存 → 默认值
+ *
+ * @returns {Object} 兑换页面配置
+ * @returns {Array} data.tabs - Tab 配置
+ * @returns {Array} data.spaces - 空间配置
+ * @returns {Object} data.shop_filters - 商品兑换筛选项
+ * @returns {Object} data.market_filters - 交易市场筛选项
+ * @returns {Object} data.card_display - 卡片主题配置
+ * @returns {Object} data.ui - 运营参数
+ * @returns {string} data.version - 配置版本标识（基于 updated_at 时间戳）
+ * @returns {string} data.updated_at - 配置最后更新时间
+ */
+router.get('/exchange-page', async (req, res) => {
+  try {
+    const { SystemConfig } = req.app.locals.models
+
+    const config = await SystemConfig.getByKey('exchange_page')
+
+    if (!config || !config.isEnabled()) {
+      // 配置不存在时返回内置默认值（兜底方案，确保小程序不白屏）
+      const defaultConfig = {
+        tabs: [
+          { key: 'exchange', label: '商品兑换', icon: 'download', enabled: true, sort_order: 1 },
+          { key: 'market', label: '交易市场', icon: 'success', enabled: true, sort_order: 2 }
+        ],
+        spaces: [
+          {
+            id: 'lucky',
+            name: '🎁 幸运空间',
+            subtitle: '瀑布流卡片',
+            description: '发现随机好物',
+            layout: 'waterfall',
+            color: '#52c41a',
+            bgGradient: 'linear-gradient(135deg, #52c41a 0%, #95de64 100%)',
+            locked: false,
+            enabled: true,
+            sort_order: 1
+          },
+          {
+            id: 'premium',
+            name: '💎 臻选空间',
+            subtitle: '混合精品展示',
+            description: '解锁高级商品',
+            layout: 'simple',
+            color: '#667eea',
+            bgGradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            locked: true,
+            enabled: true,
+            sort_order: 2
+          }
+        ],
+        shop_filters: {
+          categories: [{ value: 'all', label: '全部' }],
+          cost_ranges: [{ label: '全部', min: null, max: null }],
+          basic_filters: [{ value: 'all', label: '全部', showCount: true }],
+          stock_statuses: [{ value: 'all', label: '全部' }],
+          sort_options: [{ value: 'sort_order', label: '默认排序' }]
+        },
+        market_filters: {
+          type_filters: [{ value: 'all', label: '全部', showCount: true }],
+          category_filters: [{ value: 'all', label: '全部' }],
+          sort_options: [{ value: 'default', label: '默认' }]
+        },
+        card_display: {
+          theme: 'E',
+          effects: {
+            grain: true,
+            holo: true,
+            rotatingBorder: true,
+            breathingGlow: true,
+            ripple: true,
+            fullbleed: true,
+            listView: false
+          },
+          shop_cta_text: '立即兑换',
+          market_cta_text: '立即购买',
+          show_stock_bar: true,
+          stock_display_mode: 'bar',
+          show_sold_count: true,
+          show_tags: true,
+          price_display_mode: 'highlight',
+          image_placeholder_style: 'gradient',
+          press_effect: 'ripple',
+          show_type_badge: true,
+          price_color_mode: 'type_based',
+          default_view_mode: 'grid'
+        },
+        ui: {
+          low_stock_threshold: 10,
+          grid_page_size: 4,
+          waterfall_page_size: 20,
+          default_api_page_size: 20,
+          search_debounce_ms: 500
+        }
+      }
+
+      return res.apiSuccess(
+        { ...defaultConfig, version: Date.now().toString(), is_default: true },
+        '获取默认兑换页面配置',
+        'EXCHANGE_PAGE_CONFIG_DEFAULT'
+      )
+    }
+
+    const configData = config.getValue()
+
+    const version = config.updated_at
+      ? new Date(config.updated_at).getTime().toString()
+      : Date.now().toString()
+
+    return res.apiSuccess(
+      { ...configData, version, updated_at: config.updated_at, is_default: false },
+      '获取兑换页面配置成功',
+      'EXCHANGE_PAGE_CONFIG_SUCCESS'
+    )
+  } catch (error) {
+    logger.error('获取兑换页面配置失败', { error: error.message, stack: error.stack })
+    return res.apiError('获取配置失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
  * @route GET /api/v4/system/config
  * @desc 获取系统基础公开配置（含客服联系方式）
  * @access Public（无需登录）
@@ -255,11 +384,11 @@ router.get('/feedback', async (req, res) => {
  */
 router.get('/', async (req, res) => {
   try {
-    const AdminSystemService = ServiceManager.get('admin_system')
+    const AdminSystemService = ServiceManager.getService('admin_system')
     const settingsData = await AdminSystemService.getSettingsByCategory('basic')
 
     const configMap = {}
-    for (const s of settingsData) {
+    for (const s of settingsData.settings) {
       configMap[s.setting_key] = s.setting_value
     }
 

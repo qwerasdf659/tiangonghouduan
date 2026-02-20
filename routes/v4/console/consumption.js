@@ -368,8 +368,8 @@ router.post('/reject/:id', authenticateToken, requireRoleLevel(100), async (req,
  * @desc 管理员生成指定用户的动态身份二维码（v2版本）
  * @access Private (管理员，role_level >= 100)
  *
- * 路由分离（2026-02-12）：
- * - 用户端：GET /api/v4/shop/consumption/qrcode（从JWT Token取身份）
+ * 路由分离：
+ * - 用户端：GET /api/v4/user/consumption/qrcode（从JWT Token取身份，DB-3 迁移到 user 域）
  * - 管理端：GET /api/v4/console/consumption/qrcode/:user_id（admin专用，带审计日志）
  *
  * @param {number} user_id - 目标用户ID
@@ -411,7 +411,7 @@ router.get('/qrcode/:user_id', authenticateToken, requireRoleLevel(100), async (
 
     /*
      * 防御性校验：确保 user_uuid 存在且为字符串类型
-     * 与用户端 /shop/consumption/qrcode 保持一致的自动修复逻辑
+     * 与用户端 /user/consumption/qrcode 保持一致的自动修复逻辑
      */
     let userUuid = user.user_uuid
     if (!userUuid || typeof userUuid !== 'string') {
@@ -432,7 +432,7 @@ router.get('/qrcode/:user_id', authenticateToken, requireRoleLevel(100), async (
           await sequelize.models.User.update({ user_uuid: userUuid }, { where: { user_id } })
         }
 
-        const BusinessCacheHelper = require('../../../utils/BusinessCacheHelper')
+        const { BusinessCacheHelper } = require('../../../utils/BusinessCacheHelper')
         await BusinessCacheHelper.invalidateUser(
           { user_id, mobile: user.mobile },
           'admin_auto_repair_missing_uuid'

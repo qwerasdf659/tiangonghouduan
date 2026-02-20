@@ -1,43 +1,106 @@
 /**
  * 管理员认证路由 - V4.0 UUID角色系统版本
- * 🛡️ 权限管理：完全使用UUID角色系统，移除is_admin字段依赖
- * 🏗️ 架构优化：路由层瘦身，业务逻辑收口到Service层
+ *
+ * 会话管理（2026-02-19 补齐）：
+ * - 管理后台登录时创建 AuthenticationSession，login_platform='web'
+ * - 与用户端登录统一的会话管理体系，支持多平台会话隔离
+ * - 管理后台登出时失效会话
+ *
  * 创建时间：2025年01月21日
- * 更新时间：2025年12月11日
+ * 更新时间：2026-02-19（补齐会话管理，接入多平台隔离体系）
  */
 
 const express = require('express')
 const router = express.Router()
-const { generateTokens, getUserRoles, authenticateToken } = require('../../../middleware/auth')
+const { v4: uuidv4 } = require('uuid')
+const {
+  generateTokens,
+  getUserRoles,
+  authenticateToken,
+  invalidateUserPermissions
+} = require('../../../middleware/auth')
 const { asyncHandler } = require('./shared/middleware')
+const { logger } = require('../../../utils/logger')
+const { detectLoginPlatform } = require('../../../utils/platformDetector')
+const BeijingTimeHelper = require('../../../utils/timeHelper')
 
 /**
  * 🛡️ 管理员登录（基于UUID角色系统）
  * POST /api/v4/console/auth/login
+ *
+ * 会话管理：创建 AuthenticationSession 并通过多平台隔离策略管理会话
  */
 router.post(
   '/login',
   asyncHandler(async (req, res) => {
     const { mobile, verification_code } = req.body
 
-    // 验证必需参数
     if (!mobile) {
       return res.apiError('手机号不能为空', 'MOBILE_REQUIRED', null, 400)
     }
 
-    // ✅ 通过 ServiceManager 获取 UserService
     const UserService = req.app.locals.services.getService('user')
-
-    // ✅ 调用 Service 层方法（Service 内部完成所有验证和业务逻辑）
     const { user, roles } = await UserService.adminLogin(mobile, verification_code)
 
-    // 生成Token
-    const tokens = await generateTokens(user)
+    /**
+     * 会话管理：创建认证会话
+     * 管理后台固定 platform='web'（通过 detectLoginPlatform 自动识别，UA 无小程序标识 → web）
+     */
+    const sessionToken = uuidv4()
+    const userType = roles.role_level >= 100 ? 'admin' : 'user'
+    const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
+    const platform = detectLoginPlatform(req)
+    const { AuthenticationSession } = req.app.locals.models
 
-    // 返回登录结果 - 参数顺序：data第1个, message第2个
+    try {
+      const isTestEnv = process.env.NODE_ENV === 'test'
+      const disableMultiDeviceCheck = process.env.DISABLE_MULTI_DEVICE_CHECK === 'true'
+      const forceMultiDeviceCheck = process.env.ENABLE_MULTI_DEVICE_CHECK === 'true'
+
+      let deactivatedCount = 0
+      if (forceMultiDeviceCheck || (!isTestEnv && !disableMultiDeviceCheck)) {
+        deactivatedCount = await AuthenticationSession.deactivateUserSessions(
+          userType,
+          user.user_id,
+          null,
+          platform
+        )
+      }
+
+      if (deactivatedCount > 0) {
+        logger.info(
+          `🔒 [Session] 管理后台同平台会话替换: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id}, platform=${platform})`
+        )
+      }
+
+      await AuthenticationSession.createSession({
+        session_token: sessionToken,
+        user_type: userType,
+        user_id: user.user_id,
+        login_ip: loginIp,
+        login_platform: platform,
+        expires_in_minutes: 10080 // 7天
+      })
+      logger.info(
+        `🔐 [Session] 管理后台会话创建成功: user_id=${user.user_id}, platform=${platform}, session=${sessionToken.substring(0, 8)}...`
+      )
+    } catch (sessionError) {
+      logger.warn(`⚠️ [Session] 管理后台会话创建失败（非致命）: ${sessionError.message}`)
+    }
+
+    const tokens = await generateTokens(user, { session_token: sessionToken })
+
+    res.cookie('refresh_token', tokens.refresh_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/api/v4/auth'
+    })
+
     return res.apiSuccess(
       {
-        ...tokens,
+        access_token: tokens.access_token,
         user: {
           user_id: user.user_id,
           mobile: user.mobile,
@@ -45,7 +108,9 @@ router.post(
           status: user.status,
           role_level: roles.role_level,
           roles: roles.roles
-        }
+        },
+        expires_in: 7 * 24 * 60 * 60,
+        timestamp: BeijingTimeHelper.apiTimestamp()
       },
       '管理员登录成功'
     )
@@ -101,6 +166,48 @@ router.get(
       },
       '获取管理员信息成功'
     )
+  })
+)
+
+/**
+ * 🛡️ 管理员退出登录
+ * POST /api/v4/console/auth/logout
+ *
+ * 失效当前会话 + 清除 refresh_token Cookie + 清除权限缓存
+ */
+router.post(
+  '/logout',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const userId = req.user.user_id
+    const sessionToken = req.user?.session_token
+
+    res.clearCookie('refresh_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/api/v4/auth'
+    })
+
+    if (sessionToken) {
+      try {
+        const { AuthenticationSession } = req.app.locals.models
+        const session = await AuthenticationSession.findByToken(sessionToken)
+        if (session) {
+          await session.deactivate('管理员主动退出登录')
+          logger.info(
+            `🔐 [Session] 管理后台会话已失效: user_id=${userId}, session=${sessionToken.substring(0, 8)}...`
+          )
+        }
+      } catch (sessionError) {
+        logger.warn(`⚠️ [Session] 管理后台会话失效失败（非致命）: ${sessionError.message}`)
+      }
+    }
+
+    await invalidateUserPermissions(userId, 'console_logout', userId)
+    logger.info(`✅ [Auth] 管理员退出登录: user_id=${userId}`)
+
+    return res.apiSuccess(null, '退出登录成功', 'LOGOUT_SUCCESS')
   })
 )
 

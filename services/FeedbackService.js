@@ -404,6 +404,78 @@ class FeedbackService {
   }
 
   /**
+   * 批量更新反馈状态
+   *
+   * @description 批量将多条反馈更新为指定状态，用于运营快速处理大量反馈
+   * @param {Array<number>} feedbackIds - 反馈ID数组
+   * @param {string} status - 目标状态（pending/processing/replied/closed）
+   * @param {string|null} internalNotes - 内部备注（可选）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize 事务（由路由层传入）
+   * @returns {Promise<Object>} 批量更新结果 { updated_count, requested_count, target_status }
+   * @throws {Error} 参数校验失败或数据库操作失败
+   *
+   * @since 2026-02-20 新增批量状态更新，满足运营批量处理需求
+   */
+  static async batchUpdateStatus(feedbackIds, status, internalNotes = null, options = {}) {
+    const { transaction } = options
+
+    try {
+      logger.info('开始批量更新反馈状态', {
+        count: feedbackIds.length,
+        target_status: status
+      })
+
+      const validStatuses = ['pending', 'processing', 'replied', 'closed']
+      if (!validStatuses.includes(status)) {
+        throw new Error(`无效的状态值: ${status}，有效值为: ${validStatuses.join(', ')}`)
+      }
+
+      if (!Array.isArray(feedbackIds) || feedbackIds.length === 0) {
+        throw new Error('反馈ID列表不能为空')
+      }
+
+      if (feedbackIds.length > 100) {
+        throw new Error('单次批量操作不能超过100条')
+      }
+
+      const updateData = {
+        status,
+        updated_at: BeijingTimeHelper.createBeijingTime()
+      }
+      if (internalNotes) {
+        updateData.internal_notes = internalNotes
+      }
+
+      const [updatedCount] = await models.Feedback.update(updateData, {
+        where: {
+          feedback_id: feedbackIds
+        },
+        transaction
+      })
+
+      logger.info('批量更新反馈状态完成', {
+        requested: feedbackIds.length,
+        updated_count: updatedCount,
+        target_status: status
+      })
+
+      return {
+        updated_count: updatedCount,
+        requested_count: feedbackIds.length,
+        target_status: status
+      }
+    } catch (error) {
+      logger.error('批量更新反馈状态失败', {
+        error: error.message,
+        feedback_ids: feedbackIds,
+        target_status: status
+      })
+      throw error
+    }
+  }
+
+  /**
    * 获取反馈统计数据
    *
    * @description 按状态分类统计反馈数量

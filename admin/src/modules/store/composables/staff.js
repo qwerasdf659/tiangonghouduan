@@ -170,12 +170,12 @@ export function useStaffMethods() {
         if (this.editingStaffId) {
           response = await this.apiCall(
             buildURL(STORE_ENDPOINTS.STAFF_UPDATE, { store_staff_id: this.editingStaffId }),
-            { method: 'PUT', body: JSON.stringify(payload) }
+            { method: 'PUT', data: payload }
           )
         } else {
           response = await this.apiCall(STORE_ENDPOINTS.STAFF_CREATE, {
             method: 'POST',
-            body: JSON.stringify(payload)
+            data: payload
           })
         }
 

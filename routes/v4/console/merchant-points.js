@@ -145,6 +145,94 @@ router.get('/:audit_id', async (req, res) => {
 })
 
 /**
+ * 批量审核商家积分申请（通过或拒绝）
+ * @route POST /api/v4/console/merchant-points/batch
+ *
+ * ⚠️ 重要：此路由必须在 /:audit_id 之前定义，否则会被 /:audit_id 匹配
+ *
+ * @body {Array<number>} audit_ids - 审核记录ID数组（必填，最多50个）
+ * @body {string} action - 操作类型：'approve' | 'reject'
+ * @body {string} [reason] - 操作原因（reject 时必填）
+ *
+ * @returns {Object} 批量操作结果
+ * @returns {number} data.success_count - 成功数量
+ * @returns {number} data.fail_count - 失败数量
+ * @returns {Array} data.failed_items - 失败详情列表
+ */
+router.post('/batch', async (req, res) => {
+  try {
+    const ContentAuditEngine = req.app.locals.services.getService('content_audit')
+
+    const { audit_ids, action, reason = '' } = req.body
+    const auditorId = req.user.user_id
+
+    // 参数校验
+    if (!Array.isArray(audit_ids) || audit_ids.length === 0) {
+      return res.apiError('audit_ids 必须为非空数组', 'INVALID_PARAMS', null, 400)
+    }
+    if (audit_ids.length > 50) {
+      return res.apiError('单次批量操作不能超过50条', 'BATCH_LIMIT_EXCEEDED', null, 400)
+    }
+    if (!['approve', 'reject'].includes(action)) {
+      return res.apiError('action 必须为 approve 或 reject', 'INVALID_ACTION', null, 400)
+    }
+    if (action === 'reject' && (!reason || reason.trim().length === 0)) {
+      return res.apiError('拒绝操作必须提供原因', 'REASON_REQUIRED', null, 400)
+    }
+
+    let successCount = 0
+    const failedItems = []
+
+    /*
+     * 逐条处理：每条记录独立事务，避免一条失败导致全部回滚
+     * 使用 ContentAuditEngine 保持与单条审核一致的业务逻辑
+     */
+    for (const auditId of audit_ids) {
+      try {
+        await TransactionManager.execute(
+          async transaction => {
+            if (action === 'approve') {
+              await ContentAuditEngine.approve(parseInt(auditId, 10), auditorId, reason || null, {
+                transaction
+              })
+            } else {
+              await ContentAuditEngine.reject(parseInt(auditId, 10), auditorId, reason.trim(), {
+                transaction
+              })
+            }
+          },
+          { name: `batch_${action}_merchant_points_${auditId}` }
+        )
+        successCount++
+      } catch (error) {
+        failedItems.push({
+          audit_id: auditId,
+          reason: error.message
+        })
+      }
+    }
+
+    const failCount = failedItems.length
+    const actionText = action === 'approve' ? '通过' : '拒绝'
+    logger.info(
+      `[商家积分管理] 批量${actionText}: 成功=${successCount}, 失败=${failCount}, auditor=${auditorId}`
+    )
+
+    return res.apiSuccess(
+      {
+        success_count: successCount,
+        fail_count: failCount,
+        failed_items: failedItems
+      },
+      `批量${actionText}完成：成功 ${successCount} 条，失败 ${failCount} 条`
+    )
+  } catch (error) {
+    logger.error('❌ 批量审核商家积分申请失败:', error.message)
+    return res.apiError('批量审核失败', 'BATCH_REVIEW_FAILED', null, 500)
+  }
+})
+
+/**
  * 审核通过商家积分申请
  * @route POST /api/v4/console/merchant-points/:audit_id/approve
  *

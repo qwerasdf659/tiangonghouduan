@@ -445,12 +445,17 @@ function lotteryAlertsPage() {
 
     /**
      * data-table 数据源：抽奖告警
+     * @description 从 this.filters 读取外部筛选条件，与 data-table 分页参数合并
+     * @param {Object} params - data-table 内部传入的分页/排序参数
      */
     async fetchAlertsTableData(params) {
       const queryParams = { limit: params.page_size || 20 }
-      if (params.level) queryParams.level = params.level
-      if (params.type) queryParams.type = params.type
-      if (params.status) queryParams.status = params.status
+
+      // 从父组件 filters 读取筛选条件（外部筛选栏控制）
+      if (this.filters.level) queryParams.level = this.filters.level
+      if (this.filters.type) queryParams.type = this.filters.type
+      if (this.filters.status) queryParams.status = this.filters.status
+      if (this.filters.campaign_id) queryParams.lottery_campaign_id = this.filters.campaign_id
 
       const url = LOTTERY_ADVANCED_ENDPOINTS.REALTIME_ALERTS + buildQueryString(queryParams)
       const response = await apiRequest(url)
@@ -488,15 +493,25 @@ function lotteryAlertsPage() {
     },
 
     /**
-     * 加载告警列表（旧方法保留用于刷新）
+     * 加载告警列表
+     * @description 派发 dt-refresh 事件触发 data-table 重新加载，
+     *              data-table 会通过 fetchAlertsTableData 读取 this.filters 进行过滤查询
      */
     async loadAlerts() {
+      logger.info('[LotteryAlerts] 触发告警列表刷新, 筛选条件:', JSON.stringify(this.filters))
+      window.dispatchEvent(new CustomEvent('dt-refresh'))
+    },
+
+    /**
+     * 直接从 API 获取告警数据（用于定时刷新和统计更新）
+     * @description 独立于 data-table 的数据加载，用于更新统计/图表等非表格数据
+     */
+    async refreshAlertStats() {
       const result = await this.withLoading(async () => {
         const params = {
           limit: this.page_size
         }
 
-        // 筛选条件（参数名以后端为准）
         if (this.filters.level) params.level = this.filters.level
         if (this.filters.type) params.type = this.filters.type
         if (this.filters.status) params.status = this.filters.status
@@ -512,17 +527,14 @@ function lotteryAlertsPage() {
       })
 
       if (result.success) {
-        // 适配后端返回数据结构
         this.alerts = result.data.alerts || result.data.items || result.data.list || []
         if (!Array.isArray(this.alerts)) {
           this.alerts = []
         }
 
-        // 更新分页信息（以实际返回的过滤结果数量为准）
         this.totalCount = this.alerts.length
         this.total_pages = Math.ceil(this.totalCount / this.page_size) || 1
 
-        // 更新统计数据
         this.updateStats(result.data)
         this.updateCharts()
 
@@ -1066,7 +1078,7 @@ function lotteryAlertsPage() {
     },
 
     /**
-     * P1-9: 按级别筛选告警
+     * 按级别筛选告警（Tab 切换时调用）
      * @param {string} level - 告警级别（'all' | 'danger' | ''）
      */
     filterAlerts(level) {
@@ -1077,7 +1089,8 @@ function lotteryAlertsPage() {
       } else {
         this.filters.level = level
       }
-      this.loadAlerts()
+      // 触发 data-table 重新加载（会读取 this.filters）
+      window.dispatchEvent(new CustomEvent('dt-refresh'))
     },
 
     /**

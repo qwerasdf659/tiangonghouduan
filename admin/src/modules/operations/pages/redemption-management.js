@@ -46,7 +46,7 @@ function redemptionManagementPage() {
     /** @type {Object} 筛选条件 */
     filter: {
       status: '',
-      redeemer_user_id: '',
+      mobile: '',
       start_date: '',
       end_date: ''
     },
@@ -81,11 +81,7 @@ function redemptionManagementPage() {
       if (!this.checkAuth()) return
 
       // 并行加载数据
-      await Promise.all([
-        this.loadStats(),
-        this.loadOrders(),
-        this.loadStores()
-      ])
+      await Promise.all([this.loadStats(), this.loadOrders(), this.loadStores()])
 
       logger.info('[RedemptionMgmt] 初始化完成')
     },
@@ -125,7 +121,7 @@ function redemptionManagementPage() {
         }
 
         if (this.filter.status) params.status = this.filter.status
-        if (this.filter.redeemer_user_id) params.redeemer_user_id = this.filter.redeemer_user_id
+        if (this.filter.mobile) params.mobile = this.filter.mobile
         if (this.filter.start_date) params.start_date = this.filter.start_date
         if (this.filter.end_date) params.end_date = this.filter.end_date
 
@@ -133,6 +129,7 @@ function redemptionManagementPage() {
 
         if (result.success && result.data) {
           this.orders = result.data.orders || result.data.items || result.data.list || []
+          this.data = this.orders
           this.updatePagination(result.data)
           logger.debug('[RedemptionMgmt] 订单列表加载成功', {
             count: this.orders.length,
@@ -153,7 +150,11 @@ function redemptionManagementPage() {
      */
     async loadStores() {
       try {
-        const result = await this.apiGet(STORE_ENDPOINTS.LIST, {}, { showLoading: false, showError: false })
+        const result = await this.apiGet(
+          STORE_ENDPOINTS.LIST,
+          {},
+          { showLoading: false, showError: false }
+        )
         const data = result?.success ? result.data : result
         if (data) {
           this.stores = data.items || data.stores || data.list || []
@@ -187,7 +188,7 @@ function redemptionManagementPage() {
      * 重置筛选条件
      */
     resetFilter() {
-      this.filter = { status: '', redeemer_user_id: '', start_date: '', end_date: '' }
+      this.filter = { status: '', mobile: '', start_date: '', end_date: '' }
       this.current_page = 1
       this.loadOrders()
     },
@@ -306,6 +307,92 @@ function redemptionManagementPage() {
     },
 
     // ==================== 批量操作 ====================
+
+    /**
+     * 批量核销（仅处理 pending 状态的订单）
+     */
+    async batchRedeem() {
+      if (!this.hasSelected) {
+        Alpine.store('notification').show('请先选择要核销的订单', 'warning')
+        return
+      }
+
+      const confirmed = await Alpine.store('confirm').show(
+        '批量核销确认',
+        `确定要核销选中的 ${this.selectedCount} 个订单吗？`
+      )
+      if (!confirmed) return
+
+      try {
+        this.loading = true
+        const result = await RedemptionAPI.batchRedeem(this.selectedIds)
+
+        if (result.success) {
+          const fulfilledCount = result.data?.fulfilled_count || 0
+          const failedCount = result.data?.failed_orders?.length || 0
+
+          let message = `成功核销 ${fulfilledCount} 个订单`
+          if (failedCount > 0) {
+            message += `，${failedCount} 个订单核销失败`
+          }
+
+          Alpine.store('notification').show(message, failedCount > 0 ? 'warning' : 'success')
+          this.clearSelection()
+          await Promise.all([this.loadStats(), this.loadOrders()])
+        } else {
+          Alpine.store('notification').show(result.message || '批量核销失败', 'error')
+        }
+      } catch (error) {
+        logger.error('[RedemptionMgmt] 批量核销失败:', error)
+        Alpine.store('notification').show('批量核销失败: ' + error.message, 'error')
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
+     * 批量取消订单（仅处理 pending 状态）
+     */
+    async batchCancel() {
+      if (!this.hasSelected) {
+        Alpine.store('notification').show('请先选择要取消的订单', 'warning')
+        return
+      }
+
+      const confirmed = await Alpine.store('confirm').show(
+        '批量取消确认',
+        `确定要取消选中的 ${this.selectedCount} 个订单吗？取消后关联的物品锁定将被释放。`
+      )
+      if (!confirmed) return
+
+      try {
+        this.loading = true
+        const result = await RedemptionAPI.batchCancel(this.selectedIds, {
+          reason: '管理员批量取消'
+        })
+
+        if (result.success) {
+          const cancelledCount = result.data?.cancelled_count || 0
+          const failedCount = result.data?.failed_orders?.length || 0
+
+          let message = `成功取消 ${cancelledCount} 个订单`
+          if (failedCount > 0) {
+            message += `，${failedCount} 个订单取消失败`
+          }
+
+          Alpine.store('notification').show(message, failedCount > 0 ? 'warning' : 'success')
+          this.clearSelection()
+          await Promise.all([this.loadStats(), this.loadOrders()])
+        } else {
+          Alpine.store('notification').show(result.message || '批量取消失败', 'error')
+        }
+      } catch (error) {
+        logger.error('[RedemptionMgmt] 批量取消失败:', error)
+        Alpine.store('notification').show('批量取消失败: ' + error.message, 'error')
+      } finally {
+        this.loading = false
+      }
+    },
 
     /**
      * 批量过期处理
@@ -431,6 +518,60 @@ function redemptionManagementPage() {
         return `用户#${order.redeemer_user_id}`
       }
       return '--'
+    },
+
+    /**
+     * 获取选中订单中 pending 状态的数量（用于批量操作按钮智能提示）
+     * @returns {number} pending 状态订单数量
+     */
+    get selectedPendingCount() {
+      if (!this.selectedIds || this.selectedIds.length === 0) return 0
+      return this.orders.filter(
+        o =>
+          o.status === 'pending' && this.selectedIds.includes(o.redemption_order_id || o.order_id)
+      ).length
+    },
+
+    /**
+     * 获取奖品类型标签（product = 实物奖品，voucher = 优惠券）
+     * @param {Object} order - 订单对象
+     * @returns {string} 类型标签
+     */
+    getPrizeType(order) {
+      if (order.item_instance) {
+        const type = order.item_instance.item_type
+        if (type === 'product') return '实物'
+        if (type === 'voucher') return '优惠券'
+        return type || '--'
+      }
+      return '--'
+    },
+
+    /**
+     * 获取奖品类型的样式类
+     * @param {Object} order - 订单对象
+     * @returns {string} CSS 类名
+     */
+    getPrizeTypeClass(order) {
+      if (order.item_instance) {
+        const type = order.item_instance.item_type
+        if (type === 'product') return 'bg-purple-100 text-purple-700'
+        if (type === 'voucher') return 'bg-blue-100 text-blue-700'
+      }
+      return 'bg-gray-100 text-gray-600'
+    },
+
+    /**
+     * 判断订单是否即将过期（3天内）
+     * @param {Object} order - 订单对象
+     * @returns {boolean}
+     */
+    isExpiringSoon(order) {
+      if (order.status !== 'pending' || !order.expires_at) return false
+      const expiresAt = new Date(order.expires_at)
+      const now = new Date()
+      const diffDays = (expiresAt - now) / (1000 * 60 * 60 * 24)
+      return diffDays > 0 && diffDays <= 3
     }
   }
 }
@@ -445,4 +586,3 @@ document.addEventListener('alpine:init', () => {
 
 export { redemptionManagementPage }
 export default redemptionManagementPage
-

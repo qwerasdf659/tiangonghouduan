@@ -17,6 +17,10 @@ export const REDEMPTION_ENDPOINTS = {
   STATISTICS: `${API_PREFIX}/console/business-records/redemption-orders/statistics`,
   /** 核销订单导出 */
   EXPORT: `${API_PREFIX}/console/business-records/redemption-orders/export`,
+  /** 批量核销 */
+  BATCH_REDEEM: `${API_PREFIX}/console/business-records/redemption-orders/batch-redeem`,
+  /** 批量取消 */
+  BATCH_CANCEL: `${API_PREFIX}/console/business-records/redemption-orders/batch-cancel`,
   /** 批量过期处理 */
   BATCH_EXPIRE: `${API_PREFIX}/console/business-records/redemption-orders/batch-expire`
 }
@@ -29,7 +33,7 @@ export const RedemptionAPI = {
    * 获取核销订单列表
    * @param {Object} params - 查询参数
    * @param {string} [params.status] - 状态: pending/fulfilled/cancelled/expired
-   * @param {number} [params.redeemer_user_id] - 核销用户ID
+   * @param {string} [params.mobile] - 用户手机号（模糊搜索）
    * @param {string} [params.start_date] - 开始日期
    * @param {string} [params.end_date] - 结束日期
    * @param {number} [params.page] - 页码
@@ -89,6 +93,37 @@ export const RedemptionAPI = {
   },
 
   /**
+   * 批量核销订单（仅处理 pending 状态）
+   * @param {string[]} orderIds - 订单ID数组
+   * @param {Object} [data] - 核销附加数据
+   * @param {number} [data.store_id] - 核销门店ID
+   * @param {string} [data.remark] - 备注
+   * @returns {Promise<Object>} 批量操作结果
+   */
+  async batchRedeem(orderIds, data = {}) {
+    return request({
+      url: REDEMPTION_ENDPOINTS.BATCH_REDEEM,
+      method: 'POST',
+      data: { order_ids: orderIds, ...data }
+    })
+  },
+
+  /**
+   * 批量取消订单（仅处理 pending 状态）
+   * @param {string[]} orderIds - 订单ID数组
+   * @param {Object} [data] - 取消附加数据
+   * @param {string} [data.reason] - 取消原因
+   * @returns {Promise<Object>} 批量操作结果
+   */
+  async batchCancel(orderIds, data = {}) {
+    return request({
+      url: REDEMPTION_ENDPOINTS.BATCH_CANCEL,
+      method: 'POST',
+      data: { order_ids: orderIds, ...data }
+    })
+  },
+
+  /**
    * 批量将订单设为过期
    * @param {string[]} orderIds - 订单ID数组
    * @returns {Promise<Object>} 批量操作结果
@@ -114,4 +149,3 @@ export const RedemptionAPI = {
 }
 
 export default RedemptionAPI
-

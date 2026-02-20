@@ -3,183 +3,223 @@
 <head>
   <%- include('partials/head', { 
     title: '抽奖告警中心', 
-    pageStyle: '[x-cloak] { display: none !important; } .chart-container { height: 200px; }' 
+    pageStyle: '[x-cloak] { display: none !important; } .chart-container { height: 220px; }' 
   }) %>
 </head>
 <body class="themed-bg-subtle min-h-screen" x-data="lotteryAlertsPage()" x-init="init()" x-cloak>
   
   <!-- 导航栏 -->
-  <nav class="themed-bg-primary text-white shadow-lg">
+  <nav class="page-navbar shadow-lg">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:opacity-80">← 返回工作台</a>
+        <a href="/admin/workspace.html" class="hover:opacity-80 text-white/80 hover:text-white transition-colors text-sm">← 返回工作台</a>
         <span class="text-lg font-semibold">🎰 抽奖告警中心</span>
-        <span x-show="lastUpdateTime" class="text-xs text-white/60 ml-2">· 最后更新: <span x-text="lastUpdateTime"></span></span>
+        <span x-show="lastUpdateTime" class="text-xs text-white/50 ml-2">· 最后更新: <span x-text="lastUpdateTime"></span></span>
       </div>
-      <div class="flex items-center space-x-4">
-        <span x-text="'欢迎，' + (current_user?.nickname || '管理员')"></span>
-        <button @click="logout()" class="px-3 py-1 border border-white/50 rounded hover:bg-white/10">退出登录</button>
+      <div class="flex items-center space-x-4 text-sm">
+        <span class="text-white/70" x-text="'欢迎，' + (current_user?.nickname || '管理员')"></span>
+        <button @click="logout()" class="px-3 py-1.5 border border-white/30 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-all text-xs">退出登录</button>
       </div>
     </div>
   </nav>
 
   <div class="container mx-auto px-4 py-6">
-    <!-- P1-9: Tab切换 - 调整顺序为：全部告警→紧急告警→抽奖告警→系统告警→健康度分析 -->
-    <div class="mb-6 border-b">
-      <nav class="flex space-x-4 overflow-x-auto">
-        <button 
-          @click="activeTab = 'all'; filterAlerts('all')" 
-          :class="activeTab === 'all' ? 'border-b-2 themed-border-primary themed-text-primary' : 'themed-text-muted hover:themed-text-secondary'"
-          class="px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
-          📋 全部告警
-          <span class="ml-1 px-2 py-0.5 text-xs rounded-full themed-bg-muted" x-text="stats.danger + stats.warning + stats.info"></span>
-        </button>
-        <button 
-          @click="activeTab = 'urgent'; filterAlerts('danger')" 
-          :class="activeTab === 'urgent' ? 'border-b-2 border-red-500 text-red-600' : 'themed-text-muted hover:themed-text-secondary'"
-          class="px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
-          🔴 紧急告警
-          <span x-show="stats.danger > 0" class="ml-1 px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700" x-text="stats.danger"></span>
-        </button>
-        <button 
-          @click="activeTab = 'alerts'; filterAlerts('')" 
-          :class="activeTab === 'alerts' ? 'border-b-2 themed-border-primary themed-text-primary' : 'themed-text-muted hover:themed-text-secondary'"
-          class="px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
-          🎰 抽奖告警
-        </button>
-        <button 
-          @click="activeTab = 'system'; loadSystemHealth()" 
-          :class="activeTab === 'system' ? 'border-b-2 border-purple-500 text-purple-600' : 'themed-text-muted hover:themed-text-secondary'"
-          class="px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
-          🖥️ 系统告警
-          <span x-show="systemHealth.alert_count > 0" class="ml-1 px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700" x-text="systemHealth.alert_count"></span>
-        </button>
-        <button 
-          @click="activeTab = 'health'; loadHealthData()" 
-          :class="activeTab === 'health' ? 'border-b-2 themed-border-primary themed-text-primary' : 'themed-text-muted hover:themed-text-secondary'"
-          class="px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
-          📊 健康度分析
-        </button>
-      </nav>
+
+    <!-- 页面横幅 - 运营引导 -->
+    <div class="page-banner mb-6">
+      <div class="flex items-center justify-between relative z-10">
+        <div>
+          <h1>🛡️ 抽奖告警监控中心</h1>
+          <p class="mt-1">实时监控抽奖系统运行状况，及时发现中奖率异常、预算超限、库存不足等风险问题</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="text-right">
+            <div class="text-2xl font-bold" x-text="stats.danger + stats.warning + stats.info">0</div>
+            <div class="text-xs text-blue-200">待处理告警</div>
+          </div>
+          <div class="w-px h-10 bg-white/20"></div>
+          <div class="text-right">
+            <div class="text-2xl font-bold" x-text="stats.danger">0</div>
+            <div class="text-xs text-blue-200">紧急告警</div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- ============ 实时告警Tab（全部告警/紧急告警/抽奖告警 共用） ============ -->
+    <!-- Tab 切换（增强样式） -->
+    <div class="enhanced-tabs">
+      <button 
+        @click="activeTab = 'all'; filterAlerts('all')" 
+        :class="activeTab === 'all' ? 'active' : ''"
+        class="tab-item">
+        📋 全部告警
+        <span class="ml-1 px-1.5 py-0.5 text-xs rounded-full" :class="activeTab === 'all' ? 'bg-white/20' : 'bg-gray-200 text-gray-600'" x-text="stats.danger + stats.warning + stats.info"></span>
+      </button>
+      <button 
+        @click="activeTab = 'urgent'; filterAlerts('danger')" 
+        :class="activeTab === 'urgent' ? 'active' : ''"
+        class="tab-item">
+        🔴 紧急告警
+        <span x-show="stats.danger > 0" class="ml-1 px-1.5 py-0.5 text-xs rounded-full" :class="activeTab === 'urgent' ? 'bg-white/20' : 'bg-red-100 text-red-700'" x-text="stats.danger"></span>
+      </button>
+      <button 
+        @click="activeTab = 'alerts'; filterAlerts('')" 
+        :class="activeTab === 'alerts' ? 'active' : ''"
+        class="tab-item">
+        🎰 抽奖告警
+      </button>
+      <button 
+        @click="activeTab = 'system'; loadSystemHealth()" 
+        :class="activeTab === 'system' ? 'active' : ''"
+        class="tab-item">
+        🖥️ 系统告警
+        <span x-show="systemHealth.alert_count > 0" class="ml-1 px-1.5 py-0.5 text-xs rounded-full" :class="activeTab === 'system' ? 'bg-white/20' : 'bg-purple-100 text-purple-700'" x-text="systemHealth.alert_count"></span>
+      </button>
+      <button 
+        @click="activeTab = 'health'; loadHealthData()" 
+        :class="activeTab === 'health' ? 'active' : ''"
+        class="tab-item">
+        📊 健康度分析
+      </button>
+    </div>
+
+    <!-- ============ 实时告警Tab ============ -->
     <div x-show="activeTab === 'alerts' || activeTab === 'all' || activeTab === 'urgent'" x-cloak>
-    <!-- 统计卡片 -->
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-red-500">
-        <div class="text-3xl text-red-400 mb-2">🔴</div>
-        <h4 class="text-2xl font-bold text-red-600" x-text="stats.danger">0</h4>
-        <p class="themed-text-muted text-sm">危险告警</p>
+
+    <!-- 统计卡片（渐变风格） -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      <div class="gradient-stat-card gradient-stat-rose">
+        <div class="stat-icon">🔴</div>
+        <div class="stat-value" x-text="stats.danger">0</div>
+        <div class="stat-label">危险告警</div>
+        <div class="stat-trend">需要立即处理</div>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-yellow-500">
-        <div class="text-3xl text-yellow-400 mb-2">🟡</div>
-        <h4 class="text-2xl font-bold text-yellow-600" x-text="stats.warning">0</h4>
-        <p class="themed-text-muted text-sm">警告</p>
+      <div class="gradient-stat-card gradient-stat-orange">
+        <div class="stat-icon">⚠️</div>
+        <div class="stat-value" x-text="stats.warning">0</div>
+        <div class="stat-label">警告</div>
+        <div class="stat-trend">建议尽快关注</div>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 themed-border-primary">
-        <div class="text-3xl text-blue-400 mb-2">🔵</div>
-        <h4 class="text-2xl font-bold themed-text-primary" x-text="stats.info">0</h4>
-        <p class="themed-text-muted text-sm">提示</p>
+      <div class="gradient-stat-card gradient-stat-blue">
+        <div class="stat-icon">💡</div>
+        <div class="stat-value" x-text="stats.info">0</div>
+        <div class="stat-label">提示</div>
+        <div class="stat-trend">系统运行提示</div>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-orange-500">
-        <div class="text-3xl text-orange-400 mb-2">⏳</div>
-        <h4 class="text-2xl font-bold text-orange-600" x-text="stats.acknowledged">0</h4>
-        <p class="themed-text-muted text-sm">已确认</p>
+      <div class="gradient-stat-card gradient-stat-purple">
+        <div class="stat-icon">👁️</div>
+        <div class="stat-value" x-text="stats.acknowledged">0</div>
+        <div class="stat-label">已确认</div>
+        <div class="stat-trend">等待处理</div>
       </div>
-      <div class="themed-card rounded-lg shadow p-4 text-center border-l-4 border-green-500">
-        <div class="text-3xl text-green-400 mb-2">✅</div>
-        <h4 class="text-2xl font-bold text-green-600" x-text="stats.resolved">0</h4>
-        <p class="themed-text-muted text-sm">已解决</p>
+      <div class="gradient-stat-card gradient-stat-green">
+        <div class="stat-icon">✅</div>
+        <div class="stat-value" x-text="stats.resolved">0</div>
+        <div class="stat-label">已解决</div>
+        <div class="stat-trend">处理完毕</div>
       </div>
     </div>
 
     <!-- 图表区域 -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b">
-          <h5 class="font-semibold">📊 告警级别分布</h5>
+      <div class="chart-wrapper">
+        <div class="chart-wrapper-header">
+          <span class="flex items-center gap-2">
+            <span class="w-6 h-6 rounded flex items-center justify-center text-xs" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white;">📊</span>
+            告警级别分布
+          </span>
         </div>
-        <div class="p-4">
+        <div class="chart-wrapper-body">
           <div id="severityDistChart" class="chart-container"></div>
         </div>
       </div>
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b">
-          <h5 class="font-semibold">📈 告警类型分布</h5>
+      <div class="chart-wrapper">
+        <div class="chart-wrapper-header">
+          <span class="flex items-center gap-2">
+            <span class="w-6 h-6 rounded flex items-center justify-center text-xs" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">📈</span>
+            告警类型分布
+          </span>
         </div>
-        <div class="p-4">
+        <div class="chart-wrapper-body">
           <div id="typeDistChart" class="chart-container"></div>
         </div>
       </div>
     </div>
 
     <!-- 筛选栏 -->
-    <div class="themed-card rounded-lg shadow mb-6">
-      <div class="p-4">
-        <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
-          <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">告警级别</label>
-            <select x-model="filters.level" class="w-full px-3 py-2 border rounded-lg">
-              <option value="">全部级别</option>
-              <option value="danger">危险</option>
-              <option value="warning">警告</option>
-              <option value="info">提示</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">告警类型</label>
-            <select x-model="filters.type" class="w-full px-3 py-2 border rounded-lg">
-              <option value="">全部类型</option>
-              <option value="budget">预算告警</option>
-              <option value="inventory">库存告警</option>
-              <option value="win_rate">中奖率告警</option>
-              <option value="user">用户告警</option>
-              <option value="system">系统告警</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">告警状态</label>
-            <select x-model="filters.status" class="w-full px-3 py-2 border rounded-lg">
-              <option value="">全部状态</option>
-              <option value="active">活跃</option>
-              <option value="acknowledged">已确认</option>
-              <option value="resolved">已解决</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">关联活动</label>
-            <select x-model="filters.campaign_id" class="w-full px-3 py-2 border rounded-lg">
-              <option value="">全部活动</option>
-              <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
-                <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
-              </template>
-            </select>
-          </div>
-          <div>
-            <button @click="loadAlerts()" class="w-full px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary">
-              🔍 搜索
-            </button>
-          </div>
-          <div>
-            <button @click="toggleAutoRefresh()" :class="autoRefresh ? 'bg-green-600' : 'bg-gray-500'" class="w-full px-4 py-2 text-white rounded-lg hover:opacity-90">
-              <span x-text="autoRefresh ? '🔄 自动刷新中' : '⏸️ 自动刷新'"></span>
-            </button>
-          </div>
+    <div class="filter-toolbar">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="w-6 h-6 rounded flex items-center justify-center text-xs" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white;">🔎</span>
+        <span class="text-sm font-semibold" style="color: var(--color-text-primary);">筛选条件</span>
+        <span class="text-xs" style="color: var(--color-text-muted);">— 选择条件后点击搜索，可组合多个条件精确查找告警</span>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
+        <div>
+          <label class="form-label">告警级别</label>
+          <select x-model="filters.level" class="form-select">
+            <option value="">全部级别</option>
+            <option value="danger">🔴 危险</option>
+            <option value="warning">🟡 警告</option>
+            <option value="info">🔵 提示</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">告警类型</label>
+          <select x-model="filters.type" class="form-select">
+            <option value="">全部类型</option>
+            <option value="budget">💰 预算告警</option>
+            <option value="inventory">📦 库存告警</option>
+            <option value="win_rate">🎯 中奖率告警</option>
+            <option value="user">👤 用户告警</option>
+            <option value="system">🖥️ 系统告警</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">告警状态</label>
+          <select x-model="filters.status" class="form-select">
+            <option value="">全部状态</option>
+            <option value="active">🟢 活跃</option>
+            <option value="acknowledged">👁️ 已确认</option>
+            <option value="resolved">✅ 已解决</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">关联活动</label>
+          <select x-model="filters.campaign_id" class="form-select">
+            <option value="">全部活动</option>
+            <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
+              <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
+            </template>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">&nbsp;</label>
+          <button @click="loadAlerts()" class="action-btn action-btn-primary w-full">
+            🔍 搜索
+          </button>
+        </div>
+        <div>
+          <label class="form-label">&nbsp;</label>
+          <button @click="toggleAutoRefresh()" class="w-full px-4 py-2 text-sm font-medium rounded-lg shadow-sm transition-all duration-200 text-white" :class="autoRefresh ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600'">
+            <span x-text="autoRefresh ? '🔄 自动刷新中' : '⏸️ 自动刷新'"></span>
+          </button>
         </div>
       </div>
     </div>
 
     <!-- 告警列表 -->
-    <div class="themed-card rounded-lg shadow" @table-action="handleAlertsTableAction($event.detail)">
-      <div class="p-4 border-b flex justify-between items-center">
-        <h5 class="font-semibold">🚨 实时告警列表</h5>
+    <div class="content-section" @table-action="handleAlertsTableAction($event.detail)">
+      <div class="content-section-header">
+        <div class="section-title">
+          <span class="title-icon">🚨</span>
+          实时告警列表
+        </div>
         <div class="flex space-x-2">
-          <button @click="batchAcknowledge()" :disabled="selectedAlerts.length === 0" class="px-4 py-2 bg-orange-500 text-white rounded text-sm disabled:opacity-50 hover:bg-orange-600">
-            批量确认 (<span x-text="selectedAlerts.length"></span>)
+          <button @click="batchAcknowledge()" :disabled="selectedAlerts.length === 0" class="btn btn-warning btn-sm disabled:opacity-50">
+            👁️ 批量确认 (<span x-text="selectedAlerts.length"></span>)
           </button>
-          <button @click="batchResolve()" :disabled="selectedAlerts.length === 0" class="px-4 py-2 themed-btn-primary rounded text-sm disabled:opacity-50">
-            批量解决 (<span x-text="selectedAlerts.length"></span>)
+          <button @click="batchResolve()" :disabled="selectedAlerts.length === 0" class="btn btn-success btn-sm disabled:opacity-50">
+            ✅ 批量解决 (<span x-text="selectedAlerts.length"></span>)
           </button>
         </div>
       </div>
@@ -198,105 +238,106 @@
     </div>
     </div><!-- 结束实时告警Tab -->
 
-    <!-- ============ P1-21: 系统告警Tab ============ -->
+    <!-- ============ 系统告警Tab ============ -->
     <div x-show="activeTab === 'system'" x-cloak>
       <!-- 系统健康状态概览 -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <!-- API状态 -->
-        <div class="themed-card rounded-lg shadow p-4">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <span class="text-2xl">🌐</span>
+        <div class="content-section p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <span class="w-10 h-10 rounded-lg flex items-center justify-center text-lg" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white;">🌐</span>
               <h4 class="font-semibold themed-text">API服务</h4>
             </div>
             <span 
-              class="px-2 py-1 text-xs rounded-full"
+              class="badge"
               :class="{
-                'bg-green-100 text-green-700': systemHealth.api?.status === 'healthy',
-                'bg-yellow-100 text-yellow-700': systemHealth.api?.status === 'warning',
-                'bg-red-100 text-red-700': systemHealth.api?.status === 'critical',
-                'bg-gray-100 text-gray-700': systemHealth.api?.status === 'loading'
+                'badge-success': systemHealth.api?.status === 'healthy',
+                'badge-warning': systemHealth.api?.status === 'warning',
+                'badge-danger': systemHealth.api?.status === 'critical',
+                'badge-gray': systemHealth.api?.status === 'loading'
               }"
               x-text="systemHealth.api?.status === 'healthy' ? '正常' : systemHealth.api?.status === 'warning' ? '警告' : systemHealth.api?.status === 'critical' ? '异常' : '检测中'">
             </span>
           </div>
-          <div class="space-y-2 text-sm">
-            <div class="flex justify-between">
+          <div class="space-y-2.5 text-sm">
+            <div class="flex justify-between items-center">
               <span class="themed-text-muted">响应时间</span>
-              <span class="font-medium themed-text" x-text="(systemHealth.api?.response_time || 0) + 'ms'"></span>
+              <span class="font-semibold tabular-nums" :class="(systemHealth.api?.response_time || 0) > 1000 ? 'text-red-600' : 'text-green-600'" x-text="(systemHealth.api?.response_time || 0) + 'ms'"></span>
             </div>
-            <div class="flex justify-between">
+            <div class="flex justify-between items-center">
               <span class="themed-text-muted">上次检查</span>
-              <span class="themed-text" x-text="formatRelativeTime(systemHealth.api?.last_check)"></span>
+              <span class="themed-text text-xs" x-text="formatRelativeTime(systemHealth.api?.last_check)"></span>
             </div>
           </div>
         </div>
 
         <!-- 数据库状态 -->
-        <div class="themed-card rounded-lg shadow p-4">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <span class="text-2xl">🗄️</span>
+        <div class="content-section p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <span class="w-10 h-10 rounded-lg flex items-center justify-center text-lg" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">🗄️</span>
               <h4 class="font-semibold themed-text">数据库</h4>
             </div>
             <span 
-              class="px-2 py-1 text-xs rounded-full"
+              class="badge"
               :class="{
-                'bg-green-100 text-green-700': systemHealth.db?.status === 'healthy',
-                'bg-yellow-100 text-yellow-700': systemHealth.db?.status === 'warning',
-                'bg-red-100 text-red-700': systemHealth.db?.status === 'critical',
-                'bg-gray-100 text-gray-700': systemHealth.db?.status === 'loading'
+                'badge-success': systemHealth.db?.status === 'healthy',
+                'badge-warning': systemHealth.db?.status === 'warning',
+                'badge-danger': systemHealth.db?.status === 'critical',
+                'badge-gray': systemHealth.db?.status === 'loading'
               }"
               x-text="systemHealth.db?.status === 'healthy' ? '正常' : systemHealth.db?.status === 'warning' ? '警告' : systemHealth.db?.status === 'critical' ? '异常' : '检测中'">
             </span>
           </div>
-          <div class="space-y-2 text-sm">
-            <div class="flex justify-between">
+          <div class="space-y-2.5 text-sm">
+            <div class="flex justify-between items-center">
               <span class="themed-text-muted">主机</span>
               <span class="font-medium themed-text truncate max-w-[120px]" :title="systemHealth.db?.host" x-text="systemHealth.db?.host || '--'"></span>
             </div>
-            <div class="flex justify-between">
+            <div class="flex justify-between items-center">
               <span class="themed-text-muted">数据库</span>
-              <span class="themed-text" x-text="systemHealth.db?.database || '--'"></span>
+              <span class="themed-text text-xs" x-text="systemHealth.db?.database || '--'"></span>
             </div>
           </div>
         </div>
 
         <!-- Redis状态 -->
-        <div class="themed-card rounded-lg shadow p-4">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <span class="text-2xl">⚡</span>
+        <div class="content-section p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <span class="w-10 h-10 rounded-lg flex items-center justify-center text-lg" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white;">⚡</span>
               <h4 class="font-semibold themed-text">Redis缓存</h4>
             </div>
             <span 
-              class="px-2 py-1 text-xs rounded-full"
+              class="badge"
               :class="{
-                'bg-green-100 text-green-700': systemHealth.redis?.status === 'healthy',
-                'bg-yellow-100 text-yellow-700': systemHealth.redis?.status === 'warning',
-                'bg-red-100 text-red-700': systemHealth.redis?.status === 'critical',
-                'bg-gray-100 text-gray-700': systemHealth.redis?.status === 'loading'
+                'badge-success': systemHealth.redis?.connected,
+                'badge-danger': !systemHealth.redis?.connected
               }"
               x-text="systemHealth.redis?.connected ? '已连接' : '未连接'">
             </span>
           </div>
-          <div class="space-y-2 text-sm">
-            <div class="flex justify-between">
+          <div class="space-y-2.5 text-sm">
+            <div class="flex justify-between items-center">
               <span class="themed-text-muted">连接状态</span>
-              <span class="font-medium" :class="systemHealth.redis?.connected ? 'text-green-600' : 'text-red-600'" x-text="systemHealth.redis?.connected ? '在线' : '离线'"></span>
+              <span class="flex items-center gap-1.5 font-medium">
+                <span class="status-dot" :class="systemHealth.redis?.connected ? 'status-dot-active' : 'status-dot-danger'"></span>
+                <span :class="systemHealth.redis?.connected ? 'text-green-600' : 'text-red-600'" x-text="systemHealth.redis?.connected ? '在线' : '离线'"></span>
+              </span>
             </div>
           </div>
         </div>
 
         <!-- 综合健康度 -->
-        <div class="themed-card rounded-lg shadow p-4">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <span class="text-2xl">🏥</span>
+        <div class="content-section p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <span class="w-10 h-10 rounded-lg flex items-center justify-center text-lg" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">🏥</span>
               <h4 class="font-semibold themed-text">系统健康度</h4>
             </div>
             <span 
-              class="text-2xl font-bold"
+              class="text-2xl font-bold tabular-nums"
               :class="{
                 'text-green-600': systemHealth.overall_score >= 80,
                 'text-yellow-600': systemHealth.overall_score >= 60 && systemHealth.overall_score < 80,
@@ -305,37 +346,39 @@
               x-text="systemHealth.overall_score || '--'">
             </span>
           </div>
-          <div class="w-full themed-bg-muted rounded-full h-2">
+          <div class="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
             <div 
-              class="h-2 rounded-full transition-all duration-500"
+              class="h-full rounded-full transition-all duration-700 ease-out"
               :class="{
-                'bg-green-500': systemHealth.overall_score >= 80,
-                'bg-yellow-500': systemHealth.overall_score >= 60 && systemHealth.overall_score < 80,
-                'bg-red-500': systemHealth.overall_score < 60
+                'bg-gradient-to-r from-green-400 to-green-600': systemHealth.overall_score >= 80,
+                'bg-gradient-to-r from-yellow-400 to-yellow-600': systemHealth.overall_score >= 60 && systemHealth.overall_score < 80,
+                'bg-gradient-to-r from-red-400 to-red-600': systemHealth.overall_score < 60
               }"
               :style="{ width: (systemHealth.overall_score || 0) + '%' }">
             </div>
           </div>
+          <p class="text-xs themed-text-muted mt-2 text-center" x-text="(systemHealth.overall_score || 0) >= 80 ? '系统运行良好' : (systemHealth.overall_score || 0) >= 60 ? '存在部分风险' : '需要立即关注'"></p>
         </div>
       </div>
 
       <!-- 慢接口告警 -->
-      <div class="themed-card rounded-lg shadow mb-6">
-        <div class="p-4 border-b flex justify-between items-center">
-          <h5 class="font-semibold">⏱️ 慢接口告警</h5>
-          <button @click="loadSystemHealth()" class="px-3 py-1 text-sm themed-bg-primary text-white rounded hover:opacity-90">
-            🔄 刷新
-          </button>
+      <div class="content-section mb-6">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">⏱️</span>
+            慢接口告警
+          </div>
+          <button @click="loadSystemHealth()" class="btn btn-primary btn-sm">🔄 刷新</button>
         </div>
-        <div class="p-4">
-
-            <div x-show="!systemHealth.slow_apis || systemHealth.slow_apis.length === 0" class="text-center py-8 themed-text-muted">
-              ✅ 暂无慢接口告警，系统响应正常
-            </div>
-
+        <div class="content-section-body">
+          <div x-show="!systemHealth.slow_apis || systemHealth.slow_apis.length === 0" class="empty-state-enhanced">
+            <div class="empty-icon">✅</div>
+            <div class="empty-title">暂无慢接口告警</div>
+            <div class="empty-desc">系统所有接口响应正常，无需关注</div>
+          </div>
           <div class="space-y-3">
             <template x-for="(api, index) in (systemHealth.slow_apis || [])" :key="index">
-              <div class="p-4 rounded-lg border-l-4"
+              <div class="p-4 rounded-lg border-l-4 transition-all hover:shadow-sm"
                    :class="{
                      'border-red-500 bg-red-50': api.response_time > 3000,
                      'border-yellow-500 bg-yellow-50': api.response_time > 1000 && api.response_time <= 3000,
@@ -344,10 +387,12 @@
                 <div class="flex items-center justify-between">
                   <div>
                     <span class="font-medium themed-text" x-text="api.endpoint"></span>
-                    <p class="text-sm themed-text-muted mt-1" x-text="'方法: ' + (api.method || 'GET')"></p>
+                    <p class="text-sm themed-text-muted mt-1">
+                      <span class="badge badge-gray" x-text="api.method || 'GET'"></span>
+                    </p>
                   </div>
                   <div class="text-right">
-                    <span class="text-lg font-bold"
+                    <span class="text-lg font-bold tabular-nums"
                           :class="{
                             'text-red-600': api.response_time > 3000,
                             'text-yellow-600': api.response_time > 1000 && api.response_time <= 3000,
@@ -364,37 +409,41 @@
       </div>
 
       <!-- 系统告警历史 -->
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b">
-          <h5 class="font-semibold">📜 系统告警历史</h5>
+      <div class="content-section">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">📜</span>
+            系统告警历史
+          </div>
         </div>
-        <div class="p-4">
-
-            <div x-show="!systemHealth.recent_alerts || systemHealth.recent_alerts.length === 0" class="text-center py-8 themed-text-muted">
-              🛡️ 近期无系统告警记录
-            </div>
-
+        <div class="content-section-body">
+          <div x-show="!systemHealth.recent_alerts || systemHealth.recent_alerts.length === 0" class="empty-state-enhanced">
+            <div class="empty-icon">🛡️</div>
+            <div class="empty-title">近期无系统告警记录</div>
+            <div class="empty-desc">系统运行平稳，暂无告警历史</div>
+          </div>
           <div class="space-y-3">
             <template x-for="(alert, index) in (systemHealth.recent_alerts || [])" :key="index">
-              <div class="p-4 rounded-lg border"
+              <div class="p-4 rounded-lg border-l-4 transition-all hover:shadow-sm"
                    :class="{
-                     'border-red-300 bg-red-50': alert.severity === 'critical',
-                     'border-yellow-300 bg-yellow-50': alert.severity === 'warning',
-                     'border-blue-300 bg-blue-50': alert.severity === 'info'
+                     'border-red-500 bg-red-50': alert.severity === 'critical',
+                     'border-yellow-500 bg-yellow-50': alert.severity === 'warning',
+                     'border-blue-500 bg-blue-50': alert.severity === 'info'
                    }">
                 <div class="flex items-start justify-between">
                   <div class="flex items-center gap-2">
-                    <span :class="{
-                            'text-red-500': alert.severity === 'critical',
-                            'text-yellow-500': alert.severity === 'warning',
-                            'text-blue-500': alert.severity === 'info'
+                    <span class="badge"
+                          :class="{
+                            'badge-danger': alert.severity === 'critical',
+                            'badge-warning': alert.severity === 'warning',
+                            'badge-primary': alert.severity === 'info'
                           }"
-                          x-text="alert.severity === 'critical' ? '🔴' : alert.severity === 'warning' ? '🟡' : '🔵'"></span>
+                          x-text="alert.severity === 'critical' ? '严重' : alert.severity === 'warning' ? '警告' : '提示'"></span>
                     <span class="font-medium themed-text" x-text="alert.message"></span>
                   </div>
-                  <span class="text-xs themed-text-muted" x-text="formatDate(alert.created_at)"></span>
+                  <span class="text-xs themed-text-muted whitespace-nowrap ml-4" x-text="formatDate(alert.created_at)"></span>
                 </div>
-                <p x-show="alert.details" class="text-sm themed-text-muted mt-2" x-text="alert.details"></p>
+                <p x-show="alert.details" class="text-sm themed-text-muted mt-2 ml-16" x-text="alert.details"></p>
               </div>
             </template>
           </div>
@@ -405,20 +454,23 @@
     <!-- ============ 健康度分析Tab ============ -->
     <div x-show="activeTab === 'health'" x-cloak>
       <!-- 活动选择 -->
-      <div class="themed-card rounded-lg shadow p-4 mb-6">
-        <div class="flex items-center space-x-4">
-          <label class="text-sm font-medium themed-text-secondary">选择活动：</label>
-          <select x-model="selectedCampaignId" @change="loadHealthData()" class="px-3 py-2 border rounded-lg min-w-64" :class="!selectedCampaignId ? 'border-yellow-400 ring-1 ring-yellow-300' : ''">
+      <div class="filter-toolbar mb-6">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="w-6 h-6 rounded flex items-center justify-center text-xs" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white;">🔬</span>
+          <span class="text-sm font-semibold" style="color: var(--color-text-primary);">健康度诊断</span>
+          <span class="text-xs" style="color: var(--color-text-muted);">— 选择一个抽奖活动，查看其运行健康状况和优化建议</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <select x-model="selectedCampaignId" @change="loadHealthData()" class="form-select min-w-64" :class="!selectedCampaignId ? 'border-yellow-400 ring-1 ring-yellow-300' : ''">
             <option value="">-- 请选择一个抽奖活动 --</option>
             <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
               <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
             </template>
           </select>
-          <button @click="loadHealthData()" class="px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary" :disabled="!selectedCampaignId">
-            🔄 刷新
+          <button @click="loadHealthData()" class="btn btn-primary" :disabled="!selectedCampaignId">
+            🔄 开始诊断
           </button>
         </div>
-        <!-- 未选择活动时的提示 -->
         <div x-show="!selectedCampaignId" class="mt-3 flex items-center gap-2 px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm">
           <span class="text-lg">⚠️</span>
           <span>健康度分析需要针对<strong>具体活动</strong>进行诊断，请先在上方下拉框中选择一个抽奖活动。</span>
@@ -426,74 +478,73 @@
       </div>
 
       <!-- 健康度概览卡片 -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <div class="text-4xl mb-2" :class="healthData.overall_score >= 80 ? 'text-green-500' : healthData.overall_score >= 60 ? 'text-yellow-500' : 'text-red-500'">
-            <span x-text="healthData.overall_score || 0"></span>
-          </div>
-          <p class="text-lg font-semibold">综合评分</p>
-          <p class="text-sm themed-text-muted" x-text="getHealthLevel(healthData.overall_score)"></p>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="gradient-stat-card" :class="(healthData.overall_score || 0) >= 80 ? 'gradient-stat-green' : (healthData.overall_score || 0) >= 60 ? 'gradient-stat-orange' : 'gradient-stat-rose'">
+          <div class="stat-value" x-text="healthData.overall_score || 0"></div>
+          <div class="stat-label" style="font-size: 0.95rem; opacity: 1;">综合评分</div>
+          <div class="stat-trend" x-text="getHealthLevel(healthData.overall_score)"></div>
         </div>
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <div class="text-4xl mb-2" :class="healthData.budget_health >= 70 ? 'text-green-500' : 'text-yellow-500'">
-            <span x-text="healthData.budget_health || 0"></span>
-          </div>
-          <p class="text-lg font-semibold">预算健康度</p>
-          <p class="text-sm themed-text-muted">剩余 <span x-text="healthData.budget_remaining_days || '-'"></span> 天</p>
+        <div class="gradient-stat-card" :class="(healthData.budget_health || 0) >= 70 ? 'gradient-stat-blue' : 'gradient-stat-orange'">
+          <div class="stat-value" x-text="healthData.budget_health || 0"></div>
+          <div class="stat-label" style="font-size: 0.95rem; opacity: 1;">预算健康度</div>
+          <div class="stat-trend">剩余 <span x-text="healthData.budget_remaining_days || '-'"></span> 天</div>
         </div>
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <div class="text-4xl mb-2" :class="healthData.win_rate_health >= 70 ? 'text-green-500' : 'text-yellow-500'">
-            <span x-text="healthData.win_rate_health || 0"></span>
-          </div>
-          <p class="text-lg font-semibold">中奖率健康度</p>
-          <p class="text-sm themed-text-muted">当前 <span x-text="(healthData.current_win_rate || 0).toFixed(1)"></span>%</p>
+        <div class="gradient-stat-card" :class="(healthData.win_rate_health || 0) >= 70 ? 'gradient-stat-teal' : 'gradient-stat-orange'">
+          <div class="stat-value" x-text="healthData.win_rate_health || 0"></div>
+          <div class="stat-label" style="font-size: 0.95rem; opacity: 1;">中奖率健康度</div>
+          <div class="stat-trend">当前 <span x-text="(healthData.current_win_rate || 0).toFixed(1)"></span>%</div>
         </div>
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <div class="text-4xl mb-2" :class="healthData.prize_distribution_health >= 70 ? 'text-green-500' : 'text-yellow-500'">
-            <span x-text="healthData.prize_distribution_health || 0"></span>
-          </div>
-          <p class="text-lg font-semibold">奖品分布健康度</p>
-          <p class="text-sm themed-text-muted">高档位 <span x-text="(healthData.high_tier_ratio || 0).toFixed(1)"></span>%</p>
+        <div class="gradient-stat-card" :class="(healthData.prize_distribution_health || 0) >= 70 ? 'gradient-stat-indigo' : 'gradient-stat-orange'">
+          <div class="stat-value" x-text="healthData.prize_distribution_health || 0"></div>
+          <div class="stat-label" style="font-size: 0.95rem; opacity: 1;">奖品分布健康度</div>
+          <div class="stat-trend">高档位 <span x-text="(healthData.high_tier_ratio || 0).toFixed(1)"></span>%</div>
         </div>
       </div>
 
       <!-- 图表区域 -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <!-- 档位分布饼图 -->
-        <div class="themed-card rounded-lg shadow">
-          <div class="p-4 border-b">
-            <h5 class="font-semibold">📊 档位分布</h5>
+        <div class="chart-wrapper">
+          <div class="chart-wrapper-header">
+            <span class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded flex items-center justify-center text-xs" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">📊</span>
+              档位分布
+            </span>
           </div>
-          <div class="p-4">
+          <div class="chart-wrapper-body">
             <div id="tierDistributionChart" style="height: 250px;"></div>
           </div>
         </div>
-        <!-- 健康度趋势 -->
-        <div class="themed-card rounded-lg shadow">
-          <div class="p-4 border-b">
-            <h5 class="font-semibold">📈 健康度趋势（7天）</h5>
+        <div class="chart-wrapper">
+          <div class="chart-wrapper-header">
+            <span class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded flex items-center justify-center text-xs" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: white;">📈</span>
+              健康度趋势（7天）
+            </span>
           </div>
-          <div class="p-4">
+          <div class="chart-wrapper-body">
             <div id="healthTrendChart" style="height: 250px;"></div>
           </div>
         </div>
       </div>
 
       <!-- 问题诊断列表 -->
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b flex justify-between items-center">
-          <h5 class="font-semibold">🔍 问题诊断与建议</h5>
-          <span class="text-sm themed-text-muted" x-text="'共 ' + (healthData.issues?.length || 0) + ' 个问题'"></span>
+      <div class="content-section">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">🔍</span>
+            问题诊断与建议
+          </div>
+          <span class="badge badge-gray" x-text="'共 ' + (healthData.issues?.length || 0) + ' 个问题'"></span>
         </div>
-        <div class="p-4">
-
-            <div x-show="!healthData.issues || healthData.issues.length === 0" class="text-center py-8 themed-text-muted">
-              ✅ 暂无问题，系统运行健康
-            </div>
-
+        <div class="content-section-body">
+          <div x-show="!healthData.issues || healthData.issues.length === 0" class="empty-state-enhanced">
+            <div class="empty-icon">✅</div>
+            <div class="empty-title">暂无问题</div>
+            <div class="empty-desc">系统运行健康，未发现需要关注的问题</div>
+          </div>
           <div class="space-y-3">
             <template x-for="(issue, index) in (healthData.issues || [])" :key="index">
-              <div class="p-4 rounded-lg border-l-4" 
+              <div class="p-4 rounded-lg border-l-4 transition-all hover:shadow-sm" 
                    :class="{
                      'border-red-500 bg-red-50': issue.level === 'error',
                      'border-yellow-500 bg-yellow-50': issue.level === 'warning',
@@ -501,14 +552,14 @@
                    }">
                 <div class="flex items-start justify-between">
                   <div>
-                    <span class="font-medium" x-text="issue.title || issue.message"></span>
+                    <span class="font-medium themed-text" x-text="issue.title || issue.message"></span>
                     <p class="text-sm themed-text-muted mt-1" x-text="issue.description || issue.suggestion"></p>
                   </div>
-                  <span class="px-2 py-1 text-xs rounded" 
+                  <span class="badge ml-3 flex-shrink-0" 
                         :class="{
-                          'bg-red-100 text-red-700': issue.level === 'error',
-                          'bg-yellow-100 text-yellow-700': issue.level === 'warning',
-                          'bg-blue-100 text-blue-700': issue.level === 'info'
+                          'badge-danger': issue.level === 'error',
+                          'badge-warning': issue.level === 'warning',
+                          'badge-primary': issue.level === 'info'
                         }"
                         x-text="issue.level === 'error' ? '严重' : issue.level === 'warning' ? '警告' : '提示'">
                   </span>
@@ -527,27 +578,28 @@
        x-cloak
        class="fixed inset-0 z-50 flex items-center justify-center"
        style="display: none;">
-    <div class="fixed inset-0 bg-black/50" @click="hideModal('resolveModal')"></div>
-    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
-      <div class="p-4 border-b flex justify-between items-center">
-        <h5 class="font-semibold">✅ 解决告警</h5>
-        <button @click="hideModal('resolveModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('resolveModal')"></div>
+    <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-md mx-4 z-10 animate-slide-in-up">
+      <div class="card-header-accent">
+        <span class="header-icon">✅</span>
+        <span class="font-semibold">解决告警</span>
       </div>
       <form @submit.prevent="submitResolve()">
         <div class="p-6 space-y-4">
           <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">告警ID</label>
-            <input type="text" :value="resolveForm.alert_id" disabled class="w-full px-3 py-2 border rounded-lg bg-gray-100">
+            <label class="form-label">告警ID</label>
+            <input type="text" :value="resolveForm.alert_id" disabled class="form-input bg-gray-50">
           </div>
           <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">处理备注</label>
-            <textarea x-model="resolveForm.resolution" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="请输入解决方案描述（可选）..."></textarea>
+            <label class="form-label">处理备注</label>
+            <textarea x-model="resolveForm.resolution" rows="3" class="form-textarea" placeholder="请输入解决方案描述（可选）..."></textarea>
+            <p class="form-hint">记录处理过程，便于后续复盘</p>
           </div>
         </div>
-        <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
-          <button type="button" @click="hideModal('resolveModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
-          <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50" :disabled="submitting">
-            <span x-show="submitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+        <div class="modal-footer">
+          <button type="button" @click="hideModal('resolveModal')" class="btn btn-secondary">取消</button>
+          <button type="submit" class="btn btn-success" :disabled="submitting">
+            <span x-show="submitting" class="loading-spinner mr-1.5" style="width: 14px; height: 14px;"></span>
             确认解决
           </button>
         </div>
@@ -556,48 +608,75 @@
   </div>
 
   <!-- 告警详情模态框 -->
-  <div x-show="selectedAlert" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="selectedAlert = null">
-    <div class="themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
-      <div class="p-4 border-b flex justify-between items-center">
-        <h5 class="font-semibold">📋 告警详情</h5>
-        <button @click="selectedAlert = null" class="themed-text-muted hover:themed-text-secondary text-xl">&times;</button>
+  <div x-show="selectedAlert" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" @click.self="selectedAlert = null">
+    <div class="themed-card rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto animate-slide-in-up">
+      <div class="card-header-accent">
+        <span class="header-icon">📋</span>
+        <span class="font-semibold">告警详情</span>
+        <button @click="selectedAlert = null" class="ml-auto themed-text-muted hover:themed-text-secondary text-xl leading-none">&times;</button>
       </div>
-      <div class="p-4 space-y-4">
+      <div class="p-6 space-y-5">
         <div class="grid grid-cols-2 gap-4">
-          <div><span class="themed-text-muted">告警ID:</span> <span class="font-mono" x-text="selectedAlert?.alert_id"></span></div>
-          <div><span class="themed-text-muted">级别:</span> <span x-text="selectedAlert?.severity_display || selectedAlert?.level"></span></div>
-          <div><span class="themed-text-muted">类型:</span> <span x-text="selectedAlert?.type_display || selectedAlert?.type"></span></div>
-          <div><span class="themed-text-muted">状态:</span> <span x-text="selectedAlert?.status_display || selectedAlert?.status"></span></div>
-          <div><span class="themed-text-muted">关联活动:</span> <span x-text="selectedAlert?.campaign_name || selectedAlert?.related_entity?.name || '-'"></span></div>
-          <div><span class="themed-text-muted">触发时间:</span> <span x-text="formatDate(selectedAlert?.created_at)"></span></div>
+          <div class="p-3 rounded-lg bg-gray-50">
+            <span class="text-xs themed-text-muted block mb-1">告警ID</span>
+            <span class="font-mono font-semibold" x-text="selectedAlert?.alert_id"></span>
+          </div>
+          <div class="p-3 rounded-lg bg-gray-50">
+            <span class="text-xs themed-text-muted block mb-1">级别</span>
+            <span class="badge" :class="{
+              'badge-danger': selectedAlert?.level === 'danger',
+              'badge-warning': selectedAlert?.level === 'warning',
+              'badge-primary': selectedAlert?.level === 'info'
+            }" x-text="selectedAlert?.severity_display || selectedAlert?.level"></span>
+          </div>
+          <div class="p-3 rounded-lg bg-gray-50">
+            <span class="text-xs themed-text-muted block mb-1">类型</span>
+            <span class="font-medium" x-text="selectedAlert?.type_display || selectedAlert?.type"></span>
+          </div>
+          <div class="p-3 rounded-lg bg-gray-50">
+            <span class="text-xs themed-text-muted block mb-1">状态</span>
+            <span class="badge" :class="{
+              'badge-danger': selectedAlert?.status === 'active',
+              'badge-warning': selectedAlert?.status === 'acknowledged',
+              'badge-success': selectedAlert?.status === 'resolved'
+            }" x-text="selectedAlert?.status_display || selectedAlert?.status"></span>
+          </div>
+          <div class="p-3 rounded-lg bg-gray-50">
+            <span class="text-xs themed-text-muted block mb-1">关联活动</span>
+            <span class="font-medium" x-text="selectedAlert?.campaign_name || selectedAlert?.related_entity?.name || '-'"></span>
+          </div>
+          <div class="p-3 rounded-lg bg-gray-50">
+            <span class="text-xs themed-text-muted block mb-1">触发时间</span>
+            <span class="text-sm" x-text="formatDate(selectedAlert?.created_at)"></span>
+          </div>
         </div>
         <div>
-          <p class="themed-text-muted mb-2">告警描述:</p>
-          <div class="p-3 themed-bg-base rounded" x-text="selectedAlert?.message"></div>
+          <p class="text-xs themed-text-muted mb-2 font-medium">告警描述</p>
+          <div class="p-4 rounded-lg border" style="background: linear-gradient(to right, #f5f7fb, #edf0f8);" x-text="selectedAlert?.message"></div>
         </div>
         <div x-show="selectedAlert?.threshold || selectedAlert?.current_value">
-          <p class="themed-text-muted mb-2">告警数据:</p>
-          <div class="p-3 themed-bg-base rounded">
-            <p><span class="themed-text-muted">规则代码:</span> <span x-text="selectedAlert?.rule_code || '-'"></span></p>
-            <p><span class="themed-text-muted">阈值:</span> <span x-text="selectedAlert?.threshold ?? '-'"></span></p>
-            <p><span class="themed-text-muted">实际值:</span> <span x-text="selectedAlert?.current_value ?? '-'"></span></p>
-            <p x-show="selectedAlert?.deviation_percentage"><span class="themed-text-muted">偏离度:</span> <span x-text="selectedAlert?.deviation_percentage + '%'"></span></p>
-            <p x-show="selectedAlert?.suggestion"><span class="themed-text-muted">建议:</span> <span x-text="selectedAlert?.suggestion"></span></p>
+          <p class="text-xs themed-text-muted mb-2 font-medium">告警数据</p>
+          <div class="p-4 rounded-lg border space-y-2 text-sm" style="background: linear-gradient(to right, #f5f7fb, #edf0f8);">
+            <div class="flex justify-between"><span class="themed-text-muted">规则代码</span><span class="font-mono" x-text="selectedAlert?.rule_code || '-'"></span></div>
+            <div class="flex justify-between"><span class="themed-text-muted">阈值</span><span class="font-semibold" x-text="selectedAlert?.threshold ?? '-'"></span></div>
+            <div class="flex justify-between"><span class="themed-text-muted">实际值</span><span class="font-semibold" :class="{'text-red-600': selectedAlert?.current_value > selectedAlert?.threshold}" x-text="selectedAlert?.current_value ?? '-'"></span></div>
+            <div x-show="selectedAlert?.deviation_percentage" class="flex justify-between"><span class="themed-text-muted">偏离度</span><span class="font-semibold text-orange-600" x-text="selectedAlert?.deviation_percentage + '%'"></span></div>
+            <div x-show="selectedAlert?.suggestion" class="pt-2 border-t"><span class="themed-text-muted">建议：</span><span class="themed-text" x-text="selectedAlert?.suggestion"></span></div>
           </div>
         </div>
         <div x-show="selectedAlert?.resolved_at">
-          <p class="themed-text-muted mb-2">解决信息:</p>
-          <div class="p-3 themed-bg-base rounded">
-            <p><span class="themed-text-muted">解决时间:</span> <span x-text="formatDate(selectedAlert?.resolved_at)"></span></p>
-            <p><span class="themed-text-muted">解决人:</span> <span x-text="selectedAlert?.resolver_name || '-'"></span></p>
-            <p x-show="selectedAlert?.resolve_notes"><span class="themed-text-muted">备注:</span> <span x-text="selectedAlert?.resolve_notes"></span></p>
+          <p class="text-xs themed-text-muted mb-2 font-medium">解决信息</p>
+          <div class="p-4 rounded-lg border space-y-2 text-sm bg-green-50 border-green-200">
+            <div class="flex justify-between"><span class="themed-text-muted">解决时间</span><span x-text="formatDate(selectedAlert?.resolved_at)"></span></div>
+            <div class="flex justify-between"><span class="themed-text-muted">解决人</span><span class="font-medium" x-text="selectedAlert?.resolver_name || '-'"></span></div>
+            <div x-show="selectedAlert?.resolve_notes" class="pt-2 border-t border-green-200"><span class="themed-text-muted">备注：</span><span x-text="selectedAlert?.resolve_notes"></span></div>
           </div>
         </div>
       </div>
-      <div class="p-4 border-t flex justify-end space-x-2">
-        <button x-show="selectedAlert?.status === 'active'" @click="acknowledgeAlert(selectedAlert)" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">确认告警</button>
-        <button x-show="selectedAlert?.status !== 'resolved'" @click="openResolveModal(selectedAlert); selectedAlert = null" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">解决告警</button>
-        <button @click="selectedAlert = null" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">关闭</button>
+      <div class="modal-footer">
+        <button x-show="selectedAlert?.status === 'active'" @click="acknowledgeAlert(selectedAlert)" class="btn btn-warning btn-sm">👁️ 确认告警</button>
+        <button x-show="selectedAlert?.status !== 'resolved'" @click="openResolveModal(selectedAlert); selectedAlert = null" class="btn btn-success btn-sm">✅ 解决告警</button>
+        <button @click="selectedAlert = null" class="btn btn-secondary btn-sm">关闭</button>
       </div>
     </div>
   </div>

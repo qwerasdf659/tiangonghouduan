@@ -1374,6 +1374,7 @@ class DataSanitizer {
         is_new: !!item.is_new, // 新品标记
         is_hot: !!item.is_hot, // 热门标记
         is_lucky: !!item.is_lucky, // 幸运商品标记
+        is_limited: !!item.is_limited, // 限量商品标记（触发小程序旋转彩虹边框）
         has_warranty: !!item.has_warranty, // 质保标记
         free_shipping: !!item.free_shipping, // 包邮标记
         sell_point: item.sell_point || null, // 营销卖点文案

@@ -6,7 +6,7 @@
  * 使用模型：Claude Sonnet 4.5
  *
  * 测试覆盖：
- * 1. 生成用户二维码 GET /api/v4/shop/consumption/qrcode
+ * 1. 生成用户二维码 GET /api/v4/user/consumption/qrcode（DB-3 迁移到 user 域）
  * 2. 验证二维码并获取用户信息 GET /api/v4/shop/consumption/user-info
  * 3. 商家提交消费记录 POST /api/v4/shop/consumption/submit
  * 4. 用户查询消费记录 GET /api/v4/shop/consumption/user/:user_id
@@ -62,24 +62,26 @@ describe('消费记录API测试套件', () => {
     }
     console.log(`📍 测试门店ID: ${test_store_id}`)
 
-    // 登录获取token（既是用户也是管理员）
+    /*
+     * 登录获取token（测试账号13612227930既是用户也是管理员，role_level=100）
+     * 多平台会话隔离策略下，同user_type+同platform只保留最新会话
+     * 因此只登录一次，admin token 同时用于管理员和普通用户操作
+     */
     try {
-      // 登录为普通用户
-      const loginResponse = await tester.authenticate_v4_user('regular')
+      const loginResponse = await tester.authenticate_v4_user('admin')
       // eslint-disable-next-line require-atomic-updates
       test_account.user_id = loginResponse.user.user_id
-      console.log(`✅ 测试账号登录成功（regular），用户ID: ${test_account.user_id}`)
+      // admin token 同时作为 regular token（同一账号 role_level=100 登录后 user_type 均为 admin）
+      tester.tokens.regular = tester.tokens.admin
+      tester.tokens.user = tester.tokens.admin
+      console.log(`✅ 测试账号登录成功，用户ID: ${test_account.user_id}（admin+regular 共用token）`)
 
-      // 同时登录为管理员（使用同一账号）
-      await tester.authenticate_v4_user('admin')
-      console.log('✅ 管理员认证成功（admin）')
-
-      // 生成测试二维码（用于后续测试）
+      // 生成测试二维码（用于后续测试，DB-3 迁移后路径在 /user/ 域）
       const qrResponse = await tester.make_authenticated_request(
         'GET',
-        `/api/v4/shop/consumption/qrcode`,
+        `/api/v4/user/consumption/qrcode`,
         {},
-        'regular'
+        'admin'
       )
       if (qrResponse.data.success && qrResponse.data.data.qr_code) {
         // eslint-disable-next-line require-atomic-updates
@@ -105,12 +107,12 @@ describe('消费记录API测试套件', () => {
    * ================================
    */
   describe('二维码生成和验证', () => {
-    test('GET /api/v4/shop/consumption/qrcode - 生成用户动态身份二维码', async () => {
-      console.log('\n🔐 测试：生成用户动态身份二维码')
+    test('GET /api/v4/user/consumption/qrcode - 生成用户动态身份二维码', async () => {
+      console.log('\n🔐 测试：生成用户动态身份二维码（user 域）')
 
       const response = await tester.make_authenticated_request(
         'GET',
-        `/api/v4/shop/consumption/qrcode`,
+        `/api/v4/user/consumption/qrcode`,
         {},
         'regular'
       )

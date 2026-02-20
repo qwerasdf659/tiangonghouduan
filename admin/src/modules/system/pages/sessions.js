@@ -25,7 +25,7 @@
  * // HTML中使用
  * <div x-data="sessionsPage">
  *   <table>
- *     <template x-for="session in sessions" :key="session.user_session_id">...</template>
+ *     <template x-for="session in sessions" :key="session.authentication_session_id">...</template>
  *   </table>
  * </div>
  */
@@ -55,7 +55,7 @@ const apiRequest = async (url, options = {}) => {
 /**
  * 会话对象类型
  * @typedef {Object} UserSession
- * @property {number} user_session_id - 会话ID
+ * @property {number} authentication_session_id - 会话ID（主键）
  * @property {string} [session_id] - 会话ID别名
  * @property {number} user_id - 用户ID
  * @property {string} user_type - 用户类型 ('user'|'admin')
@@ -88,7 +88,7 @@ function sessionsPage() {
     ...createPageMixin(),
     ...createBatchOperationMixin({
       page_size: 20,
-      primaryKey: 'user_session_id'
+      primaryKey: 'authentication_session_id'
     }),
     ...userResolverMixin(),
 
@@ -127,6 +127,7 @@ function sessionsPage() {
       status: '',
       user_type: '',
       mobile: '',
+      login_platform: '',
       sort_by: 'last_activity'
     },
 
@@ -228,6 +229,10 @@ function sessionsPage() {
           params.append('user_type', this.filters.user_type)
         }
 
+        if (this.filters.login_platform) {
+          params.append('login_platform', this.filters.login_platform)
+        }
+
         // 手机号 → resolve 获取 user_id
         if (this.filters.mobile) {
           const user = await this.resolveUserByMobile(this.filters.mobile)
@@ -312,7 +317,7 @@ function sessionsPage() {
      * @returns {void}
      */
     viewSessionDetail(session) {
-      logger.debug('[Sessions] 查看会话详情:', session.user_session_id || session.session_id)
+      logger.debug('[Sessions] 查看会话详情:', session.authentication_session_id)
       this.selectedSession = session
       this.showDetailModal = true
     },
@@ -325,7 +330,7 @@ function sessionsPage() {
      */
     revokeSessionFromModal() {
       if (this.selectedSession) {
-        const sessionId = this.selectedSession.user_session_id || this.selectedSession.session_id
+        const sessionId = this.selectedSession.authentication_session_id
         this.hideModal('sessionDetailModal')
         this.revokeSession(sessionId)
       }
@@ -558,7 +563,7 @@ function sessionsPage() {
      */
     isCurrentSession(session) {
       if (!session) return false
-      const sessionId = session.user_session_id || session.session_id
+      const sessionId = session.authentication_session_id
       return String(sessionId) === String(this.currentSessionId)
     },
 
@@ -604,6 +609,42 @@ function sessionsPage() {
         revoked: '已撤销'
       }
       return labels[status] || status
+    },
+
+    /**
+     * 获取登录平台中文标签
+     * @method getPlatformLabel
+     * @param {string} platform - 平台枚举值
+     * @returns {string} 平台中文文本
+     */
+    getPlatformLabel(platform) {
+      const labels = {
+        web: 'Web浏览器',
+        wechat_mp: '微信小程序',
+        douyin_mp: '抖音小程序',
+        alipay_mp: '支付宝小程序',
+        app: '原生App',
+        unknown: '未知(旧数据)'
+      }
+      return labels[platform] || platform || '未知'
+    },
+
+    /**
+     * 获取登录平台图标
+     * @method getPlatformIcon
+     * @param {string} platform - 平台枚举值
+     * @returns {string} 平台图标 emoji
+     */
+    getPlatformIcon(platform) {
+      const icons = {
+        web: '💻',
+        wechat_mp: '📱',
+        douyin_mp: '🎵',
+        alipay_mp: '💰',
+        app: '📲',
+        unknown: '❓'
+      }
+      return icons[platform] || '❓'
     },
 
     /**

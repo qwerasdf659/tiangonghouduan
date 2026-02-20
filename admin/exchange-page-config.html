@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '兑换页面配置', 
+    pageStyle: '[x-cloak] { display: none !important; } .section-card { transition: all 0.2s ease; } .section-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); } .filter-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; font-size: 13px; background: #f1f5f9; border: 1px solid #e2e8f0; } .filter-tag .remove-btn { cursor: pointer; color: #94a3b8; } .filter-tag .remove-btn:hover { color: #ef4444; } .theme-radio input:checked + label { border-color: #3b82f6; background: #eff6ff; } .move-btn { padding: 2px 6px; border-radius: 4px; cursor: pointer; font-size: 12px; } .move-btn:hover { background: #e2e8f0; }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen" x-data="exchangePageConfigPage()" x-init="init()" x-cloak>
+
+  <!-- 页面顶部渐变横幅 -->
+  <div class="page-banner" style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #a855f7 100%);">
+    <div class="container mx-auto px-4 flex justify-between items-center">
+      <div>
+        <div class="flex items-center gap-3 mb-1">
+          <a href="/admin/workspace.html" class="text-purple-200 hover:text-white text-sm transition">← 返回工作台</a>
+        </div>
+        <h1>🛍️ 兑换页面配置管理</h1>
+        <p class="text-purple-100">配置小程序兑换页面的 Tab、空间、筛选项、卡片主题和运营参数，保存后小程序自动生效</p>
+      </div>
+      <div class="text-6xl opacity-20">⚙️</div>
+    </div>
+  </div>
+
+  <div class="container mx-auto px-4 py-6">
+
+    <!-- 操作栏 -->
+    <div class="flex justify-between items-center mb-6">
+      <div class="flex items-center gap-3">
+        <template x-if="configVersion">
+          <span class="text-sm text-gray-500">
+            最后更新: <span x-text="configUpdatedAt ? formatDateTime(configUpdatedAt) : '-'"></span>
+          </span>
+        </template>
+        <template x-if="configModified">
+          <span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-medium">未保存</span>
+        </template>
+      </div>
+      <div class="flex items-center gap-3">
+        <button @click="resetExchangePageConfig()" class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition" :disabled="!configModified">
+          🔄 重置
+        </button>
+        <button @click="saveExchangePageConfig()" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition" :disabled="saving || !configModified">
+          <span x-show="saving">⏳ 保存中...</span>
+          <span x-show="!saving">💾 保存配置</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 加载状态 -->
+    <template x-if="configLoading">
+      <div class="text-center py-20">
+        <div class="text-4xl mb-4 animate-pulse">⏳</div>
+        <p class="text-gray-500">加载配置中...</p>
+      </div>
+    </template>
+
+    <!-- 配置内容 -->
+    <template x-if="config && !configLoading">
+      <div>
+        <!-- 区块导航 -->
+        <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
+          <template x-for="section in sections" :key="section.key">
+            <button @click="activeSection = section.key" :class="activeSection === section.key ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'" class="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition shadow-sm border border-gray-200">
+              <span x-text="section.icon + ' ' + section.label"></span>
+            </button>
+          </template>
+        </div>
+
+        <!-- ========== Tab 配置区 ========== -->
+        <div x-show="activeSection === 'tabs'" class="bg-white rounded-xl shadow p-6 section-card">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">📑 Tab 配置</h3>
+            <button @click="addTab()" class="px-3 py-1.5 text-sm bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 transition">+ 添加Tab</button>
+          </div>
+          <div class="space-y-3">
+            <template x-for="(tab, index) in config.tabs" :key="index">
+              <div class="flex items-center gap-4 p-4 border border-gray-200 rounded-lg">
+                <div class="flex flex-col gap-1">
+                  <span class="move-btn" @click="moveTab(index, -1)" title="上移">▲</span>
+                  <span class="move-btn" @click="moveTab(index, 1)" title="下移">▼</span>
+                </div>
+                <label class="flex items-center cursor-pointer">
+                  <input type="checkbox" x-model="tab.enabled" @change="markConfigModified()" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                </label>
+                <div class="flex-1 grid grid-cols-3 gap-3">
+                  <div>
+                    <label class="text-xs text-gray-500">Key</label>
+                    <input type="text" x-model="tab.key" @input="markConfigModified()" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500">标签文字</label>
+                    <input type="text" x-model="tab.label" @input="markConfigModified()" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500">图标</label>
+                    <input type="text" x-model="tab.icon" @input="markConfigModified()" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                  </div>
+                </div>
+                <button @click="removeTab(index)" class="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition" title="删除">✕</button>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- ========== 空间配置区 ========== -->
+        <div x-show="activeSection === 'spaces'" class="bg-white rounded-xl shadow p-6 section-card">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">🌌 空间配置</h3>
+            <button @click="addSpace()" class="px-3 py-1.5 text-sm bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 transition">+ 添加空间</button>
+          </div>
+          <div class="space-y-4">
+            <template x-for="(space, index) in config.spaces" :key="index">
+              <div class="p-4 border border-gray-200 rounded-lg">
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex items-center gap-3">
+                    <div class="flex gap-1">
+                      <span class="move-btn" @click="moveSpace(index, -1)">▲</span>
+                      <span class="move-btn" @click="moveSpace(index, 1)">▼</span>
+                    </div>
+                    <label class="flex items-center cursor-pointer">
+                      <input type="checkbox" x-model="space.enabled" @change="markConfigModified()" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                      <span class="ml-2 text-sm font-medium" x-text="space.name"></span>
+                    </label>
+                  </div>
+                  <button @click="removeSpace(index)" class="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition">✕</button>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div>
+                    <label class="text-xs text-gray-500">ID</label>
+                    <input type="text" x-model="space.id" @input="markConfigModified()" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg">
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500">名称</label>
+                    <input type="text" x-model="space.name" @input="markConfigModified()" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg">
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500">副标题</label>
+                    <input type="text" x-model="space.subtitle" @input="markConfigModified()" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg">
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500">布局</label>
+                    <select x-model="space.layout" @change="markConfigModified()" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg">
+                      <template x-for="opt in layoutOptions" :key="opt.value">
+                        <option :value="opt.value" x-text="opt.label"></option>
+                      </template>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500">主题色</label>
+                    <input type="color" x-model="space.color" @input="markConfigModified()" class="w-full h-8 rounded border border-gray-300 cursor-pointer">
+                  </div>
+                  <div class="flex items-end">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" x-model="space.locked" @change="markConfigModified()" class="w-4 h-4 rounded border-gray-300 text-orange-600">
+                      <span class="text-sm">需要解锁</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- ========== 商品筛选配置区 ========== -->
+        <div x-show="activeSection === 'shop_filters'" class="bg-white rounded-xl shadow p-6 section-card">
+          <h3 class="text-lg font-semibold mb-4">🔍 商品兑换筛选项配置</h3>
+
+          <!-- 基础筛选 -->
+          <div class="mb-6">
+            <div class="flex justify-between items-center mb-2">
+              <h4 class="text-sm font-medium text-gray-700">基础筛选 (basic_filters)</h4>
+              <button @click="addFilterOption('shop_filters.basic_filters')" class="text-xs text-green-600 hover:text-green-800">+ 添加</button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="(item, index) in config.shop_filters?.basic_filters || []" :key="index">
+                <div class="filter-tag">
+                  <input type="text" x-model="item.label" @input="markConfigModified()" class="bg-transparent border-0 text-sm w-20 focus:outline-none">
+                  <span class="remove-btn" @click="removeFilterOption('shop_filters.basic_filters', index)">✕</span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- 商品分类 -->
+          <div class="mb-6">
+            <div class="flex justify-between items-center mb-2">
+              <h4 class="text-sm font-medium text-gray-700">商品分类 (categories)</h4>
+              <button @click="addFilterOption('shop_filters.categories')" class="text-xs text-green-600 hover:text-green-800">+ 添加</button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="(item, index) in config.shop_filters?.categories || []" :key="index">
+                <div class="filter-tag">
+                  <input type="text" x-model="item.label" @input="markConfigModified()" class="bg-transparent border-0 text-sm w-16 focus:outline-none">
+                  <span class="text-xs text-gray-400" x-text="'(' + item.value + ')'"></span>
+                  <span class="remove-btn" @click="removeFilterOption('shop_filters.categories', index)">✕</span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- 价格范围 -->
+          <div class="mb-6">
+            <div class="flex justify-between items-center mb-2">
+              <h4 class="text-sm font-medium text-gray-700">价格范围 (cost_ranges)</h4>
+              <button @click="addCostRange()" class="text-xs text-green-600 hover:text-green-800">+ 添加</button>
+            </div>
+            <div class="space-y-2">
+              <template x-for="(range, index) in config.shop_filters?.cost_ranges || []" :key="index">
+                <div class="flex items-center gap-3">
+                  <input type="text" x-model="range.label" @input="markConfigModified()" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg w-24" placeholder="标签">
+                  <input type="number" x-model.number="range.min" @input="markConfigModified()" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg w-20" placeholder="最低">
+                  <span class="text-gray-400">—</span>
+                  <input type="number" x-model.number="range.max" @input="markConfigModified()" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg w-20" placeholder="最高">
+                  <button @click="removeCostRange(index)" class="text-red-400 hover:text-red-600">✕</button>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- 库存状态 -->
+          <div class="mb-6">
+            <div class="flex justify-between items-center mb-2">
+              <h4 class="text-sm font-medium text-gray-700">库存状态 (stock_statuses)</h4>
+              <button @click="addFilterOption('shop_filters.stock_statuses')" class="text-xs text-green-600 hover:text-green-800">+ 添加</button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="(item, index) in config.shop_filters?.stock_statuses || []" :key="index">
+                <div class="filter-tag">
+                  <input type="text" x-model="item.label" @input="markConfigModified()" class="bg-transparent border-0 text-sm w-20 focus:outline-none">
+                  <span class="remove-btn" @click="removeFilterOption('shop_filters.stock_statuses', index)">✕</span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- 排序方式 -->
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <h4 class="text-sm font-medium text-gray-700">排序方式 (sort_options)</h4>
+              <button @click="addFilterOption('shop_filters.sort_options')" class="text-xs text-green-600 hover:text-green-800">+ 添加</button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="(item, index) in config.shop_filters?.sort_options || []" :key="index">
+                <div class="filter-tag">
+                  <input type="text" x-model="item.label" @input="markConfigModified()" class="bg-transparent border-0 text-sm w-24 focus:outline-none">
+                  <span class="text-xs text-gray-400" x-text="'(' + item.value + ')'"></span>
+                  <span class="remove-btn" @click="removeFilterOption('shop_filters.sort_options', index)">✕</span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 交易市场筛选配置区 ========== -->
+        <div x-show="activeSection === 'market_filters'" class="bg-white rounded-xl shadow p-6 section-card">
+          <h3 class="text-lg font-semibold mb-4">💹 交易市场筛选项配置</h3>
+
+          <!-- 类型筛选 -->
+          <div class="mb-6">
+            <div class="flex justify-between items-center mb-2">
+              <h4 class="text-sm font-medium text-gray-700">类型筛选 (type_filters)</h4>
+              <button @click="addFilterOption('market_filters.type_filters')" class="text-xs text-green-600 hover:text-green-800">+ 添加</button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="(item, index) in config.market_filters?.type_filters || []" :key="index">
+                <div class="filter-tag">
+                  <input type="text" x-model="item.label" @input="markConfigModified()" class="bg-transparent border-0 text-sm w-16 focus:outline-none">
+                  <span class="text-xs text-gray-400" x-text="'(' + item.value + ')'"></span>
+                  <span class="remove-btn" @click="removeFilterOption('market_filters.type_filters', index)">✕</span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- 挂单类型 -->
+          <div class="mb-6">
+            <div class="flex justify-between items-center mb-2">
+              <h4 class="text-sm font-medium text-gray-700">挂单类型 (category_filters)</h4>
+              <button @click="addFilterOption('market_filters.category_filters')" class="text-xs text-green-600 hover:text-green-800">+ 添加</button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="(item, index) in config.market_filters?.category_filters || []" :key="index">
+                <div class="filter-tag">
+                  <input type="text" x-model="item.label" @input="markConfigModified()" class="bg-transparent border-0 text-sm w-20 focus:outline-none">
+                  <span class="remove-btn" @click="removeFilterOption('market_filters.category_filters', index)">✕</span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- 排序方式 -->
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <h4 class="text-sm font-medium text-gray-700">排序方式 (sort_options)</h4>
+              <button @click="addFilterOption('market_filters.sort_options')" class="text-xs text-green-600 hover:text-green-800">+ 添加</button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="(item, index) in config.market_filters?.sort_options || []" :key="index">
+                <div class="filter-tag">
+                  <input type="text" x-model="item.label" @input="markConfigModified()" class="bg-transparent border-0 text-sm w-20 focus:outline-none">
+                  <span class="text-xs text-gray-400" x-text="'(' + item.value + ')'"></span>
+                  <span class="remove-btn" @click="removeFilterOption('market_filters.sort_options', index)">✕</span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 卡片主题配置区 ========== -->
+        <div x-show="activeSection === 'card_display'" class="bg-white rounded-xl shadow p-6 section-card">
+          <h3 class="text-lg font-semibold mb-4">🎨 卡片主题配置（两个Tab共用）</h3>
+
+          <!-- 主题选择 -->
+          <div class="mb-6">
+            <h4 class="text-sm font-medium text-gray-700 mb-3">主题风格</h4>
+            <div class="grid grid-cols-5 gap-3">
+              <template x-for="theme in themeOptions" :key="theme.value">
+                <label class="theme-radio cursor-pointer">
+                  <input type="radio" :value="theme.value" x-model="config.card_display.theme" @change="markConfigModified()" class="sr-only">
+                  <div :class="config.card_display.theme === theme.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200'" class="p-3 rounded-lg border-2 text-center transition">
+                    <div class="text-lg font-bold" x-text="theme.value"></div>
+                    <div class="text-xs text-gray-500" x-text="theme.label"></div>
+                  </div>
+                </label>
+              </template>
+            </div>
+          </div>
+
+          <!-- 增强效果开关 -->
+          <div class="mb-6">
+            <h4 class="text-sm font-medium text-gray-700 mb-3">增强效果</h4>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <template x-for="(label, key) in { grain: '噪点纹理', holo: '全息光效', rotatingBorder: '旋转边框', breathingGlow: '呼吸光圈', ripple: '墨水扩散', fullbleed: '全图叠字', listView: '列表视图' }" :key="key">
+                <label class="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input type="checkbox" x-model="config.card_display.effects[key]" @change="markConfigModified()" class="w-4 h-4 rounded border-gray-300 text-blue-600">
+                  <span class="text-sm" x-text="label"></span>
+                </label>
+              </template>
+            </div>
+          </div>
+
+          <!-- 显示设置 -->
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+            <div>
+              <label class="text-xs text-gray-500">默认视图</label>
+              <select x-model="config.card_display.default_view_mode" @change="markConfigModified()" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg">
+                <template x-for="opt in viewModeOptions" :key="opt.value">
+                  <option :value="opt.value" x-text="opt.label"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">库存显示模式</label>
+              <select x-model="config.card_display.stock_display_mode" @change="markConfigModified()" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg">
+                <template x-for="opt in stockDisplayOptions" :key="opt.value">
+                  <option :value="opt.value" x-text="opt.label"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">商品兑换按钮文案</label>
+              <input type="text" x-model="config.card_display.shop_cta_text" @input="markConfigModified()" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg">
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">交易市场按钮文案</label>
+              <input type="text" x-model="config.card_display.market_cta_text" @input="markConfigModified()" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg">
+            </div>
+          </div>
+
+          <!-- 布尔开关 -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <template x-for="(label, key) in { show_stock_bar: '显示库存', show_sold_count: '显示已售', show_tags: '显示标签', show_type_badge: '类型标签' }" :key="key">
+              <label class="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" x-model="config.card_display[key]" @change="markConfigModified()" class="w-4 h-4 rounded border-gray-300 text-blue-600">
+                <span class="text-sm" x-text="label"></span>
+              </label>
+            </template>
+          </div>
+        </div>
+
+        <!-- ========== 运营参数配置区 ========== -->
+        <div x-show="activeSection === 'ui'" class="bg-white rounded-xl shadow p-6 section-card">
+          <h3 class="text-lg font-semibold mb-4">⚙️ 运营参数</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="text-sm font-medium text-gray-700">低库存阈值</label>
+              <p class="text-xs text-gray-400 mb-1">低于此值时显示"即将售罄"标识</p>
+              <input type="number" x-model.number="config.ui.low_stock_threshold" @input="markConfigModified()" class="w-full px-3 py-2 border border-gray-300 rounded-lg" min="0">
+            </div>
+            <div>
+              <label class="text-sm font-medium text-gray-700">网格分页大小 (grid_page_size)</label>
+              <p class="text-xs text-gray-400 mb-1">网格视图每次加载的商品数（推荐2的倍数，如4=2×2）</p>
+              <input type="number" x-model.number="config.ui.grid_page_size" @input="markConfigModified()" class="w-full px-3 py-2 border border-gray-300 rounded-lg" min="1">
+            </div>
+            <div>
+              <label class="text-sm font-medium text-gray-700">瀑布流分页大小 (waterfall_page_size)</label>
+              <p class="text-xs text-gray-400 mb-1">瀑布流每次加载的商品数</p>
+              <input type="number" x-model.number="config.ui.waterfall_page_size" @input="markConfigModified()" class="w-full px-3 py-2 border border-gray-300 rounded-lg" min="1">
+            </div>
+            <div>
+              <label class="text-sm font-medium text-gray-700">默认API分页 (default_api_page_size)</label>
+              <p class="text-xs text-gray-400 mb-1">API 默认返回的数据条数</p>
+              <input type="number" x-model.number="config.ui.default_api_page_size" @input="markConfigModified()" class="w-full px-3 py-2 border border-gray-300 rounded-lg" min="1">
+            </div>
+            <div>
+              <label class="text-sm font-medium text-gray-700">搜索防抖延迟 (ms)</label>
+              <p class="text-xs text-gray-400 mb-1">用户输入搜索关键词后等待的毫秒数</p>
+              <input type="number" x-model.number="config.ui.search_debounce_ms" @input="markConfigModified()" class="w-full px-3 py-2 border border-gray-300 rounded-lg" min="0">
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </template>
+
+  </div>
+
+  <%- include('partials/footer') %>
+  <script type="module" src="./src/modules/system/pages/exchange-page-config.js"></script>
+</body>
+</html>

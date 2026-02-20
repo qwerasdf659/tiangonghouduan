@@ -1,16 +1,21 @@
 /**
- * 消费记录管理模块 - 二维码相关
+ * 消费记录管理模块 - 商家端二维码验证
  *
  * @route /api/v4/shop/consumption
- * @description 用户二维码生成与验证 (v2动态二维码)
+ * @description 商家扫码验证用户身份（需商家域权限）
  *
  * API列表：
- * - GET /qrcode - 生成当前用户动态身份二维码（v2版本，5分钟有效，一次性，从JWT Token取身份）
- * - GET /user-info - 验证二维码并获取用户详细信息（商家扫码后使用）
+ * - GET /user-info - 验证二维码并获取用户详细信息（商家扫码后使用，需商家域权限）
  *
- * 路由分离说明（2026-02-12）：
- * - 用户端：GET /qrcode（从JWT Token取身份，无需传user_id）
- * - 管理端：GET /api/v4/console/consumption/qrcode/:user_id（admin专用，带审计日志）
+ * 📌 DB-3 迁移记录（2026-02-20）：
+ * - GET /qrcode 已迁移到 /api/v4/user/consumption/qrcode（用户域）
+ * - 原因：QR 码生成是消费者行为，不属于商家域（与 exchange → backpack 迁移同理）
+ * - 迁移文件：routes/v4/user/consumption-qrcode.js
+ *
+ * 路由分布：
+ * - 用户端 GET /qrcode → /api/v4/user/consumption/qrcode（仅需 authenticateToken）
+ * - 商家端 GET /user-info → 本文件（需 requireMerchantDomainAccess + requireMerchantPermission）
+ * - 管理端 GET /qrcode/:user_id → /api/v4/console/consumption/qrcode/:user_id（admin专用）
  *
  * 业务场景：
  * - 用户生成自己的动态二维码用于线下消费
@@ -25,7 +30,6 @@
 
 const express = require('express')
 const router = express.Router()
-const { v4: uuidv4 } = require('uuid')
 const { authenticateToken, requireMerchantPermission } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const QRCodeValidator = require('../../../../utils/QRCodeValidator')
@@ -39,139 +43,12 @@ const logger = require('../../../../utils/logger').logger
  * - 商家域审计日志（AC4.2）通过 MerchantOperationLogService 访问
  */
 
-/**
- * @route GET /api/v4/shop/consumption/qrcode
- * @desc 生成当前用户动态身份二维码（v2版本，5分钟有效，一次性）
- * @access Private (用户本人，从JWT Token取身份)
- *
- * 路由分离（2026-02-12）：用户端不再传 :user_id，从 JWT Token 解析身份
- * 管理员查看其他用户二维码请使用：GET /api/v4/console/consumption/qrcode/:user_id
- *
- * @returns {Object} 二维码信息
- * @returns {string} data.qr_code - 二维码字符串（格式：QRV2_{base64_payload}_{signature}）
- * @returns {number} data.user_id - 用户ID（内部标识）
- * @returns {string} data.user_uuid - 用户UUID（外部标识）
- * @returns {string} data.nonce - 一次性随机数
- * @returns {string} data.expires_at - 过期时间（北京时间）
- * @returns {string} data.generated_at - 生成时间（北京时间）
- * @returns {string} data.validity - 有效期描述
- * @returns {string} data.algorithm - 签名算法
- * @returns {string} data.note - 使用说明
- * @returns {string} data.usage - 使用方式
- *
- * @example
- * GET /api/v4/shop/consumption/qrcode
- * Response:
- * {
- *   "qr_code": "QRV2_eyJ1c2VyX3V1aWQ....",
- *   "user_id": 123,
- *   "user_uuid": "550e8400-e29b-41d4-a716-446655440000",
- *   "nonce": "a1b2c3d4e5f6...",
- *   "expires_at": "2026-01-12 20:35:00",
- *   "generated_at": "2026-01-12 20:30:00",
- *   "validity": "5 minutes",
- *   "algorithm": "HMAC-SHA256",
- *   "note": "此二维码为动态码，5分钟内有效，一次性使用（v2版本，隐私保护，防重放）",
- *   "usage": "请商家扫描此二维码录入消费金额"
- * }
+/*
+ * GET /qrcode 已迁移到用户域（DB-3 修复，2026-02-20 方案B）
+ * 新端点：GET /api/v4/user/consumption/qrcode
+ * 迁移文件：routes/v4/user/consumption-qrcode.js
+ * 原因：QR 码生成是消费者行为，按行为发起者归入 /user/ 域
  */
-router.get('/qrcode', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.user_id
-
-    logger.info('生成用户动态二维码（v2版本）', { user_id: userId })
-
-    /*
-     * 查询用户获取UUID（通过 Service 层访问，符合路由层规范）
-     * P1-9：通过 ServiceManager 获取 UserService（snake_case key）
-     */
-    const UserService = req.app.locals.services.getService('user')
-    let user
-    try {
-      user = await UserService.getUserById(userId)
-    } catch (error) {
-      if (error.code === 'USER_NOT_FOUND') {
-        return res.apiError('用户不存在', 'NOT_FOUND', null, 404)
-      }
-      throw error
-    }
-
-    /*
-     * 防御性校验：确保 user_uuid 存在且为字符串类型
-     *
-     * 可能缺失的场景：
-     * 1. 用户数据来自 Redis 缓存，缓存中 user_uuid 字段丢失（缓存不一致）
-     * 2. 用户在 user_uuid 字段添加之前创建，数据库迁移未回填
-     * 3. 直接 SQL 插入的用户记录缺少 user_uuid
-     *
-     * 自动修复策略：生成 UUIDv4 并写入数据库，同时失效缓存
-     */
-    let userUuid = user.user_uuid
-    if (!userUuid || typeof userUuid !== 'string') {
-      logger.warn('用户缺少 user_uuid，执行自动修复', {
-        user_id: userId,
-        current_uuid: userUuid,
-        current_type: typeof userUuid
-      })
-
-      // 自动生成 UUIDv4 并持久化到数据库
-      userUuid = uuidv4()
-      try {
-        if (typeof user.update === 'function') {
-          // Sequelize 模型实例：直接调用 update
-          await user.update({ user_uuid: userUuid })
-        } else {
-          // 缓存返回的普通对象：通过 UserService 更新
-          const { sequelize } = require('../../../../config/database')
-          await sequelize.models.User.update(
-            { user_uuid: userUuid },
-            { where: { user_id: userId } }
-          )
-        }
-
-        // 失效用户缓存，确保下次读取到最新数据
-        const BusinessCacheHelper = require('../../../../utils/BusinessCacheHelper')
-        await BusinessCacheHelper.invalidateUser(
-          { user_id: userId, mobile: user.mobile },
-          'auto_repair_missing_uuid'
-        )
-
-        logger.info('用户 user_uuid 自动修复成功', {
-          user_id: userId,
-          new_uuid: userUuid.substring(0, 8) + '...'
-        })
-      } catch (repairError) {
-        logger.error('用户 user_uuid 自动修复失败', {
-          user_id: userId,
-          error: repairError.message
-        })
-        return res.apiError('用户身份信息异常，请联系客服处理', 'USER_UUID_MISSING', null, 500)
-      }
-    }
-
-    // 使用UUID生成v2动态二维码
-    const qrCodeInfo = QRCodeValidator.generateQRCodeInfo(userUuid)
-
-    return res.apiSuccess(
-      {
-        qr_code: qrCodeInfo.qr_code,
-        user_id: user.user_id,
-        user_uuid: qrCodeInfo.user_uuid,
-        nonce: qrCodeInfo.nonce,
-        expires_at: qrCodeInfo.expires_at,
-        generated_at: qrCodeInfo.generated_at,
-        validity: qrCodeInfo.validity,
-        algorithm: qrCodeInfo.algorithm,
-        note: qrCodeInfo.note,
-        usage: '请商家扫描此二维码录入消费金额'
-      },
-      '动态二维码生成成功'
-    )
-  } catch (error) {
-    logger.error('生成动态二维码失败', { error: error.message })
-    return handleServiceError(error, res, '生成动态二维码失败')
-  }
-})
 
 /**
  * @route GET /api/v4/shop/consumption/user-info

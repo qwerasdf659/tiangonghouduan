@@ -47,6 +47,7 @@ export const LOTTERY_ADVANCED_ENDPOINTS = {
   STRATEGY_STATS_TIER: `${API_PREFIX}/console/lottery-strategy-stats/tier-distribution/:campaign_id`,
   STRATEGY_STATS_EXPERIENCE: `${API_PREFIX}/console/lottery-strategy-stats/experience-triggers/:campaign_id`,
   STRATEGY_STATS_BUDGET: `${API_PREFIX}/console/lottery-strategy-stats/budget-consumption/:campaign_id`,
+  STRATEGY_CONFIG_SUMMARY: `${API_PREFIX}/console/lottery-strategy-stats/config-summary`,
 
   // 抽奖配额
   QUOTA_RULE_LIST: `${API_PREFIX}/console/lottery-quota/rules`,

@@ -595,7 +595,7 @@ document.addEventListener('alpine:init', () => {
             buildURL(USER_ENDPOINTS.HIERARCHY_ACTIVATE, { user_id: userId }),
             {
               method: 'POST',
-              body: JSON.stringify({ include_subordinates: false })
+              data: { include_subordinates: false }
             }
           )
           if (response.success) {

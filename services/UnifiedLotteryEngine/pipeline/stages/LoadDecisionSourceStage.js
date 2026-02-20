@@ -259,31 +259,20 @@ class LoadDecisionSourceStage extends BaseStage {
    */
   async _checkGuarantee(user_id, lottery_campaign_id, campaign) {
     try {
-      // 获取活动保底配置
-      const prize_distribution_config = campaign.prize_distribution_config || {}
-      const guarantee_config = prize_distribution_config.guarantee || {}
-      const threshold = guarantee_config.threshold || 10
+      // 读取活动顶层保底配置（与 GuaranteeStage 保持一致）
+      const guarantee_enabled = campaign.guarantee_enabled === true
+      const threshold = campaign.guarantee_threshold || 10
 
-      // 如果禁用保底，直接返回
-      if (guarantee_config.enabled === false) {
+      if (!guarantee_enabled) {
         return { triggered: false, reason: 'guarantee_disabled' }
       }
 
-      // 查询用户本周期内的抽奖次数
+      // 查询用户累计抽奖次数
       const draw_count = await LotteryDraw.count({
-        where: {
-          user_id,
-          lottery_campaign_id,
-          created_at: {
-            [Op.gte]: this._getGuaranteePeriodStart(guarantee_config)
-          }
-        }
+        where: { user_id, lottery_campaign_id }
       })
 
-      /*
-       * 检查是否达到保底阈值
-       * 使用模运算判断：每 N 次触发一次保底
-       */
+      // 检查是否达到保底阈值（每 N 次触发一次）
       const next_count = draw_count + 1
       const triggered = next_count > 0 && next_count % threshold === 0
 
@@ -291,8 +280,7 @@ class LoadDecisionSourceStage extends BaseStage {
         triggered,
         current_count: draw_count,
         next_count,
-        threshold,
-        period_type: guarantee_config.period_type || 'rolling'
+        threshold
       }
     } catch (error) {
       this.log('warn', '检查保底失败', {
@@ -301,40 +289,6 @@ class LoadDecisionSourceStage extends BaseStage {
         error: error.message
       })
       return { triggered: false, reason: 'check_failed' }
-    }
-  }
-
-  /**
-   * 获取保底周期的起始时间
-   *
-   * @param {Object} guarantee_config - 保底配置
-   * @returns {Date} 周期起始时间
-   * @private
-   */
-  _getGuaranteePeriodStart(guarantee_config) {
-    const period_type = guarantee_config.period_type || 'rolling'
-    const now = new Date()
-
-    switch (period_type) {
-      case 'daily':
-        // 今日零点
-        return new Date(now.getFullYear(), now.getMonth(), now.getDate())
-
-      case 'weekly': {
-        // 本周一零点
-        const day_of_week = now.getDay()
-        const days_since_monday = day_of_week === 0 ? 6 : day_of_week - 1
-        return new Date(now.getFullYear(), now.getMonth(), now.getDate() - days_since_monday)
-      }
-
-      case 'monthly':
-        // 本月一号零点
-        return new Date(now.getFullYear(), now.getMonth(), 1)
-
-      case 'rolling':
-      default:
-        // 滚动计数，不重置（返回很早的时间）
-        return new Date(0)
     }
   }
 }

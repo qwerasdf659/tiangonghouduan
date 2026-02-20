@@ -153,6 +153,10 @@ class LotteryCampaignCRUDService {
             : true,
         win_animation: campaignData.win_animation || 'simple',
         background_image_url: campaignData.background_image_url || null,
+        // 固定间隔保底配置（运营可按活动开关"每N次必出指定奖品"）
+        guarantee_enabled: campaignData.guarantee_enabled === true,
+        guarantee_threshold: campaignData.guarantee_threshold || 10,
+        guarantee_prize_id: campaignData.guarantee_prize_id || null,
         created_by: operator_user_id
       },
       { transaction }
@@ -293,7 +297,11 @@ class LotteryCampaignCRUDService {
       'effect_theme',
       'rarity_effects_enabled',
       'win_animation',
-      'background_image_url'
+      'background_image_url',
+      // 固定间隔保底配置
+      'guarantee_enabled',
+      'guarantee_threshold',
+      'guarantee_prize_id'
     ]
 
     const filteredData = {}

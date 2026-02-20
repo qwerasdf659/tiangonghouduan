@@ -31,8 +31,6 @@
 
 const BaseStage = require('./BaseStage')
 const { LotteryDraw, LotteryPrize } = require('../../../../models')
-/* eslint-disable-next-line spaced-comment -- Op 操作符预留用于复杂查询条件（当前版本使用简单条件） */
-// const { Op } = require('sequelize')
 
 /**
  * 默认保底阈值（抽奖次数）
@@ -81,10 +79,20 @@ class GuaranteeStage extends BaseStage {
       const campaign = campaign_data.campaign
       const prizes = campaign_data.prizes || []
 
-      // 检查活动是否启用保底机制
-      const guarantee_enabled = campaign.guarantee_enabled !== false
+      /**
+       * 🔴 2026-02-19 修复：保底机制默认关闭
+       *
+       * 修复根因：
+       * - lottery_campaigns 表无 guarantee_enabled 字段
+       * - 原代码 `campaign.guarantee_enabled !== false` → undefined !== false = true
+       * - 导致保底机制"幽灵启用"，每10次抽奖强制高档位
+       * - 项目已有 Pity 系统（连续空奖保底），无需额外的固定间隔保底
+       *
+       * 修复方案：保底需要显式设为 true 才启用（安全默认值）
+       */
+      const guarantee_enabled = campaign.guarantee_enabled === true
       if (!guarantee_enabled) {
-        this.log('info', '活动未启用保底机制', { lottery_campaign_id })
+        this.log('info', '活动未启用保底机制（需显式开启）', { lottery_campaign_id })
         return this.success({
           guarantee_triggered: false,
           reason: '活动未启用保底机制'
@@ -95,8 +103,12 @@ class GuaranteeStage extends BaseStage {
       const guarantee_threshold = campaign.guarantee_threshold || DEFAULT_GUARANTEE_THRESHOLD
       const guarantee_prize_id = campaign.guarantee_prize_id || null
 
-      // 1. 获取用户累计抽奖次数（不含当前这次）
-      const user_draw_count = await this._getUserDrawCount(user_id, lottery_campaign_id)
+      // 1. 获取用户累计抽奖次数（不含当前这次，传入事务保证连抽数据一致）
+      const user_draw_count = await this._getUserDrawCount(
+        user_id,
+        lottery_campaign_id,
+        context.transaction
+      )
       const next_draw_number = user_draw_count + 1 // 即将进行的抽奖次数
 
       // 2. 检查是否触发保底
@@ -184,18 +196,22 @@ class GuaranteeStage extends BaseStage {
   /**
    * 获取用户累计抽奖次数
    *
+   * 🔴 2026-02-19 修复：传入 transaction 确保连抽事务内数据一致性
+   *
    * @param {number} user_id - 用户ID
    * @param {number} lottery_campaign_id - 活动ID
+   * @param {Object} [transaction] - 数据库事务对象
    * @returns {Promise<number>} 累计抽奖次数
    * @private
    */
-  async _getUserDrawCount(user_id, lottery_campaign_id) {
+  async _getUserDrawCount(user_id, lottery_campaign_id, transaction) {
     try {
       const count = await LotteryDraw.count({
         where: {
           user_id,
           lottery_campaign_id
-        }
+        },
+        transaction: transaction || undefined
       })
 
       return count

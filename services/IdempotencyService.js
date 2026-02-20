@@ -240,6 +240,15 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/customer-service/sessions/:id/transfer': 'ADMIN_CS_TRANSFER', // 转接会话（canonical 路径）
   '/api/v4/console/customer-service/sessions/:id/close': 'ADMIN_CS_CLOSE', // 关闭会话（canonical 路径）
 
+  // ===== 客服座席管理 =====
+  '/api/v4/console/customer-service/agents': 'ADMIN_CS_AGENT_CREATE', // 注册客服座席
+  '/api/v4/console/customer-service/agents/:id': 'ADMIN_CS_AGENT_UPDATE', // 更新或删除客服座席（PUT/DELETE）
+
+  // ===== 客服用户分配管理 =====
+  '/api/v4/console/customer-service/assignments': 'ADMIN_CS_ASSIGNMENT_CREATE', // 分配用户给客服
+  '/api/v4/console/customer-service/assignments/batch': 'ADMIN_CS_ASSIGNMENT_BATCH', // 批量分配用户
+  '/api/v4/console/customer-service/assignments/:id': 'ADMIN_CS_ASSIGNMENT_DELETE', // 解除用户分配
+
   // ===== 图片管理 =====
   '/api/v4/console/images/upload': 'ADMIN_IMAGE_UPLOAD', // 上传图片
   '/api/v4/console/images/:id/bind': 'ADMIN_IMAGE_BIND', // 绑定图片
@@ -348,6 +357,7 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 商户积分审核 =====
   '/api/v4/console/merchant-points/:id/approve': 'ADMIN_MERCHANT_APPROVE', // 审批商户积分（修复：console/:id/approve → console/merchant-points/:id/approve）
   '/api/v4/console/merchant-points/:id/reject': 'ADMIN_MERCHANT_REJECT', // 拒绝商户积分（修复：console/:id/reject → console/merchant-points/:id/reject）
+  '/api/v4/console/merchant-points/batch': 'ADMIN_MERCHANT_POINTS_BATCH', // 批量审核商户积分（通过/拒绝）
 
   // ===== 风险告警 =====
   '/api/v4/console/risk-alerts/:id/review': 'ADMIN_RISK_ALERT_REVIEW', // 审核风险告警（修复：risk/alerts → risk-alerts）
@@ -357,6 +367,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/system/announcements/:id': 'ADMIN_ANNOUNCEMENT_UPDATE', // 更新公告（PUT）或删除公告（DELETE）
   '/api/v4/console/system/feedbacks/:id/reply': 'ADMIN_FEEDBACK_REPLY', // 回复反馈
   '/api/v4/console/system/feedbacks/:id/status': 'ADMIN_FEEDBACK_STATUS', // 更新反馈状态
+  '/api/v4/console/system/feedbacks/batch-status': 'ADMIN_FEEDBACK_BATCH_STATUS', // 批量更新反馈状态
 
   // ===== 区域管理 =====
   '/api/v4/console/regions/validate': 'ADMIN_REGION_VALIDATE', // 验证区域（修复：console/validate → console/regions/validate）

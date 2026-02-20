@@ -80,6 +80,14 @@ module.exports = sequelize => {
         comment: '登录IP'
       },
 
+      login_platform: {
+        type: DataTypes.ENUM('web', 'wechat_mp', 'douyin_mp', 'alipay_mp', 'app', 'unknown'),
+        allowNull: false,
+        defaultValue: 'unknown',
+        comment:
+          '登录平台：web=浏览器, wechat_mp=微信小程序, douyin_mp=抖音小程序, alipay_mp=支付宝小程序, app=原生App(预留), unknown=旧数据兜底'
+      },
+
       is_active: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
@@ -111,7 +119,8 @@ module.exports = sequelize => {
           fields: ['session_token']
         },
         {
-          fields: ['user_type', 'user_id', 'is_active']
+          name: 'idx_user_sessions_platform',
+          fields: ['user_type', 'user_id', 'login_platform', 'is_active']
         },
         {
           fields: ['expires_at', 'is_active']
@@ -171,6 +180,7 @@ module.exports = sequelize => {
    * @param {string} sessionData.user_type - 用户类型 (user/admin)
    * @param {number} sessionData.user_id - 用户ID
    * @param {string} [sessionData.login_ip] - 登录IP地址
+   * @param {string} [sessionData.login_platform='unknown'] - 登录平台（web/wechat_mp/douyin_mp/alipay_mp/app/unknown）
    * @param {number} [sessionData.expires_in_minutes=120] - 过期时间（分钟），默认2小时
    * @returns {Promise<AuthenticationSession>} 新创建的会话实例
    */
@@ -180,6 +190,7 @@ module.exports = sequelize => {
       user_type,
       user_id,
       login_ip,
+      login_platform = 'unknown',
       expires_in_minutes = 120 // 默认2小时
     } = sessionData
 
@@ -191,6 +202,7 @@ module.exports = sequelize => {
       user_type,
       user_id,
       login_ip,
+      login_platform,
       expires_at,
       is_active: true,
       last_activity: new Date() // ✅ 使用 UTC 时间戳，Sequelize 自动转换为北京时间
@@ -247,10 +259,24 @@ module.exports = sequelize => {
     })
   }
 
+  /**
+   * 🔒 批量失效用户会话
+   *
+   * 多平台会话隔离策略：
+   *   - 传入 login_platform 时：仅失效该平台的会话（跨平台共存）
+   *   - 不传 login_platform 时：失效所有平台的会话（兼容清理任务、强制登出等场景）
+   *
+   * @param {string} user_type - 用户类型 (user/admin)
+   * @param {number} user_id - 用户ID
+   * @param {string|null} [excludeToken=null] - 排除的会话令牌（不失效该 Token 对应的会话）
+   * @param {string|null} [login_platform=null] - 登录平台（传入时仅失效该平台会话）
+   * @returns {Promise<number>} 被失效的会话数量
+   */
   AuthenticationSession.deactivateUserSessions = async function (
     user_type,
     user_id,
-    excludeToken = null
+    excludeToken = null,
+    login_platform = null
   ) {
     const whereCondition = {
       user_type,
@@ -264,9 +290,14 @@ module.exports = sequelize => {
       }
     }
 
+    if (login_platform) {
+      whereCondition.login_platform = login_platform
+    }
+
     const affectedCount = await this.update({ is_active: false }, { where: whereCondition })
 
-    console.log(`🔒 已失效 ${affectedCount[0]} 个用户会话: ${user_type}:${user_id}`)
+    const platformInfo = login_platform ? `:${login_platform}` : '(全平台)'
+    console.log(`🔒 已失效 ${affectedCount[0]} 个用户会话: ${user_type}:${user_id}${platformInfo}`)
     return affectedCount[0]
   }
 

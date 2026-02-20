@@ -25,12 +25,16 @@ import { useCustomerServiceState, useCustomerServiceMethods } from './customer-s
 // 反馈管理模块（P1-5）
 import { useFeedbackState, useFeedbackMethods } from './feedback.js'
 
+// 客服座席管理模块
+import { useCsAgentManagementState, useCsAgentManagementMethods } from './cs-agent-management.js'
+
 export { useAnnouncementsState, useAnnouncementsMethods }
 export { useBannersState, useBannersMethods }
 export { useCarouselItemsState, useCarouselItemsMethods }
 export { useImagesState, useImagesMethods }
 export { useCustomerServiceState, useCustomerServiceMethods }
 export { useFeedbackState, useFeedbackMethods }
+export { useCsAgentManagementState, useCsAgentManagementMethods }
 
 /**
  * 组合所有内容管理状态（content-management.js 使用）

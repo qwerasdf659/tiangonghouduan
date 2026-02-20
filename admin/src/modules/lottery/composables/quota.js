@@ -77,7 +77,7 @@ export function useQuotaMethods() {
           params.append('is_active', this.quotaFilters.status === 'active' ? 'true' : 'false')
         }
         if (this.quotaFilters?.campaign_id) {
-          params.append('campaign_id', this.quotaFilters.campaign_id)
+          params.append('lottery_campaign_id', this.quotaFilters.campaign_id)
         }
 
         const queryStr = params.toString()
@@ -316,7 +316,7 @@ export function useQuotaMethods() {
     getQuotaCampaignName(scopeId) {
       if (!scopeId || scopeId === 'global') return '-'
       const campaignId = parseInt(scopeId)
-      const campaign = this.campaigns?.find(c => c.campaign_id === campaignId)
+      const campaign = this.campaigns?.find(c => c.lottery_campaign_id === campaignId)
       return campaign ? `${campaign.campaign_name} (#${campaignId})` : `活动 #${campaignId}`
     }
   }

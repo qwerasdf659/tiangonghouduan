@@ -3,91 +3,118 @@
 <head>
   <%- include('partials/head', { 
     title: '抽奖干预管理', 
-    pageStyle: '[x-cloak] { display: none !important; }' 
+    pageStyle: '[x-cloak] { display: none !important; } .page-header-gradient { background: linear-gradient(135deg, #312e81 0%, #4338ca 40%, #6366f1 100%); } .stat-card-glass { transition: all 0.25s ease; cursor: default; position: relative; overflow: hidden; } .stat-card-glass:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); } .stat-card-glass.clickable { cursor: pointer; } .tab-pill { transition: all 0.2s ease; border-radius: 9999px; } .tab-pill:hover { background: rgba(255,255,255,0.15); } .tab-pill.active { background: rgba(255,255,255,0.25); box-shadow: 0 2px 8px rgba(0,0,0,0.15); } .guide-step { position: relative; padding-left: 2rem; } .guide-step::before { content: attr(data-step); position: absolute; left: 0; top: 0; width: 1.5rem; height: 1.5rem; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; } .preset-stat-card { transition: all 0.25s ease; border-left: 4px solid transparent; } .preset-stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.06); } .preset-stat-card.clickable { cursor: pointer; } .filter-section { background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); }'
   }) %>
 </head>
 <body class="themed-bg-subtle min-h-screen" x-data="presetsPage()" x-init="init()" x-cloak @table-action="handleTableAction($event.detail)">
   
-  <!-- 导航栏 -->
-  <nav class="themed-bg-primary text-white shadow-lg">
-    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-      <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
-        <span class="text-lg font-semibold">🎯 抽奖干预管理</span>
+  <!-- ==================== 深色渐变头部 ==================== -->
+  <div class="page-header-gradient text-white">
+    <div class="px-6 py-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-xl font-bold flex items-center gap-2">🎯 抽奖干预管理</h1>
+          <p class="text-indigo-200 text-sm mt-1">管理强制中奖规则和预设队列，精准控制用户抽奖结果</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-indigo-200 text-sm" x-text="'欢迎，' + (current_user?.nickname || '管理员')"></span>
+          <button @click="activeTab === 'force_win' ? loadData() : (loadPresetStats(), loadPresets())"
+                  class="px-3 py-1.5 text-sm bg-white/15 text-white rounded-lg hover:bg-white/25 transition backdrop-blur-sm border border-white/20">
+            🔄 刷新数据
+          </button>
+        </div>
       </div>
-      <div class="flex items-center space-x-4">
-        <span x-text="'欢迎，' + (current_user?.nickname || '管理员')"></span>
-        <button @click="logout()" class="px-3 py-1 border border-white/50 rounded hover:bg-white/10">退出登录</button>
-      </div>
-    </div>
-  </nav>
 
-  <div class="container mx-auto px-4 py-6">
-
-    <!-- ==================== Tab 切换栏 ==================== -->
-    <div class="themed-card rounded-lg shadow mb-6">
-      <div class="flex border-b">
+      <!-- Tab 切换（嵌入头部，药丸样式） -->
+      <div class="flex gap-2 mt-4">
         <button @click="activeTab = 'force_win'"
-                :class="activeTab === 'force_win' ? 'border-b-2 border-blue-500 text-blue-600 font-semibold' : 'themed-text-muted hover:text-blue-500'"
-                class="px-6 py-3 text-sm transition-colors">
-          🎯 强制中奖管理
+                :class="activeTab === 'force_win' ? 'active' : ''"
+                class="tab-pill px-5 py-2 text-sm font-medium text-white/90 flex items-center gap-1.5">
+          <span>🎯</span> 强制中奖
         </button>
         <button @click="activeTab = 'preset_queue'; loadPresetTabData()"
-                :class="activeTab === 'preset_queue' ? 'border-b-2 border-blue-500 text-blue-600 font-semibold' : 'themed-text-muted hover:text-blue-500'"
-                class="px-6 py-3 text-sm transition-colors">
-          📋 预设队列管理
+                :class="activeTab === 'preset_queue' ? 'active' : ''"
+                class="tab-pill px-5 py-2 text-sm font-medium text-white/90 flex items-center gap-1.5">
+          <span>📋</span> 预设队列
         </button>
       </div>
     </div>
+  </div>
+
+  <div class="px-6 py-5">
 
     <!-- ==================== Tab 1: 强制中奖管理 ==================== -->
     <div x-show="activeTab === 'force_win'" x-cloak>
 
-      <!-- 说明区域 -->
-      <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-        <div class="flex items-start">
-          <span class="text-yellow-500 mr-2">⚠️</span>
-          <div>
-            <strong>强制中奖说明：</strong>
-            <p class="text-sm themed-text-muted mt-1">给用户"塞一次"指定奖品（临时、一次性、应急）。设置后用户下一次抽奖将命中指定奖品，使用后自动失效。请谨慎操作，所有操作记录将被审计追溯。</p>
+      <!-- 使用指南（可折叠） -->
+      <div class="rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-purple-50 mb-5 overflow-hidden">
+        <button @click="$refs.forceWinGuide.classList.toggle('hidden')" 
+                class="w-full px-5 py-3 flex items-center justify-between text-left">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">💡</span>
+            <span class="font-semibold text-indigo-800 text-sm">强制中奖 — 使用指南</span>
+            <span class="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-600 rounded-full">临时 · 一次性 · 应急场景</span>
+          </div>
+          <span class="text-indigo-400 text-xs">点击展开/收起</span>
+        </button>
+        <div x-ref="forceWinGuide" class="hidden px-5 pb-4 border-t border-indigo-100">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+            <div class="guide-step text-sm text-slate-600" data-step="1">
+              <strong class="text-slate-800">创建规则</strong>
+              <p class="mt-0.5">点击「新增强制中奖」，搜索用户手机号，选择要指定的奖品</p>
+            </div>
+            <div class="guide-step text-sm text-slate-600" data-step="2">
+              <strong class="text-slate-800">等待触发</strong>
+              <p class="mt-0.5">规则创建后处于「生效中」状态，等待该用户下一次抽奖时自动命中</p>
+            </div>
+            <div class="guide-step text-sm text-slate-600" data-step="3">
+              <strong class="text-slate-800">自动消耗</strong>
+              <p class="mt-0.5">用户抽奖后规则变为「已使用」，一次性生效，不影响后续抽奖</p>
+            </div>
+          </div>
+          <div class="mt-3 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700 flex items-start gap-1.5">
+            <span>⚠️</span>
+            <span>所有操作均有审计记录，请谨慎使用。如需连续多次干预，请切换到「预设队列」功能。</span>
           </div>
         </div>
       </div>
 
       <!-- 筛选栏 -->
-      <div class="themed-card rounded-lg shadow mb-6">
-        <div class="p-4">
-          <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+      <div class="themed-card rounded-xl shadow-sm mb-5 overflow-hidden">
+        <div class="filter-section p-4">
+          <div class="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
             <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
-              <select x-model="filters.status" class="w-full px-3 py-2 border rounded-lg" x-tooltip="'按干预规则的当前生效状态筛选'">
+              <label class="block text-xs font-medium text-slate-500 mb-1">规则状态</label>
+              <select x-model="filters.status" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
                 <option value="">全部状态</option>
-                <option value="active">生效中</option>
-                <option value="expired">已过期</option>
-                <option value="used">已使用</option>
-                <option value="cancelled">已取消</option>
+                <option value="active">🟢 生效中</option>
+                <option value="used">🔵 已使用</option>
+                <option value="expired">⚪ 已过期</option>
+                <option value="cancelled">🔴 已取消</option>
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">奖品类型</label>
-              <select x-model="filters.prize_type" class="w-full px-3 py-2 border rounded-lg" x-tooltip="'按目标奖品筛选干预规则'">
-                <option value="">全部类型</option>
+              <label class="block text-xs font-medium text-slate-500 mb-1">目标奖品</label>
+              <select x-model="filters.prize_type" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
+                <option value="">全部奖品</option>
                 <template x-for="prize in allPrizes" :key="prize.lottery_prize_id">
                   <option :value="prize.lottery_prize_id" x-text="prize.prize_name"></option>
                 </template>
               </select>
             </div>
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">用户搜索</label>
-              <input type="text" x-model="filters.user_search" placeholder="输入手机号码搜索" class="w-full px-3 py-2 border rounded-lg" x-tooltip="'支持按手机号码搜索用户'">
+            <div class="md:col-span-2">
+              <label class="block text-xs font-medium text-slate-500 mb-1">用户手机号</label>
+              <input type="text" x-model="filters.user_search" placeholder="输入11位手机号搜索" maxlength="11"
+                     class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400"
+                     @keyup.enter="searchTable()">
             </div>
             <div>
-              <button @click="searchTable()" class="w-full px-4 py-2 themed-btn-primary rounded-lg">
+              <button @click="searchTable()" class="w-full px-4 py-2 bg-indigo-500 text-white text-sm rounded-lg hover:bg-indigo-600 transition-colors shadow-sm">
                 🔍 搜索
               </button>
             </div>
             <div>
-              <button @click="openCreateModal()" class="w-full px-4 py-2 themed-btn-primary rounded-lg">
+              <button @click="openCreateModal()" class="w-full px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all shadow-sm">
                 ➕ 新增强制中奖
               </button>
             </div>
@@ -96,7 +123,7 @@
       </div>
 
       <!-- data-table 标准表格组件 -->
-      <div x-data="dataTable({
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden" x-data="dataTable({
         columns: tableColumns,
         dataSource: fetchTableData,
         primaryKey: 'setting_id',
@@ -117,143 +144,187 @@
     <!-- ==================== Tab 2: 预设队列管理 ==================== -->
     <div x-show="activeTab === 'preset_queue'" x-cloak>
 
-      <!-- 说明区域 -->
-      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <div class="flex items-start">
-          <span class="text-blue-500 mr-2">📋</span>
-          <div>
-            <strong>预设队列说明：</strong>
-            <p class="text-sm themed-text-muted mt-1">给用户"安排好接下来几次"的中奖剧本（计划性、多次、运营策略）。按 queue_order 顺序逐次消耗，队列用完后恢复正常抽奖。优先级高于强制中奖。</p>
+      <!-- 使用指南（可折叠） -->
+      <div class="rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 via-white to-cyan-50 mb-5 overflow-hidden">
+        <button @click="$refs.presetGuide.classList.toggle('hidden')" 
+                class="w-full px-5 py-3 flex items-center justify-between text-left">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">📋</span>
+            <span class="font-semibold text-blue-800 text-sm">预设队列 — 使用指南</span>
+            <span class="text-xs px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full">计划性 · 多次 · 运营策略</span>
+          </div>
+          <span class="text-blue-400 text-xs">点击展开/收起</span>
+        </button>
+        <div x-ref="presetGuide" class="hidden px-5 pb-4 border-t border-blue-100">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+            <div class="guide-step text-sm text-slate-600" data-step="1">
+              <strong class="text-slate-800">创建队列</strong>
+              <p class="mt-0.5">输入用户手机号，按顺序添加多个奖品，形成「中奖剧本」</p>
+            </div>
+            <div class="guide-step text-sm text-slate-600" data-step="2">
+              <strong class="text-slate-800">逐次消耗</strong>
+              <p class="mt-0.5">用户每次抽奖按 queue_order 顺序命中对应奖品，直到队列耗尽</p>
+            </div>
+            <div class="guide-step text-sm text-slate-600" data-step="3">
+              <strong class="text-slate-800">恢复正常</strong>
+              <p class="mt-0.5">队列全部消耗后，用户恢复正常概率抽奖，不留痕迹</p>
+            </div>
+          </div>
+          <div class="mt-3 p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 flex items-start gap-1.5">
+            <span>ℹ️</span>
+            <span>预设队列优先级高于强制中奖。适用于新用户引导、VIP 专属奖励等运营策略场景。</span>
           </div>
         </div>
       </div>
 
-      <!-- 预设统计卡片 -->
-      <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-        <div class="themed-card rounded-lg shadow p-6 text-center">
-          <div class="text-3xl mb-2">🎯</div>
-          <h6 class="themed-text-muted text-sm mb-1">总预设数</h6>
-          <h2 class="text-2xl font-bold themed-text-primary" x-text="presetStats.total_presets || 0"></h2>
+      <!-- 预设统计卡片（渐变底色） -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-5">
+        <div class="preset-stat-card themed-card rounded-xl p-4" style="border-left-color: #6366f1;">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs text-slate-400 mb-0.5">总预设数</div>
+              <div class="text-2xl font-bold text-indigo-600" x-text="presetStats.total_presets || 0"></div>
+            </div>
+            <div class="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center text-xl">🎯</div>
+          </div>
         </div>
-        <div class="themed-card rounded-lg shadow p-6 text-center cursor-pointer hover:shadow-lg transition-shadow"
+        <div class="preset-stat-card clickable themed-card rounded-xl p-4" style="border-left-color: #22c55e;"
              @click="presetFilters.status = 'pending'; searchPresets()">
-          <div class="text-3xl text-green-500 mb-2">🟢</div>
-          <h6 class="themed-text-muted text-sm mb-1">待使用</h6>
-          <h2 class="text-2xl font-bold text-green-600" x-text="presetStats.pending_presets || 0"></h2>
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs text-slate-400 mb-0.5">待使用</div>
+              <div class="text-2xl font-bold text-green-600" x-text="presetStats.pending_presets || 0"></div>
+            </div>
+            <div class="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center text-xl">🟢</div>
+          </div>
+          <div class="text-xs text-slate-400 mt-1.5">点击筛选</div>
         </div>
-        <div class="themed-card rounded-lg shadow p-6 text-center cursor-pointer hover:shadow-lg transition-shadow"
+        <div class="preset-stat-card clickable themed-card rounded-xl p-4" style="border-left-color: #94a3b8;"
              @click="presetFilters.status = 'used'; searchPresets()">
-          <div class="text-3xl text-gray-400 mb-2">⚪</div>
-          <h6 class="themed-text-muted text-sm mb-1">已使用</h6>
-          <h2 class="text-2xl font-bold text-gray-600" x-text="presetStats.used_presets || 0"></h2>
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs text-slate-400 mb-0.5">已使用</div>
+              <div class="text-2xl font-bold text-slate-500" x-text="presetStats.used_presets || 0"></div>
+            </div>
+            <div class="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center text-xl">✅</div>
+          </div>
+          <div class="text-xs text-slate-400 mt-1.5">点击筛选</div>
         </div>
-        <div class="themed-card rounded-lg shadow p-6 text-center">
-          <div class="text-3xl text-blue-500 mb-2">👥</div>
-          <h6 class="themed-text-muted text-sm mb-1">涉及用户</h6>
-          <h2 class="text-2xl font-bold text-blue-600" x-text="presetStats.total_users_with_presets || 0"></h2>
+        <div class="preset-stat-card themed-card rounded-xl p-4" style="border-left-color: #3b82f6;">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs text-slate-400 mb-0.5">涉及用户</div>
+              <div class="text-2xl font-bold text-blue-600" x-text="presetStats.total_users_with_presets || 0"></div>
+            </div>
+            <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-xl">👥</div>
+          </div>
         </div>
-        <div class="themed-card rounded-lg shadow p-6 text-center">
-          <div class="text-3xl text-purple-500 mb-2">📊</div>
-          <h6 class="themed-text-muted text-sm mb-1">使用率</h6>
-          <h2 class="text-2xl font-bold text-purple-600" x-text="(presetStats.usage_rate || '0') + '%'"></h2>
+        <div class="preset-stat-card themed-card rounded-xl p-4" style="border-left-color: #8b5cf6;">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs text-slate-400 mb-0.5">使用率</div>
+              <div class="text-2xl font-bold text-purple-600" x-text="(presetStats.usage_rate || '0') + '%'"></div>
+            </div>
+            <div class="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center text-xl">📊</div>
+          </div>
         </div>
       </div>
 
       <!-- 预设列表 -->
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b flex justify-between items-center">
-          <h5 class="font-semibold">📋 预设队列列表</h5>
-          <button @click="openCreatePresetModal()" class="px-4 py-2 themed-btn-primary rounded hover:opacity-90 transition-colors">
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden">
+        <div class="px-5 py-3.5 border-b flex justify-between items-center bg-gradient-to-r from-slate-50 to-white">
+          <h5 class="font-semibold text-sm text-slate-700 flex items-center gap-1.5">📋 预设队列列表</h5>
+          <button @click="openCreatePresetModal()" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all shadow-sm">
             ➕ 创建预设
           </button>
         </div>
         
         <!-- 筛选器 -->
-        <div class="p-4 border-b themed-bg-base">
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <select class="px-3 py-2 border rounded" x-model="presetFilters.status" @change="searchPresets()">
+        <div class="filter-section p-4 border-b">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <select class="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-300" x-model="presetFilters.status" @change="searchPresets()">
               <option value="">全部状态</option>
-              <option value="pending">待使用</option>
-              <option value="used">已使用</option>
+              <option value="pending">🟢 待使用</option>
+              <option value="used">✅ 已使用</option>
             </select>
-            <input type="text" class="px-3 py-2 border rounded" placeholder="手机号..." 
-                   maxlength="11" x-model="presetFilters.mobile" @keyup.enter="searchPresets()">
-            <button class="px-4 py-2 themed-btn-primary rounded" @click="searchPresets()">
+            <input type="text" class="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-300" 
+                   placeholder="输入手机号搜索..." maxlength="11" x-model="presetFilters.mobile" @keyup.enter="searchPresets()">
+            <button class="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors" @click="searchPresets()">
               🔍 搜索
             </button>
-            <button class="px-4 py-2 themed-btn-secondary rounded" @click="resetPresetFilters()">
+            <button class="px-4 py-2 border border-slate-300 text-slate-600 text-sm rounded-lg hover:bg-slate-50 transition-colors" @click="resetPresetFilters()">
               🔄 重置
             </button>
           </div>
         </div>
 
         <!-- 预设表格 -->
-        <div class="p-4 overflow-x-auto">
+        <div class="overflow-x-auto">
           <table class="w-full">
-            <thead>
-              <tr class="border-b">
-                <th class="text-left py-3 px-2">ID</th>
-                <th class="text-left py-3 px-2">用户ID</th>
-                <th class="text-left py-3 px-2">奖品</th>
-                <th class="text-left py-3 px-2">队列顺序</th>
-                <th class="text-left py-3 px-2">状态</th>
-                <th class="text-left py-3 px-2">创建时间</th>
-                <th class="text-left py-3 px-2">使用时间</th>
-                <th class="text-left py-3 px-2">操作</th>
+            <thead class="bg-gradient-to-r from-slate-50 to-slate-100">
+              <tr>
+                <th class="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">ID</th>
+                <th class="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">用户</th>
+                <th class="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">奖品</th>
+                <th class="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">队列顺序</th>
+                <th class="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">状态</th>
+                <th class="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">创建时间</th>
+                <th class="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">使用时间</th>
+                <th class="text-right py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">操作</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody class="divide-y divide-slate-100">
               <!-- 骨架屏加载状态 -->
               <template x-if="loading">
                 <template x-for="i in 5" :key="'skeleton-preset-' + i">
-                  <tr class="border-b animate-pulse">
-                    <td class="py-3 px-2"><div class="skeleton-text-sm w-12"></div></td>
-                    <td class="py-3 px-2"><div class="skeleton-text-sm w-16"></div></td>
-                    <td class="py-3 px-2"><div class="skeleton-text w-32"></div></td>
-                    <td class="py-3 px-2"><div class="skeleton-text-sm w-8"></div></td>
-                    <td class="py-3 px-2"><div class="skeleton-button-sm w-16"></div></td>
-                    <td class="py-3 px-2"><div class="skeleton-text-sm w-28"></div></td>
-                    <td class="py-3 px-2"><div class="skeleton-text-sm w-28"></div></td>
-                    <td class="py-3 px-2"><div class="skeleton-button-sm w-20"></div></td>
+                  <tr class="animate-pulse">
+                    <td class="py-3.5 px-4"><div class="skeleton-text-sm w-12"></div></td>
+                    <td class="py-3.5 px-4"><div class="skeleton-text-sm w-16"></div></td>
+                    <td class="py-3.5 px-4"><div class="skeleton-text w-32"></div></td>
+                    <td class="py-3.5 px-4"><div class="skeleton-text-sm w-8 mx-auto"></div></td>
+                    <td class="py-3.5 px-4"><div class="skeleton-button-sm w-16"></div></td>
+                    <td class="py-3.5 px-4"><div class="skeleton-text-sm w-28"></div></td>
+                    <td class="py-3.5 px-4"><div class="skeleton-text-sm w-28"></div></td>
+                    <td class="py-3.5 px-4"><div class="skeleton-button-sm w-20 ml-auto"></div></td>
                   </tr>
                 </template>
               </template>
               <!-- 数据行 -->
               <template x-for="preset in presets" :key="preset.lottery_preset_id">
-                <tr class="border-b hover:bg-gray-50 transition-colors">
-                  <td class="py-3 px-2 text-sm font-mono text-xs" x-text="preset.lottery_preset_id"></td>
-                  <td class="py-3 px-2">
-                    <span class="text-blue-600 hover:underline cursor-pointer" 
+                <tr class="hover:bg-indigo-50/30 transition-colors">
+                  <td class="py-3.5 px-4 font-mono text-xs text-slate-400" x-text="preset.lottery_preset_id"></td>
+                  <td class="py-3.5 px-4">
+                    <span class="text-sm text-indigo-600 hover:underline cursor-pointer font-medium" 
                           x-text="preset.target_user?.nickname || preset.user_id" 
                           @click="viewUserProfile(preset.user_id)"></span>
                   </td>
-                  <td class="py-3 px-2">
-                    <div class="text-sm font-medium" x-text="preset.prize?.prize_name || '-'"></div>
-                    <div class="text-xs themed-text-muted" x-text="'#' + (preset.lottery_prize_id || '')"></div>
+                  <td class="py-3.5 px-4">
+                    <div class="text-sm font-medium text-slate-700" x-text="preset.prize?.prize_name || '-'"></div>
+                    <div class="text-xs text-slate-400" x-text="'奖品ID: ' + (preset.lottery_prize_id || '-')"></div>
                   </td>
-                  <td class="py-3 px-2 text-center">
-                    <span class="inline-block px-2 py-1 rounded bg-blue-100 text-blue-800 text-sm font-medium" 
+                  <td class="py-3.5 px-4 text-center">
+                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-sm font-bold" 
                           x-text="preset.queue_order || '-'"></span>
                   </td>
-                  <td class="py-3 px-2">
-                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
+                  <td class="py-3.5 px-4">
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
                           :class="getPresetStatusClass(preset.status)">
                       <span x-text="getPresetStatusIcon(preset.status)"></span>
                       <span x-text="preset.status_display || preset.status"></span>
                     </span>
                   </td>
-                  <td class="py-3 px-2 text-sm themed-text-muted" x-text="formatDate(preset.created_at)"></td>
-                  <td class="py-3 px-2 text-sm themed-text-muted" x-text="preset.used_at ? formatDate(preset.used_at) : '-'"></td>
-                  <td class="py-3 px-2">
-                    <div class="flex gap-2">
-                      <button class="px-2 py-1 text-xs border border-blue-500 text-blue-500 rounded hover:bg-blue-50"
+                  <td class="py-3.5 px-4 text-sm text-slate-500" x-text="formatDate(preset.created_at)"></td>
+                  <td class="py-3.5 px-4 text-sm text-slate-500" x-text="preset.used_at ? formatDate(preset.used_at) : '-'"></td>
+                  <td class="py-3.5 px-4 text-right">
+                    <div class="flex gap-1.5 justify-end">
+                      <button class="px-2.5 py-1 text-xs bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors font-medium"
                               @click="viewPresetDetail(preset)">
-                        👁️ 详情
+                        详情
                       </button>
                       <button x-show="preset.status === 'pending'"
-                              class="px-2 py-1 text-xs border border-red-500 text-red-500 rounded hover:bg-red-50"
+                              class="px-2.5 py-1 text-xs bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors font-medium"
                               @click="deleteUserPresets(preset.user_id)">
-                        🗑️ 取消
+                        取消
                       </button>
                     </div>
                   </td>
@@ -262,9 +333,12 @@
               <!-- 空状态 -->
               <template x-if="presets.length === 0 && !loading">
                 <tr>
-                  <td colspan="8" class="py-12 text-center">
-                    <div class="text-4xl mb-2">📋</div>
-                    <p class="themed-text-muted">暂无预设队列数据</p>
+                  <td colspan="8" class="py-16 text-center">
+                    <div class="text-5xl mb-3 opacity-30">📋</div>
+                    <p class="text-slate-400 text-sm">暂无预设队列数据</p>
+                    <button @click="openCreatePresetModal()" class="mt-3 text-sm text-indigo-500 hover:text-indigo-700 font-medium">
+                      ➕ 创建第一个预设队列
+                    </button>
                   </td>
                 </tr>
               </template>
@@ -273,23 +347,25 @@
         </div>
 
         <!-- 分页 -->
-        <div class="p-4 border-t flex justify-between items-center" x-show="presets.length > 0">
-          <span class="text-sm themed-text-muted">
-            共 <span x-text="presetPagination.total"></span> 条
+        <div class="px-5 py-3 border-t bg-slate-50/50 flex justify-between items-center" x-show="presets.length > 0">
+          <span class="text-xs text-slate-400">
+            共 <span class="font-medium text-slate-600" x-text="presetPagination.total"></span> 条记录
           </span>
-          <div class="flex gap-2">
-            <button class="px-3 py-1 border rounded" 
+          <div class="flex items-center gap-1">
+            <button class="px-3 py-1.5 text-xs border border-slate-200 rounded-md hover:bg-white transition-colors disabled:opacity-40" 
                     :disabled="presetPagination.page <= 1"
                     @click="changePresetPage(presetPagination.page - 1)">
-              上一页
+              ← 上一页
             </button>
-            <span class="px-3 py-1">
-              <span x-text="presetPagination.page"></span> / <span x-text="getPresetTotalPages()"></span>
+            <span class="px-3 py-1.5 text-xs text-slate-500">
+              <span class="font-medium text-slate-700" x-text="presetPagination.page"></span>
+              <span class="mx-0.5">/</span>
+              <span x-text="getPresetTotalPages()"></span>
             </span>
-            <button class="px-3 py-1 border rounded" 
+            <button class="px-3 py-1.5 text-xs border border-slate-200 rounded-md hover:bg-white transition-colors disabled:opacity-40" 
                     :disabled="presetPagination.page >= getPresetTotalPages()"
                     @click="changePresetPage(presetPagination.page + 1)">
-              下一页
+              下一页 →
             </button>
           </div>
         </div>
@@ -303,58 +379,67 @@
        x-show="isModalOpen('createModal')" 
        x-cloak
        class="fixed inset-0 z-50 flex items-center justify-center">
-    <div class="fixed inset-0 bg-black/50 z-40" @click="hideModal('createModal')"></div>
-    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 z-50" @click.stop>
-      <div class="p-4 border-b flex justify-between items-center">
-        <h5 class="font-semibold">🎯 新增强制中奖规则</h5>
-        <button @click="hideModal('createModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+    <div class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" @click="hideModal('createModal')"></div>
+    <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-lg mx-4 z-50" @click.stop>
+      <div class="px-5 py-4 border-b bg-gradient-to-r from-indigo-50 to-purple-50 rounded-t-xl flex justify-between items-center">
+        <h5 class="font-semibold text-indigo-800 flex items-center gap-2">
+          <span class="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">🎯</span>
+          新增强制中奖规则
+        </h5>
+        <button @click="hideModal('createModal')" class="w-8 h-8 rounded-lg hover:bg-indigo-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">✕</button>
       </div>
-      <div class="p-6 space-y-4">
+      <div class="p-5 space-y-4">
         <!-- 用户搜索 -->
         <div>
-          <label class="block text-sm font-medium themed-text-secondary mb-1">选择用户 <span class="text-red-500">*</span></label>
-          <div class="flex space-x-2">
-            <input type="text" x-model="userSearchKeyword" placeholder="输入手机号码搜索" class="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
-            <button @click="searchUser()" :disabled="searchingUser" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+          <label class="block text-sm font-medium text-slate-700 mb-1.5">目标用户 <span class="text-red-500">*</span></label>
+          <div class="flex gap-2">
+            <input type="text" x-model="userSearchKeyword" placeholder="输入11位手机号码" maxlength="11"
+                   class="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400"
+                   @keyup.enter="searchUser()">
+            <button @click="searchUser()" :disabled="searchingUser" 
+                    class="px-4 py-2.5 bg-slate-600 text-white text-sm rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50">
+              <span x-show="searchingUser" class="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
               搜索
             </button>
           </div>
-          <div x-show="userSearchResults.length > 0" class="mt-2 border rounded-lg max-h-32 overflow-y-auto">
+          <div x-show="userSearchResults.length > 0" class="mt-2 border border-slate-200 rounded-lg overflow-hidden max-h-32 overflow-y-auto">
             <template x-for="user in userSearchResults" :key="user.user_id">
-              <div @click="selectUser(user)" class="px-3 py-2 themed-hover-bg cursor-pointer" :class="selectedUser?.user_id === user.user_id ? 'themed-bg-primary-light' : ''">
-                <span x-text="user.nickname"></span>
-                <span class="themed-text-muted text-sm ml-2" x-text="'(' + user.mobile + ')'"></span>
+              <div @click="selectUser(user)" class="px-3 py-2.5 hover:bg-indigo-50 cursor-pointer transition-colors text-sm"
+                   :class="selectedUser?.user_id === user.user_id ? 'bg-indigo-50 border-l-2 border-indigo-500' : ''">
+                <span class="font-medium" x-text="user.nickname"></span>
+                <span class="text-slate-400 ml-2" x-text="'(' + user.mobile + ')'"></span>
               </div>
             </template>
           </div>
-          <div x-show="selectedUser" class="mt-2 p-2 themed-bg-primary-light rounded flex justify-between items-center">
-            <span>已选择: <strong x-text="selectedUser?.nickname"></strong> (<span x-text="selectedUser?.mobile"></span>)</span>
-            <button @click="selectedUser = null" class="text-red-500 text-sm">取消</button>
+          <div x-show="selectedUser" class="mt-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg flex justify-between items-center text-sm">
+            <span class="text-indigo-700">已选择: <strong x-text="selectedUser?.nickname"></strong> (<span x-text="selectedUser?.mobile"></span>)</span>
+            <button @click="selectedUser = null" class="text-red-500 hover:text-red-700 text-xs font-medium">移除</button>
           </div>
         </div>
         
         <div>
-          <label class="block text-sm font-medium themed-text-secondary mb-1">目标奖品 <span class="text-red-500">*</span></label>
-          <select x-model="interventionForm.prize_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
-            <option value="">选择奖品</option>
+          <label class="block text-sm font-medium text-slate-700 mb-1.5">指定奖品 <span class="text-red-500">*</span></label>
+          <select x-model="interventionForm.prize_id" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
+            <option value="">请选择要指定的奖品</option>
             <template x-for="prize in allPrizes" :key="prize.lottery_prize_id">
               <option :value="prize.lottery_prize_id" x-text="prize.prize_name"></option>
             </template>
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium themed-text-secondary mb-1">过期时间</label>
-          <input type="datetime-local" x-model="interventionForm.expire_time" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+          <label class="block text-sm font-medium text-slate-700 mb-1.5">过期时间 <span class="text-slate-400 text-xs font-normal">（可选，不填则永不过期）</span></label>
+          <input type="datetime-local" x-model="interventionForm.expire_time" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
         </div>
         <div>
-          <label class="block text-sm font-medium themed-text-secondary mb-1">备注说明</label>
-          <textarea x-model="interventionForm.reason" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="请输入设置原因..."></textarea>
+          <label class="block text-sm font-medium text-slate-700 mb-1.5">操作原因 <span class="text-slate-400 text-xs font-normal">（审计追溯用）</span></label>
+          <textarea x-model="interventionForm.reason" rows="2" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" placeholder="例：客诉补偿、VIP专属奖励..."></textarea>
         </div>
       </div>
-      <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
-        <button @click="hideModal('createModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
-        <button @click="createIntervention()" :disabled="submitting || !selectedUser" class="px-4 py-2 themed-btn-primary rounded disabled:opacity-50">
-          <span x-show="submitting" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+      <div class="px-5 py-4 border-t bg-slate-50 rounded-b-xl flex justify-end gap-2">
+        <button @click="hideModal('createModal')" class="px-4 py-2 text-sm text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">取消</button>
+        <button @click="createIntervention()" :disabled="submitting || !selectedUser" 
+                class="px-5 py-2 text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all disabled:opacity-50 shadow-sm">
+          <span x-show="submitting" class="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
           确认创建
         </button>
       </div>
@@ -366,24 +451,32 @@
        x-show="isModalOpen('viewModal')" 
        x-cloak
        class="fixed inset-0 z-50 flex items-center justify-center">
-    <div class="fixed inset-0 bg-black/50 z-40" @click="hideModal('viewModal')"></div>
-    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-50" @click.stop>
-      <div class="p-4 border-b flex justify-between items-center">
-        <h5 class="font-semibold">📋 强制中奖规则详情</h5>
-        <button @click="hideModal('viewModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+    <div class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" @click="hideModal('viewModal')"></div>
+    <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-md mx-4 z-50" @click.stop>
+      <div class="px-5 py-4 border-b bg-gradient-to-r from-slate-50 to-indigo-50 rounded-t-xl flex justify-between items-center">
+        <h5 class="font-semibold text-slate-700 flex items-center gap-2">
+          <span class="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center text-sm">📋</span>
+          强制中奖规则详情
+        </h5>
+        <button @click="hideModal('viewModal')" class="w-8 h-8 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">✕</button>
       </div>
-      <div class="p-6 space-y-3" x-show="viewData">
-        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">规则ID:</span><span class="font-mono text-xs" x-text="viewData?.setting_id"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">用户:</span><span x-text="viewData?.user?.nickname || viewData?.user_id"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">类型:</span><span x-text="viewData?.setting_type_display || viewData?.setting_type || '-'"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">目标奖品:</span><span x-text="viewData?.prize_info?.prize_name || '-'"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">状态:</span><span x-text="viewData?.status_display || viewData?.status"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">创建时间:</span><span x-text="formatDate(viewData?.created_at)"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">过期时间:</span><span x-text="formatDate(viewData?.expires_at)"></span></div>
-        <div><span class="themed-text-muted">备注:</span><p class="mt-1 p-2 themed-bg-base rounded" x-text="viewData?.reason || '-'"></p></div>
+      <div class="p-5" x-show="viewData">
+        <div class="space-y-0 divide-y divide-slate-100">
+          <div class="flex justify-between items-center py-3"><span class="text-sm text-slate-500">规则ID</span><span class="font-mono text-xs text-slate-700 bg-slate-100 px-2 py-0.5 rounded" x-text="viewData?.setting_id"></span></div>
+          <div class="flex justify-between items-center py-3"><span class="text-sm text-slate-500">用户</span><span class="text-sm font-medium text-slate-700" x-text="viewData?.user?.nickname || viewData?.user_id"></span></div>
+          <div class="flex justify-between items-center py-3"><span class="text-sm text-slate-500">干预类型</span><span class="text-sm text-slate-700" x-text="viewData?.setting_type_display || viewData?.setting_type || '-'"></span></div>
+          <div class="flex justify-between items-center py-3"><span class="text-sm text-slate-500">目标奖品</span><span class="text-sm font-medium text-indigo-600" x-text="viewData?.prize_info?.prize_name || '-'"></span></div>
+          <div class="flex justify-between items-center py-3"><span class="text-sm text-slate-500">状态</span><span class="text-sm" x-text="viewData?.status_display || viewData?.status"></span></div>
+          <div class="flex justify-between items-center py-3"><span class="text-sm text-slate-500">创建时间</span><span class="text-sm text-slate-600" x-text="formatDate(viewData?.created_at)"></span></div>
+          <div class="flex justify-between items-center py-3"><span class="text-sm text-slate-500">过期时间</span><span class="text-sm text-slate-600" x-text="viewData?.expires_at ? formatDate(viewData?.expires_at) : '永不过期'"></span></div>
+        </div>
+        <div class="mt-3 p-3 bg-slate-50 rounded-lg" x-show="viewData?.reason">
+          <div class="text-xs text-slate-400 mb-1">操作原因</div>
+          <p class="text-sm text-slate-700" x-text="viewData?.reason || '-'"></p>
+        </div>
       </div>
-      <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
-        <button @click="hideModal('viewModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
+      <div class="px-5 py-3 border-t bg-slate-50 rounded-b-xl flex justify-end">
+        <button @click="hideModal('viewModal')" class="px-4 py-2 text-sm text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">关闭</button>
       </div>
     </div>
   </div>
@@ -393,43 +486,49 @@
        x-show="isModalOpen('createPresetModal')" 
        x-cloak
        class="fixed inset-0 z-50 flex items-center justify-center">
-    <div class="fixed inset-0 bg-black/50 z-40" @click="hideModal('createPresetModal')"></div>
-    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 z-50" @click.stop>
-      <div class="p-4 border-b flex justify-between items-center">
-        <h5 class="font-semibold">📋 创建预设队列</h5>
-        <button @click="hideModal('createPresetModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+    <div class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" @click="hideModal('createPresetModal')"></div>
+    <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-lg mx-4 z-50" @click.stop>
+      <div class="px-5 py-4 border-b bg-gradient-to-r from-blue-50 to-cyan-50 rounded-t-xl flex justify-between items-center">
+        <h5 class="font-semibold text-blue-800 flex items-center gap-2">
+          <span class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">📋</span>
+          创建预设队列
+        </h5>
+        <button @click="hideModal('createPresetModal')" class="w-8 h-8 rounded-lg hover:bg-blue-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">✕</button>
       </div>
-      <div class="p-6 space-y-4">
+      <div class="p-5 space-y-4">
         <div>
-          <label class="block text-sm font-medium themed-text-secondary mb-1">目标用户手机号 <span class="text-red-500">*</span></label>
-          <input type="text" x-model="createPresetForm.mobile" placeholder="输入手机号码" maxlength="11"
-                 class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+          <label class="block text-sm font-medium text-slate-700 mb-1.5">目标用户手机号 <span class="text-red-500">*</span></label>
+          <input type="text" x-model="createPresetForm.mobile" placeholder="输入11位手机号码" maxlength="11"
+                 class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400">
         </div>
         <div>
-          <label class="block text-sm font-medium themed-text-secondary mb-1">预设队列（按顺序消耗）</label>
-          <template x-for="(item, index) in createPresetForm.presets" :key="index">
-            <div class="flex items-center gap-2 mb-2">
-              <span class="text-sm themed-text-muted w-8" x-text="'#' + item.queue_order"></span>
-              <select x-model="item.lottery_prize_id" class="flex-1 px-3 py-2 border rounded-lg">
-                <option value="">选择奖品</option>
-                <template x-for="prize in allPrizes" :key="'preset-prize-' + prize.lottery_prize_id">
-                  <option :value="prize.lottery_prize_id" x-text="prize.prize_name"></option>
-                </template>
-              </select>
-              <button x-show="createPresetForm.presets.length > 1"
-                      @click="removePresetItem(index)" 
-                      class="px-2 py-1 text-red-500 hover:bg-red-50 rounded">✕</button>
-            </div>
-          </template>
-          <button @click="addPresetItem()" class="text-sm text-blue-600 hover:text-blue-800">
-            ➕ 添加一项
+          <label class="block text-sm font-medium text-slate-700 mb-1.5">中奖剧本 <span class="text-slate-400 text-xs font-normal">（按顺序依次消耗）</span></label>
+          <div class="space-y-2">
+            <template x-for="(item, index) in createPresetForm.presets" :key="index">
+              <div class="flex items-center gap-2">
+                <span class="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center" x-text="item.queue_order"></span>
+                <select x-model="item.lottery_prize_id" class="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-300">
+                  <option value="">选择第 <span x-text="item.queue_order"></span> 次中的奖品</option>
+                  <template x-for="prize in allPrizes" :key="'preset-prize-' + prize.lottery_prize_id">
+                    <option :value="prize.lottery_prize_id" x-text="prize.prize_name"></option>
+                  </template>
+                </select>
+                <button x-show="createPresetForm.presets.length > 1"
+                        @click="removePresetItem(index)" 
+                        class="flex-shrink-0 w-7 h-7 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 flex items-center justify-center transition-colors">✕</button>
+              </div>
+            </template>
+          </div>
+          <button @click="addPresetItem()" class="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
+            <span>➕</span> 添加下一次中奖
           </button>
         </div>
       </div>
-      <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
-        <button @click="hideModal('createPresetModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
-        <button @click="submitCreatePreset()" :disabled="saving" class="px-4 py-2 themed-btn-primary rounded disabled:opacity-50">
-          <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+      <div class="px-5 py-4 border-t bg-slate-50 rounded-b-xl flex justify-end gap-2">
+        <button @click="hideModal('createPresetModal')" class="px-4 py-2 text-sm text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">取消</button>
+        <button @click="submitCreatePreset()" :disabled="saving" 
+                class="px-5 py-2 text-sm bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all disabled:opacity-50 shadow-sm">
+          <span x-show="saving" class="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
           确认创建
         </button>
       </div>
@@ -441,23 +540,28 @@
        x-show="isModalOpen('presetDetailModal')" 
        x-cloak
        class="fixed inset-0 z-50 flex items-center justify-center">
-    <div class="fixed inset-0 bg-black/50 z-40" @click="hideModal('presetDetailModal')"></div>
-    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-50" @click.stop>
-      <div class="p-4 border-b flex justify-between items-center">
-        <h5 class="font-semibold">📋 预设详情</h5>
-        <button @click="hideModal('presetDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+    <div class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" @click="hideModal('presetDetailModal')"></div>
+    <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-md mx-4 z-50" @click.stop>
+      <div class="px-5 py-4 border-b bg-gradient-to-r from-slate-50 to-blue-50 rounded-t-xl flex justify-between items-center">
+        <h5 class="font-semibold text-slate-700 flex items-center gap-2">
+          <span class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-sm">📋</span>
+          预设详情
+        </h5>
+        <button @click="hideModal('presetDetailModal')" class="w-8 h-8 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">✕</button>
       </div>
-      <div class="p-6 space-y-3" x-show="selectedPreset">
-        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">预设ID:</span><span class="font-mono text-xs" x-text="selectedPreset?.lottery_preset_id"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">用户:</span><span x-text="selectedPreset?.target_user?.nickname || selectedPreset?.user_id"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">奖品:</span><span x-text="selectedPreset?.prize?.prize_name || '-'"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">队列顺序:</span><span x-text="selectedPreset?.queue_order"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">状态:</span><span x-text="selectedPreset?.status_display || selectedPreset?.status"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">审批状态:</span><span x-text="selectedPreset?.approval_status_display || selectedPreset?.approval_status"></span></div>
-        <div class="flex justify-between border-b pb-2"><span class="themed-text-muted">创建时间:</span><span x-text="formatDate(selectedPreset?.created_at)"></span></div>
+      <div class="p-5" x-show="selectedPreset">
+        <div class="space-y-0 divide-y divide-slate-100">
+          <div class="flex justify-between items-center py-3"><span class="text-sm text-slate-500">预设ID</span><span class="font-mono text-xs text-slate-700 bg-slate-100 px-2 py-0.5 rounded" x-text="selectedPreset?.lottery_preset_id"></span></div>
+          <div class="flex justify-between items-center py-3"><span class="text-sm text-slate-500">用户</span><span class="text-sm font-medium text-slate-700" x-text="selectedPreset?.target_user?.nickname || selectedPreset?.user_id"></span></div>
+          <div class="flex justify-between items-center py-3"><span class="text-sm text-slate-500">奖品</span><span class="text-sm font-medium text-blue-600" x-text="selectedPreset?.prize?.prize_name || '-'"></span></div>
+          <div class="flex justify-between items-center py-3"><span class="text-sm text-slate-500">队列顺序</span><span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold" x-text="selectedPreset?.queue_order"></span></div>
+          <div class="flex justify-between items-center py-3"><span class="text-sm text-slate-500">状态</span><span class="text-sm" x-text="selectedPreset?.status_display || selectedPreset?.status"></span></div>
+          <div class="flex justify-between items-center py-3"><span class="text-sm text-slate-500">审批状态</span><span class="text-sm" x-text="selectedPreset?.approval_status_display || selectedPreset?.approval_status"></span></div>
+          <div class="flex justify-between items-center py-3"><span class="text-sm text-slate-500">创建时间</span><span class="text-sm text-slate-600" x-text="formatDate(selectedPreset?.created_at)"></span></div>
+        </div>
       </div>
-      <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
-        <button @click="hideModal('presetDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
+      <div class="px-5 py-3 border-t bg-slate-50 rounded-b-xl flex justify-end">
+        <button @click="hideModal('presetDetailModal')" class="px-4 py-2 text-sm text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">关闭</button>
       </div>
     </div>
   </div>

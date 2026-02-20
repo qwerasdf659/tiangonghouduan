@@ -36,6 +36,7 @@ const FeedbackService = require('./FeedbackService') // 反馈管理服务
 const AdminSystemService = require('./AdminSystemService') // 管理后台系统服务（已合并SystemSettingsService）
 // [已删除] AdminLotteryService.js → 拆分为 admin-lottery/CoreService, admin-lottery/CampaignService, admin-lottery/QueryService
 const AdminCustomerServiceService = require('./AdminCustomerServiceService') // 管理后台客服管理服务
+const CustomerServiceAgentManagementService = require('./CustomerServiceAgentManagementService') // 客服座席管理服务（座席注册/配置/用户分配）
 const MaterialManagementService = require('./MaterialManagementService') // 材料系统运营管理服务（V4.5.0）
 const PopupBannerService = require('./PopupBannerService') // 弹窗Banner管理服务（2025-12-22）
 const CarouselItemService = require('./CarouselItemService') // 轮播图管理服务（Phase 1 — 拍板决策1）
@@ -397,6 +398,7 @@ class ServiceManager {
 
       this._services.set('session_management', SessionManagementService) // 会话管理服务（静态类）
       this._services.set('admin_customer_service', AdminCustomerServiceService)
+      this._services.set('cs_agent_management', CustomerServiceAgentManagementService) // 客服座席管理（静态类）
       this._services.set('material_management', MaterialManagementService)
       this._services.set('popup_banner', PopupBannerService)
       this._services.set('carousel_item', CarouselItemService)

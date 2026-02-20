@@ -242,11 +242,11 @@ export function useCampaignBudgetMethods() {
           }),
           {
             method: 'PUT',
-            body: JSON.stringify({
+            data: {
               budget_mode: this.budgetForm.budget_mode,
               pool_budget_remaining: this.budgetForm.pool_budget_remaining,
               allowed_campaign_ids: this.budgetForm.allowed_campaign_ids
-            })
+            }
           }
         )
 
@@ -282,7 +282,7 @@ export function useCampaignBudgetMethods() {
             }),
             {
               method: 'POST',
-              body: JSON.stringify({ amount })
+              data: { amount }
             }
           )
           if (response?.success) {

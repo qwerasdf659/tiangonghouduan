@@ -16,6 +16,7 @@
 const express = require('express')
 const router = express.Router()
 const { sharedComponents, adminAuthMiddleware, asyncHandler } = require('../shared/middleware')
+const TransactionManager = require('../../../../utils/TransactionManager')
 
 /**
  * GET /feedbacks - 获取所有用户反馈
@@ -73,6 +74,80 @@ router.get(
     } catch (error) {
       sharedComponents.logger.error('获取反馈统计失败', { error: error.message })
       return res.apiInternalError('获取反馈统计失败', error.message, 'FEEDBACK_STATS_ERROR')
+    }
+  })
+)
+
+/**
+ * PUT /feedbacks/batch-status - 批量更新反馈状态
+ *
+ * @description 运营批量更新多条反馈的处理状态（如一键关闭已处理反馈、批量标记处理中等）
+ * @route PUT /api/v4/console/system/feedbacks/batch-status
+ * @access Private (需要管理员权限)
+ *
+ * @body {Array<number>} feedback_ids - 反馈ID数组（必填，最多100条）
+ * @body {string} status - 目标状态（必填，pending/processing/replied/closed）
+ * @body {string} [internal_notes] - 内部备注（可选）
+ *
+ * @since 2026-02-20 新增批量状态更新，满足运营快速处理需求
+ */
+router.put(
+  '/batch-status',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const { feedback_ids, status, internal_notes = null } = req.body
+
+    // 参数校验
+    if (!Array.isArray(feedback_ids) || feedback_ids.length === 0) {
+      return res.apiError('feedback_ids 必须是非空数组', 'INVALID_PARAMETERS', null, 400)
+    }
+
+    if (!status) {
+      return res.apiError('status 不能为空', 'INVALID_PARAMETERS', null, 400)
+    }
+
+    const validStatuses = ['pending', 'processing', 'replied', 'closed']
+    if (!validStatuses.includes(status)) {
+      return res.apiError(
+        `无效的状态值: ${status}，有效值为: ${validStatuses.join(', ')}`,
+        'INVALID_PARAMETERS',
+        null,
+        400
+      )
+    }
+
+    try {
+      const result = await TransactionManager.execute(async transaction => {
+        const FeedbackService = req.app.locals.services.getService('feedback')
+        return await FeedbackService.batchUpdateStatus(feedback_ids, status, internal_notes, {
+          transaction
+        })
+      })
+
+      sharedComponents.logger.info('管理员批量更新反馈状态', {
+        admin_id: req.user.user_id,
+        feedback_ids,
+        target_status: status,
+        updated_count: result.updated_count
+      })
+
+      return res.apiSuccess(result, `批量更新成功，共更新 ${result.updated_count} 条反馈`)
+    } catch (error) {
+      sharedComponents.logger.error('批量更新反馈状态失败', { error: error.message })
+
+      if (
+        error.message.includes('不能为空') ||
+        error.message.includes('不能超过') ||
+        error.message.includes('无效的状态值')
+      ) {
+        return res.apiError(error.message, 'INVALID_PARAMETERS', null, 400)
+      }
+
+      return res.apiInternalError(
+        '批量更新反馈状态失败',
+        error.message,
+        'FEEDBACK_BATCH_STATUS_ERROR'
+      )
     }
   })
 )

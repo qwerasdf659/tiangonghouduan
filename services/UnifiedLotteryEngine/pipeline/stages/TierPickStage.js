@@ -39,6 +39,7 @@ const BaseStage = require('./BaseStage')
 const { SegmentResolver } = require('../../../../config/segment_rules')
 const { User, LotteryUserExperienceState, LotteryDraw } = require('../../../../models')
 const { Op } = require('sequelize')
+const BeijingTimeHelper = require('../../../../utils/timeHelper')
 
 /* 抽奖计算引擎 */
 const LotteryComputeEngine = require('../../compute/LotteryComputeEngine')
@@ -255,19 +256,19 @@ class TierPickStage extends BaseStage {
 
       if (selected_tier === 'high') {
         try {
-          const today_start = new Date()
-          today_start.setHours(0, 0, 0, 0)
-
           /**
-           * 🔴 2026-02-15 修复：count 查询必须包含 transaction
+           * 🔴 2026-02-19 修复：使用北京时间计算"今天"起始
            *
            * 修复根因：
-           * - 原代码不传 transaction，导致在连抽事务内看不到同批次的未提交记录
-           * - 10 连抽时所有 10 次 count 都返回事务开始前的值
-           * - 每日高价值硬上限保护完全失效
+           * - 服务器时区为 UTC，new Date().setHours(0,0,0,0) = UTC午夜
+           * - Sequelize timezone: '+08:00' 将 UTC午夜 转换为 北京时间 08:00
+           * - 导致只统计北京时间 08:00 之后的抽奖
+           * - 00:00-08:00 的高档抽奖完全绕过每日上限保护
            *
-           * 修复方案：传入 context.transaction 确保读取同事务内的数据
+           * 修复方案：使用 BeijingTimeHelper.todayStart() 获取北京时间的今日起始
            */
+          const today_start = BeijingTimeHelper.todayStart()
+
           const today_high_count = await LotteryDraw.count({
             where: {
               user_id,

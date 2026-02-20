@@ -43,7 +43,13 @@ export function useExchangeItemsState() {
       stock: 0,
       sort_order: 100,
       status: 'active',
-      primary_image_id: null
+      primary_image_id: null,
+      is_new: false,
+      is_hot: false,
+      is_lucky: false,
+      is_limited: false,
+      has_warranty: false,
+      free_shipping: false
     },
     /** @type {number|null} 正在编辑的商品ID */
     editingItemId: null,
@@ -165,7 +171,13 @@ export function useExchangeItemsMethods() {
         stock: 0,
         sort_order: 100,
         status: 'active',
-        primary_image_id: null
+        primary_image_id: null,
+        is_new: false,
+        is_hot: false,
+        is_lucky: false,
+        is_limited: false,
+        has_warranty: false,
+        free_shipping: false
       }
       this.itemImagePreviewUrl = null
       this.showModal('itemModal')
@@ -186,7 +198,13 @@ export function useExchangeItemsMethods() {
         stock: item.stock || 0,
         sort_order: item.sort_order || 100,
         status: item.status || 'active',
-        primary_image_id: item.primary_image_id || null
+        primary_image_id: item.primary_image_id || null,
+        is_new: !!item.is_new,
+        is_hot: !!item.is_hot,
+        is_lucky: !!item.is_lucky,
+        is_limited: !!item.is_limited,
+        has_warranty: !!item.has_warranty,
+        free_shipping: !!item.free_shipping
       }
       this.itemImagePreviewUrl = item.primary_image?.thumbnail_url || item.primary_image?.url || null
       this.showModal('itemModal')

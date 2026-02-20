@@ -299,7 +299,10 @@ class SettleStage extends BaseStage {
         transaction
       })
 
-      // 7. 更新用户配额（如果有）
+      // 7. 更新活动统计计数器（total_draws / total_prizes_awarded）
+      await this._updateCampaignCounters(lottery_campaign_id, transaction)
+
+      // 8. 更新用户配额（如果有）
       await this._updateUserQuota(user_id, lottery_campaign_id, transaction)
 
       /*
@@ -509,7 +512,9 @@ class SettleStage extends BaseStage {
     // 使用原子操作扣减库存
     const [affected_rows] = await sequelize.query(
       `UPDATE lottery_prizes 
-       SET stock_quantity = stock_quantity - 1, daily_win_count = daily_win_count + 1
+       SET stock_quantity = stock_quantity - 1, 
+           daily_win_count = daily_win_count + 1,
+           total_win_count = total_win_count + 1
        WHERE lottery_prize_id = ? AND stock_quantity >= 1`,
       {
         replacements: [prize.lottery_prize_id],
@@ -979,6 +984,41 @@ class SettleStage extends BaseStage {
     }
 
     return mechanisms
+  }
+
+  /**
+   * 更新活动统计计数器
+   *
+   * 原子递增 lottery_campaigns 表的 total_draws 和 total_prizes_awarded 字段，
+   * 确保策略效果分析页面的"总抽奖次数"和"总发奖次数"与实际数据一致。
+   *
+   * @param {number} lottery_campaign_id - 活动ID
+   * @param {Object} transaction - 事务对象
+   * @returns {Promise<void>} 无返回值
+   * @private
+   */
+  async _updateCampaignCounters(lottery_campaign_id, transaction) {
+    try {
+      await sequelize.query(
+        `UPDATE lottery_campaigns 
+         SET total_draws = total_draws + 1, 
+             total_prizes_awarded = total_prizes_awarded + 1,
+             updated_at = NOW()
+         WHERE lottery_campaign_id = ?`,
+        {
+          replacements: [lottery_campaign_id],
+          transaction,
+          type: sequelize.QueryTypes.UPDATE
+        }
+      )
+
+      this.log('debug', '活动计数器已更新', { lottery_campaign_id })
+    } catch (error) {
+      this.log('warn', '活动计数器更新失败（非致命）', {
+        lottery_campaign_id,
+        error: error.message
+      })
+    }
   }
 
   /**

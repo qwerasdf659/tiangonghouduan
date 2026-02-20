@@ -11,6 +11,7 @@
 
 import { logger } from '../utils/logger.js'
 import { createToastStore } from './components/toast.js'
+import { request } from '../api/base.js'
 import {
   hasMenuAccess,
   hasPageAccess,
@@ -244,22 +245,16 @@ document.addEventListener('alpine:init', () => {
       async get(url, params = {}) {
         const queryString = new URLSearchParams(params).toString()
         const fullUrl = queryString ? `${url}?${queryString}` : url
-        return await apiRequest(fullUrl)
+        return await request({ url: fullUrl })
       },
       async post(url, data = {}) {
-        return await apiRequest(url, {
-          method: 'POST',
-          body: JSON.stringify(data)
-        })
+        return await request({ url, method: 'POST', data })
       },
       async put(url, data = {}) {
-        return await apiRequest(url, {
-          method: 'PUT',
-          body: JSON.stringify(data)
-        })
+        return await request({ url, method: 'PUT', data })
       },
       async delete(url) {
-        return await apiRequest(url, { method: 'DELETE' })
+        return await request({ url, method: 'DELETE' })
       }
     }
   })

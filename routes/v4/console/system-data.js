@@ -416,7 +416,11 @@ router.put(
         effect_theme,
         rarity_effects_enabled,
         win_animation,
-        background_image_url
+        background_image_url,
+        // 固定间隔保底配置
+        guarantee_enabled,
+        guarantee_threshold,
+        guarantee_prize_id
       } = req.body
 
       // 构建更新数据（campaign_code 不可修改）
@@ -449,6 +453,10 @@ router.put(
       }
       if (win_animation !== undefined) updateData.win_animation = win_animation
       if (background_image_url !== undefined) updateData.background_image_url = background_image_url
+      // 固定间隔保底配置
+      if (guarantee_enabled !== undefined) updateData.guarantee_enabled = guarantee_enabled
+      if (guarantee_threshold !== undefined) updateData.guarantee_threshold = guarantee_threshold
+      if (guarantee_prize_id !== undefined) updateData.guarantee_prize_id = guarantee_prize_id
 
       // 通过 ServiceManager 获取服务
       const LotteryCampaignCRUDService = req.app.locals.services.getService('lottery_campaign_crud')

@@ -54,6 +54,8 @@ export function useConsumptionState() {
     batchProcessing: false,
     /** @type {Object|null} 批量操作结果 */
     batchResult: null,
+    /** @type {string} 批量拒绝原因（用于批量拒绝弹窗） */
+    batchRejectReason: '',
     // ========== P1-17: 决策辅助信息状态 ==========
     /** @type {Object|null} 当前审核记录的决策辅助信息 */
     decisionInfo: null,
@@ -112,12 +114,12 @@ export function useConsumptionMethods() {
         if (response?.success) {
           // 后端返回 records 数组，字段: record_id, consumption_amount, status, created_at, user, merchant
           const rawRecords = response.data?.records || response.data?.list || []
-          // 直接使用后端字段名，仅保留复合字段（有逻辑的派生数据）
+          // 直接使用后端 flat 字段名（toAPIResponse 返回 user_mobile/user_nickname 等平级字段）
           this.consumptions = rawRecords.map(r => ({
             ...r,
-            // user_name 和 store_name 是复合字段，从嵌套对象提取显示名
-            user_name: r.user?.nickname || r.user?.mobile || r.user_id,
-            store_name: r.merchant?.nickname || r.merchant?.mobile || `商户${r.merchant_id || '-'}`
+            // 后端 toAPIResponse() 返回 user_nickname/user_mobile 为平级字段，非嵌套 user 对象
+            user_name: r.user_nickname || r.user_mobile || `用户${r.user_id}`,
+            store_name: r.merchant_nickname || r.merchant_mobile || `商户${r.merchant_id || '-'}`
           }))
           if (response.data?.pagination) {
             // 只更新 total，total_pages 由 getter 计算
@@ -437,54 +439,56 @@ export function useConsumptionMethods() {
     },
 
     /**
-     * 批量拒绝审核
-     * 后端接口: POST /api/v4/console/consumption/batch-review
+     * 打开批量拒绝弹窗
      */
-    async batchReject() {
+    openBatchRejectModal() {
       if (this.selectedIds.length === 0) {
         this.showError('请先选择要拒绝的记录')
         return
       }
+      this.batchRejectReason = ''
+      this.showModal('batchRejectModal')
+    },
 
-      // 先弹出输入原因的提示
-      const reason = prompt('请输入拒绝原因（至少5个字符）：')
-      if (!reason || reason.trim().length < 5) {
+    /**
+     * 确认批量拒绝（从弹窗提交）
+     * 后端接口: POST /api/v4/console/consumption/batch-review
+     */
+    async confirmBatchReject() {
+      if (!this.batchRejectReason || this.batchRejectReason.trim().length < 5) {
         this.showError('拒绝原因至少需要5个字符')
         return
       }
 
-      await this.confirmAndExecute(
-        `确定批量拒绝 ${this.selectedIds.length} 条消费记录？`,
-        async () => {
-          this.batchProcessing = true
-          try {
-            const response = await this.apiCall(`${API_PREFIX}/console/consumption/batch-review`, {
-              method: 'POST',
-              data: {
-                record_ids: this.selectedIds,
-                action: 'reject',
-                reason: reason.trim()
-              }
-            })
-
-            if (response?.success) {
-              this.batchResult = response.data
-              const { success_count, fail_count } = response.data
-              if (fail_count > 0) {
-                this.showWarning(`成功 ${success_count} 项，失败 ${fail_count} 项`)
-              } else {
-                this.showSuccess(`成功拒绝 ${success_count} 条记录`)
-              }
-              // 清空选择并刷新
-              this.selectedIds = []
-              this.isAllSelected = false
-              await this.loadConsumptions()
-            }
-          } finally {
-            this.batchProcessing = false
+      this.batchProcessing = true
+      try {
+        const response = await this.apiCall(`${API_PREFIX}/console/consumption/batch-review`, {
+          method: 'POST',
+          data: {
+            record_ids: this.selectedIds,
+            action: 'reject',
+            reason: this.batchRejectReason.trim()
           }
+        })
+
+        if (response?.success) {
+          this.batchResult = response.data
+          const { success_count, fail_count } = response.data
+          this.hideModal('batchRejectModal')
+          if (fail_count > 0) {
+            this.showWarning(`成功 ${success_count} 项，失败 ${fail_count} 项`)
+          } else {
+            this.showSuccess(`成功拒绝 ${success_count} 条记录`)
+          }
+          this.selectedIds = []
+          this.isAllSelected = false
+          await this.loadConsumptions()
         }
-      )
+      } catch (error) {
+        this.showError('批量拒绝失败: ' + (error.message || '未知错误'))
+      } finally {
+        this.batchProcessing = false
+      }
     },
 
     /**
@@ -694,16 +698,16 @@ export function useConsumptionMethods() {
     /**
      * 加载决策辅助信息（用户审核率）
      * @param {number|string} userId - 用户ID
-     * 
+     *
      * 后端 API: GET /api/v4/console/users/:user_id/approval-rate
      * 返回: approval_rate, total_count, approved_count, rejected_count, credit_level
      */
     async loadDecisionInfo(userId) {
       if (!userId) return
-      
+
       this.loadingDecisionInfo = true
       this.decisionInfo = null
-      
+
       try {
         // 调用后端用户审核率 API（已实现）
         const response = await this.apiGet(
@@ -711,13 +715,14 @@ export function useConsumptionMethods() {
           { days: 90 },
           { showLoading: false }
         )
-        
+
         if (response?.success && response.data) {
           // 转换后端返回格式为前端期望格式
           const data = response.data
           this.decisionInfo = {
             user_id: data.user_id,
-            approval_rate: data.approval_rate !== null ? Math.round(data.approval_rate * 100) : null,
+            approval_rate:
+              data.approval_rate !== null ? Math.round(data.approval_rate * 100) : null,
             total_reviewed: data.total_count || 0,
             approved_count: data.approved_count || 0,
             rejected_count: data.rejected_count || 0,
@@ -727,7 +732,10 @@ export function useConsumptionMethods() {
             period_days: data.period_days || 90,
             is_local_calculated: false
           }
-          logger.info('决策辅助信息加载成功', { user_id: userId, approval_rate: this.decisionInfo.approval_rate })
+          logger.info('决策辅助信息加载成功', {
+            user_id: userId,
+            approval_rate: this.decisionInfo.approval_rate
+          })
         } else {
           // API 返回失败时使用本地计算
           this.decisionInfo = this.calculateLocalDecisionInfo(userId)
@@ -748,18 +756,17 @@ export function useConsumptionMethods() {
     calculateLocalDecisionInfo(userId) {
       // 从当前加载的消费记录中统计用户的历史情况
       const userRecords = this.consumptions.filter(
-        r => (r.user_id === userId || r.user?.user_id === userId)
+        r => r.user_id === userId || r.user?.user_id === userId
       )
-      
+
       const approvedCount = userRecords.filter(r => r.status === 'approved').length
       const rejectedCount = userRecords.filter(r => r.status === 'rejected').length
       const totalReviewed = approvedCount + rejectedCount
-      
+
       // 计算通过率
-      const approval_rate = totalReviewed > 0 
-        ? Math.round((approvedCount / totalReviewed) * 100) 
-        : null
-      
+      const approval_rate =
+        totalReviewed > 0 ? Math.round((approvedCount / totalReviewed) * 100) : null
+
       return {
         user_id: userId,
         approval_rate: approval_rate,
@@ -795,16 +802,16 @@ export function useConsumptionMethods() {
     isRecommendApproval(record) {
       // 只有待审核记录才显示推荐
       if (record.status !== 'pending') return false
-      
+
       // 获取异常分数（后端可能返回 anomaly_score 或 risk_score）
       const score = record.anomaly_score ?? record.risk_score ?? null
-      
+
       // 如果没有异常分数，检查是否有风险标记
       if (score === null) {
         // 无异常标记的记录默认推荐通过
         return !record.is_suspicious && !record.risk_level && !record.anomaly_type
       }
-      
+
       // 异常分数低于阈值则推荐通过
       return score < this.recommendThreshold
     },
@@ -830,14 +837,14 @@ export function useConsumptionMethods() {
      */
     async batchApproveRecommended() {
       const recommendedRecords = this.getRecommendedRecords()
-      
+
       if (recommendedRecords.length === 0) {
         this.showWarning('当前没有推荐通过的记录')
         return
       }
-      
+
       const recordIds = recommendedRecords.map(r => r.record_id || r.id)
-      
+
       await this.confirmAndExecute(
         `确定批量通过 ${recordIds.length} 条推荐记录？\n这些记录的异常评分均低于 ${this.recommendThreshold} 分`,
         async () => {
@@ -851,7 +858,7 @@ export function useConsumptionMethods() {
                 reason: '智能推荐批量通过（异常评分<30）'
               }
             })
-            
+
             if (response?.success) {
               const { success_count, fail_count } = response.data
               if (fail_count > 0) {
@@ -878,11 +885,11 @@ export function useConsumptionMethods() {
     getUserApprovalRateText(record) {
       // 优先使用后端返回的历史通过率
       const rate = record.user_approval_rate ?? record.user?.approval_rate ?? null
-      
+
       if (rate === null || rate === undefined) {
         return '--'
       }
-      
+
       return `${rate}%`
     },
 
@@ -893,11 +900,11 @@ export function useConsumptionMethods() {
      */
     getApprovalRateClass(record) {
       const rate = record.user_approval_rate ?? record.user?.approval_rate ?? null
-      
+
       if (rate === null || rate === undefined) {
         return 'text-gray-400'
       }
-      
+
       if (rate >= 80) return 'text-green-600 font-medium'
       if (rate >= 50) return 'text-yellow-600'
       return 'text-red-600 font-medium'

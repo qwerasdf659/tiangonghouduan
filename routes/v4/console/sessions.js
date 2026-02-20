@@ -38,6 +38,7 @@ const logger = require('../../../utils/logger').logger
  * @query {string} user_type - 筛选用户类型（user/admin）
  * @query {string} is_active - 筛选活跃状态（true/false）
  * @query {number} user_id - 筛选特定用户
+ * @query {string} login_platform - 筛选登录平台（web/wechat_mp/douyin_mp/alipay_mp/app/unknown）
  * @query {string} sort_by - 排序字段（last_activity/created_at/expires_at）
  * @query {string} sort_order - 排序方向（asc/desc）
  *
@@ -101,7 +102,7 @@ router.get('/online-users', authenticateToken, requireRoleLevel(100), async (req
 /**
  * GET /api/v4/console/sessions/:id - 会话详情
  *
- * @param {number} id - 会话ID（user_session_id）
+ * @param {number} id - 会话ID（authentication_session_id）
  * @returns {Object} 会话详情
  */
 router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
@@ -129,7 +130,7 @@ router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) =>
 /**
  * POST /api/v4/console/sessions/:id/deactivate - 失效单个会话
  *
- * @param {number} id - 会话ID（user_session_id）
+ * @param {number} id - 会话ID（authentication_session_id）
  * @body {string} reason - 失效原因（可选）
  * @returns {Object} 操作结果
  */

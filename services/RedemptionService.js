@@ -767,6 +767,91 @@ class RedemptionService {
    *   reason: '管理员手动过期'
    * })
    */
+
+  /**
+   * 管理员批量核销订单
+   *
+   * 业务规则：
+   * - 仅处理 pending 状态的订单
+   * - 已过期的订单自动标记为 expired，不执行核销
+   * - 逐单调用 adminFulfillOrderById 保证数据完整性
+   *
+   * @param {Array<number|string>} order_ids - 待核销的订单ID数组
+   * @param {Object} options - 操作选项
+   * @param {Object} options.transaction - 事务对象（必填）
+   * @param {number} options.admin_user_id - 管理员用户ID（必填）
+   * @param {number} [options.store_id] - 核销门店ID（可选）
+   * @param {string} [options.remark] - 备注（可选）
+   * @returns {Promise<Object>} 操作结果 { fulfilled_count, failed_orders }
+   */
+  static async adminBatchFulfillOrders(order_ids, options = {}) {
+    const transaction = assertAndGetTransaction(
+      options,
+      'RedemptionService.adminBatchFulfillOrders'
+    )
+    const { admin_user_id, store_id, remark } = options
+
+    if (!admin_user_id) {
+      throw new Error('admin_user_id 是必填参数')
+    }
+
+    if (!Array.isArray(order_ids) || order_ids.length === 0) {
+      throw new Error('order_ids 必须是非空数组')
+    }
+
+    logger.info('管理员开始批量核销订单', {
+      order_count: order_ids.length,
+      admin_user_id,
+      store_id
+    })
+
+    let fulfilledCount = 0
+    const failedOrders = []
+
+    for (const order_id of order_ids) {
+      try {
+        // eslint-disable-next-line no-await-in-loop -- 逐单核销保证数据完整性
+        await RedemptionService.adminFulfillOrderById(order_id, {
+          transaction,
+          admin_user_id,
+          store_id,
+          remark: remark || '批量核销'
+        })
+        fulfilledCount++
+      } catch (error) {
+        logger.warn('批量核销中单个订单失败', {
+          order_id,
+          reason: error.message
+        })
+        failedOrders.push({
+          order_id,
+          reason: error.message
+        })
+      }
+    }
+
+    logger.info('管理员批量核销订单完成', {
+      fulfilled_count: fulfilledCount,
+      failed_count: failedOrders.length,
+      admin_user_id
+    })
+
+    return {
+      fulfilled_count: fulfilledCount,
+      failed_orders: failedOrders
+    }
+  }
+
+  /**
+   * 管理员批量过期订单
+   *
+   * @param {Array<number|string>} order_ids - 待过期的订单ID数组
+   * @param {Object} options - 操作选项
+   * @param {Object} options.transaction - 事务对象（必填）
+   * @param {number} options.admin_user_id - 管理员用户ID（必填）
+   * @param {string} [options.reason] - 过期原因（可选）
+   * @returns {Promise<Object>} 操作结果 { expired_count, unlocked_count, failed_orders }
+   */
   static async adminBatchExpireOrders(order_ids, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'RedemptionService.adminBatchExpireOrders')
@@ -844,6 +929,75 @@ class RedemptionService {
     return {
       expired_count: orders.length,
       unlocked_count: unlockedCount,
+      failed_orders: failedOrders
+    }
+  }
+
+  /**
+   * 管理员批量取消订单
+   *
+   * 业务场景：
+   * - 管理员在后台一次性取消多个 pending 状态的兑换订单
+   * - 释放所有关联的物品锁定，恢复物品可用状态
+   * - 逐单调用 adminCancelOrderById 保证物品锁释放完整性
+   *
+   * @param {Array<number|string>} order_ids - 待取消的订单ID数组
+   * @param {Object} options - 操作选项
+   * @param {Object} options.transaction - 事务对象（必填）
+   * @param {number} options.admin_user_id - 管理员用户ID（必填）
+   * @param {string} [options.reason] - 取消原因（可选）
+   * @returns {Promise<Object>} 操作结果 { cancelled_count, failed_orders }
+   */
+  static async adminBatchCancelOrders(order_ids, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'RedemptionService.adminBatchCancelOrders')
+    const { admin_user_id, reason } = options
+
+    if (!admin_user_id) {
+      throw new Error('admin_user_id 是必填参数')
+    }
+
+    if (!Array.isArray(order_ids) || order_ids.length === 0) {
+      throw new Error('order_ids 必须是非空数组')
+    }
+
+    logger.info('管理员开始批量取消订单', {
+      order_count: order_ids.length,
+      admin_user_id,
+      reason
+    })
+
+    let cancelledCount = 0
+    const failedOrders = []
+
+    for (const order_id of order_ids) {
+      try {
+        // eslint-disable-next-line no-await-in-loop -- 逐单取消保证物品锁释放完整性
+        await RedemptionService.adminCancelOrderById(order_id, {
+          transaction,
+          admin_user_id,
+          reason: reason || '批量取消'
+        })
+        cancelledCount++
+      } catch (error) {
+        logger.warn('批量取消中单个订单失败', {
+          order_id,
+          reason: error.message
+        })
+        failedOrders.push({
+          order_id,
+          reason: error.message
+        })
+      }
+    }
+
+    logger.info('管理员批量取消订单完成', {
+      cancelled_count: cancelledCount,
+      failed_count: failedOrders.length,
+      admin_user_id
+    })
+
+    return {
+      cancelled_count: cancelledCount,
       failed_orders: failedOrders
     }
   }

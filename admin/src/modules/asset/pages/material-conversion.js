@@ -20,30 +20,56 @@ import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import { AssetAPI } from '../../../api/asset.js'
 import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
 
-/**
- * 风险等级中文映射
- */
+/** 风险等级中文映射 */
 const RISK_LEVEL_MAP = {
   low: { label: '低风险', color: 'bg-green-100 text-green-700' },
   medium: { label: '中风险', color: 'bg-yellow-100 text-yellow-700' },
   high: { label: '高风险', color: 'bg-red-100 text-red-700' }
 }
 
-/**
- * 材料形态中文映射
- */
+/** 材料形态中文映射 */
 const FORM_MAP = {
   shard: '碎片',
-  crystal: '水晶'
+  crystal: '水晶',
+  currency: '货币'
 }
 
-/**
- * 舍入模式中文映射
- */
+/** 舍入模式中文映射 */
 const ROUNDING_MODE_MAP = {
   floor: '向下取整',
   ceil: '向上取整',
   round: '四舍五入'
+}
+
+/** 资产分组中文映射与颜色配置 */
+const GROUP_CONFIG = {
+  points:   { name: '积分',     emoji: '💰', dot: 'bg-amber-400',   border: ' border-l-amber-400',   iconBg: 'bg-amber-50' },
+  currency: { name: '货币资产', emoji: '💎', dot: 'bg-sky-400',     border: ' border-l-sky-400',     iconBg: 'bg-sky-50' },
+  red:      { name: '红色系',   emoji: '🔴', dot: 'bg-red-500',     border: ' border-l-red-400',     iconBg: 'bg-red-50' },
+  orange:   { name: '橙色系',   emoji: '🟠', dot: 'bg-orange-500',  border: ' border-l-orange-400',  iconBg: 'bg-orange-50' },
+  yellow:   { name: '黄色系',   emoji: '🟡', dot: 'bg-yellow-500',  border: ' border-l-yellow-400',  iconBg: 'bg-yellow-50' },
+  green:    { name: '绿色系',   emoji: '🟢', dot: 'bg-green-500',   border: ' border-l-green-400',   iconBg: 'bg-green-50' },
+  blue:     { name: '蓝色系',   emoji: '🔵', dot: 'bg-blue-500',    border: ' border-l-blue-400',    iconBg: 'bg-blue-50' },
+  purple:   { name: '紫色系',   emoji: '🟣', dot: 'bg-purple-500',  border: ' border-l-purple-400',  iconBg: 'bg-purple-50' }
+}
+
+/** 资产代码 → 标签样式（规则表格中展示用） */
+const ASSET_TAG_STYLES = {
+  POINTS:         'bg-amber-100 text-amber-800',
+  DIAMOND:        'bg-sky-100 text-sky-800',
+  BUDGET_POINTS:  'bg-amber-50 text-amber-700',
+  red_shard:      'bg-red-100 text-red-700',
+  red_crystal:    'bg-red-200 text-red-800',
+  orange_shard:   'bg-orange-100 text-orange-700',
+  orange_crystal: 'bg-orange-200 text-orange-800',
+  yellow_shard:   'bg-yellow-100 text-yellow-700',
+  yellow_crystal: 'bg-yellow-200 text-yellow-800',
+  green_shard:    'bg-green-100 text-green-700',
+  green_crystal:  'bg-green-200 text-green-800',
+  blue_shard:     'bg-blue-100 text-blue-700',
+  blue_crystal:   'bg-blue-200 text-blue-800',
+  purple_shard:   'bg-purple-100 text-purple-700',
+  purple_crystal: 'bg-purple-200 text-purple-800'
 }
 
 document.addEventListener('alpine:init', () => {
@@ -182,7 +208,10 @@ document.addEventListener('alpine:init', () => {
           await pageMixin.init.call(this)
         }
 
-        await this.loadConversionRules()
+        await Promise.all([
+          this.loadConversionRules(),
+          this.loadAssetTypes()
+        ])
       },
 
       // ========== Tab 切换 ==========
@@ -773,6 +802,99 @@ document.addEventListener('alpine:init', () => {
       formatConversionRatio(rule) {
         if (!rule) return '-'
         return `${rule.from_amount} → ${rule.to_amount}`
+      },
+
+      // ==================== 分组与颜色辅助方法 ====================
+
+      /**
+       * 按 group_code 将资产类型分组（用于卡片归类展示）
+       * @returns {Array<{code: string, items: Array}>}
+       */
+      getGroupedAssetTypes() {
+        const grouped = {}
+        const order = ['points', 'currency', 'red', 'orange', 'yellow', 'green', 'blue', 'purple']
+
+        for (const t of this.asset_types) {
+          const g = t.group_code || 'other'
+          if (!grouped[g]) grouped[g] = []
+          grouped[g].push(t)
+        }
+
+        const result = []
+        for (const code of order) {
+          if (grouped[code]) {
+            result.push({ code, items: grouped[code] })
+            delete grouped[code]
+          }
+        }
+        for (const [code, items] of Object.entries(grouped)) {
+          result.push({ code, items })
+        }
+        return result
+      },
+
+      /**
+       * 获取分组中文名
+       * @param {string} code - 分组代码
+       * @returns {string}
+       */
+      getGroupDisplayName(code) {
+        return GROUP_CONFIG[code]?.name || code
+      },
+
+      /**
+       * 获取分组圆点颜色（用于标题前的色标）
+       * @param {string} code - 分组代码
+       * @returns {string}
+       */
+      getGroupDotColor(code) {
+        return GROUP_CONFIG[code]?.dot || 'bg-gray-400'
+      },
+
+      /**
+       * 获取分组左边框颜色（用于卡片左边框色带）
+       * @param {string} code - 分组代码
+       * @returns {string}
+       */
+      getGroupBorderColor(code) {
+        return GROUP_CONFIG[code]?.border || ' border-l-gray-300'
+      },
+
+      /**
+       * 获取分组图标背景色
+       * @param {string} code - 分组代码
+       * @returns {string}
+       */
+      getGroupIconBg(code) {
+        return GROUP_CONFIG[code]?.iconBg || 'bg-gray-50'
+      },
+
+      /**
+       * 获取分组默认表情符号
+       * @param {string} code - 分组代码
+       * @returns {string}
+       */
+      getGroupEmoji(code) {
+        return GROUP_CONFIG[code]?.emoji || '📦'
+      },
+
+      /**
+       * 获取资产代码对应的标签样式（规则表格中展示资产标签用）
+       * @param {string} assetCode - 资产代码
+       * @returns {string}
+       */
+      getAssetGroupStyle(assetCode) {
+        return ASSET_TAG_STYLES[assetCode] || 'bg-gray-100 text-gray-700'
+      },
+
+      /**
+       * 根据资产代码查找中文名（从已加载的资产类型中查找）
+       * @param {string} assetCode - 资产代码
+       * @returns {string}
+       */
+      getAssetDisplayName(assetCode) {
+        const found = this.asset_types.find(t => t.asset_code === assetCode)
+        return found ? found.display_name : assetCode
       }
     }
   })

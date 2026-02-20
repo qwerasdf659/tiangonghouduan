@@ -198,57 +198,77 @@ describe('P0-6: 多设备登录冲突测试', () => {
   }, 30000)
 
   /**
-   * 场景2：快速登录接口的多设备冲突处理
+   * 场景2：跨平台会话隔离 - Web 和微信小程序互不影响
+   *
+   * 多平台会话隔离策略（2026-02-19 升级）：
+   *   普通登录 → platform='web'，快速登录 → platform='wechat_mp'
+   *   跨平台登录不互踢，两个 Token 同时有效
+   *
+   * @see docs/multi-platform-session-design.md
    */
-  test('场景2：快速登录接口也应使旧Token失效', async () => {
+  test('场景2：Web登录 + 微信快速登录应共存（跨平台不互踢）', async () => {
     if (skipTests) {
       console.warn('⚠️ 跳过测试：环境未准备好')
       expect(true).toBe(true)
       return
     }
 
-    console.log('\n===== 场景2：快速登录Token失效 =====')
+    console.log('\n===== 场景2：跨平台会话隔离 =====')
 
-    // Step 1: 普通登录
-    console.log('📱 普通登录...')
-    const login1 = await request(app).post('/api/v4/auth/login').send({
+    // Step 1: Web 端普通登录
+    console.log('💻 Web端普通登录...')
+    const webLogin = await request(app).post('/api/v4/auth/login').send({
       mobile: TEST_MOBILE,
       verification_code: TEST_VERIFICATION_CODE
     })
 
-    expect(login1.status).toBe(200)
-    const token1 = login1.body.data.access_token
-    testUserId = login1.body.data.user.user_id
-    console.log('✅ 普通登录成功')
+    expect(webLogin.status).toBe(200)
+    const webToken = webLogin.body.data.access_token
+    testUserId = webLogin.body.data.user.user_id
+    console.log('✅ Web端登录成功')
 
-    // Step 2: 使用快速登录（微信授权登录）
-    console.log('📱 快速登录（微信授权）...')
-    const quickLogin = await request(app).post('/api/v4/auth/quick-login').send({
+    // Step 2: 微信小程序快速登录（不同平台）
+    console.log('📱 微信小程序快速登录...')
+    const wxLogin = await request(app).post('/api/v4/auth/quick-login').send({
       mobile: TEST_MOBILE
     })
 
-    expect(quickLogin.status).toBe(200)
-    const token2 = quickLogin.body.data.access_token
-    console.log('✅ 快速登录成功')
+    expect(wxLogin.status).toBe(200)
+    const wxToken = wxLogin.body.data.access_token
+    console.log('✅ 微信小程序登录成功')
 
-    // Step 3: 验证旧Token失效
-    console.log('📱 验证旧Token失效...')
-    const profile1 = await request(app)
+    // Step 3: 验证 Web Token 仍然有效（跨平台不互踢）
+    console.log('💻 验证Web Token仍然有效（跨平台隔离）...')
+    const webProfile = await request(app)
       .get('/api/v4/auth/profile')
-      .set('Authorization', `Bearer ${token1}`)
+      .set('Authorization', `Bearer ${webToken}`)
 
-    expect(profile1.status).toBe(401)
-    expect(profile1.body.code).toBe('SESSION_REPLACED')
-    console.log('✅ 旧Token已失效')
+    expect(webProfile.status).toBe(200)
+    expect(webProfile.body.success).toBe(true)
+    console.log('✅ Web Token仍然有效（跨平台隔离正常）')
 
-    // Step 4: 验证新Token有效
-    console.log('📱 验证新Token有效...')
-    const profile2 = await request(app)
+    // Step 4: 验证微信 Token 也有效
+    console.log('📱 验证微信Token有效...')
+    const wxProfile = await request(app)
       .get('/api/v4/auth/profile')
-      .set('Authorization', `Bearer ${token2}`)
+      .set('Authorization', `Bearer ${wxToken}`)
 
-    expect(profile2.status).toBe(200)
-    console.log('✅ 新Token有效')
+    expect(wxProfile.status).toBe(200)
+    expect(wxProfile.body.success).toBe(true)
+    console.log('✅ 微信Token有效')
+
+    // Step 5: 验证数据库中两个平台会话并存
+    console.log('🗄️ 验证数据库会话...')
+    const activeSessions = await AuthenticationSession.findAll({
+      where: { user_id: testUserId, is_active: true },
+      attributes: ['login_platform', 'user_type']
+    })
+    const platforms = activeSessions.map(s => s.login_platform)
+    console.log(`   活跃会话平台: ${platforms.join(', ')}`)
+
+    expect(platforms).toContain('web')
+    expect(platforms).toContain('wechat_mp')
+    console.log('✅ 两个平台会话并存，隔离正常')
   }, 30000)
 
   /**

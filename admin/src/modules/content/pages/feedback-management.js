@@ -35,7 +35,16 @@ document.addEventListener('alpine:init', () => {
      * 因为 spread 会立即求值 getter，此时 this 不包含其他 composable 的属性）
      */
     get feedbackTotalPages() {
-      return Math.ceil((this.feedbackPagination?.total || 0) / (this.feedbackFilters?.page_size || 20)) || 1
+      return (
+        Math.ceil(
+          (this.feedbackPagination?.total || 0) / (this.feedbackFilters?.page_size || 20)
+        ) || 1
+      )
+    },
+
+    /** 是否有选中的反馈（用于控制批量操作栏显示） */
+    get hasSelectedFeedbacks() {
+      return this.selectedFeedbackIds?.size > 0
     },
 
     /**
@@ -45,10 +54,7 @@ document.addEventListener('alpine:init', () => {
       logger.info('[FeedbackManagement] 页面初始化...')
       if (!this.checkAuth()) return
 
-      await Promise.all([
-        this.loadFeedbacks(),
-        this.loadFeedbackStats()
-      ])
+      await Promise.all([this.loadFeedbacks(), this.loadFeedbackStats()])
 
       logger.info('[FeedbackManagement] 页面初始化完成')
     }
@@ -56,5 +62,3 @@ document.addEventListener('alpine:init', () => {
 
   logger.info('[FeedbackManagement] Alpine 组件注册完成')
 })
-
-

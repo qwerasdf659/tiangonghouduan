@@ -603,13 +603,13 @@ function orphanFrozenPage() {
       try {
         const response = await apiRequest(ASSET_ENDPOINTS.ORPHAN_FROZEN_CLEANUP, {
           method: 'POST',
-          body: JSON.stringify({
+          data: {
             dry_run: false,
             user_id: item.user_id,
             asset_code: item.asset_code,
             reason: '管理员手动清理单条孤儿冻结',
             operator_name: this.current_user?.nickname || '管理员'
-          })
+          }
         })
 
         if (response && response.success) {

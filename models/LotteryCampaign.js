@@ -97,6 +97,14 @@ class LotteryCampaign extends Model {
       comment: '档位降级保底奖品（必须是prize_value_points=0的空奖）'
     })
 
+    // 多对一：固定间隔保底指定奖品（运营配置"每N次必出"的目标奖品）
+    LotteryCampaign.belongsTo(models.LotteryPrize, {
+      foreignKey: 'guarantee_prize_id',
+      as: 'guaranteePrize',
+      onDelete: 'SET NULL',
+      comment: '固定间隔保底奖品（NULL=自动选最高档有库存奖品）'
+    })
+
     /*
      * 🔥 LotteryRecord已合并到LotteryDraw，使用draws关联即可
      * 注意：新合并模型中lottery_campaign_id字段对应活动关联
@@ -1099,6 +1107,50 @@ module.exports = sequelize => {
         allowNull: true,
         defaultValue: null,
         comment: '活动背景图URL（运营上传，可选，与 banner_image_url 横幅图用途不同）'
+      },
+
+      // ======================== 固定间隔保底配置 ========================
+
+      /**
+       * 是否启用固定间隔保底
+       * @type {boolean}
+       * @业务含义 核心开关：true=启用固定间隔保底, false=关闭
+       * @场景 运营在活动编辑页配置"每N次必出大奖"营销活动
+       * @与Pity区别 Pity是"体验兜底"（连续运气差时补偿），本字段是"营销承诺"（固定间隔必出）
+       */
+      guarantee_enabled: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否启用固定间隔保底：false=关闭(默认), true=开启'
+      },
+
+      /**
+       * 保底触发间隔
+       * @type {number}
+       * @业务含义 用户每累计抽奖此次数，自动触发保底机制
+       * @范围 5~100（前端限制，后端不强制）
+       * @示例 设为20表示每20次抽奖必出一次保底奖品
+       */
+      guarantee_threshold: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 10,
+        comment: '保底触发间隔（每N次抽奖触发一次保底）'
+      },
+
+      /**
+       * 保底奖品ID
+       * @type {number|null}
+       * @业务含义 触发保底时发放的奖品，NULL表示自动选最高档有库存奖品
+       * @外键关联 lottery_prizes.lottery_prize_id
+       * @降级策略 指定奖品无库存→自动选最高档有库存→中档→返回无保底
+       */
+      guarantee_prize_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+        comment: '保底奖品ID（NULL=自动选最高档有库存奖品），FK→lottery_prizes.lottery_prize_id'
       }
     },
     {

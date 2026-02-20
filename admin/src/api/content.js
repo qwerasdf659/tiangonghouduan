@@ -72,6 +72,15 @@ export const CONTENT_ENDPOINTS = {
   // P1-22: 客服响应时长统计
   CUSTOMER_SERVICE_STATS: `${API_PREFIX}/console/customer-service/sessions/stats`,
   CUSTOMER_SERVICE_RESPONSE_STATS: `${API_PREFIX}/console/customer-service/sessions/response-stats`,
+  // 客服座席管理
+  CS_AGENT_LIST: `${API_PREFIX}/console/customer-service/agents`,
+  CS_AGENT_DETAIL: `${API_PREFIX}/console/customer-service/agents/:id`,
+  CS_AGENT_WORKLOAD: `${API_PREFIX}/console/customer-service/agents/workload`,
+  CS_AGENT_LOOKUP_USER: `${API_PREFIX}/console/customer-service/agents/lookup-user`,
+  // 客服用户分配管理
+  CS_ASSIGNMENT_LIST: `${API_PREFIX}/console/customer-service/assignments`,
+  CS_ASSIGNMENT_BATCH: `${API_PREFIX}/console/customer-service/assignments/batch`,
+  CS_ASSIGNMENT_DELETE: `${API_PREFIX}/console/customer-service/assignments/:id`,
 
   // 反馈管理
   FEEDBACK_LIST: `${API_PREFIX}/console/system/feedbacks`,
@@ -79,6 +88,7 @@ export const CONTENT_ENDPOINTS = {
   FEEDBACK_DETAIL: `${API_PREFIX}/console/system/feedbacks/:id`,
   FEEDBACK_REPLY: `${API_PREFIX}/console/system/feedbacks/:id/reply`,
   FEEDBACK_STATUS: `${API_PREFIX}/console/system/feedbacks/:id/status`,
+  FEEDBACK_BATCH_STATUS: `${API_PREFIX}/console/system/feedbacks/batch-status`,
 
   // 活动管理
   ACTIVITY_LIST: `${API_PREFIX}/activities`,
@@ -328,6 +338,33 @@ export const ContentAPI = {
   async updateFeedbackStatus(id, data) {
     const url = buildURL(CONTENT_ENDPOINTS.FEEDBACK_STATUS, { id })
     return await request({ url, method: 'PUT', data })
+  },
+
+  /**
+   * 批量更新反馈状态
+   * @async
+   * @param {Object} data - 批量更新数据
+   * @param {Array<number>} data.feedback_ids - 反馈ID数组（必填，最多100条）
+   * @param {string} data.status - 目标状态（pending/processing/replied/closed）
+   * @param {string} [data.internal_notes] - 内部备注（仅管理员可见，可选）
+   * @returns {Promise<Object>} 批量更新结果 { updated_count, requested_count, target_status }
+   * @throws {Error} 参数校验失败
+   * @throws {Error} 网络请求失败
+   *
+   * @example
+   * // 批量关闭已处理的反馈
+   * const result = await ContentAPI.batchUpdateFeedbackStatus({
+   *   feedback_ids: [1, 2, 3],
+   *   status: 'closed',
+   *   internal_notes: '批量关闭'
+   * })
+   */
+  async batchUpdateFeedbackStatus(data) {
+    return await request({
+      url: CONTENT_ENDPOINTS.FEEDBACK_BATCH_STATUS,
+      method: 'PUT',
+      data
+    })
   },
 
   // ===== 活动管理 =====

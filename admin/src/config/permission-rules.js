@@ -55,9 +55,12 @@ export const MENU_ACCESS_RULES = {
   'pending-center': { minLevel: 1, description: '待处理中心（分组）' },
   'pending-center.consumption-review': { minLevel: 30, description: '消费记录审核' },
   'pending-center.customer-service': { minLevel: 1, description: '客服工作台' },
+  'pending-center.cs-agent-management': { minLevel: 100, description: '客服管理（座席管理/用户分配）' },
   'pending-center.risk-alerts': { minLevel: 30, description: '风控告警' },
   'pending-center.lottery-alerts': { minLevel: 30, description: '抽奖告警' },
   'pending-center.feedback-mgmt': { minLevel: 30, description: '用户反馈处理' },
+
+  'content-ops.dict-mgmt': { minLevel: 100, description: '字典管理' },
 
   // ========== 抽奖运营（role_level >= 30） ==========
   'lottery-ops': { minLevel: 30, description: '抽奖运营（分组）' },
@@ -92,7 +95,10 @@ export const MENU_ACCESS_RULES = {
   system: { minLevel: 100, description: '系统设置（分组）' },
   'system.prize-config': { minLevel: 100, description: '奖品配置（Tab页面）' },
   'system.ops-rules': { minLevel: 100, description: '运营规则（Tab页面）' },
-  'system.sys-maintain': { minLevel: 100, description: '系统维护（Tab页面）' }
+  'system.sys-maintain': { minLevel: 100, description: '系统维护（Tab页面）' },
+  'system.exchange-page-config': { minLevel: 100, description: '兑换页面配置' },
+
+  'lottery-ops.exchange-page-config': { minLevel: 100, description: '兑换页面配置' }
 }
 
 // ========== 页面权限配置 ==========
@@ -109,6 +115,7 @@ export const PAGE_ACCESS_RULES = {
 
   // ========== 客服可访问（role_level >= 1） ==========
   'customer-service.html': { minLevel: 1, menuId: 'operations.customer' },
+  'cs-agent-management.html': { minLevel: 100, menuId: 'pending-center.cs-agent-management' },
 
   // ========== 运营可访问（role_level >= 30，只读） ==========
   'finance-management.html': { minLevel: 30, menuId: 'operations.consumption' },
@@ -121,7 +128,7 @@ export const PAGE_ACCESS_RULES = {
   'asset-management.html': { minLevel: 30, menuId: 'assets.asset-mgmt' },
   'asset-adjustment.html': { minLevel: 30, menuId: 'assets.asset-adj' },
   'orphan-frozen.html': { minLevel: 30, menuId: 'assets.orphan' },
-  'material-conversion-rules.html': { minLevel: 30, menuId: 'assets.material-rules' },
+  'material-conversion.html': { minLevel: 30, menuId: 'assets.material-rules' },
   'assets-portfolio.html': { minLevel: 30, menuId: 'assets.assets-portfolio' },
 
   'exchange-market.html': { minLevel: 30, menuId: 'market.exchange' },
@@ -141,7 +148,7 @@ export const PAGE_ACCESS_RULES = {
   'config-tools.html': { minLevel: 100, menuId: 'system.config-tools' },
 
   // 方案A独立页面（从system-settings.html分离）
-  'dict-management.html': { minLevel: 100, menuId: 'operations.dict' },
+  'dict-management.html': { minLevel: 100, menuId: 'content-ops.dict-mgmt' },
   'pricing-config.html': { minLevel: 100, menuId: 'operations.pricing' },
   'feature-flags.html': { minLevel: 100, menuId: 'operations.feature-flags' },
 
@@ -150,7 +157,8 @@ export const PAGE_ACCESS_RULES = {
   'ops-rules.html': { minLevel: 100, menuId: 'system.ops-rules' },
   'sys-maintain.html': { minLevel: 100, menuId: 'system.sys-maintain' },
   'reminder-rules.html': { minLevel: 100, menuId: 'system.ops-rules' },
-  'audit-logs.html': { minLevel: 100, menuId: 'system.sys-maintain' }
+  'audit-logs.html': { minLevel: 100, menuId: 'system.sys-maintain' },
+  'exchange-page-config.html': { minLevel: 100, menuId: 'system.exchange-page-config' }
 }
 
 // ========== 权限判断函数 ==========

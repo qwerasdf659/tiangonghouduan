@@ -37,7 +37,28 @@ function getLotteryQuotaService(req) {
 }
 
 /**
+ * scope_type 中文映射（四维度配额规则类型）
+ * @type {Object.<string, string>}
+ */
+const SCOPE_TYPE_DISPLAY = {
+  global: '全局',
+  campaign: '指定活动',
+  role: '指定角色',
+  user: '指定用户'
+}
+
+/**
+ * window_type 中文映射（配额统计时间窗口）
+ * @type {Object.<string, string>}
+ */
+const WINDOW_TYPE_DISPLAY = {
+  daily: '每日',
+  campaign_total: '活动累计'
+}
+
+/**
  * 格式化配额规则数据用于API响应
+ * 添加 scope_type_display、window_type_display 中文显示字段
  * @param {Object} ruleInstanceOrPlain - Sequelize模型实例或普通对象
  * @returns {Object} 格式化后的配额规则对象
  */
@@ -48,7 +69,9 @@ function formatQuotaRuleForApi(ruleInstanceOrPlain) {
       : { ...(ruleInstanceOrPlain || {}) }
 
   return {
-    ...rule
+    ...rule,
+    scope_type_display: SCOPE_TYPE_DISPLAY[rule.scope_type] || rule.scope_type,
+    window_type_display: WINDOW_TYPE_DISPLAY[rule.window_type] || rule.window_type
   }
 }
 

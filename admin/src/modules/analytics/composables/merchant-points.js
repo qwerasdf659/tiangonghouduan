@@ -11,7 +11,7 @@
 
 import { logger, $confirm } from '../../../utils/index.js'
 import { STORE_ENDPOINTS } from '../../../api/store.js'
-import { buildURL } from '../../../api/base.js'
+import { buildURL, API_PREFIX } from '../../../api/base.js'
 
 /**
  * 商户积分状态
@@ -22,7 +22,7 @@ export function useMerchantPointsState() {
     /** @type {Array} 商户积分申请列表 */
     merchantPoints: [],
     /** @type {Object} 商户积分筛选条件 - mobile 用于手机号搜索 */
-    merchantFilters: { mobile: '', keyword: '' },
+    merchantFilters: { mobile: '', keyword: '', status: '' },
     /**
      * 商户积分审核统计 - 与后端API字段一致
      * @property {number} pending_count - 待审核数量
@@ -34,7 +34,13 @@ export function useMerchantPointsState() {
     /** @type {Object|null} 选中的商户积分申请 */
     selectedMerchant: null,
     /** @type {Array} 商户积分历史 */
-    merchantPointsHistory: []
+    merchantPointsHistory: [],
+    /** @type {boolean} 批量操作进行中 */
+    merchantBatchProcessing: false,
+    /** @type {string} 批量拒绝原因 */
+    merchantBatchRejectReason: '',
+    /** @type {Array<number>} 当前批量拒绝弹窗中待拒绝的审核ID列表 */
+    selectedMerchantBatchIds: []
   }
 }
 
@@ -222,12 +228,108 @@ export function useMerchantPointsMethods() {
         )
         if (response?.success) {
           this.showSuccess('审核拒绝成功')
-          // 刷新列表和统计
           await Promise.all([this.loadMerchantPoints(), this.loadMerchantStats()])
         }
       } catch (error) {
         logger.error('审核拒绝失败:', error)
         this.showError('审核拒绝失败')
+      }
+    },
+
+    // ========== 批量审核操作方法 ==========
+
+    /**
+     * 批量通过商户积分申请
+     * 后端API: POST /api/v4/console/merchant-points/batch
+     * @param {Array<number>} auditIds - 审核记录ID数组（由 data-table 选择提供）
+     */
+    async batchApproveMerchantPoints(auditIds) {
+      if (!auditIds || auditIds.length === 0) {
+        this.showError('请先勾选要通过的申请记录')
+        return
+      }
+      if (
+        !(await $confirm(
+          `确认批量通过 ${auditIds.length} 条积分申请？\n通过后将立即发放积分给对应商户。`
+        ))
+      )
+        return
+      this.merchantBatchProcessing = true
+      try {
+        const response = await this.apiPost(
+          `${API_PREFIX}/console/merchant-points/batch`,
+          { audit_ids: auditIds, action: 'approve' },
+          { showLoading: true }
+        )
+        if (response?.success) {
+          const { success_count, fail_count } = response.data
+          if (fail_count > 0) {
+            this.showWarning(`批量通过：成功 ${success_count} 条，失败 ${fail_count} 条`)
+          } else {
+            this.showSuccess(`成功通过 ${success_count} 条积分申请`)
+          }
+          window.dispatchEvent(new CustomEvent('refresh-merchant-points'))
+          await this.loadMerchantStats()
+        }
+      } catch (error) {
+        logger.error('批量通过失败:', error)
+        this.showError('批量通过失败：' + (error.message || '未知错误'))
+      } finally {
+        this.merchantBatchProcessing = false
+      }
+    },
+
+    /**
+     * 打开批量拒绝弹窗，暂存待拒绝的ID列表
+     * @param {Array<number>} auditIds - 审核记录ID数组
+     */
+    openMerchantBatchRejectModal(auditIds) {
+      if (!auditIds || auditIds.length === 0) {
+        this.showError('请先勾选要拒绝的申请记录')
+        return
+      }
+      this.selectedMerchantBatchIds = [...auditIds]
+      this.merchantBatchRejectReason = ''
+      this.showModal('merchantBatchRejectModal')
+    },
+
+    /**
+     * 确认批量拒绝商户积分申请
+     * 后端API: POST /api/v4/console/merchant-points/batch
+     * @param {Array<number>} auditIds - 审核记录ID数组
+     */
+    async confirmMerchantBatchReject(auditIds) {
+      if (!this.merchantBatchRejectReason || this.merchantBatchRejectReason.trim().length < 2) {
+        this.showError('拒绝原因至少需要2个字符')
+        return
+      }
+      this.merchantBatchProcessing = true
+      try {
+        const response = await this.apiPost(
+          `${API_PREFIX}/console/merchant-points/batch`,
+          {
+            audit_ids: auditIds,
+            action: 'reject',
+            reason: this.merchantBatchRejectReason.trim()
+          },
+          { showLoading: true }
+        )
+        if (response?.success) {
+          const { success_count, fail_count } = response.data
+          this.hideModal('merchantBatchRejectModal')
+          if (fail_count > 0) {
+            this.showWarning(`批量拒绝：成功 ${success_count} 条，失败 ${fail_count} 条`)
+          } else {
+            this.showSuccess(`成功拒绝 ${success_count} 条积分申请`)
+          }
+          window.dispatchEvent(new CustomEvent('refresh-merchant-points'))
+          await this.loadMerchantStats()
+        }
+      } catch (error) {
+        logger.error('批量拒绝失败:', error)
+        this.showError('批量拒绝失败：' + (error.message || '未知错误'))
+      } finally {
+        this.merchantBatchProcessing = false
       }
     }
   }

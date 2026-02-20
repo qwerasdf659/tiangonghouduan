@@ -510,4 +510,176 @@ router.get(
   }
 )
 
+/*
+ * ==========================================
+ * 7. 策略配置概览摘要（辅助运营人员）
+ * ==========================================
+ */
+
+/**
+ * GET /config-summary - 获取策略配置概览摘要
+ *
+ * 为策略配置页面提供运营辅助信息，聚合以下维度：
+ * - 策略配置总览（活跃策略数、分组统计、矩阵配置数）
+ * - 关联活动信息（活跃活动数及列表）
+ * - 最近24小时策略执行概况（抽奖总数、档位分布、保底触发率）
+ * - BxPx矩阵命中分布（决策表中各组合的实际命中次数）
+ *
+ * 无需路径参数，自动汇总所有活跃活动的数据。
+ *
+ * 返回示例：
+ * {
+ *   "config_overview": {
+ *     "total_strategies": 17,
+ *     "active_strategies": 17,
+ *     "config_groups": { "anti_empty": 2, "pity": 4, ... },
+ *     "matrix_configs": 12,
+ *     "active_matrix_configs": 12
+ *   },
+ *   "active_campaigns": [...],
+ *   "recent_24h": {
+ *     "total_draws": 150,
+ *     "tier_distribution": { "high": 80, "mid": 20, "low": 30, "fallback": 20 },
+ *     "guarantee_triggered": 12,
+ *     "guarantee_rate": 0.08,
+ *     "downgrade_count": 5
+ *   },
+ *   "bxpx_hit_distribution": [
+ *     { "budget_tier": "B3", "pressure_tier": "P1", "count": 120 }, ...
+ *   ]
+ * }
+ */
+router.get('/config-summary', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const {
+      LotteryStrategyConfig,
+      LotteryTierMatrixConfig,
+      LotteryCampaign
+    } = require('../../../models')
+    // eslint-disable-next-line no-unused-vars -- 预留 Sequelize 操作符供后续扩展
+    const { Op } = require('sequelize')
+    const sequelize = require('../../../models').sequelize
+
+    // ── 1. 策略配置总览 ──
+    const allStrategies = await LotteryStrategyConfig.findAll({
+      attributes: ['config_group', 'config_key', 'is_active'],
+      order: [
+        ['config_group', 'ASC'],
+        ['priority', 'ASC']
+      ]
+    })
+
+    const activeStrategies = allStrategies.filter(s => s.is_active)
+    const configGroups = {}
+    for (const s of allStrategies) {
+      configGroups[s.config_group] = (configGroups[s.config_group] || 0) + 1
+    }
+
+    const matrixConfigs = await LotteryTierMatrixConfig.findAll({
+      attributes: ['budget_tier', 'pressure_tier', 'is_active']
+    })
+    const activeMatrixConfigs = matrixConfigs.filter(m => m.is_active)
+
+    // ── 2. 活跃活动列表 ──
+    const activeCampaigns = await LotteryCampaign.findAll({
+      where: { status: 'active' },
+      attributes: [
+        'lottery_campaign_id',
+        'campaign_name',
+        'pick_method',
+        'budget_mode',
+        'guarantee_enabled',
+        'guarantee_threshold'
+      ],
+      order: [['lottery_campaign_id', 'ASC']]
+    })
+
+    // ── 3. 最近24小时策略执行概况（直接查 lottery_draws） ──
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+
+    const [recentStats] = await sequelize.query(
+      `
+        SELECT
+          COUNT(*)                                        AS total_draws,
+          SUM(reward_tier = 'high')                       AS high_count,
+          SUM(reward_tier = 'mid')                        AS mid_count,
+          SUM(reward_tier = 'low')                        AS low_count,
+          SUM(reward_tier = 'fallback')                   AS fallback_count,
+          SUM(guarantee_triggered = 1)                    AS guarantee_triggered,
+          SUM(downgrade_count > 0)                        AS downgrade_records,
+          SUM(fallback_triggered = 1)                     AS fallback_records,
+          ROUND(AVG(cost_points), 1)                      AS avg_cost
+        FROM lottery_draws
+        WHERE created_at >= :since
+      `,
+      {
+        replacements: { since: twentyFourHoursAgo },
+        type: sequelize.QueryTypes.SELECT
+      }
+    )
+
+    const totalDraws = parseInt(recentStats.total_draws) || 0
+    const guaranteeTriggered = parseInt(recentStats.guarantee_triggered) || 0
+
+    // ── 4. BxPx 矩阵命中分布（最近24小时决策表） ──
+    const bxpxHits = await sequelize.query(
+      `
+        SELECT
+          budget_tier,
+          pressure_tier,
+          COUNT(*) AS count
+        FROM lottery_draw_decisions
+        WHERE decision_at >= :since
+          AND budget_tier IS NOT NULL
+          AND pressure_tier IS NOT NULL
+        GROUP BY budget_tier, pressure_tier
+        ORDER BY budget_tier, pressure_tier
+      `,
+      {
+        replacements: { since: twentyFourHoursAgo },
+        type: sequelize.QueryTypes.SELECT
+      }
+    )
+
+    const result = {
+      config_overview: {
+        total_strategies: allStrategies.length,
+        active_strategies: activeStrategies.length,
+        config_groups: configGroups,
+        matrix_configs: matrixConfigs.length,
+        active_matrix_configs: activeMatrixConfigs.length
+      },
+      active_campaigns: activeCampaigns.map(c => c.toJSON()),
+      recent_24h: {
+        total_draws: totalDraws,
+        tier_distribution: {
+          high: parseInt(recentStats.high_count) || 0,
+          mid: parseInt(recentStats.mid_count) || 0,
+          low: parseInt(recentStats.low_count) || 0,
+          fallback: parseInt(recentStats.fallback_count) || 0
+        },
+        guarantee_triggered: guaranteeTriggered,
+        guarantee_rate:
+          totalDraws > 0 ? parseFloat((guaranteeTriggered / totalDraws).toFixed(4)) : 0,
+        downgrade_records: parseInt(recentStats.downgrade_records) || 0,
+        fallback_records: parseInt(recentStats.fallback_records) || 0,
+        avg_cost: parseFloat(recentStats.avg_cost) || 0
+      },
+      bxpx_hit_distribution: bxpxHits || []
+    }
+
+    logger.info('查询策略配置概览摘要', {
+      admin_id: req.user.user_id,
+      total_strategies: result.config_overview.total_strategies,
+      active_campaigns: result.active_campaigns.length,
+      recent_draws: result.recent_24h.total_draws
+    })
+
+    return res.apiSuccess(result, '获取策略配置概览摘要成功')
+  } catch (error) {
+    logger.error('获取策略配置概览摘要失败:', error)
+    return res.apiError(`查询失败：${error.message}`, 'GET_CONFIG_SUMMARY_FAILED', null, 500)
+  }
+})
+
 module.exports = router

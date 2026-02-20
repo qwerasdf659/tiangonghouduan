@@ -87,6 +87,9 @@ class SessionQueryService {
         whereCondition.user_id = userIdNum
       }
     }
+    if (options.login_platform) {
+      whereCondition.login_platform = options.login_platform
+    }
 
     // 排序配置
     const allowedSortFields = ['last_activity', 'created_at', 'expires_at']
@@ -116,7 +119,7 @@ class SessionQueryService {
     const formattedSessions = sessions.map(session => {
       const userInfo = userMap.get(session.user_id)
       return {
-        user_session_id: session.user_session_id,
+        authentication_session_id: session.authentication_session_id,
         session_token: `${session.session_token.substring(0, 8)}...`, // 脱敏显示
         user_type: session.user_type,
         user_id: session.user_id,
@@ -130,6 +133,7 @@ class SessionQueryService {
             }
           : null,
         login_ip: session.login_ip,
+        login_platform: session.login_platform || 'unknown',
         is_active: session.is_active,
         is_expired: session.isExpired(),
         is_valid: session.isValid(),
@@ -155,7 +159,7 @@ class SessionQueryService {
   /**
    * 获取会话详情
    *
-   * @param {number} session_id - 会话ID（user_session_id）
+   * @param {number} session_id - 会话ID（authentication_session_id）
    * @returns {Promise<Object|null>} 会话详情
    */
   static async getSessionById(session_id) {
@@ -166,9 +170,8 @@ class SessionQueryService {
       return null
     }
 
-    // 查询会话（不使用 include 避免模型 scope 问题）
     const session = await AuthenticationSession.findOne({
-      where: { user_session_id: sessionId }
+      where: { authentication_session_id: sessionId }
     })
 
     if (!session) {
@@ -182,7 +185,7 @@ class SessionQueryService {
     })
 
     return {
-      user_session_id: session.user_session_id,
+      authentication_session_id: session.authentication_session_id,
       session_token: `${session.session_token.substring(0, 8)}...`, // 脱敏显示
       user_type: session.user_type,
       user_id: session.user_id,
@@ -199,6 +202,7 @@ class SessionQueryService {
           }
         : null,
       login_ip: session.login_ip,
+      login_platform: session.login_platform || 'unknown',
       is_active: session.is_active,
       is_expired: session.isExpired(),
       is_valid: session.isValid(),
@@ -332,13 +336,17 @@ class SessionQueryService {
           status: userInfo?.status || null,
           active_sessions: 0,
           last_activity: session.last_activity,
-          login_ips: new Set()
+          login_ips: new Set(),
+          login_platforms: new Set()
         })
       }
       const userData = userSessionMap.get(userId)
       userData.active_sessions++
       if (session.login_ip) {
         userData.login_ips.add(session.login_ip)
+      }
+      if (session.login_platform) {
+        userData.login_platforms.add(session.login_platform)
       }
       // 保留最近的活动时间
       if (session.last_activity > userData.last_activity) {
@@ -355,7 +363,8 @@ class SessionQueryService {
       status: user.status,
       active_sessions: user.active_sessions,
       last_activity: BeijingTimeHelper.formatToISO(user.last_activity),
-      login_ips: Array.from(user.login_ips)
+      login_ips: Array.from(user.login_ips),
+      login_platforms: Array.from(user.login_platforms)
     }))
 
     const result = {

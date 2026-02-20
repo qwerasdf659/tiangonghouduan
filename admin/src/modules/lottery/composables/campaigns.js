@@ -53,8 +53,17 @@ export function useCampaignsState() {
       /** 中奖动画类型 */
       win_animation: 'simple',
       /** 活动背景图URL */
-      background_image_url: null
+      background_image_url: null,
+      // ======== 固定间隔保底配置 ========
+      /** 是否启用固定间隔保底（运营可按活动开关） */
+      guarantee_enabled: false,
+      /** 保底触发间隔（每N次抽奖触发保底，范围5~100） */
+      guarantee_threshold: 20,
+      /** 保底奖品ID（NULL=自动选最高档有库存奖品） */
+      guarantee_prize_id: null
     },
+    /** @type {Array} 当前编辑活动关联的奖品列表（供保底奖品下拉选择） */
+    currentCampaignPrizes: [],
     /** @type {Array} 活动类型选项 */
     campaignTypeOptions: [
       { value: 'daily', label: '每日抽奖' },
@@ -218,40 +227,65 @@ export function useCampaignsMethods(_context) {
         effect_theme: 'default',
         rarity_effects_enabled: true,
         win_animation: 'simple',
-        background_image_url: null
+        background_image_url: null,
+        // 固定间隔保底配置默认值
+        guarantee_enabled: false,
+        guarantee_threshold: 20,
+        guarantee_prize_id: null
       }
+      this.currentCampaignPrizes = []
       this.showModal('campaignModal')
     },
 
     /**
      * 编辑活动
-     * 直接使用后端字段名称
-     * @param {Object} campaign - 活动对象
+     * 通过 system-data 详情接口获取完整数据（含关联奖品），用于保底奖品下拉
+     * @param {Object} campaign - 活动列表中的活动对象
      */
-    editCampaign(campaign) {
+    async editCampaign(campaign) {
       this.editingCampaignId = campaign.lottery_campaign_id
       this.isEditMode = true
-      this.campaignForm = {
-        campaign_name: campaign.campaign_name || '',
-        campaign_code: campaign.campaign_code || '',
-        campaign_type: campaign.campaign_type || 'event',
-        description: campaign.description || '',
-        start_time: this.formatDateTimeLocal(campaign.start_time),
-        end_time: this.formatDateTimeLocal(campaign.end_time),
-        max_draws_per_user_daily: campaign.max_draws_per_user_daily || 3,
-        max_draws_per_user_total: campaign.max_draws_per_user_total || null,
-        total_prize_pool: campaign.total_prize_pool || 10000,
-        remaining_prize_pool: campaign.remaining_prize_pool || 10000,
-        status: campaign.status || 'draft',
-        rules_text: campaign.rules_text || '',
-        // 展示配置（从后端活动详情中回填）
-        display_mode: campaign.display_mode || 'grid_3x3',
-        grid_cols: campaign.grid_cols || 3,
-        effect_theme: campaign.effect_theme || 'default',
-        rarity_effects_enabled: campaign.rarity_effects_enabled !== false,
-        win_animation: campaign.win_animation || 'simple',
-        background_image_url: campaign.background_image_url || null
+
+      // 通过 system-data 详情接口获取完整活动数据（含 prizes 关联）
+      let fullCampaign = campaign
+      try {
+        const detailUrl = `${LOTTERY_ENDPOINTS.CAMPAIGN_CREATE}/${campaign.lottery_campaign_id}`
+        const response = await this.apiGet(detailUrl, {}, { showLoading: false })
+        const data = response?.success ? response.data : response
+        if (data) {
+          fullCampaign = data
+        }
+      } catch (error) {
+        logger.warn('获取活动详情失败，使用列表数据:', error.message)
       }
+
+      this.campaignForm = {
+        campaign_name: fullCampaign.campaign_name || '',
+        campaign_code: fullCampaign.campaign_code || '',
+        campaign_type: fullCampaign.campaign_type || 'event',
+        description: fullCampaign.description || '',
+        start_time: this.formatDateTimeLocal(fullCampaign.start_time),
+        end_time: this.formatDateTimeLocal(fullCampaign.end_time),
+        max_draws_per_user_daily: fullCampaign.max_draws_per_user_daily || 3,
+        max_draws_per_user_total: fullCampaign.max_draws_per_user_total || null,
+        total_prize_pool: fullCampaign.total_prize_pool || 10000,
+        remaining_prize_pool: fullCampaign.remaining_prize_pool || 10000,
+        status: fullCampaign.status || 'draft',
+        rules_text: fullCampaign.rules_text || '',
+        display_mode: fullCampaign.display_mode || 'grid_3x3',
+        grid_cols: fullCampaign.grid_cols || 3,
+        effect_theme: fullCampaign.effect_theme || 'default',
+        rarity_effects_enabled: fullCampaign.rarity_effects_enabled !== false,
+        win_animation: fullCampaign.win_animation || 'simple',
+        background_image_url: fullCampaign.background_image_url || null,
+        // 固定间隔保底配置（从活动详情回填）
+        guarantee_enabled:
+          fullCampaign.guarantee_enabled === true || fullCampaign.guarantee_enabled === 1,
+        guarantee_threshold: fullCampaign.guarantee_threshold || 20,
+        guarantee_prize_id: fullCampaign.guarantee_prize_id || null
+      }
+      // 活动关联的奖品列表（供保底奖品下拉选择）
+      this.currentCampaignPrizes = fullCampaign.prizes || []
       this.showModal('campaignModal')
     },
 
@@ -326,7 +360,11 @@ export function useCampaignsMethods(_context) {
           effect_theme: this.campaignForm.effect_theme || 'default',
           rarity_effects_enabled: this.campaignForm.rarity_effects_enabled !== false,
           win_animation: this.campaignForm.win_animation || 'simple',
-          background_image_url: this.campaignForm.background_image_url || null
+          background_image_url: this.campaignForm.background_image_url || null,
+          // ======== 固定间隔保底配置 ========
+          guarantee_enabled: this.campaignForm.guarantee_enabled === true,
+          guarantee_threshold: parseInt(this.campaignForm.guarantee_threshold) || 20,
+          guarantee_prize_id: this.campaignForm.guarantee_prize_id || null
         }
 
         logger.debug('提交活动数据:', requestData)
@@ -360,9 +398,12 @@ export function useCampaignsMethods(_context) {
         `确认删除活动「${campaign.campaign_name}」？此操作不可恢复`,
         async () => {
           // 使用 system-data 路由删除活动
-          await this.apiCall(`${LOTTERY_ENDPOINTS.CAMPAIGN_CREATE}/${campaign.lottery_campaign_id}`, {
-            method: 'DELETE'
-          })
+          await this.apiCall(
+            `${LOTTERY_ENDPOINTS.CAMPAIGN_CREATE}/${campaign.lottery_campaign_id}`,
+            {
+              method: 'DELETE'
+            }
+          )
           // 如果没有抛出错误，则表示成功
           await this.loadCampaigns()
           await this.loadCampaignStats()

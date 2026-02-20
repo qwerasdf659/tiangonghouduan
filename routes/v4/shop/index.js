@@ -86,6 +86,11 @@ const riskRoutes = require('./risk/index')
  * - 未认证用户 → 401 UNAUTHENTICATED
  * - 非商家角色（如 ops/regional_manager）→ 403 MERCHANT_DOMAIN_ACCESS_DENIED
  * - 无活跃门店绑定 → 403 NO_STORE_BINDING
+ *
+ * 📌 DB-3 迁移记录（2026-02-20）：
+ * - GET /consumption/qrcode 已迁移到 /api/v4/user/consumption/qrcode
+ * - 原因：QR 码生成是消费者行为，不属于商家域
+ * - 与 exchange → backpack、premium → backpack 迁移决策一致
  * =================================================================
  */
 router.use(authenticateToken, requireMerchantDomainAccess())
@@ -93,9 +98,10 @@ router.use(authenticateToken, requireMerchantDomainAccess())
 /*
  * 挂载子路由
  * [已迁移] router.use('/exchange', ...) → /api/v4/backpack/exchange（2026-02-07）
+ * [已迁移] GET /consumption/qrcode → /api/v4/user/consumption/qrcode（2026-02-20 DB-3）
  */
 router.use('/redemption', redemptionRoutes) // 核销系统（商家扫码核销，保留在 shop 域）
-router.use('/consumption', consumptionRoutes) // 消费记录
+router.use('/consumption', consumptionRoutes) // 消费记录（submit/user-info/merchant-query 等商家操作）
 // [已迁移] router.use('/premium', premiumRoutes) → /api/v4/backpack/exchange/（2026-02-16 决策2）
 router.use('/assets', assetsRoutes) // 资产余额和流水查询（替代旧 /points 路由）
 router.use('/staff', staffRoutes) // 员工管理（入职/调店/禁用/启用）

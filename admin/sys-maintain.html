@@ -37,24 +37,6 @@
 
     <!-- Tab内容区域 -->
     <div class="themed-card rounded-lg shadow overflow-hidden">
-      <!-- 内容管理 -->
-      <div x-show="currentTab === 'content'" x-cloak>
-        <iframe 
-          src="/admin/content-management.html?embed=true" 
-          class="tab-content-frame"
-          x-ref="contentFrame"
-        ></iframe>
-      </div>
-      
-      <!-- 字典管理 -->
-      <div x-show="currentTab === 'dict'" x-cloak>
-        <iframe 
-          src="/admin/dict-management.html?embed=true" 
-          class="tab-content-frame"
-          x-ref="dictFrame"
-        ></iframe>
-      </div>
-      
       <!-- 系统配置 -->
       <div x-show="currentTab === 'settings'" x-cloak>
         <iframe 
@@ -108,8 +90,6 @@
 
         // Tab配置
         tabs: [
-          { id: 'content', name: '内容管理', icon: '📄' },
-          { id: 'dict', name: '字典管理', icon: '📖' },
           { id: 'settings', name: '系统配置', icon: '⚙️' },
           { id: 'sessions', name: '会话管理', icon: '💬' },
           { id: 'audit-logs', name: '操作审计', icon: '📋' },
@@ -117,7 +97,7 @@
         ],
 
         // 当前选中的Tab
-        currentTab: 'content',
+        currentTab: 'settings',
 
         init() {
           logger.info('[SysMaintainPage] 页面初始化')

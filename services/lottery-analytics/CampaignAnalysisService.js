@@ -217,14 +217,30 @@ class CampaignAnalysisService {
    * @returns {Promise<Object>} 策略效果分析数据
    */
   async getStrategyEffectiveness(options = {}) {
-    const { lottery_campaign_id, time_range = '7d', strategy_type = 'all' } = options
+    const {
+      lottery_campaign_id,
+      time_range = '30d',
+      strategy_type = 'all',
+      start_date,
+      end_date
+    } = options
     this.logger.info('获取策略效果分析', { lottery_campaign_id, time_range, strategy_type })
 
     try {
-      // 计算时间范围
-      const timeRangeMs = { '7d': 604800000, '30d': 2592000000, '90d': 7776000000 }
-      const startTime = new Date(Date.now() - (timeRangeMs[time_range] || 604800000))
-      const endTime = new Date()
+      /*
+       * 时间范围计算优先级：
+       * 1. 自定义 start_date / end_date（前端日期选择器）
+       * 2. 预设 time_range（7d / 30d / 90d）
+       */
+      let startTime, endTime
+      if (start_date) {
+        startTime = new Date(start_date)
+        endTime = end_date ? new Date(end_date + 'T23:59:59') : new Date()
+      } else {
+        const timeRangeMs = { '7d': 604800000, '30d': 2592000000, '90d': 7776000000 }
+        startTime = new Date(Date.now() - (timeRangeMs[time_range] || 2592000000))
+        endTime = new Date()
+      }
 
       const whereClause = { created_at: { [Op.gte]: startTime } }
 
@@ -555,7 +571,21 @@ class CampaignAnalysisService {
     })
 
     const total = decisions.reduce((sum, d) => sum + parseInt(d.count), 0)
+
+    /*
+     * 构建完整的 4x3 矩阵（12 个格子），确保未命中的格子也显示 0
+     * 这样前端热力图可以完整展示所有 BxPx 组合
+     */
+    const BUDGET_TIERS = ['B0', 'B1', 'B2', 'B3']
+    const PRESSURE_TIERS = ['P0', 'P1', 'P2']
+    const TOTAL_CELLS = BUDGET_TIERS.length * PRESSURE_TIERS.length // 12
     const hitDistribution = {}
+
+    BUDGET_TIERS.forEach(b => {
+      PRESSURE_TIERS.forEach(p => {
+        hitDistribution[`${b}_${p}`] = { count: 0, rate: 0 }
+      })
+    })
 
     decisions.forEach(d => {
       const key = `${d.budget_tier || 'B0'}_${d.pressure_tier || 'P0'}`
@@ -565,19 +595,35 @@ class CampaignAnalysisService {
       }
     })
 
-    const keysCount = Object.keys(hitDistribution).length || 1
-    const expectedRate = 100 / keysCount
+    /*
+     * 评估矩阵分散度：基于全部 12 个格子计算标准差
+     * 理想状态：12 个格子各约 8.33%（均匀分布）
+     * 评分公式：使用标准差归一化，标准差越小分散度越好
+     */
+    const expectedRate = 100 / TOTAL_CELLS
+    const activeCells = Object.values(hitDistribution).filter(v => v.count > 0).length
     const variance =
       Object.values(hitDistribution).reduce((sum, v) => {
         return sum + Math.pow(v.rate - expectedRate, 2)
-      }, 0) / keysCount
+      }, 0) / TOTAL_CELLS
+    const stdDev = Math.sqrt(variance)
+    const effectivenessScore = Math.max(0, Math.min(100, Math.round(100 - stdDev * 2)))
 
-    const effectivenessScore = Math.max(0, Math.min(100, 100 - variance))
+    const suggestions = []
+    if (activeCells <= 2) {
+      suggestions.push(
+        '矩阵命中集中在极少数格子，可能由测试数据/单一用户导致，真实多用户场景下分布会更均衡'
+      )
+    } else if (effectivenessScore < 70) {
+      suggestions.push('BxPx矩阵配置可能需要调整，部分格子命中率不均衡')
+    }
 
     return {
       hit_distribution: hitDistribution,
-      effectiveness_score: Math.round(effectivenessScore),
-      suggestions: effectivenessScore < 70 ? ['BxPx矩阵配置可能需要调整，部分格子命中率不均衡'] : []
+      effectiveness_score: effectivenessScore,
+      active_cells: activeCells,
+      total_cells: TOTAL_CELLS,
+      suggestions
     }
   }
 

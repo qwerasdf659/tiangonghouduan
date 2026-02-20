@@ -34,13 +34,32 @@ export function useStrategyState() {
       pressure_tier: '',
       cap_multiplier: 1.0,
       empty_weight_multiplier: 1.0,
-      // 档位权重乘数（后端P0新增字段）
       high_multiplier: 0.0,
       mid_multiplier: 0.0,
       low_multiplier: 0.0,
       fallback_multiplier: 1.0,
       description: ''
     },
+
+    /** @type {Object} 当前编辑的策略配置项 */
+    editingStrategy: {
+      lottery_strategy_config_id: null,
+      config_group: '',
+      config_key: '',
+      config_value: '',
+      value_type: 'number',
+      description: '',
+      is_active: true,
+      priority: 0
+    },
+    /** @type {boolean} 策略编辑模式标记 */
+    isStrategyEditMode: false,
+
+    // === 策略配置概览摘要（运营辅助信息） ===
+    /** @type {Object|null} 策略配置概览数据 */
+    strategyConfigSummary: null,
+    /** @type {boolean} 概览数据加载状态 */
+    loadingConfigSummary: false,
 
     // === 策略效果分析相关状态 (P2) ===
     /** @type {Object|null} 策略效果分析数据 */
@@ -102,6 +121,60 @@ export function useStrategyMethods() {
         this.strategies = []
         this.strategyGroups = {}
       }
+    },
+
+    /**
+     * 加载策略配置概览摘要（运营辅助信息）
+     * 后端端点：GET /api/v4/console/lottery-strategy-stats/config-summary
+     * 返回策略总览、活跃活动、最近24h执行概况、BxPx命中分布
+     */
+    async loadStrategyConfigSummary() {
+      this.loadingConfigSummary = true
+      try {
+        const response = await this.apiGet(
+          LOTTERY_ENDPOINTS.STRATEGY_CONFIG_SUMMARY,
+          {},
+          { showLoading: false }
+        )
+        const data = response?.success ? response.data : response
+        if (data) {
+          this.strategyConfigSummary = data
+          logger.info('[Strategy] 策略配置概览加载成功', {
+            total_strategies: data.config_overview?.total_strategies,
+            recent_draws: data.recent_24h?.total_draws
+          })
+        }
+      } catch (error) {
+        logger.error('[Strategy] 加载策略配置概览失败:', error)
+        this.strategyConfigSummary = null
+      } finally {
+        this.loadingConfigSummary = false
+      }
+    },
+
+    /**
+     * 获取档位分布百分比文本
+     * @param {string} tier - 档位名称 (high/mid/low/fallback)
+     * @returns {string} 格式化的百分比
+     */
+    getConfigSummaryTierPercent(tier) {
+      const dist = this.strategyConfigSummary?.recent_24h?.tier_distribution
+      const total = this.strategyConfigSummary?.recent_24h?.total_draws
+      if (!dist || !total || total === 0) return '0%'
+      const count = dist[tier] || 0
+      return ((count / total) * 100).toFixed(1) + '%'
+    },
+
+    /**
+     * 获取BxPx命中分布中某组合的命中数
+     * @param {string} budgetTier - B0/B1/B2/B3
+     * @param {string} pressureTier - P0/P1/P2
+     * @returns {number} 命中次数
+     */
+    getConfigSummaryBxPxCount(budgetTier, pressureTier) {
+      const hits = this.strategyConfigSummary?.bxpx_hit_distribution || []
+      const hit = hits.find(h => h.budget_tier === budgetTier && h.pressure_tier === pressureTier)
+      return hit ? parseInt(hit.count) || 0 : 0
     },
 
     /**
@@ -212,17 +285,189 @@ export function useStrategyMethods() {
     },
 
     /**
+     * 切换策略启用状态
+     * @param {Object} strategy - 策略配置对象（包含 lottery_strategy_config_id）
+     */
+    async toggleStrategyActive(strategy) {
+      const id = strategy.lottery_strategy_config_id
+      const newActive = !strategy.is_active
+      try {
+        await this.apiCall(`${LOTTERY_ENDPOINTS.STRATEGY_LIST}/${id}`, {
+          method: 'PUT',
+          data: { is_active: newActive }
+        })
+        strategy.is_active = newActive
+        this.showSuccess(`策略 ${strategy.config_key} 已${newActive ? '启用' : '禁用'}`)
+        logger.info('[Strategy] 切换启用状态', {
+          id,
+          config_key: strategy.config_key,
+          is_active: newActive
+        })
+      } catch (error) {
+        this.showError('切换启用状态失败: ' + (error.message || '未知错误'))
+        logger.error('[Strategy] toggleStrategyActive 失败:', error)
+      }
+    },
+
+    /**
+     * 打开策略编辑弹窗
+     * @param {Object} strategy - 策略配置对象
+     */
+    openStrategyEditModal(strategy) {
+      const configValue = strategy.parsed_value ?? strategy.config_value
+      this.editingStrategy = {
+        lottery_strategy_config_id: strategy.lottery_strategy_config_id,
+        config_group: strategy.config_group,
+        config_key: strategy.config_key,
+        config_value:
+          typeof configValue === 'object' ? JSON.stringify(configValue) : String(configValue ?? ''),
+        value_type: strategy.value_type || this.detectValueType(configValue),
+        description: strategy.description || '',
+        is_active: strategy.is_active,
+        priority: strategy.priority || 0
+      }
+      this.isStrategyEditMode = true
+      this.showModal('strategyEditModal')
+    },
+
+    /**
+     * 打开新建策略弹窗
+     */
+    openStrategyCreateModal() {
+      this.editingStrategy = {
+        lottery_strategy_config_id: null,
+        config_group: '',
+        config_key: '',
+        config_value: '',
+        value_type: 'number',
+        description: '',
+        is_active: true,
+        priority: 0
+      }
+      this.isStrategyEditMode = false
+      this.showModal('strategyEditModal')
+    },
+
+    /**
+     * 提交策略配置（新建或更新）
+     */
+    async submitStrategyConfig() {
+      try {
+        this.saving = true
+        const data = {
+          config_group: this.editingStrategy.config_group,
+          config_key: this.editingStrategy.config_key,
+          config_value: this.parseConfigValue(
+            this.editingStrategy.config_value,
+            this.editingStrategy.value_type
+          ),
+          description: this.editingStrategy.description,
+          is_active: this.editingStrategy.is_active,
+          priority: parseInt(this.editingStrategy.priority) || 0
+        }
+
+        const id = this.editingStrategy.lottery_strategy_config_id
+        if (this.isStrategyEditMode && id) {
+          await this.apiCall(`${LOTTERY_ENDPOINTS.STRATEGY_LIST}/${id}`, { method: 'PUT', data })
+          this.showSuccess('策略配置已更新')
+        } else {
+          await this.apiCall(LOTTERY_ENDPOINTS.STRATEGY_LIST, { method: 'POST', data })
+          this.showSuccess('策略配置已创建')
+        }
+
+        this.hideModal('strategyEditModal')
+        await this.loadStrategies()
+      } catch (error) {
+        this.showError('保存策略配置失败: ' + (error.message || '未知错误'))
+      } finally {
+        this.saving = false
+      }
+    },
+
+    /**
+     * 删除策略配置（需确认）
+     * @param {Object} strategy - 策略配置对象
+     */
+    async deleteStrategy(strategy) {
+      const id = strategy.lottery_strategy_config_id
+      if (!confirm(`确定删除策略 "${strategy.config_key}" 吗？此操作不可撤销。`)) return
+      try {
+        await this.apiCall(`${LOTTERY_ENDPOINTS.STRATEGY_LIST}/${id}`, { method: 'DELETE' })
+        this.showSuccess('策略配置已删除')
+        await this.loadStrategies()
+      } catch (error) {
+        this.showError('删除策略配置失败: ' + (error.message || '未知错误'))
+      }
+    },
+
+    /**
+     * 推断配置值类型
+     * @param {*} value - 配置值
+     * @returns {string} 值类型
+     */
+    detectValueType(value) {
+      if (typeof value === 'boolean') return 'boolean'
+      if (typeof value === 'number') return 'number'
+      if (typeof value === 'object' && value !== null) return 'object'
+      if (Array.isArray(value)) return 'array'
+      return 'string'
+    },
+
+    /**
+     * 解析配置值为正确类型
+     * @param {string} rawValue - 原始字符串值
+     * @param {string} valueType - 目标类型
+     * @returns {*} 解析后的值
+     */
+    parseConfigValue(rawValue, valueType) {
+      switch (valueType) {
+        case 'number':
+          return parseFloat(rawValue) || 0
+        case 'boolean':
+          return rawValue === 'true' || rawValue === true
+        case 'object':
+        case 'array':
+          try {
+            return JSON.parse(rawValue)
+          } catch {
+            return rawValue
+          }
+        default:
+          return rawValue
+      }
+    },
+
+    /**
+     * 获取可用的 config_group 选项列表
+     * @returns {Array} 分组选项
+     */
+    getConfigGroupOptions() {
+      return [
+        { value: 'anti_empty', label: '防空奖保护' },
+        { value: 'anti_high', label: '防连高保护' },
+        { value: 'pity', label: '保底机制' },
+        { value: 'luck_debt', label: '运气债务' },
+        { value: 'budget_tier', label: '预算层级' },
+        { value: 'pressure_tier', label: '压力层级' }
+      ]
+    },
+
+    /**
      * 获取策略分组 Emoji 图标
      * @param {string} groupName - 分组名称（后端的 config_group）
      * @returns {string} Emoji 图标
      */
     getStrategyGroupIcon(groupName) {
       const icons = {
+        anti_empty: '🛡️',
+        anti_high: '🔒',
+        pity: '⚙️',
+        luck_debt: '🎰',
+        budget_tier: '📊',
+        pressure_tier: '🔥',
         probability: '🎲',
         frequency: '⏱️',
         budget: '💰',
-        budget_tier: '📊',
-        pressure_tier: '🔥',
         win_rate: '🎯',
         empty_weight: '⚖️',
         user: '👤',
@@ -239,11 +484,15 @@ export function useStrategyMethods() {
      */
     getStrategyGroupName(groupName) {
       const names = {
+        anti_empty: '防空奖保护',
+        anti_high: '防连高保护',
+        pity: '保底机制',
+        luck_debt: '运气债务',
+        budget_tier: '预算层级',
+        pressure_tier: '压力层级',
         probability: '概率策略',
         frequency: '频率控制',
         budget: '预算管理',
-        budget_tier: '预算层级',
-        pressure_tier: '压力层级',
         win_rate: '中奖率配置',
         empty_weight: '空奖权重',
         user: '用户限制',
@@ -259,11 +508,15 @@ export function useStrategyMethods() {
      */
     getStrategyGroupDescription(groupName) {
       const descriptions = {
+        anti_empty: '防止用户连续多次抽奖都不中奖，达到阈值后自动提升中奖概率',
+        anti_high: '防止用户连续获得高价值奖品，达到阈值后降低高档位概率',
+        pity: '当用户连续未获得好奖品时，自动触发保底奖励',
+        luck_debt: '追踪用户的运气偏差度，自动回归均值',
+        budget_tier: '根据预算消耗情况动态调整策略',
+        pressure_tier: '根据系统压力自动调控出奖力度',
         probability: '控制各档位奖品的基础概率分配',
         frequency: '限制抽奖频率，防止异常高频操作',
         budget: '控制奖品发放预算上限和速率',
-        budget_tier: '根据预算消耗情况动态调整策略',
-        pressure_tier: '根据系统压力自动调控出奖力度',
         win_rate: '设置不同场景下的基础中奖概率',
         empty_weight: '调节空奖权重，优化用户体验',
         user: '针对单个用户的抽奖频次和额度限制',
@@ -279,15 +532,71 @@ export function useStrategyMethods() {
      */
     getStrategyGroupStyle(groupName) {
       const styles = {
-        probability: { border: 'border-l-4 border-l-purple-500', bg: 'bg-purple-50', badge: 'bg-purple-100 text-purple-700' },
-        frequency: { border: 'border-l-4 border-l-amber-500', bg: 'bg-amber-50', badge: 'bg-amber-100 text-amber-700' },
-        budget: { border: 'border-l-4 border-l-emerald-500', bg: 'bg-emerald-50', badge: 'bg-emerald-100 text-emerald-700' },
-        budget_tier: { border: 'border-l-4 border-l-blue-500', bg: 'bg-blue-50', badge: 'bg-blue-100 text-blue-700' },
-        pressure_tier: { border: 'border-l-4 border-l-red-500', bg: 'bg-red-50', badge: 'bg-red-100 text-red-700' },
-        win_rate: { border: 'border-l-4 border-l-indigo-500', bg: 'bg-indigo-50', badge: 'bg-indigo-100 text-indigo-700' },
-        empty_weight: { border: 'border-l-4 border-l-teal-500', bg: 'bg-teal-50', badge: 'bg-teal-100 text-teal-700' },
-        user: { border: 'border-l-4 border-l-cyan-500', bg: 'bg-cyan-50', badge: 'bg-cyan-100 text-cyan-700' },
-        other: { border: 'border-l-4 border-l-gray-400', bg: 'bg-gray-50', badge: 'bg-gray-100 text-gray-600' }
+        anti_empty: {
+          border: 'border-l-4 border-l-blue-500',
+          bg: 'bg-blue-50',
+          badge: 'bg-blue-100 text-blue-700'
+        },
+        anti_high: {
+          border: 'border-l-4 border-l-orange-500',
+          bg: 'bg-orange-50',
+          badge: 'bg-orange-100 text-orange-700'
+        },
+        pity: {
+          border: 'border-l-4 border-l-purple-500',
+          bg: 'bg-purple-50',
+          badge: 'bg-purple-100 text-purple-700'
+        },
+        luck_debt: {
+          border: 'border-l-4 border-l-teal-500',
+          bg: 'bg-teal-50',
+          badge: 'bg-teal-100 text-teal-700'
+        },
+        budget_tier: {
+          border: 'border-l-4 border-l-indigo-500',
+          bg: 'bg-indigo-50',
+          badge: 'bg-indigo-100 text-indigo-700'
+        },
+        pressure_tier: {
+          border: 'border-l-4 border-l-red-500',
+          bg: 'bg-red-50',
+          badge: 'bg-red-100 text-red-700'
+        },
+        probability: {
+          border: 'border-l-4 border-l-violet-500',
+          bg: 'bg-violet-50',
+          badge: 'bg-violet-100 text-violet-700'
+        },
+        frequency: {
+          border: 'border-l-4 border-l-amber-500',
+          bg: 'bg-amber-50',
+          badge: 'bg-amber-100 text-amber-700'
+        },
+        budget: {
+          border: 'border-l-4 border-l-emerald-500',
+          bg: 'bg-emerald-50',
+          badge: 'bg-emerald-100 text-emerald-700'
+        },
+        win_rate: {
+          border: 'border-l-4 border-l-pink-500',
+          bg: 'bg-pink-50',
+          badge: 'bg-pink-100 text-pink-700'
+        },
+        empty_weight: {
+          border: 'border-l-4 border-l-cyan-500',
+          bg: 'bg-cyan-50',
+          badge: 'bg-cyan-100 text-cyan-700'
+        },
+        user: {
+          border: 'border-l-4 border-l-sky-500',
+          bg: 'bg-sky-50',
+          badge: 'bg-sky-100 text-sky-700'
+        },
+        other: {
+          border: 'border-l-4 border-l-gray-400',
+          bg: 'bg-gray-50',
+          badge: 'bg-gray-100 text-gray-600'
+        }
       }
       return styles[groupName] || styles.other
     },
@@ -315,7 +624,10 @@ export function useStrategyMethods() {
         min_draw_count: '最少抽奖次数',
         recent_draw_window: '近期抽奖窗口',
         empty_streak_threshold: '连空触发阈值',
-        high_streak_threshold: '连高触发阈值'
+        high_streak_threshold: '连高触发阈值',
+        multiplier_table: 'Pity倍率表',
+        min_non_empty_cost: '最低非空奖成本',
+        recent_draw_window: '近期抽奖窗口'
       }
       return labels[configKey] || configKey
     },
@@ -342,7 +654,9 @@ export function useStrategyMethods() {
         min_draw_count: '策略生效所需的最少抽奖次数',
         recent_draw_window: '参与策略计算的近期抽奖记录数量',
         empty_streak_threshold: '连续空奖达到此次数后触发保护机制',
-        high_streak_threshold: '连续获得高奖品达到此次数后触发限制'
+        high_streak_threshold: '连续获得高奖品达到此次数后触发限制',
+        multiplier_table: 'Pity系统的连续未中奖次数对应的概率提升倍率映射表',
+        min_non_empty_cost: '最低非空奖品的成本阈值，用于Pity系统判断'
       }
       return descriptions[configKey] || ''
     },
@@ -573,9 +887,15 @@ export function useStrategyMethods() {
         // 准备图表数据
         const dates = dailyData.map(d => d.metric_date || d.date || '')
         const pityData = dailyData.map(d => d.pity_trigger_count || d.pity_triggered_count || 0)
-        const antiEmptyData = dailyData.map(d => d.anti_empty_trigger_count || d.anti_empty_triggered_count || 0)
-        const antiHighData = dailyData.map(d => d.anti_high_trigger_count || d.anti_high_triggered_count || 0)
-        const luckDebtData = dailyData.map(d => d.luck_debt_trigger_count || d.luck_debt_triggered_count || 0)
+        const antiEmptyData = dailyData.map(
+          d => d.anti_empty_trigger_count || d.anti_empty_triggered_count || 0
+        )
+        const antiHighData = dailyData.map(
+          d => d.anti_high_trigger_count || d.anti_high_triggered_count || 0
+        )
+        const luckDebtData = dailyData.map(
+          d => d.luck_debt_trigger_count || d.luck_debt_triggered_count || 0
+        )
 
         // 销毁旧实例
         const existingChart = echarts.getInstanceByDom(chartDom)
@@ -594,7 +914,10 @@ export function useStrategyMethods() {
             textStyle: { fontSize: 11 }
           },
           grid: {
-            left: '3%', right: '4%', bottom: '15%', top: '10%',
+            left: '3%',
+            right: '4%',
+            bottom: '15%',
+            top: '10%',
             containLabel: true
           },
           xAxis: {
@@ -640,10 +963,10 @@ export function useStrategyMethods() {
         }
 
         chart.setOption(option)
-        
+
         // 响应式
         window.addEventListener('resize', () => chart.resize())
-        
+
         logger.info('[P2-12] 策略触发热力图渲染完成', { dataPoints: dates.length })
       } catch (error) {
         logger.error('[P2-12] 渲染策略触发热力图失败:', error.message)

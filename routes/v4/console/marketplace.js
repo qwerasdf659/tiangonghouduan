@@ -442,6 +442,7 @@ router.get(
  * @body {boolean} is_lucky - 是否幸运商品（可选，默认false）
  * @body {boolean} has_warranty - 是否有质保（可选，默认false）
  * @body {boolean} free_shipping - 是否包邮（可选，默认false）
+ * @body {boolean} is_limited - 是否限量商品（可选，默认false，管理员手动控制）
  * @body {string} sell_point - 营销卖点文案（可选，最长200字符）
  * @body {string} category - 商品分类（可选）
  */
@@ -470,6 +471,7 @@ router.post(
       is_lucky,
       has_warranty,
       free_shipping,
+      is_limited,
       sell_point,
       category
     } = req.body
@@ -511,6 +513,7 @@ router.post(
           is_lucky,
           has_warranty,
           free_shipping,
+          is_limited,
           sell_point,
           category
         },
@@ -622,6 +625,7 @@ router.put(
         is_lucky,
         has_warranty,
         free_shipping,
+        is_limited,
         sell_point,
         category
       } = req.body
@@ -670,6 +674,7 @@ router.put(
               is_lucky,
               has_warranty,
               free_shipping,
+              is_limited,
               sell_point,
               category
             },

@@ -54,6 +54,7 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'is_lucky',
     'has_warranty',
     'free_shipping',
+    'is_limited',
     'sell_point',
     'created_at'
   ],
@@ -82,6 +83,7 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'is_lucky',
     'has_warranty',
     'free_shipping',
+    'is_limited',
     'sell_point',
     'created_at',
     'updated_at'

@@ -136,8 +136,7 @@ function presetsPage() {
       {
         key: 'user_id',
         label: '用户',
-        render: (_val, row) =>
-          `<span>${row.user_info?.nickname || row.user_id || '-'}</span>`
+        render: (_val, row) => `<span>${row.user_info?.nickname || row.user_id || '-'}</span>`
       },
       {
         key: 'setting_type',
@@ -149,8 +148,7 @@ function presetsPage() {
       {
         key: 'prize_info.prize_name',
         label: '目标奖品',
-        render: (_val, row) =>
-          `<span>${row.prize_info?.prize_name || '-'}</span>`
+        render: (_val, row) => `<span>${row.prize_info?.prize_name || '-'}</span>`
       },
       {
         key: 'status',
@@ -177,7 +175,7 @@ function presetsPage() {
             label: '取消',
             icon: '❌',
             class: 'text-red-500 hover:text-red-700',
-            condition: (row) => row.status === 'active'
+            condition: row => row.status === 'active'
           }
         ]
       }
@@ -195,7 +193,9 @@ function presetsPage() {
       if (params.user_search) queryParams.append('user_search', params.user_search)
       if (params.setting_type) queryParams.append('setting_type', params.setting_type)
 
-      const response = await request({ url: `${LOTTERY_ENDPOINTS.INTERVENTION_LIST}?${queryParams}` })
+      const response = await request({
+        url: `${LOTTERY_ENDPOINTS.INTERVENTION_LIST}?${queryParams}`
+      })
       if (response?.success) {
         return {
           items: response.data?.interventions || [],
@@ -724,7 +724,7 @@ function presetsPage() {
         })
       }
       return confirm(message)
-    },
+    }
 
     // ✅ 已删除 getStatusText 映射函数
     // 中文显示名称由后端 attachDisplayNames 统一返回 status_display 字段
