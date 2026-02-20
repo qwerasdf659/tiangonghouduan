@@ -61,7 +61,10 @@ import {
   useSystemAdvanceMethods,
   // 活动投放位置配置模块（多活动抽奖系统 2026-02-15）
   usePlacementState,
-  usePlacementMethods
+  usePlacementMethods,
+  // 策略效果模拟分析模块（2026-02-20 Monte Carlo 模拟引擎）
+  useStrategySimulationState,
+  useStrategySimulationMethods
 } from '../composables/index.js'
 
 /**
@@ -127,7 +130,8 @@ function registerLotteryManagementComponents() {
         { id: 'lottery-strategy', title: '策略配置', icon: '⚙️' },
         { id: 'lottery-quota', title: '配额管理', icon: '📊' },
         { id: 'lottery-pricing', title: '定价配置', icon: '💵' },
-        { id: 'strategy-effectiveness', title: '策略效果', icon: '📈' }
+        { id: 'strategy-effectiveness', title: '策略效果', icon: '📈' },
+        { id: 'strategy-simulation', title: '策略模拟', icon: '🧪' }
       ],
       tools: [
         { id: 'batch-operations', title: '批量操作', icon: '⚡' },
@@ -149,6 +153,7 @@ function registerLotteryManagementComponents() {
       'lottery-quota': 'strategy',
       'lottery-pricing': 'strategy',
       'strategy-effectiveness': 'strategy',
+      'strategy-simulation': 'strategy',
       'batch-operations': 'tools',
       'redemption-codes': 'tools'
     },
@@ -212,6 +217,8 @@ function registerLotteryManagementComponents() {
     const systemAdvanceState = useSystemAdvanceState()
     // 活动投放位置配置状态
     const placementState = usePlacementState()
+    // 策略效果模拟分析状态
+    const simulationState = useStrategySimulationState()
 
     // 预先调用所有方法 composables
     const campaignsMethods = useCampaignsMethods()
@@ -233,6 +240,8 @@ function registerLotteryManagementComponents() {
     const systemAdvanceMethods = useSystemAdvanceMethods()
     // 活动投放位置配置方法
     const placementMethods = usePlacementMethods()
+    // 策略效果模拟分析方法
+    const simulationMethods = useStrategySimulationMethods()
 
     // 合并所有状态和方法到返回对象
     const returnObj = {
@@ -253,6 +262,7 @@ function registerLotteryManagementComponents() {
       ...batchOperationsState,
       ...systemAdvanceState,
       ...placementState,
+      ...simulationState,
 
       // ==================== 通用状态 ====================
       page: 1,
@@ -384,6 +394,11 @@ function registerLotteryManagementComponents() {
                 logger.debug('🛡️ [LotteryPage] 进入风控面板页面')
                 await this.loadAbnormalUsers()
                 break
+              case 'strategy-simulation':
+                logger.debug('🧪 [LotteryPage] 进入策略模拟分析页面')
+                await this.loadSimulationBaseline()
+                await this.loadSimulationHistory()
+                break
               case 'strategy-effectiveness':
                 logger.debug('📈 [LotteryPage] 进入策略效果分析页面')
                 await this.loadStrategyEffectiveness()
@@ -453,6 +468,7 @@ function registerLotteryManagementComponents() {
       ...systemAdvanceMethods,
       // 活动投放位置配置方法
       ...placementMethods,
+      ...simulationMethods,
 
       // ==================== 工具方法 ====================
 

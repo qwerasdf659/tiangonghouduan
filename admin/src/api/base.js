@@ -359,7 +359,12 @@ export async function request(options) {
       clearToken()
 
       if (window.location.pathname !== '/admin/login.html') {
-        const redirectUrl = `/admin/login.html?reason=${encodeURIComponent(errorCode)}`
+        // 传递后端返回的详细消息（如"您的账号已在微信小程序登录"）
+        const params = new URLSearchParams({ reason: errorCode })
+        if (errorCode === 'SESSION_REPLACED' && errorMessage !== '未授权，请重新登录') {
+          params.set('message', errorMessage)
+        }
+        const redirectUrl = `/admin/login.html?${params.toString()}`
         if (window.self !== window.top) {
           try {
             window.top.location.href = redirectUrl
@@ -495,7 +500,11 @@ export async function handleResponse(response) {
 
     clearToken()
     if (window.location.pathname !== '/admin/login.html') {
-      const redirectUrl = `/admin/login.html?reason=${encodeURIComponent(errorCode)}`
+      const params = new URLSearchParams({ reason: errorCode })
+      if (errorCode === 'SESSION_REPLACED' && errorMessage !== '未授权，请重新登录') {
+        params.set('message', errorMessage)
+      }
+      const redirectUrl = `/admin/login.html?${params.toString()}`
       if (window.self !== window.top) {
         try {
           window.top.location.href = redirectUrl

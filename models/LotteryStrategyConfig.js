@@ -39,14 +39,22 @@ module.exports = (sequelize, DataTypes) => {
      * @returns {void}
      */
     static associate(models) {
-      /* 创建人关联 */
+      /** 关联抽奖活动（多活动策略隔离） */
+      if (models.LotteryCampaign) {
+        LotteryStrategyConfig.belongsTo(models.LotteryCampaign, {
+          as: 'campaign',
+          foreignKey: 'lottery_campaign_id'
+        })
+      }
+
+      /** 创建人关联 */
       if (models.User) {
         LotteryStrategyConfig.belongsTo(models.User, {
           as: 'creator',
           foreignKey: 'created_by'
         })
 
-        /* 更新人关联 */
+        /** 更新人关联 */
         LotteryStrategyConfig.belongsTo(models.User, {
           as: 'updater',
           foreignKey: 'updated_by'
@@ -113,6 +121,7 @@ module.exports = (sequelize, DataTypes) => {
     /**
      * 获取所有分组的完整配置
      *
+     * @param {number} [lottery_campaign_id] - 活动ID（可选）
      * @returns {Promise<Object>} 按分组组织的配置对象
      *
      * @example
@@ -123,9 +132,13 @@ module.exports = (sequelize, DataTypes) => {
      * //   ...
      * // }
      */
-    static async getAllConfig() {
+    static async getAllConfig(lottery_campaign_id) {
+      const where = { is_active: true }
+      if (lottery_campaign_id) {
+        where.lottery_campaign_id = lottery_campaign_id
+      }
       const configs = await this.findAll({
-        where: { is_active: true },
+        where,
         order: [
           ['config_group', 'ASC'],
           ['priority', 'DESC']
@@ -284,6 +297,22 @@ module.exports = (sequelize, DataTypes) => {
       },
 
       /**
+       * 关联的抽奖活动ID（支持多活动策略隔离）
+       * 2026-02-20 新增 — 策略模拟分析功能需要按活动隔离策略配置
+       */
+      lottery_campaign_id: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        comment: '关联的抽奖活动ID（支持多活动策略隔离）',
+        references: {
+          model: 'lottery_campaigns',
+          key: 'lottery_campaign_id'
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'RESTRICT'
+      },
+
+      /**
        * 配置分组
        * - budget_tier: 预算分层配置
        * - pressure_tier: 活动压力配置
@@ -403,12 +432,16 @@ module.exports = (sequelize, DataTypes) => {
       indexes: [
         {
           unique: true,
-          fields: ['config_group', 'config_key', 'priority'],
-          name: 'uk_strategy_config_group_key_priority'
+          fields: ['lottery_campaign_id', 'config_group', 'config_key', 'priority'],
+          name: 'uk_strategy_campaign_group_key_priority'
         },
         {
           fields: ['config_group', 'is_active'],
           name: 'idx_strategy_config_group_active'
+        },
+        {
+          fields: ['lottery_campaign_id'],
+          name: 'idx_strategy_config_campaign'
         }
       ]
     }

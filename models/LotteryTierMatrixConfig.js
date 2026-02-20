@@ -44,14 +44,22 @@ module.exports = (sequelize, DataTypes) => {
      * @returns {void}
      */
     static associate(models) {
-      // 创建人关联
+      /** 关联抽奖活动（多活动策略隔离） */
+      if (models.LotteryCampaign) {
+        LotteryTierMatrixConfig.belongsTo(models.LotteryCampaign, {
+          as: 'campaign',
+          foreignKey: 'lottery_campaign_id'
+        })
+      }
+
+      /** 创建人关联 */
       if (models.User) {
         LotteryTierMatrixConfig.belongsTo(models.User, {
           as: 'creator',
           foreignKey: 'created_by'
         })
 
-        // 更新人关联
+        /** 更新人关联 */
         LotteryTierMatrixConfig.belongsTo(models.User, {
           as: 'updater',
           foreignKey: 'updated_by'
@@ -64,6 +72,7 @@ module.exports = (sequelize, DataTypes) => {
     /**
      * 获取完整的矩阵配置
      *
+     * @param {number} [lottery_campaign_id] - 活动ID（可选）
      * @returns {Promise<Object>} 矩阵配置对象
      *
      * @example
@@ -75,9 +84,13 @@ module.exports = (sequelize, DataTypes) => {
      * //   B3: { P0: {...}, P1: {...}, P2: {...} }
      * // }
      */
-    static async getFullMatrix() {
+    static async getFullMatrix(lottery_campaign_id) {
+      const where = { is_active: true }
+      if (lottery_campaign_id) {
+        where.lottery_campaign_id = lottery_campaign_id
+      }
       const configs = await this.findAll({
-        where: { is_active: true },
+        where,
         order: [
           ['budget_tier', 'ASC'],
           ['pressure_tier', 'ASC']
@@ -283,6 +296,22 @@ module.exports = (sequelize, DataTypes) => {
       },
 
       /**
+       * 关联的抽奖活动ID（支持多活动策略隔离）
+       * 2026-02-20 新增 — 策略模拟分析功能需要按活动隔离矩阵配置
+       */
+      lottery_campaign_id: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        comment: '关联的抽奖活动ID（支持多活动策略隔离）',
+        references: {
+          model: 'lottery_campaigns',
+          key: 'lottery_campaign_id'
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'RESTRICT'
+      },
+
+      /**
        * Budget Tier 预算层级
        * - B0: 预算极低（仅 fallback）
        * - B1: 预算低（low + fallback）
@@ -473,8 +502,12 @@ module.exports = (sequelize, DataTypes) => {
       indexes: [
         {
           unique: true,
-          fields: ['budget_tier', 'pressure_tier'],
-          name: 'uk_tier_matrix_budget_pressure'
+          fields: ['lottery_campaign_id', 'budget_tier', 'pressure_tier'],
+          name: 'uk_matrix_campaign_budget_pressure'
+        },
+        {
+          fields: ['lottery_campaign_id'],
+          name: 'idx_matrix_config_campaign'
         }
       ]
     }

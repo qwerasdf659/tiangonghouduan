@@ -822,6 +822,16 @@ models.AdminNotification = require('./AdminNotification')(sequelize, DataTypes)
  *    - 业务场景：智能提醒触发→生成通知→管理员查看→标记已读→历史归档
  */
 
+// 🔴 策略效果模拟分析（2026-02-20）
+models.LotterySimulationRecord = require('./LotterySimulationRecord')(sequelize, DataTypes)
+/*
+ * ✅ LotterySimulationRecord：策略效果模拟记录表
+ *    - 用途：保存 Monte Carlo 模拟参数、结果、对比分析、风险评估和偏差追踪
+ *    - 特点：JSON存储模拟快照、支持多方案对比、偏差追踪闭环
+ *    - 表名：lottery_simulation_records，主键：lottery_simulation_record_id
+ *    - 业务场景：策略调参预览→模拟运行→对比分析→风险评估→一键应用→偏差追踪
+ */
+
 // 🔴 设置模型关联关系
 Object.keys(models).forEach(modelName => {
   if (models[modelName].associate) {

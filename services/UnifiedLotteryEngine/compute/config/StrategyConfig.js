@@ -716,8 +716,8 @@ class DynamicConfigLoader {
         return null
       }
 
-      // 4. 从数据库加载配置
-      const db_config = await LotteryStrategyConfig.getAllConfig()
+      // 4. 从数据库加载配置（支持按活动ID过滤，多活动隔离）
+      const db_config = await LotteryStrategyConfig.getAllConfig(options.lottery_campaign_id)
 
       // 5. 合并配置（数据库覆盖默认值）
       const merged_config = this.mergeConfig(db_config)
@@ -761,8 +761,8 @@ class DynamicConfigLoader {
         return null
       }
 
-      // 3. 从数据库加载矩阵
-      const db_matrix = await LotteryTierMatrixConfig.getFullMatrix()
+      // 3. 从数据库加载矩阵（支持按活动ID过滤，多活动隔离）
+      const db_matrix = await LotteryTierMatrixConfig.getFullMatrix(options.lottery_campaign_id)
 
       if (Object.keys(db_matrix).length === 0) {
         return null

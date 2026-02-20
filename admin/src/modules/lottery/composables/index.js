@@ -61,6 +61,12 @@ export { useSystemAdvanceState, useSystemAdvanceMethods } from './system-advance
 // 活动投放位置配置模块
 export { usePlacementState, usePlacementMethods } from './placement.js'
 
+// 策略效果模拟分析模块（2026-02-20 Monte Carlo 模拟引擎）
+export {
+  useStrategySimulationState,
+  useStrategySimulationMethods
+} from './strategy-simulation.js'
+
 /**
  * 组合所有状态
  * @returns {Object} 合并后的状态对象
@@ -83,7 +89,8 @@ export function useAllLotteryState() {
     ...useBatchOperationsState(),
     ...usePresetVisualizationState(),
     ...useSystemAdvanceState(),
-    ...usePlacementState()
+    ...usePlacementState(),
+    ...useStrategySimulationState()
   }
 }
 
@@ -109,6 +116,7 @@ export function useAllLotteryMethods() {
     ...useBatchOperationsMethods(),
     ...usePresetVisualizationMethods(),
     ...useSystemAdvanceMethods(),
-    ...usePlacementMethods()
+    ...usePlacementMethods(),
+    ...useStrategySimulationMethods()
   }
 }

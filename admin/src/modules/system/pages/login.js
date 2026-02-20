@@ -98,7 +98,9 @@ function loginPage() {
           TOKEN_EXPIRED: '登录已过期，请重新登录',
           INVALID_TOKEN: '登录凭证无效，请重新登录'
         }
-        const msg = reasonMessages[reason]
+        // 后端返回了具体的踢出消息时直接使用
+        const customMsg = urlParams.get('message')
+        const msg = customMsg || reasonMessages[reason]
         if (msg) {
           this.showMessage(msg, true)
           logger.info(`登录页显示会话失效原因: ${reason}`)

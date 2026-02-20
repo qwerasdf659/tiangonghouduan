@@ -175,9 +175,12 @@ LotteryAlert.initModel = sequelize => {
         onDelete: 'CASCADE'
       },
 
-      // ==================== 告警基础信息 ====================
+      /*
+       * ==================== 告警基础信息 ====================
+       * 2026-02-20：ENUM → VARCHAR(50)，支持策略模拟的 simulation_bound 告警类型
+       */
       alert_type: {
-        type: DataTypes.ENUM('win_rate', 'budget', 'inventory', 'user', 'system'),
+        type: DataTypes.STRING(50),
         allowNull: false,
         comment:
           '告警类型：win_rate=中奖率异常 | budget=预算告警 | inventory=库存告警 | user=用户异常 | system=系统告警'

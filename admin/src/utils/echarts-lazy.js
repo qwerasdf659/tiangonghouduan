@@ -21,6 +21,7 @@
  * - ScatterChart (散点图) - mini-chart组件
  * - FunnelChart (漏斗图) - dashboard 转化漏斗 Tab
  * - SankeyChart (桑基图) - dashboard 资产流动 Tab
+ * - HeatmapChart (热力图) - 策略模拟 BxPx 矩阵热力图
  *
  * @see https://echarts.apache.org/handbook/zh/basics/import
  * @version 2.2.0
@@ -62,6 +63,7 @@ async function initEChartsCore() {
     charts.ScatterChart,
     charts.FunnelChart,
     charts.SankeyChart,
+    charts.HeatmapChart,
     components.TitleComponent,
     components.TooltipComponent,
     components.GridComponent,
@@ -70,6 +72,7 @@ async function initEChartsCore() {
     components.TransformComponent,
     components.MarkPointComponent,
     components.MarkLineComponent,
+    components.VisualMapComponent,
     renderers.CanvasRenderer
   ])
 

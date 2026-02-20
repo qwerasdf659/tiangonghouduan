@@ -190,6 +190,37 @@ const OPERATION_TYPES = Object.freeze({
    */
   LOTTERY_CLEAR_SETTINGS: 'lottery_clear_settings',
 
+  // ==================== 策略模拟类（2026-02-20 策略效果模拟分析） ====================
+  /**
+   * 模拟配置一键应用到线上
+   * @description 将模拟分析的参数配置直接应用到生产环境
+   */
+  SIMULATION_APPLY: 'simulation_apply',
+
+  /**
+   * 配置版本回滚
+   * @description 从 AdminOperationLog 的 before_data 恢复历史配置
+   */
+  CONFIG_ROLLBACK: 'config_rollback',
+
+  /**
+   * 策略配置更新（用于版本历史追踪）
+   * @description 策略配置参数变更，包括 pity/anti_empty/anti_high 等
+   */
+  STRATEGY_CONFIG_UPDATE: 'strategy_config_update',
+
+  /**
+   * 矩阵配置更新（用于版本历史追踪）
+   * @description BxPx 矩阵乘数配置变更
+   */
+  MATRIX_CONFIG_UPDATE: 'matrix_config_update',
+
+  /**
+   * 基础权重更新（用于版本历史追踪）
+   * @description 档位基础权重配置变更
+   */
+  TIER_RULES_UPDATE: 'tier_rules_update',
+
   // ==================== 库存操作类 ====================
   /**
    * 库存操作（使用/核销/上架/下架）
@@ -342,6 +373,13 @@ const OPERATION_TYPE_DESCRIPTIONS = Object.freeze({
   [OPERATION_TYPES.LOTTERY_USER_QUEUE]: '用户队列',
   [OPERATION_TYPES.LOTTERY_CLEAR_SETTINGS]: '清除设置',
 
+  // 策略模拟类（2026-02-20 策略效果模拟分析）
+  [OPERATION_TYPES.SIMULATION_APPLY]: '模拟配置应用',
+  [OPERATION_TYPES.CONFIG_ROLLBACK]: '配置版本回滚',
+  [OPERATION_TYPES.STRATEGY_CONFIG_UPDATE]: '策略配置更新',
+  [OPERATION_TYPES.MATRIX_CONFIG_UPDATE]: '矩阵配置更新',
+  [OPERATION_TYPES.TIER_RULES_UPDATE]: '基础权重更新',
+
   // 库存操作类
   [OPERATION_TYPES.INVENTORY_OPERATION]: '库存操作',
   [OPERATION_TYPES.INVENTORY_TRANSFER]: '物品转让',
@@ -412,6 +450,10 @@ const CRITICAL_OPERATIONS = Object.freeze(
     OPERATION_TYPES.LOTTERY_PROBABILITY_ADJUST, // 概率调整 - 影响抽奖公平性
     OPERATION_TYPES.LOTTERY_USER_QUEUE, // 用户队列 - 影响用户抽奖顺序
     OPERATION_TYPES.LOTTERY_CLEAR_SETTINGS, // 清除设置 - 批量影响抽奖配置
+
+    // ========== 策略模拟关键操作（2026-02-20 新增）==========
+    OPERATION_TYPES.SIMULATION_APPLY, // 模拟配置应用 - 直接修改生产策略配置
+    OPERATION_TYPES.CONFIG_ROLLBACK, // 配置版本回滚 - 回退生产策略配置
 
     // ========== 市场交易关键操作（C2C Phase 2 新增）==========
     OPERATION_TYPES.MARKET_LISTING_ADMIN_WITHDRAW, // 市场挂牌强制撤回 - 影响卖家资产和交易

@@ -55,7 +55,7 @@
 
 const { DataTypes } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
-const { DB_ENUM_VALUES, getOperationTypeDescription } = require('../constants/AuditOperationTypes')
+const { getOperationTypeDescription } = require('../constants/AuditOperationTypes')
 
 module.exports = sequelize => {
   const AdminOperationLog = sequelize.define(
@@ -82,11 +82,18 @@ module.exports = sequelize => {
         onDelete: 'RESTRICT' // 不允许删除有审计日志的用户
       },
 
-      // 操作类型（来源：constants/AuditOperationTypes.js 统一枚举定义）
+      /*
+       * 操作类型（来源：constants/AuditOperationTypes.js 统一枚举定义）
+       * 2026-02-20：ENUM → VARCHAR(50)，值校验在应用层，避免新增操作类型时反复迁移
+       */
       operation_type: {
-        type: DataTypes.ENUM(...DB_ENUM_VALUES),
+        type: DataTypes.STRING(50),
         allowNull: false,
-        comment: '操作类型（V4.5.0统一枚举定义 - 详见 constants/AuditOperationTypes.js）'
+        comment: '操作类型（VARCHAR 存储，值校验在应用层 - 详见 constants/AuditOperationTypes.js）',
+        validate: {
+          notEmpty: true,
+          len: [1, 50]
+        }
       },
 
       // 目标对象信息

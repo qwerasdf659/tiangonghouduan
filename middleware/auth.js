@@ -491,14 +491,50 @@ async function authenticateToken(req, res, next) {
 
         if (rawSession && !rawSession.is_active) {
           logger.warn(
-            `🔒 [Auth] 会话被其他设备登录覆盖: session_token=${decoded.session_token.substring(0, 8)}..., user_id=${decoded.user_id}`
+            `🔒 [Auth] 会话被其他设备登录覆盖: session_token=${decoded.session_token.substring(0, 8)}..., user_id=${decoded.user_id}, platform=${rawSession.login_platform}`
           )
+
+          /**
+           * 查找替换当前会话的新会话，获取新登录的平台信息，
+           * 让用户知道是哪个平台的登录踢掉了当前会话。
+           */
+          let replacedByPlatform = null
+          try {
+            const newerSession = await AuthenticationSession.findOne({
+              where: {
+                user_id: decoded.user_id,
+                is_active: true,
+                authentication_session_id: {
+                  [require('sequelize').Op.gt]: rawSession.authentication_session_id
+                }
+              },
+              order: [['created_at', 'DESC']]
+            })
+            replacedByPlatform = newerSession?.login_platform || null
+          } catch (_) {
+            // 查询失败不影响主流程
+          }
+
+          const PLATFORM_LABELS = {
+            web: 'Web浏览器',
+            wechat_mp: '微信小程序',
+            douyin_mp: '抖音小程序',
+            alipay_mp: '支付宝小程序',
+            app: 'App客户端'
+          }
+          const platformLabel = replacedByPlatform
+            ? PLATFORM_LABELS[replacedByPlatform] || replacedByPlatform
+            : '其他设备'
+          const message = `您的账号已在${platformLabel}登录，请重新登录`
+
           return res.apiUnauthorized
-            ? res.apiUnauthorized('您的账号已在其他设备登录', 'SESSION_REPLACED')
+            ? res.apiUnauthorized(message, 'SESSION_REPLACED', {
+                replaced_by_platform: replacedByPlatform
+              })
             : res.status(401).json({
                 success: false,
                 code: 'SESSION_REPLACED',
-                message: '您的账号已在其他设备登录'
+                message
               })
         } else if (rawSession && rawSession.is_active) {
           logger.warn(

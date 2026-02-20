@@ -82,7 +82,8 @@ const {
   StatisticsService: LotteryStatisticsService, // 统计趋势服务（~900行）
   ReportService: LotteryReportService, // 报表生成服务（~700行）
   UserAnalysisService: LotteryUserAnalysisService, // 用户维度分析服务（~800行）
-  CampaignAnalysisService: LotteryCampaignAnalysisService // 活动维度分析服务（~1000行）
+  CampaignAnalysisService: LotteryCampaignAnalysisService, // 活动维度分析服务（~1000行）
+  StrategySimulationService: LotteryStrategySimulationService // 策略效果模拟服务（2026-02-20 策略模拟分析）
 } = require('./lottery-analytics')
 
 // MarketListing 域子服务
@@ -506,6 +507,7 @@ class ServiceManager {
         'lottery_analytics_campaign',
         new LotteryCampaignAnalysisService(this.models)
       ) // 活动维度分析服务（~1000行，需实例化）
+      this._services.set('strategy_simulation', new LotteryStrategySimulationService(this.models)) // 策略效果模拟服务（2026-02-20 Monte Carlo 引擎）
       this._services.set('lottery_alert', LotteryAlertService) // 抽奖告警服务（B1 实时告警列表API，2026-01-29，静态类）
 
       // ========== P1 抽奖健康度服务（2026-01-31 运营优化任务） ==========
