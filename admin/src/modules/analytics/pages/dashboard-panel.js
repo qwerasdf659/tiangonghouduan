@@ -500,28 +500,18 @@ function dashboardPanelPage() {
           return Array.from({ length: 7 }, (_, i) => {
             const date = new Date()
             date.setDate(date.getDate() - (6 - i))
-            // 基于实际数据波动生成趋势
-            const dayFactor = 0.8 + Math.random() * 0.4
             return {
               date: date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', timeZone: 'Asia/Shanghai' }),
-              new_users: Math.round(baseNewUsers * dayFactor),
-              active_users: Math.round(baseActiveUsers * dayFactor)
+              new_users: i === 6 ? baseNewUsers : 0,
+              active_users: i === 6 ? baseActiveUsers : 0
             }
           })
         }
       } catch (e) {
         logger.warn('[DashboardPanel] fetchUserGrowth 失败（适配API）:', e.message)
       }
-      // 降级：返回模拟数据
-      return Array.from({ length: 7 }, (_, i) => {
-        const date = new Date()
-        date.setDate(date.getDate() - (6 - i))
-        return {
-          date: date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', timeZone: 'Asia/Shanghai' }),
-          new_users: Math.round(Math.random() * 500 + 100),
-          active_users: Math.round(Math.random() * 3000 + 1000)
-        }
-      })
+      /* API 失败时返回空数组，不使用模拟数据 */
+      return []
     },
     
     /**
@@ -1361,8 +1351,8 @@ function dashboardPanelPage() {
             const baseAmount = dayComparison.current || 0
             return {
               date: date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', timeZone: 'Asia/Shanghai' }),
-              consumption: i === 6 ? baseAmount : Math.round(baseAmount * (0.8 + Math.random() * 0.4)),
-              orders: Math.round((baseAmount / 50) * (0.8 + Math.random() * 0.4))
+              consumption: i === 6 ? baseAmount : 0,
+              orders: i === 6 ? Math.round(baseAmount / 50) : 0
             }
           })
         }

@@ -21,16 +21,18 @@
   <!-- 页面主体 -->
   <div class="container mx-auto px-4 py-6" x-data="financeNavigation()" x-init="init()">
     
-    <!-- 子页面导航 -->
-    <div class="themed-card rounded-lg shadow mb-6">
-      <div class="flex border-b overflow-x-auto">
+    <!-- 子页面导航 - 带底部高亮条的现代风格 -->
+    <div class="themed-card rounded-xl shadow-sm mb-6 overflow-hidden">
+      <div class="flex overflow-x-auto bg-gradient-to-r from-slate-50 to-gray-50">
         <template x-for="page in subPages" :key="page.id">
           <button 
             @click="switchPage(page.id)"
-            :class="current_page === page.id ? 'border-b-2 border-gray-800 themed-text themed-bg-base' : 'themed-text-muted themed-hover-bg'"
-            class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
+            :class="current_page === page.id
+              ? 'border-b-2 border-blue-600 text-blue-700 bg-white font-semibold shadow-sm'
+              : 'border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:bg-white/60'"
+            class="px-6 py-3.5 font-medium whitespace-nowrap transition-all duration-200 relative"
           >
-            <i :class="page.icon" class="mr-1"></i>
+            <i :class="page.icon" class="mr-1.5"></i>
             <span x-text="page.title"></span>
           </button>
         </template>
@@ -56,67 +58,70 @@
     <!-- 消费记录审核 -->
     <div x-show="current_page === 'consumption'" x-cloak x-init="loadAnomalyStats()">
 
-      <!-- 异常统计面板 - 带图标和彩色边框 -->
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        <div class="themed-card rounded-lg shadow p-5 border-l-4 border-red-500">
+      <!-- 异常统计面板 - 使用统一 stats-card 组件 -->
+      <div class="stats-grid stats-grid-5 mb-6">
+        <div class="stats-card stats-danger stats-card-animate">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm themed-text-muted mb-1">异常总数</p>
-              <p class="text-2xl font-bold text-red-600" x-text="anomalyStats.total_anomaly || 0"></p>
+              <p class="stats-card-label">异常总数</p>
+              <p class="stats-card-value text-red-600" x-text="anomalyStats.total_anomaly || 0"></p>
             </div>
-            <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center text-xl">🚨</div>
+            <div class="stats-card-icon bg-gradient-to-br from-red-100 to-red-200 text-red-600">🚨</div>
           </div>
           <p class="text-xs themed-text-muted mt-2">所有异常记录汇总</p>
         </div>
-        <div class="themed-card rounded-lg shadow p-5 border-l-4 border-orange-500">
+        <div class="stats-card stats-warning stats-card-animate">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm themed-text-muted mb-1">高频消费</p>
-              <p class="text-2xl font-bold text-orange-600" x-text="anomalyStats.high_frequency || 0"></p>
+              <p class="stats-card-label">高频消费</p>
+              <p class="stats-card-value text-orange-600" x-text="anomalyStats.high_frequency || 0"></p>
             </div>
-            <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center text-xl">🔄</div>
+            <div class="stats-card-icon bg-gradient-to-br from-orange-100 to-orange-200 text-orange-600">🔄</div>
           </div>
           <p class="text-xs themed-text-muted mt-2">短时间内多次消费</p>
         </div>
-        <div class="themed-card rounded-lg shadow p-5 border-l-4 border-yellow-500">
+        <div class="stats-card stats-warning stats-card-animate" style="border-left-color: #eab308;">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm themed-text-muted mb-1">大额异常</p>
-              <p class="text-2xl font-bold text-yellow-600" x-text="anomalyStats.high_amount || 0"></p>
+              <p class="stats-card-label">大额异常</p>
+              <p class="stats-card-value text-yellow-600" x-text="anomalyStats.high_amount || 0"></p>
             </div>
-            <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center text-xl">💰</div>
+            <div class="stats-card-icon bg-gradient-to-br from-yellow-100 to-yellow-200 text-yellow-600">💰</div>
           </div>
           <p class="text-xs themed-text-muted mt-2">消费金额超过常规</p>
         </div>
-        <div class="themed-card rounded-lg shadow p-5 border-l-4 border-purple-500">
+        <div class="stats-card stats-info stats-card-animate">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm themed-text-muted mb-1">高风险</p>
-              <p class="text-2xl font-bold text-purple-600" x-text="anomalyStats.unusual_time || 0"></p>
+              <p class="stats-card-label">高风险</p>
+              <p class="stats-card-value text-purple-600" x-text="anomalyStats.unusual_time || 0"></p>
             </div>
-            <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center text-xl">⚠️</div>
+            <div class="stats-card-icon bg-gradient-to-br from-purple-100 to-purple-200 text-purple-600">⚠️</div>
           </div>
           <p class="text-xs themed-text-muted mt-2">需重点关注的记录</p>
         </div>
-        <div class="themed-card rounded-lg shadow p-5 border-l-4 border-gray-500">
+        <div class="stats-card stats-card-animate" style="border-left: 4px solid #6b7280;">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm themed-text-muted mb-1">其他异常</p>
-              <p class="text-2xl font-bold text-gray-600" x-text="anomalyStats.other || 0"></p>
+              <p class="stats-card-label">其他异常</p>
+              <p class="stats-card-value text-gray-600" x-text="anomalyStats.other || 0"></p>
             </div>
-            <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-xl">📋</div>
+            <div class="stats-card-icon bg-gradient-to-br from-gray-100 to-gray-200 text-gray-600">📋</div>
           </div>
           <p class="text-xs themed-text-muted mt-2">跨店、行为异常等</p>
         </div>
       </div>
 
-      <div class="themed-card rounded-lg shadow">
-        <!-- 标题栏 + 批量操作按钮（始终可见） -->
-        <div class="p-4 border-b">
+      <div class="themed-card rounded-xl shadow-sm border overflow-hidden">
+        <!-- 标题栏 + 批量操作按钮 -->
+        <div class="px-5 py-4 bg-gradient-to-r from-slate-50 to-white border-b">
           <div class="flex flex-wrap justify-between items-center gap-3">
             <div class="flex items-center gap-3">
-              <h5 class="font-semibold text-lg">📋 消费记录审核</h5>
-              <span class="text-xs bg-yellow-100 text-yellow-700 px-2.5 py-1 rounded-full font-medium"
+              <div class="flex items-center gap-2">
+                <span class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-base">📋</span>
+                <h5 class="font-semibold text-lg text-gray-800">消费记录审核</h5>
+              </div>
+              <span class="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-medium border border-amber-200"
                     x-text="'待审核 ' + (consumptionStats.pendingCount || 0) + ' 条'"></span>
             </div>
             <!-- 批量操作按钮区 - 始终显示，未选中时禁用 -->
@@ -214,8 +219,8 @@
         <div class="overflow-x-auto">
           <table class="w-full">
             <thead>
-              <tr class="bg-gray-50 border-b-2 border-gray-200">
-                <th class="px-4 py-3 text-center w-12">
+              <tr class="bg-gradient-to-r from-gray-50 to-slate-50 border-b-2 border-gray-200">
+                <th class="px-4 py-3.5 text-center w-12">
                   <input
                     type="checkbox"
                     :checked="isAllSelected"
@@ -224,14 +229,14 @@
                     title="全选/取消全选当前页待审核记录"
                   >
                 </th>
-                <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">记录ID</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">用户</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">门店</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold themed-text-muted uppercase tracking-wider">金额</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted uppercase tracking-wider">风控标记</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted uppercase tracking-wider">状态</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">提交时间</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted uppercase tracking-wider">操作</th>
+                <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">记录ID</th>
+                <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">用户</th>
+                <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">门店</th>
+                <th class="px-4 py-3.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">金额</th>
+                <th class="px-4 py-3.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">风控标记</th>
+                <th class="px-4 py-3.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">状态</th>
+                <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">提交时间</th>
+                <th class="px-4 py-3.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">操作</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
@@ -362,57 +367,60 @@
 
     <!-- 钻石账户 -->
     <div x-show="current_page === 'diamond-accounts'" x-cloak>
-      <!-- 统计卡片 - 使用项目统一的 border-l-4 彩色边框风格 -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="themed-card rounded-lg shadow p-5 border-l-4 border-blue-500">
+      <!-- 统计卡片 - 使用统一 stats-card 组件 -->
+      <div class="stats-grid stats-grid-4 mb-6">
+        <div class="stats-card stats-primary stats-card-animate">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm themed-text-muted mb-1">持有用户数</p>
-              <p class="text-2xl font-bold themed-text-primary" x-text="diamondStats.holder_count || 0"></p>
+              <p class="stats-card-label">持有用户数</p>
+              <p class="stats-card-value themed-text-primary" x-text="diamondStats.holder_count || 0"></p>
             </div>
-            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-xl">👤</div>
+            <div class="stats-card-icon bg-gradient-to-br from-blue-100 to-blue-200 text-blue-600">👤</div>
           </div>
           <p class="text-xs themed-text-muted mt-2">已开通钻石账户的用户</p>
         </div>
-        <div class="themed-card rounded-lg shadow p-5 border-l-4 border-green-500">
+        <div class="stats-card stats-success stats-card-animate">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm themed-text-muted mb-1">流通总量</p>
-              <p class="text-2xl font-bold text-green-600" x-text="formatNumber(diamondStats.total_circulation || 0)"></p>
+              <p class="stats-card-label">流通总量</p>
+              <p class="stats-card-value text-green-600" x-text="formatNumber(diamondStats.total_circulation || 0)"></p>
             </div>
-            <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center text-xl">💎</div>
+            <div class="stats-card-icon bg-gradient-to-br from-green-100 to-green-200 text-green-600">💎</div>
           </div>
           <p class="text-xs themed-text-muted mt-2">当前可自由使用的钻石</p>
         </div>
-        <div class="themed-card rounded-lg shadow p-5 border-l-4 border-yellow-500">
+        <div class="stats-card stats-warning stats-card-animate" style="border-left-color: #eab308;">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm themed-text-muted mb-1">冻结总量</p>
-              <p class="text-2xl font-bold text-yellow-600" x-text="formatNumber(diamondStats.total_frozen || 0)"></p>
+              <p class="stats-card-label">冻结总量</p>
+              <p class="stats-card-value text-yellow-600" x-text="formatNumber(diamondStats.total_frozen || 0)"></p>
             </div>
-            <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center text-xl">🔒</div>
+            <div class="stats-card-icon bg-gradient-to-br from-yellow-100 to-yellow-200 text-yellow-600">🔒</div>
           </div>
           <p class="text-xs themed-text-muted mt-2">挂单交易中冻结的钻石</p>
         </div>
-        <div class="themed-card rounded-lg shadow p-5 border-l-4 border-purple-500">
+        <div class="stats-card stats-info stats-card-animate">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm themed-text-muted mb-1">累计发放</p>
-              <p class="text-2xl font-bold text-purple-600" x-text="formatNumber(diamondStats.total_issued || 0)"></p>
+              <p class="stats-card-label">累计发放</p>
+              <p class="stats-card-value text-purple-600" x-text="formatNumber(diamondStats.total_issued || 0)"></p>
             </div>
-            <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center text-xl">📊</div>
+            <div class="stats-card-icon bg-gradient-to-br from-purple-100 to-purple-200 text-purple-600">📊</div>
           </div>
           <p class="text-xs themed-text-muted mt-2">系统历史累计发放总量</p>
         </div>
       </div>
 
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b flex justify-between items-center">
-          <div>
-            <h5 class="font-semibold text-lg">💎 钻石账户查询</h5>
-            <p class="text-xs themed-text-muted mt-0.5">输入用户手机号，查看钻石余额和交易流水</p>
+      <div class="themed-card rounded-xl shadow-sm border overflow-hidden">
+        <div class="px-5 py-4 bg-gradient-to-r from-slate-50 to-white border-b flex justify-between items-center">
+          <div class="flex items-center gap-2">
+            <span class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-base">💎</span>
+            <div>
+              <h5 class="font-semibold text-gray-800">钻石账户查询</h5>
+              <p class="text-xs text-gray-400 mt-0.5">输入用户手机号，查看钻石余额和交易流水</p>
+            </div>
           </div>
-          <button @click="openDiamondAdjustModal({})" class="px-4 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary text-sm flex items-center gap-1">
+          <button @click="openDiamondAdjustModal({})" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm flex items-center gap-1 transition shadow-sm">
             <span>➕</span> 调整用户钻石
           </button>
         </div>
@@ -472,14 +480,14 @@
               <div class="overflow-x-auto">
                 <table class="w-full">
                   <thead>
-                    <tr class="bg-gray-50 border-b-2 border-gray-200">
-                      <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">用户ID</th>
-                      <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">昵称</th>
-                      <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">手机号</th>
-                      <th class="px-4 py-3 text-right text-xs font-semibold themed-text-muted uppercase tracking-wider">可用余额</th>
-                      <th class="px-4 py-3 text-right text-xs font-semibold themed-text-muted uppercase tracking-wider">冻结余额</th>
-                      <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted uppercase tracking-wider">状态</th>
-                      <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted uppercase tracking-wider">操作</th>
+                    <tr class="bg-gradient-to-r from-gray-50 to-slate-50 border-b-2 border-gray-200">
+                      <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">用户ID</th>
+                      <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">昵称</th>
+                      <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">手机号</th>
+                      <th class="px-4 py-3.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">可用余额</th>
+                      <th class="px-4 py-3.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">冻结余额</th>
+                      <th class="px-4 py-3.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">状态</th>
+                      <th class="px-4 py-3.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">操作</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y">
@@ -521,53 +529,45 @@
     <!-- 商户积分 - 适配后端 merchant-points API -->
     <div x-show="current_page === 'merchant-points'" x-cloak>
 
-      <!-- 审核统计面板 - 带色彩渐变的统计卡片 -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div class="rounded-xl shadow-sm border-l-4 border-yellow-400 bg-gradient-to-r from-yellow-50 to-white p-4">
+      <!-- 审核统计面板 - 使用统一 stats-card 组件 -->
+      <div class="stats-grid stats-grid-4 mb-6">
+        <div class="stats-card stats-warning stats-card-animate" style="border-left-color: #eab308;">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-xs text-yellow-600 font-medium uppercase tracking-wide">待审核</p>
-              <p class="text-3xl font-bold text-yellow-700 mt-1" x-text="merchantStats?.pending_count || 0"></p>
+              <p class="stats-card-label">待审核</p>
+              <p class="stats-card-value text-yellow-700" x-text="merchantStats?.pending_count || 0"></p>
             </div>
-            <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
-              <span class="text-yellow-500 text-lg">⏳</span>
-            </div>
+            <div class="stats-card-icon bg-gradient-to-br from-yellow-100 to-amber-200 text-yellow-600">⏳</div>
           </div>
           <p class="text-xs text-yellow-500 mt-2">需要运营人员审核处理</p>
         </div>
-        <div class="rounded-xl shadow-sm border-l-4 border-green-400 bg-gradient-to-r from-green-50 to-white p-4">
+        <div class="stats-card stats-success stats-card-animate">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-xs text-green-600 font-medium uppercase tracking-wide">已通过</p>
-              <p class="text-3xl font-bold text-green-700 mt-1" x-text="merchantStats?.approved_count || 0"></p>
+              <p class="stats-card-label">已通过</p>
+              <p class="stats-card-value text-green-700" x-text="merchantStats?.approved_count || 0"></p>
             </div>
-            <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-              <span class="text-green-500 text-lg">✅</span>
-            </div>
+            <div class="stats-card-icon bg-gradient-to-br from-green-100 to-green-200 text-green-600">✅</div>
           </div>
           <p class="text-xs text-green-500 mt-2">审核通过并已发放积分</p>
         </div>
-        <div class="rounded-xl shadow-sm border-l-4 border-red-400 bg-gradient-to-r from-red-50 to-white p-4">
+        <div class="stats-card stats-danger stats-card-animate">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-xs text-red-600 font-medium uppercase tracking-wide">已拒绝</p>
-              <p class="text-3xl font-bold text-red-700 mt-1" x-text="merchantStats?.rejected_count || 0"></p>
+              <p class="stats-card-label">已拒绝</p>
+              <p class="stats-card-value text-red-700" x-text="merchantStats?.rejected_count || 0"></p>
             </div>
-            <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-              <span class="text-red-500 text-lg">❌</span>
-            </div>
+            <div class="stats-card-icon bg-gradient-to-br from-red-100 to-red-200 text-red-600">❌</div>
           </div>
           <p class="text-xs text-red-500 mt-2">申请不符合要求被驳回</p>
         </div>
-        <div class="rounded-xl shadow-sm border-l-4 border-blue-400 bg-gradient-to-r from-blue-50 to-white p-4">
+        <div class="stats-card stats-primary stats-card-animate">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-xs text-blue-600 font-medium uppercase tracking-wide">今日发放积分</p>
-              <p class="text-3xl font-bold text-blue-700 mt-1" x-text="formatNumber(merchantStats?.today_points || 0)"></p>
+              <p class="stats-card-label">今日发放积分</p>
+              <p class="stats-card-value text-blue-700" x-text="formatNumber(merchantStats?.today_points || 0)"></p>
             </div>
-            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-              <span class="text-blue-500 text-lg">🪙</span>
-            </div>
+            <div class="stats-card-icon bg-gradient-to-br from-blue-100 to-blue-200 text-blue-600">🪙</div>
           </div>
           <p class="text-xs text-blue-500 mt-2">今日审核通过发放的总积分</p>
         </div>
@@ -585,10 +585,13 @@
 
       <!-- 积分申请列表卡片 -->
       <div class="themed-card rounded-xl shadow-sm overflow-hidden border">
-        <div class="px-5 py-4 bg-gradient-to-r from-gray-50 to-white border-b flex items-center justify-between">
+        <div class="px-5 py-4 bg-gradient-to-r from-slate-50 to-white border-b flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <span class="text-lg">🪙</span>
-            <h5 class="font-semibold text-gray-800">商户积分申请列表</h5>
+            <span class="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center text-base">🪙</span>
+            <div>
+              <h5 class="font-semibold text-gray-800">商户积分申请列表</h5>
+              <p class="text-xs text-gray-400 mt-0.5">审核商户积分发放申请，支持批量操作</p>
+            </div>
           </div>
         </div>
 
@@ -671,24 +674,24 @@
           <!-- 数据表格 -->
           <div x-show="hasData" class="overflow-x-auto">
             <table class="w-full">
-              <thead class="bg-gray-50 border-b">
-                <tr>
+              <thead>
+                <tr class="bg-gradient-to-r from-gray-50 to-slate-50 border-b-2 border-gray-200">
                   <!-- 全选复选框 -->
-                  <th class="px-3 py-3 w-10">
+                  <th class="px-3 py-3.5 w-10">
                     <input type="checkbox" :checked="isAllSelected" :indeterminate="isPartialSelected"
                            @change="toggleSelectAll($event.target.checked)"
                            class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                            title="全选/取消全选">
                   </th>
                   <template x-for="col in columns" :key="col.key">
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
+                    <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
                         :class="{ 'cursor-pointer hover:text-gray-700': col.sortable }"
                         @click="sort(col)">
                       <span x-text="col.label"></span>
                       <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
                     </th>
                   </template>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">操作</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">操作</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
@@ -776,42 +779,76 @@
 
     <!-- 欠账管理 - 适配后端 debt-management API -->
     <div x-show="current_page === 'debt-management'" x-cloak>
-      <!-- 统计卡片 -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <h6 class="themed-text-muted text-sm mb-1">库存欠账数</h6>
-          <p class="text-2xl font-bold text-red-600" x-text="debtStats?.total_inventory_debt || 0"></p>
+      <!-- 统计卡片 - 使用统一 stats-card 组件 -->
+      <div class="stats-grid stats-grid-4 mb-6">
+        <div class="stats-card stats-danger stats-card-animate">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="stats-card-label">库存欠账数</p>
+              <p class="stats-card-value text-red-600" x-text="debtStats?.total_inventory_debt || 0"></p>
+            </div>
+            <div class="stats-card-icon bg-gradient-to-br from-red-100 to-red-200 text-red-600">📦</div>
+          </div>
+          <p class="text-xs themed-text-muted mt-2">奖品库存欠账待补充</p>
         </div>
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <h6 class="themed-text-muted text-sm mb-1">预算欠账额</h6>
-          <p class="text-2xl font-bold text-orange-600" x-text="formatAmount(debtStats?.total_budget_debt || 0)"></p>
+        <div class="stats-card stats-warning stats-card-animate">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="stats-card-label">预算欠账额</p>
+              <p class="stats-card-value text-orange-600" x-text="formatAmount(debtStats?.total_budget_debt || 0)"></p>
+            </div>
+            <div class="stats-card-icon bg-gradient-to-br from-orange-100 to-orange-200 text-orange-600">💸</div>
+          </div>
+          <p class="text-xs themed-text-muted mt-2">预算超支待冲销金额</p>
         </div>
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <h6 class="themed-text-muted text-sm mb-1">待处理</h6>
-          <p class="text-2xl font-bold text-yellow-600" x-text="debtStats?.pending_count || 0"></p>
+        <div class="stats-card stats-warning stats-card-animate" style="border-left-color: #eab308;">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="stats-card-label">待处理</p>
+              <p class="stats-card-value text-yellow-600" x-text="debtStats?.pending_count || 0"></p>
+            </div>
+            <div class="stats-card-icon bg-gradient-to-br from-yellow-100 to-yellow-200 text-yellow-600">⏳</div>
+          </div>
+          <p class="text-xs themed-text-muted mt-2">等待运营处理的欠账</p>
         </div>
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <h6 class="themed-text-muted text-sm mb-1">今日清偿</h6>
-          <p class="text-2xl font-bold text-green-600" x-text="debtStats?.cleared_today || 0"></p>
+        <div class="stats-card stats-success stats-card-animate">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="stats-card-label">今日清偿</p>
+              <p class="stats-card-value text-green-600" x-text="debtStats?.cleared_today || 0"></p>
+            </div>
+            <div class="stats-card-icon bg-gradient-to-br from-green-100 to-green-200 text-green-600">✅</div>
+          </div>
+          <p class="text-xs themed-text-muted mt-2">今日已完成清偿的记录</p>
         </div>
       </div>
 
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b">
-          <h5 class="font-semibold">📋 待冲销欠账列表</h5>
+      <div class="themed-card rounded-xl shadow-sm border overflow-hidden">
+        <div class="px-5 py-4 bg-gradient-to-r from-slate-50 to-white border-b flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center text-base">💳</span>
+            <div>
+              <h5 class="font-semibold text-gray-800">待冲销欠账列表</h5>
+              <p class="text-xs text-gray-400 mt-0.5">管理库存欠账和预算欠账，执行清偿操作</p>
+            </div>
+          </div>
         </div>
         <!-- data-table: 债务列表 -->
         <div x-data="debtDataTable()" x-init="init()">
-          <div class="p-4 border-b themed-bg-base">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <select x-model="activeFilters.debt_type" class="px-3 py-2 border rounded">
-                <option value="">全部类型</option>
-                <option value="inventory">库存欠账</option>
-                <option value="budget">预算欠账</option>
-              </select>
-              <input type="text" x-model="activeFilters.campaign_id" placeholder="活动ID" class="px-3 py-2 border rounded">
-              <button @click="search()" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">🔍 搜索</button>
-              <button @click="handleFilterReset()" class="px-4 py-2 bg-gray-300 themed-text-secondary rounded hover:bg-gray-400">重置</button>
+          <div class="p-4 border-b bg-gray-50/50">
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="flex-1 min-w-[160px] max-w-[200px]">
+                <select x-model="activeFilters.debt_type" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 bg-white">
+                  <option value="">全部类型</option>
+                  <option value="inventory">📦 库存欠账</option>
+                  <option value="budget">💸 预算欠账</option>
+                </select>
+              </div>
+              <div class="flex-1 min-w-[160px] max-w-[200px]">
+                <input type="text" x-model="activeFilters.campaign_id" placeholder="输入活动ID" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
+              </div>
+              <button @click="search()" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm">🔍 搜索</button>
+              <button @click="handleFilterReset()" class="px-4 py-2 text-sm bg-white text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition">↺ 重置</button>
             </div>
           </div>
           <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
@@ -821,29 +858,29 @@
           </div>
           <div x-show="hasData" class="overflow-x-auto">
             <table class="w-full">
-              <thead class="themed-bg-base">
-                <tr>
+              <thead>
+                <tr class="bg-gradient-to-r from-gray-50 to-slate-50 border-b-2 border-gray-200">
                   <template x-for="col in columns" :key="col.key">
-                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
-                        :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                    <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
+                        :class="{ 'cursor-pointer hover:text-gray-700': col.sortable }"
                         @click="sort(col)">
                       <span x-text="col.label"></span>
                       <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
                     </th>
                   </template>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">操作</th>
                 </tr>
               </thead>
-              <tbody class="divide-y">
+              <tbody class="divide-y divide-gray-100">
                 <template x-for="(row, idx) in data" :key="row.debt_id || idx">
-                  <tr class="themed-hover-bg">
+                  <tr class="hover:bg-gray-50 transition-colors">
                     <template x-for="col in columns" :key="col.key">
                       <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
                     </template>
                     <td class="px-4 py-3">
-                      <div class="flex space-x-2">
-                        <button @click="$dispatch('view-debt-detail', row)" class="themed-text-primary hover:text-blue-700 text-sm">详情</button>
-                        <button @click="$dispatch('open-repay', row)" class="text-green-500 hover:text-green-700 text-sm">清偿</button>
+                      <div class="flex items-center gap-1">
+                        <button @click="$dispatch('view-debt-detail', row)" class="px-2.5 py-1 text-xs text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition font-medium">📋 详情</button>
+                        <button @click="$dispatch('open-repay', row)" class="px-2.5 py-1 text-xs text-green-700 bg-green-50 rounded-md hover:bg-green-100 transition font-medium">💵 清偿</button>
                       </div>
                     </td>
                   </tr>
@@ -851,9 +888,12 @@
               </tbody>
             </table>
           </div>
-          <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
-            <div class="text-4xl mb-4">📋</div>
-            <p>暂无待冲销欠账记录</p>
+          <div x-show="isEmpty" class="p-12 text-center">
+            <div class="inline-flex flex-col items-center">
+              <span class="text-5xl mb-3">✅</span>
+              <p class="text-gray-500 font-medium">暂无待冲销欠账</p>
+              <p class="text-xs text-gray-400 mt-1">所有欠账已清偿或暂无新增欠账记录</p>
+            </div>
           </div>
           <template x-if="total_pages > 1">
             <div class="p-4 border-t flex justify-between items-center">
@@ -876,45 +916,84 @@
 
     <!-- 活动预算管理 -->
     <div x-show="current_page === 'campaign-budget'" x-cloak>
-      <!-- 预算统计卡片 -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <h6 class="themed-text-muted text-sm mb-1">总预算</h6>
-          <p class="text-2xl font-bold themed-text-primary" x-text="budgetStats?.total_budget || 0"></p>
+      <!-- 预算统计卡片 - 使用统一 stats-card 组件 -->
+      <div class="stats-grid stats-grid-4 mb-6">
+        <div class="stats-card stats-primary stats-card-animate">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="stats-card-label">总预算</p>
+              <p class="stats-card-value themed-text-primary" x-text="budgetStats?.total_budget || 0"></p>
+            </div>
+            <div class="stats-card-icon bg-gradient-to-br from-blue-100 to-blue-200 text-blue-600">🏦</div>
+          </div>
+          <p class="text-xs themed-text-muted mt-2">所有活动的预算总额</p>
         </div>
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <h6 class="themed-text-muted text-sm mb-1">已使用</h6>
-          <p class="text-2xl font-bold text-orange-600" x-text="budgetStats?.used_budget || 0"></p>
+        <div class="stats-card stats-warning stats-card-animate">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="stats-card-label">已使用</p>
+              <p class="stats-card-value text-orange-600" x-text="budgetStats?.used_budget || 0"></p>
+            </div>
+            <div class="stats-card-icon bg-gradient-to-br from-orange-100 to-orange-200 text-orange-600">📊</div>
+          </div>
+          <p class="text-xs themed-text-muted mt-2">已消耗的预算额度</p>
         </div>
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <h6 class="themed-text-muted text-sm mb-1">剩余预算</h6>
-          <p class="text-2xl font-bold text-green-600" x-text="budgetStats?.remaining_budget || 0"></p>
+        <div class="stats-card stats-success stats-card-animate">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="stats-card-label">剩余预算</p>
+              <p class="stats-card-value text-green-600" x-text="budgetStats?.remaining_budget || 0"></p>
+            </div>
+            <div class="stats-card-icon bg-gradient-to-br from-green-100 to-green-200 text-green-600">💰</div>
+          </div>
+          <p class="text-xs themed-text-muted mt-2">当前可用预算余额</p>
         </div>
-        <div class="themed-card rounded-lg shadow p-4 text-center">
-          <h6 class="themed-text-muted text-sm mb-1">使用率</h6>
-          <p class="text-2xl font-bold" :class="(budgetStats?.utilization_rate || 0) > 80 ? 'text-red-600' : 'text-green-600'" x-text="(budgetStats?.utilization_rate || 0) + '%'"></p>
+        <div class="stats-card stats-card-animate" :class="(budgetStats?.utilization_rate || 0) > 80 ? 'stats-danger' : 'stats-success'">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="stats-card-label">使用率</p>
+              <p class="stats-card-value" :class="(budgetStats?.utilization_rate || 0) > 80 ? 'text-red-600' : 'text-green-600'" x-text="(budgetStats?.utilization_rate || 0) + '%'"></p>
+            </div>
+            <div class="stats-card-icon" :class="(budgetStats?.utilization_rate || 0) > 80 ? 'bg-gradient-to-br from-red-100 to-red-200 text-red-600' : 'bg-gradient-to-br from-green-100 to-green-200 text-green-600'">
+              <span x-text="(budgetStats?.utilization_rate || 0) > 80 ? '⚠️' : '📈'"></span>
+            </div>
+          </div>
+          <p class="text-xs themed-text-muted mt-2">
+            <span x-show="(budgetStats?.utilization_rate || 0) > 80" class="text-red-500">预算即将耗尽，请关注</span>
+            <span x-show="(budgetStats?.utilization_rate || 0) <= 80">预算使用比例正常</span>
+          </p>
         </div>
       </div>
 
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b">
-          <h5 class="font-semibold">📊 活动预算列表</h5>
+      <div class="themed-card rounded-xl shadow-sm border overflow-hidden">
+        <div class="px-5 py-4 bg-gradient-to-r from-slate-50 to-white border-b flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-base">📊</span>
+            <div>
+              <h5 class="font-semibold text-gray-800">活动预算列表</h5>
+              <p class="text-xs text-gray-400 mt-0.5">查看各活动预算使用情况，调整预算配置</p>
+            </div>
+          </div>
         </div>
         <!-- data-table: 活动预算列表 -->
         <div x-data="budgetDataTable()" x-init="init()">
-          <div class="p-4 border-b themed-bg-base">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <input type="text" x-model="activeFilters.lottery_campaign_id" placeholder="活动ID" class="px-3 py-2 border rounded">
-              <input type="text" x-model="activeFilters.keyword" placeholder="活动名称关键词" class="px-3 py-2 border rounded">
-              <select x-model="activeFilters.status" class="px-3 py-2 border rounded">
-                <option value="">全部状态</option>
-                <option value="active">运行中</option>
-                <option value="exhausted">已耗尽</option>
-              </select>
-              <div class="flex space-x-2">
-                <button @click="search()" class="flex-1 px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">🔍 搜索</button>
-                <button @click="handleFilterReset()" class="px-4 py-2 bg-gray-300 themed-text-secondary rounded hover:bg-gray-400">🔄</button>
+          <div class="p-4 border-b bg-gray-50/50">
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="flex-1 min-w-[140px] max-w-[180px]">
+                <input type="text" x-model="activeFilters.lottery_campaign_id" placeholder="输入活动ID" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
               </div>
+              <div class="flex-1 min-w-[160px] max-w-[220px]">
+                <input type="text" x-model="activeFilters.keyword" placeholder="活动名称关键词" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
+              </div>
+              <div class="flex-1 min-w-[140px] max-w-[160px]">
+                <select x-model="activeFilters.status" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 bg-white">
+                  <option value="">全部状态</option>
+                  <option value="active">🟢 运行中</option>
+                  <option value="exhausted">🔴 已耗尽</option>
+                </select>
+              </div>
+              <button @click="search()" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm">🔍 搜索</button>
+              <button @click="handleFilterReset()" class="px-4 py-2 text-sm bg-white text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition">↺ 重置</button>
             </div>
           </div>
           <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
@@ -924,29 +1003,29 @@
           </div>
           <div x-show="hasData" class="overflow-x-auto">
             <table class="w-full">
-              <thead class="themed-bg-base">
-                <tr>
+              <thead>
+                <tr class="bg-gradient-to-r from-gray-50 to-slate-50 border-b-2 border-gray-200">
                   <template x-for="col in columns" :key="col.key">
-                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
-                        :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                    <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
+                        :class="{ 'cursor-pointer hover:text-gray-700': col.sortable }"
                         @click="sort(col)">
                       <span x-text="col.label"></span>
                       <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
                     </th>
                   </template>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">操作</th>
                 </tr>
               </thead>
-              <tbody class="divide-y">
+              <tbody class="divide-y divide-gray-100">
                 <template x-for="(row, idx) in data" :key="row.budget_id || idx">
-                  <tr class="themed-hover-bg">
+                  <tr class="hover:bg-gray-50 transition-colors">
                     <template x-for="col in columns" :key="col.key">
                       <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
                     </template>
                     <td class="px-4 py-3">
-                      <div class="flex space-x-2">
-                        <button @click="$dispatch('view-budget-detail', row)" class="themed-text-primary hover:text-blue-700 text-sm">详情</button>
-                        <button @click="$dispatch('open-edit-budget', row)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                      <div class="flex items-center gap-1">
+                        <button @click="$dispatch('view-budget-detail', row)" class="px-2.5 py-1 text-xs text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition font-medium">📋 详情</button>
+                        <button @click="$dispatch('open-edit-budget', row)" class="px-2.5 py-1 text-xs text-green-700 bg-green-50 rounded-md hover:bg-green-100 transition font-medium">✏️ 编辑</button>
                       </div>
                     </td>
                   </tr>
@@ -954,9 +1033,12 @@
               </tbody>
             </table>
           </div>
-          <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
-            <div class="text-4xl mb-4">📊</div>
-            <p>暂无活动预算数据</p>
+          <div x-show="isEmpty" class="p-12 text-center">
+            <div class="inline-flex flex-col items-center">
+              <span class="text-5xl mb-3">📊</span>
+              <p class="text-gray-500 font-medium">暂无活动预算数据</p>
+              <p class="text-xs text-gray-400 mt-1">创建抽奖活动后，预算信息将在此处展示</p>
+            </div>
           </div>
           <template x-if="total_pages > 1">
             <div class="p-4 border-t flex justify-between items-center">
@@ -979,36 +1061,55 @@
 
     <!-- 商户日志 -->
     <div x-show="current_page === 'merchant-logs'" x-cloak>
-      <div class="themed-card rounded-lg shadow">
-        <div class="p-4 border-b">
-          <h5 class="font-semibold">📋 商户操作日志</h5>
+      <div class="themed-card rounded-xl shadow-sm border overflow-hidden">
+        <div class="px-5 py-4 bg-gradient-to-r from-slate-50 to-white border-b flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center text-base">📝</span>
+            <div>
+              <h5 class="font-semibold text-gray-800">商户操作日志</h5>
+              <p class="text-xs text-gray-400 mt-0.5">追踪商户端所有操作记录，包括扫码、消费提交、员工管理等</p>
+            </div>
+          </div>
         </div>
         <!-- data-table: 商户操作日志 -->
         <div x-data="merchantLogsDataTable()" x-init="init()">
-          <div class="p-4 border-b themed-bg-base">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <input type="text" x-model="activeFilters.operator_mobile" placeholder="操作人手机号" maxlength="11" class="px-3 py-2 border rounded">
-              <select x-model="activeFilters.operation_type" class="px-3 py-2 border rounded">
-                <option value="">全部操作类型</option>
-                <option value="scan_user">扫码获取用户信息</option>
-                <option value="submit_consumption">提交消费记录</option>
-                <option value="view_consumption_list">查看消费记录列表</option>
-                <option value="view_consumption_detail">查看消费记录详情</option>
-                <option value="staff_login">员工登录</option>
-                <option value="staff_logout">员工登出</option>
-                <option value="staff_add">员工入职</option>
-                <option value="staff_transfer">员工调店</option>
-                <option value="staff_disable">员工禁用</option>
-                <option value="staff_enable">员工启用</option>
-              </select>
-              <div class="flex items-center gap-1">
-                <input type="date" x-model="activeFilters.start_time" class="px-3 py-2 border rounded" title="开始日期">
-                <span class="text-gray-400">~</span>
-                <input type="date" x-model="activeFilters.end_time" class="px-3 py-2 border rounded" title="结束日期">
+          <div class="p-4 border-b bg-gray-50/50">
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="flex-1 min-w-[160px] max-w-[200px]">
+                <label class="block text-xs font-medium text-gray-500 mb-1">操作人手机号</label>
+                <input type="text" x-model="activeFilters.operator_mobile" placeholder="输入手机号" maxlength="11" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
               </div>
-              <div class="flex space-x-2">
-                <button @click="search()" class="flex-1 px-4 py-2 themed-btn-primary rounded">🔍 搜索</button>
-                <button @click="handleFilterReset()" class="px-4 py-2 bg-gray-300 themed-text-secondary rounded hover:bg-gray-400">🔄</button>
+              <div class="flex-1 min-w-[180px] max-w-[220px]">
+                <label class="block text-xs font-medium text-gray-500 mb-1">操作类型</label>
+                <select x-model="activeFilters.operation_type" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 bg-white">
+                  <option value="">全部操作类型</option>
+                  <optgroup label="消费相关">
+                    <option value="scan_user">📱 扫码获取用户信息</option>
+                    <option value="submit_consumption">💰 提交消费记录</option>
+                    <option value="view_consumption_list">📋 查看消费记录列表</option>
+                    <option value="view_consumption_detail">🔍 查看消费记录详情</option>
+                  </optgroup>
+                  <optgroup label="员工管理">
+                    <option value="staff_login">🔑 员工登录</option>
+                    <option value="staff_logout">🚪 员工登出</option>
+                    <option value="staff_add">➕ 员工入职</option>
+                    <option value="staff_transfer">🔄 员工调店</option>
+                    <option value="staff_disable">🚫 员工禁用</option>
+                    <option value="staff_enable">✅ 员工启用</option>
+                  </optgroup>
+                </select>
+              </div>
+              <div class="flex-1 min-w-[260px] max-w-[320px]">
+                <label class="block text-xs font-medium text-gray-500 mb-1">时间范围</label>
+                <div class="flex items-center gap-1">
+                  <input type="date" x-model="activeFilters.start_time" class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400" title="开始日期">
+                  <span class="text-gray-400 text-sm">至</span>
+                  <input type="date" x-model="activeFilters.end_time" class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400" title="结束日期">
+                </div>
+              </div>
+              <div class="flex items-end gap-2 pt-5">
+                <button @click="search()" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm">🔍 搜索</button>
+                <button @click="handleFilterReset()" class="px-4 py-2 text-sm bg-white text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition">↺ 重置</button>
               </div>
             </div>
           </div>
@@ -1019,11 +1120,11 @@
           </div>
           <div x-show="hasData" class="overflow-x-auto">
             <table class="w-full">
-              <thead class="themed-bg-base">
-                <tr>
+              <thead>
+                <tr class="bg-gradient-to-r from-gray-50 to-slate-50 border-b-2 border-gray-200">
                   <template x-for="col in columns" :key="col.key">
-                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
-                        :class="{ 'cursor-pointer hover:themed-text-primary': col.sortable }"
+                    <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
+                        :class="{ 'cursor-pointer hover:text-gray-700': col.sortable }"
                         @click="sort(col)">
                       <span x-text="col.label"></span>
                       <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
@@ -1031,9 +1132,9 @@
                   </template>
                 </tr>
               </thead>
-              <tbody class="divide-y">
+              <tbody class="divide-y divide-gray-100">
                 <template x-for="(row, idx) in data" :key="row.id || idx">
-                  <tr class="themed-hover-bg">
+                  <tr class="hover:bg-gray-50 transition-colors">
                     <template x-for="col in columns" :key="col.key">
                       <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
                     </template>
@@ -1042,9 +1143,12 @@
               </tbody>
             </table>
           </div>
-          <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
-            <div class="text-4xl mb-4">📋</div>
-            <p>暂无商户操作日志</p>
+          <div x-show="isEmpty" class="p-12 text-center">
+            <div class="inline-flex flex-col items-center">
+              <span class="text-5xl mb-3">📝</span>
+              <p class="text-gray-500 font-medium">暂无商户操作日志</p>
+              <p class="text-xs text-gray-400 mt-1">商户端操作记录将在此处自动记录</p>
+            </div>
           </div>
           <template x-if="total_pages > 1">
             <div class="p-4 border-t flex justify-between items-center">
@@ -1060,15 +1164,6 @@
           </template>
           <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
             最后更新: <span x-text="lastUpdateTime"></span>
-          </div>
-        </div>
-        <!-- 旧分页占位 -->
-        <div class="hidden" x-show="false">
-          <span class="text-sm themed-text-muted">共 <span x-text="financePagination.total"></span> 条记录</span>
-          <div class="flex space-x-1">
-            <button @click="changePage(financePagination.page - 1)" :disabled="financePagination.page <= 1" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">上一页</button>
-            <span class="px-3 py-1 text-sm">第 <span x-text="financePagination.page"></span> / <span x-text="financeTotalPages"></span> 页</span>
-            <button @click="changePage(financePagination.page + 1)" :disabled="financePagination.page >= financeTotalPages" class="px-3 py-1 border rounded text-sm themed-hover-bg disabled:opacity-50">下一页</button>
           </div>
         </div>
       </div>
@@ -1256,12 +1351,12 @@
             <h6 class="font-medium mb-3">清偿记录</h6>
             <div class="space-y-2">
               <template x-for="record in selectedDebt?.clear_records || []" :key="record.record_id">
-                <div class="themed-bg-base rounded p-3 flex justify-between items-center">
+                <div class="bg-green-50/50 border border-green-100 rounded-lg p-3 flex justify-between items-center">
                   <div>
-                    <span class="font-mono text-green-600" x-text="'¥' + (payment.amount / 100).toFixed(2)"></span>
-                    <span class="themed-text-muted text-sm ml-2" x-text="formatDateOnly(payment.created_at)"></span>
+                    <span class="font-mono text-green-600 font-medium" x-text="'¥' + Number(record.amount || 0).toFixed(2)"></span>
+                    <span class="themed-text-muted text-sm ml-2" x-text="formatDateOnly(record.created_at)"></span>
                   </div>
-                  <span class="text-gray-400 text-sm" x-text="payment.remark || ''"></span>
+                  <span class="text-gray-400 text-sm" x-text="record.remark || ''"></span>
                 </div>
               </template>
             </div>

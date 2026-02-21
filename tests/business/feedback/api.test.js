@@ -251,7 +251,7 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
           expect(feedback).not.toHaveProperty('admin_id')
 
           // 验证：应该包含必要字段
-          expect(feedback).toHaveProperty('id') // 通用id字段（DataSanitizer转换）
+          expect(feedback).toHaveProperty('feedback_id') // {entity}_id 主键命名规范
           expect(feedback).toHaveProperty('category')
           expect(feedback).toHaveProperty('content')
           expect(feedback).toHaveProperty('status')
@@ -286,7 +286,7 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
        * 验证：返回的所有反馈都属于当前用户
        * 注意：DataSanitizer不返回user_id（已脱敏），但可以通过数据库验证
        */
-      const feedback_ids = response.body.data.feedbacks.map(f => f.id)
+      const feedback_ids = response.body.data.feedbacks.map(f => f.feedback_id)
 
       if (feedback_ids.length > 0) {
         // 从数据库验证：所有反馈的user_id都是test_user_id

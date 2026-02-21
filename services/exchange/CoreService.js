@@ -482,9 +482,9 @@ class CoreService {
       throw error
     }
 
-    // 更新评分
     await order.update(
       {
+        status: 'rated',
         rating,
         rated_at: BeijingTimeHelper.createDatabaseTime()
       },

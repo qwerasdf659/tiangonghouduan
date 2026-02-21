@@ -715,10 +715,12 @@ class BalanceService {
         )
       }
 
-      // 验证冻结余额充足
-      if (balance.frozen_amount < amount) {
+      // 验证冻结余额充足（强制 Number() 防御 DECIMAL 字符串比较）
+      const currentFrozen = Number(balance.frozen_amount)
+      const unfreezeAmount = Number(amount)
+      if (currentFrozen < unfreezeAmount) {
         throw new Error(
-          `冻结余额不足：当前冻结余额${balance.frozen_amount}个${asset_code}，需要解冻${amount}个，差额${amount - balance.frozen_amount}个`
+          `冻结余额不足：当前冻结余额${currentFrozen}个${asset_code}，需要解冻${unfreezeAmount}个，差额${unfreezeAmount - currentFrozen}个`
         )
       }
 

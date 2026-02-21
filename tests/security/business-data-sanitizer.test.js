@@ -144,40 +144,45 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
   })
 
   /**
-   * B-5-2: 库存数据脱敏测试
+   * B-5-2: 库存数据脱敏测试（γ 模式白名单）
    *
-   * 业务场景：用户查看自己的库存物品时，隐藏核销码等敏感信息
-   * 安全要求：verification_code 脱敏显示，source_id 等内部标识不暴露
+   * 业务场景：用户查看自己的库存物品时，通过白名单机制只输出安全字段
+   * 安全策略（γ 模式重构后）：不再对敏感字段做脱敏，而是完全不输出
+   *   - verification_code → 不输出（改用 has_redemption_code 布尔标识）
+   *   - source_id / owner_user_id / item_template_id → 不输出
    */
   describe('B-5-2 库存数据脱敏（sanitizeInventory）', () => {
     const mockInventory = [
       {
         item_instance_id: 1,
+        item_type: 'voucher',
         name: '测试券',
         description: '测试描述',
-        icon: '🎫',
-        type: 'voucher',
-        value: 100,
+        rarity: 'common',
         status: 'available',
-        source_type: 'lottery',
-        source_id: 123,
-        verification_code: 'A1B2C3D4',
-        verification_expires_at: '2026-02-28',
+        has_redemption_code: true,
         acquired_at: '2026-01-01',
         expires_at: '2026-12-31',
-        used_at: null,
-        transfer_count: 0,
-        last_transfer_at: null,
-        last_transfer_from: null,
+        allowed_actions: ['redeem', 'sell'],
+        status_display_name: '可用',
+        item_type_display_name: '兑换券',
+        rarity_display_name: '普通',
         created_at: '2026-01-01',
-        updated_at: '2026-01-01'
+        updated_at: '2026-01-01',
+        owner_user_id: 31,
+        item_template_id: 5,
+        source: 'lottery',
+        verification_code: 'A1B2C3D4',
+        verification_expires_at: '2026-02-28',
+        source_id: 123
       }
     ]
 
-    test('B-5-2-1 普通用户（public）核销码脱敏为******', () => {
+    test('B-5-2-1 普通用户（public）白名单排除核销码明文', () => {
       const result = DataSanitizer.sanitizeInventory(mockInventory, 'public')
 
-      expect(result[0].verification_code).toBe('******')
+      expect(result[0]).not.toHaveProperty('verification_code')
+      expect(result[0].has_redemption_code).toBe(true)
     })
 
     test('B-5-2-2 普通用户（public）不可见 verification_expires_at', () => {
@@ -192,10 +197,19 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       expect(result[0]).not.toHaveProperty('source_id')
     })
 
-    test('B-5-2-4 管理员（full）可见完整核销码', () => {
+    test('B-5-2-4 管理员（full）可见完整原始数据', () => {
       const result = DataSanitizer.sanitizeInventory(mockInventory, 'full')
 
       expect(result[0].verification_code).toBe('A1B2C3D4')
+      expect(result[0].source_id).toBe(123)
+    })
+
+    test('B-5-2-5 普通用户（public）输出描述性 item_instance_id 字段', () => {
+      const result = DataSanitizer.sanitizeInventory(mockInventory, 'public')
+
+      expect(result[0]).toHaveProperty('item_instance_id')
+      expect(result[0].item_instance_id).toBe(1)
+      expect(result[0]).not.toHaveProperty('id')
     })
   })
 
@@ -714,6 +728,316 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       expect(DataSanitizer.maskAdminName('张三')).toBe('客服三')
       expect(DataSanitizer.maskAdminName(null)).toBe('客服')
       expect(DataSanitizer.maskAdminName('')).toBe('客服')
+    })
+  })
+
+  /**
+   * B-5-11: 交易市场挂单数据脱敏测试（γ 重写方法）
+   *
+   * 业务场景：用户浏览交易市场时，脱敏卖家信息和内部字段
+   * 安全要求：locked_by_order_id、seller_contact、transaction_fees 等不对外暴露
+   */
+  describe('B-5-11 交易市场挂单脱敏（sanitizeMarketProducts）', () => {
+    const mockListings = [
+      {
+        market_listing_id: 101,
+        listing_kind: 'item_instance',
+        seller_user_id: 31,
+        seller_nickname: '张三丰',
+        seller_avatar_url: 'https://example.com/avatar1.jpg',
+        offer_item_display_name: '红宝石碎片',
+        offer_item_category_code: 'material',
+        price_amount: 500,
+        price_asset_code: 'DIAMOND',
+        status: 'on_sale',
+        item_info: { rarity: 'rare' },
+        asset_info: null,
+        created_at: '2026-02-01T10:00:00.000+08:00',
+        locked_by_order_id: 3200,
+        seller_contact: '13612227930',
+        transaction_fees: 25,
+        profit_analysis: { margin: 0.3 },
+        internal_remark: '测试挂单'
+      },
+      {
+        market_listing_id: 102,
+        listing_kind: 'fungible_asset',
+        seller_user_id: 32,
+        seller_nickname: '李四',
+        seller_avatar_url: null,
+        offer_item_display_name: '积分',
+        offer_item_category_code: 'currency',
+        price_amount: 100,
+        price_asset_code: 'DIAMOND',
+        status: 'on_sale',
+        item_info: null,
+        asset_info: { amount: 1000 },
+        created_at: '2026-02-01T11:00:00.000+08:00',
+        locked_by_order_id: null,
+        seller_contact: '13800138000',
+        transaction_fees: 5,
+        internal_remark: null
+      }
+    ]
+
+    test('B-5-11-1 普通用户（public）不可见 locked_by_order_id', () => {
+      const result = DataSanitizer.sanitizeMarketProducts(mockListings, 'public')
+
+      result.forEach(item => {
+        expect(item).not.toHaveProperty('locked_by_order_id')
+      })
+    })
+
+    test('B-5-11-2 普通用户（public）不可见 seller_contact', () => {
+      const result = DataSanitizer.sanitizeMarketProducts(mockListings, 'public')
+
+      result.forEach(item => {
+        expect(item).not.toHaveProperty('seller_contact')
+      })
+    })
+
+    test('B-5-11-3 普通用户（public）不可见 transaction_fees 和 profit_analysis', () => {
+      const result = DataSanitizer.sanitizeMarketProducts(mockListings, 'public')
+
+      result.forEach(item => {
+        expect(item).not.toHaveProperty('transaction_fees')
+        expect(item).not.toHaveProperty('profit_analysis')
+        expect(item).not.toHaveProperty('internal_remark')
+      })
+    })
+
+    test('B-5-11-4 普通用户（public）主键映射 market_listing_id → listing_id', () => {
+      const result = DataSanitizer.sanitizeMarketProducts(mockListings, 'public')
+
+      expect(result[0].listing_id).toBe(101)
+      expect(result[1].listing_id).toBe(102)
+      expect(result[0]).not.toHaveProperty('market_listing_id')
+    })
+
+    test('B-5-11-5 普通用户（public）seller_nickname 经 maskUserName 脱敏', () => {
+      const result = DataSanitizer.sanitizeMarketProducts(mockListings, 'public')
+
+      expect(result[0].seller_nickname).toBe('张*丰')
+      expect(result[1].seller_nickname).toBe('李四')
+    })
+
+    test('B-5-11-6 普通用户（public）保留业务必需字段', () => {
+      const result = DataSanitizer.sanitizeMarketProducts(mockListings, 'public')
+
+      result.forEach(item => {
+        expect(item).toHaveProperty('listing_id')
+        expect(item).toHaveProperty('listing_kind')
+        expect(item).toHaveProperty('price_amount')
+        expect(item).toHaveProperty('price_asset_code')
+        expect(item).toHaveProperty('status')
+        expect(item).toHaveProperty('offer_item_display_name')
+        expect(item).toHaveProperty('created_at')
+      })
+    })
+
+    test('B-5-11-7 管理员（full）可见完整原始数据', () => {
+      const result = DataSanitizer.sanitizeMarketProducts(mockListings, 'full')
+
+      expect(result).toEqual(mockListings)
+    })
+  })
+
+  /**
+   * B-5-12: 积分记录脱敏测试（γ 重写方法 - 委托 _sanitizeAssetTransactions）
+   *
+   * 业务场景：用户查看积分流水时，脱敏内部字段
+   * 安全要求：account_id、idempotency_key、frozen_amount_change、BUDGET_POINTS 记录不暴露
+   */
+  describe('B-5-12 积分记录脱敏（sanitizePointsRecords）', () => {
+    const mockRecords = [
+      {
+        asset_transaction_id: 501,
+        asset_code: 'POINTS',
+        business_type: 'lottery_consume',
+        delta_amount: -100,
+        balance_before: 5000,
+        balance_after: 4900,
+        created_at: '2026-02-01T10:00:00.000+08:00',
+        account_id: 7,
+        idempotency_key: 'test_key_001',
+        frozen_amount_change: 0,
+        lottery_session_id: 123,
+        meta: { description: '抽奖消耗100积分' }
+      },
+      {
+        asset_transaction_id: 502,
+        asset_code: 'POINTS',
+        business_type: 'lottery_reward',
+        delta_amount: 500,
+        balance_before: 4900,
+        balance_after: 5400,
+        created_at: '2026-02-01T10:01:00.000+08:00',
+        account_id: 7,
+        idempotency_key: 'test_key_002',
+        frozen_amount_change: 0,
+        lottery_session_id: 123,
+        meta: { description: '抽奖奖励500积分' }
+      },
+      {
+        asset_transaction_id: 503,
+        asset_code: 'BUDGET_POINTS',
+        business_type: 'budget_deduction',
+        delta_amount: -500,
+        balance_before: 100000,
+        balance_after: 99500,
+        created_at: '2026-02-01T10:01:00.000+08:00',
+        account_id: 1,
+        idempotency_key: 'budget_key_001',
+        frozen_amount_change: 0,
+        lottery_session_id: null,
+        meta: {}
+      }
+    ]
+
+    test('B-5-12-1 普通用户（public）不可见 account_id', () => {
+      const result = DataSanitizer.sanitizePointsRecords(mockRecords, 'public')
+
+      result.forEach(record => {
+        expect(record).not.toHaveProperty('account_id')
+      })
+    })
+
+    test('B-5-12-2 普通用户（public）不可见 idempotency_key', () => {
+      const result = DataSanitizer.sanitizePointsRecords(mockRecords, 'public')
+
+      result.forEach(record => {
+        expect(record).not.toHaveProperty('idempotency_key')
+      })
+    })
+
+    test('B-5-12-3 普通用户（public）不可见 frozen_amount_change 和 lottery_session_id', () => {
+      const result = DataSanitizer.sanitizePointsRecords(mockRecords, 'public')
+
+      result.forEach(record => {
+        expect(record).not.toHaveProperty('frozen_amount_change')
+        expect(record).not.toHaveProperty('lottery_session_id')
+      })
+    })
+
+    test('B-5-12-4 普通用户（public）过滤 BUDGET_POINTS 记录', () => {
+      const result = DataSanitizer.sanitizePointsRecords(mockRecords, 'public')
+
+      expect(result.length).toBe(2)
+      result.forEach(record => {
+        expect(record.asset_code).not.toBe('BUDGET_POINTS')
+      })
+    })
+
+    test('B-5-12-5 普通用户（public）主键映射 asset_transaction_id → transaction_id', () => {
+      const result = DataSanitizer.sanitizePointsRecords(mockRecords, 'public')
+
+      expect(result[0].transaction_id).toBe(501)
+      expect(result[0]).not.toHaveProperty('asset_transaction_id')
+    })
+
+    test('B-5-12-6 普通用户（public）business_type_display 中文映射', () => {
+      const result = DataSanitizer.sanitizePointsRecords(mockRecords, 'public')
+
+      expect(result[0].business_type_display).toBe('抽奖消耗')
+      expect(result[1].business_type_display).toBe('抽奖奖励')
+    })
+
+    test('B-5-12-7 普通用户（public）meta.description 提取为顶层 description', () => {
+      const result = DataSanitizer.sanitizePointsRecords(mockRecords, 'public')
+
+      expect(result[0].description).toBe('抽奖消耗100积分')
+      expect(result[0]).not.toHaveProperty('meta')
+    })
+
+    test('B-5-12-8 管理员（full）可见完整原始数据', () => {
+      const result = DataSanitizer.sanitizePointsRecords(mockRecords, 'full')
+
+      expect(result).toEqual(mockRecords)
+    })
+  })
+
+  /**
+   * B-5-13: 交易记录脱敏测试（γ 重写方法 - 与 sanitizePointsRecords 共享实现）
+   *
+   * 业务场景：用户查看资产交易流水时，脱敏内部字段
+   * 安全要求：与积分记录相同的脱敏规则（共享 _sanitizeAssetTransactions 实现）
+   */
+  describe('B-5-13 交易记录脱敏（sanitizeTransactionRecords）', () => {
+    const mockTransactions = [
+      {
+        asset_transaction_id: 601,
+        asset_code: 'DIAMOND',
+        business_type: 'market_listing_freeze',
+        delta_amount: -500,
+        balance_before: 10000,
+        balance_after: 9500,
+        created_at: '2026-02-01T12:00:00.000+08:00',
+        account_id: 7,
+        idempotency_key: 'market_freeze_001',
+        frozen_amount_change: 500,
+        lottery_session_id: null,
+        meta: { title: '市场挂单冻结500钻石' }
+      },
+      {
+        asset_transaction_id: 602,
+        asset_code: 'DIAMOND',
+        business_type: 'order_settle_seller_credit',
+        delta_amount: 300,
+        balance_before: 9500,
+        balance_after: 9800,
+        created_at: '2026-02-01T13:00:00.000+08:00',
+        account_id: 7,
+        idempotency_key: 'settle_seller_001',
+        frozen_amount_change: 0,
+        lottery_session_id: null,
+        meta: { title: '卖出商品收入300钻石' }
+      }
+    ]
+
+    test('B-5-13-1 普通用户（public）不可见内部字段', () => {
+      const result = DataSanitizer.sanitizeTransactionRecords(mockTransactions, 'public')
+
+      result.forEach(record => {
+        expect(record).not.toHaveProperty('account_id')
+        expect(record).not.toHaveProperty('idempotency_key')
+        expect(record).not.toHaveProperty('frozen_amount_change')
+        expect(record).not.toHaveProperty('lottery_session_id')
+      })
+    })
+
+    test('B-5-13-2 普通用户（public）主键映射和中文映射', () => {
+      const result = DataSanitizer.sanitizeTransactionRecords(mockTransactions, 'public')
+
+      expect(result[0].transaction_id).toBe(601)
+      expect(result[0].business_type_display).toBe('市场挂单冻结')
+      expect(result[1].business_type_display).toBe('卖出收入')
+    })
+
+    test('B-5-13-3 普通用户（public）meta.title 提取为顶层 description', () => {
+      const result = DataSanitizer.sanitizeTransactionRecords(mockTransactions, 'public')
+
+      expect(result[0].description).toBe('市场挂单冻结500钻石')
+      expect(result[1].description).toBe('卖出商品收入300钻石')
+    })
+
+    test('B-5-13-4 普通用户（public）保留业务必需字段', () => {
+      const result = DataSanitizer.sanitizeTransactionRecords(mockTransactions, 'public')
+
+      result.forEach(record => {
+        expect(record).toHaveProperty('transaction_id')
+        expect(record).toHaveProperty('asset_code')
+        expect(record).toHaveProperty('business_type')
+        expect(record).toHaveProperty('delta_amount')
+        expect(record).toHaveProperty('balance_before')
+        expect(record).toHaveProperty('balance_after')
+        expect(record).toHaveProperty('created_at')
+      })
+    })
+
+    test('B-5-13-5 管理员（full）可见完整原始数据', () => {
+      const result = DataSanitizer.sanitizeTransactionRecords(mockTransactions, 'full')
+
+      expect(result).toEqual(mockTransactions)
     })
   })
 })

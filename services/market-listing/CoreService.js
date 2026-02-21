@@ -622,7 +622,7 @@ class MarketListingCoreService {
               amount: order.gross_amount,
               meta: {
                 order_action: 'withdraw_unfreeze',
-                order_id: order.order_id,
+                trade_order_id: order.trade_order_id,
                 market_listing_id,
                 unfreeze_reason: `挂牌 ${market_listing_id} 被卖家撤回`
               }
@@ -645,18 +645,18 @@ class MarketListingCoreService {
         )
 
         cancelledOrders.push({
-          order_id: order.order_id,
+          trade_order_id: order.trade_order_id,
           buyer_user_id: order.buyer_user_id,
           asset_code: order.asset_code,
           amount: order.gross_amount,
           original_status: order.status
         })
       } catch (orderError) {
-        logger.error(`[MarketListingCoreService] 取消订单 ${order.order_id} 失败`, {
+        logger.error(`[MarketListingCoreService] 取消订单 ${order.trade_order_id} 失败`, {
           error: orderError.message
         })
         cancelledOrders.push({
-          order_id: order.order_id,
+          trade_order_id: order.trade_order_id,
           status: 'failed',
           error: orderError.message
         })
@@ -1074,9 +1074,24 @@ class MarketListingCoreService {
   static async adminForceWithdrawListing(params, options = {}) {
     const { market_listing_id, operator_id, reason } = params
 
-    if (!market_listing_id) throw new Error('market_listing_id 是必需参数')
-    if (!operator_id) throw new Error('operator_id 是必需参数')
-    if (!reason) throw new Error('reason 是必需参数')
+    if (!market_listing_id) {
+      const error = new Error('market_listing_id 是必需参数')
+      error.code = 'MISSING_LISTING_ID'
+      error.statusCode = 400
+      throw error
+    }
+    if (!operator_id) {
+      const error = new Error('operator_id 是必需参数')
+      error.code = 'MISSING_OPERATOR_ID'
+      error.statusCode = 400
+      throw error
+    }
+    if (!reason) {
+      const error = new Error('撤回原因是必需参数')
+      error.code = 'MISSING_WITHDRAW_REASON'
+      error.statusCode = 400
+      throw error
+    }
 
     const transaction = assertAndGetTransaction(
       options,
@@ -1116,12 +1131,17 @@ class MarketListingCoreService {
       )
     }
 
+    // 判断是否需要解冻卖家挂牌资产
+    const needsSellerUnfreeze =
+      listing.listing_kind === 'fungible_asset' && listing.seller_offer_frozen
+
     // 更新挂牌状态为 admin_withdrawn（管理员强制撤回使用专用状态）
     await listing.update(
       {
         status: 'admin_withdrawn',
         locked_by_order_id: null,
         locked_at: null,
+        seller_offer_frozen: needsSellerUnfreeze ? false : listing.seller_offer_frozen,
         meta: {
           ...listing.meta,
           force_withdrawn_by: operator_id,
@@ -1143,7 +1163,7 @@ class MarketListingCoreService {
       if (item) {
         await item.update({ status: 'available' }, { transaction })
       }
-    } else if (listing.listing_kind === 'fungible_asset' && listing.seller_offer_frozen) {
+    } else if (needsSellerUnfreeze) {
       // eslint-disable-next-line no-restricted-syntax
       await BalanceService.unfreeze(
         {

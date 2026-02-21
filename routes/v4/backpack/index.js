@@ -226,13 +226,18 @@ router.post(
         redemption_order_id: result.order.redemption_order_id
       })
 
-      // 生成 QR 码动态签名（决策7: QR码+文本码并存）
       let qrData = null
       try {
         const { getRedemptionQRSigner } = require('../../../utils/RedemptionQRSigner')
+        const AdminSystemService = require('../../../services/AdminSystemService')
         const signer = getRedemptionQRSigner()
         const codeHash = require('../../../utils/RedemptionCodeGenerator').hash(result.code)
-        qrData = signer.sign(result.order.redemption_order_id, codeHash)
+        const qrExpiryMinutes = Number(
+          await AdminSystemService.getSettingValue('redemption', 'qr_code_expiry_minutes', 5)
+        )
+        qrData = signer.sign(result.order.redemption_order_id, codeHash, {
+          expiry_ms: qrExpiryMinutes * 60 * 1000
+        })
       } catch (qrError) {
         logger.warn('QR码生成失败（不影响文本码使用）', { error: qrError.message })
       }
@@ -300,10 +305,15 @@ router.post(
         return res.apiError('核销码已过期，请重新生成', 'ORDER_EXPIRED', null, 400)
       }
 
-      // 生成新的 QR 码签名
       const { getRedemptionQRSigner } = require('../../../utils/RedemptionQRSigner')
+      const AdminSystemService = require('../../../services/AdminSystemService')
       const signer = getRedemptionQRSigner()
-      const qrData = signer.sign(order.redemption_order_id, order.code_hash)
+      const qrExpiryMinutes = Number(
+        await AdminSystemService.getSettingValue('redemption', 'qr_code_expiry_minutes', 5)
+      )
+      const qrData = signer.sign(order.redemption_order_id, order.code_hash, {
+        expiry_ms: qrExpiryMinutes * 60 * 1000
+      })
 
       return res.apiSuccess(
         {
@@ -415,30 +425,7 @@ router.post(
         is_duplicate: result.is_duplicate
       })
 
-      /*
-       * 获取使用操作指引文案（instructions）
-       * 优先级：模板级 meta.use_instructions > item_type 级配置 > 通用默认
-       * result.item_instance 是完整的 ItemInstance 模型实例
-       */
-      const { SystemConfig, ItemTemplate } = require('../../../models')
-      let instructions = null
-
-      const instructionsConfig = await SystemConfig.getValue('backpack_use_instructions', {})
-      const usedItem = result.item_instance
-      const itemType = usedItem?.item_type
-
-      if (usedItem?.item_template_id) {
-        const template = await ItemTemplate.findByPk(usedItem.item_template_id, {
-          attributes: ['meta']
-        })
-        if (template?.meta?.use_instructions) {
-          instructions = template.meta.use_instructions
-        }
-      }
-
-      if (!instructions && itemType) {
-        instructions = instructionsConfig[itemType] || null
-      }
+      const instructions = await BackpackService.getUseInstructions(result.item_instance)
 
       return res.apiSuccess(
         {

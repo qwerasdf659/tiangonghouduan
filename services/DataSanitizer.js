@@ -113,145 +113,126 @@ class DataSanitizer {
       return DecimalConverter.convertPrizeData(plainPrizes)
     }
 
-    // 普通用户数据脱敏 — 过滤敏感字段，输出统一 id（商业安全：防抓包推断表结构）
-    const sanitized = prizes.map(prize => {
-      // 处理图片关联数据（Sequelize include 或缓存还原的普通对象）
-      const imageData = prize.image || (prize.toJSON ? prize.toJSON().image : null)
-      let image = null
+    /*
+     * γ 模式（2026-02-21）：黑名单删除敏感字段，而非白名单构造新对象
+     * 优势：Service 层新增字段自动透传，不会产生 ghost field
+     */
+    return prizes.map(prize => {
+      const rawImage = prize.image || (prize.toJSON ? prize.toJSON().image : null)
+      const sanitized = { ...(prize.toJSON ? prize.toJSON() : prize) }
 
-      if (imageData) {
-        if (typeof imageData.toSafeJSON === 'function') {
-          // Sequelize 模型实例：通过 toSafeJSON 生成 Sealos URL
-          const safeImage = imageData.toSafeJSON()
-          image = {
-            image_resource_id: safeImage.image_resource_id,
-            url: safeImage.imageUrl,
-            mime: safeImage.mime_type,
-            thumbnail_url: safeImage.thumbnails?.small || safeImage.imageUrl
-          }
-        } else if (imageData.file_path) {
-          // 缓存还原的普通对象：直接用 ImageUrlHelper 生成 URL
-          image = {
-            image_resource_id: imageData.image_resource_id,
-            url: getImageUrl(imageData.file_path),
-            mime: imageData.mime_type,
-            thumbnail_url: imageData.thumbnail_paths?.small
-              ? getImageUrl(imageData.thumbnail_paths.small)
-              : getImageUrl(imageData.file_path)
-          }
+      // 主键统一（决策 A：剥离 lottery_ 模块前缀）
+      sanitized.prize_id = sanitized.lottery_prize_id
+      delete sanitized.lottery_prize_id
+
+      // 图片处理（从 Sequelize include 或缓存还原对象生成安全 URL）
+      if (rawImage && typeof rawImage.toSafeJSON === 'function') {
+        const safeImage = rawImage.toSafeJSON()
+        sanitized.image = {
+          image_resource_id: safeImage.image_resource_id,
+          url: safeImage.imageUrl,
+          mime: safeImage.mime_type,
+          thumbnail_url: safeImage.thumbnails?.small || safeImage.imageUrl
         }
+      } else if (rawImage?.file_path) {
+        sanitized.image = {
+          image_resource_id: rawImage.image_resource_id,
+          url: getImageUrl(rawImage.file_path),
+          mime: rawImage.mime_type,
+          thumbnail_url: rawImage.thumbnail_paths?.small
+            ? getImageUrl(rawImage.thumbnail_paths.small)
+            : getImageUrl(rawImage.file_path)
+        }
+      } else {
+        sanitized.image = null
       }
 
-      return {
-        prize_id: prize.lottery_prize_id,
-        lottery_campaign_id: prize.lottery_campaign_id,
-        prize_name: prize.prize_name,
-        prize_type: prize.prize_type,
-        prize_value: DecimalConverter.toNumber(prize.prize_value, 0),
-        prize_description: prize.prize_description,
-        /** 稀有度代码（FK→rarity_defs，前端直接使用此字段名显示对应颜色光效） */
-        rarity_code: prize.rarity_code || 'common',
-        sort_order: prize.sort_order,
-        reward_tier: prize.reward_tier,
-        status: prize.status,
-        image_resource_id: prize.image_resource_id,
-        /** 图片对象（含 Sealos URL），image_resource_id 为 NULL 时此字段为 null，前端应 emoji 兜底 */
-        image,
-        material_asset_code: prize.material_asset_code,
-        material_amount: prize.material_amount,
-        created_at: prize.created_at,
-        updated_at: prize.updated_at
-        /*
-         * ❌ 移除敏感字段（禁止暴露给微信小程序前端）：
-         * win_probability, stock_quantity, win_weight, prize_value_points,
-         * cost_points, max_daily_wins, daily_win_count, total_win_count,
-         * is_fallback, reserved_for_vip, angle, color, is_activity
-         */
-      }
+      // DECIMAL 类型转换（Sequelize DECIMAL 返回字符串，前端需要数字）
+      sanitized.prize_value = DecimalConverter.toNumber(sanitized.prize_value, 0)
+      sanitized.rarity_code = sanitized.rarity_code || 'common'
+
+      // 黑名单：删除敏感字段（商业机密 + 内部控制参数）
+      delete sanitized.win_probability
+      delete sanitized.stock_quantity
+      delete sanitized.win_weight
+      delete sanitized.cost_points
+      delete sanitized.prize_value_points
+      delete sanitized.max_daily_wins
+      delete sanitized.daily_win_count
+      delete sanitized.total_win_count
+      delete sanitized.is_fallback
+      delete sanitized.reserved_for_vip
+      delete sanitized.angle
+      delete sanitized.color
+      delete sanitized.is_activity
+
+      return sanitized
     })
-
-    return sanitized
   }
 
   /**
-   * 库存管理数据脱敏
+   * 库存物品数据脱敏（γ 模式：接收 BackpackService 输出，只做安全过滤）
+   *
+   * 🗄️ 数据库表：item_instances（主键：item_instance_id）
    *
    * ⚠️ D2 决策（2026-02-21）：此方法当前不被任何路由调用。
    * BackpackService 已是完整的领域转换层，背包列表和详情都直接使用 BackpackService 输出。
    * 保留此方法以供未来需要额外脱敏层时使用。
    *
-   * 业务场景：用户库存列表API响应时调用，防止用户通过抓包获取核销码、来源记录ID等敏感信息
+   * γ 模式职责：
+   * - 接收 BackpackService._getItems() 已转换的数据（从 meta JSON 提取的结构化字段）
+   * - 白名单输出面向用户的字段，排除内部字段（owner_user_id、locks、item_template_id、source、meta）
    *
-   * 脱敏规则：
-   * - 管理员（dataLevel='full'）：返回完整库存数据（包含完整核销码）
-   * - 普通用户（dataLevel='public'）：移除verification_code（核销码）、verification_expires_at（核销码过期时间）、
-   *   source_id（来源记录ID）等敏感字段
-   * - verification_code脱敏：完整核销码（如A1B2C3D4）→脱敏后（******）
-   * - 使用source_display（来源显示）替代source_id（来源记录ID）
-   *
-   * @param {Array<Object>} inventory - 库存数据数组（ItemInstance模型实例），包含item_instance_id、name、type等字段
+   * @param {Array<Object>} inventory - 库存数据数组（来自 BackpackService._getItems() 输出）
    * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
    * @returns {Array<Object>} 脱敏后的库存数组
-   * @returns {number} return[].inventory_id - 库存ID（主键）
-   * @returns {string} return[].name - 物品名称
-   * @returns {string} return[].description - 物品描述
-   * @returns {string} return[].icon - 物品图标
-   * @returns {string} return[].type - 物品类型（voucher/product/service）
-   * @returns {number} return[].value - 物品价值
+   * @returns {number} return[].item_instance_id - 物品实例ID（数据库主键原样输出）
+   * @returns {string} return[].item_type - 物品类型（voucher/product/service）
+   * @returns {string} return[].name - 物品名称（来自 meta JSON）
+   * @returns {string} return[].description - 物品描述（来自 meta JSON）
+   * @returns {string} return[].rarity - 稀有度代码（来自 meta JSON）
    * @returns {string} return[].status - 物品状态（available/used/expired/transferred）
-   * @returns {string} return[].source_type - 来源类型（exchange/lottery/gift等）
-   * @returns {string} return[].acquired_at - 获得时间
-   * @returns {string} return[].expires_at - 过期时间
-   * @returns {string} return[].used_at - 使用时间
-   * @returns {string} return[].verification_code - 核销码（public级别：******；full级别：完整核销码）
+   * @returns {boolean} return[].has_redemption_code - 是否有核销码（布尔标识，不暴露完整码）
+   * @returns {string} return[].acquired_at - 获得时间（映射自 created_at）
+   * @returns {string} return[].expires_at - 过期时间（来自 meta JSON）
+   * @returns {Array<string>} return[].allowed_actions - 允许操作列表（来自 system_configs 缓存）
+   * @returns {string} return[].status_display_name - 状态中文显示名
+   * @returns {string} return[].item_type_display_name - 物品类型中文显示名
+   * @returns {string} return[].rarity_display_name - 稀有度中文显示名
    * @returns {string} return[].created_at - 创建时间
    * @returns {string} return[].updated_at - 更新时间
-   *
-   * @example
-   * // 管理员查看完整数据
-   * const adminInventory = DataSanitizer.sanitizeInventory(inventory, 'full')
-   * // 返回：包含完整verification_code、source_id等敏感字段
-   *
-   * // 普通用户查看脱敏数据
-   * const publicInventory = DataSanitizer.sanitizeInventory(inventory, 'public')
-   * // 返回：verification_code脱敏为'******'，移除verification_expires_at、source_id
    */
   static sanitizeInventory(inventory, dataLevel) {
     if (dataLevel === 'full') {
-      return inventory // 管理员看完整数据
+      return inventory
     }
 
-    // 普通用户数据脱敏（P0安全修复）
+    /*
+     * γ 模式：接收 BackpackService._getItems() 输出，只做安全过滤
+     *
+     * ⚠️ 当前状态（D2 决策）：此方法未被任何路由调用。
+     * 背包列表和详情都直接使用 BackpackService 输出（BackpackService 已是完整的领域转换层）。
+     * 保留此方法供未来需要时使用。
+     *
+     * BackpackService 输出字段：item_instance_id, item_type, name, description,
+     * rarity, status, has_redemption_code, acquired_at, expires_at, allowed_actions,
+     * status_display_name, item_type_display_name, rarity_display_name
+     */
+    /*
+     * γ 模式（2026-02-21）：黑名单删除敏感字段
+     */
     return inventory.map(item => {
-      const sanitized = {
-        id: item.item_instance_id,
-        name: item.name,
-        description: item.description,
-        icon: item.icon,
-        type: item.type,
-        value: item.value,
-        status: item.status,
-        source_type: item.source_type,
-        acquired_at: item.acquired_at,
-        expires_at: item.expires_at,
-        used_at: item.used_at,
-        // 🔒 P0修复：核销码脱敏（完整码→******）
-        verification_code: item.verification_code ? '******' : null,
-        // ✅ 转让追踪字段（Transfer Tracking Fields - 公开信息，不敏感）
-        transfer_count: item.transfer_count, // 转让次数（Transfer Count - 物品被转让的次数）
-        last_transfer_at: item.last_transfer_at, // 最后转让时间（Last Transfer Time - 物品最后一次被转让的时间）
-        last_transfer_from: item.last_transfer_from, // 最后转让来源用户（Last Transfer From - 物品最后一次从哪个用户转来）
-        created_at: item.created_at,
-        updated_at: item.updated_at
-      }
+      const sanitized = { ...(item.toJSON ? item.toJSON() : item) }
 
-      /*
-       * ❌ 移除敏感字段（P0安全修复）：
-       * - verification_expires_at：核销码过期时间（避免暴露系统规则）
-       * - source_id：来源记录ID（系统内部标识，用户无需知道）
-       * - transfer_to_user_id：转让目标用户ID（隐私保护）
-       * - transfer_at：转让时间（隐私保护）
-       */
+      // 黑名单：删除内部字段（隐私 + 内部状态 + 核销码明文 + 原始 JSON）
+      delete sanitized.owner_user_id
+      delete sanitized.locks
+      delete sanitized.item_template_id
+      delete sanitized.source
+      delete sanitized.source_id
+      delete sanitized.meta
+      delete sanitized.verification_code
+      delete sanitized.verification_expires_at
 
       return sanitized
     })
@@ -286,37 +267,46 @@ class DataSanitizer {
       return user
     }
 
-    const plain = user.toJSON ? user.toJSON() : { ...user }
+    /*
+     * γ 模式（2026-02-21）：黑名单删除敏感字段
+     */
+    const sanitized = { ...(user.toJSON ? user.toJSON() : user) }
 
-    const pointsAccount = plain.points_account || {
+    // 补充派生字段
+    sanitized.avatar_url = sanitized.avatar_url || null
+    sanitized.can_lottery = sanitized.can_lottery !== false
+    sanitized.can_exchange = sanitized.can_exchange !== false
+
+    const pa = sanitized.points_account || {
       available_points: 0,
       frozen_points: 0,
       total_points: 0
     }
-
-    return {
-      user_id: plain.user_id,
-      nickname: plain.nickname,
-      avatar_url: plain.avatar_url || null,
-      can_lottery: plain.can_lottery !== false,
-      can_exchange: plain.can_exchange !== false,
-      points_account: {
-        available_points: pointsAccount.available_points || 0,
-        frozen_points: pointsAccount.frozen_points || 0,
-        total_points:
-          pointsAccount.total_points ||
-          (pointsAccount.available_points || 0) + (pointsAccount.frozen_points || 0)
-      },
-      member_since: plain.created_at
-        ? typeof plain.created_at === 'string'
-          ? plain.created_at.split('T')[0]
-          : null
-        : null
-      /*
-       * ❌ 移除敏感字段：role, permissions, admin_flags, detailed_stats,
-       *    mobile, consecutive_fail_count, max_active_listings
-       */
+    sanitized.points_account = {
+      available_points: pa.available_points || 0,
+      frozen_points: pa.frozen_points || 0,
+      total_points: pa.total_points || (pa.available_points || 0) + (pa.frozen_points || 0)
     }
+
+    sanitized.member_since = sanitized.created_at
+      ? typeof sanitized.created_at === 'string'
+        ? sanitized.created_at.split('T')[0]
+        : null
+      : null
+
+    // 黑名单：删除敏感字段（PII + 内部状态 + 权限信息）
+    delete sanitized.mobile
+    delete sanitized.consecutive_fail_count
+    delete sanitized.history_total_points
+    delete sanitized.login_count
+    delete sanitized.max_active_listings
+    delete sanitized.role
+    delete sanitized.permissions
+    delete sanitized.admin_flags
+    delete sanitized.user_uuid
+    delete sanitized.password_hash
+
+    return sanitized
   }
 
   /**
@@ -511,21 +501,28 @@ class DataSanitizer {
       return sessions
     }
 
-    // 普通用户权限：返回脱敏数据（仅保留基础业务字段）
+    /*
+     * γ 模式（2026-02-21）：黑名单删除敏感字段
+     */
     return sessions.map(session => {
-      // 获取Sequelize实例的原始数据对象
-      const sessionData = session.toJSON ? session.toJSON() : session
+      const sanitized = { ...(session.toJSON ? session.toJSON() : session) }
 
-      return {
-        session_id: sessionData.customer_service_session_id, // 会话ID（剥离 customer_service_ 模块前缀）
-        status: sessionData.status, // 会话状态（waiting/assigned/active/closed）
-        messages: sessionData.messages, // 消息关联数据（Sequelize include查询结果）
-        created_at: sessionData.createdAt // 会话创建时间（北京时间）- 统一使用snake_case
-        /*
-         * ❌ 移除敏感字段：internal_notes、escalation_reasons、admin_notes、close_reason、closed_by
-         * ❌ 移除type字段：数据库表中不存在此字段
-         */
-      }
+      // 主键统一（剥离 customer_service_ 模块前缀）
+      sanitized.session_id = sanitized.customer_service_session_id
+      delete sanitized.customer_service_session_id
+
+      // 黑名单：删除内部管理字段
+      delete sanitized.admin_id
+      delete sanitized.closed_by
+      delete sanitized.close_reason
+      delete sanitized.satisfaction_score
+      delete sanitized.first_response_at
+      delete sanitized.internal_notes
+      delete sanitized.escalation_reasons
+      delete sanitized.admin_notes
+      delete sanitized.toJSON
+
+      return sanitized
     })
   }
 
@@ -647,28 +644,38 @@ class DataSanitizer {
       return listings
     }
 
+    /*
+     * γ 模式（2026-02-21）：黑名单删除敏感字段
+     */
     return listings.map(listing => {
-      const plain = listing.toJSON ? listing.toJSON() : { ...listing }
+      const sanitized = { ...(listing.toJSON ? listing.toJSON() : listing) }
 
-      return {
-        listing_id: plain.market_listing_id,
-        listing_kind: plain.listing_kind,
-        seller_user_id: plain.seller_user_id,
-        seller_nickname: this.maskUserName(plain.seller_nickname || plain.seller?.nickname),
-        seller_avatar_url: plain.seller_avatar_url || plain.seller?.avatar_url || null,
-        offer_item_display_name: plain.offer_item_display_name,
-        offer_item_category_code: plain.offer_item_category_code,
-        price_amount: plain.price_amount,
-        price_asset_code: plain.price_asset_code,
-        status: plain.status,
-        item_info: plain.item_info || null,
-        asset_info: plain.asset_info || null,
-        created_at: plain.created_at
-        /*
-         * ❌ 移除敏感字段：locked_by_order_id、seller_contact、
-         *    transaction_fees、profit_analysis、internal_remark
-         */
-      }
+      // 主键统一（剥离 market_ 模块前缀）
+      sanitized.listing_id = sanitized.market_listing_id
+      delete sanitized.market_listing_id
+
+      // PII 脱敏：卖家昵称（保留首尾字符，中间用 * 替代）
+      sanitized.seller_nickname = this.maskUserName(
+        sanitized.seller_nickname || sanitized.seller?.nickname
+      )
+      sanitized.seller_avatar_url =
+        sanitized.seller_avatar_url || sanitized.seller?.avatar_url || null
+      delete sanitized.seller
+
+      // 黑名单：删除内部字段
+      delete sanitized.idempotency_key
+      delete sanitized.seller_offer_frozen
+      delete sanitized.locked_by_order_id
+      delete sanitized.locked_at
+      delete sanitized.seller_contact
+      delete sanitized.transaction_fees
+      delete sanitized.profit_analysis
+      delete sanitized.internal_remark
+      // Sequelize include 关联对象（含 owner_user_id、locks、meta 等敏感信息）
+      delete sanitized.offerItem
+      delete sanitized.offerItemTemplate
+
+      return sanitized
     })
   }
 
@@ -795,33 +802,44 @@ class DataSanitizer {
       return feedbacks // 管理员看完整数据（包含所有字段）
     }
 
-    // ✅ 普通用户看脱敏数据（移除敏感信息）
-    return feedbacks.map(feedback => ({
-      feedback_id: feedback.feedback_id, // 主键原样输出（行业标准：描述性 {entity}_id）
-      category: feedback.category, // 反馈分类（ENUM: technical/feature/bug/complaint/suggestion/other）
-      content: feedback.content, // 反馈内容（TEXT，1-5000字符）
-      status: feedback.status, // 处理状态（ENUM: pending/processing/replied/closed）
-      priority: feedback.priority, // ✅ 新增：优先级（ENUM: high/medium/low）
-      created_at: feedback.created_at, // 创建时间（DATETIME，北京时间，用户友好格式）
-      created_at_timestamp: feedback.createdAt ? new Date(feedback.createdAt).getTime() : null, // ✅ Unix时间戳（用于排序和时间计算）
-      estimated_response_time: feedback.estimated_response_time, // ✅ 新增：预计响应时间（VARCHAR(50)，如"4小时内"）
-      attachments: feedback.attachments, // ✅ 新增：附件URLs（JSON数组，用户自己上传的，可见）
-      reply: feedback.reply_content
+    /*
+     * γ 模式（2026-02-21）：黑名单删除敏感字段
+     */
+    return feedbacks.map(feedback => {
+      const sanitized = { ...(feedback.toJSON ? feedback.toJSON() : feedback) }
+
+      /*
+       * 派生字段：Unix 时间戳
+       * 模型 getter 将 created_at 格式化为中文字符串（如"2026年2月21日星期六 20:08:35"），
+       * 无法被 new Date() 解析。优先从 Sequelize 别名 createdAt（保留原始格式）
+       * 或模型实例的 getDataValue 取得可解析的日期值。
+       */
+      const parseableDate = feedback.getDataValue
+        ? feedback.getDataValue('created_at')
+        : sanitized.createdAt || sanitized.created_at
+      const parsedTime = parseableDate ? new Date(parseableDate).getTime() : NaN
+      sanitized.created_at_timestamp = Number.isFinite(parsedTime) ? parsedTime : null
+
+      // 构建回复对象（PII 脱敏：管理员昵称）
+      sanitized.reply = sanitized.reply_content
         ? {
-            // ✅ 回复信息（如果管理员已回复）
-            content: feedback.reply_content, // 回复内容（TEXT）
-            replied_at: feedback.replied_at, // 回复时间（DATETIME，北京时间）
-            admin_name: this.maskAdminName(feedback.admin?.nickname || '系统管理员') // 管理员名字脱敏（如"张**"）
+            content: sanitized.reply_content,
+            replied_at: sanitized.replied_at,
+            admin_name: this.maskAdminName(sanitized.admin?.nickname || '系统管理员')
           }
         : null
-      /*
-       * ❌ 移除敏感字段（用户不可见，仅管理员可见）：
-       * - user_ip: 用户IP地址（VARCHAR(45)，隐私保护，用于安全审计）
-       * - device_info: 设备信息（JSON对象，隐私保护，用于技术问题复现）
-       * - admin_id: 处理管理员ID（INTEGER，内部信息，用于绩效统计）
-       * - internal_notes: 内部备注（TEXT，管理员沟通用，用户不可见）
-       */
-    }))
+
+      // 黑名单：删除敏感字段（PII + 内部管理信息）
+      delete sanitized.user_ip
+      delete sanitized.device_info
+      delete sanitized.internal_notes
+      delete sanitized.admin_id
+      delete sanitized.reply_content
+      delete sanitized.replied_at
+      delete sanitized.admin
+
+      return sanitized
+    })
   }
 
   /**
@@ -860,26 +878,41 @@ class DataSanitizer {
       return records
     }
 
+    /*
+     * γ 模式（2026-02-21）：先过滤禁止资产，再黑名单删除敏感字段
+     */
     const filtered = this.filterForbiddenAssets(records)
 
     return filtered.map(record => {
-      const plain = record.toJSON ? record.toJSON() : { ...record }
+      const sanitized = { ...(record.toJSON ? record.toJSON() : record) }
 
-      return {
-        transaction_id: plain.asset_transaction_id,
-        asset_code: plain.asset_code,
-        business_type: plain.business_type,
-        business_type_display: this.getPublicSource(plain.business_type),
-        delta_amount: plain.delta_amount,
-        balance_before: plain.balance_before,
-        balance_after: plain.balance_after,
-        description: plain.meta?.description || plain.meta?.title || null,
-        created_at: plain.created_at
-        /*
-         * ❌ 移除敏感字段：account_id、idempotency_key、frozen_amount_change、
-         *    lottery_session_id、meta（完整 JSON 含内部信息）
-         */
-      }
+      // 主键统一（剥离 asset_ 模块前缀）
+      sanitized.transaction_id = sanitized.asset_transaction_id
+      delete sanitized.asset_transaction_id
+
+      // 补充派生字段（在删除 meta 前提取）
+      sanitized.business_type_display = this.getPublicSource(sanitized.business_type)
+      sanitized.description = sanitized.meta?.description || sanitized.meta?.title || null
+      sanitized.title = sanitized.meta?.title || null
+
+      // BIGINT → Number 转换（避免 bigNumberStrings 返回字符串）
+      if (sanitized.transaction_id !== undefined)
+        sanitized.transaction_id = Number(sanitized.transaction_id)
+      if (sanitized.delta_amount !== undefined)
+        sanitized.delta_amount = Number(sanitized.delta_amount)
+      if (sanitized.balance_before !== undefined)
+        sanitized.balance_before = Number(sanitized.balance_before)
+      if (sanitized.balance_after !== undefined)
+        sanitized.balance_after = Number(sanitized.balance_after)
+
+      // 黑名单：删除内部字段
+      delete sanitized.account_id
+      delete sanitized.idempotency_key
+      delete sanitized.frozen_amount_change
+      delete sanitized.lottery_session_id
+      delete sanitized.meta
+
+      return sanitized
     })
   }
 
@@ -1199,27 +1232,62 @@ class DataSanitizer {
       /* 抽奖相关 */
       lottery_consume: '抽奖消耗',
       lottery_reward: '抽奖奖励',
+      lottery_reward_material: '抽奖奖励',
+      lottery_management: '抽奖管理',
+      lottery_budget_deduct: '抽奖预算扣减',
+      lottery_budget_rollback: '抽奖预算回退',
       /* 兑换相关 */
       exchange_debit: '兑换扣款',
       exchange_refund: '兑换退款',
+      /* 核销相关 */
+      redemption_use: '核销使用',
+      admin_redemption_fulfill: '管理员核销',
       /* 市场交易相关 */
       market_listing_freeze: '市场挂单冻结',
       market_listing_withdraw_unfreeze: '挂单撤回',
+      market_listing_expire_unfreeze: '挂单过期退回',
+      listing_withdrawn_unfreeze: '挂单撤回退回',
+      listing_settle_seller_offer_debit: '挂单成交扣减',
+      listing_transfer_buyer_offer_credit: '挂单成交收入',
+      market_transfer: '市场转让',
+      admin_force_withdraw_unfreeze: '管理员强制撤回',
+      /* 订单相关 */
       order_freeze_buyer: '订单冻结',
       order_settle_buyer_debit: '订单结算',
       order_settle_seller_credit: '卖出收入',
       order_cancel_unfreeze_buyer: '订单取消退回',
+      order_unfreeze_buyer: '订单取消退回',
+      order_timeout_unfreeze: '订单超时退回',
+      order_settle_platform_fee_credit: '平台手续费',
+      /* 竞价相关 */
+      bid_freeze: '出价冻结',
+      bid_unfreeze: '出价退回',
+      bid_settle_winner: '竞价成交',
+      bid_settle_refund: '竞价退款',
+      bid_cancel_refund: '竞价取消退回',
       /* 材料兑换 */
       material_convert_credit: '材料兑换入账',
       material_convert_debit: '材料兑换扣款',
+      material_convert_fee: '兑换手续费',
       /* 管理员操作 */
       admin_adjustment: '系统调整',
       admin_grant: '系统发放',
       /* 消费奖励 */
       merchant_points_reward: '消费奖励',
       consumption_reward: '消费奖励',
+      consumption_budget_allocation: '消费预算分配',
+      /* 广告相关 */
+      ad_campaign_freeze: '广告冻结',
+      ad_campaign_deduct: '广告扣费',
+      ad_campaign_refund: '广告退款',
+      ad_campaign_daily_deduct: '广告日扣费',
       /* 空间解锁 */
       premium_unlock: '解锁空间',
+      /* 冻结清理 */
+      orphan_frozen_cleanup: '冻结清理',
+      buyer_orphan_frozen_cleanup: '冻结清理',
+      /* 历史数据 */
+      opening_balance: '历史余额补录',
       /* 通用 */
       transfer: '用户转让',
       manual: '系统奖励',
@@ -1306,88 +1374,65 @@ class DataSanitizer {
    *
    * 输出字段（统一规范）：
    * - primary_image_id: 主图片ID（关联 image_resources 表）
-   * - primary_image: 图片对象 { id, url, mime }，缺失时为 null（id为脱敏输出字段）
+   * - primary_image: 图片对象 { image_resource_id, url, mime, thumbnail_url }，缺失时为 null
    *
    * @param {Array<Object>} items - 商品数据数组（来自 exchange_items 表，需 include primaryImage）
    * @param {string} dataLevel - 数据级别：'full'（管理员）或'public'（普通用户）
-   * @returns {Array<Object>} 脱敏后的商品数组（id 字段映射自 exchange_item_id）
+   * @returns {Array<Object>} 脱敏后的商品数组（exchange_item_id 主键原样输出）
    */
   static sanitizeExchangeMarketItems(items, dataLevel) {
     /*
      * V4.5.0: 材料资产支付 - 统一数据格式
      * 🔧 2026-01-13 图片字段策略：添加 primary_image_id 和 primary_image 对象
      */
-    const sanitized = items.map(item => {
-      // 处理图片数据（通过 include 获取的 primaryImage 关联）
-      const primaryImageData = item.primaryImage
-      let primaryImage = null
+    /*
+     * γ 模式（2026-02-21）：黑名单删除敏感字段
+     */
+    return items.map(item => {
+      const rawPrimaryImage = item.primaryImage
+      const sanitized = { ...(item.toJSON ? item.toJSON() : item) }
 
-      if (primaryImageData) {
-        /*
-         * 使用 ImageResources 模型的 toSafeJSON 方法获取安全的公开 URL
-         * 📌 2026-01-13：image_resources 表无 width/height 字段，不输出这些字段
-         */
-        if (typeof primaryImageData.toSafeJSON === 'function') {
-          const safeImage = primaryImageData.toSafeJSON()
-          primaryImage = {
-            image_resource_id: safeImage.image_resource_id,
-            url: safeImage.imageUrl,
-            mime: safeImage.mime_type,
-            thumbnail_url: safeImage.thumbnails?.small || safeImage.imageUrl
-          }
-        } else {
-          // 降级处理：如果没有 toSafeJSON 方法（不应该发生）
-          primaryImage = {
-            image_resource_id: primaryImageData.image_resource_id,
-            url: null, // 无法生成 URL
-            mime: primaryImageData.mime_type,
-            thumbnail_url: null
-          }
+      // 图片处理（从 Sequelize include 生成安全 URL）
+      if (rawPrimaryImage && typeof rawPrimaryImage.toSafeJSON === 'function') {
+        const safeImage = rawPrimaryImage.toSafeJSON()
+        sanitized.primary_image = {
+          image_resource_id: safeImage.image_resource_id,
+          url: safeImage.imageUrl,
+          mime: safeImage.mime_type,
+          thumbnail_url: safeImage.thumbnails?.small || safeImage.imageUrl
         }
+      } else if (rawPrimaryImage) {
+        sanitized.primary_image = {
+          image_resource_id: rawPrimaryImage.image_resource_id,
+          url: null,
+          mime: rawPrimaryImage.mime_type,
+          thumbnail_url: null
+        }
+      } else {
+        sanitized.primary_image = null
+      }
+      delete sanitized.primaryImage
+
+      // 补充派生字段
+      sanitized.primary_image_id = sanitized.primary_image_id || null
+      sanitized.space = sanitized.space || 'lucky'
+      sanitized.original_price = sanitized.original_price || null
+      sanitized.tags = sanitized.tags || null
+      sanitized.is_new = !!sanitized.is_new
+      sanitized.is_hot = !!sanitized.is_hot
+      sanitized.is_lucky = !!sanitized.is_lucky
+      sanitized.is_limited = !!sanitized.is_limited
+      sanitized.has_warranty = !!sanitized.has_warranty
+      sanitized.free_shipping = !!sanitized.free_shipping
+      sanitized.sell_point = sanitized.sell_point || null
+
+      // 黑名单：删除敏感字段（成本价仅管理员可见）
+      if (dataLevel !== 'full') {
+        delete sanitized.cost_price
       }
 
-      return {
-        exchange_item_id: item.exchange_item_id, // 数据库主键原样输出
-        name: item.item_name, // 兑换商品名称（数据库字段为 item_name，API 输出为 name 保持前端兼容）
-        description: item.description,
-        // V4.5.0: 材料资产支付字段
-        cost_asset_code: item.cost_asset_code,
-        cost_amount: item.cost_amount,
-        stock: item.stock,
-        sold_count: item.sold_count, // 已售数量（用户端也可见，用于展示"已售N件"）
-        status: item.status,
-        sort_order: item.sort_order,
-        created_at: item.created_at,
-        // 🔧 2026-01-13 图片字段策略（统一规范）
-        primary_image_id: item.primary_image_id || null, // 主图片ID
-        primary_image: primaryImage, // 图片对象（缺失时为 null）
-
-        /*
-         * 臻选空间/幸运空间扩展字段（2026-02-16 决策12：9个新字段）
-         * ⚠️ BUDGET_POINTS 已在资产字段级别过滤（cost_asset_code 不会是 BUDGET_POINTS）
-         */
-        space: item.space || 'lucky', // 所属空间
-        original_price: item.original_price || null, // 原价（划线价，前端计算折扣）
-        tags: item.tags || null, // 商品标签数组
-        is_new: !!item.is_new, // 新品标记
-        is_hot: !!item.is_hot, // 热门标记
-        is_lucky: !!item.is_lucky, // 幸运商品标记
-        is_limited: !!item.is_limited, // 限量商品标记（触发小程序旋转彩虹边框）
-        has_warranty: !!item.has_warranty, // 质保标记
-        free_shipping: !!item.free_shipping, // 包邮标记
-        sell_point: item.sell_point || null, // 营销卖点文案
-
-        /*
-         * 管理员额外字段
-         * 🔧 2026-01-09 修复：字段名匹配数据库模型（sold_count，不是 total_exchange_count）
-         */
-        ...(dataLevel === 'full' && {
-          cost_price: item.cost_price
-        })
-      }
+      return sanitized
     })
-
-    return sanitized
   }
 
   /**
@@ -1415,34 +1460,37 @@ class DataSanitizer {
    *
    * 输入契约：
    * - 输入数据必须来自 exchange_records 表的 Sequelize 查询结果
-   * - 必须包含 record_id 字段（数据库主键）
+   * - 必须包含 exchange_record_id 字段（数据库主键）
    *
    * @param {Array<Object>} orders - 订单数据数组（来自 exchange_records 表）
    * @param {string} _dataLevel - 数据级别：'full'（管理员）或'public'（普通用户）（未使用，保留以保持接口一致性）
-   * @returns {Array<Object>} 脱敏后的订单数组（id 字段映射自 record_id）
+   * @returns {Array<Object>} 脱敏后的订单数组（exchange_record_id 主键原样输出）
    */
   static sanitizeExchangeMarketOrders(orders, _dataLevel) {
-    // V4.5.0: 材料资产支付 - 统一数据格式
+    /*
+     * γ 模式（2026-02-21）：黑名单删除敏感字段
+     */
+    return orders.map(order => {
+      const sanitized = { ...(order.toJSON ? order.toJSON() : order) }
 
-    // 普通用户数据脱敏（V4.5.0 材料资产支付）
-    const sanitized = orders.map(order => ({
-      exchange_record_id: order.exchange_record_id, // 数据库主键原样输出
-      order_no: order.order_no,
-      item_snapshot: {
-        name: order.item_snapshot?.name,
-        description: order.item_snapshot?.description
-      },
-      quantity: order.quantity,
-      // V4.5.0: 材料资产支付字段
-      pay_asset_code: order.pay_asset_code,
-      pay_amount: order.pay_amount,
-      status: order.status,
-      exchange_time: order.exchange_time,
-      shipped_at: order.shipped_at
-      // ❌ 移除敏感字段：total_cost, admin_remark
-    }))
+      // 安全处理 item_snapshot（只保留用户可见信息）
+      if (sanitized.item_snapshot) {
+        sanitized.item_snapshot = {
+          name: sanitized.item_snapshot.name,
+          description: sanitized.item_snapshot.description
+        }
+      }
 
-    return sanitized
+      // 黑名单：删除敏感字段（成本 + 内部标识 + 管理员备注）
+      delete sanitized.actual_cost
+      delete sanitized.total_cost
+      delete sanitized.idempotency_key
+      delete sanitized.business_id
+      delete sanitized.debit_transaction_id
+      delete sanitized.admin_remark
+
+      return sanitized
+    })
   }
 
   /**

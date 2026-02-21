@@ -260,11 +260,12 @@ export function userDrawer(_config = {}) {
           this.lotteryPagination.total = result.data?.pagination?.total || result.data?.count || 0
           logger.debug(`[UserDrawer] 加载抽奖记录成功: ${this.lotteryRecords.length} 条`)
         } else {
-          this.lotteryRecords = this.generateMockLotteryRecords()
+          this.lotteryRecords = []
+          logger.warn('[UserDrawer] 加载抽奖记录失败: API 返回非成功状态')
         }
       } catch (e) {
-        logger.warn('[UserDrawer] 加载抽奖记录失败，使用模拟数据:', e.message)
-        this.lotteryRecords = this.generateMockLotteryRecords()
+        logger.error('[UserDrawer] 加载抽奖记录异常:', e.message)
+        this.lotteryRecords = []
       } finally {
         this.loading = false
       }
@@ -293,11 +294,12 @@ export function userDrawer(_config = {}) {
             result.data?.pagination?.total || result.data?.count || 0
           logger.debug(`[UserDrawer] 加载消费记录成功: ${this.consumptionRecords.length} 条`)
         } else {
-          this.consumptionRecords = this.generateMockConsumptionRecords()
+          this.consumptionRecords = []
+          logger.warn('[UserDrawer] 加载消费记录失败: API 返回非成功状态')
         }
       } catch (e) {
-        logger.warn('[UserDrawer] 加载消费记录失败，使用模拟数据:', e.message)
-        this.consumptionRecords = this.generateMockConsumptionRecords()
+        logger.error('[UserDrawer] 加载消费记录异常:', e.message)
+        this.consumptionRecords = []
       } finally {
         this.loading = false
       }
@@ -328,11 +330,12 @@ export function userDrawer(_config = {}) {
             `[UserDrawer] 加载资产明细成功: ${this.assetDetails.transactions.length} 条`
           )
         } else {
-          this.assetDetails.transactions = this.generateMockAssetTransactions()
+          this.assetDetails.transactions = []
+          logger.warn('[UserDrawer] 加载资产明细失败: API 返回非成功状态')
         }
       } catch (e) {
-        logger.warn('[UserDrawer] 加载资产明细失败，使用模拟数据:', e.message)
-        this.assetDetails.transactions = this.generateMockAssetTransactions()
+        logger.error('[UserDrawer] 加载资产明细异常:', e.message)
+        this.assetDetails.transactions = []
       } finally {
         this.loading = false
       }
@@ -362,7 +365,7 @@ export function userDrawer(_config = {}) {
           // 转换后端数据格式为前端展示格式
           const tracks = response.data.tracks || response.data.list || []
           this.behaviorTracks = tracks.map(track => ({
-            track_id: track.track_id || track.id,
+            track_id: track.track_id,
             action_type: track.behavior_type || track.action_type,
             action_label: this._getBehaviorLabel(track.behavior_type || track.action_type),
             action_icon: this._getBehaviorIcon(track.behavior_type || track.action_type),
@@ -567,86 +570,7 @@ export function userDrawer(_config = {}) {
       return colors[status] || 'text-gray-600 bg-gray-100'
     },
 
-    // ==================== 模拟数据生成 ====================
-
-    generateMockLotteryRecords() {
-      const prizes = ['红宝石×1', '积分×100', '钻石×50', '谢谢参与', '幸运券×1']
-      const records = []
-      const now = Date.now()
-      for (let i = 0; i < 10; i++) {
-        records.push({
-          draw_id: 1000 + i,
-          campaign_name: '春节抽奖活动',
-          prize_name: prizes[Math.floor(Math.random() * prizes.length)],
-          is_winner: Math.random() > 0.3,
-          created_at: new Date(now - i * 3600000).toISOString()
-        })
-      }
-      this.lotteryPagination.total = 10
-      return records
-    },
-
-    generateMockConsumptionRecords() {
-      const items = ['抽奖卡', '会员续费', '道具购买', '兑换商品']
-      const records = []
-      const now = Date.now()
-      for (let i = 0; i < 10; i++) {
-        records.push({
-          order_id: 2000 + i,
-          item_name: items[Math.floor(Math.random() * items.length)],
-          amount: Math.floor(Math.random() * 500) + 10,
-          status: Math.random() > 0.1 ? 'completed' : 'pending',
-          created_at: new Date(now - i * 7200000).toISOString()
-        })
-      }
-      this.consumptionPagination.total = 10
-      return records
-    },
-
-    generateMockAssetTransactions() {
-      const types = ['积分', '钻石', '红宝石', '金币']
-      const txTypes = ['抽奖奖励', '消费扣减', '系统赠送', '兑换']
-      const transactions = []
-      const now = Date.now()
-      for (let i = 0; i < 10; i++) {
-        const isIncome = Math.random() > 0.4
-        transactions.push({
-          transaction_id: 3000 + i,
-          asset_name: types[Math.floor(Math.random() * types.length)],
-          tx_type: txTypes[Math.floor(Math.random() * txTypes.length)],
-          amount: (isIncome ? 1 : -1) * (Math.floor(Math.random() * 200) + 10),
-          balance_after: Math.floor(Math.random() * 5000) + 100,
-          created_at: new Date(now - i * 5400000).toISOString()
-        })
-      }
-      this.assetPagination.total = 10
-      return transactions
-    },
-
-    generateMockBehaviorTracks() {
-      const actions = [
-        { type: 'login', label: '登录系统', icon: '🔑' },
-        { type: 'lottery', label: '参与抽奖', icon: '🎰' },
-        { type: 'consume', label: '消费购买', icon: '💳' },
-        { type: 'exchange', label: '兑换商品', icon: '🎁' },
-        { type: 'profile', label: '修改资料', icon: '✏️' }
-      ]
-      const tracks = []
-      const now = Date.now()
-      for (let i = 0; i < 15; i++) {
-        const action = actions[Math.floor(Math.random() * actions.length)]
-        tracks.push({
-          track_id: 4000 + i,
-          action_type: action.type,
-          action_label: action.label,
-          action_icon: action.icon,
-          detail: `用户进行了${action.label}操作`,
-          created_at: new Date(now - i * 3600000 * 2).toISOString()
-        })
-      }
-      this.behaviorPagination.total = 15
-      return tracks
-    }
+    /* mock 数据生成器已清除（项目规则：禁止使用模拟数据）*/
   }
 }
 

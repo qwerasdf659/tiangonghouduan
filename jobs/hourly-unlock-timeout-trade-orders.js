@@ -260,11 +260,11 @@ class HourlyUnlockTimeoutTradeOrders {
             {
               user_id: order.buyer_user_id,
               asset_code: order.asset_code,
-              amount: order.gross_amount,
+              amount: Number(order.gross_amount),
               business_type: 'order_timeout_unfreeze',
               idempotency_key: `${order.idempotency_key}:timeout_unfreeze`,
               meta: {
-                order_id: order.order_id,
+                trade_order_id: order.trade_order_id,
                 unfreeze_reason: '订单超时自动取消'
               }
             },
@@ -278,7 +278,6 @@ class HourlyUnlockTimeoutTradeOrders {
             // eslint-disable-next-line no-await-in-loop
             const listing = await MarketListing.findByPk(order.market_listing_id, { transaction })
             if (listing) {
-              // 清除挂牌的锁定状态
               // eslint-disable-next-line no-await-in-loop
               await listing.update(
                 {
@@ -289,7 +288,6 @@ class HourlyUnlockTimeoutTradeOrders {
             }
           }
 
-          // 更新订单状态
           // eslint-disable-next-line no-await-in-loop
           await order.update(
             {
@@ -301,7 +299,7 @@ class HourlyUnlockTimeoutTradeOrders {
           )
 
           cancelled_orders.push({
-            order_id: order.order_id,
+            trade_order_id: order.trade_order_id,
             business_id: order.business_id,
             buyer_user_id: order.buyer_user_id,
             gross_amount: order.gross_amount,
@@ -309,11 +307,54 @@ class HourlyUnlockTimeoutTradeOrders {
             created_at: order.created_at
           })
         } catch (err) {
-          // 单个订单处理失败，记录日志但继续处理其他订单
-          logger.error('处理单个超时订单失败', {
-            order_id: order.order_id,
+          /*
+           * 解冻失败时仍需取消订单，防止"frozen 订单永远无法取消"的无限重试循环。
+           * 典型原因：历史测试残留导致 frozen_amount 与实际订单不一致。
+           * 取消后标记异常原因，运营可通过对账脚本修复余额。
+           */
+          logger.error('超时订单解冻失败，强制取消订单以阻断重试循环', {
+            trade_order_id: order.trade_order_id,
+            buyer_user_id: order.buyer_user_id,
+            asset_code: order.asset_code,
+            gross_amount: order.gross_amount,
             error: err.message
           })
+
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            await order.update(
+              {
+                status: 'cancelled',
+                cancel_reason: `订单超时取消（解冻失败：${err.message}）`,
+                cancelled_at: new Date()
+              },
+              { transaction }
+            )
+
+            if (order.market_listing_id) {
+              // eslint-disable-next-line no-await-in-loop
+              const listing = await MarketListing.findByPk(order.market_listing_id, { transaction })
+              if (listing && listing.status === 'locked') {
+                // eslint-disable-next-line no-await-in-loop
+                await listing.update({ status: 'on_sale' }, { transaction })
+              }
+            }
+
+            cancelled_orders.push({
+              trade_order_id: order.trade_order_id,
+              business_id: order.business_id,
+              buyer_user_id: order.buyer_user_id,
+              gross_amount: order.gross_amount,
+              asset_code: order.asset_code,
+              created_at: order.created_at,
+              unfreeze_failed: true
+            })
+          } catch (cancelErr) {
+            logger.error('强制取消订单也失败', {
+              trade_order_id: order.trade_order_id,
+              error: cancelErr.message
+            })
+          }
         }
       }
 

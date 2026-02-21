@@ -236,7 +236,7 @@ export function useConsumptionMethods() {
     async viewConsumptionDetail(record) {
       try {
         const response = await this.apiGet(
-          buildURL(STORE_ENDPOINTS.CONSUMPTION_DETAIL, { id: record.id }),
+          buildURL(STORE_ENDPOINTS.CONSUMPTION_DETAIL, { id: record.record_id }),
           {},
           { showLoading: true }
         )
@@ -256,7 +256,7 @@ export function useConsumptionMethods() {
      * @param {Object} record - 消费记录对象
      */
     async approveConsumption(record) {
-      const recordId = record.record_id || record.id
+      const recordId = record.record_id
       await this.confirmAndExecute(
         '确定通过此消费记录？',
         async () => {
@@ -304,7 +304,7 @@ export function useConsumptionMethods() {
 
       try {
         this.saving = true
-        const recordId = this.selectedConsumption.record_id || this.selectedConsumption.id
+        const recordId = this.selectedConsumption.record_id
         const response = await this.apiCall(
           buildURL(STORE_ENDPOINTS.CONSUMPTION_REJECT, { id: recordId }),
           {
@@ -366,7 +366,7 @@ export function useConsumptionMethods() {
       const pendingRecords = this.consumptions.filter(r => r.status === 'pending')
       this.isAllSelected =
         pendingRecords.length > 0 &&
-        pendingRecords.every(r => this.selectedIds.includes(r.record_id || r.id))
+        pendingRecords.every(r => this.selectedIds.includes(r.record_id))
     },
 
     /**
@@ -380,7 +380,7 @@ export function useConsumptionMethods() {
         this.isAllSelected = false
       } else {
         // 全选所有待审核记录
-        this.selectedIds = pendingRecords.map(r => r.record_id || r.id)
+        this.selectedIds = pendingRecords.map(r => r.record_id)
         this.isAllSelected = true
       }
     },
@@ -391,7 +391,7 @@ export function useConsumptionMethods() {
      * @returns {boolean}
      */
     isSelected(record) {
-      const recordId = record.record_id || record.id
+      const recordId = record.record_id
       return this.selectedIds.includes(recordId)
     },
 
@@ -843,7 +843,7 @@ export function useConsumptionMethods() {
         return
       }
 
-      const recordIds = recommendedRecords.map(r => r.record_id || r.id)
+      const recordIds = recommendedRecords.map(r => r.record_id)
 
       await this.confirmAndExecute(
         `确定批量通过 ${recordIds.length} 条推荐记录？\n这些记录的异常评分均低于 ${this.recommendThreshold} 分`,

@@ -97,7 +97,18 @@ class TierPickStage extends BaseStage {
       // preset 模式：使用预设奖品，跳过档位抽取
       if (decision_source === 'preset' && decision_data?.preset) {
         const preset = decision_data.preset
-        const preset_tier = preset.reward_tier || 'high'
+        let preset_tier = preset.reward_tier || 'high'
+
+        // 预设模式也受每日高档上限约束，防止运营配置大量高档预设绕过风控
+        if (preset_tier === 'high') {
+          preset_tier = await this._enforceDailyHighCap(
+            user_id,
+            lottery_campaign_id,
+            preset_tier,
+            context
+          )
+        }
+
         this.log('info', '预设模式：跳过档位抽取，使用预设档位', {
           user_id,
           decision_source,
@@ -105,10 +116,11 @@ class TierPickStage extends BaseStage {
         })
         return this.success({
           selected_tier: preset_tier,
-          original_tier: preset_tier,
+          original_tier: preset.reward_tier || 'high',
           tier_downgrade_path: [],
           random_value: 0,
           tier_weights: {},
+          weight_scale: WEIGHT_SCALE,
           decision_source,
           skipped: true,
           skip_reason: 'preset_mode'
@@ -119,8 +131,17 @@ class TierPickStage extends BaseStage {
       if (decision_source === 'override' && decision_data?.override) {
         const override = decision_data.override
         const override_type = override.setting_type || override.override_type
-        // force_win 使用 high 档位，force_lose 使用 fallback 档位
-        const override_tier = override_type === 'force_win' ? 'high' : 'fallback'
+        let override_tier = override_type === 'force_win' ? 'high' : 'fallback'
+
+        if (override_tier === 'high') {
+          override_tier = await this._enforceDailyHighCap(
+            user_id,
+            lottery_campaign_id,
+            override_tier,
+            context
+          )
+        }
+
         this.log('info', '干预模式：跳过档位抽取，使用干预档位', {
           user_id,
           decision_source,
@@ -129,28 +150,39 @@ class TierPickStage extends BaseStage {
         })
         return this.success({
           selected_tier: override_tier,
-          original_tier: override_tier,
+          original_tier: override_type === 'force_win' ? 'high' : 'fallback',
           tier_downgrade_path: [],
           random_value: 0,
           tier_weights: {},
+          weight_scale: WEIGHT_SCALE,
           decision_source,
           skipped: true,
           skip_reason: 'override_mode'
         })
       }
 
-      // guarantee 模式：使用高档位
+      // guarantee 模式：使用高档位（同样受每日上限约束）
       if (decision_source === 'guarantee') {
+        let guarantee_tier = 'high'
+        guarantee_tier = await this._enforceDailyHighCap(
+          user_id,
+          lottery_campaign_id,
+          guarantee_tier,
+          context
+        )
+
         this.log('info', '保底模式：强制使用高档位', {
           user_id,
-          decision_source
+          decision_source,
+          final_tier: guarantee_tier
         })
         return this.success({
-          selected_tier: 'high',
+          selected_tier: guarantee_tier,
           original_tier: 'high',
           tier_downgrade_path: [],
           random_value: 0,
           tier_weights: {},
+          weight_scale: WEIGHT_SCALE,
           decision_source,
           skipped: true,
           skip_reason: 'guarantee_mode'
@@ -239,74 +271,27 @@ class TierPickStage extends BaseStage {
         available_tiers
       )
 
-      /**
-       * 🛡️ 2026-02-15 新增：单用户每日高价值中奖硬上限保护
-       *
-       * 业务背景：
-       * - 即使所有概率机制正常工作，仍需要一个硬性安全网
-       * - 防止因代码缺陷、配置错误等导致单用户大量获取高价值奖品
-       * - 默认限制：每个用户每天最多 5 次 high 档位中奖
-       *
-       * 保护逻辑：
-       * - 如果用户今日 high 中奖次数 >= 限制值，强制降级到 mid 或 fallback
-       * - 此保护在体验平滑之前执行，是最终安全网
-       */
-      const DAILY_HIGH_TIER_CAP = 5 // 每用户每天最多5次高价值中奖
+      /* 🛡️ 单用户每日高价值中奖硬上限保护（统一入口方法） */
       let daily_high_capped = false
 
       if (selected_tier === 'high') {
-        try {
-          /**
-           * 🔴 2026-02-19 修复：使用北京时间计算"今天"起始
-           *
-           * 修复根因：
-           * - 服务器时区为 UTC，new Date().setHours(0,0,0,0) = UTC午夜
-           * - Sequelize timezone: '+08:00' 将 UTC午夜 转换为 北京时间 08:00
-           * - 导致只统计北京时间 08:00 之后的抽奖
-           * - 00:00-08:00 的高档抽奖完全绕过每日上限保护
-           *
-           * 修复方案：使用 BeijingTimeHelper.todayStart() 获取北京时间的今日起始
-           */
-          const today_start = BeijingTimeHelper.todayStart()
-
-          const today_high_count = await LotteryDraw.count({
-            where: {
-              user_id,
-              lottery_campaign_id,
-              reward_tier: 'high',
-              created_at: { [Op.gte]: today_start }
-            },
-            transaction: context.transaction || undefined
-          })
-
-          if (today_high_count >= DAILY_HIGH_TIER_CAP) {
-            this.log('warn', '🛡️ 触发每日高价值中奖硬上限保护', {
-              user_id,
-              lottery_campaign_id,
-              today_high_count,
-              daily_cap: DAILY_HIGH_TIER_CAP,
-              original_selected_tier: selected_tier,
-              capped_to: 'mid'
-            })
-
-            // 降级到 mid 档位（如果 mid 有奖品），否则降级到 low
-            const mid_prizes = prizes_by_tier.mid || []
-            const low_prizes = prizes_by_tier.low || []
-            if (mid_prizes.length > 0) {
-              selected_tier = 'mid'
-            } else if (low_prizes.length > 0) {
-              selected_tier = 'low'
-            } else {
-              selected_tier = 'fallback'
-            }
-            daily_high_capped = true
+        const capped_tier = await this._enforceDailyHighCap(
+          user_id,
+          lottery_campaign_id,
+          selected_tier,
+          context
+        )
+        if (capped_tier !== selected_tier) {
+          const mid_prizes = prizes_by_tier.mid || []
+          const low_prizes = prizes_by_tier.low || []
+          if (capped_tier === 'mid' && mid_prizes.length > 0) {
+            selected_tier = 'mid'
+          } else if (low_prizes.length > 0) {
+            selected_tier = 'low'
+          } else {
+            selected_tier = 'fallback'
           }
-        } catch (cap_error) {
-          /* 硬上限检查失败不阻断抽奖，记录日志继续 */
-          this.log('warn', '每日高价值硬上限检查失败（非致命）', {
-            user_id,
-            error: cap_error.message
-          })
+          daily_high_capped = true
         }
       }
 
@@ -716,6 +701,57 @@ class TierPickStage extends BaseStage {
       selected_tier: current_tier,
       downgrade_path
     }
+  }
+
+  /**
+   * 统一的每日高档上限强制执行
+   *
+   * 适用于所有 decision_source（normal / preset / override / guarantee）
+   * 无论奖品来源如何，单用户每天 high 档位中奖次数不得超过硬上限
+   *
+   * @param {number} user_id - 用户ID
+   * @param {number} lottery_campaign_id - 活动ID
+   * @param {string} selected_tier - 当前选中的档位
+   * @param {Object} context - 执行上下文（包含 transaction）
+   * @returns {Promise<string>} 经过上限检查后的档位
+   * @private
+   */
+  async _enforceDailyHighCap(user_id, lottery_campaign_id, selected_tier, context) {
+    if (selected_tier !== 'high') return selected_tier
+
+    const DAILY_HIGH_TIER_CAP = 5
+
+    try {
+      const today_start = BeijingTimeHelper.todayStart()
+
+      const today_high_count = await LotteryDraw.count({
+        where: {
+          user_id,
+          lottery_campaign_id,
+          reward_tier: 'high',
+          created_at: { [Op.gte]: today_start }
+        },
+        transaction: context.transaction || undefined
+      })
+
+      if (today_high_count >= DAILY_HIGH_TIER_CAP) {
+        this.log('warn', '🛡️ 每日高档上限保护（统一入口）', {
+          user_id,
+          lottery_campaign_id,
+          today_high_count,
+          daily_cap: DAILY_HIGH_TIER_CAP,
+          downgraded_to: 'mid'
+        })
+        return 'mid'
+      }
+    } catch (error) {
+      this.log('warn', '每日高档上限检查失败（非致命）', {
+        user_id,
+        error: error.message
+      })
+    }
+
+    return selected_tier
   }
 }
 

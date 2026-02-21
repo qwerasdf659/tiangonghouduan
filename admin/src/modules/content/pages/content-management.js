@@ -113,7 +113,7 @@ document.addEventListener('alpine:init', () => {
         let url = ''
         let successMsg = ''
         const targetId =
-          this.deleteTarget.system_announcement_id ||
+          this.deleteTarget.announcement_id ||
           this.deleteTarget.popup_banner_id ||
           this.deleteTarget.carousel_item_id ||
           this.deleteTarget.image_resource_id
@@ -161,7 +161,7 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('announcementsTable', () => {
     const table = dataTable({
       columns: [
-        { key: 'system_announcement_id', label: '公告ID', sortable: true },
+        { key: 'announcement_id', label: '公告ID', sortable: true },
         { key: 'title', label: '标题', sortable: true },
         { key: 'type', label: '类型', type: 'badge', badgeMap: { notice: 'blue', alert: 'red', info: 'gray' }, labelMap: { notice: '通知', alert: '警告', info: '信息' } },
         { key: 'is_active', label: '状态', type: 'status', statusMap: { true: { class: 'green', label: '已发布' }, false: { class: 'gray', label: '草稿' } } },
@@ -174,7 +174,7 @@ document.addEventListener('alpine:init', () => {
           total: res.data?.pagination?.total || res.data?.total || 0
         }
       },
-      primaryKey: 'system_announcement_id',
+      primaryKey: 'announcement_id',
       sortable: true,
       page_size: 20
     })

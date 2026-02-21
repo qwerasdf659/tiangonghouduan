@@ -755,7 +755,14 @@ class SettleStage extends BaseStage {
          * 之前这些字段全部为 NULL，导致无法事后追踪中奖率异常
          */
         pipeline_type: 'normal',
-        pick_method: tier_pick_data.weight_scale ? 'tier_first' : null,
+        /**
+         * pick_method 判定：
+         * - TierPickStage 正常执行（有 weight_scale）→ tier_first
+         * - TierPickStage 跳过（preset/override/guarantee 模式）→ 从 skip_reason 推断
+         */
+        pick_method: tier_pick_data.weight_scale
+          ? 'tier_first'
+          : tier_pick_data.skip_reason || 'tier_first',
         /**
          * original_tier 字段类型为 ENUM('high','mid','low')，不含 'fallback'
          * 当 _pickTier 原始选中 'fallback' 时，写入 null 避免 ENUM 溢出错误
@@ -874,8 +881,14 @@ class SettleStage extends BaseStage {
           (decision_snapshot.tier_decision?.downgrade_path?.length || 1) - 1
         ),
 
-        // 随机数审计
-        random_seed: Math.round((decision_snapshot.tier_decision?.random_value || 0) * 999999),
+        /**
+         * 随机数审计（random_value 已在 TierPickStage 中乘以 WEIGHT_SCALE）
+         * random_value 范围：0 ~ 1,000,000，直接取整存入 UNSIGNED INT 字段
+         */
+        random_seed: Math.min(
+          Math.round(decision_snapshot.tier_decision?.random_value || 0),
+          4294967295
+        ),
 
         // 预算相关
         budget_provider_type: budget_snapshot.budget_mode === 'none' ? 'none' : 'user',

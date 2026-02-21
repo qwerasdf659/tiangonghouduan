@@ -889,19 +889,40 @@ function statisticsPage() {
     },
 
     /**
+     * 根据当前维度提取行数据中的标识值
+     * 后端按维度返回不同字段：store→store_id, campaign→lottery_campaign_id, time→period
+     * @param {Object} item - 多维度统计数据行
+     * @returns {string|number} 该维度的标识值
+     */
+    _getDimensionValue(item) {
+      return item.store_id || item.lottery_campaign_id || item.period || item.value
+    },
+
+    /**
+     * 根据当前维度提取行数据中的显示名称
+     * @param {Object} item - 多维度统计数据行
+     * @returns {string} 该维度的显示名称
+     */
+    _getDimensionDisplay(item) {
+      return item.store_name || item.name || item.period
+        || (item.lottery_campaign_id ? `活动#${item.lottery_campaign_id}` : '未知')
+    },
+
+    /**
      * 多维度下钻分析
-     * @param {Object} item - 当前项
+     * @param {Object} item - 当前项（后端返回的维度行数据）
      */
     async drillDown(item) {
+      const dimensionValue = this._getDimensionValue(item)
       this.drillDownStack.push({
         dimension: this.multiDimensionFilters.dimension,
-        value: item.name || item.id
+        value: this._getDimensionDisplay(item)
       })
 
       const result = await this.withLoading(async () => {
         return await MultiDimensionStatsAPI.drillDown({
           dimension: this.multiDimensionFilters.dimension,
-          value: item.id || item.value,
+          value: dimensionValue,
           start_date: this.multiDimensionFilters.start_date || this.filters.start_date,
           end_date: this.multiDimensionFilters.end_date || this.filters.end_date
         })
@@ -926,7 +947,7 @@ function statisticsPage() {
         await this.loadMultiDimensionStats()
       } else {
         const parent = this.drillDownStack[this.drillDownStack.length - 1]
-        await this.drillDown({ id: parent.value, name: parent.value })
+        await this.drillDown({ value: parent.value, name: parent.value })
         this.drillDownStack.pop() // 移除重复添加的
       }
     },

@@ -131,7 +131,7 @@ export function useStoresMethods() {
     },
 
     async editStore(store) {
-      this.editingStoreId = store.store_id || store.id
+      this.editingStoreId = store.store_id
       this.isEditMode = true
       this.storeForm = {
         store_name: store.store_name || '',

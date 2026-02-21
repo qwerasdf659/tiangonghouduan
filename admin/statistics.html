@@ -299,7 +299,7 @@
               </tr>
             </thead>
             <tbody class="divide-y">
-              <template x-for="item in multiDimensionData.breakdown.slice(0, 10)" :key="item.store_id || item.lottery_campaign_id || item.period || item.id">
+              <template x-for="(item, idx) in multiDimensionData.breakdown.slice(0, 10)" :key="item.store_id || item.lottery_campaign_id || item.period || idx">
                 <tr class="themed-hover-bg">
                   <!-- 显示维度值：门店名/活动名/时间周期 - 使用后端字段名 -->
                   <td class="px-3 py-2" x-text="item.store_name || item.name || item.period || ('活动#' + item.lottery_campaign_id) || '未知'"></td>

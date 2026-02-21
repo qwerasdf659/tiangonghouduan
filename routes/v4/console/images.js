@@ -141,38 +141,6 @@ router.post(
 )
 
 /**
- * GET /api/v4/console/images/:id
- *
- * @description 获取图片详情
- *
- * @header Authorization - Bearer {token} 管理员认证
- * @param {number} id - 图片资源 ID（image_resource_id）
- *
- * @response {Object} 200 - 图片详情
- * @response {Object} 404 - 图片不存在
- *
- * @since 2026-02-01 主键命名规范化：事务实体路由参数使用 :id（混合策略）
- */
-router.get(
-  '/:id',
-  authenticateToken,
-  requireRoleLevel(100),
-  asyncHandler(async (req, res) => {
-    const imageId = parseInt(req.params.id, 10)
-    if (isNaN(imageId)) {
-      return res.apiError('无效的图片 ID', 'INVALID_IMAGE_ID', null, 400)
-    }
-
-    const image = await getImageService().getImageById(imageId)
-    if (!image) {
-      return res.apiError('图片不存在', 'IMAGE_NOT_FOUND', null, 404)
-    }
-
-    return res.apiSuccess(image, '获取图片详情成功')
-  })
-)
-
-/**
  * GET /api/v4/console/images
  *
  * @description 分页获取图片列表（管理后台用）
@@ -225,28 +193,37 @@ router.get(
 /**
  * GET /api/v4/console/images/by-business
  *
- * @description 根据业务类型和上下文 ID 获取关联图片（原 GET / 的功能）
+ * @description 根据业务类型和上下文 ID 获取关联图片
+ *              支持可选的 category 过滤（区分主图/详情图）
  *
  * @header Authorization - Bearer {token} 管理员认证
  * @query {string} business_type - 业务类型：lottery|exchange|trade|uploads
- * @query {number} context_id - 业务上下文 ID（如 prize_id、product_id）
+ * @query {number} context_id - 业务上下文 ID（如 prize_id、exchange_item_id）
+ * @query {string} [category] - 图片分类过滤：primary|detail|icons（可选）
  *
- * @response {Object} 200 - 图片列表
+ * @response {Object} 200 - 图片列表（按 sort_order ASC 排序）
+ *
+ * @since 2026-01-08 图片管理架构
+ * @updated 2026-02-21 新增 category 过滤支持（多图功能）
  */
 router.get(
   '/by-business',
   authenticateToken,
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
-    const { business_type: businessType, context_id: contextId } = req.query
+    const { business_type: businessType, context_id: contextId, category } = req.query
 
     if (!businessType || !contextId) {
       return res.apiError('缺少必填参数：business_type 和 context_id', 'MISSING_PARAMS', null, 400)
     }
 
+    const options = {}
+    if (category) options.category = category
+
     const images = await getImageService().getImagesByBusiness(
       businessType,
-      parseInt(contextId, 10)
+      parseInt(contextId, 10),
+      options
     )
 
     return res.apiSuccess(
@@ -256,6 +233,39 @@ router.get(
       },
       '获取图片列表成功'
     )
+  })
+)
+
+/**
+ * GET /api/v4/console/images/:id
+ *
+ * @description 获取图片详情
+ *              注意：此路由必须放在 /by-business 之后，避免 Express 将 "by-business" 匹配为 :id
+ *
+ * @header Authorization - Bearer {token} 管理员认证
+ * @param {number} id - 图片资源 ID（image_resource_id）
+ *
+ * @response {Object} 200 - 图片详情
+ * @response {Object} 404 - 图片不存在
+ *
+ * @since 2026-02-01 主键命名规范化：事务实体路由参数使用 :id（混合策略）
+ */
+router.get(
+  '/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const imageId = parseInt(req.params.id, 10)
+    if (isNaN(imageId)) {
+      return res.apiError('无效的图片 ID', 'INVALID_IMAGE_ID', null, 400)
+    }
+
+    const image = await getImageService().getImageById(imageId)
+    if (!image) {
+      return res.apiError('图片不存在', 'IMAGE_NOT_FOUND', null, 404)
+    }
+
+    return res.apiSuccess(image, '获取图片详情成功')
   })
 )
 

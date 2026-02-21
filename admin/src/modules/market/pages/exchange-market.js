@@ -223,7 +223,7 @@ document.addEventListener('alpine:init', () => {
        * @param {Object} order - 订单对象
        */
       async completeOrder(order) {
-        if (!(await $confirm(`确定要完成订单 ${order.order_no || order.order_id} 吗？`))) return
+        if (!(await $confirm(`确定要完成订单 ${order.order_no} 吗？`))) return
 
         try {
           this.saving = true
@@ -231,7 +231,7 @@ document.addEventListener('alpine:init', () => {
             url: buildURL(
               MARKET_ENDPOINTS.EXCHANGE_ORDER_COMPLETE || MARKET_ENDPOINTS.EXCHANGE_ORDER_SHIP,
               {
-                order_no: order.order_no || order.order_id
+                order_no: order.order_no
               }
             ),
             method: 'POST',

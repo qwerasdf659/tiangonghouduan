@@ -550,7 +550,7 @@ export function useAdvancedStatusMethods() {
      */
     openProbabilityModal(user) {
       this.probabilityModal = {
-        user_id: user.user_id || user.id,
+        user_id: user.user_id,
         user_nickname: user.nickname || `用户${user.user_id}`,
         mode: 'global',
         multiplier: 1,

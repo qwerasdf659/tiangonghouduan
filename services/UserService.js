@@ -632,14 +632,9 @@ class UserService {
           )
 
           // 获取或创建 POINTS 余额记录（决策G：自动创建）
-          const balance = await BalanceService.getOrCreateBalance(
-            account.account_id,
-            'POINTS',
-            null,
-            {
-              transaction
-            }
-          )
+          const balance = await BalanceService.getOrCreateBalance(account.account_id, 'POINTS', {
+            transaction
+          })
 
           // 决策H：账户冻结时返回 403
           if (account.status !== 'active') {

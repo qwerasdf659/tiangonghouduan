@@ -278,21 +278,17 @@ describe('P3-10: 日志格式和监控验证', () => {
         return
       }
 
-      if (DataSanitizer && DataSanitizer.sanitize) {
-        const testData = {
-          mobile: '13612227930',
-          name: '张三'
-        }
-
-        const sanitized = DataSanitizer.sanitize(testData)
-
-        // 验证手机号被脱敏
-        if (sanitized.mobile) {
-          expect(sanitized.mobile).not.toBe('13612227930')
-          expect(sanitized.mobile).toMatch(/\*/)
-        }
-
-        console.log('[P3-10] DataSanitizer脱敏验证通过')
+      /*
+       * DataSanitizer 使用领域方法（sanitizeUser 等），不存在通用 sanitize()
+       * 验证 maskUserName 脱敏能力（静态方法）
+       */
+      if (DataSanitizer && typeof DataSanitizer.maskUserName === 'function') {
+        const masked = DataSanitizer.maskUserName('张三丰')
+        expect(masked).not.toBe('张三丰')
+        expect(masked).toMatch(/\*/)
+        console.log('[P3-10] DataSanitizer.maskUserName脱敏验证通过:', masked)
+      } else {
+        console.log('[P3-10] DataSanitizer.maskUserName 不可用，跳过脱敏测试')
       }
     })
   })

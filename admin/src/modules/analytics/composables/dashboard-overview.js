@@ -418,7 +418,7 @@ export function useDashboardOverviewMethods() {
       const trendData = [], forecastData = [], today = new Date()
       for (let i = 6; i >= 0; i--) {
         const date = new Date(today); date.setDate(date.getDate() - i)
-        trendData.push({ date: date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', timeZone: 'Asia/Shanghai' }), consumed: Math.round(dailyAverage * (0.8 + Math.random() * 0.4)) })
+        trendData.push({ date: date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', timeZone: 'Asia/Shanghai' }), consumed: Math.round(dailyAverage) })
       }
       for (let i = 1; i <= 7; i++) {
         const date = new Date(today); date.setDate(date.getDate() + i)

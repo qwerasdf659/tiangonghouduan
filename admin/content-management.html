@@ -101,7 +101,7 @@
                 </tr>
               </thead>
               <tbody class="divide-y">
-                <template x-for="(row, idx) in data" :key="row.system_announcement_id || idx">
+                <template x-for="(row, idx) in data" :key="row.announcement_id || idx">
                   <tr class="themed-hover-bg transition-colors">
                     <template x-for="col in columns" :key="col.key">
                       <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>

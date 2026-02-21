@@ -360,9 +360,12 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
 
         const tx = response.body.data.transactions[0]
 
-        // 主键字段：asset_transaction_id（snake_case 规范，与模型主键一致）
-        expect(tx).toHaveProperty('asset_transaction_id')
-        expect(typeof tx.asset_transaction_id).toBe('number')
+        /*
+         * 主键字段：transaction_id（γ 模式：剥离 asset_ 模块前缀）
+         * 经 DataSanitizer.sanitizeTransactionRecords() 脱敏后输出
+         */
+        expect(tx).toHaveProperty('transaction_id')
+        expect(typeof tx.transaction_id).toBe('number')
 
         // 核心业务字段
         expect(tx).toHaveProperty('asset_code')
@@ -372,17 +375,24 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
         expect(tx).toHaveProperty('business_type')
         expect(tx).toHaveProperty('created_at')
 
+        // γ 模式新增：business_type 中文映射
+        expect(tx).toHaveProperty('business_type_display')
+        expect(typeof tx.business_type_display).toBe('string')
+
         // 类型验证
         expect(typeof tx.delta_amount).toBe('number')
         expect(typeof tx.balance_before).toBe('number')
         expect(typeof tx.balance_after).toBe('number')
 
-        // 新增字段：description 和 title（从 meta JSON 提取，可为 null）
+        // 从 meta JSON 提取的描述字段（可为 null）
         expect(tx).toHaveProperty('description')
         expect(tx).toHaveProperty('title')
 
-        // 旧字段 transaction_id 不应存在（已修正为 asset_transaction_id）
-        expect(tx).not.toHaveProperty('transaction_id')
+        // 内部字段不应暴露（DataSanitizer 黑名单删除）
+        expect(tx).not.toHaveProperty('asset_transaction_id')
+        expect(tx).not.toHaveProperty('account_id')
+        expect(tx).not.toHaveProperty('idempotency_key')
+        expect(tx).not.toHaveProperty('meta')
       })
     })
 

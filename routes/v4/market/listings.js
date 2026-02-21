@@ -91,6 +91,15 @@ router.get('/listings', authenticateToken, async (req, res) => {
       sort
     })
 
+    /*
+     * γ 模式（2026-02-21）：通过 DataSanitizer 统一脱敏
+     * - 卖家昵称经 maskUserName() PII 脱敏
+     * - 内部字段（idempotency_key、locked_by_order_id 等）自动删除
+     */
+    const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
+    const dataLevel = req.dataLevel || 'public'
+    const sanitizedProducts = DataSanitizer.sanitizeMarketProducts(result.products, dataLevel)
+
     logger.info('获取交易市场挂牌列表成功', {
       user_id: req.user.user_id,
       listing_kind,
@@ -102,12 +111,12 @@ router.get('/listings', authenticateToken, async (req, res) => {
       max_price,
       sort,
       total: result.pagination.total,
-      returned: result.products.length
+      returned: sanitizedProducts.length
     })
 
     return res.apiSuccess(
       {
-        products: result.products,
+        products: sanitizedProducts,
         pagination: {
           total: result.pagination.total,
           page: result.pagination.page,
@@ -215,49 +224,47 @@ router.get(
       }
 
       /*
-       * 格式化返回数据（优先使用快照字段，fallback 到关联查询）
-       * 2026-01-20 技术债务清理：统一使用 name 字段名
-       * 2026-02-01 主键规范化：listing_id → market_listing_id
+       * γ 模式（2026-02-21）：通过 DataSanitizer 统一脱敏
+       * - 主键 market_listing_id → listing_id（与列表接口一致）
+       * - 卖家昵称 PII 脱敏
+       * - 内部字段自动删除
        */
-      const listingDetail = {
-        market_listing_id: listing.market_listing_id,
-        listing_kind: listing.listing_kind,
-        // 物品实例挂牌字段
-        item_instance_id: listing.offer_item_instance_id,
-        item_template_id: listing.offer_item_template_id || null,
-        name:
-          listing.offer_item_display_name ||
-          listing.offerItem?.meta?.name ||
-          listing.offerItem?.item_type ||
-          '未知商品',
-        item_type: listing.offerItem?.item_type || 'unknown',
-        // 分类信息（快照字段）
-        item_category_code: listing.offer_item_category_code || null,
-        rarity_code: listing.offer_item_rarity || null,
-        rarity: listing.offer_item_rarity || listing.offerItem?.meta?.rarity || 'common',
-        // 可叠加资产挂牌字段
-        offer_asset_code: listing.offer_asset_code,
-        offer_amount: listing.offer_amount ? Number(listing.offer_amount) : null,
-        asset_group_code: listing.offer_asset_group_code || null,
-        asset_display_name: listing.offer_asset_display_name || null,
-        // 价格信息
-        price_amount: listing.price_amount,
-        price_asset_code: listing.price_asset_code || 'DIAMOND',
-        // 卖家和状态信息
-        seller_user_id: listing.seller_user_id,
-        status: listing.status,
-        listed_at: listing.created_at,
-        // 详情描述
-        description: listing.offerItem?.meta?.description || '',
-        is_own: listing.seller_user_id === req.user.user_id
-      }
+      const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
+      const dataLevel = req.dataLevel || 'public'
+
+      const plainListing = listing.toJSON ? listing.toJSON() : { ...listing }
+
+      // 补充详情专有字段（列表接口不包含）
+      plainListing.item_instance_id = plainListing.offer_item_instance_id
+      plainListing.item_template_id = plainListing.offer_item_template_id || null
+      plainListing.name =
+        plainListing.offer_item_display_name ||
+        plainListing.offerItem?.meta?.name ||
+        plainListing.offerItem?.item_type ||
+        '未知商品'
+      plainListing.item_type = plainListing.offerItem?.item_type || 'unknown'
+      plainListing.item_category_code = plainListing.offer_item_category_code || null
+      plainListing.rarity_code = plainListing.offer_item_rarity || null
+      plainListing.rarity =
+        plainListing.offer_item_rarity || plainListing.offerItem?.meta?.rarity || 'common'
+      plainListing.offer_amount = plainListing.offer_amount
+        ? Number(plainListing.offer_amount)
+        : null
+      plainListing.asset_group_code = plainListing.offer_asset_group_code || null
+      plainListing.asset_display_name = plainListing.offer_asset_display_name || null
+      plainListing.price_asset_code = plainListing.price_asset_code || 'DIAMOND'
+      plainListing.listed_at = plainListing.created_at
+      plainListing.description = plainListing.offerItem?.meta?.description || ''
+      plainListing.is_own = plainListing.seller_user_id === req.user.user_id
+
+      const [sanitizedDetail] = DataSanitizer.sanitizeMarketProducts([plainListing], dataLevel)
 
       logger.info('获取市场挂牌详情成功', {
         market_listing_id: listingId,
         user_id: req.user.user_id
       })
 
-      return res.apiSuccess(listingDetail, '获取挂牌详情成功')
+      return res.apiSuccess(sanitizedDetail, '获取挂牌详情成功')
     } catch (error) {
       logger.error('获取市场挂牌详情失败', {
         error: error.message,

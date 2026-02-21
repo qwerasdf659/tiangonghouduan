@@ -40,24 +40,18 @@ router.get('/points', authenticateToken, pointsRateLimiter, async (req, res) => 
     const user_id = req.user.user_id
 
     const UserService = req.app.locals.services.getService('user')
-    const AssetQueryService = req.app.locals.services.getService('asset_query')
 
-    // 并行查询积分账户 + 今日收支汇总，减少响应延迟
-    const [pointsResult, todaySummary] = await Promise.all([
-      UserService.getUserWithPoints(user_id, {
-        checkPointsAccount: true,
-        checkStatus: true
-      }),
-      AssetQueryService.getTodaySummary({ user_id, asset_code: 'POINTS' })
-    ])
+    /*
+     * 决策 D-1（2026-02-21）：today_summary 已拆分到 /api/v4/assets/today-summary
+     * 本接口回归纯积分余额查询职责，不再跨域拼接资产汇总
+     */
+    const pointsResult = await UserService.getUserWithPoints(user_id, {
+      checkPointsAccount: true,
+      checkStatus: true
+    })
 
     const responseData = {
-      ...pointsResult.points_account,
-      today_summary: {
-        today_earned: todaySummary.today_earned,
-        today_consumed: todaySummary.today_consumed,
-        transaction_count: todaySummary.transaction_count
-      }
+      ...pointsResult.points_account
     }
 
     return res.apiSuccess(responseData, '用户积分获取成功', 'POINTS_SUCCESS')

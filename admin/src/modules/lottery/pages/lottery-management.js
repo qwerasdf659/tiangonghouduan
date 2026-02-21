@@ -16,7 +16,6 @@
  * - 配额管理（quota）
  * - 定价配置（pricing）
  * - 抽奖监控（metrics）
- * - 核销码管理（redemption）
  */
 
 // ES Module 导入（替代 window.xxx 全局变量）
@@ -40,8 +39,6 @@ import {
   usePricingMethods,
   useMetricsState,
   useMetricsMethods,
-  useRedemptionState,
-  useRedemptionMethods,
   useUserProfileState,
   useUserProfileMethods,
   // 新增模块 - P0/P1/P2/P3 优先级功能
@@ -134,8 +131,7 @@ function registerLotteryManagementComponents() {
         { id: 'strategy-simulation', title: '策略模拟', icon: '🧪' }
       ],
       tools: [
-        { id: 'batch-operations', title: '批量操作', icon: '⚡' },
-        { id: 'redemption-codes', title: '核销码管理', icon: '🎫' }
+        { id: 'batch-operations', title: '批量操作', icon: '⚡' }
       ]
     },
 
@@ -154,8 +150,7 @@ function registerLotteryManagementComponents() {
       'lottery-pricing': 'strategy',
       'strategy-effectiveness': 'strategy',
       'strategy-simulation': 'strategy',
-      'batch-operations': 'tools',
-      'redemption-codes': 'tools'
+      'batch-operations': 'tools'
     },
 
     // 获取当前分类的子Tab列表（用于右侧Tab栏显示）
@@ -205,7 +200,6 @@ function registerLotteryManagementComponents() {
     const quotaState = useQuotaState()
     const pricingState = usePricingState()
     const metricsState = useMetricsState()
-    const redemptionState = useRedemptionState()
     const userProfileState = useUserProfileState()
     // 新增模块状态
     const alertsState = useAlertsState()
@@ -228,7 +222,6 @@ function registerLotteryManagementComponents() {
     const quotaMethods = useQuotaMethods()
     const pricingMethods = usePricingMethods()
     const metricsMethods = useMetricsMethods()
-    const redemptionMethods = useRedemptionMethods()
     const userProfileMethods = useUserProfileMethods()
     // 新增模块方法
     const alertsMethods = useAlertsMethods()
@@ -253,7 +246,6 @@ function registerLotteryManagementComponents() {
       ...quotaState,
       ...pricingState,
       ...metricsState,
-      ...redemptionState,
       ...userProfileState,
       ...alertsState,
       ...riskControlState,
@@ -275,16 +267,6 @@ function registerLotteryManagementComponents() {
 
       get current_page() {
         return Alpine.store('lotteryPage')
-      },
-
-      /**
-       * 是否全选核销码（getter必须在主组件中定义，确保this上下文正确）
-       * @returns {boolean}
-       */
-      get isAllRedemptionSelected() {
-        const codes = this.redemptionCodes || []
-        const selectedIds = this.redemptionSelectedIds || []
-        return codes.length > 0 && selectedIds.length === codes.length
       },
 
       // ==================== 初始化和数据加载 ====================
@@ -383,12 +365,6 @@ function registerLotteryManagementComponents() {
                   await this.loadCampaigns()
                 }
                 break
-              case 'redemption-codes':
-                logger.debug('🎫 [LotteryPage] 进入核销码管理页面')
-                await this.loadStores()
-                await this.loadRedemptionCodes()
-                logger.debug('✅ [LotteryPage] 核销码数据加载完成')
-                break
               // 告警中心已迁移至独立页面 /admin/lottery-alerts.html
               case 'lottery-risk-control':
                 logger.debug('🛡️ [LotteryPage] 进入风控面板页面')
@@ -456,7 +432,6 @@ function registerLotteryManagementComponents() {
       ...quotaMethods,
       ...pricingMethods,
       ...metricsMethods,
-      ...redemptionMethods,
       ...userProfileMethods,
       // 新增模块方法
       ...alertsMethods,
@@ -605,19 +580,6 @@ function registerLotteryManagementComponents() {
       { key: 'updated_at', label: '更新时间', type: 'datetime', sortable: true }
     ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/lottery-configs/matrix`, method: 'GET', params: p }); return { items: r.data?.matrix_configs || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'id', page_size: 20 })
     const o = t.init; t.init = async function () { window.addEventListener('refresh-matrix', () => this.loadData()); if (o) await o.call(this) }; return t
-  })
-
-  /** 核销码列表 - 对接 /console/business-records/redemption-orders */
-  Alpine.data('redemptionCodesDataTable', () => {
-    const t = dataTable({ columns: [
-      { key: 'redemption_order_id', label: '核销码ID', sortable: true, render: (v) => v ? v.substring(0, 8) + '...' : '-' },
-      { key: 'item_instance', label: '奖品名称', render: (v) => v?.meta?.name || '-' },
-      { key: 'redeemer_user_id', label: '核销用户', render: (v) => v || '未核销' },
-      { key: 'status', label: '状态', type: 'status', statusMap: { pending: { class: 'yellow', label: '待核销' }, fulfilled: { class: 'green', label: '已核销' }, expired: { class: 'red', label: '已过期' }, cancelled: { class: 'gray', label: '已取消' } } },
-      { key: 'created_at', label: '创建时间', type: 'datetime', sortable: true },
-      { key: 'fulfilled_at', label: '核销时间', type: 'datetime' }
-    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/business-records/redemption-orders`, method: 'GET', params: p }); return { items: r.data?.orders || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'redemption_order_id', page_size: 20 })
-    const o = t.init; t.init = async function () { window.addEventListener('refresh-redemption-codes', () => this.loadData()); if (o) await o.call(this) }; return t
   })
 
   /** 抽奖记录 */

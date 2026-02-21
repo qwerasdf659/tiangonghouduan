@@ -8,87 +8,129 @@
 </head>
 <body class="themed-bg-subtle min-h-screen">
   
-  <!-- 导航栏 -->
-  <nav class="themed-bg-primary text-white shadow-lg">
-    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-      <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:text-yellow-200">← 返回工作台</a>
-        <span class="text-lg font-semibold">💰 定价配置</span>
+  <!-- 页面顶部渐变横幅 -->
+  <div class="page-banner">
+    <div class="container mx-auto px-4 flex justify-between items-center">
+      <div>
+        <div class="flex items-center gap-3 mb-1">
+          <a href="/admin/workspace.html" class="text-blue-200 hover:text-white text-sm transition">← 返回工作台</a>
+        </div>
+        <h1>💰 积分定价配置</h1>
+        <p>管理抽奖消耗、签到奖励、新用户初始积分等核心运营参数，修改后即时生效</p>
       </div>
+      <div class="text-6xl opacity-20">💎</div>
     </div>
-  </nav>
+  </div>
 
   <!-- 页面主体 -->
   <div class="container mx-auto px-4 py-6" x-data="pricingConfig()">
     
-    <!-- 积分配置卡片 -->
-    <div class="themed-card rounded-lg shadow">
-      <div class="p-4 border-b flex justify-between items-center">
-        <h5 class="font-semibold">💎 积分定价配置</h5>
+    <!-- 快速概览统计卡片 -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="gradient-stat-card gradient-stat-blue">
+        <div class="stat-icon">🎰</div>
+        <div class="stat-value" x-text="pointsDefaults.lottery_cost_points || 0"></div>
+        <div class="stat-label">抽奖消耗积分/次</div>
+      </div>
+      <div class="gradient-stat-card gradient-stat-orange">
+        <div class="stat-icon">📊</div>
+        <div class="stat-value" x-text="pointsDefaults.daily_lottery_limit || 0"></div>
+        <div class="stat-label">每日抽奖上限/次</div>
+      </div>
+      <div class="gradient-stat-card gradient-stat-green">
+        <div class="stat-icon">✅</div>
+        <div class="stat-value" x-text="pointsDefaults.sign_in_points || 0"></div>
+        <div class="stat-label">签到奖励积分/次</div>
+      </div>
+      <div class="gradient-stat-card gradient-stat-purple">
+        <div class="stat-icon">🎁</div>
+        <div class="stat-value" x-text="pointsDefaults.initial_points || 0"></div>
+        <div class="stat-label">新用户初始积分</div>
+      </div>
+    </div>
+
+    <!-- 积分配置编辑卡片 -->
+    <div class="content-section mb-6">
+      <div class="content-section-header">
+        <div class="section-title">
+          <span class="title-icon">⚙️</span>
+          <div>
+            <span>积分参数配置</span>
+            <div class="text-xs font-normal mt-0.5" style="color: var(--color-text-muted)">修改后点击「保存配置」立即生效，影响所有用户</div>
+          </div>
+        </div>
         <button @click="savePointsConfigs()" 
-                class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 disabled:opacity-50"
+                class="action-btn action-btn-primary flex items-center gap-2"
                 :disabled="saving">
-          <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
-          保存配置
+          <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+          💾 保存配置
         </button>
       </div>
-      <div class="p-6">
+      <div class="content-section-body">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           
           <!-- 抽奖消耗积分 -->
-          <div class="space-y-2">
-            <label class="block text-sm font-medium themed-text-secondary" x-tooltip="'每次抽奖扣除的积分数，设为0则免费抽奖'">抽奖消耗积分 ℹ️</label>
-            <div class="flex items-center">
+          <div class="p-4 rounded-lg border border-blue-100 bg-blue-50/30 space-y-2">
+            <label class="block text-sm font-semibold text-blue-800" x-tooltip="'每次抽奖扣除的积分数，设为0则免费抽奖'">
+              🎰 抽奖消耗积分 <span class="text-blue-400 text-xs ml-1">ℹ️</span>
+            </label>
+            <div class="flex items-center gap-2">
               <input type="number" 
-                     class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                     class="flex-1 px-3 py-2.5 border border-blue-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg font-semibold"
                      x-model.number="pointsDefaults.lottery_cost_points"
                      min="0"
-                     placeholder="每次抽奖消耗的积分数">
-              <span class="ml-2 text-sm themed-text-muted">积分/次</span>
+                     placeholder="0">
+              <span class="px-3 py-2 bg-blue-100 text-blue-700 text-sm rounded-lg font-medium whitespace-nowrap">积分/次</span>
             </div>
-            <p class="text-xs themed-text-muted">用户每次抽奖需要消耗的积分数</p>
+            <p class="text-xs text-blue-600/70">每次抽奖从用户余额中扣除的积分数量</p>
           </div>
 
           <!-- 每日抽奖次数限制 -->
-          <div class="space-y-2">
-            <label class="block text-sm font-medium themed-text-secondary" x-tooltip="'限制用户每天的抽奖次数，设为0则不限制'">每日抽奖次数限制 ℹ️</label>
-            <div class="flex items-center">
+          <div class="p-4 rounded-lg border border-orange-100 bg-orange-50/30 space-y-2">
+            <label class="block text-sm font-semibold text-orange-800" x-tooltip="'限制用户每天的抽奖次数，设为0则不限制'">
+              📊 每日抽奖次数限制 <span class="text-orange-400 text-xs ml-1">ℹ️</span>
+            </label>
+            <div class="flex items-center gap-2">
               <input type="number" 
-                     class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                     class="flex-1 px-3 py-2.5 border border-orange-200 rounded-lg bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-lg font-semibold"
                      x-model.number="pointsDefaults.daily_lottery_limit"
                      min="0"
-                     placeholder="每天最多抽奖次数">
-              <span class="ml-2 text-sm themed-text-muted">次/日</span>
+                     placeholder="0">
+              <span class="px-3 py-2 bg-orange-100 text-orange-700 text-sm rounded-lg font-medium whitespace-nowrap">次/日</span>
             </div>
-            <p class="text-xs themed-text-muted">每位用户每天最多抽奖次数</p>
+            <p class="text-xs text-orange-600/70">设为 0 表示不限制每日抽奖次数</p>
           </div>
 
           <!-- 签到积分 -->
-          <div class="space-y-2">
-            <label class="block text-sm font-medium themed-text-secondary" x-tooltip="'用户每日签到可获得的积分奖励'">签到积分 ℹ️</label>
-            <div class="flex items-center">
+          <div class="p-4 rounded-lg border border-green-100 bg-green-50/30 space-y-2">
+            <label class="block text-sm font-semibold text-green-800" x-tooltip="'用户每日签到可获得的积分奖励'">
+              ✅ 签到积分 <span class="text-green-400 text-xs ml-1">ℹ️</span>
+            </label>
+            <div class="flex items-center gap-2">
               <input type="number" 
-                     class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                     class="flex-1 px-3 py-2.5 border border-green-200 rounded-lg bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 text-lg font-semibold"
                      x-model.number="pointsDefaults.sign_in_points"
                      min="0"
-                     placeholder="每日签到奖励积分">
-              <span class="ml-2 text-sm themed-text-muted">积分/次</span>
+                     placeholder="0">
+              <span class="px-3 py-2 bg-green-100 text-green-700 text-sm rounded-lg font-medium whitespace-nowrap">积分/次</span>
             </div>
-            <p class="text-xs themed-text-muted">用户每日签到获得的积分数</p>
+            <p class="text-xs text-green-600/70">用户每日签到可获得的积分奖励</p>
           </div>
 
           <!-- 新用户初始积分 -->
-          <div class="space-y-2">
-            <label class="block text-sm font-medium themed-text-secondary" x-tooltip="'新用户注册后自动获得的初始积分'">新用户初始积分 ℹ️</label>
-            <div class="flex items-center">
+          <div class="p-4 rounded-lg border border-purple-100 bg-purple-50/30 space-y-2">
+            <label class="block text-sm font-semibold text-purple-800" x-tooltip="'新用户注册后自动获得的初始积分'">
+              🎁 新用户初始积分 <span class="text-purple-400 text-xs ml-1">ℹ️</span>
+            </label>
+            <div class="flex items-center gap-2">
               <input type="number" 
-                     class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                     class="flex-1 px-3 py-2.5 border border-purple-200 rounded-lg bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg font-semibold"
                      x-model.number="pointsDefaults.initial_points"
                      min="0"
-                     placeholder="新用户初始积分数">
-              <span class="ml-2 text-sm themed-text-muted">积分</span>
+                     placeholder="0">
+              <span class="px-3 py-2 bg-purple-100 text-purple-700 text-sm rounded-lg font-medium whitespace-nowrap">积分</span>
             </div>
-            <p class="text-xs themed-text-muted">新注册用户默认获得的积分数</p>
+            <p class="text-xs text-purple-600/70">新注册用户自动获得的初始积分数量</p>
           </div>
 
         </div>
@@ -96,9 +138,15 @@
     </div>
 
     <!-- 配置记录（data-table） -->
-    <div class="themed-card rounded-lg shadow mt-6" @table-action="handleTableAction($event.detail)">
-      <div class="p-4 border-b">
-        <h5 class="font-semibold">📋 配置记录</h5>
+    <div class="content-section" @table-action="handleTableAction($event.detail)">
+      <div class="content-section-header">
+        <div class="section-title">
+          <span class="title-icon">📋</span>
+          <div>
+            <span>全部积分配置记录</span>
+            <div class="text-xs font-normal mt-0.5" style="color: var(--color-text-muted)">包含所有积分相关配置项的当前值和最近更新时间</div>
+          </div>
+        </div>
       </div>
       <div x-data="dataTable({
         columns: tableColumns,
@@ -114,43 +162,79 @@
       </div>
     </div>
 
-    <!-- 积分配置 Modal（必须在主组件范围内） -->
+    <!-- 操作说明卡片 -->
+    <div class="themed-card rounded-xl shadow-sm mt-6 border border-gray-100 overflow-hidden">
+      <div class="card-header-accent">
+        <span class="header-icon">💡</span>
+        <span>操作指南</span>
+      </div>
+      <div class="p-5">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div class="flex items-start gap-3 p-3 rounded-lg bg-blue-50 border border-blue-100">
+            <span class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">1</span>
+            <div>
+              <div class="font-medium text-blue-800">修改参数</div>
+              <div class="text-xs text-blue-600 mt-0.5">在上方彩色卡片区域直接修改对应的积分数值</div>
+            </div>
+          </div>
+          <div class="flex items-start gap-3 p-3 rounded-lg bg-green-50 border border-green-100">
+            <span class="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">2</span>
+            <div>
+              <div class="font-medium text-green-800">保存生效</div>
+              <div class="text-xs text-green-600 mt-0.5">点击「保存配置」按钮，修改立即对所有用户生效</div>
+            </div>
+          </div>
+          <div class="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-100">
+            <span class="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">3</span>
+            <div>
+              <div class="font-medium text-amber-800">单项编辑</div>
+              <div class="text-xs text-amber-600 mt-0.5">也可在下方配置记录表中点击「编辑」修改单个配置项</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 积分配置 Modal -->
     <div x-ref="pointsModal" 
          x-show="isModalOpen('pointsModal')" 
          x-cloak 
          class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="fixed inset-0 bg-black/50" @click="hideModal('pointsModal')"></div>
-      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
-        <div class="p-4 border-b flex justify-between items-center">
-          <h5 class="font-semibold">💎 编辑积分配置</h5>
-          <button @click="hideModal('pointsModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('pointsModal')"></div>
+      <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-md mx-4 z-10 animate-slide-in-up">
+        <div class="p-5 border-b flex justify-between items-center bg-gradient-to-r from-blue-50 to-white rounded-t-xl">
+          <h5 class="font-semibold text-blue-900 flex items-center gap-2">
+            <span class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-sm">💎</span>
+            编辑积分配置
+          </h5>
+          <button @click="hideModal('pointsModal')" class="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">✕</button>
         </div>
         <form @submit.prevent="savePointsConfig()">
           <template x-if="editingPoints">
             <div class="p-6 space-y-4">
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">配置项</label>
-                <input type="text" class="w-full px-3 py-2 border rounded-lg bg-gray-100 cursor-not-allowed" 
+                <input type="text" class="w-full px-3 py-2 border rounded-lg bg-gray-50 cursor-not-allowed text-gray-500" 
                        :value="editingPoints.setting_key" 
                        disabled>
               </div>
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">配置值 <span class="text-red-500">*</span></label>
-                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500" 
+                <input type="number" class="w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg font-semibold" 
                        x-model="editingPoints.setting_value" 
                        required>
               </div>
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">显示名称</label>
-                <input type="text" class="w-full px-3 py-2 border rounded-lg bg-gray-100 cursor-not-allowed" 
+                <input type="text" class="w-full px-3 py-2 border rounded-lg bg-gray-50 cursor-not-allowed text-gray-500" 
                        :value="editingPoints.display_name || '-'" 
                        disabled>
               </div>
             </div>
           </template>
-          <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
-            <button type="button" @click="hideModal('pointsModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300">取消</button>
-            <button type="submit" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50" :disabled="saving">
+          <div class="modal-footer">
+            <button type="button" @click="hideModal('pointsModal')" class="btn btn-secondary">取消</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving">
               <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
               保存
             </button>

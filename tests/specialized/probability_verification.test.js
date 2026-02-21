@@ -30,7 +30,8 @@ const { TEST_DATA } = require('../helpers/test-data')
 const {
   ensureTestUserHasPoints,
   getTestUserPointsBalance,
-  ensureTestUserHasQuota
+  ensureTestUserHasQuota,
+  resetTestUserDailyQuota
 } = require('../helpers/test-points-setup')
 const {
   TestAssertions: _TestAssertions,
@@ -250,7 +251,14 @@ describe('【P0】概率分布验证测试 - 10,000次抽奖统计', () => {
     console.log('='.repeat(80))
   }, 300000) // 5分钟超时（包括积分充值时间）
 
-  afterAll(() => {
+  afterAll(async () => {
+    /* 清理测试产生的 bonus_draw_count，防止污染真实用户配额 */
+    try {
+      await resetTestUserDailyQuota(null, 1)
+      console.log('🧹 已重置测试用户的每日配额（bonus_draw_count 已清零）')
+    } catch (error) {
+      console.warn('⚠️ 配额清理失败（非致命）:', error.message)
+    }
     console.log('='.repeat(80))
     console.log('🏁 概率分布验证测试完成')
     console.log('='.repeat(80))

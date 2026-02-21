@@ -186,61 +186,78 @@ router.post('/login', async (req, res) => {
 
   try {
     /**
-     * 多平台会话隔离策略（2026-02-19 升级）
+     * 多平台会话隔离策略（行级锁 + 原子操作）
      *
-     * 仅失效同平台的旧会话，跨平台共存：
+     * 策略：先锁定 → 再失效旧会话 → 最后创建新会话
+     * 使用 SELECT FOR UPDATE 行级锁序列化同一用户的并发登录，
+     * 避免 REPEATABLE READ 隔离级别下多个事务互相看不到未提交数据导致旧会话未被去活。
+     *
+     * 平台隔离规则：
      *   Web 登录 → 只踢 Web 旧会话，微信/抖音小程序不受影响
      *   微信小程序登录 → 只踢微信旧会话，Web/抖音不受影响
-     *
-     * 测试环境控制逻辑不变：
-     * - 默认测试环境跳过（避免并发测试互相干扰）
-     * - ENABLE_MULTI_DEVICE_CHECK=true 可在测试环境强制启用
-     * - DISABLE_MULTI_DEVICE_CHECK=true 可在任何环境关闭
-     *
-     * @see docs/multi-platform-session-design.md
      */
     const isTestEnv = process.env.NODE_ENV === 'test'
     const disableMultiDeviceCheck = process.env.DISABLE_MULTI_DEVICE_CHECK === 'true'
     const forceMultiDeviceCheck = process.env.ENABLE_MULTI_DEVICE_CHECK === 'true'
 
-    let deactivatedCount = 0
-    if (forceMultiDeviceCheck || (!isTestEnv && !disableMultiDeviceCheck)) {
-      deactivatedCount = await AuthenticationSession.deactivateUserSessions(
-        userType,
-        user.user_id,
-        null,
-        platform
-      )
-    }
+    const { sequelize } = AuthenticationSession
+    const transaction = await sequelize.transaction()
 
-    if (deactivatedCount > 0) {
-      logger.info(
-        `🔒 [Session] 同平台会话替换: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id}, platform=${platform})`
+    try {
+      // 行级锁：锁定该用户在该平台的所有活跃会话，序列化并发登录
+      await sequelize.query(
+        'SELECT authentication_session_id FROM authentication_sessions WHERE user_type = ? AND user_id = ? AND login_platform = ? AND is_active = 1 FOR UPDATE',
+        { replacements: [userType, user.user_id, platform], transaction }
       )
 
-      try {
-        const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
-        ChatWebSocketService.disconnectUser(user.user_id, userType)
-        logger.info(
-          `🔌 [Session] 已断开旧设备WebSocket连接: user_id=${user.user_id}, type=${userType}`
+      let deactivatedCount = 0
+      if (forceMultiDeviceCheck || (!isTestEnv && !disableMultiDeviceCheck)) {
+        deactivatedCount = await AuthenticationSession.deactivateUserSessions(
+          userType,
+          user.user_id,
+          null,
+          platform,
+          { transaction }
         )
-      } catch (wsError) {
-        logger.debug(`🔌 [Session] WebSocket断开跳过: ${wsError.message}`)
       }
-    }
 
-    // 创建新会话（TTL 与 refresh_token 7天生命周期对齐）
-    await AuthenticationSession.createSession({
-      session_token: sessionToken,
-      user_type: userType,
-      user_id: user.user_id,
-      login_ip: loginIp,
-      login_platform: platform,
-      expires_in_minutes: 10080 // 7天（7 * 24 * 60），与 refresh_token 生命周期对齐
-    })
-    logger.info(
-      `🔐 [Session] 会话创建成功: user_id=${user.user_id}, platform=${platform}, session=${sessionToken.substring(0, 8)}...`
-    )
+      await AuthenticationSession.createSession(
+        {
+          session_token: sessionToken,
+          user_type: userType,
+          user_id: user.user_id,
+          login_ip: loginIp,
+          login_platform: platform,
+          expires_in_minutes: 10080
+        },
+        { transaction }
+      )
+
+      await transaction.commit()
+
+      if (deactivatedCount > 0) {
+        logger.info(
+          `🔒 [Session] 同平台会话替换: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id}, platform=${platform})`
+        )
+
+        try {
+          const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
+          ChatWebSocketService.disconnectUser(user.user_id, userType)
+          logger.info(
+            `🔌 [Session] 已断开旧设备WebSocket连接: user_id=${user.user_id}, type=${userType}`
+          )
+        } catch (wsError) {
+          logger.debug(`🔌 [Session] WebSocket断开跳过: ${wsError.message}`)
+        }
+      }
+
+      logger.info(
+        `🔐 [Session] 会话创建成功: user_id=${user.user_id}, platform=${platform}, session=${sessionToken.substring(0, 8)}...`
+      )
+    } catch (innerError) {
+      await transaction.rollback()
+      throw innerError
+    }
   } catch (sessionError) {
     logger.warn(`⚠️ [Session] 会话创建失败（非致命）: ${sessionError.message}`)
   }
@@ -388,6 +405,9 @@ router.post('/quick-login', async (req, res) => {
   // 通过ServiceManager获取UserService
   const UserService = req.app.locals.services.getService('user')
 
+  /* 决策 D-2：与 SMS 登录保持一致，追踪是否为新用户（2026-02-21） */
+  let isNewUser = false
+
   /*
    * 查找用户
    * 决策21：登录场景禁用缓存，强制查库获取最新用户状态
@@ -403,6 +423,7 @@ router.post('/quick-login', async (req, res) => {
       user = await TransactionManager.execute(async transaction => {
         return await UserService.registerUser(mobile, { transaction })
       })
+      isNewUser = true
       logger.info(`✅ 用户 ${sanitize.mobile(mobile)} 注册流程完成（用户+积分账户+角色）`)
     } catch (error) {
       logger.error(`❌ 用户 ${sanitize.mobile(mobile)} 注册失败:`, error)
@@ -450,52 +471,73 @@ router.post('/quick-login', async (req, res) => {
 
   try {
     const { AuthenticationSession } = req.app.locals.models
+    const { sequelize } = AuthenticationSession
 
     /**
-     * 多平台会话隔离（快速登录）
+     * 多平台会话隔离（快速登录 + 行级锁防并发）
      * 仅失效 wechat_mp 平台的旧会话，Web 端不受影响
      */
     const isTestEnv = process.env.NODE_ENV === 'test'
     const disableMultiDeviceCheck = process.env.DISABLE_MULTI_DEVICE_CHECK === 'true'
     const forceMultiDeviceCheck = process.env.ENABLE_MULTI_DEVICE_CHECK === 'true'
 
-    let deactivatedCount = 0
-    if (forceMultiDeviceCheck || (!isTestEnv && !disableMultiDeviceCheck)) {
-      deactivatedCount = await AuthenticationSession.deactivateUserSessions(
-        userType,
-        user.user_id,
-        null,
-        platform
-      )
-    }
+    const transaction = await sequelize.transaction()
 
-    if (deactivatedCount > 0) {
-      logger.info(
-        `🔒 [Session] 快速登录同平台会话替换: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id}, platform=${platform})`
+    try {
+      // 行级锁：锁定该用户在该平台的所有活跃会话，序列化并发登录
+      await sequelize.query(
+        'SELECT authentication_session_id FROM authentication_sessions WHERE user_type = ? AND user_id = ? AND login_platform = ? AND is_active = 1 FOR UPDATE',
+        { replacements: [userType, user.user_id, platform], transaction }
       )
 
-      try {
-        const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
-        ChatWebSocketService.disconnectUser(user.user_id, userType)
-        logger.info(
-          `🔌 [Session] 快速登录已断开旧设备WebSocket: user_id=${user.user_id}, type=${userType}`
+      let deactivatedCount = 0
+      if (forceMultiDeviceCheck || (!isTestEnv && !disableMultiDeviceCheck)) {
+        deactivatedCount = await AuthenticationSession.deactivateUserSessions(
+          userType,
+          user.user_id,
+          null,
+          platform,
+          { transaction }
         )
-      } catch (wsError) {
-        logger.debug(`🔌 [Session] WebSocket断开跳过: ${wsError.message}`)
       }
-    }
 
-    await AuthenticationSession.createSession({
-      session_token: sessionToken,
-      user_type: userType,
-      user_id: user.user_id,
-      login_ip: loginIp,
-      login_platform: platform,
-      expires_in_minutes: 10080 // 7天
-    })
-    logger.info(
-      `🔐 [Session] 快速登录会话创建成功: user_id=${user.user_id}, platform=${platform}, session=${sessionToken.substring(0, 8)}...`
-    )
+      await AuthenticationSession.createSession(
+        {
+          session_token: sessionToken,
+          user_type: userType,
+          user_id: user.user_id,
+          login_ip: loginIp,
+          login_platform: platform,
+          expires_in_minutes: 10080
+        },
+        { transaction }
+      )
+
+      await transaction.commit()
+
+      if (deactivatedCount > 0) {
+        logger.info(
+          `🔒 [Session] 快速登录同平台会话替换: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id}, platform=${platform})`
+        )
+
+        try {
+          const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
+          ChatWebSocketService.disconnectUser(user.user_id, userType)
+          logger.info(
+            `🔌 [Session] 快速登录已断开旧设备WebSocket: user_id=${user.user_id}, type=${userType}`
+          )
+        } catch (wsError) {
+          logger.debug(`🔌 [Session] WebSocket断开跳过: ${wsError.message}`)
+        }
+      }
+
+      logger.info(
+        `🔐 [Session] 快速登录会话创建成功: user_id=${user.user_id}, platform=${platform}, session=${sessionToken.substring(0, 8)}...`
+      )
+    } catch (innerError) {
+      await transaction.rollback()
+      throw innerError
+    }
   } catch (sessionError) {
     logger.warn(`⚠️ [Session] 快速登录会话创建失败（非致命）: ${sessionError.message}`)
   }
@@ -532,11 +574,13 @@ router.post('/quick-login', async (req, res) => {
       created_at: user.created_at,
       last_login: user.last_login
     },
+    is_new_user: isNewUser, // 决策 D-2：与 SMS 登录保持一致
     expires_in: 7 * 24 * 60 * 60,
     timestamp: BeijingTimeHelper.apiTimestamp()
   }
 
-  logger.info(`✅ 用户 ${sanitize.mobile(mobile)} 微信授权登录成功`)
+  const message = isNewUser ? '注册并登录成功' : '快速登录成功'
+  logger.info(`✅ 用户 ${sanitize.mobile(mobile)} 微信授权登录成功 (is_new_user: ${isNewUser})`)
 
   // 登录性能监控
   const loginDuration = Date.now() - loginStartTime
@@ -558,7 +602,7 @@ router.post('/quick-login', async (req, res) => {
     )
   }
 
-  return res.apiSuccess(responseData, '快速登录成功')
+  return res.apiSuccess(responseData, message)
 })
 
 module.exports = router

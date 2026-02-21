@@ -69,8 +69,8 @@ export function useDebtManagementMethods() {
           const campaigns = response.data?.campaigns || response.data?.list || response.data?.items || []
           // 转换为下拉框选项格式
           this.campaignOptions = campaigns.map((c) => ({
-            value: c.lottery_campaign_id || c.campaign_id || c.id,
-            label: c.campaign_name || c.name || `活动#${c.lottery_campaign_id || c.id}`,
+            value: c.lottery_campaign_id || c.campaign_id,
+            label: c.campaign_name || c.name || `活动#${c.lottery_campaign_id || c.campaign_id}`,
             status: c.status
           }))
           logger.debug('加载活动选项列表成功:', this.campaignOptions.length, '个活动')
@@ -192,7 +192,7 @@ export function useDebtManagementMethods() {
     openRepayModal(debt) {
       this.debtRepayForm = {
         debt_type: debt.debt_type || 'inventory',
-        debt_id: debt.debt_id || debt.id,
+        debt_id: debt.debt_id,
         amount: debt.remaining_amount || debt.owed_quantity || debt.amount || 0,
         remark: ''
       }
@@ -248,7 +248,7 @@ export function useDebtManagementMethods() {
         async () => {
           const response = await this.apiPost(ASSET_ENDPOINTS.DEBT_WRITE_OFF, {
             debt_type: debt.debt_type || 'inventory',
-            debt_id: debt.debt_id || debt.id,
+            debt_id: debt.debt_id,
             amount: amount,
             remark: '管理员核销'
           })

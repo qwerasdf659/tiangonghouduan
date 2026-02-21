@@ -182,9 +182,10 @@ module.exports = sequelize => {
    * @param {string} [sessionData.login_ip] - 登录IP地址
    * @param {string} [sessionData.login_platform='unknown'] - 登录平台（web/wechat_mp/douyin_mp/alipay_mp/app/unknown）
    * @param {number} [sessionData.expires_in_minutes=120] - 过期时间（分钟），默认2小时
+   * @param {Object} [options] - Sequelize 选项（支持 transaction）
    * @returns {Promise<AuthenticationSession>} 新创建的会话实例
    */
-  AuthenticationSession.createSession = async function (sessionData) {
+  AuthenticationSession.createSession = async function (sessionData, options = {}) {
     const {
       session_token,
       user_type,
@@ -197,16 +198,19 @@ module.exports = sequelize => {
     // ✅ futureTime 使用 Date.now()，与 new Date() 时间基准一致
     const expires_at = BeijingTimeHelper.futureTime(expires_in_minutes * 60 * 1000)
 
-    return this.create({
-      session_token,
-      user_type,
-      user_id,
-      login_ip,
-      login_platform,
-      expires_at,
-      is_active: true,
-      last_activity: new Date() // ✅ 使用 UTC 时间戳，Sequelize 自动转换为北京时间
-    })
+    return this.create(
+      {
+        session_token,
+        user_type,
+        user_id,
+        login_ip,
+        login_platform,
+        expires_at,
+        is_active: true,
+        last_activity: new Date() // ✅ 使用 UTC 时间戳，Sequelize 自动转换为北京时间
+      },
+      options
+    )
   }
 
   AuthenticationSession.findByToken = function (session_token) {
@@ -272,11 +276,20 @@ module.exports = sequelize => {
    * @param {string|null} [login_platform=null] - 登录平台（传入时仅失效该平台会话）
    * @returns {Promise<number>} 被失效的会话数量
    */
+  /**
+   * @param {string} user_type - 用户类型 (user/admin)
+   * @param {number} user_id - 用户ID
+   * @param {string|null} [excludeToken=null] - 排除的会话令牌
+   * @param {string|null} [login_platform=null] - 登录平台
+   * @param {Object} [options] - Sequelize 选项（支持 transaction）
+   * @returns {Promise<number>} 被失效的会话数量
+   */
   AuthenticationSession.deactivateUserSessions = async function (
     user_type,
     user_id,
     excludeToken = null,
-    login_platform = null
+    login_platform = null,
+    options = {}
   ) {
     const whereCondition = {
       user_type,
@@ -294,7 +307,10 @@ module.exports = sequelize => {
       whereCondition.login_platform = login_platform
     }
 
-    const affectedCount = await this.update({ is_active: false }, { where: whereCondition })
+    const affectedCount = await this.update(
+      { is_active: false },
+      { where: whereCondition, ...options }
+    )
 
     const platformInfo = login_platform ? `:${login_platform}` : '(全平台)'
     console.log(`🔒 已失效 ${affectedCount[0]} 个用户会话: ${user_type}:${user_id}${platformInfo}`)

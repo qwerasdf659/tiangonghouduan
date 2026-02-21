@@ -28,9 +28,6 @@ export { usePricingState, usePricingMethods } from './pricing.js'
 // 抽奖监控模块
 export { useMetricsState, useMetricsMethods } from './metrics.js'
 
-// 核销码管理模块
-export { useRedemptionState, useRedemptionMethods } from './redemption.js'
-
 // 用户抽奖档案模块
 export { useUserProfileState, useUserProfileMethods } from './user-profile.js'
 
@@ -80,7 +77,6 @@ export function useAllLotteryState() {
     ...useQuotaState(),
     ...usePricingState(),
     ...useMetricsState(),
-    ...useRedemptionState(),
     ...useUserProfileState(),
     ...useAlertsState(),
     ...useRiskControlState(),
@@ -107,7 +103,6 @@ export function useAllLotteryMethods() {
     ...useQuotaMethods(),
     ...usePricingMethods(),
     ...useMetricsMethods(),
-    ...useRedemptionMethods(),
     ...useUserProfileMethods(),
     ...useAlertsMethods(),
     ...useRiskControlMethods(),

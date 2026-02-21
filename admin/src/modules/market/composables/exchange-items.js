@@ -391,7 +391,7 @@ export function useExchangeItemsMethods() {
 
       try {
         const token = localStorage.getItem('token')
-        const url = `${SYSTEM_ADMIN_ENDPOINTS.IMAGE_LIST}?business_type=exchange&context_id=${contextId}&category=detail`
+        const url = `${SYSTEM_ADMIN_ENDPOINTS.IMAGE_BY_BUSINESS}?business_type=exchange&context_id=${contextId}&category=detail`
         const response = await fetch(url, {
           headers: { Authorization: `Bearer ${token}` }
         })
@@ -458,22 +458,20 @@ export function useExchangeItemsMethods() {
       this.detailImages[newIndex] = temp
 
       // 更新 sort_order（异步，不阻塞UI）
-      this.detailImages.forEach(async (img, i) => {
+      const token = localStorage.getItem('token')
+      this.detailImages.forEach((img, i) => {
         img.sort_order = i + 1
-        try {
-          const token = localStorage.getItem('token')
-          const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPDATE || `${SYSTEM_ADMIN_ENDPOINTS.IMAGE_LIST}/${img.image_resource_id}`, { id: img.image_resource_id })
-          await fetch(url, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({ sort_order: i + 1 })
-          })
-        } catch (e) {
+        const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPDATE, { id: img.image_resource_id })
+        fetch(url, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ sort_order: i + 1 })
+        }).catch(e => {
           logger.warn('[ExchangeItems] 更新排序失败:', e)
-        }
+        })
       })
     },
 

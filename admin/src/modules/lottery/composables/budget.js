@@ -110,7 +110,7 @@ export function useBudgetMethods() {
     openSetBudgetModal(campaignId = null) {
       this.editingBudgetCampaignId = campaignId
       if (campaignId) {
-        const campaign = this.budgetCampaigns.find(c => (c.campaign_id || c.id) === campaignId)
+        const campaign = this.budgetCampaigns.find(c => c.lottery_campaign_id === campaignId)
         if (campaign) {
           this.budgetForm = {
             campaign_id: campaignId,
@@ -199,7 +199,7 @@ export function useBudgetMethods() {
 
     /**
      * 加载预算消耗趋势数据
-     * 从 hourlyMetrics 或单独 API 获取最近7天的消耗数据
+     * 调用后端 lottery-strategy-stats/daily API 获取 lottery_daily_metrics 真实数据
      * @param {number} campaignId - 活动ID
      */
     async loadBudgetTrendData(campaignId = null) {
@@ -210,101 +210,45 @@ export function useBudgetMethods() {
           return
         }
 
-        logger.info('[Budget] 加载预算消耗趋势', { campaign_id: targetCampaignId })
+        logger.info('[Budget] 加载预算消耗趋势（真实数据）', { campaign_id: targetCampaignId })
 
-        // 从 hourlyMetrics 计算每日消耗（如果数据可用）
-        // 或使用预算历史数据
-        const trendData = this.calculateDailyBudgetTrend(targetCampaignId)
-        this.budgetTrendData = trendData
+        const url = buildURL(LOTTERY_ENDPOINTS.STRATEGY_STATS_DAILY, {
+          campaign_id: targetCampaignId
+        })
+        const result = await this.apiCall(url)
 
-        // 更新图表
+        /* 后端返回 { lottery_campaign_id, start_date, end_date, data: [...] } */
+        const dailyMetrics = result?.data || []
+
+        /* 查找活动预算配置用于计算 remaining */
+        const campaign = this.budgetCampaigns.find(
+          c => c.lottery_campaign_id === targetCampaignId
+        )
+        const totalBudget = campaign?.pool_budget?.total || 0
+
+        /* 将后端 daily_metrics 转换为图表所需格式 */
+        let cumulative = 0
+        this.budgetTrendData = dailyMetrics.map(m => {
+          const daily = Number(m.total_budget_consumed) || 0
+          cumulative += daily
+          const dateStr = new Date(m.metric_date).toLocaleDateString('zh-CN', {
+            month: 'numeric',
+            day: 'numeric',
+            timeZone: 'Asia/Shanghai'
+          })
+          return {
+            date: dateStr,
+            daily,
+            cumulative,
+            remaining: totalBudget - cumulative
+          }
+        })
+
         this.updateBudgetTrendChart()
       } catch (error) {
         logger.error('[Budget] 加载趋势数据失败:', error)
         this.budgetTrendData = []
       }
-    },
-
-    /**
-     * 计算每日预算消耗趋势
-     * 基于现有数据生成7天趋势
-     * @param {number} campaignId - 活动ID
-     * @returns {Array} 趋势数据数组
-     */
-    calculateDailyBudgetTrend(campaignId) {
-      // 查找活动预算配置
-      const campaign = this.budgetCampaigns.find(c => (c.campaign_id || c.id) === campaignId)
-
-      if (!campaign) {
-        return this.generateMockTrendData()
-      }
-
-      const totalBudget = campaign.pool_budget?.total || 0
-      const usedBudget = campaign.pool_budget?.used || 0
-
-      // 生成7天趋势数据（基于当前使用量进行模拟分布）
-      const days = 7
-      const trend = []
-      const today = new Date()
-
-      // 假设消耗是递增的，计算日均消耗
-      const dailyAvg = usedBudget / Math.max(days, 1)
-
-      for (let i = days - 1; i >= 0; i--) {
-        const date = new Date(today)
-        date.setDate(date.getDate() - i)
-        const dateStr = date.toLocaleDateString('zh-CN', {
-          month: 'numeric',
-          day: 'numeric',
-          timeZone: 'Asia/Shanghai'
-        })
-
-        // 计算累计消耗（模拟递增）
-        const factor = (days - i) / days
-        const cumulativeUsed = Math.round(usedBudget * factor)
-        const dailyUsed =
-          i === 0
-            ? usedBudget - (trend[trend.length - 1]?.cumulative || 0)
-            : Math.round(dailyAvg * (0.8 + Math.random() * 0.4))
-
-        trend.push({
-          date: dateStr,
-          daily: Math.max(0, dailyUsed),
-          cumulative: cumulativeUsed,
-          remaining: totalBudget - cumulativeUsed
-        })
-      }
-
-      return trend
-    },
-
-    /**
-     * 生成模拟趋势数据（无实际数据时使用）
-     * @returns {Array} 模拟趋势数据
-     */
-    generateMockTrendData() {
-      const days = 7
-      const trend = []
-      const today = new Date()
-
-      for (let i = days - 1; i >= 0; i--) {
-        const date = new Date(today)
-        date.setDate(date.getDate() - i)
-        const dateStr = date.toLocaleDateString('zh-CN', {
-          month: 'numeric',
-          day: 'numeric',
-          timeZone: 'Asia/Shanghai'
-        })
-
-        trend.push({
-          date: dateStr,
-          daily: 0,
-          cumulative: 0,
-          remaining: 0
-        })
-      }
-
-      return trend
     },
 
     /**
@@ -443,7 +387,7 @@ export function useBudgetMethods() {
      * @param {Object} campaign - 活动对象
      */
     async viewBudgetTrend(campaign) {
-      const campaignId = campaign.lottery_campaign_id || campaign.id
+      const campaignId = campaign.lottery_campaign_id
       this.selectedBudgetCampaignId = campaignId
 
       // 加载趋势数据

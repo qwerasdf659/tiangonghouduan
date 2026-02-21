@@ -195,16 +195,26 @@ class ImageService {
    *
    * @param {string} businessType - 业务类型：lottery|exchange|trade|uploads
    * @param {number} contextId - 业务上下文 ID（如 lottery_prize_id、exchange_item_id）
+   * @param {Object} [options] - 查询选项
+   * @param {string} [options.category] - 图片分类过滤（primary/detail/icons 等）
    * @returns {Promise<Array>} 图片列表
    */
-  static async getImagesByBusiness(businessType, contextId) {
+  static async getImagesByBusiness(businessType, contextId, options = {}) {
     const { ImageResources } = require('../models')
+
+    const where = {
+      business_type: businessType,
+      context_id: contextId,
+      status: 'active'
+    }
+
+    // 可选的 category 过滤（用于区分主图和详情图）
+    if (options.category) {
+      where.category = options.category
+    }
+
     const images = await ImageResources.findAll({
-      where: {
-        business_type: businessType,
-        context_id: contextId, // 🔴 修复：business_id → context_id
-        status: 'active'
-      },
+      where,
       order: [
         ['sort_order', 'ASC'],
         ['created_at', 'ASC']
@@ -574,6 +584,7 @@ class ImageService {
       business_type: imageRecord.business_type,
       category: imageRecord.category,
       context_id: imageRecord.context_id,
+      sort_order: imageRecord.sort_order || 0,
       status: imageRecord.status,
       created_at: imageRecord.created_at
     }

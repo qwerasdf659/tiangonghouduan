@@ -236,8 +236,8 @@ router.post(
   requireRoleLevel(100),
   async (req, res) => {
     try {
-      // 🔄 通过 ServiceManager 获取 ExchangeService（符合TR-005规范）
-      const ExchangeService = req.app.locals.services.getService('exchange_query')
+      const ExchangeService = req.app.locals.services.getService('exchange_core')
+      const TransactionManager = require('../../../../utils/TransactionManager')
 
       const { order_no } = req.params
       const { status, remark = '' } = req.body
@@ -250,7 +250,6 @@ router.post(
         remark
       })
 
-      // 参数验证
       if (!order_no || order_no.trim().length === 0) {
         return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
       }
@@ -259,7 +258,6 @@ router.post(
         return res.apiError('订单状态不能为空', 'BAD_REQUEST', null, 400)
       }
 
-      // 状态白名单验证（包含 Phase 3 新增状态）
       const validStatuses = [
         'approved',
         'shipped',
@@ -278,8 +276,11 @@ router.post(
         )
       }
 
-      // 调用服务层
-      const result = await ExchangeService.updateOrderStatus(order_no, status, operator_id, remark)
+      const result = await TransactionManager.execute(async transaction => {
+        return await ExchangeService.updateOrderStatus(order_no, status, operator_id, remark, {
+          transaction
+        })
+      })
 
       logger.info('订单状态更新成功', {
         operator_id,

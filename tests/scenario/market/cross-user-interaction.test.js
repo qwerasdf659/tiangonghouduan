@@ -120,6 +120,31 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
       buyer_2_id: test_buyer_2?.user_id || '未找到',
       admin_id: test_admin.user_id
     })
+
+    // 清理历史测试遗留的 on_sale 挂牌（避免超出挂牌数量限制）
+    const staleCount = await MarketListing.update(
+      { status: 'withdrawn' },
+      {
+        where: {
+          seller_user_id: test_seller.user_id,
+          status: 'on_sale',
+          idempotency_key: {
+            [sequelize.Sequelize.Op.or]: [
+              { [sequelize.Sequelize.Op.like]: '%test%' },
+              { [sequelize.Sequelize.Op.like]: 'cancel_%' },
+              { [sequelize.Sequelize.Op.like]: 'multi_user_%' },
+              { [sequelize.Sequelize.Op.like]: 'fungible_%' },
+              { [sequelize.Sequelize.Op.like]: 'item_listing_%' },
+              { [sequelize.Sequelize.Op.like]: 'stress_%' },
+              { [sequelize.Sequelize.Op.like]: 'admin_%' }
+            ]
+          }
+        }
+      }
+    )
+    if (staleCount[0] > 0) {
+      console.log(`🧹 清理 ${staleCount[0]} 个历史测试遗留挂牌`)
+    }
   })
 
   afterAll(async () => {
@@ -332,7 +357,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
       try {
         cancel_result = await TradeOrderService.cancelOrder(
           {
-            order_id,
+            trade_order_id: order_id,
             cancel_reason: '买家主动取消测试'
           },
           { transaction: cancel_tx }
@@ -852,10 +877,8 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
         withdraw_result = await MarketListingService.adminForceWithdrawListing(
           {
             market_listing_id: listing.market_listing_id,
-            admin_id: test_admin.user_id,
-            withdraw_reason: '测试：违规挂牌强制下架',
-            ip_address: '127.0.0.1',
-            user_agent: 'Jest Test'
+            operator_id: test_admin.user_id,
+            reason: '测试：违规挂牌强制下架'
           },
           { transaction: withdraw_tx }
         )
@@ -928,8 +951,8 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
         await MarketListingService.adminForceWithdrawListing(
           {
             market_listing_id: listing.market_listing_id,
-            admin_id: test_admin.user_id,
-            withdraw_reason: '' // 空原因
+            operator_id: test_admin.user_id,
+            reason: '' // 空原因
           },
           { transaction: withdraw_tx }
         )
@@ -952,8 +975,8 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
         await MarketListingService.adminForceWithdrawListing(
           {
             market_listing_id: 999999999, // 不存在的挂牌ID
-            admin_id: test_admin.user_id,
-            withdraw_reason: '测试不存在的挂牌'
+            operator_id: test_admin.user_id,
+            reason: '测试不存在的挂牌'
           },
           { transaction: withdraw_tx }
         )
@@ -991,8 +1014,8 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
         await MarketListingService.adminForceWithdrawListing(
           {
             market_listing_id: mock_listing.market_listing_id,
-            admin_id: test_admin.user_id,
-            withdraw_reason: '测试已售出挂牌'
+            operator_id: test_admin.user_id,
+            reason: '测试已售出挂牌'
           },
           { transaction: withdraw_tx }
         )

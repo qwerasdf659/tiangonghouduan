@@ -377,7 +377,7 @@ export function useUsersMethods() {
      */
     async viewUserDetail(user) {
       try {
-        const userId = user.user_id || user.id
+        const userId = user.user_id
         const userData = {
           user_id: userId,
           nickname: user.nickname || '',
@@ -556,7 +556,7 @@ export function useUsersMethods() {
 
       // 从角色列表中查找角色名称
       const selectedRole = this.roles.find(
-        r => (r.role_uuid || r.id) === roleCode || r.role_name === roleCode
+        r => r.role_uuid === roleCode || r.role_name === roleCode
       )
       const roleName = selectedRole?.role_name || roleCode
 
@@ -643,7 +643,7 @@ export function useUsersMethods() {
     openAssignUserRoleModal(user) {
       this.selectedUserForRole = user
       this.assignRoleForm = {
-        user_id: user.user_id || user.id || '',
+        user_id: user.user_id || '',
         role_code: ''
       }
       this.showModal('userRoleModal')

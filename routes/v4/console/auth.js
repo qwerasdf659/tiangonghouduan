@@ -43,47 +43,63 @@ router.post(
     const { user, roles } = await UserService.adminLogin(mobile, verification_code)
 
     /**
-     * 会话管理：创建认证会话
-     * 管理后台固定 platform='web'（通过 detectLoginPlatform 自动识别，UA 无小程序标识 → web）
+     * 会话管理：创建认证会话（原子操作 + 行级锁防并发）
+     *
+     * 策略：先锁定 → 再失效旧会话 → 最后创建新会话
+     * 使用 SELECT FOR UPDATE 行级锁序列化同一用户的并发登录，
+     * 避免 REPEATABLE READ 隔离级别下多个事务互相看不到未提交数据导致旧会话未被去活。
      */
     const sessionToken = uuidv4()
     const userType = roles.role_level >= 100 ? 'admin' : 'user'
     const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
     const platform = detectLoginPlatform(req)
     const { AuthenticationSession } = req.app.locals.models
+    const { sequelize } = req.app.locals.models.AuthenticationSession
 
     try {
-      const isTestEnv = process.env.NODE_ENV === 'test'
-      const disableMultiDeviceCheck = process.env.DISABLE_MULTI_DEVICE_CHECK === 'true'
-      const forceMultiDeviceCheck = process.env.ENABLE_MULTI_DEVICE_CHECK === 'true'
+      const transaction = await sequelize.transaction()
 
-      let deactivatedCount = 0
-      if (forceMultiDeviceCheck || (!isTestEnv && !disableMultiDeviceCheck)) {
-        deactivatedCount = await AuthenticationSession.deactivateUserSessions(
+      try {
+        // 行级锁：锁定该用户在该平台的所有活跃会话，序列化并发登录
+        await sequelize.query(
+          'SELECT authentication_session_id FROM authentication_sessions WHERE user_type = ? AND user_id = ? AND login_platform = ? AND is_active = 1 FOR UPDATE',
+          { replacements: [userType, user.user_id, platform], transaction }
+        )
+
+        const deactivatedCount = await AuthenticationSession.deactivateUserSessions(
           userType,
           user.user_id,
           null,
-          platform
+          platform,
+          { transaction }
         )
-      }
 
-      if (deactivatedCount > 0) {
+        await AuthenticationSession.createSession(
+          {
+            session_token: sessionToken,
+            user_type: userType,
+            user_id: user.user_id,
+            login_ip: loginIp,
+            login_platform: platform,
+            expires_in_minutes: 10080
+          },
+          { transaction }
+        )
+
+        await transaction.commit()
+
+        if (deactivatedCount > 0) {
+          logger.info(
+            `🔒 [Session] 管理后台同平台会话替换: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id}, platform=${platform})`
+          )
+        }
         logger.info(
-          `🔒 [Session] 管理后台同平台会话替换: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id}, platform=${platform})`
+          `🔐 [Session] 管理后台会话创建成功: user_id=${user.user_id}, platform=${platform}, session=${sessionToken.substring(0, 8)}...`
         )
+      } catch (innerError) {
+        await transaction.rollback()
+        throw innerError
       }
-
-      await AuthenticationSession.createSession({
-        session_token: sessionToken,
-        user_type: userType,
-        user_id: user.user_id,
-        login_ip: loginIp,
-        login_platform: platform,
-        expires_in_minutes: 10080 // 7天
-      })
-      logger.info(
-        `🔐 [Session] 管理后台会话创建成功: user_id=${user.user_id}, platform=${platform}, session=${sessionToken.substring(0, 8)}...`
-      )
     } catch (sessionError) {
       logger.warn(`⚠️ [Session] 管理后台会话创建失败（非致命）: ${sessionError.message}`)
     }

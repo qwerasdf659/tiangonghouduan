@@ -527,6 +527,36 @@ class BackpackService {
       throw error
     }
   }
+
+  /**
+   * 获取物品使用后的操作指引文案
+   * 优先级：模板级 meta.use_instructions > item_type 级配置 > null
+   * @param {Object} itemInstance - 已使用的 ItemInstance 模型实例
+   * @returns {Promise<string|null>} 操作指引文案
+   */
+  static async getUseInstructions(itemInstance) {
+    if (!itemInstance) return null
+
+    const { SystemConfig, ItemTemplate } = require('../models')
+
+    const instructionsConfig = await SystemConfig.getValue('backpack_use_instructions', {})
+    const itemType = itemInstance.item_type
+
+    if (itemInstance.item_template_id) {
+      const template = await ItemTemplate.findByPk(itemInstance.item_template_id, {
+        attributes: ['meta']
+      })
+      if (template?.meta?.use_instructions) {
+        return template.meta.use_instructions
+      }
+    }
+
+    if (itemType) {
+      return instructionsConfig[itemType] || null
+    }
+
+    return null
+  }
 }
 
 module.exports = BackpackService

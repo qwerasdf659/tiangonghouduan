@@ -8,35 +8,36 @@
 </head>
 <body class="themed-bg-subtle min-h-screen">
   
-  <!-- 导航栏 -->
-  <nav class="themed-bg-primary text-white shadow-lg">
-    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-      <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
-        <span class="text-lg font-semibold">📊 运营规则</span>
+  <!-- 页面顶部渐变横幅 -->
+  <div class="page-banner">
+    <div class="container mx-auto px-4 flex justify-between items-center">
+      <div>
+        <div class="flex items-center gap-3 mb-1">
+          <a href="/admin/workspace.html" class="text-blue-200 hover:text-white text-sm transition">← 返回工作台</a>
+        </div>
+        <h1>📊 运营规则</h1>
+        <p>管理积分定价、功能灰度开关和运营提醒规则，精细化控制业务运营策略</p>
       </div>
+      <div class="text-6xl opacity-20">⚙️</div>
     </div>
-  </nav>
+  </div>
 
   <!-- 页面主体 -->
   <div class="container mx-auto px-4 py-6" x-data="opsRulesPage()" x-init="init()">
     
     <!-- Tab导航 -->
-    <div class="themed-card rounded-lg shadow mb-6">
-      <div class="flex border-b overflow-x-auto">
-        <template x-for="tab in tabs" :key="tab.id">
-          <button 
-            @click="switchTab(tab.id)"
-            :class="currentTab === tab.id ? 'border-b-2 themed-border-primary themed-text-primary themed-bg-primary-light' : 'themed-text-muted themed-hover-bg'"
-            class="px-6 py-3 font-medium whitespace-nowrap transition-colors"
-            x-text="tab.icon + ' ' + tab.name"
-          ></button>
-        </template>
-      </div>
+    <div class="enhanced-tabs mb-6">
+      <template x-for="tab in tabs" :key="tab.id">
+        <button 
+          @click="switchTab(tab.id)"
+          :class="currentTab === tab.id ? 'tab-item active' : 'tab-item'"
+          x-text="tab.icon + ' ' + tab.name"
+        ></button>
+      </template>
     </div>
 
     <!-- Tab内容区域 -->
-    <div class="themed-card rounded-lg shadow overflow-hidden">
+    <div class="themed-card rounded-xl shadow-sm overflow-hidden">
       <!-- 定价配置 -->
       <div x-show="currentTab === 'pricing'" x-cloak>
         <iframe 

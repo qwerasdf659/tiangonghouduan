@@ -8,10 +8,9 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { buildURL } from '../../../api/base.js'
+import { buildURL, request } from '../../../api/base.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
-import { request } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/echarts-lazy.js'
 
 document.addEventListener('alpine:init', () => {
@@ -72,6 +71,48 @@ document.addEventListener('alpine:init', () => {
       lottery: '抽奖页',
       profile: '个人中心'
     },
+    /** 竞价落选原因 → 中文 */
+    LOSE_REASON_MAP: {
+      outbid: '被更高出价击败',
+      targeting_mismatch: '定向不匹配',
+      budget_exhausted: '预算已耗尽'
+    },
+    /** 反作弊触发规则 → 中文 */
+    RULE_MAP: {
+      none: '无异常',
+      frequency_cap: '频次超限',
+      frequency_limit: '频次超限',
+      batch_detection: '批量异常',
+      device_fingerprint: '设备指纹异常',
+      self_click: '自刷行为',
+      fake_click: '虚假点击'
+    },
+    /** 反作弊判定结果 → 中文 + 颜色 */
+    VERDICT_MAP: {
+      valid: { text: '有效', color: 'bg-emerald-500' },
+      invalid: { text: '无效', color: 'bg-red-500' },
+      suspicious: { text: '可疑', color: 'bg-amber-500' }
+    },
+    /** 转化类型 → 中文 + 颜色 */
+    CONVERSION_MAP: {
+      lottery_draw: { text: '抽奖', color: 'bg-purple-100 text-purple-700' },
+      exchange: { text: '兑换', color: 'bg-blue-100 text-blue-700' },
+      market_buy: { text: '市场购买', color: 'bg-green-100 text-green-700' },
+      page_view: { text: '页面浏览', color: 'bg-gray-100 text-gray-700' }
+    },
+    /** DMP 标签键 → 中文说明 */
+    TAG_KEY_MAP: {
+      lottery_active_7d: '7天抽奖活跃',
+      lottery_active_30d: '30天抽奖活跃',
+      lottery_total_count: '累计抽奖次数',
+      diamond_balance: '钻石余额',
+      diamond_rich: '钻石富豪',
+      has_red_shard: '持有红水晶碎片',
+      market_trader: 'C2C交易者',
+      new_user: '新用户',
+      register_days: '注册天数',
+      active_7d: '7天活跃'
+    },
 
     /** 获取状态中文名 */
     statusText(status) { return this.STATUS_MAP[status] || status },
@@ -83,6 +124,20 @@ document.addEventListener('alpine:init', () => {
     slotTypeText(type) { return this.SLOT_TYPE_MAP[type] || type },
     /** 获取位置中文名 */
     positionText(pos) { return this.POSITION_MAP[pos] || pos },
+    /** 获取落选原因中文 */
+    loseReasonText(reason) { return this.LOSE_REASON_MAP[reason] || reason || '-' },
+    /** 获取触发规则中文 */
+    ruleText(rule) { return this.RULE_MAP[rule] || rule || '-' },
+    /** 获取判定结果中文 */
+    verdictText(v) { return this.VERDICT_MAP[v]?.text || v },
+    /** 获取判定结果颜色 */
+    verdictColor(v) { return this.VERDICT_MAP[v]?.color || 'bg-gray-500' },
+    /** 获取转化类型中文 */
+    conversionText(type) { return this.CONVERSION_MAP[type]?.text || type },
+    /** 获取转化类型颜色 */
+    conversionColor(type) { return this.CONVERSION_MAP[type]?.color || 'bg-gray-100 text-gray-700' },
+    /** 获取标签键中文 */
+    tagKeyText(key) { return this.TAG_KEY_MAP[key] || key },
 
     // ==================== 通用状态 ====================
     saving: false,
@@ -144,6 +199,7 @@ document.addEventListener('alpine:init', () => {
     reportOverview: {},
     reportLoading: false,
     reportFilters: { start_date: '', end_date: '' },
+    reportRangeLabel: '7天',
     // ==================== Phase 4-6 数据查询 ====================
     bidLogs: [],
     bidLogsLoading: false,
@@ -565,6 +621,16 @@ document.addEventListener('alpine:init', () => {
     },
 
     // ==================== 报表 ====================
+    /** 快速设置报表时间范围 */
+    setReportRange(days) {
+      const today = new Date()
+      const start = new Date(today.getTime() - (days - 1) * 24 * 3600 * 1000)
+      this.reportFilters.end_date = today.toISOString().slice(0, 10)
+      this.reportFilters.start_date = start.toISOString().slice(0, 10)
+      this.reportRangeLabel = days === 1 ? '今天' : days + '天'
+      this.loadReportOverview()
+    },
+
     async loadReportOverview() {
       this.reportLoading = true
       try {

@@ -43,13 +43,14 @@ function asyncHandler(fn) {
  * @access Private（需要 JWT 认证）
  *
  * @returns {Object} 响应体
- * @returns {Array} data.transactions - 流水记录数组
- * @returns {number} data.transactions[].asset_transaction_id - 流水ID（主键）
+ * @returns {Array} data.transactions - 流水记录数组（经 DataSanitizer 脱敏，含 BUDGET_POINTS 过滤）
+ * @returns {number} data.transactions[].transaction_id - 流水ID（剥离 asset_ 前缀）
  * @returns {string} data.transactions[].asset_code - 资产代码
  * @returns {number} data.transactions[].delta_amount - 变动金额（正=增加，负=扣减）
  * @returns {number} data.transactions[].balance_before - 变动前余额
  * @returns {number} data.transactions[].balance_after - 变动后余额
  * @returns {string} data.transactions[].business_type - 业务类型枚举
+ * @returns {string} data.transactions[].business_type_display - 业务类型中文显示名
  * @returns {string|null} data.transactions[].description - 交易描述（来自 meta.description，约91%有值）
  * @returns {string|null} data.transactions[].title - 交易标题（来自 meta.title，约79%有值）
  * @returns {string} data.transactions[].created_at - 创建时间（ISO 8601格式）
@@ -62,34 +63,28 @@ router.get(
     const user_id = req.user.user_id
     const { asset_code, business_type, page = 1, page_size = 20 } = req.query
 
-    // 通过 ServiceManager 获取 QueryService（V4.7.0 AssetService 拆分）
     const QueryService = req.app.locals.services.getService('asset_query')
+    const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
 
     const result = await QueryService.getTransactions(
       { user_id },
       { asset_code, business_type, page: parseInt(page), page_size: parseInt(page_size) }
     )
 
+    /*
+     * γ 模式（2026-02-21）：通过 DataSanitizer 统一脱敏
+     * - BUDGET_POINTS 等禁止资产自动过滤（安全关键）
+     * - business_type_display 中文映射自动添加
+     * - 内部字段（account_id、idempotency_key 等）自动删除
+     */
+    const dataLevel = req.dataLevel || 'public'
+    const sanitizedTransactions = DataSanitizer.sanitizeTransactionRecords(
+      result.transactions,
+      dataLevel
+    )
+
     return res.apiSuccess({
-      transactions: result.transactions.map(t => ({
-        /*
-         * 主键：使用模型实际字段名 asset_transaction_id（snake_case 规范）
-         * BIGINT 类型通过 Number() 转换为数字（避免 bigNumberStrings 导致返回字符串）
-         */
-        asset_transaction_id: Number(t.asset_transaction_id),
-        asset_code: t.asset_code,
-        // 变动金额：正数=资产增加（earn），负数=资产扣减（consume）
-        delta_amount: Number(t.delta_amount),
-        balance_before: Number(t.balance_before),
-        balance_after: Number(t.balance_after),
-        // 业务类型：lottery_consume/lottery_reward/exchange_debit/consumption_reward 等
-        business_type: t.business_type,
-        // 交易描述：从 meta JSON 提取，覆盖率约91%，旧数据可能为 null
-        description: t.meta?.description || t.meta?.title || null,
-        // 交易标题：从 meta JSON 提取，覆盖率约79%，旧数据可能为 null
-        title: t.meta?.title || null,
-        created_at: t.created_at
-      })),
+      transactions: sanitizedTransactions,
       pagination: {
         total: result.total,
         page: result.page,

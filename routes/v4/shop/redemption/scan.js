@@ -77,21 +77,31 @@ router.post('/scan', authenticateToken, async (req, res) => {
     // 通过 order_id 查找并核销（QR码内已包含订单ID，无需再输入核销码）
     const RedemptionService = req.app.locals.services.getService('redemption_order')
     const order = await TransactionManager.execute(async transaction => {
+      // 先查询订单，验证 code_hash 前缀匹配（防止 order_id 被篡改）
+      const { RedemptionOrder } = require('../../../../models')
+      const targetOrder = await RedemptionOrder.findByPk(redemption_order_id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      })
+
+      if (!targetOrder) {
+        throw new Error(`核销订单不存在: ${redemption_order_id}`)
+      }
+
+      if (targetOrder.code_hash && !targetOrder.code_hash.startsWith(code_hash_prefix)) {
+        logger.error('QR码哈希前缀不匹配，可能被篡改', {
+          expected_prefix: code_hash_prefix,
+          actual_hash: targetOrder.code_hash?.substring(0, 8),
+          redemption_order_id
+        })
+        throw new Error('QR码数据异常：哈希前缀不匹配')
+      }
+
       return await RedemptionService.adminFulfillOrderById(redemption_order_id, {
         transaction,
         admin_user_id: redeemerUserId
       })
     })
-
-    // 验证 code_hash 前缀匹配（防止篡改 order_id）
-    if (order.code_hash && !order.code_hash.startsWith(code_hash_prefix)) {
-      logger.error('QR码哈希前缀不匹配，可能被篡改', {
-        expected_prefix: code_hash_prefix,
-        actual_hash: order.code_hash?.substring(0, 8),
-        redemption_order_id
-      })
-      return res.apiError('QR码数据异常', 'QR_DATA_MISMATCH', null, 400)
-    }
 
     // 异步通知物品所有者
     const NotificationService = req.app.locals.services.getService('notification')

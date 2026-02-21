@@ -22,7 +22,6 @@ const { sequelize } = require('../../models')
 let app
 let accessToken
 let testCampaignCode
-let testUserId
 
 jest.setTimeout(30000)
 
@@ -38,7 +37,6 @@ describe('API契约测试 - 抽奖模块 (/api/v4/lottery)', () => {
 
     if (loginResponse.body.success) {
       accessToken = loginResponse.body.data.access_token
-      testUserId = loginResponse.body.data.user.user_id
     }
 
     // 获取测试活动
