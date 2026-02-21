@@ -82,7 +82,7 @@ export function useStaffMethods() {
     },
 
     editStaff(staff) {
-      this.editingStaffId = staff.store_staff_id || staff.id
+      this.editingStaffId = staff.store_staff_id
       this.isEditMode = true
       this.staffForm = {
         name: staff.user_nickname || '',

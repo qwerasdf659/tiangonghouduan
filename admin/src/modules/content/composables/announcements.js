@@ -72,7 +72,7 @@ export function useAnnouncementsMethods() {
     editAnnouncement(ann) {
       this.isEditMode = true
       this.announcementForm = {
-        announcement_id: ann.announcement_id || ann.id,
+        announcement_id: ann.announcement_id,
         title: ann.title || '',
         content: ann.content || '',
         type: ann.type || 'notice',
@@ -133,38 +133,3 @@ export function useAnnouncementsMethods() {
     }
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

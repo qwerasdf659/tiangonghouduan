@@ -91,6 +91,7 @@ class ImageService {
       userId = null,
       sourceModule = 'admin',
       ipAddress = null,
+      sortOrder = 0, // 多图排序序号（同一 context_id 内排序）
       transaction
     } = options
 
@@ -138,6 +139,7 @@ class ImageService {
         source_module: sourceModule,
         ip_address: ipAddress,
         upload_id: uploadId, // 用于垃圾回收追踪
+        sort_order: sortOrder, // 多图排序序号
         status: 'active'
       },
       { transaction }
@@ -203,7 +205,10 @@ class ImageService {
         context_id: contextId, // 🔴 修复：business_id → context_id
         status: 'active'
       },
-      order: [['created_at', 'ASC']]
+      order: [
+        ['sort_order', 'ASC'],
+        ['created_at', 'ASC']
+      ]
     })
 
     return images.map(img => ImageService._formatImageResponse(img))
@@ -228,6 +233,23 @@ class ImageService {
   }
 
   /**
+   * 更新图片排序序号（多图管理）
+   *
+   * @param {number} imageId - 图片资源 ID
+   * @param {number} sortOrder - 新的排序序号
+   * @param {Object} [transaction] - Sequelize 事务
+   * @returns {Promise<boolean>} 更新是否成功
+   */
+  static async updateImageSortOrder(imageId, sortOrder, transaction = null) {
+    const { ImageResources } = require('../models')
+    const [affectedCount] = await ImageResources.update(
+      { sort_order: sortOrder },
+      { where: { image_resource_id: imageId }, transaction }
+    )
+    return affectedCount > 0
+  }
+
+  /**
    * 物理删除图片（从 Sealos 和数据库中删除）
    *
    * @description
@@ -241,12 +263,31 @@ class ImageService {
    * @returns {Promise<boolean>} 删除是否成功
    */
   static async deleteImage(imageId, transaction = null) {
-    const { ImageResources } = require('../models')
+    const { ImageResources, ExchangeItem, LotteryPrize, ItemTemplate } = require('../models')
     const imageRecord = await ImageResources.findByPk(imageId)
 
     if (!imageRecord) {
       _logger.warn(`⚠️ ImageService: 尝试删除不存在的图片 image_id=${imageId}`)
       return false
+    }
+
+    // 引用保护检查：删除前验证是否被业务实体引用
+    const references = []
+    const exchangeCount = await ExchangeItem.count({ where: { primary_image_id: imageId } })
+    if (exchangeCount > 0) references.push(`${exchangeCount} 个兑换商品`)
+
+    const prizeCount = await LotteryPrize.count({ where: { image_resource_id: imageId } })
+    if (prizeCount > 0) references.push(`${prizeCount} 个抽奖奖品`)
+
+    if (ItemTemplate) {
+      const templateCount = await ItemTemplate.count({ where: { image_resource_id: imageId } })
+      if (templateCount > 0) references.push(`${templateCount} 个物品模板`)
+    }
+
+    if (references.length > 0) {
+      const refDesc = references.join('、')
+      _logger.warn(`⚠️ ImageService: 图片 image_id=${imageId} 正在被引用: ${refDesc}，拒绝删除`)
+      throw new Error(`图片正在被 ${refDesc} 使用，无法删除。请先解除关联后再删除。`)
     }
 
     // 1. 物理删除 Sealos 对象（原图 + 缩略图）
@@ -642,6 +683,24 @@ class ImageService {
         orphan_count: orphanCount
       }
     }
+  }
+
+  /**
+   * 检测图片存储一致性（数据库记录 vs Sealos 物理文件）
+   *
+   * @description
+   *   遍历 image_resources 表中 status='active' 的记录，
+   *   通过 S3 HEAD 请求验证对应文件是否真实存在于 Sealos 对象存储中。
+   *   供定时任务 DailyImageStorageConsistencyCheck 调用。
+   *
+   * @param {Object} [options] - 检测选项
+   * @param {number} [options.batchSize=50] - 每批检测数量
+   * @param {number} [options.concurrency=5] - 并发 HEAD 请求数
+   * @returns {Promise<Object>} 检测报告
+   */
+  static async checkStorageConsistency(options = {}) {
+    const DailyImageStorageConsistencyCheck = require('../jobs/daily-image-storage-consistency-check')
+    return DailyImageStorageConsistencyCheck.execute(options)
   }
 }
 

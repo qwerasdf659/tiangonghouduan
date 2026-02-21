@@ -91,6 +91,7 @@ describe('物品实例测试 - P2优先级', () => {
       test_item_instance = await ItemInstance.create({
         item_template_id: test_item_template.item_template_id,
         owner_user_id: test_user_id,
+        item_type: 'voucher',
         status: 'available',
         acquisition_method: 'test',
         acquisition_source_type: 'system',
@@ -249,6 +250,7 @@ describe('物品实例测试 - P2优先级', () => {
       const expireTestInstance = await ItemInstance.create({
         item_template_id: test_item_template.item_template_id,
         owner_user_id: test_user_id,
+        item_type: 'voucher',
         status: 'available',
         acquisition_method: 'test',
         acquisition_source_type: 'system',
@@ -297,7 +299,7 @@ describe('物品实例测试 - P2优先级', () => {
       })
 
       expect(event).toBeDefined()
-      expect(event.event_id).toBeDefined()
+      expect(event.item_instance_event_id).toBeDefined()
       expect(event.event_type).toBe('lock')
     })
 
@@ -369,11 +371,14 @@ describe('物品实例测试 - P2优先级', () => {
       expect(stats).toHaveProperty('total_items')
     })
 
-    test('对于不存在的用户应该抛出错误', async () => {
+    test('对于不存在的用户应该返回空背包', async () => {
       const BackpackService = getTestService('backpack')
 
-      // 使用一个不存在的用户ID，应该抛出错误
-      await expect(BackpackService.getUserBackpack(999999999)).rejects.toThrow('用户不存在')
+      // 不存在的用户ID应返回空的背包数据（无资产、无物品）
+      const result = await BackpackService.getUserBackpack(999999999)
+      expect(result).toBeDefined()
+      expect(result.assets).toEqual([])
+      expect(result.items).toEqual([])
     })
   })
 

@@ -579,6 +579,17 @@ class PrizePoolService {
       }
     }
 
+    // 3b. 实物奖品上架强制图片校验（图片管理体系决策3）
+    if (filteredUpdateData.status === 'active' && prize.status !== 'active') {
+      const prizeType = filteredUpdateData.prize_type || prize.prize_type
+      if (prizeType === 'physical') {
+        const targetImageId = filteredUpdateData.image_resource_id ?? prize.image_resource_id
+        if (!targetImageId) {
+          throw new Error('实物奖品上架必须上传图片（image_resource_id 不能为空）')
+        }
+      }
+    }
+
     /*
      * 🎯 2026-01-08 图片存储架构：处理图片更换逻辑
      * 2026-02-01 主键命名规范化：image_id → image_resource_id
@@ -797,9 +808,21 @@ class PrizePoolService {
     // 3. 更新库存
     await prize.update({ stock_quantity: newQuantity }, { transaction })
 
-    // 4. 如果之前是 inactive 状态（如库存耗尽导致），补货后自动恢复为 active
+    /*
+     * 4. 如果之前是 inactive 状态（如库存耗尽导致），补货后自动恢复为 active
+     * 实物奖品(physical)需要有图片才能自动激活（图片管理体系决策3）
+     */
     if (prize.status === 'inactive' && newQuantity > 0) {
-      await prize.update({ status: 'active' }, { transaction })
+      const canActivate = prize.prize_type !== 'physical' || prize.image_resource_id != null
+      if (canActivate) {
+        await prize.update({ status: 'active' }, { transaction })
+      } else {
+        logger.warn('[PrizePool] 实物奖品补货但缺少图片，保持 inactive 状态', {
+          prize_id: prize.lottery_prize_id,
+          prize_name: prize.prize_name,
+          prize_type: prize.prize_type
+        })
+      }
     }
 
     /*

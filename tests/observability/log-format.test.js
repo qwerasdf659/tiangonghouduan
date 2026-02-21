@@ -269,12 +269,11 @@ describe('P3-10: 日志格式和监控验证', () => {
     test('DataSanitizer应正确脱敏手机号', () => {
       console.log = originalConsoleLog
 
-      // 尝试导入DataSanitizer
+      // 导入 DataSanitizer（E1 决策：统一使用 services/ 版本）
       let DataSanitizer
       try {
-        DataSanitizer = require('../../utils/DataSanitizer')
+        DataSanitizer = require('../../services/DataSanitizer')
       } catch (e) {
-        // 如果不存在，跳过测试
         console.log('[P3-10] DataSanitizer不存在，跳过测试')
         return
       }

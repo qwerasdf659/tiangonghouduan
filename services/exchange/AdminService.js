@@ -122,7 +122,10 @@ class AdminService {
       throw new Error(`无效的space参数，允许值：${validSpaces.join(', ')}`)
     }
 
-    // 创建商品（包含臻选空间/幸运空间扩展字段）
+    /*
+     * 创建商品（包含臻选空间/幸运空间扩展字段）
+     * 商品上架图片校验（决策3）已在路由层前置执行，避免 TransactionManager 误重试业务校验
+     */
     const item = await this.ExchangeItem.create(
       {
         item_name: name.trim(),
@@ -271,6 +274,24 @@ class AdminService {
       if (!validStatuses.includes(updateData.status)) {
         throw new Error(`无效的status参数，允许值：${validStatuses.join(', ')}`)
       }
+
+      // 商品上架强制图片校验（决策3：商品 status → active 时校验 primary_image_id 非空）
+      if (updateData.status === 'active' && item.status !== 'active') {
+        const targetImageId = updateData.primary_image_id ?? item.primary_image_id
+        if (!targetImageId) {
+          throw new Error('商品上架必须上传主图片（primary_image_id 不能为空）')
+        }
+        // 验证图片记录真实存在且状态为 active
+        const { ImageResources } = require('../../models')
+        const imageRecord = await ImageResources.findByPk(targetImageId, { transaction })
+        if (!imageRecord) {
+          throw new Error(`商品上架失败：关联图片不存在（image_resource_id=${targetImageId}）`)
+        }
+        if (imageRecord.status !== 'active') {
+          throw new Error(`商品上架失败：关联图片状态异常（status=${imageRecord.status}）`)
+        }
+      }
+
       finalUpdateData.status = updateData.status
     }
 

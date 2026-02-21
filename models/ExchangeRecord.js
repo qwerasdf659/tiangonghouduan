@@ -155,10 +155,21 @@ module.exports = sequelize => {
         }
       },
       status: {
-        type: DataTypes.ENUM('pending', 'completed', 'shipped', 'cancelled'),
+        type: DataTypes.ENUM(
+          'pending',
+          'approved',
+          'shipped',
+          'received',
+          'rated',
+          'rejected',
+          'refunded',
+          'cancelled',
+          'completed'
+        ),
         allowNull: false,
         defaultValue: 'pending',
-        comment: '订单状态'
+        comment:
+          '订单状态：pending-待审核 | approved-审核通过 | shipped-已发货 | received-已收货 | rated-已评价 | rejected-审核拒绝 | refunded-已退款 | cancelled-已取消 | completed-已完成(历史兼容)'
       },
       admin_remark: {
         type: DataTypes.TEXT,
@@ -213,6 +224,38 @@ module.exports = sequelize => {
         allowNull: true,
         defaultValue: null,
         comment: '评分时间（用户提交评分的时间）'
+      },
+
+      // 确认收货时间（Phase 3 核销码系统升级新增）
+      received_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        defaultValue: null,
+        comment: '收货时间（用户确认收货或7天自动确认的时间）'
+      },
+
+      // 是否自动确认收货
+      auto_confirmed: {
+        type: DataTypes.BOOLEAN,
+        allowNull: true,
+        defaultValue: false,
+        comment: '是否自动确认收货：true-7天自动确认 | false-用户手动确认'
+      },
+
+      // 拒绝时间
+      rejected_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        defaultValue: null,
+        comment: '拒绝时间（管理员审核拒绝的时间）'
+      },
+
+      // 退款时间
+      refunded_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        defaultValue: null,
+        comment: '退款时间（退款完成的时间）'
       }
     },
     {

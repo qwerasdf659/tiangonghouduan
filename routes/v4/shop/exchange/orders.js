@@ -7,6 +7,7 @@
  * API列表：
  * - GET /orders - 获取用户订单列表
  * - GET /orders/:order_no - 获取订单详情
+ * - POST /orders/:order_no/confirm-receipt - 用户确认收货
  * - POST /orders/:order_no/status - 更新订单状态（管理员操作）
  *
  * 业务场景：
@@ -54,9 +55,19 @@ router.get('/orders', authenticateToken, async (req, res) => {
     const finalPage = Math.max(parseInt(page) || 1, 1)
     const finalPageSize = Math.min(Math.max(parseInt(page_size) || 20, 1), 50)
 
-    // 状态白名单验证
+    // 状态白名单验证（包含 Phase 3 完整状态机）
     if (status) {
-      const validStatuses = ['pending', 'completed', 'shipped', 'cancelled']
+      const validStatuses = [
+        'pending',
+        'approved',
+        'shipped',
+        'received',
+        'rated',
+        'rejected',
+        'refunded',
+        'cancelled',
+        'completed'
+      ]
       if (!validStatuses.includes(status)) {
         return res.apiError(
           `无效的status参数，允许值：${validStatuses.join(', ')}`,
@@ -165,12 +176,56 @@ router.get('/orders/:order_no', authenticateToken, async (req, res) => {
 })
 
 /**
+ * @route POST /api/v4/shop/exchange/orders/:order_no/confirm-receipt
+ * @desc 用户确认收货（Phase 3 Step 3.2：积分商城确认收货）
+ * @access Private (需要登录，只能确认自己的订单)
+ *
+ * 业务场景：
+ * - 用户收到商品后手动确认收货
+ * - 确认后订单状态从 shipped → received
+ * - 发货后7天未操作系统自动确认（由定时任务处理）
+ *
+ * @param {string} order_no - 订单号
+ * @returns {Object} 确认收货结果
+ */
+router.post('/orders/:order_no/confirm-receipt', authenticateToken, async (req, res) => {
+  try {
+    const ExchangeService = req.app.locals.services.getService('exchange_core')
+    const TransactionManager = require('../../../../utils/TransactionManager')
+
+    const { order_no } = req.params
+    const user_id = req.user.user_id
+
+    logger.info('用户确认收货', { user_id, order_no })
+
+    if (!order_no || order_no.trim().length === 0) {
+      return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
+    }
+
+    const result = await TransactionManager.execute(async transaction => {
+      return await ExchangeService.confirmReceipt(user_id, order_no, { transaction })
+    })
+
+    logger.info('确认收货成功', { user_id, order_no })
+
+    return res.apiSuccess(result, result.message)
+  } catch (error) {
+    logger.error('确认收货失败', {
+      error: error.message,
+      user_id: req.user?.user_id,
+      order_no: req.params.order_no
+    })
+    return handleServiceError(error, res, '确认收货失败')
+  }
+})
+
+/**
  * @route POST /api/v4/shop/exchange/orders/:order_no/status
  * @desc 更新订单状态（管理员操作）
  * @access Private (仅管理员)
  *
  * @param {string} order_no - 订单号
- * @body {string} status - 新状态（completed/shipped/cancelled）
+ * @body {string} status - 新状态（approved/shipped/received/completed/rejected/refunded/cancelled）
  * @body {string} remark - 备注（可选）
  *
  * @returns {Object} 更新后的订单信息
@@ -204,8 +259,16 @@ router.post(
         return res.apiError('订单状态不能为空', 'BAD_REQUEST', null, 400)
       }
 
-      // 状态白名单验证
-      const validStatuses = ['completed', 'shipped', 'cancelled']
+      // 状态白名单验证（包含 Phase 3 新增状态）
+      const validStatuses = [
+        'approved',
+        'shipped',
+        'received',
+        'completed',
+        'rejected',
+        'refunded',
+        'cancelled'
+      ]
       if (!validStatuses.includes(status)) {
         return res.apiError(
           `无效的status参数，允许值：${validStatuses.join(', ')}`,

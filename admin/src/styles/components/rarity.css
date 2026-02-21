@@ -1,0 +1,177 @@
+/**
+ * 稀有度视觉效果系统
+ *
+ * @description 基于 rarity_defs.color_hex 实现的稀有度边框、光晕和动画效果
+ *              适用于物品模板卡片、商品展示、奖品列表等场景
+ *
+ * 稀有度等级与配色：
+ *   common    (#9E9E9E) - 灰色：无特效，朴素边框
+ *   uncommon  (#4CAF50) - 绿色：微光边框
+ *   rare      (#2196F3) - 蓝色：光晕边框
+ *   epic      (#9C27B0) - 紫色：闪烁光效
+ *   legendary (#FF9800) - 金色：动态光效动画
+ *
+ * @version 1.0.0
+ * @date 2026-02-21
+ * @see docs/图片管理体系设计方案.md §5.2
+ */
+
+/* ========== 稀有度 CSS 变量 ========== */
+:root {
+  --rarity-common: #9E9E9E;
+  --rarity-uncommon: #4CAF50;
+  --rarity-rare: #2196F3;
+  --rarity-epic: #9C27B0;
+  --rarity-legendary: #FF9800;
+}
+
+/* ========== 稀有度标签/徽章（渐变背景） ========== */
+.rarity-common { background: linear-gradient(135deg, #6b7280, #9ca3af); color: white; }
+.rarity-uncommon { background: linear-gradient(135deg, #10b981, #34d399); color: white; }
+.rarity-rare { background: linear-gradient(135deg, #3b82f6, #60a5fa); color: white; }
+.rarity-epic { background: linear-gradient(135deg, #8b5cf6, #a78bfa); color: white; }
+.rarity-legendary { background: linear-gradient(135deg, #f97316, #fb923c); color: white; }
+
+/* ========== 稀有度左侧边框条 ========== */
+.rarity-border-common { border-left: 3px solid var(--rarity-common); }
+.rarity-border-uncommon { border-left: 3px solid var(--rarity-uncommon); }
+.rarity-border-rare { border-left: 3px solid var(--rarity-rare); }
+.rarity-border-epic { border-left: 3px solid var(--rarity-epic); }
+.rarity-border-legendary { border-left: 3px solid var(--rarity-legendary); }
+
+/* ========== 稀有度卡片边框光效 ========== */
+
+/* 普通 - 朴素灰色边框，无光效 */
+.rarity-glow-common {
+  border: 2px solid var(--rarity-common);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+/* 优良 - 绿色边框 + 悬停微光 */
+.rarity-glow-uncommon {
+  border: 2px solid var(--rarity-uncommon);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.rarity-glow-uncommon:hover {
+  box-shadow: 0 0 8px 1px rgba(76, 175, 80, 0.3);
+}
+
+/* 稀有 - 蓝色边框 + 常驻微光 + 悬停增强 */
+.rarity-glow-rare {
+  border: 2px solid var(--rarity-rare);
+  box-shadow: 0 0 6px 0 rgba(33, 150, 243, 0.2);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.rarity-glow-rare:hover {
+  box-shadow: 0 0 12px 2px rgba(33, 150, 243, 0.4);
+}
+
+/* 史诗 - 紫色边框 + 脉冲呼吸光效 */
+.rarity-glow-epic {
+  border: 2px solid var(--rarity-epic);
+  box-shadow: 0 0 8px 1px rgba(156, 39, 176, 0.25);
+  animation: rarity-pulse-epic 2.5s ease-in-out infinite;
+}
+
+@keyframes rarity-pulse-epic {
+  0%, 100% { box-shadow: 0 0 8px 1px rgba(156, 39, 176, 0.25); }
+  50% { box-shadow: 0 0 16px 3px rgba(156, 39, 176, 0.45); }
+}
+
+/* 传说 - 金色边框 + 旋转光芒动画 */
+.rarity-glow-legendary {
+  border: 2px solid var(--rarity-legendary);
+  box-shadow: 0 0 10px 2px rgba(255, 152, 0, 0.3);
+  animation: rarity-glow-legendary 3s ease-in-out infinite;
+  position: relative;
+}
+
+@keyframes rarity-glow-legendary {
+  0%, 100% {
+    box-shadow:
+      0 0 10px 2px rgba(255, 152, 0, 0.3),
+      0 0 20px 4px rgba(255, 152, 0, 0.1);
+  }
+  33% {
+    box-shadow:
+      0 0 14px 3px rgba(255, 193, 7, 0.4),
+      0 0 28px 6px rgba(255, 193, 7, 0.15);
+  }
+  66% {
+    box-shadow:
+      0 0 12px 2px rgba(255, 152, 0, 0.35),
+      0 0 24px 5px rgba(255, 152, 0, 0.12);
+  }
+}
+
+/* 传说级额外光芒扫过效果（可选，用于重点展示场景） */
+.rarity-glow-legendary.rarity-shine::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -100%;
+  width: 60%;
+  height: calc(100% + 4px);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 193, 7, 0.15),
+    transparent
+  );
+  animation: rarity-shine-sweep 4s ease-in-out infinite;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+@keyframes rarity-shine-sweep {
+  0% { left: -100%; }
+  50% { left: 100%; }
+  100% { left: 100%; }
+}
+
+/* ========== 稀有度图标容器（图片外框） ========== */
+.rarity-icon-frame {
+  @apply relative inline-flex items-center justify-center rounded-lg overflow-hidden;
+  transition: all 0.3s ease;
+}
+
+.rarity-icon-frame.rarity-frame-common {
+  border: 2px solid var(--rarity-common);
+  background: linear-gradient(135deg, #f5f5f5, #e0e0e0);
+}
+
+.rarity-icon-frame.rarity-frame-uncommon {
+  border: 2px solid var(--rarity-uncommon);
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+}
+
+.rarity-icon-frame.rarity-frame-rare {
+  border: 2px solid var(--rarity-rare);
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  box-shadow: 0 0 6px rgba(33, 150, 243, 0.2);
+}
+
+.rarity-icon-frame.rarity-frame-epic {
+  border: 2px solid var(--rarity-epic);
+  background: linear-gradient(135deg, #f3e5f5, #e1bee7);
+  box-shadow: 0 0 8px rgba(156, 39, 176, 0.25);
+}
+
+.rarity-icon-frame.rarity-frame-legendary {
+  border: 2px solid var(--rarity-legendary);
+  background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+  box-shadow: 0 0 10px rgba(255, 152, 0, 0.3);
+  animation: rarity-pulse-frame-legendary 3s ease-in-out infinite;
+}
+
+@keyframes rarity-pulse-frame-legendary {
+  0%, 100% { box-shadow: 0 0 10px rgba(255, 152, 0, 0.3); }
+  50% { box-shadow: 0 0 18px rgba(255, 152, 0, 0.5); }
+}
+
+/* ========== 稀有度文字颜色 ========== */
+.rarity-text-common { color: var(--rarity-common); }
+.rarity-text-uncommon { color: var(--rarity-uncommon); }
+.rarity-text-rare { color: var(--rarity-rare); }
+.rarity-text-epic { color: var(--rarity-epic); }
+.rarity-text-legendary { color: var(--rarity-legendary); }

@@ -88,6 +88,7 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
         {
           owner_user_id: testUser.user_id,
           item_template_id: null,
+          item_type: 'tradable_item',
           status: 'available',
           meta: {
             name: `事务隔离测试物品_${Date.now()}`,
@@ -136,6 +137,7 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
             {
               owner_user_id: testUser.user_id,
               item_template_id: null,
+              item_type: 'tradable_item',
               status: 'available',
               meta: {
                 name: `withTransactionRollback测试_${Date.now()}`,
@@ -169,6 +171,7 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
             {
               owner_user_id: testUser.user_id,
               item_template_id: null,
+              item_type: 'tradable_item',
               status: 'available',
               meta: { name: `断言失败测试_${Date.now()}` }
             },
@@ -210,6 +213,7 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
           {
             owner_user_id: testUser.user_id,
             item_template_id: null,
+            item_type: 'tradable_item',
             status: 'available',
             meta: { name: `手动管理测试_${Date.now()}` }
           },
@@ -246,6 +250,7 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
                 {
                   owner_user_id: testUser.user_id,
                   item_template_id: null,
+                  item_type: 'tradable_item',
                   status: 'available',
                   meta: { name: '批量创建测试1' }
                 },
@@ -256,6 +261,7 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
                 {
                   owner_user_id: testUser.user_id,
                   item_template_id: null,
+                  item_type: 'tradable_item',
                   status: 'available',
                   meta: { name: '批量创建测试2' }
                 },
@@ -283,6 +289,7 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
             {
               owner_user_id: testUser.user_id,
               item_template_id: null,
+              item_type: 'tradable_item',
               status: 'available',
               meta: { name: '验证测试物品' }
             },
@@ -328,6 +335,7 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
           {
             owner_user_id: testUser.user_id,
             item_template_id: null,
+            item_type: 'tradable_item',
             status: 'available',
             meta: { name: '隔离测试-事务1' }
           },

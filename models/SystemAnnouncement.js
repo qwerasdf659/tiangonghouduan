@@ -18,7 +18,7 @@
  * 5. 公告过期或禁用 → expires_at已过或is_active=false，停止展示
  *
  * 数据库表名：system_announcements
- * 主键：announcement_id（INTEGER，自增）
+ * 主键：system_announcement_id（INTEGER，自增）
  *
  * 数据安全：
  * - 普通用户仅能查看公开信息（标题、内容、类型、优先级、过期时间、查看次数）

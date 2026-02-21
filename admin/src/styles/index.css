@@ -21,6 +21,7 @@
 @import './components/empty-state.css';
 @import './components/stats-card.css';
 @import './components/interactions.css';
+@import './components/rarity.css';
 
 /* ========== Tailwind 基础 ========== */
 @tailwind base;

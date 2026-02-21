@@ -162,16 +162,12 @@ router.get(
     }
 
     /*
-     * 数据脱敏：通过 ServiceManager 获取 DataSanitizer
-     * 管理员查看完整数据，普通用户查看脱敏数据
-     * 使用 sanitizeInventory 方法处理物品数据（数组接口，取第一个元素）
+     * γ 模式（D2 决策）：BackpackService 已是完整的领域转换层，
+     * 不再经过 DataSanitizer（避免 ghost field 风险）。
+     * BackpackService._getItems() 已从 meta JSON 提取面向用户的字段，
+     * 不输出 owner_user_id、locks、item_template_id 等内部字段。
      */
-    const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
-    const dataLevel = has_admin_access ? 'full' : 'public'
-    const sanitizedItems = DataSanitizer.sanitizeInventory([itemDetail], dataLevel)
-    const sanitizedDetail = sanitizedItems[0] || itemDetail
-
-    return res.apiSuccess(sanitizedDetail, '获取物品详情成功')
+    return res.apiSuccess(itemDetail, '获取物品详情成功')
   })
 )
 
@@ -230,6 +226,17 @@ router.post(
         redemption_order_id: result.order.redemption_order_id
       })
 
+      // 生成 QR 码动态签名（决策7: QR码+文本码并存）
+      let qrData = null
+      try {
+        const { getRedemptionQRSigner } = require('../../../utils/RedemptionQRSigner')
+        const signer = getRedemptionQRSigner()
+        const codeHash = require('../../../utils/RedemptionCodeGenerator').hash(result.code)
+        qrData = signer.sign(result.order.redemption_order_id, codeHash)
+      } catch (qrError) {
+        logger.warn('QR码生成失败（不影响文本码使用）', { error: qrError.message })
+      }
+
       return res.apiSuccess(
         {
           order: {
@@ -237,7 +244,8 @@ router.post(
             status: result.order.status,
             expires_at: result.order.expires_at
           },
-          code: result.code
+          code: result.code,
+          qr: qrData
         },
         '核销码生成成功，请在有效期内到店出示'
       )
@@ -248,6 +256,69 @@ router.post(
         item_instance_id: instanceId
       })
       return handleServiceError(error, res, '生成核销码失败')
+    }
+  })
+)
+
+/**
+ * POST /api/v4/backpack/items/:item_instance_id/redeem/refresh-qr
+ *
+ * @description 刷新核销码的动态QR码（5分钟有效，过期后调用此接口刷新）
+ * @access Private（仅物品所有者可操作）
+ *
+ * @param {number} item_instance_id - 物品实例ID（路由参数）
+ *
+ * @returns {Object} { qr: { qr_content, expires_at } }
+ */
+router.post(
+  '/items/:item_instance_id/redeem/refresh-qr',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { item_instance_id } = req.params
+    const user_id = req.user.user_id
+
+    const instanceId = parseInt(item_instance_id, 10)
+    if (isNaN(instanceId) || instanceId <= 0) {
+      return res.apiError('无效的物品实例ID', 'BAD_REQUEST', null, 400)
+    }
+
+    try {
+      const RedemptionService = req.app.locals.services.getService('redemption_order')
+
+      // 查找该物品的 pending 核销订单
+      const order = await RedemptionService.getOrderByItem(instanceId)
+
+      if (!order) {
+        return res.apiError('该物品没有待核销订单', 'NOT_FOUND', null, 404)
+      }
+
+      if (order.status !== 'pending') {
+        return res.apiError('核销订单状态异常', 'ORDER_STATUS_INVALID', null, 400)
+      }
+
+      if (order.isExpired()) {
+        return res.apiError('核销码已过期，请重新生成', 'ORDER_EXPIRED', null, 400)
+      }
+
+      // 生成新的 QR 码签名
+      const { getRedemptionQRSigner } = require('../../../utils/RedemptionQRSigner')
+      const signer = getRedemptionQRSigner()
+      const qrData = signer.sign(order.redemption_order_id, order.code_hash)
+
+      return res.apiSuccess(
+        {
+          redemption_order_id: order.redemption_order_id,
+          qr: qrData
+        },
+        'QR码刷新成功'
+      )
+    } catch (error) {
+      logger.error('QR码刷新失败', {
+        error: error.message,
+        user_id,
+        item_instance_id: instanceId
+      })
+      return handleServiceError(error, res, 'QR码刷新失败')
     }
   })
 )
@@ -344,11 +415,37 @@ router.post(
         is_duplicate: result.is_duplicate
       })
 
+      /*
+       * 获取使用操作指引文案（instructions）
+       * 优先级：模板级 meta.use_instructions > item_type 级配置 > 通用默认
+       * result.item_instance 是完整的 ItemInstance 模型实例
+       */
+      const { SystemConfig, ItemTemplate } = require('../../../models')
+      let instructions = null
+
+      const instructionsConfig = await SystemConfig.getValue('backpack_use_instructions', {})
+      const usedItem = result.item_instance
+      const itemType = usedItem?.item_type
+
+      if (usedItem?.item_template_id) {
+        const template = await ItemTemplate.findByPk(usedItem.item_template_id, {
+          attributes: ['meta']
+        })
+        if (template?.meta?.use_instructions) {
+          instructions = template.meta.use_instructions
+        }
+      }
+
+      if (!instructions && itemType) {
+        instructions = instructionsConfig[itemType] || null
+      }
+
       return res.apiSuccess(
         {
           item_instance_id: instanceId,
           status: 'used',
-          is_duplicate: result.is_duplicate
+          is_duplicate: result.is_duplicate,
+          instructions
         },
         result.is_duplicate ? '物品已使用（幂等回放）' : '物品使用成功'
       )

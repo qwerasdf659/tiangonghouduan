@@ -139,7 +139,7 @@ export function useMerchantPointsMethods() {
     async viewMerchantDetail(item) {
       try {
         // 后端使用 audit_id 作为主键
-        const auditId = item.audit_id || item.id
+        const auditId = item.audit_id
         logger.debug('[商户积分] 查看详情, audit_id:', auditId)
         const response = await this.apiGet(
           buildURL(STORE_ENDPOINTS.MERCHANT_POINT_DETAIL, { id: auditId }),
@@ -164,7 +164,7 @@ export function useMerchantPointsMethods() {
      */
     async viewMerchantHistory(item) {
       try {
-        const auditId = item.audit_id || item.id
+        const auditId = item.audit_id
         logger.debug('[商户积分] 查看历史, audit_id:', auditId)
         const response = await this.apiGet(
           buildURL(STORE_ENDPOINTS.MERCHANT_POINT_HISTORY, { id: auditId }),
@@ -191,7 +191,7 @@ export function useMerchantPointsMethods() {
     async approveMerchantPoints(item) {
       if (!(await $confirm('确认通过该商户积分申请？'))) return
       try {
-        const auditId = item.audit_id || item.id
+        const auditId = item.audit_id
         const response = await this.apiPost(
           buildURL(STORE_ENDPOINTS.MERCHANT_POINT_APPROVE, { id: auditId }),
           {},
@@ -220,7 +220,7 @@ export function useMerchantPointsMethods() {
         return
       }
       try {
-        const auditId = item.audit_id || item.id
+        const auditId = item.audit_id
         const response = await this.apiPost(
           buildURL(STORE_ENDPOINTS.MERCHANT_POINT_REJECT, { id: auditId }),
           { reason: reason.trim() },

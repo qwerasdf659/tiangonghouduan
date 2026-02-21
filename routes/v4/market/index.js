@@ -14,6 +14,7 @@
  * - sell.js     - 上架商品（POST /list, POST /fungible-assets/list）
  * - buy.js      - 购买商品（POST /listings/:market_listing_id/purchase）
  * - manage.js   - 撤回/管理（POST /listings/:market_listing_id/withdraw, POST /fungible-assets/:market_listing_id/withdraw）
+ * - escrow.js   - C2C担保码（POST /trade-orders/:id/confirm-delivery, GET /trade-orders/:id/escrow-status, POST /trade-orders/:id/cancel）
  *
  * 业务说明：
  * - 用户可以将 inventory 中的物品挂单出售
@@ -36,11 +37,13 @@ const listingsRoutes = require('./listings')
 const sellRoutes = require('./sell')
 const buyRoutes = require('./buy')
 const manageRoutes = require('./manage')
+const escrowRoutes = require('./escrow')
 
 // 挂载子路由
 router.use('/', listingsRoutes) // 市场列表查询
 router.use('/', sellRoutes) // 上架商品
 router.use('/', buyRoutes) // 购买商品
 router.use('/', manageRoutes) // 撤回/管理
+router.use('/', escrowRoutes) // C2C担保码确认（Phase 4）
 
 module.exports = router

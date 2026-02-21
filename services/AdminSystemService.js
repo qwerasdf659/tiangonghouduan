@@ -481,7 +481,10 @@ class AdminSystemService {
     daily_max_trades_red_shard: '红晶每日最大交易数',
     daily_max_amount_DIAMOND: '钻石每日最大交易额',
     daily_max_amount_red_shard: '红晶每日最大交易额',
-    allowed_listing_assets: '允许上架资产类型'
+    allowed_listing_assets: '允许上架资产类型',
+    // ===== 背包设置 (backpack) =====
+    backpack_use_instructions: '物品使用操作指引文案',
+    item_type_action_rules: '物品类型操作规则'
   }
 
   /**
@@ -493,10 +496,61 @@ class AdminSystemService {
    */
   static async getSettingsByCategory(category) {
     try {
-      // 验证分类是否合法（2026-01-21 修复：与 updateSettings 保持一致，添加 marketplace 分类）
-      const validCategories = ['basic', 'points', 'notification', 'security', 'marketplace']
+      // 验证分类是否合法
+      const validCategories = [
+        'basic',
+        'points',
+        'notification',
+        'security',
+        'marketplace',
+        'redemption',
+        'backpack'
+      ]
       if (!validCategories.includes(category)) {
         throw new Error(`无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`)
+      }
+
+      /*
+       * backpack 分类桥接到 system_configs 表
+       * system_configs 存储 JSON 格式的业务配置（BackpackService/路由直接读取）
+       * 通过桥接让管理后台也能读写同一数据源，避免双表不同步
+       */
+      if (category === 'backpack') {
+        const { SystemConfig } = models
+        const configs = await SystemConfig.findAll({
+          where: { config_category: 'backpack', is_active: true },
+          order: [['system_config_id', 'ASC']]
+        })
+
+        const parsedSettings = configs.map(cfg => {
+          const raw = cfg.toJSON()
+          let parsedValue = raw.config_value
+          if (typeof parsedValue === 'string') {
+            try {
+              parsedValue = JSON.parse(parsedValue)
+            } catch {
+              /* 保持原值 */
+            }
+          }
+          return {
+            system_setting_id: raw.system_config_id,
+            category: 'backpack',
+            setting_key: raw.config_key,
+            setting_value:
+              typeof raw.config_value === 'object'
+                ? JSON.stringify(raw.config_value)
+                : raw.config_value,
+            value_type: 'json',
+            description: raw.description,
+            is_readonly: false,
+            updated_at: raw.updated_at,
+            parsed_value: parsedValue,
+            display_name: AdminSystemService.SETTING_DISPLAY_NAMES[raw.config_key] || raw.config_key
+          }
+        })
+
+        logger.info('获取背包配置成功（桥接 system_configs）', { count: configs.length })
+        return { category, count: configs.length, settings: parsedSettings }
       }
 
       // 查询该分类下的所有配置项
@@ -628,8 +682,16 @@ class AdminSystemService {
     const transaction = assertAndGetTransaction(options, 'AdminSystemService.updateSettings')
     const { reason } = options
 
-    // 验证分类是否合法（2025-12-30 新增 marketplace 分类）
-    const validCategories = ['basic', 'points', 'notification', 'security', 'marketplace']
+    // 验证分类是否合法
+    const validCategories = [
+      'basic',
+      'points',
+      'notification',
+      'security',
+      'marketplace',
+      'redemption',
+      'backpack'
+    ]
     if (!validCategories.includes(category)) {
       throw new Error(`无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`)
     }
@@ -641,6 +703,42 @@ class AdminSystemService {
       Object.keys(settingsToUpdate).length === 0
     ) {
       throw new Error('请提供要更新的设置项')
+    }
+
+    /*
+     * backpack 分类桥接到 system_configs 表
+     * 跳过白名单校验（system_configs 不走 system_settings 的三层分离方案）
+     * 直接更新 config_value JSON 字段
+     */
+    if (category === 'backpack') {
+      const { SystemConfig } = models
+      const updateResults = []
+      const errors = []
+
+      for (const [key, value] of Object.entries(settingsToUpdate)) {
+        // eslint-disable-next-line no-await-in-loop
+        const config = await SystemConfig.findOne({
+          where: { config_key: key, config_category: 'backpack' },
+          transaction
+        })
+        if (!config) {
+          errors.push({ setting_key: key, error: '配置项不存在' })
+          continue
+        }
+        const serialized = typeof value === 'string' ? value : JSON.stringify(value)
+        config.config_value = serialized
+        config.updated_at = BeijingTimeHelper.createBeijingTime()
+        // eslint-disable-next-line no-await-in-loop
+        await config.save({ transaction })
+        updateResults.push({ setting_key: key, success: true })
+      }
+
+      logger.info('更新背包配置成功（桥接 system_configs）', {
+        updated: updateResults.length,
+        errors: errors.length
+      })
+
+      return { category, updated: updateResults, errors }
     }
 
     const settingKeys = Object.keys(settingsToUpdate)

@@ -3,7 +3,7 @@
 <head>
   <%- include('partials/head', { 
     title: '物品模板', 
-    pageStyle: '[x-cloak] { display: none !important; } .template-card { transition: all 0.3s ease; } .template-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.12); } .rarity-common { background: linear-gradient(135deg, #6b7280, #9ca3af); } .rarity-uncommon { background: linear-gradient(135deg, #10b981, #34d399); } .rarity-rare { background: linear-gradient(135deg, #3b82f6, #60a5fa); } .rarity-epic { background: linear-gradient(135deg, #8b5cf6, #a78bfa); } .rarity-legendary { background: linear-gradient(135deg, #f97316, #fb923c); } .rarity-border-common { border-left: 3px solid #6b7280; } .rarity-border-uncommon { border-left: 3px solid #10b981; } .rarity-border-rare { border-left: 3px solid #3b82f6; } .rarity-border-epic { border-left: 3px solid #8b5cf6; } .rarity-border-legendary { border-left: 3px solid #f97316; }' 
+    pageStyle: '[x-cloak] { display: none !important; } .template-card { transition: all 0.3s ease; } .template-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.12); }' 
   }) %>
 </head>
 <body class="themed-bg-subtle min-h-screen" x-data="itemTemplatesPage()" x-init="init()" x-cloak>
@@ -246,6 +246,24 @@
             <div class="md:col-span-2">
               <label class="block text-sm font-medium themed-text-secondary mb-1">模板描述</label>
               <textarea class="w-full px-3 py-2 border rounded-lg" x-model="form.description" rows="2"></textarea>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">使用操作指引文案</label>
+              <input type="text" class="w-full px-3 py-2 border rounded-lg" x-model="form.use_instructions" placeholder="覆盖该模板的默认使用提示（留空使用按类型的默认文案）">
+              <p class="text-xs themed-text-muted mt-1">用户使用该物品后显示的引导文案，留空则使用 item_type 级别的默认配置</p>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">允许操作（模板级覆盖）</label>
+              <div class="flex flex-wrap gap-3">
+                <template x-for="opt in action_options" :key="opt.value">
+                  <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" :value="opt.value" x-model="form.allowed_actions"
+                           class="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500">
+                    <span class="text-sm" x-text="opt.label"></span>
+                  </label>
+                </template>
+              </div>
+              <p class="text-xs themed-text-muted mt-1">勾选后覆盖该模板的默认操作规则（留空使用 item_type 级别的默认配置）</p>
             </div>
             <div class="md:col-span-2">
               <label class="block text-sm font-medium themed-text-secondary mb-1">扩展属性 (JSON格式)</label>

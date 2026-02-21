@@ -152,6 +152,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
     const item_data = {
       owner_user_id,
       item_template_id: test_item_template?.item_template_id || null,
+      item_type: 'tradable_item',
       status: options.status || 'available',
       meta: options.meta || { name: `测试物品_${Date.now()}`, description: '市场交易测试用物品' }
     }

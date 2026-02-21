@@ -104,6 +104,14 @@ module.exports = sequelize => {
         comment: '来源模块：系统/抽奖/兑换/管理员'
       },
 
+      // 排序序号（同一 context_id 内多图排序）
+      sort_order: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '排序序号（同一 context_id 内排序，数字越小越靠前）'
+      },
+
       // IP地址（安全审核需要）
       ip_address: {
         type: DataTypes.STRING(45),

@@ -101,6 +101,7 @@ describe('物品兑换核销测试 - P2优先级', () => {
       test_item_instance = await ItemInstance.create({
         item_template_id: test_item_template.item_template_id,
         owner_user_id: test_user_id,
+        item_type: 'voucher',
         status: 'available',
         acquisition_method: 'redemption_test',
         acquisition_source_type: 'system',
@@ -192,6 +193,7 @@ describe('物品兑换核销测试 - P2优先级', () => {
       const usedInstance = await ItemInstance.create({
         item_template_id: test_item_template.item_template_id,
         owner_user_id: test_user_id,
+        item_type: 'voucher',
         status: 'available',
         acquisition_method: 'test',
         acquisition_source_type: 'system',
@@ -217,6 +219,7 @@ describe('物品兑换核销测试 - P2优先级', () => {
       const alreadyUsedInstance = await ItemInstance.create({
         item_template_id: test_item_template.item_template_id,
         owner_user_id: test_user_id,
+        item_type: 'voucher',
         status: 'used',
         acquisition_method: 'test',
         acquisition_source_type: 'system',
@@ -260,6 +263,7 @@ describe('物品兑换核销测试 - P2优先级', () => {
       const statusTestInstance = await ItemInstance.create({
         item_template_id: test_item_template.item_template_id,
         owner_user_id: test_user_id,
+        item_type: 'voucher',
         status: 'available',
         acquisition_method: 'test',
         acquisition_source_type: 'system',
@@ -297,6 +301,7 @@ describe('物品兑换核销测试 - P2优先级', () => {
       const concurrentTestInstance = await ItemInstance.create({
         item_template_id: test_item_template.item_template_id,
         owner_user_id: test_user_id,
+        item_type: 'voucher',
         status: 'available',
         acquisition_method: 'test',
         acquisition_source_type: 'system',

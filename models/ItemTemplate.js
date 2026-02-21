@@ -72,6 +72,14 @@ class ItemTemplate extends Model {
         as: 'market_listings'
       })
     }
+
+    // 关联图片资源（多对一，统一图片管理体系）
+    if (models.ImageResources) {
+      ItemTemplate.belongsTo(models.ImageResources, {
+        foreignKey: 'image_resource_id',
+        as: 'primaryImage'
+      })
+    }
   }
 
   /**
@@ -194,18 +202,31 @@ module.exports = sequelize => {
         comment: '物品描述'
       },
 
-      // 物品图片URL
+      // 主图片ID（外键 → image_resources，统一图片管理体系）
+      image_resource_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '主图片ID（外键 → image_resources.image_resource_id）',
+        references: {
+          model: 'image_resources',
+          key: 'image_resource_id'
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL'
+      },
+
+      // 遗留字段（已废弃，保留数据库兼容性，新功能使用 image_resource_id）
       image_url: {
         type: DataTypes.STRING(500),
         allowNull: true,
-        comment: '物品图片URL'
+        comment: '【已废弃】物品图片URL（请使用 image_resource_id）'
       },
 
-      // 缩略图URL
+      // 遗留字段（已废弃）
       thumbnail_url: {
         type: DataTypes.STRING(500),
         allowNull: true,
-        comment: '缩略图URL'
+        comment: '【已废弃】缩略图URL（请使用 image_resource_id 关联的缩略图）'
       },
 
       // 参考价格（积分）

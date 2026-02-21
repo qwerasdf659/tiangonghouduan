@@ -137,6 +137,7 @@ const BackpackService = require('./BackpackService') // 背包双轨查询服务
 
 // V4.2 交易市场服务（2025-12-21 暴力重构）
 const TradeOrderService = require('./TradeOrderService') // 交易订单服务（市场交易核心）
+const EscrowCodeService = require('./EscrowCodeService') // C2C交易担保码服务（Phase 4）
 // [已删除] MarketListingService.js → 拆分为 market-listing/CoreService, market-listing/QueryService, market-listing/AdminService
 
 // P0-2 孤儿冻结清理服务（2026-01-09）
@@ -452,6 +453,7 @@ class ServiceManager {
       // ========== 交易市场服务（使用 snake_case key） ==========
 
       this._services.set('trade_order', TradeOrderService)
+      this._services.set('escrow_code', EscrowCodeService) // C2C交易担保码（Phase 4）
 
       // MarketListing 域子服务
       this._services.set('market_listing_core', MarketListingCoreService) // 核心挂牌操作（静态类）

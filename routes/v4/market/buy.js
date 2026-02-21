@@ -148,49 +148,103 @@ router.post(
       }
 
       /*
-       * 创建并完成交易订单
-       * 使用 TransactionManager 统一事务边界（符合治理决策）
-       * 传递 idempotency_key 给服务层（业界标准形态命名）
+       * 购买流程分支（Phase 4 担保码集成）：
+       * - item_instance 交易：创建订单 + 生成担保码（买方需确认后才完成）
+       * - fungible_asset 交易：创建订单 + 立即完成（自动转移，无需担保码）
        */
-      const { orderResult, completeResult } = await TransactionManager.execute(
-        async transaction => {
-          const orderResult = await TradeOrderService.createOrder(
+      const isItemInstanceTrade = listing.listing_kind === 'item_instance'
+      const EscrowCodeService = req.app.locals.services.getService('escrow_code')
+
+      let responseData
+
+      if (isItemInstanceTrade) {
+        // 实物交易：创建订单（冻结资产）→ 生成担保码 → 等待买方确认
+        const orderResult = await TransactionManager.execute(async transaction => {
+          return await TradeOrderService.createOrder(
             {
               buyer_id,
               seller_id: listing.seller_user_id,
               market_listing_id,
               item_instance_id: listing.offer_item_instance_id,
               price_amount: listing.price_amount,
-              price_asset_code: listing.price_asset_code, // 2026-01-20：sell.js 已强制必填，无需默认值
-              idempotency_key // 业界标准形态：统一使用 idempotency_key
+              price_asset_code: listing.price_asset_code,
+              idempotency_key
             },
             { transaction }
           )
+        })
 
-          // 完成订单（createOrder 返回 trade_order_id，需用正确字段名传递）
-          const completeResult = await TradeOrderService.completeOrder(
-            {
-              trade_order_id: orderResult.trade_order_id,
-              buyer_id
-            },
-            { transaction }
-          )
+        // 生成担保码（Redis 存储，30 分钟有效）
+        const escrowResult = await EscrowCodeService.generateEscrowCode(
+          orderResult.trade_order_id,
+          {
+            buyer_user_id: buyer_id,
+            seller_user_id: listing.seller_user_id
+          }
+        )
 
-          return { orderResult, completeResult }
+        responseData = {
+          trade_order_id: orderResult.trade_order_id,
+          market_listing_id,
+          seller_id: listing.seller_user_id,
+          asset_code: listing.price_asset_code,
+          gross_amount: listing.price_amount,
+          fee_amount: 0,
+          net_amount: listing.price_amount,
+          is_duplicate: false,
+          purchase_note: purchase_note || null,
+          // 担保码交易特有字段
+          requires_escrow_confirmation: true,
+          escrow_expires_at: escrowResult.expires_at,
+          status: 'frozen'
         }
-      )
 
-      // 构建响应数据
-      const responseData = {
-        trade_order_id: orderResult.trade_order_id,
-        market_listing_id,
-        seller_id: listing.seller_user_id,
-        asset_code: listing.price_asset_code, // 2026-01-20：无需默认值
-        gross_amount: listing.price_amount,
-        fee_amount: completeResult.fee_amount || 0,
-        net_amount: completeResult.net_amount || listing.price_amount,
-        is_duplicate: false,
-        purchase_note: purchase_note || null
+        logger.info('实物交易订单已创建，等待担保码确认', {
+          trade_order_id: orderResult.trade_order_id,
+          escrow_expires_at: escrowResult.expires_at
+        })
+      } else {
+        // 可替代资产交易：创建并立即完成（保持原有逻辑）
+        const { orderResult, completeResult } = await TransactionManager.execute(
+          async transaction => {
+            const orderResult = await TradeOrderService.createOrder(
+              {
+                buyer_id,
+                seller_id: listing.seller_user_id,
+                market_listing_id,
+                item_instance_id: listing.offer_item_instance_id,
+                price_amount: listing.price_amount,
+                price_asset_code: listing.price_asset_code,
+                idempotency_key
+              },
+              { transaction }
+            )
+
+            const completeResult = await TradeOrderService.completeOrder(
+              {
+                trade_order_id: orderResult.trade_order_id,
+                buyer_id
+              },
+              { transaction }
+            )
+
+            return { orderResult, completeResult }
+          }
+        )
+
+        responseData = {
+          trade_order_id: orderResult.trade_order_id,
+          market_listing_id,
+          seller_id: listing.seller_user_id,
+          asset_code: listing.price_asset_code,
+          gross_amount: listing.price_amount,
+          fee_amount: completeResult.fee_amount || 0,
+          net_amount: completeResult.net_amount || listing.price_amount,
+          is_duplicate: false,
+          purchase_note: purchase_note || null,
+          requires_escrow_confirmation: false,
+          status: 'completed'
+        }
       }
 
       /*
@@ -198,7 +252,7 @@ router.post(
        */
       await IdempotencyService.markAsCompleted(
         idempotency_key,
-        orderResult.trade_order_id, // 业务事件ID = 订单ID
+        responseData.trade_order_id, // 业务事件ID = 订单ID
         responseData
       )
 
@@ -209,7 +263,8 @@ router.post(
         buyer_id,
         seller_id: listing.seller_user_id,
         price_amount: listing.price_amount,
-        trade_order_id: orderResult.trade_order_id,
+        trade_order_id: responseData.trade_order_id,
+        requires_escrow: isItemInstanceTrade,
         idempotency_key
       })
 
@@ -219,7 +274,7 @@ router.post(
         await AdAttributionService.checkConversion(
           buyer_id,
           'market_buy',
-          String(orderResult.trade_order_id)
+          String(responseData.trade_order_id)
         )
       } catch (attrError) {
         logger.warn('[MarketBuy] 广告归因追踪失败（非关键）', { error: attrError.message })

@@ -70,6 +70,7 @@ describe('🛒 并发购买竞态测试', () => {
     const itemData = {
       owner_user_id: ownerUserId,
       item_template_id: testItemTemplate?.item_template_id || null,
+      item_type: 'tradable_item',
       status: options.status || 'available',
       meta: options.meta || {
         name: `并发测试物品_${Date.now()}`,

@@ -19,12 +19,19 @@
  * 使用模型：Claude Sonnet 4.5
  */
 
-const { ItemInstance, MaterialAssetType, sequelize } = require('../models')
+const { ItemInstance, MaterialAssetType, SystemConfig, sequelize } = require('../models')
 // V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
 const BalanceService = require('./asset/BalanceService')
 const { attachDisplayNames } = require('../utils/displayNameHelper')
 
 const logger = require('../utils/logger').logger
+
+/**
+ * allowed_actions 配置缓存
+ * 避免每次请求都查询 system_configs，TTL 5 分钟
+ */
+const _actionRulesCacheHolder = { value: null, time: 0 }
+const ACTION_RULES_CACHE_TTL = 5 * 60 * 1000
 
 /**
  * 背包服务类
@@ -302,7 +309,26 @@ class BackpackService {
       }
 
       /*
-       * 4. 附加中文显示名称
+       * 4. 附加 allowed_actions（按 item_type 从 system_configs 读取配置）
+       * 支持模板级覆盖：item_templates.meta.allowed_actions
+       * 缓存 5 分钟避免频繁查库
+       */
+      const now = Date.now()
+      if (
+        !_actionRulesCacheHolder.value ||
+        now - _actionRulesCacheHolder.time > ACTION_RULES_CACHE_TTL
+      ) {
+        _actionRulesCacheHolder.value = await SystemConfig.getValue('item_type_action_rules', {}) // eslint-disable-line require-atomic-updates
+        _actionRulesCacheHolder.time = Date.now() // eslint-disable-line require-atomic-updates
+      }
+
+      const actionRules = _actionRulesCacheHolder.value
+      formattedItems.forEach(item => {
+        item.allowed_actions = actionRules[item.item_type] || []
+      })
+
+      /*
+       * 5. 附加中文显示名称
        * 使用 displayNameHelper 从系统字典获取以下字段的中文显示名称：
        * - status → item_status 字典类型
        * - item_type → item_type 字典类型
@@ -393,10 +419,22 @@ class BackpackService {
         transaction
       })
 
-      // 4. 格式化返回数据（name 从 meta.name 获取）
+      // 4. 附加 allowed_actions（复用缓存）
+      const detailNow = Date.now()
+      if (
+        !_actionRulesCacheHolder.value ||
+        detailNow - _actionRulesCacheHolder.time > ACTION_RULES_CACHE_TTL
+      ) {
+        _actionRulesCacheHolder.value = await SystemConfig.getValue('item_type_action_rules', {}) // eslint-disable-line require-atomic-updates
+        _actionRulesCacheHolder.time = Date.now() // eslint-disable-line require-atomic-updates
+      }
+      const detailActionRules = _actionRulesCacheHolder.value
+      const itemType = item.item_type || 'unknown'
+
+      // 5. 格式化返回数据（name 从 meta.name 获取）
       const itemDetail = {
         item_instance_id: item.item_instance_id,
-        item_type: item.item_type || 'unknown',
+        item_type: itemType,
         name: item.meta?.name || '未命名物品',
         status: item.status,
         rarity: item.meta?.rarity || 'common',
@@ -404,7 +442,8 @@ class BackpackService {
         acquired_at: item.created_at,
         expires_at: item.meta?.expires_at || null,
         is_owner: viewer_user_id ? item.owner_user_id === viewer_user_id : null,
-        has_redemption_code: !!redemptionOrder
+        has_redemption_code: !!redemptionOrder,
+        allowed_actions: detailActionRules[itemType] || []
       }
 
       /*

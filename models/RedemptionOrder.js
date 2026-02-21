@@ -89,6 +89,28 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: true,
         comment: '核销时间（Fulfilled At）：实际核销时间'
+      },
+
+      // 核销门店ID
+      fulfilled_store_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '核销门店ID（Fulfilled Store ID）：记录核销发生在哪个门店',
+        references: {
+          model: 'stores',
+          key: 'store_id'
+        }
+      },
+
+      // 核销员工ID
+      fulfilled_by_staff_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        comment: '核销员工ID（Fulfilled By Staff ID）：执行核销操作的门店员工',
+        references: {
+          model: 'store_staff',
+          key: 'store_staff_id'
+        }
       }
     },
     {
@@ -120,6 +142,20 @@ module.exports = sequelize => {
       as: 'redeemer',
       comment: '核销操作的用户'
     })
+
+    // 关联核销门店
+    RedemptionOrder.belongsTo(models.Store, {
+      foreignKey: 'fulfilled_store_id',
+      as: 'fulfilled_store',
+      comment: '核销发生的门店'
+    })
+
+    // 关联核销员工
+    RedemptionOrder.belongsTo(models.StoreStaff, {
+      foreignKey: 'fulfilled_by_staff_id',
+      as: 'fulfilled_staff',
+      comment: '执行核销操作的员工'
+    })
   }
 
   /**
@@ -147,10 +183,12 @@ module.exports = sequelize => {
    * @param {number} redeemer_user_id - 核销用户ID
    * @param {Object} options - 选项
    * @param {Object} options.transaction - 事务对象
+   * @param {number} [options.store_id] - 核销门店ID
+   * @param {number} [options.staff_id] - 核销员工ID
    * @returns {Promise<RedemptionOrder>} 更新后的订单
    */
   RedemptionOrder.prototype.fulfill = async function (redeemer_user_id, options = {}) {
-    const { transaction = null } = options
+    const { transaction = null, store_id = null, staff_id = null } = options
 
     if (!this.canFulfill()) {
       throw new Error('订单不可核销')
@@ -160,7 +198,9 @@ module.exports = sequelize => {
       {
         status: 'fulfilled',
         redeemer_user_id,
-        fulfilled_at: BeijingTimeHelper.createDatabaseTime()
+        fulfilled_at: BeijingTimeHelper.createDatabaseTime(),
+        fulfilled_store_id: store_id,
+        fulfilled_by_staff_id: staff_id
       },
       { transaction }
     )

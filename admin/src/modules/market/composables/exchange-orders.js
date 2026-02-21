@@ -221,11 +221,15 @@ export function useExchangeOrdersMethods() {
     getOrderStatusClass(status) {
       const map = {
         pending: 'bg-warning',
+        approved: 'bg-info',
         processing: 'bg-info',
-        shipped: 'bg-success',
+        shipped: 'bg-blue-500',
+        received: 'bg-green-500',
+        rated: 'bg-green-600',
+        rejected: 'bg-red-500',
+        refunded: 'bg-secondary',
         completed: 'bg-success',
-        cancelled: 'bg-danger',
-        refunded: 'bg-secondary'
+        cancelled: 'bg-danger'
       }
       return map[status] || 'bg-secondary'
     },

@@ -1023,6 +1023,16 @@ if (require.main === module) {
           appLogger.error('广告定时任务加载失败', { error: error.message })
         }
 
+        // 初始化内容过期清理定时任务（ENABLE_CONTENT_CRON_JOBS=true 时启用）
+        try {
+          require('./jobs/content-cron-jobs')
+          appLogger.info('内容过期清理定时任务模块已加载', {
+            enabled: process.env.ENABLE_CONTENT_CRON_JOBS === 'true'
+          })
+        } catch (error) {
+          appLogger.error('内容过期清理定时任务加载失败', { error: error.message })
+        }
+
         /*
          * 🔴 连接池持续监控（2025-12-30 方案A已拍板）
          * 功能：每60s打点到应用日志，建立连接池可观测性

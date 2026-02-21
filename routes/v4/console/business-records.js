@@ -231,7 +231,7 @@ router.get(
           }
 
           return [
-            order.order_id,
+            order.redemption_order_id,
             order.code_hash ? order.code_hash.substring(0, 8) + '...' : '-',
             redeemer.user_id || '-',
             redeemer.nickname || '-',
@@ -342,7 +342,7 @@ router.post(
 
       return res.apiSuccess(
         {
-          order_id: order.order_id,
+          order_id: order.redemption_order_id,
           status: order.status,
           fulfilled_at: order.fulfilled_at
         },
@@ -394,7 +394,7 @@ router.post(
 
       return res.apiSuccess(
         {
-          order_id: order.order_id,
+          order_id: order.redemption_order_id,
           status: order.status
         },
         '取消成功'

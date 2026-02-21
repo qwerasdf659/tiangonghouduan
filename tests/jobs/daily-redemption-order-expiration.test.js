@@ -138,7 +138,7 @@ describe('P3-2: DailyRedemptionOrderExpiration - 每日兑换订单过期任务'
 
       // 重新查询这些订单，确认状态未变
       for (const order of pendingOrders) {
-        const updatedOrder = await RedemptionOrder.findByPk(order.order_id)
+        const updatedOrder = await RedemptionOrder.findByPk(order.redemption_order_id)
         // 未过期的订单应该仍然是pending状态
         expect(updatedOrder.status).toBe('pending')
       }
@@ -161,8 +161,8 @@ describe('P3-2: DailyRedemptionOrderExpiration - 每日兑换订单过期任务'
         return
       }
 
-      // 验证必要字段存在
-      expect(expiredOrder.order_id).toBeDefined()
+      // 验证必要字段存在（主键是 redemption_order_id，非 order_id）
+      expect(expiredOrder.redemption_order_id).toBeDefined()
       expect(expiredOrder.item_instance_id).toBeDefined()
       expect(expiredOrder.code_hash).toBeDefined()
       expect(expiredOrder.status).toBe('expired')

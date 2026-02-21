@@ -387,6 +387,7 @@ describe('物品系统 ItemService 测试 - P2优先级', () => {
       const used_item = await ItemInstance.create({
         item_template_id: test_item_template.item_template_id,
         owner_user_id: test_user_id,
+        item_type: 'voucher',
         status: 'used',
         acquisition_method: 'test',
         acquisition_source_type: 'test',
@@ -610,6 +611,7 @@ describe('物品系统 ItemService 测试 - P2优先级', () => {
       const used_item = await ItemInstance.create({
         item_template_id: test_item_template.item_template_id,
         owner_user_id: test_user_id,
+        item_type: 'voucher',
         status: 'used',
         acquisition_method: 'test',
         acquisition_source_type: 'test',

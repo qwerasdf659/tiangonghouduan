@@ -36,7 +36,8 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * @body {string} redeem_code - 12位Base32核销码（格式：XXXX-YYYY-ZZZZ）
  *
  * 权限要求：
- * - 商户（role_level >= 50）或管理员
+ * - 商户员工（role_level >= 20，含 merchant_staff/merchant_manager）或管理员
+ * - 决策P6：降低阈值使商家员工可执行核销，服务层叠加 store_staff 活跃校验
  *
  * 返回数据：
  * @returns {Object} order - 订单对象
@@ -63,16 +64,21 @@ router.post('/fulfill', authenticateToken, async (req, res) => {
       return res.apiError('核销码不能为空', 'REDEEM_CODE_REQUIRED', null, 400)
     }
 
-    // 权限验证（只允许商户或管理员核销）
+    // 权限验证（从 SystemSettings 读取最低角色等级，决策P6）
     const { getUserRoles } = require('../../../../middleware/auth')
+    const AdminSystemService = require('../../../../services/AdminSystemService')
     const userRoles = await getUserRoles(redeemerUserId)
+    const minRoleLevel = Number(
+      await AdminSystemService.getSettingValue('redemption', 'min_role_level_for_fulfill', 20)
+    )
 
-    if (userRoles.role_level < 50) {
+    if (userRoles.role_level < minRoleLevel) {
       logger.warn('权限不足：非商户或管理员尝试核销', {
         user_id: redeemerUserId,
-        role_level: userRoles.role_level
+        role_level: userRoles.role_level,
+        min_required: minRoleLevel
       })
-      return res.apiError('权限不足，只有商户或管理员可以核销', 'FORBIDDEN', null, 403)
+      return res.apiError('权限不足，只有商户员工或管理员可以核销', 'FORBIDDEN', null, 403)
     }
 
     logger.info('开始核销订单', {
@@ -101,7 +107,7 @@ router.post('/fulfill', authenticateToken, async (req, res) => {
         title: '核销通知',
         content: '您的商品已核销成功',
         data: {
-          order_id: order.order_id,
+          order_id: order.redemption_order_id,
           item_instance_id: order.item_instance_id,
           fulfilled_at: order.fulfilled_at
         }
@@ -114,23 +120,21 @@ router.post('/fulfill', authenticateToken, async (req, res) => {
     }
 
     logger.info('核销成功', {
-      order_id: order.order_id,
+      order_id: order.redemption_order_id,
       redeemer_user_id: redeemerUserId
     })
 
     return res.apiSuccess(
       {
         order: {
-          order_id: order.order_id,
+          redemption_order_id: order.redemption_order_id,
           item_instance_id: order.item_instance_id,
           status: order.status,
           fulfilled_at: order.fulfilled_at,
-          redeemer_user_id: order.redeemer_user_id
+          redeemer_user_id: order.redeemer_user_id,
+          fulfilled_store_id: order.fulfilled_store_id,
+          fulfilled_by_staff_id: order.fulfilled_by_staff_id
         },
-        /*
-         * 物品实例信息
-         * 2026-01-20 技术债务清理：name 从 meta.name 获取
-         */
         item_instance: order.item_instance
           ? {
               item_instance_id: order.item_instance.item_instance_id,

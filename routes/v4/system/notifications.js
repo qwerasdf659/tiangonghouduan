@@ -292,11 +292,13 @@ router.post('/send', authenticateToken, requireRoleLevel(100), async (req, res) 
       req.user.user_id
     )
 
-    logger.info(`[Notifications] ✅ 发送通知成功: ${announcement.announcement_id} - ${title}`)
+    logger.info(
+      `[Notifications] ✅ 发送通知成功: ${announcement.system_announcement_id} - ${title}`
+    )
 
     return res.apiSuccess(
       {
-        notification_id: announcement.announcement_id,
+        notification_id: announcement.system_announcement_id,
         title,
         content,
         type: announcement_type,

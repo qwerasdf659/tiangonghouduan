@@ -71,7 +71,7 @@ router.post('/orders', authenticateToken, async (req, res) => {
     })
 
     logger.info('核销订单生成成功', {
-      order_id: result.order.order_id,
+      order_id: result.order.redemption_order_id,
       item_instance_id,
       expires_at: result.order.expires_at
     })
@@ -79,7 +79,7 @@ router.post('/orders', authenticateToken, async (req, res) => {
     return res.apiSuccess(
       {
         order: {
-          order_id: result.order.order_id,
+          order_id: result.order.redemption_order_id,
           item_instance_id: result.order.item_instance_id,
           status: result.order.status,
           expires_at: result.order.expires_at,
@@ -148,7 +148,7 @@ router.post('/orders/:order_id/cancel', authenticateToken, async (req, res) => {
 
     return res.apiSuccess(
       {
-        order_id: order.order_id,
+        order_id: order.redemption_order_id,
         status: order.status,
         updated_at: order.updated_at
       },

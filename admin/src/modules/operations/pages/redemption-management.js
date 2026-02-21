@@ -201,7 +201,7 @@ function redemptionManagementPage() {
      */
     openRedeemModal(order) {
       this.redeemForm = {
-        order_id: order.redemption_order_id || order.order_id,
+        order_id: order.redemption_order_id,
         store_id: '',
         remark: ''
       }
@@ -248,7 +248,7 @@ function redemptionManagementPage() {
      */
     openCancelModal(order) {
       this.cancelForm = {
-        order_id: order.redemption_order_id || order.order_id,
+        order_id: order.redemption_order_id,
         reason: ''
       }
       this.orderDetail = order
@@ -292,7 +292,7 @@ function redemptionManagementPage() {
      * @param {Object} order - 订单对象
      */
     async viewDetail(order) {
-      const orderId = order.redemption_order_id || order.order_id
+      const orderId = order.redemption_order_id
       try {
         const result = await RedemptionAPI.getDetail(orderId)
         if (result.success && result.data) {
@@ -528,7 +528,7 @@ function redemptionManagementPage() {
       if (!this.selectedIds || this.selectedIds.length === 0) return 0
       return this.orders.filter(
         o =>
-          o.status === 'pending' && this.selectedIds.includes(o.redemption_order_id || o.order_id)
+          o.status === 'pending' && this.selectedIds.includes(o.redemption_order_id)
       ).length
     },
 
@@ -572,6 +572,32 @@ function redemptionManagementPage() {
       const now = new Date()
       const diffDays = (expiresAt - now) / (1000 * 60 * 60 * 24)
       return diffDays > 0 && diffDays <= 3
+    },
+
+    /**
+     * 获取核销门店名称
+     * @param {Object} order - 订单对象
+     * @returns {string}
+     */
+    getStoreName(order) {
+      if (order.fulfilled_store?.store_name) return order.fulfilled_store.store_name
+      if (order.fulfilled_store_id) {
+        const store = this.stores.find(s => s.store_id === order.fulfilled_store_id)
+        return store ? (store.store_name || store.name) : `门店#${order.fulfilled_store_id}`
+      }
+      return '-'
+    },
+
+    /**
+     * 获取核销员工信息
+     * @param {Object} order - 订单对象
+     * @returns {string}
+     */
+    getStaffDisplay(order) {
+      if (order.fulfilled_staff?.staff_name) return order.fulfilled_staff.staff_name
+      if (order.fulfilled_staff?.nickname) return order.fulfilled_staff.nickname
+      if (order.fulfilled_by_user_id) return `员工#${order.fulfilled_by_user_id}`
+      return '-'
     }
   }
 }

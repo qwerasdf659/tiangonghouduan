@@ -431,6 +431,65 @@ const SYSTEM_SETTINGS_WHITELIST = {
     approvalRequired: false
   },
 
+  /*
+   * ===== 核销设置（运营可调）=====
+   * 实物奖品核销码默认有效天数（用户兑换后几天内必须到店核销）
+   */
+  'redemption/default_expiry_days_product': {
+    type: 'number',
+    min: 1,
+    max: 365,
+    default: 7,
+    readonly: false,
+    description: '实物奖品核销码默认有效天数（用户兑换后的到店核销期限）',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  // 优惠券核销码默认有效天数（优惠券类奖品的核销期限）
+  'redemption/default_expiry_days_voucher': {
+    type: 'number',
+    min: 1,
+    max: 365,
+    default: 30,
+    readonly: false,
+    description: '优惠券核销码默认有效天数（优惠券类奖品的核销期限）',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  // QR码有效期分钟数（用户出示的动态QR码刷新间隔）
+  'redemption/qr_code_expiry_minutes': {
+    type: 'number',
+    min: 1,
+    max: 60,
+    default: 5,
+    readonly: false,
+    description: 'QR码有效期分钟数（动态核销二维码的刷新间隔）',
+    changeRequiresRestart: false,
+    businessImpact: 'MEDIUM',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  // 允许核销的最低角色等级（控制哪些角色可以执行核销操作）
+  'redemption/min_role_level_for_fulfill': {
+    type: 'number',
+    min: 1,
+    max: 100,
+    default: 20,
+    readonly: false,
+    description: '允许核销的最低角色等级（控制哪些角色可以执行核销操作）',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
   // ===== 通知设置（开关类，适合 DB）=====
   'notification/sms_enabled': {
     type: 'boolean',

@@ -131,7 +131,8 @@ router.post(
       contextId: businessId ? parseInt(businessId, 10) : 0, // 上下文 ID（0 表示待绑定）
       userId: req.user.user_id,
       sourceModule: 'admin',
-      ipAddress: req.ip
+      ipAddress: req.ip,
+      sortOrder: req.body.sort_order ? parseInt(req.body.sort_order, 10) : 0 // 多图排序序号
     })
 
     // 4. 返回上传结果
@@ -296,6 +297,47 @@ router.patch(
 
     // 2026-02-01 主键命名规范化：API响应字段使用完整前缀 image_resource_id
     return res.apiSuccess({ image_resource_id: imageId, context_id: contextId }, '图片绑定成功')
+  })
+)
+
+/**
+ * PATCH /api/v4/console/images/:id
+ *
+ * @description 更新图片属性（排序序号等）
+ *
+ * @header Authorization - Bearer {token} 管理员认证
+ * @param {number} id - 图片资源 ID（image_resource_id）
+ * @body {number} [sort_order] - 排序序号（同一 context_id 内排序，数字越小越靠前）
+ *
+ * @response {Object} 200 - 更新成功
+ * @response {Object} 400 - 参数错误
+ * @response {Object} 404 - 图片不存在
+ */
+router.patch(
+  '/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const imageId = parseInt(req.params.id, 10)
+    if (isNaN(imageId)) {
+      return res.apiError('无效的图片 ID', 'INVALID_IMAGE_ID', null, 400)
+    }
+
+    const { sort_order: sortOrder } = req.body
+    if (sortOrder === undefined) {
+      return res.apiError('缺少可更新的参数（支持：sort_order）', 'MISSING_PARAM', null, 400)
+    }
+
+    const success = await getImageService().updateImageSortOrder(imageId, parseInt(sortOrder, 10))
+
+    if (!success) {
+      return res.apiError('图片不存在或更新失败', 'UPDATE_FAILED', null, 404)
+    }
+
+    return res.apiSuccess(
+      { image_resource_id: imageId, sort_order: parseInt(sortOrder, 10) },
+      '图片排序更新成功'
+    )
   })
 )
 

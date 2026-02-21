@@ -490,6 +490,17 @@ router.post(
     // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
     const ExchangeService = req.app.locals.services.getService('exchange_admin')
 
+    // 商品上架前置校验（在事务外执行，避免 TransactionManager 误重试业务校验错误）
+    const targetStatus = status || 'active'
+    if (targetStatus === 'active' && !primary_image_id) {
+      return res.apiError(
+        '商品上架必须上传主图片（primary_image_id 不能为空）',
+        'IMAGE_REQUIRED',
+        null,
+        400
+      )
+    }
+
     // 🎯 2026-01-08 图片存储架构修复：使用 TransactionManager 包装事务
     const transactionResult = await TransactionManager.execute(async transaction => {
       // 调用服务层方法创建商品（V4.5.0 材料资产支付 + 臻选空间/幸运空间扩展字段）

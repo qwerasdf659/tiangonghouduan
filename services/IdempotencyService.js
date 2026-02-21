@@ -106,7 +106,8 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/lottery/campaigns/:code/prizes': 'CAMPAIGN_PRIZES', // 获取活动奖品列表
   '/api/v4/lottery/campaigns/:code/config': 'CAMPAIGN_CONFIG', // 获取活动抽奖配置
 
-  // ===== B2C 兑换下单（2026-02-07 从 shop 域迁移到 backpack 域） =====
+  // ===== 背包域写操作 =====
+  '/api/v4/backpack/items/:id/redeem': 'BACKPACK_ITEM_REDEEM', // 用户生成核销码（创建核销订单+锁定物品）
   '/api/v4/backpack/exchange': 'BACKPACK_EXCHANGE_CREATE_ORDER', // 用户端兑换商品（新路径）
   '/api/v4/shop/exchange/orders/:id/status': 'SHOP_EXCHANGE_UPDATE_STATUS', // 更新订单状态（管理操作保留在 shop）
 
@@ -118,6 +119,10 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/market/listings/:id/purchase': 'MARKET_PURCHASE_LISTING', // 购买物品
   '/api/v4/market/listings/:id/withdraw': 'MARKET_CANCEL_LISTING', // 撤回物品
 
+  // ===== C2C 市场交易 - 担保码确认（Phase 4） =====
+  '/api/v4/market/trade-orders/:id/confirm-delivery': 'MARKET_ESCROW_CONFIRM', // 担保码确认收货
+  '/api/v4/market/trade-orders/:id/cancel': 'MARKET_ESCROW_CANCEL', // 担保码交易取消
+
   // ===== C2C 市场交易 - 可叠加资产（材料） =====
   '/api/v4/market/fungible-assets/list': 'MARKET_CREATE_FUNGIBLE_LISTING', // 材料上架
   '/api/v4/market/fungible-assets/:id/purchase': 'MARKET_PURCHASE_FUNGIBLE', // 购买材料
@@ -125,7 +130,8 @@ const CANONICAL_OPERATION_MAP = {
 
   // ===== 核销系统 =====
   '/api/v4/shop/redemption/orders': 'REDEMPTION_CREATE_ORDER', // 创建核销订单（canonical 路径）
-  '/api/v4/shop/redemption/fulfill': 'REDEMPTION_FULFILL', // 执行核销（canonical 路径）
+  '/api/v4/shop/redemption/fulfill': 'REDEMPTION_FULFILL', // 文本码核销（canonical 路径）
+  '/api/v4/shop/redemption/scan': 'REDEMPTION_QR_SCAN_FULFILL', // QR码扫码核销（Phase 1 新增）
   '/api/v4/shop/redemption/orders/:id/cancel': 'REDEMPTION_CANCEL_ORDER', // 取消核销订单
 
   // ===== 消费记录 =====

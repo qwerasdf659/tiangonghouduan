@@ -462,8 +462,8 @@ module.exports = sequelize => {
       // 物品类型（Item Type）
       item_type: {
         type: DataTypes.STRING(50),
-        allowNull: true,
-        comment: '物品类型（如 voucher/product/service/equipment/card）'
+        allowNull: false,
+        comment: '物品类型（product/voucher/prize/tradable_item/service）'
       },
 
       // 物品模板ID（Item Template ID）
@@ -518,9 +518,10 @@ module.exports = sequelize => {
        */
       source: {
         type: DataTypes.STRING(20),
-        allowNull: true,
-        defaultValue: null,
-        comment: '来源：exchange=兑换, bid_settlement=竞价结算, lottery=抽奖（存量为 NULL）'
+        allowNull: false,
+        defaultValue: 'unknown',
+        comment:
+          '来源：lottery=抽奖, exchange=兑换, bid_settlement=竞价结算, test=测试, unknown=未知'
       },
 
       // 创建时间（Created At）

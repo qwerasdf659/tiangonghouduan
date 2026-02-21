@@ -51,6 +51,9 @@ import {
 // ========== 草稿自动保存 ==========
 import { withDraftAutoSave, createDraftFormMixin } from './draft-auto-save.js'
 
+// ========== 图片上传 ==========
+import { imageUploadMixin } from './image-upload.js'
+
 export { paginationMixin } from './pagination.js'
 export { asyncDataMixin, createDataLoaderConfig } from './async-data.js'
 export { modalMixin } from './modal.js'
@@ -60,6 +63,7 @@ export { authGuardMixin } from './auth-guard.js'
 export { withDraftAutoSave, createDraftFormMixin } from './draft-auto-save.js'
 export { drillDownMixin, DRILL_DOWN_SIZES, DRILL_DOWN_TYPES } from './drill-down.js'
 export { userResolverMixin } from './user-resolver.js'
+export { imageUploadMixin } from './image-upload.js'
 
 /**
  * 创建页面 Mixin
@@ -226,7 +230,13 @@ export function createPageMixin(mixinConfig = {}, customProps = {}) {
     Object.assign(composed, userResolverMixin())
   }
 
-  // 9. 合并自定义属性（自定义优先级最高）
+  // 9. 图片上传 mixin（统一图片管理体系 2026-02-21）
+  if (mixinConfig.imageUpload) {
+    const uploadConfig = typeof mixinConfig.imageUpload === 'object' ? mixinConfig.imageUpload : {}
+    Object.assign(composed, imageUploadMixin(uploadConfig))
+  }
+
+  // 10. 合并自定义属性（自定义优先级最高）
   Object.assign(composed, customProps)
 
   return composed

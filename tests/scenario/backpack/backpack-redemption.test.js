@@ -396,7 +396,7 @@ describe('背包与兑换集成测试', () => {
 
       // 取消订单
       await TransactionManager.execute(async transaction => {
-        return await RedemptionService.cancelOrder(order.order_id, { transaction })
+        return await RedemptionService.cancelOrder(order.redemption_order_id, { transaction })
       })
 
       // 尝试核销已取消的订单（应该失败）

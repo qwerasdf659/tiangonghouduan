@@ -78,6 +78,8 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   // 图片资源
   IMAGE_LIST: `${API_PREFIX}/console/images`,
   IMAGE_UPLOAD: `${API_PREFIX}/console/images/upload`,
+  IMAGE_UPDATE: `${API_PREFIX}/console/images/:id`,
+  IMAGE_BIND: `${API_PREFIX}/console/images/:id/bind`,
   IMAGE_DELETE: `${API_PREFIX}/console/images/:id`,
 
   // 风控告警

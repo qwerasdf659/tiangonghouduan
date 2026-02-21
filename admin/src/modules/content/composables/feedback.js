@@ -175,7 +175,7 @@ export function useFeedbackMethods() {
      */
     async viewFeedbackDetail(feedback) {
       try {
-        const response = await ContentAPI.getFeedbackDetail(feedback.feedback_id || feedback.id)
+        const response = await ContentAPI.getFeedbackDetail(feedback.feedback_id)
         if (response?.success) {
           this.currentFeedback = response.data?.feedback || response.data
           this.showFeedbackDetail = true
@@ -210,7 +210,7 @@ export function useFeedbackMethods() {
 
       this.submittingReply = true
       try {
-        const feedbackId = this.currentFeedback?.feedback_id || this.currentFeedback?.id
+        const feedbackId = this.currentFeedback?.feedback_id
         const response = await ContentAPI.replyFeedback(feedbackId, {
           reply_content: this.replyContent.trim(),
           internal_notes: this.replyInternalNotes.trim() || null
@@ -257,7 +257,7 @@ export function useFeedbackMethods() {
       }
 
       try {
-        const feedbackId = this.currentFeedback?.feedback_id || this.currentFeedback?.id
+        const feedbackId = this.currentFeedback?.feedback_id
         const response = await ContentAPI.updateFeedbackStatus(feedbackId, {
           status: this.newStatus,
           internal_notes: this.statusNotes.trim() || null
@@ -414,7 +414,7 @@ export function useFeedbackMethods() {
      * 全选/取消全选当前页的反馈
      */
     toggleSelectAllFeedbacks() {
-      const currentPageIds = this.feedbacks.map(f => f.feedback_id || f.id).filter(Boolean)
+      const currentPageIds = this.feedbacks.map(f => f.feedback_id).filter(Boolean)
 
       const allSelected =
         currentPageIds.length > 0 && currentPageIds.every(id => this.selectedFeedbackIds.has(id))
@@ -431,7 +431,7 @@ export function useFeedbackMethods() {
      * @returns {boolean}
      */
     isAllFeedbacksSelected() {
-      const currentPageIds = this.feedbacks?.map(f => f.feedback_id || f.id).filter(Boolean) || []
+      const currentPageIds = this.feedbacks?.map(f => f.feedback_id).filter(Boolean) || []
       return (
         currentPageIds.length > 0 && currentPageIds.every(id => this.selectedFeedbackIds.has(id))
       )

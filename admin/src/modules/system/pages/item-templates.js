@@ -111,8 +111,16 @@ document.addEventListener('alpine:init', () => {
       image_url: '',
       reference_price_points: 0,
       description: '',
-      meta: ''
+      meta: '',
+      use_instructions: '',
+      allowed_actions: []
     },
+    /** @type {Array<Object>} 可选操作类型 */
+    action_options: [
+      { value: 'use', label: '直接使用（线上生效）' },
+      { value: 'redeem', label: '生成核销码（到店核销）' },
+      { value: 'sell', label: '上架交易市场' }
+    ],
     is_submitting: false,
     /** @type {string|null} 图片上传预览URL */
     image_preview_url: null,
@@ -279,7 +287,9 @@ document.addEventListener('alpine:init', () => {
         image_url: '',
         reference_price_points: 0,
         description: '',
-        meta: ''
+        meta: '',
+        use_instructions: '',
+        allowed_actions: []
       }
       this.image_preview_url = null
       logger.info('[openCreateModal] 表单已初始化:', JSON.stringify(this.form))
@@ -303,6 +313,11 @@ document.addEventListener('alpine:init', () => {
         )
         if (response && response.success) {
           const t = response.data
+          const metaObj = t.meta || {}
+          const metaCopy = { ...metaObj }
+          delete metaCopy.use_instructions
+          delete metaCopy.allowed_actions
+
           this.form = {
             template_id: t.item_template_id,
             display_name: t.display_name || '',
@@ -313,7 +328,9 @@ document.addEventListener('alpine:init', () => {
             image_url: t.image_url || '',
             reference_price_points: t.reference_price_points || 0,
             description: t.description || '',
-            meta: t.meta ? JSON.stringify(t.meta, null, 2) : ''
+            meta: Object.keys(metaCopy).length > 0 ? JSON.stringify(metaCopy, null, 2) : '',
+            use_instructions: metaObj.use_instructions || '',
+            allowed_actions: metaObj.allowed_actions || []
           }
           this.image_preview_url = t.image_url || null
           this.showModal('templateModal')
@@ -363,6 +380,15 @@ document.addEventListener('alpine:init', () => {
         return
       }
 
+      // 将 use_instructions 和 allowed_actions 合并到 meta JSON 中
+      const finalMeta = meta || {}
+      if (this.form.use_instructions && this.form.use_instructions.trim()) {
+        finalMeta.use_instructions = this.form.use_instructions.trim()
+      }
+      if (this.form.allowed_actions && this.form.allowed_actions.length > 0) {
+        finalMeta.allowed_actions = this.form.allowed_actions
+      }
+
       const data = {
         display_name: this.form.display_name,
         template_code: this.form.template_code,
@@ -372,7 +398,7 @@ document.addEventListener('alpine:init', () => {
         image_url: this.form.image_url || null,
         reference_price_points: this.form.reference_price_points || 0,
         description: this.form.description || null,
-        meta: meta
+        meta: Object.keys(finalMeta).length > 0 ? finalMeta : null
       }
 
       if (!data.display_name || !data.template_code) {

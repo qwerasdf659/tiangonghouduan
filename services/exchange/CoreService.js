@@ -399,14 +399,16 @@ class CoreService {
       { transaction }
     )
 
-    // 如果是发货，记录发货时间
-    if (new_status === 'shipped') {
-      await order.update(
-        {
-          shipped_at: BeijingTimeHelper.createDatabaseTime()
-        },
-        { transaction }
-      )
+    // 根据状态类型记录对应时间戳
+    const timestampMap = {
+      shipped: { shipped_at: BeijingTimeHelper.createDatabaseTime() },
+      received: { received_at: BeijingTimeHelper.createDatabaseTime() },
+      rejected: { rejected_at: BeijingTimeHelper.createDatabaseTime() },
+      refunded: { refunded_at: BeijingTimeHelper.createDatabaseTime() }
+    }
+
+    if (timestampMap[new_status]) {
+      await order.update(timestampMap[new_status], { transaction })
     }
 
     logger.info(`[兑换市场] 订单状态更新成功：${order_no} -> ${new_status}`)
@@ -463,9 +465,9 @@ class CoreService {
       throw error
     }
 
-    // 订单状态校验：只有已完成/已发货的订单才能评分
-    if (!['completed', 'shipped'].includes(order.status)) {
-      const error = new Error('只有已完成或已发货的订单才能评分')
+    // 订单状态校验：已收货/已完成/已发货的订单才能评分
+    if (!['received', 'completed', 'shipped'].includes(order.status)) {
+      const error = new Error('只有已收货、已完成或已发货的订单才能评分')
       error.statusCode = 400
       error.code = 'ORDER_STATUS_INVALID'
       throw error
@@ -508,6 +510,119 @@ class CoreService {
       rating,
       rated_at: BeijingTimeHelper.now()
     }
+  }
+
+  /**
+   * 用户确认收货（决策4/Phase 3：发货后7天未操作自动确认）
+   *
+   * 业务规则：
+   * - 只能对自己的订单确认收货
+   * - 订单状态必须为 shipped（已发货才能确认收货）
+   * - 确认收货后状态变为 received
+   * - 管理员可通过 auto_confirmed=true 标记自动确认
+   *
+   * @param {number} user_id - 用户ID
+   * @param {string} order_no - 订单号
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 外部事务对象（必填）
+   * @param {boolean} [options.auto_confirmed=false] - 是否为系统自动确认
+   * @returns {Promise<Object>} 确认收货结果
+   */
+  async confirmReceipt(user_id, order_no, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'CoreService.confirmReceipt')
+    const { auto_confirmed = false } = options
+
+    const whereClause = { order_no }
+    if (!auto_confirmed) {
+      whereClause.user_id = user_id
+    }
+
+    const order = await this.ExchangeRecord.findOne({
+      where: whereClause,
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
+
+    if (!order) {
+      const error = new Error('订单不存在或无权操作')
+      error.statusCode = 404
+      error.code = 'ORDER_NOT_FOUND'
+      throw error
+    }
+
+    if (order.status !== 'shipped') {
+      const error = new Error('只有已发货的订单才能确认收货')
+      error.statusCode = 400
+      error.code = 'ORDER_STATUS_INVALID'
+      error.data = { current_status: order.status }
+      throw error
+    }
+
+    await order.update(
+      {
+        status: 'received',
+        received_at: BeijingTimeHelper.createDatabaseTime(),
+        auto_confirmed
+      },
+      { transaction }
+    )
+
+    await BusinessCacheHelper.invalidateExchangeItems().catch(err => {
+      logger.warn('[兑换市场] 确认收货后清除缓存失败（非致命）:', err.message)
+    })
+
+    logger.info('[兑换市场] 确认收货成功', {
+      user_id,
+      order_no,
+      auto_confirmed
+    })
+
+    return {
+      success: true,
+      message: auto_confirmed ? '系统自动确认收货成功' : '确认收货成功',
+      order_no,
+      status: 'received',
+      received_at: BeijingTimeHelper.now(),
+      auto_confirmed
+    }
+  }
+
+  /**
+   * 批量自动确认收货（定时任务调用：发货7天后自动确认）
+   *
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 外部事务对象（必填）
+   * @returns {Promise<number>} 自动确认的订单数量
+   */
+  async autoConfirmShippedOrders(options = {}) {
+    const transaction = assertAndGetTransaction(options, 'CoreService.autoConfirmShippedOrders')
+
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+    const [affectedCount] = await this.ExchangeRecord.update(
+      {
+        status: 'received',
+        received_at: BeijingTimeHelper.createDatabaseTime(),
+        auto_confirmed: true
+      },
+      {
+        where: {
+          status: 'shipped',
+          shipped_at: { [require('sequelize').Op.lt]: sevenDaysAgo }
+        },
+        transaction
+      }
+    )
+
+    if (affectedCount > 0) {
+      logger.info(`[兑换市场] 自动确认收货完成，共 ${affectedCount} 笔订单`)
+      await BusinessCacheHelper.invalidateExchangeItems().catch(err => {
+        logger.warn('[兑换市场] 批量确认收货后清除缓存失败（非致命）:', err.message)
+      })
+    }
+
+    return affectedCount
   }
 
   /**

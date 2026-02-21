@@ -29,11 +29,13 @@ const router = express.Router()
 // 导入子路由模块
 const ordersRoutes = require('./orders')
 const fulfillRoutes = require('./fulfill')
+const scanRoutes = require('./scan')
 const queryRoutes = require('./query')
 
 // 挂载子路由
 router.use('/', ordersRoutes) // POST /orders, POST /orders/:order_id/cancel
-router.use('/', fulfillRoutes) // POST /fulfill
+router.use('/', fulfillRoutes) // POST /fulfill（文本码核销，备用）
+router.use('/', scanRoutes) // POST /scan（QR码扫码核销，主流程）
 router.use('/', queryRoutes) // GET /orders/:order_id, GET /items/:item_instance_id/order
 
 module.exports = router

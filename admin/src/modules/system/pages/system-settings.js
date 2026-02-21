@@ -8,7 +8,7 @@
  *
  * @description
  * 系统设置整合页面，通过 composables 模块化管理：
- * - 系统配置 - 全5大分类（basic/points/notification/security/marketplace）
+ * - 系统配置 - 全7大分类（basic/points/notification/security/marketplace/backpack/redemption）
  * - 活动关联配置项使用下拉选择器
  * - 提醒规则
  * - 审计日志

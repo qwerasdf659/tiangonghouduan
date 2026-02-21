@@ -291,7 +291,7 @@
               <span>履约进度</span>
               <span x-text="fulfillmentTracking.completed_count + fulfillmentTracking.shipped_count + ' / ' + fulfillmentTracking.total_orders + ' 已处理'">0 / 0</span>
             </div>
-            <!-- 后端 ExchangeRecord 状态枚举: pending / completed / shipped / cancelled -->
+            <!-- 后端 ExchangeRecord 状态枚举: pending / approved / shipped / received / rated / rejected / refunded / cancelled / completed -->
             <div class="h-4 bg-gray-200 rounded-full overflow-hidden flex" x-show="fulfillmentTracking.total_orders > 0">
               <div class="bg-green-500 transition-all" :style="'width:' + (fulfillmentTracking.completed_count / fulfillmentTracking.total_orders * 100) + '%'" title="已完成"></div>
               <div class="bg-blue-500 transition-all" :style="'width:' + (fulfillmentTracking.shipped_count / fulfillmentTracking.total_orders * 100) + '%'" title="已发货"></div>
@@ -406,6 +406,39 @@
                 <p class="text-xs themed-text-muted mt-1">支持 JPG/PNG/GIF/WebP，最大 5MB</p>
               </div>
             </div>
+          </div>
+          <!-- 详情图上传区域（多图支持，最多9张） -->
+          <div x-show="editingItemId">
+            <label class="block text-sm font-medium themed-text-secondary mb-1">详情图 <span class="text-xs themed-text-muted">(选填，最多9张，用于商品详情页展示)</span></label>
+            <div class="grid grid-cols-5 gap-2 mb-2">
+              <!-- 已上传的详情图 -->
+              <template x-for="(img, idx) in detailImages" :key="img.image_resource_id">
+                <div class="relative group w-full aspect-square border rounded-lg overflow-hidden bg-gray-50">
+                  <img :src="img.url" class="w-full h-full object-cover" />
+                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                    <button type="button" @click="moveDetailImage(idx, 'up')" x-show="idx > 0"
+                            class="w-6 h-6 bg-white/80 rounded text-xs hover:bg-white" title="上移">←</button>
+                    <button type="button" @click="moveDetailImage(idx, 'down')" x-show="idx < detailImages.length - 1"
+                            class="w-6 h-6 bg-white/80 rounded text-xs hover:bg-white" title="下移">→</button>
+                    <button type="button" @click="removeDetailImage(img.image_resource_id)"
+                            class="w-6 h-6 bg-red-500/80 text-white rounded text-xs hover:bg-red-600" title="删除">✕</button>
+                  </div>
+                  <span class="absolute top-1 left-1 bg-black/50 text-white text-xs px-1 rounded" x-text="idx + 1"></span>
+                </div>
+              </template>
+              <!-- 添加按钮（未满9张时显示） -->
+              <div x-show="detailImages.length < 9"
+                   class="w-full aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-colors">
+                <label class="flex flex-col items-center cursor-pointer w-full h-full justify-center">
+                  <span x-show="!detailImageUploading" class="text-gray-400 text-xl">+</span>
+                  <span x-show="!detailImageUploading" class="text-xs text-gray-400 mt-1">添加</span>
+                  <span x-show="detailImageUploading" class="text-gray-400 text-sm">⏳</span>
+                  <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden"
+                         @change="uploadDetailImage($event)" :disabled="detailImageUploading">
+                </label>
+              </div>
+            </div>
+            <p class="text-xs themed-text-muted">已上传 <span x-text="detailImages.length">0</span>/9 张 · 拖拽图片缩略图可排序 · 支持 JPG/PNG/GIF/WebP，最大 5MB</p>
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div>

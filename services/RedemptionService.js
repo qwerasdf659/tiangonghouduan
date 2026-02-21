@@ -12,7 +12,7 @@
  *    - 验证物品实例状态（available）
  *    - 生成12位Base32核销码
  *    - 计算SHA-256哈希
- *    - 创建订单记录（status = pending, expires_at = now + 30天）
+ *    - 创建订单记录（status = pending, expires_at = now + 配置天数）
  *    - 返回明文码（仅一次）
  * 2. 核销订单（fulfillOrder）：
  *    - 验证核销码格式
@@ -34,7 +34,7 @@
  * 最后更新：2026年01月05日（事务边界治理改造）
  */
 
-const { sequelize, RedemptionOrder, ItemInstance, User } = require('../models')
+const { sequelize, RedemptionOrder, ItemInstance, User, StoreStaff } = require('../models')
 const RedemptionCodeGenerator = require('../utils/RedemptionCodeGenerator')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
@@ -72,7 +72,7 @@ class RedemptionService {
    * @example
    * const result = await RedemptionService.createOrder(123, { transaction, creator_user_id: 456 })
    * logger.info('核销码:', result.code) // '3K7J-2MQP-WXYZ'
-   * logger.info('订单ID:', result.order.order_id)
+   * logger.info('订单ID:', result.order.redemption_order_id)
    * logger.info('过期时间:', result.order.expires_at)
    */
   static async createOrder(item_instance_id, options = {}) {
@@ -108,7 +108,7 @@ class RedemptionService {
     if (existingOrder) {
       logger.warn('物品已有pending核销订单，拒绝重复创建', {
         item_instance_id,
-        existing_order_id: existingOrder.order_id,
+        existing_order_id: existingOrder.redemption_order_id,
         creator_user_id
       })
       throw new Error('该物品已有待核销订单，请勿重复生成核销码')
@@ -162,9 +162,19 @@ class RedemptionService {
 
     const codeHash = RedemptionCodeGenerator.hash(code)
 
-    // 3. 计算过期时间（30天后）
+    // 3. 计算过期时间（从 SystemSettings 读取可配置有效期，决策9/P8）
+    const AdminSystemService = require('./AdminSystemService')
+    const itemType = item.item_type || 'product'
+    const settingKey =
+      itemType === 'voucher' ? 'default_expiry_days_voucher' : 'default_expiry_days_product'
+    const expiryDays = await AdminSystemService.getSettingValue(
+      'redemption',
+      settingKey,
+      itemType === 'voucher' ? 30 : 7
+    )
+
     const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + 30)
+    expiresAt.setDate(expiresAt.getDate() + Number(expiryDays))
 
     // 4. 创建订单记录
     const order = await RedemptionOrder.create(
@@ -179,22 +189,22 @@ class RedemptionService {
 
     /*
      * 5. 立即锁定物品实例（防止码已发出但物品被转让/重复生成码）
-     * 方案B升级：使用多级锁定机制，redemption 锁有效期 30 天
+     * 方案B升级：使用多级锁定机制，redemption 锁有效期与核销码一致
      */
-    await item.lock(order.order_id, 'redemption', expiresAt, {
+    await item.lock(order.redemption_order_id, 'redemption', expiresAt, {
       transaction,
       reason: '兑换订单锁定'
     })
 
     logger.info('物品已锁定', {
       item_instance_id,
-      order_id: order.order_id,
+      order_id: order.redemption_order_id,
       lock_type: 'redemption',
       expires_at: expiresAt
     })
 
     logger.info('兑换订单创建成功', {
-      order_id: order.order_id,
+      order_id: order.redemption_order_id,
       item_instance_id,
       expires_at: expiresAt,
       item_locked: true
@@ -222,15 +232,15 @@ class RedemptionService {
    * @param {number} redeemer_user_id - 核销用户ID
    * @param {Object} options - 事务选项
    * @param {Object} options.transaction - Sequelize事务对象（必填）
+   * @param {number} [options.store_id] - 核销门店ID（可选，不传则自动匹配 store_staff）
+   * @param {number} [options.staff_id] - 核销员工ID（可选，不传则自动匹配 store_staff）
    * @returns {Promise<RedemptionOrder>} 核销后的订单对象
    * @throws {Error} 核销码格式错误、订单不存在、订单已使用、订单已过期等
    *
    * @example
    * const order = await RedemptionService.fulfillOrder('3K7J-2MQP-WXYZ', 123, { transaction })
-   * logger.info('核销成功:', order.order_id)
    */
   static async fulfillOrder(code, redeemer_user_id, options = {}) {
-    // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'RedemptionService.fulfillOrder')
 
     logger.info('开始核销订单', {
@@ -254,7 +264,7 @@ class RedemptionService {
           as: 'item_instance'
         }
       ],
-      lock: transaction.LOCK.UPDATE, // 行锁，防止并发核销
+      lock: transaction.LOCK.UPDATE,
       transaction
     })
 
@@ -277,22 +287,51 @@ class RedemptionService {
 
     // 4. 检查是否超过有效期
     if (order.isExpired()) {
-      // 自动标记为过期
       await order.update({ status: 'expired' }, { transaction })
       throw new Error('核销码已超过有效期')
     }
 
-    // 5. 更新订单状态
+    // 5. 门店关联：自动查询核销人的 store_staff 绑定关系（决策8/P6）
+    let fulfilledStoreId = options.store_id || null
+    let fulfilledByStaffId = options.staff_id || null
+
+    if (!fulfilledStoreId || !fulfilledByStaffId) {
+      const staffRecord = await StoreStaff.findOne({
+        where: {
+          user_id: redeemer_user_id,
+          status: 'active'
+        },
+        transaction
+      })
+
+      if (staffRecord) {
+        fulfilledStoreId = fulfilledStoreId || staffRecord.store_id
+        fulfilledByStaffId = fulfilledByStaffId || staffRecord.store_staff_id
+        logger.info('自动匹配门店信息', {
+          store_id: fulfilledStoreId,
+          staff_id: fulfilledByStaffId,
+          role_in_store: staffRecord.role_in_store
+        })
+      } else {
+        logger.info('核销人无活跃 store_staff 记录，门店字段为空', {
+          redeemer_user_id
+        })
+      }
+    }
+
+    // 6. 更新订单状态
     await order.update(
       {
         status: 'fulfilled',
         redeemer_user_id,
-        fulfilled_at: new Date()
+        fulfilled_at: new Date(),
+        fulfilled_store_id: fulfilledStoreId,
+        fulfilled_by_staff_id: fulfilledByStaffId
       },
       { transaction }
     )
 
-    // 6. 使用 ItemService.consumeItem() 消耗物品实例（自动记录事件）
+    // 7. 使用 ItemService.consumeItem() 消耗物品实例
     if (order.item_instance) {
       const ItemService = require('./asset/ItemService')
       await ItemService.consumeItem(
@@ -300,11 +339,12 @@ class RedemptionService {
           item_instance_id: order.item_instance.item_instance_id,
           operator_user_id: redeemer_user_id,
           business_type: 'redemption_use',
-          idempotency_key: order.order_id,
-          // meta 元数据（用于审计追溯）
+          idempotency_key: order.redemption_order_id,
           meta: {
-            order_id: order.order_id,
+            order_id: order.redemption_order_id,
             redeemer_user_id,
+            store_id: fulfilledStoreId,
+            staff_id: fulfilledByStaffId,
             name: order.item_instance.meta?.name
           }
         },
@@ -313,8 +353,10 @@ class RedemptionService {
     }
 
     logger.info('核销成功', {
-      order_id: order.order_id,
-      redeemer_user_id
+      order_id: order.redemption_order_id,
+      redeemer_user_id,
+      store_id: fulfilledStoreId,
+      staff_id: fulfilledByStaffId
     })
 
     return order
@@ -433,12 +475,12 @@ class RedemptionService {
     }
 
     // 2. 批量更新订单状态为expired
-    const orderIds = expiredOrders.map(order => order.order_id)
+    const orderIds = expiredOrders.map(order => order.redemption_order_id)
     await RedemptionOrder.update(
       { status: 'expired' },
       {
         where: {
-          order_id: orderIds
+          redemption_order_id: orderIds
         },
         transaction
       }
@@ -451,10 +493,10 @@ class RedemptionService {
     let unlockedCount = 0
     for (const order of expiredOrders) {
       if (order.item_instance) {
-        const existingLock = order.item_instance.getLockById(order.order_id)
+        const existingLock = order.item_instance.getLockById(order.redemption_order_id)
         if (existingLock && existingLock.lock_type === 'redemption') {
           // eslint-disable-next-line no-await-in-loop -- 批量解锁需要在事务内串行执行
-          await order.item_instance.unlock(order.order_id, 'redemption', { transaction })
+          await order.item_instance.unlock(order.redemption_order_id, 'redemption', { transaction })
           unlockedCount++
         }
       }
@@ -559,9 +601,8 @@ class RedemptionService {
    * })
    */
   static async adminFulfillOrderById(order_id, options = {}) {
-    // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'RedemptionService.adminFulfillOrderById')
-    const { admin_user_id, store_id, remark } = options
+    const { admin_user_id, store_id, staff_id, remark } = options
 
     if (!admin_user_id) {
       throw new Error('admin_user_id 是必填参数')
@@ -605,22 +646,42 @@ class RedemptionService {
 
     // 3. 检查是否超过有效期
     if (order.isExpired()) {
-      // 自动标记为过期
       await order.update({ status: 'expired' }, { transaction })
       throw new Error('订单已超过有效期')
     }
 
-    // 4. 执行核销
+    // 4. 门店关联：自动查询核销人的 store_staff 绑定关系
+    let fulfilledStoreId = store_id || null
+    let fulfilledByStaffId = staff_id || null
+
+    if (!fulfilledStoreId || !fulfilledByStaffId) {
+      const staffRecord = await StoreStaff.findOne({
+        where: {
+          user_id: admin_user_id,
+          status: 'active'
+        },
+        transaction
+      })
+
+      if (staffRecord) {
+        fulfilledStoreId = fulfilledStoreId || staffRecord.store_id
+        fulfilledByStaffId = fulfilledByStaffId || staffRecord.store_staff_id
+      }
+    }
+
+    // 5. 执行核销
     await order.update(
       {
         status: 'fulfilled',
         redeemer_user_id: admin_user_id,
-        fulfilled_at: new Date()
+        fulfilled_at: new Date(),
+        fulfilled_store_id: fulfilledStoreId,
+        fulfilled_by_staff_id: fulfilledByStaffId
       },
       { transaction }
     )
 
-    // 5. 使用 ItemService.consumeItem() 消耗物品实例（自动记录事件）
+    // 6. 使用 ItemService.consumeItem() 消耗物品实例
     if (order.item_instance) {
       const ItemService = require('./asset/ItemService')
       await ItemService.consumeItem(
@@ -628,11 +689,12 @@ class RedemptionService {
           item_instance_id: order.item_instance.item_instance_id,
           operator_user_id: admin_user_id,
           business_type: 'admin_redemption_fulfill',
-          idempotency_key: `admin_fulfill_${order.order_id}`,
+          idempotency_key: `admin_fulfill_${order.redemption_order_id}`,
           meta: {
-            order_id: order.order_id,
+            order_id: order.redemption_order_id,
             admin_user_id,
-            store_id,
+            store_id: fulfilledStoreId,
+            staff_id: fulfilledByStaffId,
             remark,
             name: order.item_instance.meta?.name
           }
@@ -642,9 +704,10 @@ class RedemptionService {
     }
 
     logger.info('管理员核销订单成功', {
-      order_id: order.order_id,
+      order_id: order.redemption_order_id,
       admin_user_id,
-      store_id,
+      store_id: fulfilledStoreId,
+      staff_id: fulfilledByStaffId,
       remark
     })
 
@@ -733,7 +796,7 @@ class RedemptionService {
     }
 
     logger.info('管理员取消订单成功', {
-      order_id: order.order_id,
+      order_id: order.redemption_order_id,
       admin_user_id,
       reason,
       item_unlocked: true
@@ -874,7 +937,7 @@ class RedemptionService {
     // 1. 查找所有符合条件的 pending 订单
     const orders = await RedemptionOrder.findAll({
       where: {
-        order_id: order_ids,
+        redemption_order_id: order_ids,
         status: 'pending'
       },
       include: [
@@ -893,11 +956,11 @@ class RedemptionService {
     }
 
     // 2. 批量更新订单状态为 expired
-    const validOrderIds = orders.map(order => order.order_id)
+    const validOrderIds = orders.map(order => order.redemption_order_id)
     await RedemptionOrder.update(
       { status: 'expired' },
       {
-        where: { order_id: validOrderIds },
+        where: { redemption_order_id: validOrderIds },
         transaction
       }
     )
@@ -906,10 +969,10 @@ class RedemptionService {
     let unlockedCount = 0
     for (const order of orders) {
       if (order.item_instance) {
-        const existingLock = order.item_instance.getLockById(order.order_id)
+        const existingLock = order.item_instance.getLockById(order.redemption_order_id)
         if (existingLock && existingLock.lock_type === 'redemption') {
           // eslint-disable-next-line no-await-in-loop -- 批量解锁需要在事务内串行执行
-          await order.item_instance.unlock(order.order_id, 'redemption', { transaction })
+          await order.item_instance.unlock(order.redemption_order_id, 'redemption', { transaction })
           unlockedCount++
         }
       }

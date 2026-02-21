@@ -613,7 +613,7 @@ export function useStrategySimulationMethods() {
         })
         const data = response?.success ? response.data : response
         const idx = this.simulation_history.findIndex(
-          h => (h.lottery_simulation_record_id || h.id) === record_id
+          h => h.lottery_simulation_record_id === record_id
         )
         if (idx >= 0) {
           this.simulation_history[idx].drift_result = data

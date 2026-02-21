@@ -56,7 +56,11 @@ export function useExchangeItemsState() {
     /** @type {string|null} 商品图片预览 URL（上传后由后端返回） */
     itemImagePreviewUrl: null,
     /** @type {boolean} 图片上传中 */
-    imageUploading: false
+    imageUploading: false,
+    /** @type {Array<Object>} 商品详情图列表（多图支持） */
+    detailImages: [],
+    /** @type {boolean} 详情图上传中 */
+    detailImageUploading: false
   }
 }
 
@@ -180,6 +184,7 @@ export function useExchangeItemsMethods() {
         free_shipping: false
       }
       this.itemImagePreviewUrl = null
+      this.detailImages = []
       this.showModal('itemModal')
     },
 
@@ -207,6 +212,7 @@ export function useExchangeItemsMethods() {
         free_shipping: !!item.free_shipping
       }
       this.itemImagePreviewUrl = item.primary_image?.thumbnail_url || item.primary_image?.url || null
+      this.loadDetailImages(item.exchange_item_id)
       this.showModal('itemModal')
     },
 
@@ -306,6 +312,169 @@ export function useExchangeItemsMethods() {
       } finally {
         this.imageUploading = false
       }
+    },
+
+    /**
+     * 上传商品详情图（多图支持，最多9张）
+     *
+     * @param {Event} event - 文件选择事件
+     * @description 上传详情图到 Sealos，绑定到当前编辑商品的 context_id
+     */
+    async uploadDetailImage(event) {
+      const file = event.target.files?.[0]
+      if (!file) return
+
+      if (this.detailImages.length >= 9) {
+        this.showError?.('详情图最多9张')
+        return
+      }
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+      if (!allowedTypes.includes(file.type)) {
+        this.showError?.('仅支持 JPG/PNG/GIF/WebP 格式')
+        return
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        this.showError?.('图片大小不能超过 5MB')
+        return
+      }
+
+      try {
+        this.detailImageUploading = true
+        const formData = new FormData()
+        formData.append('image', file)
+        formData.append('business_type', 'exchange')
+        formData.append('category', 'detail')
+        if (this.editingItemId) {
+          formData.append('context_id', String(this.editingItemId))
+        }
+        formData.append('sort_order', String(this.detailImages.length + 1))
+
+        const token = localStorage.getItem('token')
+        const response = await fetch(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData
+        })
+        const res = await response.json()
+
+        if (res.success && res.data) {
+          this.detailImages.push({
+            image_resource_id: res.data.image_resource_id,
+            url: res.data.url || res.data.image_url,
+            sort_order: this.detailImages.length + 1
+          })
+          this.showSuccess?.('详情图上传成功')
+        } else {
+          this.showError?.(res.message || '详情图上传失败')
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 详情图上传失败:', e)
+        this.showError?.('详情图上传失败')
+      } finally {
+        this.detailImageUploading = false
+        // 清空 input 以允许重复选择同一文件
+        if (event.target) event.target.value = ''
+      }
+    },
+
+    /**
+     * 加载商品的详情图列表
+     *
+     * @param {number} contextId - 商品 exchange_item_id
+     */
+    async loadDetailImages(contextId) {
+      if (!contextId) {
+        this.detailImages = []
+        return
+      }
+
+      try {
+        const token = localStorage.getItem('token')
+        const url = `${SYSTEM_ADMIN_ENDPOINTS.IMAGE_LIST}?business_type=exchange&context_id=${contextId}&category=detail`
+        const response = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const res = await response.json()
+
+        if (res.success && res.data?.images) {
+          this.detailImages = res.data.images.map(img => ({
+            image_resource_id: img.image_resource_id,
+            url: img.public_url || img.url,
+            sort_order: img.sort_order || 0
+          }))
+        } else {
+          this.detailImages = []
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 加载详情图失败:', e)
+        this.detailImages = []
+      }
+    },
+
+    /**
+     * 删除一张详情图
+     *
+     * @param {number} imageId - 图片资源 ID
+     */
+    async removeDetailImage(imageId) {
+      const confirmed = await this.$confirm?.('确定要删除此详情图吗？')
+      if (!confirmed) return
+
+      try {
+        const token = localStorage.getItem('token')
+        const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.IMAGE_DELETE, { id: imageId })
+        const response = await fetch(url, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const res = await response.json()
+
+        if (res.success) {
+          this.detailImages = this.detailImages.filter(img => img.image_resource_id !== imageId)
+          this.showSuccess?.('详情图已删除')
+        } else {
+          this.showError?.(res.message || '删除失败')
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 删除详情图失败:', e)
+        this.showError?.('删除详情图失败')
+      }
+    },
+
+    /**
+     * 移动详情图排序（上移/下移）
+     *
+     * @param {number} index - 当前位置索引
+     * @param {string} direction - 'up' 或 'down'
+     */
+    async moveDetailImage(index, direction) {
+      const newIndex = direction === 'up' ? index - 1 : index + 1
+      if (newIndex < 0 || newIndex >= this.detailImages.length) return
+
+      // 交换位置
+      const temp = this.detailImages[index]
+      this.detailImages[index] = this.detailImages[newIndex]
+      this.detailImages[newIndex] = temp
+
+      // 更新 sort_order（异步，不阻塞UI）
+      this.detailImages.forEach(async (img, i) => {
+        img.sort_order = i + 1
+        try {
+          const token = localStorage.getItem('token')
+          const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPDATE || `${SYSTEM_ADMIN_ENDPOINTS.IMAGE_LIST}/${img.image_resource_id}`, { id: img.image_resource_id })
+          await fetch(url, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ sort_order: i + 1 })
+          })
+        } catch (e) {
+          logger.warn('[ExchangeItems] 更新排序失败:', e)
+        }
+      })
     },
 
     /**

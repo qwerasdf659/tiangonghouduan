@@ -55,7 +55,7 @@ describe('AnnouncementService - 公告通知服务测试', () => {
     if (created_announcement_ids.length > 0) {
       await SystemAnnouncement.destroy({
         where: {
-          announcement_id: created_announcement_ids
+          system_announcement_id: created_announcement_ids
         }
       })
       created_announcement_ids.length = 0 // 清空数组
@@ -222,13 +222,13 @@ describe('AnnouncementService - 公告通知服务测试', () => {
         const result = await AnnouncementService.createAnnouncement(testData, testUserId)
 
         // 记录ID用于清理
-        if (result && result.announcement_id) {
-          created_announcement_ids.push(result.announcement_id)
+        if (result && result.system_announcement_id) {
+          created_announcement_ids.push(result.system_announcement_id)
         }
 
         // 断言：返回公告对象
         expect(result).toBeDefined()
-        expect(result.announcement_id).toBeDefined()
+        expect(result.system_announcement_id).toBeDefined()
         expect(result.title).toContain('测试公告')
         expect(result.type).toBe('notice')
         expect(result.priority).toBe('medium')
@@ -263,7 +263,7 @@ describe('AnnouncementService - 公告通知服务测试', () => {
           },
           testUserId
         )
-        test_announcement_id = announcement.announcement_id
+        test_announcement_id = announcement.system_announcement_id
         created_announcement_ids.push(test_announcement_id)
       })
 
@@ -304,7 +304,7 @@ describe('AnnouncementService - 公告通知服务测试', () => {
           testUserId
         )
 
-        const announcement_id = announcement.announcement_id
+        const announcement_id = announcement.system_announcement_id
 
         // 执行：删除公告
         const result = await AnnouncementService.deleteAnnouncement(announcement_id)
@@ -339,8 +339,8 @@ describe('AnnouncementService - 公告通知服务测试', () => {
             },
             testUserId
           )
-          announcement_ids.push(announcement.announcement_id)
-          created_announcement_ids.push(announcement.announcement_id)
+          announcement_ids.push(announcement.system_announcement_id)
+          created_announcement_ids.push(announcement.system_announcement_id)
         }
 
         // 执行：批量停用

@@ -84,6 +84,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
     const item_data = {
       owner_user_id,
       item_template_id: testItemTemplate?.item_template_id || null,
+      item_type: 'tradable_item',
       status: options.status || 'available',
       meta: options.meta || {
         name: `挂牌生命周期测试物品_${Date.now()}`,

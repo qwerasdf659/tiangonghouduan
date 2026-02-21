@@ -39,6 +39,8 @@ export function useCarouselItemsState() {
     carouselImageFile: null,
     /** 轮播图图片预览URL */
     carouselImagePreview: '',
+    /** 图片比例校验警告信息（空字符串表示匹配，非空表示有偏差） */
+    carouselImageRatioWarning: '',
     /** 轮播图筛选 */
     carouselFilters: { position: '', status: '' },
     /** 轮播图统计 */
@@ -153,11 +155,26 @@ export function useCarouselItemsMethods() {
 
       this.carouselImageFile = file
       this.carouselImagePreview = URL.createObjectURL(file)
+
+      // 图片比例校验：读取实际尺寸与所选 display_mode 对比（复用弹窗管理的比例范围定义）
+      const img = new Image()
+      img.onload = () => {
+        this.carouselImageRatioWarning = this.checkCarouselImageRatio(
+          this.carouselForm.display_mode,
+          img.naturalWidth,
+          img.naturalHeight
+        )
+        if (this.carouselImageRatioWarning) {
+          logger.warn('轮播图图片比例偏差:', this.carouselImageRatioWarning)
+        }
+      }
+      img.src = this.carouselImagePreview
       logger.info('轮播图图片已选择:', file.name)
     },
 
     clearCarouselImage() {
       this.carouselImageFile = null
+      this.carouselImageRatioWarning = ''
       if (this.carouselImagePreview) {
         URL.revokeObjectURL(this.carouselImagePreview)
         this.carouselImagePreview = ''
@@ -186,7 +203,9 @@ export function useCarouselItemsMethods() {
       this.saving = true
       try {
         const url = this.isEditMode
-          ? buildURL(SYSTEM_ENDPOINTS.CAROUSEL_ITEM_UPDATE, { id: this.carouselForm.carousel_item_id })
+          ? buildURL(SYSTEM_ENDPOINTS.CAROUSEL_ITEM_UPDATE, {
+              id: this.carouselForm.carousel_item_id
+            })
           : SYSTEM_ENDPOINTS.CAROUSEL_ITEM_CREATE
         const method = this.isEditMode ? 'PUT' : 'POST'
 
@@ -199,7 +218,8 @@ export function useCarouselItemsMethods() {
         formData.append('link_url', this.carouselForm.link_url || '')
         formData.append('link_type', this.carouselForm.link_type || 'none')
         formData.append('slide_interval_ms', String(this.carouselForm.slide_interval_ms || 3000))
-        if (this.carouselForm.start_time) formData.append('start_time', this.carouselForm.start_time)
+        if (this.carouselForm.start_time)
+          formData.append('start_time', this.carouselForm.start_time)
         if (this.carouselForm.end_time) formData.append('end_time', this.carouselForm.end_time)
 
         if (this.carouselImageFile) {
@@ -255,6 +275,27 @@ export function useCarouselItemsMethods() {
       if (item.image_url) window.open(item.image_url, '_blank')
     },
 
+    /**
+     * 校验图片比例与所选模板的匹配度（与弹窗管理 checkImageRatio 保持一致的比例范围定义）
+     * @param {string} displayMode - 显示模式
+     * @param {number} width - 图片宽度
+     * @param {number} height - 图片高度
+     * @returns {string} 警告信息，空字符串表示匹配
+     */
+    checkCarouselImageRatio(displayMode, width, height) {
+      if (!displayMode || !width || !height) return ''
+      const ranges = {
+        wide: { min: 1.6, max: 2.0, label: '16:9 宽屏' },
+        horizontal: { min: 1.3, max: 1.6, label: '3:2 横版' },
+        square: { min: 0.85, max: 1.3, label: '1:1 方图' }
+      }
+      const range = ranges[displayMode]
+      if (!range) return ''
+      const ratio = width / height
+      if (ratio >= range.min && ratio <= range.max) return ''
+      return `当前图片比例 ${ratio.toFixed(2)}:1，与${range.label}模板有偏差，展示时可能被裁切`
+    },
+
     getCarouselAspectStyle(displayMode) {
       const ratios = { wide: '16/9', horizontal: '3/2', square: '1/1' }
       const ratio = ratios[displayMode] || '16/9'
@@ -279,9 +320,13 @@ export function useCarouselItemsMethods() {
       this.carouselShowStatsLoading = true
       try {
         const params = new URLSearchParams()
-        if (this.carouselShowStatsDateRange.start_date) params.append('start_date', this.carouselShowStatsDateRange.start_date)
-        if (this.carouselShowStatsDateRange.end_date) params.append('end_date', this.carouselShowStatsDateRange.end_date)
-        const url = buildURL(SYSTEM_ENDPOINTS.CAROUSEL_ITEM_SHOW_STATS, { id: this.carouselShowStatsTarget.carousel_item_id })
+        if (this.carouselShowStatsDateRange.start_date)
+          params.append('start_date', this.carouselShowStatsDateRange.start_date)
+        if (this.carouselShowStatsDateRange.end_date)
+          params.append('end_date', this.carouselShowStatsDateRange.end_date)
+        const url = buildURL(SYSTEM_ENDPOINTS.CAROUSEL_ITEM_SHOW_STATS, {
+          id: this.carouselShowStatsTarget.carousel_item_id
+        })
         const response = await this.apiGet(`${url}?${params}`)
         if (response?.success) {
           this.carouselShowStats = response.data || {}

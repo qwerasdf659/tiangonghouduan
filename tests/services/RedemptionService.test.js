@@ -119,7 +119,7 @@ describe('RedemptionService - 兑换订单服务', () => {
 
       // 验证订单
       const order = result.order
-      expect(order.order_id).toBeDefined()
+      expect(order.redemption_order_id).toBeDefined()
       expect(order.item_instance_id).toBe(test_item_instance.item_instance_id)
       expect(order.status).toBe('pending')
       expect(order.expires_at).toBeDefined()
@@ -272,7 +272,7 @@ describe('RedemptionService - 兑换订单服务', () => {
     it('应该成功取消待核销的订单', async () => {
       // 执行取消（使用事务包裹）
       const cancelled_order = await TransactionManager.execute(async transaction => {
-        return await RedemptionService.cancelOrder(test_order.order_id, { transaction })
+        return await RedemptionService.cancelOrder(test_order.redemption_order_id, { transaction })
       })
 
       // 验证订单状态
@@ -288,7 +288,9 @@ describe('RedemptionService - 兑换订单服务', () => {
       // 尝试取消（应该失败）
       await expect(
         TransactionManager.execute(async transaction => {
-          return await RedemptionService.cancelOrder(test_order.order_id, { transaction })
+          return await RedemptionService.cancelOrder(test_order.redemption_order_id, {
+            transaction
+          })
         })
       ).rejects.toThrow(/只能取消pending状态的订单|订单已核销，不能取消/)
     })

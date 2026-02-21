@@ -81,6 +81,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
     const item_data = {
       owner_user_id,
       item_template_id: testItemTemplate?.item_template_id || null,
+      item_type: 'tradable_item',
       status: options.status || 'available',
       meta: options.meta || {
         name: `生命周期测试物品_${Date.now()}`,

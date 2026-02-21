@@ -103,12 +103,11 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       })
     })
 
-    test('B-5-1-5 普通用户（public）输出统一 id 字段（商业安全：防抓包推断表结构）', () => {
+    test('B-5-1-5 普通用户（public）输出描述性 prize_id 字段（行业标准：{entity}_id）', () => {
       const result = DataSanitizer.sanitizePrizes(mockPrizes, 'public')
 
       result.forEach(prize => {
-        // 输出统一 id 字段，隐藏真实主键名 lottery_prize_id
-        expect(prize).toHaveProperty('id')
+        expect(prize).toHaveProperty('prize_id')
         expect(prize).toHaveProperty('prize_name')
         expect(prize).toHaveProperty('prize_type')
         expect(prize).toHaveProperty('prize_value')
@@ -124,11 +123,11 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       expect(result.length).toBe(mockPrizes.length)
     })
 
-    test('B-5-1-7 普通用户（public）id 映射自数据库 lottery_prize_id', () => {
+    test('B-5-1-7 普通用户（public）prize_id 映射自数据库 lottery_prize_id', () => {
       const result = DataSanitizer.sanitizePrizes(mockPrizes, 'public')
 
       result.forEach((prize, index) => {
-        expect(prize.id).toBe(mockPrizes[index].lottery_prize_id)
+        expect(prize.prize_id).toBe(mockPrizes[index].lottery_prize_id)
         expect(prize.prize_name).toBe(mockPrizes[index].prize_name)
         expect(prize.prize_type).toBe(mockPrizes[index].prize_type)
       })
@@ -209,8 +208,8 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
   describe('B-5-3 用户数据脱敏（sanitizeUser）', () => {
     const mockUser = {
       user_id: 1,
-      username: 'testuser',
-      display_name: '测试用户',
+      nickname: '测试用户',
+      avatar_url: 'https://example.com/avatar.jpg',
       mobile: '13612227930',
       role: 'admin',
       permissions: ['manage_users', 'manage_prizes'],
@@ -222,7 +221,6 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
         frozen_points: 100,
         total_points: 1100
       },
-      avatar: 'https://example.com/avatar.jpg',
       created_at: '2026-01-01T00:00:00.000Z'
     }
 
@@ -244,14 +242,21 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       expect(result).not.toHaveProperty('admin_flags')
     })
 
-    test('B-5-3-4 普通用户（public）可见基础信息', () => {
+    test('B-5-3-4 普通用户（public）可见基础信息（γ 模式：使用 DB 真实字段名）', () => {
       const result = DataSanitizer.sanitizeUser(mockUser, 'public')
 
-      expect(result.id).toBe(1)
-      expect(result.display_name).toBe('测试用户')
+      expect(result.user_id).toBe(1)
+      expect(result.nickname).toBe('测试用户')
+      expect(result.avatar_url).toBe('https://example.com/avatar.jpg')
       expect(result.can_lottery).toBe(true)
       expect(result.can_exchange).toBe(true)
       expect(result.points_account).toBeDefined()
+    })
+
+    test('B-5-3-4b 普通用户（public）不可见 mobile', () => {
+      const result = DataSanitizer.sanitizeUser(mockUser, 'public')
+
+      expect(result).not.toHaveProperty('mobile')
     })
 
     test('B-5-3-5 管理员（full）可见完整数据', () => {
@@ -380,11 +385,10 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       expect(result[0]).not.toHaveProperty('escalation_reasons')
     })
 
-    test('B-5-6-3 普通用户（public）可见基础会话信息', () => {
+    test('B-5-6-3 普通用户（public）可见基础会话信息（session_id 剥离 customer_service_ 前缀）', () => {
       const result = DataSanitizer.sanitizeChatSessions(mockSessions, 'public')
 
-      // sanitizeChatSessions 当前使用通用 id 字段（映射自 customer_service_session_id）
-      expect(result[0].id).toBe('session-001')
+      expect(result[0].session_id).toBe('session-001')
       expect(result[0].status).toBe('active')
     })
 
@@ -402,9 +406,10 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
    * 安全要求：admin_id、internal_notes、target_groups 不对外暴露
    */
   describe('B-5-7 公告数据脱敏（sanitizeAnnouncements）', () => {
+    // Mock 数据模拟 Sequelize toJSON() 输出，主键字段名为 system_announcement_id（数据库实际列名）
     const mockAnnouncements = [
       {
-        announcement_id: 1,
+        system_announcement_id: 1,
         title: '系统公告',
         content: '公告内容',
         type: 'notice',
@@ -441,17 +446,25 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       expect(result[0]).not.toHaveProperty('target_groups')
     })
 
-    test('B-5-7-4 普通用户（public）使用通用 id 字段', () => {
+    test('B-5-7-4 普通用户（public）使用 announcement_id 字段（映射自 system_announcement_id）', () => {
       const result = DataSanitizer.sanitizeAnnouncements(mockAnnouncements, 'public')
 
-      expect(result[0].id).toBe(1)
-      expect(result[0]).not.toHaveProperty('announcement_id')
+      // DataSanitizer 将 system_announcement_id 映射为 announcement_id（与 popup_banner_id 命名模式一致）
+      expect(result[0].announcement_id).toBe(1)
+      // public 级别不暴露数据库内部主键名
+      expect(result[0]).not.toHaveProperty('system_announcement_id')
     })
 
-    test('B-5-7-5 管理员（full）可见完整数据', () => {
+    test('B-5-7-5 管理员（full）可见完整数据且包含 announcement_id 映射', () => {
       const result = DataSanitizer.sanitizeAnnouncements(mockAnnouncements, 'full')
 
-      expect(result).toEqual(mockAnnouncements)
+      // full 级别：展开所有原始字段 + 添加 announcement_id（映射自 system_announcement_id）
+      expect(result[0].announcement_id).toBe(1)
+      expect(result[0].system_announcement_id).toBe(1)
+      // 管理员可见敏感字段
+      expect(result[0].admin_id).toBe(999)
+      expect(result[0].internal_notes).toBe('内部备注')
+      expect(result[0].target_groups).toEqual(['vip'])
     })
   })
 
@@ -516,7 +529,14 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       expect(result[0].reply.admin_name).toMatch(/^客服/)
     })
 
-    test('B-5-8-6 管理员（full）可见完整数据', () => {
+    test('B-5-8-6 普通用户（public）输出描述性 feedback_id 字段', () => {
+      const result = DataSanitizer.sanitizeFeedbacks(mockFeedbacks, 'public')
+
+      expect(result[0]).toHaveProperty('feedback_id')
+      expect(result[0].feedback_id).toBe(1)
+    })
+
+    test('B-5-8-7 管理员（full）可见完整数据', () => {
       const result = DataSanitizer.sanitizeFeedbacks(mockFeedbacks, 'full')
 
       expect(result).toEqual(mockFeedbacks)
@@ -561,11 +581,10 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       expect(result[0]).toHaveProperty('sold_count')
     })
 
-    test('B-5-9-3 普通用户（public）使用通用 id 字段', () => {
+    test('B-5-9-3 普通用户（public）使用描述性 exchange_item_id 字段', () => {
       const result = DataSanitizer.sanitizeExchangeMarketItems(mockItems, 'public')
 
-      expect(result[0].id).toBe(1)
-      expect(result[0]).not.toHaveProperty('exchange_item_id')
+      expect(result[0].exchange_item_id).toBe(1)
     })
 
     test('B-5-9-4 管理员（full）可见 cost_price 和 sold_count', () => {
@@ -668,13 +687,18 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       expect(DataSanitizer.getDisplayValue('invalid')).toBe('未知价值')
     })
 
-    test('getPublicSource 将内部来源转换为用户友好显示', () => {
-      expect(DataSanitizer.getPublicSource('lottery_win')).toBe('抽奖获得')
-      expect(DataSanitizer.getPublicSource('exchange')).toBe('商品兑换')
+    test('getPublicSource 将 V4 business_type 转换为中文显示', () => {
+      expect(DataSanitizer.getPublicSource('lottery_consume')).toBe('抽奖消耗')
+      expect(DataSanitizer.getPublicSource('lottery_reward')).toBe('抽奖奖励')
+      expect(DataSanitizer.getPublicSource('exchange_debit')).toBe('兑换扣款')
+      expect(DataSanitizer.getPublicSource('market_listing_freeze')).toBe('市场挂单冻结')
+      expect(DataSanitizer.getPublicSource('order_settle_seller_credit')).toBe('卖出收入')
+      expect(DataSanitizer.getPublicSource('admin_adjustment')).toBe('系统调整')
+      expect(DataSanitizer.getPublicSource('merchant_points_reward')).toBe('消费奖励')
       expect(DataSanitizer.getPublicSource('transfer')).toBe('用户转让')
-      expect(DataSanitizer.getPublicSource('manual')).toBe('系统奖励')
-      expect(DataSanitizer.getPublicSource('bonus')).toBe('奖励积分')
-      expect(DataSanitizer.getPublicSource('unknown')).toBe('其他来源')
+      expect(DataSanitizer.getPublicSource('test_grant')).toBe('测试操作')
+      expect(DataSanitizer.getPublicSource('unknown_type')).toBe('系统操作')
+      expect(DataSanitizer.getPublicSource(null)).toBe('系统操作')
     })
 
     test('maskUserName 脱敏用户名', () => {

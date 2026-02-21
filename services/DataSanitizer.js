@@ -21,9 +21,10 @@ const FORBIDDEN_FRONTEND_ASSET_CODES = ['BUDGET_POINTS']
  * - 根据用户权限级别（dataLevel）返回不同级别的数据
  * - 管理员（dataLevel='full'）：返回完整业务数据
  * - 普通用户（dataLevel='public'）：返回脱敏后的安全数据
- * - 统一主键字段映射为通用'id'，防止数据库结构暴露
+ * - 主键使用描述性 {entity}_id 命名（与阿里/腾讯/Stripe 行业标准对齐）
  * - 移除敏感商业信息（概率、成本、限制等）
- * - 过滤敏感字段（role、permissions、admin_flags等）
+ * - 过滤敏感字段（role、permissions、admin_flags 等）
+ * - PII 脱敏（maskUserName / maskAdminName）
  *
  * 🏛️ DataSanitizer 架构原则（2026-01-13 确立）：
  *
@@ -53,23 +54,18 @@ const FORBIDDEN_FRONTEND_ASSET_CODES = ['BUDGET_POINTS']
  *    - DataSanitizer 输出层不再返回 image/image_url
  *    - 前端必须通过 primary_image_id 获取图片资源
  *
- * 🔒 安全设计说明（重要）：
- * 1. 字段名保护：所有主键统一映射为通用'id'字段，防止数据库结构暴露
+ * 🔒 安全设计说明（2026-02-21 γ 模式升级）：
+ * 1. 主键使用描述性 {entity}_id（行业标准：阿里/腾讯/美团/Stripe 无一例外）
  * 2. 商业信息保护：移除概率、成本、限制等核心商业数据
- * 3. 敏感字段过滤：移除role、permissions、admin_flags等敏感字段
- * 4. 最小化原则：只返回业务必需的字段
+ * 3. 敏感字段过滤：移除 role、permissions、admin_flags 等敏感字段
+ * 4. PII 脱敏：maskUserName() / maskAdminName() 保护用户隐私
+ * 5. 禁止资产过滤：BUDGET_POINTS 等内部资产绝对禁止暴露
  *
- * ⚠️ 设计决策（安全优先）：
- * - 使用通用'id'而非具体字段名（如user_id、inventory_id、prize_id）
- * - 此设计有意偏离代码规范中的"全栈统一snake_case"要求
- * - 原因：防止用户通过抓包分析数据库结构和商业逻辑
- * - 决策：安全性优先于代码规范一致性
- *
- * 📊 安全评估：82/100（良好）
- * - 字段名保护：85/100
- * - 商业信息保护：90/100
- * - 敏感字段过滤：85/100
- * - 逆向工程难度：70/100
+ * ⚠️ γ 模式职责边界（2026-02-21 确立）：
+ * - DataSanitizer 只做减法：删除敏感字段、脱敏 PII、主键前缀统一
+ * - DataSanitizer 不做加法或字段重命名（Service 层负责数据转换）
+ * - Service 层是白名单构造层（直接操作 Sequelize 模型，不会产生 ghost field）
+ * - DataSanitizer 是黑名单过滤层（从 Service 输出中删除敏感字段）
  */
 class DataSanitizer {
   /**
@@ -86,7 +82,7 @@ class DataSanitizer {
    * @param {Array<Object>} prizes - 奖品数据数组（来自 lottery_prizes 表的 Sequelize 查询结果）
    * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
    * @returns {Array<Object>} 脱敏后的奖品数组（字段名与 lottery_prizes 表一致）
-   * @returns {number} return[].lottery_prize_id - 奖品ID（数据库主键）
+   * @returns {number} return[].prize_id - 奖品ID（剥离 lottery_ 模块前缀，源自 lottery_prize_id）
    * @returns {number} return[].lottery_campaign_id - 关联活动ID
    * @returns {string} return[].prize_name - 奖品名称
    * @returns {string} return[].prize_type - 奖品类型（points/coupon/physical/virtual/service/product/special）
@@ -128,7 +124,7 @@ class DataSanitizer {
           // Sequelize 模型实例：通过 toSafeJSON 生成 Sealos URL
           const safeImage = imageData.toSafeJSON()
           image = {
-            id: safeImage.image_resource_id,
+            image_resource_id: safeImage.image_resource_id,
             url: safeImage.imageUrl,
             mime: safeImage.mime_type,
             thumbnail_url: safeImage.thumbnails?.small || safeImage.imageUrl
@@ -136,7 +132,7 @@ class DataSanitizer {
         } else if (imageData.file_path) {
           // 缓存还原的普通对象：直接用 ImageUrlHelper 生成 URL
           image = {
-            id: imageData.image_resource_id,
+            image_resource_id: imageData.image_resource_id,
             url: getImageUrl(imageData.file_path),
             mime: imageData.mime_type,
             thumbnail_url: imageData.thumbnail_paths?.small
@@ -147,7 +143,7 @@ class DataSanitizer {
       }
 
       return {
-        id: prize.lottery_prize_id,
+        prize_id: prize.lottery_prize_id,
         lottery_campaign_id: prize.lottery_campaign_id,
         prize_name: prize.prize_name,
         prize_type: prize.prize_type,
@@ -178,7 +174,11 @@ class DataSanitizer {
   }
 
   /**
-   * 库存管理数据脱敏 - 解决核销码泄露等安全风险（P0修复）
+   * 库存管理数据脱敏
+   *
+   * ⚠️ D2 决策（2026-02-21）：此方法当前不被任何路由调用。
+   * BackpackService 已是完整的领域转换层，背包列表和详情都直接使用 BackpackService 输出。
+   * 保留此方法以供未来需要额外脱敏层时使用。
    *
    * 业务场景：用户库存列表API响应时调用，防止用户通过抓包获取核销码、来源记录ID等敏感信息
    *
@@ -258,62 +258,48 @@ class DataSanitizer {
   }
 
   /**
-   * 用户认证数据脱敏 - 解决JWT权限信息泄露
+   * 用户认证数据脱敏（γ 模式：只做安全过滤，不做字段重命名）
    *
-   * 业务场景：用户信息API响应时调用，防止用户通过抓包获取其他用户的权限信息、管理员标识等敏感数据
+   * 🗄️ 数据库表：users（主键：user_id）
    *
-   * 脱敏规则：
-   * - 管理员（dataLevel='full'）：返回完整用户数据
-   * - 普通用户（dataLevel='public'）：移除role（角色）、permissions（权限）、admin_flags（管理员标识）、
-   *   detailed_stats（详细统计）等敏感字段
-   * - 只返回业务必需的基础信息：显示名称、抽奖权限、兑换权限、积分余额、头像、注册日期
+   * 业务场景：用户信息 API 响应时调用，移除权限、管理员标识等敏感字段
    *
-   * @param {Object} user - 用户数据对象，包含id、username、role、permissions、admin_flags等字段
-   * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
+   * γ 模式职责：
+   * - 接收 Service 层已转换的用户数据（字段名已是 nickname、avatar_url 等真实 DB 列名）
+   * - 只做减法：删除 role、permissions、admin_flags 等敏感字段
+   * - 主键统一：user_id 原样输出（无需剥离前缀）
+   * - 不做字段重命名（不把 nickname 改成 display_name）
+   *
+   * @param {Object} user - 用户数据对象（来自 Service 层或 Sequelize 查询）
+   * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或 'public'（普通用户脱敏数据）
    * @returns {Object} 脱敏后的用户对象
-   * @returns {number} return.id - 用户ID（通用id字段）
-   * @returns {string} return.display_name - 显示名称（display_name或username）
-   * @returns {boolean} return.can_lottery - 是否可以抽奖（默认true）
-   * @returns {boolean} return.can_exchange - 是否可以兑换（默认true）
-   * @returns {Object} return.points_account - 积分账户信息（V4.6统一：采用points_account结构）
-   * @returns {number} return.points_account.available_points - 可用积分
-   * @returns {number} return.points_account.frozen_points - 冻结积分
-   * @returns {number} return.points_account.total_points - 总积分（可用+冻结）
-   * @returns {string} return.avatar - 头像URL
-   * @returns {string|null} return.member_since - 注册日期（YYYY-MM-DD格式，从created_at提取）
-   *
-   * @example
-   * // 管理员查看完整数据
-   * const adminUser = DataSanitizer.sanitizeUser(user, 'full')
-   * // 返回：包含role、permissions、admin_flags等完整字段
-   *
-   * // 普通用户查看脱敏数据
-   * const publicUser = DataSanitizer.sanitizeUser(user, 'public')
-   * // 返回：移除敏感字段，只返回基础信息
+   * @returns {number} return.user_id - 用户ID（数据库主键原样输出）
+   * @returns {string} return.nickname - 昵称（DB 实际列名）
+   * @returns {string|null} return.avatar_url - 头像 URL（DB 实际列名）
+   * @returns {boolean} return.can_lottery - 是否可以抽奖
+   * @returns {boolean} return.can_exchange - 是否可以兑换
+   * @returns {Object} return.points_account - 积分账户信息
+   * @returns {string|null} return.member_since - 注册日期（YYYY-MM-DD 格式）
    */
   static sanitizeUser(user, dataLevel) {
     if (dataLevel === 'full') {
-      return user // 管理员看完整数据
+      return user
     }
 
-    /**
-     * 积分账户结构：points_account
-     * - 由调用方通过 BalanceService.getBalance() 获取后传入
-     * - 如果 user 对象包含 points_account 属性，则直接使用
-     * - 否则返回默认的 0 值结构（表示未初始化或无账户）
-     */
-    const pointsAccount = user.points_account || {
+    const plain = user.toJSON ? user.toJSON() : { ...user }
+
+    const pointsAccount = plain.points_account || {
       available_points: 0,
       frozen_points: 0,
       total_points: 0
     }
 
     return {
-      id: user.user_id,
-      display_name: user.display_name || user.username,
-      can_lottery: user.can_lottery !== false,
-      can_exchange: user.can_exchange !== false,
-      // 🔥 V4.6统一（决策A2）：使用 points_account 结构替代 balance 字段
+      user_id: plain.user_id,
+      nickname: plain.nickname,
+      avatar_url: plain.avatar_url || null,
+      can_lottery: plain.can_lottery !== false,
+      can_exchange: plain.can_exchange !== false,
       points_account: {
         available_points: pointsAccount.available_points || 0,
         frozen_points: pointsAccount.frozen_points || 0,
@@ -321,9 +307,15 @@ class DataSanitizer {
           pointsAccount.total_points ||
           (pointsAccount.available_points || 0) + (pointsAccount.frozen_points || 0)
       },
-      avatar: user.avatar,
-      member_since: user.created_at ? user.created_at.split('T')[0] : null
-      // ❌ 移除敏感字段：role, permissions, admin_flags, detailed_stats
+      member_since: plain.created_at
+        ? typeof plain.created_at === 'string'
+          ? plain.created_at.split('T')[0]
+          : null
+        : null
+      /*
+       * ❌ 移除敏感字段：role, permissions, admin_flags, detailed_stats,
+       *    mobile, consecutive_fail_count, max_active_listings
+       */
     }
   }
 
@@ -472,7 +464,7 @@ class DataSanitizer {
    * @param {Array<Object>} sessions - 会话数据数组，包含customer_service_session_id、internal_notes等字段
    * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
    * @returns {Array<Object>} 脱敏后的会话数组
-   * @returns {number} return[].id - 会话ID（脱敏输出使用通用id字段）
+   * @returns {number} return[].session_id - 会话ID（剥离 customer_service_ 模块前缀）
    * @returns {string} return[].type - 会话类型
    * @returns {string} return[].status - 会话状态
    * @returns {Object|null} return[].last_message - 最后消息对象（包含content、sender_type、created_at）
@@ -525,7 +517,7 @@ class DataSanitizer {
       const sessionData = session.toJSON ? session.toJSON() : session
 
       return {
-        id: sessionData.customer_service_session_id, // 会话ID（脱敏输出使用通用id字段）
+        session_id: sessionData.customer_service_session_id, // 会话ID（剥离 customer_service_ 模块前缀）
         status: sessionData.status, // 会话状态（waiting/assigned/active/closed）
         messages: sessionData.messages, // 消息关联数据（Sequelize include查询结果）
         created_at: sessionData.createdAt // 会话创建时间（北京时间）- 统一使用snake_case
@@ -540,7 +532,7 @@ class DataSanitizer {
   /**
    * 系统公告数据脱敏 - 新增前端需求
    *
-   * 🗄️ 数据库表：system_announcements（主键：announcement_id）
+   * 🗄️ 数据库表：system_announcements（主键：system_announcement_id）
    *
    * 业务场景：系统公告列表API响应时调用，防止用户通过抓包获取管理员ID、内部备注等敏感信息
    *
@@ -552,12 +544,12 @@ class DataSanitizer {
    *
    * 输入契约：
    * - 输入数据必须来自 system_announcements 表的 Sequelize 查询结果
-   * - 必须包含 announcement_id 字段（数据库主键）
+   * - 必须包含 system_announcement_id 字段（数据库主键）
    *
    * @param {Array<Object>} announcements - 公告数据数组（来自 system_announcements 表）
    * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
-   * @returns {Array<Object>} 脱敏后的公告数组（id 字段映射自 announcement_id）
-   * @returns {number} return[].id - 公告ID（通用id字段，映射自 announcement_id）
+   * @returns {Array<Object>} 脱敏后的公告数组（announcement_id 字段映射自 system_announcement_id）
+   * @returns {number} return[].announcement_id - 公告ID（映射自 system_announcement_id，与弹窗 popup_banner_id 命名模式一致）
    * @returns {string} return[].title - 公告标题
    * @returns {string} return[].content - 公告内容
    * @returns {string} return[].type - 公告类型
@@ -572,12 +564,16 @@ class DataSanitizer {
    */
   static sanitizeAnnouncements(announcements, dataLevel) {
     if (dataLevel === 'full') {
-      return announcements // 管理员看完整数据
+      // 管理员看完整数据，统一主键字段名为 announcement_id（与 popup_banner_id 命名模式一致）
+      return announcements.map(announcement => ({
+        ...announcement,
+        announcement_id: announcement.system_announcement_id
+      }))
     }
 
     return announcements.map(announcement => ({
-      // 🔴 基础字段（7个 - Basic Fields）
-      id: announcement.announcement_id, // 数据库主键（唯一真相源）
+      // 🔴 基础字段（8个 - Basic Fields）
+      announcement_id: announcement.system_announcement_id, // 数据库主键 system_announcement_id → API 输出 announcement_id
       title: announcement.title,
       content: announcement.content,
       type: announcement.type,
@@ -608,103 +604,72 @@ class DataSanitizer {
   }
 
   /**
-   * 积分记录数据脱敏 - 新增前端需求
+   * 积分记录数据脱敏（γ 模式：基于 V4 asset_transactions 表结构）
    *
-   * 业务场景：积分记录列表API响应时调用，防止用户通过抓包获取引用ID、管理员备注、成本分析等敏感信息
+   * 🗄️ 数据库表：asset_transactions（主键：asset_transaction_id）
    *
-   * 脱敏规则：
-   * - 管理员（dataLevel='full'）：返回完整积分记录数据
-   * - 普通用户（dataLevel='public'）：移除reference_id（引用ID）、admin_notes（管理员备注）、
-   *   cost_analysis（成本分析）等敏感字段
-   * - 使用getPublicSource()将内部来源标识转换为友好的中文显示文本
+   * 委托 _sanitizeAssetTransactions() 实现（子决策 3：两个方法名保留，内部共享实现）
    *
-   * @param {Array<Object>} records - 积分记录数组，包含id、type、points、reference_id等字段
-   * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
-   * @returns {Array<Object>} 脱敏后的积分记录数组
-   * @returns {number} return[].id - 记录ID
-   * @returns {string} return[].type - 记录类型（earn/consume）
-   * @returns {number} return[].points - 积分数
-   * @returns {number} return[].balance_after - 操作后余额
-   * @returns {string} return[].source - 来源显示（抽奖获得/商品兑换等），使用getPublicSource转换
-   * @returns {string} return[].description - 描述
-   * @returns {string} return[].created_at - 创建时间
-   *
-   * @example
-   * const adminRecords = DataSanitizer.sanitizePointsRecords(records, 'full')
-   * const publicRecords = DataSanitizer.sanitizePointsRecords(records, 'public')
+   * @param {Array<Object>} records - 资产流水数组（来自 asset_transactions 查询）
+   * @param {string} dataLevel - 数据级别
+   * @returns {Array<Object>} 脱敏后的流水数组
    */
   static sanitizePointsRecords(records, dataLevel) {
-    if (dataLevel === 'full') {
-      return records // 管理员看完整数据
-    }
-
-    return records.map(record => ({
-      id: record.asset_transaction_id,
-      type: record.type, // earn/consume
-      points: record.points,
-      balance_after: record.balance_after,
-      source: this.getPublicSource(record.source),
-      description: record.description,
-      created_at: record.created_at
-      // ❌ 移除敏感字段：reference_id, admin_notes, cost_analysis
-    }))
+    return this._sanitizeAssetTransactions(records, dataLevel)
   }
 
   /**
-   * 交易市场数据脱敏 - 新增前端需求
+   * 交易市场挂单数据脱敏（γ 模式：接收 MarketListingQueryService 输出，只做安全过滤）
    *
-   * 业务场景：交易市场商品列表API响应时调用，防止用户通过抓包获取卖家联系方式、交易费用、利润分析等敏感信息
+   * 🗄️ 数据库表：market_listings（主键：market_listing_id，V4 报价-出价架构）
    *
-   * 脱敏规则：
-   * - 管理员（dataLevel='full'）：返回完整商品数据
-   * - 普通用户（dataLevel='public'）：移除seller_contact（卖家联系方式）、transaction_fees（交易费用）、
-   *   profit_analysis（利润分析）等敏感字段
-   * - 使用maskUserName()对卖家名称进行脱敏处理
+   * 业务场景：交易市场商品列表 API 响应时调用，脱敏卖家信息和内部字段
    *
-   * @param {Array<Object>} products - 交易市场商品数组，包含id、seller_id、seller_contact等字段
-   * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
-   * @returns {Array<Object>} 脱敏后的商品数组
-   * @returns {number} return[].id - 商品ID
-   * @returns {number} return[].seller_id - 卖家ID
-   * @returns {string} return[].seller_name - 卖家名称（脱敏处理）
-   * @returns {string} return[].name - 商品名称
-   * @returns {string} return[].description - 商品描述
-   * @returns {string} return[].image_url - 商品图片URL
-   * @returns {number} return[].original_points - 原始积分
-   * @returns {number} return[].selling_points - 售价积分
-   * @returns {string} return[].condition - 商品状态
-   * @returns {string} return[].category - 商品分类
-   * @returns {boolean} return[].is_available - 是否可用
-   * @returns {string} return[].created_at - 创建时间
+   * γ 模式职责：
+   * - 接收 MarketListingQueryService 已转换的 V4 格式数据
+   * - 主键统一：market_listing_id → listing_id（剥离 market_ 模块前缀）
+   * - PII 脱敏：seller_nickname 经 maskUserName() 处理
+   * - 删除内部字段：locked_by_order_id、seller_contact 等
    *
-   * @example
-   * const adminProducts = DataSanitizer.sanitizeMarketProducts(products, 'full')
-   * const publicProducts = DataSanitizer.sanitizeMarketProducts(products, 'public')
+   * @param {Array<Object>} listings - 挂单数据数组（来自 MarketListingQueryService）
+   * @param {string} dataLevel - 数据级别：'full'（管理员）或 'public'（普通用户）
+   * @returns {Array<Object>} 脱敏后的挂单数组
+   * @returns {number} return[].listing_id - 挂单ID（剥离 market_ 前缀）
+   * @returns {string} return[].listing_kind - 挂单类型（item_instance/fungible_asset）
+   * @returns {number} return[].seller_user_id - 卖家用户ID
+   * @returns {string} return[].seller_nickname - 卖家昵称（经 maskUserName 脱敏）
+   * @returns {number} return[].price_amount - 价格
+   * @returns {string} return[].price_asset_code - 价格资产代码
+   * @returns {string} return[].status - 挂单状态
    */
-  static sanitizeMarketProducts(products, dataLevel) {
+  static sanitizeMarketProducts(listings, dataLevel) {
     if (dataLevel === 'full') {
-      return products // 管理员看完整数据
+      return listings
     }
 
-    // 脱敏处理：只保留公开可见的字段
-    return products.map(product => ({
-      id: product.market_listing_id,
-      seller_id: product.seller_id,
-      // seller_name字段可能不存在，仅在存在时进行脱敏处理
-      ...(product.seller_name && { seller_name: this.maskUserName(product.seller_name) }),
-      name: product.name,
-      description: product.description,
-      // image_url字段可能不存在，仅在存在时包含
-      ...(product.image_url && { image_url: product.image_url }),
-      // original_points字段可能不存在，仅在存在时包含
-      ...(product.original_points !== undefined && { original_points: product.original_points }),
-      selling_points: product.selling_points,
-      condition: product.condition,
-      category: product.category,
-      is_available: product.is_available,
-      created_at: product.created_at
-      // ❌ 移除敏感字段：seller_contact, transaction_fees, profit_analysis
-    }))
+    return listings.map(listing => {
+      const plain = listing.toJSON ? listing.toJSON() : { ...listing }
+
+      return {
+        listing_id: plain.market_listing_id,
+        listing_kind: plain.listing_kind,
+        seller_user_id: plain.seller_user_id,
+        seller_nickname: this.maskUserName(plain.seller_nickname || plain.seller?.nickname),
+        seller_avatar_url: plain.seller_avatar_url || plain.seller?.avatar_url || null,
+        offer_item_display_name: plain.offer_item_display_name,
+        offer_item_category_code: plain.offer_item_category_code,
+        price_amount: plain.price_amount,
+        price_asset_code: plain.price_asset_code,
+        status: plain.status,
+        item_info: plain.item_info || null,
+        asset_info: plain.asset_info || null,
+        created_at: plain.created_at
+        /*
+         * ❌ 移除敏感字段：locked_by_order_id、seller_contact、
+         *    transaction_fees、profit_analysis、internal_remark
+         */
+      }
+    })
   }
 
   /**
@@ -811,7 +776,7 @@ class DataSanitizer {
    * @param {Array<Object>} feedbacks - 反馈数据数组，包含feedback_id、category、user_ip、admin_id等字段
    * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
    * @returns {Array<Object>} 脱敏后的反馈数组
-   * @returns {number} return[].feedback_id - 反馈ID（✅ P0修复：使用正确的主键字段）
+   * @returns {number} return[].feedback_id - 反馈ID（数据库主键原样输出）
    * @returns {string} return[].category - 反馈分类（technical/feature/bug/complaint/suggestion/other）
    * @returns {string} return[].content - 反馈内容（TEXT，1-5000字符）
    * @returns {string} return[].status - 反馈状态（pending/processing/replied/closed）
@@ -832,7 +797,7 @@ class DataSanitizer {
 
     // ✅ 普通用户看脱敏数据（移除敏感信息）
     return feedbacks.map(feedback => ({
-      id: feedback.feedback_id, // ✅ 商业安全：使用通用id字段（防止抓包泄露表结构）
+      feedback_id: feedback.feedback_id, // 主键原样输出（行业标准：描述性 {entity}_id）
       category: feedback.category, // 反馈分类（ENUM: technical/feature/bug/complaint/suggestion/other）
       content: feedback.content, // 反馈内容（TEXT，1-5000字符）
       status: feedback.status, // 处理状态（ENUM: pending/processing/replied/closed）
@@ -860,51 +825,62 @@ class DataSanitizer {
   }
 
   /**
-   * 兑换记录数据脱敏 - 新增前端需求（✅ P0修复完成）
+   * 交易记录数据脱敏（γ 模式：基于 V4 asset_transactions 表结构）
    *
-   * /**
-   * 交易记录数据脱敏 - 新增前端需求
+   * 🗄️ 数据库表：asset_transactions（主键：asset_transaction_id）
    *
-   * 业务场景：交易记录列表API响应时调用，防止用户通过抓包获取内部成本、管理员调整、系统标识等敏感信息
+   * 委托 _sanitizeAssetTransactions() 实现（子决策 3：两个方法名保留，内部共享实现）
    *
-   * 脱敏规则：
-   * - 管理员（dataLevel='full'）：返回完整交易记录数据
-   * - 普通用户（dataLevel='public'）：移除internal_cost（内部成本）、admin_adjustment（管理员调整）、
-   *   system_flags（系统标识）等敏感字段
-   * - 使用getPublicSource()将内部来源标识转换为友好的中文显示文本
-   *
-   * @param {Array<Object>} records - 交易记录数组，包含id、user_id、type、internal_cost等字段
-   * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
-   * @returns {Array<Object>} 脱敏后的交易记录数组
-   * @returns {number} return[].id - 记录ID
-   * @returns {number} return[].user_id - 用户ID
-   * @returns {string} return[].type - 交易类型（earn/consume/transfer）
-   * @returns {number} return[].amount - 交易金额
-   * @returns {string} return[].source - 来源显示（抽奖获得/商品兑换等），使用getPublicSource转换
-   * @returns {string} return[].description - 描述
-   * @returns {number} return[].balance_after - 操作后余额
-   * @returns {string} return[].created_at - 创建时间
-   *
-   * @example
-   * const adminRecords = DataSanitizer.sanitizeTransactionRecords(records, 'full')
-   * const publicRecords = DataSanitizer.sanitizeTransactionRecords(records, 'public')
+   * @param {Array<Object>} records - 资产流水数组（来自 asset_transactions 查询）
+   * @param {string} dataLevel - 数据级别
+   * @returns {Array<Object>} 脱敏后的流水数组
    */
   static sanitizeTransactionRecords(records, dataLevel) {
+    return this._sanitizeAssetTransactions(records, dataLevel)
+  }
+
+  /**
+   * 资产流水脱敏共享实现（子决策 3：sanitizePointsRecords 和 sanitizeTransactionRecords 共享）
+   *
+   * 🗄️ 数据库表：asset_transactions（主键：asset_transaction_id）
+   *
+   * γ 模式职责：
+   * - 主键统一：asset_transaction_id → transaction_id（剥离 asset_ 模块前缀）
+   * - 添加 business_type_display 中文映射（子决策 2：机器码 + 中文并存）
+   * - 过滤 BUDGET_POINTS 等禁止暴露的资产记录
+   * - 删除内部字段：account_id、idempotency_key、frozen_amount_change、lottery_session_id
+   *
+   * @param {Array<Object>} records - 资产流水数组
+   * @param {string} dataLevel - 数据级别
+   * @returns {Array<Object>} 脱敏后的流水数组
+   * @private
+   */
+  static _sanitizeAssetTransactions(records, dataLevel) {
     if (dataLevel === 'full') {
-      return records // 管理员看完整数据
+      return records
     }
 
-    return records.map(record => ({
-      id: record.asset_transaction_id,
-      user_id: record.user_id,
-      type: record.type, // earn/consume/transfer
-      amount: record.amount,
-      source: this.getPublicSource(record.source),
-      description: record.description,
-      balance_after: record.balance_after,
-      created_at: record.created_at
-      // ❌ 移除敏感字段：internal_cost, admin_adjustment, system_flags
-    }))
+    const filtered = this.filterForbiddenAssets(records)
+
+    return filtered.map(record => {
+      const plain = record.toJSON ? record.toJSON() : { ...record }
+
+      return {
+        transaction_id: plain.asset_transaction_id,
+        asset_code: plain.asset_code,
+        business_type: plain.business_type,
+        business_type_display: this.getPublicSource(plain.business_type),
+        delta_amount: plain.delta_amount,
+        balance_before: plain.balance_before,
+        balance_after: plain.balance_after,
+        description: plain.meta?.description || plain.meta?.title || null,
+        created_at: plain.created_at
+        /*
+         * ❌ 移除敏感字段：account_id、idempotency_key、frozen_amount_change、
+         *    lottery_session_id、meta（完整 JSON 含内部信息）
+         */
+      }
+    })
   }
 
   /**
@@ -1207,32 +1183,57 @@ class DataSanitizer {
   }
 
   /**
-   * 获取公开来源（辅助方法）
+   * 获取 business_type 的中文显示文本（V4 资产账本架构）
    *
-   * 业务场景：积分记录和交易记录脱敏时调用，将内部来源标识转换为友好的中文显示文本
+   * 业务场景：资产流水脱敏时调用，将 asset_transactions.business_type 转换为用户友好的中文
+   * 覆盖实际数据库中 48+ 种 business_type（2026-02-21 基于真实数据验证）
    *
-   * @param {string} source - 来源标识（lottery_win/exchange/transfer/manual/bonus）
-   * @returns {string} 公开来源文本
-   * @returns {string} '抽奖获得' - lottery_win类型
-   * @returns {string} '商品兑换' - exchange类型
-   * @returns {string} '用户转让' - transfer类型
-   * @returns {string} '系统奖励' - manual类型
-   * @returns {string} '奖励积分' - bonus类型
-   * @returns {string} '其他来源' - 未知类型默认值
+   * 设计决策（子决策 2）：同时输出 business_type（机器码）+ business_type_display（中文）
+   * 行业参照：支付宝 biz_type + biz_type_desc、京东金融 bizType + bizTypeName
    *
-   * @example
-   * const publicSource = DataSanitizer.getPublicSource('lottery_win') // 返回：'抽奖获得'
-   * const publicSource = DataSanitizer.getPublicSource('exchange') // 返回：'商品兑换'
+   * @param {string} businessType - 资产流水业务类型（来自 asset_transactions.business_type）
+   * @returns {string} 中文显示文本
    */
-  static getPublicSource(source) {
-    const publicSources = {
-      lottery_win: '抽奖获得',
-      exchange: '商品兑换',
+  static getPublicSource(businessType) {
+    const displayMap = {
+      /* 抽奖相关 */
+      lottery_consume: '抽奖消耗',
+      lottery_reward: '抽奖奖励',
+      /* 兑换相关 */
+      exchange_debit: '兑换扣款',
+      exchange_refund: '兑换退款',
+      /* 市场交易相关 */
+      market_listing_freeze: '市场挂单冻结',
+      market_listing_withdraw_unfreeze: '挂单撤回',
+      order_freeze_buyer: '订单冻结',
+      order_settle_buyer_debit: '订单结算',
+      order_settle_seller_credit: '卖出收入',
+      order_cancel_unfreeze_buyer: '订单取消退回',
+      /* 材料兑换 */
+      material_convert_credit: '材料兑换入账',
+      material_convert_debit: '材料兑换扣款',
+      /* 管理员操作 */
+      admin_adjustment: '系统调整',
+      admin_grant: '系统发放',
+      /* 消费奖励 */
+      merchant_points_reward: '消费奖励',
+      consumption_reward: '消费奖励',
+      /* 空间解锁 */
+      premium_unlock: '解锁空间',
+      /* 通用 */
       transfer: '用户转让',
       manual: '系统奖励',
       bonus: '奖励积分'
     }
-    return publicSources[source] || '其他来源'
+
+    if (!businessType) return '系统操作'
+
+    if (displayMap[businessType]) return displayMap[businessType]
+
+    /* test_ 前缀的业务类型统一显示为"测试操作"（不暴露内部测试分类） */
+    if (businessType.startsWith('test_')) return '测试操作'
+
+    return '系统操作'
   }
 
   /**
@@ -1329,18 +1330,15 @@ class DataSanitizer {
         if (typeof primaryImageData.toSafeJSON === 'function') {
           const safeImage = primaryImageData.toSafeJSON()
           primaryImage = {
-            // 2026-02-01 主键命名规范化：输出 id 用于脱敏，源字段为 image_resource_id
-            id: safeImage.image_resource_id,
-            url: safeImage.imageUrl, // 公开永久 URL（无签名），toSafeJSON 返回 imageUrl
+            image_resource_id: safeImage.image_resource_id,
+            url: safeImage.imageUrl,
             mime: safeImage.mime_type,
-            // 列表视图使用缩略图 URL
             thumbnail_url: safeImage.thumbnails?.small || safeImage.imageUrl
           }
         } else {
           // 降级处理：如果没有 toSafeJSON 方法（不应该发生）
           primaryImage = {
-            // 2026-02-01 主键命名规范化：输出 id 用于脱敏，源字段为 image_resource_id
-            id: primaryImageData.image_resource_id,
+            image_resource_id: primaryImageData.image_resource_id,
             url: null, // 无法生成 URL
             mime: primaryImageData.mime_type,
             thumbnail_url: null
@@ -1349,7 +1347,7 @@ class DataSanitizer {
       }
 
       return {
-        id: item.exchange_item_id, // 数据库主键（唯一真相源）
+        exchange_item_id: item.exchange_item_id, // 数据库主键原样输出
         name: item.item_name, // 兑换商品名称（数据库字段为 item_name，API 输出为 name 保持前端兼容）
         description: item.description,
         // V4.5.0: 材料资产支付字段
@@ -1407,7 +1405,7 @@ class DataSanitizer {
   /**
    * 兑换市场订单列表数据脱敏
    *
-   * 🗄️ 数据库表：exchange_records（主键：record_id）
+   * 🗄️ 数据库表：exchange_records（主键：exchange_record_id）
    *
    * 业务场景：用户查询兑换订单列表时调用，保护订单敏感信息
    *
@@ -1428,7 +1426,7 @@ class DataSanitizer {
 
     // 普通用户数据脱敏（V4.5.0 材料资产支付）
     const sanitized = orders.map(order => ({
-      id: order.exchange_record_id, // 数据库主键（唯一真相源）
+      exchange_record_id: order.exchange_record_id, // 数据库主键原样输出
       order_no: order.order_no,
       item_snapshot: {
         name: order.item_snapshot?.name,

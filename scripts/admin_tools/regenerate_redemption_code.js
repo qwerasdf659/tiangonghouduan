@@ -126,13 +126,13 @@ class RegenerateRedemptionCodeTool {
         )
 
         cancelled_orders.push({
-          order_id: order.order_id,
+          order_id: order.redemption_order_id,
           created_at: order.created_at,
           expires_at: order.expires_at
         })
 
         logger.info('取消现有订单', {
-          order_id: order.order_id,
+          order_id: order.redemption_order_id,
           item_instance_id
         })
       }
@@ -143,7 +143,7 @@ class RegenerateRedemptionCodeTool {
       })
 
       logger.info('创建新订单成功', {
-        order_id: new_order_result.order.order_id,
+        order_id: new_order_result.order.redemption_order_id,
         item_instance_id
       })
 
@@ -154,7 +154,7 @@ class RegenerateRedemptionCodeTool {
         operator_user_id,
         reason,
         cancelled_orders,
-        new_order_id: new_order_result.order.order_id,
+        new_order_id: new_order_result.order.redemption_order_id,
         new_code: new_order_result.code, // ⚠️ 仅在管理工具中临时记录
         timestamp: new Date().toISOString()
       }
@@ -172,7 +172,7 @@ class RegenerateRedemptionCodeTool {
         item_instance_id,
         old_order_count: cancelled_orders.length,
         new_order: {
-          order_id: new_order_result.order.order_id,
+          order_id: new_order_result.order.redemption_order_id,
           code: new_order_result.code,
           expires_at: new_order_result.order.expires_at
         },

@@ -22,7 +22,7 @@
  * @since 2026-02-20
  */
 
-const _Op = require('sequelize').Op // eslint-disable-line no-unused-vars
+const { Op } = require('sequelize')
 
 /** 权重刻度（与引擎一致：1,000,000 = 100%） */
 const WEIGHT_SCALE = 1000000
@@ -519,7 +519,7 @@ class StrategySimulationService {
       }
     }
 
-    // 写审计日志
+    // 写审计日志（before_data 包含 lottery_campaign_id 用于回滚时精确定位）
     const logEntry = await AdminOperationLog.create(
       {
         operator_id,
@@ -527,8 +527,8 @@ class StrategySimulationService {
         target_type: 'lottery_simulation_record',
         target_id: lottery_simulation_record_id,
         action: 'update',
-        before_data: record.proposed_config,
-        after_data: { changes },
+        before_data: { ...record.proposed_config, lottery_campaign_id: campaignId },
+        after_data: { changes, lottery_campaign_id: campaignId },
         reason: `应用模拟记录 #${lottery_simulation_record_id} 的配置到活动 #${campaignId}`,
         idempotency_key: `simulation_apply_${lottery_simulation_record_id}_${Date.now()}`,
         risk_level: 'high',
@@ -766,7 +766,6 @@ class StrategySimulationService {
   async executeScheduledActivations(options = {}) {
     const { transaction } = options
     const { LotterySimulationRecord } = this.models
-    const Op = require('sequelize').Op
 
     const pendingRecords = await LotterySimulationRecord.findAll({
       where: {
@@ -818,7 +817,6 @@ class StrategySimulationService {
   async getConfigVersionHistory(lottery_campaign_id, options = {}) {
     const { AdminOperationLog } = this.models
     const { OPERATION_TYPES } = require('../../constants/AuditOperationTypes')
-    const Op = require('sequelize').Op
     const { limit = 50, offset = 0 } = options
 
     const relevantTypes = [
@@ -886,21 +884,36 @@ class StrategySimulationService {
     const afterData = logEntry.after_data
     const changes = []
 
+    // 提取 lottery_campaign_id 确保回滚时精确定位到正确的活动配置
+    let campaignId = beforeData.lottery_campaign_id || afterData?.lottery_campaign_id
+    if (!campaignId && logEntry.target_type === 'lottery_simulation_record') {
+      const simRecord = await this.models.LotterySimulationRecord.findByPk(logEntry.target_id, {
+        attributes: ['lottery_campaign_id'],
+        transaction
+      })
+      campaignId = simRecord?.lottery_campaign_id
+    }
+
     // 根据 operation_type 确定回滚目标表
     const operationType = logEntry.operation_type
 
     if (operationType === OPERATION_TYPES.SIMULATION_APPLY && beforeData.matrix_config) {
-      // 回滚 apply 操作：还原 matrix_config、strategy_config、tier_rules
-      await this._rollbackSimulationApply(beforeData, afterData, operator_id, changes, transaction)
+      await this._rollbackSimulationApply(
+        beforeData,
+        afterData,
+        operator_id,
+        changes,
+        transaction,
+        campaignId
+      )
     } else if (operationType === OPERATION_TYPES.STRATEGY_CONFIG_UPDATE) {
-      await this._rollbackStrategyConfig(beforeData, operator_id, changes, transaction)
+      await this._rollbackStrategyConfig(beforeData, operator_id, changes, transaction, campaignId)
     } else if (operationType === OPERATION_TYPES.MATRIX_CONFIG_UPDATE) {
-      await this._rollbackMatrixConfig(beforeData, operator_id, changes, transaction)
+      await this._rollbackMatrixConfig(beforeData, operator_id, changes, transaction, campaignId)
     } else if (operationType === OPERATION_TYPES.TIER_RULES_UPDATE) {
-      await this._rollbackTierRules(beforeData, operator_id, changes, transaction)
+      await this._rollbackTierRules(beforeData, operator_id, changes, transaction, campaignId)
     } else {
-      // 通用回滚：尝试从 before_data 结构推断目标
-      await this._rollbackGeneric(beforeData, operator_id, changes, transaction)
+      await this._rollbackGeneric(beforeData, operator_id, changes, transaction, campaignId)
     }
 
     // 记录回滚操作本身的审计日志
@@ -933,18 +946,25 @@ class StrategySimulationService {
    * @param {number} operator_id - 操作者ID
    * @param {Array} changes - 变更记录数组（引用传入，追加写入）
    * @param {Object} transaction - Sequelize 事务对象
+   * @param {number|null} campaignId - 活动ID（用于精确定位回滚目标）
    * @returns {Promise<void>} 回滚完成
    */
-  async _rollbackSimulationApply(beforeData, _afterData, operator_id, changes, transaction) {
-    // beforeData 结构同 proposed_config
+  async _rollbackSimulationApply(
+    beforeData,
+    _afterData,
+    operator_id,
+    changes,
+    transaction,
+    campaignId
+  ) {
     if (beforeData.matrix_config?.length > 0) {
-      await this._rollbackMatrixConfig(beforeData, operator_id, changes, transaction)
+      await this._rollbackMatrixConfig(beforeData, operator_id, changes, transaction, campaignId)
     }
     if (beforeData.strategy_config) {
-      await this._rollbackStrategyConfig(beforeData, operator_id, changes, transaction)
+      await this._rollbackStrategyConfig(beforeData, operator_id, changes, transaction, campaignId)
     }
     if (beforeData.tier_rules?.length > 0) {
-      await this._rollbackTierRules(beforeData, operator_id, changes, transaction)
+      await this._rollbackTierRules(beforeData, operator_id, changes, transaction, campaignId)
     }
   }
 
@@ -955,19 +975,20 @@ class StrategySimulationService {
    * @param {number} operator_id - 操作者ID
    * @param {Array} changes - 变更记录数组
    * @param {Object} transaction - Sequelize 事务对象
+   * @param {number|null} campaignId - 活动ID（用于精确定位回滚目标）
    * @returns {Promise<void>} 回滚完成
    */
-  async _rollbackStrategyConfig(data, operator_id, changes, transaction) {
+  async _rollbackStrategyConfig(data, operator_id, changes, transaction, campaignId) {
     const config = data.strategy_config || data
     for (const [group, values] of Object.entries(config)) {
       if (typeof values !== 'object' || values === null) continue
+      if (group === 'lottery_campaign_id') continue
       for (const [key, value] of Object.entries(values)) {
+        const whereClause = { config_group: group, config_key: key }
+        if (campaignId) whereClause.lottery_campaign_id = campaignId
         const [count] = await this.models.LotteryStrategyConfig.update(
           { config_value: JSON.stringify(value), updated_by: operator_id },
-          {
-            where: { config_group: group, config_key: key },
-            transaction
-          }
+          { where: whereClause, transaction }
         )
         if (count > 0) {
           changes.push({
@@ -987,9 +1008,10 @@ class StrategySimulationService {
    * @param {number} operator_id - 操作者ID
    * @param {Array} changes - 变更记录数组
    * @param {Object} transaction - Sequelize 事务对象
+   * @param {number|null} campaignId - 活动ID（用于精确定位回滚目标）
    * @returns {Promise<void>} 回滚完成
    */
-  async _rollbackMatrixConfig(data, operator_id, changes, transaction) {
+  async _rollbackMatrixConfig(data, operator_id, changes, transaction, campaignId) {
     const configs = data.matrix_config || (Array.isArray(data) ? data : [])
     for (const mc of configs) {
       if (!mc.budget_tier || !mc.pressure_tier) continue
@@ -1006,8 +1028,10 @@ class StrategySimulationService {
       }
       updateFields.updated_by = operator_id
 
+      const whereClause = { budget_tier: mc.budget_tier, pressure_tier: mc.pressure_tier }
+      if (campaignId) whereClause.lottery_campaign_id = campaignId
       const [count] = await this.models.LotteryTierMatrixConfig.update(updateFields, {
-        where: { budget_tier: mc.budget_tier, pressure_tier: mc.pressure_tier },
+        where: whereClause,
         transaction
       })
       if (count > 0) {
@@ -1027,18 +1051,18 @@ class StrategySimulationService {
    * @param {number} _operator_id - 操作者ID（未使用）
    * @param {Array} changes - 变更记录数组
    * @param {Object} transaction - Sequelize 事务对象
+   * @param {number|null} campaignId - 活动ID（用于精确定位回滚目标）
    * @returns {Promise<void>} 回滚完成
    */
-  async _rollbackTierRules(data, _operator_id, changes, transaction) {
+  async _rollbackTierRules(data, _operator_id, changes, transaction, campaignId) {
     const rules = data.tier_rules || (Array.isArray(data) ? data : [])
     for (const rule of rules) {
       if (!rule.segment_key || !rule.tier_name) continue
+      const whereClause = { segment_key: rule.segment_key, tier_name: rule.tier_name }
+      if (campaignId) whereClause.lottery_campaign_id = campaignId
       const [count] = await this.models.LotteryTierRule.update(
         { tier_weight: rule.tier_weight },
-        {
-          where: { segment_key: rule.segment_key, tier_name: rule.tier_name },
-          transaction
-        }
+        { where: whereClause, transaction }
       )
       if (count > 0) {
         changes.push({
@@ -1057,17 +1081,18 @@ class StrategySimulationService {
    * @param {number} operator_id - 操作者ID
    * @param {Array} changes - 变更记录数组
    * @param {Object} transaction - Sequelize 事务对象
+   * @param {number|null} campaignId - 活动ID（用于精确定位回滚目标）
    * @returns {Promise<void>} 回滚完成
    */
-  async _rollbackGeneric(beforeData, operator_id, changes, transaction) {
+  async _rollbackGeneric(beforeData, operator_id, changes, transaction, campaignId) {
     if (beforeData.matrix_config) {
-      await this._rollbackMatrixConfig(beforeData, operator_id, changes, transaction)
+      await this._rollbackMatrixConfig(beforeData, operator_id, changes, transaction, campaignId)
     }
     if (beforeData.strategy_config) {
-      await this._rollbackStrategyConfig(beforeData, operator_id, changes, transaction)
+      await this._rollbackStrategyConfig(beforeData, operator_id, changes, transaction, campaignId)
     }
     if (beforeData.tier_rules) {
-      await this._rollbackTierRules(beforeData, operator_id, changes, transaction)
+      await this._rollbackTierRules(beforeData, operator_id, changes, transaction, campaignId)
     }
   }
 

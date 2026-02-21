@@ -50,7 +50,7 @@ router.get('/orders/:order_id', authenticateToken, async (req, res) => {
 
     return res.apiSuccess(
       {
-        order_id: order.order_id,
+        order_id: order.redemption_order_id,
         item_instance_id: order.item_instance_id,
         status: order.status,
         expires_at: order.expires_at,
@@ -113,7 +113,7 @@ router.get(
         {
           has_order: true,
           order: {
-            order_id: order.order_id,
+            order_id: order.redemption_order_id,
             status: order.status,
             expires_at: order.expires_at,
             fulfilled_at: order.fulfilled_at,

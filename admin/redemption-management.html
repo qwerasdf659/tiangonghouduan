@@ -250,6 +250,8 @@
                 <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">奖品信息</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">用户</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">状态</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">核销门店</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">核销员工</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">创建时间</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">到期时间</th>
                 <th class="px-4 py-3 text-center text-xs font-semibold themed-text-muted uppercase tracking-wider">操作</th>
@@ -295,6 +297,10 @@
                       </template>
                     </div>
                   </td>
+                  <!-- 核销门店 -->
+                  <td class="px-4 py-3 text-sm themed-text" x-text="getStoreName(order)"></td>
+                  <!-- 核销员工 -->
+                  <td class="px-4 py-3 text-sm themed-text" x-text="getStaffDisplay(order)"></td>
                   <!-- 创建时间 -->
                   <td class="px-4 py-3 text-xs themed-text-muted" x-text="formatDate(order.created_at)"></td>
                   <!-- 到期时间 -->
@@ -508,6 +514,14 @@
                           :class="getPrizeTypeClass(orderDetail)"
                           x-text="getPrizeType(orderDetail)"></span>
                   </p>
+                </div>
+                <div x-show="orderDetail.fulfilled_store_id || orderDetail.fulfilled_store">
+                  <span class="text-xs themed-text-muted uppercase">核销门店</span>
+                  <p class="text-sm themed-text mt-0.5" x-text="getStoreName(orderDetail)"></p>
+                </div>
+                <div x-show="orderDetail.fulfilled_by_user_id || orderDetail.fulfilled_staff">
+                  <span class="text-xs themed-text-muted uppercase">核销员工</span>
+                  <p class="text-sm themed-text mt-0.5" x-text="getStaffDisplay(orderDetail)"></p>
                 </div>
               </div>
             </div>

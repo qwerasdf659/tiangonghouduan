@@ -186,9 +186,10 @@ class AnnouncementService {
    * @returns {Array} 通知格式列表
    */
   static convertToNotificationFormat(announcements) {
+    // 输入来自 getAnnouncements({dataLevel: 'full'})，经 DataSanitizer 处理后包含 announcement_id
     return announcements.map(ann => ({
-      notification_id: ann.system_announcement_id,
-      id: ann.system_announcement_id,
+      notification_id: ann.announcement_id,
+      id: ann.announcement_id,
       type: ann.type,
       title: ann.title,
       content: ann.content,
@@ -244,7 +245,7 @@ class AnnouncementService {
         { view_count: 1 },
         {
           where: {
-            announcement_id: { [Op.in]: announcementIds }
+            system_announcement_id: { [Op.in]: announcementIds }
           }
         }
       )
@@ -337,7 +338,7 @@ class AnnouncementService {
       { is_active: false },
       {
         where: {
-          announcement_id: { [Op.in]: announcementIds }
+          system_announcement_id: { [Op.in]: announcementIds }
         }
       }
     )

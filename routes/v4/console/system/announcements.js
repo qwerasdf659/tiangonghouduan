@@ -64,7 +64,7 @@ router.post(
 
       sharedComponents.logger.info('管理员创建系统公告', {
         admin_id: req.user.user_id,
-        announcement_id: announcement.announcement_id,
+        announcement_id: announcement.system_announcement_id,
         title: announcement.title,
         type: announcement.type
       })

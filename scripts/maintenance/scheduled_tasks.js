@@ -283,7 +283,17 @@ class ScheduledTasks {
     // 任务32: 每小时第5分钟执行定时报表推送（B-39）
     this.scheduleReportPush()
 
-    logger.info('所有定时任务已初始化完成（包含2026-01-30新增的6个迁移任务 + 2026-01-31 P2阶段2个任务）')
+    // ========== 2026-02-21 核销码系统升级方案新增 ==========
+
+    // 任务33: 每天凌晨3:15积分商城订单自动确认收货（Phase 3 Step 3.3：发货7天后自动确认）
+    this.scheduleExchangeOrderAutoConfirm()
+
+    // ========== 2026-02-21 图片管理体系设计方案新增 ==========
+
+    // 任务34: 每天凌晨5点图片存储一致性检测（HEAD请求验证Sealos文件真实存在）
+    this.scheduleDailyImageStorageConsistencyCheck()
+
+    logger.info('所有定时任务已初始化完成（包含2026-02-21核销码系统升级方案 + 图片管理体系方案新增任务）')
   }
 
   /**
@@ -3325,6 +3335,70 @@ class ScheduledTasks {
   }
 
   /**
+   * 定时任务33: 每天凌晨3:15积分商城订单自动确认收货
+   * Cron表达式: 15 3 * * * (每天凌晨3:15)
+   *
+   * 业务依据：决策4（积分商城确认收货）+ Phase 3 Step 3.3
+   * 已发货超过7天未确认收货的订单自动确认
+   *
+   * @returns {void}
+   */
+  static scheduleExchangeOrderAutoConfirm() {
+    cron.schedule('15 3 * * *', async () => {
+      const lockKey = 'lock:exchange_order_auto_confirm'
+      const lockValue = `${process.pid}_${Date.now()}`
+      let redisClient = null
+
+      try {
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
+
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 600, 'NX')
+
+        if (!acquired) {
+          logger.info('[定时任务33] 积分商城订单自动确认收货 - 其他实例正在执行，跳过')
+          return
+        }
+
+        logger.info('[定时任务33] 开始执行积分商城订单自动确认收货...')
+
+        const DailyExchangeOrderAutoConfirm = require('../../jobs/daily-exchange-order-auto-confirm')
+        const report = await DailyExchangeOrderAutoConfirm.execute()
+
+        logger.info('[定时任务33] 积分商城订单自动确认收货完成', {
+          auto_confirmed_count: report.auto_confirmed_count,
+          duration_ms: report.duration_ms
+        })
+
+        if (redisClient) {
+          const currentValue = await redisClient.get(lockKey)
+          if (currentValue === lockValue) {
+            await redisClient.del(lockKey)
+          }
+        }
+      } catch (error) {
+        logger.error('[定时任务33] 积分商城订单自动确认收货失败', {
+          error: error.message,
+          stack: error.stack
+        })
+
+        if (redisClient) {
+          try {
+            const currentValue = await redisClient.get(lockKey)
+            if (currentValue === lockValue) {
+              await redisClient.del(lockKey)
+            }
+          } catch (unlockError) {
+            logger.error('[定时任务33] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
+      }
+    })
+
+    logger.info('[定时任务33] 积分商城订单自动确认收货任务已注册（每天 3:15 AM）')
+  }
+
+  /**
    * 手动触发定时报表推送（用于测试）
    *
    * @returns {Promise<Object>} 执行结果
@@ -3345,6 +3419,74 @@ class ScheduledTasks {
       logger.error('[手动触发] 定时报表推送失败', { error: error.message })
       throw error
     }
+  }
+  // ========== 2026-02-21 图片管理体系设计方案新增 ==========
+
+  /**
+   * 定时任务34: 每天凌晨5点图片存储一致性检测
+   * Cron表达式: 0 5 * * * (每天凌晨5点)
+   *
+   * 业务场景（图片管理体系设计方案 §4.2 2026-02-21）：
+   * - 通过 S3 HEAD 请求验证 image_resources 表中的图片文件在 Sealos 对象存储中真实存在
+   * - 发现"数据库有记录但存储文件缺失"的不一致情况
+   * - 仅记录 WARN 日志，不自动删除记录（防止误删）
+   * - 分批处理（每批50条）+ 并发控制（每批5个HEAD请求），避免压垮存储服务
+   *
+   * @returns {void}
+   * @since 2026-02-21
+   */
+  static scheduleDailyImageStorageConsistencyCheck() {
+    cron.schedule('0 5 * * *', async () => {
+      const lockKey = 'lock:image_storage_consistency_check'
+      const lockValue = `${process.pid}_${Date.now()}`
+      let redisClient = null
+
+      try {
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
+
+        // 尝试获取分布式锁（30分钟过期，大表检测可能耗时较长）
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 1800, 'NX')
+
+        if (!acquired) {
+          logger.info('[定时任务] 其他实例正在执行图片存储一致性检测，跳过')
+          return
+        }
+
+        logger.info('[定时任务] 获取分布式锁成功，开始执行图片存储一致性检测...', {
+          lock_key: lockKey,
+          lock_value: lockValue
+        })
+
+        const DailyImageStorageConsistencyCheck = require('../../jobs/daily-image-storage-consistency-check')
+        const report = await DailyImageStorageConsistencyCheck.execute()
+
+        if (report.missing_count > 0) {
+          logger.warn(`[定时任务] 图片存储一致性检测完成：发现 ${report.missing_count} 个文件缺失`, {
+            total_checked: report.total_checked,
+            missing_count: report.missing_count,
+            duration_ms: report.duration_ms
+          })
+        } else {
+          logger.info('[定时任务] 图片存储一致性检测完成：存储一致性良好')
+        }
+
+        await redisClient.del(lockKey)
+        logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
+      } catch (error) {
+        logger.error('[定时任务] 图片存储一致性检测失败', { error: error.message })
+
+        if (redisClient) {
+          try {
+            await redisClient.del(lockKey)
+          } catch (unlockError) {
+            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 图片存储一致性检测（每天凌晨5点执行，HEAD请求验证Sealos文件存在性）')
   }
 }
 
