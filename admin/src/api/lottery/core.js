@@ -31,6 +31,24 @@ export const LOTTERY_CORE_ENDPOINTS = {
   PRIZE_DELETE: `${API_PREFIX}/console/prize-pool/prize/:prize_id`,
   PRIZE_DETAIL: `${API_PREFIX}/console/prize-pool/prize/:prize_id`,
   PRIZE_ADD_STOCK: `${API_PREFIX}/console/prize-pool/prize/:prize_id/add-stock`,
+  /** 按档位分组获取活动奖品（含档内占比、风险警告） */
+  PRIZE_GROUPED: `${API_PREFIX}/console/prize-pool/:code/grouped`,
+  /** 为指定活动添加单个奖品 */
+  PRIZE_ADD_TO_CAMPAIGN: `${API_PREFIX}/console/prize-pool/:code/add-prize`,
+  /** 批量更新奖品排序 */
+  PRIZE_SORT_ORDER: `${API_PREFIX}/console/prize-pool/:code/sort-order`,
+  /** 批量更新奖品库存 */
+  PRIZE_BATCH_STOCK: `${API_PREFIX}/console/prize-pool/:code/batch-stock`,
+  /** 设置单个奖品绝对库存值 */
+  PRIZE_SET_STOCK: `${API_PREFIX}/console/prize-pool/prize/:prize_id/stock`,
+
+  // 分群策略管理
+  SEGMENT_RULE_LIST: `${API_PREFIX}/console/segment-rules`,
+  SEGMENT_RULE_DETAIL: `${API_PREFIX}/console/segment-rules/:version_key`,
+  SEGMENT_RULE_CREATE: `${API_PREFIX}/console/segment-rules`,
+  SEGMENT_RULE_UPDATE: `${API_PREFIX}/console/segment-rules/:version_key`,
+  SEGMENT_RULE_DELETE: `${API_PREFIX}/console/segment-rules/:version_key`,
+  SEGMENT_RULE_FIELD_REGISTRY: `${API_PREFIX}/console/segment-rules/field-registry`,
 
   // 活动管理（管理后台 - 使用 console 路由）
   CAMPAIGN_LIST: `${API_PREFIX}/console/lottery-campaigns`,

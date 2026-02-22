@@ -17,6 +17,7 @@
 
 import { logger, $confirm } from '../../../utils/index.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
+import { request } from '../../../api/base.js'
 import { AssetAPI } from '../../../api/asset.js'
 import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
 
@@ -657,13 +658,11 @@ document.addEventListener('alpine:init', () => {
           formData.append('business_type', 'uploads')
           formData.append('category', 'icons')
 
-          const token = localStorage.getItem('token')
-          const response = await fetch(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD, {
+          const res = await request({
+            url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD,
             method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-            body: formData
+            data: formData
           })
-          const res = await response.json()
 
           if (res.success && res.data) {
             this.create_type_form.icon_url = res.data.object_key
@@ -706,13 +705,11 @@ document.addEventListener('alpine:init', () => {
           formData.append('business_type', 'uploads')
           formData.append('category', 'icons')
 
-          const token = localStorage.getItem('token')
-          const response = await fetch(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD, {
+          const res = await request({
+            url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD,
             method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-            body: formData
+            data: formData
           })
-          const res = await response.json()
 
           if (res.success && res.data) {
             this.edit_type_form.icon_url = res.data.object_key

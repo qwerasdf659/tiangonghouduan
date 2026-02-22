@@ -35,7 +35,8 @@ const TransactionManager = require('../../../utils/TransactionManager')
  * @route GET /api/v4/console/ad-campaigns
  * @access Private (Admin)
  * @query {string} [status] - 活动状态筛选
- * @query {string} [billing_mode] - 计费模式筛选（cpc/cpm/cpa）
+ * @query {string} [billing_mode] - 计费模式筛选（fixed_daily/bidding/free）
+ * @query {string} [campaign_category] - 计划分类筛选（commercial/operational/system）
  * @query {number} [ad_slot_id] - 广告位ID筛选
  * @query {number} [advertiser_user_id] - 广告主用户ID筛选
  * @query {number} [page=1] - 页码
@@ -51,6 +52,7 @@ router.get(
         billing_mode = null,
         ad_slot_id = null,
         advertiser_user_id = null,
+        campaign_category = null,
         page = 1,
         limit = 20
       } = req.query
@@ -64,6 +66,7 @@ router.get(
         billing_mode,
         ad_slot_id: ad_slot_id ? parseInt(ad_slot_id) : null,
         advertiser_user_id: advertiser_user_id ? parseInt(advertiser_user_id) : null,
+        campaign_category,
         page: pageNum,
         pageSize
       })
@@ -87,8 +90,11 @@ router.get(
   })
 )
 
-/** 计费模式枚举（管理员创建广告活动用） */
+/** 计费模式枚举（管理员创建商业广告活动用） */
 const VALID_BILLING_MODES = ['fixed_daily', 'bidding']
+
+/** 合法的计划分类 */
+const VALID_CAMPAIGN_CATEGORIES = ['commercial', 'operational', 'system']
 
 /** 管理员创建广告活动允许的字段白名单 */
 const ALLOWED_ADMIN_CREATE_FIELDS = [
@@ -187,6 +193,160 @@ router.post(
 )
 
 /**
+ * POST /operational - 创建运营内容计划（简化流程，无计费字段）
+ * @route POST /api/v4/console/ad-campaigns/operational
+ * @access Private (Admin)
+ * @body {string} campaign_name - 计划名称
+ * @body {number} ad_slot_id - 广告位ID
+ * @body {number} [priority=500] - 优先级（100-899）
+ * @body {string} [frequency_rule='once_per_day'] - 频次规则
+ * @body {number} [frequency_value=1] - 频次参数值
+ * @body {boolean} [force_show=false] - 是否强制弹出
+ * @body {number} [slide_interval_ms=3000] - 轮播间隔毫秒
+ * @body {string} [start_date] - 开始日期（YYYY-MM-DD）
+ * @body {string} [end_date] - 结束日期（YYYY-MM-DD）
+ * @body {string} [internal_notes] - 内部运营备注
+ */
+router.post(
+  '/operational',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    try {
+      const { campaign_name, ad_slot_id } = req.body
+
+      if (!campaign_name || !ad_slot_id) {
+        return res.apiBadRequest('缺少必需参数：campaign_name, ad_slot_id')
+      }
+
+      const AdCampaignService = req.app.locals.services.getService('ad_campaign')
+      const campaign = await AdCampaignService.createOperationalCampaign({
+        operator_user_id: req.user.user_id,
+        ad_slot_id: parseInt(ad_slot_id),
+        campaign_name,
+        priority: req.body.priority ? parseInt(req.body.priority) : 500,
+        frequency_rule: req.body.frequency_rule || 'once_per_day',
+        frequency_value: req.body.frequency_value ? parseInt(req.body.frequency_value) : 1,
+        force_show: req.body.force_show === true || req.body.force_show === 'true',
+        slide_interval_ms: req.body.slide_interval_ms
+          ? parseInt(req.body.slide_interval_ms)
+          : 3000,
+        start_date: req.body.start_date || null,
+        end_date: req.body.end_date || null,
+        internal_notes: req.body.internal_notes || null,
+        targeting_rules: req.body.targeting_rules || null
+      })
+
+      logger.info('创建运营内容计划成功', {
+        campaign_id: campaign.ad_campaign_id,
+        operator_user_id: req.user.user_id
+      })
+
+      return res.apiSuccess(campaign, '创建运营内容计划成功')
+    } catch (error) {
+      logger.error('创建运营内容计划失败', {
+        error: error.message,
+        operator_user_id: req.user.user_id
+      })
+      return res.apiInternalError(
+        '创建运营内容计划失败',
+        error.message,
+        'OPERATIONAL_CAMPAIGN_CREATE_ERROR'
+      )
+    }
+  })
+)
+
+/**
+ * POST /system - 创建系统通知计划（简化流程，强制展示）
+ * @route POST /api/v4/console/ad-campaigns/system
+ * @access Private (Admin)
+ * @body {string} campaign_name - 通知标题
+ * @body {number} ad_slot_id - 广告位ID（通常为 home_announcement）
+ * @body {number} [priority=950] - 优先级（900-999）
+ * @body {boolean} [force_show=true] - 是否强制展示
+ * @body {string} [end_date] - 过期日期（YYYY-MM-DD）
+ * @body {string} [internal_notes] - 内部备注
+ */
+router.post(
+  '/system',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    try {
+      const { campaign_name, ad_slot_id } = req.body
+
+      if (!campaign_name || !ad_slot_id) {
+        return res.apiBadRequest('缺少必需参数：campaign_name, ad_slot_id')
+      }
+
+      const AdCampaignService = req.app.locals.services.getService('ad_campaign')
+      const campaign = await AdCampaignService.createSystemCampaign({
+        operator_user_id: req.user.user_id,
+        ad_slot_id: parseInt(ad_slot_id),
+        campaign_name,
+        priority: req.body.priority ? parseInt(req.body.priority) : 950,
+        force_show: req.body.force_show !== false,
+        start_date: req.body.start_date || null,
+        end_date: req.body.end_date || null,
+        internal_notes: req.body.internal_notes || null,
+        targeting_rules: req.body.targeting_rules || null
+      })
+
+      logger.info('创建系统通知计划成功', {
+        campaign_id: campaign.ad_campaign_id,
+        operator_user_id: req.user.user_id
+      })
+
+      return res.apiSuccess(campaign, '创建系统通知计划成功')
+    } catch (error) {
+      logger.error('创建系统通知计划失败', {
+        error: error.message,
+        operator_user_id: req.user.user_id
+      })
+      return res.apiInternalError(
+        '创建系统通知计划失败',
+        error.message,
+        'SYSTEM_CAMPAIGN_CREATE_ERROR'
+      )
+    }
+  })
+)
+
+/**
+ * PATCH /:id/publish - 发布运营/系统类型计划（draft → active）
+ * D1 定论：手动发布，跳过审核流程
+ * @route PATCH /api/v4/console/ad-campaigns/:id/publish
+ * @access Private (Admin)
+ * @param {number} id - 计划ID
+ */
+router.patch(
+  '/:id/publish',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    try {
+      const { id } = req.params
+
+      const AdCampaignService = req.app.locals.services.getService('ad_campaign')
+      const campaign = await AdCampaignService.publishCampaign(parseInt(id))
+
+      logger.info('发布计划成功', {
+        campaign_id: id,
+        operator_user_id: req.user.user_id,
+        category: campaign.campaign_category
+      })
+
+      return res.apiSuccess(campaign, '发布成功')
+    } catch (error) {
+      logger.error('发布计划失败', {
+        error: error.message,
+        campaign_id: req.params.id,
+        operator_user_id: req.user.user_id
+      })
+      return res.apiInternalError('发布计划失败', error.message, 'CAMPAIGN_PUBLISH_ERROR')
+    }
+  })
+)
+
+/**
  * GET /statistics - 获取广告活动统计数据
  * 注意：此路由必须定义在 /:id 之前，否则 "statistics" 会被匹配为 :id 参数
  *
@@ -247,69 +407,35 @@ router.get(
 )
 
 /**
- * GET /popup-banners/:id/show-stats - 获取弹窗横幅展示统计
- * 注意：此路由必须定义在 /:id 之前，因为含有固定前缀路径段
- *
- * @route GET /api/v4/console/ad-campaigns/popup-banners/:id/show-stats
+ * GET /interaction-stats/:id - 获取计划交互统计（统一替代旧的 popup/carousel 独立统计）
+ * @route GET /api/v4/console/ad-campaigns/interaction-stats/:id
  * @access Private (Admin)
- * @param {number} id - 弹窗横幅ID
+ * @param {number} id - 广告计划ID
  * @query {string} [start_date] - 开始日期（YYYY-MM-DD）
  * @query {string} [end_date] - 结束日期（YYYY-MM-DD）
  */
 router.get(
-  '/popup-banners/:id/show-stats',
+  '/interaction-stats/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
       const { id } = req.params
       const { start_date, end_date } = req.query
 
-      const PopupShowLogService = req.app.locals.services.getService('popup_show_log')
-      const stats = await PopupShowLogService.getShowStats(parseInt(id), {
+      const AdInteractionLogService =
+        req.app.locals.services.getService('ad_interaction_log')
+      const stats = await AdInteractionLogService.getShowStats(parseInt(id), {
         start_date,
         end_date
       })
 
-      return res.apiSuccess(stats, '获取弹窗横幅展示统计成功')
+      return res.apiSuccess(stats, '获取交互统计成功')
     } catch (error) {
-      logger.error('获取弹窗横幅展示统计失败', {
+      logger.error('获取交互统计失败', {
         error: error.message,
-        popup_banner_id: req.params.id
+        campaign_id: req.params.id
       })
-      return res.apiInternalError('获取展示统计失败', error.message, 'POPUP_SHOW_STATS_ERROR')
-    }
-  })
-)
-
-/**
- * GET /carousel-items/:id/show-stats - 获取轮播图展示统计
- * @route GET /api/v4/console/ad-campaigns/carousel-items/:id/show-stats
- * @access Private (Admin)
- * @param {number} id - 轮播图ID
- * @query {string} [start_date] - 开始日期（YYYY-MM-DD）
- * @query {string} [end_date] - 结束日期（YYYY-MM-DD）
- */
-router.get(
-  '/carousel-items/:id/show-stats',
-  adminAuthMiddleware,
-  asyncHandler(async (req, res) => {
-    try {
-      const { id } = req.params
-      const { start_date, end_date } = req.query
-
-      const CarouselShowLogService = req.app.locals.services.getService('carousel_show_log')
-      const stats = await CarouselShowLogService.getShowStats(parseInt(id), {
-        start_date,
-        end_date
-      })
-
-      return res.apiSuccess(stats, '获取轮播图展示统计成功')
-    } catch (error) {
-      logger.error('获取轮播图展示统计失败', {
-        error: error.message,
-        carousel_item_id: req.params.id
-      })
-      return res.apiInternalError('获取展示统计失败', error.message, 'CAROUSEL_SHOW_STATS_ERROR')
+      return res.apiInternalError('获取交互统计失败', error.message, 'INTERACTION_STATS_ERROR')
     }
   })
 )

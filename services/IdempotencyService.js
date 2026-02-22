@@ -255,6 +255,17 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/customer-service/assignments/batch': 'ADMIN_CS_ASSIGNMENT_BATCH', // 批量分配用户
   '/api/v4/console/customer-service/assignments/:id': 'ADMIN_CS_ASSIGNMENT_DELETE', // 解除用户分配
 
+  // ===== GM工作台 — 工单管理 =====
+  '/api/v4/console/customer-service/issues': 'ADMIN_CS_ISSUE_CREATE', // 创建工单
+  '/api/v4/console/customer-service/issues/:id': 'ADMIN_CS_ISSUE_UPDATE', // 更新工单
+  '/api/v4/console/customer-service/issues/:id/notes': 'ADMIN_CS_ISSUE_NOTE_ADD', // 添加工单备注
+
+  // ===== GM工作台 — 补偿发放 =====
+  '/api/v4/console/customer-service/gm-tools/compensate': 'ADMIN_CS_COMPENSATE', // 客服补偿发放
+
+  // ===== GM工作台 — 消息模板 =====
+  '/api/v4/console/customer-service/gm-tools/templates': 'ADMIN_CS_TEMPLATE_UPDATE', // 更新消息模板
+
   // ===== 图片管理 =====
   '/api/v4/console/images/upload': 'ADMIN_IMAGE_UPLOAD', // 上传图片
   '/api/v4/console/images/:id/bind': 'ADMIN_IMAGE_BIND', // 绑定图片
@@ -291,6 +302,14 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/prize-pool/prize/:id': 'ADMIN_PRIZE_UPDATE', // 更新奖品或删除奖品
   '/api/v4/console/prize-pool/prize/:id/add-stock': 'ADMIN_PRIZE_ADD_STOCK', // 增加库存
   '/api/v4/console/prize-pool/batch-add': 'ADMIN_PRIZE_BATCH_ADD', // 批量添加奖品
+  '/api/v4/console/prize-pool/:code/add-prize': 'ADMIN_PRIZE_ADD_TO_CAMPAIGN', // 为活动添加单个奖品
+  '/api/v4/console/prize-pool/prize/:id/stock': 'ADMIN_PRIZE_SET_STOCK', // 设置绝对库存
+  '/api/v4/console/prize-pool/:code/batch-stock': 'ADMIN_PRIZE_BATCH_STOCK', // 批量更新库存
+  '/api/v4/console/prize-pool/:code/sort-order': 'ADMIN_PRIZE_SORT_ORDER', // 批量更新排序
+
+  // ===== 分群规则管理 =====
+  '/api/v4/console/segment-rules': 'ADMIN_SEGMENT_RULE_CREATE', // 创建分群策略
+  '/api/v4/console/segment-rules/:code': 'ADMIN_SEGMENT_RULE_UPDATE', // 更新/删除分群策略
 
   // ===== 抽奖配额管理 =====
   '/api/v4/console/lottery-quota/rules/': 'ADMIN_LOTTERY_QUOTA_CREATE', // 创建配额规则（修复：尾斜杠）
@@ -368,9 +387,7 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 风险告警 =====
   '/api/v4/console/risk-alerts/:id/review': 'ADMIN_RISK_ALERT_REVIEW', // 审核风险告警（修复：risk/alerts → risk-alerts）
 
-  // ===== 公告与反馈管理 =====
-  '/api/v4/console/system/announcements/': 'ADMIN_ANNOUNCEMENT_CREATE', // 创建公告（修复：尾斜杠）
-  '/api/v4/console/system/announcements/:id': 'ADMIN_ANNOUNCEMENT_UPDATE', // 更新公告（PUT）或删除公告（DELETE）
+  // ===== 反馈管理（公告已合并到 ad-campaigns?category=system） =====
   '/api/v4/console/system/feedbacks/:id/reply': 'ADMIN_FEEDBACK_REPLY', // 回复反馈
   '/api/v4/console/system/feedbacks/:id/status': 'ADMIN_FEEDBACK_STATUS', // 更新反馈状态
   '/api/v4/console/system/feedbacks/batch-status': 'ADMIN_FEEDBACK_BATCH_STATUS', // 批量更新反馈状态
@@ -378,23 +395,12 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 区域管理 =====
   '/api/v4/console/regions/validate': 'ADMIN_REGION_VALIDATE', // 验证区域（修复：console/validate → console/regions/validate）
 
-  // ===== 弹窗 Banner 管理 =====
-  '/api/v4/console/popup-banners/': 'ADMIN_POPUP_BANNER_CREATE', // 创建弹窗 Banner（修复：尾斜杠）
-  '/api/v4/console/popup-banners/:id': 'ADMIN_POPUP_BANNER_UPDATE', // 更新弹窗 Banner（PUT）或删除（DELETE）
-  '/api/v4/console/popup-banners/:id/toggle': 'ADMIN_POPUP_BANNER_TOGGLE', // 切换弹窗 Banner 状态（新增）
-  '/api/v4/console/popup-banners/order': 'ADMIN_POPUP_BANNER_ORDER', // 调整弹窗 Banner 排序（新增）
-
-  // ===== 轮播图管理（Phase 1 — 拍板决策1：轮播图独立表） =====
-  '/api/v4/console/carousel-items/': 'ADMIN_CAROUSEL_ITEM_CREATE', // 创建轮播图
-  '/api/v4/console/carousel-items/:id': 'ADMIN_CAROUSEL_ITEM_UPDATE', // 更新轮播图（PUT）或删除（DELETE）
-  '/api/v4/console/carousel-items/:id/toggle': 'ADMIN_CAROUSEL_ITEM_TOGGLE', // 切换轮播图启用状态
-  '/api/v4/console/carousel-items/order': 'ADMIN_CAROUSEL_ITEM_ORDER', // 调整轮播图排序
+  // [已合并] 弹窗 Banner + 轮播图管理 → 使用 ad-campaigns 路由（category=operational）
 
   // ===== 广告系统（Phase 2-6 虚拟货币广告平台） =====
 
-  // Phase 2: 展示日志上报
-  '/api/v4/system/ad-events/popup-banners/show-log': 'AD_POPUP_SHOW_LOG_CREATE', // 弹窗展示日志上报
-  '/api/v4/system/ad-events/carousel-items/show-log': 'AD_CAROUSEL_SHOW_LOG_CREATE', // 轮播图曝光日志上报
+  // 统一交互日志上报（D2 定论：替代已移除的 popup_show_log / carousel_show_log 两个分散端点）
+  '/api/v4/system/ad-events/interaction-log': 'AD_INTERACTION_LOG_CREATE', // 统一内容交互日志上报
 
   // Phase 3: 广告计划管理（用户端）
   '/api/v4/user/ad-campaigns/': 'USER_AD_CAMPAIGN_CREATE', // 创建广告计划
@@ -404,6 +410,7 @@ const CANONICAL_OPERATION_MAP = {
 
   // Phase 3: 广告计划管理（管理端）
   '/api/v4/console/ad-campaigns/': 'ADMIN_AD_CAMPAIGN_CREATE', // 管理员创建广告计划
+  '/api/v4/console/ad-campaigns/:id': 'ADMIN_AD_CAMPAIGN_UPDATE_STATUS', // 管理员更新活动状态（发布/暂停）
   '/api/v4/console/ad-campaigns/:id/review': 'ADMIN_AD_CAMPAIGN_REVIEW', // 审核广告计划
 
   // Phase 3: 广告位管理（管理端）

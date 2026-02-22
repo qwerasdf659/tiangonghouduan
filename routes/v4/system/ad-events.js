@@ -2,17 +2,17 @@
  * 系统端 - 广告事件上报模块
  *
  * 业务范围：
- * - 弹窗横幅展示事件上报
- * - 轮播图展示事件上报
- * - 广告曝光事件上报（Phase 5）
- * - 广告点击事件上报（Phase 5）
+ * - 统一内容交互日志上报（D2 定论：替代 popup-banners/carousel-items 独立上报）
+ * - 广告曝光事件上报（Phase 5，commercial 类型专用）
+ * - 广告点击事件上报（Phase 5，commercial 类型专用）
  *
  * 架构规范：
  * - 路由层不直连 models，通过 ServiceManager 获取相应 Service
  * - 使用 res.apiSuccess / res.apiError 统一响应
  * - 曝光和点击事件需经过反作弊检查（AdAntifraudService）
+ * - 与 ad-delivery.js 职责分离（ad-events 只写，ad-delivery 只读）
  *
- * @see docs/广告系统升级方案.md
+ * @see docs/内容投放系统-重复功能合并方案.md 第十七节 17.3
  */
 
 const express = require('express')
@@ -30,104 +30,68 @@ const asyncHandler = fn => (req, res, next) => {
 const logger = require('../../../utils/logger').logger
 
 /**
- * POST /popup-banners/show-log - 上报弹窗横幅展示事件
- * @route POST /api/v4/system/ad-events/popup-banners/show-log
+ * POST /interaction-log - 统一内容交互日志上报（D2 定论：替代旧的独立上报端点）
+ *
+ * 替代原来的 2 个独立端点：
+ * - POST /popup-banners/show-log → interaction_type='impression', extra_data.show_duration_ms
+ * - POST /carousel-items/show-log → interaction_type='impression', extra_data.exposure_duration_ms
+ *
+ * @route POST /api/v4/system/ad-events/interaction-log
  * @access Private
- * @body {number} popup_banner_id - 弹窗横幅ID
- * @body {number} [show_duration_ms] - 展示时长（毫秒）
- * @body {string} [close_method] - 关闭方式（auto/manual/click）
- * @body {number} [queue_position] - 队列位置
+ * @body {number} ad_campaign_id - 广告计划ID（来自 ad-delivery 接口返回）
+ * @body {string} interaction_type - 交互类型（impression/click/close/swipe）
+ * @body {Object} [extra_data] - 扩展数据JSON
  */
 router.post(
-  '/popup-banners/show-log',
+  '/interaction-log',
   authenticateToken,
   asyncHandler(async (req, res) => {
     try {
-      const { popup_banner_id, show_duration_ms, close_method, queue_position } = req.body
+      const { ad_campaign_id, interaction_type, extra_data } = req.body
 
-      if (!popup_banner_id) {
-        return res.apiBadRequest('缺少必需参数：popup_banner_id')
+      if (!ad_campaign_id || !interaction_type) {
+        return res.apiBadRequest('缺少必需参数：ad_campaign_id, interaction_type')
       }
 
-      const parsedBannerId = parseInt(popup_banner_id)
-      if (isNaN(parsedBannerId)) {
-        return res.apiBadRequest('popup_banner_id 必须是有效数字')
+      const parsedCampaignId = parseInt(ad_campaign_id)
+      if (isNaN(parsedCampaignId)) {
+        return res.apiBadRequest('ad_campaign_id 必须是有效数字')
       }
 
-      const PopupShowLogService = req.app.locals.services.getService('popup_show_log')
-      const showLog = await PopupShowLogService.createLog({
-        popup_banner_id: parsedBannerId,
+      const validTypes = ['impression', 'click', 'close', 'swipe']
+      if (!validTypes.includes(interaction_type)) {
+        return res.apiBadRequest(
+          'interaction_type 必须是以下之一：' + validTypes.join(', ')
+        )
+      }
+
+      const AdInteractionLogService =
+        req.app.locals.services.getService('ad_interaction_log')
+      const log = await AdInteractionLogService.createLog({
+        ad_campaign_id: parsedCampaignId,
         user_id: req.user.user_id,
-        show_duration_ms: show_duration_ms ? parseInt(show_duration_ms) : null,
-        close_method,
-        queue_position: queue_position ? parseInt(queue_position) : null
+        interaction_type,
+        extra_data: extra_data || null
       })
 
-      logger.info('弹窗横幅展示事件上报成功', {
-        popup_banner_id,
+      logger.info('统一交互日志上报成功', {
+        ad_campaign_id: parsedCampaignId,
+        interaction_type,
         user_id: req.user.user_id
       })
 
-      return res.apiSuccess(showLog, '上报展示事件成功')
+      return res.apiSuccess(log, '上报交互日志成功')
     } catch (error) {
-      logger.error('弹窗横幅展示事件上报失败', {
+      logger.error('统一交互日志上报失败', {
         error: error.message,
-        popup_banner_id: req.body.popup_banner_id,
+        ad_campaign_id: req.body.ad_campaign_id,
         user_id: req.user?.user_id
       })
-      return res.apiInternalError('上报展示事件失败', error.message, 'POPUP_SHOW_LOG_ERROR')
-    }
-  })
-)
-
-/**
- * POST /carousel-items/show-log - 上报轮播图展示事件
- * @route POST /api/v4/system/ad-events/carousel-items/show-log
- * @access Private
- * @body {number} carousel_item_id - 轮播图ID
- * @body {number} [exposure_duration_ms] - 曝光时长（毫秒）
- * @body {boolean} [is_manual_swipe] - 是否手动滑动
- * @body {boolean} [is_clicked] - 是否点击
- */
-router.post(
-  '/carousel-items/show-log',
-  authenticateToken,
-  asyncHandler(async (req, res) => {
-    try {
-      const { carousel_item_id, exposure_duration_ms, is_manual_swipe, is_clicked } = req.body
-
-      if (!carousel_item_id) {
-        return res.apiBadRequest('缺少必需参数：carousel_item_id')
-      }
-
-      const parsedItemId = parseInt(carousel_item_id)
-      if (isNaN(parsedItemId)) {
-        return res.apiBadRequest('carousel_item_id 必须是有效数字')
-      }
-
-      const CarouselShowLogService = req.app.locals.services.getService('carousel_show_log')
-      const showLog = await CarouselShowLogService.createLog({
-        carousel_item_id: parsedItemId,
-        user_id: req.user.user_id,
-        exposure_duration_ms: exposure_duration_ms ? parseInt(exposure_duration_ms) : null,
-        is_manual_swipe:
-          is_manual_swipe === true || is_manual_swipe === 'true' || is_manual_swipe === 1,
-        is_clicked: is_clicked === true || is_clicked === 'true' || is_clicked === 1
-      })
-
-      logger.info('轮播图展示事件上报成功', {
-        carousel_item_id,
-        user_id: req.user.user_id
-      })
-
-      return res.apiSuccess(showLog, '上报展示事件成功')
-    } catch (error) {
-      logger.error('轮播图展示事件上报失败', {
-        error: error.message,
-        carousel_item_id: req.body.carousel_item_id,
-        user_id: req.user?.user_id
-      })
-      return res.apiInternalError('上报展示事件失败', error.message, 'CAROUSEL_SHOW_LOG_ERROR')
+      return res.apiInternalError(
+        '上报交互日志失败',
+        error.message,
+        'INTERACTION_LOG_ERROR'
+      )
     }
   })
 )

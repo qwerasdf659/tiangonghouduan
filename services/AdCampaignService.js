@@ -2,20 +2,30 @@
  * 广告计划服务层（AdCampaignService）
  *
  * 业务场景：
- * - 管理广告主的广告投放计划
- * - 支持固定包天和竞价两种计费模式
- * - 管理计划的审核、启用、暂停等生命周期状态
- * - 记录计划的预算、消耗、定向规则等信息
+ * - 统一管理所有内容投放计划（商业广告 / 运营推广 / 系统通知）
+ * - 支持三种计费模式：固定包天、竞价、免费（运营/系统类型）
+ * - 商业广告走完整审核流程，运营/系统类型走简化发布流程（D1 定论：draft→active）
+ * - 通过 campaign_category 区分不同类型，priority 按类型分段校验（D6 定论）
  *
  * 服务对象：
  * - /api/v4/ad/campaigns（小程序端 - 用户自己的计划）
  * - /api/v4/console/ad-campaigns（管理端 - 计划管理和审核）
  *
  * 创建时间：2026-02-18
+ * 更新时间：2026-02-22（内容投放合并 — 新增运营/系统类型创建方法）
+ *
+ * @see docs/内容投放系统-重复功能合并方案.md
  */
 
 const logger = require('../utils/logger').logger
-const { AdCampaign, AdSlot, AdCreative, AdBillingRecord, User } = require('../models')
+const {
+  AdCampaign,
+  AdSlot,
+  AdCreative,
+  AdBillingRecord,
+  AdInteractionLog,
+  User
+} = require('../models')
 
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
@@ -491,11 +501,15 @@ class AdCampaignService {
         status,
         billing_mode,
         advertiser_user_id,
-        ad_slot_id
+        ad_slot_id,
+        campaign_category
       } = options
 
       // 构建查询条件
       const where = {}
+      if (campaign_category) {
+        where.campaign_category = campaign_category
+      }
       if (status) {
         where.status = status
       }
@@ -507,6 +521,9 @@ class AdCampaignService {
       }
       if (ad_slot_id) {
         where.ad_slot_id = ad_slot_id
+      }
+      if (campaign_category) {
+        where.campaign_category = campaign_category
       }
 
       // 查询总数
@@ -693,6 +710,196 @@ class AdCampaignService {
   }
 
   /**
+   * 创建运营内容计划（operational 类型 — 原 PopupBanner / CarouselItem）
+   *
+   * 简化创建流程：
+   * - billing_mode 固定为 'free'
+   * - status 固定为 'draft'（D1 定论：手动点"发布"切 active）
+   * - priority 范围 100-899（D6 定论：Service 层强制校验）
+   * - 不需要预算、竞价等计费字段
+   *
+   * @param {Object} data - 计划数据
+   * @param {number} data.operator_user_id - 运营人员用户ID
+   * @param {number} data.ad_slot_id - 广告位ID
+   * @param {string} data.campaign_name - 计划名称
+   * @param {string} [data.frequency_rule='once_per_day'] - 频次规则
+   * @param {number} [data.frequency_value=1] - 频次参数值
+   * @param {boolean} [data.force_show=false] - 是否强制弹出
+   * @param {number} [data.priority=500] - 优先级（100-899）
+   * @param {number} [data.slide_interval_ms=3000] - 轮播间隔（carousel 类型）
+   * @param {string} [data.start_date] - 开始日期
+   * @param {string} [data.end_date] - 结束日期
+   * @param {string} [data.internal_notes] - 内部备注
+   * @param {Object} [data.targeting_rules] - 定向规则
+   * @param {Object} options - 操作选项
+   * @param {Object} options.transaction - 数据库事务
+   * @returns {Promise<Object>} 创建的广告计划对象
+   */
+  static async createOperationalCampaign(data, options = {}) {
+    try {
+      const priority = data.priority || 500
+      if (priority < 100 || priority > 899) {
+        throw new Error('运营内容优先级必须在 100-899 范围内，当前值: ' + priority)
+      }
+
+      const adSlot = await AdSlot.findByPk(data.ad_slot_id, {
+        transaction: options.transaction
+      })
+      if (!adSlot) {
+        throw new Error('广告位不存在: ' + data.ad_slot_id)
+      }
+      if (!adSlot.is_active) {
+        throw new Error('广告位未启用: ' + data.ad_slot_id)
+      }
+
+      const business_id = uuidv4()
+
+      const campaign = await AdCampaign.create(
+        {
+          business_id,
+          campaign_category: 'operational',
+          advertiser_user_id: data.operator_user_id,
+          ad_slot_id: data.ad_slot_id,
+          campaign_name: data.campaign_name,
+          billing_mode: 'free',
+          status: 'draft',
+          priority,
+          frequency_rule: data.frequency_rule || 'once_per_day',
+          frequency_value: data.frequency_value || 1,
+          force_show: data.force_show || false,
+          slide_interval_ms: data.slide_interval_ms || 3000,
+          internal_notes: data.internal_notes || null,
+          targeting_rules: data.targeting_rules || null,
+          start_date: data.start_date || null,
+          end_date: data.end_date || null
+        },
+        { transaction: options.transaction }
+      )
+
+      logger.info('创建运营内容计划成功', {
+        campaign_id: campaign.ad_campaign_id,
+        operator_user_id: data.operator_user_id,
+        slot_id: data.ad_slot_id
+      })
+
+      return campaign
+    } catch (error) {
+      logger.error('创建运营内容计划失败', { error: error.message, data })
+      throw error
+    }
+  }
+
+  /**
+   * 创建系统通知计划（system 类型 — 原 SystemAnnouncement）
+   *
+   * 简化创建流程：
+   * - billing_mode 固定为 'free'
+   * - status 固定为 'draft'（D1 定论：手动点"发布"切 active）
+   * - priority 范围 900-999（D6 定论：Service 层强制校验）
+   * - force_show 默认为 true（系统通知默认强制展示）
+   *
+   * @param {Object} data - 计划数据
+   * @param {number} data.operator_user_id - 管理员用户ID
+   * @param {number} data.ad_slot_id - 广告位ID（通常为 home_announcement）
+   * @param {string} data.campaign_name - 通知标题
+   * @param {number} [data.priority=950] - 优先级（900-999）
+   * @param {boolean} [data.force_show=true] - 是否强制展示
+   * @param {string} [data.end_date] - 过期日期
+   * @param {string} [data.internal_notes] - 内部备注
+   * @param {Object} [data.targeting_rules] - 目标用户组
+   * @param {Object} options - 操作选项
+   * @param {Object} options.transaction - 数据库事务
+   * @returns {Promise<Object>} 创建的广告计划对象
+   */
+  static async createSystemCampaign(data, options = {}) {
+    try {
+      const priority = data.priority || 950
+      if (priority < 900 || priority > 999) {
+        throw new Error('系统通知优先级必须在 900-999 范围内，当前值: ' + priority)
+      }
+
+      const adSlot = await AdSlot.findByPk(data.ad_slot_id, {
+        transaction: options.transaction
+      })
+      if (!adSlot) {
+        throw new Error('广告位不存在: ' + data.ad_slot_id)
+      }
+
+      const business_id = uuidv4()
+
+      const campaign = await AdCampaign.create(
+        {
+          business_id,
+          campaign_category: 'system',
+          advertiser_user_id: data.operator_user_id,
+          ad_slot_id: data.ad_slot_id,
+          campaign_name: data.campaign_name,
+          billing_mode: 'free',
+          status: 'draft',
+          priority,
+          force_show: data.force_show !== undefined ? data.force_show : true,
+          internal_notes: data.internal_notes || null,
+          targeting_rules: data.targeting_rules || null,
+          start_date: data.start_date || null,
+          end_date: data.end_date || null
+        },
+        { transaction: options.transaction }
+      )
+
+      logger.info('创建系统通知计划成功', {
+        campaign_id: campaign.ad_campaign_id,
+        operator_user_id: data.operator_user_id
+      })
+
+      return campaign
+    } catch (error) {
+      logger.error('创建系统通知计划失败', { error: error.message, data })
+      throw error
+    }
+  }
+
+  /**
+   * 发布计划（draft → active）
+   * 运营/系统类型使用此方法直接激活，跳过审核流程（D1 定论）
+   *
+   * @param {number} campaignId - 计划ID
+   * @param {Object} options - 操作选项
+   * @param {Object} options.transaction - 数据库事务
+   * @returns {Promise<Object>} 更新后的广告计划
+   */
+  static async publishCampaign(campaignId, options = {}) {
+    try {
+      const campaign = await AdCampaign.findByPk(campaignId, {
+        transaction: options.transaction
+      })
+
+      if (!campaign) {
+        throw new Error('计划不存在: ' + campaignId)
+      }
+
+      if (campaign.status !== 'draft') {
+        throw new Error('只能发布草稿状态的计划，当前状态: ' + campaign.status)
+      }
+
+      if (!['operational', 'system'].includes(campaign.campaign_category)) {
+        throw new Error('只有运营/系统类型计划可以直接发布，当前类型: ' + campaign.campaign_category)
+      }
+
+      await campaign.update({ status: 'active' }, { transaction: options.transaction })
+
+      logger.info('发布计划成功', {
+        campaign_id: campaignId,
+        category: campaign.campaign_category
+      })
+
+      return campaign
+    } catch (error) {
+      logger.error('发布计划失败', { campaignId, error: error.message })
+      throw error
+    }
+  }
+
+  /**
    * 获取广告计划统计信息
    *
    * @returns {Promise<Object>} 统计信息
@@ -751,7 +958,7 @@ class AdCampaignService {
       })
 
       // 组装计费模式统计
-      const byBillingMode = { fixed_daily: 0, bidding: 0 }
+      const byBillingMode = { fixed_daily: 0, bidding: 0, free: 0 }
       billingModeCounts.forEach(row => {
         byBillingMode[row.billing_mode] = parseInt(row.count) || 0
       })
@@ -765,6 +972,322 @@ class AdCampaignService {
     } catch (error) {
       logger.error('获取广告计划统计信息失败', { error: error.message })
       throw error
+    }
+  }
+
+  /**
+   * 创建运营内容计划（简化流程：billing_mode='free'，status='draft'，手动发布切 active）
+   * D1 定论 + D6 定论：priority 强制 100-899 范围
+   *
+   * @param {Object} data - 创建数据
+   * @param {number} data.ad_slot_id - 广告位ID
+   * @param {string} data.campaign_name - 计划名称
+   * @param {number} data.advertiser_user_id - 运营人员 user_id
+   * @param {number} [data.priority=500] - 优先级（100-899）
+   * @param {string} [data.frequency_rule='once_per_day'] - 频次规则
+   * @param {number} [data.frequency_value=1] - 频次参数
+   * @param {boolean} [data.force_show=false] - 是否强制弹出
+   * @param {number} [data.slide_interval_ms] - 轮播间隔毫秒
+   * @param {string} [data.start_date] - 开始日期
+   * @param {string} [data.end_date] - 结束日期
+   * @param {string} [data.internal_notes] - 内部备注
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 数据库事务（路由层传入）
+   * @returns {Promise<Object>} 创建的 campaign 实例
+   */
+  static async createOperationalCampaign(data, options = {}) {
+    const priority = data.priority || 500
+    if (priority < 100 || priority > 899) {
+      throw new Error('运营内容优先级必须在 100-899 范围内')
+    }
+
+    const campaignData = {
+      business_id: data.business_id || `operational_${uuidv4()}`,
+      advertiser_user_id: data.advertiser_user_id,
+      ad_slot_id: data.ad_slot_id,
+      campaign_name: data.campaign_name,
+      billing_mode: 'free',
+      status: 'draft',
+      campaign_category: 'operational',
+      priority,
+      start_date: data.start_date || null,
+      end_date: data.end_date || null,
+      targeting_rules: data.targeting_rules || null,
+      frequency_rule: data.frequency_rule || 'once_per_day',
+      frequency_value: data.frequency_value || 1,
+      force_show: data.force_show || false,
+      slide_interval_ms: data.slide_interval_ms || null,
+      internal_notes: data.internal_notes || null,
+      budget_spent_diamond: 0
+    }
+
+    const campaign = await AdCampaign.create(campaignData, {
+      transaction: options.transaction
+    })
+
+    logger.info('[AdCampaignService] 创建运营内容计划', {
+      ad_campaign_id: campaign.ad_campaign_id,
+      campaign_name: campaign.campaign_name,
+      priority
+    })
+
+    return campaign
+  }
+
+  /**
+   * 创建系统通知计划（简化流程：billing_mode='free'，force_show=true，priority≥900）
+   * D1 定论 + D6 定论：priority 强制 900-999 范围
+   *
+   * @param {Object} data - 创建数据
+   * @param {number} data.ad_slot_id - 广告位ID
+   * @param {string} data.campaign_name - 计划名称
+   * @param {number} data.advertiser_user_id - 管理员 user_id
+   * @param {number} [data.priority=950] - 优先级（900-999）
+   * @param {string} [data.end_date] - 结束日期
+   * @param {string} [data.internal_notes] - 内部备注
+   * @param {Object} [data.targeting_rules] - 目标用户组
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 数据库事务（路由层传入）
+   * @returns {Promise<Object>} 创建的 campaign 实例
+   */
+  static async createSystemCampaign(data, options = {}) {
+    const priority = data.priority || 950
+    if (priority < 900 || priority > 999) {
+      throw new Error('系统通知优先级必须在 900-999 范围内')
+    }
+
+    const campaignData = {
+      business_id: data.business_id || `system_${uuidv4()}`,
+      advertiser_user_id: data.advertiser_user_id,
+      ad_slot_id: data.ad_slot_id,
+      campaign_name: data.campaign_name,
+      billing_mode: 'free',
+      status: 'draft',
+      campaign_category: 'system',
+      priority,
+      start_date: data.start_date || null,
+      end_date: data.end_date || null,
+      targeting_rules: data.targeting_rules || null,
+      frequency_rule: data.frequency_rule || 'always',
+      frequency_value: 1,
+      force_show: true,
+      internal_notes: data.internal_notes || null,
+      budget_spent_diamond: 0
+    }
+
+    const campaign = await AdCampaign.create(campaignData, {
+      transaction: options.transaction
+    })
+
+    logger.info('[AdCampaignService] 创建系统通知计划', {
+      ad_campaign_id: campaign.ad_campaign_id,
+      campaign_name: campaign.campaign_name,
+      priority
+    })
+
+    return campaign
+  }
+
+  /**
+   * 创建统一交互日志（弹窗/轮播/公告展示事件统一入口）
+   *
+   * @param {Object} data - 交互日志数据
+   * @param {number} data.ad_campaign_id - 广告计划ID
+   * @param {number} data.user_id - 用户ID
+   * @param {string} data.interaction_type - 交互类型：impression/click/close/swipe
+   * @param {number} [data.ad_slot_id] - 广告位ID
+   * @param {Object} [data.extra_data] - 扩展数据（JSON）
+   * @param {Object} [options] - 可选参数
+   * @param {Object} [options.transaction] - Sequelize 事务实例
+   * @returns {Promise<Object>} 创建的日志记录
+   */
+  static async createInteractionLog(data, options = {}) {
+    const { ad_campaign_id, user_id, interaction_type, ad_slot_id = null, extra_data = null } = data
+    const { transaction } = options
+
+    const log = await AdInteractionLog.create(
+      {
+        ad_campaign_id,
+        user_id,
+        ad_slot_id,
+        interaction_type,
+        extra_data
+      },
+      { transaction }
+    )
+
+    logger.info('[AdCampaignService] 统一交互日志已创建', {
+      ad_interaction_log_id: log.ad_interaction_log_id,
+      ad_campaign_id,
+      interaction_type,
+      user_id
+    })
+
+    return log
+  }
+
+  /**
+   * 获取系统通知列表（campaign_category='system'）
+   *
+   * 业务场景：通知中心查看系统级通知，合并自原 SystemAnnouncement
+   *
+   * @param {Object} options - 查询选项
+   * @param {number} [options.limit=50] - 返回数量（最大100）
+   * @returns {Promise<Object>} { notifications, statistics }
+   */
+  static async getSystemNotifications(options = {}) {
+    const { Op } = require('sequelize')
+    const pageSize = Math.min(parseInt(options.limit) || 50, 100)
+
+    const campaigns = await AdCampaign.findAll({
+      where: {
+        campaign_category: 'system',
+        status: { [Op.in]: ['active', 'draft', 'paused'] }
+      },
+      include: [
+        {
+          model: AdCreative,
+          as: 'creatives',
+          attributes: ['ad_creative_id', 'title', 'text_content', 'content_type'],
+          required: false
+        }
+      ],
+      order: [
+        ['priority', 'DESC'],
+        ['created_at', 'DESC']
+      ],
+      limit: pageSize
+    })
+
+    const notifications = campaigns.map(c => {
+      const creative = c.creatives && c.creatives[0]
+      return {
+        notification_id: c.ad_campaign_id,
+        id: c.ad_campaign_id,
+        title: creative?.title || c.campaign_name,
+        content: creative?.text_content || '',
+        type: 'system',
+        priority: c.priority,
+        is_active: c.status === 'active',
+        created_at: c.created_at,
+        end_date: c.end_date
+      }
+    })
+
+    const activeCount = notifications.filter(n => n.is_active).length
+
+    return {
+      notifications,
+      statistics: {
+        total: notifications.length,
+        active: activeCount,
+        unread: activeCount
+      }
+    }
+  }
+
+  /**
+   * 获取单条系统通知详情
+   *
+   * @param {number} notificationId - 通知ID（即 ad_campaign_id）
+   * @param {Object} options - 选项
+   * @param {number} [options.userId] - 当前用户ID（用于记录浏览日志）
+   * @returns {Promise<Object>} 通知详情
+   */
+  static async getSystemNotificationById(notificationId, options = {}) {
+    const campaign = await AdCampaign.findByPk(parseInt(notificationId), {
+      include: [
+        {
+          model: AdCreative,
+          as: 'creatives',
+          attributes: ['ad_creative_id', 'title', 'text_content', 'content_type'],
+          required: false
+        }
+      ]
+    })
+
+    if (!campaign || campaign.campaign_category !== 'system') {
+      return null
+    }
+
+    const creative = campaign.creatives && campaign.creatives[0]
+
+    if (options.userId) {
+      AdInteractionLog.create({
+        ad_campaign_id: campaign.ad_campaign_id,
+        user_id: options.userId,
+        interaction_type: 'impression',
+        extra_data: { source: 'notification_detail' }
+      }).catch(err => {
+        logger.warn('[AdCampaignService] 记录通知浏览日志失败', { error: err.message })
+      })
+    }
+
+    return {
+      notification_id: campaign.ad_campaign_id,
+      id: campaign.ad_campaign_id,
+      type: 'system',
+      title: creative?.title || campaign.campaign_name,
+      content: creative?.text_content || '',
+      is_read: true,
+      created_at: campaign.created_at,
+      priority: campaign.priority,
+      end_date: campaign.end_date
+    }
+  }
+
+  /**
+   * 发送系统通知（创建 system 类型 campaign + text creative）
+   *
+   * @param {Object} data - 通知数据
+   * @param {string} data.title - 通知标题
+   * @param {string} data.content - 通知内容
+   * @param {string} [data.target='all'] - 目标用户
+   * @param {number} data.sender_user_id - 发送者用户ID
+   * @param {Object} [options] - 选项
+   * @param {Object} [options.transaction] - 数据库事务
+   * @returns {Promise<Object>} 发送结果
+   */
+  static async sendSystemNotification(data, options = {}) {
+    const { title, content, target = 'all', sender_user_id } = data
+
+    const announcementSlot = await AdSlot.findOne({
+      where: { slot_type: 'announcement', is_active: true },
+      transaction: options.transaction
+    })
+
+    if (!announcementSlot) {
+      throw new Error('系统公告广告位未配置')
+    }
+
+    const campaign = await this.createSystemCampaign({
+      ad_slot_id: announcementSlot.ad_slot_id,
+      campaign_name: title,
+      advertiser_user_id: sender_user_id,
+      targeting_rules: target !== 'all' ? { target_groups: target } : null,
+      internal_notes: `通过通知中心发送，管理员ID: ${sender_user_id}`
+    }, options)
+
+    await AdCreative.create({
+      ad_campaign_id: campaign.ad_campaign_id,
+      title,
+      content_type: 'text',
+      text_content: content,
+      link_type: 'none',
+      review_status: 'approved'
+    }, { transaction: options.transaction })
+
+    logger.info('[AdCampaignService] 发送系统通知成功', {
+      ad_campaign_id: campaign.ad_campaign_id,
+      title
+    })
+
+    return {
+      notification_id: campaign.ad_campaign_id,
+      title,
+      content,
+      type: 'system',
+      created_at: campaign.created_at
     }
   }
 }

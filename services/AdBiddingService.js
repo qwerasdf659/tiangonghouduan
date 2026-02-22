@@ -2,15 +2,20 @@
  * 广告竞价服务层（AdBiddingService）
  *
  * 业务场景：
- * - 广告竞价引擎：从多个广告计划中选出胜出者
- * - 支持固定包天（直接包含）和竞价（按出价排序）两种模式
- * - 3秒内完成竞价逻辑（SLA要求）
+ * - 统一内容投放引擎：从多个广告计划中选出展示内容
+ * - 三层优先级出队逻辑：system（最高）→ operational（固定排序）→ commercial（竞价排序）
+ * - 支持固定包天（直接包含）和竞价（按出价排序）两种商业计费模式
+ * - 3秒内完成选择逻辑（SLA要求）
  * - 记录所有竞价日志（胜出者和失败者）
  *
  * 服务对象：
+ * - /api/v4/system/ad-delivery（统一前端内容获取，D5 定论）
  * - /api/v4/ads/select（小程序端 - 获取广告）
  *
  * 创建时间：2026-02-18
+ * 更新时间：2026-02-22（内容投放合并 — 三层优先级出队）
+ *
+ * @see docs/内容投放系统-重复功能合并方案.md 第二节 2.7
  */
 
 const logger = require('../utils/logger').logger
@@ -85,19 +90,25 @@ class AdBiddingService {
         userTags = await AdBiddingService._getUserTags(userId, { transaction })
       }
 
-      // 4. 分离固定包天和竞价广告
+      // 4. 三层优先级分组：system → operational → commercial
+      const systemCampaigns = []
+      const operationalCampaigns = []
       const fixedDailyCampaigns = []
       const biddingCampaigns = []
 
       for (const campaign of activeCampaigns) {
-        // Phase 5: 定向匹配检查
-        if (campaign.targeting_rules && userTags) {
-          const matched = AdBiddingService._matchTargeting(
-            JSON.parse(campaign.targeting_rules),
-            userTags
-          )
+        // 定向匹配检查（仅 commercial 需要定向，operational/system 跳过）
+        if (
+          campaign.campaign_category === 'commercial' &&
+          campaign.targeting_rules &&
+          userTags
+        ) {
+          const rules =
+            typeof campaign.targeting_rules === 'string'
+              ? JSON.parse(campaign.targeting_rules)
+              : campaign.targeting_rules
+          const matched = AdBiddingService._matchTargeting(rules, userTags)
           if (!matched) {
-            // 记录未匹配原因
             await AdBidLog.create(
               {
                 ad_slot_id: adSlot.ad_slot_id,
@@ -113,22 +124,29 @@ class AdBiddingService {
           }
         }
 
-        if (campaign.billing_mode === 'fixed_daily') {
+        if (campaign.campaign_category === 'system') {
+          systemCampaigns.push(campaign)
+        } else if (campaign.campaign_category === 'operational') {
+          operationalCampaigns.push(campaign)
+        } else if (campaign.billing_mode === 'fixed_daily') {
           fixedDailyCampaigns.push(campaign)
         } else if (campaign.billing_mode === 'bidding') {
           biddingCampaigns.push(campaign)
         }
       }
 
-      // 5. 竞价排序（按出价降序）
-      biddingCampaigns.sort((a, b) => {
-        const bidA = a.daily_bid_diamond || 0
-        const bidB = b.daily_bid_diamond || 0
-        return bidB - bidA
-      })
+      // 5. 各层内部排序
+      systemCampaigns.sort((a, b) => (b.priority || 0) - (a.priority || 0))
+      operationalCampaigns.sort((a, b) => (b.priority || 0) - (a.priority || 0))
+      biddingCampaigns.sort((a, b) => (b.daily_bid_diamond || 0) - (a.daily_bid_diamond || 0))
 
-      // 6. 合并并截断到最大展示数量
-      const allCandidates = [...fixedDailyCampaigns, ...biddingCampaigns]
+      // 6. 合并：system 最先 → operational 其次 → commercial（固定包天 + 竞价）最后
+      const allCandidates = [
+        ...systemCampaigns,
+        ...operationalCampaigns,
+        ...fixedDailyCampaigns,
+        ...biddingCampaigns
+      ]
       const winners = allCandidates.slice(0, adSlot.max_display_count)
 
       // 7. 记录所有竞价日志
@@ -151,7 +169,7 @@ class AdBiddingService {
         await AdBidLog.bulkCreate(bidLogs, { transaction })
       }
 
-      // 8. 组装返回结果（包含创意数据）
+      // 8. 组装返回结果（包含创意数据 + 合并字段）
       const winnerResults = winners.map(campaign => {
         const creative =
           campaign.creatives && campaign.creatives.length > 0 ? campaign.creatives[0] : null
@@ -159,15 +177,27 @@ class AdBiddingService {
         return {
           ad_campaign_id: campaign.ad_campaign_id,
           campaign_name: campaign.campaign_name,
+          campaign_category: campaign.campaign_category,
           billing_mode: campaign.billing_mode,
-          daily_bid_diamond: campaign.daily_bid_diamond,
+          priority: campaign.priority,
+          frequency_rule: campaign.frequency_rule,
+          frequency_value: campaign.frequency_value,
+          force_show: campaign.force_show,
+          slide_interval_ms: campaign.slide_interval_ms,
+          start_date: campaign.start_date,
+          end_date: campaign.end_date,
           creative: creative
             ? {
                 ad_creative_id: creative.ad_creative_id,
-                image_url: creative.image_url,
                 title: creative.title,
+                content_type: creative.content_type,
+                image_url: creative.image_url,
+                image_width: creative.image_width,
+                image_height: creative.image_height,
+                text_content: creative.text_content,
                 link_url: creative.link_url,
-                link_type: creative.link_type
+                link_type: creative.link_type,
+                display_mode: creative.display_mode
               }
             : null
         }

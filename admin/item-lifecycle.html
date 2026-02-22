@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '物品全链路追踪', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="page-navbar">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="text-blue-200 hover:text-white transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">🔍 物品全链路追踪</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="itemLifecyclePage()" x-init="init()">
+    
+    <!-- 页面横幅 -->
+    <div class="page-banner mb-6">
+      <h1>🔍 物品全链路追踪</h1>
+      <p>输入追踪码或物品ID，查看物品从铸造到最终状态的完整流转历史</p>
+    </div>
+
+    <!-- 搜索区域 -->
+    <div class="content-section mb-6">
+      <div class="content-section-header">
+        <div class="section-title">
+          <span class="title-icon">🔎</span>
+          查询物品
+        </div>
+      </div>
+      <div class="content-section-body">
+        <div class="flex space-x-4">
+          <input type="text" x-model="search_identifier" 
+                 placeholder="输入追踪码（如 LT260219028738）或物品ID" 
+                 class="themed-input flex-1"
+                 @keyup.enter="searchItem()">
+          <button @click="searchItem()" class="themed-btn-primary px-6" :disabled="loading">
+            <span x-show="!loading">查询</span>
+            <span x-show="loading">查询中...</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 查询结果 -->
+    <template x-if="lifecycle_data">
+      
+      <!-- 物品基本信息 -->
+      <div class="content-section mb-6">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">📦</span>
+            物品信息
+          </div>
+          <div class="flex items-center space-x-2">
+            <span class="px-3 py-1 rounded-full text-sm font-medium"
+                  :class="{
+                    'bg-green-100 text-green-800': lifecycle_data.status === 'available',
+                    'bg-yellow-100 text-yellow-800': lifecycle_data.status === 'held',
+                    'bg-gray-100 text-gray-800': lifecycle_data.status === 'used',
+                    'bg-red-100 text-red-800': lifecycle_data.status === 'expired' || lifecycle_data.status === 'destroyed'
+                  }"
+                  x-text="statusDisplay(lifecycle_data.status)">
+            </span>
+          </div>
+        </div>
+        <div class="content-section-body">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <div class="text-sm text-gray-500">追踪码</div>
+              <div class="font-mono font-bold text-lg" x-text="lifecycle_data.tracking_code"></div>
+            </div>
+            <div>
+              <div class="text-sm text-gray-500">物品名称</div>
+              <div class="font-medium" x-text="lifecycle_data.item_name"></div>
+            </div>
+            <div>
+              <div class="text-sm text-gray-500">物品类型</div>
+              <div x-text="lifecycle_data.item_type"></div>
+            </div>
+            <div>
+              <div class="text-sm text-gray-500">价值（积分）</div>
+              <div x-text="lifecycle_data.item_value"></div>
+            </div>
+            <div>
+              <div class="text-sm text-gray-500">来源</div>
+              <div x-text="lifecycle_data.source"></div>
+            </div>
+            <div>
+              <div class="text-sm text-gray-500">来源引用</div>
+              <div x-text="lifecycle_data.source_ref_id || '-'"></div>
+            </div>
+            <div>
+              <div class="text-sm text-gray-500">稀有度</div>
+              <div x-text="lifecycle_data.rarity_code"></div>
+            </div>
+            <div>
+              <div class="text-sm text-gray-500">持有者账户ID</div>
+              <div x-text="lifecycle_data.owner_account_id"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 对账状态 -->
+      <div class="content-section mb-6">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">✅</span>
+            对账状态
+          </div>
+        </div>
+        <div class="content-section-body">
+          <div class="flex items-center space-x-4">
+            <span class="text-2xl" x-text="lifecycle_data.ledger_check.status === 'balanced' ? '✅' : '❌'"></span>
+            <div>
+              <div class="font-medium" x-text="lifecycle_data.ledger_check.status === 'balanced' ? '账本平衡' : '账本不平衡！'"></div>
+              <div class="text-sm text-gray-500">
+                SUM(delta) = <span x-text="lifecycle_data.ledger_check.sum_delta"></span>，
+                共 <span x-text="lifecycle_data.ledger_check.entry_count"></span> 条账本条目
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 时间线 -->
+      <div class="content-section mb-6">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">📊</span>
+            流转时间线
+          </div>
+        </div>
+        <div class="content-section-body">
+          <div class="space-y-4">
+            <template x-for="(event, idx) in lifecycle_data.timeline" :key="idx">
+              <div class="flex items-start space-x-4 border-l-2 border-blue-300 pl-4 py-2">
+                <div class="w-32 text-sm text-gray-500 flex-shrink-0" x-text="formatDateTime(event.time)"></div>
+                <div>
+                  <div class="font-medium" x-text="event.detail"></div>
+                  <div class="text-sm text-gray-400" x-text="event.business_type"></div>
+                </div>
+              </div>
+            </template>
+            <div x-show="!lifecycle_data.timeline || lifecycle_data.timeline.length === 0" class="text-gray-400 text-center py-4">
+              暂无流转记录
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </template>
+
+    <!-- 空状态 -->
+    <div x-show="!lifecycle_data && !loading && searched" class="text-center py-12 text-gray-500" x-cloak>
+      未找到物品，请检查追踪码或物品ID是否正确
+    </div>
+
+  </div>
+
+  <!-- 脚本 -->
+  <script type="module" src="./src/modules/asset/pages/item-lifecycle.js"></script>
+  <%- include('partials/footer') %>
+</body>
+</html>

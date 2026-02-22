@@ -1,23 +1,22 @@
 'use strict'
 
 /**
- * @file 内容过期自动清理定时任务
- * @description 每小时扫描弹窗Banner、轮播图、系统公告，自动将已过期的内容标记为停用
+ * @file 内容/广告计划过期自动清理定时任务
+ * @description 每小时扫描 ad_campaigns 表，自动将已过期的计划标记为 completed
  *
  * 业务场景：
- * - 弹窗Banner（popup_banners）：end_time 已过但 is_active=1 → 自动标记为 is_active=0
- * - 轮播图（carousel_items）：end_time 已过但 is_active=1 → 自动标记为 is_active=0
- * - 系统公告（system_announcements）：expires_at 已过但 is_active=1 → 自动标记为 is_active=0
+ * - 所有类型的 campaign（commercial/operational/system）统一通过 end_date 判断过期
+ * - end_date < 当前日期 且 status='active' → 自动标记为 status='completed'
  *
  * 双保险架构（阿里/美团模式）：
- * - 第一层：查询时过滤（已有，实时准确）
+ * - 第一层：查询时通过 AdBiddingService 的 start_date/end_date 过滤（实时准确）
  * - 第二层：定时任务自动清理（本文件，保证管理后台状态一致）
  *
  * 环境变量控制：
  * - ENABLE_CONTENT_CRON_JOBS=true 时启用（默认禁用）
  *
- * @version 1.0.0
- * @date 2026-02-21
+ * @version 2.0.0
+ * @date 2026-02-22
  * @module jobs/content-cron-jobs
  */
 
@@ -43,7 +42,6 @@ if (!ENABLE_CONTENT_CRON_JOBS) {
     static init() {
       logger.info('[ContentCronJobs] 初始化内容过期清理定时任务')
 
-      // 每小时整点执行过期内容清理
       cron.schedule('0 * * * *', async () => {
         await ContentCronJobs.runExpiredContentCleanup()
       })
@@ -53,70 +51,38 @@ if (!ENABLE_CONTENT_CRON_JOBS) {
 
     /**
      * 执行过期内容清理任务
-     * 扫描三张内容表，将已过期但仍标记为活跃的记录自动停用
+     * 扫描 ad_campaigns 表，将已过期但仍为 active 的计划标记为 completed
      * @returns {Promise<void>} 无返回值
      */
     static async runExpiredContentCleanup() {
       const startTime = Date.now()
       logger.info('[ContentCronJobs] 开始执行过期内容清理任务')
 
-      const results = {
-        popup_banners: 0,
-        carousel_items: 0,
-        system_announcements: 0
-      }
-
       try {
         const { Op } = require('sequelize')
-        const { PopupBanner, CarouselItem, SystemAnnouncement } = require('../models')
-        const now = new Date()
+        const { AdCampaign } = require('../models')
+        const BeijingTimeHelper = require('../utils/timeHelper')
+        const today = BeijingTimeHelper.createDatabaseTime()
 
-        // 1. 清理过期弹窗Banner：end_time < 当前时间 且 is_active=1
-        const [bannerCount] = await PopupBanner.update(
-          { is_active: false },
+        // 统一清理：end_date < 当前日期 且 status='active'
+        const [completedCount] = await AdCampaign.update(
+          { status: 'completed' },
           {
             where: {
-              is_active: true,
-              end_time: { [Op.lt]: now }
-            }
-          }
-        )
-        results.popup_banners = bannerCount
-
-        // 2. 清理过期轮播图：end_time < 当前时间 且 is_active=1
-        const [carouselCount] = await CarouselItem.update(
-          { is_active: false },
-          {
-            where: {
-              is_active: true,
-              end_time: { [Op.lt]: now }
-            }
-          }
-        )
-        results.carousel_items = carouselCount
-
-        // 3. 清理过期公告：expires_at < 当前时间 且 is_active=1（expires_at 为 null 的不处理，表示永不过期）
-        const [announcementCount] = await SystemAnnouncement.update(
-          { is_active: false },
-          {
-            where: {
-              is_active: true,
-              expires_at: {
+              status: 'active',
+              end_date: {
                 [Op.not]: null,
-                [Op.lt]: now
+                [Op.lt]: today
               }
             }
           }
         )
-        results.system_announcements = announcementCount
 
         const duration = Date.now() - startTime
-        const totalCleaned = bannerCount + carouselCount + announcementCount
 
-        if (totalCleaned > 0) {
+        if (completedCount > 0) {
           logger.info('[ContentCronJobs] 过期内容清理完成', {
-            results,
-            total_cleaned: totalCleaned,
+            completed_campaigns: completedCount,
             duration_ms: duration
           })
         } else {

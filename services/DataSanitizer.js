@@ -527,80 +527,6 @@ class DataSanitizer {
   }
 
   /**
-   * 系统公告数据脱敏 - 新增前端需求
-   *
-   * 🗄️ 数据库表：system_announcements（主键：system_announcement_id）
-   *
-   * 业务场景：系统公告列表API响应时调用，防止用户通过抓包获取管理员ID、内部备注等敏感信息
-   *
-   * 脱敏规则：
-   * - 管理员（dataLevel='full'）：返回完整公告数据
-   * - 普通用户（dataLevel='public'）：移除admin_id（管理员ID）、internal_notes（内部备注）、
-   *   target_groups（目标群体）等敏感字段
-   * - 只返回业务必需的公告信息：ID、标题、内容、类型、优先级、创建时间、过期时间、是否激活
-   *
-   * 输入契约：
-   * - 输入数据必须来自 system_announcements 表的 Sequelize 查询结果
-   * - 必须包含 system_announcement_id 字段（数据库主键）
-   *
-   * @param {Array<Object>} announcements - 公告数据数组（来自 system_announcements 表）
-   * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
-   * @returns {Array<Object>} 脱敏后的公告数组（announcement_id 字段映射自 system_announcement_id）
-   * @returns {number} return[].announcement_id - 公告ID（映射自 system_announcement_id，与弹窗 popup_banner_id 命名模式一致）
-   * @returns {string} return[].title - 公告标题
-   * @returns {string} return[].content - 公告内容
-   * @returns {string} return[].type - 公告类型
-   * @returns {string} return[].priority - 优先级
-   * @returns {string} return[].created_at - 创建时间
-   * @returns {string} return[].expires_at - 过期时间
-   * @returns {boolean} return[].is_active - 是否激活
-   *
-   * @example
-   * const adminAnnouncements = DataSanitizer.sanitizeAnnouncements(announcements, 'full')
-   * const publicAnnouncements = DataSanitizer.sanitizeAnnouncements(announcements, 'public')
-   */
-  static sanitizeAnnouncements(announcements, dataLevel) {
-    if (dataLevel === 'full') {
-      // 管理员看完整数据，统一主键字段名为 announcement_id（与 popup_banner_id 命名模式一致）
-      return announcements.map(announcement => ({
-        ...announcement,
-        announcement_id: announcement.system_announcement_id
-      }))
-    }
-
-    return announcements.map(announcement => ({
-      // 🔴 基础字段（8个 - Basic Fields）
-      announcement_id: announcement.system_announcement_id, // 数据库主键 system_announcement_id → API 输出 announcement_id
-      title: announcement.title,
-      content: announcement.content,
-      type: announcement.type,
-      priority: announcement.priority,
-      created_at: announcement.created_at,
-      expires_at: announcement.expires_at,
-      is_active: announcement.is_active,
-
-      /*
-       * ✅ 新增公开字段（2个 - 修复P0级别字段丢失问题，解决前端显示异常和运营数据缺失问题）
-       * 业务场景1: view_count用于前端显示"已浏览XX次",提升用户对公告重要性的感知
-       * 业务场景2: view_count用于运营分析,判断公告的实际阅读量和用户关注度
-       * 业务场景3: creator用于前端显示"发布者:XX",增强公告的可信度和权威性
-       */
-      view_count: announcement.view_count || 0, // 浏览次数（默认0,防止undefined显示问题）
-      creator: announcement.creator
-        ? {
-            user_id: announcement.creator.user_id, // 发布者用户ID（用于前端显示和数据追踪）
-            nickname: announcement.creator.nickname // 发布者昵称（用于前端友好显示）
-          }
-        : null // creator为null时返回null,前端可统一处理为"系统管理员"
-
-      /*
-       * ❌ 仍然移除敏感字段（3个 - Sensitive Fields Removed）：admin_id, internal_notes, target_groups
-       * 原因: admin_id暴露管理员ID有安全风险,internal_notes是内部备注不应公开,target_groups是精准推送配置不应公开
-       */
-    }))
-  }
-
-  /**
    * 积分记录数据脱敏（γ 模式：基于 V4 asset_transactions 表结构）
    *
    * 🗄️ 数据库表：asset_transactions（主键：asset_transaction_id）
@@ -896,14 +822,18 @@ class DataSanitizer {
       sanitized.title = sanitized.meta?.title || null
 
       // BIGINT → Number 转换（避免 bigNumberStrings 返回字符串）
-      if (sanitized.transaction_id !== undefined)
+      if (sanitized.transaction_id !== undefined) {
         sanitized.transaction_id = Number(sanitized.transaction_id)
-      if (sanitized.delta_amount !== undefined)
+      }
+      if (sanitized.delta_amount !== undefined) {
         sanitized.delta_amount = Number(sanitized.delta_amount)
-      if (sanitized.balance_before !== undefined)
+      }
+      if (sanitized.balance_before !== undefined) {
         sanitized.balance_before = Number(sanitized.balance_before)
-      if (sanitized.balance_after !== undefined)
+      }
+      if (sanitized.balance_after !== undefined) {
         sanitized.balance_after = Number(sanitized.balance_after)
+      }
 
       // 黑名单：删除内部字段
       delete sanitized.account_id

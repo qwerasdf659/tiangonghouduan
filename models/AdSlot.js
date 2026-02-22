@@ -21,10 +21,10 @@ const { DataTypes } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 /**
- * 广告位类型有效值
+ * 广告位类型有效值（含 announcement — 系统公告展示位）
  * @constant {string[]}
  */
-const VALID_SLOT_TYPES = ['popup', 'carousel']
+const VALID_SLOT_TYPES = ['popup', 'carousel', 'announcement']
 
 /**
  * 定义 AdSlot 模型
@@ -70,10 +70,10 @@ module.exports = sequelize => {
           notEmpty: { msg: '广告位类型不能为空' },
           isIn: {
             args: [VALID_SLOT_TYPES],
-            msg: '广告位类型必须是：popup, carousel 之一'
+            msg: '广告位类型必须是：popup, carousel, announcement 之一'
           }
         },
-        comment: '广告位类型：popup=弹窗 / carousel=轮播图'
+        comment: '广告位类型：popup=弹窗 / carousel=轮播图 / announcement=系统公告'
       },
 
       position: {

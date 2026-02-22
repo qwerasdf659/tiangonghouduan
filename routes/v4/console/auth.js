@@ -23,6 +23,7 @@ const { asyncHandler } = require('./shared/middleware')
 const { logger } = require('../../../utils/logger')
 const { detectLoginPlatform } = require('../../../utils/platformDetector')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
+const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
  * 🛡️ 管理员登录（基于UUID角色系统）
@@ -54,52 +55,49 @@ router.post(
     const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
     const platform = detectLoginPlatform(req)
     const { AuthenticationSession } = req.app.locals.models
-    const { sequelize } = req.app.locals.models.AuthenticationSession
 
     try {
-      const transaction = await sequelize.transaction()
+      await TransactionManager.execute(
+        async transaction => {
+          const { sequelize: seq } = AuthenticationSession
 
-      try {
-        // 行级锁：锁定该用户在该平台的所有活跃会话，序列化并发登录
-        await sequelize.query(
-          'SELECT authentication_session_id FROM authentication_sessions WHERE user_type = ? AND user_id = ? AND login_platform = ? AND is_active = 1 FOR UPDATE',
-          { replacements: [userType, user.user_id, platform], transaction }
-        )
-
-        const deactivatedCount = await AuthenticationSession.deactivateUserSessions(
-          userType,
-          user.user_id,
-          null,
-          platform,
-          { transaction }
-        )
-
-        await AuthenticationSession.createSession(
-          {
-            session_token: sessionToken,
-            user_type: userType,
-            user_id: user.user_id,
-            login_ip: loginIp,
-            login_platform: platform,
-            expires_in_minutes: 10080
-          },
-          { transaction }
-        )
-
-        await transaction.commit()
-
-        if (deactivatedCount > 0) {
-          logger.info(
-            `🔒 [Session] 管理后台同平台会话替换: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id}, platform=${platform})`
+          /* 行级锁：锁定该用户在该平台的所有活跃会话，序列化并发登录 */
+          await seq.query(
+            'SELECT authentication_session_id FROM authentication_sessions WHERE user_type = ? AND user_id = ? AND login_platform = ? AND is_active = 1 FOR UPDATE',
+            { replacements: [userType, user.user_id, platform], transaction }
           )
-        }
-        logger.info(
-          `🔐 [Session] 管理后台会话创建成功: user_id=${user.user_id}, platform=${platform}, session=${sessionToken.substring(0, 8)}...`
-        )
-      } catch (innerError) {
-        await transaction.rollback()
-        throw innerError
-      }
+
+          const deactivatedCount = await AuthenticationSession.deactivateUserSessions(
+            userType,
+            user.user_id,
+            null,
+            platform,
+            { transaction }
+          )
+
+          await AuthenticationSession.createSession(
+            {
+              session_token: sessionToken,
+              user_type: userType,
+              user_id: user.user_id,
+              login_ip: loginIp,
+              login_platform: platform,
+              expires_in_minutes: 10080
+            },
+            { transaction }
+          )
+
+          if (deactivatedCount > 0) {
+            logger.info(
+              `🔒 [Session] 管理后台同平台会话替换: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id}, platform=${platform})`
+            )
+          }
+          logger.info(
+            `🔐 [Session] 管理后台会话创建成功: user_id=${user.user_id}, platform=${platform}, session=${sessionToken.substring(0, 8)}...`
+          )
+        },
+        { description: '管理后台登录会话创建', maxRetries: 2 }
+      )
     } catch (sessionError) {
       logger.warn(`⚠️ [Session] 管理后台会话创建失败（非致命）: ${sessionError.message}`)
     }

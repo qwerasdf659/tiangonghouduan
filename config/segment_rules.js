@@ -225,27 +225,95 @@ class SegmentResolver {
   /**
    * 解析用户的分层标识
    *
+   * 优先读取数据库 segment_rule_configs 表的自定义规则，
+   * 未找到时回退到内置硬编码规则
+   *
    * @param {string} version - 分层规则版本（如 'default', 'v1', 'v2'）
    * @param {Object} user - 用户对象（包含 created_at, history_total_points 等字段）
    * @returns {string} segment_key - 用户的分层标识
    *
    * @example
-   * // 解析用户分层
    * const segmentKey = SegmentResolver.resolveSegment('v1', user)
-   * // 返回: 'new_user' 或 'regular_user'
    */
   static resolveSegment(version, user) {
+    return SegmentResolver._resolveFromBuiltinRules(version, user)
+  }
+
+  /**
+   * 异步版本：优先从数据库加载规则，回退到内置规则
+   * 供 TierPickStage 等需要异步的场景使用
+   *
+   * @param {string} version - 分层规则版本
+   * @param {Object} user - 用户对象
+   * @returns {Promise<string>} segment_key
+   */
+  static async resolveSegmentAsync(version, user) {
+    try {
+      const { SegmentRuleConfig } = require('../models')
+      const { SEGMENT_FIELD_REGISTRY } = require('./segment_field_registry')
+
+      const dbConfig = await SegmentRuleConfig.findOne({
+        where: { version_key: version, status: 'active' }
+      })
+
+      if (dbConfig && dbConfig.rules) {
+        return SegmentResolver._evaluateConditions(dbConfig.rules, user, SEGMENT_FIELD_REGISTRY)
+      }
+    } catch {
+      // 数据库查询失败（如表不存在），静默回退到内置规则
+    }
+
+    return SegmentResolver._resolveFromBuiltinRules(version, user)
+  }
+
+  /**
+   * 通用条件求值器 — 解析数据库中运营搭建的条件 JSON 并执行
+   * @param {Array} rules - 规则数组
+   * @param {Object} user - 用户对象
+   * @param {Object} registry - 字段运算符注册表
+   * @returns {string} segment_key
+   * @private
+   */
+  static _evaluateConditions(rules, user, registry) {
+    const sorted = [...rules].sort((a, b) => (b.priority || 0) - (a.priority || 0))
+
+    for (const rule of sorted) {
+      if (!rule.conditions || rule.conditions.length === 0) {
+        return rule.segment_key
+      }
+
+      const results = rule.conditions.map(cond => {
+        const fieldValue = user?.[cond.field]
+        const operator = registry.operators[cond.operator]
+        if (!operator) return false
+        return operator.evaluate(fieldValue, cond.value)
+      })
+
+      const matched = rule.logic === 'OR' ? results.some(r => r) : results.every(r => r)
+
+      if (matched) return rule.segment_key
+    }
+
+    return 'default'
+  }
+
+  /**
+   * 从内置硬编码规则解析（同步版本，保持向后兼容）
+   * @param {string} version - 分层规则版本
+   * @param {Object} user - 用户对象
+   * @returns {string} segment_key
+   * @private
+   */
+  static _resolveFromBuiltinRules(version, user) {
     const config = SEGMENT_RULE_VERSIONS[version]
 
     if (!config) {
       console.warn(`[SegmentResolver] 未知的分层版本: ${version}，使用默认版本`)
-      return SegmentResolver.resolveSegment('default', user)
+      return SegmentResolver._resolveFromBuiltinRules('default', user)
     }
 
-    // 按优先级从高到低排序规则
     const sortedRules = [...config.rules].sort((a, b) => b.priority - a.priority)
 
-    // 依次执行规则条件，返回第一个匹配的 segment_key
     for (const rule of sortedRules) {
       try {
         if (rule.condition(user)) {
@@ -253,11 +321,9 @@ class SegmentResolver {
         }
       } catch (error) {
         console.error(`[SegmentResolver] 规则执行错误: ${rule.segment_key}`, error.message)
-        // 继续检查下一个规则
       }
     }
 
-    // 如果没有任何规则匹配，返回 'default'
     return 'default'
   }
 

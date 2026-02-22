@@ -31,7 +31,7 @@
  */
 
 import { SYSTEM_ADMIN_ENDPOINTS } from '../../api/system/admin.js'
-import { buildURL } from '../../api/base.js'
+import { buildURL, request } from '../../api/base.js'
 import { logger } from '../../utils/logger.js'
 
 /**
@@ -110,14 +110,11 @@ export function imageUploadMixin(config = {}) {
         if (options.context_id) formData.append('context_id', String(options.context_id))
         if (options.sort_order != null) formData.append('sort_order', String(options.sort_order))
 
-        const token = localStorage.getItem('token')
-        const response = await fetch(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD, {
+        const result = await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD,
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData
+          data: formData
         })
-
-        const result = await response.json()
 
         if (result.success && result.data) {
           logger.info('图片上传成功', {
@@ -150,18 +147,8 @@ export function imageUploadMixin(config = {}) {
      */
     async updateImageSortOrder(imageId, sortOrder) {
       try {
-        const token = localStorage.getItem('token')
         const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPDATE, { id: imageId })
-        const response = await fetch(url, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({ sort_order: sortOrder })
-        })
-
-        const result = await response.json()
+        const result = await request({ url, method: 'PATCH', data: { sort_order: sortOrder } })
         return result.success === true
       } catch (error) {
         logger.error('更新图片排序失败', { image_id: imageId, error: error.message })
@@ -177,14 +164,8 @@ export function imageUploadMixin(config = {}) {
      */
     async deleteImageResource(imageId) {
       try {
-        const token = localStorage.getItem('token')
         const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.IMAGE_DELETE, { id: imageId })
-        const response = await fetch(url, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` }
-        })
-
-        const result = await response.json()
+        const result = await request({ url, method: 'DELETE' })
 
         if (result.success) {
           this.showSuccess?.('图片已删除')

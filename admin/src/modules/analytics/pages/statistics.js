@@ -29,7 +29,7 @@
 // ES Module 导入
 import { logger } from '../../../utils/logger.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
-import { request, getToken } from '../../../api/base.js'
+import { request } from '../../../api/base.js'
 import { loadECharts, $confirmDanger } from '../../../utils/index.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
 import { EASING_FUNCTIONS } from '../../../alpine/components/animated-counter.js'
@@ -694,31 +694,27 @@ function statisticsPage() {
 
       try {
         const days = this.periodToDays(this.filters.period)
-        const params = new URLSearchParams({ days, format: 'excel' })
-
+        const queryParams = { days, format: 'excel' }
         if (this.filters.period === 'custom') {
-          params.append('start_date', this.filters.start_date)
-          params.append('end_date', this.filters.end_date)
+          queryParams.start_date = this.filters.start_date
+          queryParams.end_date = this.filters.end_date
         }
 
-        const response = await fetch(`${SYSTEM_ENDPOINTS.STATISTIC_EXPORT}?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${getToken()}` }
+        const blob = await request({
+          url: SYSTEM_ENDPOINTS.STATISTIC_EXPORT,
+          params: queryParams,
+          responseType: 'blob'
         })
 
-        if (response.ok) {
-          const blob = await response.blob()
-          const url = window.URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = url
-          a.download = `统计报表_${new Date().toISOString().split('T')[0]}.xlsx`
-          document.body.appendChild(a)
-          a.click()
-          window.URL.revokeObjectURL(url)
-          document.body.removeChild(a)
-          this.showSuccess('Excel文件已下载')
-        } else {
-          this.showError('无法生成Excel文件')
-        }
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `统计报表_${new Date().toISOString().split('T')[0]}.xlsx`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        this.showSuccess('Excel文件已下载')
       } catch (error) {
         logger.error('导出Excel失败:', error)
         this.showError(`导出失败: ${error.message}`)
@@ -738,31 +734,27 @@ function statisticsPage() {
 
       try {
         const days = this.periodToDays(this.filters.period)
-        const params = new URLSearchParams({ days, format: 'pdf' })
-
+        const queryParams = { days, format: 'pdf' }
         if (this.filters.period === 'custom') {
-          params.append('start_date', this.filters.start_date)
-          params.append('end_date', this.filters.end_date)
+          queryParams.start_date = this.filters.start_date
+          queryParams.end_date = this.filters.end_date
         }
 
-        const response = await fetch(`${SYSTEM_ENDPOINTS.STATISTIC_EXPORT}?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${getToken()}` }
+        const blob = await request({
+          url: SYSTEM_ENDPOINTS.STATISTIC_EXPORT,
+          params: queryParams,
+          responseType: 'blob'
         })
 
-        if (response.ok) {
-          const blob = await response.blob()
-          const url = window.URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = url
-          a.download = `统计报表_${new Date().toISOString().split('T')[0]}.pdf`
-          document.body.appendChild(a)
-          a.click()
-          window.URL.revokeObjectURL(url)
-          document.body.removeChild(a)
-          this.showSuccess('PDF文件已下载')
-        } else {
-          this.showError('无法生成PDF文件')
-        }
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `统计报表_${new Date().toISOString().split('T')[0]}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        this.showSuccess('PDF文件已下载')
       } catch (error) {
         logger.error('导出PDF失败:', error)
         this.showError(`导出失败: ${error.message}`)

@@ -191,6 +191,26 @@ class TierPickStage extends BaseStage {
 
       // normal 模式：继续正常的档位抽取流程
 
+      /* normalize 模式：跳过档位选择，由 PrizePickStage 直接按 win_probability 选奖 */
+      const campaign_check = this.getContextData(context, 'LoadCampaignStage.data')
+      if (campaign_check?.campaign?.pick_method === 'normalize') {
+        this.log('info', 'normalize 模式：跳过档位抽取，由 PrizePickStage 直接选奖', {
+          user_id,
+          pick_method: 'normalize'
+        })
+        return this.success({
+          selected_tier: null,
+          original_tier: null,
+          tier_downgrade_path: [],
+          random_value: 0,
+          tier_weights: {},
+          weight_scale: WEIGHT_SCALE,
+          decision_source: 'normal',
+          skipped: true,
+          skip_reason: 'normalize_mode'
+        })
+      }
+
       // 获取活动配置（从 LoadCampaignStage 的结果中）
       const campaign_data = this.getContextData(context, 'LoadCampaignStage.data')
       if (!campaign_data || !campaign_data.campaign) {
@@ -203,6 +223,29 @@ class TierPickStage extends BaseStage {
 
       const campaign = campaign_data.campaign
       const tier_rules = campaign_data.tier_rules || []
+
+      /**
+       * normalize 模式：跳过档位抽取，直接使用全量奖品池
+       * normalize 按 win_probability 百分比直接抽奖，不区分档位
+       */
+      if (campaign_data.pick_method === 'normalize') {
+        this.log('info', 'normalize模式：跳过档位抽取，使用全量奖品池', {
+          user_id,
+          pick_method: 'normalize'
+        })
+        return this.success({
+          selected_tier: null,
+          original_tier: null,
+          tier_downgrade_path: [],
+          random_value: 0,
+          tier_weights: {},
+          weight_scale: WEIGHT_SCALE,
+          decision_source,
+          skipped: true,
+          skip_reason: 'normalize_mode',
+          pick_method: 'normalize'
+        })
+      }
 
       /* 获取奖品池信息（从 BuildPrizePoolStage 的结果中） */
       const prize_pool_data = this.getContextData(context, 'BuildPrizePoolStage.data')

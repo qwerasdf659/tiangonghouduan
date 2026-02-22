@@ -47,7 +47,11 @@ export function usePrizesState() {
        * 外键关联 rarity_defs.rarity_code，前端直接使用此字段名
        * 枚举值：common/uncommon/rare/epic/legendary
        */
-      rarity_code: 'common'
+      rarity_code: 'common',
+      /** 选奖权重（tier_first 模式下实际生效的概率控制字段） */
+      win_weight: 100000,
+      /** 所属档位（high/mid/low，决定奖品归属哪个档位池） */
+      reward_tier: 'low'
       // sort_order 不在表单中设置，由后端自动分配唯一递增值
       // 编辑模式下通过 editPrize() 从后端数据中获取
     },
@@ -156,7 +160,9 @@ export function usePrizesMethods() {
         status: 'active',
         image_id: null,
         prize_description: '',
-        rarity_code: 'common' // 稀有度默认普通
+        rarity_code: 'common',
+        win_weight: 100000,
+        reward_tier: 'low'
         // sort_order 不设置，由后端自动分配唯一递增值
       }
       this.showModal('prizeModal')
@@ -173,16 +179,18 @@ export function usePrizesMethods() {
       const winProbability = parseFloat(prize.win_probability || 0) * 100
       // 使用后端字段名
       this.prizeForm = {
-        lottery_campaign_id: prize.lottery_campaign_id || null, // 编辑时保留原活动ID
+        lottery_campaign_id: prize.lottery_campaign_id || null,
         prize_name: prize.prize_name || '',
         prize_type: prize.prize_type || 'virtual',
-        win_probability: winProbability, // 转换为百分比显示
+        win_probability: winProbability,
         stock_quantity: prize.stock_quantity || 100,
         status: prize.status || 'active',
         image_id: prize.image_id || null,
         prize_description: prize.prize_description || '',
-        rarity_code: prize.rarity_code || 'common', // 稀有度（来自后端 rarity_defs 外键）
-        sort_order: prize.sort_order || 1
+        rarity_code: prize.rarity_code || 'common',
+        sort_order: prize.sort_order || 1,
+        win_weight: prize.win_weight || 100000,
+        reward_tier: prize.reward_tier || 'low'
       }
       this.showModal('prizeModal')
     },
@@ -265,7 +273,9 @@ export function usePrizesMethods() {
               status: this.prizeForm.status,
               image_id: this.prizeForm.image_id,
               prize_description: this.prizeForm.prize_description,
-              rarity_code: this.prizeForm.rarity_code || 'common'
+              rarity_code: this.prizeForm.rarity_code || 'common',
+              win_weight: parseInt(this.prizeForm.win_weight) || 100000,
+              reward_tier: this.prizeForm.reward_tier || 'low'
             }
           // 编辑模式下保留原有 sort_order（来自后端数据）
           if (this.prizeForm.sort_order !== undefined) {
@@ -306,7 +316,9 @@ export function usePrizesMethods() {
                   win_probability: winProbability,
                   stock_quantity: stockQuantity,
                   prize_description: this.prizeForm.prize_description,
-                  rarity_code: this.prizeForm.rarity_code || 'common'
+                  rarity_code: this.prizeForm.rarity_code || 'common',
+                  win_weight: parseInt(this.prizeForm.win_weight) || 100000,
+                  reward_tier: this.prizeForm.reward_tier || 'low'
                 }
               ]
             }

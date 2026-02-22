@@ -19,7 +19,7 @@ const { UnifiedLotteryEngine } = require('./UnifiedLotteryEngine/UnifiedLotteryE
  */
 // [已删除] ExchangeService.js → 拆分为 exchange/CoreService, exchange/QueryService, exchange/AdminService
 const ContentAuditEngine = require('./ContentAuditEngine')
-const AnnouncementService = require('./AnnouncementService')
+/* [已合并] AnnouncementService → AdCampaignService.createSystemCampaign() */
 const NotificationService = require('./NotificationService')
 // [已删除] ConsumptionService.js → 拆分为 consumption/CoreService, consumption/QueryService, consumption/MerchantService
 const CustomerServiceSessionService = require('./CustomerServiceSessionService')
@@ -37,14 +37,20 @@ const AdminSystemService = require('./AdminSystemService') // 管理后台系统
 // [已删除] AdminLotteryService.js → 拆分为 admin-lottery/CoreService, admin-lottery/CampaignService, admin-lottery/QueryService
 const AdminCustomerServiceService = require('./AdminCustomerServiceService') // 管理后台客服管理服务
 const CustomerServiceAgentManagementService = require('./CustomerServiceAgentManagementService') // 客服座席管理服务（座席注册/配置/用户分配）
+const CustomerServiceUserContextService = require('./CustomerServiceUserContextService') // 客服用户上下文聚合查询（GM工作台C区）
+const CustomerServiceDiagnoseService = require('./CustomerServiceDiagnoseService') // 客服一键诊断服务（GM工作台核心功能）
+const CustomerServiceCompensateService = require('./CustomerServiceCompensateService') // 客服补偿发放服务（GM工作台补偿工具）
+const CustomerServiceIssueService = require('./CustomerServiceIssueService') // 客服工单管理服务（工单CRUD+内部备注）
 const MaterialManagementService = require('./MaterialManagementService') // 材料系统运营管理服务（V4.5.0）
-const PopupBannerService = require('./PopupBannerService') // 弹窗Banner管理服务（2025-12-22）
-const CarouselItemService = require('./CarouselItemService') // 轮播图管理服务（Phase 1 — 拍板决策1）
+/*
+ * [已合并] PopupBannerService + CarouselItemService → AdCampaignService.createOperationalCampaign()
+ */
 const ImageService = require('./ImageService') // 通用图片上传服务（2026-01-08 图片存储架构）
 
-// 🔴 广告系统服务（Phase 2-6）
-const PopupShowLogService = require('./PopupShowLogService') // Phase 2: 弹窗展示日志服务
-const CarouselShowLogService = require('./CarouselShowLogService') // Phase 2: 轮播图曝光日志服务
+/*
+ * 🔴 广告系统服务（Phase 2-6）
+ * [已合并] PopupShowLogService + CarouselShowLogService → AdInteractionLog 模型 + ad-events/interaction-log 路由
+ */
 const AdSlotService = require('./AdSlotService') // Phase 3: 广告位管理服务
 const AdCampaignService = require('./AdCampaignService') // Phase 3: 广告计划管理服务
 const AdCreativeService = require('./AdCreativeService') // Phase 3: 广告素材管理服务
@@ -73,7 +79,8 @@ const AssetConversionService = require('./AssetConversionService') // 资产转�
 
 // Asset 域子服务
 const BalanceService = require('./asset/BalanceService') // 资产余额服务（8个方法）
-const ItemService = require('./asset/ItemService') // 资产物品服务（9个方法）
+const ItemService = require('./asset/ItemService') // 资产物品服务（含三表模型双录）
+const ItemLifecycleService = require('./asset/ItemLifecycleService') // 物品全链路追踪服务
 const QueryService = require('./asset/QueryService') // 资产查询服务（7个方法）
 
 // LotteryAnalytics 域子服务
@@ -368,7 +375,7 @@ class ServiceManager {
       this._services.set('exchange_bid_core', new ExchangeBidService(this.models)) // 竞价核心服务（出价/结算/取消）
       this._services.set('exchange_bid_query', new ExchangeBidQueryService(this.models)) // 竞价查询服务（列表/详情/历史）
       this._services.set('content_audit', ContentAuditEngine)
-      this._services.set('announcement', AnnouncementService)
+      // [已合并] this._services.set('announcement', AnnouncementService)
       this._services.set('notification', NotificationService)
 
       // Consumption 域子服务
@@ -386,6 +393,7 @@ class ServiceManager {
       // ========== 管理后台服务（使用 snake_case key） ==========
 
       this._services.set('prize_pool', PrizePoolService)
+      this._services.set('segment_rule', require('./SegmentRuleService')) // 分群规则配置服务
       this._services.set('premium', PremiumService)
       this._services.set('feedback', FeedbackService)
       this._services.set('admin_system', AdminSystemService)
@@ -401,14 +409,15 @@ class ServiceManager {
       this._services.set('session_management', SessionManagementService) // 会话管理服务（静态类）
       this._services.set('admin_customer_service', AdminCustomerServiceService)
       this._services.set('cs_agent_management', CustomerServiceAgentManagementService) // 客服座席管理（静态类）
+      this._services.set('cs_user_context', CustomerServiceUserContextService) // 客服用户上下文聚合查询（静态类，委托UserDataQueryService）
+      this._services.set('cs_diagnose', CustomerServiceDiagnoseService) // 客服一键诊断（静态类）
+      this._services.set('cs_compensate', CustomerServiceCompensateService) // 客服补偿发放（静态类）
+      this._services.set('cs_issue', CustomerServiceIssueService) // 客服工单管理（静态类）
       this._services.set('material_management', MaterialManagementService)
-      this._services.set('popup_banner', PopupBannerService)
-      this._services.set('carousel_item', CarouselItemService)
+      /* [已合并] popup_banner → AdCampaignService, carousel_item → AdCampaignService */
       this._services.set('image', ImageService)
 
-      // ========== 广告系统服务（Phase 2-6 广告平台） ==========
-      this._services.set('popup_show_log', PopupShowLogService) // Phase 2: 弹窗展示日志
-      this._services.set('carousel_show_log', CarouselShowLogService) // Phase 2: 轮播图曝光日志
+      /* ========== 广告系统服务（Phase 2-6 广告平台，popup_show_log/carousel_show_log 已合并） ========== */
       this._services.set('ad_slot', AdSlotService) // Phase 3: 广告位管理
       this._services.set('ad_campaign', AdCampaignService) // Phase 3: 广告计划管理
       this._services.set('ad_creative', AdCreativeService) // Phase 3: 广告素材管理
@@ -436,8 +445,9 @@ class ServiceManager {
 
       // Asset 域子服务
       this._services.set('asset_balance', BalanceService) // 资产余额服务（8个方法，静态类）
-      this._services.set('asset_item', ItemService) // 资产物品服务（9个方法，静态类）
+      this._services.set('asset_item', ItemService) // 资产物品服务（含三表模型双录，静态类）
       this._services.set('asset_query', QueryService) // 资产查询服务（7个方法，静态类）
+      this._services.set('item_lifecycle', ItemLifecycleService) // 物品全链路追踪服务（静态类）
 
       this._services.set('asset_conversion', AssetConversionService)
 

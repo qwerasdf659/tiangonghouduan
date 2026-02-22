@@ -290,13 +290,11 @@ export function useExchangeItemsMethods() {
         formData.append('business_type', 'exchange')
         formData.append('category', 'products')
 
-        const token = localStorage.getItem('token')
-        const response = await fetch(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD, {
+        const res = await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD,
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData
+          data: formData
         })
-        const res = await response.json()
 
         if (res.success && res.data) {
           this.itemForm.primary_image_id = res.data.image_resource_id
@@ -350,13 +348,11 @@ export function useExchangeItemsMethods() {
         }
         formData.append('sort_order', String(this.detailImages.length + 1))
 
-        const token = localStorage.getItem('token')
-        const response = await fetch(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD, {
+        const res = await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD,
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData
+          data: formData
         })
-        const res = await response.json()
 
         if (res.success && res.data) {
           this.detailImages.push({
@@ -390,12 +386,10 @@ export function useExchangeItemsMethods() {
       }
 
       try {
-        const token = localStorage.getItem('token')
-        const url = `${SYSTEM_ADMIN_ENDPOINTS.IMAGE_BY_BUSINESS}?business_type=exchange&context_id=${contextId}&category=detail`
-        const response = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}` }
+        const res = await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_BY_BUSINESS,
+          params: { business_type: 'exchange', context_id: contextId, category: 'detail' }
         })
-        const res = await response.json()
 
         if (res.success && res.data?.images) {
           this.detailImages = res.data.images.map(img => ({
@@ -422,13 +416,8 @@ export function useExchangeItemsMethods() {
       if (!confirmed) return
 
       try {
-        const token = localStorage.getItem('token')
         const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.IMAGE_DELETE, { id: imageId })
-        const response = await fetch(url, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        const res = await response.json()
+        const res = await request({ url, method: 'DELETE' })
 
         if (res.success) {
           this.detailImages = this.detailImages.filter(img => img.image_resource_id !== imageId)
@@ -457,19 +446,10 @@ export function useExchangeItemsMethods() {
       this.detailImages[index] = this.detailImages[newIndex]
       this.detailImages[newIndex] = temp
 
-      // 更新 sort_order（异步，不阻塞UI）
-      const token = localStorage.getItem('token')
       this.detailImages.forEach((img, i) => {
         img.sort_order = i + 1
         const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPDATE, { id: img.image_resource_id })
-        fetch(url, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({ sort_order: i + 1 })
-        }).catch(e => {
+        request({ url, method: 'PATCH', data: { sort_order: i + 1 } }).catch(e => {
           logger.warn('[ExchangeItems] 更新排序失败:', e)
         })
       })

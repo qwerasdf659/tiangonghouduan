@@ -1380,6 +1380,65 @@ class CustomerServiceSessionService {
       throw error
     }
   }
+
+  /**
+   * 用户提交满意度评分
+   *
+   * 业务场景：会话关闭后，用户对客服服务进行1-5星评分
+   * 数据写入 customer_service_sessions.satisfaction_score 字段
+   *
+   * 约束：
+   * - 仅已关闭的会话可评分
+   * - 仅会话归属用户可评分
+   * - 评分不可修改（防止刷分）
+   *
+   * @param {number} session_id - 会话ID
+   * @param {Object} data - 评分数据
+   * @param {number} data.user_id - 评分用户ID
+   * @param {number} data.satisfaction_score - 满意度评分（1-5）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 外部事务对象（必填）
+   * @returns {Object} 评分结果
+   */
+  static async rateSession(session_id, data, options = {}) {
+    const transaction = assertAndGetTransaction(
+      options,
+      'CustomerServiceSessionService.rateSession'
+    )
+
+    const { user_id, satisfaction_score } = data
+
+    const session = await CustomerServiceSession.findOne({
+      where: { customer_service_session_id: session_id },
+      transaction
+    })
+
+    if (!session) {
+      throw new Error('会话不存在')
+    }
+
+    if (session.user_id !== user_id) {
+      throw new Error('无权对此会话评分')
+    }
+
+    if (session.status !== 'closed') {
+      throw new Error('仅已关闭的会话可评分')
+    }
+
+    if (session.satisfaction_score !== null) {
+      throw new Error('此会话已评分，不可重复评分')
+    }
+
+    await session.update({ satisfaction_score }, { transaction })
+
+    logger.info(`⭐ 用户 ${user_id} 对会话 ${session_id} 评分：${satisfaction_score}`)
+
+    return {
+      customer_service_session_id: session_id,
+      satisfaction_score,
+      rated_at: BeijingTimeHelper.formatForAPI(new Date()).iso
+    }
+  }
 }
 
 module.exports = CustomerServiceSessionService

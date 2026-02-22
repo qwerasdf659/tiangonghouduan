@@ -125,9 +125,8 @@ router.post(
     })
 
     try {
+      const { ExchangeItem, BidProduct } = req.app.locals.models
       const result = await TransactionManager.execute(async transaction => {
-        const { ExchangeItem, BidProduct } = require('../../../models')
-
         // 校验兑换商品是否存在
         const exchangeItem = await ExchangeItem.findByPk(exchange_item_id, { transaction })
         if (!exchangeItem) {
@@ -284,8 +283,7 @@ router.get(
       // 管理视图不传 user_id
       const result = await BidQueryService.getBidProductDetail(bidProductId, {})
 
-      // 管理视图额外返回完整出价记录（不脱敏用户ID，管理员需要看到）
-      const { BidRecord } = require('../../../models')
+      const { BidRecord } = req.app.locals.models
       const allBids = await BidRecord.findAll({
         where: { bid_product_id: bidProductId },
         order: [['bid_amount', 'DESC']],

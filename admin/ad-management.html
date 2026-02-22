@@ -151,7 +151,163 @@
       </div>
     </div>
 
-    <!-- ===== 广告活动管理 ===== -->
+    <!-- ===== 系统通知管理（category=system） ===== -->
+    <div x-show="current_page === 'system-notices'" x-cloak>
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden">
+        <div class="px-5 py-4 bg-gradient-to-r from-purple-500 to-violet-500 text-white flex justify-between items-center flex-wrap gap-2">
+          <div>
+            <h5 class="font-semibold text-lg">📢 系统通知</h5>
+            <p class="text-purple-100 text-xs mt-0.5">管理系统级文字通知（维护公告、活动通知等），自动跳过审核流程</p>
+          </div>
+          <button @click="openCreateCampaignModal()" class="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition text-sm font-medium backdrop-blur-sm">➕ 创建系统通知</button>
+        </div>
+        <div class="px-5 py-3 themed-bg-base border-b flex items-center gap-2 flex-wrap">
+          <select x-model="campaignFilters.status" @change="loadCampaigns()" class="px-3 py-1.5 text-sm border rounded-lg themed-bg-base focus:ring-2 focus:ring-purple-500">
+            <option value="">全部状态</option>
+            <option value="draft">草稿</option>
+            <option value="active">投放中</option>
+            <option value="paused">已暂停</option>
+            <option value="completed">已完成</option>
+          </select>
+        </div>
+        <div x-show="campaignsLoading" class="p-8 text-center themed-text-muted">加载中...</div>
+        <div x-show="campaigns.length === 0 && !campaignsLoading" class="empty-state empty-state-compact">
+          <div class="empty-state-icon-circle"><span class="empty-state-icon">📢</span></div>
+          <h6 class="empty-state-title">暂无系统通知</h6>
+          <p class="empty-state-description">系统通知用于维护公告、活动提醒等场景，创建后手动发布即可投放</p>
+          <button @click="openCreateCampaignModal()" class="empty-state-action">➕ 创建第一条系统通知</button>
+        </div>
+        <div x-show="campaigns.length > 0" class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="themed-bg-base">
+              <tr>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">ID</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">通知标题</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">优先级</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">投放日期</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <template x-for="c in campaigns" :key="c.ad_campaign_id">
+                <tr class="themed-hover-bg">
+                  <td class="px-4 py-3 text-sm" x-text="c.ad_campaign_id"></td>
+                  <td class="px-4 py-3 text-sm font-medium" x-text="c.campaign_name"></td>
+                  <td class="px-4 py-3 text-sm">
+                    <span class="text-xs px-2.5 py-1 rounded-full font-medium text-white" :class="statusColor(c.status)" x-text="statusText(c.status)"></span>
+                  </td>
+                  <td class="px-4 py-3 text-sm font-medium" x-text="c.priority"></td>
+                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="(c.start_date || '-') + ' ~ ' + (c.end_date || '-')"></td>
+                  <td class="px-4 py-3">
+                    <div class="flex flex-wrap gap-1.5">
+                      <button @click="viewCampaign(c)" class="text-xs px-2.5 py-1 rounded-md bg-purple-50 text-purple-600 hover:bg-purple-100 font-medium transition">详情</button>
+                      <button x-show="c.status === 'draft'" @click="publishCampaign(c)" class="text-xs px-2.5 py-1 rounded-md bg-green-50 text-green-600 hover:bg-green-100 font-medium transition">发布</button>
+                      <button x-show="c.status === 'active'" @click="pauseCampaign(c)" class="text-xs px-2.5 py-1 rounded-md bg-orange-50 text-orange-600 hover:bg-orange-100 font-medium transition">暂停</button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <template x-if="campaignPagination.total_pages > 1">
+          <div class="p-4 border-t flex justify-between items-center">
+            <span class="text-sm themed-text-muted" x-text="'共 ' + campaignPagination.total + ' 条'"></span>
+            <div class="flex space-x-1">
+              <button @click="campaignPage > 1 && (campaignPage--, loadCampaigns())" :disabled="campaignPage <= 1" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+              <span class="px-3 py-1 text-sm" x-text="campaignPage + ' / ' + campaignPagination.total_pages"></span>
+              <button @click="campaignPage < campaignPagination.total_pages && (campaignPage++, loadCampaigns())" :disabled="campaignPage >= campaignPagination.total_pages" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ===== 运营推广管理（category=operational） ===== -->
+    <div x-show="current_page === 'operational'" x-cloak>
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden">
+        <div class="px-5 py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white flex justify-between items-center flex-wrap gap-2">
+          <div>
+            <h5 class="font-semibold text-lg">🎯 运营推广</h5>
+            <p class="text-green-100 text-xs mt-0.5">管理运营弹窗和轮播图（免费投放，无计费流程），自动跳过审核</p>
+          </div>
+          <button @click="openCreateCampaignModal()" class="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition text-sm font-medium backdrop-blur-sm">➕ 创建运营推广</button>
+        </div>
+        <div class="px-5 py-3 themed-bg-base border-b flex items-center gap-2 flex-wrap">
+          <select x-model="campaignFilters.status" @change="loadCampaigns()" class="px-3 py-1.5 text-sm border rounded-lg themed-bg-base focus:ring-2 focus:ring-green-500">
+            <option value="">全部状态</option>
+            <option value="draft">草稿</option>
+            <option value="active">投放中</option>
+            <option value="paused">已暂停</option>
+            <option value="completed">已完成</option>
+          </select>
+          <select x-model="campaignFilters.ad_slot_id" @change="loadCampaigns()" class="px-3 py-1.5 text-sm border rounded-lg themed-bg-base focus:ring-2 focus:ring-green-500">
+            <option value="">全部广告位</option>
+            <template x-for="slot in allSlotsList" :key="slot.ad_slot_id">
+              <option :value="slot.ad_slot_id" x-text="slot.slot_name"></option>
+            </template>
+          </select>
+        </div>
+        <div x-show="campaignsLoading" class="p-8 text-center themed-text-muted">加载中...</div>
+        <div x-show="campaigns.length === 0 && !campaignsLoading" class="empty-state empty-state-compact">
+          <div class="empty-state-icon-circle"><span class="empty-state-icon">🎯</span></div>
+          <h6 class="empty-state-title">暂无运营推广</h6>
+          <p class="empty-state-description">运营推广用于首页弹窗和轮播图展示，免费投放无需计费</p>
+          <button @click="openCreateCampaignModal()" class="empty-state-action">➕ 创建第一条运营推广</button>
+        </div>
+        <div x-show="campaigns.length > 0" class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="themed-bg-base">
+              <tr>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">ID</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">推广名称</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">广告位</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">优先级</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">频次规则</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">投放日期</th>
+                <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <template x-for="c in campaigns" :key="c.ad_campaign_id">
+                <tr class="themed-hover-bg">
+                  <td class="px-4 py-3 text-sm" x-text="c.ad_campaign_id"></td>
+                  <td class="px-4 py-3 text-sm font-medium" x-text="c.campaign_name"></td>
+                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="c.ad_slot?.slot_name || '-'"></td>
+                  <td class="px-4 py-3 text-sm">
+                    <span class="text-xs px-2.5 py-1 rounded-full font-medium text-white" :class="statusColor(c.status)" x-text="statusText(c.status)"></span>
+                  </td>
+                  <td class="px-4 py-3 text-sm font-medium" x-text="c.priority"></td>
+                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="frequencyText(c.frequency_rule)"></td>
+                  <td class="px-4 py-3 text-sm themed-text-muted" x-text="(c.start_date || '-') + ' ~ ' + (c.end_date || '-')"></td>
+                  <td class="px-4 py-3">
+                    <div class="flex flex-wrap gap-1.5">
+                      <button @click="viewCampaign(c)" class="text-xs px-2.5 py-1 rounded-md bg-green-50 text-green-600 hover:bg-green-100 font-medium transition">详情</button>
+                      <button x-show="c.status === 'draft'" @click="publishCampaign(c)" class="text-xs px-2.5 py-1 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium transition">发布</button>
+                      <button x-show="c.status === 'active'" @click="pauseCampaign(c)" class="text-xs px-2.5 py-1 rounded-md bg-orange-50 text-orange-600 hover:bg-orange-100 font-medium transition">暂停</button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <template x-if="campaignPagination.total_pages > 1">
+          <div class="p-4 border-t flex justify-between items-center">
+            <span class="text-sm themed-text-muted" x-text="'共 ' + campaignPagination.total + ' 条'"></span>
+            <div class="flex space-x-1">
+              <button @click="campaignPage > 1 && (campaignPage--, loadCampaigns())" :disabled="campaignPage <= 1" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+              <span class="px-3 py-1 text-sm" x-text="campaignPage + ' / ' + campaignPagination.total_pages"></span>
+              <button @click="campaignPage < campaignPagination.total_pages && (campaignPage++, loadCampaigns())" :disabled="campaignPage >= campaignPagination.total_pages" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ===== 商业广告管理（category=commercial） ===== -->
     <div x-show="current_page === 'campaigns'" x-cloak>
       <div class="themed-card rounded-xl shadow-sm overflow-hidden">
         <div class="px-5 py-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white flex justify-between items-center flex-wrap gap-2">
@@ -860,6 +1016,7 @@
                 <select x-model="slotForm.slot_type" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
                   <option value="popup">弹窗</option>
                   <option value="carousel">轮播图</option>
+                  <option value="announcement">系统公告</option>
                 </select>
               </div>
               <div>
@@ -914,14 +1071,22 @@
       <div class="fixed inset-0 bg-black/50" @click="hideModal('campaignCreateModal')"></div>
       <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
         <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
-          <h5 class="font-semibold">➕ 创建广告活动</h5>
+          <h5 class="font-semibold">➕ <span x-text="CATEGORY_MAP[campaignForm.campaign_category] || '创建广告活动'"></span></h5>
           <button @click="hideModal('campaignCreateModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
         </div>
         <form @submit.prevent="saveCampaign()">
           <div class="p-6 space-y-4">
+            <!-- 分类提示（非 commercial 时显示） -->
+            <div x-show="campaignForm.campaign_category === 'system'" class="p-3 bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-700 rounded-lg text-sm text-purple-800 dark:text-purple-300">
+              <span class="font-medium">📢 系统通知模式：</span>免费投放，跳过审核流程，创建后手动发布。支持纯文字内容，优先级范围 900-999。
+            </div>
+            <div x-show="campaignForm.campaign_category === 'operational'" class="p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-700 rounded-lg text-sm text-green-800 dark:text-green-300">
+              <span class="font-medium">🎯 运营推广模式：</span>免费投放，跳过审核流程，创建后手动发布。支持图片弹窗/轮播，可配置频次规则，优先级范围 100-899。
+            </div>
+
             <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">活动名称 <span class="text-red-500">*</span></label>
-              <input type="text" x-model="campaignForm.campaign_name" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500" placeholder="输入广告活动名称">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">名称 <span class="text-red-500">*</span></label>
+              <input type="text" x-model="campaignForm.campaign_name" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500" :placeholder="campaignForm.campaign_category === 'system' ? '输入系统通知标题' : campaignForm.campaign_category === 'operational' ? '输入运营推广名称' : '输入广告活动名称'">
             </div>
 
             <div class="grid grid-cols-2 gap-4">
@@ -930,19 +1095,60 @@
                 <select x-model="campaignForm.ad_slot_id" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
                   <option value="">请选择广告位</option>
                   <template x-for="slot in allSlotsList" :key="slot.ad_slot_id">
-                    <option :value="slot.ad_slot_id" x-text="slot.slot_name + ' (' + slot.slot_type + ' · ' + slot.position + ')'"></option>
+                    <option :value="slot.ad_slot_id" x-text="slot.slot_name + ' (' + slotTypeText(slot.slot_type) + ' · ' + positionText(slot.position) + ')'"></option>
                   </template>
                 </select>
-                <p class="text-xs themed-text-muted mt-1" x-show="getSelectedSlotInfo()" x-text="'日价: ' + (getSelectedSlotInfo()?.daily_price_diamond || '-') + ' 💎 · 最低出价: ' + (getSelectedSlotInfo()?.min_bid_diamond || '-') + ' 💎'"></p>
+                <p class="text-xs themed-text-muted mt-1" x-show="getSelectedSlotInfo() && campaignForm.campaign_category === 'commercial'" x-text="'日价: ' + (getSelectedSlotInfo()?.daily_price_diamond || '-') + ' 💎 · 最低出价: ' + (getSelectedSlotInfo()?.min_bid_diamond || '-') + ' 💎'"></p>
               </div>
-              <div>
+              <div x-show="campaignForm.campaign_category === 'commercial'">
                 <label class="block text-sm font-medium themed-text-secondary mb-1">广告主用户ID（可选）</label>
                 <input type="number" x-model="campaignForm.advertiser_user_id" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500" placeholder="不填则为当前管理员">
                 <p class="text-xs themed-text-muted mt-1">留空表示管理员自己作为广告主</p>
               </div>
             </div>
 
-            <div>
+            <!-- 系统通知专属：文字内容 -->
+            <div x-show="campaignForm.campaign_category === 'system'">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">通知内容 <span class="text-red-500">*</span></label>
+              <textarea x-model="campaignForm.text_content" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-purple-500" rows="3" placeholder="输入通知文字内容（如：系统将于今晚进行维护升级）"></textarea>
+            </div>
+
+            <!-- 系统通知专属：内部备注 -->
+            <div x-show="campaignForm.campaign_category === 'system'">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">内部备注</label>
+              <textarea x-model="campaignForm.internal_notes" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-purple-500" rows="2" placeholder="仅内部可见的备注（可选）"></textarea>
+            </div>
+
+            <!-- 运营推广专属：频次控制 -->
+            <div x-show="campaignForm.campaign_category === 'operational'" class="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg">
+              <h6 class="text-sm font-medium mb-3 text-green-700 dark:text-green-300">频次与展示控制</h6>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm themed-text-secondary mb-1">频次规则</label>
+                  <select x-model="campaignForm.frequency_rule" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-green-500">
+                    <option value="once_per_day">每天显示一次</option>
+                    <option value="always">每次都显示</option>
+                    <option value="once">只显示一次</option>
+                    <option value="once_per_session">每次启动显示一次</option>
+                    <option value="once_per_n_days">每N天显示一次</option>
+                    <option value="n_times_total">总共显示N次</option>
+                  </select>
+                </div>
+                <div x-show="['once_per_n_days','n_times_total'].includes(campaignForm.frequency_rule)">
+                  <label class="block text-sm themed-text-secondary mb-1">频次参数值</label>
+                  <input type="number" x-model.number="campaignForm.frequency_value" min="1" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-green-500">
+                </div>
+              </div>
+              <div class="mt-3 flex items-center gap-3">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" x-model="campaignForm.force_show" class="rounded border-gray-300 text-green-600 focus:ring-green-500">
+                  <span class="text-sm">强制弹出（忽略用户关闭行为）</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- 商业广告：计费模式选择（仅 commercial 显示） -->
+            <div x-show="campaignForm.campaign_category === 'commercial'">
               <label class="block text-sm font-medium themed-text-secondary mb-2">计费模式 <span class="text-red-500">*</span></label>
               <div class="grid grid-cols-2 gap-3">
                 <label class="flex items-center p-3 border rounded cursor-pointer transition-colors"
@@ -964,8 +1170,8 @@
               </div>
             </div>
 
-            <!-- 固定包天字段 -->
-            <div x-show="campaignForm.billing_mode === 'fixed_daily'" class="p-4 bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-200 dark:border-indigo-800 rounded-lg">
+            <!-- 固定包天字段（仅 commercial） -->
+            <div x-show="campaignForm.campaign_category === 'commercial' && campaignForm.billing_mode === 'fixed_daily'" class="p-4 bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-200 dark:border-indigo-800 rounded-lg">
               <h6 class="text-sm font-medium mb-3 text-indigo-700 dark:text-indigo-300">固定包天参数</h6>
               <div class="grid grid-cols-2 gap-4">
                 <div>
@@ -982,8 +1188,8 @@
               </div>
             </div>
 
-            <!-- 竞价排名字段 -->
-            <div x-show="campaignForm.billing_mode === 'bidding'" class="p-4 bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800 rounded-lg">
+            <!-- 竞价排名字段（仅 commercial） -->
+            <div x-show="campaignForm.campaign_category === 'commercial' && campaignForm.billing_mode === 'bidding'" class="p-4 bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800 rounded-lg">
               <h6 class="text-sm font-medium mb-3 text-purple-700 dark:text-purple-300">竞价排名参数</h6>
               <div class="grid grid-cols-2 gap-4">
                 <div>
@@ -1010,20 +1216,25 @@
               </div>
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">展示优先级</label>
-                <input type="number" x-model.number="campaignForm.priority" min="1" max="99" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
-                <p class="text-xs themed-text-muted mt-1">1~99，数字越大越优先展示</p>
+                <input type="number" x-model.number="campaignForm.priority" :min="campaignForm.campaign_category === 'system' ? 900 : campaignForm.campaign_category === 'operational' ? 100 : 1" :max="campaignForm.campaign_category === 'system' ? 999 : campaignForm.campaign_category === 'operational' ? 899 : 99" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+                <p class="text-xs themed-text-muted mt-1" x-text="campaignForm.campaign_category === 'system' ? '900~999（系统通知）' : campaignForm.campaign_category === 'operational' ? '100~899（运营推广）' : '1~99（商业广告）'"></p>
               </div>
             </div>
 
-            <div class="p-3 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-700 rounded text-sm text-yellow-800 dark:text-yellow-300">
+            <!-- 商业广告提示 -->
+            <div x-show="campaignForm.campaign_category === 'commercial'" class="p-3 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-700 rounded text-sm text-yellow-800 dark:text-yellow-300">
               <span class="font-medium">说明：</span>创建后为草稿状态，需通过「审核」流程才能正式投放。固定包天模式在提交审核时会冻结钻石，审核通过后扣除、拒绝后退回。
+            </div>
+            <!-- 运营/系统提示 -->
+            <div x-show="campaignForm.campaign_category !== 'commercial'" class="p-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-700 rounded text-sm text-blue-800 dark:text-blue-300">
+              <span class="font-medium">说明：</span>创建后为草稿状态，在列表中点击「发布」即可切换为投放中。无需审核流程，无计费扣款。
             </div>
           </div>
           <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2 sticky bottom-0">
             <button type="button" @click="hideModal('campaignCreateModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
             <button type="submit" class="px-4 py-2 themed-btn-primary rounded" :disabled="saving">
               <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
-              <span>创建广告活动</span>
+              <span x-text="'创建' + (CATEGORY_MAP[campaignForm.campaign_category] || '广告活动')"></span>
             </button>
           </div>
         </form>

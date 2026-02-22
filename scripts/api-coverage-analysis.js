@@ -254,12 +254,11 @@ async function main() {
         }
       }
       
-      // 策略3：通过服务文件名推断路由文件名（如 PopupBannerService -> popup-banners.js）
+      // 策略3：通过服务文件名推断路由文件名（如 AdCampaignService -> ad-campaigns.js）
       if (!hasExternalAPI) {
         for (const serviceFile of serviceUsages.map(s => s.file)) {
-          // 从服务文件名提取关键词
           const serviceName = path.basename(serviceFile, '.js')
-          // PopupBannerService -> popup-banner
+          // AdCampaignService -> ad-campaign
           const routeNameBase = serviceName
             .replace(/Service$/i, '')
             .replace(/([A-Z])/g, (m, p1, offset) => offset ? `-${p1.toLowerCase()}` : p1.toLowerCase())

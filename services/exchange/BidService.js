@@ -436,27 +436,28 @@ class BidService {
       { transaction }
     )
 
-    // d. 中标商品入背包（决策7：meta 快照方式）
-    await this.ItemInstance.create(
+    // d. 中标商品入背包（三表模型：通过 ItemService.mintItem 双录写入）
+    const ItemService = require('../asset/ItemService')
+    await ItemService.mintItem(
       {
-        owner_user_id: winnerId,
+        user_id: winnerId,
         item_type: 'product',
-        item_template_id: null,
         source: 'bid_settlement',
-        status: 'available',
+        source_ref_id: String(bidProductId),
+        item_name: exchangeItem.item_name,
+        item_description: exchangeItem.description || '',
+        item_value: Number(exchangeItem.cost_amount) || 0,
+        business_type: 'bid_settlement_mint',
+        idempotency_key: `bid_settle_item_${bidProductId}`,
         meta: {
-          source: 'bid_settlement',
           bid_product_id: bidProductId,
           exchange_item_id: exchangeItem.exchange_item_id,
-          item_name: exchangeItem.item_name,
-          description: exchangeItem.description,
           primary_image_id: exchangeItem.primary_image_id,
           category: exchangeItem.category,
           original_cost_asset_code: exchangeItem.cost_asset_code,
           original_cost_amount: Number(exchangeItem.cost_amount),
           bid_winning_amount: winningAmount,
-          bid_asset_code: assetCode,
-          settled_at: BeijingTimeHelper.now()
+          bid_asset_code: assetCode
         }
       },
       { transaction }

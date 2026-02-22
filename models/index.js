@@ -200,23 +200,44 @@ models.ItemTemplate = require('./ItemTemplate')(sequelize, DataTypes)
 
 models.ItemInstance = require('./ItemInstance')(sequelize, DataTypes)
 /*
- * ✅ ItemInstance：物品实例所有权管理（物品所有权真相 - P0-2）
- *    - 用途：管理不可叠加物品的所有权状态（装备、卡牌、优惠券等）
- *    - 特点：单源真相、状态机管理、订单锁定、所有权转移
+ * ✅ ItemInstance：物品实例所有权管理（旧表 — 迁移完成后退役）
  *    - 表名：item_instances，主键：item_instance_id，外键：owner_user_id
- *    - 业务场景：物品上架、购买转移、使用核销、过期管理
- *    - 状态流转：available → locked → transferred/used/expired
- *    - 锁TTL：3分钟（2025-12-28从15分钟优化）
+ *    - ⚠️ 新代码应使用 Item + ItemLedger + ItemHold 三表模型
  */
 
 models.ItemInstanceEvent = require('./ItemInstanceEvent')(sequelize, DataTypes)
 /*
- * ✅ ItemInstanceEvent：物品实例事件（事件溯源 - 2025-12-28新增）
- *    - 用途：记录物品实例的所有变更事件（铸造/锁定/解锁/转移/使用/过期/销毁）
- *    - 特点：事件溯源、业务幂等（business_type + business_id 唯一约束）
+ * ✅ ItemInstanceEvent：物品实例事件（旧表 — 迁移完成后退役）
  *    - 表名：item_instance_events，主键：event_id，外键：item_instance_id
- *    - 业务场景：物品审计追踪、所有权历史、状态变更溯源
- *    - 事件类型：mint/lock/unlock/transfer/use/expire/destroy
+ *    - ⚠️ 新代码应使用 ItemLedger 双录记账
+ */
+
+// 🔴 从零三表模型（资产全链路追踪 — 2026-02-22）
+models.Item = require('./Item')(sequelize, DataTypes)
+/*
+ * ✅ Item：物品（当前状态缓存，可从 item_ledger 重建）
+ *    - 用途：不可叠加物品的一等实体（替代 item_instances）
+ *    - 特点：正式列（item_name/item_value/item_type）、tracking_code 唯一追踪码
+ *    - 表名：items，主键：item_id，外键：owner_account_id
+ *    - 状态流转：available → held → used/expired/destroyed
+ */
+
+models.ItemLedger = require('./ItemLedger')(sequelize, DataTypes)
+/*
+ * ✅ ItemLedger：物品所有权账本（唯一真相，双录记账）
+ *    - 用途：双录记账（SUM(delta) 验证守恒）+ 审计日志 + 事件溯源
+ *    - 特点：只追加不修改不删除，每次操作写出方(-1)+入方(+1)两条
+ *    - 表名：item_ledger，主键：ledger_entry_id
+ *    - 对账SQL：SELECT item_id, SUM(delta) FROM item_ledger GROUP BY item_id HAVING SUM(delta)!=0
+ */
+
+models.ItemHold = require('./ItemHold')(sequelize, DataTypes)
+/*
+ * ✅ ItemHold：物品锁定记录（替代 JSON locks，可索引可查询可审计）
+ *    - 用途：记录物品锁定/解锁的完整历史
+ *    - 特点：trade(3分钟)/redemption(30天)/security(无限期) 三种锁类型
+ *    - 表名：item_holds，主键：hold_id，外键：item_id
+ *    - 优先级：security(3) > redemption(2) > trade(1)
  */
 
 // 🔴 管理和客服系统
@@ -247,6 +268,24 @@ models.CustomerServiceAgent = require('./CustomerServiceAgent')(sequelize, DataT
  *    - 业务场景：管理员注册客服座席→配置并发上限→开启自动分配→监控工作负载
  */
 
+models.CustomerServiceIssue = require('./CustomerServiceIssue')(sequelize, DataTypes)
+/*
+ * ✅ CustomerServiceIssue：客服工单（GM工作台问题跟踪）
+ *    - 用途：客服聊天中发现的问题创建为工单，跨会话跨班次跟踪到底
+ *    - 特点：8种问题类型（资产/交易/抽奖/物品/账号/消费/反馈/其他）、4种优先级、4种状态
+ *    - 表名：customer_service_issues，主键：issue_id
+ *    - 业务场景：聊天→创建工单→处理→解决→关闭，一个工单可关联多个会话
+ */
+
+models.CustomerServiceNote = require('./CustomerServiceNote')(sequelize, DataTypes)
+/*
+ * ✅ CustomerServiceNote：客服内部备注（仅客服可见）
+ *    - 用途：客服之间传递关于用户的内部信息（用户永远看不到）
+ *    - 特点：可关联工单或会话，支持客服交接班/转接时保留上下文
+ *    - 表名：customer_service_notes，主键：note_id
+ *    - 业务场景：客服记录备注→转接时新客服看到→交接班不丢失信息
+ */
+
 models.CustomerServiceUserAssignment = require('./CustomerServiceUserAssignment')(
   sequelize,
   DataTypes
@@ -259,8 +298,10 @@ models.CustomerServiceUserAssignment = require('./CustomerServiceUserAssignment'
  *    - 业务场景：管理员分配用户到客服→用户下次咨询自动路由→客服间转移用户
  */
 
-// V4.0新增：系统公告和反馈系统
-models.SystemAnnouncement = require('./SystemAnnouncement')(sequelize, DataTypes)
+/*
+ * V4.0新增：系统公告和反馈系统
+ * [已合并+DROP] models.SystemAnnouncement — 表已迁移到 ad_campaigns + ad_creatives
+ */
 models.Feedback = require('./Feedback')(sequelize, DataTypes)
 models.SystemSettings = require('./SystemSettings')(sequelize, DataTypes)
 /*
@@ -271,7 +312,7 @@ models.SystemSettings = require('./SystemSettings')(sequelize, DataTypes)
  *    - 业务场景：系统配置管理、参数调整、策略控制
  */
 
-models.PopupBanner = require('./PopupBanner')(sequelize, DataTypes)
+// [已合并+DROP] models.PopupBanner — 表已迁移到 ad_campaigns + ad_creatives
 /*
  * ✅ PopupBanner：弹窗Banner配置（首页弹窗管理）
  *    - 用途：管理微信小程序首页弹窗图片和跳转链接
@@ -280,7 +321,7 @@ models.PopupBanner = require('./PopupBanner')(sequelize, DataTypes)
  *    - Phase 1 新增：banner_type / frequency_rule / frequency_value / force_show / priority
  */
 
-models.CarouselItem = require('./CarouselItem')(sequelize, DataTypes)
+// [已合并+DROP] models.CarouselItem — 表已迁移到 ad_campaigns + ad_creatives
 /*
  * ✅ CarouselItem：轮播图配置（页面内嵌 swiper 组件）
  *    - 用途：管理微信小程序首页轮播图展示
@@ -291,15 +332,17 @@ models.CarouselItem = require('./CarouselItem')(sequelize, DataTypes)
  *    - 业务场景：首页活动弹窗、公告展示、运营推广
  */
 
-// 🔴 Phase 2：服务端展示日志
-models.PopupShowLog = require('./PopupShowLog')(sequelize, DataTypes)
+/*
+ * 🔴 Phase 2：服务端展示日志
+ * [已合并+DROP] models.PopupShowLog — 表已迁移到 ad_interaction_logs
+ */
 /*
  * ✅ PopupShowLog：弹窗展示日志
  *    - 用途：记录每个弹窗的展示时长、关闭方式、队列位置
  *    - 表名：popup_show_logs，主键：popup_show_log_id（BIGINT）
  */
 
-models.CarouselShowLog = require('./CarouselShowLog')(sequelize, DataTypes)
+// [已合并+DROP] models.CarouselShowLog — 表已迁移到 ad_interaction_logs
 /*
  * ✅ CarouselShowLog：轮播图曝光日志
  *    - 用途：记录每张轮播图的曝光时长、手动滑入、点击情况
@@ -385,6 +428,14 @@ models.AdReportDailySnapshot = require('./AdReportDailySnapshot')(sequelize, Dat
  * ✅ AdReportDailySnapshot：每日报表快照
  *    - 用途：凌晨4点聚合前一天的曝光/点击/转化/消耗数据
  *    - 表名：ad_report_daily_snapshots，主键：snapshot_id（BIGINT）
+ */
+
+// 🔴 内容投放合并：通用交互日志表（D2 定论：替代分散的 popup_show_logs / carousel_show_logs）
+models.AdInteractionLog = require('./AdInteractionLog')(sequelize, DataTypes)
+/*
+ * ✅ AdInteractionLog：通用内容交互日志
+ *    - 用途：统一记录弹窗/轮播/公告/广告的展示、点击、关闭等交互事件
+ *    - 表名：ad_interaction_logs，主键：ad_interaction_log_id（BIGINT）
  */
 
 // 🔴 图片和存储系统
@@ -689,6 +740,7 @@ models.LotteryHourlyMetrics = require('./LotteryHourlyMetrics')(sequelize, DataT
  */
 
 models.LotteryAlert = require('./LotteryAlert').initModel(sequelize)
+models.SegmentRuleConfig = require('./SegmentRuleConfig')(sequelize)
 /*
  * ✅ LotteryAlert：抽奖系统告警表（运营监控专用）
  *    - 用途：记录抽奖系统的实时告警信息，用于运营监控和异常检测

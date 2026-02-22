@@ -413,6 +413,10 @@ export function useCustomerServiceMethods() {
     selectSession(session) {
       if (session && session.customer_service_session_id) {
         this.openSession(session.customer_service_session_id)
+        /* 触发C区用户上下文面板加载（如果 composable 已混入） */
+        if (typeof this.loadUserContext === 'function') {
+          this.$nextTick(() => this.loadUserContext())
+        }
       }
     },
 

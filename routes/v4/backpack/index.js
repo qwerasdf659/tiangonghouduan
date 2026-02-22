@@ -465,4 +465,50 @@ router.use('/exchange', exchangeRoutes)
 const bidRoutes = require('./bid')
 router.use('/bid', bidRoutes)
 
+/**
+ * ========================================
+ * 物品流转时间线（资产全链路追踪 2026-02-22）
+ * ========================================
+ */
+
+/**
+ * GET /items/:item_id/timeline - 用户查看自己物品的流转历史
+ *
+ * 仅返回与当前用户相关的记录
+ *
+ * @route GET /api/v4/backpack/items/:item_id/timeline
+ */
+router.get('/items/:item_id/timeline', async (req, res) => {
+  try {
+    const ItemLifecycleService = require('../../../services/asset/ItemLifecycleService')
+    const { Item } = require('../../../models')
+    const BalanceService = require('../../../services/asset/BalanceService')
+
+    const userId = req.user?.user_id
+    if (!userId) return res.apiError('UNAUTHORIZED', '未登录', 401)
+
+    const account = await BalanceService.getOrCreateAccount({ user_id: userId })
+    const item = await Item.findByPk(req.params.item_id)
+
+    if (!item || item.owner_account_id !== account.account_id) {
+      return res.apiError('ITEM_NOT_FOUND', '物品不存在或无权访问', 404)
+    }
+
+    const lifecycle = await ItemLifecycleService.getLifecycle(item.item_id)
+    if (!lifecycle) return res.apiError('ITEM_NOT_FOUND', '物品不存在', 404)
+
+    return res.apiSuccess({
+      tracking_code: lifecycle.tracking_code,
+      item_name: lifecycle.item_name,
+      item_type: lifecycle.item_type,
+      status: lifecycle.status,
+      timeline: lifecycle.timeline
+    }, '获取物品时间线成功')
+  } catch (error) {
+    const logger = require('../../../utils/logger')
+    logger.error('获取物品时间线失败', { error: error.message })
+    return res.apiError('TIMELINE_QUERY_FAILED', error.message, 500)
+  }
+})
+
 module.exports = router

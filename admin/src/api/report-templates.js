@@ -6,7 +6,7 @@
  * @updated 2026-02-06 - 统一使用 request() 替代原生 fetch
  */
 
-import { API_PREFIX, request, authHeaders } from './base.js'
+import { API_PREFIX, request } from './base.js'
 
 // 报表模板端点
 export const REPORT_TEMPLATES_ENDPOINTS = {
@@ -83,24 +83,18 @@ export const ReportTemplatesAPI = {
   },
 
   /**
-   * 导出报表（需要原生 fetch 处理二进制数据）
+   * 导出报表（Blob 响应 - 文件下载）
    * @param {number} templateId - 模板ID
    * @param {Object} params - 导出参数
    * @param {string} params.format - 导出格式：xlsx/csv
    * @returns {Promise<Blob>} 文件数据
    */
   async exportReport(templateId, params = {}) {
-    const query = new URLSearchParams(params).toString()
-    const url = query
-      ? `${REPORT_TEMPLATES_ENDPOINTS.EXPORT(templateId)}?${query}`
-      : REPORT_TEMPLATES_ENDPOINTS.EXPORT(templateId)
-    const response = await fetch(url, {
-      headers: authHeaders()
+    return request({
+      url: REPORT_TEMPLATES_ENDPOINTS.EXPORT(templateId),
+      params,
+      responseType: 'blob'
     })
-    if (!response.ok) {
-      throw new Error('导出失败')
-    }
-    return response.blob()
   },
 
   /**

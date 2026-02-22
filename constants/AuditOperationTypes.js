@@ -149,6 +149,12 @@ const OPERATION_TYPES = Object.freeze({
   PRIZE_STOCK_ADJUST: 'prize_stock_adjust',
 
   /**
+   * 奖品库存设置（设置绝对值）
+   * @description 管理员设置奖品库存为指定数值（区别于 adjust 的增量模式）
+   */
+  PRIZE_STOCK_SET: 'prize_stock_set',
+
+  /**
    * 活动配置（修改活动配置）
    * @description 管理员修改抽奖活动配置
    */
@@ -364,6 +370,7 @@ const OPERATION_TYPE_DESCRIPTIONS = Object.freeze({
   [OPERATION_TYPES.PRIZE_CREATE]: '奖品创建',
   [OPERATION_TYPES.PRIZE_DELETE]: '奖品删除',
   [OPERATION_TYPES.PRIZE_STOCK_ADJUST]: '奖品库存调整',
+  [OPERATION_TYPES.PRIZE_STOCK_SET]: '奖品库存设置',
   [OPERATION_TYPES.CAMPAIGN_CONFIG]: '活动配置',
 
   // 抽奖管理类（V4.5.0新增）
@@ -442,6 +449,7 @@ const CRITICAL_OPERATIONS = Object.freeze(
 
     // ========== 奖品管理关键操作 ==========
     OPERATION_TYPES.PRIZE_STOCK_ADJUST, // 奖品库存调整 - 影响抽奖可用库存
+    OPERATION_TYPES.PRIZE_STOCK_SET, // 奖品库存设置 - 直接设置绝对库存值
     OPERATION_TYPES.PRIZE_DELETE, // 奖品删除 - 不可恢复的破坏性操作
 
     // ========== 抽奖管理关键操作（V4.5.0 新增）==========

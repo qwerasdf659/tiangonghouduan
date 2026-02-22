@@ -12,12 +12,7 @@ import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
 // ========== API 端点 ==========
 
 export const SYSTEM_ADMIN_ENDPOINTS = {
-  // 公告管理
-  ANNOUNCEMENT_LIST: `${API_PREFIX}/console/system/announcements`,
-  ANNOUNCEMENT_DETAIL: `${API_PREFIX}/console/system/announcements/:id`,
-  ANNOUNCEMENT_CREATE: `${API_PREFIX}/console/system/announcements`,
-  ANNOUNCEMENT_UPDATE: `${API_PREFIX}/console/system/announcements/:id`,
-  ANNOUNCEMENT_DELETE: `${API_PREFIX}/console/system/announcements/:id`,
+  // [已合并] 公告管理 → ad-campaigns?category=system
 
   // 系统通知
   NOTIFICATION_LIST: `${API_PREFIX}/system/notifications`,
@@ -28,35 +23,20 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   NOTIFICATION_ANNOUNCEMENTS: `${API_PREFIX}/console/notifications/announcements`,
   CONSOLE_NOTIFICATIONS: `${API_PREFIX}/console/system/notifications`,
 
-  // 弹窗Banner
-  POPUP_BANNER_LIST: `${API_PREFIX}/console/popup-banners`,
-  POPUP_BANNER_STATS: `${API_PREFIX}/console/popup-banners/statistics`,
-  POPUP_BANNER_DETAIL: `${API_PREFIX}/console/popup-banners/:id`,
-  POPUP_BANNER_CREATE: `${API_PREFIX}/console/popup-banners`,
-  POPUP_BANNER_UPDATE: `${API_PREFIX}/console/popup-banners/:id`,
-  POPUP_BANNER_DELETE: `${API_PREFIX}/console/popup-banners/:id`,
-  POPUP_BANNER_TOGGLE: `${API_PREFIX}/console/popup-banners/:id/toggle`,
-  POPUP_BANNER_ORDER: `${API_PREFIX}/console/popup-banners/order`,
-  POPUP_BANNER_SHOW_STATS: `${API_PREFIX}/console/ad-campaigns/popup-banners/:id/show-stats`,
+  // [已合并] 弹窗Banner + 轮播图 → ad-campaigns?category=operational
+  // [已合并] 公告 → ad-campaigns?category=system
 
-  // 轮播图管理（carousel_items 独立表）
-  CAROUSEL_ITEM_LIST: `${API_PREFIX}/console/carousel-items`,
-  CAROUSEL_ITEM_STATS: `${API_PREFIX}/console/carousel-items/statistics`,
-  CAROUSEL_ITEM_DETAIL: `${API_PREFIX}/console/carousel-items/:id`,
-  CAROUSEL_ITEM_CREATE: `${API_PREFIX}/console/carousel-items`,
-  CAROUSEL_ITEM_UPDATE: `${API_PREFIX}/console/carousel-items/:id`,
-  CAROUSEL_ITEM_DELETE: `${API_PREFIX}/console/carousel-items/:id`,
-  CAROUSEL_ITEM_TOGGLE: `${API_PREFIX}/console/carousel-items/:id/toggle`,
-  CAROUSEL_ITEM_ORDER: `${API_PREFIX}/console/carousel-items/order`,
-  CAROUSEL_ITEM_SHOW_STATS: `${API_PREFIX}/console/ad-campaigns/carousel-items/:id/show-stats`,
-
-  // 广告活动管理
+  // 广告活动管理（统一内容投放管理，支持 commercial/operational/system 三种类型）
   AD_CAMPAIGN_LIST: `${API_PREFIX}/console/ad-campaigns`,
   AD_CAMPAIGN_CREATE: `${API_PREFIX}/console/ad-campaigns`,
+  AD_CAMPAIGN_OPERATIONAL_CREATE: `${API_PREFIX}/console/ad-campaigns/operational`,
+  AD_CAMPAIGN_SYSTEM_CREATE: `${API_PREFIX}/console/ad-campaigns/system`,
   AD_CAMPAIGN_DETAIL: `${API_PREFIX}/console/ad-campaigns/:id`,
   AD_CAMPAIGN_REVIEW: `${API_PREFIX}/console/ad-campaigns/:id/review`,
+  AD_CAMPAIGN_PUBLISH: `${API_PREFIX}/console/ad-campaigns/:id/publish`,
   AD_CAMPAIGN_STATS: `${API_PREFIX}/console/ad-campaigns/statistics`,
   AD_CAMPAIGN_DASHBOARD: `${API_PREFIX}/console/ad-campaigns/dashboard`,
+  AD_CAMPAIGN_INTERACTION_STATS: `${API_PREFIX}/console/ad-campaigns/interaction-stats/:id`,
   AD_POPUP_QUEUE_CONFIG: `${API_PREFIX}/console/ad-campaigns/popup-queue-config`,
   AD_BID_LOGS: `${API_PREFIX}/console/ad-campaigns/bid-logs`,
   AD_USER_TAGS: `${API_PREFIX}/console/ad-campaigns/user-ad-tags`,

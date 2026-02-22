@@ -98,22 +98,27 @@ class PrizePoolService {
       created_by
     })
 
-    // 1. 验证概率总和必须为1（2026-01-26 技术债务清理：仅接受规范字段 win_probability）
-    const totalProbability = prizes.reduce((sum, p) => {
-      const prob = parseFloat(p.win_probability) || 0
-      return sum + prob
-    }, 0)
-
-    if (Math.abs(totalProbability - 1.0) > 0.001) {
-      throw new Error(`奖品概率总和必须为1，当前为${totalProbability.toFixed(4)}`)
-    }
-
-    // 2. 查找活动
+    // 1. 查找活动（需要 pick_method 来决定校验逻辑）
     const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, {
       transaction
     })
     if (!campaign) {
       throw new Error('活动不存在')
+    }
+
+    /**
+     * 2. 按选奖方式分支校验
+     * - normalize 模式：校验 win_probability 总和 = 1.0
+     * - tier_first 模式：不校验概率总和（使用 win_weight 权重）
+     */
+    if (campaign.pick_method === 'normalize') {
+      const totalProbability = prizes.reduce((sum, p) => {
+        const prob = parseFloat(p.win_probability) || 0
+        return sum + prob
+      }, 0)
+      if (Math.abs(totalProbability - 1.0) > 0.001) {
+        throw new Error(`normalize模式下奖品概率总和必须为1，当前为${totalProbability.toFixed(4)}`)
+      }
     }
 
     // 3. 获取活动现有奖品的最大sort_order（避免重复）
@@ -158,7 +163,13 @@ class PrizePoolService {
            * @枚举值 common/uncommon/rare/epic/legendary
            * @注意 与 reward_tier（后端概率档位）是独立维度
            */
-          rarity_code: prizeData.rarity_code || 'common'
+          rarity_code: prizeData.rarity_code || 'common',
+          /** 选奖权重（tier_first 模式下的概率控制字段） */
+          win_weight: parseInt(prizeData.win_weight) || 0,
+          /** 所属档位（high/mid/low） */
+          reward_tier: prizeData.reward_tier || 'low',
+          /** 是否为兜底奖品（所有档位无可用奖品时发放） */
+          is_fallback: prizeData.is_fallback ? 1 : 0
         },
         { transaction }
       )
@@ -291,6 +302,10 @@ class PrizePoolService {
           'cost_points',
           'status',
           'sort_order',
+          'rarity_code',
+          'win_weight',
+          'reward_tier',
+          'is_fallback',
           'total_win_count',
           'daily_win_count',
           'max_daily_wins',
@@ -326,6 +341,10 @@ class PrizePoolService {
         cost_points: prize.cost_points,
         status: prize.status,
         sort_order: prize.sort_order,
+        rarity_code: prize.rarity_code || 'common',
+        win_weight: prize.win_weight || 0,
+        reward_tier: prize.reward_tier || 'low',
+        is_fallback: prize.is_fallback || false,
         total_win_count: prize.total_win_count,
         daily_win_count: prize.daily_win_count,
         max_daily_wins: prize.max_daily_wins,
@@ -416,6 +435,9 @@ class PrizePoolService {
           'status',
           'sort_order',
           'rarity_code',
+          'win_weight',
+          'reward_tier',
+          'is_fallback',
           'created_at',
           'updated_at'
         ]
@@ -461,6 +483,9 @@ class PrizePoolService {
         status: prize.status,
         sort_order: prize.sort_order,
         rarity_code: prize.rarity_code || 'common',
+        win_weight: prize.win_weight || 0,
+        reward_tier: prize.reward_tier || 'low',
+        is_fallback: prize.is_fallback || false,
         created_at: prize.created_at,
         updated_at: prize.updated_at
       }))
@@ -554,7 +579,11 @@ class PrizePoolService {
        * @枚举值 common/uncommon/rare/epic/legendary
        * @注意 与 reward_tier（后端概率档位）是独立维度
        */
-      rarity_code: 'rarity_code'
+      rarity_code: 'rarity_code',
+      /** 选奖权重（tier_first 模式下实际生效的概率控制字段） */
+      win_weight: 'win_weight',
+      /** 所属档位（high/mid/low，决定奖品归属哪个档位池） */
+      reward_tier: 'reward_tier'
     }
 
     const filteredUpdateData = {}
@@ -732,6 +761,10 @@ class PrizePoolService {
       cost_points: updatedPrize.cost_points,
       status: updatedPrize.status,
       sort_order: updatedPrize.sort_order,
+      rarity_code: updatedPrize.rarity_code || 'common',
+      win_weight: updatedPrize.win_weight || 0,
+      reward_tier: updatedPrize.reward_tier || 'low',
+      is_fallback: updatedPrize.is_fallback || false,
       total_win_count: updatedPrize.total_win_count,
       daily_win_count: updatedPrize.daily_win_count,
       max_daily_wins: updatedPrize.max_daily_wins,
@@ -1043,6 +1076,370 @@ class PrizePoolService {
       logger.error('查询奖品失败', { error: error.message, prize_id })
       throw error
     }
+  }
+
+  /**
+   * 获取指定活动的奖品列表，按档位分组返回
+   * 包含档内占比计算和库存风险检测
+   *
+   * @param {string} campaign_code - 活动业务码
+   * @returns {Promise<Object>} 分组后的奖品数据 + 风险警告
+   */
+  static async getPrizesByCampaignGrouped(campaign_code) {
+    try {
+      logger.info('获取活动奖品分组数据', { campaign_code })
+
+      const campaign = await LotteryCampaign.findOne({
+        where: { campaign_code }
+      })
+      if (!campaign) {
+        throw new Error(`活动不存在: ${campaign_code}`)
+      }
+
+      const prizes = await LotteryPrize.findAll({
+        where: { lottery_campaign_id: campaign.lottery_campaign_id },
+        order: [['reward_tier', 'ASC'], ['sort_order', 'ASC']],
+        attributes: [
+          'lottery_prize_id', 'lottery_campaign_id', 'prize_name', 'prize_type',
+          'prize_value', 'prize_value_points', 'stock_quantity', 'win_probability',
+          'win_weight', 'reward_tier', 'is_fallback', 'prize_description',
+          'image_resource_id', 'angle', 'color', 'cost_points', 'status',
+          'sort_order', 'rarity_code', 'total_win_count', 'daily_win_count',
+          'max_daily_wins', 'created_at', 'updated_at'
+        ]
+      })
+
+      /** 档位中文标签映射 */
+      const tierLabels = { high: '高档', mid: '中档', low: '低档' }
+      const tierOrder = ['high', 'mid', 'low']
+      const warnings = []
+
+      /** 按 reward_tier 分组 */
+      const grouped = {}
+      for (const prize of prizes) {
+        const tier = prize.reward_tier || 'low'
+        if (!grouped[tier]) grouped[tier] = []
+        grouped[tier].push(prize)
+      }
+
+      /** 构建分组结果，计算档内占比 */
+      const prizeGroups = tierOrder
+        .filter(tier => grouped[tier] && grouped[tier].length > 0)
+        .map(tier => {
+          const tierPrizes = grouped[tier]
+          const totalWeight = tierPrizes.reduce((sum, p) => sum + (p.win_weight || 0), 0)
+
+          const formattedPrizes = tierPrizes.map(p => {
+            const tierPercentage = totalWeight > 0
+              ? parseFloat(((p.win_weight || 0) / totalWeight * 100).toFixed(2))
+              : 0
+
+            if (p.stock_quantity === 0 && (p.win_weight || 0) > 0) {
+              warnings.push({
+                lottery_prize_id: p.lottery_prize_id,
+                type: 'zero_stock_positive_weight',
+                message: `${p.prize_name}：库存为 0 但权重 ${p.win_weight} > 0`
+              })
+            }
+
+            return {
+              lottery_prize_id: p.lottery_prize_id,
+              lottery_campaign_id: p.lottery_campaign_id,
+              prize_name: p.prize_name,
+              prize_type: p.prize_type,
+              prize_value: p.prize_value,
+              prize_value_points: p.prize_value_points,
+              win_weight: p.win_weight || 0,
+              tier_percentage: tierPercentage,
+              stock_quantity: p.stock_quantity,
+              remaining_quantity: Math.max(0, (p.stock_quantity || 0) - (p.total_win_count || 0)),
+              total_win_count: p.total_win_count || 0,
+              is_fallback: p.is_fallback || false,
+              sort_order: p.sort_order,
+              status: p.status,
+              rarity_code: p.rarity_code || 'common',
+              win_probability: p.win_probability,
+              prize_description: p.prize_description,
+              image_resource_id: p.image_resource_id,
+              angle: p.angle,
+              color: p.color,
+              cost_points: p.cost_points,
+              daily_win_count: p.daily_win_count || 0,
+              max_daily_wins: p.max_daily_wins,
+              reward_tier: p.reward_tier,
+              created_at: p.created_at,
+              updated_at: p.updated_at
+            }
+          })
+
+          return {
+            tier,
+            tier_label: tierLabels[tier] || tier,
+            prize_count: tierPrizes.length,
+            total_weight: totalWeight,
+            prizes: DecimalConverter.convertPrizeData(formattedPrizes)
+          }
+        })
+
+      logger.info('获取活动奖品分组数据成功', {
+        campaign_code,
+        group_count: prizeGroups.length,
+        total_prizes: prizes.length
+      })
+
+      return {
+        campaign: {
+          lottery_campaign_id: campaign.lottery_campaign_id,
+          campaign_name: campaign.campaign_name,
+          campaign_code: campaign.campaign_code,
+          pick_method: campaign.pick_method,
+          status: campaign.status
+        },
+        prize_groups: prizeGroups,
+        warnings
+      }
+    } catch (error) {
+      logger.error('获取活动奖品分组数据失败', { error: error.message, campaign_code })
+      throw error
+    }
+  }
+
+  /**
+   * 为指定活动添加单个奖品
+   * 自动分配 sort_order，根据 pick_method 做不同校验
+   *
+   * @param {string} campaign_code - 活动业务码
+   * @param {Object} prizeData - 奖品数据
+   * @param {Object} options - { created_by, transaction }
+   * @returns {Promise<Object>} 创建结果
+   */
+  static async addPrizeToCampaign(campaign_code, prizeData, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'PrizePoolService.addPrizeToCampaign')
+    const { created_by } = options
+
+    logger.info('为活动添加单个奖品', { campaign_code, prize_name: prizeData.prize_name })
+
+    const campaign = await LotteryCampaign.findOne({
+      where: { campaign_code },
+      transaction
+    })
+    if (!campaign) {
+      throw new Error(`活动不存在: ${campaign_code}`)
+    }
+
+    const result = await PrizePoolService.batchAddPrizes(
+      campaign.lottery_campaign_id,
+      [prizeData],
+      { created_by, transaction }
+    )
+
+    return {
+      lottery_campaign_id: campaign.lottery_campaign_id,
+      campaign_code,
+      prize: result.prizes[0]
+    }
+  }
+
+  /**
+   * 设置单个奖品的绝对库存值
+   * 区别于 addStock 的增量模式
+   *
+   * @param {number} prize_id - 奖品ID
+   * @param {number} stock_quantity - 目标库存值
+   * @param {Object} options - { operated_by, transaction }
+   * @returns {Promise<Object>} { old_stock, new_stock }
+   */
+  static async setPrizeStock(prize_id, stock_quantity, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'PrizePoolService.setPrizeStock')
+    const { operated_by } = options
+
+    logger.info('设置奖品绝对库存', { prize_id, stock_quantity })
+
+    const prize = await LotteryPrize.findByPk(prize_id, { transaction })
+    if (!prize) {
+      throw new Error('奖品不存在')
+    }
+
+    const oldStock = prize.stock_quantity || 0
+    const newStock = parseInt(stock_quantity)
+
+    if (isNaN(newStock) || newStock < 0) {
+      throw new Error('库存数量必须为非负整数')
+    }
+
+    const currentUsed = prize.total_win_count || 0
+    if (newStock < currentUsed) {
+      throw new Error(`新库存(${newStock})不能小于已发放数量(${currentUsed})`)
+    }
+
+    await prize.update({ stock_quantity: newStock }, { transaction })
+
+    const warnings = []
+    if (newStock === 0 && (prize.win_weight || 0) > 0) {
+      warnings.push({
+        type: 'zero_stock_positive_weight',
+        message: `${prize.prize_name}：库存为 0 但权重 ${prize.win_weight} > 0，算法选中后将触发降级`
+      })
+    }
+
+    await AuditLogService.logOperation({
+      operator_id: operated_by || 1,
+      operation_type: 'prize_stock_adjust',
+      target_type: 'LotteryPrize',
+      target_id: prize_id,
+      action: 'set_stock',
+      before_data: { stock_quantity: oldStock },
+      after_data: { stock_quantity: newStock },
+      reason: `设置绝对库存: ${oldStock} → ${newStock}`,
+      idempotency_key: `stock_set_${prize_id}_from${oldStock}_to${newStock}`,
+      is_critical_operation: true,
+      transaction
+    })
+
+    try {
+      await BusinessCacheHelper.invalidateLotteryCampaign(
+        prize.lottery_campaign_id, 'prize_stock_set'
+      )
+    } catch (cacheError) {
+      logger.warn('[缓存] 活动配置缓存失效失败（非致命）', { error: cacheError.message })
+    }
+
+    logger.info('奖品绝对库存设置成功', { prize_id, old_stock: oldStock, new_stock: newStock })
+
+    return { prize_id, old_stock: oldStock, new_stock: newStock, warnings }
+  }
+
+  /**
+   * 批量更新多个奖品库存
+   * 在单一事务内原子执行
+   *
+   * @param {string} campaign_code - 活动业务码
+   * @param {Array<{lottery_prize_id: number, stock_quantity: number}>} updates - 更新列表
+   * @param {Object} options - { operated_by, transaction }
+   * @returns {Promise<Object>} { updated_count, warnings }
+   */
+  static async batchUpdatePrizeStock(campaign_code, updates, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'PrizePoolService.batchUpdatePrizeStock')
+    const { operated_by } = options
+
+    logger.info('批量更新奖品库存', { campaign_code, update_count: updates.length })
+
+    const campaign = await LotteryCampaign.findOne({
+      where: { campaign_code },
+      transaction
+    })
+    if (!campaign) {
+      throw new Error(`活动不存在: ${campaign_code}`)
+    }
+
+    const warnings = []
+    let updatedCount = 0
+
+    for (const update of updates) {
+      // eslint-disable-next-line no-await-in-loop -- 事务内顺序更新，保证原子性
+      const result = await PrizePoolService.setPrizeStock(
+        update.lottery_prize_id,
+        update.stock_quantity,
+        { operated_by, transaction }
+      )
+      updatedCount++
+      if (result.warnings?.length) {
+        warnings.push(...result.warnings)
+      }
+    }
+
+    logger.info('批量库存更新成功', { campaign_code, updated_count: updatedCount })
+
+    return { updated_count: updatedCount, warnings }
+  }
+
+  /**
+   * 批量更新奖品排序
+   * 使用 CASE WHEN 单条SQL避免唯一索引中间态冲突
+   *
+   * @param {string} campaign_code - 活动业务码
+   * @param {Array<{lottery_prize_id: number, sort_order: number}>} updates - 排序更新列表
+   * @param {Object} options - { updated_by, transaction }
+   * @returns {Promise<Object>} { updated_count }
+   */
+  static async batchUpdateSortOrder(campaign_code, updates, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'PrizePoolService.batchUpdateSortOrder')
+    const { updated_by } = options
+
+    logger.info('批量更新奖品排序', { campaign_code, update_count: updates.length })
+
+    const campaign = await LotteryCampaign.findOne({
+      where: { campaign_code },
+      transaction
+    })
+    if (!campaign) {
+      throw new Error(`活动不存在: ${campaign_code}`)
+    }
+
+    if (!updates || updates.length === 0) {
+      throw new Error('排序更新列表不能为空')
+    }
+
+    /**
+     * 先将所有目标奖品的 sort_order 设为负数临时值（避免唯一索引冲突），
+     * 再设为正式目标值
+     */
+
+    // 阶段1：设置临时负值
+    for (let i = 0; i < updates.length; i++) {
+      // eslint-disable-next-line no-await-in-loop -- 事务内顺序执行避免索引冲突
+      await LotteryPrize.update(
+        { sort_order: -(i + 1) },
+        {
+          where: {
+            lottery_prize_id: updates[i].lottery_prize_id,
+            lottery_campaign_id: campaign.lottery_campaign_id
+          },
+          transaction
+        }
+      )
+    }
+
+    // 阶段2：设置正式目标值
+    for (const update of updates) {
+      // eslint-disable-next-line no-await-in-loop -- 事务内顺序执行避免索引冲突
+      await LotteryPrize.update(
+        { sort_order: update.sort_order },
+        {
+          where: {
+            lottery_prize_id: update.lottery_prize_id,
+            lottery_campaign_id: campaign.lottery_campaign_id
+          },
+          transaction
+        }
+      )
+    }
+
+    await AuditLogService.logOperation({
+      operator_id: updated_by || 1,
+      operation_type: 'prize_sort_order',
+      target_type: 'LotteryCampaign',
+      target_id: campaign.lottery_campaign_id,
+      action: 'batch_sort',
+      before_data: { note: '排序值已变更' },
+      after_data: { updates },
+      reason: `批量更新${updates.length}个奖品排序`,
+      idempotency_key: `sort_order_${campaign_code}_${Date.now()}`,
+      is_critical_operation: false,
+      transaction
+    })
+
+    try {
+      await BusinessCacheHelper.invalidateLotteryCampaign(
+        campaign.lottery_campaign_id, 'prize_sort_updated'
+      )
+    } catch (cacheError) {
+      logger.warn('[缓存] 活动配置缓存失效失败（非致命）', { error: cacheError.message })
+    }
+
+    logger.info('批量排序更新成功', { campaign_code, updated_count: updates.length })
+
+    return { updated_count: updates.length }
   }
 }
 

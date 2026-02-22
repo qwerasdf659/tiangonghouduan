@@ -331,12 +331,12 @@ class RedemptionService {
       { transaction }
     )
 
-    // 7. 使用 ItemService.consumeItem() 消耗物品实例
-    if (order.item_instance) {
+    // 7. 消耗物品（双录记账：用户→SYSTEM_BURN）
+    if (order.item_id) {
       const ItemService = require('./asset/ItemService')
       await ItemService.consumeItem(
         {
-          item_instance_id: order.item_instance.item_instance_id,
+          item_id: order.item_id,
           operator_user_id: redeemer_user_id,
           business_type: 'redemption_use',
           idempotency_key: order.redemption_order_id,
@@ -344,8 +344,7 @@ class RedemptionService {
             order_id: order.redemption_order_id,
             redeemer_user_id,
             store_id: fulfilledStoreId,
-            staff_id: fulfilledByStaffId,
-            name: order.item_instance.meta?.name
+            staff_id: fulfilledByStaffId
           }
         },
         { transaction }
@@ -521,7 +520,12 @@ class RedemptionService {
    * @returns {Promise<RedemptionOrder>} 订单对象
    */
   static async getOrderDetail(order_id, options = {}) {
-    const { include_item = false, include_redeemer = false, transaction = null } = options
+    const {
+      include_item = false,
+      include_redeemer = false,
+      transaction = null,
+      lock = null
+    } = options
 
     const include = []
 
@@ -540,10 +544,12 @@ class RedemptionService {
       })
     }
 
-    const order = await RedemptionOrder.findByPk(order_id, {
-      include,
-      transaction
-    })
+    const queryOptions = { include, transaction }
+    if (lock && transaction) {
+      queryOptions.lock = lock
+    }
+
+    const order = await RedemptionOrder.findByPk(order_id, queryOptions)
 
     if (!order) {
       throw new Error('订单不存在')
@@ -681,12 +687,12 @@ class RedemptionService {
       { transaction }
     )
 
-    // 6. 使用 ItemService.consumeItem() 消耗物品实例
-    if (order.item_instance) {
+    // 6. 消耗物品（双录记账：用户→SYSTEM_BURN）
+    if (order.item_id) {
       const ItemService = require('./asset/ItemService')
       await ItemService.consumeItem(
         {
-          item_instance_id: order.item_instance.item_instance_id,
+          item_id: order.item_id,
           operator_user_id: admin_user_id,
           business_type: 'admin_redemption_fulfill',
           idempotency_key: `admin_fulfill_${order.redemption_order_id}`,
@@ -695,8 +701,7 @@ class RedemptionService {
             admin_user_id,
             store_id: fulfilledStoreId,
             staff_id: fulfilledByStaffId,
-            remark,
-            name: order.item_instance.meta?.name
+            remark
           }
         },
         { transaction }

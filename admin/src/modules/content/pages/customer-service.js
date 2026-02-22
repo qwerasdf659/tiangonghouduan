@@ -11,7 +11,9 @@ import { logger } from '../../../utils/logger.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import {
   useCustomerServiceState,
-  useCustomerServiceMethods
+  useCustomerServiceMethods,
+  useUserContextState,
+  useUserContextMethods
 } from '../composables/index.js'
 
 /**
@@ -26,6 +28,8 @@ function customerServicePage() {
     // ==================== Composables ====================
     ...useCustomerServiceState(),
     ...useCustomerServiceMethods(),
+    ...useUserContextState(),
+    ...useUserContextMethods(),
 
     // ==================== 生命周期 ====================
 

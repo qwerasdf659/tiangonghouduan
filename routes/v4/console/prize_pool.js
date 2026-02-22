@@ -137,6 +137,163 @@ router.get(
 )
 
 /**
+ * GET /:code/grouped - 获取指定活动的奖品（按档位分组）
+ *
+ * @description 返回按 reward_tier 分组的奖品列表，含档内占比和风险警告
+ * @route GET /api/v4/console/prize-pool/:code/grouped
+ * @access Private (需要管理员权限)
+ */
+router.get(
+  '/:code/grouped',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    try {
+      const campaign_code = req.params.code
+      if (!campaign_code) {
+        return res.apiError('缺少活动代码', 'MISSING_CAMPAIGN_CODE')
+      }
+
+      const PrizePoolService = req.app.locals.services.getService('prize_pool')
+      const result = await PrizePoolService.getPrizesByCampaignGrouped(campaign_code)
+
+      return res.apiSuccess(result, '活动奖品分组信息获取成功')
+    } catch (error) {
+      if (error.message.includes('活动不存在')) {
+        return res.apiError(error.message, 'CAMPAIGN_NOT_FOUND')
+      }
+      sharedComponents.logger.error('获取活动奖品分组数据失败', { error: error.message })
+      return res.apiInternalError('获取活动奖品分组数据失败', error.message, 'PRIZE_GROUPED_ERROR')
+    }
+  })
+)
+
+/**
+ * POST /:code/add-prize - 为指定活动添加单个奖品
+ *
+ * @route POST /api/v4/console/prize-pool/:code/add-prize
+ * @access Private (需要管理员权限)
+ */
+router.post(
+  '/:code/add-prize',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const campaign_code = req.params.code
+    const prizeData = req.body
+
+    try {
+      if (!campaign_code) {
+        return res.apiError('缺少活动代码', 'MISSING_CAMPAIGN_CODE')
+      }
+      if (!prizeData.prize_name) {
+        return res.apiError('奖品名称不能为空', 'MISSING_PRIZE_NAME')
+      }
+
+      const PrizePoolService = req.app.locals.services.getService('prize_pool')
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await PrizePoolService.addPrizeToCampaign(campaign_code, prizeData, {
+            created_by: req.user?.user_id,
+            transaction
+          })
+        },
+        { description: 'addPrizeToCampaign' }
+      )
+
+      return res.apiSuccess(result, '奖品添加成功')
+    } catch (error) {
+      if (error.message.includes('排序') && error.message.includes('已存在')) {
+        return res.apiError(error.message, 'SORT_ORDER_DUPLICATE')
+      }
+      sharedComponents.logger.error('添加奖品失败', { error: error.message })
+      return res.apiInternalError('添加奖品失败', error.message, 'PRIZE_ADD_ERROR')
+    }
+  })
+)
+
+/**
+ * PUT /:code/sort-order - 批量更新奖品排序
+ *
+ * @route PUT /api/v4/console/prize-pool/:code/sort-order
+ * @access Private (需要管理员权限)
+ */
+router.put(
+  '/:code/sort-order',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const campaign_code = req.params.code
+    const { updates } = req.body
+
+    try {
+      if (!campaign_code) {
+        return res.apiError('缺少活动代码', 'MISSING_CAMPAIGN_CODE')
+      }
+      if (!updates || !Array.isArray(updates) || updates.length === 0) {
+        return res.apiError('排序更新列表不能为空', 'INVALID_UPDATES')
+      }
+
+      const PrizePoolService = req.app.locals.services.getService('prize_pool')
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await PrizePoolService.batchUpdateSortOrder(campaign_code, updates, {
+            updated_by: req.user?.user_id,
+            transaction
+          })
+        },
+        { description: 'batchUpdateSortOrder' }
+      )
+
+      return res.apiSuccess(result, '排序更新成功')
+    } catch (error) {
+      sharedComponents.logger.error('排序更新失败', { error: error.message })
+      return res.apiInternalError('排序更新失败', error.message, 'SORT_ORDER_UPDATE_ERROR')
+    }
+  })
+)
+
+/**
+ * PUT /:code/batch-stock - 批量更新多个奖品库存
+ *
+ * @route PUT /api/v4/console/prize-pool/:code/batch-stock
+ * @access Private (需要管理员权限)
+ */
+router.put(
+  '/:code/batch-stock',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const campaign_code = req.params.code
+    const { updates } = req.body
+
+    try {
+      if (!campaign_code) {
+        return res.apiError('缺少活动代码', 'MISSING_CAMPAIGN_CODE')
+      }
+      if (!updates || !Array.isArray(updates) || updates.length === 0) {
+        return res.apiError('库存更新列表不能为空', 'INVALID_UPDATES')
+      }
+
+      const PrizePoolService = req.app.locals.services.getService('prize_pool')
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await PrizePoolService.batchUpdatePrizeStock(campaign_code, updates, {
+            updated_by: req.user?.user_id,
+            transaction
+          })
+        },
+        { description: 'batchUpdatePrizeStock' }
+      )
+
+      return res.apiSuccess(result, '批量库存更新成功')
+    } catch (error) {
+      sharedComponents.logger.error('批量库存更新失败', { error: error.message })
+      return res.apiInternalError('批量库存更新失败', error.message, 'BATCH_STOCK_UPDATE_ERROR')
+    }
+  })
+)
+
+/**
  * GET /:code - 获取指定活动的奖品池
  *
  * @description 获取指定活动的所有奖品信息
@@ -307,6 +464,51 @@ router.post(
 )
 
 /**
+ * PUT /prize/:id/stock - 设置单个奖品绝对库存值
+ *
+ * @description 区别于 add-stock（增量），这个接口设置绝对库存值
+ * @route PUT /api/v4/console/prize-pool/prize/:id/stock
+ * @access Private (需要管理员权限)
+ */
+router.put(
+  '/prize/:id/stock',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const prize_id = parseInt(req.params.id, 10)
+    const { stock_quantity } = req.body
+
+    try {
+      if (!prize_id || isNaN(prize_id) || prize_id <= 0) {
+        return res.apiError('无效的奖品ID', 'INVALID_PRIZE_ID')
+      }
+      if (stock_quantity === undefined || stock_quantity === null) {
+        return res.apiError('库存值不能为空', 'MISSING_STOCK_QUANTITY')
+      }
+
+      const PrizePoolService = req.app.locals.services.getService('prize_pool')
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await PrizePoolService.updatePrizeStock(prize_id, stock_quantity, {
+            updated_by: req.user?.user_id,
+            transaction
+          })
+        },
+        { description: 'updatePrizeStock' }
+      )
+
+      return res.apiSuccess(result, '库存更新成功')
+    } catch (error) {
+      if (error.message === '奖品不存在') {
+        return res.apiError(error.message, 'PRIZE_NOT_FOUND')
+      }
+      sharedComponents.logger.error('库存更新失败', { error: error.message })
+      return res.apiInternalError('库存更新失败', error.message, 'STOCK_UPDATE_ERROR')
+    }
+  })
+)
+
+/**
  * DELETE /prize/:id - 删除奖品
  *
  * @description 删除指定的奖品（仅当无中奖记录时）
@@ -351,9 +553,223 @@ router.delete(
       if (error.message.includes('已被中奖') && error.message.includes('不能删除')) {
         return res.apiError(error.message, 'PRIZE_IN_USE')
       }
+      if (error.message.includes('兜底奖品')) {
+        return res.apiError(error.message, 'FALLBACK_PROTECTED')
+      }
 
       sharedComponents.logger.error('删除奖品失败', { error: error.message })
       return res.apiInternalError('删除奖品失败', error.message, 'PRIZE_DELETE_ERROR')
+    }
+  })
+)
+
+/**
+ * GET /:code/grouped - 获取指定活动的奖品列表（按档位分组）
+ *
+ * @description 按 reward_tier 分组返回奖品，含档内占比计算和风险检测
+ * @route GET /api/v4/console/prize-pool/:code/grouped
+ * @access Private (需要管理员权限)
+ */
+router.get(
+  '/:code/grouped',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    try {
+      const campaign_code = req.params.code
+      if (!campaign_code) {
+        return res.apiError('缺少活动代码', 'MISSING_CAMPAIGN_CODE')
+      }
+
+      const PrizePoolService = req.app.locals.services.getService('prize_pool')
+      const result = await PrizePoolService.getPrizesByCampaignGrouped(campaign_code)
+
+      return res.apiSuccess(result, '活动奖品分组信息获取成功')
+    } catch (error) {
+      if (error.message.includes('活动不存在')) {
+        return res.apiError(error.message, 'CAMPAIGN_NOT_FOUND')
+      }
+      sharedComponents.logger.error('获取活动奖品分组失败', { error: error.message })
+      return res.apiInternalError('获取活动奖品分组失败', error.message, 'PRIZE_GROUPED_ERROR')
+    }
+  })
+)
+
+/**
+ * POST /:code/add-prize - 为指定活动添加单个奖品
+ *
+ * @description 通过活动 campaign_code 添加单个奖品，自动关联活动ID和分配sort_order
+ * @route POST /api/v4/console/prize-pool/:code/add-prize
+ * @access Private (需要管理员权限)
+ */
+router.post(
+  '/:code/add-prize',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const campaign_code = req.params.code
+    const prizeData = req.body
+
+    try {
+      if (!campaign_code) {
+        return res.apiError('缺少活动代码', 'MISSING_CAMPAIGN_CODE')
+      }
+      if (!prizeData.prize_name) {
+        return res.apiError('奖品名称不能为空', 'MISSING_PRIZE_NAME')
+      }
+
+      const PrizePoolService = req.app.locals.services.getService('prize_pool')
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await PrizePoolService.addPrizeToCampaign(campaign_code, prizeData, {
+            created_by: req.user?.user_id,
+            transaction
+          })
+        },
+        { description: 'addPrizeToCampaign' }
+      )
+
+      return res.apiSuccess(result, '奖品添加成功')
+    } catch (error) {
+      if (error.message.includes('活动不存在')) {
+        return res.apiError(error.message, 'CAMPAIGN_NOT_FOUND')
+      }
+      sharedComponents.logger.error('添加奖品失败', { error: error.message })
+      return res.apiInternalError('添加奖品失败', error.message, 'PRIZE_ADD_ERROR')
+    }
+  })
+)
+
+/**
+ * PUT /prize/:id/stock - 设置单个奖品绝对库存值
+ *
+ * @description 区别于 add-stock（增量），这里是设置绝对库存值
+ * @route PUT /api/v4/console/prize-pool/prize/:id/stock
+ * @access Private (需要管理员权限)
+ */
+router.put(
+  '/prize/:id/stock',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const prize_id = parseInt(req.params.id, 10)
+    const { stock_quantity } = req.body
+
+    try {
+      if (!prize_id || isNaN(prize_id)) {
+        return res.apiError('无效的奖品ID', 'INVALID_PRIZE_ID')
+      }
+      if (stock_quantity === undefined || stock_quantity === null) {
+        return res.apiError('缺少库存数量', 'MISSING_STOCK_QUANTITY')
+      }
+
+      const PrizePoolService = req.app.locals.services.getService('prize_pool')
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await PrizePoolService.setPrizeStock(prize_id, stock_quantity, {
+            operated_by: req.user?.user_id,
+            transaction
+          })
+        },
+        { description: 'setPrizeStock' }
+      )
+
+      return res.apiSuccess(result, '库存更新成功')
+    } catch (error) {
+      if (error.message === '奖品不存在') {
+        return res.apiError(error.message, 'PRIZE_NOT_FOUND')
+      }
+      sharedComponents.logger.error('设置库存失败', { error: error.message })
+      return res.apiInternalError('设置库存失败', error.message, 'SET_STOCK_ERROR')
+    }
+  })
+)
+
+/**
+ * PUT /:code/batch-stock - 批量更新多个奖品库存
+ *
+ * @description 在一个事务内原子更新多个奖品的绝对库存值
+ * @route PUT /api/v4/console/prize-pool/:code/batch-stock
+ * @access Private (需要管理员权限)
+ */
+router.put(
+  '/:code/batch-stock',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const campaign_code = req.params.code
+    const { updates } = req.body
+
+    try {
+      if (!campaign_code) {
+        return res.apiError('缺少活动代码', 'MISSING_CAMPAIGN_CODE')
+      }
+      if (!updates || !Array.isArray(updates) || updates.length === 0) {
+        return res.apiError('更新列表不能为空', 'MISSING_UPDATES')
+      }
+
+      const PrizePoolService = req.app.locals.services.getService('prize_pool')
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await PrizePoolService.batchUpdatePrizeStock(campaign_code, updates, {
+            operated_by: req.user?.user_id,
+            transaction
+          })
+        },
+        { description: 'batchUpdatePrizeStock' }
+      )
+
+      return res.apiSuccess(result, '批量库存更新成功')
+    } catch (error) {
+      if (error.message.includes('活动不存在')) {
+        return res.apiError(error.message, 'CAMPAIGN_NOT_FOUND')
+      }
+      sharedComponents.logger.error('批量库存更新失败', { error: error.message })
+      return res.apiInternalError('批量库存更新失败', error.message, 'BATCH_STOCK_ERROR')
+    }
+  })
+)
+
+/**
+ * PUT /:code/sort-order - 批量更新奖品排序
+ *
+ * @description 一个事务内批量更新奖品的 sort_order，避免唯一索引冲突
+ * @route PUT /api/v4/console/prize-pool/:code/sort-order
+ * @access Private (需要管理员权限)
+ */
+router.put(
+  '/:code/sort-order',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const campaign_code = req.params.code
+    const { updates } = req.body
+
+    try {
+      if (!campaign_code) {
+        return res.apiError('缺少活动代码', 'MISSING_CAMPAIGN_CODE')
+      }
+      if (!updates || !Array.isArray(updates) || updates.length === 0) {
+        return res.apiError('排序更新列表不能为空', 'MISSING_UPDATES')
+      }
+
+      const PrizePoolService = req.app.locals.services.getService('prize_pool')
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await PrizePoolService.batchUpdateSortOrder(campaign_code, updates, {
+            updated_by: req.user?.user_id,
+            transaction
+          })
+        },
+        { description: 'batchUpdateSortOrder' }
+      )
+
+      return res.apiSuccess(result, '排序更新成功')
+    } catch (error) {
+      if (error.message.includes('活动不存在')) {
+        return res.apiError(error.message, 'CAMPAIGN_NOT_FOUND')
+      }
+      sharedComponents.logger.error('排序更新失败', { error: error.message })
+      return res.apiInternalError('排序更新失败', error.message, 'SORT_ORDER_ERROR')
     }
   })
 )

@@ -551,14 +551,8 @@ router.get(
  */
 router.get('/config-summary', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const {
-      LotteryStrategyConfig,
-      LotteryTierMatrixConfig,
-      LotteryCampaign
-    } = require('../../../models')
-    // eslint-disable-next-line no-unused-vars -- 预留 Sequelize 操作符供后续扩展
-    const { Op } = require('sequelize')
-    const sequelize = require('../../../models').sequelize
+    const { LotteryStrategyConfig, LotteryTierMatrixConfig, LotteryCampaign, sequelize } =
+      req.app.locals.models
 
     // ── 1. 策略配置总览 ──
     const allStrategies = await LotteryStrategyConfig.findAll({

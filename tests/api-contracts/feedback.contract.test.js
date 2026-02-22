@@ -109,33 +109,34 @@ describe('API契约测试 - 反馈模块 (/api/v4/system)', () => {
     })
   })
 
-  // ==================== GET /api/v4/system/announcements ====================
-  describe('GET /system/announcements - 系统公告', () => {
+  // ==================== GET /api/v4/system/ad-delivery?slot_type=announcement ====================
+  // [已合并] /system/announcements → /system/ad-delivery?slot_type=announcement
+  describe('GET /system/ad-delivery?slot_type=announcement - 系统公告（统一内容投放）', () => {
     /**
-     * Case 1: 获取公告列表
+     * Case 1: 获取公告列表（已合并到统一内容投放接口）
      */
     test('应该返回公告列表契约格式', async () => {
       const response = await request(app)
-        .get('/api/v4/system/announcements')
+        .get('/api/v4/system/ad-delivery?slot_type=announcement')
         .set('Authorization', `Bearer ${accessToken}`)
 
       expect(response.status).toBe(200)
       validateApiContract(response.body)
 
-      // 验证数据结构
-      if (response.body.data.announcements) {
-        expect(Array.isArray(response.body.data.announcements)).toBe(true)
+      if (response.body.data?.items) {
+        expect(Array.isArray(response.body.data.items)).toBe(true)
       }
     })
 
     /**
-     * Case 2: 公告接口是公开的，无 Token 也应该返回 200
+     * Case 2: 统一内容投放接口需要登录
      */
-    test('无 Authorization 也应该返回公告列表（公开接口）', async () => {
-      const response = await request(app).get('/api/v4/system/announcements')
+    test('无 Authorization 应该返回 401', async () => {
+      const response = await request(app).get(
+        '/api/v4/system/ad-delivery?slot_type=announcement'
+      )
 
-      expect(response.status).toBe(200)
-      validateApiContract(response.body)
+      expect(response.status).toBe(401)
     })
   })
 

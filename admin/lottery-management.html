@@ -304,8 +304,8 @@
                 <tr>
                   <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">奖品</th>
                   <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">类型</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">稀有度</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">概率</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">档位</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">权重</th>
                   <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">库存</th>
                   <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
                   <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
@@ -313,13 +313,13 @@
               </thead>
               <tbody class="divide-y">
                 <tr x-show="prizes.length === 0">
-                  <td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无奖品数据</td>
+                  <td colspan="7" class="px-4 py-8 text-center themed-text-muted">暂无奖品数据</td>
                 </tr>
                 <template x-for="prize in prizes" :key="prize.lottery_prize_id">
-                  <tr class="themed-hover-bg">
+                  <tr class="themed-hover-bg" :class="{ 'bg-yellow-50': prize.stock_quantity === 0 && (prize.win_weight || 0) > 0 }">
                     <td class="px-4 py-3">
                       <div class="flex items-center">
-                        <div class="w-12 h-12 rounded overflow-hidden mr-3 img-blur-load">
+                        <div class="w-10 h-10 rounded overflow-hidden mr-3 img-blur-load">
                           <img :data-src="prize.image_url || '/admin/images/placeholder.svg'" 
                                :alt="prize.prize_name" 
                                class="w-full h-full object-cover img-lazy"
@@ -327,26 +327,44 @@
                                @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22><rect width=%22100%22 height=%22100%22 fill=%22%23e5e7eb%22/></svg>'">
                         </div>
                         <div>
-                          <div class="font-medium" x-text="prize.prize_name"></div>
-                          <small class="text-gray-400" x-text="prize.lottery_prize_id"></small>
+                          <div class="font-medium text-sm" x-text="prize.prize_name"></div>
+                          <div class="flex items-center gap-1">
+                            <small class="text-gray-400" x-text="'#' + prize.lottery_prize_id"></small>
+                            <template x-if="prize.is_fallback">
+                              <span class="text-xs text-orange-500" title="兜底奖品">兜底</span>
+                            </template>
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded bg-cyan-100 text-cyan-700" x-text="prize.prize_type_display || prize.prize_type"></span></td>
-                    <!-- 稀有度（rarity_code 来自 rarity_defs 表） -->
                     <td class="px-4 py-3">
-                      <span class="px-2 py-1 text-xs rounded text-white"
+                      <span class="px-2 py-1 text-xs rounded bg-cyan-100 text-cyan-700" x-text="prize.prize_type_display || prize.prize_type"></span>
+                      <span class="ml-1 px-2 py-1 text-xs rounded text-white"
                             :style="'background:' + (rarityOptions.find(o => o.value === prize.rarity_code) || { color: '#9E9E9E' }).color"
                             x-text="(rarityOptions.find(o => o.value === prize.rarity_code) || { label: '普通' }).label">
                       </span>
                     </td>
-                    <!-- sort_order 九宫格位置 -->
+                    <!-- 档位（reward_tier） -->
                     <td class="px-4 py-3">
-                      <span class="px-2 py-1 text-xs rounded bg-indigo-100 text-indigo-700 font-mono"
-                            x-text="prize.sort_order != null ? '#' + prize.sort_order : '-'"></span>
+                      <span class="px-2 py-1 text-xs rounded font-medium"
+                            :class="{
+                              'bg-red-100 text-red-700': prize.reward_tier === 'high',
+                              'bg-blue-100 text-blue-700': prize.reward_tier === 'mid',
+                              'bg-gray-100 text-gray-700': prize.reward_tier === 'low' || !prize.reward_tier
+                            }"
+                            x-text="{ 'high': '高档', 'mid': '中档', 'low': '低档' }[prize.reward_tier] || '低档'"></span>
                     </td>
-                    <td class="px-4 py-3 text-sm" x-text="(prize.win_probability * 100).toFixed(1) + '%'"></td>
-                    <td class="px-4 py-3 text-sm" x-text="prize.stock_quantity >= 999999 ? '无限' : prize.stock_quantity"></td>
+                    <!-- 选奖权重（win_weight） -->
+                    <td class="px-4 py-3 text-sm font-mono">
+                      <span x-text="(prize.win_weight || 0).toLocaleString()"></span>
+                    </td>
+                    <td class="px-4 py-3 text-sm">
+                      <span :class="{ 'text-red-600 font-bold': prize.stock_quantity === 0 }"
+                            x-text="prize.stock_quantity >= 999999 ? '无限' : prize.stock_quantity"></span>
+                      <template x-if="prize.stock_quantity === 0 && (prize.win_weight || 0) > 0">
+                        <span class="ml-1 text-yellow-500 text-xs" title="库存为0但权重>0，算法选中后将触发降级">⚠️</span>
+                      </template>
+                    </td>
                     <td class="px-4 py-3">
                       <span class="px-2 py-1 text-xs rounded" :class="isPrizeActive(prize) ? 'bg-green-100 themed-text-success' : 'themed-bg-subtle themed-text-secondary'" x-text="isPrizeActive(prize) ? '启用' : '禁用'"></span>
                     </td>
@@ -5557,11 +5575,28 @@
               <p class="text-xs themed-text-muted mt-1" x-text="isEditMode ? '九宫格顺时针位置编号（1=左上 → 8=左中）' : '留空则由系统自动分配唯一位置编号'"></p>
             </div>
           </div>
+          <!-- 选奖权重和档位（tier_first 模式下的核心概率控制字段） -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">选奖权重</label>
+              <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.win_weight" min="1" step="1000">
+              <p class="text-xs themed-text-muted mt-1">数字越大，在同档位内被抽中的概率越高</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">所属档位</label>
+              <select class="w-full px-3 py-2 border rounded" x-model="prizeForm.reward_tier">
+                <option value="high">高档（high）</option>
+                <option value="mid">中档（mid）</option>
+                <option value="low">低档（low）</option>
+              </select>
+              <p class="text-xs themed-text-muted mt-1">决定奖品归属哪个档次的奖品池</p>
+            </div>
+          </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">中奖概率 (%)</label>
               <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.win_probability" min="0" max="100" step="0.01">
-              <p class="text-xs text-amber-600 mt-1">⚠️ 添加后请编辑调整概率，确保所有奖品概率总和=100%</p>
+              <p class="text-xs text-amber-600 mt-1">⚠️ tier_first模式下此字段不生效，实际概率由权重控制</p>
             </div>
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">库存数量</label>

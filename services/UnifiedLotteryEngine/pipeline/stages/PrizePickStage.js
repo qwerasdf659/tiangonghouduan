@@ -196,6 +196,41 @@ class PrizePickStage extends BaseStage {
         )
       }
 
+      /**
+       * normalize 模式：按 win_probability 百分比直接抽奖，不区分档位
+       * 从全量可用奖品中按概率归一化随机选取
+       */
+      if (tier_pick_data.pick_method === 'normalize') {
+        const all_prizes = Object.values(prizes_by_tier).flat()
+          .filter(p => p.status === 'active' && (p.stock_quantity || 0) > (p.total_win_count || 0))
+
+        if (all_prizes.length === 0) {
+          throw this.createError('normalize模式下没有可用奖品', 'NO_AVAILABLE_PRIZES', true)
+        }
+
+        const { selected_prize, random_value, total_weight, hit_range } =
+          this._pickPrizeByProbability(all_prizes)
+
+        this.log('info', 'normalize模式：按概率抽取奖品成功', {
+          user_id,
+          selected_prize_id: selected_prize.lottery_prize_id,
+          prize_name: selected_prize.prize_name,
+          win_probability: selected_prize.win_probability,
+          total_probability: total_weight
+        })
+
+        return this.success({
+          selected_prize,
+          prize_random_value: random_value,
+          tier_total_weight: total_weight,
+          prize_hit_range: hit_range,
+          tier_prize_count: all_prizes.length,
+          selected_tier: selected_prize.reward_tier || null,
+          decision_source,
+          pick_method: 'normalize'
+        })
+      }
+
       const selected_tier = tier_pick_data.selected_tier
 
       // 获取选中档位的奖品列表
@@ -306,6 +341,66 @@ class PrizePickStage extends BaseStage {
         random_value,
         total_weight
       })
+    }
+
+    return {
+      selected_prize,
+      random_value,
+      total_weight,
+      hit_range
+    }
+  }
+
+  /**
+   * normalize 模式：按 win_probability 百分比抽取奖品
+   *
+   * 算法：概率归一化随机选择
+   * 1. 累加所有可用奖品的 win_probability
+   * 2. 归一化后生成 [0, total_probability) 范围的随机数
+   * 3. 累加概率直到覆盖随机数
+   *
+   * @param {Array} prizes - 所有可用奖品列表
+   * @returns {Object} { selected_prize, random_value, total_weight, hit_range }
+   * @private
+   */
+  _pickPrizeByProbability(prizes) {
+    const total_weight = prizes.reduce((sum, prize) => {
+      return sum + (parseFloat(prize.win_probability) || 0)
+    }, 0)
+
+    if (total_weight === 0) {
+      this.log('warn', 'normalize模式：所有奖品概率为0，随机选择')
+      const random_index = Math.floor(Math.random() * prizes.length)
+      return {
+        selected_prize: prizes[random_index],
+        random_value: 0,
+        total_weight: 0,
+        hit_range: [0, 0]
+      }
+    }
+
+    const random_value = Math.random() * total_weight
+    let cumulative = 0
+    let selected_prize = null
+    let hit_range = [0, 0]
+
+    for (const prize of prizes) {
+      const prize_probability = parseFloat(prize.win_probability) || 0
+      const range_start = cumulative
+      cumulative += prize_probability
+      const range_end = cumulative
+
+      if (random_value < cumulative) {
+        selected_prize = prize
+        hit_range = [range_start, range_end]
+        break
+      }
+    }
+
+    if (!selected_prize && prizes.length > 0) {
+      selected_prize = prizes[prizes.length - 1]
+      const last_probability = parseFloat(selected_prize.win_probability) || 0
+      hit_range = [total_weight - last_probability, total_weight]
     }
 
     return {

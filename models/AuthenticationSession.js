@@ -43,6 +43,7 @@
 
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { DataTypes } = require('sequelize')
+const logger = require('../utils/logger').logger
 
 module.exports = sequelize => {
   const AuthenticationSession = sequelize.define(
@@ -153,7 +154,7 @@ module.exports = sequelize => {
   }
 
   AuthenticationSession.prototype.deactivate = function (reason = null) {
-    console.log(`🔒 会话失效: ${this.session_token}, 原因: ${reason || '未指定'}`)
+    logger.info(`🔒 会话失效: ${this.session_token}, 原因: ${reason || '未指定'}`)
     return this.update({
       is_active: false
     })
@@ -313,7 +314,7 @@ module.exports = sequelize => {
     )
 
     const platformInfo = login_platform ? `:${login_platform}` : '(全平台)'
-    console.log(`🔒 已失效 ${affectedCount[0]} 个用户会话: ${user_type}:${user_id}${platformInfo}`)
+    logger.info(`🔒 已失效 ${affectedCount[0]} 个用户会话: ${user_type}:${user_id}${platformInfo}`)
     return affectedCount[0]
   }
 
@@ -330,7 +331,7 @@ module.exports = sequelize => {
       }
     })
 
-    console.log(`🗑️ 清理过期会话: ${deletedCount} 个`)
+    logger.info(`🗑️ 清理过期会话: ${deletedCount} 个`)
     return deletedCount
   }
 

@@ -125,6 +125,7 @@ function registerLotteryManagementComponents() {
       ],
       strategy: [
         { id: 'lottery-strategy', title: '策略配置', icon: '⚙️' },
+        { id: 'segment-rules', title: '分群策略', icon: '👥' },
         { id: 'lottery-quota', title: '配额管理', icon: '📊' },
         { id: 'lottery-pricing', title: '定价配置', icon: '💵' },
         { id: 'strategy-effectiveness', title: '策略效果', icon: '📈' },
@@ -146,6 +147,7 @@ function registerLotteryManagementComponents() {
       'campaign-budget': 'activity',
       'campaign-placement': 'activity',
       'lottery-strategy': 'strategy',
+      'segment-rules': 'strategy',
       'lottery-quota': 'strategy',
       'lottery-pricing': 'strategy',
       'strategy-effectiveness': 'strategy',
@@ -255,6 +257,16 @@ function registerLotteryManagementComponents() {
       ...systemAdvanceState,
       ...placementState,
       ...simulationState,
+
+      // ==================== 分群策略管理状态（任务3前端） ====================
+      /** @type {Array} 分群策略版本列表 */
+      segmentRuleVersions: [],
+      /** @type {Object|null} 当前编辑的策略版本 */
+      editingSegmentRule: null,
+      /** @type {Object} 字段注册表（可选字段 + 运算符） */
+      segmentFieldRegistry: { fields: {}, operators: {} },
+      /** @type {Object|null} 分群测试结果 */
+      segmentTestResult: null,
 
       // ==================== 通用状态 ====================
       page: 1,
@@ -375,6 +387,10 @@ function registerLotteryManagementComponents() {
                 await this.loadSimulationBaseline()
                 await this.loadSimulationHistory()
                 break
+              case 'segment-rules':
+                logger.debug('👥 [LotteryPage] 进入分群策略管理页面')
+                await this.loadSegmentRules()
+                break
               case 'strategy-effectiveness':
                 logger.debug('📈 [LotteryPage] 进入策略效果分析页面')
                 await this.loadStrategyEffectiveness()
@@ -444,6 +460,173 @@ function registerLotteryManagementComponents() {
       // 活动投放位置配置方法
       ...placementMethods,
       ...simulationMethods,
+
+      // ==================== 分群策略管理方法（任务3前端） ====================
+
+      /** 加载所有分群策略版本 */
+      async loadSegmentRules() {
+        try {
+          const response = await this.apiGet(
+            `${API_PREFIX}/console/segment-rules`, {}, { showLoading: false }
+          )
+          const data = response?.success ? response.data : response
+          this.segmentRuleVersions = data?.versions || data || []
+          // 加载字段注册表
+          const regResponse = await this.apiGet(
+            `${API_PREFIX}/console/segment-rules/field-registry`, {}, { showLoading: false }
+          )
+          const regData = regResponse?.success ? regResponse.data : regResponse
+          if (regData) {
+            this.segmentFieldRegistry = regData
+          }
+        } catch (error) {
+          logger.error('[SegmentRules] 加载分群策略失败:', error)
+          this.segmentRuleVersions = []
+        }
+      },
+
+      /** 打开编辑分群策略（查看详情/编辑模式） */
+      async openSegmentRuleEditor(versionKey) {
+        try {
+          const response = await this.apiGet(
+            `${API_PREFIX}/console/segment-rules/${versionKey}`, {}, { showLoading: false }
+          )
+          const data = response?.success ? response.data : response
+          this.editingSegmentRule = data
+          this.showModal('segmentRuleModal')
+        } catch (error) {
+          this.showError('加载策略详情失败')
+        }
+      },
+
+      /** 创建新的分群策略版本 */
+      openCreateSegmentRule() {
+        this.editingSegmentRule = {
+          version_key: '',
+          version_name: '',
+          description: '',
+          is_system: false,
+          rules: [
+            { segment_key: 'default', label: '所有用户', conditions: [], logic: 'AND', priority: 0 }
+          ]
+        }
+        this.showModal('segmentRuleModal')
+      },
+
+      /** 保存分群策略 */
+      async saveSegmentRule() {
+        if (!this.editingSegmentRule) return
+        try {
+          this.saving = true
+          const isNew = !this.editingSegmentRule.id
+          const data = {
+            version_key: this.editingSegmentRule.version_key,
+            version_name: this.editingSegmentRule.version_name,
+            description: this.editingSegmentRule.description,
+            rules: this.editingSegmentRule.rules
+          }
+          if (isNew) {
+            await this.apiCall(`${API_PREFIX}/console/segment-rules`, { method: 'POST', data })
+          } else {
+            await this.apiCall(
+              `${API_PREFIX}/console/segment-rules/${this.editingSegmentRule.version_key}`,
+              { method: 'PUT', data }
+            )
+          }
+          this.showSuccess(isNew ? '策略创建成功' : '策略更新成功')
+          this.hideModal('segmentRuleModal')
+          await this.loadSegmentRules()
+        } catch (error) {
+          this.showError('保存策略失败: ' + (error.message || '未知错误'))
+        } finally {
+          this.saving = false
+        }
+      },
+
+      /** 归档分群策略 */
+      async archiveSegmentRule(versionKey) {
+        await this.confirmAndExecute(
+          `确认归档策略「${versionKey}」？归档后将不可用于新活动。`,
+          async () => {
+            await this.apiCall(
+              `${API_PREFIX}/console/segment-rules/${versionKey}`, { method: 'DELETE' }
+            )
+            await this.loadSegmentRules()
+          },
+          { successMessage: '策略已归档' }
+        )
+      },
+
+      /** 添加规则到当前编辑的策略 */
+      addSegmentRuleCondition(ruleIndex) {
+        if (!this.editingSegmentRule?.rules?.[ruleIndex]) return
+        this.editingSegmentRule.rules[ruleIndex].conditions.push(
+          { field: 'created_at', operator: 'days_within', value: 7 }
+        )
+      },
+
+      /** 移除规则条件 */
+      removeSegmentRuleCondition(ruleIndex, condIndex) {
+        if (!this.editingSegmentRule?.rules?.[ruleIndex]) return
+        this.editingSegmentRule.rules[ruleIndex].conditions.splice(condIndex, 1)
+      },
+
+      /** 添加新的分群规则 */
+      addSegmentRule() {
+        if (!this.editingSegmentRule) return
+        this.editingSegmentRule.rules.push({
+          segment_key: '', label: '', conditions: [], logic: 'AND', priority: 5
+        })
+      },
+
+      /** 移除分群规则 */
+      removeSegmentRule(index) {
+        if (!this.editingSegmentRule?.rules) return
+        this.editingSegmentRule.rules.splice(index, 1)
+      },
+
+      /** 获取字段的可用运算符列表 */
+      getOperatorsForField(fieldKey) {
+        const field = this.segmentFieldRegistry.fields?.[fieldKey]
+        if (!field) return []
+        return (field.operators || []).map(opKey => ({
+          key: opKey,
+          label: this.segmentFieldRegistry.operators?.[opKey]?.label || opKey
+        }))
+      },
+
+      /** 生成条件的自然语言描述 */
+      describeCondition(cond) {
+        const field = this.segmentFieldRegistry.fields?.[cond.field]
+        const op = this.segmentFieldRegistry.operators?.[cond.operator]
+        const fieldLabel = field?.label || cond.field
+        const opLabel = op?.label || cond.operator
+        return `${fieldLabel} ${opLabel} ${cond.value}`
+      },
+
+      /** 测试分群策略（模拟用户匹配） */
+      async testSegmentRule() {
+        if (!this.editingSegmentRule?.version_key) {
+          this.showError('请先保存策略后再测试')
+          return
+        }
+        try {
+          const mockUser = {
+            created_at: this.segmentTestInput?.created_at || new Date().toISOString(),
+            history_total_points: parseInt(this.segmentTestInput?.points) || 0,
+            user_level: this.segmentTestInput?.user_level || 'normal',
+            last_active_at: this.segmentTestInput?.last_active_at || new Date().toISOString(),
+            consecutive_fail_count: parseInt(this.segmentTestInput?.fail_count) || 0
+          }
+          const response = await this.apiCall(
+            `${API_PREFIX}/console/segment-rules/${this.editingSegmentRule.version_key}`,
+            { method: 'GET', params: { simulate: JSON.stringify(mockUser) } }
+          )
+          this.segmentTestResult = response?.data || response
+        } catch (error) {
+          this.showError('测试失败: ' + (error.message || '未知错误'))
+        }
+      },
 
       // ==================== 工具方法 ====================
 

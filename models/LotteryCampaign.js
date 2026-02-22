@@ -734,15 +734,15 @@ module.exports = sequelize => {
        * @type {string}
        * @业务含义 控制如何从奖品池中选择奖品
        * @枚举值
-       * - normalize：归一化方法（传统概率归一化）
-       * - fallback：保底方法（概率穷尽时使用保底奖品）
-       * - tier_first：先选档位法（推荐，先选档位再选奖品）
+       * - normalize：归一化百分比方法（按 win_probability 直接抽奖，不分档位）
+       * - tier_first：先选档位法（推荐，先按 reward_tier 选档位，再按 win_weight 选奖品）
+       * @注意 fallback 已废弃并移除（2026-02-22），功能被 is_fallback + tier_fallback 替代
        */
       pick_method: {
-        type: DataTypes.ENUM('normalize', 'fallback', 'tier_first'),
+        type: DataTypes.ENUM('normalize', 'tier_first'),
         allowNull: false,
         defaultValue: 'tier_first',
-        comment: '选奖方法：normalize=归一化, fallback=保底, tier_first=先选档位（推荐）'
+        comment: '选奖方法：normalize=归一化百分比, tier_first=先选档位再选奖品（推荐）'
       },
 
       /**
@@ -790,17 +790,16 @@ module.exports = sequelize => {
       // ======================== 预设欠账控制字段（统一架构V1.6） ========================
 
       /**
-       * 兜底奖品ID（P3迁移重命名：fallback_prize_id → fallback_lottery_prize_id）
+       * [已废弃] 原 fallback 模式专用兜底奖品ID
        * @type {number}
-       * @业务含义 pick_method=fallback时使用，允许null表示自动选择prize_value_points=0的奖品
+       * @deprecated fallback 选奖模式已废弃（2026-02-22），功能被 tier_fallback_lottery_prize_id + is_fallback 替代
        * @外键关联 lottery_prizes.lottery_prize_id
        */
       fallback_lottery_prize_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
         defaultValue: null,
-        comment:
-          '兜底奖品ID（pick_method=fallback时使用，外键关联 lottery_prizes.lottery_prize_id）'
+        comment: '[已废弃] 原 fallback 模式专用字段，功能已被 tier_fallback_lottery_prize_id + is_fallback 替代'
       },
 
       /**

@@ -154,6 +154,13 @@ module.exports = sequelize => {
           '账户ID（Account ID - 流水所属账户）：关联accounts.account_id，支持用户账户和系统账户（平台手续费、铸币、销毁、托管）'
       },
 
+      // 对手方账户ID（双录记账：发放→SYSTEM_MINT，消耗→SYSTEM_BURN，交易→对方用户）
+      counterpart_account_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        comment: '对手方账户ID（双录升级：每次变动的资金来源/去向，NULL=历史单式记录）'
+      },
+
       // 资产代码（Asset Code - 资产类型标识）
       asset_code: {
         type: DataTypes.STRING(50),
@@ -225,6 +232,14 @@ module.exports = sequelize => {
         allowNull: true,
         comment:
           '扩展信息（Meta - JSON格式存储业务扩展信息）：如order_no, item_id, conversion_rule, fee_amount等，用于业务追溯和审计'
+      },
+
+      // 是否无效记录（BIGINT溢出等异常数据标记，对账时排除）
+      is_invalid: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否无效记录（标记 BIGINT 溢出等异常，对账时 WHERE is_invalid=false 排除）'
       }
     },
     {

@@ -140,6 +140,24 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: true,
         comment: '客服首次响应时间（用于计算响应时长）'
+      },
+
+      issue_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        comment: '关联工单ID（一个工单可关联多个会话）'
+      },
+
+      tags: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: '会话标签（如 ["交易纠纷","已补偿"]，用于分类统计和快速筛选）'
+      },
+
+      resolution_summary: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+        comment: '处理摘要（关闭时填写，在历史会话Tab中展示）'
       }
     },
     {
@@ -201,6 +219,23 @@ module.exports = sequelize => {
       sourceKey: 'customer_service_session_id',
       as: 'messages'
     })
+
+    // 会话可关联工单（多个会话可关联同一工单，条件检查防止加载顺序问题）
+    if (models.CustomerServiceIssue) {
+      CustomerServiceSession.belongsTo(models.CustomerServiceIssue, {
+        foreignKey: 'issue_id',
+        as: 'issue'
+      })
+    }
+
+    // 会话包含的内部备注
+    if (models.CustomerServiceNote) {
+      CustomerServiceSession.hasMany(models.CustomerServiceNote, {
+        foreignKey: 'session_id',
+        sourceKey: 'customer_service_session_id',
+        as: 'notes'
+      })
+    }
   }
 
   // 实例方法（使用状态常量，消除硬编码）

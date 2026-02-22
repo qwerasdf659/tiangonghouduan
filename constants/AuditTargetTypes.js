@@ -69,6 +69,7 @@ const AUDIT_TARGET_TYPES = Object.freeze({
   LOTTERY_DRAW: 'lottery_draw',
   LOTTERY_MANAGEMENT_SETTING: 'lottery_management_setting',
   LOTTERY_CLEAR_SETTING_RECORD: 'lottery_clear_setting_record',
+  LOTTERY_SIMULATION_RECORD: 'lottery_simulation_record',
 
   // ========== 市场交易 ==========
   MARKET_LISTING: 'market_listing',
@@ -160,6 +161,7 @@ function getTargetTypeDisplayName(targetType) {
     lottery_draw: '抽奖记录',
     lottery_management_setting: '抽奖管理设置',
     lottery_clear_setting_record: '清库存设置记录',
+    lottery_simulation_record: '策略模拟记录',
     market_listing: '市场挂牌',
     trade_order: '交易订单',
     system_setting: '系统设置',

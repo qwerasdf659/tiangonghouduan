@@ -503,4 +503,86 @@ router.post(
   }
 )
 
+// ========== 客服工作台重设计新增接口（2026-02-22） ==========
+
+/**
+ * POST /chat/sessions/:id/rate - 用户提交满意度评分
+ *
+ * @description 用户对客服会话提交满意度评分（1-5星）
+ * @route POST /api/v4/system/chat/sessions/:id/rate
+ * @param {number} id - 会话ID（事务实体）
+ * @body {number} satisfaction_score - 评分（1-5）
+ * @access 已登录用户
+ */
+router.post(
+  '/sessions/:id/rate',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const sessionId = parseInt(req.params.id)
+      if (isNaN(sessionId) || sessionId <= 0) {
+        return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
+      }
+
+      const { satisfaction_score } = req.body
+      const score = parseInt(satisfaction_score)
+      if (isNaN(score) || score < 1 || score > 5) {
+        return res.apiError('评分必须为1-5的整数', 'BAD_REQUEST', null, 400)
+      }
+
+      const userId = req.user.user_id
+      const models = req.app.locals.models
+
+      /* 验证会话属于当前用户 */
+      const session = await models.CustomerServiceSession.findOne({
+        where: {
+          customer_service_session_id: sessionId,
+          user_id: userId
+        }
+      })
+
+      if (!session) {
+        return res.apiError('会话不存在或无权操作', 'NOT_FOUND', null, 404)
+      }
+
+      /* 更新满意度评分 */
+      await session.update({ satisfaction_score: score })
+
+      logger.info(`用户满意度评分: session_id=${sessionId}, user_id=${userId}, score=${score}`)
+
+      res.apiSuccess({ session_id: sessionId, satisfaction_score: score }, '评分提交成功')
+    } catch (error) {
+      logger.error('满意度评分提交失败:', error)
+      return handleServiceError(error, res, '评分提交失败')
+    }
+  }
+)
+
+/**
+ * GET /chat/issues - 用户查看自己的工单列表
+ *
+ * @description 用户查看自己提交的工单进度（脱敏数据，不含内部备注）
+ * @route GET /api/v4/system/chat/issues
+ * @query {number} [page=1] - 页码
+ * @query {number} [page_size=10] - 每页数量
+ * @access 已登录用户
+ */
+router.get(
+  '/issues',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const userId = req.user.user_id
+      const models = req.app.locals.models
+      const IssueService = req.app.locals.services.getService('cs_issue')
+      const result = await IssueService.getUserIssues(models, userId, req.query)
+
+      res.apiSuccess(result, '获取工单列表成功')
+    } catch (error) {
+      logger.error('获取用户工单列表失败:', error)
+      return handleServiceError(error, res, '获取工单列表失败')
+    }
+  }
+)
+
 module.exports = router

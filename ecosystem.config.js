@@ -14,7 +14,7 @@ module.exports = {
       script: 'app.js',
 
       // 运行目录
-      cwd: '/home/devbox/project',
+      cwd: '/home/devbox/.cursor/worktrees/project__SSH__bja.sealos.run_ns-br0za7uc_devbox2_/srq',
 
       // 🔧 加载.env文件
       env_file: '.env',

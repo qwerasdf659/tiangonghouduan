@@ -26,7 +26,6 @@ const express = require('express')
 const router = express.Router()
 
 // 🔄 系统核心功能路由（已拆分为子模块）
-const announcementsRoutes = require('./announcements') // 公告管理
 const feedbackRoutes = require('./feedback') // 用户反馈
 const statusRoutes = require('./status') // 系统状态和配置
 const chatRoutes = require('./chat') // 客服聊天
@@ -39,10 +38,8 @@ const statisticsRoutes = require('./statistics')
 const notificationsRoutes = require('./notifications')
 
 // 弹窗Banner路由（2025-12-22 新增）
-const popupBannersRoutes = require('./popup-banners')
 
 // 轮播图路由（Phase 1 新增 — 拍板决策1：轮播图独立表）
-const carouselItemsRoutes = require('./carousel-items')
 
 // 系统字典路由（2026-01-22 新增 - 中文化显示名称系统）
 const dictionariesRoutes = require('./dictionaries')
@@ -52,9 +49,7 @@ const configRoutes = require('./config')
 
 // 🔴 广告事件上报路由（Phase 2-5）
 const adEventsRoutes = require('./ad-events')
-
-// 挂载公告路由
-router.use('/', announcementsRoutes)
+const adDeliveryRoutes = require('./ad-delivery')
 
 // 挂载反馈路由
 router.use('/', feedbackRoutes)
@@ -74,12 +69,6 @@ router.use('/statistics', statisticsRoutes)
 // 挂载系统通知路由
 router.use('/notifications', notificationsRoutes)
 
-// 挂载弹窗Banner路由（2025-12-22 新增）
-router.use('/', popupBannersRoutes)
-
-// 挂载轮播图路由（Phase 1 新增）
-router.use('/', carouselItemsRoutes)
-
 // 挂载系统字典路由（2026-01-22 新增 - 中文化显示名称系统）
 router.use('/dictionaries', dictionariesRoutes)
 
@@ -88,5 +77,6 @@ router.use('/config', configRoutes)
 
 // 挂载广告事件上报路由（Phase 2-5 新增）
 router.use('/ad-events', adEventsRoutes)
+router.use('/ad-delivery', adDeliveryRoutes)
 
 module.exports = router

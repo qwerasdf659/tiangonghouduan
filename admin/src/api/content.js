@@ -82,6 +82,24 @@ export const CONTENT_ENDPOINTS = {
   CS_ASSIGNMENT_BATCH: `${API_PREFIX}/console/customer-service/assignments/batch`,
   CS_ASSIGNMENT_DELETE: `${API_PREFIX}/console/customer-service/assignments/:id`,
 
+  // 客服工作台 - 用户上下文查询（C区面板数据源）
+  CS_USER_CONTEXT_SUMMARY: `${API_PREFIX}/console/customer-service/user-context/:userId/summary`,
+  CS_USER_CONTEXT_ASSETS: `${API_PREFIX}/console/customer-service/user-context/:userId/assets`,
+  CS_USER_CONTEXT_BACKPACK: `${API_PREFIX}/console/customer-service/user-context/:userId/backpack`,
+  CS_USER_CONTEXT_LOTTERY: `${API_PREFIX}/console/customer-service/user-context/:userId/lottery`,
+  CS_USER_CONTEXT_TRADES: `${API_PREFIX}/console/customer-service/user-context/:userId/trades`,
+  CS_USER_CONTEXT_TIMELINE: `${API_PREFIX}/console/customer-service/user-context/:userId/timeline`,
+  CS_USER_CONTEXT_RISK: `${API_PREFIX}/console/customer-service/user-context/:userId/risk`,
+  CS_USER_CONTEXT_HISTORY: `${API_PREFIX}/console/customer-service/user-context/:userId/history`,
+  CS_USER_CONTEXT_DIAGNOSE: `${API_PREFIX}/console/customer-service/user-context/:userId/diagnose`,
+  // 客服工作台 - 工单管理
+  CS_ISSUE_LIST: `${API_PREFIX}/console/customer-service/issues`,
+  CS_ISSUE_DETAIL: `${API_PREFIX}/console/customer-service/issues/:id`,
+  CS_ISSUE_NOTES: `${API_PREFIX}/console/customer-service/issues/:id/notes`,
+  // 客服工作台 - GM工具
+  CS_GM_COMPENSATE: `${API_PREFIX}/console/customer-service/gm-tools/compensate`,
+  CS_GM_TEMPLATES: `${API_PREFIX}/console/customer-service/gm-tools/templates`,
+
   // 反馈管理
   FEEDBACK_LIST: `${API_PREFIX}/console/system/feedbacks`,
   FEEDBACK_STATS: `${API_PREFIX}/console/system/feedbacks/stats`,

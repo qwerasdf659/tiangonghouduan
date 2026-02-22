@@ -230,6 +230,7 @@ class BalanceService {
       idempotency_key,
       lottery_session_id,
       lottery_campaign_id,
+      counterpart_account_id,
       meta = {}
     } = params
     const { transaction } = options
@@ -367,10 +368,11 @@ class BalanceService {
         { transaction }
       )
 
-      // 创建资产流水记录（方案B：使用 idempotency_key）
+      // 创建资产流水记录（方案B：使用 idempotency_key + 双录对手方）
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
+          counterpart_account_id: counterpart_account_id || null,
           asset_code,
           delta_amount,
           balance_before,
@@ -380,11 +382,42 @@ class BalanceService {
           idempotency_key,
           meta: {
             ...meta,
-            lottery_campaign_id: lottery_campaign_id || null
+            lottery_campaign_id: lottery_campaign_id || null,
+            counterpart_account_id: params.counterpart_account_id || null
           }
         },
         { transaction }
       )
+
+      // === 双录记账：写入对手方流水（V4.2.0 资产全链路追踪） ===
+      if (params.counterpart_account_id) {
+        const counterpartIdempotencyKey = `${idempotency_key}:counterpart`
+        const existingCounterpart = await AssetTransaction.findOne({
+          where: { idempotency_key: counterpartIdempotencyKey },
+          transaction
+        })
+
+        if (!existingCounterpart) {
+          await AssetTransaction.create(
+            {
+              account_id: params.counterpart_account_id,
+              asset_code,
+              delta_amount: -delta_amount,
+              balance_before: 0,
+              balance_after: 0,
+              business_type: `${business_type}_counterpart`,
+              lottery_session_id: lottery_session_id || null,
+              idempotency_key: counterpartIdempotencyKey,
+              meta: {
+                counterpart_of: idempotency_key,
+                original_account_id: account.account_id,
+                lottery_campaign_id: lottery_campaign_id || null
+              }
+            },
+            { transaction }
+          )
+        }
+      }
 
       logger.info('✅ 资产变动成功', {
         service: 'BalanceService',
@@ -399,7 +432,8 @@ class BalanceService {
         lottery_session_id: lottery_session_id || null,
         lottery_campaign_id: lottery_campaign_id || null,
         idempotency_key,
-        asset_transaction_id: transaction_record.asset_transaction_id
+        asset_transaction_id: transaction_record.asset_transaction_id,
+        double_entry: !!params.counterpart_account_id
       })
 
       // 刷新余额数据

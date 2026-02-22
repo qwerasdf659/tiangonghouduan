@@ -8,6 +8,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
+import { request } from '../../../api/base.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 
 /**
@@ -86,15 +87,11 @@ export function useImagesMethods() {
         formData.append('business_type', 'uploads')
         formData.append('category', 'general')
 
-        const response = await fetch(SYSTEM_ENDPOINTS.IMAGE_UPLOAD, {
+        const result = await request({
+          url: SYSTEM_ENDPOINTS.IMAGE_UPLOAD,
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('admin_token')}`
-          },
-          body: formData
+          data: formData
         })
-
-        const result = await response.json()
 
         if (result?.success) {
           this.hideModal('uploadImageModal')

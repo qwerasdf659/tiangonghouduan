@@ -299,52 +299,58 @@ export function buildApiURL(path, pathParams = {}) {
  * @param {Object} options - 请求配置
  * @param {string} options.url - 请求 URL
  * @param {string} [options.method='GET'] - 请求方法
- * @param {Object} [options.data] - 请求数据
+ * @param {Object|FormData} [options.data] - 请求数据（JSON 对象或 FormData 实例）
  * @param {Object} [options.params] - 查询参数
  * @param {Object} [options.pathParams] - 路径参数
  * @param {Object} [options.headers] - 自定义请求头
+ * @param {'json'|'blob'} [options.responseType='json'] - 响应类型（blob 用于文件下载）
  * @async
- * @returns {Promise<Object>} 响应数据
+ * @returns {Promise<Object|Blob>} 响应数据（JSON 对象或 Blob）
  * @throws {Error} 未授权，请重新登录（401 错误时自动跳转登录页）
  * @throws {Error} 网络请求失败或服务器错误
  * @throws {Error} 响应解析失败
  */
 export async function request(options) {
-  const { url, method = 'GET', data, params, pathParams, headers = {} } = options
+  const {
+    url,
+    method = 'GET',
+    data,
+    params,
+    pathParams,
+    headers = {},
+    responseType = 'json'
+  } = options
 
-  // 构建完整 URL
   let fullUrl = pathParams ? buildURL(url, pathParams) : url
   if (params) {
     fullUrl += buildQueryString(params)
   }
 
-  // 准备请求头
-  const requestHeaders = {
-    'Content-Type': 'application/json',
-    ...headers
+  const isFormData = data instanceof FormData
+  const requestHeaders = { ...headers }
+
+  /* FormData 时不设置 Content-Type，浏览器自动添加 multipart/form-data + boundary */
+  if (!isFormData) {
+    requestHeaders['Content-Type'] = 'application/json'
   }
 
-  // 添加 Token
   const token = getToken()
   if (token) {
     requestHeaders.Authorization = `Bearer ${token}`
   }
 
-  // 准备请求配置
   const requestConfig = {
     method,
     headers: requestHeaders
   }
 
-  // 添加请求体
   if (data && method !== 'GET') {
-    requestConfig.body = JSON.stringify(data)
+    requestConfig.body = isFormData ? data : JSON.stringify(data)
   }
 
   try {
     const response = await fetch(fullUrl, requestConfig)
 
-    // 处理 401 未授权（区分会话失效原因）
     if (response.status === 401) {
       let errorCode = 'UNAUTHORIZED'
       let errorMessage = '未授权，请重新登录'
@@ -359,12 +365,11 @@ export async function request(options) {
       clearToken()
 
       if (window.location.pathname !== '/admin/login.html') {
-        // 传递后端返回的详细消息（如"您的账号已在微信小程序登录"）
-        const params = new URLSearchParams({ reason: errorCode })
+        const qp = new URLSearchParams({ reason: errorCode })
         if (errorCode === 'SESSION_REPLACED' && errorMessage !== '未授权，请重新登录') {
-          params.set('message', errorMessage)
+          qp.set('message', errorMessage)
         }
-        const redirectUrl = `/admin/login.html?${params.toString()}`
+        const redirectUrl = `/admin/login.html?${qp.toString()}`
         if (window.self !== window.top) {
           try {
             window.top.location.href = redirectUrl
@@ -379,10 +384,16 @@ export async function request(options) {
       throw new Error(errorMessage)
     }
 
-    // 解析响应
+    /* Blob 响应（文件下载场景） */
+    if (responseType === 'blob') {
+      if (!response.ok) {
+        throw new Error(`文件下载失败: ${response.status}`)
+      }
+      return await response.blob()
+    }
+
     const result = await response.json()
 
-    // 检查业务错误
     if (!response.ok) {
       throw new Error(result.message || `请求失败: ${response.status}`)
     }

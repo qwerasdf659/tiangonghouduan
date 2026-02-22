@@ -2,30 +2,47 @@
  * 广告创意模型（AdCreative）
  *
  * 业务场景：
- * - 管理广告计划下的具体创意内容（图片、标题、链接等）
- * - 支持创意的审核流程（待审核→已审核/已拒绝）
+ * - 管理广告计划下的具体创意内容（图片、文字、标题、链接等）
+ * - 支持图片创意（commercial/operational）和纯文字创意（system 公告）
+ * - 支持创意的审核流程（commercial 类型需审核，operational/system 直接 approved）
  * - 记录创意的审核信息和审核人
  *
  * 设计决策：
- * - 一个广告计划可以有多个创意（用于A/B测试或轮播展示）
- * - 创意需要单独审核，审核通过后才能使用
- * - 记录图片尺寸信息，便于前端展示
- * - 支持多种链接类型（外部链接、内部页面等）
+ * - content_type 区分图片/文字创意（合并 SystemAnnouncement 的文字内容）
+ * - display_mode 记录显示模式（从 PopupBanner 合并而来）
+ * - link_type 统一为微信系命名（D3 定论：page/miniprogram/webview）
+ * - image_url 允许为空（text 类型无图片）
  *
  * 数据库表名：ad_creatives
  * 主键：ad_creative_id（INT，自增）
  *
- * @see docs/广告系统升级方案.md
+ * @see docs/内容投放系统-重复功能合并方案.md
  */
 
 const { DataTypes } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 /**
- * 链接类型有效值
+ * 链接类型有效值（D3 定论：统一为微信系命名）
+ * - none：无跳转
+ * - page：小程序内部页面（对应 wx.navigateTo）
+ * - miniprogram：跳转其他小程序（对应 wx.navigateToMiniProgram）
+ * - webview：H5 页面（对应 web-view 组件）
  * @constant {string[]}
  */
-const VALID_LINK_TYPES = ['none', 'external', 'internal', 'app_page']
+const VALID_LINK_TYPES = ['none', 'page', 'miniprogram', 'webview']
+
+/**
+ * 创意内容类型有效值
+ * @constant {string[]}
+ */
+const VALID_CONTENT_TYPES = ['image', 'text']
+
+/**
+ * 显示模式有效值（从 PopupBanner 合并而来）
+ * @constant {string[]}
+ */
+const VALID_DISPLAY_MODES = ['wide', 'horizontal', 'square', 'tall', 'slim', 'full_image']
 
 /**
  * 审核状态有效值
@@ -65,14 +82,32 @@ module.exports = sequelize => {
         comment: '创意标题'
       },
 
+      content_type: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
+        defaultValue: 'image',
+        validate: {
+          notEmpty: { msg: '内容类型不能为空' },
+          isIn: {
+            args: [VALID_CONTENT_TYPES],
+            msg: '内容类型必须是：image, text 之一'
+          }
+        },
+        comment: '创意内容类型：image=图片 / text=纯文字（系统公告）'
+      },
+
       image_url: {
         type: DataTypes.STRING(500),
-        allowNull: false,
+        allowNull: true,
         validate: {
-          notEmpty: { msg: '图片URL不能为空' },
-          len: { args: [1, 500], msg: '图片URL长度必须在1-500字符之间' }
+          conditionalNotEmpty(value) {
+            if (this.content_type === 'image' && (!value || value.trim() === '')) {
+              throw new Error('图片类型创意必须提供图片URL')
+            }
+          },
+          len: { args: [0, 500], msg: '图片URL长度不能超过500字符' }
         },
-        comment: '图片URL（对象存储key）'
+        comment: '图片URL（content_type=image 时必填，text 类型为 NULL）'
       },
 
       image_width: {
@@ -110,11 +145,31 @@ module.exports = sequelize => {
           notEmpty: { msg: '链接类型不能为空' },
           isIn: {
             args: [VALID_LINK_TYPES],
-            msg: '链接类型必须是：none, external, internal, app_page 之一'
+            msg: '链接类型必须是：none, page, miniprogram, webview 之一'
           }
         },
-        comment:
-          '链接类型：none=无链接 / external=外部链接 / internal=内部页面 / app_page=应用内页面'
+        comment: '链接类型（D3 定论微信系命名）：none=无跳转 / page=小程序页面 / miniprogram=其他小程序 / webview=H5页面'
+      },
+
+      text_content: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: '文字内容（content_type=text 时使用，如系统公告的文字正文）'
+      },
+
+      display_mode: {
+        type: DataTypes.STRING(30),
+        allowNull: true,
+        validate: {
+          isValidMode(value) {
+            if (value !== null && !VALID_DISPLAY_MODES.includes(value)) {
+              throw new Error(
+                '显示模式必须是：' + VALID_DISPLAY_MODES.join(', ') + ' 之一'
+              )
+            }
+          }
+        },
+        comment: '显示模式（原 PopupBanner 属性）：wide / horizontal / square / tall / slim / full_image'
       },
 
       review_status: {
@@ -229,4 +284,6 @@ module.exports = sequelize => {
 }
 
 module.exports.VALID_LINK_TYPES = VALID_LINK_TYPES
+module.exports.VALID_CONTENT_TYPES = VALID_CONTENT_TYPES
+module.exports.VALID_DISPLAY_MODES = VALID_DISPLAY_MODES
 module.exports.VALID_REVIEW_STATUSES = VALID_REVIEW_STATUSES

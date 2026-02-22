@@ -802,10 +802,12 @@ module.exports = sequelize => {
       modelName: 'LotteryPrize',
       tableName: 'lottery_prizes',
       timestamps: true,
+      paranoid: true,
       created_at: 'created_at',
       updated_at: 'updated_at',
+      deletedAt: 'deleted_at',
       underscored: true,
-      comment: '抽奖奖品配置表',
+      comment: '抽奖奖品配置表（paranoid 软删除：destroy() 设置 deleted_at，查询自动过滤已删除记录）',
       indexes: [
         {
           fields: ['lottery_campaign_id', 'status'],

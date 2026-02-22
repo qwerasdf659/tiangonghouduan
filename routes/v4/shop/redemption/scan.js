@@ -77,16 +77,10 @@ router.post('/scan', authenticateToken, async (req, res) => {
     // 通过 order_id 查找并核销（QR码内已包含订单ID，无需再输入核销码）
     const RedemptionService = req.app.locals.services.getService('redemption_order')
     const order = await TransactionManager.execute(async transaction => {
-      // 先查询订单，验证 code_hash 前缀匹配（防止 order_id 被篡改）
-      const { RedemptionOrder } = require('../../../../models')
-      const targetOrder = await RedemptionOrder.findByPk(redemption_order_id, {
+      const targetOrder = await RedemptionService.getOrderDetail(redemption_order_id, {
         transaction,
         lock: transaction.LOCK.UPDATE
       })
-
-      if (!targetOrder) {
-        throw new Error(`核销订单不存在: ${redemption_order_id}`)
-      }
 
       if (targetOrder.code_hash && !targetOrder.code_hash.startsWith(code_hash_prefix)) {
         logger.error('QR码哈希前缀不匹配，可能被篡改', {

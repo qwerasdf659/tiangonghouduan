@@ -22,8 +22,10 @@ document.addEventListener('alpine:init', () => {
     // ==================== 子页面导航 ====================
     current_page: 'dashboard',
     subPages: [
-      { id: 'dashboard', name: '广告概览', icon: '📊' },
-      { id: 'campaigns', name: '广告活动', icon: '📋' },
+      { id: 'dashboard', name: '投放概览', icon: '📊' },
+      { id: 'system-notices', name: '系统通知', icon: '📢' },
+      { id: 'operational', name: '运营推广', icon: '🎯' },
+      { id: 'campaigns', name: '商业广告', icon: '📋' },
       { id: 'slots', name: '广告位', icon: '📍' },
       { id: 'reports', name: '数据报表', icon: '📈' },
       { id: 'bid-logs', name: '竞价日志', icon: '🏷️' },
@@ -31,6 +33,9 @@ document.addEventListener('alpine:init', () => {
       { id: 'antifraud', name: '反作弊', icon: '🛡️' },
       { id: 'attribution', name: '归因追踪', icon: '🔗' }
     ],
+
+    /** 当前选中的 category 筛选（system/operational/commercial）*/
+    category_filter: null,
 
     // ==================== 中文映射字典 ====================
     /** 广告活动状态 → 中文 */
@@ -58,12 +63,26 @@ document.addEventListener('alpine:init', () => {
     /** 计费模式 → 中文 */
     BILLING_MAP: {
       fixed_daily: '固定包天',
-      bidding: '竞价排名'
+      bidding: '竞价排名',
+      free: '免费（运营/系统）'
     },
     /** 广告位类型 → 中文 */
     SLOT_TYPE_MAP: {
       popup: '弹窗',
-      carousel: '轮播图'
+      carousel: '轮播图',
+      announcement: '系统公告'
+    },
+    /** 计划分类 → 中文 */
+    CATEGORY_MAP: {
+      commercial: '商业广告',
+      operational: '运营推广',
+      system: '系统通知'
+    },
+    /** 计划分类 → 颜色 */
+    CATEGORY_COLOR: {
+      commercial: 'bg-blue-500',
+      operational: 'bg-green-500',
+      system: 'bg-purple-500'
     },
     /** 页面位置 → 中文 */
     POSITION_MAP: {
@@ -100,6 +119,15 @@ document.addEventListener('alpine:init', () => {
       market_buy: { text: '市场购买', color: 'bg-green-100 text-green-700' },
       page_view: { text: '页面浏览', color: 'bg-gray-100 text-gray-700' }
     },
+    /** 频次规则 → 中文说明 */
+    FREQUENCY_MAP: {
+      always: '每次都显示',
+      once: '只显示一次',
+      once_per_session: '每次启动一次',
+      once_per_day: '每天一次',
+      once_per_n_days: '每N天一次',
+      n_times_total: '总共N次'
+    },
     /** DMP 标签键 → 中文说明 */
     TAG_KEY_MAP: {
       lottery_active_7d: '7天抽奖活跃',
@@ -115,29 +143,57 @@ document.addEventListener('alpine:init', () => {
     },
 
     /** 获取状态中文名 */
-    statusText(status) { return this.STATUS_MAP[status] || status },
+    statusText(status) {
+      return this.STATUS_MAP[status] || status
+    },
     /** 获取状态颜色 */
-    statusColor(status) { return this.STATUS_COLOR[status] || 'bg-gray-500' },
+    statusColor(status) {
+      return this.STATUS_COLOR[status] || 'bg-gray-500'
+    },
     /** 获取计费模式中文名 */
-    billingText(mode) { return this.BILLING_MAP[mode] || mode },
+    billingText(mode) {
+      return this.BILLING_MAP[mode] || mode
+    },
     /** 获取广告位类型中文名 */
-    slotTypeText(type) { return this.SLOT_TYPE_MAP[type] || type },
+    slotTypeText(type) {
+      return this.SLOT_TYPE_MAP[type] || type
+    },
     /** 获取位置中文名 */
-    positionText(pos) { return this.POSITION_MAP[pos] || pos },
+    positionText(pos) {
+      return this.POSITION_MAP[pos] || pos
+    },
     /** 获取落选原因中文 */
-    loseReasonText(reason) { return this.LOSE_REASON_MAP[reason] || reason || '-' },
+    loseReasonText(reason) {
+      return this.LOSE_REASON_MAP[reason] || reason || '-'
+    },
     /** 获取触发规则中文 */
-    ruleText(rule) { return this.RULE_MAP[rule] || rule || '-' },
+    ruleText(rule) {
+      return this.RULE_MAP[rule] || rule || '-'
+    },
     /** 获取判定结果中文 */
-    verdictText(v) { return this.VERDICT_MAP[v]?.text || v },
+    verdictText(v) {
+      return this.VERDICT_MAP[v]?.text || v
+    },
     /** 获取判定结果颜色 */
-    verdictColor(v) { return this.VERDICT_MAP[v]?.color || 'bg-gray-500' },
+    verdictColor(v) {
+      return this.VERDICT_MAP[v]?.color || 'bg-gray-500'
+    },
     /** 获取转化类型中文 */
-    conversionText(type) { return this.CONVERSION_MAP[type]?.text || type },
+    conversionText(type) {
+      return this.CONVERSION_MAP[type]?.text || type
+    },
     /** 获取转化类型颜色 */
-    conversionColor(type) { return this.CONVERSION_MAP[type]?.color || 'bg-gray-100 text-gray-700' },
+    conversionColor(type) {
+      return this.CONVERSION_MAP[type]?.color || 'bg-gray-100 text-gray-700'
+    },
     /** 获取标签键中文 */
-    tagKeyText(key) { return this.TAG_KEY_MAP[key] || key },
+    tagKeyText (key) {
+      return this.TAG_KEY_MAP[key] || key
+    },
+    /** 获取频次规则中文 */
+    frequencyText (rule) {
+      return this.FREQUENCY_MAP[rule] || rule || '-'
+    },
 
     // ==================== 通用状态 ====================
     saving: false,
@@ -273,7 +329,16 @@ document.addEventListener('alpine:init', () => {
         case 'dashboard':
           await this.loadDashboard()
           break
+        case 'system-notices':
+          this.category_filter = 'system'
+          await this.loadCampaigns()
+          break
+        case 'operational':
+          this.category_filter = 'operational'
+          await this.loadCampaigns()
+          break
         case 'campaigns':
+          this.category_filter = 'commercial'
           await this.loadCampaigns()
           break
         case 'slots':
@@ -355,8 +420,10 @@ document.addEventListener('alpine:init', () => {
       this.campaignsLoading = true
       try {
         const params = { page: this.campaignPage, limit: 20 }
+        if (this.category_filter) params.category = this.category_filter
         if (this.campaignFilters.status) params.status = this.campaignFilters.status
-        if (this.campaignFilters.billing_mode) params.billing_mode = this.campaignFilters.billing_mode
+        if (this.campaignFilters.billing_mode)
+          params.billing_mode = this.campaignFilters.billing_mode
         if (this.campaignFilters.ad_slot_id) params.ad_slot_id = this.campaignFilters.ad_slot_id
 
         const response = await request({
@@ -379,17 +446,28 @@ document.addEventListener('alpine:init', () => {
     openCreateCampaignModal() {
       const today = new Date()
       const nextWeek = new Date(today.getTime() + 7 * 24 * 3600 * 1000)
+
+      const isSystem = this.category_filter === 'system'
+      const isOperational = this.category_filter === 'operational'
+
       this.campaignForm = {
         campaign_name: '',
+        campaign_category: this.category_filter || 'commercial',
         ad_slot_id: this.allSlotsList.length > 0 ? this.allSlotsList[0].ad_slot_id : '',
-        billing_mode: 'fixed_daily',
+        billing_mode: (isSystem || isOperational) ? 'free' : 'fixed_daily',
         advertiser_user_id: '',
         daily_bid_diamond: 50,
         budget_total_diamond: 500,
         fixed_days: 7,
         start_date: today.toISOString().slice(0, 10),
         end_date: nextWeek.toISOString().slice(0, 10),
-        priority: 50
+        priority: isSystem ? 950 : isOperational ? 500 : 50,
+        frequency_rule: isOperational ? 'once_per_day' : null,
+        frequency_value: 1,
+        force_show: isSystem,
+        internal_notes: '',
+        text_content: '',
+        content_type: isSystem ? 'text' : 'image'
       }
       this.showModal('campaignCreateModal')
     },
@@ -408,27 +486,35 @@ document.addEventListener('alpine:init', () => {
         this.showError('请选择广告位')
         return
       }
-      if (!this.campaignForm.billing_mode) {
-        this.showError('请选择计费模式')
-        return
-      }
 
-      if (this.campaignForm.billing_mode === 'fixed_daily') {
-        if (!this.campaignForm.fixed_days || this.campaignForm.fixed_days < 1) {
-          this.showError('固定包天模式必须填写天数（≥1天）')
+      const category = this.campaignForm.campaign_category || 'commercial'
+      const isFree = category === 'system' || category === 'operational'
+
+      if (!isFree) {
+        if (!this.campaignForm.billing_mode) {
+          this.showError('请选择计费模式')
           return
         }
-      } else if (this.campaignForm.billing_mode === 'bidding') {
-        const slotInfo = this.getSelectedSlotInfo()
-        const minBid = slotInfo?.min_bid_diamond || 50
-        const minBudget = slotInfo?.min_budget_diamond || 500
-        if (!this.campaignForm.daily_bid_diamond || this.campaignForm.daily_bid_diamond < minBid) {
-          this.showError(`竞价模式每日出价不能低于 ${minBid} 钻石`)
-          return
-        }
-        if (!this.campaignForm.budget_total_diamond || this.campaignForm.budget_total_diamond < minBudget) {
-          this.showError(`竞价模式总预算不能低于 ${minBudget} 钻石`)
-          return
+        if (this.campaignForm.billing_mode === 'fixed_daily') {
+          if (!this.campaignForm.fixed_days || this.campaignForm.fixed_days < 1) {
+            this.showError('固定包天模式必须填写天数（≥1天）')
+            return
+          }
+        } else if (this.campaignForm.billing_mode === 'bidding') {
+          const slotInfo = this.getSelectedSlotInfo()
+          const minBid = slotInfo?.min_bid_diamond || 50
+          const minBudget = slotInfo?.min_budget_diamond || 500
+          if (!this.campaignForm.daily_bid_diamond || this.campaignForm.daily_bid_diamond < minBid) {
+            this.showError(`竞价模式每日出价不能低于 ${minBid} 钻石`)
+            return
+          }
+          if (
+            !this.campaignForm.budget_total_diamond ||
+            this.campaignForm.budget_total_diamond < minBudget
+          ) {
+            this.showError(`竞价模式总预算不能低于 ${minBudget} 钻石`)
+            return
+          }
         }
       }
 
@@ -436,8 +522,9 @@ document.addEventListener('alpine:init', () => {
       try {
         const data = {
           campaign_name: this.campaignForm.campaign_name.trim(),
+          campaign_category: category,
           ad_slot_id: Number(this.campaignForm.ad_slot_id),
-          billing_mode: this.campaignForm.billing_mode,
+          billing_mode: isFree ? 'free' : this.campaignForm.billing_mode,
           priority: Number(this.campaignForm.priority) || 50
         }
 
@@ -445,15 +532,26 @@ document.addEventListener('alpine:init', () => {
           data.advertiser_user_id = Number(this.campaignForm.advertiser_user_id)
         }
 
-        if (this.campaignForm.billing_mode === 'fixed_daily') {
-          data.fixed_days = Number(this.campaignForm.fixed_days)
-        } else {
-          data.daily_bid_diamond = Number(this.campaignForm.daily_bid_diamond)
-          data.budget_total_diamond = Number(this.campaignForm.budget_total_diamond)
+        if (!isFree) {
+          if (this.campaignForm.billing_mode === 'fixed_daily') {
+            data.fixed_days = Number(this.campaignForm.fixed_days)
+          } else {
+            data.daily_bid_diamond = Number(this.campaignForm.daily_bid_diamond)
+            data.budget_total_diamond = Number(this.campaignForm.budget_total_diamond)
+          }
         }
 
         if (this.campaignForm.start_date) data.start_date = this.campaignForm.start_date
         if (this.campaignForm.end_date) data.end_date = this.campaignForm.end_date
+
+        if (category === 'operational' || category === 'system') {
+          if (this.campaignForm.frequency_rule) data.frequency_rule = this.campaignForm.frequency_rule
+          if (this.campaignForm.frequency_value) data.frequency_value = Number(this.campaignForm.frequency_value)
+          data.force_show = !!this.campaignForm.force_show
+        }
+        if (category === 'system' && this.campaignForm.internal_notes) {
+          data.internal_notes = this.campaignForm.internal_notes
+        }
 
         const response = await request({
           url: SYSTEM_ENDPOINTS.AD_CAMPAIGN_CREATE,
@@ -462,7 +560,8 @@ document.addEventListener('alpine:init', () => {
         })
         if (response?.success) {
           this.hideModal('campaignCreateModal')
-          this.showSuccess('广告活动创建成功（草稿状态）')
+          const typeLabel = this.CATEGORY_MAP[category] || '广告活动'
+          this.showSuccess(`${typeLabel}创建成功（草稿状态）`)
           await this.loadCampaigns()
         }
       } catch (error) {
@@ -489,19 +588,65 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
-    reviewCampaign(campaign, action) {
+    /** 发布活动（draft → active，用于 operational/system 类型跳过审核） */
+    async publishCampaign (campaign) {
+      if (!confirm(`确认发布「${campaign.campaign_name}」？发布后立即投放。`)) return
+      this.saving = true
+      try {
+        const response = await request({
+          url: buildURL(SYSTEM_ENDPOINTS.AD_CAMPAIGN_UPDATE, { id: campaign.ad_campaign_id }),
+          method: 'PATCH',
+          data: { status: 'active' }
+        })
+        if (response?.success) {
+          this.showSuccess('已发布，开始投放')
+          await this.loadCampaigns()
+        }
+      } catch (error) {
+        logger.error('发布失败:', error)
+        this.showError('发布失败: ' + error.message)
+      } finally {
+        this.saving = false
+      }
+    },
+
+    /** 暂停活动（active → paused） */
+    async pauseCampaign (campaign) {
+      if (!confirm(`确认暂停「${campaign.campaign_name}」？暂停后停止投放。`)) return
+      this.saving = true
+      try {
+        const response = await request({
+          url: buildURL(SYSTEM_ENDPOINTS.AD_CAMPAIGN_UPDATE, { id: campaign.ad_campaign_id }),
+          method: 'PATCH',
+          data: { status: 'paused' }
+        })
+        if (response?.success) {
+          this.showSuccess('已暂停投放')
+          await this.loadCampaigns()
+        }
+      } catch (error) {
+        logger.error('暂停失败:', error)
+        this.showError('暂停失败: ' + error.message)
+      } finally {
+        this.saving = false
+      }
+    },
+
+    reviewCampaign (campaign, action) {
       this.reviewTarget = campaign
       this.reviewAction = action
       this.reviewNote = ''
       this.showModal('reviewModal')
     },
 
-    async submitReview() {
+    async submitReview () {
       if (!this.reviewTarget) return
       this.saving = true
       try {
         const response = await request({
-          url: buildURL(SYSTEM_ENDPOINTS.AD_CAMPAIGN_REVIEW, { id: this.reviewTarget.ad_campaign_id }),
+          url: buildURL(SYSTEM_ENDPOINTS.AD_CAMPAIGN_REVIEW, {
+            id: this.reviewTarget.ad_campaign_id
+          }),
           method: 'PATCH',
           data: {
             action: this.reviewAction,
@@ -713,7 +858,8 @@ document.addEventListener('alpine:init', () => {
       this.bidLogsLoading = true
       try {
         const params = { page: this.bidLogsPage, limit: 20 }
-        if (this.bidLogsFilters.ad_campaign_id) params.ad_campaign_id = this.bidLogsFilters.ad_campaign_id
+        if (this.bidLogsFilters.ad_campaign_id)
+          params.ad_campaign_id = this.bidLogsFilters.ad_campaign_id
         if (this.bidLogsFilters.is_winner) params.is_winner = this.bidLogsFilters.is_winner
         const response = await request({ url: SYSTEM_ENDPOINTS.AD_BID_LOGS, method: 'GET', params })
         if (response?.success) {
@@ -735,7 +881,11 @@ document.addEventListener('alpine:init', () => {
         const params = { page: this.userAdTagsPage, limit: 50 }
         if (this.userAdTagsFilters.user_id) params.user_id = this.userAdTagsFilters.user_id
         if (this.userAdTagsFilters.tag_key) params.tag_key = this.userAdTagsFilters.tag_key
-        const response = await request({ url: SYSTEM_ENDPOINTS.AD_USER_TAGS, method: 'GET', params })
+        const response = await request({
+          url: SYSTEM_ENDPOINTS.AD_USER_TAGS,
+          method: 'GET',
+          params
+        })
         if (response?.success) {
           this.userAdTags = response.data?.user_ad_tags || []
           this.userAdTagsPagination = response.data?.pagination || { total: 0, total_pages: 0 }
@@ -753,10 +903,15 @@ document.addEventListener('alpine:init', () => {
       this.antifraudLogsLoading = true
       try {
         const params = { page: this.antifraudPage, limit: 20 }
-        if (this.antifraudFilters.ad_campaign_id) params.ad_campaign_id = this.antifraudFilters.ad_campaign_id
+        if (this.antifraudFilters.ad_campaign_id)
+          params.ad_campaign_id = this.antifraudFilters.ad_campaign_id
         if (this.antifraudFilters.verdict) params.verdict = this.antifraudFilters.verdict
         if (this.antifraudFilters.event_type) params.event_type = this.antifraudFilters.event_type
-        const response = await request({ url: SYSTEM_ENDPOINTS.AD_ANTIFRAUD_LOGS, method: 'GET', params })
+        const response = await request({
+          url: SYSTEM_ENDPOINTS.AD_ANTIFRAUD_LOGS,
+          method: 'GET',
+          params
+        })
         if (response?.success) {
           this.antifraudLogs = response.data?.antifraud_logs || []
           this.antifraudPagination = response.data?.pagination || { total: 0, total_pages: 0 }
@@ -774,9 +929,15 @@ document.addEventListener('alpine:init', () => {
       this.attributionLogsLoading = true
       try {
         const params = { page: this.attributionPage, limit: 20 }
-        if (this.attributionFilters.ad_campaign_id) params.ad_campaign_id = this.attributionFilters.ad_campaign_id
-        if (this.attributionFilters.conversion_type) params.conversion_type = this.attributionFilters.conversion_type
-        const response = await request({ url: SYSTEM_ENDPOINTS.AD_ATTRIBUTION_LOGS, method: 'GET', params })
+        if (this.attributionFilters.ad_campaign_id)
+          params.ad_campaign_id = this.attributionFilters.ad_campaign_id
+        if (this.attributionFilters.conversion_type)
+          params.conversion_type = this.attributionFilters.conversion_type
+        const response = await request({
+          url: SYSTEM_ENDPOINTS.AD_ATTRIBUTION_LOGS,
+          method: 'GET',
+          params
+        })
         if (response?.success) {
           this.attributionLogs = response.data?.attribution_logs || []
           this.attributionPagination = response.data?.pagination || { total: 0, total_pages: 0 }
@@ -806,9 +967,24 @@ document.addEventListener('alpine:init', () => {
           xAxis: { type: 'category', data: days },
           yAxis: { type: 'value' },
           series: [
-            { name: '曝光', type: 'bar', data: report.daily_snapshots.map(s => s.impressions_total || 0), itemStyle: { color: '#6366f1' } },
-            { name: '点击', type: 'line', data: report.daily_snapshots.map(s => s.clicks_total || 0), itemStyle: { color: '#10b981' } },
-            { name: '转化', type: 'line', data: report.daily_snapshots.map(s => s.conversions || 0), itemStyle: { color: '#f59e0b' } }
+            {
+              name: '曝光',
+              type: 'bar',
+              data: report.daily_snapshots.map(s => s.impressions_total || 0),
+              itemStyle: { color: '#6366f1' }
+            },
+            {
+              name: '点击',
+              type: 'line',
+              data: report.daily_snapshots.map(s => s.clicks_total || 0),
+              itemStyle: { color: '#10b981' }
+            },
+            {
+              name: '转化',
+              type: 'line',
+              data: report.daily_snapshots.map(s => s.conversions || 0),
+              itemStyle: { color: '#f59e0b' }
+            }
           ]
         })
       } catch (error) {

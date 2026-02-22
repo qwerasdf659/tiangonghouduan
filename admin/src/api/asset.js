@@ -17,7 +17,7 @@
  * @see routes/v4/console/material.js - 材料转换规则管理
  */
 
-import { API_PREFIX, request, buildURL, buildQueryString, authHeaders } from './base.js'
+import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
 
 // ========== API 端点 ==========
 
@@ -62,6 +62,14 @@ export const ASSET_ENDPOINTS = {
   ITEM_INSTANCE_TRANSFER: `${API_PREFIX}/console/item-instances/:instance_id/transfer`,
   ITEM_INSTANCE_FREEZE: `${API_PREFIX}/console/item-instances/:instance_id/freeze`,
   ITEM_INSTANCE_UNFREEZE: `${API_PREFIX}/console/item-instances/:instance_id/unfreeze`,
+
+  // 物品全链路追踪（三表模型 2026-02-22）
+  ITEM_LIFECYCLE: `${API_PREFIX}/console/item-lifecycle/:identifier/lifecycle`,
+  ITEM_LEDGER: `${API_PREFIX}/console/item-lifecycle/ledger`,
+
+  // 对账报告（三表模型 2026-02-22）
+  RECONCILIATION_ITEMS: `${API_PREFIX}/console/reconciliation/items`,
+  RECONCILIATION_ASSETS: `${API_PREFIX}/console/reconciliation/assets`,
 
   // 孤立冻结资产
   ORPHAN_FROZEN_DETECT: `${API_PREFIX}/console/orphan-frozen/detect`,
@@ -177,19 +185,11 @@ export const AssetAPI = {
    * @see GET /api/v4/console/assets/export
    */
   async exportAssets(params = {}) {
-    const queryString = Object.keys(params).length > 0 ? buildQueryString(params) : ''
-    const url = ASSET_ENDPOINTS.EXPORT + queryString
-
-    const response = await fetch(url, {
-      headers: authHeaders()
+    return await request({
+      url: ASSET_ENDPOINTS.EXPORT,
+      params,
+      responseType: 'blob'
     })
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: '导出失败' }))
-      throw new Error(error.message || '导出失败')
-    }
-
-    return await response.blob()
   },
 
   /**

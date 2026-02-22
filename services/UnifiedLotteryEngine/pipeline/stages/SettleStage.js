@@ -256,8 +256,9 @@ class SettleStage extends BaseStage {
       const reward_idempotency_key = `${idempotency_key}:reward_${reward_index}`
 
       await this._distributePrize(user_id, final_prize, {
-        idempotency_key: reward_idempotency_key, // 🔴 使用派生幂等键
+        idempotency_key: reward_idempotency_key,
         lottery_session_id,
+        lottery_draw_id,
         transaction
       })
 
@@ -576,12 +577,11 @@ class SettleStage extends BaseStage {
    * @private
    */
   async _distributePrize(user_id, prize, options) {
-    const { idempotency_key, lottery_session_id, transaction } = options
+    const { idempotency_key, lottery_session_id, lottery_draw_id, transaction } = options
 
     try {
       switch (prize.prize_type) {
         case 'points':
-          // 积分奖品：增加用户积分
           // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
           await BalanceService.changeBalance(
             {
@@ -603,18 +603,23 @@ class SettleStage extends BaseStage {
 
         case 'coupon':
         case 'physical':
-          // 优惠券/实物：写入 item_instances
+          // 优惠券/实物：写入 items + item_ledger 双录（三表模型）
           await ItemService.mintItem(
             {
               user_id,
               item_type: prize.prize_type === 'coupon' ? 'voucher' : 'product',
-              source_type: 'lottery',
-              source_id: `${idempotency_key}:item`,
+              source: 'lottery',
+              source_ref_id: lottery_draw_id ? String(lottery_draw_id) : null,
+              item_name: prize.prize_name,
+              item_description: prize.prize_description || `抽奖获得：${prize.prize_name}`,
+              item_value: Math.round(parseFloat(prize.prize_value) || 0),
+              prize_definition_id: prize.lottery_prize_id,
+              rarity_code: prize.rarity_code || 'common',
+              business_type: 'lottery_mint',
+              idempotency_key: `${idempotency_key}:item`,
               meta: {
-                name: prize.prize_name,
-                description: prize.prize_description || `抽奖获得：${prize.prize_name}`,
-                value: Math.round(parseFloat(prize.prize_value) || 0),
-                lottery_prize_id: prize.lottery_prize_id,
+                lottery_draw_id,
+                lottery_session_id,
                 prize_type: prize.prize_type,
                 acquisition_method: 'lottery'
               }
@@ -624,7 +629,6 @@ class SettleStage extends BaseStage {
           break
 
         case 'virtual':
-          // 虚拟资产：写入材料余额
           if (prize.material_asset_code && prize.material_amount) {
             // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
             await BalanceService.changeBalance(

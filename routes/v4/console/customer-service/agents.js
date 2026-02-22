@@ -135,8 +135,8 @@ router.post('/', async (req, res) => {
        */
       let resolvedDisplayName = (req.body.display_name || '').trim()
       if (!resolvedDisplayName) {
-        const models = require('../../../../models')
-        const user = await models.User.findByPk(resolvedUserId, {
+        const { User } = req.app.locals.models
+        const user = await User.findByPk(resolvedUserId, {
           attributes: ['nickname', 'mobile'],
           transaction
         })

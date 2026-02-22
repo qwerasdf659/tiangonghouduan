@@ -22,8 +22,7 @@ const analyticsRoutes = require('./analytics')
 const customerServiceRoutes = require('./customer-service') // 模块化重构：拆分为子模块
 const marketplaceRoutes = require('./marketplace') // 🆕 市场统计管理
 const materialRoutes = require('./material') // 🆕 材料系统管理（V4.5.0）
-const popupBannersRoutes = require('./popup-banners') // 🆕 弹窗Banner管理（2025-12-22）
-const carouselItemsRoutes = require('./carousel-items') // 🆕 轮播图管理（Phase 1 — 拍板决策1：轮播图独立表）
+/* [已合并到 ad-campaigns?category=operational] popupBannersRoutes + carouselItemsRoutes */
 const lotteryQuotaRoutes = require('./lottery-quota') // 🆕 抽奖配额管理（2025-12-23）
 const assetAdjustmentRoutes = require('./asset-adjustment') // 🆕 资产调整管理（2025-12-30）
 const campaignBudgetRoutes = require('./campaign-budget') // 🆕 活动预算管理（2026-01-03 BUDGET_POINTS架构）
@@ -73,6 +72,9 @@ const itemInstancesRoutes = require('./item-instances') // 🆕 物品实例管�
 const lotteryRoutes = require('./lottery') // 🆕 抽奖分析Dashboard（2026-02-04 运营仪表盘E2E测试）
 const bidManagementRoutes = require('./bid-management') // 🆕 竞价管理（2026-02-16 臻选空间/幸运空间/竞价功能 Phase 3.7）
 const userDataQueryRoutes = require('./user-data-query') // 🆕 用户数据查询（2026-02-18 用户全维度数据检索看板）
+const segmentRulesRoutes = require('./segment-rules') // 🆕 分群策略管理（2026-02-22 运营可视化搭建分群条件）
+const itemLifecycleRoutes = require('./item-lifecycle') // 🆕 物品全链路追踪（2026-02-22 资产全链路追踪方案）
+const reconciliationRoutes = require('./reconciliation') // 🆕 对账报告（2026-02-22 资产全链路追踪方案）
 
 // 🔴 广告系统路由（Phase 2-6）
 const adCampaignsRoutes = require('./ad-campaigns') // Phase 3: 广告计划管理
@@ -99,8 +101,7 @@ router.use('/analytics', analyticsRoutes)
 router.use('/customer-service', customerServiceRoutes) // 🆕 客服管理路由
 router.use('/marketplace', marketplaceRoutes) // 🆕 市场统计路由
 router.use('/material', materialRoutes) // 🆕 材料系统管理路由（V4.5.0）
-router.use('/popup-banners', popupBannersRoutes) // 🆕 弹窗Banner管理路由（2025-12-22）
-router.use('/carousel-items', carouselItemsRoutes) // 🆕 轮播图管理路由（Phase 1）
+/* [已合并] popup-banners + carousel-items → ad-campaigns */
 router.use('/lottery-quota', lotteryQuotaRoutes) // 🆕 抽奖配额管理路由（2025-12-23）
 router.use('/asset-adjustment', assetAdjustmentRoutes) // 🆕 资产调整管理路由（2025-12-30）
 router.use('/campaign-budget', campaignBudgetRoutes) // 🆕 活动预算管理路由（2026-01-03 BUDGET_POINTS架构）
@@ -138,6 +139,7 @@ router.use('/lottery-strategy-stats', lotteryStrategyStatsRoutes) // 🆕 抽奖
 router.use('/lottery-simulation', lotterySimulationRoutes) // 🆕 策略效果模拟分析路由（2026-02-20 Monte Carlo 模拟引擎）
 router.use('/sessions', sessionsRoutes) // 🆕 会话管理路由（2026-01-21 会话管理功能补齐）
 router.use('/lottery-campaigns', lotteryCampaignsRoutes) // 🆕 抽奖活动列表管理路由（2026-01-28 P1 运营后台 ROI/复购率/库存预警）
+router.use('/segment-rules', require('./segment-rules')) // 🆕 分群规则管理路由（2026-02-22 分群动态管理）
 router.use('/batch-operations', batchOperationsRoutes) // 🆕 批量操作路由（2026-01-30 阶段C 批量赠送/核销/状态切换/预算调整）
 router.use('/dashboard', dashboardRoutes) // 🆕 运营看板路由（2026-01-31 P0 待处理聚合）
 router.use('/pending', pendingRoutes) // 🆕 待处理中心路由（2026-01-31 P0 统一待处理管理）
@@ -150,6 +152,9 @@ router.use('/item-instances', itemInstancesRoutes) // 🆕 物品实例管理路
 router.use('/lottery', lotteryRoutes) // 🆕 抽奖分析Dashboard路由（2026-02-04 运营仪表盘E2E测试）
 router.use('/bid-management', bidManagementRoutes) // 🆕 竞价管理路由（2026-02-16 臻选空间/幸运空间/竞价功能 Phase 3.7）
 router.use('/user-data-query', userDataQueryRoutes) // 🆕 用户数据查询路由（2026-02-18 用户全维度数据检索看板）
+router.use('/segment-rules', segmentRulesRoutes) // 🆕 分群策略管理路由（2026-02-22 运营可视化搭建分群条件）
+router.use('/item-lifecycle', itemLifecycleRoutes) // 🆕 物品全链路追踪路由（2026-02-22 资产全链路追踪）
+router.use('/reconciliation', reconciliationRoutes) // 🆕 对账报告路由（2026-02-22 资产全链路追踪）
 
 // 🔴 广告系统路由（Phase 2-6）
 router.use('/ad-campaigns', adCampaignsRoutes) // Phase 3: 广告计划管理路由
@@ -275,28 +280,7 @@ router.get('/', (req, res) => {
        * 资产调整: /asset-adjustment/adjust
        * 资产流水: /assets/transactions
        */
-      popup_banners: {
-        description: '弹窗Banner管理（2025-12-22，Phase 1 新增频率控制）',
-        endpoints: [
-          '/popup-banners',
-          '/popup-banners/statistics',
-          '/popup-banners/:id',
-          '/popup-banners/:id/toggle',
-          '/popup-banners/order'
-        ],
-        note: '弹窗管理、频率控制、类型分级（notice/event/promo）、优先级排序'
-      },
-      carousel_items: {
-        description: '轮播图管理（Phase 1 — 拍板决策1：轮播图独立表）',
-        endpoints: [
-          '/carousel-items',
-          '/carousel-items/statistics',
-          '/carousel-items/:id',
-          '/carousel-items/:id/toggle',
-          '/carousel-items/order'
-        ],
-        note: '轮播图 CRUD、Sealos 图片上传、排序管理'
-      },
+      /* [已合并+删除] popup_banners + carousel_items → ad-campaigns?category=operational */
       lottery_quota: {
         description: '抽奖配额管理（2025-12-23）',
         endpoints: [
@@ -712,22 +696,25 @@ router.get('/', (req, res) => {
       },
       // ========== 广告系统（Phase 2-6 虚拟货币广告平台） ==========
       ad_campaigns: {
-        description: '广告计划管理（Phase 3 广告主自助投放）',
+        description: '广告计划管理（含商业/运营/系统三类，?category= 筛选）',
         endpoints: [
           '/ad-campaigns',
           '/ad-campaigns/:id',
           '/ad-campaigns/:id/review',
           '/ad-campaigns/statistics',
           '/ad-campaigns/dashboard',
-          '/ad-campaigns/popup-banners/:id/show-stats',
-          '/ad-campaigns/carousel-items/:id/show-stats'
+          '/ad-campaigns/popup-queue-config',
+          '/ad-campaigns/bid-logs',
+          '/ad-campaigns/user-ad-tags',
+          '/ad-campaigns/antifraud-logs',
+          '/ad-campaigns/attribution-logs'
         ],
-        note: '广告计划 CRUD、审核通过/拒绝、统计看板、展示日志统计；仅限 admin 访问'
+        note: '广告计划 CRUD + category=commercial/operational/system 筛选、审核、竞价日志、DMP 标签、反作弊'
       },
       ad_slots: {
         description: '广告位管理（Phase 3 动态广告位配置）',
         endpoints: ['/ad-slots', '/ad-slots/:id', '/ad-slots/:id/toggle', '/ad-slots/statistics'],
-        note: '广告位 CRUD、开关控制（popup/carousel 两种类型）；仅限 admin 访问'
+        note: '广告位 CRUD、开关控制（popup/carousel/announcement 三种类型）；仅限 admin 访问'
       },
       ad_reports: {
         description: '广告报表（Phase 6 多维分析）',

@@ -512,13 +512,11 @@ document.addEventListener('alpine:init', () => {
         formData.append('business_type', 'uploads')
         formData.append('category', 'items')
 
-        const token = localStorage.getItem('token')
-        const response = await fetch(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD, {
+        const res = await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD,
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData
+          data: formData
         })
-        const res = await response.json()
 
         if (res.success && res.data) {
           this.form.image_resource_id = res.data.image_resource_id || res.data.image_id || null
