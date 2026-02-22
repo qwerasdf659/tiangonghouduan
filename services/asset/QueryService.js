@@ -179,7 +179,10 @@ class QueryService {
       { transaction }
     )
 
-    const where = { account_id: account.account_id }
+    const where = {
+      account_id: account.account_id,
+      [Op.or]: [{ is_test_data: 0 }, { is_test_data: null }]
+    }
 
     if (asset_code) {
       where.asset_code = asset_code
@@ -610,7 +613,8 @@ class QueryService {
        WHERE account_id = :account_id
          AND asset_code = :asset_code
          AND created_at >= :today_start
-         AND created_at < :today_end`,
+         AND created_at < :today_end
+         AND (is_test_data = 0 OR is_test_data IS NULL)`,
       {
         replacements: {
           account_id: account.account_id,
